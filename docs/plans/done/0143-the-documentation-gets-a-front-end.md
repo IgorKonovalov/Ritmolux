@@ -1,16 +1,23 @@
 # 0143 — The documentation gets a front end
 
-> **Status:** approved, **parked 2026-09-01**
-> **Parked until:** the application's new name is chosen. The site bakes the project name into
-> the Starlight title, the Pages subpath every published URL carries, and the header of every
-> page — so publishing under `ritmolux` buys a full republish and a dead set of
-> external links as soon as the rename lands. The rename is itself parked with a shortlist
-> (Ritmolux, Clavilux) and no ADR or plan yet; **that decision is the named trigger for this one**.
+> **Status:** done (2026-09-05)
+> **Closed 2026-09-05.** Phases 1, 2, 3, 5 and 6 as commits `41c77c5`, `44d1ec3`, `03a9588`,
+> `eeac887` and `cb3529c`; Phase 7 (`human`) on 2026-09-05 with no commit; Phase 4 (`human`)
+> **permanently skipped** by the user, which Phase 6's CI made unnecessary. Mode 4 review:
+> **no blockers, no majors, four minors and three nits.** Verified independently of the log —
+> `cargo nextest run --workspace` green (1536 passed, 0 failed, 5 skipped), all six existing gates
+> green and unmodified, `npm run build` clean at 16 pages with `scripts/check-site-links.mjs` exit
+> 0, the gate provoked into convicting in both of its failure directions, the built output holding
+> 82 cards under 12 family headings and 269 rewritten off-site hrefs, and the deployed site
+> answering 200 on every route sampled while both lowercase demo paths 404.
+> **Unparked 2026-09-05:** the named trigger fired — the name is Ritmolux (ADR-0162), Plan 0150
+> landed the rename, and the Pages subpath is `/ritmolux/` (chosen by the user at the start of this
+> `dev` lane). Phases 1 and 4 still read `/lmv/`; that one token is superseded, see the log's Notes.
 > **Created:** 2026-08-30
 > **Approved:** 2026-08-30 (user)
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0154](../adrs/0154-the-reader-facing-docs-publish-as-a-site.md)
-> **Coordinates with:** [0103](0103-the-project-gets-an-audience.md) — that plan owns `README.md`
+> **Related ADRs:** [0154](../../adrs/0154-the-reader-facing-docs-publish-as-a-site.md)
+> **Coordinates with:** [0103](../0103-the-project-gets-an-audience.md) — that plan owns `README.md`
 > and the repository front door; **this plan does not touch `README.md`**
 > **Lane guidance:** build on `main` directly, **not** in a worktree. ADR-0053's default does not pay
 > here: every phase but 5 is JavaScript, markdown and config, and a fresh worktree would buy a cold
@@ -55,7 +62,7 @@ And `IgorKonovalov/IgorKonovalov.github.io` already exists, is public, and is on
 
 ## Decision
 
-Build the site with Astro Starlight per [ADR-0154](../adrs/0154-the-reader-facing-docs-publish-as-a-site.md),
+Build the site with Astro Starlight per [ADR-0154](../../adrs/0154-the-reader-facing-docs-publish-as-a-site.md),
 keep `docs/` as the single source with all transformation in a build-time remark plugin, and stage
 the hosting: a hand-copied build into a subdirectory of the personal user site first, a CI-deployed
 project Pages site second. We rejected MkDocs Material (better technical fit — `docs_dir: docs` is
@@ -283,30 +290,101 @@ other off-site target. `dev` should not re-raise this.
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `main` directly, no worktree — the plan's own Lane guidance.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the site renders the published set from one source | dev | not started | |
-| 2 — links resolve across the publish boundary | dev | not started | |
-| 3 — the home page routes, and does not pitch | dev | not started | |
-| 4 — the demo goes live on the personal site | human | not started | |
-| 5 — the gallery covers everything that ships | dev | not started | |
-| 6 — the permanent home builds itself | dev | not started | |
-| 7 — Pages is enabled and the demo is retired | human | not started | |
+| 1 — the site renders the published set from one source | dev | done | 41c77c5 |
+| 2 — links resolve across the publish boundary | dev | done | 44d1ec3 |
+| 3 — the home page routes, and does not pitch | dev | done | 03a9588 |
+| 4 — the demo goes live on the personal site | human | not started — skipped by the user, this lane runs 1-3 and 5-6 | |
+| 5 — the gallery covers everything that ships | dev | done | eeac887 |
+| 6 — the permanent home builds itself | dev | done | cb3529c |
+| 7 — Pages is enabled and the demo is retired | human | done | no commit — see Notes |
 
 ### Notes
 
-_(to be filled by `dev`)_
+- **Deviation, decided by the user at the start of the lane: the Pages subpath is `ritmolux`, not
+  the `lmv` Phases 1 and 4 name.** Those blocks predate ADR-0162 and Plan 0150; Phase 7 already
+  says `ritmolux`. The plan header's park is discharged in the `Status:` block for the same reason
+  — its named trigger, the name being chosen, fired. That block and this log are the only parts of
+  the plan this lane edited.
+- **The two hosting stages do not share a base, which the phases assume they do.** GitHub serves a
+  project site under the repository's name as spelled, so the permanent home is `/Ritmolux/` and
+  the Phase 4 demo directory is `/ritmolux/`. `SITE_BASE` switches it and the workflow sets it;
+  the config default is the demo path. **Phase 4's destination is `public/ritmolux/`.**
+- **Phase 1 took the preferred mechanism, not the permitted fallback: there is no staged copy.**
+  The loader reads `docs/`, `docs/specs/` and `presets/README.md` in place. Two build-time
+  transformations stand in for frontmatter the sources do not have and may not gain — the title is
+  derived from each document's opening `# ` heading, and that heading is then dropped from the body,
+  because Starlight renders `title` as the page `<h1>`.
+- **`@astrojs/markdown-remark` is a third direct dependency.** Astro 7.3 ships a different default
+  Markdown processor and `markdown.remarkPlugins` is inert without it.
+- **Phase 2's done-when reads “no `href` in the built output ends in `.md`” and is implemented as
+  *no **site-relative** href does*.** Read literally it contradicts the same phase's What: the
+  rewrite turns a relative `.md` link into a blob URL for that same `.md` file, so 268 correct
+  off-site hrefs end in `.md` by design.
+- **Phase 2's gate did not exit 0 at Phase 2's own commit** — 28 unresolved hrefs over two targets,
+  `/ritmolux/` and `/ritmolux/favicon.svg`, both created by Phase 3, with zero rewrite defects. It
+  is green from Phase 3 onward. An ordering artifact of the plan, not a defect found in it.
+- **Files two phases needed that their `Files touched` lists do not name:** `site/public/favicon.svg`
+  and a `customCss` line in `astro.config.mjs` (Phase 3), and `core/tests/hygiene.rs` (Phase 5,
+  which is where the existing per-system self-check lives).
+- **Two rewriter fixes came out of later phases.** A root-relative URL is already a site route and
+  is skipped (Phase 3). Building at `/Ritmolux/` then exposed eleven hardcoded subpaths in the
+  site's own two pages (Phase 6): their prose links became relative links to the source files, and
+  the landing page's entrance buttons became `<LinkButton>`s over `import.meta.env.BASE_URL`,
+  because Starlight passes a frontmatter `hero.actions` link through verbatim.
+- **82 presets ship, not the 81 Phase 5 names**, and its `CARDS` list is spelled out rather than
+  globbed so the check can fail at all. All three failure directions were provoked and observed.
+- **A full `scripts/docs-shots.mjs` run moves 13 of the 20 pre-existing committed images.** Those 13
+  were reverted rather than committed — ADR-0100 already holds that freshness is a human duty at
+  the close-ceremony sweep, not a side effect of adding a collection.
+- **Measured, because Phase 4 has to weigh it:** the 82 cards are 23.5 MB committed (median 284 KB
+  at 640x360) and `site/dist/` is now **41 MB**. That is what a hand-copy adds to the personal
+  site's repository on every deploy, and it is ADR-0154's “prefer bringing Phases 6-7 forward over
+  growing the copy” as a number.
+- **Phase 6's second done-when is verified locally, not in CI, because this lane does not push.**
+  Renaming one target to `guide/preset-guid/` and building at `SITE_BASE=/Ritmolux/` left the build
+  green at 16 pages and failed the gate with `index.html -> /Ritmolux/guide/preset-guid/`, exit 1.
+- **`CLAUDE.md` says “Six Node gates, all run by pre-push and by the CI `links` job”.**
+  `scripts/check-site-links.mjs` is a seventh and is run by neither — it needs a built site, so it
+  lives in the Pages workflow. That sentence is now wrong, in a file this lane does not own.
+
+- **Phase 7 ran on 2026-09-05 and needed no commit.** Pages did not exist on the repository
+  (`gh api .../pages` returned 404), and `actions/deploy-pages` fails against a repository with no
+  site, so it was created first with `build_type=workflow` — the API reported
+  `html_url: https://igorkonovalov.github.io/Ritmolux/`, confirming the capital-R base
+  `SITE_BASE` builds at. The push then ran `Pages` green: build 33 s, deploy 10 s. The `workflow`
+  OAuth scope the phase warns about was already on the credential, so the push was not rejected.
+  **Verified against the deployed site, not the run log:** all 15 published routes return 200,
+  `pagefind/pagefind.js` is served (so search works on the permanent home), the roster renders as
+  484 KB of HTML with its title taken from the source heading and 70 rewritten blob links on that
+  page alone, and all 82 gallery cards are present as fingerprinted `_astro/` assets.
+- **Phase 7's second clause was vacuous, and that is Phase 4's doing.** There was no personal-site
+  copy to retire or redirect, because Phase 4 was never run.
 
 ### Close triggers
 
-- **`presets/` touched:** _(to be filled)_
+> **Every phase is landed or deliberately skipped.** Phase 4 was skipped by the user and stays
+> skipped; Phase 7 completed on 2026-09-05 against the live site. Everything below is the state at
+> the end of the work.
+
+- **`presets/` touched:** no. `git diff --name-only 89c8c99..HEAD -- presets/` is empty.
+  `presets/README.md` is published by the site and is read, never written.
 - **Plan header `Closes:`** none
-- **What shipped:** _(to be filled)_
-- **Operator docs touched:** _(to be filled)_
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** _(to be filled)_
-- **Outstanding `human` phases:** _(to be filled)_
+- **What shipped:** feature. A documentation site under `site/`, a seventh Node gate
+  (`scripts/check-site-links.mjs`), a Pages workflow, a second `core/tests/hygiene.rs` cross-check,
+  and 82 committed gallery renders.
+- **Operator docs touched:** none. No file under `docs/` was modified except this plan; the only new
+  prose is `site/README.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0.
+- **Outstanding `human` phases:** none. **4** is permanently skipped - the user declined the
+  hand-copied demo, and Phase 6's CI made it unnecessary. **7** is done: Pages was enabled on
+  `IgorKonovalov/Ritmolux` with `build_type=workflow`, the push ran the workflow green, and there
+  was no demo copy to retire.
+- **Full suite (ADR-0156), run before this block:** `cargo nextest run --workspace` — exit 0,
+  **1536 passed, 0 failed, 5 skipped**, 11 slow, 469.2 s.
 
 ## Followups (after this lands)
 

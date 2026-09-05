@@ -51,7 +51,7 @@ This plan exists in front of Plan 0103's outreach phases, which need demo materi
 both small and both explicitly ADR-free by their own entries. Phase 3 is the doc sweep. The plan is
 three `dev` phases with no human gate, which is what makes it takeable in any spare session.
 
-**Backlog 0125's evidence gate is deliberately not here — [Plan 0128](../0128-the-rendered-file-stops-looking-upscaled.md)
+**Backlog 0125's evidence gate is deliberately not here — [Plan 0128](0128-the-rendered-file-stops-looking-upscaled.md)
 Phase 5 already owns it**, describes it better, and pairs it with that plan's own Phase 4 look gate
 in one sitting. Duplicating it would have put the same `human` render on two roster rows.
 
@@ -153,7 +153,7 @@ flowchart TB
 - **It does not change the default `-crf`.** Archival-grade is the deliberate default; this adds a
   lever beside it.
 - **It does not touch the diffusion filter at all**, and it does not carry backlog 0125. That
-  entry's evidence gate is [Plan 0128](../0128-the-rendered-file-stops-looking-upscaled.md) Phase 5,
+  entry's evidence gate is [Plan 0128](0128-the-rendered-file-stops-looking-upscaled.md) Phase 5,
   which owned it first.
 
 ## Implementation log

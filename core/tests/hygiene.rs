@@ -628,7 +628,14 @@ fn system_names(schema: &str) -> Vec<String> {
     out
 }
 
-/// The gallery entries' file stems, read out of the manifest's `out:` fields.
+/// The per-SYSTEM gallery entries' file stems, read out of the manifest's
+/// `out:` fields.
+///
+/// A stem containing `/` is skipped, and that is what keeps the two collections
+/// apart: the per-preset cards live one level down at
+/// `docs/images/gallery/presets/<preset>.png`, so they match the same prefix and
+/// would otherwise read as 82 systems that do not exist. They are read instead
+/// by [`card_presets`], out of the manifest's own `CARDS` list.
 fn gallery_names(manifest: &str) -> Vec<String> {
     let mut out = Vec::new();
     for line in manifest.lines() {
@@ -638,11 +645,120 @@ fn gallery_names(manifest: &str) -> Vec<String> {
         let Some((stem, _)) = rest.split_once(".png") else {
             continue;
         };
+        if stem.contains('/') {
+            continue;
+        }
         if !stem.is_empty() && !out.contains(&stem.to_string()) {
             out.push(stem.to_string());
         }
     }
     out
+}
+
+/// The preset names in the manifest's `CARDS` list.
+///
+/// Read as "every quoted string between `const CARDS = [` and the closing `];`",
+/// the same shape as [`system_names`] reads `const TABLE`, so a group comment
+/// gaining a name or rustfmt-equivalent reflowing cannot break the parse.
+fn card_presets(manifest: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let Some(start) = manifest.find("const CARDS = [") else {
+        return out;
+    };
+    let end = manifest[start..]
+        .find("\n];")
+        .map(|i| start + i)
+        .unwrap_or(manifest.len());
+    let mut rest = &manifest[start..end];
+    while let Some(open) = rest.find('"') {
+        let after = &rest[open + 1..];
+        let Some(close) = after.find('"') else {
+            break;
+        };
+        let name = &after[..close];
+        if !name.is_empty() {
+            out.push(name.to_string());
+        }
+        rest = &after[close + 1..];
+    }
+    out
+}
+
+/// The presets that actually ship: `presets/*.toml`, non-recursive.
+///
+/// This is `core/build.rs`'s own rule (ADR-0022), which is why `presets/pending/`
+/// is invisible here without being named -- a `read_dir` that does not descend
+/// skips a subdirectory by construction, and that is exactly how a pending
+/// preset stays out of the shipped set.
+fn shipped_presets(root: &Path) -> Vec<String> {
+    let mut out: Vec<String> = std::fs::read_dir(root.join("presets"))
+        .expect("presets/ is readable")
+        .filter_map(|entry| {
+            let path = entry.expect("presets/ entry is readable").path();
+            if !path.is_file() || path.extension()? != "toml" {
+                return None;
+            }
+            Some(path.file_stem()?.to_string_lossy().into_owned())
+        })
+        .collect();
+    out.sort();
+    out
+}
+
+/// (d2) Every shipped preset has a gallery card in `scripts/docs-shots.mjs`, and
+/// every card names a preset that ships.
+///
+/// The second half of (d), over the second collection. Same reasoning, same
+/// place, and for the same reason: it is pure text, so it fails on the commit
+/// that adds a preset rather than whenever someone next runs the renderer behind
+/// a GPU. The manifest's `CARDS` list is spelled out rather than globbed
+/// precisely so this can fail -- a glob would define the missing case out of
+/// existence.
+///
+/// **It does not claim the cards are current** either, for the reason (d) gives
+/// above. Existence is mechanical; freshness is not.
+#[test]
+fn every_shipped_preset_has_a_gallery_card() {
+    let root = workspace_root();
+    let manifest = std::fs::read_to_string(root.join("scripts").join("docs-shots.mjs"))
+        .expect("scripts/docs-shots.mjs is readable");
+
+    let shipped = shipped_presets(&root);
+    assert!(
+        shipped.len() >= 12,
+        "read {} presets out of presets/; the directory scan has broken, not the library",
+        shipped.len()
+    );
+
+    let cards = card_presets(&manifest);
+    assert!(
+        !cards.is_empty(),
+        "read no entries out of the CARDS list in scripts/docs-shots.mjs; the parse has broken"
+    );
+
+    let missing: Vec<&String> = shipped.iter().filter(|p| !cards.contains(p)).collect();
+    let extra: Vec<&String> = cards.iter().filter(|c| !shipped.contains(c)).collect();
+    assert!(
+        missing.is_empty() && extra.is_empty(),
+        "the CARDS list in scripts/docs-shots.mjs and the shipped preset set disagree.\n  \
+         ships with no card: {missing:?}\n  \
+         a card for a preset that does not ship: {extra:?}\n\
+         Add the name to CARDS and re-run scripts/docs-shots.mjs on a machine with a GPU."
+    );
+
+    for preset in &cards {
+        let png = root
+            .join("docs")
+            .join("images")
+            .join("gallery")
+            .join("presets")
+            .join(format!("{preset}.png"));
+        assert!(
+            png.is_file(),
+            "scripts/docs-shots.mjs lists {preset} in CARDS but \
+             docs/images/gallery/presets/{preset}.png is not committed"
+        );
+    }
 }
 
 // ---------------------------------------------------------------------------

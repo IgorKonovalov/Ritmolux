@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Ritmolux">
+  <rect width="32" height="32" rx="7" fill="#12101c"/>
+  <g fill="none" stroke-linecap="round" stroke-width="3">
+    <path d="M7 21V11" stroke="#7c5cff"/>
+    <path d="M13 24V8" stroke="#a97bff"/>
+    <path d="M19 24V8" stroke="#4dd8e6"/>
+    <path d="M25 21V11" stroke="#2ea8c7"/>
+  </g>
+</svg>

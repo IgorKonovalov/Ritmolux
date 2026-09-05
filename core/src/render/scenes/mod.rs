@@ -504,6 +504,30 @@ pub(crate) trait Scene {
     fn mirror_overflow(&self) -> Option<&lines::CapOverflow> {
         None
     }
+
+    /// The scene's **resolved sample budget** for the target it was last given,
+    /// where it has one (ADR-0140) — the attractor, and nothing else today.
+    ///
+    /// A hook rather than a field on the roster because it is a scene's own
+    /// arithmetic: only a scene knows what its budget resolved to. `None` is the
+    /// honest answer for every scene whose count is a flat capacity, and for the
+    /// attractor before a target size has reached it.
+    ///
+    /// **The seam exists so the factory's choice of ceiling is readable off the
+    /// built scene**, which is what makes that wiring testable at all — a test
+    /// that recomputed the law would pass with both modes handed the same
+    /// number. It is not the reporting path: `shot --render` prints its budget
+    /// from [`TierConfig::attractor_budget_offline`] instead, because the header
+    /// is written before the renderer is constructed and this would answer
+    /// `None` there.
+    ///
+    /// `#[cfg(test)]` because that leaves nothing but the test: no shipped path
+    /// asks a scene what its budget resolved to, and a trait method the engine
+    /// never calls is a widened seam pretending to be an API.
+    #[cfg(test)]
+    fn sample_budget(&self) -> Option<u32> {
+        None
+    }
 }
 
 /// The registry: every built-in scene, **keyed by the [`SystemKind`] it drives**,
@@ -518,6 +542,7 @@ pub(crate) fn create_all(
     device: &wgpu::Device,
     surface_format: wgpu::TextureFormat,
     tier: &crate::render::TierConfig,
+    budget: crate::render::SampleBudget,
 ) -> Vec<(SystemKind, Box<dyn Scene>)> {
     // One shared line renderer for every line scene (ADR-0007: "one line
     // renderer"). A single instanced-quad pipeline + segment buffer, borrowed by
@@ -552,6 +577,7 @@ pub(crate) fn create_all(
                     surface_format,
                     &mut || line_renderer.clone(),
                     tier,
+                    budget,
                 ),
             )
         })
@@ -589,6 +615,7 @@ pub(crate) fn create_layer_scene(
     device: &wgpu::Device,
     surface_format: wgpu::TextureFormat,
     tier: &crate::render::TierConfig,
+    budget: crate::render::SampleBudget,
 ) -> Box<dyn Scene> {
     create(
         kind,
@@ -607,6 +634,7 @@ pub(crate) fn create_layer_scene(
             )))
         },
         tier,
+        budget,
     )
 }
 
@@ -669,6 +697,7 @@ fn create(
     surface_format: wgpu::TextureFormat,
     line_renderer: &mut dyn FnMut() -> Rc<RefCell<lines::LineRenderer>>,
     tier: &crate::render::TierConfig,
+    budget: crate::render::SampleBudget,
 ) -> Box<dyn Scene> {
     match kind {
         SystemKind::FragmentField => Box::new(fragment_field::FragmentFieldScene::new(
@@ -699,6 +728,10 @@ fn create(
             device,
             surface_format,
             tier.attractor_particles,
+            match budget {
+                crate::render::SampleBudget::Live => tier.attractor_particles_live_ceiling,
+                crate::render::SampleBudget::Offline => tier.attractor_particles_offline_ceiling,
+            },
             tier.attractor_trail_cap,
         )),
         SystemKind::Spectrum => Box::new(lines::SpectrumScene::new(
@@ -786,6 +819,82 @@ mod tests {
         }
     }
 
+    /// **The factory is what chooses the ceiling**, and the two choices resolve
+    /// different budgets at the same target (ADR-0140).
+    ///
+    /// Read off the scene rather than recomputed: this is the wiring under test,
+    /// so a recomputation of the law here would pass with the factory handing
+    /// both modes the same number. 1920x1080 is the size the whole plan is
+    /// about — nine times the reference — and it is past the live ceiling and
+    /// under the offline one, which is what makes the two answers differ.
+    ///
+    /// No frame is rendered: `set_target_size` is CPU arithmetic, so this costs
+    /// one scene build on WARP and nothing else.
+    #[test]
+    fn the_render_path_resolves_a_larger_budget_than_a_window_does() {
+        use crate::render::{SampleBudget, TierConfig};
+
+        let ctx = match RenderContext::new_headless(64, 64, true) {
+            Ok(ctx) => ctx,
+            Err(RenderError::RequestAdapter(_)) => {
+                eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+                return;
+            }
+            Err(e) => panic!("headless context build failed: {e}"),
+        };
+
+        let resolved = |budget: SampleBudget, tier: &TierConfig, w: u32, h: u32| -> Option<u32> {
+            let mut scenes = create_all(&ctx.device, ctx.surface_format(), tier, budget);
+            let (_, scene) = scenes
+                .iter_mut()
+                .find(|(kind, _)| *kind == SystemKind::Attractor)?;
+            // Before a target size reaches it, a scene has no resolved budget to
+            // report - which is the distinction the hook's `None` carries.
+            assert_eq!(scene.sample_budget(), None);
+            scene.set_target_size(w, h);
+            scene.sample_budget()
+        };
+
+        let rich = TierConfig::RICH;
+        assert_eq!(
+            resolved(SampleBudget::Offline, &rich, 1920, 1080),
+            Some(1_350_000),
+            "a render at 1080p must reach the law's own value, not the live cap"
+        );
+        assert_eq!(
+            resolved(SampleBudget::Live, &rich, 1920, 1080),
+            Some(rich.attractor_particles_live_ceiling),
+            "a window at 1080p is held at the live ceiling"
+        );
+
+        // Deposits per output pixel, stated as sample arithmetic (an image
+        // statistic would be the wrong instrument - the ones this repo has are
+        // themselves resolution-bound). The render reaches the 640x360
+        // reference density exactly; today's flat count delivers a ninth of it.
+        const PX: u32 = 1920 * 1080;
+        let render = 1_350_000_f64 / f64::from(PX);
+        let reference =
+            f64::from(rich.attractor_particles) / f64::from(crate::render::REFERENCE_PX);
+        assert!(
+            (render - reference).abs() < 1e-9,
+            "a 1080p render deposits {render} samples per pixel against the reference {reference}"
+        );
+        assert_eq!(1_350_000 / rich.attractor_particles, 9);
+
+        // And the small captures are untouched at BOTH ceilings, which is the
+        // half that keeps every baseline where it is.
+        for tier in [TierConfig::FLOOR, TierConfig::RICH] {
+            for budget in [SampleBudget::Live, SampleBudget::Offline] {
+                assert_eq!(
+                    resolved(budget, &tier, 128, 128),
+                    Some(tier.attractor_particles),
+                    "{:?}/{budget:?} moved the golden suite's count",
+                    tier.tier
+                );
+            }
+        }
+    }
+
     /// Every `SystemKind::ALL` entry builds the scene that kind is supposed to
     /// drive, and the roster covers exactly the roster — so transposing two
     /// factory arms — which silently points every preset of one system at
@@ -808,6 +917,7 @@ mod tests {
             &ctx.device,
             ctx.surface_format(),
             &crate::render::TierConfig::FLOOR,
+            crate::render::SampleBudget::Live,
         );
 
         let kinds: Vec<SystemKind> = scenes.iter().map(|(kind, _)| *kind).collect();

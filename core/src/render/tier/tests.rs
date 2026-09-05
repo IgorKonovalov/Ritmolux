@@ -53,6 +53,24 @@ fn rich_is_never_below_the_floor() {
     assert!(rich.post_cap.1 >= floor.post_cap.1);
     assert!(rich.bloom_levels >= floor.bloom_levels);
     assert!(rich.attractor_particles >= floor.attractor_particles);
+    // The two ceilings the density law clamps against are capacities like the
+    // rest, so the same direction binds them (ADR-0140). `Floor`'s live ceiling
+    // is its own anchor, which is what makes the live pair the tightest row
+    // here: equality is permitted, a Rich ceiling below Floor's is not.
+    assert!(rich.attractor_particles_live_ceiling >= floor.attractor_particles_live_ceiling);
+    assert!(rich.attractor_particles_offline_ceiling >= floor.attractor_particles_offline_ceiling);
+    // A ceiling below its own tier's anchor would make the law allocate less
+    // than its lower clamp resolves and index past the buffer. `attractor_budget`
+    // raises such a ceiling rather than panicking, so nothing here would crash -
+    // it would silently draw a count no tier table says it draws.
+    assert!(floor.attractor_particles_live_ceiling >= floor.attractor_particles);
+    assert!(rich.attractor_particles_live_ceiling >= rich.attractor_particles);
+    assert!(floor.attractor_particles_offline_ceiling >= floor.attractor_particles);
+    assert!(rich.attractor_particles_offline_ceiling >= rich.attractor_particles);
+    // Offline is never the tighter of the two: it answers to memory and the live
+    // one to a frame deadline, so a render may never resolve less than a window.
+    assert!(floor.attractor_particles_offline_ceiling >= floor.attractor_particles_live_ceiling);
+    assert!(rich.attractor_particles_offline_ceiling >= rich.attractor_particles_live_ceiling);
     assert!(rich.attractor_trail_cap.0 >= floor.attractor_trail_cap.0);
     assert!(rich.attractor_trail_cap.1 >= floor.attractor_trail_cap.1);
     assert!(rich.swarm_particles >= floor.swarm_particles);
@@ -294,5 +312,209 @@ fn the_budget_follows_the_display_rate() {
     assert!(
         sustained_miss(steady.iter().copied(), budget_secs(144.0)),
         "16.7 ms frames are a sustained miss of a 144 Hz budget"
+    );
+}
+
+// -----------------------------------------------------------------------
+// The sample budget is a density against the render target (ADR-0140)
+// -----------------------------------------------------------------------
+
+use super::{REFERENCE_PX, attractor_budget};
+
+/// Every target this project captures at resolves to **exactly today's count**,
+/// asserted on the resolved value rather than inferred from pixels.
+///
+/// This is what makes the law shippable without blessing a single baseline: the
+/// golden suite captures at 128x128 and the sanity suite at 96x96, both far under
+/// [`REFERENCE_PX`], so the lower clamp returns the anchor and every existing
+/// frame is byte-identical. Same shape of argument ADR-0065 used for
+/// `deposit_scale` being exactly `1.0` at `Floor`.
+#[test]
+fn every_existing_capture_resolves_to_todays_count() {
+    for tier in [Tier::Floor, Tier::Rich] {
+        let cfg = TierConfig::for_tier(tier);
+        let anchor = cfg.attractor_particles;
+        for (w, h) in [(128, 128), (96, 96), (64, 64), (320, 180), (640, 360)] {
+            let px = w * h;
+            assert_eq!(
+                cfg.attractor_budget_live(px),
+                anchor,
+                "{tier:?} at {w}x{h} ({px} px) must resolve today's {anchor}"
+            );
+            assert_eq!(
+                cfg.attractor_budget_offline(px),
+                anchor,
+                "{tier:?} at {w}x{h} ({px} px) must resolve today's {anchor} offline too"
+            );
+        }
+    }
+    // Non-vacuity: the law is not simply returning the anchor everywhere.
+    assert!(
+        TierConfig::RICH.attractor_budget_offline(1920 * 1080)
+            > TierConfig::RICH.attractor_particles
+    );
+}
+
+/// The reference resolves the anchor **exactly**, which is what makes 640x360 the
+/// size the density is anchored at rather than merely near it.
+#[test]
+fn the_reference_size_resolves_exactly_the_anchor() {
+    assert_eq!(REFERENCE_PX, 640 * 360);
+    for tier in [Tier::Floor, Tier::Rich] {
+        let cfg = TierConfig::for_tier(tier);
+        assert_eq!(
+            cfg.attractor_budget_offline(REFERENCE_PX),
+            cfg.attractor_particles
+        );
+        // One pixel past it still rounds to the anchor, and a whole multiple
+        // scales by exactly that multiple.
+        assert_eq!(
+            cfg.attractor_budget_offline(REFERENCE_PX * 4),
+            cfg.attractor_particles * 4
+        );
+    }
+}
+
+/// **Monotone, and clamped at both ends**, over a sweep from the golden suite's
+/// capture to 4K — the whole range of targets the engine can be handed.
+#[test]
+fn the_law_is_monotone_and_clamped_at_both_ends() {
+    let sizes = [
+        (96, 96),
+        (128, 128),
+        (320, 180),
+        (640, 360),
+        (854, 480),
+        (1280, 720),
+        (1600, 900),
+        (1920, 1080),
+        (2560, 1440),
+        (3440, 1440),
+        (3840, 2160),
+    ];
+    for tier in [Tier::Floor, Tier::Rich] {
+        let cfg = TierConfig::for_tier(tier);
+        let anchor = cfg.attractor_particles;
+        for (ceiling, resolve) in [
+            (
+                cfg.attractor_particles_live_ceiling,
+                TierConfig::attractor_budget_live as fn(&TierConfig, u32) -> u32,
+            ),
+            (
+                cfg.attractor_particles_offline_ceiling,
+                TierConfig::attractor_budget_offline as fn(&TierConfig, u32) -> u32,
+            ),
+        ] {
+            let mut previous = 0;
+            for (w, h) in sizes {
+                let got = resolve(&cfg, w * h);
+                assert!(
+                    got >= anchor,
+                    "{tier:?} at {w}x{h} resolved {got}, below the anchor {anchor} - the law removed samples"
+                );
+                assert!(
+                    got <= ceiling,
+                    "{tier:?} at {w}x{h} resolved {got}, above the ceiling {ceiling}"
+                );
+                assert!(
+                    got >= previous,
+                    "{tier:?} at {w}x{h} resolved {got} after {previous} at a smaller target - the law is not monotone"
+                );
+                previous = got;
+            }
+        }
+    }
+}
+
+/// The three constants Plan 0128 Phase 1 measured, pinned where a nudge is
+/// visible. Each carries the reading it came from in `tier.rs`'s own docs; this
+/// is what fails when one is changed without one.
+#[test]
+fn the_measured_ceilings_are_the_ones_that_shipped() {
+    assert_eq!(REFERENCE_PX, 230_400);
+
+    // `Floor`'s live ceiling IS its anchor: 1080p at `Floor` already sits on the
+    // 16.67 ms budget on integrated hardware, so the law must not raise it.
+    assert_eq!(TierConfig::FLOOR.attractor_particles_live_ceiling, 50_000);
+    assert_eq!(
+        TierConfig::FLOOR.attractor_particles_live_ceiling,
+        TierConfig::FLOOR.attractor_particles
+    );
+    assert_eq!(
+        TierConfig::FLOOR.attractor_particles_offline_ceiling,
+        900_000
+    );
+
+    assert_eq!(TierConfig::RICH.attractor_particles_live_ceiling, 600_000);
+    assert_eq!(
+        TierConfig::RICH.attractor_particles_offline_ceiling,
+        2_700_000
+    );
+
+    // Offline is a whole multiple of the anchor at BOTH tiers, and the SAME
+    // multiple - which is what keeps a tier meaning something offline rather
+    // than both tiers converging on one shared wall at a large target.
+    assert_eq!(
+        TierConfig::RICH.attractor_particles_offline_ceiling / TierConfig::RICH.attractor_particles,
+        TierConfig::FLOOR.attractor_particles_offline_ceiling
+            / TierConfig::FLOOR.attractor_particles
+    );
+
+    // The offline ceiling fits the device's default storage-buffer binding
+    // limit at 48 B a particle - the wall Phase 1 hit at 5 400 000, and the
+    // reason this number is not simply the law's own 4K value.
+    const PARTICLE_BYTES: u64 = 48;
+    const MAX_BINDING: u64 = 134_217_728;
+    assert!(
+        u64::from(TierConfig::RICH.attractor_particles_offline_ceiling) * PARTICLE_BYTES
+            <= MAX_BINDING
+    );
+}
+
+/// **`Floor` never moves at any target size**, stated on its own because it is a
+/// commitment (NFR section 1: `Floor` holds 60 fps at 1080p on the baseline
+/// hardware, at "values exactly the pre-tier engine's") and not a consequence
+/// anyone reading the clamp would notice.
+#[test]
+fn the_floor_tier_draws_the_pre_tier_count_on_every_display() {
+    let floor = TierConfig::FLOOR;
+    for (w, h) in [(1280, 720), (1920, 1080), (2560, 1440), (3840, 2160)] {
+        assert_eq!(
+            floor.attractor_budget_live(w * h),
+            floor.attractor_particles,
+            "{w}x{h} raised the live Floor budget"
+        );
+    }
+    // And `Rich` at the same sizes does move, so the equality above is the
+    // clamp doing work rather than the law being inert.
+    assert!(
+        TierConfig::RICH.attractor_budget_live(1920 * 1080) > TierConfig::RICH.attractor_particles
+    );
+}
+
+/// A ceiling under the anchor resolves the anchor instead of panicking.
+///
+/// `u32::clamp` panics when `min > max`, and this runs on the resize path — so
+/// the guard is not decoration: a mis-set constant would take down the render
+/// thread on the first frame at a large target rather than drawing the wrong
+/// count.
+#[test]
+fn a_ceiling_under_the_anchor_resolves_the_anchor() {
+    assert_eq!(attractor_budget(150_000, 1920 * 1080, 1), 150_000);
+    assert_eq!(attractor_budget(150_000, 1920 * 1080, 0), 150_000);
+}
+
+/// A target large enough to overflow the arithmetic still clamps rather than
+/// wrapping to something small.
+#[test]
+fn an_absurd_target_still_clamps_at_the_ceiling() {
+    let cfg = TierConfig::RICH;
+    assert_eq!(
+        attractor_budget(
+            cfg.attractor_particles,
+            u32::MAX,
+            cfg.attractor_particles_offline_ceiling
+        ),
+        cfg.attractor_particles_offline_ceiling
     );
 }

@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0154** (ADRs are a separate sequence — next free there is **0166**.)
+**Next free number: 0156** (ADRs are a separate sequence — next free there is **0169**.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -43,14 +43,14 @@ place. The plan file carries the real link.
 | [0120](0120-the-standalone-ships-on-ubuntu.md) | The standalone ships on Ubuntu | approved | dev, human | ADR-0131 (proposed): a PulseAudio capture arm plus an `ubuntu-latest` CI arm. **Phase 1 is a `human` stop gate before `dev`** — only one of its three outcomes lets `dev` start. |
 | [0092](0092-the-engine-draws-an-authored-path.md) | The engine draws an authored path | approved | dev, human | Hard dependency discharged: 0091 closed, and `shape_field` is the scene this draws into. Takeable even if 0087 stalls — Phase 4 may legitimately be empty. Expect morph degeneracy. |
 | [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | approved | dev, human | **A new Phase 1 fixes backlog 0102 + 0103 before anything advertises the component** — foobar's UI starves until playback starts. **Phases 4-6 unblocked, 0150 closed.** |
-| [0128](0128-the-rendered-file-stops-looking-upscaled.md) | The rendered file stops looking upscaled | approved | dev, human | Backlog 0110 + 0130. ADR-0140 (proposed): drawn count becomes a density against the render target, **anchored so it can only add samples** — a moved golden is a finding. **Gates 0103.** |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | **Supersedes 0132's architecture, which a live set on 2026-08-29 bypassed entirely.** ADR-0145 (proposed): Art-Net straight to the fixtures. Phase 8 hard-depends on 0115 Phase 2; 1-7 do not. |
 | [0140](0140-every-rate-integrates-for-real.md) | Every rate integrates, for real | approved | dev, human | Backlog 0149 + 0150 (**0142 carried**). ADR-0152 + 0153 (proposed): `dt` sanitized at the scene seam, per-element rates integrate per element. Phase 3 moves goldens; Phase 2 must not. |
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
-| [0143](0143-the-documentation-gets-a-front-end.md) | The documentation gets a front end | approved | dev, human | ADR-0154 (proposed): docs publish as a Starlight site, `docs/` stays the source, 926 of 1,059 links rewrite at build time. **Unparked, 0150 closed** — pick the Pages subpath. |
 | [0147](0147-what-the-show-costs-and-what-its-numbers-mean.md) | What the show costs, and what its numbers mean | approved | dev, human | Backlog 0164 + 0163; 0154 half, 0165 update. The console halves output fps and two comments deny it. **Phase 4 is a hands-off window.** Phase 1 precedes 0133. |
 | [0152](0152-the-osc-root-becomes-rlx.md) | The OSC root becomes `/rlx` | approved | dev, human | ADR-0164 (proposed): discharges ADR-0162's deferred decision. One clean break, `/v1` unmoved. **Phase 5 is `human`** — every rig binding re-pointed by hand, and the break is silent. |
 | [0153](0153-the-debug-tree-stops-carrying-dependency-line-tables.md) | The debug tree stops carrying dependency line tables | draft | dev | ADR-0165 (proposed): dependencies compile with `debug = 0`; measured 40.5 MB -> 15.0 MB per test `.pdb`. Backlog 0182-0184 hold the larger levers. |
+| [0154](0154-the-site-becomes-navigable.md) | The site becomes navigable | draft | dev, human | ADR-0166 + 0167 + 0168 (proposed): documents split into routes by size, a fragment gate, an entrance. **Every phase deploys** — `pages.yml` publishes on each push to `main`. |
+| [0155](0155-the-reader-documents-stop-explaining-themselves.md) | The reader documents stop explaining themselves | draft | dev | ADR-0168 (proposed): 235 bare citations leave three documents. **Hard dependency: 0154 Phase 3** — until that gate exists a renamed heading breaks anchors silently. |
 <!-- roster:end -->
 
 **Added 2026-09-04 — [0152] is approved, and it runs before [0133] and [0147] rather than after.**
@@ -123,7 +123,7 @@ shape, because most of what it decided was sequencing rather than design:
   cheap. [ADR-0159] settles what backlog 0177 filed rather than answered — the plugin's own cap —
   and does **not** touch the standalone exe's, which keeps its inherited value and gains only a unit.
 
-[0143]: 0143-the-documentation-gets-a-front-end.md
+[0143]: done/0143-the-documentation-gets-a-front-end.md
 [0147]: 0147-what-the-show-costs-and-what-its-numbers-mean.md
 [0148]: done/0148-the-shipped-artifacts-carry-their-own-guarantees.md
 [0149]: done/0149-the-line-corners-stop-being-blunt.md
@@ -334,26 +334,7 @@ Sequencing:
   ADR-0053's disk cost: each lane carries its own `target/` again, so **remove a finished lane's
   worktree**.
 
-**Added 2026-08-28, from a "what next, functionally" round after the whole-codebase review's three
-plans ([0124]/[0125]/[0126], which move no pixels): [0127](done/0127-the-picture-stops-depending-on-the-volume-slider.md)
-— **closed 2026-08-28** — and [0128](0128-the-rendered-file-stops-looking-upscaled.md).** Both take defects in already-shipped
-output rather than adding capability, which is why they were picked ahead of the four other
-functional candidates the round surfaced (backlog 0042's bar gate, 0126's per-track variety, 0142's
-2x dissolve, and the limited-ink cohort behind [0123]). Sequencing:
-
-- **They contend with nothing on the current roster** and share no files with each other — 0127 is
-  `core/src/dsp/` plus `warp_mesh`'s draw layer, 0128 is `tier.rs` plus the particles scene. Either
-  can be taken by a free session, and they can run in parallel lanes.
-- **[0128] goes before [0103]'s outreach phases.** Demo material made before the density law lands
-  shows the engine at its grainiest, which is the same dependency [backlog 0110](../design-backlog.md)
-  states in its own priority line.
-- ~~**[0127] is the one to take first if only one is taken**~~ — **taken and closed 2026-08-28**, so
-  [0128] is what is left of this pair. 0127's Phase 3 capture also left a number 0128 does not need
-  but the next `warp_mesh` plan will: the reference draws a unit-scale mode-6 trace at 0.316 frame
-  heights against our 0.3019, which is [backlog 0120](../design-backlog.md)'s whole remaining gap.
-- ~~**Neither waits on [0124]/[0125]/[0126]**~~ - **discharged 2026-09-03: all three are closed.**
-  0125 retired the GPU boilerplate across the 12 scenes on 2026-08-31 and 0126 split the seven large
-  files on 2026-09-03, so [0128]'s `core/src/render/scenes/particles/` contention is gone.
+**The 2026-08-28 "what next, functionally" round that produced [0127] and [0128] is spent** — both closed, and its sequencing note moved verbatim to [README-archive.md](README-archive.md)'s `Prior sequencing notes (superseded)` on 2026-09-04. The one thing it parked that is still open is 0127's Phase 3 capture number, which [backlog 0120](../design-backlog.md) carries for the next `warp_mesh` plan.
 
 **[0129](done/0129-the-build-stops-being-paid-three-times.md) closed 2026-08-29, and every plan on
 this roster is the beneficiary.** A lane that has never built now compiles **3 workspace crates in
@@ -372,12 +353,6 @@ build is no longer a reason to keep a finished worktree around.
 - **The `opt-level` question is closed, not deferred.** Phase 6 measured our unoptimized code at
   **19.1 %** of the `reactivity` suite — the minority arm, so ADR-0033's ratchet derivation is not
   reopened and no ADR is owed.
-
-**Superseded 2026-09-04 by [0151]'s close — the layout it settles is now on `main`.** [0143] can be
-written against final headings: `capturing.md` and `presets/README.md` each carry a generated
-contents block, and `scripts/toc.mjs --check` holds it to the headings beneath it
-([ADR-0163](../adrs/0163-a-long-document-carries-a-generated-contents-block.md)). The note that
-sequenced the two is in [README-archive.md](README-archive.md).
 
 ### The two lanes, now
 
@@ -747,6 +722,8 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0143 — The documentation gets a front end](done/0143-the-documentation-gets-a-front-end.md) — closed 2026-09-05. Review: **no blockers, no majors, four minors, three nits.** Version: **0.106.0** (minor). ADR-0154 accepted with an `Outcome`. [Write-up](README-archive.md).
+- [0128 — The rendered file stops looking upscaled](done/0128-the-rendered-file-stops-looking-upscaled.md) — closed 2026-09-04. Review: **no blockers, one major, six minors.** Version: **0.105.0** (minor). Archived [backlog 0110](../design-backlog-archive.md); filed 0186. [Write-up](README-archive.md).
 - [0138 — The colour surface stops misleading its authors](done/0138-the-colour-surface-stops-misleading-its-authors.md) — closed 2026-09-04. Review: **no blockers, two majors, two minors.** Version: **0.104.0** (minor). Archived [backlog 0099 + 0153](../design-backlog-archive.md). [Write-up](README-archive.md).
 - [0151 — The long documents become navigable](done/0151-the-long-documents-become-navigable.md) — closed 2026-09-04. Review: **no blockers, one major, four minors.** Version: **none** (docs/chore-only). Touched `presets/README.md` only, closed no backlog entry. [Write-up](README-archive.md).
 - [0126 - The large files split along their seams](done/0126-the-large-files-split-along-their-seams.md) - closed 2026-09-03. Review: **no blockers, no majors in the code; one major doc repair, five minors.** Version: **0.103.1** (patch). Touched no presets, closed no backlog entry. [Write-up](README-archive.md).
@@ -959,7 +936,7 @@ Later, unordered: better tempo tracking, preset sharing/library, signed installe
 [0125]: done/0125-the-scenes-share-their-gpu-boilerplate.md
 [0126]: done/0126-the-large-files-split-along-their-seams.md
 [0127]: done/0127-the-picture-stops-depending-on-the-volume-slider.md
-[0128]: 0128-the-rendered-file-stops-looking-upscaled.md
+[0128]: done/0128-the-rendered-file-stops-looking-upscaled.md
 [0131]: done/0131-the-operator-gets-a-console.md
 [0133]: 0133-the-engine-drives-the-lights.md
 [0135]: done/0135-the-show-night-surfaces-stop-lying.md

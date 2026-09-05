@@ -79,7 +79,7 @@ already own them. We rejected one file per entry (~240 files) because it rewrite
 close ceremony, and inbound references in 32 files to buy addressability in two write-only archives,
 and we rejected number-range shards because the seams are arbitrary and each shard regrows.
 
-**Sequencing:** this plan runs **before** [Plan 0143](../0143-the-documentation-gets-a-front-end.md),
+**Sequencing:** this plan runs **before** [Plan 0143](0143-the-documentation-gets-a-front-end.md),
 so that 0143's remark plugin and its 926-link rewrite are written against the final layout of
 `capturing.md` and `presets/README.md` rather than against a layout this plan then changes.
 
@@ -352,7 +352,7 @@ const anchor = (heading) =>
   unchecked by construction, so a rename breaks silently. `capturing.md`'s six plan-numbered heading
   suffixes (`(Plan 0045)`, `(Plan 0082)`, …) read as the plan-relative narration `CLAUDE.md` bars
   from comments, and they stay for now — that is a followup, not this plan.
-- **It does not build the documentation site.** That is [Plan 0143](../0143-the-documentation-gets-a-front-end.md),
+- **It does not build the documentation site.** That is [Plan 0143](0143-the-documentation-gets-a-front-end.md),
   which this plan sequences before so 0143's route map is written against the final layout.
 
 ## Implementation log
