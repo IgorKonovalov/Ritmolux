@@ -11,6 +11,8 @@
 
 use rlx_core::audio::{AudioFormat, SampleConsumer};
 
+#[cfg(target_os = "macos")]
+use crate::capture_mac;
 use crate::capture_verdict::CaptureVerdict;
 #[cfg(windows)]
 use crate::capture_win;
