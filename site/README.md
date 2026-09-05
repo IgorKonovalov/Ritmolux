@@ -37,7 +37,7 @@ never will:
 | `astro.config.mjs` | substitutes `@VERSION@` from the workspace version, for the packaging pages |
 | `astro.config.mjs` | wraps every table in a scroll container, so a wide table scrolls and the page does not |
 | `src/plugins/strip-provenance.mjs` | drops a trailing `(Plan NNNN)` / `(ADR-NNNN)` from headings and block ends, before slugs are computed (ADR-0168) |
-| `src/plugins/split-document.mjs` | cuts a document over 40 KB into one route per section, and emits the fragment map that keeps deep links resolving (ADR-0166) |
+| `src/plugins/split-document.mjs` | cuts a document past the size threshold into one route per section, and emits the fragment map that keeps deep links resolving (ADR-0166 owns both constants) |
 | `src/plugins/rewrite-links.mjs` | rewrites every relative link: inside the published set to a site route, outside it to a GitHub URL (ADR-0154) |
 
 ## Working on it
