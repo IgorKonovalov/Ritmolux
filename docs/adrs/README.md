@@ -189,5 +189,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0165](0165-dependencies-compile-without-debug-info-and-one-line-buys-it-back.md) | Dependencies compile without debug info, and one line buys it back | proposed |
 | [0166](0166-a-published-document-splits-into-routes-by-size.md) | A published document splits into routes by size, and a fragment map is the contract | accepted 2026-09-05 (Plan 0154), Outcome; extends 0154 |
 | [0167](0167-the-site-owns-its-entrance-and-the-install-page-is-the-testers-own-file.md) | The site owns its entrance, and the install page is the tester's own file | accepted 2026-09-05 (Plan 0154), narrows 0154 |
-| [0168](0168-the-reader-documents-address-a-reader-and-the-record-stays-a-link.md) | The reader documents address a reader, and the working record stays a link | accepted 2026-09-05 (Plan 0154), prose half open as Plan 0155 |
+| [0168](0168-the-reader-documents-address-a-reader-and-the-record-stays-a-link.md) | The reader documents address a reader, and the working record stays a link | accepted 2026-09-05 (Plan 0154), prose half landed in Plan 0155 |
 <!-- roster:end -->

@@ -1,11 +1,21 @@
 # 0155 — The reader documents stop explaining themselves
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-05. Five phases landed (`3fdd391`, `2bce9be`, `3bbcaf0`,
+> `0dc85dd`, `18ee259`): 235 bare citations across the five Entrance A documents went to 0, the
+> 121 that remain are all inside links, and `scripts/check-reader-prose.mjs` holds the result at
+> pre-push and in CI. Mode 4 review: **no blockers, no majors, four minors, two nits.** Verified
+> independently — `cargo nextest run --workspace` 1536/1536 pass (including
+> `every_declared_param_is_documented_in_the_presets_readme`, which is the mechanical proof the
+> parameter roster survived); all nine Node gates green; the site builds to 137 pages / 135
+> routes / 26,893 B largest split route; a fragment sweep over all 412 tracked markdown files
+> found zero unresolved anchors in any file this plan touched; and an independent numeric diff
+> of the three rewritten files found nothing removed beyond what the log's own table names.
+> Version: **none** (docs/chore-only).
 > **Created:** 2026-09-05
 > **Owner skill(s):** dev
-> **Related ADRs:** [0168](../adrs/0168-the-reader-documents-address-a-reader-and-the-record-stays-a-link.md)
-> **Hard dependency:** [0154](done/0154-the-site-becomes-navigable.md) **Phase 3.** This plan renames
-> headings, and under [ADR-0166](../adrs/0166-a-published-document-splits-into-routes-by-size.md) a
+> **Related ADRs:** [0168](../../adrs/0168-the-reader-documents-address-a-reader-and-the-record-stays-a-link.md)
+> **Hard dependency:** [0154](0154-the-site-becomes-navigable.md) **Phase 3.** This plan renames
+> headings, and under [ADR-0166](../../adrs/0166-a-published-document-splits-into-routes-by-size.md) a
 > heading is a URL. `scripts/check-doc-links.mjs` deliberately never validates fragments, so today a
 > renamed heading breaks every inbound anchor silently. 0154 Phase 3 turns that into a build
 > failure. **Do not start this plan before that phase has landed.**
@@ -26,7 +36,7 @@ The user's instruction was direct: a reader *"should understand how the applicat
 why this or that decision were made."*
 
 The citation convention that produced this prose is deliberate and good.
-[ADR-0127](../adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md)
+[ADR-0127](../../adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md)
 requires code comments to cite by bare number so a claim can be traced to the measurement that
 earned it, and `CLAUDE.md` extends the habit to documentation. It has worked — this corpus is
 unusually free of assertions nobody can check. It also addresses the wrong audience in the documents
@@ -48,7 +58,7 @@ other three can be brought to it rather than invented.
 
 The work is bounded by what these documents are *for*. They are what the `preset-author` lane is
 pointed at instead of keeping a private catalogue
-([ADR-0017](../adrs/0017-preset-author-skill-lane.md)) — the private copies rotted while these
+([ADR-0017](../../adrs/0017-preset-author-skill-lane.md)) — the private copies rotted while these
 stayed current. They cannot be thinned. And much of the provenance is what makes a number checkable:
 *"measured at Plan 0063 Phase 5"* is the difference between a threshold a reader can trust and one
 they take on faith.
@@ -56,7 +66,7 @@ they take on faith.
 ## Decision
 
 Rewrite the prose of the three documents that carry bare citations, under the rule recorded in
-[ADR-0168](../adrs/0168-the-reader-documents-address-a-reader-and-the-record-stays-a-link.md):
+[ADR-0168](../../adrs/0168-the-reader-documents-address-a-reader-and-the-record-stays-a-link.md):
 
 > **Keep the fact. Demote the provenance to the link.**
 
@@ -209,7 +219,7 @@ flowchart LR
 - **It does not remove the 109 citations that are already links.** A link is inert until clicked.
 - **It does not change any code, default, parameter name or behaviour.** Nothing under `core/`,
   `standalone/`, `plugin-foobar/` or `presets/*.toml` is touched.
-- **It does not touch the site.** All of that is [Plan 0154](done/0154-the-site-becomes-navigable.md).
+- **It does not touch the site.** All of that is [Plan 0154](0154-the-site-becomes-navigable.md).
 
 ## Implementation log
 
