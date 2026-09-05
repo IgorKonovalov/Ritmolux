@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0152 — The OSC root becomes `/rlx`](#0152--the-osc-root-becomes-rlx)
   - [0143 — The documentation gets a front end](#0143--the-documentation-gets-a-front-end)
   - [0128 — The rendered file stops looking upscaled](#0128--the-rendered-file-stops-looking-upscaled)
   - [0138 — The colour surface stops misleading its authors](#0138--the-colour-surface-stops-misleading-its-authors)
@@ -157,6 +158,7 @@ hand-edited.
   - [0002 — Rust enforcement tooling](#0002--rust-enforcement-tooling)
   - [0001 — Core + standalone MVP, then foobar parity](#0001--core--standalone-mvp-then-foobar-parity)
 - [Prior sequencing notes (superseded)](#prior-sequencing-notes-superseded)
+  - [Moved 2026-09-05 from `README.md` — the 0152-before-0133-and-0147 note](#moved-2026-09-05-from-readmemd--the-0152-before-0133-and-0147-note)
   - [Moved 2026-09-05 from `README.md` — the 0151/0143 heading-layout note](#moved-2026-09-05-from-readmemd--the-01510143-heading-layout-note)
   - [Moved 2026-09-04 from `README.md` — the 0127/0128 pair from the 2026-08-28 "what next" round](#moved-2026-09-04-from-readmemd--the-01270128-pair-from-the-2026-08-28-what-next-round)
   - [Moved 2026-09-04 from `README.md` — the note that sequenced 0138 behind 0137](#moved-2026-09-04-from-readmemd--the-note-that-sequenced-0138-behind-0137)
@@ -170,6 +172,78 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0152 — The OSC root becomes `/rlx`](done/0152-the-osc-root-becomes-rlx.md)
+
+— closed 2026-09-05. Four `dev` phases in the worktree lane `plan-0152-the-osc-root-becomes-rlx`:
+`aec2381` (Phase 1, the wire), `7644cc3` (2, the operator's table), `56f8a69` (3, the record),
+`c594fa5` (4, the two seed comments). The lane sat unmerged for a day while `main` took Plans 0128
+and 0143; `main` was merged into it at this close and the whole gate re-run on the combination,
+which is the first moment the two trees met. Version: **0.107.0** (minor — Phase 1 changes what the
+sink puts on the wire). Review: **no blockers, no majors, four minors.**
+[ADR-0164](../adrs/0164-the-osc-address-root-becomes-rlx-in-one-break.md) accepted;
+[ADR-0144](../adrs/0144-the-lighting-feed-is-a-resolved-ndi-sender-and-a-fixed-osc-telemetry-set.md)
+gained a second dated `Outcome` rather than an edit.
+
+**What it did.** `ADDRESS_PREFIX` moved from `/lmv/v1` to `/rlx/v1` — the last operator-visible
+surface still carrying the old name, left standing by
+[Plan 0150](done/0150-the-application-becomes-ritmolux.md) because that sweep's `lmv[-_]` grep could
+not match a token followed by `/`. One clean break, no transition period and no dual-emit; `/v1` did
+not move, because no payload, argument type tag, address suffix, vocabulary or send cadence changed.
+Fourteen literals, twenty-four test assertions, the `README.md` table, two backlog probes, three
+backlog prose sites, two active plans and one mermaid node label followed. ADR-0162's deferral —
+*"it needs a decision, not a sweep"* — is discharged, and this plan is the record of what the
+decision was.
+
+**The padding arithmetic was verified rather than assumed, which is the whole reason it was a
+done-when.** OSC pads an address to a 4-byte boundary, so a root of a different length would have
+changed every packet's layout while the equality assertions in `osc/tests.rs` still passed on the
+slices they check. Both roots are 7 bytes: `/rlx/v1/preset` is 14 (2 of padding), `/rlx/v1/tempo`
+is 13 (3), `/rlx/v1/beat/index` is 18 (2) — every asserted length and every comment stating one is
+unchanged.
+
+**Phase 4 found a different defect than the one it was written for, and that is the useful
+finding.** The phase says Plan 0150's sweep *removed* both RNG seed comments and that the constants
+*"now sit as bare hex"*. They did not: each already carried the **trap** half — that re-spelling the
+bytes to match a renamed product moves that scene's goldens. What was missing is the **decoder**,
+which is the half a reader cannot re-derive, so `dev` added the ASCII to the existing comment rather
+than restoring a deleted one. Both bytes were decoded from the literals rather than copied from the
+plan, and both check out: `0x4C4D_565F_5357_524D` is `LMV_SWRM` and `0x4C4D_565F_5244_5F31` is
+`LMV_RD_1`. No golden moved.
+
+**The plan said fifteen addresses in five places and there are fourteen** — `ADDRESS_COUNT` is 14,
+`Telemetry::messages` returns fourteen entries, the `README.md` table has fourteen rows. An
+architect-side arithmetic error in the plan, not an implementation gap: the assertion Phase 1's
+done-when names (`messages.len() == ADDRESS_COUNT` plus a `starts_with(ADDRESS_PREFIX)` loop) covers
+the whole set either way. `dev` caught it and recorded it rather than implementing to the wrong
+number, which is the behaviour the done-when-arithmetic rule exists to make possible.
+
+**Two deviations, both correct, both against the letter of a done-when.** Phase 2 asks both that the
+README prose *"becomes a statement that the root changed in this release"* and that `README.md`
+contain no `lmv` — which cannot both hold, because naming the old root is what makes the notice
+useful to an operator holding a bound show file, and is the string they will search for. One
+historical mention stands at `README.md:368` and every table row reads `/rlx/v1`. And Phase 1 asks
+for both backlog probes to move in its own commit, but the `README.md` probe cannot be green until
+Phase 2 lands — so it moved beside the edit that satisfies it, and `check-backlog-claims.mjs` was
+green at **every** commit in the lane, which is what that done-when was actually protecting.
+
+**Phase 5 (`human`) is not discharged, and it is the only detector this break has.** The rig was
+unreachable, so what was taken instead is a synthetic acceptance run: the shipped sink aimed at a
+local UDP receiver, a throwaway decoder self-tested against three known-good encoded messages first,
+1450 sets over ~24 s against a live loopback track. It establishes fourteen addresses all under
+`/rlx/v1`, none on the old root, every type tag as ADR-0144 specifies, every datagram a multiple of
+4 bytes, and `n` equal across all fourteen so no partial set was sent. **It reaches everything on
+the app side of the socket and nothing on the binding side.** The rig half was extracted to
+[`docs/on-device-validation.md`](../on-device-validation.md) at this close, under its own
+`## Rig-gated` heading — the same treatment every hardware-gated `human` item in this project gets,
+so a plan does not sit in the roster reading as stalled work while it waits for a room.
+
+**Two observations the acceptance run recorded and did not diagnose**, both left as-is: `level/treb`
+peaked at 0.192 while `bass`, `mid` and `onset` each reached 1.000 on bass-heavy material, which the
+band normalizer's seconds-scale peak release explains without needing a defect; and `beat/index`
+advanced 169 times in ~24 s against a `tempo` maximum of 170.455, about 2.5 onsets per beat and just
+above the 1.2x-2.3x band `README.md` states — the octave question is design-backlog 0158 and is not
+this plan's.
 
 ### [0143 — The documentation gets a front end](done/0143-the-documentation-gets-a-front-end.md)
 
@@ -6826,6 +6900,34 @@ stays in `lmv-core`, and is out of the Miri job's scope, so the FFI pointer hand
 uncovered (its C side remains the Plan 0001 Phase-6 smoke program's job, per ADR-0003).
 
 ## Prior sequencing notes (superseded)
+
+### Moved 2026-09-05 from `README.md` — the 0152-before-0133-and-0147 note
+
+Spent when [0152] closed on 2026-09-05. It sequenced 0152 ahead of [0133] and [0147] so that neither
+lane would be taken while its own text still said `/lmv/v1`; 0152's Phase 3 re-pointed both, so the
+window is gone. Its second paragraph, on Phase 5 being the only detector, is not spent — that phase
+outlived the plan and moved to [`docs/on-device-validation.md`](../on-device-validation.md), where
+the live index now points. (It also says *"all fifteen addresses"*; there are fourteen — the plan's
+own miscount, recorded in the close write-up above.) The note as it stood:
+
+> **Added 2026-09-04 — [0152] is approved, and it runs before [0133] and [0147] rather than after.**
+> It moves the last operator-visible surface still carrying the old name: `ADDRESS_PREFIX` at
+> `standalone/src/osc.rs:52`, left standing by [0150] because that plan's greps could not match a
+> token followed by `/`. ADR-0164 is the decision ADR-0162 deferred — one clean break, no dual-emit,
+> no transition period, and `/v1` does not move because no payload did. Both 0133 and 0147 are
+> approved, unstarted, and name `/lmv/v1` in live text a `dev` lane would read; 0152's Phase 3 is what
+> re-points them, so taking 0152 first removes that window instead of closing it afterwards. Nothing
+> else contends: [0151] closed 2026-09-04, and the backlog preamble it rewrote is not a region 0152's
+> Phase 3 touches.
+>
+> **Phase 5 is the operator's, and it is the only detector.** OSC has no negotiation and no error
+> channel, so a binding left on the old root stops firing and looks exactly like a fixture that is not
+> moving. Schedule that phase against a rig session with a playing track, and keep the old show file
+> until all fifteen addresses are confirmed.
+
+[0152]: done/0152-the-osc-root-becomes-rlx.md
+[0133]: 0133-the-engine-drives-the-lights.md
+[0147]: 0147-what-the-show-costs-and-what-its-numbers-mean.md
 
 ### Moved 2026-09-05 from `README.md` — the 0151/0143 heading-layout note
 

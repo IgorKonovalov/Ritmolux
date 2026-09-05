@@ -1,26 +1,35 @@
 # 0152 — The OSC root becomes `/rlx`
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-05. Four `dev` phases in the lane
+> `plan-0152-the-osc-root-becomes-rlx`: `aec2381` (Phase 1, the wire), `7644cc3` (2, the operator's
+> table), `56f8a69` (3, the record), `c594fa5` (4, the two seed comments). `main` was merged into the
+> lane at the close and the whole gate re-run on the combination. Mode 4 review: **no blockers, no
+> majors, four minors.** Verified: `ADDRESS_PREFIX` is `/rlx/v1`, all fourteen literals and every
+> test assertion follow, the OSC padding arithmetic was re-checked rather than assumed (both roots
+> are 7 bytes, so every asserted length is unchanged), both RNG seeds decode to the ASCII their new
+> comments claim, and no golden moved. **Phase 5 (`human`) is not discharged** — the rig bindings
+> were extracted to
+> [`docs/on-device-validation.md`](../../on-device-validation.md) at this close.
 > **Created:** 2026-09-03
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0164](../adrs/0164-the-osc-address-root-becomes-rlx-in-one-break.md) (proposed),
-> [0144](../adrs/0144-the-lighting-feed-is-a-resolved-ndi-sender-and-a-fixed-osc-telemetry-set.md) (gains an Outcome),
-> [0162](../adrs/0162-the-application-is-renamed-to-ritmolux.md) (this discharges its deferral)
+> **Related ADRs:** [0164](../../adrs/0164-the-osc-address-root-becomes-rlx-in-one-break.md) (accepted),
+> [0144](../../adrs/0144-the-lighting-feed-is-a-resolved-ndi-sender-and-a-fixed-osc-telemetry-set.md) (gains an Outcome),
+> [0162](../../adrs/0162-the-application-is-renamed-to-ritmolux.md) (this discharges its deferral)
 
 ## TL;DR
 
 `standalone/src/osc.rs:52` still reads `pub const ADDRESS_PREFIX: &str = "/lmv/v1"` — the last
 operator-visible surface in the product carrying the old name, left behind deliberately because
 Plan 0150's `\blmv[-_]` grep could not match a token followed by `/`. Per
-[ADR-0164](../adrs/0164-the-osc-address-root-becomes-rlx-in-one-break.md) the root moves to `/rlx`
+[ADR-0164](../../adrs/0164-the-osc-address-root-becomes-rlx-in-one-break.md) the root moves to `/rlx`
 in one clean break with no transition period, and `/v1` stays because no protocol changed. Fifteen
 addresses move; every binding in the rig must be re-pointed by hand, which is the `human` phase at
 the end.
 
 ## Context & problem
 
-The rename to Ritmolux ([ADR-0162](../adrs/0162-the-application-is-renamed-to-ritmolux.md),
-[Plan 0150](done/0150-the-application-becomes-ritmolux.md)) swept 1,318 sites and left this one
+The rename to Ritmolux ([ADR-0162](../../adrs/0162-the-application-is-renamed-to-ritmolux.md),
+[Plan 0150](0150-the-application-becomes-ritmolux.md)) swept 1,318 sites and left this one
 standing on purpose. Both records say why, and both say what is owed:
 
 > *"It was left alone deliberately — Plan 0150's greps do not match it, because the character after
@@ -141,7 +150,7 @@ flowchart LR
   seven ASCII seeds, and for these two the comments were **removed**. At the pre-rename baseline
   `47432ca`, `swarm.rs:27` carried `// "LMV_SWRM"` and `reaction_diffusion.rs:66` carried
   `// "LMV_RD_1"`; both now sit as bare hex. No other plan touches these files —
-  [0126](done/0126-the-large-files-split-along-their-seams.md)'s eight phases do not name either.
+  [0126](0126-the-large-files-split-along-their-seams.md)'s eight phases do not name either.
 - **Done when:**
   - Each constant carries a comment giving the ASCII the bytes spell **and** the trap:
     the value is a golden-fixing RNG seed, so it must not be re-spelled to match the new product
@@ -192,8 +201,8 @@ before                      after
 - **Two active plans name the old root in text `dev` may be reading.** 0133 and 0147 are both
   approved and unstarted; if either is taken before this plan lands, its author reads `/lmv/v1`. The
   window is small and Phase 3 closes it, but the ordering is worth knowing.
-- **No collision with [0126](done/0126-the-large-files-split-along-their-seams.md) or
-  [0151](done/0151-the-long-documents-become-navigable.md).** 0126's eight phases name none of these
+- **No collision with [0126](0126-the-large-files-split-along-their-seams.md) or
+  [0151](0151-the-long-documents-become-navigable.md).** 0126's eight phases name none of these
   files; 0151 touches `docs/` and `scripts/` but none of the four documents Phase 3 edits except
   `docs/design-backlog.md` — and there 0151 edits only the preamble and the sweep narrative, while
   this plan edits five entry bodies. Different regions of one file; a 3-way merge handles it.

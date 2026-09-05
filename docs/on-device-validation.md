@@ -2,8 +2,9 @@
 
 > **Status:** standing / mostly hardware-gated — **does not block plan closes.** (Two items, the
 > Plan 0044 `Rich` calibration and the Plan 0102 foobar2000 component install, are runnable on the
-> dev box today; each has its own section.)
-> **Owner:** human (the user; only runnable on the target hardware).
+> dev box today; each has its own section. A third, the Plan 0152 OSC re-point, is gated on the
+> lighting rig rather than on a GPU — the file's purpose is the same for it.)
+> **Owner:** human (the user; only runnable on the target hardware, or at the rig).
 > **Created:** 2026-07-22 (extracted from Plan 0012 Phase 3).
 
 This is a **checklist, not a phased plan.** It exists so that on-device checks the user can
@@ -483,6 +484,40 @@ or an older copy shadows the one under test and the version check means nothing.
       then click a preset — the one that starts showing must be the one whose name you clicked.
       _(Plan 0107 Phase 5, carried forward at that plan's close 2026-08-18; run 2026-08-24;
       (a) re-opened by Plan 0141 Phase 1 on 2026-09-01.)_
+
+## Rig-gated — the OSC bindings move to `/rlx/v1` (Plan 0152 Phase 5)
+
+**Not iGPU-gated and not runnable at the desk either.** It needs the lighting rig — Arena, the
+TouchDesigner patch and whatever show file the set runs from. Extracted from Plan 0152 at that
+plan's close (2026-09-05) so the plan could close on its four completed `dev` phases without
+waiting on a rig session, exactly as every item above was.
+
+**The break is silent, and this check is its only detector.** ADR-0164 moved the OSC address root
+from `/lmv/v1` to `/rlx/v1` in one clean break — no transition period, no dual-emit. OSC has no
+negotiation and no error channel, so a binding left on the old root simply stops firing: the
+fixture holds its last value, nothing in the app, the console or the protocol reports it, and from
+front of house that is indistinguishable from a fixture that happens not to be moving. Nothing in
+CI, and no synthetic run, can see the binding half.
+
+- [ ] **Re-point every OSC binding from `/lmv/v1/…` to `/rlx/v1/…`.** Fourteen addresses; the table
+      in `README.md`'s *Flags & environment* is the roster. Only the root changes — no payload,
+      argument type tag, address suffix, vocabulary or send cadence moved, so `/v1` stays and a
+      binding that re-points its root and changes nothing else is correct. Report **each** of the
+      fourteen driving what it drove before, confirmed against a playing track with
+      `ritmolux --osc <host:port>`. A "looks fine" reading does not discharge this — a missed
+      binding is invisible until the moment the show needs it. **Keep the old show file until every
+      address is confirmed**: a build from before Plan 0152 and a build after it cannot drive the
+      same bindings, and `/v1` deliberately does not distinguish them on the wire.
+      _(Plan 0152 Phase 5, extracted at that plan's close 2026-09-05.)_
+
+**What is already known, and what it does not cover.** A synthetic acceptance run on 2026-09-05
+took the app side of the break: the shipped sink aimed at a local UDP receiver, a throwaway decoder
+self-tested against three known-good encoded messages first, 1450 sets over ~24 s against a live
+loopback track. It establishes that all fourteen addresses publish under `/rlx/v1`, none on the old
+root and none outside it; that every argument type tag matches ADR-0144; that every datagram is a
+multiple of 4 bytes; and that `n` was equal across all fourteen, so no partial set was sent. The
+reading is in the plan's `## Implementation log`. **It reaches everything on the app side of the
+socket and nothing on the binding side**, which is the half this item exists for.
 
 ## How to run
 

@@ -1,10 +1,10 @@
 # ADR-0164 — The OSC address root becomes `/rlx`, in one break, and `/v1` does not move
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-05 (Plan 0152)
 > **Date:** 2026-09-03
 > **Extends:** [ADR-0144](0144-the-lighting-feed-is-a-resolved-ndi-sender-and-a-fixed-osc-telemetry-set.md)
 > **Follows:** [ADR-0162](0162-the-application-is-renamed-to-ritmolux.md)
-> **Related plan(s):** [0152](../plans/0152-the-osc-root-becomes-rlx.md)
+> **Related plan(s):** [0152](../plans/done/0152-the-osc-root-becomes-rlx.md)
 
 ## Context
 

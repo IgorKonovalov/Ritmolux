@@ -320,7 +320,7 @@ retains the sink as built.
 
 **The address root moved from `/lmv/v1` to `/rlx/v1`**, in one break with no transition period and
 no dual-emit, per [ADR-0164](0164-the-osc-address-root-becomes-rlx-in-one-break.md) and
-[Plan 0152](../plans/0152-the-osc-root-becomes-rlx.md). Every `/lmv/v1/…` address named above now
+[Plan 0152](../plans/done/0152-the-osc-root-becomes-rlx.md). Every `/lmv/v1/…` address named above now
 reads `/rlx/v1/…` on the wire. The body is left as written: it records what was decided and what
 shipped at the time, and that stays true.
 
