@@ -853,7 +853,8 @@ mod tests;
 // ---------------------------------------------------------------------------
 
 /// How much of the drawn segment length landed inside the render target, summed
-/// over one [`LineRenderer::draw`] call (Plan 0069, ADR-0083).
+/// over one [`LineRenderer::draw`](crate::render::scenes::lines::LineRenderer::draw)
+/// call (Plan 0069, ADR-0083).
 ///
 /// Pixel coverage cannot see an over-scaled figure: a comb roots every bar on a
 /// shared baseline and a corona roots every spoke at a centre, so clipping the
@@ -865,7 +866,8 @@ mod tests;
 /// not counted, so a thick stroke leaving the frame is under-counted. That is
 /// the right measure for *overshoot* and a poor one for anything else.
 ///
-/// **Arcs count too** (Plan 0087 Phase 2). An [`ArcInstance`] contributes its
+/// **Arcs count too** (Plan 0087 Phase 2). An
+/// [`ArcInstance`](crate::render::scenes::lines::ArcInstance) contributes its
 /// own arc length, `|sweep| * radius`, to both sums. This is a correctness
 /// obligation of the arc primitive rather than a feature: an arc contributing
 /// nothing would shrink the denominator, and every arc-drawing preset would
