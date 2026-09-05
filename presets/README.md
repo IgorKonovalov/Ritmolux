@@ -1,12 +1,12 @@
 # Preset authoring
 
-Presets are TOML files (ADR-0002). A preset names a built-in **system** and binds
-that system's **named parameters** to **expression strings** over the audio
-analysis. Line-art systems (ADR-0007) additionally take a declarative
-**structural-config table** (`[curve]` / `[generator]`) that is *not* expressions.
+Presets are TOML files. A preset names a built-in **system** and binds that
+system's **named parameters** to **expression strings** over the audio analysis.
+Line-art systems additionally take a declarative **structural-config table**
+(`[curve]` / `[generator]`) that is *not* expressions.
 
 Files here are the curated set embedded into the binary and seeded into the
-per-user preset directory on first run (Plan 0007). Seeding is **write-if-absent**,
+per-user preset directory on first run. Seeding is **write-if-absent**,
 so editing a file *here* is invisible to a frontend already reading its seeded
 copy. Point both frontends at this folder instead and edit in place — the app
 hot-reloads within ~150 ms, no rebuild:
@@ -29,8 +29,8 @@ and [`../docs/capturing.md`](../docs/capturing.md#editing-presets-live).
 ([ADR-0081](../docs/adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md)),
 so know what green is evidence of.** Five gates sweep this folder and **one of them
 plays audio**: `reactivity` drives four `core::signal` clips through the real FFT,
-band split and onset detector (Plan 0067 Phase 1), so it is the only one that would
-notice a preset ignoring the music. `sanity`, `animation`, `distinctness` and
+band split and onset detector, so it is the only one that would notice a preset
+ignoring the music. `sanity`, `animation`, `distinctness` and
 `golden` construct an analysis frame directly — deliberately, because their
 questions are about the *frame* — and would pass a preset with every band binding
 deleted. The full table is in
@@ -42,8 +42,8 @@ these, which is `architect`'s judgement at the next plan close.
 
 **Author against the floor tier.** Shipped presets are authored and gated on
 `Floor` — every `shot` capture and every CI gate (`sanity` / `reactivity` /
-`animation` / `distinctness`) pins it (Plan 0044 /
-[ADR-0045](../docs/adrs/0045-quality-tiers-floor-and-rich.md)). `Rich` raises
+`animation` / `distinctness`) pins it
+([ADR-0045](../docs/adrs/0045-quality-tiers-floor-and-rich.md)). `Rich` raises
 **capacity**, not behavior: more particles, more segments, a larger internal grid.
 No expression, param or structural field changes meaning, and nothing in the
 grammar can read the tier. The one edge worth knowing is the segment cap — it is a
@@ -51,28 +51,23 @@ tier value, so geometry that overflows and truncates at the floor's 20 000 may f
 at rich. Compose so the floor's cap is the one you tuned for, and treat the extra
 headroom as headroom.
 
-> **That claim was false for the `attractor` family until Plan 0057, and how it
-> was false is worth knowing** ([ADR-0065](../docs/adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md)).
+> **The `attractor` family needs one extra step to hold that promise, and it has it**
+> ([ADR-0065](../docs/adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md)).
 > The attractor draws its particles with an **additive** blend into a linear
-> accumulation, so 150 000 points at `Rich` deposited three times the light of
-> 50 000 at `Floor` into the same texels — same `fade`, same `size`, a picture
-> three stops hotter. For an accumulating scene, capacity *is* the picture; and no
-> capture in this project could render `Rich` to notice. Four shipped presets were
-> retuned **downward** to survive it (commit `00d99d0`), which is a compensation
-> for an engine defect carried in content.
+> accumulation, so without a correction 150 000 points at `Rich` would deposit three
+> times the light of 50 000 at `Floor` into the same texels — same `fade`, same
+> `size`, a picture three stops hotter. For an accumulating scene, capacity *is* the
+> picture.
 >
-> The deposit is now divided by the particle count, so the total light laid down
-> per frame is invariant. At `Floor` the factor is exactly `1.0` and nothing moves;
-> at `Rich` the same figure is drawn from three times the samples at a third the
-> weight each. **A tier now buys less shot noise in the same picture, which is what
-> a capacity tier was always supposed to buy.** Measured on `Clifford` at
-> 1280x720: mean display luminance `17.37` at `Rich` before the change, `10.86`
-> after, against `Floor`'s `10.34`.
+> So the deposit is divided by the particle count, and the total light laid down per
+> frame is invariant. At `Floor` the factor is exactly `1.0` and nothing moves; at
+> `Rich` the same figure is drawn from three times the samples at a third the weight
+> each. **A tier buys less shot noise in the same picture, which is what a capacity
+> tier is for.** Measured on `Clifford` at 1280x720: mean display luminance `10.86`
+> at `Rich` against `Floor`'s `10.34`.
 >
-> Two things follow for you. A preset can no longer buy brightness by running at
-> `Rich` — it never could on purpose, but it is what the shipped pictures did. And
-> anyone comparing a pre-Plan-0057 `Rich` screenshot will find the new one dimmer:
-> that is the fix, not a regression. Capture both tiers with
+> What follows for you is that **a preset cannot buy brightness by running at
+> `Rich`.** Capture both tiers with
 > [`shot --tier`](../docs/capturing.md#captures-pin-the-floor-tier) rather than
 > reasoning about it.
 
@@ -110,7 +105,7 @@ headroom as headroom.
   - [Bloom — `bloom_amount`, `bloom_threshold`, `bloom_radius` (Plan 0045)](#bloom--bloom_amount-bloom_threshold-bloom_radius-plan-0045)
   - [Linear light and `exposure` (Plan 0045)](#linear-light-and-exposure-plan-0045)
   - [Ink on paper — `ink_amount`, `paper_*`, `ink_*`, `ink_gamma` (Plans 0027, 0078)](#ink-on-paper--ink_amount-paper_-ink_-ink_gamma-plans-0027-0078)
-- [Colour — the palette surface (Plan 0020)](#colour--the-palette-surface-plan-0020)
+- [Colour — the palette surface](#colour--the-palette-surface)
   - [Hard bands — `palette_steps` and `palette_contour`](#hard-bands--palette_steps-and-palette_contour)
 - [Eased parameters — the `[smoothing]` table](#eased-parameters--the-smoothing-table)
   - [Snap up, glide down — the `{ attack, release }` form](#snap-up-glide-down--the--attack-release--form)
@@ -124,7 +119,7 @@ headroom as headroom.
   - [`[particles]` — for `attractor`](#particles--for-attractor)
   - [`tuple` picks a whole figure, framing included](#tuple-picks-a-whole-figure-framing-included)
   - [`[spectrum]` — for `spectrum`](#spectrum--for-spectrum)
-- [The second layer — the `[layer]` table (ADR-0090 / Plan 0076)](#the-second-layer--the-layer-table-adr-0090--plan-0076)
+- [The second layer — the `[layer]` table](#the-second-layer--the-layer-table)
   - [The two joins](#the-two-joins)
   - [The `over` join's blend and mix](#the-over-joins-blend-and-mix)
   - [Dark on light — the `multiply` route, and its two traps](#dark-on-light--the-multiply-route-and-its-two-traps)
@@ -152,12 +147,12 @@ hue   = "0.5 + time * 0.02 + treb * 0.3"
 
 A preset may declare `representative = true`. It marks the preset as one of its
 family's samples for the **per-phase** test tier the `dev` lane runs while
-implementing a plan (ADR-0157). Absent means `false`.
+implementing a plan. Absent means `false`.
 
 **It does not change what ships, what the preset looks like, or what gates it.**
 The plan-close run and CI render the **whole** library exactly as before, so the
 behavioral suite that lets this lane land presets without `dev` couriering them
-(ADR-0081) keeps its full strength. The only thing the flag moves is *when* a
+keeps its full strength. The only thing the flag moves is *when* a
 defect in a non-representative preset is noticed: at the close rather than at the
 phase that caused it.
 
@@ -184,48 +179,42 @@ surfaced error — the engine keeps the last good preset, never crashes (NFR 10)
   **BPM**, not a 0..1 band; `novelty` is an experimental track-change transient;
   `index` is the element's own 0..1 position in a per-element binding, and `0`
   everywhere else. The four `*_raw` escapes carry the pre-v2 absolute magnitudes
-  (see below). The five musical-time variables are ADR-0050's, and they are **not
-  equals** — see the two layers immediately below.
+  (see below). The five musical-time variables are **not equals** — see the two
+  layers immediately below.
 
 **The two musical-time layers, and why neither is a musical period on its own.**
 `beat_index` and `time_since_beat` are unconditional — always tracked — but
 **`beat_index` does not count musical beats.** It counts onset-detector events
 ([ADR-0109](../docs/adrs/0109-the-beat-clock-counts-onsets-not-beats.md)):
-1.35x-2.10x detections per musical beat across Plan 0086's three genres,
-1.20x / 1.22x / 2.28x across Plan 0095's, and it wanders between 1x, 2x and 4x
-*inside* one track. The ratio is material-dependent and not a stable integer, so
-`beat_index` is a monotone activity counter and **not a musical period**:
-`mod(beat_index, 16)` is not four bars and `mod(beat_index, 4)` is not "every
-4th beat". Neither idiom is safe to write, and both used to be taught here.
+measured across two sets of three genres at 1.35x-2.10x detections per musical
+beat in one and 1.20x / 1.22x / 2.28x in the other, and it wanders between 1x, 2x
+and 4x *inside* one track. The ratio is material-dependent and not a stable
+integer, so `beat_index` is a monotone activity counter and **not a musical
+period**: `mod(beat_index, 16)` is not four bars and `mod(beat_index, 4)` is not
+"every 4th beat". Neither idiom is safe to write.
 
 `beat_in_bar`, `bar_index` and `bar_phase` come from a **gated** downbeat
-estimator and are counter-derived whenever it is not confident. Since Plan 0095
-that estimator folds over a **tempo-driven** bar grid rather than over
-`beat_index`, so its unit is a stable multiple of the beat instead of a
-wandering one — a real bar when the tempo estimate is on the right octave, and
-half or double one when it is not. That caveat is not theoretical: on the
-hip-hop capture below the estimate read a 165 BPM median on a track that counts
-at ~90, so its "bar" there spanned two musical beats. Re-measured through the
-live app on three genres — paired against a reconstruction of the pre-0095 fold
-on the same captures — the share of hops over the `0.25` confidence gate moved
-**0.00 -> 2.36 %** on rock/pop, **0.79 -> 3.67 %** on hip-hop (at that wrong
-octave) and **4.16 -> 0.42 %** on techno.
+estimator and are counter-derived whenever it is not confident. That estimator
+folds over a **tempo-driven** bar grid rather than over `beat_index`, so its unit
+is a stable multiple of the beat instead of a wandering one — a real bar when the
+tempo estimate is on the right octave, and half or double one when it is not. That
+caveat is not theoretical: on the hip-hop capture below the estimate read a 165 BPM
+median on a track that counts at ~90, so its "bar" there spanned two musical beats.
+Measured through the live app on three genres, the share of hops over the `0.25`
+confidence gate is **2.36 %** on rock/pop, **3.67 %** on hip-hop (at that wrong
+octave) and **0.42 %** on techno.
 
 Read that as **roughly 2-4 % on material with bar-scale accents, near zero on
 material without.** Four-on-the-floor puts a kick on every beat, so there is no
-bar-scale accent to find and the honest outcome is a shut gate; the old fold's
-4.16 % came from a counter running at 2.28 detections per beat aliasing its four
-buckets onto the kick/hat alternation — a real 4-periodicity that is not a bar.
-The accent feature is still 70 % bass band, which is why it finds so little
+bar-scale accent to find and the honest outcome is a shut gate. The accent feature
+is 70 % bass band, which is why it finds so little
 ([ADR-0082](../docs/adrs/0082-the-downbeat-gate-holds-and-the-estimator-is-diagnosed-first.md)'s
 `Outcome` carries that diagnosis).
 
-So the trio is **still counter-derived most of the time**, and the old advice
-here — "build an arc on `beat_index` and treat the bar trio as decorative" — is
-**retracted in both halves**: `beat_index` is not the safer unit. Bind the trio
-freely, since it stays periodic and never claims a wrong beat 1 (ADR-0050's
-deliberate trade), but do not write a look whose whole point is landing on the
-real bar line. For a structural pulse, `bar_index` / `beat_in_bar` are the
+So the trio is **counter-derived most of the time**, and `beat_index` is not the
+safer unit to reach for instead. Bind the trio freely, since it stays periodic and
+never claims a wrong beat 1, but do not write a look whose whole point is landing
+on the real bar line. For a structural pulse, `bar_index` / `beat_in_bar` are the
 closest unit there is; for a *timed* one, `time` in seconds against `tempo` in
 BPM is the only reading that is neither gated nor onset-driven.
 - **Functions:** `sin cos abs floor sqrt log min max pow mod clamp lerp
@@ -241,12 +230,11 @@ Full grammar reference: [`../docs/presets.md`](../docs/presets.md#the-expression
 
 ### What range the bands actually occupy
 
-**Since ADR-0049, `bass`/`mid`/`treb`/`onset` really are `0..1`.** Each is a
-fraction of that signal's *own slowly-decaying recent peak*, so `> 0.5` means
-"loud for this track" — on any track, at any gain, under any stimulus. This is the
-single biggest change to authoring in the project's history, and it deleted a
-whole class of defect: a threshold can no longer be quietly unreachable because
-the levels turned out to be a hundred times smaller than they looked.
+**`bass`/`mid`/`treb`/`onset` really are `0..1`.** Each is a fraction of that
+signal's *own slowly-decaying recent peak*, so `> 0.5` means "loud for this track"
+— on any track, at any gain, under any stimulus. That is what keeps a threshold
+from being quietly unreachable because the levels turn out to be a hundred times
+smaller than they looked.
 
 | variable | min | mean | max | note |
 |---|---|---|---|---|
@@ -295,9 +283,8 @@ in
   On the v2 scale `bass + mid` has a mean of `1.24` against a max of `2.0`, so
   `select(bass + mid > 1.5, 12, 6)` is a live gate while `select(bass + mid > 0.085,
   12, 6)` is the constant `12` and `> 2.4` is the constant `6`. Pre-v2 the
-  low-threshold failure was rare because the levels were tiny; now it is the
-  commoner mistake, and it is the one Plan 0048 Phase 7 found in nine shipped
-  bindings and retuned.
+  low-threshold failure is the commoner mistake on this scale, and it is the one
+  that was found in nine shipped bindings at once and retuned.
 - **Calibrate a continuous parameter against the mean and a percussive one
   against the peak.** A zoom or a hue drift spends its life near the mean; a
   flash or a burst exists to fire on the hit.
@@ -411,7 +398,7 @@ first `·` are the shared **view transform** and
 line-**mirror** controls (Plan 0018) — see [Engine-wide controls](#engine-wide-controls-plan-0018);
 the trailing group on the palette-coloured scenes (the four shader ones, plus
 `spectrum` since Plan 0034) is the shared **palette** colour surface (Plan 0020) —
-see [Colour — the palette surface](#colour--the-palette-surface-plan-0020).
+see [Colour — the palette surface](#colour--the-palette-surface).
 Every system additionally accepts the engine-stage params `bg_*`, `trails`,
 `kaleido_*`, `bloom_*`, `occlude`, `exposure`, and the final `ink_*`/`paper_*`
 remap documented there.
@@ -3057,12 +3044,12 @@ the palette to sculpt *contrast* in an ink preset, not colour.
 The HUD, the browse overlay, and the diagnostics overlay draw *after* this stage,
 so they are never inverted.
 
-## Colour — the palette surface (Plan 0020)
+## Colour — the palette surface
 
 The four **shader-coloured** scenes (`fragment_field`, `swarm`,
-`reaction_diffusion`, `attractor`) — and, since Plan 0034, `spectrum`, which
-samples the same LUT on the CPU, one colour per element — colour through a shared
-**palette** (ADR-0021): a gradient — a built-in `name` or custom `stops` — baked
+`reaction_diffusion`, `attractor`) — and `spectrum`, which samples the same LUT on
+the CPU, one colour per element — colour through a shared
+**palette** ([ADR-0021](../docs/adrs/0021-shared-palette-system.md)): a gradient — a built-in `name` or custom `stops` — baked
 into a lookup table the scene samples. An optional top-level `[palette]` table
 picks it; a `[palette_b]` + bindable `palette_mix` crossfades between two. **A
 custom stop is authored in sRGB** — the hex a picker gives you — and the engine
@@ -3074,8 +3061,9 @@ surface](../docs/preset-palettes.md#custom-gradient-stops--stops) has the domain
 Colour modulation (`saturation`, `color_span`/`color_center`, `hue_spread`/`hue_center`,
 `palette_mix`) is normal audio-bindable `[params]`. All defaults reproduce each
 scene's prior look (`[palette]`-less = the classic `spectrum` cosine), so a preset
-that sets none is unchanged. **Since Plan 0054 / ADR-0059 the other three line
-scenes join them** — `parametric_curve`, `lsystem` and `star_pattern` all sample
+that sets none is unchanged. **The other three line scenes join them**
+([ADR-0059](../docs/adrs/0059-line-scenes-colour-along-their-generator-axis.md)) —
+`parametric_curve`, `lsystem` and `star_pattern` all sample
 the same LUT on the CPU, each walking `hue_spread` along its own generator's axis
 (see [the colour axes](#the-line-scenes-colour-axes--what-hue_spread-walks); the
 star's is inert until its interior is redesigned). With no `[palette]` that LUT is
@@ -3116,8 +3104,8 @@ them to an existing preset is the only thing that changes it.
 | `palette_steps` | `0` (off) | **`4`–`12`** | `0` = smooth, up to `64` |
 | `palette_contour` | `0` (none) | **`0`–`0.5`** | `0` = none, up to `1`. Draws **only where the two bands it separates are different colours** ([ADR-0133](../docs/adrs/0133-the-band-contour-fires-where-the-ink-changes.md)) — so it is silent inside a plateau and draws at each run boundary, which is what makes it usable on a limited-ink palette. Unchanged on a smooth one at any step count |
 
-Those two ranges are Plan 0064 Phase 4's, read off a rendered sweep rather than
-argued. Outside them nothing breaks — it just stops being the *graphic* look:
+Those two ranges were read off a rendered sweep rather than argued. Outside them
+nothing breaks — it just stops being the *graphic* look:
 
 - **`palette_steps` 16 and up approaches the smooth ramp again.** The bands get
   narrower than the eye separates them at, so the picture converges on the
@@ -3158,8 +3146,8 @@ and the A/B crossfade — is in **[docs/preset-palettes.md](../docs/preset-palet
 ## Eased parameters — the `[smoothing]` table
 
 An optional top-level `[smoothing]` table low-passes chosen params so band- and
-beat-driven motion eases instead of snapping (ADR-0019). Each entry is a **time
-constant in seconds** (a bare number, *not* an expression):
+beat-driven motion eases instead of snapping. Each entry is a **time constant in
+seconds** (a bare number, *not* an expression):
 
 ```toml
 [smoothing]
@@ -3168,8 +3156,7 @@ bg_bright = 0.3
 hue   = 0.4    # a slow, fluid hue drift
 ```
 
-A param not listed is applied instantly (today's behaviour); `0` also means no
-smoothing. The smoothing runs on real elapsed time, so it is identical at any
+A param not listed is applied instantly; `0` also means no smoothing. The smoothing runs on real elapsed time, so it is identical at any
 refresh rate, and it resets on a preset switch (a switch snaps to the new preset's
 first value). Validated non-negative and finite at load.
 
@@ -3177,7 +3164,7 @@ first value). Validated non-negative and finite at load.
 
 One constant slows the rise exactly as much as it slows the fall, so a longer
 `tau` trades a jarring attack for a mushy one. An entry may instead name **two**
-constants, and the smoother picks by direction (ADR-0035):
+constants, and the smoother picks by direction:
 
 ```toml
 [smoothing]
@@ -3278,17 +3265,17 @@ and the ceiling is reached at `bass = 0.019` — below the quietest hop of any r
 material. The binding is not a parameter any more; it is the constant `0.3` with
 a brief flicker near silence. Every reactivity instrument in this project scores
 it as **perfectly reactive**, because they all compare a driven band against
-*silence*, and against silence a binary switch is maximally responsive. Plan 0048
-Phase 7 measured what that costs: 263 of 332 clamped band terms in exactly this
-state, 14 presets with no live audio term at all, behind a fully green suite.
+*silence*, and against silence a binary switch is maximally responsive. What that
+costs has been measured across the whole library at once: 263 of 332 clamped band
+terms in exactly this state, 14 presets with no live audio term at all, behind a
+fully green suite.
 
-**Plan 0067 Phase 1 did not change this, and it is worth being explicit about
-why.** `reactivity` now drives real PCM through the real analyzer instead of
-hand-built frames — but it still compares a driven band against **silence**, and
-that is the property this section is about. A saturating clamp is maximally
-reactive against silence whether the "driven" number came from an FFT or from a
-literal. `saturation` remains the only gate that asks the question this section
-asks.
+**Driving the gate with real audio does not change this.** `reactivity` puts real
+PCM through the real analyzer rather than hand-built frames — but it still compares
+a driven band against **silence**, and that is the property this section is about.
+A saturating clamp is maximally reactive against silence whether the "driven"
+number came from an FFT or from a literal. `saturation` is the only gate that asks
+the question this section asks.
 
 The fix is always the same arithmetic: **divide the gain until the bound is
 reached only on peaks.** With `bass` averaging `0.661`, `clamp(bass * 0.45, 0,
@@ -3375,12 +3362,12 @@ cargo run -p standalone --example shot -- --preset-file presets/yours.toml --sig
 ```
 
 `core/tests/sanity.rs` catches the **total** case — a figure so far out that the
-frame comes back empty — with the backdrop suppressed since Plan 0058, so a
-`bg_vignette` can no longer stand in for a figure that is not there, and since
-Plan 0116 against **the frame's own ground** rather than against black: the mean
-tone of its most populous luminance band (ADR-0126), so a scene that paints its
-own paper is measured on what it drew instead of reading as a completely full
-frame. It also prints a per-preset **excitation ratio**
+frame comes back empty. It suppresses the backdrop, so a `bg_vignette` cannot
+stand in for a figure that is not there, and it measures against **the frame's own
+ground** rather than against black — the mean tone of its most populous luminance
+band ([ADR-0126](../docs/adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md)),
+so a scene that paints its own paper is measured on what it drew instead of
+reading as a completely full frame. It also prints a per-preset **excitation ratio**
 (coverage when fully driven over coverage at a moderate level) on every run. That
 ratio is a report rather than a gate, and the reason is worth knowing: a partial
 over-scale that clips only the tips costs almost no pixels, so the number comes
@@ -4121,7 +4108,7 @@ Two attractor params behave unlike anything else in the set:
   The seed box survives where it is correct — the initial fill and a family change,
   the two places there is no existing cloud to disturb.
 
-## The second layer — the `[layer]` table (ADR-0090 / Plan 0076)
+## The second layer — the `[layer]` table
 
 A preset may compose **one** optional second scene. The `[layer]` table names its
 own system and carries a full authoring surface — params, easing, structural
@@ -4208,8 +4195,8 @@ about:
   the default `occlude = 1` a covering layer makes the frame **byte-identical**
   to the same preset over a black backdrop (the backdrop is held out, not
   darkened); at `occlude = 0` it is added *after* the blend and becomes a floor
-  the layer cannot cross. Measured at Plan 0091 Phase 1: a multiply layer
-  reaching display luma 18.9 over black reaches only 171.3 over a lit sky.
+  the layer cannot cross: a multiply layer reaching display luma 18.9 over black
+  reaches only 171.3 over a lit sky.
 
 Which scene to put in the slot is a question of **footprint**, not of
 capability — both routes darken:
@@ -4221,8 +4208,7 @@ capability — both routes darken:
 
 The particle route reaches **darker**: a frozen swarm at `brightness = 0` takes
 a light chain to display luma **0.9**, against **18.9** for the field route.
-(If you find a document saying a particle layer cannot darken at all — ADR-0106
-and design-backlog 0069 both did — it is wrong and corrected; a particle's alpha
+(A particle layer **can** darken, whatever an older note says: a particle's alpha
 is its *geometric* falloff, independent of its colour.)
 
 ### What the layer does and does not get
@@ -4254,8 +4240,8 @@ shipping one.
 ## Finding a starting point in this folder
 
 Filenames are `<system>_<look>.toml`, so `ls` is the roster — there is no list here to
-drift (adding a preset is dropping a file; `core/build.rs` globs the directory,
-ADR-0022). To browse them rendered instead, shoot a contact sheet:
+drift (adding a preset is dropping a file; `core/build.rs` globs the directory).
+To browse them rendered instead, shoot a contact sheet:
 
 ```sh
 cargo run -p standalone --example shot -- --presets presets --all --out sheet.png
