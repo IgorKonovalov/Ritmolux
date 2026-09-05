@@ -289,8 +289,8 @@ against the merged tree.
 | 3 — a wrong anchor fails the build | dev | done | `f7b5676` |
 | 4 — the rule generalises | dev | done | `f3c8bb2` |
 | 5 — a stranger can find out what this is and get it | dev | done | `22a0371` |
-| 6 — the drift classes get gates | dev | done | committed with this row |
-| 7 — it looks like one thing | dev | | |
+| 6 — the drift classes get gates | dev | done | `96e5806` |
+| 7 — it looks like one thing | dev | done | committed with this row |
 | 8 — verified where it is served | human | | |
 
 ### Notes
@@ -515,6 +515,42 @@ pages carry it**, the splash landing page and `404.html` included.
 
 **Phase 6 — `CLAUDE.md` now reads eight gates**, and the `scripts/` block says that two of them, not
 one, need a built site and live in `.github/workflows/pages.yml`.
+
+**Phase 7 — measured at 360 px, in the browser, on all four named pages.** `documentElement.scrollWidth`
+against `clientWidth` (345 px of content inside a 360 px viewport), plus a walk of every element
+looking for one that extends past the viewport without a scrolling ancestor:
+
+| page | page scrolls sideways | element overflowing outside a scroll box |
+|---|---|---|
+| landing | no | none |
+| gallery | no | none |
+| roster index | no | none |
+| `…/attractor-depth-perspective-depth_fade-depth_hue-spin/` | no | none |
+
+**Phase 7 — the roster's tables needed the opposite of what they were doing.** They did not overflow
+before this phase; they *squeezed*, wrapping four columns into 313 px at roughly one word per line.
+A rehype plugin now wraps every table in a focusable `div.table-scroll` and the table carries a
+34 rem minimum, so on that route the tables are 544 px wide and scroll inside their own box while
+the page does not. The wrapper is `tabindex="0"` with `role="region"`: a box that scrolls but cannot
+be reached from the keyboard is unreadable to anyone not using a pointer.
+
+**Phase 7 — the gallery already reserved its space, and it is asserted rather than assumed.** All
+**82** images carry `width`/`height` attributes and a CSS `aspect-ratio: 16 / 9`, so the grid's
+height is final before any of the 82 lazy loads returns.
+
+**Phase 7 — the hero.** Starlight's splash template puts only the title and tagline in `.hero`, and
+this page's buttons are body content underneath (a frontmatter `hero.actions` link cannot carry the
+site base). Stock, that seam showed as roughly 190 px of dead space at 1440 px. `.hero` loses its
+bottom padding and the action row loses its top margin, so name, tagline, buttons, the opening
+sentence and the top of the gallery are all above the fold at 1440x900.
+
+**Phase 7 — both schemes are set, not inherited.** Starlight's stock accent is a blue that says
+nothing about this project. `site.css` sets three accent stops per scheme — `#5b4bd6` on light,
+`#7d6cf0` on dark — chosen separately rather than one lightened from the other, and both were looked
+at.
+
+**Phase 7 — `gallery.css` is `site.css`.** It stopped being about the gallery two rules in; renamed
+with `git mv` so the history follows.
 
 ### Close triggers
 

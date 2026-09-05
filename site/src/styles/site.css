@@ -1,0 +1,185 @@
+/* The site's own stylesheet: the image grids, the landing page's hero, the
+ * tables that must scroll rather than squeeze, and the accent both colour
+ * schemes are built from.
+ *
+ * Loaded through Starlight's `customCss`. Everything here is either scoped to a
+ * class this site's own pages emit, or is a deliberate override of a stock rule
+ * that reads badly at this corpus's shape - a five-column parameter table on a
+ * phone, or a splash hero whose actions are body content.
+ */
+
+/* ---------------------------------------------------------------------------
+ * Colour. Both schemes are chosen rather than inherited.
+ *
+ * Starlight's default accent is a blue that says nothing about this project.
+ * The violet below is taken from the gallery frames the landing page shows, and
+ * each scheme gets its own three stops rather than one being derived from the
+ * other by lightening: a hue that reads as accent on white is muddy on near
+ * black, and one that glows on black is unreadable on white.
+ * ------------------------------------------------------------------------- */
+:root {
+  --sl-color-accent-low: #d8d3f7;
+  --sl-color-accent: #5b4bd6;
+  --sl-color-accent-high: #2f2585;
+}
+
+:root[data-theme='dark'] {
+  --sl-color-accent-low: #241d54;
+  --sl-color-accent: #7d6cf0;
+  --sl-color-accent-high: #c9c2fb;
+}
+
+/* The image grids: the landing page's one-per-system strip and the gallery
+ * page's one-per-preset cards, which are the same object at two lengths.
+ *
+ * Scoped to two class names and loaded through Starlight's `customCss`, so it
+ * reaches only the pages that use them and every published document keeps the
+ * stock theme. `auto-fill` with a min track width is what lets a grid be a
+ * single column on a phone and a wide row on a desktop without a media
+ * query. */
+.gallery-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.gallery-strip figure {
+  margin: 0;
+}
+
+.gallery-strip img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 0.5rem;
+  background: var(--sl-color-gray-6);
+}
+
+.gallery-strip figcaption {
+  margin-top: 0.35rem;
+  font-size: var(--sl-text-xs);
+  color: var(--sl-color-gray-3);
+  text-align: center;
+}
+
+/* The gallery page's own index, standing in for a table of contents.
+ * Twelve family headings are emitted from JSX, which rehype never sees, so
+ * Starlight's sidebar TOC would be empty for this page - `tableOfContents` is
+ * off in its frontmatter and this is what replaces it. */
+.family-index {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.6rem;
+  padding: 0;
+  margin: 1rem 0 2rem;
+  list-style: none;
+}
+
+.family-index a {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 999px;
+  font-size: var(--sl-text-xs);
+  text-decoration: none;
+}
+
+.family-section {
+  margin-top: 2.5rem;
+}
+
+.family-section h2 {
+  border-bottom: 1px solid var(--sl-color-hairline);
+  padding-bottom: 0.3rem;
+}
+
+.family-section .family-count {
+  color: var(--sl-color-gray-3);
+  font-size: var(--sl-text-sm);
+  font-weight: normal;
+}
+
+/* The landing page's entrance buttons, which stand in for `hero.actions`.
+ * Starlight's own splash layout centres the frontmatter actions; these are body
+ * content, so the row is laid out here. */
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 1.5rem 0 2rem;
+}
+
+/* ---------------------------------------------------------------------------
+ * The landing page's hero.
+ *
+ * Starlight's splash template renders only the title and the tagline inside
+ * `.hero`; the entrance buttons and the opening sentence are body content below
+ * it, because a frontmatter `hero.actions` link cannot carry the site base
+ * (see the comment in index.mdx). Left stock, that seam shows as a band of dead
+ * space between the tagline and the buttons at desktop widths. These rules
+ * close it, so the three things a stranger needs - what it is, what it looks
+ * like, how to get it - sit together above the fold.
+ * ------------------------------------------------------------------------- */
+.hero {
+  padding-bottom: 0;
+}
+
+.hero .tagline {
+  max-width: 34ch;
+  font-size: clamp(1.125rem, 1rem + 0.9vw, 1.5rem);
+  line-height: 1.4;
+}
+
+/* The button row is the first body block on the landing page, and it belongs to
+ * the hero visually even though it is not inside it. */
+.sl-markdown-content > .hero-actions:first-child {
+  margin-top: 0.75rem;
+}
+
+/* ---------------------------------------------------------------------------
+ * Wide tables scroll in their own box, never the page.
+ *
+ * The parameter roster is mostly tables of four or five columns, and squeezing
+ * one into a 345 px viewport wraps every cell to one word per line. A minimum
+ * width keeps the columns readable and hands the overflow to a scroll container
+ * around the table, so the page itself never scrolls sideways. The wrapper is
+ * added by a rehype plugin in `astro.config.mjs`.
+ * ------------------------------------------------------------------------- */
+.table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+  margin-block: 1rem;
+}
+
+.table-scroll > table {
+  min-width: 34rem;
+  margin-block: 0;
+}
+
+/* A keyboard user has to be able to reach a scroll box, and a focus ring is how
+ * they know they did. */
+.table-scroll:focus-visible {
+  outline: 2px solid var(--sl-color-accent-high);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+ * The build stamp, on every page (ADR-0154: this site tracks `main`).
+ *
+ * Deliberately quiet - it is provenance, not content, and a reader who is not
+ * comparing the site against a release zip should never notice it.
+ * ------------------------------------------------------------------------- */
+.build-stamp {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--sl-color-hairline);
+  color: var(--sl-color-gray-3);
+  font-size: var(--sl-text-xs);
+}
+
+.build-stamp code {
+  font-size: inherit;
+}
