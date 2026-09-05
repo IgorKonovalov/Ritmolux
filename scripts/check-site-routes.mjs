@@ -107,9 +107,9 @@ function sidebarRoutes(pageFile) {
 function publishedRoutes() {
   const routes = new Set();
   const splitSizes = new Map();
-  for (const [source, route] of Object.entries(PUBLISHED)) {
+  for (const [source, { route, title }] of Object.entries(PUBLISHED)) {
     const text = readFileSync(new URL(source, REPO_ROOT_URL), "utf8");
-    const split = splitDocument(text, route, source);
+    const split = splitDocument(text, route, title);
     if (split === null) {
       routes.add(route);
       continue;

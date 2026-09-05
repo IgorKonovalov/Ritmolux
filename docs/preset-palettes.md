@@ -264,7 +264,7 @@ second choice.
 One more trap on `root_tint` specifically: **its effective range is per figure**,
 from `0.41` on the spiral to `1.05` on the dragon, so the same binding is not the
 same look across figures. See
-[the full section in `presets/README.md`](../presets/README.md#what-made-this-point-and-how-far-into-the-figure-it-is)
+[the full section in the parameter roster](../presets/README.md#what-made-this-point-and-how-far-into-the-figure-it-is)
 for the table and for the `age_*` params these replaced.
 
 ### Spectrum — colour along the frequency axis

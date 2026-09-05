@@ -1,0 +1,19 @@
+<!doctype html>
+<!--
+  Seeded bite check for check-site-links.mjs property 4, run as
+  `node scripts/check-site-links.mjs scripts/fixtures/site-links`.
+
+  Exactly one defect, and every other property holds, so a red exit here names
+  property 4 and nothing else. The base is /ritmolux/ because the gate reads it
+  from site/astro.config.mjs and that is the local default.
+-->
+<html lang="en">
+  <body>
+    <!-- The defect: a link into the site whose text is still a file path. -->
+    <a href="/ritmolux/guide/expression-language/">docs/presets.md</a>
+
+    <!-- Not defects, and here so the fixture proves the exemptions too. -->
+    <a href="/ritmolux/guide/expression-language/">Expression language</a>
+    <a href="https://github.com/IgorKonovalov/Ritmolux/blob/main/docs/adrs/0169-the-site-is-organised-by-reader-task-and-the-readme-stops-being-a-reference.md">docs/adrs/0169-the-site-is-organised-by-reader-task-and-the-readme-stops-being-a-reference.md</a>
+  </body>
+</html>

@@ -17,7 +17,7 @@
 // argument points at some other build directory; it is what makes the
 // "no build happened" behaviour below testable.
 //
-// Three properties, all exact -- there is no threshold to tune:
+// Four properties, all exact -- there is no threshold to tune:
 //
 //   1. No site-relative href ends in `.md`. A markdown link that escaped the
 //      rewrite serves a 404, and it is the single most likely rewrite defect.
@@ -28,6 +28,13 @@
 //   3. Every off-site href is an absolute `https` URL. Nothing else is a legal
 //      way out of this site -- no `http`, no protocol-relative `//host`, no
 //      other scheme.
+//   4. No site-relative link's TEXT ends in `.md`. Property 1 is about where a
+//      link goes; this one is about what it says. A source writes
+//      ``[`docs/presets.md`](presets.md)`` because a path is the honest name of
+//      a file on GitHub, and the rewrite renames it to the target's declared
+//      title (ADR-0169). A survivor works, so nothing else would ever report
+//      it, and it reads as a leaked file path. Off-site links are exempt and
+//      keep their path text, for the same reason the source wrote it.
 //
 // A build that has not happened fails LOUDLY rather than passing vacuously:
 // an empty or missing directory, or one holding no HTML at all, is reported as
@@ -105,14 +112,36 @@ function resolveInBuild(href, pageFile) {
   return target;
 }
 
+/**
+ * An anchor's visible text: its markup with tags and entities removed.
+ *
+ * Property 4 reads a link the rewrite was supposed to rename, and the rename
+ * replaces a code span with plain text -- so the text is read from the RENDERED
+ * anchor rather than from the source, which is the only place a survivor shows.
+ * Anchors do not nest, so a non-greedy match needs no parser.
+ */
+function linkText(markup) {
+  return markup
+    .replace(/<[^>]*>/g, "")
+    .replace(/&[a-z]+;|&#\d+;/gi, " ")
+    .trim();
+}
+
 const unrewritten = [];
 const unresolved = [];
 const notHttps = [];
 const outsideBase = [];
+const pathText = [];
 
 for (const pageFile of pages) {
   const page = path.relative(DIST, pageFile).split(path.sep).join("/");
   const html = readFileSync(pageFile, "utf8");
+  for (const [, href, inner] of html.matchAll(/<a\s[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g)) {
+    if (href === "" || href.startsWith("#")) continue;
+    if (href.startsWith("https://") || /^([a-z][a-z0-9+.-]*:|\/\/)/i.test(href)) continue;
+    const text = linkText(inner);
+    if (text.endsWith(".md")) pathText.push([page, `"${text}" -> ${href}`]);
+  }
   for (const [, href] of html.matchAll(/href="([^"]*)"/g)) {
     if (href === "" || href.startsWith("#")) continue;
 
@@ -133,11 +162,12 @@ for (const pageFile of pages) {
   }
 }
 
-const failures = unrewritten.length + unresolved.length + notHttps.length + outsideBase.length;
+const failures =
+  unrewritten.length + unresolved.length + notHttps.length + outsideBase.length + pathText.length;
 if (failures === 0) {
   console.log(
     `site links: OK (${pages.length} built pages, every site-relative href resolves, ` +
-      `every off-site href is absolute https)`,
+      `every off-site href is absolute https, no on-site link reads as a file path)`,
   );
   process.exit(0);
 }
@@ -152,6 +182,7 @@ report(unrewritten, "A markdown link escaped the rewrite and the site would serv
 report(unresolved, "A site-relative href resolves to nothing in the build output");
 report(notHttps, "An off-site href is not an absolute https URL");
 report(outsideBase, `A site-relative href leaves the site base ${BASE}`);
+report(pathText, "A link into the site reads as a file path rather than as a page title");
 
 console.error(
   "\nThe rewrite lives in site/src/plugins/rewrite-links.mjs. A link that escaped it is\n" +
@@ -161,6 +192,11 @@ console.error(
     "\n" +
     "An href that resolves to nothing is a page the site links to and does not build.\n" +
     "Check PUBLISHED in site/src/plugins/rewrite-links.mjs against the sidebar in\n" +
-    "site/astro.config.mjs: a route in one and not the other fails exactly this way.",
+    "site/astro.config.mjs: a route in one and not the other fails exactly this way.\n" +
+    "\n" +
+    "A link that reads as a file path is a source link whose whole text was that path and\n" +
+    "whose target is published. The rewriter renames those to the target's declared title;\n" +
+    "one that survived was written in a shape `pathTextLeaf` does not recognise - text split\n" +
+    "across nodes, or raw HTML. Give the link a name in the source, or teach the rewriter.",
 );
 process.exit(1);

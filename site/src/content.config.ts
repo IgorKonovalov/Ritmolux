@@ -36,18 +36,38 @@ const SPLIT_SOURCES = new Set(splitSources(PUBLISHED, REPO_ROOT));
 
 /** Repo-relative sources the glob loader still serves one route each. */
 const WHOLE: Record<string, string> = Object.fromEntries(
-  Object.entries({ ...PUBLISHED, ...SITE_PAGES }).filter(([source]) => !SPLIT_SOURCES.has(source)),
+  [
+    ...Object.entries(PUBLISHED).map(([source, { route }]) => [source, route] as const),
+    ...Object.entries(SITE_PAGES),
+  ].filter(([source]) => !SPLIT_SOURCES.has(source)),
 );
 
 /**
+ * The title a published source declares, or `undefined` for a page the site
+ * owns (those carry their own frontmatter title).
+ *
+ * `filePath` on a loader entry is relative to the Astro project root, which is
+ * `site/`, while `PUBLISHED` is keyed from the repository root one level above
+ * it - so the path is resolved and re-relativized rather than string-matched.
+ */
+function declaredTitle(filePath: string): string | undefined {
+  const abs = path.resolve(fileURLToPath(SITE_ROOT), filePath);
+  const rel = path.relative(fileURLToPath(REPO_ROOT), abs).split(path.sep).join('/');
+  return PUBLISHED[rel]?.title;
+}
+
+/**
+ * The fallback title, for a published source that declares none in `PUBLISHED`:
+ * the document's own opening `# ` heading.
+ *
  * Starlight's `docsSchema()` requires a `title`; not one file in the published
- * set carries frontmatter, and none may gain any. The title is therefore taken
- * from the document's own opening `# ` heading, injected into the frontmatter
- * object on its way to schema validation.
+ * set carries frontmatter, and none may gain any, so the title is injected into
+ * the frontmatter object on its way to schema validation either way.
  *
  * The matching half of this lives in `astro.config.mjs`: a remark plugin drops
  * that same leading heading from the body, because Starlight renders `title`
- * as the page `<h1>` and the document would otherwise show two.
+ * as the page `<h1>` and the document would otherwise show two - which is true
+ * of a declared title as much as of a derived one.
  *
  * A setext heading counts. `packaging/*\/READ-ME-FIRST.md` writes its title over
  * a rule of `=` rather than behind a `# `, and those files are published as they
@@ -83,7 +103,11 @@ function withDerivedTitles(loader: Loader): Loader {
             // demanding a heading of a file that has no body heading.
             data: props.data?.title
               ? props.data
-              : { title: titleFromLeadingHeading(props.filePath!), ...props.data },
+              : {
+                  title:
+                    declaredTitle(props.filePath!) ?? titleFromLeadingHeading(props.filePath!),
+                  ...props.data,
+                },
           }),
       }),
   };
@@ -112,7 +136,8 @@ function splitLoader(sources: Iterable<string>): Loader {
         const fileURL = new URL(source, REPO_ROOT);
         const filePath = fileURLToPath(fileURL);
         const text = readFileSync(filePath, 'utf8');
-        const split = splitDocument(text, PUBLISHED[source], titleFromLeadingHeading(filePath, text));
+        const { route, title } = PUBLISHED[source];
+        const split = splitDocument(text, route, title);
         if (!split) {
           throw new Error(
             `${source} is listed as a split document but is under the size the split needs, ` +

@@ -234,10 +234,14 @@ export function contentsList(chunk, base, heading) {
  * rename would silently orphan a route. A section that split again nests its
  * subsections under itself, so the menu is never a flat list of 45 siblings.
  *
+ * The group's own label is the document's DECLARED title, not a second string
+ * passed in beside it: the menu entry and the page `<h1>` are one fact
+ * (ADR-0169), and a label written here would be the copy that drifts.
+ *
  * @param source repo-relative path, as spelled in `PUBLISHED`
- * @param route  the site route that path publishes as
+ * @param published that source's `{ route, title }` entry
  */
-export function sidebarGroup(source, route, label) {
+export function sidebarGroup(source, { route, title: label }) {
   const fileURL = new URL(`../../../${source}`, import.meta.url);
   const split = splitDocument(readFileSync(fileURL, 'utf8'), route, label);
   if (!split) return { label, slug: route };

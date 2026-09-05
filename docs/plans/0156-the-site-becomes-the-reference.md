@@ -1,6 +1,6 @@
 # 0156 — The site becomes the reference
 
-> **Status:** draft
+> **Status:** in-progress
 > **Created:** 2026-09-06
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0169](../adrs/0169-the-site-is-organised-by-reader-task-and-the-readme-stops-being-a-reference.md)
@@ -421,11 +421,11 @@ pub const PARAMS: &[ParamSpec] = &[
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(`WORK/rlx-plan-0156` on `plan-0156-the-site-becomes-the-reference`, or as run)_
+**Lane:** `WORK/rlx-plan-0156` on `plan-0156-the-site-becomes-the-reference`.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The menu is organised by reader task | dev | not started | |
+| 1 — The menu is organised by reader task | dev | done | committed with this row |
 | 2 — The operator surface has a reference | dev | not started | |
 | 3 — The site renders diagrams, and How it works exists | dev | not started | |
 | 4 — The engine-side documents address a reader | dev | not started | |
@@ -436,7 +436,16 @@ pub const PARAMS: &[ParamSpec] = &[
 
 ### Notes
 
-_(deviations, unmet done-whens by exception, followups noticed — one line each)_
+- **Phase 1 edited one file outside its `Files touched` list:** `docs/preset-palettes.md`, one
+  link's text, `the full section in `presets/README.md`` → `the full section in the parameter
+  roster`. The new gate reads rendered link text, and that link's text ends in `.md` while not
+  being a path the rewriter may rename — the plan's rule is "a link whose text *is* the target's
+  path", and this one is a sentence containing a path.
+- The rewriter also unwraps `strong`/`emphasis` around a path, for
+  `[**`docs/preset-tuning-walkthrough.md`**](…)` in `docs/preset-guide.md`.
+- **The site's content-collection cache hides a plugin edit.** A split document's chunks are stored
+  under a digest of the chunk body, so a change to the *rewriter* re-renders nothing. `rm -rf
+  site/.astro` before believing a build that a plugin edit should have changed.
 
 ### Close triggers
 

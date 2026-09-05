@@ -1,7 +1,9 @@
 # scripts/fixtures — the trees the doc checkers bite on
 
-Seven checkers in `scripts/` take an optional `root` argument so they can be run against a tree
-other than this repository. This directory is that tree. Most files under it are **deliberately
+Eight checkers in `scripts/` take an optional `root` argument so they can be run against a tree
+other than this repository. This directory is that tree. `site-links/` is the one whose root is a
+BUILT SITE rather than a repository, which is why it holds HTML and everything else here holds
+markdown. Most files under it are **deliberately
 wrong in a named way**, so that "the checker still catches things" is a command anyone can run
 rather than a property nobody has re-tested since the day it was written. `index-rows/` and `toc/`
 are the exceptions and invert it — and `index-rows-red/` is the half that restores the usual
@@ -400,6 +402,33 @@ false positives on the shipped tree — which is what it did before this file ex
 **`docs/capturing.md` is here and is deliberately out of scope.** It is an Entrance B document
 carrying four bare citations, and the run must never report them. If it ever does, the filename
 list inside the script has widened past what ADR-0168 decided.
+
+## `site-links/` — for `check-site-links.mjs`
+
+```
+node scripts/check-site-links.mjs scripts/fixtures/site-links
+```
+
+Expect **exit 1 and exactly one break**, under *A link into the site reads as a file path rather
+than as a page title*. The root here is the checker's optional `dist` argument, so this
+subdirectory is a two-page pretend build rather than a pretend repository, and its hrefs are
+written at `/ritmolux/` because the gate reads the base from `site/astro.config.mjs` and that is
+the local default.
+
+**The property under test is the fourth one, and it is the only one that can be seeded.** The other
+three convict an href — a `.md` target, a target that resolves to nothing, a non-`https` way out —
+and each of them is already a red build. The fourth convicts what a link *says* while its href is
+perfectly correct, so it is the one defect that ships silently.
+
+| Element | Verdict | Why |
+|---|---|---|
+| `<a href="/ritmolux/guide/expression-language/">docs/presets.md</a>` | **break** | the rewrite should have renamed it to the target's declared title |
+| the same href, text *Expression language* | clean | a renamed link, and the shape the gate exists to leave alone |
+| a `https://github.com/...` href whose text is the blob's path | clean | off-site links keep path text on purpose (ADR-0169) |
+
+`guide/expression-language/index.html` exists so the two site-relative hrefs resolve. Without it
+the run would report property 2 as well, and a fixture that fails two ways at once measures
+neither.
 
 ## `toc/` — for `toc.mjs`
 

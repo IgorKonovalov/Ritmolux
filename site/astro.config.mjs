@@ -119,7 +119,7 @@ function stripLeadingHeading() {
  * a document crossing the threshold joins the menu as a group on the next build
  * with no edit to this file.
  */
-const doc = (source, label) => sidebarGroup(source, PUBLISHED[source], label);
+const doc = (source) => sidebarGroup(source, PUBLISHED[source]);
 
 export default defineConfig({
   site: 'https://igorkonovalov.github.io',
@@ -164,38 +164,49 @@ export default defineConfig({
           href: 'https://github.com/IgorKonovalov/Ritmolux',
         },
       ],
+      // Six groups, each named for what the reader is doing rather than for
+      // where the file came from (ADR-0169). Every group's first entry is a page
+      // a stranger can start from; `scripts/check-site-routes.mjs` holds every
+      // route to being reachable from here rather than only by search.
       sidebar: [
         {
           label: 'Get it',
           items: [
             { label: 'Start here', slug: 'start-here' },
-            doc('packaging/windows/READ-ME-FIRST.md', 'Windows'),
-            doc('packaging/macos/READ-ME-FIRST.md', 'macOS'),
-            doc('packaging/foobar/READ-ME-FIRST.md', 'foobar2000 component'),
+            doc('packaging/windows/READ-ME-FIRST.md'),
+            doc('packaging/macos/READ-ME-FIRST.md'),
+            doc('packaging/foobar/READ-ME-FIRST.md'),
           ],
         },
         {
-          label: 'Use it / author presets',
+          label: 'Use it',
+          items: [{ label: 'Gallery', slug: 'gallery' }],
+        },
+        {
+          label: 'Author presets',
           items: [
-            doc('docs/preset-guide.md', 'Preset guide'),
-            doc('docs/presets.md', 'Expression language'),
-            doc('docs/preset-palettes.md', 'Colour and palettes'),
-            doc('docs/preset-tuning-walkthrough.md', 'Tuning walkthrough'),
-            doc('presets/README.md', 'Parameter roster'),
-            { label: 'Gallery', slug: 'gallery' },
+            doc('docs/preset-guide.md'),
+            doc('docs/presets.md'),
+            doc('docs/preset-palettes.md'),
+            doc('docs/preset-tuning-walkthrough.md'),
+            doc('presets/README.md'),
+            doc('docs/capturing.md'),
           ],
         },
         {
-          label: 'Understand and build it',
+          label: 'Embed it',
+          items: [doc('docs/specs/0001-c-abi.md'), doc('docs/specs/0002-ring-determinism.md')],
+        },
+        {
+          label: 'How it works',
+          items: [doc('docs/nfr.md'), doc('docs/generative-techniques-catalogue.md')],
+        },
+        {
+          label: 'Contribute',
           items: [
-            doc('docs/nfr.md', 'Non-functional requirements'),
-            doc('docs/capturing.md', 'Headless capture and video'),
-            doc('docs/generative-techniques-catalogue.md', 'Technique catalogue'),
-            doc('docs/diffusion-filter.md', 'Diffusion filter'),
-            doc('docs/on-device-validation.md', 'On-device validation'),
-            doc('docs/releasing.md', 'Releasing'),
-            doc('docs/specs/0001-c-abi.md', 'C ABI contract'),
-            doc('docs/specs/0002-ring-determinism.md', 'Ring determinism'),
+            doc('docs/releasing.md'),
+            doc('docs/on-device-validation.md'),
+            doc('docs/diffusion-filter.md'),
           ],
         },
       ],
