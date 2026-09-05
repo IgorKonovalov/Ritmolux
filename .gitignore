@@ -66,3 +66,16 @@ spike/
 # (tools/sd-filter/) and its requirements.txt ARE tracked; the environment they
 # build is not.
 .venv/
+
+# The documentation site (Plan 0143). `site/` is the repository's only npm
+# project; it is never shipped and no shipped artifact depends on it. Its
+# dependency tree, build output and Astro's own cache are all derived - the
+# lockfile IS committed, because a site that builds differently on CI than on a
+# laptop is the failure mode ADR-0154 accepted the npm tree in spite of.
+#
+# There is deliberately no staged copy of the published set to ignore here: the
+# content loader reads `docs/`, `docs/specs/` and `presets/README.md` in place,
+# so `docs/` stays the single source with no second file at all.
+site/node_modules/
+site/dist/
+site/.astro/

@@ -38,7 +38,8 @@ pub(crate) enum Modal {
 /// straight over it. `enabled` is the operator's own switch (`[hud] preset_name`).
 ///
 /// A free function, not a method, so the rule is assertable as a value with no
-/// window and no GPU — the same discipline [`overlay`] and [`settings`] keep.
+/// window and no GPU — the same discipline [`overlay`] and [`crate::settings`]
+/// keep.
 ///
 /// This governs the **show furniture only**. The F3 capture line is deliberately
 /// not gated on it: that line exists *because* the panel is up (Plan 0083), so

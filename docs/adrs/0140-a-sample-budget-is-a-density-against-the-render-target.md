@@ -1,8 +1,8 @@
 # ADR-0140 — An attractor's sample budget is a density against the render target, capped live and uncapped offline
 
-> **Status:** proposed
+> **Status:** accepted 2026-08-28 (Plan 0128, closed 2026-09-04) — see the `Outcome` section
 > **Date:** 2026-08-28
-> **Related plan(s):** [0128](../plans/0128-the-rendered-file-stops-looking-upscaled.md)
+> **Related plan(s):** [0128](../plans/done/0128-the-rendered-file-stops-looking-upscaled.md)
 
 ## Context
 
@@ -155,3 +155,51 @@ trail grid past its cap.
 - `REFERENCE_PX` and both ceilings are **measurements, not constants chosen here.** The plan's first
   phase reads density, frame time and deposit precision across three target sizes and sets them; an
   ADR that named them would be inventing numbers it did not take.
+
+## Outcome (added at Plan 0128's close, 2026-09-04)
+
+The law shipped as specified — `REFERENCE_PX` 230,400, live ceilings 50,000 / 600,000, offline
+ceilings 900,000 / 2,700,000, all measured in Phase 1 on named hardware — and the picture it was
+written to fix came back *"looks good!"* on a 1080p/60 render. Three claims in the body did not
+survive the implementation, and the decision stands with all three.
+
+**1. "Every `shot` still resolves to exactly today's count and stays byte-identical" is half true.**
+The Decision's count claim holds and is asserted on the resolved value. The **byte** claim is false
+for a `Rich` still at *any* size, and the count is not why: `AttractorScene::seed` draws `x`/`y`/
+`seed`/`age` in one pass and `z` in a second from one RNG stream, so `z` for particle `i` sits at
+stream position `3 * count + i`. Allocating at the ceiling moves `count`, which moves the depth of
+every particle including the drawn ones. Giving `z` its own stream fixes the coupling and moves a
+committed golden, so it was tried and reverted; the trap is documented on `seed` itself. **Nothing
+pinned moves, structurally rather than luckily** — every committed baseline is `Tier::Floor`, whose
+live ceiling *is* its anchor. The residue is that **the ceiling constant is an input to every `Rich`
+attractor picture**: re-measuring it re-renders them.
+
+**2. "60 MB of particle state costs nothing anybody watches" is 4.3x low.** The `Rich` offline
+ceiling is 129.6 MB of GPU buffer and the process holds it twice — once on the device, once as the
+CPU scatter it re-uploads from — for 259.2 MB. Measured peak resident set for a 1080p render is
+956 MB, flat across 480 frames (growth -7.9 MB). Still a one-shot process, still flat; the sentence
+understated it by more than a factor of four. A render also pays the ceiling **whatever its size**
+(952 MB at 640x360), because a headless render holds one target for its whole life and can never
+resize — so offline, the resize property the ceiling allocation exists to protect is unreachable and
+buys nothing.
+
+**3. "The preset's `[particles] density` composes on top unchanged" is true of the arithmetic and
+false of the look.** This ADR's Positive consequences reason entirely about the *cloud* case, where
+`density = 1.0` and more samples is the same total light with less shot noise. ADR-0069's purpose is
+the *trace* case, where a low `density` buys followable trajectories and the count **is** the look —
+and that count now scales with the window: eight shipped worlds at `density` 0.006–0.060 draw four
+times the strokes at a quarter the per-stroke deposit in a 1080p `Rich` window, nine times under
+`--render`. No baseline can see it, because every one is `Floor` and small, where the law is a no-op
+twice over. Filed as design-backlog 0186 with the arithmetic and the two candidate repairs
+(scope the law below a `density` threshold, or retune the ten files); **not repaired at this close**,
+and the Neutral section's scope note should be read as covering it — only the attractor's *cloud*
+case was argued here.
+
+Two things the implementation added that the ADR does not specify, both recorded rather than
+smuggled. The live ceiling is **per tier**, because measurement said so: at `Floor` on integrated
+hardware 1080p already sits *on* the 16.67 ms budget at today's 50,000 (p99 16.854 ms) and the law's
+own `Floor` value takes it to 31.942 ms, so `Floor`'s live ceiling is its anchor and the law is a
+no-op there. And the offline ceiling is a **whole multiple of each anchor** rather than the device
+wall itself, so a tier still means something offline. Precision does not bind: at the top swept count
+the per-particle deposit is 4.7x the f16 ULP at the p99 working level, and the first quantization
+would come at about 3.2M particles — past the storage-buffer wall at 2,796,202.

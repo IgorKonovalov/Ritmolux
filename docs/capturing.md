@@ -89,6 +89,15 @@ Two reasons, and both are load-bearing:
 `--tier rich` is the deliberate opt-in, for spot-checking that the raised budgets
 actually render.
 
+**A tier is no longer one number per scene**, and the attractor is where that
+started: its sample budget is a density against the render target, capped by one
+ceiling in a window and a larger one under `--render`
+([ADR-0140](adrs/0140-a-sample-budget-is-a-density-against-the-render-target.md)).
+Every capture path — this page's stills, filmstrips and reports, and both test
+suites — takes the **window's** ceiling, and at capture sizes the law's lower
+clamp resolves exactly the tier's own count, so no baseline moves. See
+[`--render`](#--render-a-music-video-from-a-track) for the path that does not.
+
 > **A `Rich` capture is an instrument, and never a baseline**
 > ([ADR-0064](adrs/0064-a-capture-may-pin-the-rich-tier.md)). Use it to *look*, not
 > to bless: a rich capture must never be written into `core/tests/golden/`. The
@@ -301,6 +310,45 @@ is injected (ADR-0013), the DSP is a pure function of its input window
 ([NFR §6](nfr.md#6-determinism)), and the grammar's randomness is pinned
 (ADR-0051). Two runs of the same command produce **byte-identical** streams, and
 that is asserted in `standalone/tests/shot_cli.rs` rather than inferred.
+
+**A render draws the attractor denser than a window does, deliberately**
+([ADR-0140](adrs/0140-a-sample-budget-is-a-density-against-the-render-target.md)).
+The attractor's sample budget is a *density* against the render target rather
+than a flat tier constant —
+`clamp(round(anchor * target_px / 230400), anchor, ceiling)`, anchored at
+640x360, whose density was the accepted one. There are two ceilings, and
+`--render` is the **only** path in this repo that takes the larger:
+
+| target | `Rich` in a window | `Rich` through `--render` | samples per output pixel, rendered |
+|---|---|---|---|
+| 640x360 | 150,000 | 150,000 | 0.651 |
+| 1280x720 | 600,000 | 600,000 | 0.651 |
+| 1920x1080 | 600,000 | **1,350,000** | 0.651 |
+| 2560x1440 | 600,000 | **2,400,000** | 0.651 |
+| 3840x2160 | 600,000 | 2,700,000 | 0.326 |
+
+The window column stops at 600,000 because a display has a frame to hit and the
+buffer is paid for in every window; a render answers to memory instead, so a
+1080p file reaches the reference density outright. **`--render` prints the number
+it drew at** — `tier rich, attractor samples 1350000` in the header — which is
+the only way to tell two files apart afterwards.
+
+Three consequences worth knowing before you read a rendered file as evidence:
+
+- **A rendered file is not the frames the app would have drawn at that size.**
+  That is the one property `shot` otherwise works to keep, and `--render` gives
+  it up on purpose. `--frame-at` and every other mode here stay on the window's
+  ceiling, so a still and a render of the same instant differ at 1080p `Rich`.
+- **`Floor` never moves in a window, at any size.** Its live ceiling *is* its
+  anchor: 1080p at `Floor` on integrated hardware already sits on the 16.67 ms
+  budget at today's 50,000 ([NFR §1](nfr.md#1-performance--adaptive-quality)),
+  so the law is a no-op there. Through `--render` it scales like `Rich` does.
+- **A render's resident set is ~950 MB whatever its size**, because the particle
+  buffer is allocated once at the ceiling rather than at what the target asked
+  for: measured 956 MB peak at 1920x1080 and 952 MB at 640x360, flat across 480
+  frames either way (growth -7.9 MB and +0.1 MB). The offline ceiling is
+  2,700,000 particles at 48 B, and the process holds it twice — once on the GPU
+  and once as the CPU scatter it re-uploads from.
 
 **The two clocks are different clocks.** Analysis hops arrive at
 `sample_rate / HOP_SIZE` — 93.75 Hz for 48 kHz audio — and frames at `--fps`.

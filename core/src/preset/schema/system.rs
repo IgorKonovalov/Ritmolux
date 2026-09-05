@@ -126,10 +126,11 @@ const _: () = {
 };
 
 impl SystemKind {
-    /// How many variants [`SystemKind`] has. Kept honest by [`Self::row`]: a new
-    /// variant fails the build there until it is rostered, and [`TABLE`] is
+    /// How many variants [`SystemKind`] has. Kept honest by `row`: a new
+    /// variant fails the build there until it is rostered, and `TABLE` is
     /// typed off this count, so bumping the count without adding a row does not
-    /// compile either.
+    /// compile either. Both are module-private, so this names them rather than
+    /// linking them.
     pub const VARIANT_COUNT: usize = 12;
 
     /// This variant's index into [`TABLE`].
@@ -189,7 +190,8 @@ impl SystemKind {
         TABLE[self.row()].1
     }
 
-    /// The parameter names this system's scene consumes ([`TABLE`]).
+    /// The parameter names this system's scene consumes (the module-private
+    /// `TABLE`).
     pub fn param_names(self) -> &'static [&'static str] {
         TABLE[self.row()].2
     }

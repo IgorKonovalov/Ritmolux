@@ -18,6 +18,8 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0143 — The documentation gets a front end](#0143--the-documentation-gets-a-front-end)
+  - [0128 — The rendered file stops looking upscaled](#0128--the-rendered-file-stops-looking-upscaled)
   - [0138 — The colour surface stops misleading its authors](#0138--the-colour-surface-stops-misleading-its-authors)
   - [0151 — The long documents become navigable](#0151--the-long-documents-become-navigable)
   - [0126 — The large files split along their seams](#0126--the-large-files-split-along-their-seams)
@@ -155,6 +157,8 @@ hand-edited.
   - [0002 — Rust enforcement tooling](#0002--rust-enforcement-tooling)
   - [0001 — Core + standalone MVP, then foobar parity](#0001--core--standalone-mvp-then-foobar-parity)
 - [Prior sequencing notes (superseded)](#prior-sequencing-notes-superseded)
+  - [Moved 2026-09-05 from `README.md` — the 0151/0143 heading-layout note](#moved-2026-09-05-from-readmemd--the-01510143-heading-layout-note)
+  - [Moved 2026-09-04 from `README.md` — the 0127/0128 pair from the 2026-08-28 "what next" round](#moved-2026-09-04-from-readmemd--the-01270128-pair-from-the-2026-08-28-what-next-round)
   - [Moved 2026-09-04 from `README.md` — the note that sequenced 0138 behind 0137](#moved-2026-09-04-from-readmemd--the-note-that-sequenced-0138-behind-0137)
   - [Moved 2026-09-04 from `README.md` — the note that sequenced 0151 before 0143](#moved-2026-09-04-from-readmemd--the-note-that-sequenced-0151-before-0143)
   - [Moved 2026-09-03 from `README.md` — the 2026-08-16 sequence and everything under it](#moved-2026-09-03-from-readmemd--the-2026-08-16-sequence-and-everything-under-it)
@@ -166,6 +170,155 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0143 — The documentation gets a front end](done/0143-the-documentation-gets-a-front-end.md)
+
+— closed 2026-09-05. Five `dev` phases on `main` directly rather than in a worktree — the plan's own
+Lane guidance, and correct: every phase but 5 is JavaScript, markdown and config, so a fresh lane
+would have bought an 8-18 GB cold `target/` to run `shot --release` once. Commits `41c77c5`
+(Phase 1), `44d1ec3` (2), `03a9588` (3), `eeac887` (5), `cb3529c` (6), plus the `human` Phase 7 on
+2026-09-05 with no commit at all. Version: **0.106.0** (minor). Review: **no blockers, no majors,
+four minors and three nits.**
+
+**What it built.** An Astro Starlight site under `site/` publishing thirteen reader-facing documents
+plus a landing page and an exhaustive gallery, live at
+`https://igorkonovalov.github.io/Ritmolux/` with Pagefind search over the 264 KB parameter roster.
+`scripts/check-site-links.mjs` is the repository's seventh Node gate and the first that runs in
+neither `.githooks/pre-push` nor CI's `links` job — it needs a built site, so it lives in
+`.github/workflows/pages.yml`. `core/tests/hygiene.rs` gained a second cross-check, and 82 gallery
+cards (23.5 MB) are committed under `docs/images/gallery/presets/`.
+[ADR-0154](../adrs/0154-the-reader-facing-docs-publish-as-a-site.md) accepted with an `Outcome`.
+
+**The one-source rule held completely, and it was the whole risk.** Phase 1 took the preferred
+mechanism rather than the permitted fallback: the content loader reads `docs/`, `docs/specs/` and
+`presets/README.md` in place, so there is no staged copy and no second file to drift. `git diff
+--name-status` over the plan's whole range shows not one file under `docs/` or `presets/` modified
+except the plan itself. Two build-time transformations stand in for frontmatter the sources do not
+have and may not gain — the title is derived from each document's opening `# ` heading, and that
+heading is then dropped from the body so Starlight's `<h1>` is not doubled.
+
+**ADR-0154's headline measurement was falsified, and it is a scope error rather than a design
+error.** The ADR sizes the problem at 926 relative links pointing outside the published set; the
+built site rewrites **269** off-site hrefs over 137 distinct targets, because 926 was measured over
+`README.md` plus *all* of `docs/*.md` plus `presets/README.md` and the published set was then
+narrowed to thirteen files without re-measuring. Nothing turns on it — the rewrite is per-link — but
+the Context table sizes the candidate set, not the site. Recorded in the ADR's `Outcome`.
+
+**Hosting never had a first stage.** Phase 4's hand-copied demo into the personal user site's
+`public/` was skipped outright by the user, and the site went straight to CI-deployed project Pages.
+The half of that argument that mattered still paid: `base` had to be configurable from build one,
+and the two paths turn out to differ in **case** — GitHub serves a project site under the repository
+name as spelled, so the permanent home is `/Ritmolux/` against the `/ritmolux/` the demo would have
+used. Building at both bases is what surfaced eleven hardcoded subpaths in the site's own two pages.
+
+**What was verified at the close, independently of the implementation log.** `cargo nextest run
+--workspace` green at 1536 passed / 0 failed / 5 skipped; all six pre-existing gates green and
+unmodified; `npm run build` clean at 16 pages with `scripts/check-site-links.mjs` exit 0; that gate
+provoked into convicting in both directions (an empty directory reported as "the site has not been
+built", a renamed route reported as 16 unresolved hrefs); the built gallery holding 82 cards under
+12 family headings with none falling to `unknown`; and the deployed site answering 200 on `/`,
+`/guide/parameter-roster/`, `/gallery/`, `/engine/spec-c-abi/` and `/pagefind/pagefind.js`, while
+`igorkonovalov.github.io/ritmolux/` and `/lmv/` both 404 — so Phase 7's "retire the demo" clause is
+satisfied by there being no demo, which is Phase 4's doing.
+
+**What outlived the plan.** `scripts/check-site-links.mjs` breaks the sentence *"every `.mjs` is
+wired into pre-push or CI's `links` job"* that `CLAUDE.md` and `README.md` both carried; both were
+corrected in the close commit, along with a `site/` row neither layout block had. The publish
+boundary is declared in two files — `PUBLISHED` in `site/src/plugins/rewrite-links.mjs` and the
+sidebar in `site/astro.config.mjs` — and only one direction is guarded: a sidebar slug with no
+`PUBLISHED` entry fails the build, while a `PUBLISHED` entry with no sidebar item builds a page
+reachable only by search and passes every gate. The rewriter visits `definition` nodes, which
+markdown shares between link and *image* references, so a reference-style image would be rewritten
+to a blob URL and serve HTML instead of a picture; no published source uses that form today. And a
+full `docs-shots.mjs` run moves 13 of the 20 pre-existing committed images, which `dev` correctly
+reverted — this plan changed nothing they depict, and ADR-0100 records renders as not
+byte-reproducible, with 8 of 20 baselines rewriting on a clean local bless.
+
+### [0128 — The rendered file stops looking upscaled](done/0128-the-rendered-file-stops-looking-upscaled.md)
+
+Closed 2026-09-04. Lane `plan-0128-the-rendered-file-stops-looking-upscaled`. Review: **no blockers,
+one major, six minors, two nits.** Version **0.105.0** (minor — a feature plan, two behavioral
+commits). Archived [backlog 0110](../design-backlog-archive.md); filed 0186.
+
+**What landed.** `TierConfig::attractor_particles` stopped being the count drawn and became the
+**anchor** of `clamp(round(anchor * target_px / 230400), anchor, ceiling)` (ADR-0140), against two
+ceilings measured in Phase 1 rather than chosen: live 50,000 / 600,000, offline 900,000 / 2,700,000,
+with `REFERENCE_PX` 230,400. The particle buffer is allocated once at the ceiling, so a resize moves
+the drawn count and rebuilds no GPU resource. `shot --render` is the only path in the repo that takes
+the offline ceiling, so a 1080p file draws 1,350,000 samples — the 640x360 reference density exactly,
+nine times the flat count — and prints the number in its header. Phase 4's human gate came back
+**"looks good!"**
+
+**What was verified at the close, independently of the log.** `cargo nextest run --workspace`
+1535/1535 passed, 5 skipped, exit 0 at the lane tip; `fmt --check` and
+`clippy --workspace --all-targets` clean; all six Node gates exit 0. **No golden was blessed and none
+moved** — which is the claim the whole plan was built to make, and it holds structurally rather than
+luckily: every committed baseline is `Tier::Floor`, and `Floor`'s live ceiling *is* its anchor.
+
+**The test set is the part worth keeping.** Three assertions do work no green suite would have done
+on its own. `a_resize_moves_the_budget_and_rebuilds_no_particle_buffer` proves the buffer survived by
+reading the **inactive tail** back off the GPU bit for bit, and forces the grid to change across the
+same resize so the survival is not vacuous. `total_light_is_invariant_across_resolved_budgets`
+measures in the accumulation rather than the composite, because everything downstream applies a
+tonemap and two equally bright pictures would not be evidence. And
+`the_render_path_resolves_a_larger_budget_than_a_window_does` reads the budget **off the built
+scene** rather than recomputing the law, so it convicts if the factory hands both modes the same
+ceiling — the one wiring a recomputation would silently pass.
+
+**The major, and it is now 0186.** ADR-0140 reasons entirely about the *cloud* case, where
+`density = 1.0` and more samples is the same total light with less shot noise. ADR-0069's purpose is
+the *trace* case, where a low `density` buys followable trajectories and the count **is** the look.
+Eight shipped worlds at `density` 0.006–0.060 now draw **four times the strokes at a quarter the
+per-stroke deposit** in a 1080p `Rich` window, nine times under `--render`; `fragment_sumi`'s header
+says in as many words that being *"sparse enough that each trajectory is a stroke, not a fog"* is the
+mechanism. Nothing can see it, because every baseline is `Floor` and small, where the law is a no-op
+twice over — the ADR-0037 shape one level over: the two candidate sources agree at the size we test
+at and disagree at the size the app runs at. Filed, not repaired; the user's call was **file it and
+close**.
+
+**Three claims of the ADR's did not survive**, and it was accepted with a dated `Outcome` covering
+all three rather than edited: *"every `shot` still stays byte-identical"* (false for a `Rich` still at
+any size — `seed` draws `z` at stream position `3 * count + i`, so the ceiling is an input to every
+`Rich` attractor picture); *"60 MB of particle state costs nothing"* (4.3x low — 259.2 MB held twice,
+inside a ~950 MB process); and *"`density` composes on top unchanged"* (true of the arithmetic, false
+of the look — the major above).
+
+**Two things the implementation added that the ADR does not specify**, both disclosed by `dev` rather
+than smuggled. The live ceiling is **per tier**, by measurement: at `Floor` on integrated hardware
+1080p already sits *on* the 16.67 ms budget at today's 50,000 (p99 16.854 ms), so `Floor`'s live
+ceiling is its anchor and the law is a no-op there — which is what keeps NFR §1's floor commitment
+true at every target size. And the offline ceiling is a **whole multiple of each anchor** rather than
+the device wall, so a tier still means something offline instead of both converging at 4K.
+
+**Minors recorded and not repaired.** The close-trigger bullets were written two commits before the
+tip and went stale — the cited `git diff 5ae5d60..HEAD -- presets/` now lists 70 files (the merge
+pulled in Plan 0138's palette sweep), though the conclusion is right against the real base
+(`15dfe7f..HEAD -- 'presets/*.toml'` is empty), and three swept operator docs are unnamed. Phase 3's
+*"inside the bound Phase 1 named"* is unfalsifiable — no total-process bound was ever stated; the
+delta arithmetic (+224 MB measured against 201.6 MB predicted) is the real check. Phase 2's
+*"byte-identical on both adapters"* has no recorded hardware-adapter golden run, though the
+structural argument covers it. Phase 4 judged one file rather than the promised two — Plan 0101's
+original render and its source track went with a removed lane. And the log runs 312 lines against a
+138-line phases section, most of it the three measurement tables the plan itself ordered into it.
+
+**Curation verdict (step 3b).** No preset `.toml` moved — `git diff 15dfe7f..HEAD -- 'presets/*.toml'`
+is empty — so nothing new to weigh against the set. The *stale* half of the sweep is the finding:
+this plan fixed an engine defect, and two headers now state counts it made conditional —
+`presets/attractor_thomas.toml:25` (*"At the full 50 000 particles"*, plus its own measured
+blot/drawing/sketch/scribble ladder, whose 0.02 rung now lands roughly where 0.08 did at 1080p
+`Rich`) and `presets/fragment_sumi.toml:4` (*"~1000 particles"*). Both are carried by 0186 rather
+than swept here, because the sweep and the retune are the same edit and it is content work.
+
+**Phase 5 never ran**, deliberately: the `fast`-vs-`quality` diffusion side-by-side is a `human`
+probe for backlog 0125, which stays live and unprobed. Worth knowing before anyone renders for it —
+`renders/plan-0106-p7/` already holds `p7_fast.mp4` and `p7_quality.mp4`, which that directory's own
+README calls the only side-by-side of what the larger pixel budget buys.
+
+**Phase 6 was superseded before it ran.** design-backlog 0130 was closed 2026-09-01 by Plan 0137
+Phase 4, four days after this plan was written; both halves of the done-when had already landed. One
+clause was still open — `boundary_density`'s summary sentence still read scale-free — and `9239bb3`
+is that clause and nothing else. The plan header's `Closes: 0130` was stale and is corrected at this
+close.
 
 ### [0138 — The colour surface stops misleading its authors](done/0138-the-colour-surface-stops-misleading-its-authors.md)
 — closed 2026-09-04. Four `dev` phases in the `WORK/rlx-0138-colour-surface` lane,
@@ -6674,6 +6827,50 @@ uncovered (its C side remains the Plan 0001 Phase-6 smoke program's job, per ADR
 
 ## Prior sequencing notes (superseded)
 
+### Moved 2026-09-05 from `README.md` — the 0151/0143 heading-layout note
+
+Spent when [0143] closed on 2026-09-05. It sequenced [0151] before [0143] so the site would be
+built against final headings, and that is exactly what happened: the generated contents blocks in
+`capturing.md` and `presets/README.md` were on `main` before Phase 1 read either file, and the site
+publishes both unmodified. The note as it stood:
+
+> **Superseded 2026-09-04 by [0151]'s close — the layout it settles is now on `main`.** [0143] can be
+> written against final headings: `capturing.md` and `presets/README.md` each carry a generated
+> contents block, and `scripts/toc.mjs --check` holds it to the headings beneath it
+> ([ADR-0163](../adrs/0163-a-long-document-carries-a-generated-contents-block.md)). The note that
+> sequenced the two is in [README-archive.md](README-archive.md).
+
+### Moved 2026-09-04 from `README.md` — the 0127/0128 pair from the 2026-08-28 "what next" round
+
+Spent when [0128] closed on 2026-09-04; [0127] had closed the same day the note was written. Both
+its live predictions held. The pair never contended — 0127 ran in `core/src/dsp/` and 0128 in
+`tier.rs` plus the particles scene — and **[0128] did land before [0103]'s outreach phases**, which
+was the note's one real ordering constraint and the reason it was written. What outlives it is the
+0127 residue the third bullet parked: the reference draws a unit-scale mode-6 trace at 0.316 frame
+heights against our 0.3019, which is backlog 0120's remaining gap and belongs to the next
+`warp_mesh` plan, not to either of these.
+
+**Added 2026-08-28, from a "what next, functionally" round after the whole-codebase review's three
+plans ([0124]/[0125]/[0126], which move no pixels): [0127](done/0127-the-picture-stops-depending-on-the-volume-slider.md)
+— **closed 2026-08-28** — and [0128](done/0128-the-rendered-file-stops-looking-upscaled.md).** Both take defects in already-shipped
+output rather than adding capability, which is why they were picked ahead of the four other
+functional candidates the round surfaced (backlog 0042's bar gate, 0126's per-track variety, 0142's
+2x dissolve, and the limited-ink cohort behind [0123]). Sequencing:
+
+- **They contend with nothing on the current roster** and share no files with each other — 0127 is
+  `core/src/dsp/` plus `warp_mesh`'s draw layer, 0128 is `tier.rs` plus the particles scene. Either
+  can be taken by a free session, and they can run in parallel lanes.
+- **[0128] goes before [0103]'s outreach phases.** Demo material made before the density law lands
+  shows the engine at its grainiest, which is the same dependency [backlog 0110](../design-backlog.md)
+  states in its own priority line.
+- ~~**[0127] is the one to take first if only one is taken**~~ — **taken and closed 2026-08-28**, so
+  [0128] is what is left of this pair. 0127's Phase 3 capture also left a number 0128 does not need
+  but the next `warp_mesh` plan will: the reference draws a unit-scale mode-6 trace at 0.316 frame
+  heights against our 0.3019, which is [backlog 0120](../design-backlog.md)'s whole remaining gap.
+- ~~**Neither waits on [0124]/[0125]/[0126]**~~ - **discharged 2026-09-03: all three are closed.**
+  0125 retired the GPU boilerplate across the 12 scenes on 2026-08-31 and 0126 split the seven large
+  files on 2026-09-03, so [0128]'s `core/src/render/scenes/particles/` contention is gone.
+
 ### Moved 2026-09-04 from `README.md` — the note that sequenced 0138 behind 0137
 
 Spent when [0138] closed on 2026-09-04. It held for its whole life: [0137] closed 2026-09-01 and
@@ -6847,7 +7044,7 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
 [0125]: done/0125-the-scenes-share-their-gpu-boilerplate.md
 [0126]: done/0126-the-large-files-split-along-their-seams.md
 [0127]: done/0127-the-picture-stops-depending-on-the-volume-slider.md
-[0128]: 0128-the-rendered-file-stops-looking-upscaled.md
+[0128]: done/0128-the-rendered-file-stops-looking-upscaled.md
 [0046]: done/0046-transformed-feedback.md
 [0064]: done/0064-the-symmetry-stage-and-the-banded-palette.md
 [0068]: done/0068-why-the-downbeat-rarely-locks.md
@@ -6865,7 +7062,7 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
 [0103]: 0103-the-project-gets-an-audience.md
 [0104]: done/0104-the-library-stops-being-lopsided.md
 [0061]: done/0061-the-build-stops-paying-for-what-it-is-not-building.md
-[0143]: 0143-the-documentation-gets-a-front-end.md
+[0143]: done/0143-the-documentation-gets-a-front-end.md
 [0151]: done/0151-the-long-documents-become-navigable.md
 [0145]: done/0145-the-per-phase-gate-stops-paying-for-the-preset-library.md
 [0150]: done/0150-the-application-becomes-ritmolux.md

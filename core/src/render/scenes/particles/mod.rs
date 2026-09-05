@@ -76,6 +76,7 @@ use resources::*;
 use shaders::*;
 
 use crate::render::gpu;
+use crate::render::tier::attractor_budget;
 
 use ifs::{FitLut, IfsFigure, IfsPacked, IfsTable, Levers};
 
@@ -582,13 +583,36 @@ pub struct AttractorScene {
     /// resolved once at construction. Read only in `set_target_size`, so the grid
     /// stays a pure function of the target and the cap.
     trail_cap: (u32, u32),
-    /// The active tier's particle count
-    /// ([`TierConfig::attractor_particles`](crate::render::TierConfig::attractor_particles)).
-    /// Fixed for the life of the scene: the storage buffer and the seeded scatter
-    /// are both sized to it, and a tier change rebuilds the scene.
+    /// The **allocation**: how many particles the storage buffer and the seeded
+    /// scatter hold. The tier's own ceiling
+    /// ([`attractor_particles_live_ceiling`](crate::render::TierConfig::attractor_particles_live_ceiling),
+    /// or the offline one on a headless render path), fixed for the life of the
+    /// scene — a tier change rebuilds the scene.
+    ///
+    /// **Sized at the ceiling and not at the current budget, deliberately**
+    /// (ADR-0140): a resize then moves [`budget`](Self::budget) and
+    /// [`active_count`](Self::active_count) and rebuilds no GPU resource. Building
+    /// one mid-run is what shifts what a later pass resolves to on the DX12
+    /// software adapter, and the field block stays the only rebuild a resize
+    /// costs.
     particle_count: u32,
-    /// How many of [`particle_count`](Self::particle_count) are actually stepped
-    /// and drawn — `round(particle_count * density)` (ADR-0069).
+    /// The tier's sample budget **at [`REFERENCE_PX`](crate::render::tier::REFERENCE_PX)**
+    /// ([`TierConfig::attractor_particles`](crate::render::TierConfig::attractor_particles)) —
+    /// the density law's anchor, and the floor of what
+    /// [`budget`](Self::budget) can resolve to.
+    anchor: u32,
+    /// Whether a target size has reached this scene yet, so
+    /// [`sample_budget`](Scene::sample_budget) can tell "the anchor, because the
+    /// target is small" from "the anchor, because nothing has asked yet".
+    targeted: bool,
+    /// This target's resolved sample budget:
+    /// `clamp(round(anchor * target_px / REFERENCE_PX), anchor, particle_count)`
+    /// ([`attractor_budget`], ADR-0140). Updated in
+    /// [`set_target_size`](Scene::set_target_size), which is why a resize changes
+    /// how densely the figure is sampled and nothing else.
+    budget: u32,
+    /// How many of [`budget`](Self::budget) are actually stepped and drawn —
+    /// `round(budget * density)` (ADR-0069).
     ///
     /// **Nothing is reallocated when this moves.** The storage buffer, the seeded
     /// scatter and every bind group stay sized to `particle_count`; this only
@@ -821,12 +845,22 @@ pub struct AttractorScene {
 impl AttractorScene {
     /// Build the CPU-side seeded scatter. GPU resources are deferred to the first
     /// render (module docs).
+    /// `anchor` is the tier's budget at [`REFERENCE_PX`](crate::render::tier::REFERENCE_PX) and `ceiling` is the
+    /// most the density law may resolve for this scene — the tier's live ceiling
+    /// on a surface, its offline one on a headless render path. The buffer is
+    /// sized at `ceiling`; the budget starts at `anchor` and moves on the first
+    /// `Scene::set_target_size`, whose trait is crate-private and so is named
+    /// here rather than linked.
     pub fn new(
         device: &wgpu::Device,
         surface_format: wgpu::TextureFormat,
-        particle_count: u32,
+        anchor: u32,
+        ceiling: u32,
         trail_cap: (u32, u32),
     ) -> Self {
+        // A ceiling under the anchor would allocate less than the law's own floor
+        // resolves to and index past the buffer; the law clamps the same way.
+        let particle_count = ceiling.max(anchor);
         let family = AttractorFamily::DeJong;
         // Entry 0's box by construction rather than by index: nothing has been
         // configured yet, so the canonical framing IS the roster's first entry
@@ -844,9 +878,14 @@ impl AttractorScene {
             res: None,
             trail_cap,
             particle_count,
+            anchor,
+            targeted: false,
+            // The law's own lower clamp until a target size arrives — never fewer
+            // than the tier's count, which is what every small capture resolves.
+            budget: anchor,
             // The whole budget until a `[particles] density` says otherwise, so a
             // preset that never mentions the key is byte-identical to before it.
-            active_count: particle_count,
+            active_count: anchor,
             density: 1.0,
             trail_w: TRAIL_FALLBACK_W,
             trail_h: TRAIL_FALLBACK_H,
@@ -953,6 +992,20 @@ impl AttractorScene {
         self.needs_clear = true;
     }
 
+    /// The trail accumulation's readable texture, or `None` before the first
+    /// render has built the GPU resources.
+    ///
+    /// **A test instrument**, the same tap `warp_mesh` opens on its own field and
+    /// for the same reason: the claim ADR-0065's normalization makes is about the
+    /// **total light laid into the accumulation**, and a composite readback
+    /// cannot state it — everything downstream of the field applies a tonemap, so
+    /// a picture that looks equally bright is not a measurement that the light is
+    /// equal. `PingPongField` already carries `COPY_SRC` for exactly this.
+    #[cfg(test)]
+    pub(crate) fn field_texture(&self) -> Option<&wgpu::Texture> {
+        Some(self.res.as_ref()?.grid.field.read_texture())
+    }
+
     /// Read every live particle position back off the GPU.
     ///
     /// **A test instrument** (Plan 0057 Phase 3), not a render path: it blocks on a
@@ -1044,6 +1097,23 @@ impl AttractorScene {
     /// so there is no resolved table to ask. Phase 3's continuous respawn targets
     /// the live resolved table, which is what carries the fill to wherever a
     /// bound `morph` has taken the figure — within one particle lifetime.
+    ///
+    /// # The scatter is a function of `count`, not only of a particle's index
+    ///
+    /// **The trap, for whoever changes a ceiling.** `x`, `y`, `seed` and `age` are
+    /// drawn in the first pass and `z` in the second, from **one** stream — so
+    /// `z` for particle `i` sits at stream position `3 * count + i`, and asking
+    /// for a different `count` moves the depth of *every* particle, including the
+    /// ones the caller then draws. The buffer is allocated at the tier's ceiling
+    /// (ADR-0140), so that ceiling is an input to every attractor picture at a
+    /// tier where it differs from the anchor — and moving it re-renders every one
+    /// of them.
+    ///
+    /// It is not fixable by giving `z` its own stream: that was tried and it
+    /// moves a committed golden baseline, which is the one thing the law is built
+    /// not to do. `Tier::Floor` is unaffected either way, because its ceiling
+    /// **is** its anchor — which is why every baseline in this repo, all of them
+    /// `Floor` by construction, is untouched.
     fn seed(
         family: AttractorFamily,
         seed_box: ([f32; 3], [f32; 3]),
@@ -1314,20 +1384,48 @@ impl Scene for AttractorScene {
         self.pending_steps = self.fixed_step.advance(dt);
     }
 
-    /// Size the trail accumulation grid to the render target, capped and
-    /// quantized (Plan 0027 Phase 2, Plan 0029 Phase 2). Called every frame, so
-    /// the unchanged case must stay free (ADR-0030 condition 2): this only records
-    /// the request — no allocation, no GPU work — and `render` re-allocates the
-    /// field when it differs from what the live one was built for.
+    /// Size the trail accumulation grid **and** the sample budget to the render
+    /// target (Plan 0027 Phase 2, Plan 0029 Phase 2; ADR-0140). Called every
+    /// frame, so the unchanged case must stay free (ADR-0030 condition 2): this
+    /// only records the grid request — no allocation, no GPU work — and `render`
+    /// re-allocates the field when it differs from what the live one was built
+    /// for.
+    ///
+    /// **The budget moves here and allocates nothing.** The buffer is already
+    /// sized at the ceiling, so a resize is this arithmetic plus the field
+    /// rebuild the grid change was always going to cost.
+    ///
+    /// The pixel count saturates rather than wrapping: `u32` overflows past a
+    /// 65 535-square target, and the law clamps at the ceiling long before that,
+    /// so saturating is exact everywhere it matters.
     fn set_target_size(&mut self, width: u32, height: u32) {
         let (w, h) = trail_grid_size(width, height, self.trail_cap);
         self.trail_w = w;
         self.trail_h = h;
+        self.targeted = true;
+        self.budget = attractor_budget(
+            self.anchor,
+            width.saturating_mul(height),
+            self.particle_count,
+        );
+        self.active_count = active_particles(self.budget, self.density);
     }
 
     // No `set_time`. The display rotation was this scene's only reader of the
     // shared clock, and since ADR-0076 it is an integrated phase instead — so
     // the trait's no-op default is the honest implementation.
+
+    /// The budget the density law resolved for the target this scene was last
+    /// given (ADR-0140) — `None` until [`set_target_size`](Self::set_target_size)
+    /// has been called, which is the first frame.
+    ///
+    /// The **budget**, not `active_count`: a preset's `[particles] density`
+    /// narrows what is drawn out of it (ADR-0069), and that is a look choice
+    /// rather than a property of the target.
+    #[cfg(test)]
+    fn sample_budget(&self) -> Option<u32> {
+        self.targeted.then_some(self.budget)
+    }
 
     fn set_palette(&mut self, palette: &Palette) {
         // Uploaded to the draw LUT textures in `render` (deferred — resources build
@@ -1486,7 +1584,7 @@ impl Scene for AttractorScene {
             // two presets can share a family and differ only in how much of it
             // they draw, and `configure` runs on every preset switch.
             self.density = *density;
-            self.active_count = active_particles(self.particle_count, *density);
+            self.active_count = active_particles(self.budget, *density);
             // Likewise the morph ends: two presets can share a figure and morph
             // it towards different partners. **Decomposed here**, off the hot
             // path, so a frame pays only the lerp and the recompose.

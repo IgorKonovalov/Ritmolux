@@ -12,7 +12,7 @@ the C ABI's sixteen `extern "C"` symbols, every `LMV_*` environment variable, th
 the foobar component filename and the per-user data directory.
 
 **Two approved plans are blocked on the name, and both bake it into a surface that is expensive to
-change afterwards.** [Plan 0143](../plans/0143-the-documentation-gets-a-front-end.md) publishes the
+change afterwards.** [Plan 0143](../plans/done/0143-the-documentation-gets-a-front-end.md) publishes the
 reader-facing docs as a site and is already parked in writing — *"the rename is the named trigger
 for this one"* — because the project name lands in the Starlight title, the header of every page,
 and the Pages subpath every published URL carries. A renamed repository redirects its web traffic,

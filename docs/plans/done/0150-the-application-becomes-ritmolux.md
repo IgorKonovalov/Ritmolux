@@ -17,7 +17,7 @@
 > **Approved:** 2026-09-02 (user) - runs next, once the lanes now live have closed
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0162](../../adrs/0162-the-application-is-renamed-to-ritmolux.md)
-> **Blocks:** [0143](../0143-the-documentation-gets-a-front-end.md) (parked in writing on this
+> **Blocks:** [0143](0143-the-documentation-gets-a-front-end.md) (parked in writing on this
 > decision) and [0103](../0103-the-project-gets-an-audience.md) Phases 4-6 (repository metadata,
 > component submission, three posts). Neither may ship before this lands.
 > **Lane guidance:** `main` directly, with **no other lane live** — see Phase 1. A worktree buys
@@ -38,7 +38,7 @@ them legible. When this lands, Plans 0143 and 0103 unpark.
 ## Context & problem
 
 The name is a description that was never chosen as a product name, and two approved plans are now
-waiting on it. [Plan 0143](../0143-the-documentation-gets-a-front-end.md) is parked in its own header —
+waiting on it. [Plan 0143](0143-the-documentation-gets-a-front-end.md) is parked in its own header —
 *"the rename is itself parked … that decision is the named trigger for this one"* — because a
 GitHub Pages project site lives at a path derived from the repository name and **a renamed
 repository does not redirect its Pages URLs**. [Plan 0103](../0103-the-project-gets-an-audience.md)
@@ -352,7 +352,7 @@ flowchart TB
   `lmv` in 990 places, by design. ADR-0162 exists to make them legible.
 - **It does not clear a trademark.** Phase 1 records a knockout search and an accepted risk; a
   clearance opinion is a different exercise, and the trigger for it is commercial distribution.
-- **It does not publish anything.** The docs site is [0143](../0143-the-documentation-gets-a-front-end.md);
+- **It does not publish anything.** The docs site is [0143](0143-the-documentation-gets-a-front-end.md);
   the component submission, the repository metadata and the posts are
   [0103](../0103-the-project-gets-an-audience.md) Phases 4-6. This plan only removes the reason both
   are waiting.
@@ -681,7 +681,7 @@ body below it is byte-identical — the diff is 1 insertion, 1 deletion.
 
 ## Followups (after this lands)
 
-- Unpark [0143](../0143-the-documentation-gets-a-front-end.md): remove the `Parked until` block and
+- Unpark [0143](0143-the-documentation-gets-a-front-end.md): remove the `Parked until` block and
   choose the Pages subpath under the new repository name.
 - Unblock [0103](../0103-the-project-gets-an-audience.md) Phases 4-6.
 - Decide whether the rename and 1.0 coincide, and whether `RLX_ABI_VERSION` moves at 1.0 for

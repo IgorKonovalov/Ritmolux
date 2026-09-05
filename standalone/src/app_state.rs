@@ -92,7 +92,7 @@ pub(crate) struct Capture {
     /// on (ADR-0142).
     pub(crate) capture_token: String,
 
-    /// The format the live [`AppState::analyzer`] was built on. Kept beside the
+    /// The format the live [`Capture::analyzer`] was built on. Kept beside the
     /// analyzer because a swap rebuilds it only when the negotiated format
     /// actually moved — an unchanged format keeps the AGC's running peak and the
     /// tempo history, which is most swaps between two 48 kHz endpoints.
@@ -184,7 +184,7 @@ pub(crate) struct Hud {
     pub(crate) browse: OverlayState,
 
     /// The settings modal's state (`S` toggles; Plan 0050 Phase 4). A second,
-    /// independent pure state machine — see [`settings`] for why it is not the
+    /// independent pure state machine — see [`crate::settings`] for why it is not the
     /// same one.
     pub(crate) settings: SettingsState,
 
@@ -230,7 +230,7 @@ pub(crate) struct Hud {
     pub(crate) frame_text: console::FrameText,
 
     /// Scratch for the frame's modal rows, before routing moves them into
-    /// [`AppState::frame_text`]. Retained for its capacity.
+    /// [`Hud::frame_text`]. Retained for its capacity.
     pub(crate) modal_scratch: Vec<console::Line>,
 
     /// Retained scratch for [`AppState::queue_frame_text`], cleared at entry
@@ -373,7 +373,14 @@ impl AppState {
             Arc::clone(&window),
             size.width,
             size.height,
-            RendererOptions { tier, adapter },
+            // The window is the live path by definition, so the live sample
+            // ceiling (ADR-0140) - spelled out rather than left to `..default()`
+            // because this is the call site the choice is *about*.
+            RendererOptions {
+                tier,
+                adapter,
+                budget: rlx_core::render::SampleBudget::Live,
+            },
         )
         .unwrap_or_else(|err| {
             eprintln!("renderer init failed: {err}");
@@ -951,7 +958,7 @@ impl AppState {
     /// the roster does not reach the incoming preset until the dissolve's capture
     /// frame has rendered. Reading the title or the cap overflow here would describe
     /// the preset being left, so both wait one frame — see
-    /// [`pending_switch_settle`](AppState::pending_switch_settle).
+    /// [`pending_switch_settle`](Presets::pending_switch_settle).
     pub(crate) fn on_preset_switched(&mut self) {
         self.presets.pending_switch_settle = true;
         self.note_soak_switch();
