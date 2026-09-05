@@ -60,7 +60,7 @@ The splitter emits a **fragment map**: every heading slug in a split document, k
 that now carries it. `site/src/plugins/rewrite-links.mjs` resolves `some/doc.md#slug` through that
 map instead of appending the fragment to a single route. **A fragment that matches no heading fails
 the build.** That is a gate the tree has never had, and it is what makes the prose rewrite in
-[Plan 0155](../plans/0155-the-reader-documents-stop-explaining-themselves.md) safe to attempt.
+[Plan 0155](../plans/done/0155-the-reader-documents-stop-explaining-themselves.md) safe to attempt.
 
 **Provenance parentheticals are stripped from headings before slugs are computed.** A heading like
 `## Engine-wide controls (Plan 0018)` would otherwise put a plan number in the URL itself. The strip

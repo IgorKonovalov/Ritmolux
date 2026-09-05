@@ -48,7 +48,6 @@ place. The plan file carries the real link.
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
 | [0147](0147-what-the-show-costs-and-what-its-numbers-mean.md) | What the show costs, and what its numbers mean | approved | dev, human | Backlog 0164 + 0163; 0154 half, 0165 update. The console halves output fps and two comments deny it. **Phase 4 is a hands-off window.** Phase 1 precedes 0133. |
 | [0153](0153-the-debug-tree-stops-carrying-dependency-line-tables.md) | The debug tree stops carrying dependency line tables | draft | dev | ADR-0165 (proposed): dependencies compile with `debug = 0`; measured 40.5 MB -> 15.0 MB per test `.pdb`. Backlog 0182-0184 hold the larger levers. |
-| [0155](0155-the-reader-documents-stop-explaining-themselves.md) | The reader documents stop explaining themselves | draft | dev | ADR-0168 (accepted): 235 bare citations leave three documents. Its hard dependency, 0154 Phase 3, **landed** — a renamed heading now fails the site build instead of rotting. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-04 — [0152] is approved, and it runs before [0133] and [0147] rather than after.**~~ — **closed 2026-09-05.** Its Phase 3 re-pointed [0133] and [0147], so the window this note existed to close is gone and both plans now read `/rlx/v1`. The note is in [README-archive.md](README-archive.md) under `## Prior sequencing notes (superseded)`.
@@ -709,6 +708,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0155 — The reader documents stop explaining themselves](done/0155-the-reader-documents-stop-explaining-themselves.md) — closed 2026-09-05. Review: **no blockers, no majors, four minors, two nits.** Version: **none** (docs/chore-only). 235 bare citations -> 0, held by a new gate. [Write-up](README-archive.md).
 - [0154 — The site becomes navigable](done/0154-the-site-becomes-navigable.md) — closed 2026-09-05. Review: **no blockers, two majors, six minors, two nits.** Version: **0.108.0** (minor). ADR-0166 accepted with an `Outcome`; 0167 + 0168 accepted. [Write-up](README-archive.md).
 - [0152 — The OSC root becomes `/rlx`](done/0152-the-osc-root-becomes-rlx.md) — closed 2026-09-05. Review: **no blockers, no majors, four minors.** Version: **0.107.0** (minor). ADR-0164 accepted; ADR-0144 gained an `Outcome`. Phase 5 (`human`) extracted to `on-device-validation.md`. [Write-up](README-archive.md).
 - [0143 — The documentation gets a front end](done/0143-the-documentation-gets-a-front-end.md) — closed 2026-09-05. Review: **no blockers, no majors, four minors, three nits.** Version: **0.106.0** (minor). ADR-0154 accepted with an `Outcome`. [Write-up](README-archive.md).
