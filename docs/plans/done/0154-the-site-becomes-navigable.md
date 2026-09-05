@@ -21,7 +21,7 @@
 > [0168](../../adrs/0168-the-reader-documents-address-a-reader-and-the-record-stays-a-link.md)
 > **Coordinates with:** [0103](../0103-the-project-gets-an-audience.md) — that plan owns `README.md`;
 > **this plan does not touch it**, and ADR-0167 records the narrowing of its exclusion.
-> **Sequenced before:** [0155](../0155-the-reader-documents-stop-explaining-themselves.md) — that plan's
+> **Sequenced before:** [0155](0155-the-reader-documents-stop-explaining-themselves.md) — that plan's
 > prose rewrite renames headings, and Phase 3 here is what turns a broken inbound anchor into a
 > build failure instead of silent rot.
 > **Lane guidance:** build on `main` directly, **not** in a worktree, for Plan 0143's reason: every
@@ -68,7 +68,7 @@ no audience and is wrong now that it has a public URL. The reasoning is in
 set. 31 of them end a heading, which under ADR-0166 would make a plan number part of a URL —
 `.../guide/parameter-roster/engine-wide-controls-plan-0018/`. That class plus 26 trailing body-line
 citations is the mechanical 7 %; the other 93 % is prose and is
-[Plan 0155](../0155-the-reader-documents-stop-explaining-themselves.md).
+[Plan 0155](0155-the-reader-documents-stop-explaining-themselves.md).
 
 Two smaller defects belong here because they are the same kind of thing. Adding a page requires
 editing `PUBLISHED` in `site/src/plugins/rewrite-links.mjs` **and** the sidebar in
@@ -273,7 +273,7 @@ flowchart TB
 ## What this plan does NOT do
 
 - **It does not rewrite the prose.** The 735 citations woven into sentences are
-  [Plan 0155](../0155-the-reader-documents-stop-explaining-themselves.md), which this plan's Phase 3
+  [Plan 0155](0155-the-reader-documents-stop-explaining-themselves.md), which this plan's Phase 3
   gate exists to protect.
 - **It does not touch `README.md`.** Plan 0103 owns it. ADR-0167 records the narrowing of that
   plan's exclusion; the file itself is untouched here except that `CLAUDE.md`'s packaging line is

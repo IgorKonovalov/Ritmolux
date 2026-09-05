@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0155 — The reader documents stop explaining themselves](#0155--the-reader-documents-stop-explaining-themselves)
   - [0154 — The site becomes navigable](#0154--the-site-becomes-navigable)
   - [0152 — The OSC root becomes `/rlx`](#0152--the-osc-root-becomes-rlx)
   - [0143 — The documentation gets a front end](#0143--the-documentation-gets-a-front-end)
@@ -173,6 +174,90 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0155 — The reader documents stop explaining themselves](done/0155-the-reader-documents-stop-explaining-themselves.md)
+
+— closed 2026-09-05. Five `dev` phases on `main` directly with no worktree, per the plan's own lane
+guidance: `3fdd391` (1, the palette surface), `2bce9be` (2, the expression reference), `3bbcaf0`
+(3, the roster front matter and small sections), `0dc85dd` (4, the three large roster sections),
+`18ee259` (5, the gate and the sweep). Version: **none** (docs/chore-only — no `core/`,
+`standalone/` or `plugin-foobar/` file moved, no default, parameter name or behaviour changed, and
+the one new artifact is a repo-maintenance gate that ships in nothing; the same call Plan 0151 took
+for the same shape). Review: **no blockers, no majors, four minors, two nits.**
+
+**What landed.** 235 bare `Plan NNNN` / `ADR-NNNN` citations across the five Entrance A documents
+went to 0 under ADR-0168's rule — keep the fact, demote the provenance to the link. The 121
+citations that remain are all inside markdown links. The five documents went 450,330 to 442,992
+bytes (-1.6 %), which is the property the plan asked for: a rewrite of framing, not a cut.
+18 headings were renamed and 21 inbound anchors repointed, computed with `github-slugger` over each
+whole document in reading order — the same key `site/src/plugins/split-document.mjs` builds its
+fragment map on. `scripts/check-reader-prose.mjs` is the ninth Node gate and the seventh in
+pre-push and CI's `links` job; it masks the four markdown link forms, skips fenced code, and names
+three of its own holes in its header.
+
+**What the close verified rather than accepted.** The whole risk of this plan is that a fact leaves
+with its provenance and nothing catches it, so the review ran four independent instruments against
+the tree rather than reading the log's claims:
+
+- `cargo nextest run --workspace` — **1536 run, 1536 passed, 5 skipped**, exit 0, 550 s. The
+  load-bearing one inside it is `core/tests/preset.rs`'s
+  `every_declared_param_is_documented_in_the_presets_readme`, which asserts every declared scene
+  param appears in backticks in `presets/README.md`. That is the mechanical proof Phases 3 and 4's
+  "the parameter roster is complete" done-when holds, and it is code guarding the doc rather than an
+  author comparing lists.
+- **A fragment sweep over all 412 tracked markdown files**, slugging every heading with
+  `github-slugger` and resolving every inline `#fragment`: 734 fragments checked, **zero unresolved
+  in any file this plan touched**. Three apparent breaks in `presets/README.md` and
+  `docs/preset-palettes.md` resolve to author-placed `<a id>` targets present before and after. This
+  is the check `scripts/check-doc-links.mjs` deliberately does not do, and the reason the plan
+  carried a hard dependency on 0154 Phase 3.
+- **An independent numeric diff** of the three rewritten files — every number extracted before and
+  after, citations stripped, multisets compared. The only figures that left are the ones the log's
+  own "information deliberately removed" table names: the downbeat fold's superseded column, the
+  fixed 1280x720 post grid and its 28 % stretch, two polyline segment counts in the mandala budget,
+  and `17.37` with commit `00d99d0`. Nothing else. `1.75` and `396`/`432` belong to two of those
+  four rows.
+- **The site build and both site gates** — 137 pages, 135 routes, largest split route 26,893 B
+  against ADR-0166's 30,000 cap. Matches the log exactly.
+
+Two removals were checked separately and are corrections rather than losses: `fragment_kaleido` and
+`reaction_gilt` are genuinely retired presets (`c8e5cad`, `d92dcb2`), and `` `0 = falloff` `` lost
+only its code span — the value and the name both stay in the `kaleido_edge` table above it.
+
+**What the review found.** Four minors and two nits, none of them in the prose:
+
+- The gate's four link-mask patterns are line-bounded (`[^\]
+]*`), so a markdown link whose text
+  wraps a line reads as a bare citation. Provoked and confirmed. There are already 22 multi-line
+  link texts across the five documents; none carries a citation yet, so the gate is green, but the
+  natural wrap in an 85-column corpus is a false positive whose repair pressure is to unwrap or drop
+  a correct link. The script names three of its own holes and not this one.
+- `packaging/{windows,macos,foobar}/READ-ME-FIRST.md` are what a tester finds in the zip and what
+  the site publishes as its install pages (ADR-0167). They are as reader-facing as
+  `docs/preset-guide.md` and sit outside `READER_DOCS`, so they carry zero citations by accident
+  rather than by gate.
+- The implementation log (7,603 B) outweighs the plan's own `## Implementation phases` (4,007 B).
+  The content earned its keep — the removal table is what made this audit an hour rather than a day
+  — but the ratio is the one the close ceremony names.
+- `docs/design-backlog.md` 0179's body says the pre-push hook "runs the six Node gates"; Phase 5
+  made it seven. Its probes still pass, so nothing convicted it — the backlog advisory's moved-path
+  block is what surfaced it, which is exactly what that block is for. Corrected in place at the
+  close.
+- `site/src/plugins/split-document.mjs:268` illustrates the pre-strip slug with
+  `presets/README.md#attractor-detail-sharpness-plan-0027`. The revert was deliberate and the
+  mechanism is still live for the 9 provenance headings left in `docs/capturing.md` and
+  `docs/on-device-validation.md` — but that file no longer produces that slug shape at all, so the
+  example now names a dead anchor.
+- The balance is drop, not link: 235 bare citations went and links rose only 109 to 121, so 223 were
+  dropped outright and 12 promoted. That is inside the rule as written, and the plan's own before/
+  after example drops — but ADR-0168's title says the working record *stays a link*, and one place
+  it shows is `docs/preset-palettes.md`, which dropped "ADR-0151 records why one was rejected" with
+  no substitute, leaving no route to why a second reading of a hex triple was refused.
+
+**What outlived the plan.** Its own two followups stand: the same treatment for `docs/capturing.md`
+if non-contributors turn out to read it, and an ADR on the phase owner-tag vocabulary if editorial
+work recurs often enough that tagging it `dev` keeps being wrong. The plan flagged that mismatch in
+its own Decision section rather than working around it, which is the right handling.
 
 ### [0154 — The site becomes navigable](done/0154-the-site-becomes-navigable.md)
 

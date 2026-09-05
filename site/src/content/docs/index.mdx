@@ -8,6 +8,7 @@ hero:
   tagline: A music visualizer that listens to whatever you are playing, and draws to it.
 ---
 
+import Frame from '../../components/Frame.astro';
 import { Card, CardGrid, LinkButton } from '@astrojs/starlight/components';
 
 {/*
@@ -46,16 +47,26 @@ export const gallery = Object.entries(
   .map(([file, image]) => ({ image, system: file.split('/').pop().replace('.png', '') }))
   .sort((a, b) => a.system.localeCompare(b.system));
 
+{/*
+  Two destinations per frame, and `Frame` carries both: the picture opens itself
+  at full size, the caption goes to the gallery section holding that system's
+  presets. It is also what keeps this strip from shipping the originals - see
+  the component.
+*/}
+
 <div class="gallery-strip" role="list">
   {gallery.map(({ image, system }) => (
-    <figure role="listitem">
-      <img src={image.src} width={image.width} height={image.height} alt={`The ${system} rendering system`} loading="lazy" />
-      <figcaption><code>{system}</code></figcaption>
-    </figure>
+    <Frame
+      image={image}
+      href={`${import.meta.env.BASE_URL}gallery/#${system}`}
+      label={system}
+      alt={`The ${system} rendering system`}
+      sizes="(min-width: 46rem) 15rem, 45vw"
+    />
   ))}
 </div>
 
-<CardGrid stagger>
+<CardGrid>
   <Card title="Get it and run it" icon="rocket">
     Pick a download, unzip it, and run it — <a href={`${import.meta.env.BASE_URL}start-here/`}>Start here</a> says which build you
     want and what the first launch looks like on each platform. Nothing installs into the

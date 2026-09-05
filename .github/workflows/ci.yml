@@ -191,6 +191,14 @@ jobs:
       # already links, and to the shapes the corpus contains.
       - run: node scripts/toc.mjs --check
       - run: node scripts/toc.mjs --self-test
+      # And the seventh (ADR-0168): in the five documents a preset author reads,
+      # every citation of a plan or an ADR sits inside a markdown link rather than
+      # bare in a sentence. It is the exact inverse of what the comment-hygiene
+      # gate above asks of a `.rs` comment, and the boundary between the two rules
+      # is the filename list inside the script. The convention alone was tried:
+      # CLAUDE.md has asked for bare-number citation throughout, and that is how
+      # those five documents accumulated 235 of them.
+      - run: node scripts/check-reader-prose.mjs
       # And the diffusion filter's own suite (Plan 0106 Phase 7c). It belongs in
       # this job rather than in the `check` matrix for the same reasons the three
       # gates above do: it is cheap, platform-independent, needs no GPU, no

@@ -1,0 +1,66 @@
+---
+/**
+ * One captured frame in a thumbnail strip, carrying its two destinations.
+ *
+ * The picture links to itself at full size and the caption links to the thing
+ * the picture is OF - on the home page a rendering system, so the caption goes
+ * to the gallery section holding that system's presets; in the gallery a
+ * preset, so it goes to that preset's `.toml`. Each link sits on the element
+ * whose meaning matches it, which is why one link is not enough.
+ *
+ * An `.astro` component rather than the JSX the two pages used to inline,
+ * because `getImage` is async and MDX has no top-level await.
+ *
+ * BOTH sizes go through the image service, and the difference between them is
+ * the whole reason this component exists. A source frame is a PNG of hundreds
+ * of kilobytes to two megabytes; the strip paints it into a cell a couple of
+ * hundred pixels wide. `<Image>` emits the downscaled WebP the strip actually
+ * needs, and `getImage` emits a native-resolution WebP for the link to open -
+ * about 26 kB a frame, because these are synthesised renders rather than
+ * photographs and WebP compresses them hard. Linking the source PNG instead
+ * would serve fifty times the bytes for the same picture.
+ *
+ * "Native" is not one number. `scripts/docs-shots.mjs` captures the twelve
+ * per-system frames at 1280x720 and the per-preset cards at `CARD_SIZE`, which
+ * is smaller - so a card's full size is a genuine step up from its thumbnail,
+ * but a smaller one than a system frame's. Nothing here is worth branching on:
+ * this passes no width and gets whatever the file has, so a re-capture at a
+ * different size arrives with no edit to this component.
+ */
+import { Image, getImage } from 'astro:assets';
+
+interface Props {
+  /** The captured frame, from an `import.meta.glob` of the images directory. */
+  image: ImageMetadata;
+  /** Where the caption points: a gallery section, or a preset's source file. */
+  href: string;
+  /** The caption itself - a system name or a preset name, set in code. */
+  label: string;
+  alt: string;
+  /**
+   * The strip's cell width, for the browser's `srcset` choice. It differs per
+   * page because the home page is a splash layout and the gallery sits in the
+   * narrower documentation column.
+   */
+  sizes?: string;
+}
+
+const { image, href, label, alt, sizes = '(min-width: 46rem) 14rem, 45vw' } = Astro.props;
+
+const full = await getImage({ src: image, format: 'webp', quality: 80 });
+---
+
+<figure role="listitem">
+  <a href={full.src} aria-label={`${alt}, at full size`}>
+    <Image
+      src={image}
+      widths={[240, 480, 720]}
+      sizes={sizes}
+      format="webp"
+      quality={72}
+      alt={alt}
+      loading="lazy"
+    />
+  </a>
+  <figcaption><a href={href}><code>{label}</code></a></figcaption>
+</figure>

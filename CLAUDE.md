@@ -122,7 +122,7 @@ docs/                # Full one-line-per-doc map: README.md "Repository layout".
 .githooks/           # Checked-in git hooks. pre-push runs the fast subset (doc links + fmt +
                      #   clippy + a narrowed nextest, ~28 s). OPT-IN PER CLONE — nothing runs
                      #   until `git config core.hooksPath .githooks`. See README + ADR-0033.
-scripts/             # Repo maintenance. Eight Node gates. SIX run by pre-push and by the CI
+scripts/             # Repo maintenance. Nine Node gates. SEVEN run by pre-push and by the CI
                      #   `links` job; the other TWO run in neither, because they need a BUILT site -
                      #   they live in .github/workflows/pages.yml. check-site-links.mjs asserts that
                      #   no site-relative href in site/dist/ ends in .md, that every one resolves to
@@ -131,7 +131,7 @@ scripts/             # Repo maintenance. Eight Node gates. SIX run by pre-push a
                      #   from the menu rather than only by search, and that no route the splitter
                      #   produced exceeds 30,000 bytes of source (ADR-0166) - a route over that means
                      #   ADR-0166's arithmetic needs redoing, never that the constant needs raising.
-                     #   Of the six, the first three and toc.mjs also run in the close
+                     #   Of the seven, the first three and toc.mjs also run in the close
                      #   ceremony, because a close is what breaks them. check-doc-links.mjs asserts
                      #   every relative markdown link resolves (moving a plan to plans/done/ breaks
                      #   links in both directions, and rejects a design-backlog fragment outright
@@ -142,7 +142,10 @@ scripts/             # Repo maintenance. Eight Node gates. SIX run by pre-push a
                      #   relative links and plan-relative narration in .rs and .cpp/.h comments
                      #   (ADR-0127); toc.mjs regenerates the contents block in each of the six long
                      #   documents from the headings under it, and --check reports drift (ADR-0163)
-                     #   — a block is generated, never hand-edited.
+                     #   — a block is generated, never hand-edited; check-reader-prose.mjs holds the
+                     #   FIVE reader documents to the opposite of ADR-0127's rule — every Plan/ADR
+                     #   citation inside a markdown link, never bare in a sentence (ADR-0168), the
+                     #   two rules meeting at a filename list inside that script.
                      #   scripts/fixtures/ holds their seeded bite checks.
                      #   RENDERERS, NOT GATES: docs-shots.mjs (regenerates docs/images/),
                      #   tuple-sheets.mjs + tuple-paths.mjs (attractor roster/walk contact

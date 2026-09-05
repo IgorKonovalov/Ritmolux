@@ -5,14 +5,26 @@ description: >-
 tableOfContents: false
 ---
 
+import Frame from '../../components/Frame.astro';
+
 Every preset that ships, one frame each, grouped by the system it draws with. Each frame is the
 same capture: the synthesized `dynamic:110` clip at its loudest hop, at the Rich quality tier —
 the settings [`scripts/docs-shots.mjs`](../../../../scripts/docs-shots.mjs)
 records for every committed picture in this repository.
 
-A preset is a text file. [The preset guide](../../../../docs/preset-guide.md) opens the smallest one
-worth looking at, and [the parameter roster](../../../../presets/README.md) lists every named
-parameter each of these systems takes.
+**Click a frame to open it full size; click the name under it to read the preset that drew
+it.** A preset is a text file — [the preset guide](../../../../docs/preset-guide.md) opens the
+smallest one worth looking at, and [the parameter roster](../../../../presets/README.md) lists
+every named parameter each of these systems takes.
+
+{/*
+  Where a frame's CAPTION links to - the picture itself opens at full size, which
+  `Frame` handles. A preset has no page of its own on this site: it IS a text
+  file, so the file is the destination. `blob/main` rather than a tag, because
+  the gallery is rebuilt from the same tree it links into.
+*/}
+
+export const SOURCE = 'https://github.com/IgorKonovalov/Ritmolux/blob/main/presets/';
 
 export const cards = Object.entries(
   import.meta.glob('../../../../docs/images/gallery/presets/*.png', {
@@ -57,16 +69,13 @@ export const families = [
     </h2>
     <div class="gallery-strip" role="list">
       {members.map(({ image, preset }) => (
-        <figure role="listitem">
-          <img
-            src={image.src}
-            width={image.width}
-            height={image.height}
-            alt={`The ${preset} preset, drawn with the ${system} system`}
-            loading="lazy"
-          />
-          <figcaption><code>{preset}</code></figcaption>
-        </figure>
+        <Frame
+          image={image}
+          href={`${SOURCE}${preset}.toml`}
+          label={preset}
+          alt={`The ${preset} preset, drawn with the ${system} system`}
+          sizes="(min-width: 46rem) 13rem, 45vw"
+        />
       ))}
     </div>
   </section>

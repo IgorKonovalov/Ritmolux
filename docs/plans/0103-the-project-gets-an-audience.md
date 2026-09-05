@@ -11,6 +11,9 @@
 > **Closes:** design-backlog 0102, design-backlog 0103
 > **Soft dependency:** [0101](done/0101-the-engine-renders-a-music-video.md) (nothing here can currently record motion)
 > **Hard dependency for Phase 5:** [0102](done/0102-the-component-ships.md)
+> **Coordinates with:** [0156](0156-the-site-becomes-the-reference.md) — its Phase 2 moves the operator
+> and developer sections out of `README.md` into `docs/` (ADR-0169), so Phase 2 here reorders a shorter file;
+> the architecture diagram moves to `docs/how-it-works.md` in its Phase 3.
 
 ## TL;DR
 

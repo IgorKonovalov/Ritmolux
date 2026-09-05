@@ -78,18 +78,18 @@ headroom as headroom.
   - [What range the bands actually occupy](#what-range-the-bands-actually-occupy)
   - [Seeded randomness — `hash`, `noise`, and `[generator] seed`](#seeded-randomness--hash-noise-and-generator-seed)
 - [Systems and their named parameters](#systems-and-their-named-parameters)
-  - [`fragment_field` animation rates — `field_speed` and `fold_speed` (Plan 0121)](#fragment_field-animation-rates--field_speed-and-fold_speed-plan-0121)
-  - [Attractor depth: `perspective`, `depth_fade`, `depth_hue`, `spin` (Plan 0063)](#attractor-depth-perspective-depth_fade-depth_hue-spin-plan-0063)
-  - [Attractor detail sharpness (Plan 0027)](#attractor-detail-sharpness-plan-0027)
-  - [Swarm flow-field structure (Plan 0043)](#swarm-flow-field-structure-plan-0043)
-  - [`emitter` — objects that spawn, fall, and die (Plan 0052)](#emitter--objects-that-spawn-fall-and-die-plan-0052)
-  - [Shaped marks — the particle silhouette (Plan 0070)](#shaped-marks--the-particle-silhouette-plan-0070)
-  - [`shape_field` — the same roster, at frame scale (Plan 0091)](#shape_field--the-same-roster-at-frame-scale-plan-0091)
-  - [`warp_mesh` — the past, resampled through a per-vertex grid (Plan 0100)](#warp_mesh--the-past-resampled-through-a-per-vertex-grid-plan-0100)
-  - [`shape_collage` — flat opaque elements on their own paper (Plan 0113)](#shape_collage--flat-opaque-elements-on-their-own-paper-plan-0113)
+  - [`fragment_field` animation rates — `field_speed` and `fold_speed`](#fragment_field-animation-rates--field_speed-and-fold_speed)
+  - [Attractor depth: `perspective`, `depth_fade`, `depth_hue`, `spin`](#attractor-depth-perspective-depth_fade-depth_hue-spin)
+  - [Attractor detail sharpness](#attractor-detail-sharpness)
+  - [Swarm flow-field structure](#swarm-flow-field-structure)
+  - [`emitter` — objects that spawn, fall, and die](#emitter--objects-that-spawn-fall-and-die)
+  - [Shaped marks — the particle silhouette](#shaped-marks--the-particle-silhouette)
+  - [`shape_field` — the same roster, at frame scale](#shape_field--the-same-roster-at-frame-scale)
+  - [`warp_mesh` — the past, resampled through a per-vertex grid](#warp_mesh--the-past-resampled-through-a-per-vertex-grid)
+  - [`shape_collage` — flat opaque elements on their own paper](#shape_collage--flat-opaque-elements-on-their-own-paper)
   - [Line-art parameter notes — strokes, joins, and per-scene shape](#line-art-parameter-notes--strokes-joins-and-per-scene-shape)
-  - [`spectrum` — the frequency-axis readout (Plan 0034)](#spectrum--the-frequency-axis-readout-plan-0034)
-- [Engine-wide controls (Plan 0018)](#engine-wide-controls-plan-0018)
+  - [`spectrum` — the frequency-axis readout](#spectrum--the-frequency-axis-readout)
+- [Engine-wide controls](#engine-wide-controls)
   - [Shared view transform — `zoom`, `pan_x`, `pan_y`](#shared-view-transform--zoom-pan_x-pan_y)
   - [Background pass — `bg_hue`, `bg_bright`, `bg_vignette`, the ramp and the band](#background-pass--bg_hue-bg_bright-bg_vignette-the-ramp-and-the-band)
   - [Backdrop occlusion — `occlude`](#backdrop-occlusion--occlude)
@@ -102,9 +102,9 @@ headroom as headroom.
   - [The symmetry stage — `kaleido_tile`, `kaleido_radial`, `kaleido_spiral`, `kaleido_zoom`, `kaleido_inner`](#the-symmetry-stage--kaleido_tile-kaleido_radial-kaleido_spiral-kaleido_zoom-kaleido_inner)
   - [Mirror or kaleidoscope? They are not the same cost](#mirror-or-kaleidoscope-they-are-not-the-same-cost)
   - [The composite stages render at the target](#the-composite-stages-render-at-the-target)
-  - [Bloom — `bloom_amount`, `bloom_threshold`, `bloom_radius` (Plan 0045)](#bloom--bloom_amount-bloom_threshold-bloom_radius-plan-0045)
-  - [Linear light and `exposure` (Plan 0045)](#linear-light-and-exposure-plan-0045)
-  - [Ink on paper — `ink_amount`, `paper_*`, `ink_*`, `ink_gamma` (Plans 0027, 0078)](#ink-on-paper--ink_amount-paper_-ink_-ink_gamma-plans-0027-0078)
+  - [Bloom — `bloom_amount`, `bloom_threshold`, `bloom_radius`](#bloom--bloom_amount-bloom_threshold-bloom_radius)
+  - [Linear light and `exposure`](#linear-light-and-exposure)
+  - [Ink on paper — `ink_amount`, `paper_*`, `ink_*`, `ink_gamma`](#ink-on-paper--ink_amount-paper_-ink_-ink_gamma)
 - [Colour — the palette surface](#colour--the-palette-surface)
   - [Hard bands — `palette_steps` and `palette_contour`](#hard-bands--palette_steps-and-palette_contour)
 - [Eased parameters — the `[smoothing]` table](#eased-parameters--the-smoothing-table)
@@ -393,12 +393,12 @@ preset folder — so while you are editing a file it re-rolls on each save.
 
 Unbound parameters fall back to each system's defaults. An **unknown** parameter
 name is reported as a load-time warning naming the param and the system — the
-preset still loads and its other bindings apply (ADR-0020). The params after the
-first `·` are the shared **view transform** and
-line-**mirror** controls (Plan 0018) — see [Engine-wide controls](#engine-wide-controls-plan-0018);
-the trailing group on the palette-coloured scenes (the four shader ones, plus
-`spectrum` since Plan 0034) is the shared **palette** colour surface (Plan 0020) —
-see [Colour — the palette surface](#colour--the-palette-surface).
+preset still loads and its other bindings apply. The params after the first `·`
+are the shared **view transform** and line-**mirror** controls — see
+[Engine-wide controls](#engine-wide-controls); the trailing group on the
+palette-coloured scenes (the four shader ones, plus `spectrum`) is the shared
+**palette** colour surface — see
+[Colour — the palette surface](#colour--the-palette-surface).
 Every system additionally accepts the engine-stage params `bg_*`, `trails`,
 `kaleido_*`, `bloom_*`, `occlude`, `exposure`, and the final `ink_*`/`paper_*`
 remap documented there.
@@ -413,7 +413,7 @@ remap documented there.
 > [The five IFS figures](#the-five-ifs-figures--a-different-kind-of-family),
 > [What made this point, and how far into the figure it is](#what-made-this-point-and-how-far-into-the-figure-it-is)
 > and
-> [Attractor depth](#attractor-depth-perspective-depth_fade-depth_hue-spin-plan-0063).
+> [Attractor depth](#attractor-depth-perspective-depth_fade-depth_hue-spin).
 
 **My attractor is too bright / too dim — which knob?** `brightness`. It is a
 plain multiplier on the light each particle deposits (default `1.0`), so it
@@ -424,11 +424,11 @@ The deposit is already normalized by particle count, so `brightness` composes
 with `[particles] density` rather than fighting it. **Not `exposure`** — that is
 the whole-frame stop, it crossfades as a scalar across a preset dissolve, and
 `bloom_threshold` is measured against it; see
-[Linear light and `exposure`](#linear-light-and-exposure-plan-0045). `size` and
+[Linear light and `exposure`](#linear-light-and-exposure). `size` and
 `fade` also move the level, but they move the picture with it — a wider nib and a
 longer trail — so use them when that is what you want.
 
-### `fragment_field` animation rates — `field_speed` and `fold_speed` (Plan 0121)
+### `fragment_field` animation rates — `field_speed` and `fold_speed`
 
 | param | default | what it scales |
 |---|---|---|
@@ -465,7 +465,7 @@ same shape for the same reason.)
 under one `fold_speed`; they are a sine/cosine pair chosen not to beat against
 each other, and nothing has asked for them to diverge.
 
-### Attractor depth: `perspective`, `depth_fade`, `depth_hue`, `spin` (Plan 0063)
+### Attractor depth: `perspective`, `depth_fade`, `depth_hue`, `spin`
 
 **Three of these four are exact no-ops on every flat family**, the same way
 `a b c d` already carry family-specific meanings. `perspective`, `depth_fade`
@@ -477,11 +477,10 @@ Binding them there is not an error and produces no warning — it produces
 nothing at all. (Verified by capture: at any setting, **zero pixels** differ —
 asserted for all three in `core/tests/attractor.rs`.)
 
-> **`depth_fade` joined the other two on 2026-08-09** (Plan 0075 Phase 2,
-> [design-backlog 0067](../docs/design-backlog.md)). Until then it was the one
-> exception — a uniform dimmer rather than a no-op: the haze is
-> `1 − depth_fade · (1 − depth01(dn))`, and a flat family's `dn ≡ 0` put the
-> multiplier at `1 − depth_fade/2`, so `depth_fade = 0.9` dimmed a flat figure
+> **`depth_fade` is a no-op on a flat family too, and the arithmetic is why it once
+> was not** ([design-backlog 0067](../docs/design-backlog.md)). The haze is
+> `1 − depth_fade · (1 − depth01(dn))`, and a flat family's `dn ≡ 0` would put the
+> multiplier at `1 − depth_fade/2`, so `depth_fade = 0.9` would dim a flat figure
 > **45 %** everywhere with no depth gradient (measured on `attractor_dissolve`:
 > 20.1 % of pixels moved, max channel delta 97, while `perspective` and
 > `depth_hue` moved **zero**). The fade term is now multiplied by the family's
@@ -499,7 +498,7 @@ reads as wind. That asymmetry is deliberate; do not read it as an oversight.
 |---|---|---|
 | `perspective` | Near material grows and far material shrinks, position and point size together. Segments foreshorten, because both endpoints project independently. | `0` (orthographic, the default) .. **~`0.3` in practice**; the clamp is at `0.8` and the reason to stop short of it is below |
 | `depth_fade`  | Attenuates brightness with distance — the substitute for occlusion, which this scene does not do. `1` takes the far end to black. | `0` (off) .. `1` |
-| `depth_hue`   | Shifts the palette coordinate by `±depth_hue/2` across the depth range, so distance moves *colour* as well as contrast — **on a ramp that travels in hue at roughly constant lightness.** On a dark-to-light ramp (which is what the 3-D presets have shipped) it duplicates `depth_fade` instead, and under `ink_amount = 1` it is structurally dead, like `saturation`. Measured at Plan 0063 Phase 5; [design-backlog 0062](../docs/design-backlog.md) | `0` (off) .. **`2 * min(hue_center, 1 - hue_center)`**, past which the offset wraps on the LUT's repeat sampler and far material lands on the near colour |
+| `depth_hue`   | Shifts the palette coordinate by `±depth_hue/2` across the depth range, so distance moves *colour* as well as contrast — **on a ramp that travels in hue at roughly constant lightness.** On a dark-to-light ramp (which is what the 3-D presets have shipped) it duplicates `depth_fade` instead, and under `ink_amount = 1` it is structurally dead, like `saturation`. [design-backlog 0062](../docs/design-backlog.md) | `0` (off) .. **`2 * min(hue_center, 1 - hue_center)`**, past which the offset wraps on the LUT's repeat sampler and far material lands on the near colour |
 | `spin`        | Rate multiplier on the display rotation. `1` is unchanged, `0` holds the figure still, negative reverses it. | any |
 
 Four things you cannot discover by binding them:
@@ -512,9 +511,8 @@ Four things you cannot discover by binding them:
   and the singularity would be at `1`.
 - **`perspective` mostly MOVES the figure, and a `zoom` edit cannot recover
   that.** The magnification is applied *before* the view transform, so raising it
-  does make the figure bigger — but that is the small half, and this entry used
-  to stop there. **Measured** at Plan 0063 Phase 5, peak-to-peak over four spin
-  phases on a bare Lorenz, 600 px square:
+  does make the figure bigger — but that is the small half. **Measured**
+  peak-to-peak over four spin phases on a bare Lorenz, 600 px square:
 
   | `perspective` | centre-x swing | widest span |
   |---|---|---|
@@ -537,16 +535,16 @@ Four things you cannot discover by binding them:
   artifact than the flatness `perspective` was bought to fix. The clamp is not
   where the projection breaks; at `0.8` it is still a true perspective divide and
   reads as a strong wide angle, not a fisheye. This ceiling note is
-  [design-backlog 0061](../docs/design-backlog.md)'s documented resolution
-  (Plan 0075); the deeper fix — re-centring the projection on the figure's
-  projected centroid — remains unowned.
+  [design-backlog 0061](../docs/design-backlog.md)'s documented resolution; the
+  deeper fix — re-centring the projection on the figure's projected centroid —
+  remains unowned.
 - **`spin` is a multiplier on 0.18 rad/s** (`spin = 1` is one revolution per
   **34.9 seconds**), and **its usable ceiling is set by `fade`, not by taste —
   `spin` and `fade` are one look.** A frame of trail drawn while the figure
   turns is a frame of *rotational smear*: push the pair too far and the
   accumulation stops being a trace of the trajectory and becomes concentric
   arcs, which destroys exactly the volume `perspective` was bought to buy.
-  **Measured** at Plan 0063 Phase 5: at `fade = 0.932` (~15 frames of trail)
+  **Measured**: at `fade = 0.932` (~15 frames of trail)
   the rendered ladder `1 / 2 / 3 / 5 / 8` reads *crisp, crisp, softening,
   smeared, scribble* — usable peak about **1.9**; `attractor_thomas` runs
   `fade = 0.955` (~22 frames) and its ceiling is correspondingly lower, about
@@ -567,7 +565,7 @@ Four things you cannot discover by binding them:
   these are set to. If depth stops reading, lower `density` before raising
   `perspective`.
 
-### Attractor detail sharpness (Plan 0027)
+### Attractor detail sharpness
 
 The `attractor` accumulates its trails into an offscreen grid sized to what it is
 drawing into, up to 2560x1440 — so at 1080p the filaments are pixel-crisp rather
@@ -579,7 +577,7 @@ window. Two authoring consequences: `size` now reads *finer* at high resolution
 attractor the way it did against the old fixed 1280x720 — the two caps still differ,
 so a very large window resolves the attractor alone slightly finer.
 
-### Swarm flow-field structure (Plan 0043)
+### Swarm flow-field structure
 
 `field_freq` is the swarm's **spatial** lever and the one that decides how many
 distinct streams a frame can hold. The scene steers every particle by a scalar
@@ -607,17 +605,16 @@ formation-holding end, and raising either dissolves the flock toward shimmer.
 
 `spin` **integrates a phase** ([ADR-0132](../docs/adrs/0132-a-rate-parameter-integrates-a-phase.md)),
 the same shape `fragment_field`'s
-[`field_speed` / `fold_speed`](#fragment_field-animation-rates--field_speed-and-fold_speed-plan-0121),
+[`field_speed` / `fold_speed`](#fragment_field-animation-rates--field_speed-and-fold_speed),
 `warp_mesh`'s `warp_speed` and `parametric_curve`'s `spin` take — so it is safe to
-bind to audio. Until Plan 0122 it multiplied the shared clock, and of those four it is
-the one shipped content had already found: `swarm_shatter` and `swarm_drift` both bind
-it to `mid`, and across a `0.75` swing a hundred seconds into a set the field clock
-advanced about **four seconds in one frame** against a nominal `0.019` — a re-roll of
-the whole field, growing without bound as a set runs. Both worlds were retuned onto the
-corrected clock at that plan's close, so a `spin` range lifted from either file is a
-range for the integrated form.
+bind to audio. A rate that instead *multiplied* the shared clock is what makes this
+matter: `swarm_shatter` and `swarm_drift` both bind `spin` to `mid`, and under that
+older form a `0.75` swing a hundred seconds into a set advanced the field clock about
+**four seconds in one frame** against a nominal `0.019` — a re-roll of the whole field,
+growing without bound as a set runs. Both worlds are tuned for the integrated form, so a
+`spin` range lifted from either file is a range for what ships.
 
-Since Plan 0077 the swarm's marks individuate the way the emitter's do —
+The swarm's marks individuate the way the emitter's do —
 same names, same semantics (see [Individuation](#individuation--the-distribution-params)).
 `size_spread` widens the per-mark size as a fraction either side of `size`; the
 swarm's seeded scatter already varies mildly on its own, and this opens that
@@ -628,8 +625,8 @@ whole-frame light sits still — which is what separates it from binding
 default `0`; an unbound preset is byte-unchanged. This is the pair that makes a
 sparse starfield able to twinkle at all (backlog 0068).
 
-And since the same plan the swarm carries `reseed`, the attractor family's
-percussive accent with the attractor's semantics (ADR-0066): a rising edge past
+The swarm also carries `reseed`, the attractor family's percussive accent with
+the attractor's semantics: a rising edge past
 `0.5` **disturbs the population where it is** — a seeded kick of ±6 % of the
 domain per axis — rather than respawning it into a box, so it reads as the
 field being shaken, never erased, and the flow re-gathers it within a few
@@ -637,7 +634,7 @@ seconds. It is edge-triggered: bind a gate (`reseed = "onset > 0.6"`), not a
 level — a held high fires once, not continuously. It is also the recovery
 lever for a sustained-force pile-up (backlog 0085); note that the *minutes*
 horizon of that recovery is outside what the test suite can see, so a world
-leaning on it owes the one-off soak check Plan 0077 Phase 5 describes.
+leaning on it owes a one-off soak check of its own.
 
 Two things the swarm does on its own, with nothing to bind.
 
@@ -670,10 +667,10 @@ assuming something broke.
 
 The swarm's mark is no longer only a round blob: `shape` and `points` give it a
 silhouette — see
-[Shaped marks](#shaped-marks--the-particle-silhouette-plan-0070), which covers
+[Shaped marks](#shaped-marks--the-particle-silhouette), which covers
 this scene and the emitter together.
 
-### `emitter` — objects that spawn, fall, and die (Plan 0052)
+### `emitter` — objects that spawn, fall, and die
 
 The emitter is the only system whose **population is not fixed**. Every other
 scene draws the same number of things every frame; this one throws objects from a
@@ -713,7 +710,7 @@ its crest at `y = 1.48` (`v = 2.6`, `g = 1.3`), off frame, for exactly that reas
 is retired the moment it does, so the only thing a long `lifetime` buys is slots
 held by objects thrown straight up into a `gravity = 0` sky.
 
-#### The source (Plan 0090)
+#### The source
 
 The line objects are thrown from is **geometry the preset owns**
 ([ADR-0104](../docs/adrs/0104-the-emitters-source-is-authorable-geometry.md)). Four
@@ -752,12 +749,12 @@ The price is a spawn pop — an object switched on at full brightness where the 
 black over the first fraction of its life, so a mark born mid-frame arrives instead
 of appearing. `0.3` on a two-second life is a 0.6 s arrival. Nothing validates the
 pair — an inside-frame `source_y` at `spawn_fade = 0` pops, and the engine lets it
-(ADR-0104 rejected coupling them: the preset surface is a flat set of independent
+(coupling them was rejected: the preset surface is a flat set of independent
 scalars, and a rule like that would make a legal preset briefly illegal under a
 `[smoothing]`-eased fade passing through zero). It is also worth having on its own:
 a ramp on a short-lived object is a *soft* spark, which no `brightness` can express.
 
-**Judged in the app, 2026-08-15** (Plan 0090 Phase 5): at the pop's most visible —
+**Judged in the app, 2026-08-15:** at the pop's most visible —
 a source on the screen midline, `source_y = 0` — **`spawn_fade = 0.35` hides it**,
 against a paired `spawn_fade = 0` probe that shows the artifact plainly. So the
 price above is real but payable, and there is no "keep the marks faint" caveat to
@@ -812,13 +809,13 @@ Because each object draws its own *rate* as well as its own phase, the whole-fra
 brightness stays steady while every member of the field swings; a shared rate
 would flash as one sheet whatever the phases were.
 
-`spin` turns the mark, and since Plan 0070 there is something to turn. The
-emitter's default mark is a soft **elongated glint** rather than a perfect disc —
+`spin` turns the mark, and there is something to turn. The emitter's default mark
+is a soft **elongated glint** rather than a perfect disc —
 a disc is rotationally symmetric, so on one `spin` would be invisible — and that
 glint is what `shape = disc` means *on this scene*. Select any other silhouette
 and `spin` rotates the figure itself, which is what makes a shaped mark read as
 an object rather than a stamp. See
-[Shaped marks](#shaped-marks--the-particle-silhouette-plan-0070).
+[Shaped marks](#shaped-marks--the-particle-silhouette).
 
 #### What it does not have
 
@@ -835,7 +832,7 @@ there is no fade-*out* to match `spawn_fade`: an object vanishes at its death ti
 which the retirement margin usually puts off-frame — an inside-frame `source_y`
 is exactly the case that undoes that.
 
-### Shaped marks — the particle silhouette (Plan 0070)
+### Shaped marks — the particle silhouette
 
 `swarm` and `emitter` both carry `shape` and `points`. They are the only two
 scenes that do: the `attractor`'s marks are a chaos-game accumulation, and at the
@@ -858,7 +855,7 @@ has no strings, so a star is `shape = "3"`.
 nothing on `disc`, `ring` or `heart`. Past a dozen the marks these are *for* — a
 few pixels across — are a disc with a rough edge.
 
-#### The `star` arm's three shape params (Plan 0091 Phase 5)
+#### The `star` arm's three shape params
 
 The star was one welded silhouette until a batch of six reference images turned
 out to be **five requests for parameters this arm did not have**. It has them
@@ -899,8 +896,7 @@ Three things worth knowing before you tune them:
   visible (the sprite reads only the interior); on a big banded field, a heavily
   jittered star's outer rings are approximate.
 - **They are inert on the other four shapes**, and nothing warns — the name is
-  known, so no unknown-parameter warning fires (ADR-0020). This paragraph is the
-  warning.
+  known, so no unknown-parameter warning fires. This paragraph is the warning.
 
 #### These three MORPH the figure with the music, and that needs no engine work
 
@@ -930,11 +926,11 @@ Three things to know before binding them:
   the arm takes a closed-form straight-edge branch; either side of it takes a sampled one, and the
   two disagree by about `0.0032` (the polyline's sagitta). Small, but it sits in the middle of the
   range you are most likely to animate through — bias the range to one side if it shows.
-- **A curved or jittered star's interior moved at Plan 0098 Phase 1, and so did its contour
-  spacing.** That branch used to normalize by the straight edge plane's perpendicular; it now
-  divides by the figure's own deepest-point distance. `gamma` works on it again (it was a NaN
-  before), and a `color_span` tuned against the old scale is out by the ratio of the two references
-  — roughly 1.1x at a shallow curve and 1.9x at `star_valley = 0.18`.
+- **A curved or jittered star's interior normalizes differently from a straight-edged one, and so
+  does its contour spacing.** That branch divides by the figure's own deepest-point distance rather
+  than by the straight edge plane's perpendicular, so a `color_span` carried over from a
+  straight-edged star is out by the ratio of the two references — roughly 1.1x at a shallow curve
+  and 1.9x at `star_valley = 0.18`.
 
 **Not in the roster and not a parameter: a star with *eyes*.** Composing two
 discs onto a silhouette is multi-shape composition, which is neither a knob nor
@@ -981,12 +977,12 @@ Two consequences worth planning around:
 > light — there is no fill and no outline.** The compositor adds, so black adds
 > nothing and a dark edge cannot exist *there*: a `heart` drawn this way is a
 > heart-shaped **glow**, brightest in its middle and fading to nothing at its
-> outline, not a red body with a black rim. That is ADR-0084's deliberate scope.
+> outline, not a red body with a black rim. That is the scene's deliberate scope.
 >
-> **It is no longer the whole story, and the correction is not a workaround.**
+> **It is not the whole story, though, and the route out is not a workaround.**
 > Put the same scene in a `[layer]` with `blend = "multiply"` and its marks
 > *subtract* light instead — dark figures on a light ground, measured to display
-> luma 0.9 at Plan 0091 Phase 1. See
+> luma 0.9. See
 > [Dark on light](#dark-on-light--the-multiply-route-and-its-two-traps). What
 > stays true is the sentence's other half: nothing in this engine decides what
 > is in **front** of what, so a mark that occludes another figure is still
@@ -997,7 +993,7 @@ work, not a preset. That is the same trade
 [ADR-0061](../docs/adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md)
 made for fold edges.
 
-### `shape_field` — the same roster, at frame scale (Plan 0091)
+### `shape_field` — the same roster, at frame scale
 
 **The five silhouettes above are not only marks.** `system = "shape_field"`
 draws one of them as a **fullscreen signed-distance field**, which is a different
@@ -1020,19 +1016,19 @@ color_span      = "0.45"     # how much gradient the figure's interior spans
 |---|---|
 | `shape` | the same numeric selector as the table above, same five names, same closed roster |
 | `points` | the same `3`..`12` count, for `polygon` and `star` |
-| `star_valley` / `star_curve` / `star_jitter` | the same three star shape params — see [The `star` arm](#the-star-arms-three-shape-params-plan-0091-phase-5). `star_jitter` is the one whose *field* precision is worth reading about there |
+| `star_valley` / `star_curve` / `star_jitter` | the same three star shape params — see [The `star` arm](#the-star-arms-three-shape-params). `star_jitter` is the one whose *field* precision is worth reading about there |
 | `scale` | the figure's size: its outline sits at `scale` of the frame's short half-axis. Default `0.6`, clamped to `0.01`..`20` |
 | `pan_x` / `pan_y` | move the figure's centre (the shared view transform) |
 | `rotation` | turns the figure **about its own centre**, in radians. Default `0`, an exact identity, unclamped — an angle wraps. Applied after `pan_*`, so a panned figure spins in place rather than orbiting the frame |
 | `gamma` | the **response exponent** on the figure coordinate, before it becomes a palette coordinate — where the contours crowd. Default `1.0` (evenly spaced, and an exact identity), clamped to `0.05`..`20` |
 | `coord_mode` | **which coordinate the palette is handed.** `0` (default) is the distance, whose contours are offset curves; `1` is `r / r_boundary(theta)`, whose contours are **scaled copies** of the outline. Stepped, like `shape`. See [Two coordinates](#two-coordinates--offsets-and-scaled-copies) |
 
-> **`gamma` on a curved or jittered star used to be a NaN, and no longer is** (Plan 0098 Phase 1,
-> closing [backlog 0097](../docs/design-backlog.md)). Those two params take the star arm's curved
-> branch, which normalized a true distance by the *straight* edge plane's perpendicular — always
-> shorter than the figure's real deepest-point distance, so the coordinate came out **negative** at
-> the centre and `pow` of a negative base is NaN. The branch now divides by the figure's own
-> deepest-point distance and the coordinate is `0` there — **exactly** `0` while the spikes are all
+> **`gamma` is well defined on a curved or jittered star, and the arithmetic behind that is worth
+> knowing** ([backlog 0097](../docs/design-backlog.md)). Those two params take the star arm's curved
+> branch. Normalizing its true distance by the *straight* edge plane's perpendicular — always
+> shorter than the figure's real deepest-point distance — would put the coordinate **negative** at
+> the centre, and `pow` of a negative base is NaN. The branch instead divides by the figure's own
+> deepest-point distance, so the coordinate is `0` there — **exactly** `0` while the spikes are all
 > the same length, and within about `0.09` of it under `star_jitter`, where the divisor is the
 > unjittered figure's while the measurement is the fragment's own spike's. Either way `gamma` is an
 > ordinary knob on every star. **`presets/shape_facet.toml` is the worked example**: it pinned
@@ -1133,8 +1129,8 @@ size lever, and a view zoom on top of it would be a second spelling of one idea.
 #### Making the figure respond — the three levers, and none of them is new
 
 All three of the obvious reactivity asks fall out of parameters that already
-existed, once the thing being banded is a distance. That is ADR-0105's claim and
-it holds; these are recipes, not features.
+existed, once the thing being banded is a distance. These are recipes, not
+features.
 
 ```toml
 [params]
@@ -1200,8 +1196,8 @@ that shows both.
 > about `0.64` for the `heart` against `0.093` for a sharp `star`
 > (`star_valley = 0.18`, 7 points). So *the same* `color_span` gives roughly
 > **seven times** the contour count on that star, and a value tuned on one shape
-> is meaningless on another. Authoring the Plan 0091 star probes needed a
-> separately computed span per figure just to keep one sweep on frame.
+> is meaningless on another. Authoring a sweep across several figures needs a
+> separately computed span per figure just to keep it on frame.
 >
 > **The live consequence: binding `star_valley` or `points` silently changes the
 > ring count while it moves**, because both move the inradius. If you animate
@@ -1230,8 +1226,8 @@ texture in a still and shimmers the moment anything moves. `d` at the corner is
 
 > **`points` on a `star` here is not the same picture as on a mark.** These
 > silhouettes were tuned for sprites a few pixels across, and at frame scale the
-> star's interior is knowingly approximate — measured at Plan 0091 Phase 2, its
-> field is 0.066 out of true at 5 points and **0.248 at 12**, in units where the
+> star's interior is knowingly approximate — its field is measured 0.066 out of
+> true at 5 points and **0.248 at 12**, in units where the
 > figure's own inradius is 1. The contours *outside* every shape are exact. So
 > a many-pointed star's inner rings will not sit where an offset curve should;
 > its outer ones will.
@@ -1285,7 +1281,7 @@ Read the three roles, because under the old coordinate they were not separable:
 > It is a shipped, accepted look and nothing forces it to move, but
 > `coord_mode = "1"` is the documented route now.
 
-### `warp_mesh` — the past, resampled through a per-vertex grid (Plan 0100)
+### `warp_mesh` — the past, resampled through a per-vertex grid
 
 **One transform per vertex, where `trails` gives you one for the whole frame.**
 `system = "warp_mesh"` covers the frame with a grid of cells and resamples the
@@ -1346,8 +1342,8 @@ naming `rad` gets a load warning and reads zero.
 The table accepts exactly the nine names below, and **each is also an ordinary
 scalar param**. That is the composition rule: a scalar sets the output for the
 whole mesh, and a `[per_vertex]` binding of the same name replaces it vertex by
-vertex. Bind none of them and you have ADR-0048's single shared transform; bind
-one and only that one varies.
+vertex. Bind none of them and you have the single shared transform; bind one and
+only that one varies.
 
 | output | does (all rates are **per second**) |
 |---|---|
@@ -1368,12 +1364,10 @@ properties of the pattern rather than of a vertex:
 
 `warp_speed` **integrates a phase** ([ADR-0132](../docs/adrs/0132-a-rate-parameter-integrates-a-phase.md)),
 the same shape `fragment_field`'s
-[`field_speed` / `fold_speed`](#fragment_field-animation-rates--field_speed-and-fold_speed-plan-0121)
-take — so it is safe to bind to audio. Until Plan 0121 it multiplied the shared
-clock, where a swing from `1` to `1.5` a hundred seconds into a set would have
-moved the warp's phase by **fifty seconds in one frame**: a teleport, not an
-acceleration. No shipped preset binds it, which is the only reason nobody found
-that.
+[`field_speed` / `fold_speed`](#fragment_field-animation-rates--field_speed-and-fold_speed)
+take — so it is safe to bind to audio. A rate that instead *multiplied* the shared
+clock would move the warp's phase by **fifty seconds in one frame** on a swing from
+`1` to `1.5` a hundred seconds into a set: a teleport, not an acceleration.
 
 **A `[smoothing]` entry naming a `[per_vertex]` binding is ignored, with a
 warning** — the same rule a per-element `index` binding takes, and for the same
@@ -1407,7 +1401,7 @@ shader, so a preset that binds none of them pays nothing.
 
 | param | does |
 |---|---|
-| `wrap` | past `0.5`, the past is **toroidal**: content that a zoom pulls off one edge comes back on the other. This is what most of the classic tunnels are made of. Off — the default — an off-field read contributes nothing, which is the transparent-border policy `trails` takes (ADR-0048) |
+| `wrap` | past `0.5`, the past is **toroidal**: content that a zoom pulls off one edge comes back on the other. This is what most of the classic tunnels are made of. Off — the default — an off-field read contributes nothing, which is the transparent-border policy `trails` takes |
 | `gamma` | multiplies the light on the way out. Default `1` |
 | `darken_center` | darkens a soft disc at the middle, in frame-heights so it is round on any display. What stops a zooming feedback loop saturating there. A fraction gives a proportional amount, which the source format cannot express |
 | `brighten` | past `0.5`, `sqrt` of the light — lifts the shadows |
@@ -1510,8 +1504,8 @@ Three things about it are worth knowing even though you will not author one:
   place where reading this section as "the warp mesh has nothing to draw" would
   mislead you.
 - **A MilkDrop 2 bundle may also carry `warp_shader` / `comp_shader`** — the
-  preset's own pixel shaders, translated from HLSL to WGSL ahead of time
-  (Plan 0100 Phase 6), plus a `blur_level` naming how deep a blur chain they
+  preset's own pixel shaders, translated from HLSL to WGSL ahead of time, plus a
+  `blur_level` naming how deep a blur chain they
   sample. The engine validates each through naga at load; **a shader that does
   not compile rejects that one preset by name and the rest of the library
   loads**. When a `warp_shader` is present it replaces the built-in decay
@@ -1532,7 +1526,7 @@ Three things about it are worth knowing even though you will not author one:
   [milk]
   quantize_steps = 255   # the default for a bundle. 0 turns it off entirely;
                          # -255 floors dim pixels to zero without stepping the
-                         # levels between (ADR-0118 Alternative D)
+                         # levels between
   ```
 
   **A negative value still takes its floor from the magnitude**, which is the one
@@ -1574,7 +1568,7 @@ by drawing the left channel against the right, this draws the one trace at the
 separation the reference's own parameters name. It is the same figure with the
 channel difference removed.
 
-### `shape_collage` — flat opaque elements on their own paper (Plan 0113)
+### `shape_collage` — flat opaque elements on their own paper
 
 **This is the one system in the engine where one object is in front of another.**
 Every other scene emits additive light, and additive light has no ordering: a
@@ -1630,9 +1624,9 @@ preset that binds none of them draws a still canvas.
 > and the look is free.** This is the one
 > authoring fact this system has, and it comes off the tonemap rather than off
 > any parameter — see
-> [Linear light and `exposure`](#linear-light-and-exposure-plan-0045) and the
+> [Linear light and `exposure`](#linear-light-and-exposure) and the
 > paragraph on the knee in [`docs/preset-palettes.md`](../docs/preset-palettes.md).
-> Below the knee ADR-0046's curve is exactly the identity, so the fill survives
+> Below the knee the tonemap curve is exactly the identity, so the fill survives
 > the post chain **unshaded** — the value the element wrote is the value that
 > leaves the tonemap — and bloom's threshold sits above that same knee, so the
 > edges stay hard with no halo. One constraint, both properties, no parameter.
@@ -1640,7 +1634,7 @@ preset that binds none of them draws a still canvas.
 > together, and nothing will tell you why.
 >
 > **Unshaded also means the hex you typed.** A stop is sRGB and is decoded once
-> at load (ADR-0151), so the decode and the display encode are inverses and the
+> at load, so the decode and the display encode are inverses and the
 > identity curve between them changes nothing: in `collage_suprematist`,
 > `#494949` renders `#494949` and `#c24f63` renders `#c24f63`. The only residual
 > is the LUT's own 8-bit linear storage, up to two levels on a very dark
@@ -1666,25 +1660,23 @@ works, but its elements land wherever those eight coordinates happen to fall.
 
 ### Line-art parameter notes — strokes, joins, and per-scene shape
 
-**Strokes join at their interior vertices** (Plan 0039,
-[ADR-0041](../docs/adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)).
+**Strokes join at their interior vertices**
+([ADR-0041](../docs/adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)).
 A line scene builds its figure as a list of segments, but a *connected* run of
 them renders as one continuous stroke: where the stroke turns, the quads either
-side of the vertex overlap instead of leaving the wedge of background they used
-to. There is no parameter for this and it is not authorable — each scene declares
+side of the vertex overlap instead of leaving a wedge of background between them.
+There is no parameter for this and it is not authorable — each scene declares
 its own connectivity, so a genuinely separate segment keeps its exact ends and
 does not grow. A `spectrum` bar still stands exactly on `baseline`, a radial
 spoke still starts exactly on `radius`, and an L-system branch still begins where
 it begins.
 
-Two things follow for authoring. **A thin stroke is a real option now**: the dark
-tick that used to cross every vertex scaled with `thickness`, so a figure with
-sharp turns — a `polyline` spectrum above all — had to be drawn heavy to hide it,
-and that constraint is gone. And **a very sharp turn reads slightly bright**
-rather than broken, since the two overlapping quads add under the additive blend.
-That is the trade ADR-0041 took in place of a miter limit; it is far less visible
-than the gap it replaced, but if a near-reversal is meant to read as a fine point
-rather than a bead, soften the turn rather than the stroke. On `star_pattern` the
+Two things follow for authoring. **A thin stroke is a real option**: nothing about
+a sharp-turning figure — a `polyline` spectrum above all — forces it to be drawn
+heavy. And **a very sharp turn reads slightly bright** rather than broken, since
+the two overlapping quads add under the additive blend. That is the trade taken in
+place of a miter limit; if a near-reversal is meant to read as a fine point rather
+than a bead, soften the turn rather than the stroke. On `star_pattern` the
 turn is `[generator] contact_angle_deg`, not a `[params]` binding: a low angle
 makes the outer points sharper, so their studs tighten and the point blunts by
 about a half-width. The bead is most distinct in the middle of the range, where
@@ -1700,7 +1692,7 @@ wrong one is the trap the `glow` entry below records.
 - `thickness` — stroke weight (roughly 1–5); scaled to a projector-friendly glow.
   Pick it for the weight you want: it no longer trades against a joint artifact.
   The weight is the **same at every orientation** — a vertical stroke and a
-  horizontal one measure the same across on screen, on any aspect (ADR-0160).
+  horizontal one measure the same across on screen, on any aspect.
 
   > **Below `0.167` is a DEAD ZONE — every value there renders identically.** The
   > param maps to a **world** half-width as `thickness * 0.003`, floored at `0.0005`
@@ -1718,9 +1710,8 @@ wrong one is the trap the `glow` entry below records.
 - `softness` — the **shape of the stroke across its width**, `0` to `1`, default
   **`0.25`**: a solid stroke with a short shoulder. `0` is solid with a
   **one-pixel** antialiased edge; `0.5` makes the inner half solid and ramps
-  across the outer half; `1.0` is the pure quadratic falloff these scenes drew
-  until Plan 0114, where brightness starts falling at the centreline and a 14 px
-  line is a 4 px spine inside a 10 px gradient. The edge is one pixel of the
+  across the outer half; `1.0` is a pure quadratic falloff, where brightness starts
+  falling at the centreline and a 14 px line is a 4 px spine inside a 10 px gradient. The edge is one pixel of the
   **render target** at any resolution and any aspect, so a low `softness` reads
   the same on a laptop panel and on a 4K screen.
 
@@ -1741,8 +1732,8 @@ wrong one is the trap the `glow` entry below records.
   > zone above, one derivative up.
 
 - `stroke_blend` — which **seam** the figure draws through, default `0`. At `0`
-  the batch is **additive light** (ADR-0056), which is what these four scenes
-  have always drawn: overlapping strokes sum, so white over red is pink. At `1`
+  the batch is **additive light**, which is what these four scenes draw by
+  default: overlapping strokes sum, so white over red is pink. At `1`
   the whole batch — segments and any arcs together — composites **over**, so a
   stroke laid on another **replaces the interior of what it covers** and a
   quantized palette keeps its plateaus. That is the difference between a
@@ -1764,13 +1755,11 @@ wrong one is the trap the `glow` entry below records.
   > **Turning it on usually costs `brightness`.** Additive light builds up where
   > a figure crosses itself, and a dense rosette leans on that. Under OVER it
   > does not, so the same `brightness` reads flatter and often darker.
-- `glow` — the line renderer's **per-segment light** multiplier, default `1.0`
-  (exactly what these scenes drew before it was bindable), whole-figure on all
-  four. **It multiplies the stroke's colour and never its coverage**: a dimmed
-  stroke still covers its whole footprint, which is ADR-0056's rule. This entry
-  called it a *falloff* multiplier for four years and it is not one — that
-  confusion is precisely what let the blurred stroke sit unfixed, because the
-  parameter that looked like it should sharpen a line could only dim it.
+- `glow` — the line renderer's **per-segment light** multiplier, default `1.0`,
+  whole-figure on all four. **It multiplies the stroke's colour and never its
+  coverage**: a dimmed stroke still covers its whole footprint. It is emphatically
+  **not** a falloff multiplier — it cannot sharpen a line, only dim it, and
+  `softness` is the parameter that shapes the edge.
   Below `1` the stroke recedes toward a dim hairline, above `1` it saturates the
   core and only widens the visible skirt. **There is more range downward than
   upward** —
@@ -1792,11 +1781,11 @@ wrong one is the trap the `glow` entry below records.
   in radians a second, `samples` the chord count (clamped to the segment cap).
   `spin` **integrates a phase** ([ADR-0132](../docs/adrs/0132-a-rate-parameter-integrates-a-phase.md)),
   the same shape `fragment_field`'s
-  [`field_speed` / `fold_speed`](#fragment_field-animation-rates--field_speed-and-fold_speed-plan-0121)
-  and `warp_mesh`'s `warp_speed` take — so it is safe to bind to audio. Until
-  Plan 0122 it multiplied the shared clock, where a swing from `0.1` to `1.5` a
-  hundred seconds into a set would have turned the figure through a hundred and
-  forty radians in one frame: a teleport, not an acceleration. Two **shape** params morph the curve itself (default `0.0`, a no-op):
+  [`field_speed` / `fold_speed`](#fragment_field-animation-rates--field_speed-and-fold_speed)
+  and `warp_mesh`'s `warp_speed` take — so it is safe to bind to audio. A rate that
+  instead *multiplied* the shared clock would turn the figure through a hundred and
+  forty radians in one frame on a swing from `0.1` to `1.5` a hundred seconds into a
+  set: a teleport, not an acceleration. Two **shape** params morph the curve itself (default `0.0`, a no-op):
   `phase` (radians added *inside* the sine, `r = sin(n*theta + phase) + radial_offset`)
   reshapes the petals as it advances — distinct from `spin`, which rotates the
   finished figure; `radial_offset` adds to the radius, opening the rose off-origin
@@ -1816,14 +1805,14 @@ wrong one is the trap the `glow` entry below records.
 
 #### `star_pattern` `variant` — a continuous contact angle
 
-Since Plan 0054 / [ADR-0060](../docs/adrs/0060-star-pattern-variants-interpolate.md)
-`variant` sweeps the Hankin construction's **contact angle** rather than indexing
-one of three precomputed rosettes. `0` is 24° below the `[generator]
+`variant` sweeps the Hankin construction's **contact angle**
+([ADR-0060](../docs/adrs/0060-star-pattern-variants-interpolate.md)) rather than
+indexing one of three precomputed rosettes. `0` is 24° below the `[generator]
 contact_angle_deg` (a sharper star), `1` is the base angle, `2` is 24° above (a
 blunter one), the whole thing clamped into the 8–80° range that makes a sensible
 figure. Values outside `0..2` clamp to the ends.
 
-**`0`, `1` and `2` still name the same three rosettes they always did**, so an
+**`0`, `1` and `2` name the three rosettes the discrete form did**, so an
 existing preset is unchanged. What is new is everything between them:
 
 - **`[smoothing]` on `variant` now morphs** instead of stuttering. Easing it used
@@ -1868,9 +1857,9 @@ changes nothing.
 nothing to ramp along.** The retired `lsystem_fern` reached generation 11 at
 `visible_depth = 6`; the retired `lsystem_arrowhead` had no `[` in its rules at
 all, so every segment of it sat at generation 0 and `hue_spread` was a no-op
-there however large (both retired at Plan 0075 cohort 1 — the property is the
-grammar's, not the file's). That is a property of a Sierpinski arrowhead — every segment genuinely is
-at the same recursion level — not a missing feature. Such a preset still reaches
+there however large — the property is the grammar's, not the file's. That is a
+property of a Sierpinski arrowhead — every segment genuinely is at the same
+recursion level — not a missing feature. Such a preset still reaches
 `[palette]`; what it cannot reach is a ramp. The ramp is normalized over the
 **figure's own** deepest generation, so `hue_spread = 1` spans the palette once
 whatever the grammar's branching factor and whichever depth is visible.
@@ -1882,9 +1871,9 @@ the palette's first half — rather than re-tinting every chord it already drew.
 > **`hue_spread` on `star_pattern` is live if and only if the preset declares
 > `rings`, and that is measured both ways.** A Hankin rosette is `2n` congruent
 > segments about the frame centre, so every one of them occupies the *same*
-> radial interval: on `star_rosette` and `star_lantern` (both retired at Plan
-> 0075 cohort 1) the spread of segment radii across the whole figure measured
-> `1.2e-7` (f32 noise) at every tiling order and every contact angle. There is no range for a radial ramp to walk, so
+> radial interval: on the retired `star_rosette` and `star_lantern` the spread of
+> segment radii across the whole figure measured `1.2e-7` (f32 noise) at every
+> tiling order and every contact angle. There is no range for a radial ramp to walk, so
 > the ramp collapses to the flat `hue` rather than sweeping on noise, and what
 > those presets gain from the palette surface is `[palette]` itself — the rosette
 > can be an ember or an ice figure instead of a point on the built-in cosine —
@@ -1902,28 +1891,24 @@ the palette's first half — rather than re-tinting every chord it already drew.
 > ornament along the rest, which is a way to separate the two figures by colour
 > rather than by brightness.
 >
-> **`star_rosewindow` (Rose Window, Plan 0075 cohort 1) is the shipped `rings`
-> preset today**, and it stayed at interlace scale deliberately — the reason was
-> design-backlog 0073: every motif was a parametric outline sampled to straight
-> segments, so at ornament scale the vertices showed and a circle read as a
-> polygon. That is what retired the first three rings presets (`star_mandala`,
-> `star_mandala_six`, `star_weave`, 2026-08-06). The ornament-scale mandala
-> register moved to an analytic iso-contour fold (`reaction_gilt`, itself since
-> retired at Plan 0075 cohort 3) and now lives in `fragment_mandala` (Banded
-> Mandala), which has no geometry to facet.
+> **`star_rosewindow` (Rose Window) is the shipped `rings` preset**, and it stays at
+> interlace scale deliberately — the reason is design-backlog 0073: a motif built as
+> a parametric outline sampled to straight segments shows its vertices at ornament
+> scale, and a circle reads as a polygon. That is what retired the first three rings
+> presets (`star_mandala`, `star_mandala_six`, `star_weave`, 2026-08-06). The
+> ornament-scale mandala register moved to an analytic iso-contour fold and now lives
+> in `fragment_mandala` (Banded Mandala), which has no geometry to facet.
 >
-> **Plan 0087 removed that ceiling for every curved member of the roster.**
-> `circle` and `arc` became single per-pixel arcs at its Phase 3; `petal`,
-> `teardrop` and `trefoil` became **G1 arc chains** at its Phase 5 — a handful of
-> arcs that share a tangent where they meet, so the chain has no tangent
-> discontinuity for the eye to read as a corner and no sampled vertex to bead at.
-> A ring of any of the five is round at `scale = 0.13` and at full frame. Only
-> `diamond` and `chevron` are still sampled polylines, and their vertices are the
-> figure. **The three retired presets have not been re-judged** — that is the
-> plan's own Phase 7 — so read Rose Window's header before authoring the next
-> rings preset.
+> **The curved members of the roster no longer carry that ceiling.** `circle` and
+> `arc` are single per-pixel arcs; `petal`, `teardrop` and `trefoil` are **G1 arc
+> chains** — a handful of arcs that share a tangent where they meet, so the chain has
+> no tangent discontinuity for the eye to read as a corner and no sampled vertex to
+> bead at. A ring of any of the five is round at `scale = 0.13` and at full frame.
+> Only `diamond` and `chevron` are still sampled polylines, and their vertices are
+> the figure. **The three retired presets have not been re-judged**, so read Rose
+> Window's header before authoring the next rings preset.
 
-### `spectrum` — the frequency-axis readout (Plan 0034)
+### `spectrum` — the frequency-axis readout
 
 A line system like the three above, but its figure is not a generator's geometry:
 it is the engine's log-spaced band array, divided into elements by the
@@ -2004,7 +1989,7 @@ applied later in the shader, so panning moves the mirrored pair together.
   `radial_ring` a spread of exactly `1` makes the wrap continuous in colour as
   well as in position.
 
-**Per-element bindings (Plan 0034 Phase 4).** This is the one system where a
+**Per-element bindings.** This is the one system where a
 single `[params]` expression can say something *different about each element*. A
 binding whose text names `index` — the element's normalized `0..1` position along
 the frequency axis — is evaluated once per element instead of once per frame:
@@ -2037,9 +2022,9 @@ for the same reason it is on `star_pattern` — the figure is already rotational
 symmetric about the frame centre, so the copies land on the original. On `bars`
 and `polyline` it is genuinely transformative.
 
-## Engine-wide controls (Plan 0018)
+## Engine-wide controls
 
-These sit in the **render composite** (ADR-0018), not in one scene, so they are
+These sit in the **render composite**, not in one scene, so they are
 audio-bindable like any other param. All default to *off/identity*, so a preset
 that binds none renders exactly as before.
 
@@ -2047,8 +2032,8 @@ that binds none renders exactly as before.
 
 A camera zoom about the frame centre, then a pan. Applied by **every** coloured
 scene: `fragment_field`, `swarm`, the line systems (`parametric_curve` /
-`lsystem` / `star_pattern`, and `spectrum` since Plan 0034), and — since Plan
-0025 — `reaction_diffusion` and `attractor`.
+`lsystem` / `star_pattern`, and `spectrum`), and `reaction_diffusion` and
+`attractor`.
 
 - On the **line**, **swarm**, and **attractor** scenes, `zoom > 1` moves the camera
   *in* (geometry bigger); `zoom = 1` is no zoom. `pan_*` shift in world units. Try
@@ -2061,8 +2046,7 @@ scene: `fragment_field`, `swarm`, the line systems (`parametric_curve` /
 **Reaction-diffusion's field is finite but toroidal**, and that is what makes the
 view transform usable on it. The simulation runs on a fixed grid whose edges wrap
 — growth leaving the right edge re-enters on the left — so the field is seamless
-even though it is not infinite. Since Plan 0033 the present pass samples it that
-way too:
+even though it is not infinite, and the present pass samples it that way too:
 
 - `pan_x` / `pan_y` are a **seamless infinite scroll**. Pan as far as you like in
   either axis; the field repeats, and there is no edge to fall off.
@@ -2095,9 +2079,9 @@ is that ramp — so `bg_hue` `0.30` is cornflower blue, `0.45` aqua, `0.85` ambe
 stops of your own, at which point read the value off your own gradient instead. A `bg_hue` copied
 from another preset arrives at whatever colour your gradient holds there, not the colour it was in
 the preset you took it from. Visible wherever the scene leaves the frame unpainted: behind
-the **sparse** scenes (lines, swarm, attractor) where the gaps show through, and —
-since Plan 0025 — in the **reaction-diffusion** field's voids (both scenes now
-composite over the backdrop instead of presenting opaque). The **fragment field**
+the **sparse** scenes (lines, swarm, attractor) where the gaps show through, and in
+the **reaction-diffusion** field's voids (both composite over the backdrop instead
+of presenting opaque). The **fragment field**
 is the one full-screen scene that still draws opaquely, so `bg_*` has no visible
 effect there — **including the whole ramp and the band below**. A dusk ground
 under a `fragment_field` preset is not a dim ground, it is an absent one.
@@ -2150,18 +2134,18 @@ Move the `at = 0.50` stop down and the ember band moves down the frame with it. 
 `bg_ramp_gamma` and the band holds longer before fading; drop it below `1` and the ramp falls away
 fast and leaves a long dim tail.
 
-**A wide smooth ramp is safe now, and the dark tail is no longer the risky end.** Until Plan 0082
-a gradient this broad *banded* — visibly, on a real display — and the worst of it was exactly where
-this control is most useful. The reason is worth carrying: a band is a run of pixels sharing one
-8-bit value, so it is widest where the ramp is **flattest**, and sRGB's near-black slope makes the
-dim tail the flattest part of any ramp that reaches toward black. Measured on the dusk ground at
-1080p, `bg_ramp_gamma = 0.4` spent 7.5 pixels on each level and held one value for **58 pixels**
-in its tail. (The intuition that *steep* is dangerous is backwards, and it is written down wrong in
-one closed plan — two pixels per level is the healthy state.)
+**A wide smooth ramp is safe, and the dark tail is not the risky end.** A gradient this broad
+would otherwise *band* — visibly, on a real display — worst exactly where this control is most
+useful. The reason is worth carrying: a band is a run of pixels sharing one 8-bit value, so it is
+widest where the ramp is **flattest**, and sRGB's near-black slope makes the dim tail the flattest
+part of any ramp that reaches toward black. Undithered on the dusk ground at 1080p,
+`bg_ramp_gamma = 0.4` spends 7.5 pixels on each level and holds one value for **58 pixels** in its
+tail. (The intuition that *steep* is dangerous is backwards — two pixels per level is the healthy
+state.)
 
-The tonemap now dithers its output by one encoded level
+The tonemap dithers its output by one encoded level
 ([ADR-0096](../docs/adrs/0096-the-display-write-dithers.md)), always, for every gradient in the
-engine at once — the same frame now spends 2.1 pixels per level and its widest plateau is 20. So
+engine at once — the same frame then spends 2.1 pixels per level and its widest plateau is 20. So
 **author the ramp you want**: a long dim tail, a low exponent, a near-black sky under a bright
 horizon are all ordinary requests, and none of them needs a stop added to break up a step. Nothing
 to switch on and no param to bind.
@@ -2199,20 +2183,18 @@ So a world whose *ground* is painted here earns exactly nothing at either gate: 
 used to game the gates — but it means a frame that looks full to you can still read as sparse to
 `sanity`. Give the figure enough to stand on its own before reaching for the ramp to fill the frame.
 
-**Since Plan 0051 the backdrop composites correctly under every scene, and a lit
-`bg_bright` is worth revisiting on anything in the `swarm_*` and line families.**
-Until then the swarm's sprites and the line renderer's strokes emitted a constant
-alpha across their whole quad while only their colour carried the falloff, so
-every sprite punched four black rectangular notches beside itself and every
-stroke drew itself a black rim — invisible at `bg_bright = 0`, and worse the
-fatter the stroke. Raising `thickness` against a lit backdrop therefore widened
-the rim as fast as it widened the glow, which is why several presets in these
-families sit at a near-black floor. That constraint is gone
-([ADR-0056](../docs/adrs/0056-additive-scenes-emit-premultiplied-alpha.md)); the
-values themselves were not re-tuned.
+**The backdrop composites correctly under every scene, so a lit `bg_bright` is
+worth revisiting on anything in the `swarm_*` and line families.** Additive scenes
+emit premultiplied alpha
+([ADR-0056](../docs/adrs/0056-additive-scenes-emit-premultiplied-alpha.md)), so a
+sprite's falloff is carried by its alpha rather than by its colour alone. Without
+that, every sprite punches four black rectangular notches beside itself and every
+stroke draws itself a black rim — invisible at `bg_bright = 0`, and worse the
+fatter the stroke. Several presets in these families still sit at a near-black
+floor tuned under the older behaviour, and their values were never re-tuned.
 
-**The ceiling on `bg_bright` moved rather than disappeared — and since Plan 0071
-it is a choice rather than a property of the engine.** A scene that draws into
+**`bg_bright` has a ceiling, and it is a choice rather than a property of the
+engine.** A scene that draws into
 the chain occludes the backdrop by its **coverage**, whatever light it emits: the
 frame resolves `c * g + bg * (1 - g)`, so a fragment *darkens* the backdrop
 wherever its own light `c` is dimmer than the backdrop `bg`. Raise `bg_bright`
@@ -2387,11 +2369,11 @@ moving shapes leave light trails. `trails = 0` (default) is off; `0 < trails < 1
 sets the decay (higher = longer trails). Best on a scene with real motion (a
 spinning curve, a drifting swarm).
 
-**`trails` is retention per 1/60 s, not per frame** (Plan 0046). The stage raises it
-to the `dt`-relative power, so a `trails = 0.9` tail lasts the same *wall-clock*
-time on a 48 Hz laptop and a 144 Hz monitor. It used to be applied once per frame,
-which made the same preset's trails a third as long at 144 Hz. Captures are
-unaffected: the harness steps a fixed 1/60 s, where the exponent is exactly 1.
+**`trails` is retention per 1/60 s, not per frame.** The stage raises it to the
+`dt`-relative power, so a `trails = 0.9` tail lasts the same *wall-clock* time on a
+48 Hz laptop and a 144 Hz monitor — applied once per frame instead, the same
+preset's trails would be a third as long at 144 Hz. Captures are unaffected: the
+harness steps a fixed 1/60 s, where the exponent is exactly 1.
 
 ### Transformed feedback — `fb_zoom`, `fb_rotate`, `fb_dx`, `fb_dy`, `fb_center_x`, `fb_center_y`
 
@@ -2473,7 +2455,7 @@ vortex rather than a spin.
   the series converges to `1 / (1 - trails)`, i.e. at most 50x at the `0.98`
   ceiling, and the extra rolls off through the tonemap instead of clipping —
   which only works because the composite runs in linear light (see
-  [Linear light and `exposure`](#linear-light-and-exposure-plan-0045)).
+  [Linear light and `exposure`](#linear-light-and-exposure)).
 
 `add` wants a *dimmer* preset than `max`: with `trails = 0.95` a figure is already
 20x its own brightness once the tail settles. Start by dropping `brightness` (or
@@ -2528,26 +2510,24 @@ The fold is a polar operation on a rectangular picture, so it can only reach the
 largest circle the frame contains — radius half the **shorter** side, centred on
 the fold axis. At 16:9 the frame's corner sits at 2.04x that radius and **56 % of
 the frame lies outside the disc**, so this is not corner trim: it is most of the
-picture, and it is a choice per preset (ADR-0061).
+picture, and it is a choice per preset.
 
 | `kaleido_edge` | What it does outside the disc |
 |---|---|
-| `0` — `falloff` | Clamps the sample radius at the disc and **fades out** past it, so the corners are backdrop. ADR-0047's treatment, and the one every preset got before this param existed. Crops. |
+| `0` — `falloff` | Clamps the sample radius at the disc and **fades out** past it, so the corners are backdrop. Crops. |
 | **`1` — `tile`** (**default**) | Continues the picture past the disc by **mirroring the source at its own borders**, so the frame is filled with related content. No crop and no fade. |
 | `2` — `squash` | **Compresses** the radius asymptotically into the disc, 1:1 at the fold axis and approaching the rim at the corners. Fills the frame with no crop and no fade, at the cost of bending geometry near the frame edge — and, unlike a clamp, it pulls the disc's *interior* inward too. |
 
-**The default is `1`, not `0`.** A preset that binds nothing fills its frame.
-`0 = falloff` keeps the numbering tied to what ADR-0047 shipped — the numbering
-and the default are separate facts here, and a live A/B on a centred figure and a
-border-filling field chose differently on each.
+**The default is `1`, not `0`.** A preset that binds nothing fills its frame — the
+numbering and the default are separate facts here, and a live A/B on a centred
+figure and a border-filling field chose differently on each.
 
 **Two shipped presets carry the instructive contrast.** `attractor_leviathan`
 (a centred figure that overruns the inscribed disc) binds `tile`;
 `attractor_clifford` (a ribbon whose wings reach past the frame edge) binds
 `squash` — and both files carry a header comment beside the binding recording
 the render that chose it. Read those two before choosing for a preset of your
-own. (`fragment_kaleido`, the border-filling half of the original A/B, retired
-at Plan 0075 cohort 2.) Several renaissance field worlds bind their own edge
+own. Several renaissance field worlds bind their own edge
 too — `fragment_mandala`, `fragment_supernova`, `fragment_tunnel`,
 `fragment_vitrail` — so the default is no longer the common case.
 
@@ -2573,7 +2553,7 @@ Consequences worth composing around whichever you choose:
   `bg_vignette` decide what the frame's edge looks like. Under `tile` and `squash`
   the corners are the *scene's*, so the backdrop retreats to whatever the scene
   leaves transparent.
-- **The backdrop is underneath the fold, not inside it** (ADR-0055). It is painted
+- **The backdrop is underneath the fold, not inside it.** It is painted
   first and the folded scene composites over it, so `bg_vignette`'s darkening stays
   centred on the *frame* however you drive `kaleido_center_*`, and the backdrop is
   never chopped into the wedges. A lit backdrop is the way to give a folded preset
@@ -2632,7 +2612,7 @@ all on costs no more sharpness than the fold alone.
 | `kaleido_zoom` | `0` | any | travel through the rings, **in rings** — `1` is exactly one |
 | `kaleido_inner` | **`0.06`** | `0`–`1` of the disc radius | where the repeat freezes |
 
-The default and the reads-well range came off Plan 0064 Phase 4's rendered grid —
+The default and the reads-well range came off a rendered grid —
 `kaleido_radial` × `kaleido_spiral` on a full-frame field, an accumulating attractor
 and a sparse line figure, at two aspects — not off the arithmetic. Nothing outside
 them is forbidden; the notes below say what you get out there.
@@ -2743,9 +2723,9 @@ can look nearly alike — but they work at opposite ends of the pipeline:
 geometry is rasterized at the target's own resolution, so a 24-fold mirror is
 exactly as crisp as no mirror at all; the screen-space fold has to resample.
 
-Since Plan 0033 the post stages **follow the render target** rather than sitting at
-a fixed 1280x720 (see below), so the fold's cost is far smaller than it was — but
-it is still a resample, and the mirror is still free.
+The post stages **follow the render target** rather than sitting at a fixed grid
+(see below), which keeps the fold's cost down — but it is still a resample, and the
+mirror is still free.
 
 ### The composite stages render at the target
 
@@ -2772,14 +2752,15 @@ Two consequences worth knowing:
 The grid's own shape is not the picture's: it is quantized, so it is only roughly
 your window's ratio, and the scene is drawn at the **window's** aspect and then
 stretched back by exactly the inverse when the stage presents. The two cancel, so a
-circle is a circle with `trails` on and with it off (ADR-0037).
+circle is a circle with `trails` on and with it off
+([ADR-0037](../docs/adrs/0037-internal-grid-is-a-resolution-not-a-shape.md)).
 
-That was not true until Plan 0035 — the scene took its aspect from the grid, so
-turning a stage on stretched the whole frame by up to 28 % on common window sizes
-(1280x800 and 1366x768 among them). If you are reading a preset comment written
-before then that talks about a stage changing the shape of a figure, it is stale.
+A scene that took its aspect from the grid instead would stretch the whole frame by
+up to 28 % on common window sizes (1280x800 and 1366x768 among them) the moment a
+stage was composed. A preset comment that talks about a stage changing the shape of
+a figure is stale.
 
-### Bloom — `bloom_amount`, `bloom_threshold`, `bloom_radius` (Plan 0045)
+### Bloom — `bloom_amount`, `bloom_threshold`, `bloom_radius`
 
 The **last** stage in the per-preset chain, after the fold, so it blooms the
 finished composite. It picks out the parts of the frame that are brighter than
@@ -2803,13 +2784,14 @@ clip, and nowhere else. That is usually what you want; reach for a lower
 threshold when you want the whole figure to glow rather than just its hot spots.
 
 **The comparison happens *after* `exposure`, which is what lets that sentence stay
-true when you move the stop** (ADR-0080). The bright-pass scales the light it
+true when you move the stop.** The bright-pass scales the light it
 samples by the frame's `exposure` before comparing, so "over range" means over the
 range the *display* is being asked to show, not over the scene's own linear units.
 At `exposure = 1` — the default, and where most presets sit — nothing about this
-is visible. It matters the moment a preset moves off it: before this, a preset at
-`exposure = 0.03` put its entire figure over every threshold the engine allows
-(the ceiling is `8`), so `bloom_threshold` had no discriminating range left and
+is visible. It matters the moment a preset moves off it: comparing before the stop
+instead, a preset at `exposure = 0.03` would put its entire figure over every
+threshold the engine allows (the ceiling is `8`), so `bloom_threshold` would have
+no discriminating range left and
 authors ended up pinning it at the top and calling it capped. Whatever stop you
 choose, pick `bloom_threshold` against the picture you see.
 
@@ -2824,9 +2806,9 @@ to the same file at `bloom_amount = 0`. **Something in the frame must deliberate
 cross 1.0.** The cheapest fuel is `glow`, because it drives the stroke's *core*
 rather than its width — raising `thickness` instead spreads the same light over a
 larger quad and can move the peak the wrong way. `brightness` works too, and on
-the fullscreen scenes it is the only lever. (`star_lantern`, the preset that
-shipped as the worked example of this, retired at Plan 0075 cohort 1 — its
-header survives in git history, and the measurements above are its record.)
+the fullscreen scenes it is the only lever. (The measurements above are the record
+of the retired `star_lantern`, which shipped as the worked example of this; its
+header survives in git history.)
 
 ```toml
 [params]
@@ -2854,7 +2836,7 @@ shrinking pyramid — and the pyramid is one level deeper on the rich tier, so t
 halo reaches a little further there. Everything else about it is identical
 between tiers.
 
-### Linear light and `exposure` (Plan 0045)
+### Linear light and `exposure`
 
 Worth knowing even if you never bind anything here, because it changed what the
 other luminance params mean.
@@ -2904,11 +2886,11 @@ Bind it sparingly for the same reason it exists — an `exposure` riding the bas
 pumps the entire frame, which reads as a camera reacting rather than as the
 music, and it is the same trap `glow` on a beat has always been.
 
-### Ink on paper — `ink_amount`, `paper_*`, `ink_*`, `ink_gamma` (Plans 0027, 0078)
+### Ink on paper — `ink_amount`, `paper_*`, `ink_*`, `ink_gamma`
 
-The **last** stage before present (ADR-0028), and the only engine-wide one that is
-not per-preset: it remaps the one finished frame, which during a cross-preset
-dissolve is the *blended* frame of both presets (ADR-0032). Your `ink_*`/`paper_*`
+The **last** stage before present, and the only engine-wide one that is not
+per-preset: it remaps the one finished frame, which during a cross-preset dissolve
+is the *blended* frame of both presets. Your `ink_*`/`paper_*`
 values therefore crossfade with the dissolve rather than snapping — a switch from a
 white-paper preset into a black-ink one travels between the two poles. It reads each
 pixel's brightness as an *ink density* and repaints the frame between two colours:
@@ -2944,7 +2926,7 @@ the three-lever note below says which does what.
 | `ink_gamma` | `1` | **Response** between the two poles — how fast a pixel travels from paper to ink. `1` is the identity. Above `1` thins the mid-tones toward paper, so only the strongest strokes keep full ink; below `1` inks the mids for a heavier, flatter print. Neither pole moves at any value. Bindable and continuous; clamped to `0.05 .. 20`, both far outside anything a look wants. |
 
 > **These poles are LINEAR LIGHT, and a `[palette]` stop is not.** A stop is sRGB
-> and is decoded at load (ADR-0151), so the hex you write is the colour that
+> and is decoded at load, so the hex you write is the colour that
 > renders. `paper_bright` and `ink_bright` take no decode — they are the light
 > itself, so a "dark" paper needs a far smaller number than the display value
 > suggests: `lsystem_vellum` measured `0.07` as a mid violet and settled on
@@ -3405,7 +3387,7 @@ character is an inert grammar variable.
 |---------------------|-------------------------------------------------------|------------------------------|
 | `tiling`            | `square`/`4`/`4.4.4.4`, `hexagon`/`6`/`6.6.6`, `octagon`/`8`/`4.8.8`, `dodecagon`/`12`/`3.12.12`, `none` | Star order `n`. Required. **`none` draws no interlace at all** — the rings-only mandala below — and is a load error unless `rings` has at least one entry, because a preset with neither draws nothing. |
 | `contact_angle_deg` | number                                                | Hankin contact angle. Default 30. Inert at `tiling = "none"`. |
-| `rings`             | array of ring tables (below)                          | The **mandala interior** (ADR-0079 / Plan 0065). Optional — absent is the Hankin interlace alone, i.e. the scene as it was, segment for segment. |
+| `rings`             | array of ring tables (below)                          | The **mandala interior**. Optional — absent is the Hankin interlace alone, segment for segment. |
 
 #### `rings` — concentric rings of repeated motifs
 
@@ -3432,9 +3414,8 @@ the ones you already know.
 > width. `phase` turns the whole boundary, as it turns every other ring. Each
 > key keeps its spirit; none of them means a copy.
 
-**The closed motif roster is eight names** — seven picked from rendered samples
-at Plan 0065 Phase 3, plus `scallop` at Plan 0087 Phase 6 — and closed on
-purpose: a look outside it routes back through `architect` + `dev`, it is not a
+**The closed motif roster is eight names**, every one picked from rendered
+samples, and closed on purpose: a look outside it routes back through `architect` + `dev`, it is not a
 preset-side extension point:
 
 | `motif`    | what it is                                                | instances per copy |
@@ -3448,7 +3429,7 @@ preset-side extension point:
 | `chevron`  | an **open** two-segment wedge, apex outward; a sawtooth border at high counts | 2  |
 | `scallop`  | the **scalloped boundary** — one closed chain of outward-bulging arcs meeting at cusps. Not a bead: see the key note above | **1 arc per lobe** |
 
-> **Six of the eight are drawn as real curves** (Plan 0087, [ADR-0098]) — only
+> **Six of the eight are drawn as real curves** ([ADR-0098]) — only
 > `diamond` and `chevron` are still sampled polylines — and the two circular ones
 > are the cheapest members of the roster. Every arc's
 > stroke is a distance evaluated **per pixel**, so it has no vertices at any
@@ -3484,10 +3465,9 @@ preset-side extension point:
 `count × instances-per-copy`, and the interlace adds `2n` on top. Segments and
 arcs share **one** ceiling — **20 000** at the floor tier, 60 000 at rich — so the
 four-ring mandala roster at `24 + 12×4 + 18×22 + 24×1 = 492` plus a 24-segment
-interlace uses under 3 % of it. (That roster cost 1 092 before Plan 0087: its
-`circle` ring fell from 576 segments to 24 arcs at Phase 3, and its `trefoil` and
-`petal` rings from 36 and 432 segments to 24 and 396 arcs at Phase 5.) Two things
-to know:
+interlace uses under 3 % of it. (Drawn as sampled polylines instead, the same
+roster would cost 1 092 — its `circle` ring alone is 576 segments against 24
+arcs.) Two things to know:
 
 - **Truncation at the cap is silent.** The build stops emitting and nothing warns
   you — no load error, no `--report` column. The figure simply ends part-way
@@ -3516,11 +3496,9 @@ rings = [
 ]
 ```
 
-> **The scalloped boundary is the figure the roster was missing.** Shown a ring
-> of 40 overlapping `arc` motifs faking a continuous edge side by side with the
-> real thing at Plan 0065 Phase 2, the answer was the real thing — and until
-> Plan 0087 gave the renderer an arc instance there was no way to build one.
-> `arc` is now just an open arc; reach for `scallop` when you want a boundary.
+> **`scallop` is the boundary motif; `arc` is not.** A ring of 40 overlapping `arc`
+> motifs faking a continuous edge was judged against a real scalloped boundary and
+> lost. `arc` is an open arc; reach for `scallop` when you want a boundary.
 
 #### The ring levers — and why two of them are radial
 
@@ -3609,9 +3587,8 @@ Two things worth knowing before you reach for it:
   reach for them when you want what they do, not when you only want less light.
   (`attractor_thomas` ships `brightness = 0.10` at `density = 0.02`, and the
   since-retired `attractor_lorenz` shipped `0.03` at `0.002` — the worked
-  examples of that cut. Both carried the number on `exposure` until Plan 0066
-  moved it; if you are reading an older copy, the swap is level-neutral and the
-  value transfers unchanged.)
+  examples of that cut. An older copy of either may carry the same number on
+  `exposure` instead; the swap is level-neutral and the value transfers unchanged.)
 - **The tier caps the top, it does not set the value.** `density` is a fraction
   of whatever the current quality tier allows — 50 000 at the standard tier and
   150 000 at the rich one *at the 640x360 anchor*, and more than that at a larger
@@ -3691,8 +3668,8 @@ Three things to know before you bind it:
 
 #### What is in each roster
 
-Curated at Plan 0079 Phase 3 by judging every candidate in motion. Entry `0` is
-always the canonical figure — what the family drew before this param existed.
+Every entry was curated by judging the candidate in motion. Entry `0` is always
+the family's canonical figure.
 
 | Family | Entries | What the extras are |
 |---|---|---|
@@ -3755,8 +3732,8 @@ Five things that are not guessable:
 - **Not every pair has a walk.** A tuple partway between two others can collapse
   to a fixed point, whose extent is zero and which has no scale to render at.
   The engine then refuses the path and the preset sits on its near end with
-  `morph` doing nothing. Four of the twenty pairs swept at Plan 0079 Phase 5 were
-  refused this way — all on the two discrete maps. If your `morph` does nothing,
+  `morph` doing nothing. Of twenty pairs swept, four were refused this way — all
+  on the two discrete maps. If your `morph` does nothing,
   this is the first thing to suspect.
 - **Do not put `morph` in `[smoothing]`.** The binding is already a slow curve
   and easing an ease only lags it. The walk's smoothness is the mechanism's.
@@ -3764,7 +3741,7 @@ Five things that are not guessable:
   attractor — the rho ≈ 100 knot is one — a cloud arriving along the walk is
   still falling onto it for several seconds after `morph` reaches `1`.
 
-Four paths ship, judged in motion at Plan 0079 Phase 6:
+Four paths ship, each judged in motion:
 `thomas` 5→8 (`Thomas Walk`), `lorenz` 0→1 (`Butterfly to Knot`), `lorenz` 0→4
 (`Rho Walk`), `de_jong` 1→3 (`De Jong Walk`). The one-dimensional sweeps are the
 strongest case: neighbouring `a` or `rho` values are neighbouring *figures*.
@@ -3801,9 +3778,9 @@ scene, same trails, same `density` / `fade` / palette / view surface — differe
 step: four affine maps, one drawn at random per particle per step, converging
 onto a *figure* rather than onto a filigree.
 
-**Four things change for you as an author**, and the last two are the ones that
-cost a session if you carry the rest of this library's habits across. All four
-were measured in the Plan 0062 Phase 7 content pass.
+**Four things are different for you as an author on an IFS**, and the last two are
+the ones that cost a session if you carry the rest of this library's habits across.
+All four are measured.
 
 **`a` `b` `c` `d` are inert.** An IFS's shape lives in its affine table, not in
 four scalars. What reaches the figure is the five params below — plus the four
@@ -3816,7 +3793,7 @@ way `a`..`d` already carry family-specific meanings.
 |---------|---------|--------------|
 | `morph` | `0`     | Position from `family` to `[particles] morph_to`. `0` is the named figure, `1` is the target, and every value between is a real figure — but **not a proportionally-different one**, see [below](#morph-is-a-travel-knob). Clamped; out of range pins to an endpoint. |
 | `curl`  | `0`     | Radians added to every map's rotation — fronds curl and uncurl. |
-| `vigor` | `1`     | Multiplier on the figure's contraction — a bushier, deeper, denser figure. **Has a silent ceiling; see below.** **Inverts on a space-filling figure:** the `dragon`'s two maps sit at exactly `0.7071`, already space-filling, so vigor *above* 1 overfills the region and dissolves the figure into dust — measured on the loud frame at Plan 0075 cohort 5; `attractor_dragon` ships the binding inverted below 1. |
+| `vigor` | `1`     | Multiplier on the figure's contraction — a bushier, deeper, denser figure. **Has a silent ceiling; see below.** **Inverts on a space-filling figure:** the `dragon`'s two maps sit at exactly `0.7071`, already space-filling, so vigor *above* 1 overfills the region and dissolves the figure into dust — measured on the loud frame; `attractor_dragon` ships the binding inverted below 1. |
 | `lean`  | `0`     | Radians every translation is rotated by — the plant bends. |
 | `bias`  | `0`     | Moves sampling weight from the trunk/body maps to the branch maps. Geometry is untouched; only the density distribution moves. Inert on `dragon`, whose two maps are both branches. |
 
@@ -3880,8 +3857,8 @@ live under about `0.03`, which is not a lever. **So: bind `morph` when the
 preset is meant to travel, and leave it alone when it is meant to be one
 figure** — the four levers are what change a figure without leaving it.
 `attractor_fern` binds no `morph` at all; the since-retired `attractor_dissolve`
-(Plan 0075 cohort 5) used the full range, and travelling was its whole point —
-its file remains the worked example, in git history.
+used the full range, and travelling was its whole point — its file remains the
+worked example, in git history.
 
 **The `spiral` is a fine figure and a poor morph target.** Anything ending there
 thins into ragged streaks with half the frame empty: its dominant map contracts
@@ -3906,7 +3883,7 @@ a turning figure. A rock (`sin(time * k) * 0.25`) is almost always what you want
 
 <a id="what-made-this-point-and-how-far-into-the-figure-it-is"></a>
 
-#### Colouring by what made a point, and by how far into the figure it is (Plan 0073, Plan 0074)
+#### Colouring by what made a point, and by how far into the figure it is
 
 Every particle carries two extra values, and **neither is guessable from the
 param name**, so read this before reaching for them
@@ -3947,8 +3924,8 @@ Each reaches the picture by **two routes**, which is four params:
 >
 > **Its effective range is per figure, and that will surprise you.** The channel
 > is normalised by the figure's own skeleton, and four of the five figures reach
-> less than half of it. Measured at Plan 0074 Phase 1, the fraction of the
-> palette a `root_tint` of `1.0` actually buys:
+> less than half of it. The fraction of the palette a `root_tint` of `1.0`
+> actually buys, measured:
 >
 > | figure | reaches | so for a full sweep, bind about |
 > |---|---|---|
@@ -3973,12 +3950,11 @@ Each reaches the picture by **two routes**, which is four params:
 > ceiling of `0.46`). Do the same arithmetic for your own preset before going
 > negative.
 
-> **The `age_*` params are gone** (Plan 0074). They coloured by how many steps
-> since a particle last restarted, on the theory that age proxied
-> distance-from-the-restart-points — but the proxy decayed after about ten steps
-> and they rendered as per-particle speckle with no gradient anywhere.
-> `root_tint`/`root_hue` measure that distance directly and replace them. A
-> preset still binding an `age_*` name gets the usual unknown-param warning.
+> **There are no `age_*` params.** Colouring by how many steps since a particle
+> last restarted proxies distance-from-the-restart-points badly: the proxy decays
+> after about ten steps and renders as per-particle speckle with no gradient
+> anywhere. `root_tint`/`root_hue` measure that distance directly instead. A preset
+> binding an `age_*` name gets the usual unknown-param warning.
 
 **Which route do you want?** They are not peers — `*_tint` is the default and
 `*_hue` is the special case. `*_tint` keeps the figure inside the ramp you
@@ -3992,14 +3968,15 @@ next thing on this page.
 **The palette coordinate is a fixed budget, and this is the one that will cost
 you a session.** *Three* params write it — `hue_spread` per particle at random,
 `map_tint` per part, `root_tint` per distance — so adding one means **taking
-authority away from another**, not stacking a third term on top. Twice measured:
+authority away from another**, not stacking a third term on top. Twice measured on
+`attractor_fern`:
 
-- Plan 0073 brought `attractor_fern`'s `hue_spread` down from `0.16..0.42` to
-  `0.05..0.125` before `map_tint` read at all; below that the parts smeared into
-  each other and `map_tint` was a faint wash *at any setting*.
-- Plan 0074 then found the same fern needs `map_tint` cut from `0.46` to `0.22`
-  before `root_tint` improves the picture. Stacked at full strength the plant
-  washes out and the stock preset looks better.
+- Its `hue_spread` had to come down from `0.16..0.42` to `0.05..0.125` before
+  `map_tint` read at all; above that the parts smeared into each other and
+  `map_tint` was a faint wash *at any setting*.
+- Its `map_tint` then had to be cut from `0.46` to `0.22` before `root_tint`
+  improved the picture. Stacked at full strength the plant washes out and the
+  stock preset looks better.
 
 Each time you are trading one kind of structure for another, which is a real
 choice rather than a bug. **`*_hue` is the escape**: it does not touch this
@@ -4009,8 +3986,8 @@ or a part separation through the hue route.
 **And on the fern, the escape is what shipped** — so do not read the `0.22`
 above as the tuning in the file. Rendered against each other, `root_hue` at the
 fern's *full* `map_tint = 0.46` beat the split: the body cools to jade, the
-frond origins stay warm, and the part separation Plan 0073 paid `hue_spread` for
-is not given back. Every shipped IFS preset binds `root_hue` and **none binds
+frond origins stay warm, and the part separation the narrowed `hue_spread` paid
+for is not given back. Every shipped IFS preset binds `root_hue` and **none binds
 `root_tint`**. The budget rule is real and the `0.22` measurement stands; the
 conclusion drawn from it is that when a coordinate is spent you take the other
 route rather than pay.
@@ -4072,7 +4049,7 @@ meter instead of strobing on every analysis hop. Like all easing in this engine 
 is expressed in seconds against the real frame time, so it looks the same at 60
 and 144 Hz — **and the same at any `curve`**, since what it eases is the curved
 level, which is the one you see. Engaging a
-[`curve`](#spectrum--the-frequency-axis-readout-plan-0034) costs you a `scale`
+[`curve`](#spectrum--the-frequency-axis-readout) costs you a `scale`
 retune, not a `release` retune.
 
 Two attractor params behave unlike anything else in the set:

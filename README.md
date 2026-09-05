@@ -23,6 +23,11 @@ codebase serve both frontends.
 Twelve built-in rendering systems, all driven by editable text presets —
 **[see them, and how to write one](docs/preset-guide.md)**.
 
+**Documentation site: [igorkonovalov.github.io/Ritmolux](https://igorkonovalov.github.io/Ritmolux/)**
+— the same documents this repository holds, with search, plus a
+[gallery](https://igorkonovalov.github.io/Ritmolux/gallery/) of one frame from every
+preset that ships.
+
 > Every picture in this repository is a **headless render of the engine**, captured by the `shot`
 > CLI under a synthesized audio clip — not a screenshot of the application window. There is no
 > picture anywhere of the preset browser, the settings menu or the `F3` overlay.
