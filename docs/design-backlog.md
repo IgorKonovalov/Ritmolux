@@ -3218,6 +3218,24 @@ the running adapter has already landed and is what makes any of this attributabl
 > work is a measurement pass producing a **new row** beside the iGPU numbers, not a correction to
 > them. The first probe below is rewritten because Phase 2 falsified its reduction, not its claim.
 
+> **Updated 2026-09-06, at Plan 0147 Phase 6. The measurement half is discharged; the degrade half is
+> not, and this entry stays live for it.** A windowed frame-time row now names
+> `NVIDIA GeForce RTX 3080 Laptop GPU (Dx12, DiscreteGpu)` and sits **beside** the iGPU figures in
+> [nfr.md](nfr.md), which were not edited. It is a matched pair taken on one build minutes apart —
+> 1080p windowed, `Rich` tier, rotation on — so the two rows are comparable to each other rather than
+> to a cross-build figure: the discrete part reads 165.0 fps median with a worst p99 sample of
+> 8.936 ms, the unflagged integrated part 112.8 median with 21 of 171 samples under the 60 fps floor.
+> Neither drops a frame. **This entry's title is now satisfied**: a published windowed figure names
+> the discrete adapter.
+>
+> **The console's dual-GPU degrade path still has not executed, and this box cannot make it.** A
+> window pinned to the adapter that does not drive the display was the configuration in which it
+> could first have fired, and it did not — the console opened normally on the RTX 3080 (`Mailbox`,
+> frame latency 1) and presented 9,834 times with 0 skips. On a single-display Optimus laptop the
+> discrete adapter presents to a window the integrated part composites, so nothing refuses. Reaching
+> that branch needs a genuinely multi-adapter display topology; the last probe below therefore still
+> holds, and the entry keeps this half.
+
 - **Re-written 2026-08-31** - the constructor now takes the choice, so the old reduction is dead; what stands is that the window still *asks* for the default when unflagged: `present: None => AdapterChoice::Default in: standalone/src/gpu.rs`
 - **Verified 2026-08-30** - and the code's own doc says what the default yields on a hybrid box: `present: the power-saving GPU for a console process in: core/src/render/context.rs`
 - **Verified 2026-08-31** - the two unflagged arms are held apart, which is what keeps the published figures comparable: `present: fn the_window_and_the_stream_disagree_when_unflagged in: standalone/src/gpu.rs`

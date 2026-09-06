@@ -376,7 +376,7 @@ pub struct ConsolePacing {
 | 3c — The give-up verdict is scoped to the incident the budget counts | dev | done | `ada2b37` |
 | 4 — Human: four arms, one hands-off window | human | done — 5 arms + 2 extra regimes | (a measurement; rows below) |
 | 5 — The verdict becomes the default | dev | not started | |
-| 6 — Human: the first frame-time row that names the discrete GPU | human | not started | |
+| 6 — Human: the first frame-time row that names the discrete GPU | human | done | (a measurement; rows below) |
 
 ### Notes
 
@@ -503,6 +503,36 @@ Sixteen presets: **one** lands between 45 and 90 fps. The rest sit at the 165 Hz
 40. `--tier floor` does not fill the gap either — it overshoots it: Clifford 38.8 -> 119.4 and Nebula
 30.4 -> 109.4. Fullscreen was rejected as the lever because borderless fullscreen puts the show
 *over* the console window, and a covered console is the occluded-surface case that voids an arm.
+
+**Phase 6, 2026-09-06: the discrete row exists, and the degrade path still has not fired.** Two
+3-minute runs, one build, minutes apart, 1080p windowed, `Rich` tier, rotation on at a 20-40 s dwell
+so switches land inside the window, ~172 one-second `diagnostics.log` samples each. A matched pair
+rather than a single pinned run, because the published figures are a different build and the plan
+forbids that comparison — this way the new row has a same-build twin.
+
+| | unflagged | `--gpu` pinned |
+|---|---|---|
+| adapter | AMD Radeon(TM) Graphics (Dx12, IntegratedGpu) | NVIDIA GeForce RTX 3080 Laptop GPU (Dx12, DiscreteGpu) |
+| fps median / min | 112.8 / 37.8 | **165.0 / 162.2** |
+| `frame_ms_avg` median / max | 8.863 / 26.490 ms | **6.061 / 6.164 ms** |
+| `frame_ms_p99` median / max | 12.889 / 31.619 ms | **6.276 / 8.936 ms** |
+| frames dropped | 0 | 0 |
+| samples under the 60 fps floor | 21 of 171 | **0 of 172** |
+
+Written to `docs/nfr.md` **beside** the existing table, which was not edited, and to
+`docs/on-device-validation.md` as a dated "ran" section. Backlog 0165 gets a dated update rather
+than a close, for the reason its own promotion bullet names:
+
+**The console's dual-GPU degrade path did not become reachable.** A window pinned to the adapter that
+does not drive the display was the first configuration in which
+`console surface unavailable on this adapter` could execute; it did not. The console opened normally
+on the RTX 3080 (`Mailbox`, frame latency 1) and presented **9,834 times with 0 skips**. On a
+single-display Optimus laptop the discrete adapter presents to a window the integrated part
+composites, so nothing refuses — reaching that branch needs a display topology this box does not
+have. **A finding either way, as the phase says, and 0165 keeps that half and stays live.**
+
+That console run is also a **second-adapter witness for Phase 4**: Dragon, which reads 53 fps with
+the console open on the integrated part, holds 165.0 fps median with the console open here.
 
 **How to run Phase 4's arms.** `[console] frame_latency` (1 or 2) and `[console] present_every_n`
 (1 or 2) in `config.toml`, then `ritmolux --soak --console`; the console-closed control is the same
