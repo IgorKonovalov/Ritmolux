@@ -109,6 +109,7 @@ const READER_DOCS = [
   "docs/nfr.md",
   "docs/generative-techniques-catalogue.md",
   // Embed it
+  "docs/embedding.md",
   "docs/specs/0001-c-abi.md",
   "docs/specs/0002-ring-determinism.md",
 ];

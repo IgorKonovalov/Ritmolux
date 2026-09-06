@@ -107,7 +107,15 @@ function sidebarRoutes(pageFile) {
 function publishedRoutes() {
   const routes = new Set();
   const splitSizes = new Map();
-  for (const [source, { route, title }] of Object.entries(PUBLISHED)) {
+  for (const [source, { route, title, wrap }] of Object.entries(PUBLISHED)) {
+    // A wrapped source is one fenced code block, so it contributes one route and
+    // is never measured against the split ceiling: the ceiling asserts that
+    // cutting at `##` produced pages a reader can hold, and there is nothing to
+    // cut here.
+    if (wrap !== undefined) {
+      routes.add(route);
+      continue;
+    }
     const text = readFileSync(new URL(source, REPO_ROOT_URL), "utf8");
     const split = splitDocument(text, route, title);
     if (split === null) {

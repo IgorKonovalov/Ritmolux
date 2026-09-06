@@ -55,6 +55,16 @@ export const PUBLISHED = {
     title: 'Technique catalogue',
   },
   // Embed it
+  'docs/embedding.md': { route: 'embed/embedding', title: 'Embedding the core' },
+  // The header itself, published as it compiles. `wrap` names the language of a
+  // NON-MARKDOWN source: the loader fences the file's bytes in a code block
+  // rather than parsing them, so the page is the header at the build's commit
+  // and there is no second copy to drift (ADR-0169).
+  'core-cabi/include/rlx_core.h': {
+    route: 'embed/c-abi-header',
+    title: 'The C ABI header',
+    wrap: 'c',
+  },
   'docs/specs/0001-c-abi.md': { route: 'engine/spec-c-abi', title: 'C ABI contract' },
   'docs/specs/0002-ring-determinism.md': {
     route: 'engine/spec-ring-determinism',
@@ -134,6 +144,17 @@ function splitFragment(url) {
 
 function isExternal(url) {
   return /^[a-z][a-z0-9+.-]*:/i.test(url) || url.startsWith('//');
+}
+
+/**
+ * Whether a published source is a non-markdown file fenced into a page.
+ *
+ * Such a page has no links to rewrite, no headings to slug and no fragment map:
+ * it is one code block. Every consumer checks this before treating a source as
+ * a document.
+ */
+export function isWrapped(source) {
+  return PUBLISHED[source]?.wrap !== undefined;
 }
 
 /** The repo-relative published source a vfile came from, or null. */

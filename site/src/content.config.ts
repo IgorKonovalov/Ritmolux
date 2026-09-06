@@ -29,6 +29,18 @@ const SITE_ROOT = new URL('../', import.meta.url);
 const REPO_ROOT = new URL('../../', import.meta.url);
 
 /**
+ * Published sources that are not markdown: the C ABI header, fenced into a page.
+ *
+ * The glob loader would hand a `.h` file to the markdown parser, so these are
+ * loaded separately - the bytes go into a code block and nothing else happens to
+ * them. That is the point: the page IS the header at the build's commit, and the
+ * per-function reference has exactly one copy (ADR-0169).
+ */
+const WRAPPED: Record<string, { route: string; title: string; wrap: string }> = Object.fromEntries(
+  Object.entries(PUBLISHED).filter(([, entry]) => entry.wrap !== undefined),
+) as Record<string, { route: string; title: string; wrap: string }>;
+
+/**
  * The published sources the splitter owns, decided by size on every build
  * rather than listed (ADR-0166).
  */
@@ -37,7 +49,9 @@ const SPLIT_SOURCES = new Set(splitSources(PUBLISHED, REPO_ROOT));
 /** Repo-relative sources the glob loader still serves one route each. */
 const WHOLE: Record<string, string> = Object.fromEntries(
   [
-    ...Object.entries(PUBLISHED).map(([source, { route }]) => [source, route] as const),
+    ...Object.entries(PUBLISHED)
+      .filter(([source]) => !(source in WRAPPED))
+      .map(([source, { route }]) => [source, route] as const),
     ...Object.entries(SITE_PAGES),
   ].filter(([source]) => !SPLIT_SOURCES.has(source)),
 );
@@ -176,13 +190,51 @@ function splitLoader(sources: Iterable<string>): Loader {
   };
 }
 
-/** Runs the whole-document loader and the splitter into one collection. */
-function bothLoaders(whole: Loader, split: Loader): Loader {
+/**
+ * Emits one entry per non-markdown published source, as a single fenced block.
+ *
+ * The file's bytes are not escaped or transformed on the way in - a fence is
+ * verbatim by definition, and the whole value of this page is that it is the
+ * header rather than a description of it. A backtick fence long enough to
+ * survive any content the source could hold is used, since C has no ``` in it
+ * but nothing here should depend on that.
+ */
+function wrappedLoader(sources: Record<string, { route: string; title: string; wrap: string }>): Loader {
+  return {
+    name: 'ritmolux-wrapped-sources',
+    load: async (context: LoaderContext) => {
+      for (const [source, { route, title, wrap }] of Object.entries(sources)) {
+        const filePath = fileURLToPath(new URL(source, REPO_ROOT));
+        const text = readFileSync(filePath, 'utf8');
+        const body = `\`\`\`\`${wrap}\n${text.replace(/\n+$/, '')}\n\`\`\`\``;
+        const relative = path
+          .relative(fileURLToPath(SITE_ROOT), filePath)
+          .split(path.sep)
+          .join('/');
+        const rendered = await context.renderMarkdown(body, {
+          fileURL: new URL(source, REPO_ROOT),
+        });
+        context.store.set({
+          id: route,
+          data: await context.parseData({ id: route, data: { title }, filePath: relative }),
+          body,
+          filePath: relative,
+          digest: context.generateDigest(body),
+          rendered,
+        });
+      }
+    },
+  };
+}
+
+/** Runs the whole-document loader, the splitter and the wrapper into one collection. */
+function bothLoaders(whole: Loader, split: Loader, wrapped: Loader): Loader {
   return {
     name: 'ritmolux-published-set',
     load: async (context) => {
       await whole.load(context);
       await split.load(context);
+      await wrapped.load(context);
     },
   };
 }
@@ -194,6 +246,7 @@ export const collections = {
         glob({ base: '..', pattern: Object.keys(WHOLE), generateId: ({ entry }) => WHOLE[entry] }),
       ),
       splitLoader(SPLIT_SOURCES),
+      wrappedLoader(WRAPPED),
     ),
     schema: docsSchema(),
   }),

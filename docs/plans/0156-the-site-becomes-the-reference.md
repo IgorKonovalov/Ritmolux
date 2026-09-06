@@ -428,8 +428,8 @@ pub const PARAMS: &[ParamSpec] = &[
 | 1 — The menu is organised by reader task | dev | done | 7f2b0b9 |
 | 2 — The operator surface has a reference | dev | done | 786d687 |
 | 3 — The site renders diagrams, and How it works exists | dev | done | d2f2d24 |
-| 4 — The engine-side documents address a reader | dev | done | committed with this row |
-| 5 — The embedding surface | dev | not started | |
+| 4 — The engine-side documents address a reader | dev | done | 5227878 |
+| 5 — The embedding surface | dev | done | committed with this row |
 | 6 — rustdoc joins the Pages artifact | dev | not started | |
 | 7 — The parameter reference is generated from the engine | dev | not started | |
 | 8 — The live walk | human | not started | |
@@ -492,6 +492,12 @@ pub const PARAMS: &[ParamSpec] = &[
 - **`docs/capturing.md` was the reader-prose fixture's out-of-scope case and is now in scope.**
   `docs/releasing.md` takes that role; the fixture's expected shape moves from six breaks across
   three files to ten across four.
+- Phase 5's `wrap` entry needed a **third loader** beside the glob loader and the splitter: the glob
+  loader hands a file to the markdown parser, and a `.h` is not markdown. `splitSources` and
+  `check-site-routes.mjs` both exclude a wrapped source explicitly — it is one fenced block with no
+  `##` to cut at, and the route ceiling asserts a property of the splitter's output.
+- The header page was verified byte-for-byte by decoding the built code block's own line structure
+  back to text and comparing it to `core-cabi/include/rlx_core.h`: 213 lines, equal.
 - **The site's content-collection cache hides a plugin edit.** A split document's chunks are stored
   under a digest of the chunk body, so a change to the *rewriter* re-renders nothing. `rm -rf
   site/.astro` before believing a build that a plugin edit should have changed.

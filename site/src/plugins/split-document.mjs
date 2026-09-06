@@ -37,9 +37,17 @@ export function splits(source, repoRoot) {
   return statSync(new URL(source, repoRoot)).size > DOCUMENT_SPLIT_BYTES;
 }
 
-/** The published sources the splitter owns, in `PUBLISHED` order. */
+/**
+ * The published sources the splitter owns, in `PUBLISHED` order.
+ *
+ * A `wrap`ped source is excluded whatever its size: it is one fenced code block
+ * with no `##` in it, so there is nothing to cut it at, and the header is a
+ * reference a reader scrolls rather than a document they navigate.
+ */
 export function splitSources(published, repoRoot) {
-  return Object.keys(published).filter((source) => splits(source, repoRoot));
+  return Object.keys(published).filter(
+    (source) => published[source].wrap === undefined && splits(source, repoRoot),
+  );
 }
 
 /**

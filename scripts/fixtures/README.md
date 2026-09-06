@@ -372,7 +372,7 @@ node scripts/check-reader-prose.mjs scripts/fixtures/reader-prose
 ```
 
 Expect **exit 1 and exactly ten breaks, across four files**. Unlike every other checker here this
-one does not walk a tree at all — it reads thirteen fixed paths under the root, which is the scope
+one does not walk a tree at all — it reads fourteen fixed paths under the root, which is the scope
 boundary ADR-0168 draws — so this subdirectory mirrors those paths rather than seeding an
 arbitrary layout. **A path in the list and not in this tree is its own failure**, reported before
 the breaks are, which is why every page below is here at all.
@@ -395,6 +395,7 @@ alternation that stops matching shows up as a number that moved rather than as a
 | `docs/generative-techniques-catalogue.md` | 0 | clean, with no citation of any kind |
 | `docs/specs/0001-c-abi.md` | 0 | clean, and **one directory deeper** — the only path in the list that is not a direct child of `docs/` |
 | `docs/specs/0002-ring-determinism.md` | 0 | clean, with a citation-shaped filename inside a fenced block |
+| `docs/embedding.md` | 0 | clean, and the record that **inline code is not a hole** — a citation in backticks IS convicted, unlike one inside a fence, and nothing here is seeded to suggest otherwise |
 
 **The silences are the larger half of this fixture**, because every one of them is a shape the gate
 must NOT convict. `presets/README.md` carries all four markdown link forms — inline, full

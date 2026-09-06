@@ -48,7 +48,8 @@ over in constant time. The contract is written out in
 [Ring determinism](specs/0002-ring-determinism.md).
 
 Embedding the engine in something else is the same picture with your own code where the two
-frontends are, and [the C ABI contract](specs/0001-c-abi.md) is what that seam is held to.
+frontends are; [Embedding the core](embedding.md) walks that path, and
+[the C ABI contract](specs/0001-c-abi.md) is what the seam is held to.
 
 ## What happens each frame
 

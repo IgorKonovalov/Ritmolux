@@ -296,7 +296,12 @@ export default defineConfig({
         },
         {
           label: 'Embed it',
-          items: [doc('docs/specs/0001-c-abi.md'), doc('docs/specs/0002-ring-determinism.md')],
+          items: [
+            doc('docs/embedding.md'),
+            doc('core-cabi/include/rlx_core.h'),
+            doc('docs/specs/0001-c-abi.md'),
+            doc('docs/specs/0002-ring-determinism.md'),
+          ],
         },
         {
           label: 'How it works',
