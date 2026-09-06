@@ -163,8 +163,8 @@ one key in one TOML table.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The profile setting | dev | done | committed with this row |
-| 2 — The escape hatch, written down where it is needed | dev | not started | |
+| 1 — The profile setting | dev | done | `96458c9` |
+| 2 — The escape hatch, written down where it is needed | dev | done | committed with this row |
 
 ### Notes
 

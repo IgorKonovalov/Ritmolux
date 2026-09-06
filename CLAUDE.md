@@ -203,6 +203,25 @@ The cost that comes back with the revocation is disk, and it is not gated:
   disk mid-session. **Remove a finished lane's worktree** — on Windows `git worktree remove` fails
   with `Permission denied` while any shell still has its working directory inside it.
 
+## Dependencies compile with no debug info (committed, unlike the override above)
+
+`[profile.dev.package."*"]` in the root `Cargo.toml` carries `debug = 0`, so **every dependency —
+wgpu, naga, winit, windows-rs — compiles with no debug info at all**, while every workspace crate
+keeps `profile.dev`'s `line-tables-only`. Unlike the linker override this is **committed and applies
+to every clone**: it names nothing machine-specific, and a build profile that silently differs
+between two checkouts is the hazard ADR-0147 exists to end.
+
+**What it costs you: a backtrace frame inside one of those crates carries no line number.** A wgpu
+validation failure is normally diagnosed from its message rather than from a backtrace line, which
+is what makes that affordable — and on the day it is not, **delete the `debug = 0` line and
+rebuild**. That buys the line numbers back at the price of a full rebuild of the dependency graph at
+`opt-level = 2` — 87 s on the reference machine, and the same again when the line goes back. Do not
+commit the deletion.
+
+Why the line is there: MSVC emits a separate `.pdb` per linked target and packs no split debuginfo,
+so the dependency graph's line tables are duplicated into every one of the workspace's 46 test
+binaries — 25.5 MB per binary, measured, which the setting stops emitting. ADR-0165.
+
 ## How we work (canonical workflow)
 
 This project runs a **three-skill** plan-driven harness (`.claude/skills/`), adapted from the
