@@ -372,8 +372,8 @@ pub struct ConsolePacing {
 | 1 — `level/*` says what it is normalized against | dev | done | `eacaf8c` |
 | 2 — A failed activation and a dead endpoint stop reading alike | dev | done | `bdbba7f` |
 | 3 — Both console levers become reachable | dev | done | `9e7dee1` |
-| 3b — The console present becomes countable | dev | done | committed with this row |
-| 3c — The give-up verdict is scoped to the incident the budget counts | dev | not started | |
+| 3b — The console present becomes countable | dev | done | `76e3452` |
+| 3c — The give-up verdict is scoped to the incident the budget counts | dev | done | committed with this row |
 | 4 — Human: four arms, one hands-off window | human | not started | |
 | 5 — The verdict becomes the default | dev | not started | |
 | 6 — Human: the first frame-time row that names the discrete GPU | human | not started | |
@@ -405,6 +405,18 @@ replaced it starts with the same two words.
 four the done-when names. It is the only exit that returns `Err`, the shell closes the console on
 it, and leaving it uncounted breaks the reconciliation by one frame on exactly the frame a console
 dies.
+
+**Phase 3c's extracted decision is a value, not a function.** The done-when asks for "a function over
+(the incident's evidence, a start's `failed_at_activation`)"; what landed is
+`RecoveryIncident` in `standalone/src/capture_start.rs`, holding the `RecoveryPolicy` and the
+evidence together and delegating `poll` / `on_restart` to it. The clearing rule is then structural
+rather than a caller convention — the evidence is cleared inside the same two calls that can restore
+the budget, so no call site can get the pairing wrong. `RecoveryPolicy` is unchanged and its five
+bound tests are untouched. `AppState`'s `reopen_reached_endpoint` field is gone; `input_recovery` is
+the one value.
+
+Both new tests were checked against a mutation (evidence cleared on every poll): both fail, so
+neither passes on the strength of the token's shape alone.
 
 **Phase 5's comment repair has one more site than the plan names, and one fewer.** The falsified
 cadence claim is in three places, not two, and one of the two the plan names is no longer where it
@@ -442,8 +454,9 @@ because these phases landed.** The script's own text says repairing a falsified 
   delay a frame, but the two comments Phase 5 names still stand, and Phase 5 is where they are
   corrected.
 
-**This gate runs in `pre-push` and in CI's `links` job, so the lane is red on it until those entries
-are re-read.**
+**Those three were repaired in the review commit `c2c18de`, and the gate is green again at the 3c
+tip**: `backlog claims: OK — 107 stated reductions still hold across all 46 live entries`, exit 0.
+Phases 3b and 3c break no further probe.
 
 ### Close triggers
 
