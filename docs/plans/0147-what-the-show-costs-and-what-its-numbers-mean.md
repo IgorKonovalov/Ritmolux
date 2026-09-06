@@ -375,7 +375,7 @@ pub struct ConsolePacing {
 | 3b — The console present becomes countable | dev | done | `76e3452` |
 | 3c — The give-up verdict is scoped to the incident the budget counts | dev | done | `ada2b37` |
 | 4 — Human: four arms, one hands-off window | human | done — 5 arms + 2 extra regimes | (a measurement; rows below) |
-| 5 — The verdict becomes the default | dev | done | committed with this row |
+| 5 — The verdict becomes the default | dev | done | `8b7bf2d` |
 | 6 — Human: the first frame-time row that names the discrete GPU | human | done | (a measurement; rows below) |
 
 ### Notes
@@ -513,16 +513,8 @@ to hide, and it is also the arm ADR-0172 records as unreadable the first time ro
 **Reaching the regime took a preset screen, and the roster's shape is a finding of its own.** Every
 figure below is a 22 s windowed run, console closed, same box and build:
 
-| preset | mean fps | p99 | | preset | mean fps | p99 |
-|---|---|---|---|---|---|---|
-| Ridge | 165.0 | 6.81 ms | | Supernova | 164.9 | 6.46 ms |
-| Smoke | 165.0 | 6.54 ms | | Whorl | 165.0 | 6.59 ms |
-| Stipple | 164.8 | 7.16 ms | | Thomas | 165.0 | 6.49 ms |
-| Etching | 165.0 | 6.58 ms | | Bower | 165.0 | 6.67 ms |
-| Cauldron | 165.0 | 6.53 ms | | Mitosis | 125.4 | 12.83 ms |
-| Wellhead | 165.0 | 6.70 ms | | **Dragon** | **52.9** | **25.21 ms** |
-| Lichen | 116.3 | 12.88 ms | | Clifford | 38.8 | 31.35 ms |
-| Verdigris | 109.8 | 12.92 ms | | Nebula | 30.4 | 42.56 ms |
+Ten of the sixteen sit **at** the 165 Hz vsync cap (6.5-7.2 ms). Below them: Mitosis 125.4,
+Lichen 116.3, Verdigris 109.8 — then a gap — **Dragon 52.9** — then Clifford 38.8 and Nebula 30.4.
 
 Sixteen presets: **one** lands between 45 and 90 fps. The rest sit at the 165 Hz vsync cap or below
 40. `--tier floor` does not fill the gap either — it overshoots it: Clifford 38.8 -> 119.4 and Nebula
@@ -535,14 +527,9 @@ so switches land inside the window, ~172 one-second `diagnostics.log` samples ea
 rather than a single pinned run, because the published figures are a different build and the plan
 forbids that comparison — this way the new row has a same-build twin.
 
-| | unflagged | `--gpu` pinned |
-|---|---|---|
-| adapter | AMD Radeon(TM) Graphics (Dx12, IntegratedGpu) | NVIDIA GeForce RTX 3080 Laptop GPU (Dx12, DiscreteGpu) |
-| fps median / min | 112.8 / 37.8 | **165.0 / 162.2** |
-| `frame_ms_avg` median / max | 8.863 / 26.490 ms | **6.061 / 6.164 ms** |
-| `frame_ms_p99` median / max | 12.889 / 31.619 ms | **6.276 / 8.936 ms** |
-| frames dropped | 0 | 0 |
-| samples under the 60 fps floor | 21 of 171 | **0 of 172** |
+The discrete part reads **165.0 fps median** with a worst p99 sample of **8.936 ms**; the unflagged
+integrated part **112.8 median**, with **21 of 171** samples under this project's own 60 fps floor.
+Neither drops a frame. The full pair is in `docs/nfr.md`.
 
 Written to `docs/nfr.md` **beside** the existing table, which was not edited, and to
 `docs/on-device-validation.md` as a dated "ran" section. Backlog 0165 gets a dated update rather
@@ -559,40 +546,39 @@ have. **A finding either way, as the phase says, and 0165 keeps that half and st
 That console run is also a **second-adapter witness for Phase 4**: Dragon, which reads 53 fps with
 the console open on the integrated part, holds 165.0 fps median with the console open here.
 
-**How to run Phase 4's arms.** `[console] frame_latency` (1 or 2) and `[console] present_every_n`
-(1 or 2) in `config.toml`, then `ritmolux --soak --console`; the console-closed control is the same
-without `--console`. Each arm is a relaunch, so the two keys are edited between arms. The
-`console opened:` line in `diagnostics.log` names the present mode, the frame latency **after
-clamping**, and the cadence, so every row can name the combination that actually ran.
-
-**`node scripts/check-backlog-claims.mjs` now exits 1 with three broken probes, and all three broke
-because these phases landed.** The script's own text says repairing a falsified entry is an
-`architect` call, so none was touched:
-
-- `0154 absent: REGDB in: standalone/src` — now matches, at `standalone/src/capture_verdict.rs`. The
-  entry's claim was that *nothing* distinguishes an activation failure from a dead endpoint; Phase 2
-  is what falsifies it.
-- `0164 present: desired_maximum_frame_latency = 1 in: core/src/render/aux_target.rs` — the literal
-  assignment is gone; the value now arrives from the caller and is clamped.
-- `0164 present: must not delay the frame it reports on in: standalone/src/app_state.rs` — that
-  sentence was rewritten when the decimation moved the cadence decision to the display loop. **The
-  claim it made is not yet repaired**: the surviving comment no longer asserts the console cannot
-  delay a frame, but the two comments Phase 5 names still stand, and Phase 5 is where they are
-  corrected.
-
-**Those three were repaired in the review commit `c2c18de`, and the gate is green again at the 3c
-tip**: `backlog claims: OK — 107 stated reductions still hold across all 46 live entries`, exit 0.
-Phases 3b and 3c break no further probe.
-
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`** design-backlog 0164, 0163; 0154 half; 0165 dated update
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** no. Nothing under `presets/` was read or written by any phase.
+- **Plan header `Closes:`** design-backlog **0163** (Phase 1) and **0164** (Phases 3, 3b, 4, 5) are
+  discharged. **0154 is half discharged** — Phases 2 and 3c took its reporting shape; its mechanism
+  halves (retry-in-place, a long-lived enumerator) are untouched and still want the unplug evidence.
+  **0165 got a dated update and stays live**: its title is satisfied — a published windowed figure
+  now names the discrete adapter — but the console's dual-GPU degrade path did not fire and this box
+  cannot make it, so the entry keeps that half.
+- **What shipped:** a **feature** (the console present is counted and the totals reach
+  `diagnostics.log` — Phase 3b), a **fix** (the give-up verdict is scoped to the incident the budget
+  counts, which repairs a defect Phase 2 shipped — Phase 3c), and **docs** (Phases 1, 5, 6). Two
+  operator-settable keys landed in Phase 3 before this session and are now documented.
+- **Operator docs touched:** `README.md` (the `level/*` normalization sentence from Phase 1; the two
+  `[console]` keys from Phase 5), `docs/nfr.md` (a discrete-GPU row **beside** the existing table,
+  which was not edited), `docs/on-device-validation.md` (a dated "ran" section for Phase 6),
+  `docs/design-backlog.md` (0165's dated update), and `docs/adrs/0143-*.md` (a second dated
+  `Outcome`, appended — see the lane-rule disclosure in the Notes above).
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit **1**, `2 broken`, and **both
+  broke because Phase 5 did what it was for**. Each is a **0164** `present:` probe asserting that a
+  falsified comment still stands — `console that stalls cannot pace in: core/src/render/mod.rs` and
+  `cannot alter what the show displays in: core/src/render/aux_target.rs` — and Phase 5 repaired both
+  sentences, so the reductions no longer match the tree. The script's own text says repairing a
+  falsified entry is an `architect` call, so **neither entry was touched**. 0164 is in this plan's
+  `Closes:` list; closing it discharges both probes. **The lane is red on `pre-push` and CI's `links`
+  job until that happens.** (The three probes the Phases 1-3 log recorded as broken were repaired
+  earlier, in the review commit `c2c18de`.)
+- **Full suite:** `cargo nextest run --workspace`, exit **0** — **1545 passed, 5 skipped**, 402 s,
+  run at the tip of Phase 5 before this block was written.
+- **Outstanding `human` phases:** **none.** Phases 4 and 6 both ran on 2026-09-06 and their results
+  are above. What remains owed is **not** a phase: the cross-refresh two-display run that would name
+  the pacing mechanism, and an unplug for 0154's mechanism half — both need hardware or a display
+  topology this box does not have, and both stay on the checklist.
 
 ## Followups (after this lands)
 

@@ -355,7 +355,7 @@ impl AuxTarget {
     /// Wholly independent of the output's frame: its own encoder, its own
     /// submit, its own present. Nothing here touches the primary swapchain, the
     /// scene clock or the dissolve, so a console that stalls or drops a frame
-    /// cannot alter **what the show displays** — the pixels, which the golden
+    /// cannot alter the **pixels** the show puts on screen — which the golden
     /// suite asserts byte-exactly.
     ///
     /// **It says nothing about when.** This runs on the display thread, so its
