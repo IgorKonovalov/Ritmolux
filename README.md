@@ -229,6 +229,23 @@ show, so you never lose the menu along with the window.
 On a single-monitor machine it opens as an ordinary window on that monitor, which is a
 supported way to work rather than an error.
 
+Two further `[console]` keys tune how it presents, and **neither needs touching on a
+machine that keeps up** — they exist so the console's cost can be measured rather than
+argued about:
+
+| key | default | what it does |
+|---|---|---|
+| `frame_latency` | `1` | The console swapchain's `desired_maximum_frame_latency`, clamped to `1..=3`. At `1` the surface holds a single in-flight image, so acquiring the next one waits for its own previous present to retire |
+| `present_every_n` | `1` | Present the console every Nth output frame. At `1` every frame; at `2` the console's readout updates at **half rate**, which is visible on the transport strip and the preview |
+
+Measured across five combinations and three frame-time regimes on this project's
+development box, an open console cost the output nothing outside measurement noise — so
+the defaults above are the shipped ones and there is no tuning to perform. The
+`diagnostics.log` line `console opened:` names the mode, the frame latency **after
+clamping** and the cadence actually in force, and a periodic `console open:` note carries
+the presented / skipped / decimated totals, which is what makes a cost reading on some
+other machine believable rather than merely low.
+
 The browser lays the roster out in **as many columns as the window fits**, so a
 library taller than the screen is visible at once rather than scrolled past. When
 even the columns can't hold it, the list scrolls by whole columns and keeps the

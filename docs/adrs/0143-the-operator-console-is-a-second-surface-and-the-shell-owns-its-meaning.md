@@ -183,3 +183,47 @@ integrated GPU, and both surfaces on one display, which is the configuration the
 separate the two pacing sources — so it convicts the claim without naming the mechanism. Carried as
 [backlog 0164](../design-backlog.md); the cross-refresh measurement that would name it is still owed
 on the checklist.
+
+## Outcome — 2026-09-06, at Plan 0147 Phase 4
+
+**This does not revise the Outcome above, and it does not restate it.** That one convicted the
+cadence claim on a 61.7 -> 33.1 reading; this one records what the same measurement, re-taken with
+an instrument the first one did not have, found on the build at Plan 0147 Phase 5.
+
+**Five arms, and neither lever moves anything, because there was nothing to move.** The two levers
+that reading named — `desired_maximum_frame_latency` and an undecimated synchronous present — were
+both made settable (Plan 0147 Phase 3) and all four combinations measured in one hands-off window
+against a console-closed control, 95 s each, integrated Radeon, 1080p windowed:
+
+| arm | mean fps | `frame_ms_p99_steady` |
+|---|---|---|
+| closed (control) | 53.5 | 25.03 ms |
+| latency 1, every frame (shipped) | 53.1 | 24.26 ms |
+| latency 2, every frame | 52.3 | 25.56 ms |
+| latency 1, every 2nd | 52.8 | 25.23 ms |
+| latency 2, every 2nd | 54.5 | 24.91 ms |
+
+The five span 52.3 to 54.5 against a 53.5 control — noise in both directions. **The defaults
+therefore did not change**, and moving them on a 1.0 fps difference would trade a real cost (at
+every-2nd the console's own readout updates at half rate) for one the instrument cannot resolve.
+
+**Two further regimes, because one frame time cannot separate "cheap" from "hidden".** A vblank at
+165 Hz is 6.06 ms, which could hide inside the 19 ms frame above and cannot hide inside a 6.5 ms
+one. At the vsync cap the console presented **14,797 times with zero skips** and the output held
+165.0 fps closed and open; at the heavy end 32.2 became 31.9. On the discrete adapter the same
+preset that reads 53 fps with the console open on the integrated part holds 165.0 (9,834 presents,
+0 skips).
+
+**Every figure here carries a present count, which is the whole reason it can be believed**
+([ADR-0172](0172-a-null-cost-measurement-names-the-witness-that-the-thing-ran.md)). The first
+attempt at this window returned `165.0 -> 165.0` and was unreadable, because a console that never
+acquired a texture produces the same reading as one that presented every frame. `AuxCounts` and the
+display loop's decimation counter reconcile against the frames the loop ran, so an arm now states
+that its subject ran.
+
+**What this does not say.** It does not refute the 61.7 -> 33.1 figures: those came from a different
+build, and a cross-build comparison is not one this measurement can make. It says the halving did
+not reproduce here, in the regime it was reported in, with a witness attached — and that whether
+that is a build difference, a configuration difference, or an uncontrolled variable in the original
+reading is unresolved. Both surfaces were still on **one display at one refresh rate**, so the
+cross-refresh two-display run this ADR's first Outcome calls owed is **still owed**.

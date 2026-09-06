@@ -808,8 +808,17 @@ impl Renderer {
     /// attached.
     ///
     /// Deliberately **not** called from [`render`](Self::render): the two
-    /// surfaces present independently, so a console that stalls cannot pace the
-    /// show, and a frame the output drops does not have to cost the console one.
+    /// surfaces present independently, so a frame the output drops does not
+    /// have to cost the console one, and neither surface's state can reach the
+    /// other's.
+    ///
+    /// **Independent is not free.** The caller decides when this runs, and in
+    /// the standalone that is the display thread — so a console that stalls
+    /// stalls the loop that called it, whatever the two surfaces do
+    /// separately. The cost is a measurement: Plan 0147 Phase 4 put it inside
+    /// noise across three frame-time regimes on an integrated Radeon, and
+    /// [`aux_counts`](Self::aux_counts) is what makes such a reading
+    /// distinguishable from a console that never presented at all.
     #[cfg(feature = "text")]
     pub fn present_aux(&mut self, runs: &[TextRun<'_>]) -> Result<(), RenderError> {
         match self.aux.as_mut() {

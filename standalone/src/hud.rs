@@ -304,8 +304,15 @@ impl AppState {
     /// Present the console's half of this frame, if one is attached.
     ///
     /// Separate from the output's `render` and after it: the console is a
-    /// monitor, so a frame it drops or a present that stalls must cost the show
-    /// nothing. A failure here closes the console rather than killing the app.
+    /// monitor, so a frame it drops costs the show no pixels and no state.
+    ///
+    /// **After the show's present is not outside the show's frame.** This is
+    /// the same thread, so whatever this costs lands in the next frame's
+    /// budget — being ordered last buys correctness, not freedom. What it
+    /// actually costs was measured rather than asserted (Plan 0147 Phase 4):
+    /// inside noise in three frame-time regimes on this box's integrated
+    /// adapter, each arm witnessed by a non-zero present count. A failure here
+    /// closes the console rather than killing the app.
     pub(crate) fn present_console(&mut self) {
         if self.hud.console_window.is_none() {
             return;

@@ -375,7 +375,7 @@ pub struct ConsolePacing {
 | 3b — The console present becomes countable | dev | done | `76e3452` |
 | 3c — The give-up verdict is scoped to the incident the budget counts | dev | done | `ada2b37` |
 | 4 — Human: four arms, one hands-off window | human | done — 5 arms + 2 extra regimes | (a measurement; rows below) |
-| 5 — The verdict becomes the default | dev | not started | |
+| 5 — The verdict becomes the default | dev | done | committed with this row |
 | 6 — Human: the first frame-time row that names the discrete GPU | human | done | (a measurement; rows below) |
 
 ### Notes
@@ -391,6 +391,31 @@ only caller of `AuxTarget::new`, so the new `frame_latency` parameter passes thr
 edit added `Renderer::aux_frame_latency`, so the shell's "console opened" note quotes the depth the
 swapchain got rather than the one the config asked for — which Phase 4 needs, since a clamped value
 would otherwise be reported as the requested one.
+
+**Phase 5 took the plan's "neither lever" branch, so no default moved.** The phase's first done-when
+— *"the defaults match Phase 4's best arm"* — is satisfied vacuously and deliberately: the nominal
+best arm is `(2, every-2nd)` by 1.0 fps over a control the five arms straddle by 1.2 in the other
+direction, and `present_every_n = 2` has a real operator cost (the console's readout updates at half
+rate) against a difference the instrument cannot resolve. The shipped `(1, every-frame)` stands, and
+both keys stay reachable.
+
+**All four comment sites were repaired, and the roster the review established was correct.** The
+falsified claim stood in `core/src/render/aux_target.rs` twice (`AuxPresentMode::NonBlocking`,
+`present`), in `core/src/render/mod.rs` (`present_aux`) and in `standalone/src/hud.rs`
+(`present_console`); `standalone/src/app_state.rs` carried nothing false, as the plan says. Each now
+separates the property that holds (pixels and state are unaffected — byte-exact, asserted) from the
+one that is a measurement (cadence, which shares the display thread), and quotes what Phase 4
+measured rather than deducing a guarantee from independence.
+
+**`README.md` documents both keys**, with their defaults, the clamp on `frame_latency`, the half-rate
+readout `present_every_n = 2` buys, and the `diagnostics.log` lines that name what actually ran.
+
+**One item in this phase crosses the `dev` lane rule, and it is disclosed rather than skipped.** The
+phase's Files touched lists `docs/adrs/0143-*.md` for a second dated `Outcome`, and the `dev` skill
+says ADRs are not `dev`'s to write. The plan is architect-authored and names the file explicitly, so
+it was written — appended, never editing the body or the 2026-08-30 `Outcome`, and confined to
+recording Phase 4's measurement. **If that judgement is wrong the section reverts on its own commit**
+without touching anything else in this phase.
 
 **Phase 3b's totals reach `diagnostics.log` as a `#` note on a 30 s cadence, not only on close.** The
 done-when allows columns or the `# console closed:` note; the phase's file list does not include

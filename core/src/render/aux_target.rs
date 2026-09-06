@@ -180,8 +180,14 @@ const CLEAR: wgpu::Color = wgpu::Color {
 /// name its present mode cannot be compared with another machine's).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AuxPresentMode {
-    /// A non-blocking mode was offered and taken: the console's present cannot
-    /// block on its own display's vblank, so it cannot pace the output.
+    /// A non-blocking mode was offered and taken: the console's present does
+    /// not block on its own display's vblank.
+    ///
+    /// That is a property of this surface's present, **not** a guarantee about
+    /// the output's cadence — the two presents still run on one thread, and
+    /// what the second costs the first is a measurement rather than a
+    /// deduction. Measured at Plan 0147 Phase 4 on an integrated Radeon: at the
+    /// 165 Hz vsync cap, 14,797 console presents cost the output 0.0 fps.
     NonBlocking(&'static str),
     /// Only `Fifo` was offered. The console presents in lockstep with its own
     /// display, which is the configuration where a slower second monitor can be
@@ -349,7 +355,15 @@ impl AuxTarget {
     /// Wholly independent of the output's frame: its own encoder, its own
     /// submit, its own present. Nothing here touches the primary swapchain, the
     /// scene clock or the dissolve, so a console that stalls or drops a frame
-    /// cannot alter what the show displays.
+    /// cannot alter **what the show displays** — the pixels, which the golden
+    /// suite asserts byte-exactly.
+    ///
+    /// **It says nothing about when.** This runs on the display thread, so its
+    /// cost is inside the caller's frame whatever this surface's present mode
+    /// is; the separation above is of *state*, not of *time*. What that costs
+    /// is measured rather than argued — Plan 0147 Phase 4, five arms in three
+    /// frame-time regimes on an integrated Radeon, found it inside noise, with
+    /// [`AuxCounts`] beside each arm to prove the presents happened.
     ///
     /// **Every exit counts itself** into [`AuxCounts`]: the four surface states
     /// that skip return the same `Ok(())` a present does, so without the
