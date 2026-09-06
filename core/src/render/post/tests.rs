@@ -15,6 +15,7 @@ use crate::render::background::Background;
 use crate::render::capture::{self, CaptureImage};
 use crate::render::context::{RenderContext, RenderError};
 use crate::render::gpu;
+use crate::render::scenes::{declares, spec_names};
 
 /// The tier every test in this module runs at, and the one every golden
 /// baseline is blessed at (ADR-0045). These tests pin the **policy** — the
@@ -1374,7 +1375,7 @@ fn occlude_releases_the_backdrop_with_no_post_stage_active() {
     // binding would move the seam to the chain and silently duplicate the test
     // above.
     for stage_params in super::STAGE_PARAMS {
-        for name in stage_params.iter() {
+        for name in stage_params.iter().map(|spec| spec.name) {
             assert!(
                 fixture_value(NO_STAGE_FIXTURE, name).is_nan(),
                 "attractor_lit_backdrop_no_stage.toml now binds `{name}`, so a \
@@ -1443,7 +1444,7 @@ fn the_chain_clamps_and_resets_occlude() {
 /// `resolve_route` test one before the other and take the first match.
 #[test]
 fn the_chain_vocabulary_does_not_overlap_the_stages() {
-    for name in CHAIN_PARAMS {
+    for name in spec_names(CHAIN_PARAMS) {
         assert!(
             super::stage_for(name).is_none(),
             "`{name}` is claimed by both the chain and a stage; route \
@@ -1451,5 +1452,5 @@ fn the_chain_vocabulary_does_not_overlap_the_stages() {
              reached"
         );
     }
-    assert!(CHAIN_PARAMS.contains(&"occlude"));
+    assert!(declares(CHAIN_PARAMS, "occlude"));
 }

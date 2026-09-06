@@ -31,23 +31,24 @@ use super::common;
 use super::{Phase, Scene};
 use crate::dsp::AnalysisFrame;
 use crate::render::palette::{self, Palette};
+use crate::render::scenes::{ParamSpec, default_of};
 
 /// Parameter defaults — a calm idle field when nothing is bound.
-const DEFAULT_WARP: f32 = 0.4;
+const DEFAULT_WARP: f32 = default_of(PARAMS, "warp");
 const DEFAULT_HUE: f32 = 0.0;
 const DEFAULT_ZOOM: f32 = 1.0;
-const DEFAULT_GLOW: f32 = 0.7;
-const DEFAULT_FLASH: f32 = 0.0;
+const DEFAULT_GLOW: f32 = default_of(PARAMS, "glow");
+const DEFAULT_FLASH: f32 = default_of(PARAMS, "flash");
 // Shared palette color knobs (ADR-0021). `color_span` = 0.6 + `color_center` = 0
 // + `saturation` = 1 reproduce the prior look exactly (the old `field*0.6` sample
 // with no desaturation).
-const DEFAULT_COLOR_SPAN: f32 = 0.6;
-const DEFAULT_COLOR_CENTER: f32 = 0.0;
+const DEFAULT_COLOR_SPAN: f32 = default_of(PARAMS, "color_span");
+const DEFAULT_COLOR_CENTER: f32 = default_of(PARAMS, "color_center");
 /// The two rate parameters (ADR-0132), in units of the scene's own default
 /// speed. `1.0` is what this scene has always animated at, so a preset that
 /// binds neither renders exactly as before.
-const DEFAULT_FIELD_SPEED: f32 = 1.0;
-const DEFAULT_FOLD_SPEED: f32 = 1.0;
+const DEFAULT_FIELD_SPEED: f32 = default_of(PARAMS, "field_speed");
+const DEFAULT_FOLD_SPEED: f32 = default_of(PARAMS, "fold_speed");
 
 const SHADER: &str = r#"
 struct Params {
@@ -352,22 +353,57 @@ impl FragmentFieldScene {
 /// doing nothing (ADR-0020). **Keep in sync with `set_param` below**; the
 /// `declared_params_match_set_param` guard in `core/tests/preset.rs` fails if
 /// the two drift.
-pub const PARAMS: &[&str] = &[
-    "warp",
-    "field_speed",
-    "fold_speed",
-    "hue",
-    "zoom",
-    "glow",
-    "flash",
-    "pan_x",
-    "pan_y",
-    "color_span",
-    "color_center",
-    "saturation",
-    "palette_mix",
-    "palette_steps",
-    "palette_contour",
+pub const PARAMS: &[ParamSpec] = &[
+    ParamSpec {
+        name: "warp",
+        default: 0.4,
+        range: Some([0.0, 1.5]),
+        doc: "Amplitude of the domain fold; 0 flattens the field into plain bands.",
+    },
+    ParamSpec {
+        name: "field_speed",
+        default: 1.0,
+        range: Some([0.0, 4.0]),
+        doc: "How fast the field itself drifts, as a multiple of its base rate.",
+    },
+    ParamSpec {
+        name: "fold_speed",
+        default: 1.0,
+        range: Some([0.0, 4.0]),
+        doc: "How fast the fold turns, independently of the field's own drift.",
+    },
+    crate::render::scenes::common::hue(DEFAULT_HUE),
+    crate::render::scenes::common::zoom(DEFAULT_ZOOM),
+    ParamSpec {
+        name: "glow",
+        default: 0.7,
+        range: Some([0.0, 2.0]),
+        doc: "Overall light the field emits, before the composite sees it.",
+    },
+    ParamSpec {
+        name: "flash",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Lifts the whole field toward white, for a beat-driven blink.",
+    },
+    crate::render::scenes::common::PAN_X,
+    crate::render::scenes::common::PAN_Y,
+    ParamSpec {
+        name: "color_span",
+        default: 0.6,
+        range: Some([0.0, 1.0]),
+        doc: "How much of the palette the field's range covers; 0 is one flat colour.",
+    },
+    ParamSpec {
+        name: "color_center",
+        default: 0.0,
+        range: Some([-1.0, 1.0]),
+        doc: "Shifts which part of the field's range lands in the middle of the palette.",
+    },
+    crate::render::scenes::common::SATURATION,
+    crate::render::scenes::common::PALETTE_MIX,
+    crate::render::scenes::common::PALETTE_STEPS,
+    crate::render::scenes::common::PALETTE_CONTOUR,
 ];
 
 impl Scene for FragmentFieldScene {

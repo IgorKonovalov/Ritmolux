@@ -45,16 +45,17 @@ use super::{
 };
 use crate::dsp::AnalysisFrame;
 use crate::render::palette::Palette;
+use crate::render::scenes::{ParamSpec, default_of};
 
 // Parameter defaults — a calm, whole, slowly turning rose when nothing is bound.
-const DEFAULT_N: f32 = 6.0;
-const DEFAULT_D: f32 = 71.0;
+const DEFAULT_N: f32 = default_of(PARAMS, "n");
+const DEFAULT_D: f32 = default_of(PARAMS, "d");
 // Shape params (ADR-0029): both no-ops by default, so an unbound rose is the
 // plain `sin(n*theta)` curve — `phase` adds inside the sine, `radial_offset`
 // adds to the radius.
-const DEFAULT_PHASE: f32 = 0.0;
-const DEFAULT_RADIAL_OFFSET: f32 = 0.0;
-const DEFAULT_SAMPLES: f32 = 361.0;
+const DEFAULT_PHASE: f32 = default_of(PARAMS, "phase");
+const DEFAULT_RADIAL_OFFSET: f32 = default_of(PARAMS, "radial_offset");
+const DEFAULT_SAMPLES: f32 = default_of(PARAMS, "samples");
 const DEFAULT_THICKNESS: f32 = 2.0;
 const DEFAULT_HUE: f32 = 0.6;
 /// Colour surface (ADR-0021 / ADR-0059), at the value that reproduces the single
@@ -62,7 +63,7 @@ const DEFAULT_HUE: f32 = 0.6;
 /// The palette-A-alone and unmodified-saturation halves of that rest in
 /// `scenes::common`, which every system shares them with.
 const DEFAULT_HUE_SPREAD: f32 = 0.0;
-const DEFAULT_SPIN: f32 = 0.1;
+const DEFAULT_SPIN: f32 = default_of(PARAMS, "spin");
 const DEFAULT_SCALE: f32 = 0.9;
 const DEFAULT_BRIGHTNESS: f32 = 1.0;
 /// The line renderer's **per-segment falloff** multiplier (Plan 0038 Phase 1) —
@@ -335,31 +336,61 @@ pub(crate) fn color_along_path(
 
 /// Parameter vocabulary — see [`fragment_field::PARAMS`](crate::render::scenes::fragment_field::PARAMS).
 /// **Keep in sync with `set_param` below.**
-pub const PARAMS: &[&str] = &[
-    "n",
-    "d",
-    "phase",
-    "radial_offset",
-    "samples",
-    "thickness",
-    "hue",
-    "hue_spread",
-    "saturation",
-    "palette_mix",
-    "palette_steps",
-    "palette_contour",
-    "spin",
-    "scale",
-    "brightness",
-    "glow",
-    "softness",
-    "stroke_blend",
-    "draw_progress",
-    "zoom",
-    "pan_x",
-    "pan_y",
-    "mirror_order",
-    "mirror_reflect",
+pub const PARAMS: &[ParamSpec] = &[
+    ParamSpec {
+        name: "n",
+        default: 6.0,
+        range: Some([1.0, 24.0]),
+        doc: "The rose's petal number - the first of the two integers that pick the figure.",
+    },
+    ParamSpec {
+        name: "d",
+        default: 71.0,
+        range: Some([1.0, 360.0]),
+        doc: "The step between sampled angles, which is what turns a rose into a Maurer figure.",
+    },
+    ParamSpec {
+        name: "phase",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Rotates where the figure starts sampling, as a fraction of a turn.",
+    },
+    ParamSpec {
+        name: "radial_offset",
+        default: 0.0,
+        range: Some([-1.0, 1.0]),
+        doc: "Pushes every point out from the centre, opening the figure into a ring.",
+    },
+    ParamSpec {
+        name: "samples",
+        default: 361.0,
+        range: Some([16.0, 2048.0]),
+        doc: "How many points the curve is drawn from; fewer reads as a polygon.",
+    },
+    crate::render::scenes::lines::thickness(DEFAULT_THICKNESS),
+    crate::render::scenes::common::hue(DEFAULT_HUE),
+    crate::render::scenes::lines::hue_spread(DEFAULT_HUE_SPREAD),
+    crate::render::scenes::common::SATURATION,
+    crate::render::scenes::common::PALETTE_MIX,
+    crate::render::scenes::common::PALETTE_STEPS,
+    crate::render::scenes::common::PALETTE_CONTOUR,
+    ParamSpec {
+        name: "spin",
+        default: 0.1,
+        range: Some([-2.0, 2.0]),
+        doc: "Turns per second the whole figure rotates by.",
+    },
+    crate::render::scenes::lines::scale(DEFAULT_SCALE),
+    crate::render::scenes::common::brightness(DEFAULT_BRIGHTNESS),
+    crate::render::scenes::lines::GLOW,
+    crate::render::scenes::lines::SOFTNESS,
+    crate::render::scenes::lines::STROKE_BLEND,
+    crate::render::scenes::lines::DRAW_PROGRESS,
+    crate::render::scenes::common::zoom(DEFAULT_ZOOM),
+    crate::render::scenes::common::PAN_X,
+    crate::render::scenes::common::PAN_Y,
+    crate::render::scenes::lines::MIRROR_ORDER,
+    crate::render::scenes::lines::MIRROR_REFLECT,
 ];
 
 impl Scene for ParametricCurveScene {

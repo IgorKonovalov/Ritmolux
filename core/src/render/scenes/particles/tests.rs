@@ -11,6 +11,7 @@ use super::{
 };
 use crate::dsp::AnalysisFrame;
 use crate::render::context::RenderContext;
+use crate::render::scenes::declares;
 use crate::render::{Tier, TierConfig};
 use family::Framing;
 use ifs::{IfsFigure, Levers};
@@ -2040,7 +2041,7 @@ fn the_colour_channels_default_to_the_identity() {
     let names = ["map_tint", "map_hue", "root_tint", "root_hue"];
     for name in names {
         assert!(
-            super::PARAMS.contains(&name),
+            declares(super::PARAMS, name),
             "`{name}` is missing from PARAMS, so a preset binding it warns instead \
              of working"
         );
@@ -2313,14 +2314,14 @@ fn an_unusable_emergence_binding_clamps_instead_of_dividing() {
 fn the_age_colour_channel_is_gone_from_the_roster() {
     for retired in ["age_tint", "age_hue"] {
         assert!(
-            !super::PARAMS.contains(&retired),
+            !declares(super::PARAMS, retired),
             "`{retired}` is still in PARAMS — it was retired at Plan 0074 Phase 3 \
              because `age` proxied distance-from-the-fixed-points and the proxy decayed"
         );
     }
     for live in ["map_tint", "map_hue", "root_tint", "root_hue"] {
         assert!(
-            super::PARAMS.contains(&live),
+            declares(super::PARAMS, live),
             "`{live}` is missing from PARAMS, so a preset binding it warns instead \
              of working"
         );

@@ -160,8 +160,8 @@ const CONTACT_MAX_DEG: f32 = 80.0;
 /// morph, not a shape (the ADR-0037 habit).
 const STEP_DEG: f32 = 0.1;
 
-const DEFAULT_VARIANT: f32 = 1.0;
-const DEFAULT_ROTATION: f32 = 0.0;
+const DEFAULT_VARIANT: f32 = default_of(PARAMS, "variant");
+const DEFAULT_ROTATION: f32 = default_of(PARAMS, "rotation");
 const DEFAULT_HUE: f32 = 0.5;
 /// Colour surface (ADR-0021 / ADR-0059), at the value that reproduces the single
 /// flat `hue` this scene drew before the palette reached it: no ramp along the
@@ -183,9 +183,9 @@ const DEFAULT_MIRROR_ORDER: f32 = 1.0;
 const DEFAULT_MIRROR_REFLECT: f32 = 0.0;
 // The ring levers (Plan 0065 Phase 4), all at the exact identity so a preset
 // that binds none of them draws the static roster it declared.
-const DEFAULT_RING_PHASE: f32 = 0.0;
-const DEFAULT_RING_SPREAD: f32 = 1.0;
-const DEFAULT_RING_SCALE_PARAM: f32 = 1.0;
+const DEFAULT_RING_PHASE: f32 = default_of(PARAMS, "ring_phase");
+const DEFAULT_RING_SPREAD: f32 = default_of(PARAMS, "ring_spread");
+const DEFAULT_RING_SCALE_PARAM: f32 = default_of(PARAMS, "ring_scale");
 
 /// A generator scene drawing a Hankin star pattern.
 pub struct StarPatternScene {
@@ -655,37 +655,61 @@ mod rings;
 pub use motif::{MIN_SCALLOP_LOBES, Motif};
 pub use rings::{DEFAULT_RING_SCALE, MAX_RING_COUNT, RingSpec};
 
+use crate::render::scenes::{ParamSpec, default_of};
 use motif::*;
 use rings::*;
 
 /// Parameter vocabulary — see [`fragment_field::PARAMS`](crate::render::scenes::fragment_field::PARAMS).
 /// **Keep in sync with `set_param` below.**
-pub const PARAMS: &[&str] = &[
-    "variant",
-    "rotation",
-    "hue",
-    "hue_spread",
-    "saturation",
-    "palette_mix",
-    "palette_steps",
-    "palette_contour",
-    "draw_progress",
-    "thickness",
-    "scale",
-    "brightness",
-    "glow",
-    "softness",
-    "stroke_blend",
-    "zoom",
-    "pan_x",
-    "pan_y",
-    "mirror_order",
-    "mirror_reflect",
-    // The ring levers (Plan 0065 Phase 4). Inert on a preset that declares no
-    // `[generator] rings` — there is nothing for them to move.
-    "ring_phase",
-    "ring_spread",
-    "ring_scale",
+pub const PARAMS: &[ParamSpec] = &[
+    ParamSpec {
+        name: "variant",
+        default: 1.0,
+        range: Some([0.0, 8.0]),
+        doc: "Picks which of the built-in star constructions is drawn.",
+    },
+    ParamSpec {
+        name: "rotation",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Turns the whole pattern, as a fraction of a full turn.",
+    },
+    crate::render::scenes::common::hue(DEFAULT_HUE),
+    crate::render::scenes::lines::hue_spread(DEFAULT_HUE_SPREAD),
+    crate::render::scenes::common::SATURATION,
+    crate::render::scenes::common::PALETTE_MIX,
+    crate::render::scenes::common::PALETTE_STEPS,
+    crate::render::scenes::common::PALETTE_CONTOUR,
+    crate::render::scenes::lines::DRAW_PROGRESS,
+    crate::render::scenes::lines::thickness(DEFAULT_THICKNESS),
+    crate::render::scenes::lines::scale(DEFAULT_SCALE),
+    crate::render::scenes::common::brightness(DEFAULT_BRIGHTNESS),
+    crate::render::scenes::lines::GLOW,
+    crate::render::scenes::lines::SOFTNESS,
+    crate::render::scenes::lines::STROKE_BLEND,
+    crate::render::scenes::common::zoom(DEFAULT_ZOOM),
+    crate::render::scenes::common::PAN_X,
+    crate::render::scenes::common::PAN_Y,
+    crate::render::scenes::lines::MIRROR_ORDER,
+    crate::render::scenes::lines::MIRROR_REFLECT,
+    ParamSpec {
+        name: "ring_phase",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Rotates each concentric ring against its neighbour.",
+    },
+    ParamSpec {
+        name: "ring_spread",
+        default: 1.0,
+        range: Some([0.0, 2.0]),
+        doc: "How far apart the rings sit radially.",
+    },
+    ParamSpec {
+        name: "ring_scale",
+        default: 1.0,
+        range: Some([0.25, 4.0]),
+        doc: "How much each ring grows over the one inside it.",
+    },
 ];
 
 impl Scene for StarPatternScene {

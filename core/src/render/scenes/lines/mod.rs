@@ -21,6 +21,8 @@
     clippy::unreachable
 )]
 
+use crate::render::scenes::ParamSpec;
+
 pub mod biarc;
 pub mod curves;
 pub mod grammar;
@@ -115,6 +117,84 @@ pub const OPAQUE_BLEND: f32 = 0.5;
 /// additive light, ADR-0056's seam, and what every line scene drew before the
 /// selector existed.
 pub const ADDITIVE_BLEND: f32 = 0.0;
+/// The stroke and framing parameters every line system shares, declared once
+/// (ADR-0170) — the line-art half of what `scenes::common` does for colour.
+pub const SOFTNESS: ParamSpec = ParamSpec {
+    name: "softness",
+    default: DEFAULT_SOFTNESS,
+    range: Some([0.0, 1.0]),
+    doc: "How far a stroke's edge fades out; 0 is a hard line, 1 a wide glow with no core.",
+};
+
+/// `stroke_blend`, shared: additive light at 0, opaque paint at 1.
+pub const STROKE_BLEND: ParamSpec = ParamSpec {
+    name: "stroke_blend",
+    default: ADDITIVE_BLEND,
+    range: Some([0.0, 1.0]),
+    doc: "Moves the stroke from additive light toward opaque paint, so crossings stop brightening.",
+};
+
+/// `mirror_order`, shared: how many copies of the geometry ring the centre.
+pub const MIRROR_ORDER: ParamSpec = ParamSpec {
+    name: "mirror_order",
+    default: 1.0,
+    range: Some([1.0, 12.0]),
+    doc: "Repeats the geometry this many times around the centre; 1 draws it once.",
+};
+
+/// `mirror_reflect`, shared: whether those copies alternate as mirror images.
+pub const MIRROR_REFLECT: ParamSpec = ParamSpec {
+    name: "mirror_reflect",
+    default: 0.0,
+    range: Some([0.0, 1.0]),
+    doc: "Alternates the repeats into mirror images rather than plain rotations.",
+};
+
+/// `draw_progress`, shared: how much of the figure has been drawn.
+pub const DRAW_PROGRESS: ParamSpec = ParamSpec {
+    name: "draw_progress",
+    default: 1.0,
+    range: Some([0.0, 1.0]),
+    doc: "How much of the figure is drawn, from its start; below 1 the line is still arriving.",
+};
+
+/// `glow`, shared: the halo around a stroke, on top of the stroke itself.
+pub const GLOW: ParamSpec = ParamSpec {
+    name: "glow",
+    default: 1.0,
+    range: Some([0.0, 4.0]),
+    doc: "Brightness of the halo around each stroke, on top of the stroke itself.",
+};
+
+/// `thickness` at the scene's own resting width, in pixels at the render target.
+pub const fn thickness(default: f32) -> ParamSpec {
+    ParamSpec {
+        name: "thickness",
+        default,
+        range: Some([0.5, 12.0]),
+        doc: "Stroke width in pixels at the render target, before softness widens the falloff.",
+    }
+}
+
+/// `scale` at the scene's own resting size.
+pub const fn scale(default: f32) -> ParamSpec {
+    ParamSpec {
+        name: "scale",
+        default,
+        range: Some([0.1, 2.0]),
+        doc: "Size of the figure within the frame, before the shared zoom is applied.",
+    }
+}
+
+/// `hue_spread` at the scene's own resting width.
+pub const fn hue_spread(default: f32) -> ParamSpec {
+    ParamSpec {
+        name: "hue_spread",
+        default,
+        range: Some([0.0, 1.0]),
+        doc: "How far along the palette the colour travels from one end of the figure to the other.",
+    }
+}
 
 /// Hard clamp on L-system iteration depth, enforced at preset load. A branching
 /// rule expands exponentially, so an unbounded `max_depth` would stall a preset

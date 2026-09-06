@@ -15,7 +15,7 @@ Where to go from here:
 
 | You want | Go to |
 |---|---|
-| Every parameter each system takes | [`presets/README.md`](../presets/README.md) |
+| The parameter reference: every parameter, its default, its range, what it does | [`presets/README.md`](../presets/README.md) |
 | The expression grammar — variables, functions, operators | [`docs/presets.md`](presets.md) |
 | Palettes, custom stops, the A/B crossfade | [`docs/preset-palettes.md`](preset-palettes.md) |
 | One preset tuned step by step, with the numbers | [`docs/preset-tuning-walkthrough.md`](preset-tuning-walkthrough.md) |
@@ -75,8 +75,8 @@ the params then animate it.
 
 One image each, captured under the same stimulus at the same moment in the clip, so they are
 comparable. Each is a real shipped preset — the file name is under the picture. All twelve systems
-have one; the roster and the full parameter tables live in
-[`../presets/README.md`](../presets/README.md).
+have one; the **parameter reference** — every parameter of every system, with its default, the
+range that reads and what it does — is [`../presets/README.md`](../presets/README.md).
 
 ### `fragment_field`
 

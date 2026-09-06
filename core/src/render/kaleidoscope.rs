@@ -187,14 +187,15 @@
 use crate::render::gpu;
 
 use super::post::{Fold, PostStage, internal_grid_size};
+use crate::render::scenes::{ParamSpec, default_of};
 
 /// `kaleido_order` default — 1 = identity, so an unbound preset is unaffected.
-const DEFAULT_ORDER: f32 = 1.0;
+const DEFAULT_ORDER: f32 = default_of(PARAMS, "kaleido_order");
 /// `kaleido_angle` default — no rotation.
-const DEFAULT_ANGLE: f32 = 0.0;
+const DEFAULT_ANGLE: f32 = default_of(PARAMS, "kaleido_angle");
 /// `kaleido_center_x` / `kaleido_center_y` default — the screen centre, which is
 /// where the fold axis was hardcoded before it became bindable (ADR-0047).
-const DEFAULT_CENTER: f32 = 0.5;
+const DEFAULT_CENTER: f32 = default_of(PARAMS, "kaleido_center_x");
 
 /// How far past the inscribed disc the vignette takes to fade out, as a fraction
 /// of `r_max` (ADR-0047).
@@ -221,7 +222,7 @@ const MAX_EDGE: f32 = 2.0;
 /// preset comments refer to; which member of the roster is the *default* is a
 /// separate question and the A/B answered it differently. Reordering the roster to
 /// force the default to 0 would trade a readable history for a tidier constant.
-const DEFAULT_EDGE: f32 = 1.0;
+const DEFAULT_EDGE: f32 = default_of(PARAMS, "kaleido_edge");
 
 /// Below this order the fold term is the identity (no angular wrap at all).
 const MIN_ACTIVE_ORDER: f32 = 2.0;
@@ -238,7 +239,7 @@ const IDENTITY_ORDER: f32 = 1.0;
 // --- The composed coordinate map (ADR-0077) ---------------------------------
 
 /// `kaleido_radial` default — 1 = no repeat, the unmapped path.
-const DEFAULT_RADIAL: f32 = 1.0;
+const DEFAULT_RADIAL: f32 = default_of(PARAMS, "kaleido_radial");
 /// At or below this ring ratio the log-radius repeat is **off**, and off is the
 /// unmapped path rather than a degenerate case of the mapped one.
 const MIN_ACTIVE_RADIAL: f32 = 1.0;
@@ -256,16 +257,16 @@ const MIN_RADIAL: f32 = 1.02;
 const MAX_RADIAL: f32 = 8.0;
 
 /// `kaleido_spiral` default — 0 = no shear.
-const DEFAULT_SPIRAL: f32 = 0.0;
+const DEFAULT_SPIRAL: f32 = default_of(PARAMS, "kaleido_spiral");
 /// Ceiling on `|kaleido_spiral|`. The shear is `m` whole turns of `log r` per
 /// revolution; past a handful the rings are a vortex with no readable motif.
 const MAX_SPIRAL: f32 = 8.0;
 
 /// `kaleido_zoom` default — 0 rings travelled, so no offset along `log r`.
-const DEFAULT_ZOOM: f32 = 0.0;
+const DEFAULT_ZOOM: f32 = default_of(PARAMS, "kaleido_zoom");
 
 /// `kaleido_tile` default — 1 cell across, the identity.
-const DEFAULT_TILE: f32 = 1.0;
+const DEFAULT_TILE: f32 = default_of(PARAMS, "kaleido_tile");
 /// At or below this cell count the wallpaper tile is **off**. Not a degenerate
 /// case: `abs(fract(x/2)*2 - 1)` at one cell is `1 - x`, a flip, not the identity.
 const MIN_ACTIVE_TILE: f32 = 1.0;
@@ -286,7 +287,7 @@ const MAX_TILE: f32 = 16.0;
 /// It costs an author nothing to opt out — `kaleido_inner = "0"` is honoured
 /// exactly ([`fold_inner`] clamps but does not floor) — and it costs the stage
 /// nothing when the repeat is off, since the whole radial group is skipped then.
-const DEFAULT_INNER: f32 = 0.06;
+const DEFAULT_INNER: f32 = default_of(PARAMS, "kaleido_inner");
 /// Ceiling on the inner cutoff: `r_max` itself, at which the whole disc is the
 /// frozen innermost ring and the repeat shows nothing.
 const MAX_INNER: f32 = 1.0;
@@ -915,20 +916,70 @@ pub struct Kaleidoscope {
 
 /// Global parameter vocabulary — see [`background::PARAMS`](super::background::PARAMS).
 /// **Keep in sync with `set_param` below.**
-pub const PARAMS: &[&str] = &[
-    "kaleido_order",
-    "kaleido_angle",
-    "kaleido_center_x",
-    "kaleido_center_y",
-    "kaleido_edge",
+pub const PARAMS: &[ParamSpec] = &[
+    ParamSpec {
+        name: "kaleido_order",
+        default: 1.0,
+        range: Some([1.0, 16.0]),
+        doc: "How many mirrored wedges the frame is folded into; 1 is no fold at all.",
+    },
+    ParamSpec {
+        name: "kaleido_angle",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Rotates the whole fold, as a fraction of a full turn.",
+    },
+    ParamSpec {
+        name: "kaleido_center_x",
+        default: 0.5,
+        range: Some([0.0, 1.0]),
+        doc: "The horizontal point the wedges radiate from, in uv.",
+    },
+    ParamSpec {
+        name: "kaleido_center_y",
+        default: 0.5,
+        range: Some([0.0, 1.0]),
+        doc: "The vertical point the wedges radiate from, in uv.",
+    },
+    ParamSpec {
+        name: "kaleido_edge",
+        default: 1.0,
+        range: Some([0.0, 1.0]),
+        doc: "Softens the seam between mirrored wedges; 1 is a hard edge.",
+    },
     // ADR-0077's composed map, in the order it is applied
     // (destination-to-source): tile -> fold -> radial -> spiral, with `zoom` and
     // `inner` riding on the radial term.
-    "kaleido_tile",
-    "kaleido_radial",
-    "kaleido_spiral",
-    "kaleido_zoom",
-    "kaleido_inner",
+    ParamSpec {
+        name: "kaleido_tile",
+        default: 1.0,
+        range: Some([1.0, 8.0]),
+        doc: "Repeats the source across the frame before it is folded, so one wedge shows several copies.",
+    },
+    ParamSpec {
+        name: "kaleido_radial",
+        default: 1.0,
+        range: Some([0.25, 4.0]),
+        doc: "Scales distance from the centre when sampling, pulling detail inward or pushing it out.",
+    },
+    ParamSpec {
+        name: "kaleido_spiral",
+        default: 0.0,
+        range: Some([-2.0, 2.0]),
+        doc: "Rotates the sample by an amount that grows with radius, turning the wedges into a spiral.",
+    },
+    ParamSpec {
+        name: "kaleido_zoom",
+        default: 0.0,
+        range: Some([-1.0, 1.0]),
+        doc: "Shifts the sampled radius inward or outward, riding on the radial term.",
+    },
+    ParamSpec {
+        name: "kaleido_inner",
+        default: 0.06,
+        range: Some([0.0, 0.5]),
+        doc: "Radius of the untouched disc at the centre, which keeps the pivot from smearing.",
+    },
 ];
 
 impl Kaleidoscope {
@@ -1010,7 +1061,7 @@ impl PostStage for Kaleidoscope {
         true
     }
 
-    fn params(&self) -> &'static [&'static str] {
+    fn params(&self) -> &'static [ParamSpec] {
         PARAMS
     }
 

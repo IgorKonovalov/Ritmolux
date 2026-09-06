@@ -28,7 +28,7 @@ in-repo documents are maintained by the architect close ceremony and are the wor
 
 | What | Read this |
 |------|-----------|
-| Per-system parameter roster, engine-wide stage params, structural / palette / smoothing tables | **`presets/README.md`** |
+| The parameter reference — every parameter, its default, the range that reads, what it does — plus the structural / palette / smoothing tables | **`presets/README.md`** |
 | The expression language: variables, constants, functions, comparisons, idioms, error surface | **`docs/presets.md`** |
 | Colour in depth: built-in palettes, custom stops, per-scene colour params, A/B crossfade | **`docs/preset-palettes.md`** |
 | The `shot` CLI in full | **`docs/capturing.md`** |
@@ -198,7 +198,8 @@ to render **two or three concrete directions** and let them pick. This project d
 looking at side-by-side artifacts, not by discussing abstractions (a standing preference — honor it).
 
 ### 2 — Confirm the params you're about to bind
-Open `presets/README.md` for the system's roster, and — for anything unusual — the scene's `PARAMS`
+Open `presets/README.md` for the system's table — name, default, range, meaning, generated from the
+engine's own declarations — and, for anything unusual, the scene's `PARAMS`
 const. A misspelled param still *renders*; see the footguns below.
 
 ### 3 — Draft

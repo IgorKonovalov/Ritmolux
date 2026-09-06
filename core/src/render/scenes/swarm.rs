@@ -23,6 +23,7 @@ use super::marks;
 use super::{FALLBACK_DT, Phase, Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
 use crate::render::palette::{self, Palette};
+use crate::render::scenes::{ParamSpec, default_of};
 
 // The ASCII bytes of "LMV_SWRM" read as a number. Re-spelling them to
 // match a renamed prefix changes every particle's start state and moves
@@ -103,12 +104,12 @@ const DEPTH_PARALLAX_NEAR: f32 = 1.25;
 const DEPTH_FIELD_OFFSET: f32 = 2.6;
 
 /// Parameter defaults — a calm idle drift when nothing is bound.
-const DEFAULT_FORCE: f32 = 1.4;
-const DEFAULT_SPIN: f32 = 0.3;
-const DEFAULT_BURST: f32 = 0.0;
+const DEFAULT_FORCE: f32 = default_of(PARAMS, "force");
+const DEFAULT_SPIN: f32 = default_of(PARAMS, "spin");
+const DEFAULT_BURST: f32 = default_of(PARAMS, "burst");
 const DEFAULT_HUE: f32 = 0.0;
 const DEFAULT_BRIGHTNESS: f32 = 0.8;
-const DEFAULT_SIZE: f32 = 1.0;
+const DEFAULT_SIZE: f32 = default_of(PARAMS, "size");
 /// Spatial frequency of the flow field — how many vortices fit across the world,
 /// and so how many distinct streams a frame can hold (Plan 0043 Phase 2).
 ///
@@ -121,14 +122,14 @@ const DEFAULT_SIZE: f32 = 1.0;
 /// flocking comes from, since neighbours on one streamline travel together — and
 /// high values give many tight swirls. `spin` says how fast the field is rewritten;
 /// this says how finely it is divided.
-const DEFAULT_FIELD_FREQ: f32 = 2.3;
+const DEFAULT_FIELD_FREQ: f32 = default_of(PARAMS, "field_freq");
 // Per-mark individuation (Plan 0077 Phase 2, backlog 0068). Both default OFF —
 // unlike the emitter's spreads, which default non-zero, the swarm's scatter
 // already ships a seeded per-particle size and brightness, so these *widen*
 // what is there and their defaults must leave every shipped capture
 // byte-identical.
-const DEFAULT_TWINKLE: f32 = 0.0;
-const DEFAULT_SIZE_SPREAD: f32 = 0.0;
+const DEFAULT_TWINKLE: f32 = default_of(PARAMS, "twinkle");
+const DEFAULT_SIZE_SPREAD: f32 = default_of(PARAMS, "size_spread");
 /// The per-particle twinkle rate band, Hz — the emitter's values
 /// (`emitter.rs`), kept equal so `twinkle` means one thing across the two
 /// particle scenes. The spread across particles is the point, not the values:
@@ -159,8 +160,8 @@ const RESEED_KICK: f32 = 0.06;
 // `hue_center + (particle_hue - 0.5) * hue_spread`; the defaults (`center = 0.5`,
 // `spread = 1`) reproduce the prior full-wheel look (`particle_hue`), and
 // `saturation = 1` leaves color untouched — so an unbound swarm is unchanged.
-const DEFAULT_HUE_SPREAD: f32 = 1.0;
-const DEFAULT_HUE_CENTER: f32 = 0.5;
+const DEFAULT_HUE_SPREAD: f32 = default_of(PARAMS, "hue_spread");
+const DEFAULT_HUE_CENTER: f32 = default_of(PARAMS, "hue_center");
 // Shared view transform (ADR-0018): identity by default, so an unbound preset is
 // unchanged. `zoom` multiplies particle positions about the frame centre; `pan_*`
 // offset them — matching the line scenes' semantics (zoom > 1 = zoomed in).
@@ -582,37 +583,81 @@ fn size_factor(size_unit: f32, size_spread: f32) -> f32 {
 
 /// Parameter vocabulary — see [`fragment_field::PARAMS`](super::fragment_field::PARAMS).
 /// **Keep in sync with `set_param` below.**
-pub const PARAMS: &[&str] = &[
-    "force",
-    "spin",
-    "burst",
-    "hue",
-    "brightness",
-    "size",
-    "field_freq",
-    "zoom",
-    "pan_x",
-    "pan_y",
-    "hue_spread",
-    "hue_center",
-    "saturation",
-    "palette_mix",
-    "palette_steps",
-    "palette_contour",
-    // Per-mark individuation (Plan 0077 Phase 2) — the emitter's names, with
-    // the emitter's semantics.
-    "twinkle",
-    "size_spread",
-    // The percussive accent (Plan 0077 Phase 3) — the attractor's name, with
-    // ADR-0066's disturbance semantics.
-    "reseed",
-    // The shared mark silhouette (ADR-0084) — the same two names the emitter
-    // carries; `marks::PARAMS` is the single statement of the pair.
-    "shape",
-    "points",
-    "star_valley",
-    "star_curve",
-    "star_jitter",
+pub const PARAMS: &[ParamSpec] = &[
+    ParamSpec {
+        name: "force",
+        default: 1.4,
+        range: Some([0.0, 4.0]),
+        doc: "How hard the flow field pushes each particle, so higher is faster and straighter.",
+    },
+    ParamSpec {
+        name: "spin",
+        default: 0.3,
+        range: Some([-2.0, 2.0]),
+        doc: "Rotational bias added to the flow, curling the paths into vortices.",
+    },
+    ParamSpec {
+        name: "burst",
+        default: 0.0,
+        range: Some([0.0, 2.0]),
+        doc: "An outward impulse from the centre, for a beat to throw the swarm apart.",
+    },
+    crate::render::scenes::common::hue(DEFAULT_HUE),
+    crate::render::scenes::common::brightness(DEFAULT_BRIGHTNESS),
+    ParamSpec {
+        name: "size",
+        default: 1.0,
+        range: Some([0.0, 4.0]),
+        doc: "Size of each particle's mark.",
+    },
+    ParamSpec {
+        name: "field_freq",
+        default: 2.3,
+        range: Some([0.5, 8.0]),
+        doc: "Spatial frequency of the flow field; higher makes smaller, busier eddies.",
+    },
+    crate::render::scenes::common::zoom(DEFAULT_ZOOM),
+    crate::render::scenes::common::PAN_X,
+    crate::render::scenes::common::PAN_Y,
+    ParamSpec {
+        name: "hue_spread",
+        default: 1.0,
+        range: Some([0.0, 1.0]),
+        doc: "How far across the palette the particle band reaches.",
+    },
+    ParamSpec {
+        name: "hue_center",
+        default: 0.5,
+        range: Some([0.0, 1.0]),
+        doc: "Where that band sits along the palette.",
+    },
+    crate::render::scenes::common::SATURATION,
+    crate::render::scenes::common::PALETTE_MIX,
+    crate::render::scenes::common::PALETTE_STEPS,
+    crate::render::scenes::common::PALETTE_CONTOUR,
+    ParamSpec {
+        name: "twinkle",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Per-particle brightness flicker, seeded so it is reproducible.",
+    },
+    ParamSpec {
+        name: "size_spread",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "How much particle sizes vary about `size`; 0 makes them uniform.",
+    },
+    ParamSpec {
+        name: "reseed",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Crossing zero throws every particle back to a fresh start position.",
+    },
+    crate::render::scenes::marks::SHAPE,
+    crate::render::scenes::marks::POINTS,
+    crate::render::scenes::marks::STAR_VALLEY,
+    crate::render::scenes::marks::STAR_CURVE,
+    crate::render::scenes::marks::STAR_JITTER,
 ];
 
 impl Scene for SwarmScene {

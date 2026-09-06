@@ -99,6 +99,7 @@
 )]
 
 use super::gpu;
+use crate::render::scenes::{ParamSpec, default_of};
 
 /// `exposure` default — a plain 1.0 stop, so an unbound preset is scaled by
 /// nothing and only the curve applies.
@@ -107,7 +108,7 @@ use super::gpu;
 /// *exposed* luminance, so it needs the neutral stop — the value at which its own
 /// multiply is the IEEE-754 identity and every existing baseline is byte-identical
 /// — and the two must not be able to drift to different numbers.
-pub(crate) const DEFAULT_EXPOSURE: f32 = 1.0;
+pub(crate) const DEFAULT_EXPOSURE: f32 = default_of(PARAMS, "exposure");
 
 /// Where the shoulder starts. Below this the curve is **exactly** the identity,
 /// which is what keeps existing sub-1.0 content where it was (ADR-0046).
@@ -419,7 +420,12 @@ impl Resources {
 
 /// Global parameter vocabulary — see [`background::PARAMS`](super::background::PARAMS).
 /// **Keep in sync with `set_param` below.**
-pub const PARAMS: &[&str] = &["exposure"];
+pub const PARAMS: &[ParamSpec] = &[ParamSpec {
+    name: "exposure",
+    default: 1.0,
+    range: Some([0.0, 4.0]),
+    doc: "Linear gain applied to the whole frame before the tonemap; 1 leaves it as rendered.",
+}];
 
 /// The engine-wide exposure + tonemap pass. Neither a
 /// [`Scene`](super::scenes::Scene) nor a [`PostStage`](super::post::PostStage):

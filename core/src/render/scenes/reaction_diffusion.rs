@@ -40,6 +40,7 @@ use super::{Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
 use crate::render::feedback::PingPongField;
 use crate::render::palette::{self, Palette};
+use crate::render::scenes::{ParamSpec, default_of};
 
 /// Fixed internal simulation grid (square). 256² resolves the Gray-Scott
 /// patterns well while staying cheap enough that the headless capture tests run
@@ -71,8 +72,8 @@ const SEED: u64 = 0x4C4D_565F_5244_5F31;
 /// Parameter defaults — the "mitosis" Gray-Scott regime (Pearson's
 /// classification): spots that perpetually divide, so the field keeps
 /// restructuring rather than settling into a static pattern.
-const DEFAULT_FEED: f32 = 0.0367;
-const DEFAULT_KILL: f32 = 0.0649;
+const DEFAULT_FEED: f32 = default_of(PARAMS, "feed");
+const DEFAULT_KILL: f32 = default_of(PARAMS, "kill");
 /// Diffusion rates for the two species (classic Karl Sims values at internal
 /// `dt = 1`, paired with the 3×3 Laplacian kernel in the shader). The `flow`
 /// param (Phase 3) scales both, keeping their ratio, so a band can coarsen or
@@ -80,20 +81,20 @@ const DEFAULT_KILL: f32 = 0.0649;
 const DIFFUSE_U: f32 = 0.16;
 const DIFFUSE_V: f32 = 0.08;
 /// `flow` default: unscaled diffusion.
-const DEFAULT_FLOW: f32 = 1.0;
+const DEFAULT_FLOW: f32 = default_of(PARAMS, "flow");
 
 /// Present-look defaults (Phase 4): palette hue offset, iso-contour band count,
 /// hatch stripe spacing in texels, and glow strength.
 const DEFAULT_HUE: f32 = 0.0;
-const DEFAULT_CONTOUR: f32 = 6.0;
-const DEFAULT_HATCH: f32 = 5.0;
-const DEFAULT_GLOW: f32 = 1.0;
+const DEFAULT_CONTOUR: f32 = default_of(PARAMS, "contour");
+const DEFAULT_HATCH: f32 = default_of(PARAMS, "hatch");
+const DEFAULT_GLOW: f32 = default_of(PARAMS, "glow");
 // Shared palette color knobs (ADR-0021 / Plan 0020 Phase 5). `color_span` = 0.85
 // (the old fixed field-to-gradient coefficient) + `color_center` = 0 +
 // `saturation` = 1 + `palette_mix` = 0 reproduce the prior present-look color math
 // (now sampling the shared LUT instead of the private cosine).
-const DEFAULT_COLOR_SPAN: f32 = 0.85;
-const DEFAULT_COLOR_CENTER: f32 = 0.0;
+const DEFAULT_COLOR_SPAN: f32 = default_of(PARAMS, "color_span");
+const DEFAULT_COLOR_CENTER: f32 = default_of(PARAMS, "color_center");
 /// View transform defaults (ADR-0018): identity — `zoom` = 1 leaves the sampled
 /// window unscaled, `pan` = 0 unshifted, so an unbound preset is byte-unchanged.
 const DEFAULT_ZOOM: f32 = 1.0;
@@ -818,24 +819,69 @@ fn present_bind_group(
 
 /// Parameter vocabulary — see [`fragment_field::PARAMS`](super::fragment_field::PARAMS).
 /// **Keep in sync with `set_param` below.**
-pub const PARAMS: &[&str] = &[
-    "feed",
-    "kill",
-    "flow",
-    "inject",
-    "hue",
-    "contour",
-    "hatch",
-    "glow",
-    "color_span",
-    "color_center",
-    "saturation",
-    "palette_mix",
-    "palette_steps",
-    "palette_contour",
-    "zoom",
-    "pan_x",
-    "pan_y",
+pub const PARAMS: &[ParamSpec] = &[
+    ParamSpec {
+        name: "feed",
+        default: 0.0367,
+        range: Some([0.01, 0.09]),
+        doc: "Feed rate of the reaction - with `kill`, it is what decides whether you get spots, stripes or mitosis.",
+    },
+    ParamSpec {
+        name: "kill",
+        default: 0.0649,
+        range: Some([0.03, 0.07]),
+        doc: "Kill rate of the reaction; small moves here change the pattern's whole character.",
+    },
+    ParamSpec {
+        name: "flow",
+        default: 1.0,
+        range: Some([0.0, 4.0]),
+        doc: "How fast the simulation advances per second.",
+    },
+    ParamSpec {
+        name: "inject",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Drops fresh reagent into the field, which is how a beat seeds new growth.",
+    },
+    crate::render::scenes::common::hue(DEFAULT_HUE),
+    ParamSpec {
+        name: "contour",
+        default: 6.0,
+        range: Some([0.0, 24.0]),
+        doc: "How many bands the concentration is drawn as; 0 is a smooth gradient.",
+    },
+    ParamSpec {
+        name: "hatch",
+        default: 5.0,
+        range: Some([0.0, 24.0]),
+        doc: "Density of the hatching drawn along the concentration gradient.",
+    },
+    ParamSpec {
+        name: "glow",
+        default: 1.0,
+        range: Some([0.0, 2.0]),
+        doc: "Overall light the field emits.",
+    },
+    ParamSpec {
+        name: "color_span",
+        default: 0.85,
+        range: Some([0.0, 1.0]),
+        doc: "How much of the palette the concentration range covers.",
+    },
+    ParamSpec {
+        name: "color_center",
+        default: 0.0,
+        range: Some([-1.0, 1.0]),
+        doc: "Shifts which concentration lands in the middle of the palette.",
+    },
+    crate::render::scenes::common::SATURATION,
+    crate::render::scenes::common::PALETTE_MIX,
+    crate::render::scenes::common::PALETTE_STEPS,
+    crate::render::scenes::common::PALETTE_CONTOUR,
+    crate::render::scenes::common::zoom(DEFAULT_ZOOM),
+    crate::render::scenes::common::PAN_X,
+    crate::render::scenes::common::PAN_Y,
 ];
 
 impl Scene for ReactionDiffusionScene {

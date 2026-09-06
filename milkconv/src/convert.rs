@@ -1007,6 +1007,7 @@ mod tests {
     #[test]
     fn every_consumed_output_reaches_the_engine() {
         use rlx_core::milk::outputs::FRAME_OUTPUT_NAMES;
+        use rlx_core::render::scenes::declares;
         use rlx_core::render::scenes::warp_mesh::PARAMS;
         for out in OUTPUTS {
             if !out.consumed {
@@ -1020,7 +1021,7 @@ mod tests {
                 );
                 continue;
             }
-            let known = PARAMS.contains(&out.eel) || FRAME_OUTPUT_NAMES.contains(&out.eel);
+            let known = declares(PARAMS, out.eel) || FRAME_OUTPUT_NAMES.contains(&out.eel);
             assert!(
                 known,
                 "the roster says `{}` is consumed, but neither the warp mesh's \

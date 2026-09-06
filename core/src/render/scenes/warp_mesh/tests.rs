@@ -16,6 +16,7 @@
 
 use super::*;
 use crate::render::TierConfig;
+use crate::render::scenes::{declares, spec_names};
 
 /// The roster and its defaults are the same length and describe the same thing,
 /// and the identity really is the identity — the affine this idiom generalizes
@@ -23,8 +24,9 @@ use crate::render::TierConfig;
 #[test]
 fn the_per_vertex_roster_is_the_identity_at_rest() {
     assert_eq!(PER_VERTEX_PARAMS.len(), PER_VERTEX_DEFAULTS.len());
-    for (name, value) in PER_VERTEX_PARAMS.iter().zip(PER_VERTEX_DEFAULTS) {
-        let expected = match *name {
+    for (spec, value) in PER_VERTEX_PARAMS.iter().zip(PER_VERTEX_DEFAULTS) {
+        let name = spec.name;
+        let expected = match name {
             // A factor: unit scale.
             "zoom" | "sx" | "sy" => 1.0,
             // The fixed point: the middle of the frame, in uv.
@@ -45,9 +47,9 @@ fn the_per_vertex_roster_is_the_identity_at_rest() {
 /// second unrelated vocabulary.
 #[test]
 fn every_per_vertex_output_is_also_a_scalar_param() {
-    for name in PER_VERTEX_PARAMS {
+    for name in spec_names(PER_VERTEX_PARAMS) {
         assert!(
-            PARAMS.contains(name),
+            declares(PARAMS, name),
             "`{name}` is a per-vertex output but not a scalar param, so a preset \
              could not set it for the whole mesh"
         );
@@ -1134,7 +1136,7 @@ fn field_trace(
     });
     for (name, value) in params {
         assert!(
-            PARAMS.contains(name),
+            declares(PARAMS, name),
             "the probe set an unknown param `{name}`"
         );
         scene.set_param(name, *value);

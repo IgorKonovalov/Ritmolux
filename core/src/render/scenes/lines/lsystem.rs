@@ -63,9 +63,10 @@ use super::{
 };
 use crate::dsp::AnalysisFrame;
 use crate::render::palette::Palette;
+use crate::render::scenes::{ParamSpec, default_of};
 
-const DEFAULT_VISIBLE_DEPTH: f32 = 1.0;
-const DEFAULT_ROTATION: f32 = 0.0;
+const DEFAULT_VISIBLE_DEPTH: f32 = default_of(PARAMS, "visible_depth");
+const DEFAULT_ROTATION: f32 = default_of(PARAMS, "rotation");
 const DEFAULT_HUE: f32 = 0.3;
 /// Colour surface (ADR-0021 / ADR-0059), at the value that reproduces the single
 /// flat `hue` this scene drew before the palette reached it: no ramp along the depth axis.
@@ -280,27 +281,37 @@ pub(crate) fn apply_depth_colors(
 
 /// Parameter vocabulary — see [`fragment_field::PARAMS`](crate::render::scenes::fragment_field::PARAMS).
 /// **Keep in sync with `set_param` below.**
-pub const PARAMS: &[&str] = &[
-    "visible_depth",
-    "rotation",
-    "hue",
-    "hue_spread",
-    "saturation",
-    "palette_mix",
-    "palette_steps",
-    "palette_contour",
-    "draw_progress",
-    "thickness",
-    "scale",
-    "brightness",
-    "glow",
-    "softness",
-    "zoom",
-    "pan_x",
-    "pan_y",
-    "stroke_blend",
-    "mirror_order",
-    "mirror_reflect",
+pub const PARAMS: &[ParamSpec] = &[
+    ParamSpec {
+        name: "visible_depth",
+        default: 1.0,
+        range: Some([0.0, 1.0]),
+        doc: "How deep into the grammar's recursion is drawn; below 1 the fine branches are missing.",
+    },
+    ParamSpec {
+        name: "rotation",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Turns the whole figure, as a fraction of a full turn.",
+    },
+    crate::render::scenes::common::hue(DEFAULT_HUE),
+    crate::render::scenes::lines::hue_spread(DEFAULT_HUE_SPREAD),
+    crate::render::scenes::common::SATURATION,
+    crate::render::scenes::common::PALETTE_MIX,
+    crate::render::scenes::common::PALETTE_STEPS,
+    crate::render::scenes::common::PALETTE_CONTOUR,
+    crate::render::scenes::lines::DRAW_PROGRESS,
+    crate::render::scenes::lines::thickness(DEFAULT_THICKNESS),
+    crate::render::scenes::lines::scale(DEFAULT_SCALE),
+    crate::render::scenes::common::brightness(DEFAULT_BRIGHTNESS),
+    crate::render::scenes::lines::GLOW,
+    crate::render::scenes::lines::SOFTNESS,
+    crate::render::scenes::common::zoom(DEFAULT_ZOOM),
+    crate::render::scenes::common::PAN_X,
+    crate::render::scenes::common::PAN_Y,
+    crate::render::scenes::lines::STROKE_BLEND,
+    crate::render::scenes::lines::MIRROR_ORDER,
+    crate::render::scenes::lines::MIRROR_REFLECT,
 ];
 
 impl Scene for LSystemScene {

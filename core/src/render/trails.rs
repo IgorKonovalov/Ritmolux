@@ -91,9 +91,10 @@
 use super::feedback::{self, Deposit, FeedbackConfig, PingPongField, Transform};
 use super::gpu;
 use super::post::{Fold, PostStage, internal_grid_size};
+use crate::render::scenes::{ParamSpec, default_of};
 
 /// `trails` param default — off, so an unbound preset pays nothing.
-const DEFAULT_TRAILS: f32 = 0.0;
+const DEFAULT_TRAILS: f32 = default_of(PARAMS, "trails");
 
 /// Hard ceiling on the decay factor: `1.0` would never fade (an ever-brightening
 /// smear), so keep it strictly below.
@@ -446,15 +447,55 @@ pub struct Trails {
 /// accumulation already holds. They are declared here — on the stage that owns the
 /// buffer — and every one of them defaults to the identity, so a preset binding
 /// none of them renders exactly what it rendered before they existed.
-pub const PARAMS: &[&str] = &[
-    "trails",
-    "fb_zoom",
-    "fb_rotate",
-    "fb_dx",
-    "fb_dy",
-    "fb_center_x",
-    "fb_center_y",
-    "fb_warp",
+pub const PARAMS: &[ParamSpec] = &[
+    ParamSpec {
+        name: "trails",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "How much of the previous frame survives into this one; 0 is no trail, near 1 a long smear.",
+    },
+    ParamSpec {
+        name: "fb_zoom",
+        default: crate::render::feedback::DEFAULT_FB_ZOOM,
+        range: Some([0.9, 1.1]),
+        doc: "Scale the accumulation is grown by each second, so held above 1 the trail tunnels outward.",
+    },
+    ParamSpec {
+        name: "fb_rotate",
+        default: crate::render::feedback::DEFAULT_FB_RATE,
+        range: Some([-1.0, 1.0]),
+        doc: "Turns per second the accumulation is rotated by, about the feedback centre.",
+    },
+    ParamSpec {
+        name: "fb_dx",
+        default: crate::render::feedback::DEFAULT_FB_RATE,
+        range: Some([-1.0, 1.0]),
+        doc: "Sideways drift of the accumulation, in frame widths per second.",
+    },
+    ParamSpec {
+        name: "fb_dy",
+        default: crate::render::feedback::DEFAULT_FB_RATE,
+        range: Some([-1.0, 1.0]),
+        doc: "Vertical drift of the accumulation, in frame heights per second.",
+    },
+    ParamSpec {
+        name: "fb_center_x",
+        default: crate::render::feedback::DEFAULT_FB_CENTER,
+        range: Some([0.0, 1.0]),
+        doc: "The horizontal point the zoom and the rotation pivot about, in uv.",
+    },
+    ParamSpec {
+        name: "fb_center_y",
+        default: crate::render::feedback::DEFAULT_FB_CENTER,
+        range: Some([0.0, 1.0]),
+        doc: "The vertical point the zoom and the rotation pivot about, in uv.",
+    },
+    ParamSpec {
+        name: "fb_warp",
+        default: crate::render::feedback::DEFAULT_FB_RATE,
+        range: Some([0.0, 0.5]),
+        doc: "Amplitude of a swirl added to the feedback sample, so the trail curls rather than sliding.",
+    },
 ];
 
 impl Trails {
@@ -526,7 +567,7 @@ impl PostStage for Trails {
         self.config = cfg;
     }
 
-    fn params(&self) -> &'static [&'static str] {
+    fn params(&self) -> &'static [ParamSpec] {
         PARAMS
     }
 

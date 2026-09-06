@@ -85,6 +85,7 @@ use super::{Phase, Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
 use crate::render::feedback::{self, FeedbackConfig, PingPongField};
 use crate::render::palette::{self, Palette};
+use crate::render::scenes::{ParamSpec, default_of};
 
 /// Compute workgroup size (1D). 64 is a safe, portable default across DX12/Metal.
 const WORKGROUP: u32 = 64;
@@ -160,16 +161,16 @@ const JITTER_SLOT: u32 = MAX_SUBSTEPS;
 
 /// `morph`'s default: the configured figure, unmixed (ADR-0075). An IFS preset
 /// that never binds it draws exactly the figure it named.
-const DEFAULT_MORPH: f32 = 0.0;
+const DEFAULT_MORPH: f32 = default_of(PARAMS, "morph");
 
 /// `tuple`'s default: roster entry 0 (ADR-0093), which is the family's canonical
 /// coefficients with the framing this scene shipped with — so a preset that never
 /// binds it renders byte-identically to the build before the roster existed, and
 /// no golden baseline moves.
-const DEFAULT_TUPLE: f32 = 0.0;
+const DEFAULT_TUPLE: f32 = default_of(PARAMS, "tuple");
 
 /// Parameter defaults — a calm idle look when nothing is bound.
-const DEFAULT_SIZE: f32 = 1.0;
+const DEFAULT_SIZE: f32 = default_of(PARAMS, "size");
 const DEFAULT_HUE: f32 = 0.0;
 /// `brightness`'s default (ADR-0080): a multiply by **literal `1.0`**, which is
 /// the identity in IEEE-754 — so an unbound preset renders byte-identically to
@@ -184,7 +185,7 @@ const DEFAULT_BRIGHTNESS: f32 = 1.0;
 /// `perspective = 0` the magnification is `1 / (1 - 0 * d_n)` = `1`, and a
 /// multiply by `1.0` is exact — so an unbound preset is byte-identical and no
 /// golden baseline moves.
-const DEFAULT_PERSPECTIVE: f32 = 0.0;
+const DEFAULT_PERSPECTIVE: f32 = default_of(PARAMS, "perspective");
 /// The two atmospheric cues, likewise inert at their defaults: `depth_fade = 0`
 /// leaves the brightness multiplier exactly `1`, and `depth_hue = 0` adds an
 /// exact `0` to the palette coordinate.
@@ -196,8 +197,8 @@ const DEFAULT_PERSPECTIVE: f32 = 0.0;
 /// are also the substitute for the occlusion ADR-0076 declines to do: far
 /// material is attenuated until it stops competing with near material, which is
 /// what reads as depth for a diffuse cloud that cannot hide anything.
-const DEFAULT_DEPTH_FADE: f32 = 0.0;
-const DEFAULT_DEPTH_HUE: f32 = 0.0;
+const DEFAULT_DEPTH_FADE: f32 = default_of(PARAMS, "depth_fade");
+const DEFAULT_DEPTH_HUE: f32 = default_of(PARAMS, "depth_hue");
 /// ADR-0087's colour channels, all four inert at their default. `*_tint` adds an
 /// exact `0` to the palette coordinate; `*_hue` compares equal to literal `0.0`
 /// and takes `shift_hue`'s early return, so no capture moves through a
@@ -221,8 +222,8 @@ const MAX_PERSPECTIVE: f32 = 0.8;
 // seed jitter occupies `hue_center + (seed - 0.5)*hue_spread`; the defaults
 // (`spread = 0.15`, `center = 0.075`) reduce to `seed*0.15` — the prior hardcoded
 // jitter — so an unbound attractor is unchanged (`saturation = 1`, `mix = 0`).
-const DEFAULT_HUE_SPREAD: f32 = 0.15;
-const DEFAULT_HUE_CENTER: f32 = 0.075;
+const DEFAULT_HUE_SPREAD: f32 = default_of(PARAMS, "hue_spread");
+const DEFAULT_HUE_CENTER: f32 = default_of(PARAMS, "hue_center");
 /// View transform defaults (ADR-0018): identity — `zoom` = 1 unscaled, `pan` = 0
 /// unshifted, so an unbound preset is byte-unchanged.
 const DEFAULT_ZOOM: f32 = 1.0;
@@ -230,7 +231,7 @@ const DEFAULT_ZOOM: f32 = 1.0;
 /// ~0.94 gives glowing trails that fade over ~1 s; `fade = 0` clears each frame
 /// (trail-free). Applied frame-rate-independently (raised to the `dt`-relative
 /// power), so the trail length is the same wall-clock duration on any refresh.
-const DEFAULT_FADE: f32 = 0.94;
+const DEFAULT_FADE: f32 = default_of(PARAMS, "fade");
 /// Base point half-size in world units (before the `size` multiplier), matching
 /// the swarm's small-glowing-point scale.
 const POINT_BASE: f32 = 0.006;
@@ -481,7 +482,7 @@ const CHURN_LIFETIME_SPREAD: [f32; 2] = [0.5, 1.5];
 /// because a longer trail integrates the four restart points over more frames.
 /// The *other* motivation for exposing it — letting the age gradient show — died
 /// with the age channel and is not why this shipped.
-const DEFAULT_EMERGENCE: f32 = 8.0;
+const DEFAULT_EMERGENCE: f32 = default_of(PARAMS, "emergence");
 
 /// The shortest ramp that is still a ramp.
 ///
@@ -1301,69 +1302,202 @@ pub fn roster_len(family: AttractorFamily) -> usize {
 
 /// Parameter vocabulary — see [`fragment_field::PARAMS`](super::fragment_field::PARAMS).
 /// **Keep in sync with `set_param` below.**
-pub const PARAMS: &[&str] = &[
-    "a",
-    "b",
-    "c",
-    "d",
-    // The roster selector (ADR-0093), quantized CPU-side to an entry index. It
-    // sits with the coefficients because it selects them — an entry is a tuple
-    // and the framing that makes the tuple reachable.
-    "tuple",
-    "size",
-    "hue",
-    // The scene-local level (ADR-0080) — spelled exactly as `swarm` and
-    // `emitter` spell it.
-    "brightness",
-    "fade",
-    "hue_spread",
-    "hue_center",
-    "saturation",
-    "palette_mix",
-    "palette_steps",
-    "palette_contour",
-    "zoom",
-    "pan_x",
-    "pan_y",
-    "reseed",
-    "perspective",
-    "depth_fade",
-    "depth_hue",
-    "spin",
-    // IFS-only (ADR-0075). Inert on the four map families, the same way `a`..`d`
-    // already carry family-specific meanings.
-    "morph",
-    "curl",
-    "vigor",
-    "lean",
-    "bias",
-    // Also IFS-only (ADR-0087), and for a structural reason rather than a
-    // default: `Particle::map` is written by the IFS arm of the step shader and
-    // by nothing else, so on the four map families it is identically `0.0` and
-    // both of these are exactly the identity.
-    "map_tint",
-    "map_hue",
-    // ...and ADR-0088's root channel, IFS-only for exactly the same structural
-    // reason: `Particle::root` is written by the IFS arm and by nothing else.
-    // These two took `age_tint`/`age_hue`'s place at Plan 0074 Phase 3 rather
-    // than joining them, so the roster did not grow.
-    "root_tint",
-    "root_hue",
-    // The emergence ramp's length in steps (Plan 0074 Phase 4). IFS-only for the
-    // structural reason the channels above are: nothing else respawns, so
-    // nothing else has a ramp - em is a flat 1.0 on the four map families.
-    "emergence",
-    // ADR-0048's transform, on THIS scene's own trail field. The same seven names
-    // the trails stage declares (`feedback::PARAMS` is what both are checked
-    // against) — one vocabulary, two buffers, each transforming only its own
-    // accumulation. A preset may drive both at once, and then both move.
-    "fb_zoom",
-    "fb_rotate",
-    "fb_dx",
-    "fb_dy",
-    "fb_center_x",
-    "fb_center_y",
-    "fb_warp",
+pub const PARAMS: &[ParamSpec] = &[
+    ParamSpec {
+        name: "a",
+        default: 0.0,
+        range: None,
+        doc: "First of the four family coefficients; what it means depends on the attractor family the tuple picked.",
+    },
+    ParamSpec {
+        name: "b",
+        default: 0.0,
+        range: None,
+        doc: "Second family coefficient - see the roster's attractor essay for what each family does with it.",
+    },
+    ParamSpec {
+        name: "c",
+        default: 0.0,
+        range: None,
+        doc: "Third family coefficient, and on the IFS figures it means nothing at all.",
+    },
+    ParamSpec {
+        name: "d",
+        default: 0.0,
+        range: None,
+        doc: "Fourth family coefficient; like the other three it is inert on the IFS figures.",
+    },
+    ParamSpec {
+        name: "tuple",
+        default: 0.0,
+        range: None,
+        doc: "Picks a whole known-good figure - family, coefficients and framing together.",
+    },
+    ParamSpec {
+        name: "size",
+        default: 1.0,
+        range: Some([0.0, 4.0]),
+        doc: "Size of each particle's deposit into the accumulation.",
+    },
+    crate::render::scenes::common::hue(DEFAULT_HUE),
+    crate::render::scenes::common::brightness(DEFAULT_BRIGHTNESS),
+    ParamSpec {
+        name: "fade",
+        default: 0.94,
+        range: Some([0.0, 1.0]),
+        doc: "How much of the accumulation survives each second; near 1 the figure builds up for a long time.",
+    },
+    ParamSpec {
+        name: "hue_spread",
+        default: 0.15,
+        range: Some([0.0, 1.0]),
+        doc: "How far across the palette the particle band reaches.",
+    },
+    ParamSpec {
+        name: "hue_center",
+        default: 0.075,
+        range: Some([0.0, 1.0]),
+        doc: "Where that band sits along the palette.",
+    },
+    crate::render::scenes::common::SATURATION,
+    crate::render::scenes::common::PALETTE_MIX,
+    crate::render::scenes::common::PALETTE_STEPS,
+    crate::render::scenes::common::PALETTE_CONTOUR,
+    crate::render::scenes::common::zoom(DEFAULT_ZOOM),
+    crate::render::scenes::common::PAN_X,
+    crate::render::scenes::common::PAN_Y,
+    ParamSpec {
+        name: "reseed",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Crossing zero throws every particle back onto a fresh start position.",
+    },
+    ParamSpec {
+        name: "perspective",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "How strongly depth shrinks a particle, turning a flat figure into a solid one.",
+    },
+    ParamSpec {
+        name: "depth_fade",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "How much depth dims a particle, which is what reads as air between the layers.",
+    },
+    ParamSpec {
+        name: "depth_hue",
+        default: 0.0,
+        range: Some([-1.0, 1.0]),
+        doc: "Shifts colour with depth, so far parts of the figure sit elsewhere on the palette.",
+    },
+    ParamSpec {
+        name: "spin",
+        default: 0.0,
+        range: Some([-2.0, 2.0]),
+        doc: "Turns per second the figure rotates by about its vertical axis.",
+    },
+    ParamSpec {
+        name: "morph",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Travels between the tuple's figure and the next one; the visible rate is steepest near zero.",
+    },
+    ParamSpec {
+        name: "curl",
+        default: 0.0,
+        range: Some([-2.0, 2.0]),
+        doc: "Adds a rotational term to the map, curling the trajectories.",
+    },
+    ParamSpec {
+        name: "vigor",
+        default: 1.0,
+        range: Some([0.0, 4.0]),
+        doc: "How far a particle moves per step, so higher spreads the figure and thins it.",
+    },
+    ParamSpec {
+        name: "lean",
+        default: 0.0,
+        range: Some([-1.0, 1.0]),
+        doc: "Tilts the map, breaking the figure's symmetry.",
+    },
+    ParamSpec {
+        name: "bias",
+        default: 0.0,
+        range: Some([-1.0, 1.0]),
+        doc: "Offsets the map, sliding the figure within its own attractor.",
+    },
+    ParamSpec {
+        name: "map_tint",
+        default: DEFAULT_CHANNEL_COLOUR,
+        range: Some([0.0, 1.0]),
+        doc: "How much a particle's colour follows which branch of the map produced it.",
+    },
+    ParamSpec {
+        name: "map_hue",
+        default: 0.0,
+        range: Some([-1.0, 1.0]),
+        doc: "How far apart on the palette those branches are placed.",
+    },
+    ParamSpec {
+        name: "root_tint",
+        default: DEFAULT_CHANNEL_COLOUR,
+        range: Some([0.0, 1.0]),
+        doc: "How much a particle's colour follows the seed it started from.",
+    },
+    ParamSpec {
+        name: "root_hue",
+        default: 0.0,
+        range: Some([-1.0, 1.0]),
+        doc: "How far apart on the palette those seeds are placed.",
+    },
+    ParamSpec {
+        name: "emergence",
+        default: 8.0,
+        range: Some([0.0, 60.0]),
+        doc: "How many seconds the figure takes to settle out of its starting cloud.",
+    },
+    ParamSpec {
+        name: "fb_zoom",
+        default: crate::render::feedback::DEFAULT_FB_ZOOM,
+        range: Some([0.9, 1.1]),
+        doc: "Scale the attractor's own accumulation is grown by each second.",
+    },
+    ParamSpec {
+        name: "fb_rotate",
+        default: crate::render::feedback::DEFAULT_FB_RATE,
+        range: Some([-1.0, 1.0]),
+        doc: "Turns per second that accumulation is rotated by.",
+    },
+    ParamSpec {
+        name: "fb_dx",
+        default: crate::render::feedback::DEFAULT_FB_RATE,
+        range: Some([-1.0, 1.0]),
+        doc: "Sideways drift of that accumulation, in frame widths per second.",
+    },
+    ParamSpec {
+        name: "fb_dy",
+        default: crate::render::feedback::DEFAULT_FB_RATE,
+        range: Some([-1.0, 1.0]),
+        doc: "Vertical drift of that accumulation, in frame heights per second.",
+    },
+    ParamSpec {
+        name: "fb_center_x",
+        default: crate::render::feedback::DEFAULT_FB_CENTER,
+        range: Some([0.0, 1.0]),
+        doc: "The horizontal point its zoom and rotation pivot about, in uv.",
+    },
+    ParamSpec {
+        name: "fb_center_y",
+        default: crate::render::feedback::DEFAULT_FB_CENTER,
+        range: Some([0.0, 1.0]),
+        doc: "The vertical point its zoom and rotation pivot about, in uv.",
+    },
+    ParamSpec {
+        name: "fb_warp",
+        default: crate::render::feedback::DEFAULT_FB_RATE,
+        range: Some([0.0, 0.5]),
+        doc: "Amplitude of a swirl added to its feedback sample, so the trail curls.",
+    },
 ];
 
 impl Scene for AttractorScene {

@@ -8,6 +8,7 @@
 // A continuation of one module split across several files, so it needs the
 // names `preset/schema/mod.rs` has in scope.
 use super::*;
+use crate::render::scenes::declares;
 
 impl Preset {
     /// Parse and compile a preset from a TOML source string.
@@ -92,7 +93,7 @@ impl Preset {
         // surface: the value is in range and the preset is otherwise good.
         // Only a binding that *rests* at such a value is reported — see
         // `Expr::as_const`.
-        if system.param_names().contains(&"thickness") {
+        if declares(system.param_specs(), "thickness") {
             for binding in &params {
                 if binding.name != "thickness" {
                     continue;
@@ -130,7 +131,7 @@ impl Preset {
         // `thickness` dead-zone surface above: both values are legal, the
         // preset is otherwise good, and only a binding that *rests* on the
         // combination can be seen from here.
-        if system.param_names().contains(&"coord_mode") {
+        if declares(system.param_specs(), "coord_mode") {
             let resting = |name: &str| -> Option<f32> {
                 params
                     .iter()
@@ -408,11 +409,17 @@ pub(super) fn build_per_vertex(
                 param: format!("{label}[per_vertex] {param}"),
                 err,
             })?;
-        if !crate::render::scenes::warp_mesh::PER_VERTEX_PARAMS.contains(&param.as_str()) {
+        if !declares(
+            crate::render::scenes::warp_mesh::PER_VERTEX_PARAMS,
+            param.as_str(),
+        ) {
             warnings.push(format!(
                 "unknown {label}[per_vertex] parameter '{param}' (expected one of: {}) \
                  (binding kept, but nothing reads it)",
-                crate::render::scenes::warp_mesh::PER_VERTEX_PARAMS.join(", ")
+                crate::render::scenes::spec_names(
+                    crate::render::scenes::warp_mesh::PER_VERTEX_PARAMS
+                )
+                .join(", ")
             ));
         }
         if smoothing.contains_key(&param) {
@@ -733,13 +740,13 @@ pub(super) fn compile_bindings(
             // A layer binds its own scene's params only, never the compositing
             // stages -- so a global here is a *different* mistake from a typo
             // and says so.
-            Surface::Layer => system.param_names().contains(&param.as_str()),
+            Surface::Layer => declares(system.param_specs(), param.as_str()),
         };
         if !known {
             if surface == Surface::Layer
                 && GLOBAL_PARAMS
                     .iter()
-                    .any(|stage| stage.contains(&param.as_str()))
+                    .any(|stage| declares(stage, param.as_str()))
             {
                 warnings.push(format!(
                     "[layer] parameter '{param}' is a compositing parameter; a layer \

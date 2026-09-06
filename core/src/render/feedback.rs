@@ -499,14 +499,14 @@ mod tests {
     /// what replaces the coverage it costs.
     #[test]
     fn both_sinks_declare_exactly_the_shared_fb_vocabulary() {
-        let sinks: [(&str, &[&str]); 2] = [
+        let sinks: [(&str, &[crate::render::scenes::ParamSpec]); 2] = [
             ("trails stage", crate::render::trails::PARAMS),
             ("attractor scene", crate::render::scenes::particles::PARAMS),
         ];
         for (label, declared) in sinks {
             for name in PARAMS {
                 assert!(
-                    declared.contains(name),
+                    crate::render::scenes::declares(declared, name),
                     "the {label} does not declare `{name}`, so a preset binding it \
                      would only reach the other sink — see ADR-0048's routing \
                      contract"
@@ -514,9 +514,10 @@ mod tests {
             }
             // ...and nothing `fb_`-shaped that the shared roster does not know
             // about, which would be a name only one sink answered.
-            for name in declared.iter().filter(|n| n.starts_with("fb_")) {
+            for spec in declared.iter().filter(|s| s.name.starts_with("fb_")) {
+                let name = spec.name;
                 assert!(
-                    PARAMS.contains(name),
+                    PARAMS.contains(&name),
                     "the {label} declares `{name}`, which is not in the shared \
                      `feedback::PARAMS` roster — either add it there (so BOTH \
                      sinks get it) or it does not belong in an `fb_` namespace"

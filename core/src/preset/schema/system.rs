@@ -1,6 +1,8 @@
 //! [`SystemKind`]: which built-in system a preset drives, and the one roster
 //! every other list of systems derives from.
 
+use crate::render::scenes::{ParamSpec, declares, spec_names};
+
 /// The built-in system a preset drives. Extend as Plan 0003 (and later plans)
 /// add systems; unknown names are rejected at load.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,7 +59,7 @@ pub enum SystemKind {
 /// pair); this is where they are gathered for the loader's typo check
 /// (ADR-0020). They do **not** include the global compositing params, which any
 /// preset may bind whatever its system -- [`is_known_param`] unions those in.
-const TABLE: [(SystemKind, &str, &[&str]); SystemKind::VARIANT_COUNT] = {
+const TABLE: [(SystemKind, &str, &[ParamSpec]); SystemKind::VARIANT_COUNT] = {
     use crate::render::scenes;
     [
         (
@@ -190,10 +192,23 @@ impl SystemKind {
         TABLE[self.row()].1
     }
 
-    /// The parameter names this system's scene consumes (the module-private
-    /// `TABLE`).
-    pub fn param_names(self) -> &'static [&'static str] {
+    /// The parameters this system's scene consumes, as the scene declares them
+    /// (the module-private `TABLE`).
+    ///
+    /// The specs carry the default and the doc line as well as the name
+    /// (ADR-0170), which is what lets the generated reference in
+    /// `presets/README.md` be derived from the same declaration the loader
+    /// checks a binding against.
+    pub fn param_specs(self) -> &'static [ParamSpec] {
         TABLE[self.row()].2
+    }
+
+    /// Just the names, for a caller that wants to print or join them.
+    ///
+    /// Allocates. Use [`declares`] for a membership test, which is what almost
+    /// every caller actually wants.
+    pub fn param_names(self) -> Vec<&'static str> {
+        spec_names(TABLE[self.row()].2)
     }
 }
 
@@ -208,7 +223,7 @@ impl SystemKind {
 /// pass (ADR-0032); only `bg_*` goes to a pass the renderer drives directly. The
 /// *names* are what this const is about — see `render::ParamRoute` for who
 /// actually owns each.
-pub const GLOBAL_PARAMS: [&[&str]; 7] = [
+pub const GLOBAL_PARAMS: [&[ParamSpec]; 7] = [
     crate::render::background::PARAMS,
     crate::render::trails::PARAMS,
     crate::render::kaleidoscope::PARAMS,
@@ -225,5 +240,5 @@ pub const GLOBAL_PARAMS: [&[&str]; 7] = [
 /// actually consumes. An unknown name is a load-time **warning**, not an error:
 /// the preset still loads and applies its good bindings (ADR-0020, NFR 10).
 pub fn is_known_param(system: SystemKind, name: &str) -> bool {
-    system.param_names().contains(&name) || GLOBAL_PARAMS.iter().any(|stage| stage.contains(&name))
+    declares(system.param_specs(), name) || GLOBAL_PARAMS.iter().any(|stage| declares(stage, name))
 }

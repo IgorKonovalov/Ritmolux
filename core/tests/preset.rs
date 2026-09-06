@@ -1235,117 +1235,268 @@ fn a_bad_spectrum_table_is_a_surfaced_load_error() {
     );
 }
 
-/// Param names that are deliberately absent from `presets/README.md`.
+/// Every declared parameter carries a one-line definition (ADR-0170).
 ///
-/// **Empty, and a new entry needs a reason next to it** (the shape ADR-0058 uses
-/// for evidence). A name here is a promise that an author never has to reach for
-/// it; an unexplained skip is how the third copy drifts in the first place.
-const README_EXEMPT: &[(&str, &str)] = &[
-    // ("param_name", "why an author never binds this"),
-];
-
-/// **The third copy of every parameter name** (Plan 0061 Phase 7).
+/// This is what replaced `every_declared_param_is_documented_in_the_presets_readme`,
+/// and it asserts the property that one could not state. The old guard checked
+/// that each declared NAME appeared in backticks somewhere in the roster, which a
+/// single row listing every name of a system satisfied — so a parameter could be
+/// named and never explained, and 33 hand-written tables covering 24 declarations
+/// is what that yielded. A parameter cannot be absent from a reference generated
+/// from the declarations, so what is left to hold is that the declaration says
+/// something.
 ///
-/// The name of a param exists in three places: the scene's `PARAMS` list, its
-/// `set_param` match, and `presets/README.md`. `declared_params_match_set_param`
-/// below guards code against code. Nothing guarded code against the **doc**, and
-/// that doc is the surface `preset-author` composes against (ADR-0017) — a param
-/// missing from it is a capability the content lane cannot discover exists.
-///
-/// The scan is recursive rather than a hand-kept file list precisely so a new
-/// scene is covered the day it lands, without anyone remembering to add it here.
-/// It matches the README's own convention — a documented param appears in
-/// backticks — so a bare mention of `size` inside `--size` does not count as
-/// documenting the `size` param.
+/// A doc line is the DEFINITION; the essays below the generated block are the
+/// discussion. Whether a line is a good one is a review's judgement, exactly as
+/// comment quality is — what is mechanical is that it exists, that it is a
+/// sentence rather than the name again, and that it ends like one.
 #[test]
-fn every_declared_param_is_documented_in_the_presets_readme() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-    let readme_path = root
-        .parent()
-        .expect("core has a workspace-root parent")
-        .join("presets/README.md");
-    let readme = std::fs::read_to_string(&readme_path)
-        .unwrap_or_else(|e| panic!("read {}: {e}", readme_path.display()));
-
-    let mut sources = Vec::new();
-    collect_rs(&root.join("src"), &mut sources);
-
+fn every_param_spec_has_a_doc_line() {
     let mut checked = 0usize;
-    let mut undocumented: Vec<String> = Vec::new();
-    for file in &sources {
-        let text = std::fs::read_to_string(file)
-            .unwrap_or_else(|e| panic!("read {}: {e}", file.display()));
-        for name in params_declared_in(&text) {
-            if README_EXEMPT.iter().any(|(n, _)| *n == name) {
+    let mut findings: Vec<String> = Vec::new();
+
+    for (label, specs) in reference_rosters() {
+        for spec in specs {
+            checked += 1;
+            let doc = spec.doc.trim();
+            if doc.is_empty() {
+                findings.push(format!("  {label}.{} has no doc line", spec.name));
                 continue;
             }
-            checked += 1;
-            if !readme.contains(&format!("`{name}`")) {
-                undocumented.push(format!(
-                    "  `{name}` (declared in {})",
-                    file.strip_prefix(root).unwrap_or(file).display()
+            if !doc.ends_with('.') {
+                findings.push(format!(
+                    "  {label}.{}'s doc line does not end in a full stop: {doc:?}",
+                    spec.name
+                ));
+            }
+            // A line that is the name again documents nothing. The bar is
+            // deliberately low - it catches `"warp"` and `"the warp"`, not a
+            // short-but-real sentence.
+            let words = doc.split_whitespace().count();
+            if words < 4 {
+                findings.push(format!(
+                    "  {label}.{}'s doc line is {words} word(s), which cannot be a definition: {doc:?}",
+                    spec.name
                 ));
             }
         }
     }
 
     assert!(
-        checked > 100,
-        "only {checked} params scanned — the PARAMS scan has stopped finding \
+        checked > 150,
+        "only {checked} specs scanned - the roster walk has stopped finding \
          declarations, so this guard would pass vacuously"
     );
     assert!(
-        undocumented.is_empty(),
-        "{} declared parameter(s) are missing from presets/README.md:\n{}\n\
-         Document each one there, or add it to README_EXEMPT with a reason.\n\
-         That file is the surface `preset-author` writes against (ADR-0017): an \
-         undocumented param is a capability the content lane cannot find.",
-        undocumented.len(),
-        undocumented.join("\n"),
+        findings.is_empty(),
+        "{} parameter(s) do not carry a usable definition:\n{}\n\
+         The doc line is what the generated reference in presets/README.md prints, \
+         and that file is the surface `preset-author` composes against (ADR-0017).",
+        findings.len(),
+        findings.join("\n"),
     );
 }
 
-/// Every `.rs` under `dir`, recursively.
-fn collect_rs(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
-    let entries = std::fs::read_dir(dir)
-        .unwrap_or_else(|e| panic!("read_dir {}: {e}", dir.display()))
-        .map(|e| e.expect("dir entry").path());
-    let mut entries: Vec<_> = entries.collect();
-    entries.sort();
-    for path in entries {
-        if path.is_dir() {
-            collect_rs(&path, out);
-        } else if path.extension().is_some_and(|e| e == "rs") {
-            out.push(path);
-        }
+/// The generated parameter reference in `presets/README.md` matches the engine.
+///
+/// The block between `<!-- params:begin -->` and `<!-- params:end -->` is derived
+/// from the same `ParamSpec` declarations the loader checks a binding against and
+/// the scene applies at reset, so it cannot state a default the engine does not
+/// use or omit a parameter that exists (ADR-0170).
+///
+/// **Set `RLX_UPDATE_PARAM_REFERENCE=1` to rewrite it** — the shape
+/// `scripts/toc.mjs --check` uses for the contents blocks. A hand edit inside the
+/// markers fails here, which is the point: the block is generated, never authored.
+/// The essays around it stay hand-written and are where depth lives.
+#[test]
+fn the_parameter_reference_block_is_current() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("core has a workspace-root parent")
+        .join("presets/README.md");
+    let readme =
+        std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+
+    let begin = readme
+        .find(PARAM_BLOCK_BEGIN)
+        .unwrap_or_else(|| panic!("presets/README.md has no `{PARAM_BLOCK_BEGIN}` marker"));
+    let end = readme
+        .find(PARAM_BLOCK_END)
+        .unwrap_or_else(|| panic!("presets/README.md has no `{PARAM_BLOCK_END}` marker"));
+    assert!(begin < end, "the parameter-block markers are out of order");
+
+    let current = &readme[begin + PARAM_BLOCK_BEGIN.len()..end];
+    let generated = render_parameter_reference();
+
+    if std::env::var_os("RLX_UPDATE_PARAM_REFERENCE").is_some() {
+        let updated = format!(
+            "{}{PARAM_BLOCK_BEGIN}{generated}{}",
+            &readme[..begin],
+            &readme[end..]
+        );
+        std::fs::write(&path, updated).unwrap_or_else(|e| panic!("write {}: {e}", path.display()));
+        return;
     }
+
+    assert_eq!(
+        current.trim(),
+        generated.trim(),
+        "the parameter reference in presets/README.md is not what the engine \
+         declares.\nRe-run with RLX_UPDATE_PARAM_REFERENCE=1 to regenerate it. \
+         A hand edit inside the markers is what this fails on: the block is \
+         generated from the ParamSpec declarations and the essays around it are \
+         where hand-written depth belongs."
+    );
 }
 
-/// The string literals of a `const PARAMS … = [ … ];` declaration, if the file
-/// has one. Both spellings in the tree are covered: `&[&str]` slices and the
-/// `[&str; N]` array `marks.rs` uses.
-fn params_declared_in(text: &str) -> Vec<String> {
-    let Some(start) = text.find("const PARAMS") else {
-        return Vec::new();
-    };
-    let Some(open) = text.get(start..).and_then(|t| t.find('[')) else {
-        return Vec::new();
-    };
-    let body_start = start + open;
-    let Some(end) = text.get(body_start..).and_then(|t| t.find("];")) else {
-        return Vec::new();
-    };
-    let body = text.get(body_start..body_start + end).unwrap_or_default();
+/// A **report**, not an assertion: essays in the roster that name a default.
+///
+/// The generated block is the definition of a default; the essays below it are
+/// the discussion, and one that quotes a number is a second copy of it. That copy
+/// is prose, so it cannot be compared mechanically — `default \`0.8\`` in a
+/// sentence about a *range* is not a claim about the default at all — and a test
+/// that guessed would either convict good prose or pass on anything.
+///
+/// So this prints what it found and never fails. The Mode 4 review reads the
+/// list; ADR-0170's rule is that no essay contradicts its table, and this is what
+/// makes checking that a glance rather than a reread of 268 KB.
+#[test]
+fn essays_that_state_a_default_are_reported() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("core has a workspace-root parent")
+        .join("presets/README.md");
+    let readme =
+        std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
 
-    let mut names = Vec::new();
-    let mut rest = body;
-    while let Some(q) = rest.find('"') {
-        let after = rest.get(q + 1..).unwrap_or_default();
-        let Some(close) = after.find('"') else { break };
-        names.push(after.get(..close).unwrap_or_default().to_string());
-        rest = after.get(close + 1..).unwrap_or_default();
+    // Only the prose BELOW the generated block: the block's own rows are the
+    // authority and are not a second copy of anything.
+    let after = readme
+        .find(PARAM_BLOCK_END)
+        .map(|i| &readme[i..])
+        .unwrap_or(&readme);
+
+    let mut hits = Vec::new();
+    for (n, line) in after.lines().enumerate() {
+        let lower = line.to_ascii_lowercase();
+        if lower.contains("default") && line.contains('`') {
+            hits.push(format!("  +{n}: {}", line.trim()));
+        }
     }
-    names
+
+    if hits.is_empty() {
+        return;
+    }
+    println!(
+        "{} essay line(s) below the generated block mention a default. \
+         None of this is a failure - it is the list a review reads against the \
+         block's own rows:\n{}",
+        hits.len(),
+        hits.join("\n"),
+    );
+}
+
+const PARAM_BLOCK_BEGIN: &str = "<!-- params:begin -->";
+const PARAM_BLOCK_END: &str = "<!-- params:end -->";
+
+/// Every roster the reference prints, in the order it prints them: one per
+/// system, then the engine-wide stages any preset may bind whatever its system.
+fn reference_rosters() -> Vec<(&'static str, &'static [rlx_core::render::scenes::ParamSpec])> {
+    use rlx_core::preset::SystemKind;
+    let mut out: Vec<(&'static str, &'static [rlx_core::render::scenes::ParamSpec])> =
+        SystemKind::ALL
+            .iter()
+            .map(|kind| (kind.as_str(), kind.param_specs()))
+            .collect();
+    out.extend(engine_stage_rosters());
+    out
+}
+
+/// The engine-wide stages, labelled as a reader meets them rather than as the
+/// modules are named.
+fn engine_stage_rosters() -> Vec<(&'static str, &'static [rlx_core::render::scenes::ParamSpec])> {
+    // Zipped against `GLOBAL_PARAMS` rather than naming each module, because
+    // those modules are crate-private and because that array is already the one
+    // statement of which stages a preset may bind whatever its system. The
+    // labels are in its order, and the length assert is what holds them there.
+    const LABELS: [&str; 7] = [
+        "background",
+        "trails",
+        "kaleidoscope",
+        "bloom",
+        "composite",
+        "tonemap",
+        "ink",
+    ];
+    assert_eq!(
+        LABELS.len(),
+        rlx_core::preset::GLOBAL_PARAMS.len(),
+        "a stage joined GLOBAL_PARAMS without a label here, so the reference          would print it under the wrong heading"
+    );
+    LABELS
+        .iter()
+        .copied()
+        .zip(rlx_core::preset::GLOBAL_PARAMS)
+        .collect()
+}
+
+/// The reference itself: one table per system, then one per engine stage.
+///
+/// Four columns, which are the four things a reader asks in order — what is it
+/// called, what does it do if I bind nothing, what range moves it, and what does
+/// it mean. The range is the range that READS, not a clamp: a blank cell is a
+/// parameter that is unbounded or world-space, where the frame is the bound and
+/// inventing a number would be a claim nothing holds.
+fn render_parameter_reference() -> String {
+    let mut out = String::from("\n");
+    out.push_str(
+        "<!-- GENERATED - do not edit between the markers. Rewrite it with:\n     \
+         RLX_UPDATE_PARAM_REFERENCE=1 cargo test -p rlx-core --test preset \\\n       \
+         the_parameter_reference_block_is_current\n     \
+         The declarations it is generated from live beside each scene's own \
+         `set_param`. -->\n",
+    );
+
+    let systems: Vec<_> = reference_rosters();
+    let stage_names: Vec<&str> = engine_stage_rosters().iter().map(|(n, _)| *n).collect();
+
+    for (label, specs) in &systems {
+        let engine_stage = stage_names.contains(label);
+        out.push_str(&format!(
+            "\n### {} `{label}`\n\n",
+            if engine_stage {
+                "Engine stage:"
+            } else {
+                "System:"
+            }
+        ));
+        out.push_str("| Parameter | Default | Range | What it does |\n");
+        out.push_str("|---|---|---|---|\n");
+        for spec in *specs {
+            let range = match spec.range {
+                Some([lo, hi]) => format!("`{}` – `{}`", number(lo), number(hi)),
+                None => String::new(),
+            };
+            out.push_str(&format!(
+                "| `{}` | `{}` | {range} | {} |\n",
+                spec.name,
+                number(spec.default),
+                spec.doc,
+            ));
+        }
+    }
+    out.push('\n');
+    out
+}
+
+/// A default or a bound as the reference prints it: the shortest spelling that
+/// round-trips, so `1` rather than `1.0` and `0.0367` rather than `0.0367000006`.
+fn number(value: f32) -> String {
+    let mut text = format!("{value}");
+    if text.ends_with(".0") {
+        text.truncate(text.len() - 2);
+    }
+    text
 }
 
 /// The colour and framing names every scene **delegates** to
@@ -1379,7 +1530,7 @@ fn declared_params_match_set_param() {
     let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
 
     // (source file, the declared vocabulary it must match).
-    let scenes: Vec<(std::path::PathBuf, &[&str])> = vec![
+    let scenes: Vec<(std::path::PathBuf, Vec<&str>)> = vec![
         (
             src.join("render/scenes/fragment_field.rs"),
             SystemKind::FragmentField.param_names(),
@@ -1419,7 +1570,7 @@ fn declared_params_match_set_param() {
         // The global compositing stages, declared the same way.
         (
             src.join("render/background.rs"),
-            &[
+            vec![
                 "bg_hue",
                 "bg_bright",
                 "bg_vignette",
@@ -1444,7 +1595,7 @@ fn declared_params_match_set_param() {
         ),
         (
             src.join("render/trails.rs"),
-            &[
+            vec![
                 "trails",
                 // ADR-0048's transform on the accumulation this stage already
                 // owns: the affine, then the centre it turns about.
@@ -1461,7 +1612,7 @@ fn declared_params_match_set_param() {
         ),
         (
             src.join("render/kaleidoscope.rs"),
-            &[
+            vec![
                 "kaleido_order",
                 "kaleido_angle",
                 "kaleido_center_x",
@@ -1478,7 +1629,7 @@ fn declared_params_match_set_param() {
         ),
         (
             src.join("render/ink.rs"),
-            &[
+            vec![
                 "ink_amount",
                 "paper_hue",
                 "paper_sat",

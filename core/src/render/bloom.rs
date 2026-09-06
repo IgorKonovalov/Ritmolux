@@ -126,9 +126,10 @@
 
 use super::gpu;
 use super::post::{Fold, PostStage, internal_grid_size};
+use crate::render::scenes::{ParamSpec, default_of};
 
 /// `bloom_amount` default — **off**, so an unbound preset never builds the stage.
-const DEFAULT_AMOUNT: f32 = 0.0;
+const DEFAULT_AMOUNT: f32 = default_of(PARAMS, "bloom_amount");
 
 /// `bloom_threshold` default — 1.0, the display's own ceiling.
 ///
@@ -136,11 +137,11 @@ const DEFAULT_AMOUNT: f32 = 0.0;
 /// at 1.0 the bright-pass selects exactly the light the 8-bit surface could not
 /// have carried anyway, so a preset that switches bloom on gets halos around the
 /// places that *were* clipping and nothing else. Lower it to bloom mid-tones too.
-const DEFAULT_THRESHOLD: f32 = 1.0;
+const DEFAULT_THRESHOLD: f32 = default_of(PARAMS, "bloom_threshold");
 
 /// `bloom_radius` default — the middle of the scatter range, a halo that reads as
 /// a glow around the figure rather than as a wash over the frame.
-const DEFAULT_RADIUS: f32 = 1.0;
+const DEFAULT_RADIUS: f32 = default_of(PARAMS, "bloom_radius");
 
 /// Ceiling on `bloom_amount`. Four times the pyramid's own energy is already a
 /// blown-out look; past it the frame is halo and the tonemap's shoulder is doing
@@ -878,7 +879,26 @@ pub struct Bloom {
 
 /// Global parameter vocabulary — see [`background::PARAMS`](super::background::PARAMS).
 /// **Keep in sync with `set_param` below.**
-pub const PARAMS: &[&str] = &["bloom_amount", "bloom_threshold", "bloom_radius"];
+pub const PARAMS: &[ParamSpec] = &[
+    ParamSpec {
+        name: "bloom_amount",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "How much of the blurred bright pass is added back; 0 turns the stage off entirely.",
+    },
+    ParamSpec {
+        name: "bloom_threshold",
+        default: 1.0,
+        range: Some([0.0, 4.0]),
+        doc: "The linear level a pixel must exceed before it glows at all; raise it to bloom only highlights.",
+    },
+    ParamSpec {
+        name: "bloom_radius",
+        default: 1.0,
+        range: Some([0.25, 4.0]),
+        doc: "Scales how far the glow spreads from the pixel that produced it.",
+    },
+];
 
 impl Bloom {
     /// Store the device/format/tier for a lazy build; no GPU resources yet.
@@ -932,7 +952,7 @@ impl PostStage for Bloom {
         true
     }
 
-    fn params(&self) -> &'static [&'static str] {
+    fn params(&self) -> &'static [ParamSpec] {
         PARAMS
     }
 

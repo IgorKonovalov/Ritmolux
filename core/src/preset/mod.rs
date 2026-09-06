@@ -25,8 +25,8 @@ pub use expr::{
     SATURATED_OCCUPANCY, Variables, compile,
 };
 pub use schema::{
-    Binding, Easing, Latch, Layer, LayerBlend, LayerJoin, Preset, PresetError, SystemKind,
-    is_known_param,
+    Binding, Easing, GLOBAL_PARAMS, Latch, Layer, LayerBlend, LayerJoin, Preset, PresetError,
+    SystemKind, is_known_param,
 };
 
 // The shipped example presets, embedded at compile time so the C-ABI/foobar

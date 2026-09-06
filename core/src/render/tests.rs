@@ -18,6 +18,7 @@ use crate::dsp::AnalysisFrame;
 use crate::preset::{Easing, Latch, Preset, SystemKind, Variables, compile};
 use crate::render::metrics::frame_diff;
 use crate::render::post::{KALEIDOSCOPE, TRAILS};
+use crate::render::scenes::{declares, spec_names};
 
 /// A minimal valid preset: a known system + explicit name, no params.
 fn preset(name: &str) -> Preset {
@@ -39,7 +40,7 @@ fn roster(names: &[&str]) -> Roster {
 fn each_namespace_resolves_to_its_owner() {
     let swarm = SystemKind::Swarm;
     // The backdrop pre-pass, outside the chain (ADR-0031).
-    for name in crate::render::background::PARAMS {
+    for name in spec_names(crate::render::background::PARAMS) {
         assert_eq!(
             resolve_route(name, swarm),
             ParamRoute::Background,
@@ -48,16 +49,16 @@ fn each_namespace_resolves_to_its_owner() {
     }
     // The two chain stages, each to its own fixed position — not merely "some
     // stage", so a swapped `STAGE_PARAMS` order would fail here.
-    for name in crate::render::trails::PARAMS {
+    for name in spec_names(crate::render::trails::PARAMS) {
         assert_eq!(resolve_route(name, swarm), ParamRoute::Stage(TRAILS));
     }
-    for name in crate::render::kaleidoscope::PARAMS {
+    for name in spec_names(crate::render::kaleidoscope::PARAMS) {
         assert_eq!(resolve_route(name, swarm), ParamRoute::Stage(KALEIDOSCOPE));
     }
     // The composite seam itself (`occlude`, ADR-0085) — the chain's own
     // vocabulary, which belongs to no stage in it and must therefore not resolve
     // to one.
-    for name in crate::render::post::CHAIN_PARAMS {
+    for name in spec_names(crate::render::post::CHAIN_PARAMS) {
         assert_eq!(
             resolve_route(name, swarm),
             ParamRoute::Composite,
@@ -65,7 +66,7 @@ fn each_namespace_resolves_to_its_owner() {
         );
     }
     // The terminal engine-wide ink pass (ADR-0032) — `ink_*` and `paper_*`.
-    for name in crate::render::ink::PARAMS {
+    for name in spec_names(crate::render::ink::PARAMS) {
         assert_eq!(
             resolve_route(name, swarm),
             ParamRoute::Ink,
@@ -73,8 +74,8 @@ fn each_namespace_resolves_to_its_owner() {
         );
     }
     assert!(
-        crate::render::ink::PARAMS.contains(&"ink_amount")
-            && crate::render::ink::PARAMS
+        declares(crate::render::ink::PARAMS, "ink_amount")
+            && spec_names(crate::render::ink::PARAMS)
                 .iter()
                 .any(|n| n.starts_with("paper_")),
         "the ink vocabulary covers both the ink_* and paper_* halves"
@@ -88,9 +89,9 @@ fn each_namespace_resolves_to_its_owner() {
     // `fb_*` seven also reach the trails stage (ADR-0048).
     for system in SystemKind::ALL {
         for name in system.param_names() {
-            let want = if crate::render::background::SHARED_COLOUR_PARAMS.contains(name) {
+            let want = if crate::render::background::SHARED_COLOUR_PARAMS.contains(&name) {
                 ParamRoute::SceneAndBackdrop
-            } else if crate::render::feedback::PARAMS.contains(name) {
+            } else if crate::render::feedback::PARAMS.contains(&name) {
                 ParamRoute::StageAndScene(TRAILS)
             } else {
                 ParamRoute::Scene
@@ -113,7 +114,7 @@ fn each_namespace_resolves_to_its_owner() {
             "`{name}` reaches the swarm and the backdrop"
         );
         assert!(
-            !crate::render::background::PARAMS.contains(name),
+            !declares(crate::render::background::PARAMS, name),
             "`{name}` must stay out of the backdrop's own vocabulary — claiming \
              it there would take it off the scene"
         );
@@ -137,7 +138,7 @@ fn each_namespace_resolves_to_its_owner() {
              accumulation of its own"
         );
         assert!(
-            crate::render::trails::PARAMS.contains(name),
+            declares(crate::render::trails::PARAMS, name),
             "`{name}` must stay in the trails stage's vocabulary — the fan-out is \
              resolved from the stage side, so dropping it there would take the \
              param off both sinks"

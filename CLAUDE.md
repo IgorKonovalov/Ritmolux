@@ -63,7 +63,9 @@ milkconv/            # The MilkDrop `.milk` -> preset converter (ADR-0113). A fu
                      #   tests build it, and the everyday loop does not. Built by Plan 0100; the
                      #   `.milk` corpus it converts lives outside the repo, not in this checkout.
 presets/             # The curated preset library (*.toml) — build.rs globs and embeds it.
-    ├── README.md    #   THE per-system parameter roster + structural/palette/smoothing tables.
+    ├── README.md    #   THE parameter reference (name/default/range/meaning per system, GENERATED
+                     #   from the engine's ParamSpec declarations per ADR-0170) + the hand-written
+                     #   structural/palette/smoothing tables and the essays around it.
     └── pending/     #   Authored, approved, NOT shipped — held back by a known engine or harness
                      #   gap, not by the look. build.rs's read_dir is non-recursive (ADR-0022), so
                      #   a subdirectory is skipped by construction. See its own README.

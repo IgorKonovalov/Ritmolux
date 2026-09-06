@@ -83,6 +83,7 @@ use super::Scene;
 use super::common;
 use crate::dsp::AnalysisFrame;
 use crate::render::palette::Palette;
+use crate::render::scenes::{ParamSpec, default_of};
 
 /// Element kind selectors, as they reach the shader's `shape.z`. Phase 7 of
 /// Plan 0113 extends this roster; these three are what a suprematist canvas is
@@ -210,7 +211,7 @@ const SQRT3_2: f32 = 0.866_025_4;
 
 /// `scale` default — the authored canvas is laid out to fill roughly the frame
 /// at 1.0, so the neutral value is the composition as composed.
-const DEFAULT_SCALE: f32 = 1.0;
+const DEFAULT_SCALE: f32 = default_of(PARAMS, "scale");
 /// Smallest `scale` the shader is handed. Not zero: the canvas transform divides
 /// by it.
 const MIN_SCALE: f32 = 0.05;
@@ -221,22 +222,22 @@ const MAX_SCALE: f32 = 20.0;
 
 /// `paper` default — the top of the gradient, which is where a light stop
 /// naturally goes and what both reference grounds are.
-const DEFAULT_PAPER: f32 = 1.0;
+const DEFAULT_PAPER: f32 = default_of(PARAMS, "paper");
 
 /// Shared palette colour knobs (ADR-0021). Both defaults are the identity on an
 /// element's stored coordinate, so an unbound preset gets exactly the colours it
 /// authored into its stops.
-const DEFAULT_COLOR_SPAN: f32 = 1.0;
-const DEFAULT_PALETTE_SHIFT: f32 = 0.0;
+const DEFAULT_COLOR_SPAN: f32 = default_of(PARAMS, "color_span");
+const DEFAULT_PALETTE_SHIFT: f32 = default_of(PARAMS, "palette_shift");
 
 /// `opacity` default — fully opaque, which is the whole point of the scene.
-const DEFAULT_OPACITY: f32 = 1.0;
+const DEFAULT_OPACITY: f32 = default_of(PARAMS, "opacity");
 
 /// `edge_softness` default — **zero, and that is the hard edge**. Coverage comes
 /// from the distance against exactly one pixel, so an edge is analytically
 /// antialiased and nothing more. Raising this widens the ramp in pixels; it is
 /// an escape from the look, not a quality knob.
-const DEFAULT_EDGE_SOFTNESS: f32 = 0.0;
+const DEFAULT_EDGE_SOFTNESS: f32 = default_of(PARAMS, "edge_softness");
 /// Widest ramp, in pixels. Past a few pixels the elements stop reading as flat
 /// graphics at all.
 const MAX_EDGE_SOFTNESS: f32 = 32.0;
@@ -811,29 +812,29 @@ pub(crate) const AUTHORED_COUNT: usize = SUPREMATIST.len();
 
 /// `roster` default — the suprematist three, so a preset that says nothing
 /// draws the canvas Phase 5 settled on.
-const DEFAULT_ROSTER: f32 = 0.0;
+const DEFAULT_ROSTER: f32 = default_of(PARAMS, "roster");
 /// `layout` default — the authored control, not a grammar (see `layout.rs`).
-const DEFAULT_LAYOUT: f32 = 0.0;
+const DEFAULT_LAYOUT: f32 = default_of(PARAMS, "layout");
 /// `seed` default.
-const DEFAULT_SEED: f32 = 0.0;
+const DEFAULT_SEED: f32 = default_of(PARAMS, "seed");
 /// `size_hierarchy` default — a middling fall from the largest form to the
 /// smallest, so the generated grammars have a range without being dominated.
-const DEFAULT_SIZE_HIERARCHY: f32 = 0.5;
+const DEFAULT_SIZE_HIERARCHY: f32 = default_of(PARAMS, "size_hierarchy");
 /// `angle_bias` default, in **degrees** as an author writes it. `-22` is the
 /// authored canvas's own dominant angle, so a generated canvas starts out
 /// leaning the same way the control does.
-const DEFAULT_ANGLE_BIAS: f32 = -22.0;
+const DEFAULT_ANGLE_BIAS: f32 = default_of(PARAMS, "angle_bias");
 
 /// `density` default — every generated element is live.
-const DEFAULT_DENSITY: f32 = 1.0;
+const DEFAULT_DENSITY: f32 = default_of(PARAMS, "density");
 /// `drift`, `spin`, `recompose`, `recompose_blend`, `pump_size`, `pump_alpha`
 /// defaults. **Every one of them is the identity**, so a preset that binds none
 /// of Phase 6's levers draws exactly the still canvas Phase 5 settled on — which
 /// is what lets the golden baseline survive this phase unchanged.
-const DEFAULT_DRIFT: f32 = 0.0;
-const DEFAULT_SPIN: f32 = 0.0;
-const DEFAULT_RECOMPOSE: f32 = 0.0;
-const DEFAULT_RECOMPOSE_BLEND: f32 = 0.0;
+const DEFAULT_DRIFT: f32 = default_of(PARAMS, "drift");
+const DEFAULT_SPIN: f32 = default_of(PARAMS, "spin");
+const DEFAULT_RECOMPOSE: f32 = default_of(PARAMS, "recompose");
+const DEFAULT_RECOMPOSE_BLEND: f32 = default_of(PARAMS, "recompose_blend");
 const DEFAULT_PUMP: f32 = 0.0;
 
 /// `recompose` rises past this to recompose once — **edge-triggered**, the
@@ -1418,30 +1419,125 @@ fn applied_edge_softness(softness: f32) -> f32 {
 /// checked against at load (ADR-0020). **Keep in sync with `set_param` below**;
 /// `declared_params_match_set_param` in `core/tests/preset.rs` fails if the two
 /// drift.
-pub const PARAMS: &[&str] = &[
-    "count",
-    "layout",
-    "seed",
-    "size_hierarchy",
-    "angle_bias",
-    "roster",
-    "density",
-    "drift",
-    "spin",
-    "recompose",
-    "recompose_blend",
-    "pump_size",
-    "pump_alpha",
-    "scale",
-    "pan_x",
-    "pan_y",
-    "paper",
-    "color_span",
-    "palette_shift",
-    "saturation",
-    "palette_mix",
-    "opacity",
-    "edge_softness",
+pub const PARAMS: &[ParamSpec] = &[
+    ParamSpec {
+        name: "count",
+        default: 0.0,
+        range: Some([0.0, 64.0]),
+        doc: "How many elements are placed; 0 lets the layout decide.",
+    },
+    ParamSpec {
+        name: "layout",
+        default: 0.0,
+        range: Some([0.0, 8.0]),
+        doc: "Picks which arrangement the elements are placed by.",
+    },
+    ParamSpec {
+        name: "seed",
+        default: 0.0,
+        range: None,
+        doc: "Chooses one arrangement out of the family; the same seed always composes the same way.",
+    },
+    ParamSpec {
+        name: "size_hierarchy",
+        default: 0.5,
+        range: Some([0.0, 1.0]),
+        doc: "How much larger the leading elements are than the rest; 0 makes them equal.",
+    },
+    ParamSpec {
+        name: "angle_bias",
+        default: -22.0,
+        range: None,
+        doc: "Degrees the elements lean by, which is what gives the composition its tilt.",
+    },
+    ParamSpec {
+        name: "roster",
+        default: 0.0,
+        range: Some([0.0, 8.0]),
+        doc: "Picks which set of shapes the elements are drawn from.",
+    },
+    ParamSpec {
+        name: "density",
+        default: 1.0,
+        range: Some([0.0, 2.0]),
+        doc: "How much of the frame the arrangement fills.",
+    },
+    ParamSpec {
+        name: "drift",
+        default: 0.0,
+        range: Some([0.0, 2.0]),
+        doc: "How far the elements wander from their placed positions.",
+    },
+    ParamSpec {
+        name: "spin",
+        default: 0.0,
+        range: Some([-2.0, 2.0]),
+        doc: "Turns per second the elements rotate by.",
+    },
+    ParamSpec {
+        name: "recompose",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Crossing zero lays the composition out again from a new arrangement.",
+    },
+    ParamSpec {
+        name: "recompose_blend",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "How long the change between two arrangements takes, rather than cutting.",
+    },
+    ParamSpec {
+        name: "pump_size",
+        default: DEFAULT_PUMP,
+        range: Some([0.0, 2.0]),
+        doc: "Scales every element together, for a beat to make the whole composition breathe.",
+    },
+    ParamSpec {
+        name: "pump_alpha",
+        default: DEFAULT_PUMP,
+        range: Some([0.0, 2.0]),
+        doc: "Fades every element together, the opacity twin of `pump_size`.",
+    },
+    ParamSpec {
+        name: "scale",
+        default: 1.0,
+        range: Some([0.1, 4.0]),
+        doc: "Size of the whole composition within the frame.",
+    },
+    crate::render::scenes::common::PAN_X,
+    crate::render::scenes::common::PAN_Y,
+    ParamSpec {
+        name: "paper",
+        default: 1.0,
+        range: Some([0.0, 1.0]),
+        doc: "How opaque the ground behind the elements is; 0 leaves the backdrop showing.",
+    },
+    ParamSpec {
+        name: "color_span",
+        default: 1.0,
+        range: Some([0.0, 1.0]),
+        doc: "How much of the palette the elements are coloured across.",
+    },
+    ParamSpec {
+        name: "palette_shift",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Rotates every element's colour along the palette together.",
+    },
+    crate::render::scenes::common::SATURATION,
+    crate::render::scenes::common::PALETTE_MIX,
+    ParamSpec {
+        name: "opacity",
+        default: 1.0,
+        range: Some([0.0, 1.0]),
+        doc: "How opaque each element is, so overlaps can show through.",
+    },
+    ParamSpec {
+        name: "edge_softness",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "How far each element's edge fades; 0 is a hard cut.",
+    },
 ];
 
 impl Scene for ShapeCollageScene {

@@ -33,6 +33,7 @@ use crate::dsp::AnalysisFrame;
 use crate::preset::Preset;
 use crate::render::context::{RenderContext, RenderError as CtxError};
 use crate::render::scenes::Scene;
+use crate::render::scenes::declares;
 use crate::render::tonemap::KNEE;
 use crate::render::{CaptureImage, HeadlessOptions, RenderError, Renderer, capture};
 
@@ -86,7 +87,7 @@ fn the_count_is_quantized_and_capped() {
 #[test]
 fn the_vocabulary_carries_the_canvas_knobs() {
     for name in ["count", "scale", "paper", "opacity", "edge_softness"] {
-        assert!(PARAMS.contains(&name), "`{name}` is missing from PARAMS");
+        assert!(declares(PARAMS, name), "`{name}` is missing from PARAMS");
     }
 }
 

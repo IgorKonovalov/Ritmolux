@@ -148,32 +148,33 @@
 
 use crate::render::gpu;
 use crate::render::palette::{self, Palette};
+use crate::render::scenes::{ParamSpec, default_of};
 
 /// Parameter defaults — a black backdrop when nothing is bound, so the composite
 /// is byte-neutral against the pre-Phase-3 per-scene clears.
-const DEFAULT_HUE: f32 = 0.0;
-const DEFAULT_BRIGHT: f32 = 0.0;
-const DEFAULT_VIGNETTE: f32 = 0.0;
+const DEFAULT_HUE: f32 = default_of(PARAMS, "bg_hue");
+const DEFAULT_BRIGHT: f32 = default_of(PARAMS, "bg_bright");
+const DEFAULT_VIGNETTE: f32 = default_of(PARAMS, "bg_vignette");
 /// The ramp's palette travel (ADR-0094). `0.0` sweeps nowhere, so the pass takes
 /// one sample at `bg_hue` — today's picture, as an arithmetic identity rather
 /// than an approximation of it.
-const DEFAULT_HUE_SPAN: f32 = 0.0;
+const DEFAULT_HUE_SPAN: f32 = default_of(PARAMS, "bg_hue_span");
 /// The ramp's direction, in radians, `0` = bottom-to-top — the axis the retired
 /// tilt already used, and `launch_angle`'s zero-is-up convention. At `0` the
 /// aspect term cancels exactly (see the shader), so the default is the identity
 /// rather than an approximation of it.
-const DEFAULT_ANGLE: f32 = 0.0;
+const DEFAULT_ANGLE: f32 = default_of(PARAMS, "bg_angle");
 /// The brightness ramp's two ends, on the same axis as the colour sweep. These
 /// two numbers **are** the fixed `mix(0.72, 1.0, ·)` tilt: the shader runs
 /// that instruction with these as its constants, so an unbound preset pays no
 /// pixels for the generality. A preset that binds them can point the
 /// brightness the other way, which a hardcoded tilt cannot.
-const DEFAULT_SHADE: f32 = 0.72;
-const DEFAULT_SHADE_END: f32 = 1.0;
+const DEFAULT_SHADE: f32 = default_of(PARAMS, "bg_shade");
+const DEFAULT_SHADE_END: f32 = default_of(PARAMS, "bg_shade_end");
 /// The ramp's response exponent (ADR-0094, in ADR-0092's form). `1.0` is the
 /// **exact** identity — the shader's `select` takes the unexponentiated arm — so
 /// the ramp is bit-for-bit linear until a preset bends it.
-const DEFAULT_RAMP_GAMMA: f32 = 1.0;
+const DEFAULT_RAMP_GAMMA: f32 = default_of(PARAMS, "bg_ramp_gamma");
 /// The exponent's guard rails, and the reasoning `ink.rs` states for the same
 /// pair: `pow(0, 0)` is undefined and a negative exponent sends the ramp's start
 /// to infinity, so a binding that sweeps out of range is clamped rather than
@@ -191,22 +192,22 @@ const DEFAULT_PALETTE_MIX: f32 = 0.0;
 /// the shader takes a `select` arm rather than multiplying by zero — so this
 /// default is an identity with the pre-band picture structurally rather than by
 /// arithmetic that a rounding step could perturb.
-const DEFAULT_BAND_AMOUNT: f32 = 0.0;
+const DEFAULT_BAND_AMOUNT: f32 = default_of(PARAMS, "bg_band_amount");
 /// The band's direction, in radians, naming the axis **across** the band. Shares
 /// [`DEFAULT_ANGLE`]'s convention exactly — same `sin`/`cos` pair, same
 /// `axis_pos` — so `0` runs the band horizontally.
-const DEFAULT_BAND_ANGLE: f32 = 0.0;
+const DEFAULT_BAND_ANGLE: f32 = default_of(PARAMS, "bg_band_angle");
 /// The centreline's position along that across-axis, in the same normalized
 /// `0..1` the ramp's `s` uses: `0.5` is the middle of the frame.
-const DEFAULT_BAND_POS: f32 = 0.5;
+const DEFAULT_BAND_POS: f32 = default_of(PARAMS, "bg_band_pos");
 /// The gaussian's **`1/e` half-width**, in those same units — the envelope
 /// reaches `1/e` exactly this far either side of the centre.
-const DEFAULT_BAND_WIDTH: f32 = 0.15;
+const DEFAULT_BAND_WIDTH: f32 = default_of(PARAMS, "bg_band_width");
 /// The arc: how far the centreline bows, in across-axis units, at the middle of
 /// the band. `0.0` is **exactly** straight rather than nearly so — the bow term
 /// is `0.0` times a finite number — so the straight band the simpler design
 /// would have shipped is still here, as the default (ADR-0095 Alternative F).
-const DEFAULT_BAND_CURVE: f32 = 0.0;
+const DEFAULT_BAND_CURVE: f32 = default_of(PARAMS, "bg_band_curve");
 /// The band's **own** coordinate in the same `[palette]` the ground samples, and
 /// how far it travels **along** the band so the galactic core can brighten
 /// toward one end. Absolute rather than an offset from the ground's coordinate:
@@ -218,8 +219,8 @@ const DEFAULT_BAND_CURVE: f32 = 0.0;
 /// `bg_band_amount = 0` the band is an untaken `select` branch. A frame that
 /// *does* light the band takes `palette[0.0]` here, which is a colour of its own
 /// rather than the ground's.
-const DEFAULT_BAND_HUE: f32 = 0.0;
-const DEFAULT_BAND_HUE_SPAN: f32 = 0.0;
+const DEFAULT_BAND_HUE: f32 = default_of(PARAMS, "bg_band_hue");
+const DEFAULT_BAND_HUE_SPAN: f32 = default_of(PARAMS, "bg_band_hue_span");
 /// The half-width's guard rails, and the reasoning [`applied_ramp_gamma`] states
 /// for its pair: the shader divides by this, so zero is a division by zero and a
 /// negative value is a mirrored band no author asked for. Both ends are far
@@ -657,22 +658,97 @@ pub struct Background {
 /// **Keep in sync with `set_param` below**; the
 /// `declared_params_match_set_param` guard in `core/tests/preset.rs` fails if
 /// the two drift.
-pub const PARAMS: &[&str] = &[
-    "bg_hue",
-    "bg_bright",
-    "bg_vignette",
-    "bg_angle",
-    "bg_hue_span",
-    "bg_shade",
-    "bg_shade_end",
-    "bg_ramp_gamma",
-    "bg_band_amount",
-    "bg_band_angle",
-    "bg_band_pos",
-    "bg_band_width",
-    "bg_band_curve",
-    "bg_band_hue",
-    "bg_band_hue_span",
+pub const PARAMS: &[ParamSpec] = &[
+    ParamSpec {
+        name: "bg_hue",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Where the backdrop starts in the preset's palette, as a coordinate along it.",
+    },
+    ParamSpec {
+        name: "bg_bright",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "How lit the backdrop is; 0 is black and the scene draws on nothing.",
+    },
+    ParamSpec {
+        name: "bg_vignette",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Darkens the backdrop toward the corners, pulling the eye to the middle.",
+    },
+    ParamSpec {
+        name: "bg_angle",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Direction the backdrop ramp runs in, as a fraction of a full turn.",
+    },
+    ParamSpec {
+        name: "bg_hue_span",
+        default: 0.0,
+        range: Some([-0.5, 0.5]),
+        doc: "How far along the palette the ramp travels from `bg_hue`; 0 is a flat colour.",
+    },
+    ParamSpec {
+        name: "bg_shade",
+        default: 0.72,
+        range: Some([0.0, 1.0]),
+        doc: "Brightness multiplier at the ramp's start, so a sky can be dark at one edge.",
+    },
+    ParamSpec {
+        name: "bg_shade_end",
+        default: 1.0,
+        range: Some([0.0, 1.0]),
+        doc: "Brightness multiplier at the ramp's far end.",
+    },
+    ParamSpec {
+        name: "bg_ramp_gamma",
+        default: 1.0,
+        range: Some([0.25, 4.0]),
+        doc: "Bends the ramp's progress: below 1 the far colour arrives early, above 1 it holds off.",
+    },
+    ParamSpec {
+        name: "bg_band_amount",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Strength of a second colour band laid across the ramp; 0 removes it.",
+    },
+    ParamSpec {
+        name: "bg_band_angle",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Direction the band runs in, independently of the ramp, as a fraction of a turn.",
+    },
+    ParamSpec {
+        name: "bg_band_pos",
+        default: 0.5,
+        range: Some([0.0, 1.0]),
+        doc: "Where across the frame the band sits.",
+    },
+    ParamSpec {
+        name: "bg_band_width",
+        default: 0.15,
+        range: Some([0.02, 1.0]),
+        doc: "How wide the band is; narrow reads as a horizon, wide as a wash.",
+    },
+    ParamSpec {
+        name: "bg_band_curve",
+        default: 0.0,
+        range: Some([-1.0, 1.0]),
+        doc: "Bows the band into an arc instead of a straight line.",
+    },
+    ParamSpec {
+        name: "bg_band_hue",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Where the band's own colour is picked from the palette.",
+    },
+    ParamSpec {
+        name: "bg_band_hue_span",
+        default: 0.0,
+        range: Some([-0.5, 0.5]),
+        doc: "How far the band's colour travels along the palette across its width.",
+    },
 ];
 
 /// The exponent the shader will **actually apply** for a bound `bg_ramp_gamma`:

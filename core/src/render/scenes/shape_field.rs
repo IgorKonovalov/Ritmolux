@@ -83,12 +83,13 @@ use super::common;
 use super::marks;
 use crate::dsp::AnalysisFrame;
 use crate::render::palette::{self, Palette};
+use crate::render::scenes::{ParamSpec, default_of};
 
 /// `scale` default — the figure's outline sits at 0.6 of the frame's short
 /// half-axis, which leaves room for several contour bands around it before they
 /// leave the frame. The whole point of this scene is what happens *outside* the
 /// silhouette, so a figure filling the frame would be the wrong default.
-const DEFAULT_SCALE: f32 = 0.6;
+const DEFAULT_SCALE: f32 = default_of(PARAMS, "scale");
 /// Smallest `scale` the shader is handed. Not zero: at zero the figure has no
 /// size and every pixel is infinitely far outside it in units of nothing, so
 /// the coordinate degenerates rather than fading out.
@@ -107,12 +108,12 @@ const MAX_SCALE: f32 = 20.0;
 /// they are: an angle wraps, so there is no end of the useful range to hold it
 /// inside; a non-finite binding falls back to the identity because `cos(NaN)`
 /// would take the whole frame with it.
-const DEFAULT_ROTATION: f32 = 0.0;
+const DEFAULT_ROTATION: f32 = default_of(PARAMS, "rotation");
 
 /// `gamma` default — **the identity**, and it is exactly `1.0` on the way to the
 /// uniform because the shader's identity branch tests for it (`pow(x, 1.0)` is
 /// not bit-exact, ADR-0092's care).
-const DEFAULT_GAMMA: f32 = 1.0;
+const DEFAULT_GAMMA: f32 = default_of(PARAMS, "gamma");
 /// The range `gamma` is held in. Same shape and the same reasoning as
 /// `ink_gamma` and `bg_ramp_gamma`: positive on both sides, wide enough that the
 /// clamp is the end of the useful range rather than a limit an author meets.
@@ -131,15 +132,15 @@ pub(crate) const COORD_MODES: [&str; 2] = ["distance", "radius"];
 /// `coord_mode` default — **0, the distance**, and that is an obligation rather
 /// than a preference: it is the arithmetic every shipped preset and every golden
 /// baseline has today.
-const DEFAULT_COORD_MODE: f32 = 0.0;
+const DEFAULT_COORD_MODE: f32 = default_of(PARAMS, "coord_mode");
 const MIN_COORD_MODE: f32 = 0.0;
 const MAX_COORD_MODE: f32 = COORD_MODES.len() as f32 - 1.0;
 
 /// Shared palette colour knobs (ADR-0021). `color_span = 0.6` puts the
 /// silhouette's interior (`d` in `0..1`) across the gradient's first 60 %, so
 /// the exterior contours have somewhere to go.
-const DEFAULT_COLOR_SPAN: f32 = 0.6;
-const DEFAULT_COLOR_CENTER: f32 = 0.0;
+const DEFAULT_COLOR_SPAN: f32 = default_of(PARAMS, "color_span");
+const DEFAULT_COLOR_CENTER: f32 = default_of(PARAMS, "color_center");
 
 /// How many of the palette's [`LUT_SIZE`] texels a resting `color_span` spends on
 /// the **figure's own interior**.
@@ -621,24 +622,54 @@ pub(crate) fn coord(distance: f32, gamma: f32, color_span: f32, color_center: f3
 /// checked against at load (ADR-0020). **Keep in sync with `set_param` below**;
 /// `declared_params_match_set_param` in `core/tests/preset.rs` fails if the two
 /// drift.
-pub const PARAMS: &[&str] = &[
-    "shape",
-    "points",
-    "star_valley",
-    "star_curve",
-    "star_jitter",
-    "scale",
-    "pan_x",
-    "pan_y",
-    "color_span",
-    "color_center",
-    "saturation",
-    "palette_mix",
-    "palette_steps",
-    "palette_contour",
-    "gamma",
-    "coord_mode",
-    "rotation",
+pub const PARAMS: &[ParamSpec] = &[
+    crate::render::scenes::marks::SHAPE,
+    crate::render::scenes::marks::POINTS,
+    crate::render::scenes::marks::STAR_VALLEY,
+    crate::render::scenes::marks::STAR_CURVE,
+    crate::render::scenes::marks::STAR_JITTER,
+    ParamSpec {
+        name: "scale",
+        default: 0.6,
+        range: Some([0.05, 2.0]),
+        doc: "Size of the shape within the frame.",
+    },
+    crate::render::scenes::common::PAN_X,
+    crate::render::scenes::common::PAN_Y,
+    ParamSpec {
+        name: "color_span",
+        default: 0.6,
+        range: Some([0.0, 1.0]),
+        doc: "How much of the palette the field's range covers.",
+    },
+    ParamSpec {
+        name: "color_center",
+        default: 0.0,
+        range: Some([-1.0, 1.0]),
+        doc: "Shifts which part of that range lands in the middle of the palette.",
+    },
+    crate::render::scenes::common::SATURATION,
+    crate::render::scenes::common::PALETTE_MIX,
+    crate::render::scenes::common::PALETTE_STEPS,
+    crate::render::scenes::common::PALETTE_CONTOUR,
+    ParamSpec {
+        name: "gamma",
+        default: 1.0,
+        range: Some([0.25, 4.0]),
+        doc: "Shapes the falloff from the shape's edge; below 1 it bites sooner.",
+    },
+    ParamSpec {
+        name: "coord_mode",
+        default: 0.0,
+        range: Some([0.0, 2.0]),
+        doc: "Which coordinate frame the distance is measured in, which changes the shape's whole geometry.",
+    },
+    ParamSpec {
+        name: "rotation",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Turns the shape, as a fraction of a full turn.",
+    },
 ];
 
 impl Scene for ShapeFieldScene {

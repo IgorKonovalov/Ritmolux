@@ -76,6 +76,7 @@ use super::{
 use crate::dsp::AnalysisFrame;
 use crate::preset::Easing;
 use crate::render::palette::{self, Palette, desaturate};
+use crate::render::scenes::{ParamSpec, default_of};
 
 /// Largest element count a `[spectrum]` table may ask for — the band count
 /// itself, because above it the 64 → N reduction stops being a partition of the
@@ -92,13 +93,13 @@ const DEFAULT_BRIGHTNESS: f32 = 1.0;
 /// not a post-process bloom. `1.0` is the value this scene passed as a literal
 /// before it was bound, so the default is exactly today's look.
 const DEFAULT_GLOW: f32 = 1.0;
-const DEFAULT_SCALE: f32 = 1.2;
+const DEFAULT_SCALE: f32 = default_of(PARAMS, "scale");
 /// Minimum element length, in world units. Non-zero on purpose: a spectrum
 /// readout at rest is a comb, not an empty frame, so the figure stays on screen
 /// (and legible) through a silence instead of vanishing.
-const DEFAULT_BASE: f32 = 0.06;
+const DEFAULT_BASE: f32 = default_of(PARAMS, "base");
 /// Inner radius of the radial ring (ignored by the other two layouts).
-const DEFAULT_RADIUS: f32 = 0.35;
+const DEFAULT_RADIUS: f32 = default_of(PARAMS, "radius");
 /// World-space **half-width** the readout spans, so the figure is `2 * span`
 /// wide — `1.0` is what an unbound preset gets.
 ///
@@ -112,7 +113,7 @@ const DEFAULT_RADIUS: f32 = 0.35;
 /// **no-op on [`SpectrumLayout::RadialRing`]**, which is sized by `radius`
 /// instead — the mirror image of `radius` already being a no-op on the
 /// other two.
-const DEFAULT_SPAN: f32 = 1.0;
+const DEFAULT_SPAN: f32 = default_of(PARAMS, "span");
 /// World-space y the bars and the polyline rest on — what an unbound preset
 /// gets. Also a **no-op on [`SpectrumLayout::RadialRing`]**, whose spokes start
 /// on the ring.
@@ -122,7 +123,7 @@ const DEFAULT_SPAN: f32 = 1.0;
 /// axis reflects into a symmetric "landscape and its reflection" about the
 /// frame centre, while one standing at `-0.85` throws its copy against the top
 /// edge (design-backlog 0018).
-const DEFAULT_BASELINE: f32 = -0.85;
+const DEFAULT_BASELINE: f32 = default_of(PARAMS, "baseline");
 /// Level-shaping exponent (ADR-0040). `1.0` is exactly linear — `powf(x, 1.0) ==
 /// x` — `0.5` is a square root, and lower values compress harder.
 ///
@@ -147,30 +148,65 @@ const DEFAULT_MIRROR_REFLECT: f32 = 0.0;
 
 /// Parameter vocabulary — see [`fragment_field::PARAMS`](crate::render::scenes::fragment_field::PARAMS).
 /// **Keep in sync with `set_param` below.**
-pub const PARAMS: &[&str] = &[
-    "base",
-    "scale",
-    "curve",
-    "radius",
-    "span",
-    "baseline",
-    "rotation",
-    "thickness",
-    "hue",
-    "hue_spread",
-    "saturation",
-    "palette_mix",
-    "palette_steps",
-    "palette_contour",
-    "brightness",
-    "glow",
-    "softness",
-    "stroke_blend",
-    "zoom",
-    "pan_x",
-    "pan_y",
-    "mirror_order",
-    "mirror_reflect",
+pub const PARAMS: &[ParamSpec] = &[
+    ParamSpec {
+        name: "base",
+        default: 0.06,
+        range: Some([0.0, 1.0]),
+        doc: "Height the readout sits at when the band is silent.",
+    },
+    ParamSpec {
+        name: "scale",
+        default: 1.2,
+        range: Some([0.0, 4.0]),
+        doc: "How far a full band pushes the readout above its base.",
+    },
+    ParamSpec {
+        name: "curve",
+        default: 0.0,
+        range: Some([-1.0, 1.0]),
+        doc: "Bends the level response: below 0 quiet detail is lifted, above 0 it is pushed down.",
+    },
+    ParamSpec {
+        name: "radius",
+        default: 0.35,
+        range: Some([0.0, 1.0]),
+        doc: "Radius of the ring the readout is drawn around, in the radial layouts.",
+    },
+    ParamSpec {
+        name: "span",
+        default: 1.0,
+        range: Some([0.0, 1.0]),
+        doc: "How much of the frequency axis is shown; below 1 the top end is cut.",
+    },
+    ParamSpec {
+        name: "baseline",
+        default: -0.85,
+        range: None,
+        doc: "Where the flat layout's zero line sits vertically.",
+    },
+    ParamSpec {
+        name: "rotation",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Turns the readout, as a fraction of a full turn.",
+    },
+    crate::render::scenes::lines::thickness(DEFAULT_THICKNESS),
+    crate::render::scenes::common::hue(DEFAULT_HUE),
+    crate::render::scenes::lines::hue_spread(DEFAULT_HUE_SPREAD),
+    crate::render::scenes::common::SATURATION,
+    crate::render::scenes::common::PALETTE_MIX,
+    crate::render::scenes::common::PALETTE_STEPS,
+    crate::render::scenes::common::PALETTE_CONTOUR,
+    crate::render::scenes::common::brightness(DEFAULT_BRIGHTNESS),
+    crate::render::scenes::lines::GLOW,
+    crate::render::scenes::lines::SOFTNESS,
+    crate::render::scenes::lines::STROKE_BLEND,
+    crate::render::scenes::common::zoom(1.0),
+    crate::render::scenes::common::PAN_X,
+    crate::render::scenes::common::PAN_Y,
+    crate::render::scenes::lines::MIRROR_ORDER,
+    crate::render::scenes::lines::MIRROR_REFLECT,
 ];
 
 /// Which figure the elements form. Selected once at preset load through the

@@ -85,6 +85,7 @@ mod shaders;
 // keep their old path rather than gaining a `mesh::` segment.
 pub use mesh::{DEFAULT_MESH, MAX_MESH, MIN_MESH, clamp_grid, vertex_count, vertex_position};
 
+use crate::render::scenes::{ParamSpec, default_of};
 use mesh::*;
 use resources::*;
 use shaders::*;
@@ -107,7 +108,62 @@ pub const MAX_SHAPE_VERTICES: usize = 96 * 1024;
 /// binding of the same name **replaces** it vertex by vertex. A preset therefore
 /// starts from one shared transform and opts into a spatially-varying one output
 /// at a time.
-pub const PER_VERTEX_PARAMS: &[&str] = &["zoom", "rot", "cx", "cy", "dx", "dy", "sx", "sy", "warp"];
+pub const PER_VERTEX_PARAMS: &[ParamSpec] = &[
+    ParamSpec {
+        name: "zoom",
+        default: 1.0,
+        range: Some([0.5, 2.0]),
+        doc: "Scale the previous frame is resampled at, per vertex; above 1 the image tunnels inward.",
+    },
+    ParamSpec {
+        name: "rot",
+        default: 0.0,
+        range: Some([-1.0, 1.0]),
+        doc: "Turns per second the resample is rotated by, per vertex.",
+    },
+    ParamSpec {
+        name: "cx",
+        default: 0.5,
+        range: Some([0.0, 1.0]),
+        doc: "Horizontal point the per-vertex zoom and rotation pivot about, in uv.",
+    },
+    ParamSpec {
+        name: "cy",
+        default: 0.5,
+        range: Some([0.0, 1.0]),
+        doc: "Vertical point the per-vertex zoom and rotation pivot about, in uv.",
+    },
+    ParamSpec {
+        name: "dx",
+        default: 0.0,
+        range: Some([-1.0, 1.0]),
+        doc: "Sideways offset of the resample, in frame widths.",
+    },
+    ParamSpec {
+        name: "dy",
+        default: 0.0,
+        range: Some([-1.0, 1.0]),
+        doc: "Vertical offset of the resample, in frame heights.",
+    },
+    ParamSpec {
+        name: "sx",
+        default: 1.0,
+        range: Some([0.5, 2.0]),
+        doc: "Horizontal stretch of the resample, independently of `zoom`.",
+    },
+    ParamSpec {
+        name: "sy",
+        default: 1.0,
+        range: Some([0.5, 2.0]),
+        doc: "Vertical stretch of the resample, independently of `zoom`.",
+    },
+    ParamSpec {
+        name: "warp",
+        default: 0.0,
+        range: Some([0.0, 2.0]),
+        doc: "Amplitude of the travelling ripple added to the resample.",
+    },
+];
 
 /// Each [`PER_VERTEX_PARAMS`] entry's identity value, positionally.
 ///
@@ -127,7 +183,7 @@ const _: () = assert!(
 
 /// `decay` default: 0.72 of the past survives each second, so a deposited streak
 /// fades over roughly a second and a half.
-const DEFAULT_DECAY: f32 = 0.72;
+const DEFAULT_DECAY: f32 = default_of(PARAMS, "decay");
 /// The most of the past a preset may keep per second. Not 1.0: at exactly 1 the
 /// field is a perfect integrator and any deposit accumulates without bound, which
 /// in linear light is a slowly whitening frame rather than a clip. Mirrors the
@@ -163,18 +219,18 @@ pub const MILKDROP_SOFTNESS: f32 = 1.0;
 
 /// Procedural-warp defaults — the spatial scale of the four sinusoids and how
 /// fast they animate. `1.0` is MilkDrop's own unit scale.
-const DEFAULT_WARP_SCALE: f32 = 1.0;
-const DEFAULT_WARP_SPEED: f32 = 1.0;
+const DEFAULT_WARP_SCALE: f32 = default_of(PARAMS, "warp_scale");
+const DEFAULT_WARP_SPEED: f32 = default_of(PARAMS, "warp_speed");
 
 /// Deposit defaults: a soft blob at the centre, bright enough to see and small
 /// enough to be dragged into structure rather than filling the frame.
-const DEFAULT_DEPOSIT: f32 = 1.6;
-const DEFAULT_DEPOSIT_CENTRE: f32 = 0.5;
-const DEFAULT_DEPOSIT_RADIUS: f32 = 0.45;
-const DEFAULT_DEPOSIT_WIDTH: f32 = 0.11;
-const DEFAULT_DEPOSIT_ARMS: f32 = 0.0;
-const DEFAULT_DEPOSIT_TWIST: f32 = 0.0;
-const DEFAULT_DEPOSIT_SPIN: f32 = 0.0;
+const DEFAULT_DEPOSIT: f32 = default_of(PARAMS, "deposit");
+const DEFAULT_DEPOSIT_CENTRE: f32 = default_of(PARAMS, "deposit_x");
+const DEFAULT_DEPOSIT_RADIUS: f32 = default_of(PARAMS, "deposit_radius");
+const DEFAULT_DEPOSIT_WIDTH: f32 = default_of(PARAMS, "deposit_width");
+const DEFAULT_DEPOSIT_ARMS: f32 = default_of(PARAMS, "deposit_arms");
+const DEFAULT_DEPOSIT_TWIST: f32 = default_of(PARAMS, "deposit_twist");
+const DEFAULT_DEPOSIT_SPIN: f32 = default_of(PARAMS, "deposit_spin");
 
 /// **MilkDrop's composite roster**, in the order [`COMPOSITE_PARAMS`] declares
 /// it — the six flags and one multiplier its format carries, reachable from a
@@ -201,28 +257,78 @@ const DEFAULT_DEPOSIT_SPIN: f32 = 0.0;
 /// a non-zero echo alpha, which is why it waited — but where it appears it is
 /// load-bearing rather than decorative, and *Songflower (Moss Posy)*'s woven
 /// lattice is only one family of bars without it.
-pub const COMPOSITE_PARAMS: &[&str] = &[
-    "gamma",
-    "wrap",
-    "darken_center",
-    "brighten",
-    "darken",
-    "solarize",
-    "invert",
-    "echo_alpha",
-    "echo_zoom",
-    "echo_orient",
+pub const COMPOSITE_PARAMS: &[ParamSpec] = &[
+    ParamSpec {
+        name: "gamma",
+        default: 1.0,
+        range: Some([0.25, 4.0]),
+        doc: "Shapes the field's tone curve on its way out; below 1 lifts the mid tones.",
+    },
+    ParamSpec {
+        name: "wrap",
+        default: DEFAULT_COMPOSITE_FLAG,
+        range: Some([0.0, 1.0]),
+        doc: "Wraps a sample that leaves the frame back in at the opposite edge, instead of clamping.",
+    },
+    ParamSpec {
+        name: "darken_center",
+        default: DEFAULT_COMPOSITE_FLAG,
+        range: Some([0.0, 1.0]),
+        doc: "Pulls brightness down toward the middle of the frame.",
+    },
+    ParamSpec {
+        name: "brighten",
+        default: DEFAULT_COMPOSITE_FLAG,
+        range: Some([0.0, 1.0]),
+        doc: "Lifts the field's bright end, MilkDrop's own brighten switch.",
+    },
+    ParamSpec {
+        name: "darken",
+        default: DEFAULT_COMPOSITE_FLAG,
+        range: Some([0.0, 1.0]),
+        doc: "Pushes the field's dark end down, MilkDrop's own darken switch.",
+    },
+    ParamSpec {
+        name: "solarize",
+        default: DEFAULT_COMPOSITE_FLAG,
+        range: Some([0.0, 1.0]),
+        doc: "Inverts the field above its midpoint, so highlights fold back into shadow.",
+    },
+    ParamSpec {
+        name: "invert",
+        default: DEFAULT_COMPOSITE_FLAG,
+        range: Some([0.0, 1.0]),
+        doc: "Inverts the whole field.",
+    },
+    ParamSpec {
+        name: "echo_alpha",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "How strongly a second, scaled copy of the field is blended over the first.",
+    },
+    ParamSpec {
+        name: "echo_zoom",
+        default: 1.0,
+        range: Some([0.25, 4.0]),
+        doc: "How much larger or smaller that echoed copy is.",
+    },
+    ParamSpec {
+        name: "echo_orient",
+        default: 0.0,
+        range: Some([0.0, 3.0]),
+        doc: "Which way the echoed copy is flipped before it is blended.",
+    },
 ];
 
 /// `gamma` default — MilkDrop's `fGammaAdj` at unity.
-const DEFAULT_GAMMA: f32 = 1.0;
+const DEFAULT_GAMMA: f32 = default_of(PARAMS, "gamma");
 /// The other six default off, which is the identity for each.
 const DEFAULT_COMPOSITE_FLAG: f32 = 0.0;
 /// The echo's own defaults — no second copy, at unit zoom and unflipped, which
 /// is the identity and is MilkDrop's own resting value for each.
-const DEFAULT_ECHO_ALPHA: f32 = 0.0;
-const DEFAULT_ECHO_ZOOM: f32 = 1.0;
-const DEFAULT_ECHO_ORIENT: f32 = 0.0;
+const DEFAULT_ECHO_ALPHA: f32 = default_of(PARAMS, "echo_alpha");
+const DEFAULT_ECHO_ZOOM: f32 = default_of(PARAMS, "echo_zoom");
+const DEFAULT_ECHO_ORIENT: f32 = default_of(PARAMS, "echo_orient");
 
 /// MilkDrop's `nVideoEchoOrientation` as its two flip bits — `1` flips x, `2`
 /// flips y, `3` both.
@@ -258,57 +364,211 @@ const DARKEN_CENTER_STRENGTH: f32 = 0.22;
 /// Colour defaults (ADR-0021), matching the shared vocabulary every other
 /// scene uses.
 const DEFAULT_HUE: f32 = 0.0;
-const DEFAULT_COLOR_SPAN: f32 = 1.0;
-const DEFAULT_COLOR_CENTER: f32 = 0.0;
+const DEFAULT_COLOR_SPAN: f32 = default_of(PARAMS, "color_span");
+const DEFAULT_COLOR_CENTER: f32 = default_of(PARAMS, "color_center");
 const DEFAULT_BRIGHTNESS: f32 = 1.0;
 
 /// Parameter vocabulary — see [`fragment_field::PARAMS`](super::fragment_field::PARAMS).
 /// **Keep in sync with `set_param` below.**
-pub const PARAMS: &[&str] = &[
-    // The nine per-vertex outputs, as whole-mesh scalars.
-    "zoom",
-    "rot",
-    "cx",
-    "cy",
-    "dx",
-    "dy",
-    "sx",
-    "sy",
-    "warp",
-    // The procedural warp's own shape.
-    "warp_scale",
-    "warp_speed",
-    // The feedback field.
-    "decay",
-    // This frame's light.
-    "deposit",
-    "deposit_x",
-    "deposit_y",
-    "deposit_radius",
-    "deposit_width",
-    "deposit_arms",
-    "deposit_twist",
-    "deposit_spin",
-    // MilkDrop's composite roster (see `COMPOSITE_PARAMS`).
-    "gamma",
-    "wrap",
-    "darken_center",
-    "brighten",
-    "darken",
-    "solarize",
-    "invert",
-    "echo_alpha",
-    "echo_zoom",
-    "echo_orient",
-    // Colour.
-    "hue",
-    "color_span",
-    "color_center",
-    "saturation",
-    "palette_mix",
-    "palette_steps",
-    "palette_contour",
-    "brightness",
+pub const PARAMS: &[ParamSpec] = &[
+    ParamSpec {
+        name: "zoom",
+        default: 1.0,
+        range: Some([0.5, 2.0]),
+        doc: "Scale the previous frame is resampled at, per vertex; above 1 the image tunnels inward.",
+    },
+    ParamSpec {
+        name: "rot",
+        default: 0.0,
+        range: Some([-1.0, 1.0]),
+        doc: "Turns per second the resample is rotated by, per vertex.",
+    },
+    ParamSpec {
+        name: "cx",
+        default: 0.5,
+        range: Some([0.0, 1.0]),
+        doc: "Horizontal point the per-vertex zoom and rotation pivot about, in uv.",
+    },
+    ParamSpec {
+        name: "cy",
+        default: 0.5,
+        range: Some([0.0, 1.0]),
+        doc: "Vertical point the per-vertex zoom and rotation pivot about, in uv.",
+    },
+    ParamSpec {
+        name: "dx",
+        default: 0.0,
+        range: Some([-1.0, 1.0]),
+        doc: "Sideways offset of the resample, in frame widths.",
+    },
+    ParamSpec {
+        name: "dy",
+        default: 0.0,
+        range: Some([-1.0, 1.0]),
+        doc: "Vertical offset of the resample, in frame heights.",
+    },
+    ParamSpec {
+        name: "sx",
+        default: 1.0,
+        range: Some([0.5, 2.0]),
+        doc: "Horizontal stretch of the resample, independently of `zoom`.",
+    },
+    ParamSpec {
+        name: "sy",
+        default: 1.0,
+        range: Some([0.5, 2.0]),
+        doc: "Vertical stretch of the resample, independently of `zoom`.",
+    },
+    ParamSpec {
+        name: "warp",
+        default: 0.0,
+        range: Some([0.0, 2.0]),
+        doc: "Amplitude of the travelling ripple added to the resample.",
+    },
+    ParamSpec {
+        name: "warp_scale",
+        default: 1.0,
+        range: Some([0.1, 4.0]),
+        doc: "Spatial frequency of the ripple; higher makes it finer.",
+    },
+    ParamSpec {
+        name: "warp_speed",
+        default: 1.0,
+        range: Some([0.0, 4.0]),
+        doc: "How fast the ripple travels, as a multiple of its base rate.",
+    },
+    ParamSpec {
+        name: "decay",
+        default: 0.72,
+        range: Some([0.0, 1.0]),
+        doc: "How much of the field survives each second, which is what sets the trail's length.",
+    },
+    ParamSpec {
+        name: "deposit",
+        default: 1.6,
+        range: Some([0.0, 8.0]),
+        doc: "How much light the source figure adds into the field each frame.",
+    },
+    ParamSpec {
+        name: "deposit_x",
+        default: 0.5,
+        range: Some([0.0, 1.0]),
+        doc: "Horizontal position of the deposited figure, in uv.",
+    },
+    ParamSpec {
+        name: "deposit_y",
+        default: 0.5,
+        range: Some([0.0, 1.0]),
+        doc: "Vertical position of the deposited figure, in uv.",
+    },
+    ParamSpec {
+        name: "deposit_radius",
+        default: 0.45,
+        range: Some([0.0, 1.0]),
+        doc: "Radius of the deposited ring.",
+    },
+    ParamSpec {
+        name: "deposit_width",
+        default: 0.11,
+        range: Some([0.0, 0.5]),
+        doc: "How thick that ring is; narrow reads as a wire, wide as a disc.",
+    },
+    ParamSpec {
+        name: "deposit_arms",
+        default: 0.0,
+        range: Some([0.0, 16.0]),
+        doc: "How many arms the ring is broken into; 0 leaves it whole.",
+    },
+    ParamSpec {
+        name: "deposit_twist",
+        default: 0.0,
+        range: Some([-2.0, 2.0]),
+        doc: "Sweeps the arms into a spiral rather than leaving them radial.",
+    },
+    ParamSpec {
+        name: "deposit_spin",
+        default: 0.0,
+        range: Some([-2.0, 2.0]),
+        doc: "Turns per second the deposited figure rotates by.",
+    },
+    ParamSpec {
+        name: "gamma",
+        default: 1.0,
+        range: Some([0.25, 4.0]),
+        doc: "Shapes the field's tone curve on its way out; below 1 lifts the mid tones.",
+    },
+    ParamSpec {
+        name: "wrap",
+        default: DEFAULT_COMPOSITE_FLAG,
+        range: Some([0.0, 1.0]),
+        doc: "Wraps a sample that leaves the frame back in at the opposite edge, instead of clamping.",
+    },
+    ParamSpec {
+        name: "darken_center",
+        default: DEFAULT_COMPOSITE_FLAG,
+        range: Some([0.0, 1.0]),
+        doc: "Pulls brightness down toward the middle of the frame.",
+    },
+    ParamSpec {
+        name: "brighten",
+        default: DEFAULT_COMPOSITE_FLAG,
+        range: Some([0.0, 1.0]),
+        doc: "Lifts the field's bright end, MilkDrop's own brighten switch.",
+    },
+    ParamSpec {
+        name: "darken",
+        default: DEFAULT_COMPOSITE_FLAG,
+        range: Some([0.0, 1.0]),
+        doc: "Pushes the field's dark end down, MilkDrop's own darken switch.",
+    },
+    ParamSpec {
+        name: "solarize",
+        default: DEFAULT_COMPOSITE_FLAG,
+        range: Some([0.0, 1.0]),
+        doc: "Inverts the field above its midpoint, so highlights fold back into shadow.",
+    },
+    ParamSpec {
+        name: "invert",
+        default: DEFAULT_COMPOSITE_FLAG,
+        range: Some([0.0, 1.0]),
+        doc: "Inverts the whole field.",
+    },
+    ParamSpec {
+        name: "echo_alpha",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "How strongly a second, scaled copy of the field is blended over the first.",
+    },
+    ParamSpec {
+        name: "echo_zoom",
+        default: 1.0,
+        range: Some([0.25, 4.0]),
+        doc: "How much larger or smaller that echoed copy is.",
+    },
+    ParamSpec {
+        name: "echo_orient",
+        default: 0.0,
+        range: Some([0.0, 3.0]),
+        doc: "Which way the echoed copy is flipped before it is blended.",
+    },
+    crate::render::scenes::common::hue(DEFAULT_HUE),
+    ParamSpec {
+        name: "color_span",
+        default: 1.0,
+        range: Some([0.0, 1.0]),
+        doc: "How much of the palette the field's range covers.",
+    },
+    ParamSpec {
+        name: "color_center",
+        default: 0.0,
+        range: Some([-1.0, 1.0]),
+        doc: "Shifts which part of that range lands in the middle of the palette.",
+    },
+    crate::render::scenes::common::SATURATION,
+    crate::render::scenes::common::PALETTE_MIX,
+    crate::render::scenes::common::PALETTE_STEPS,
+    crate::render::scenes::common::PALETTE_CONTOUR,
+    crate::render::scenes::common::brightness(DEFAULT_BRIGHTNESS),
 ];
 
 /// The warp mesh scene (ADR-0113).
@@ -618,7 +878,7 @@ impl Scene for WarpMeshScene {
         }
         // The nine per-vertex outputs, as whole-mesh scalars — the fallback a
         // `[per_vertex]` binding of the same name overrides.
-        if let Some(index) = PER_VERTEX_PARAMS.iter().position(|n| *n == name) {
+        if let Some(index) = PER_VERTEX_PARAMS.iter().position(|spec| spec.name == name) {
             if let Some(slot) = self.scalars.get_mut(index) {
                 *slot = value;
             }
@@ -653,7 +913,7 @@ impl Scene for WarpMeshScene {
     }
 
     fn set_per_vertex(&mut self, name: &str, values: &[f32]) {
-        let Some(index) = PER_VERTEX_PARAMS.iter().position(|n| *n == name) else {
+        let Some(index) = PER_VERTEX_PARAMS.iter().position(|spec| spec.name == name) else {
             return;
         };
         let Some(slot) = self.state.values.get_mut(index) else {

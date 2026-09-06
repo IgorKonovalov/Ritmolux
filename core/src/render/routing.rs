@@ -19,6 +19,7 @@
 // A continuation of one module split across several files, so it needs the
 // names `render/mod.rs` has in scope.
 use super::*;
+use crate::render::scenes::declares;
 
 /// The built scenes, each paired with the [`SystemKind`] it drives — the roster
 /// [`scenes::create_all`] returns. Addressed by kind, never by position, so a
@@ -117,12 +118,12 @@ pub(super) enum ParamRoute {
 /// namespaces are disjoint, so the order is a formality rather than a tie-break —
 /// but it is the documented one.
 pub(super) fn resolve_route(name: &str, system: SystemKind) -> ParamRoute {
-    if background::PARAMS.contains(&name) {
+    if declares(background::PARAMS, name) {
         return ParamRoute::Background;
     }
     // Ahead of the stages, and disjoint from them: a chain-level name has no stage
     // index to route to (ADR-0085).
-    if post::CHAIN_PARAMS.contains(&name) {
+    if declares(post::CHAIN_PARAMS, name) {
         return ParamRoute::Composite;
     }
     if let Some(stage) = post::stage_for(name) {
@@ -131,18 +132,18 @@ pub(super) fn resolve_route(name: &str, system: SystemKind) -> ParamRoute {
         // `fb_*` names too, and then the binding drives both. Tested against the
         // system's own vocabulary, exactly as `SceneAndBackdrop` is, so the
         // fan-out can never conjure a route for a name the scene would drop.
-        if feedback::PARAMS.contains(&name) && system.param_names().contains(&name) {
+        if feedback::PARAMS.contains(&name) && declares(system.param_specs(), name) {
             return ParamRoute::StageAndScene(stage);
         }
         return ParamRoute::Stage(stage);
     }
-    if tonemap::PARAMS.contains(&name) {
+    if declares(tonemap::PARAMS, name) {
         return ParamRoute::Tonemap;
     }
-    if ink::PARAMS.contains(&name) {
+    if declares(ink::PARAMS, name) {
         return ParamRoute::Ink;
     }
-    if system.param_names().contains(&name) {
+    if declares(system.param_specs(), name) {
         // The backdrop colours through the preset's palette (ADR-0086), so the
         // two shared modulations move it with the figure. Tested *after* the
         // system's own vocabulary, not before it: a system that declares neither

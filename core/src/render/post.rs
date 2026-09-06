@@ -98,6 +98,7 @@ use super::layer_blend::LayerBlendPass;
 use super::trails::Trails;
 use crate::preset::LayerBlend;
 use crate::render::gpu;
+use crate::render::scenes::{ParamSpec, default_of};
 
 /// How many stages the chain holds. A compile-time constant, not a capacity:
 /// [`PostChain::new`] fills the array exactly, and [`Routing`] is sized from it so
@@ -149,7 +150,7 @@ pub(crate) const BLOOM: usize = 2;
 /// answer is fixed the moment a preset is parsed, and a chained
 /// `set_param(&str, ..)` fallthrough inside the hot loop is a link every new
 /// stage would lengthen (Plan 0031 Phase 3).
-pub(crate) const STAGE_PARAMS: [&[&str]; STAGE_COUNT] = [
+pub(crate) const STAGE_PARAMS: [&[ParamSpec]; STAGE_COUNT] = [
     super::trails::PARAMS,
     super::kaleidoscope::PARAMS,
     super::bloom::PARAMS,
@@ -165,7 +166,7 @@ pub(crate) const STAGE_PARAMS: [&[&str]; STAGE_COUNT] = [
 pub(crate) fn stage_for(name: &str) -> Option<usize> {
     STAGE_PARAMS
         .iter()
-        .position(|params| params.contains(&name))
+        .position(|params| crate::render::scenes::declares(params, name))
 }
 
 /// The chain's own parameter vocabulary — names owned by the **composite seam**
@@ -175,13 +176,18 @@ pub(crate) fn stage_for(name: &str) -> Option<usize> {
 /// name has no stage index to route to: it reaches every stage's fold *and* the
 /// scene's own present, which is the one place a backdrop can be occluded when no
 /// stage is active at all.
-pub const CHAIN_PARAMS: &[&str] = &["occlude"];
+pub const CHAIN_PARAMS: &[ParamSpec] = &[ParamSpec {
+    name: "occlude",
+    default: 1.0,
+    range: Some([0.0, 1.0]),
+    doc: "How much of the backdrop the scene's own coverage hides; 0 lets the sky through everywhere.",
+}];
 
 /// How much of the scene's coverage the backdrop resolves against, by default:
 /// **all of it**, which is the arithmetic every frame ran before `occlude`
 /// existed (ADR-0085). A literal `1.0` — the multiply it produces is exact, so
 /// an unbound preset renders byte-identically rather than approximately so.
-pub const DEFAULT_OCCLUDE: f32 = 1.0;
+pub const DEFAULT_OCCLUDE: f32 = default_of(CHAIN_PARAMS, "occlude");
 
 /// One skippable post-composite stage (ADR-0031). Crate-internal on purpose: the
 /// composite order is fixed in [`PostChain::new`], not registered, and no preset
@@ -201,10 +207,10 @@ pub(crate) trait PostStage {
     /// [`STAGE_PARAMS`]'s `debug_assert` in [`PostChain::new`] exists to catch.
     fn set_param(&mut self, name: &str, value: f32) -> bool;
 
-    /// This stage's declared parameter vocabulary — the names its
+    /// This stage's declared parameter vocabulary — the specs its
     /// [`set_param`](Self::set_param) claims. Read only to pin [`STAGE_PARAMS`]
     /// to the live array at construction; never on the hot path.
-    fn params(&self) -> &'static [&'static str];
+    fn params(&self) -> &'static [ParamSpec];
 
     /// Hand this stage the frame's evaluated `exposure` (ADR-0080).
     ///
@@ -588,6 +594,10 @@ impl PostChain {
         // has to be this array's order — otherwise a resolved `Stage(i)` would
         // hand `kaleido_*` to trails. Swapping the literal above trips here.
         for (index, stage) in chain.stages.iter().enumerate() {
+            // Compared by VALUE. A `const` is inlined at every use site, so the
+            // two references to one roster are two allocations and pointer
+            // identity does not hold - which is a fact about `const`, not about
+            // whether the rosters agree.
             debug_assert_eq!(
                 STAGE_PARAMS.get(index).copied(),
                 Some(stage.params()),

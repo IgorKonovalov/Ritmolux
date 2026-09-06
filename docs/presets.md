@@ -15,9 +15,10 @@ architecture) and [ADR-0020](adrs/0020-preset-grammar-v2-branching-functions-tem
 presets over a pure expression language. Layer 3 (Rhai scripting) and cross-preset
 blending are deferred.
 
-**The per-system parameter tables live in [`presets/README.md`](../presets/README.md)**,
-next to the preset files themselves. That is the one place they are maintained;
-this document does not duplicate them.
+**The per-system parameter reference lives in [`presets/README.md`](../presets/README.md)**,
+next to the preset files themselves — every parameter of every system, with its default, the range
+that reads and a line saying what it does, generated from the engine's own declarations. That is
+the one place it is maintained; this document does not duplicate it.
 
 > **New to presets? Start with [`docs/preset-guide.md`](preset-guide.md)** — the illustrated
 > entrance: what each built-in system looks like, which of these three references owns which
@@ -1390,7 +1391,7 @@ quietly widening the vocabulary here.
   the data/expression/script model and why it is layered.
 - [ADR-0020 — Preset expression grammar v2](adrs/0020-preset-grammar-v2-branching-functions-tempo.md):
   the math functions, branching, `tempo`/`novelty`, and warn-but-load typo handling.
-- [`presets/README.md`](../presets/README.md): the per-system parameter tables,
+- [`presets/README.md`](../presets/README.md): the per-system parameter reference,
   engine-wide controls, structural config, `[smoothing]` and `[latch]`.
 - [`docs/preset-palettes.md`](preset-palettes.md): the palette surface — built-in
   names, custom stops, and the A/B crossfade.

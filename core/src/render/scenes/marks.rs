@@ -119,6 +119,7 @@
 )]
 
 use crate::render::gpu;
+use crate::render::scenes::{ParamSpec, default_of};
 
 /// The `shape` roster, in the order the numeric parameter selects them.
 ///
@@ -147,7 +148,7 @@ const MIN_SHAPE: f32 = 0.0;
 const MAX_SHAPE: f32 = SHAPES.len() as f32 - 1.0;
 /// `shape` default — **`disc`**, which is exactly the arithmetic every mark drew
 /// before this module existed.
-pub(crate) const DEFAULT_SHAPE: f32 = 0.0;
+pub(crate) const DEFAULT_SHAPE: f32 = default_of(PARAMS, "shape");
 
 /// Fewest points a polygon or star may have. Two "points" is a line, and the
 /// star arm's inner vertex is only defined for `n >= 3`.
@@ -157,7 +158,7 @@ const MIN_POINTS: f32 = 3.0;
 /// fold costs the same either way.
 const MAX_POINTS: f32 = 12.0;
 /// `points` default — a five-pointed star / a pentagon.
-pub(crate) const DEFAULT_POINTS: f32 = 5.0;
+pub(crate) const DEFAULT_POINTS: f32 = default_of(PARAMS, "points");
 
 // --- The instanced-quad draw both mark scenes share ----------------------------
 
@@ -376,7 +377,7 @@ const RING_HALF: f32 = 0.3;
 /// chunk means this knob reaches `swarm` and `emitter` as well as
 /// `shape_field`, so anything but the old constant moves every shipped
 /// `shape = "3"` preset (ADR-0105's shared-chunk consequence).
-pub(crate) const DEFAULT_STAR_VALLEY: f32 = 0.45;
+pub(crate) const DEFAULT_STAR_VALLEY: f32 = default_of(PARAMS, "star_valley");
 /// The range `star_valley` is held in. Not 0 and not 1: at 0 the spikes meet at
 /// a point and the figure has no interior, and at 1 it is a polygon with the
 /// valley on the circumcircle, so both ends are degenerate rather than extreme.
@@ -386,7 +387,7 @@ const MAX_STAR_VALLEY: f32 = 0.95;
 /// `star_curve` default — **0, the straight edge**, and an exact identity: at
 /// this value the arm takes the closed-form straight-edge branch, which is the
 /// arithmetic that shipped.
-pub(crate) const DEFAULT_STAR_CURVE: f32 = 0.0;
+pub(crate) const DEFAULT_STAR_CURVE: f32 = default_of(PARAMS, "star_curve");
 /// How far the edge may bow. Positive pulls the edge's midpoint toward the
 /// centre (the concave sparkle silhouette); negative pushes it out. Bounded
 /// short of 1, where the midpoint would reach the origin and the edge would fold
@@ -395,7 +396,7 @@ const MAX_STAR_CURVE: f32 = 0.9;
 
 /// `star_jitter` default — **0, every spike the same length**, and an exact
 /// identity for the same reason `star_curve`'s is.
-pub(crate) const DEFAULT_STAR_JITTER: f32 = 0.0;
+pub(crate) const DEFAULT_STAR_JITTER: f32 = default_of(PARAMS, "star_jitter");
 /// The most a spike's tip radius may vary. At 1 a spike can vanish into the
 /// valley circle, which is the end of the range rather than a useful value.
 const MAX_STAR_JITTER: f32 = 1.0;
@@ -440,22 +441,55 @@ const HEART_INRADIUS: f32 = std::f32::consts::SQRT_2 - 1.0;
 const HEART_SCALE: f32 = 0.65;
 const HEART_CY: f32 = 0.552;
 
-/// The two `[params]` names a scene gains by adopting this roster.
+/// The five `[params]` names a scene gains by adopting this roster, declared
+/// once (ADR-0170).
 ///
-/// This is the single statement of the pair;
-/// `emitter.rs`'s `both_particle_scenes_carry_the_same_shape_vocabulary` holds
-/// both particle scenes' own `PARAMS` to it, so the two cannot drift into
-/// different spellings of the same idea. Test-only because that guard is its
-/// only reader: each scene lists its own vocabulary literally, which is what
-/// `core/tests/preset.rs`'s source-scanning `set_param` drift guard requires.
-#[cfg(test)]
-pub(crate) const PARAMS: [&str; 5] = [
-    "shape",
-    "points",
-    "star_valley",
-    "star_curve",
-    "star_jitter",
-];
+/// This is the single statement of the set, and the three scenes that draw
+/// shaped marks splice these specs into their own `PARAMS` by value rather than
+/// restating them - so a name, a range and a sentence cannot drift into three
+/// spellings of the same idea. `emitter.rs`'s
+/// `both_particle_scenes_carry_the_same_shape_vocabulary` is what holds the
+/// rosters to it.
+pub(crate) const SHAPE: ParamSpec = ParamSpec {
+    name: "shape",
+    default: 0.0,
+    range: Some([0.0, 4.0]),
+    doc: "Which silhouette each mark is drawn as - a disc, a square, a star, and so on.",
+};
+
+/// `points`, shared by the three shaped-mark scenes: the silhouette's count.
+pub(crate) const POINTS: ParamSpec = ParamSpec {
+    name: "points",
+    default: 5.0,
+    range: Some([3.0, 16.0]),
+    doc: "How many points or sides the silhouette has, where the shape has a count at all.",
+};
+
+/// `star_valley`, shared: how deep a star's notches cut.
+pub(crate) const STAR_VALLEY: ParamSpec = ParamSpec {
+    name: "star_valley",
+    default: 0.45,
+    range: Some([0.0, 1.0]),
+    doc: "How deep the notches between a star's points cut; near 1 the star becomes a disc.",
+};
+
+/// `star_curve`, shared: how far a star's edges bow.
+pub(crate) const STAR_CURVE: ParamSpec = ParamSpec {
+    name: "star_curve",
+    default: 0.0,
+    range: Some([-1.0, 1.0]),
+    doc: "Bows a star's edges inward or outward instead of leaving them straight.",
+};
+
+/// `star_jitter`, shared: the seeded variation in point length.
+pub(crate) const STAR_JITTER: ParamSpec = ParamSpec {
+    name: "star_jitter",
+    default: 0.0,
+    range: Some([0.0, 1.0]),
+    doc: "Randomises each point's length by a seeded amount, so the star reads as hand-drawn.",
+};
+
+pub(crate) const PARAMS: &[ParamSpec] = &[SHAPE, POINTS, STAR_VALLEY, STAR_CURVE, STAR_JITTER];
 
 /// The `shape` index the shader is handed: clamped into the roster, then
 /// **rounded to an integer**, with a non-finite binding falling back to the

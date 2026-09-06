@@ -39,6 +39,7 @@
 )]
 
 use crate::render::palette;
+use crate::render::scenes::ParamSpec;
 
 /// `saturation` at rest: fully saturated, the palette's own colour.
 pub(crate) const DEFAULT_SATURATION: f32 = 1.0;
@@ -51,6 +52,95 @@ pub(crate) const DEFAULT_PAN: f32 = 0.0;
 /// this is only the value eleven of the twelve pass — including the three whose
 /// roster has no `brightness` at all, where it is inert.
 pub(crate) const DEFAULT_BRIGHTNESS: f32 = 1.0;
+/// The colour and framing parameters every palette-coloured scene delegates to
+/// this module, declared **once** (ADR-0170).
+///
+/// A scene splices these into its own `PARAMS` by value rather than composing at
+/// runtime, because a roster has to be a `const` the loader and the generated
+/// reference can both read without allocating. What that buys is the thing the
+/// twelve copies could not have: one name, one range and one sentence, wherever
+/// the parameter appears.
+///
+/// [`hue`] and [`brightness`] are functions rather than constants because their
+/// **default** is the scene's own resting value while everything else about them
+/// is shared - `fragment_field` rests at hue 0 and `parametric_curve` at 0.6, and
+/// both mean the same thing by it.
+pub(crate) const SATURATION: ParamSpec = ParamSpec {
+    name: "saturation",
+    default: DEFAULT_SATURATION,
+    range: Some([0.0, 1.0]),
+    doc: "Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own.",
+};
+
+/// `palette_mix`, shared: the A/B palette crossfade position.
+pub(crate) const PALETTE_MIX: ParamSpec = ParamSpec {
+    name: "palette_mix",
+    default: DEFAULT_PALETTE_MIX,
+    range: Some([0.0, 1.0]),
+    doc: "Crossfades from the preset's palette to its second one; 0 is the first, 1 the second.",
+};
+
+/// `palette_steps`, shared: how many flat bands the palette is cut into.
+pub(crate) const PALETTE_STEPS: ParamSpec = ParamSpec {
+    name: "palette_steps",
+    default: palette::DEFAULT_PALETTE_STEPS,
+    range: Some([0.0, 16.0]),
+    doc: "Quantizes the palette into this many flat bands; 0 leaves it continuous.",
+};
+
+/// `palette_contour`, shared: the line drawn at each band edge.
+pub(crate) const PALETTE_CONTOUR: ParamSpec = ParamSpec {
+    name: "palette_contour",
+    default: palette::DEFAULT_PALETTE_CONTOUR,
+    range: Some([0.0, 1.0]),
+    doc: "Draws a line at each band edge when the palette is stepped; 0 draws none.",
+};
+
+/// `pan_x`, shared: the scene's horizontal offset.
+pub(crate) const PAN_X: ParamSpec = ParamSpec {
+    name: "pan_x",
+    default: DEFAULT_PAN,
+    range: None,
+    doc: "Slides the whole scene sideways, in the scene's own units rather than pixels.",
+};
+
+/// `pan_y`, shared: the scene's vertical offset.
+pub(crate) const PAN_Y: ParamSpec = ParamSpec {
+    name: "pan_y",
+    default: DEFAULT_PAN,
+    range: None,
+    doc: "Slides the whole scene vertically, in the scene's own units rather than pixels.",
+};
+
+/// `hue` at the scene's own resting coordinate. See the block docs above.
+pub(crate) const fn hue(default: f32) -> ParamSpec {
+    ParamSpec {
+        name: "hue",
+        default,
+        range: Some([0.0, 1.0]),
+        doc: "Where this scene reads from the palette, as a coordinate along it rather than a colour.",
+    }
+}
+
+/// `brightness` at the scene's own resting level. See the block docs above.
+pub(crate) const fn brightness(default: f32) -> ParamSpec {
+    ParamSpec {
+        name: "brightness",
+        default,
+        range: Some([0.0, 2.0]),
+        doc: "The scene's overall light level, multiplying what it draws before the composite.",
+    }
+}
+
+/// `zoom`, the shared view transform. One meaning across every scene that has it.
+pub(crate) const fn zoom(default: f32) -> ParamSpec {
+    ParamSpec {
+        name: "zoom",
+        default,
+        range: Some([0.25, 4.0]),
+        doc: "Scales the whole scene about its centre; above 1 fills more of the frame.",
+    }
+}
 
 /// The names [`PaletteParams::set`] answers, as a roster.
 ///
@@ -252,7 +342,7 @@ mod tests {
         let mut seen = 0usize;
         for system in SystemKind::ALL {
             for name in system.param_names() {
-                if PALETTE_PARAMS.contains(name) || PAN_PARAMS.contains(name) {
+                if PALETTE_PARAMS.contains(&name) || PAN_PARAMS.contains(&name) {
                     seen += 1;
                     assert!(
                         palette.set(name, 0.5) || pan.set(name, 0.5),

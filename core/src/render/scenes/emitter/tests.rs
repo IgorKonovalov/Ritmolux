@@ -7,6 +7,7 @@ use super::{
     size_factor, sprite_angle, twinkle_factor,
 };
 use crate::render::scenes::marks::QuadInstance;
+use crate::render::scenes::{declares, spec_names};
 
 /// A test aspect, and the retirement bound it gives.
 const ASPECT: f32 = 16.0 / 9.0;
@@ -28,13 +29,13 @@ const ASPECT: f32 = 16.0 / 9.0;
 fn both_particle_scenes_carry_the_same_shape_vocabulary() {
     use crate::render::scenes::{marks, swarm};
 
-    for name in marks::PARAMS {
+    for name in spec_names(marks::PARAMS) {
         assert!(
-            swarm::PARAMS.contains(&name),
+            declares(swarm::PARAMS, name),
             "the swarm must carry `{name}`"
         );
         assert!(
-            super::PARAMS.contains(&name),
+            declares(super::PARAMS, name),
             "the emitter must carry `{name}`"
         );
     }

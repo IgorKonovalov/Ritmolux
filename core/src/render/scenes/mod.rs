@@ -44,6 +44,97 @@ use crate::render::palette::Palette;
 /// function of its inputs.
 pub(crate) const FALLBACK_DT: f32 = 1.0 / 60.0;
 
+/// What one named parameter is, as the engine declares it (ADR-0170).
+///
+/// A scene and an engine stage each declare their parameters as a `&[ParamSpec]`
+/// rather than as a bare `&[&str]`. Three things read the same declaration: the
+/// load-time check that a preset binding names something real, the constant a
+/// scene applies at reset, and the generated reference table in
+/// `presets/README.md`. Before this they were three copies, and only the names
+/// were held together.
+///
+/// **The doc line is the definition; the roster's essay is the discussion.**
+/// One sentence, saying what the parameter does — not restating its name.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ParamSpec {
+    /// The name a preset binds, exactly as it is spelled in a `.toml`.
+    pub name: &'static str,
+    /// The value `reset_params` applies, and the one the reference prints.
+    ///
+    /// Read back out with [`default_of`], which resolves at compile time — so
+    /// the scene's `DEFAULT_*` constants and this field are one number, not two.
+    pub default: f32,
+    /// The range that **reads**, for the table.
+    ///
+    /// Not a clamp and not a validation bound: it is what an author can expect
+    /// to see a difference across. `None` where the parameter is unbounded or
+    /// world-space, in which case the frame is the bound — inventing a number
+    /// there would be a claim nothing holds.
+    pub range: Option<[f32; 2]>,
+    /// One sentence: what the parameter does.
+    pub doc: &'static str,
+}
+
+/// Byte-wise `str` equality, usable in a `const fn`.
+///
+/// `PartialEq` for `str` is not const, and this is only ever called at compile
+/// time over rosters of a few dozen entries.
+#[allow(
+    clippy::indexing_slicing,
+    reason = "compile-time only; a const fn cannot call `slice::get`, the bound is checked above each index, and a violation is a compile error"
+)]
+const fn str_eq(a: &str, b: &str) -> bool {
+    let (a, b) = (a.as_bytes(), b.as_bytes());
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut i = 0;
+    while i < a.len() {
+        if a[i] != b[i] {
+            return false;
+        }
+        i += 1;
+    }
+    true
+}
+
+/// The default `name` is declared with, resolved **at compile time**.
+///
+/// This is what makes a scene's `DEFAULT_*` constant and its `ParamSpec` one
+/// number rather than two copies of one: the constant is defined as a call to
+/// this, so a default changed in the spec changes what `reset_params` applies,
+/// and the generated table cannot state a value the engine does not use.
+///
+/// The linear scan costs nothing — it never runs at runtime — and a name with no
+/// spec is a **compile error**, because a const-eval panic is.
+#[allow(
+    clippy::indexing_slicing,
+    clippy::panic,
+    reason = "compile-time only; the panic is the point, since a name no spec declares is then a compile error rather than anything a frame reaches"
+)]
+pub const fn default_of(specs: &[ParamSpec], name: &str) -> f32 {
+    let mut i = 0;
+    while i < specs.len() {
+        if str_eq(specs[i].name, name) {
+            return specs[i].default;
+        }
+        i += 1;
+    }
+    panic!("default_of: no ParamSpec declares that name");
+}
+
+/// The names in a spec roster, for the places that still want `&[&str]`.
+///
+/// Allocates, so it is for load-time validation and tests rather than a frame.
+pub fn spec_names(specs: &[ParamSpec]) -> Vec<&'static str> {
+    specs.iter().map(|spec| spec.name).collect()
+}
+
+/// Whether `name` is declared in `specs`. The load-time membership test.
+pub fn declares(specs: &[ParamSpec], name: &str) -> bool {
+    specs.iter().any(|spec| spec.name == name)
+}
+
 /// One integrated animation phase — the only way a bindable rate advances
 /// anything in this engine (ADR-0135, finishing the rule ADR-0132 stated).
 ///

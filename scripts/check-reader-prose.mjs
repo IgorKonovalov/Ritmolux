@@ -235,7 +235,7 @@ for (const f of findings) {
   console.error(`    ${f.text.length > 96 ? f.text.slice(0, 93) + "…" : f.text}`);
 }
 console.error(
-  "\nThese five documents cite by link, never by bare number (ADR-0168):\n" +
+  "\nThese documents cite by link, never by bare number (ADR-0168):\n" +
     "\n" +
     "    Keep the fact. Demote the provenance to the link.\n" +
     "\n" +
@@ -250,8 +250,8 @@ console.error(
     "  after:   `depth_fade` above 0.8 flattens the figure: the far end of the\n" +
     "           attractor stops separating from the near end.\n" +
     "\n" +
-    "This rule is scoped to these five. Every code comment and every Entrance B\n" +
-    "document keeps bare-number citation, which is what ADR-0127 and CLAUDE.md ask\n" +
-    "for everywhere else.",
+    "This rule is scoped to the list above. Every code comment and every" +
+    " **Contribute** page keeps bare-number citation, which is what ADR-0127\n" +
+    "and CLAUDE.md ask for everywhere else.",
 );
 process.exit(1);

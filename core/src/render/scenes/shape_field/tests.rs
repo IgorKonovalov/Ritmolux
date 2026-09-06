@@ -15,6 +15,7 @@ use super::{
 };
 use crate::dsp::AnalysisFrame;
 use crate::preset::Preset;
+use crate::render::scenes::declares;
 use crate::render::scenes::marks;
 use crate::render::{CaptureImage, HeadlessOptions, RenderError, Renderer};
 
@@ -63,9 +64,9 @@ fn the_scale_is_clamped_and_falls_back() {
 /// binding `shape` on this scene is not warned at as a typo.
 #[test]
 fn the_vocabulary_carries_the_shared_roster() {
-    assert!(PARAMS.contains(&"shape"));
-    assert!(PARAMS.contains(&"points"));
-    assert!(PARAMS.contains(&"scale"));
+    assert!(declares(PARAMS, "shape"));
+    assert!(declares(PARAMS, "points"));
+    assert!(declares(PARAMS, "scale"));
 }
 
 /// **The aspect comes from the render target, and this test bites**
@@ -597,7 +598,7 @@ fn the_coordinate_mode_clamps_rounds_and_falls_back() {
         );
     }
     assert_eq!(COORD_MODES, ["distance", "radius"]);
-    assert!(PARAMS.contains(&"coord_mode"));
+    assert!(declares(PARAMS, "coord_mode"));
 }
 
 /// **Under the radius mode a contour is a SCALED COPY of the outline, and under
@@ -930,7 +931,7 @@ fn the_rotation_passes_through_and_zero_is_the_identity() {
     assert_eq!(applied_rotation(f32::NAN), DEFAULT_ROTATION);
     assert_eq!(applied_rotation(f32::INFINITY), DEFAULT_ROTATION);
     assert_eq!(applied_rotation(f32::NEG_INFINITY), DEFAULT_ROTATION);
-    assert!(PARAMS.contains(&"rotation"));
+    assert!(declares(PARAMS, "rotation"));
 }
 
 /// **A quarter turn does not shear the figure at a 2:1 target**

@@ -1,5 +1,7 @@
 #![allow(clippy::indexing_slicing, clippy::panic, clippy::expect_used)]
 
+use crate::render::scenes::spec_names;
+
 use super::{
     DEFAULT_POINTS, DEFAULT_SHAPE, DEFAULT_STAR_CURVE, DEFAULT_STAR_JITTER, DEFAULT_STAR_VALLEY,
     HEART_CY, HEART_INRADIUS, HEART_LOBE_R, HEART_SCALE, MAX_POINTS, MAX_SHAPE, MIN_POINTS, PARAMS,
@@ -545,7 +547,7 @@ fn the_shape_roster_is_pinned() {
     assert_eq!(DEFAULT_SHAPE, 0.0);
     assert_eq!(DEFAULT_POINTS, 5.0);
     assert_eq!(
-        PARAMS,
+        spec_names(PARAMS),
         [
             "shape",
             "points",

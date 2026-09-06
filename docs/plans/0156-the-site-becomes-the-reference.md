@@ -430,8 +430,8 @@ pub const PARAMS: &[ParamSpec] = &[
 | 3 — The site renders diagrams, and How it works exists | dev | done | d2f2d24 |
 | 4 — The engine-side documents address a reader | dev | done | 5227878 |
 | 5 — The embedding surface | dev | done | 24ce616 |
-| 6 — rustdoc joins the Pages artifact | dev | done | committed with this row |
-| 7 — The parameter reference is generated from the engine | dev | not started | |
+| 6 — rustdoc joins the Pages artifact | dev | done | 070c549 |
+| 7 — The parameter reference is generated from the engine | dev | done | committed with this row |
 | 8 — The live walk | human | not started | |
 
 ### Notes
@@ -519,6 +519,34 @@ pub const PARAMS: &[ParamSpec] = &[
 - Backlog 0180's `present:` probe was inverted to `absent:`, since the fix is the disappearance of
   the claim. The entry carries its `CLOSED` line in the body rather than in its heading, which is
   where this file's other closed entries carry it, and which keeps the heading's slug stable.
+- **`ParamSpec` counts.** 26 rosters converted, **341 rows** across **19 tables** (12 systems, 7
+  engine stages), **180 distinct parameters**. 31 rows carry no range: `pan_x`/`pan_y`, the
+  attractor's `a b c d` and `tuple`, `baseline`, `source_y`, `seed`, `angle_bias` — unbounded or
+  world-space, where the frame is the bound.
+- **`default_of` is a `const fn`, so a default resolves at compile time.** 150 `DEFAULT_*` constants
+  are now `default_of(PARAMS, "name")` reads of a literal that lives on the spec; the other 50 name
+  a parameter the roster provides through a **shared** spec parameterised on that constant
+  (`common::hue(DEFAULT_HUE)`), where the constant is already the only copy. Either way the number
+  exists once. A constant naming a parameter no spec declares is a **compile error**, because a
+  const-eval panic is one.
+- The shared blocks declare their specs once and scenes splice them **by value**: `scenes::common`
+  for the colour and framing names, `scenes::lines` for the stroke ones, `scenes::marks` for the
+  five shaped-mark names. `ParamSpec` gained `Copy` for that and `PartialEq` for `post.rs`'s
+  `STAGE_PARAMS` assertion — which had to move from pointer identity to value equality, because a
+  `const` is inlined at every use site and two references to one roster are two allocations.
+- **`every_param_spec_has_a_doc_line` caught two of my own lines** on its first run (`attractor.c`
+  and `.d` at three words); both were rewritten rather than exempted.
+- **The generated block split itself into one route per system.** ADR-0166's size rule saw the new
+  `###` headings and cut them, so the site now serves `system-fragment_field`,
+  `engine-stage-ink` and seventeen more, each with its own table — which is this plan's own
+  Followups list, arriving without being asked for.
+- `essays_that_state_a_default_are_reported` is a **report, not an assertion**: it prints the 92
+  essay lines below the block that mention a default, and never fails. Whether an essay contradicts
+  its table is prose against prose, which a test cannot judge and a review can.
+- The plan's Phase 7 file list does not name `milkconv/src/convert.rs`, `CLAUDE.md` or
+  `.claude/skills/preset-author/SKILL.md`; all three were edited, the first because it does a
+  membership test against `warp_mesh::PARAMS`, the other two because they describe the roster as a
+  set of hand-written tables.
 - **The site's content-collection cache hides a plugin edit.** A split document's chunks are stored
   under a digest of the chunk body, so a change to the *rewriter* re-renders nothing. `rm -rf
   site/.astro` before believing a build that a plugin edit should have changed.

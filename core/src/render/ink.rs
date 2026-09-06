@@ -63,21 +63,22 @@
 )]
 
 use crate::render::gpu;
+use crate::render::scenes::{ParamSpec, default_of};
 
 /// `ink_amount` default — 0 = off (passthrough), so an unbound preset is
 /// unaffected and the stage is never built.
-const DEFAULT_AMOUNT: f32 = 0.0;
+const DEFAULT_AMOUNT: f32 = default_of(PARAMS, "ink_amount");
 /// Paper (density 0) defaults — a neutral true white (`sat = 0`, `bright = 1`).
-const DEFAULT_PAPER_HUE: f32 = 0.0;
-const DEFAULT_PAPER_SAT: f32 = 0.0;
-const DEFAULT_PAPER_BRIGHT: f32 = 1.0;
+const DEFAULT_PAPER_HUE: f32 = default_of(PARAMS, "paper_hue");
+const DEFAULT_PAPER_SAT: f32 = default_of(PARAMS, "paper_sat");
+const DEFAULT_PAPER_BRIGHT: f32 = default_of(PARAMS, "paper_bright");
 /// Ink (density 1) defaults — a neutral true black (`sat = 0`, `bright = 0`).
-const DEFAULT_INK_HUE: f32 = 0.0;
-const DEFAULT_INK_SAT: f32 = 0.0;
-const DEFAULT_INK_BRIGHT: f32 = 0.0;
+const DEFAULT_INK_HUE: f32 = default_of(PARAMS, "ink_hue");
+const DEFAULT_INK_SAT: f32 = default_of(PARAMS, "ink_sat");
+const DEFAULT_INK_BRIGHT: f32 = default_of(PARAMS, "ink_bright");
 /// `ink_gamma` default — the **exact** identity response (ADR-0092), so the stage
 /// is unchanged until a preset binds it.
-const DEFAULT_GAMMA: f32 = 1.0;
+const DEFAULT_GAMMA: f32 = default_of(PARAMS, "ink_gamma");
 /// The exponent's guard rails. An exponent is only endpoint-invariant for a
 /// *positive* `g` — `pow(0, 0)` is undefined and a negative `g` sends the dark
 /// end to infinity — so a binding that sweeps out of range is clamped rather than
@@ -387,15 +388,55 @@ pub(crate) fn key(d: f32, gamma: f32) -> f32 {
 
 /// Global parameter vocabulary — see [`background::PARAMS`](super::background::PARAMS).
 /// **Keep in sync with `set_param` below.**
-pub const PARAMS: &[&str] = &[
-    "ink_amount",
-    "paper_hue",
-    "paper_sat",
-    "paper_bright",
-    "ink_hue",
-    "ink_sat",
-    "ink_bright",
-    "ink_gamma",
+pub const PARAMS: &[ParamSpec] = &[
+    ParamSpec {
+        name: "ink_amount",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "How far the frame is remapped onto the paper-and-ink pair; 0 leaves it untouched.",
+    },
+    ParamSpec {
+        name: "paper_hue",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Hue of the colour an unlit pixel becomes, as a position around the wheel.",
+    },
+    ParamSpec {
+        name: "paper_sat",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Saturation of the paper colour; 0 is neutral.",
+    },
+    ParamSpec {
+        name: "paper_bright",
+        default: 1.0,
+        range: Some([0.0, 1.0]),
+        doc: "Brightness of the paper colour, which sets how light the empty ground reads.",
+    },
+    ParamSpec {
+        name: "ink_hue",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Hue of the colour a fully lit pixel becomes.",
+    },
+    ParamSpec {
+        name: "ink_sat",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Saturation of the ink colour; 0 is neutral.",
+    },
+    ParamSpec {
+        name: "ink_bright",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Brightness of the ink colour, which sets how dark the drawn marks read.",
+    },
+    ParamSpec {
+        name: "ink_gamma",
+        default: 1.0,
+        range: Some([0.25, 4.0]),
+        doc: "Shapes the paper-to-ink ramp: below 1 the mid tones bite earlier, above 1 they hold back.",
+    },
 ];
 
 impl Ink {

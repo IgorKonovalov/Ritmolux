@@ -65,6 +65,7 @@ use super::marks;
 use super::{Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
 use crate::render::palette::{self, Palette};
+use crate::render::scenes::{ParamSpec, default_of};
 
 /// The scene's spawn seed — the only randomness it has, and it is explicit
 /// (NFR §6). The bytes are ASCII used as a number: re-spelling them to match
@@ -141,12 +142,12 @@ const MIN_LIFETIME: f32 = 0.05;
 const MAX_LIFETIME: f32 = 60.0;
 
 // Parameter defaults — an unbound emitter is a calm upward shower.
-const DEFAULT_SPAWN_RATE: f32 = 120.0;
-const DEFAULT_GRAVITY: f32 = 1.5;
-const DEFAULT_LAUNCH_SPEED: f32 = 1.75;
-const DEFAULT_LAUNCH_ANGLE: f32 = 0.0;
-const DEFAULT_LIFETIME: f32 = 3.0;
-const DEFAULT_SIZE: f32 = 1.0;
+const DEFAULT_SPAWN_RATE: f32 = default_of(PARAMS, "spawn_rate");
+const DEFAULT_GRAVITY: f32 = default_of(PARAMS, "gravity");
+const DEFAULT_LAUNCH_SPEED: f32 = default_of(PARAMS, "launch_speed");
+const DEFAULT_LAUNCH_ANGLE: f32 = default_of(PARAMS, "launch_angle");
+const DEFAULT_LIFETIME: f32 = default_of(PARAMS, "lifetime");
+const DEFAULT_SIZE: f32 = default_of(PARAMS, "size");
 const DEFAULT_BRIGHTNESS: f32 = 1.0;
 // The distribution params (Phase 2). Each says how *wide* a per-object draw is;
 // the seed picks within it. `spread` and the two `*_spread` widths default
@@ -154,11 +155,11 @@ const DEFAULT_BRIGHTNESS: f32 = 1.0;
 // exists to fix — a shower launched on one angle is a column, not a shower.
 // `spin` and `twinkle` default off: both are motion a preset asks for.
 /// Full width of the launch-angle cone, radians (~31 degrees).
-const DEFAULT_SPREAD: f32 = 0.55;
-const DEFAULT_SIZE_SPREAD: f32 = 0.6;
-const DEFAULT_LIFETIME_SPREAD: f32 = 0.45;
-const DEFAULT_SPIN: f32 = 0.0;
-const DEFAULT_TWINKLE: f32 = 0.0;
+const DEFAULT_SPREAD: f32 = default_of(PARAMS, "spread");
+const DEFAULT_SIZE_SPREAD: f32 = default_of(PARAMS, "size_spread");
+const DEFAULT_LIFETIME_SPREAD: f32 = default_of(PARAMS, "lifetime_spread");
+const DEFAULT_SPIN: f32 = default_of(PARAMS, "spin");
+const DEFAULT_TWINKLE: f32 = default_of(PARAMS, "twinkle");
 // The source geometry (Plan 0090). Both defaults are the geometry this scene
 // shipped with, stated as values rather than as constants at the spawn site
 // (ADR-0104).
@@ -170,20 +171,20 @@ const DEFAULT_TWINKLE: f32 = 0.0;
 /// where the eye is unless the preset also asks for a `spawn_fade`. It is still
 /// clamped to the retirement bound, by correctness rather than by taste: a source
 /// outside it spawns objects whose exit time has already passed.
-const DEFAULT_SOURCE_Y: f32 = -1.12;
+const DEFAULT_SOURCE_Y: f32 = default_of(PARAMS, "source_y");
 /// The source line's half-width **as a fraction of the frame's**, so the default
 /// resolves to `aspect * 1.0` — bit for bit the full-frame line this scene has
 /// always drawn. `0` collapses the line to a point source.
-const DEFAULT_SOURCE_WIDTH: f32 = 1.0;
+const DEFAULT_SOURCE_WIDTH: f32 = default_of(PARAMS, "source_width");
 /// Fraction of an object's life over which its brightness ramps up from zero.
 /// Off by default, which is exactly today: an object arrives at the brightness
 /// [`ATTACK_FRAC`] gives it. It is the answer to an inside-frame `source_y`,
 /// where a mark switched on at full brightness is a pop.
-const DEFAULT_SPAWN_FADE: f32 = 0.0;
+const DEFAULT_SPAWN_FADE: f32 = default_of(PARAMS, "spawn_fade");
 /// Lifetimes of spawns to back-date at scene start. Off by default, because a
 /// prewarmed world is *full* on its first frame — right for a sky, wrong for a
 /// cascade, and the two readings live one number apart.
-const DEFAULT_PREWARM: f32 = 0.0;
+const DEFAULT_PREWARM: f32 = default_of(PARAMS, "prewarm");
 
 /// Ceiling on `prewarm`, in lifetimes. Past one nothing new survives to be
 /// added — an object older than its own life is dead by definition — and the
@@ -193,8 +194,8 @@ const DEFAULT_PREWARM: f32 = 0.0;
 const MAX_PREWARM: f32 = 2.0;
 // Shared palette colour knobs (ADR-0021), same meaning as the swarm's.
 const DEFAULT_HUE: f32 = 0.0;
-const DEFAULT_HUE_SPREAD: f32 = 1.0;
-const DEFAULT_HUE_CENTER: f32 = 0.5;
+const DEFAULT_HUE_SPREAD: f32 = default_of(PARAMS, "hue_spread");
+const DEFAULT_HUE_CENTER: f32 = default_of(PARAMS, "hue_center");
 // Shared view transform (ADR-0018): identity by default.
 const DEFAULT_ZOOM: f32 = 1.0;
 // The shared mark silhouette (ADR-0084). `disc` is this scene's glint, exactly
@@ -757,42 +758,123 @@ fn size_factor(seed: u32, size_spread: f32) -> f32 {
 
 /// Parameter vocabulary — see [`fragment_field::PARAMS`](super::fragment_field::PARAMS).
 /// **Keep in sync with `set_param` below.**
-pub const PARAMS: &[&str] = &[
-    "spawn_rate",
-    "gravity",
-    "launch_speed",
-    "launch_angle",
-    "spread",
-    "lifetime",
-    "lifetime_spread",
-    // The source geometry, and the ramp that makes an inside-frame one usable
-    // (Plan 0090).
-    "source_y",
-    "source_width",
-    "spawn_fade",
-    "prewarm",
-    "size",
-    "size_spread",
-    "spin",
-    "twinkle",
-    "brightness",
-    "hue",
-    "hue_spread",
-    "hue_center",
-    "saturation",
-    "palette_mix",
-    "palette_steps",
-    "palette_contour",
-    "zoom",
-    "pan_x",
-    "pan_y",
-    // The shared mark silhouette (ADR-0084) — the same two names the swarm
-    // carries; `marks::PARAMS` is the single statement of the pair.
-    "shape",
-    "points",
-    "star_valley",
-    "star_curve",
-    "star_jitter",
+pub const PARAMS: &[ParamSpec] = &[
+    ParamSpec {
+        name: "spawn_rate",
+        default: 120.0,
+        range: Some([0.0, 2000.0]),
+        doc: "New objects launched per second.",
+    },
+    ParamSpec {
+        name: "gravity",
+        default: 1.5,
+        range: Some([-4.0, 8.0]),
+        doc: "Downward acceleration, in frame heights per second squared; negative floats them up.",
+    },
+    ParamSpec {
+        name: "launch_speed",
+        default: 1.75,
+        range: Some([0.0, 6.0]),
+        doc: "Speed each object leaves the source at.",
+    },
+    ParamSpec {
+        name: "launch_angle",
+        default: 0.0,
+        range: Some([-1.0, 1.0]),
+        doc: "Direction of launch, as a fraction of a turn from straight up.",
+    },
+    ParamSpec {
+        name: "spread",
+        default: 0.55,
+        range: Some([0.0, 1.0]),
+        doc: "How wide the launch directions fan out about that angle.",
+    },
+    ParamSpec {
+        name: "lifetime",
+        default: 3.0,
+        range: Some([0.1, 20.0]),
+        doc: "Seconds an object lives before it fades out.",
+    },
+    ParamSpec {
+        name: "lifetime_spread",
+        default: 0.45,
+        range: Some([0.0, 1.0]),
+        doc: "How much lifetimes vary between objects; 0 makes them all die together.",
+    },
+    ParamSpec {
+        name: "source_y",
+        default: -1.12,
+        range: None,
+        doc: "Height the source sits at, which is normally just below the frame.",
+    },
+    ParamSpec {
+        name: "source_width",
+        default: 1.0,
+        range: Some([0.0, 4.0]),
+        doc: "How wide a line the objects are launched from; 0 is a single point.",
+    },
+    ParamSpec {
+        name: "spawn_fade",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Fades each object in over the start of its life rather than popping it on.",
+    },
+    ParamSpec {
+        name: "prewarm",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Back-dates the population so the first frame is already the steady state.",
+    },
+    ParamSpec {
+        name: "size",
+        default: 1.0,
+        range: Some([0.0, 4.0]),
+        doc: "Size of each object's mark.",
+    },
+    ParamSpec {
+        name: "size_spread",
+        default: 0.6,
+        range: Some([0.0, 1.0]),
+        doc: "How much sizes vary between objects.",
+    },
+    ParamSpec {
+        name: "spin",
+        default: 0.0,
+        range: Some([-4.0, 4.0]),
+        doc: "Turns per second each object rotates by as it flies.",
+    },
+    ParamSpec {
+        name: "twinkle",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Per-object brightness flicker, seeded so it is reproducible.",
+    },
+    crate::render::scenes::common::brightness(DEFAULT_BRIGHTNESS),
+    crate::render::scenes::common::hue(DEFAULT_HUE),
+    ParamSpec {
+        name: "hue_spread",
+        default: 1.0,
+        range: Some([0.0, 1.0]),
+        doc: "How far across the palette the object colours reach.",
+    },
+    ParamSpec {
+        name: "hue_center",
+        default: 0.5,
+        range: Some([0.0, 1.0]),
+        doc: "Where that band sits along the palette.",
+    },
+    crate::render::scenes::common::SATURATION,
+    crate::render::scenes::common::PALETTE_MIX,
+    crate::render::scenes::common::PALETTE_STEPS,
+    crate::render::scenes::common::PALETTE_CONTOUR,
+    crate::render::scenes::common::zoom(DEFAULT_ZOOM),
+    crate::render::scenes::common::PAN_X,
+    crate::render::scenes::common::PAN_Y,
+    crate::render::scenes::marks::SHAPE,
+    crate::render::scenes::marks::POINTS,
+    crate::render::scenes::marks::STAR_VALLEY,
+    crate::render::scenes::marks::STAR_CURVE,
+    crate::render::scenes::marks::STAR_JITTER,
 ];
 
 /// Objects that spawn, fall on a parabola, and die (ADR-0057).

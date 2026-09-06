@@ -2,6 +2,7 @@
 
 use super::*;
 use crate::render::gpu;
+use crate::render::scenes::{declares, spec_names};
 
 /// Build one rosette exactly as `build` does.
 fn rosette(n: u32, contact_deg: f32) -> Vec<SegmentInstance> {
@@ -1422,9 +1423,9 @@ fn the_ornament_rebuilds_per_step_not_per_frame() {
 #[test]
 fn the_ring_levers_are_bindable_and_default_to_the_static_configuration() {
     for lever in ["ring_phase", "ring_spread", "ring_scale"] {
-        assert!(PARAMS.contains(&lever), "{lever} must be in PARAMS");
+        assert!(declares(PARAMS, lever), "{lever} must be in PARAMS");
     }
-    let mut seen = PARAMS.to_vec();
+    let mut seen = spec_names(PARAMS);
     seen.sort_unstable();
     let before = seen.len();
     seen.dedup();
