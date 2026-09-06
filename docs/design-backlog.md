@@ -56,7 +56,6 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0160 - the test suite re-creates a `target/` inside the worktree that no redirect reaches, and its own comment says it cannot](#0160---the-test-suite-re-creates-a-target-inside-the-worktree-that-no-redirect-reaches-and-its-own-comment-says-it-cannot)
 - [0161 - three committed scripts still resolve cargo output under `<repo>/target`, which the artifact-store docs assert nothing does](#0161---three-committed-scripts-still-resolve-cargo-output-under-repotarget-which-the-artifact-store-docs-assert-nothing-does)
 - [0163 - `level/bass` reads exactly 1.0 on every local peak by construction, so the lighting consumer that read it as a dimmer value saw pinned dynamics, and the recorded diagnosis blamed an input gain that cannot move it](#0163---levelbass-reads-exactly-10-on-every-local-peak-by-construction-so-the-lighting-consumer-that-read-it-as-a-dimmer-value-saw-pinned-dynamics-and-the-recorded-diagnosis-blamed-an-input-gain-that-cannot-move-it)
-- [0164 - the operator console halves the output's frame rate, and two comments say it cannot](#0164---the-operator-console-halves-the-outputs-frame-rate-and-two-comments-say-it-cannot)
 - [0165 - the windowed app cannot ask for the discrete GPU, so every windowed frame-time figure this project has quoted is an integrated-GPU figure](#0165---the-windowed-app-cannot-ask-for-the-discrete-gpu-so-every-windowed-frame-time-figure-this-project-has-quoted-is-an-integrated-gpu-figure)
 - [0172 - the seeded preset directory is never pruned, so an operator's roster drifts from the shipped set and can hold two presets under one name](#0172---the-seeded-preset-directory-is-never-pruned-so-an-operators-roster-drifts-from-the-shipped-set-and-can-hold-two-presets-under-one-name)
 - [0179 — `cargo doc` is the one CI gate no local step mirrors, so making an item public cannot fail until after the push](#0179--cargo-doc-is-the-one-ci-gate-no-local-step-mirrors-so-making-an-item-public-cannot-fail-until-after-the-push)
@@ -67,6 +66,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0184 — Cargo emits a new artifact generation per fingerprint change and never collects the old one, and the pinned stable toolchain has no GC](#0184--cargo-emits-a-new-artifact-generation-per-fingerprint-change-and-never-collects-the-old-one-and-the-pinned-stable-toolchain-has-no-gc)
 - [0185 — The `--help` banner still calls the application `ritmolux`](#0185--the---help-banner-still-calls-the-application-ritmolux)
 - [0186 — the density law scales a preset's *trace count*, so eight low-`density` worlds draw 4x the strokes at 1/4 the brightness on a large display](#0186--the-density-law-scales-a-presets-trace-count-so-eight-low-density-worlds-draw-4x-the-strokes-at-14-the-brightness-on-a-large-display)
+- [0187 — two measurements of the same console on the same adapter class disagree by 2x, and nothing explains which one the machine actually does](#0187--two-measurements-of-the-same-console-on-the-same-adapter-class-disagree-by-2x-and-nothing-explains-which-one-the-machine-actually-does)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -325,6 +325,7 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0099 | A narrow `color_span` silently spends the palette’s 256-texel budget, and the figure comes back looking upscaled | [Plan 0138](plans/done/0138-the-colour-surface-stops-misleading-its-authors.md) Phase 4: a load-time warning naming the estimate and `palette_steps`. **Closed 2026-09-04** |
 | 0153 | The palette consumes its stops as linear light, and the page calls the shift unavoidable | [ADR-0151](adrs/0151-palette-stops-are-authored-in-srgb-and-converted-at-load.md) + [Plan 0138](plans/done/0138-the-colour-surface-stops-misleading-its-authors.md). **Closed 2026-09-04** |
 | 0110 | An attractor's sample budget ignores the render target, so a 1080p render reads as an upscale | [ADR-0140](adrs/0140-a-sample-budget-is-a-density-against-the-render-target.md) + [Plan 0128](plans/done/0128-the-rendered-file-stops-looking-upscaled.md); see 0186. **Closed 2026-09-04** |
+| 0164 | The operator console halves the output's frame rate, and two comments say it cannot | [Plan 0147](plans/done/0147-what-the-show-costs-and-what-its-numbers-mean.md): four comment sites repaired, both levers measured with a witness, and the halving did not reproduce; see 0187. **Closed 2026-09-06** |
 <!-- roster:end -->
 
 ## Open entries
@@ -2741,8 +2742,9 @@ evidence rather than more reasoning:
 
 - **Verified 2026-08-28** — a fresh COM object is still created per stream start, on the capture
   thread: `present: CoCreateInstance in: standalone/src/capture_win.rs`
-- **Verified 2026-08-28** — and nothing anywhere distinguishes this failure class from a dead
-  endpoint: `absent: REGDB in: standalone/src`
+- **Verified 2026-09-06** — discharging the REGDB-absence bullet this entry
+  carried until Plan 0147 Phase 2 landed the third shape. The two failure classes are now separate
+  verdicts about separate subjects: `present: LossCause in: standalone/src/capture_verdict.rs`
 - **Verified 2026-08-28** — the budget that would be spent on it is still the only bound:
   `present: INPUT_RECOVERY_ATTEMPTS in: standalone/src/capture_start.rs`
 
@@ -2768,10 +2770,23 @@ questions (**(d)** does `REGDB_E_CLASSNOTREG` appear during a *real* loss, **(e)
 a real unplug consumes, **(f)** does the verdict name the right cause) alongside Plan 0130's
 original three, and a Standing bullet in [the plans index](plans/README.md). Run against v0.95.0 or
 later, or the policy under test is not the repaired one.
-- **PARTLY PROMOTED 2026-09-01 -> [Plan 0147](plans/0147-what-the-show-costs-and-what-its-numbers-mean.md) Phase 2**, which takes **only the third shape** - the verdict
+- **PARTLY PROMOTED 2026-09-01 -> [Plan 0147](plans/done/0147-what-the-show-costs-and-what-its-numbers-mean.md) Phase 2**, which takes **only the third shape** - the verdict
   stops reading the same about an activation and about a device. **The mechanism halves stay filed and
   this entry stays live**, because choosing between retry-in-place and a long-lived enumerator wants the
   unplug evidence, and the box still has no removable interface.
+
+**Update 2026-09-06, at the Plan 0147 Phases 1-3 review — the third shape landed, and it is wired to
+the wrong incident.** `CaptureVerdict::Lost` now carries a `LossCause`, and the two tokens are
+distinguishable and tested. What is not yet right is which one the shell picks. The evidence flag
+`reopen_reached_endpoint` is cleared on the **lost-flag rising edge**, but a reopen that *succeeds*
+clears `input_lost`, so the next re-loss inside the same budget presents as a fresh incident and
+wipes the flag. The recovery budget's incident is wider — `RecoveryPolicy` keeps `attempts` until
+`INPUT_RECOVERY_SETTLE_SECS` of unbroken delivery — and the give-up verdict is a statement about
+*that* incident. So in the flap path `capture_start.rs`'s own
+`a_stream_that_dies_as_fast_as_it_opens_still_gives_up` models, every attempt reaches an endpoint
+and the verdict still reads *"none of which reached an endpoint"*. The evidence has to be scoped to
+the budget's incident — cleared where `RecoveryPolicy` resets itself, not on the lost flag. Carried
+as Plan 0147 Phase 3c; **this half of the third shape is not discharged until that lands.**
 
 ## 0157 - the fixed telemetry set omits the bar grid the engine already computes, so a consumer reconstructs a worse one by hand
 
@@ -3055,68 +3070,19 @@ control) - and that is an ADR if it is ever wanted, not a patch.
 - **Verified 2026-08-30** - `bass` is levelled by that normalizer at the published frame boundary: `present: bass_gain\.normalize in: core/src/dsp/mod.rs`
 - **Verified 2026-09-04** - the absolute twin the consumer needed is already published: `present: "/rlx/v1/raw/bass" in: standalone/src/osc.rs`
 - **Verified 2026-09-04** - and already documented, which is why this entry is about the missing property rather than a missing address: `present: /rlx/v1/raw/bass in: docs/configuration.md`
-- `unprobeable:` that no surface states `level/*` reaches 1.0 by design is a negative about prose across `docs/` and the OSC table, not a match countable in one file
-- **PROMOTED 2026-09-01 -> [Plan 0147](plans/0147-what-the-show-costs-and-what-its-numbers-mean.md) Phase 1**, as the documentation ask this entry says it is. The
+- **Verified 2026-09-06** — discharged for the OSC consumer, replacing this entry's `unprobeable:` bullet about prose. Plan 0147 Phase 1 states the property where the telemetry table is read: `present: normalized against \*\*its own running peak\*\* in: docs/configuration.md`
+- **Still open for the preset author.** `docs/presets.md` states the normalization and names the `*_raw` twin, and does **not** state that the four terms reach 1.0 on every local peak - which is the half that misled the room. A look written as `glow + depth * bass` in the expression grammar hits the identical ceiling. Phase 1 did not cover it and did not claim to; it is one paragraph, and it belongs with whatever plan next touches that document
+**Update 2026-09-06, at Plan 0147's close — half discharged, and this entry stays live for the other
+half.** The plan's header names this entry under `Closes:` and its close block reports it discharged;
+that is true for the OSC consumer and not for the preset author. The OSC address table in `docs/configuration.md` now
+states the ceiling property, why `1.0` is normal, and that no input gain moves it. `docs/presets.md`
+states the normalization and names the `*_raw` twin and **still does not say the four terms reach 1.0
+on every local peak** — so a look written `glow + depth * bass` in the expression grammar hits the
+identical ceiling that misled the room, with nothing on the page to warn its author. One paragraph,
+and it belongs with whatever plan next touches that document.
+
+- **PROMOTED 2026-09-01 -> [Plan 0147](plans/done/0147-what-the-show-costs-and-what-its-numbers-mean.md) Phase 1**, as the documentation ask this entry says it is. The
   phase lands first in that plan because [Plan 0133](plans/0133-the-engine-drives-the-lights.md) is approved and meets this on its first evening.
-
-## 0164 - the operator console halves the output's frame rate, and two comments say it cannot
-
-> **Filed 2026-08-30** at Plan 0131's close, out of that plan's own Phase 6, which names
-> "it costs the output frames" as a valid outcome and routes it here rather than tuning it away.
-
-Two 95 s release runs differing only by `--console`, both hands-off, `[console] enabled` reset to
-false first so the closed arm was genuinely closed:
-
-| | closed | open |
-|---|---|---|
-| mean fps over 18 samples | **61.7** | **33.1** |
-| `frame_ms_p99_steady` | **18.6 ms** | **47.3 ms** |
-| frames over the same 90 s | 5,549 | 2,976 |
-
-**+29 ms per frame is far more than a full-frame copy plus a 900x640 blit accounts for**, and
-landing within 3 % of exactly half is the shape of two presents serialising rather than of copy
-cost. The console's present mode was confirmed as `Mailbox` from the diagnostic note it writes on
-open, so the **non-blocking arm was taken** and the halving happened with it, not in the `Fifo`
-fallback. That is what convicts ADR-0143's stated cadence property: an independent encoder, submit
-and present is not an independent frame loop.
-
-**Two levers are visible in the diff and neither has been tried.** The console swapchain is
-configured with `desired_maximum_frame_latency = 1`, so its `get_current_texture` waits for its own
-previous present to retire - one vblank - while the output's own present waits for another; two
-vblanks per frame is exactly the halving. And `present_console` runs synchronously in the display
-loop on every frame, with no decimation, which is the explicit remedy Plan 0131 Phase 6 asks for a
-verdict on.
-
-**Two comments state the property the measurement denies**, which is the half of this entry that is
-a defect rather than a design question. `standalone/src/app_state.rs` says the console present is placed
-after the show's "never before it and never inside it: the console is a monitor and must not delay
-the frame it reports on" - being after this frame's present does not stop it delaying the next one.
-`core/src/render/aux_target.rs` says "a console that stalls or drops a frame cannot alter what the
-show displays". What actually holds is narrower and worth saying instead: the show's **pixels** are
-unaffected, asserted byte-exactly; its **cadence** is not, measured at ~2x.
-
-**What bounds the reading.** It is the **integrated** GPU (see 0165), so the absolute cost is not the
-discrete GPU's; and both surfaces were on **one display at one refresh rate**, which is precisely the
-configuration Plan 0131 Phase 6 says cannot separate the two pacing sources. **The measurement says
-the cost is real and large; it does not say the present mode is the mechanism.** The cross-refresh
-two-display run that would name it is still owed and is on the checklist.
-
-### What a fix looks like
-
-Raise the console's frame latency, or decimate its present to every Nth output frame, or both, and
-re-measure on the same two arms - the instrument already exists and costs 3 minutes. If neither
-lever moves it, the mechanism is elsewhere and the next thing to try is presenting the console off
-the display thread, which is a real design change and an ADR. Whichever lands, the two comments
-above are corrected to the property that survives.
-
-- **Verified 2026-08-30** - the console swapchain still asks for a single in-flight image: `present: desired_maximum_frame_latency = 1 in: core/src/render/aux_target.rs`
-- **Verified 2026-08-30** - the console still presents synchronously in the display loop, undecimated: `present: self\.present_console\(\) in: standalone/src/app_state.rs`
-- **Verified 2026-08-30** - the comment that denies the cost is still there: `present: must not delay the frame it reports on in: standalone/src/app_state.rs`
-- **Verified 2026-08-30** - and so is its twin in the core: `present: cannot alter what the show displays in: core/src/render/aux_target.rs`
-- **Verified 2026-08-30** - the non-blocking arm the design rests on is the one that ran: `present: AuxPresentMode::NonBlocking\("Mailbox"\) in: core/src/render/aux_target.rs`
-- **PROMOTED 2026-09-01 -> [Plan 0147](plans/0147-what-the-show-costs-and-what-its-numbers-mean.md) Phases 3-5.** Both levers become reachable, a hands-off window measures
-  four arms, and whichever verdict arrives sets the defaults. **The two false comments are corrected
-  either way** - the plan is explicit that a fix is conditional and the claim repair is not.
 
 ## 0165 - the windowed app cannot ask for the discrete GPU, so every windowed frame-time figure this project has quoted is an integrated-GPU figure
 
@@ -3171,12 +3137,30 @@ the running adapter has already landed and is what makes any of this attributabl
 > work is a measurement pass producing a **new row** beside the iGPU numbers, not a correction to
 > them. The first probe below is rewritten because Phase 2 falsified its reduction, not its claim.
 
-- **Re-written 2026-08-31** - the constructor now takes the choice, so the old reduction is dead; what stands is that the window still *asks* for the default when unflagged: `present: None => AdapterChoice::Default in: standalone/src/gpu.rs`
+> **Updated 2026-09-06, at Plan 0147 Phase 6. The measurement half is discharged; the degrade half is
+> not, and this entry stays live for it.** A windowed frame-time row now names
+> `NVIDIA GeForce RTX 3080 Laptop GPU (Dx12, DiscreteGpu)` and sits **beside** the iGPU figures in
+> [nfr.md](nfr.md), which were not edited. It is a matched pair taken on one build minutes apart —
+> 1080p windowed, `Rich` tier, rotation on — so the two rows are comparable to each other rather than
+> to a cross-build figure: the discrete part reads 165.0 fps median with a worst p99 sample of
+> 8.936 ms, the unflagged integrated part 112.8 median with 21 of 171 samples under the 60 fps floor.
+> Neither drops a frame. **This entry's title is now satisfied**: a published windowed figure names
+> the discrete adapter.
+>
+> **The console's dual-GPU degrade path still has not executed, and this box cannot make it.** A
+> window pinned to the adapter that does not drive the display was the configuration in which it
+> could first have fired, and it did not — the console opened normally on the RTX 3080 (`Mailbox`,
+> frame latency 1) and presented 9,834 times with 0 skips. On a single-display Optimus laptop the
+> discrete adapter presents to a window the integrated part composites, so nothing refuses. Reaching
+> that branch needs a genuinely multi-adapter display topology; the last probe below therefore still
+> holds, and the entry keeps this half.
+
+- **Verified 2026-08-31** - re-written: the constructor now takes the choice, so the old reduction is dead; what stands is that the window still *asks* for the default when unflagged: `present: None => AdapterChoice::Default in: standalone/src/gpu.rs`
 - **Verified 2026-08-30** - and the code's own doc says what the default yields on a hybrid box: `present: the power-saving GPU for a console process in: core/src/render/context.rs`
 - **Verified 2026-08-31** - the two unflagged arms are held apart, which is what keeps the published figures comparable: `present: fn the_window_and_the_stream_disagree_when_unflagged in: standalone/src/gpu.rs`
 - **Verified 2026-08-30** - the startup note that makes a figure attributable exists: `present: renderer adapter in: standalone/src/app_state.rs`
 - **Verified 2026-08-30** - the console's degrade branch is still built and still unreachable here: `present: console surface unavailable on this adapter in: standalone/src/app_state.rs`
-- **PARTLY PROMOTED 2026-09-01 -> [Plan 0147](plans/0147-what-the-show-costs-and-what-its-numbers-mean.md) Phase 6**, which takes the measurement half: a new windowed
+- **PARTLY PROMOTED 2026-09-01 -> [Plan 0147](plans/done/0147-what-the-show-costs-and-what-its-numbers-mean.md) Phase 6**, which takes the measurement half: a new windowed
   frame-time row naming the discrete adapter, beside the iGPU figures rather than replacing them. The
   phase also records whether the console's dual-GPU degrade path became reachable; **if it stays
   unexercised this entry keeps that half and stays live.**
@@ -3569,3 +3553,47 @@ which is exactly the sentence that is false for a trace.
 
 Either way the two stale headers above want a sweep, and `presets/README.md`'s note wants the trace
 half added beside the cloud half it already has.
+
+## 0187 — two measurements of the same console on the same adapter class disagree by 2x, and nothing explains which one the machine actually does
+
+**Raised by:** `architect`, at [Plan 0147](plans/done/0147-what-the-show-costs-and-what-its-numbers-mean.md)'s
+close review (2026-09-06), carrying the residue of archived 0164. **Owner if taken:** `human` first
+— it is a measurement question before it is a design one, and the configuration that would settle it
+is hardware this box does not have.
+
+On 2026-08-30 a 95 s hands-off pair differing only by `--console` read **61.7 fps closed against
+33.1 open**, `frame_ms_p99_steady` 18.6 ms against 47.3 ms — landing within 3 % of exactly half,
+which is the shape of two presents serialising. On 2026-09-06 the same protocol, on the same
+integrated Radeon and the same single 165 Hz display, read **53.5 closed against 53.1 open**, with
+four further arms spanning 52.3 to 54.5 and a witness attached: every open arm presented ~4,700
+times with **zero skips**, and at the vsync cap 14,797 presents cost the output 0.0 fps. The second
+reading is the better-instrumented one by a wide margin. It is not a refutation of the first — the
+two are different builds, and a cross-build comparison is one Plan 0147 explicitly forbade itself —
+so what stands is that **a 2x cost was measured once, has never been reproduced, and has no named
+cause.**
+
+Three hypotheses, none tested: a build difference somewhere in the 71 versions between them; a
+configuration difference the first window did not record (the console's size, its position, whether
+another window overlapped it); or an uncontrolled variable in the first reading, which had no present
+count and therefore cannot distinguish a console that cost 29 ms from one whose surface was in a
+state the second window never entered.
+
+**What would settle it, and why it is not free.** Both windows put both surfaces on **one display at
+one refresh rate**, which archived 0164 and
+[ADR-0143](adrs/0143-the-operator-console-is-a-second-surface-and-the-shell-owns-its-meaning.md)'s
+first `Outcome` both name as precisely the configuration that cannot separate the two pacing
+sources. The cross-refresh, two-display run is still owed and needs a second monitor at a different
+refresh rate. Until then the honest statement in the operator docs is the one Plan 0147 Phase 5
+shipped: the cost is a measurement, quoted with its adapter and its present count, not a guarantee.
+
+- **Verified 2026-09-06** — the instrument that makes any re-run readable now exists and reconciles
+  against the frames the loop ran:
+  `present: pub struct AuxCounts in: core/src/render/aux_target.rs`
+- **Verified 2026-09-06** — and its totals reach the log rather than dying with the process:
+  `present: console \{label\}: in: standalone/src/app_state.rs`
+- **Verified 2026-09-06** — both levers stay reachable, so a re-run costs a config edit rather than
+  a build:
+  `present: pub present_every_n in: standalone/src/config.rs`
+- `unprobeable:` that no run anywhere has put the two surfaces on displays at different refresh
+  rates is a negative about measurement history, not a match countable in any file
+

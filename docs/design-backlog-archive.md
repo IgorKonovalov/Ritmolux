@@ -198,6 +198,7 @@ accepted cost" are different documents and only one of them is honest.
 - [0153 — the palette consumes its stops as linear light, and `preset-palettes.md` presents the resulting shift as unavoidable when below the tonemap knee the author can correct it exactly](#0153--the-palette-consumes-its-stops-as-linear-light-and-preset-palettesmd-presents-the-resulting-shift-as-unavoidable-when-below-the-tonemap-knee-the-author-can-correct-it-exactly)
 - [How this archive came to exist — three sweeps in ten days](#how-this-archive-came-to-exist--three-sweeps-in-ten-days)
 - [0110 — an attractor's sample budget ignores the render target, so a 1080p render reads as an upscale](#0110--an-attractors-sample-budget-ignores-the-render-target-so-a-1080p-render-reads-as-an-upscale)
+- [0164 - the operator console halves the output's frame rate, and two comments say it cannot](#0164---the-operator-console-halves-the-outputs-frame-rate-and-two-comments-say-it-cannot)
 <!-- toc:end -->
 
 ## 0001 — reaction_diffusion reaches only 2 of the 5 Plan-0018 composite levers
@@ -8871,3 +8872,111 @@ original, which no longer exists.
 denominator, so a preset authored on the *sparse* side draws four times the trajectories at a
 quarter the deposit each on a large display — a look change where the cloud case is an improvement.
 That is a new question, not a residue of this one, and it is live as 0186.
+
+## 0164 - the operator console halves the output's frame rate, and two comments say it cannot
+
+> **Filed 2026-08-30** at Plan 0131's close, out of that plan's own Phase 6, which names
+> "it costs the output frames" as a valid outcome and routes it here rather than tuning it away.
+
+Two 95 s release runs differing only by `--console`, both hands-off, `[console] enabled` reset to
+false first so the closed arm was genuinely closed:
+
+| | closed | open |
+|---|---|---|
+| mean fps over 18 samples | **61.7** | **33.1** |
+| `frame_ms_p99_steady` | **18.6 ms** | **47.3 ms** |
+| frames over the same 90 s | 5,549 | 2,976 |
+
+**+29 ms per frame is far more than a full-frame copy plus a 900x640 blit accounts for**, and
+landing within 3 % of exactly half is the shape of two presents serialising rather than of copy
+cost. The console's present mode was confirmed as `Mailbox` from the diagnostic note it writes on
+open, so the **non-blocking arm was taken** and the halving happened with it, not in the `Fifo`
+fallback. That is what convicts ADR-0143's stated cadence property: an independent encoder, submit
+and present is not an independent frame loop.
+
+**Two levers are visible in the diff and neither has been tried.** The console swapchain is
+configured with `desired_maximum_frame_latency = 1`, so its `get_current_texture` waits for its own
+previous present to retire - one vblank - while the output's own present waits for another; two
+vblanks per frame is exactly the halving. And `present_console` runs synchronously in the display
+loop on every frame, with no decimation, which is the explicit remedy Plan 0131 Phase 6 asks for a
+verdict on.
+
+**Two comments state the property the measurement denies**, which is the half of this entry that is
+a defect rather than a design question. `standalone/src/app_state.rs` says the console present is placed
+after the show's "never before it and never inside it: the console is a monitor and must not delay
+the frame it reports on" - being after this frame's present does not stop it delaying the next one.
+`core/src/render/aux_target.rs` says "a console that stalls or drops a frame cannot alter what the
+show displays". What actually holds is narrower and worth saying instead: the show's **pixels** are
+unaffected, asserted byte-exactly; its **cadence** is not, measured at ~2x.
+
+**What bounds the reading.** It is the **integrated** GPU (see 0165), so the absolute cost is not the
+discrete GPU's; and both surfaces were on **one display at one refresh rate**, which is precisely the
+configuration Plan 0131 Phase 6 says cannot separate the two pacing sources. **The measurement says
+the cost is real and large; it does not say the present mode is the mechanism.** The cross-refresh
+two-display run that would name it is still owed and is on the checklist.
+
+### What a fix looks like
+
+Raise the console's frame latency, or decimate its present to every Nth output frame, or both, and
+re-measure on the same two arms - the instrument already exists and costs 3 minutes. If neither
+lever moves it, the mechanism is elsewhere and the next thing to try is presenting the console off
+the display thread, which is a real design change and an ADR. Whichever lands, the two comments
+above are corrected to the property that survives.
+
+- **Verified 2026-09-06** - re-probed: the console swapchain still gets a single in-flight image *by default*. Plan 0147 Phase 3 removed the literal this bullet used to match in `aux_target.rs`; the value now arrives from the caller and is clamped, so the shipped depth is the config default: `present: frame_latency: 1 in: standalone/src/config.rs`
+- **Verified 2026-08-30** - the console still presents synchronously in the display loop, undecimated: `present: self\.present_console\(\) in: standalone/src/app_state.rs`
+- **Verified 2026-09-06** - re-probed: a comment that denies the cost is still there. The sentence this bullet used to match in `app_state.rs` was rewritten by Plan 0147 Phase 3 when the decimation moved the cadence decision into the display loop; the same claim stands in three other places, and this probes the one furthest from the plan's own file list: `present: cost the show nothing in: standalone/src/hud.rs`
+- **Verified 2026-09-06** - and in the core's own wrapper, which no plan text had named until this review: `present: console that stalls cannot pace in: core/src/render/mod.rs`
+- **Verified 2026-08-30** - and so is its twin in the core: `present: cannot alter what the show displays in: core/src/render/aux_target.rs`
+- **Verified 2026-08-30** - the non-blocking arm the design rests on is the one that ran: `present: AuxPresentMode::NonBlocking\("Mailbox"\) in: core/src/render/aux_target.rs`
+- **PROMOTED 2026-09-01 -> [Plan 0147](plans/done/0147-what-the-show-costs-and-what-its-numbers-mean.md) Phases 3-5.** Both levers become reachable, a hands-off window measures
+  four arms, and whichever verdict arrives sets the defaults. **The two false comments are corrected
+  either way** - the plan is explicit that a fix is conditional and the claim repair is not.
+
+**Update 2026-09-06, at the Plan 0147 Phases 1-3 review. Three things this entry got wrong or
+under-counted, and one instrument it turns out to need.**
+
+**The false claim has four sites, not two.** This entry names `app_state.rs` and `aux_target.rs`.
+The full roster at Plan 0147's Phase 3 tip is `core/src/render/aux_target.rs` twice (the
+`NonBlocking` doc's *"it cannot pace the output"* and `present`'s *"cannot alter what the show
+displays"*), `core/src/render/mod.rs`'s `present_aux` doc (*"a console that stalls cannot pace the
+show"*), and `standalone/src/hud.rs`'s `present_console` doc (*"must cost the show nothing"*). The
+`app_state.rs` sentence this entry quotes no longer exists - Phase 3 rewrote that block for the
+decimation and replaced the claim with the mechanism, so nothing false stands there.
+
+**A first measurement window ran on 2026-09-06 and produced no usable verdict.** Three arms on
+`AMD Radeon(TM) Graphics (Dx12, IntegratedGpu)`, one display at 165 Hz, windowed: Meter Mono
+165.0 -> 165.0 fps, Clifford 40.0 -> 40.4, Leviathan 29.4 -> 28.7. **None of these is 0164's
+regime.** No shipped preset screened between 45 and 90 fps closed on that box, and a one-vblank
+penalty is 6.06 ms - invisible against a 34 ms frame and arithmetically incapable of halving it.
+The 61.7 -> 33.1 reading sits at ~16 ms closed, where two vblanks *is* a halving. **A null taken
+outside the regime is not evidence against the mechanism**, and the window has to reach ~2-3 vblanks
+per frame closed before its result means anything.
+
+**And nothing in this repository can tell a console that cost nothing from one that never
+presented.** `AuxTarget::present` returns `Ok(())` on `Timeout | Occluded` *and* on
+`Outdated | Lost`, before any encoder work; `present_aux` propagates that `Ok`; nothing counts. The
+show's own path is not like this - `Renderer::render` calls `record_dropped()` on the same skip and
+`record_frame()` only after `queue.present`, so `fps` counts presents and `frames_dropped` is
+published in `diagnostics.log` (0 across every arm of the window above). **The show's numbers are
+sound and the console's are unwitnessed**, and the Meter Mono arm is the one this bites hardest: at
+165 Hz a console presenting synchronously at `frame_latency = 1` should cost about a vblank, and the
+arm moved by nothing at all. Carried as Plan 0147 Phase 3b (make the present countable) and
+[ADR-0172](adrs/0172-a-null-cost-measurement-names-the-witness-that-the-thing-ran.md).
+
+**CLOSED 2026-09-06** at [Plan 0147](plans/done/0147-what-the-show-costs-and-what-its-numbers-mean.md)'s
+close. Both asks were executed: the falsified comments — **four sites, not the two named above** —
+were repaired in Phase 5, and both levers were made reachable in Phase 3 and measured in Phase 4
+with the witness [ADR-0172](adrs/0172-a-null-cost-measurement-names-the-witness-that-the-thing-ran.md)
+requires. **The halving in this entry's own title did not reproduce.** Five arms plus a closed
+control on the same integrated Radeon spanned 52.3 to 54.5 fps against a 53.5 control, every open
+arm presenting ~4,700 times with zero skips; at the 165 Hz vsync cap 14,797 console presents cost
+the output 0.0 fps, which is the arm where the suspected mechanism had nowhere to hide. That is
+**not** a refutation of the 61.7 -> 33.1 figures — they came from a different build and the plan
+forbade that comparison — and the unexplained gap between the two readings is live as **0187**,
+which also carries the cross-refresh two-display run this entry left owed.
+
+**Two of this entry's `present:` probes were falsified by the repair itself and one was never run.**
+The `cost the show nothing` reduction sat in a bullet stamped `Re-probed` rather than `Verified`,
+which `scripts/check-backlog-claims.mjs` does not parse, so it went red silently. The bullets were
+restamped at this close and the remaining breaks retire with this body.

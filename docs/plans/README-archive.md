@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0147 — What the show costs, and what its numbers mean](#0147--what-the-show-costs-and-what-its-numbers-mean)
   - [0155 — The reader documents stop explaining themselves](#0155--the-reader-documents-stop-explaining-themselves)
   - [0154 — The site becomes navigable](#0154--the-site-becomes-navigable)
   - [0152 — The OSC root becomes `/rlx`](#0152--the-osc-root-becomes-rlx)
@@ -160,6 +161,7 @@ hand-edited.
   - [0002 — Rust enforcement tooling](#0002--rust-enforcement-tooling)
   - [0001 — Core + standalone MVP, then foobar parity](#0001--core--standalone-mvp-then-foobar-parity)
 - [Prior sequencing notes (superseded)](#prior-sequencing-notes-superseded)
+  - [Moved 2026-09-06 from `README.md` — the 0147-Phase-1-before-0133 note](#moved-2026-09-06-from-readmemd--the-0147-phase-1-before-0133-note)
   - [Moved 2026-09-05 from `README.md` — the 0152-before-0133-and-0147 note](#moved-2026-09-05-from-readmemd--the-0152-before-0133-and-0147-note)
   - [Moved 2026-09-05 from `README.md` — the 0151/0143 heading-layout note](#moved-2026-09-05-from-readmemd--the-01510143-heading-layout-note)
   - [Moved 2026-09-04 from `README.md` — the 0127/0128 pair from the 2026-08-28 "what next" round](#moved-2026-09-04-from-readmemd--the-01270128-pair-from-the-2026-08-28-what-next-round)
@@ -174,6 +176,87 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0147 — What the show costs, and what its numbers mean](done/0147-what-the-show-costs-and-what-its-numbers-mean.md)
+
+— closed 2026-09-06. Eight phases in the `plan-0147-show-costs` lane (`WORK/lmv-plan-0147`):
+`eacaf8c` (1, `level/*` states its normalization), `bdbba7f` (2, the activation verdict),
+`9e7dee1` (3, both console pacing levers), `76e3452` (3b, the present becomes countable),
+`ada2b37` (3c, the give-up verdict is scoped to the budget's incident), `8b7bf2d` (5, the four
+comments and the two documented keys), plus the two `human` measurement phases recorded in the log
+(`cd7af11` for Phase 4, `7478fa2` for Phase 6). Phases 3b and 3c were added mid-plan at a Phases 1-3
+review (`c2c18de`) after the first Phase 4 window produced a null nothing could read. Version:
+**0.109.0** (minor — Phase 3 shipped two operator-settable keys and Phase 3b shipped counters plus
+new `diagnostics.log` lines). Review: **no blockers, one major, four minors, one nit.**
+
+**What landed.** Four surfaces an operator reads stopped saying something the machine does not do.
+`README.md`'s telemetry table now states that `level/*` is an excitation against its own running
+peak, that `1.0` is a normal reading rather than a clip, and that no input gain moves it —
+the property whose absence sent a live operator to the wrong lever. `CaptureVerdict::Lost` carries a
+`LossCause`, so three COM activation failures no longer write a verdict about a device none of them
+reached. The console's two pacing levers became config keys with their shipped combination pinned by
+a test. And `AuxCounts` plus the display loop's decimation counter make the console's present
+countable, so `presented + skipped + decimated` reconciles against the frames the loop ran and
+reaches `diagnostics.log` on a 30 s census rather than only on close.
+
+**The verdict Phase 4 reached is the plan's "neither lever moves it", in its stronger form: on this
+build there was no cost for a lever to move.** Five arms plus a closed control, 95 s each, hands-off
+on an idle box, `AMD Radeon(TM) Graphics (Dx12, IntegratedGpu)`: 52.3 to 54.5 fps against a 53.5
+control, every open arm with ~4,700 presents and **zero skips**. Two further regimes were taken
+because one frame time cannot separate "cheap" from "hidden" — at the 165 Hz vsync cap the console
+presented 14,797 times inside a 6.5 ms frame budget and the output never left 165.0 fps, which is
+the arm where a present serialising behind the output's vblank had nowhere to hide. The defaults
+therefore did not move, and both keys stay reachable.
+
+**What the close verified rather than accepted.** `cargo nextest run --workspace` at the lane tip —
+**1545 passed, 5 skipped**, exit 0, 431 s — matching the log's claim; `cargo fmt --all --check` and
+`cargo clippy --workspace --all-targets -- -D warnings` clean; the seven pre-push Node gates run
+individually. All four falsified comment sites were opened and read: `AuxPresentMode::NonBlocking`
+and `AuxTarget::present` in `core/src/render/aux_target.rs`, `present_aux` in
+`core/src/render/mod.rs`, and `present_console` in `standalone/src/hud.rs`. Each now separates the
+property that holds (pixels and state, asserted byte-exactly) from the one that is a measurement
+(cadence, which shares the display thread), and quotes what Phase 4 measured on the adapter it
+names. `standalone/src/app_state.rs` carried nothing false, as the plan says.
+
+**The major, and the class it belongs to.** `scripts/check-backlog-claims.mjs:98` parses only
+bullets beginning `**Verified YYYY-MM-DD**`. This plan wrote four probe bullets as
+`**Discharged 2026-09-06**` and `**Re-probed 2026-09-06**`, and the gate never ran any of their
+reductions — including `present: cost the show nothing in: standalone/src/hud.rs`, which Phase 5 had
+already falsified by repairing that sentence. A probe that should have been red was silently absent
+instead. One precedent existed on `main` (`**Re-written 2026-08-31**`, entry 0165). All six bullets
+were restamped `**Verified**` at this close, which is the whole repair: the prose was already
+verification, only the verb hid it. The lesson generalizes past this plan — ADR-0108's gate is
+keyed on a literal, so any new bullet verb silently removes claims from it.
+
+**What did not close, and why.** Backlog 0163 is **half discharged**, against the plan header's own
+`Closes:` and against `dev`'s close block, both of which call it discharged. `README.md` now states
+the ceiling property for the OSC consumer; `docs/presets.md` states the normalization and names the
+`*_raw` twin and still does not say the four terms reach `1.0` on every local peak, so a look
+written `glow + depth * bass` in the expression grammar hits the identical ceiling. The entry stays
+live with a dated update naming that half. Backlog 0154 keeps its mechanism halves (retry-in-place,
+a long-lived enumerator) pending unplug evidence the box cannot produce; 0165 keeps the dual-GPU
+degrade path, which did not fire even with a window pinned to the discrete adapter — on a
+single-display Optimus laptop the discrete part presents to a window the integrated part composites,
+so nothing refuses.
+
+**Backlog 0164 was archived and a successor filed.** Both of its asks were executed — the false
+comments repaired, both levers made reachable and measured with a witness — but its own title
+asserts a halving that did not reproduce, and closing it silently would retire an unexplained
+contradiction between two measurements on the same adapter class. Backlog 0187 carries the residue:
+the 2026-08-30 `61.7 -> 33.1` reading has never been reproduced or explained, and the cross-refresh
+two-display run that would name the pacing mechanism is still owed.
+
+**Two minor items were left for a `dev` commit rather than repaired here.** `rotate_for`'s doc
+comment now heads `presents_console` in `standalone/src/app_state.rs` — Phase 3 inserted the new
+helper between the block and its function, so the cadence helper is documented by prose about the
+dwell timer and ADR-0155 and `rotate_for` is undocumented. And the plan's `## Implementation log`
+runs longer than its own `## Implementation phases`, which nothing gates.
+
+**One lane-rule crossing, disclosed rather than skipped.** Phase 5's commit appends the second dated
+`Outcome` to ADR-0143, which is architect work; the plan named the file in that phase's **Files
+touched**, so the crossing is the plan's doing rather than `dev`'s. The section is append-only,
+dated, and confined to recording Phase 4's measurement, so it stands. Future plans route ADR prose
+to the close instead.
 
 ### [0155 — The reader documents stop explaining themselves](done/0155-the-reader-documents-stop-explaining-themselves.md)
 
@@ -7066,6 +7149,22 @@ uncovered (its C side remains the Plan 0001 Phase-6 smoke program's job, per ADR
 
 ## Prior sequencing notes (superseded)
 
+### Moved 2026-09-06 from `README.md` — the 0147-Phase-1-before-0133 note
+
+Spent when [0147] closed on 2026-09-06. Its Phase 1 landed the sentence 0163 asked for, so the
+window this note held open is gone and [0133] now meets the property already written. Verbatim:
+
+> - **[0147]'s Phase 1 wants to land before [0133] is built.** Backlog 0163 is one sentence of prose,
+>   and 0133 brings in-house the exact consumer that was misled by its absence — a lighting look
+>   multiplying a band term into a physical output. The rest of 0147 does not gate 0133.
+
+**What it did not cover.** 0163 is only half discharged: `README.md` carries the property for the
+OSC consumer and `docs/presets.md` does not carry it for the expression grammar, so the entry stays
+live and the note's premise survives one level down — for a preset author rather than for [0133].
+
+[0133]: 0133-the-engine-drives-the-lights.md
+[0147]: done/0147-what-the-show-costs-and-what-its-numbers-mean.md
+
 ### Moved 2026-09-05 from `README.md` — the 0152-before-0133-and-0147 note
 
 Spent when [0152] closed on 2026-09-05. It sequenced 0152 ahead of [0133] and [0147] so that neither
@@ -7092,7 +7191,7 @@ own miscount, recorded in the close write-up above.) The note as it stood:
 
 [0152]: done/0152-the-osc-root-becomes-rlx.md
 [0133]: 0133-the-engine-drives-the-lights.md
-[0147]: 0147-what-the-show-costs-and-what-its-numbers-mean.md
+[0147]: done/0147-what-the-show-costs-and-what-its-numbers-mean.md
 
 ### Moved 2026-09-05 from `README.md` — the 0151/0143 heading-layout note
 

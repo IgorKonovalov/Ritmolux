@@ -489,6 +489,32 @@ or an older copy shadows the one under test and the version check means nothing.
       _(Plan 0107 Phase 5, carried forward at that plan's close 2026-08-18; run 2026-08-24;
       (a) re-opened by Plan 0141 Phase 1 on 2026-09-01.)_
 
+## Ran 2026-09-06 — the first frame-time row that names the discrete GPU (Plan 0147 Phase 6)
+
+**Done, and recorded here because the checklist is where the dev box's own GPU-facing runs land.**
+Every windowed frame-time figure this project had published was an integrated-GPU figure — not
+because the discrete part was unreachable, but because an unflagged run resolves
+`AdapterChoice::Default` and Plan 0144 deliberately left it there so no existing number would move
+underneath a CLI change.
+
+Two 3-minute runs, one build, minutes apart, 1920x1080 windowed, `Rich` tier, rotation on at a
+20-40 s dwell. The pair and its numbers are in [nfr.md](nfr.md) — added **beside** the existing
+table, which was not edited. In short: the discrete part holds 165.0 fps median with a worst p99
+sample of 8.936 ms; the unflagged integrated part reads 112.8 median and spends 21 of 171 samples
+under the 60 fps floor. Neither drops a frame.
+
+**The console's dual-GPU degrade path did not fire, and it remains unexercised.** A window pinned to
+the adapter that does not drive the display is the first configuration in which
+`console surface unavailable on this adapter` could execute, and it did not: the console opened
+normally on the RTX 3080 (`Mailbox`, frame latency 1) and presented **9,834 times with 0 skips**.
+That is a finding, not a failure — on this single-display Optimus laptop the discrete adapter can
+present to a window the integrated part composites, so the path has still never run anywhere. **It
+needs a genuinely multi-adapter display topology**, which this box does not have; the item stays
+open rather than being marked covered.
+
+_(Plan 0147 Phase 6. The console figure is also a second-adapter witness for that plan's Phase 4:
+the same preset that runs 53 fps on the integrated part holds 165.0 with the console open here.)_
+
 ## Rig-gated — the OSC bindings move to `/rlx/v1` (Plan 0152 Phase 5)
 
 **Not iGPU-gated and not runnable at the desk either.** It needs the lighting rig — Arena, the

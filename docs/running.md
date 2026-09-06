@@ -87,6 +87,15 @@ show, so you never lose the menu along with the window.
 On a single-monitor machine it opens as an ordinary window on that monitor, which is a
 supported way to work rather than an error.
 
+**An open console costs the output nothing outside measurement noise.** That was measured across
+five combinations of the two pacing keys — `frame_latency` and `present_every_n`, both documented
+in [Configuration](configuration.md) — and three frame-time regimes on this project's development
+box, so the defaults are the shipped ones and there is no tuning to perform. The
+`diagnostics.log` line `console opened:` names the mode, the frame latency **after clamping** and
+the cadence actually in force, and a periodic `console open:` note carries the presented / skipped
+/ decimated totals, which is what makes a cost reading on some other machine believable rather
+than merely low.
+
 ## Now playing
 
 When the track changes, the **artist and title fade in** over the visuals in the

@@ -23,6 +23,27 @@ use std::fmt;
 
 use rlx_core::audio::AudioFormat;
 
+/// What a spent recovery budget actually establishes about the endpoint.
+///
+/// The budget bounds device activations against a device that is not coming
+/// back, and it counts attempts rather than reasons — a reopen that never
+/// reached an endpoint costs exactly as much as one that found it gone. That is
+/// correct as a bound and wrong as a conclusion: if every attempt failed before
+/// any endpoint was touched, "not recovered" is a fact about this process and
+/// not about the device, which may have been fine throughout.
+///
+/// So the count and the subject are carried separately. Nothing here changes
+/// what is *spent*; it changes what the spend is allowed to claim.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LossCause {
+    /// At least one reopen reached an endpoint and it did not deliver. The
+    /// verdict is about the device.
+    Endpoint,
+    /// Every reopen failed before reaching an endpoint — the platform's capture
+    /// stack could not be stood up. The endpoint's state is unknown.
+    Activation,
+}
+
 /// What `start_capture` concluded.
 ///
 /// `backend` is the short static name of the platform capture path — `"WASAPI"`,
@@ -51,6 +72,7 @@ pub enum CaptureVerdict {
     Lost {
         backend: &'static str,
         attempts: u32,
+        cause: LossCause,
     },
     /// The platform capture path failed; `reason` is the error's `Display`.
     ///
@@ -113,8 +135,22 @@ impl CaptureVerdict {
                 "live {backend} {}/{} {endpoint}",
                 format.sample_rate, format.channels
             ),
-            Self::Lost { backend, attempts } => {
+            Self::Lost {
+                backend,
+                attempts,
+                cause: LossCause::Endpoint,
+            } => {
                 format!("lost {backend} not recovered in {attempts} attempts")
+            }
+            Self::Lost {
+                backend,
+                attempts,
+                cause: LossCause::Activation,
+            } => {
+                format!(
+                    "lost {backend} not recovered in {attempts} attempts, \
+                     none of which reached an endpoint"
+                )
             }
             Self::Failed { backend, reason } => format!("failed {backend} {reason}"),
             Self::Unsupported => "unsupported".to_owned(),
@@ -170,6 +206,7 @@ mod tests {
         let lost = CaptureVerdict::Lost {
             backend: SCK,
             attempts: 3,
+            cause: LossCause::Endpoint,
         }
         .token();
         let unsupported = CaptureVerdict::Unsupported.token();
@@ -235,5 +272,81 @@ mod tests {
     fn an_empty_reason_still_says_something() {
         let token = CaptureVerdict::failed(WASAPI, "   ").token();
         assert_eq!(token, "failed WASAPI (no message)");
+    }
+
+    /// **An activation failure and an endpoint loss are verdicts about
+    /// different subjects, and the tokens say which.**
+    ///
+    /// The path this guards: a device that is fine, three consecutive reopens
+    /// that all fail at `CoCreateInstance`, a budget spent, and a verdict
+    /// reading `lost` — a conclusion about hardware drawn from three failures
+    /// that never reached it. A reader has the token and nothing else: no
+    /// HRESULT appears in any of these strings, so the subject has to be in the
+    /// words.
+    #[test]
+    fn an_activation_failure_and_an_endpoint_loss_are_about_different_things() {
+        // What the capture layer's `Display` hands the verdict for the observed
+        // `REGDB_E_CLASSNOTREG` case; the code itself is deliberately absent.
+        let activation =
+            CaptureVerdict::failed(WASAPI, "COM activation failed, no endpoint was reached")
+                .token();
+        let endpoint_loss = CaptureVerdict::Lost {
+            backend: WASAPI,
+            attempts: 3,
+            cause: LossCause::Endpoint,
+        }
+        .token();
+
+        assert_ne!(
+            activation, endpoint_loss,
+            "the two subjects render as one string"
+        );
+        assert!(
+            activation.contains("no endpoint was reached"),
+            "the activation verdict does not say it never reached a device: {activation:?}"
+        );
+        for token in [&activation, &endpoint_loss] {
+            assert!(
+                !token.contains("0x") && !token.contains("80040154"),
+                "a reader is being asked to decode an HRESULT: {token:?}"
+            );
+        }
+    }
+
+    /// **A give-up whose reopens never reached a device does not convict one.**
+    /// Same backend, same spent budget, same attempt count — the only thing that
+    /// differs is what the attempts failed at, and that is exactly what the two
+    /// tokens have to keep apart.
+    #[test]
+    fn a_give_up_that_never_reached_an_endpoint_says_so() {
+        let unreached = CaptureVerdict::Lost {
+            backend: WASAPI,
+            attempts: 3,
+            cause: LossCause::Activation,
+        }
+        .token();
+        let dead_device = CaptureVerdict::Lost {
+            backend: WASAPI,
+            attempts: 3,
+            cause: LossCause::Endpoint,
+        }
+        .token();
+
+        assert_ne!(
+            unreached, dead_device,
+            "three failed activations read as a dead endpoint"
+        );
+        assert!(
+            unreached.contains("none of which reached an endpoint"),
+            "the verdict claims the device is gone on evidence it does not have: {unreached:?}"
+        );
+        // Both still carry how hard it tried: the budget's accounting is what it
+        // was, and only the conclusion drawn from it moved.
+        for token in [&unreached, &dead_device] {
+            assert!(
+                token.starts_with("lost WASAPI") && token.contains('3'),
+                "the loss token stopped saying what it is or how hard it tried: {token:?}"
+            );
+        }
     }
 }

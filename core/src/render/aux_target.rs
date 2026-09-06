@@ -180,8 +180,14 @@ const CLEAR: wgpu::Color = wgpu::Color {
 /// name its present mode cannot be compared with another machine's).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AuxPresentMode {
-    /// A non-blocking mode was offered and taken: the console's present cannot
-    /// block on its own display's vblank, so it cannot pace the output.
+    /// A non-blocking mode was offered and taken: the console's present does
+    /// not block on its own display's vblank.
+    ///
+    /// That is a property of this surface's present, **not** a guarantee about
+    /// the output's cadence — the two presents still run on one thread, and
+    /// what the second costs the first is a measurement rather than a
+    /// deduction. Measured at Plan 0147 Phase 4 on an integrated Radeon: at the
+    /// 165 Hz vsync cap, 14,797 console presents cost the output 0.0 fps.
     NonBlocking(&'static str),
     /// Only `Fifo` was offered. The console presents in lockstep with its own
     /// display, which is the configuration where a slower second monitor can be
@@ -199,6 +205,27 @@ impl AuxPresentMode {
     }
 }
 
+/// What [`AuxTarget::present`] did with the calls it was given, since attach.
+///
+/// The witness a cost measurement of this surface needs (ADR-0172). Every arm
+/// of the present path that returns without reaching `queue.present` returns
+/// the same `Ok(())` a successful present does, so a surface that was occluded
+/// for a whole run and one that presented every frame produce the same log and
+/// the same frame rate. `presented` is what separates them; a measurement
+/// reading zero cost against a zero present count has measured nothing.
+///
+/// `presented + skipped` is the number of calls the target received, which is
+/// what lets a caller reconcile its own totals: whatever it decimated, plus
+/// these two, is the frames it ran with this target attached.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct AuxCounts {
+    /// Calls that reached this surface's own `queue.present`.
+    pub presented: u64,
+    /// Calls that returned without presenting — the surface had no texture to
+    /// give, or refused validation.
+    pub skipped: u64,
+}
+
 /// A second swapchain plus its own text layer.
 ///
 /// Its own layer, not the renderer's: glyphon's atlas and viewport are built
@@ -211,10 +238,29 @@ pub struct AuxTarget {
     text: TextLayer,
     mode: AuxPresentMode,
     blit: Blit,
+    counts: AuxCounts,
 }
+
+/// The range a secondary surface's `desired_maximum_frame_latency` is held to.
+///
+/// A depth of 0 configures no images and is rejected by the backend; past 3 the
+/// queue is deeper than any presentation engine here will run ahead, so the
+/// extra images cost memory and buy latency. The caller's value is clamped into
+/// this range at the boundary rather than validated and refused: it is a pacing
+/// hint, and a surface that will not attach is a worse answer than one that
+/// attaches at the nearest depth.
+const AUX_FRAME_LATENCY: std::ops::RangeInclusive<u32> = 1..=3;
 
 impl AuxTarget {
     /// Attach a secondary surface for `target` to `ctx`'s device.
+    ///
+    /// `frame_latency` is the swapchain's `desired_maximum_frame_latency`,
+    /// clamped to [`AUX_FRAME_LATENCY`]. It is a **pacing** control and not a
+    /// picture one: at 1 the surface holds a single in-flight image, so
+    /// `get_current_texture` waits for this surface's own previous present to
+    /// retire before it returns — one vblank, spent on whichever thread calls
+    /// it. A caller presenting this surface from the same thread as another one
+    /// pays that wait inside that thread's frame.
     ///
     /// Fails — rather than panicking or degrading silently — when the surface
     /// cannot be configured on the adapter this device was created on. That is
@@ -226,6 +272,7 @@ impl AuxTarget {
         target: impl Into<wgpu::SurfaceTarget<'static>>,
         width: u32,
         height: u32,
+        frame_latency: u32,
     ) -> Result<Self, RenderError> {
         let surface = ctx
             .instance
@@ -253,9 +300,8 @@ impl AuxTarget {
             config.present_mode = wgpu::PresentMode::Fifo;
             AuxPresentMode::Fifo
         };
-        // One in-flight image: the console is a monitor, so a deep queue only
-        // buys it latency behind the output it is reporting on.
-        config.desired_maximum_frame_latency = 1;
+        config.desired_maximum_frame_latency =
+            frame_latency.clamp(*AUX_FRAME_LATENCY.start(), *AUX_FRAME_LATENCY.end());
         surface.configure(&ctx.device, &config);
 
         let text = TextLayer::new(&ctx.device, &ctx.queue, config.format);
@@ -266,12 +312,26 @@ impl AuxTarget {
             text,
             mode,
             blit,
+            counts: AuxCounts::default(),
         })
     }
 
     /// The present mode this surface was configured with.
     pub fn present_mode(&self) -> AuxPresentMode {
         self.mode
+    }
+
+    /// What the present path has done since attach. Reset with the target: the
+    /// counts describe one open session, not the process.
+    pub fn counts(&self) -> AuxCounts {
+        self.counts
+    }
+
+    /// The frame latency this surface was configured with, **after clamping** —
+    /// so a caller reporting which arm ran quotes the depth the swapchain got
+    /// rather than the one it asked for.
+    pub fn frame_latency(&self) -> u32 {
+        self.config.desired_maximum_frame_latency
     }
 
     /// The surface's current size in physical pixels.
@@ -295,7 +355,23 @@ impl AuxTarget {
     /// Wholly independent of the output's frame: its own encoder, its own
     /// submit, its own present. Nothing here touches the primary swapchain, the
     /// scene clock or the dissolve, so a console that stalls or drops a frame
-    /// cannot alter what the show displays.
+    /// cannot alter the **pixels** the show puts on screen — which the golden
+    /// suite asserts byte-exactly.
+    ///
+    /// **It says nothing about when.** This runs on the display thread, so its
+    /// cost is inside the caller's frame whatever this surface's present mode
+    /// is; the separation above is of *state*, not of *time*. What that costs
+    /// is measured rather than argued — Plan 0147 Phase 4, five arms in three
+    /// frame-time regimes on an integrated Radeon, found it inside noise, with
+    /// [`AuxCounts`] beside each arm to prove the presents happened.
+    ///
+    /// **Every exit counts itself** into [`AuxCounts`]: the four surface states
+    /// that skip return the same `Ok(())` a present does, so without the
+    /// counter a caller cannot tell a console that ran from one that never
+    /// acquired a texture. The validation arm counts as a skip too — it is the
+    /// only exit that returns `Err`, and leaving it uncounted would break the
+    /// caller's reconciliation by one frame on exactly the frame the console
+    /// dies.
     pub fn present(
         &mut self,
         ctx: &RenderContext,
@@ -308,16 +384,23 @@ impl AuxTarget {
             // Transient: the window is resizing, occluded or hidden. Skipping
             // this console frame is correct, and the output is unaffected —
             // which is the whole reason the console presents on its own encoder.
-            C::Timeout | C::Occluded => return Ok(()),
+            C::Timeout | C::Occluded => {
+                self.counts.skipped = self.counts.skipped.saturating_add(1);
+                return Ok(());
+            }
             // Reconfigure and skip. Unlike the output path this does not retry
             // in the same frame: a console frame is worth nothing and the next
             // one is 16 ms away, so the retry would only add a stall the show
             // could feel.
             C::Outdated | C::Lost => {
+                self.counts.skipped = self.counts.skipped.saturating_add(1);
                 self.surface.configure(&ctx.device, &self.config);
                 return Ok(());
             }
-            C::Validation => return Err(RenderError::SurfaceValidation),
+            C::Validation => {
+                self.counts.skipped = self.counts.skipped.saturating_add(1);
+                return Err(RenderError::SurfaceValidation);
+            }
         };
 
         let view = frame
@@ -377,6 +460,7 @@ impl AuxTarget {
 
         ctx.queue.submit(std::iter::once(encoder.finish()));
         ctx.queue.present(frame);
+        self.counts.presented = self.counts.presented.saturating_add(1);
         self.text.end_frame();
         Ok(())
     }

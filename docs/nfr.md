@@ -81,6 +81,30 @@ the decision that moved it is linked.
   that reads p99, and a future revisit starting from that description would reintroduce the hazard
   this measurement documents.
 
+  **Every figure above is an integrated-GPU figure, and here is the discrete one beside it**
+  ([Plan 0147](plans/done/0147-what-the-show-costs-and-what-its-numbers-mean.md) Phase 6, 2026-09-06). The table above is **not edited** — a corrected number and a
+  second number answer different questions, and only the second preserves the comparison. These two
+  rows are a matched pair taken on one build minutes apart, 1920x1080 windowed, `Rich` tier,
+  rotation on with a 20-40 s dwell so switches land inside the window, ~172 one-second samples each.
+  They are **not** comparable to the three-minute run above, which is a different build and adds a
+  fullscreen toggle this pair does not perform:
+
+  | | unflagged | `--gpu` pinned |
+  |---|---|---|
+  | adapter | AMD Radeon(TM) Graphics (Dx12, **IntegratedGpu**) | NVIDIA GeForce RTX 3080 Laptop GPU (Dx12, **DiscreteGpu**) |
+  | fps median / min | 112.8 / 37.8 | **165.0 / 162.2** |
+  | `frame_ms_avg` median / max | 8.863 / 26.490 ms | **6.061 / 6.164 ms** |
+  | `frame_ms_p99` median / max | 12.889 / 31.619 ms | **6.276 / 8.936 ms** |
+  | frames dropped | 0 | 0 |
+  | samples under the 60 fps floor | 21 of 171 | **0 of 172** |
+
+  **What moves is the spread, not just the level.** The discrete part holds the 165 Hz vsync cap
+  through every switch — its worst p99 sample is 8.936 ms, inside one 6.06 ms vblank of the median —
+  while the integrated part spends 21 samples under this section's own 60 fps floor and reaches
+  31.619 ms. Neither drops a frame. **The unflagged run is what an operator gets by default**
+  ([ADR-0071](adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md): a frame-time figure names the machine that produced it), so the floor commitment is met
+  on the part that is *not* being measured whenever a published figure carries no adapter.
+
   The instrument for the third response exists anyway: `--soak` writes **`frame_ms_p99_steady`**
   beside the raw `frame_ms_p99`, the same statistic with the frames following a switch or
   reconfigure left out, alongside a monotone `switches` counter ([Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md) Phase 3,

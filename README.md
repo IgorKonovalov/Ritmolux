@@ -181,7 +181,6 @@ leaving. Everything else it used to carry now lives on the documentation site, w
   every environment variable, every `config.toml` key with its default, the precedence between
   them, and the OSC address table.
 
-
 ## Design principles
 
 This is real-time audio + graphics, so a few rules are non-negotiable:

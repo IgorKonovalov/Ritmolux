@@ -17,6 +17,15 @@
 //!   — the difference between a quiet room and a loud one must not be a
 //!   full-scale visual.
 //!
+//! **The ceiling is reached routinely, and that is what these properties buy.**
+//! The reading is `raw / peak` against the signal's *own* peak, so it is exactly
+//! 1.0 on any hop that is the loudest since the peak last released — on periodic
+//! material, every kick, at any input level. It is scale-invariant for the same
+//! reason: halve the input and both terms halve, so no input gain moves it. A
+//! consumer that wants a magnitude rather than an excitation must read the raw
+//! value beside it; one that reads a levelled scalar as a dimmer sees a term
+//! pinned at its ceiling and no gain control that can unpin it.
+//!
 //! Pure and allocation-free after construction: state is a fixed set of floats
 //! and every step is arithmetic on the input, so the same sequence always yields
 //! the same output (NFR section 6).

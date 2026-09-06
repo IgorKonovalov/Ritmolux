@@ -80,9 +80,9 @@ use crate::preset::{
     Easing, Expr, LATCH_CAP, Latch, Layer, LayerJoin, Preset, SystemKind, Variables,
 };
 #[cfg(feature = "text")]
-pub use aux_target::AuxPresentMode;
-#[cfg(feature = "text")]
 use aux_target::AuxTarget;
+#[cfg(feature = "text")]
+pub use aux_target::{AuxCounts, AuxPresentMode};
 use background::Background;
 pub use capture::{CaptureImage, FrameTap};
 pub use capture_api::AudioCapture;
@@ -740,6 +740,10 @@ impl Renderer {
     /// Returns the present mode the surface negotiated, so the caller can log
     /// which arm ran.
     ///
+    /// `frame_latency` is the secondary swapchain's
+    /// `desired_maximum_frame_latency`; see [`AuxTarget::new`] for what it paces
+    /// and for the range it is clamped to.
+    ///
     /// An already-attached target is replaced. An `Err` means this adapter
     /// cannot drive that surface — the dual-GPU case — and the caller is
     /// expected to degrade rather than treat it as fatal: the show is on the
@@ -750,11 +754,28 @@ impl Renderer {
         target: impl Into<wgpu::SurfaceTarget<'static>>,
         width: u32,
         height: u32,
+        frame_latency: u32,
     ) -> Result<AuxPresentMode, RenderError> {
-        let aux = AuxTarget::new(&self.ctx, target, width, height)?;
+        let aux = AuxTarget::new(&self.ctx, target, width, height, frame_latency)?;
         let mode = aux.present_mode();
         self.aux = Some(aux);
         Ok(mode)
+    }
+
+    /// The secondary target's configured frame latency, or `None` when detached.
+    #[cfg(feature = "text")]
+    pub fn aux_frame_latency(&self) -> Option<u32> {
+        self.aux.as_ref().map(AuxTarget::frame_latency)
+    }
+
+    /// What the secondary target's present path has done since it was attached,
+    /// or `None` when detached.
+    ///
+    /// The counts live with the target and die with it, so a caller that wants
+    /// a session's totals reads them **before** [`detach_aux`](Self::detach_aux).
+    #[cfg(feature = "text")]
+    pub fn aux_counts(&self) -> Option<AuxCounts> {
+        self.aux.as_ref().map(AuxTarget::counts)
     }
 
     /// Release the secondary target, its swapchain and its text atlas. Idempotent.
@@ -787,8 +808,17 @@ impl Renderer {
     /// attached.
     ///
     /// Deliberately **not** called from [`render`](Self::render): the two
-    /// surfaces present independently, so a console that stalls cannot pace the
-    /// show, and a frame the output drops does not have to cost the console one.
+    /// surfaces present independently, so a frame the output drops does not
+    /// have to cost the console one, and neither surface's state can reach the
+    /// other's.
+    ///
+    /// **Independent is not free.** The caller decides when this runs, and in
+    /// the standalone that is the display thread — so a console that stalls
+    /// stalls the loop that called it, whatever the two surfaces do
+    /// separately. The cost is a measurement: Plan 0147 Phase 4 put it inside
+    /// noise across three frame-time regimes on an integrated Radeon, and
+    /// [`aux_counts`](Self::aux_counts) is what makes such a reading
+    /// distinguishable from a console that never presented at all.
     #[cfg(feature = "text")]
     pub fn present_aux(&mut self, runs: &[TextRun<'_>]) -> Result<(), RenderError> {
         match self.aux.as_mut() {

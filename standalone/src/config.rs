@@ -59,6 +59,27 @@ pub struct Console {
     /// single-monitor machine this falls back to the only monitor there is,
     /// which is the correct degrade rather than a failure.
     pub display: usize,
+
+    /// The console swapchain's `desired_maximum_frame_latency`, clamped to
+    /// `1..=3` by the renderer.
+    ///
+    /// **A pacing lever, not a picture one** — it changes nothing the console
+    /// draws. At 1 the surface holds a single in-flight image, so acquiring its
+    /// next texture waits for its own previous present to retire; that wait is
+    /// paid on the display thread, which is also the thread the show presents
+    /// on. Raising it lets the console run a frame ahead instead of making the
+    /// show's loop wait for it.
+    pub frame_latency: u32,
+
+    /// Present the console every Nth output frame. `1` is every frame; `0` is
+    /// read as `1`.
+    ///
+    /// The other end of the same question: how *often* the show's frame budget
+    /// pays for a console present at all. Above 1 the console's own readout
+    /// updates at a fraction of the output's rate — a sampled monitor rather
+    /// than a continuous one — which is operator-visible and is why this is a
+    /// key rather than a constant.
+    pub present_every_n: u32,
 }
 
 impl Default for Console {
@@ -67,6 +88,8 @@ impl Default for Console {
             enabled: false,
             display_name: None,
             display: 1,
+            frame_latency: 1,
+            present_every_n: 1,
         }
     }
 }
@@ -391,6 +414,60 @@ fullscreen = true
         // every multi-monitor machine.
         assert_eq!(config.console.display, 1);
         assert_eq!(config.console.display_name, None);
+    }
+
+    /// **The console's two pacing keys default to the cadence the app shipped
+    /// with, and this pins them so moving either is a visible diff.**
+    ///
+    /// They exist to be varied — frame latency 1 or 2, present every frame or
+    /// every second one, in any of the four combinations — which is exactly why
+    /// the untouched combination has to be nailed down: a measurement whose
+    /// baseline arm quietly ran on different defaults compares nothing. Pinned
+    /// on `Default` *and* through a config that predates the keys, because an
+    /// upgrading operator's file has neither.
+    #[test]
+    fn the_console_pacing_defaults_to_one_in_flight_image_presented_every_frame() {
+        assert_eq!(
+            Console::default().frame_latency,
+            1,
+            "the shipped swapchain depth moved"
+        );
+        assert_eq!(
+            Console::default().present_every_n,
+            1,
+            "the shipped console cadence stopped being every frame"
+        );
+
+        let config: Config = toml::from_str(
+            "[console]
+enabled = true
+display = 2
+",
+        )
+        .expect("a [console] section predating the pacing keys must still parse");
+        assert_eq!(config.console.frame_latency, 1);
+        assert_eq!(config.console.present_every_n, 1);
+    }
+
+    /// **All four arms are expressible, and each survives the file.** The keys
+    /// are only useful in combination, so round-tripping one of them proves
+    /// nothing about the pair.
+    #[test]
+    fn every_console_pacing_combination_round_trips() {
+        for (frame_latency, present_every_n) in [(1, 1), (2, 1), (1, 2), (2, 2)] {
+            let mut config = Config::default();
+            config.console.frame_latency = frame_latency;
+            config.console.present_every_n = present_every_n;
+
+            let text = toml::to_string(&config).expect("config must serialize");
+            let back: Config = toml::from_str(&text).expect("config must round-trip");
+
+            assert_eq!(
+                (back.console.frame_latency, back.console.present_every_n),
+                (frame_latency, present_every_n),
+                "the ({frame_latency}, {present_every_n}) arm did not survive a save"
+            );
+        }
     }
 
     /// Both `[console]` keys survive the write/read the settings row performs,

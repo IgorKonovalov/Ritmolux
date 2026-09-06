@@ -13,7 +13,7 @@ use rlx_core::audio::{AudioFormat, SampleConsumer};
 
 #[cfg(target_os = "macos")]
 use crate::capture_mac;
-use crate::capture_verdict::CaptureVerdict;
+use crate::capture_verdict::{CaptureVerdict, LossCause};
 #[cfg(windows)]
 use crate::capture_win;
 use standalone::config;
@@ -41,6 +41,14 @@ pub(crate) struct CaptureStart {
     /// one, so a selection that degraded names what is running. `None` when the
     /// start failed, and on a platform whose capture path picks no endpoint.
     pub(crate) endpoint: Option<String>,
+    /// Whether this start failed *before* reaching any endpoint.
+    ///
+    /// `false` for a start that worked and for one that reached a device and was
+    /// refused — both of those touched an endpoint. It exists so the shell can
+    /// tell what a spent recovery budget establishes: three reopens that all
+    /// answered this way have concluded nothing about the device
+    /// ([`LossCause`](crate::capture_verdict::LossCause)).
+    pub(crate) failed_at_activation: bool,
 }
 
 /// Whether a capture swap writes its selection back to `config.toml`.
@@ -172,6 +180,70 @@ impl RecoveryPolicy {
     }
 }
 
+/// One recovery incident: the retry budget, and what the starts inside it have
+/// established about the endpoint.
+///
+/// The two are held in one value because they have to begin and end together.
+/// The budget's incident runs from the first reopen until
+/// [`INPUT_RECOVERY_SETTLE_SECS`] of unbroken delivery restores it, and a
+/// give-up is a statement about **that** span — so the evidence it quotes has to
+/// cover the same span. Evidence keyed on the shell's lost flag instead is
+/// cleared by every reopen that succeeds, so a stream that flaps inside one
+/// budget arrives at the give-up with its record wiped and convicts COM for a
+/// device every attempt reached.
+///
+/// [`RecoveryPolicy`] itself learns nothing about failure classes: the bound
+/// counts attempts and its own tests assert that bound. What is added here is
+/// only what the spend is allowed to claim.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub(crate) struct RecoveryIncident {
+    policy: RecoveryPolicy,
+    /// Whether any start in this incident got as far as an endpoint.
+    reached_endpoint: bool,
+}
+
+impl RecoveryIncident {
+    /// Advance the budget one frame. See [`RecoveryPolicy::poll`].
+    pub(crate) fn poll(&mut self, lost: bool, dt: f32) -> Recovery {
+        let recovery = self.policy.poll(lost, dt);
+        self.forget_if_restored();
+        recovery
+    }
+
+    /// Fold a capture restart into the budget. See [`RecoveryPolicy::on_restart`].
+    pub(crate) fn on_restart(&mut self, persist: Persist) {
+        self.policy.on_restart(persist);
+        self.forget_if_restored();
+    }
+
+    /// Fold one start's outcome into the evidence: anything that is not a bare
+    /// activation failure got as far as a device, a successful start included.
+    pub(crate) fn record_start(&mut self, failed_at_activation: bool) {
+        self.reached_endpoint |= !failed_at_activation;
+    }
+
+    /// What a spent budget establishes about the endpoint.
+    pub(crate) fn cause(&self) -> LossCause {
+        if self.reached_endpoint {
+            LossCause::Endpoint
+        } else {
+            LossCause::Activation
+        }
+    }
+
+    /// The evidence dies with the budget it describes, and only with it.
+    ///
+    /// A restored budget is the one event that ends an incident: both roads to
+    /// it — the settle window closing, and an operator's own swap — put the
+    /// policy back to its default, and neither leaves anything the next
+    /// incident's give-up may quote.
+    fn forget_if_restored(&mut self) {
+        if self.policy == RecoveryPolicy::default() {
+            self.reached_endpoint = false;
+        }
+    }
+}
+
 /// Whether the running capture stream has reported itself dead.
 ///
 /// Only the Windows path reports it; elsewhere a stream is either running or was
@@ -264,9 +336,13 @@ pub(crate) fn start_capture(input: &config::Input) -> CaptureStart {
                 format,
                 verdict,
                 endpoint: Some(endpoint),
+                failed_at_activation: false,
             }
         }
         Err(err) => {
+            // Read before the error is consumed by the verdict: the subject is
+            // the one thing about a failure the token cannot be re-parsed for.
+            let failed_at_activation = err.is_activation();
             // Stays: it costs nothing and is still the fastest read for anyone
             // already at a terminal. The verdict is for everyone who is not.
             eprintln!("audio capture unavailable ({err}); rendering without audio");
@@ -276,6 +352,7 @@ pub(crate) fn start_capture(input: &config::Input) -> CaptureStart {
                 format: FALLBACK_FORMAT,
                 verdict: CaptureVerdict::failed(CAPTURE_BACKEND, err),
                 endpoint: None,
+                failed_at_activation,
             }
         }
     }
@@ -296,6 +373,7 @@ pub(crate) fn start_capture(_input: &config::Input) -> CaptureStart {
                 verdict,
                 // Not an endpoint anything can select, so it positions no row.
                 endpoint: None,
+                failed_at_activation: false,
             }
         }
         Err(err) => {
@@ -306,6 +384,10 @@ pub(crate) fn start_capture(_input: &config::Input) -> CaptureStart {
                 format: FALLBACK_FORMAT,
                 verdict: CaptureVerdict::failed(CAPTURE_BACKEND, err),
                 endpoint: None,
+                // ScreenCaptureKit taps the system mix rather than activating a
+                // per-endpoint object, so there is no stage here that can fail
+                // short of a device.
+                failed_at_activation: false,
             }
         }
     }
@@ -320,6 +402,7 @@ pub(crate) fn start_capture(_input: &config::Input) -> CaptureStart {
         format: FALLBACK_FORMAT,
         verdict: CaptureVerdict::Unsupported,
         endpoint: None,
+        failed_at_activation: false,
     }
 }
 
@@ -340,9 +423,10 @@ pub(crate) fn list_devices_and_exit() {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::{
-        INPUT_RECOVERY_ATTEMPTS, INPUT_RECOVERY_SETTLE_SECS, Persist, Recovery, RecoveryPolicy,
-        device_row_index,
+        CAPTURE_BACKEND, INPUT_RECOVERY_ATTEMPTS, INPUT_RECOVERY_SETTLE_SECS, Persist, Recovery,
+        RecoveryIncident, RecoveryPolicy, device_row_index,
     };
+    use crate::capture_verdict::CaptureVerdict;
 
     /// One frame at 60 Hz, for the cases where the *rate* is not what is under
     /// test — the bound, the flap and the give-up latch all count events rather
@@ -470,6 +554,80 @@ pub(crate) mod tests {
             "a flapping endpoint reopened past the bound"
         );
         assert_eq!(gave_up, 1, "the give-up notice did not arrive exactly once");
+    }
+
+    /// Replay one loss through a [`RecoveryIncident`] the way `poll_input_lost`
+    /// and `restart_capture` drive it, and return the token its give-up writes.
+    ///
+    /// `reopen_reaches_endpoint` is the only thing that differs between the two
+    /// sequences under test: `true` is a stream that opens and dies a frame
+    /// later, every attempt of which touched a device; `false` is an activation
+    /// that fails before reaching one. Everything else is the shell's own loop —
+    /// the lost flag stays set while nothing is delivering, and a reopen that
+    /// produced a handle clears it for the single frame it delivers.
+    fn give_up_token(reopen_reaches_endpoint: bool) -> String {
+        let mut incident = RecoveryIncident::default();
+        let mut lost = true;
+        for _ in 0..10_000 {
+            match incident.poll(lost, A_FRAME) {
+                Recovery::Reopen(_) => {
+                    incident.record_start(!reopen_reaches_endpoint);
+                    incident.on_restart(Persist::No);
+                    lost = !reopen_reaches_endpoint;
+                }
+                // The flap: whatever opened is gone again by the next frame.
+                Recovery::Hold => lost = true,
+                Recovery::GiveUp => {
+                    return CaptureVerdict::Lost {
+                        backend: CAPTURE_BACKEND,
+                        attempts: INPUT_RECOVERY_ATTEMPTS,
+                        cause: incident.cause(),
+                    }
+                    .token();
+                }
+            }
+        }
+        panic!("the incident never reached its give-up");
+    }
+
+    /// **A flap does not convict COM for a device every attempt reached.** The
+    /// sequence is the one `a_stream_that_dies_as_fast_as_it_opens_still_gives_up`
+    /// models — reopen, one live frame, lost again, to the bound — and every
+    /// reopen in it opened a stream. Evidence cleared on the lost flag instead
+    /// is wiped by each of those reopens, so the give-up arrives with an empty
+    /// record and says the opposite of what happened.
+    #[test]
+    fn a_flap_whose_reopens_all_reached_a_device_says_the_device_is_gone() {
+        let token = give_up_token(true);
+        assert!(
+            token.contains(&format!(
+                "not recovered in {INPUT_RECOVERY_ATTEMPTS} attempts"
+            )),
+            "the give-up stopped saying how hard it tried: {token:?}"
+        );
+        assert!(
+            !token.contains("none of which reached an endpoint"),
+            "every attempt opened a stream and the verdict says none reached a \
+             device: {token:?}"
+        );
+    }
+
+    /// **Three activations that never reached a device conclude nothing about
+    /// one.** The same spent budget and the same attempt count as the flap
+    /// above; only what the attempts failed at differs, and that is the whole
+    /// of what the two tokens have to keep apart.
+    #[test]
+    fn three_activation_failures_do_not_read_as_a_dead_endpoint() {
+        let token = give_up_token(false);
+        assert!(
+            token.contains("none of which reached an endpoint"),
+            "the verdict convicts a device on evidence it does not have: {token:?}"
+        );
+        assert_ne!(
+            token,
+            give_up_token(true),
+            "a flap and three failed activations write the same verdict"
+        );
     }
 
     /// **The device row is positioned by what capture reports running**, never

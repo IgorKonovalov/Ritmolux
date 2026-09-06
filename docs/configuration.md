@@ -222,6 +222,12 @@ intermediate render target and no extra copy per frame.
 | `enabled` | `false` | Open the console at launch |
 | `display_name` | unset | Preferred monitor identity for the console, matched by name before the index. Unset means "use the index" |
 | `display` | `1` | Fallback monitor index when no `display_name` matches |
+| `frame_latency` | `1` | The console swapchain's `desired_maximum_frame_latency`, clamped to `1..=3`. At `1` the surface holds a single in-flight image, so acquiring the next one waits for its own previous present to retire |
+| `present_every_n` | `1` | Present the console every Nth output frame. At `1` every frame; at `2` the console's readout updates at **half rate**, which is visible on the transport strip and the preview |
+
+**Neither of the last two needs touching on a machine that keeps up.** They exist so the console's
+cost can be measured rather than argued about; the defaults above are the shipped ones, and what
+they cost in practice is in [Running the app](running.md).
 
 `display` defaults to **1, not 0**: a console's whole point is to be on a display other than the
 show's, and the show defaults to `0`. On a single-monitor machine this falls back to the only
@@ -266,6 +272,8 @@ rate_hz = 60
 [console]
 enabled = false
 display = 1
+frame_latency = 1
+present_every_n = 1
 ```
 
 ## Precedence
@@ -298,12 +306,12 @@ address, so a console binds a parameter to an address rather than to a position 
 
 | Address | Type | What it carries |
 |---------|------|-----------------|
-| `/rlx/v1/level/bass` | `f` | Bass level, peak-normalized to `0`–`1` |
-| `/rlx/v1/level/mid` | `f` | Mid level, peak-normalized |
-| `/rlx/v1/level/treb` | `f` | Treble level, peak-normalized |
-| `/rlx/v1/level/onset` | `f` | Spectral-flux onset envelope, peak-normalized |
+| `/rlx/v1/level/bass` | `f` | Bass **excitation**, `0`–`1`, normalized against **its own running peak** — not a magnitude. It reads `1.0` whenever this moment is the loudest bass of the last few seconds, which on four-on-the-floor material is **every kick**. See the note below the table before binding it to a dimmer |
+| `/rlx/v1/level/mid` | `f` | Mid excitation, same normalization and same ceiling behaviour |
+| `/rlx/v1/level/treb` | `f` | Treble excitation, same normalization and same ceiling behaviour |
+| `/rlx/v1/level/onset` | `f` | Spectral-flux onset envelope, same normalization and same ceiling behaviour |
 | `/rlx/v1/level/rms` | `f` | Broadband RMS of the waveform trace — **un-normalized**, unlike the four above it, because the trace it comes from deliberately is. Map it with a gain in the console |
-| `/rlx/v1/raw/bass` | `f` | Raw mean magnitude in the bass band — the absolute twin of `level/bass` |
+| `/rlx/v1/raw/bass` | `f` | Raw mean magnitude in the bass band — the absolute twin of `level/bass`, and **the one to bind when you want loudness**. Unnormalized, so it does move with input gain and is not portable across tracks |
 | `/rlx/v1/raw/mid` | `f` | Raw mean magnitude, mid |
 | `/rlx/v1/raw/treb` | `f` | Raw mean magnitude, treble |
 | `/rlx/v1/raw/onset` | `f` | Raw spectral-flux envelope |
@@ -312,6 +320,25 @@ address, so a console binds a parameter to an address rather than to a position 
 | `/rlx/v1/beat/phase` | `f` | Beat phase in `[0, 1)`: `0` on each beat, ramping to the next |
 | `/rlx/v1/tempo` | `f` | Tempo estimate in BPM, `0` until the tracker warms. Expect a warm-up of tens of seconds before it settles |
 | `/rlx/v1/preset` | `s` | The active preset's name |
+
+**`level/*` touches its ceiling by design, and no input gain moves it.** Each of the four is
+divided by *its own* slowly-decaying running peak — instant attack, a 2.5 s release
+([ADR-0049](adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md)) — so the value it
+publishes is `raw / peak`, an **excitation relative to this track's recent past** rather than a
+loudness. Two consequences are worth knowing before a fixture is bound to one:
+
+- **`1.0` is a normal reading, not a clip and not "loud".** It means only *this is the loudest bass
+  since the peak last released*. At 120 BPM the peak is re-adopted every 0.5 s against a 2.5 s
+  release, so on periodic material the term spends most of its life near the top of its range and
+  reaches `1.0` once per kick. A look shaped as `glow + depth * level/bass` therefore sits at
+  `glow + depth` on every kick and reads flat in the room — that is the term behaving as
+  specified, not a saturated input.
+- **Turning the mic or the interface down changes it by exactly nothing.** `raw / peak` is
+  scale-invariant: halve the input and both terms halve. Gain portability is the entire purpose of
+  the normalization — `> 0.5` is meant to mean the same thing on every track at every gain — so an
+  input-gain control is provably the wrong lever for a pinned `level/*`. The right lever is the
+  binding: reach for `raw/*`, which is the absolute twin and is published beside every one of them,
+  and scale it yourself.
 
 Telemetry rides the rendered frame, so it stops when the window is hidden and the preset name lags
 a switch by one frame. Nothing here is a musical timebase you can drive a sequencer from — it is a
