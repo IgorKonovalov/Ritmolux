@@ -164,30 +164,38 @@ one key in one TOML table.
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The profile setting | dev | done | `96458c9` |
-| 2 — The escape hatch, written down where it is needed | dev | done | committed with this row |
+| 2 — The escape hatch, written down where it is needed | dev | done | `8503b25` |
 
 ### Notes
 
-**Phase 1 measurements** — `x86_64-pc-windows-msvc`, rustc 1.97.1, main checkout, after
-`cargo test -p rlx-core --test easing --no-run`:
+**Phase 1 measurements** — `x86_64-pc-windows-msvc`, rustc 1.97.1, after `cargo test -p rlx-core
+--test easing --no-run`:
 
-- `easing-636d629356472676.pdb` — **15,073,280 B (15.07 MB)**, against the 40.5 MB ADR-0165 records
-  for the same artifact: 62.9 % smaller. Its `.exe` is 10,577,408 B (10.58 MB).
-- `librlx_core-be79abfedb629390.rlib` — **53,324,328 B (53.32 MB)**, inside the 52.9 MB +/- 5 %
-  band (50.26-55.55 MB). The two builds immediately preceding it, both under
-  `line-tables-only`, were 54,497,738 B and 54,523,934 B.
-- The dependency graph did not rebuild: the 2026-09-04 controlled measurement's `debug = 0`
-  artifacts were still in `deps/`, so cargo reused them and the build took 14.87 s.
+- `easing-636d629356472676.pdb` **15,073,280 B (15.07 MB)** against the 40.5 MB ADR-0165 records for
+  the same artifact — 62.9 % smaller; its `.exe` is 10,577,408 B.
+- `librlx_core-be79abfedb629390.rlib` **53,324,328 B (53.32 MB)**, inside the 52.9 MB +/- 5 % band;
+  the two builds before it, under `line-tables-only`, were 54,497,738 B and 54,523,934 B.
+- No dependency rebuild happened — the 2026-09-04 measurement's `debug = 0` artifacts were still in
+  `deps/`, so cargo reused them and the build took 14.87 s.
+
+**Phase 2's third done-when** asks for bare-number citation "matching how the neighbouring
+linker-override section cites its own ADRs"; that section does both. The new text follows the
+operative half — bare number, no relative link.
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** none.
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** no runtime behavior — `debug = 0` in `Cargo.toml`'s dependency profile plus one
+  new `CLAUDE.md` section; `[profile.release]` untouched.
+- **Operator docs touched:** none moved; `CLAUDE.md` gained one section.
+- **Backlog probes:** exit 0 — `106 stated reductions still hold across all 45 live entries
+  (8 unprobeable)`; its advisory list, never part of the exit code, names 0185 and 0186 among 64
+  moved paths.
+- **Full suite:** `cargo nextest run --workspace` at `8503b25`, exit 0 — 1556 passed (11 slow),
+  5 skipped, 416.462 s. Phase 1's own done-when names the same command and it ran there too:
+  1556 passed, 5 skipped, 444.233 s.
+- **Outstanding `human` phases:** none.
 
 ## Followups (after this lands)
 
