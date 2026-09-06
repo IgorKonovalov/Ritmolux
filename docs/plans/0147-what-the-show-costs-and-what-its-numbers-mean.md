@@ -372,6 +372,8 @@ pub struct ConsolePacing {
 | 1 — `level/*` says what it is normalized against | dev | done | `eacaf8c` |
 | 2 — A failed activation and a dead endpoint stop reading alike | dev | done | `bdbba7f` |
 | 3 — Both console levers become reachable | dev | done | `9e7dee1` |
+| 3b — The console present becomes countable | dev | done | committed with this row |
+| 3c — The give-up verdict is scoped to the incident the budget counts | dev | not started | |
 | 4 — Human: four arms, one hands-off window | human | not started | |
 | 5 — The verdict becomes the default | dev | not started | |
 | 6 — Human: the first frame-time row that names the discrete GPU | human | not started | |
@@ -389,6 +391,20 @@ only caller of `AuxTarget::new`, so the new `frame_latency` parameter passes thr
 edit added `Renderer::aux_frame_latency`, so the shell's "console opened" note quotes the depth the
 swapchain got rather than the one the config asked for — which Phase 4 needs, since a clamped value
 would otherwise be reported as the requested one.
+
+**Phase 3b's totals reach `diagnostics.log` as a `#` note on a 30 s cadence, not only on close.** The
+done-when allows columns or the `# console closed:` note; the phase's file list does not include
+`standalone/src/diaglog.rs`, so columns were out of scope, and a close-only note is never written by
+a run that ends by closing the *app* — which is every measurement arm. So `note_console_totals` runs
+from the display loop every `CONSOLE_CENSUS_SECS` while the console is open (`# console open: …`)
+and once from `close_console` (`# console closed: …`), the latter before `detach_aux`, since the
+present and skip counts live on the target. The bare `console closed` note is gone; the line that
+replaced it starts with the same two words.
+
+**`AuxTarget::present`'s `Validation` arm counts as a skip too**, which is a fifth state beyond the
+four the done-when names. It is the only exit that returns `Err`, the shell closes the console on
+it, and leaving it uncounted breaks the reconciliation by one frame on exactly the frame a console
+dies.
 
 **Phase 5's comment repair has one more site than the plan names, and one fewer.** The falsified
 cadence claim is in three places, not two, and one of the two the plan names is no longer where it

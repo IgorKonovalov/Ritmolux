@@ -199,6 +199,27 @@ impl AuxPresentMode {
     }
 }
 
+/// What [`AuxTarget::present`] did with the calls it was given, since attach.
+///
+/// The witness a cost measurement of this surface needs (ADR-0172). Every arm
+/// of the present path that returns without reaching `queue.present` returns
+/// the same `Ok(())` a successful present does, so a surface that was occluded
+/// for a whole run and one that presented every frame produce the same log and
+/// the same frame rate. `presented` is what separates them; a measurement
+/// reading zero cost against a zero present count has measured nothing.
+///
+/// `presented + skipped` is the number of calls the target received, which is
+/// what lets a caller reconcile its own totals: whatever it decimated, plus
+/// these two, is the frames it ran with this target attached.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct AuxCounts {
+    /// Calls that reached this surface's own `queue.present`.
+    pub presented: u64,
+    /// Calls that returned without presenting — the surface had no texture to
+    /// give, or refused validation.
+    pub skipped: u64,
+}
+
 /// A second swapchain plus its own text layer.
 ///
 /// Its own layer, not the renderer's: glyphon's atlas and viewport are built
@@ -211,6 +232,7 @@ pub struct AuxTarget {
     text: TextLayer,
     mode: AuxPresentMode,
     blit: Blit,
+    counts: AuxCounts,
 }
 
 /// The range a secondary surface's `desired_maximum_frame_latency` is held to.
@@ -284,12 +306,19 @@ impl AuxTarget {
             text,
             mode,
             blit,
+            counts: AuxCounts::default(),
         })
     }
 
     /// The present mode this surface was configured with.
     pub fn present_mode(&self) -> AuxPresentMode {
         self.mode
+    }
+
+    /// What the present path has done since attach. Reset with the target: the
+    /// counts describe one open session, not the process.
+    pub fn counts(&self) -> AuxCounts {
+        self.counts
     }
 
     /// The frame latency this surface was configured with, **after clamping** —
@@ -321,6 +350,14 @@ impl AuxTarget {
     /// submit, its own present. Nothing here touches the primary swapchain, the
     /// scene clock or the dissolve, so a console that stalls or drops a frame
     /// cannot alter what the show displays.
+    ///
+    /// **Every exit counts itself** into [`AuxCounts`]: the four surface states
+    /// that skip return the same `Ok(())` a present does, so without the
+    /// counter a caller cannot tell a console that ran from one that never
+    /// acquired a texture. The validation arm counts as a skip too — it is the
+    /// only exit that returns `Err`, and leaving it uncounted would break the
+    /// caller's reconciliation by one frame on exactly the frame the console
+    /// dies.
     pub fn present(
         &mut self,
         ctx: &RenderContext,
@@ -333,16 +370,23 @@ impl AuxTarget {
             // Transient: the window is resizing, occluded or hidden. Skipping
             // this console frame is correct, and the output is unaffected —
             // which is the whole reason the console presents on its own encoder.
-            C::Timeout | C::Occluded => return Ok(()),
+            C::Timeout | C::Occluded => {
+                self.counts.skipped = self.counts.skipped.saturating_add(1);
+                return Ok(());
+            }
             // Reconfigure and skip. Unlike the output path this does not retry
             // in the same frame: a console frame is worth nothing and the next
             // one is 16 ms away, so the retry would only add a stall the show
             // could feel.
             C::Outdated | C::Lost => {
+                self.counts.skipped = self.counts.skipped.saturating_add(1);
                 self.surface.configure(&ctx.device, &self.config);
                 return Ok(());
             }
-            C::Validation => return Err(RenderError::SurfaceValidation),
+            C::Validation => {
+                self.counts.skipped = self.counts.skipped.saturating_add(1);
+                return Err(RenderError::SurfaceValidation);
+            }
         };
 
         let view = frame
@@ -402,6 +446,7 @@ impl AuxTarget {
 
         ctx.queue.submit(std::iter::once(encoder.finish()));
         ctx.queue.present(frame);
+        self.counts.presented = self.counts.presented.saturating_add(1);
         self.text.end_frame();
         Ok(())
     }

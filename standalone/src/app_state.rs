@@ -69,6 +69,15 @@ pub(crate) const CONSOLE_HEIGHT: u32 = 640;
 /// Inset from the chosen monitor's top-left, so the console does not open flush
 /// into a corner under a taskbar.
 pub(crate) const CONSOLE_MARGIN: i32 = 64;
+/// How often an open console's present, skip and decimation totals are written
+/// to `diagnostics.log`.
+///
+/// A note on close alone is not enough: a run that ends by closing the *app*
+/// never reaches `close_console`, so the whole of a measurement session would
+/// publish no count — and a cost figure with no count beside it cannot be told
+/// from one whose console never presented (ADR-0172). 30 s is coarse beside a
+/// 1 Hz sample row and still puts three of these in a 95 s window.
+pub(crate) const CONSOLE_CENSUS_SECS: f32 = 30.0;
 
 /// The capture stream and the analysis it feeds.
 ///
@@ -212,6 +221,23 @@ pub(crate) struct Hud {
     /// shift the phase of a decimation already in progress. Its only reader is
     /// the `present_every_n` test in the display loop.
     pub(crate) console_frame: u64,
+
+    /// Display-loop frames run with the console open, and how many of those the
+    /// cadence spent no present on.
+    ///
+    /// **Zeroed when a console opens**, so both describe one session rather
+    /// than the process — as do the renderer's own present and skip counts,
+    /// which live on the target and die with it. The three reconcile against
+    /// the first: presented + skipped + decimated is `console_open_frames`, and
+    /// two counters that do not add up to a known total move an ambiguity
+    /// rather than removing it (ADR-0172).
+    pub(crate) console_open_frames: u64,
+    pub(crate) console_decimated: u64,
+
+    /// Seconds since the last totals note, against [`CONSOLE_CENSUS_SECS`].
+    /// Accumulated from the display loop's own `dt`, so the cadence is a
+    /// duration on every display rather than a frame count on one.
+    pub(crate) console_census_secs: f32,
 
     /// Last cursor position seen on the console surface, in its device pixels.
     ///
@@ -360,6 +386,18 @@ pub(crate) struct AppState {
 /// A held preset opts out of the dwell timer and changes nothing else: the
 /// bounds stay the operator's, and `auto` is only ever narrowed — a config with
 /// `auto = false` and no flag is already the answer (ADR-0155).
+/// Whether the display loop spends a console present on frame `frame`, at
+/// cadence `every_n`.
+///
+/// The frame index is free-running rather than counted from the console's open,
+/// so opening one does not shift the phase of a decimation already in progress.
+/// A cadence of 0 is read as 1: the key is operator-settable, and a console that
+/// silently never presents is the reading a cost measurement cannot tell from a
+/// free one.
+pub(crate) fn presents_console(frame: u64, every_n: u32) -> bool {
+    frame.is_multiple_of(u64::from(every_n.max(1)))
+}
+
 pub(crate) fn rotate_for(config: &config::Rotate, held_preset: Option<&str>) -> config::Rotate {
     config::Rotate {
         auto: config.auto && held_preset.is_none(),
@@ -508,6 +546,9 @@ impl AppState {
                 settings: SettingsState::new(),
                 console_window: None,
                 console_frame: 0,
+                console_open_frames: 0,
+                console_decimated: 0,
+                console_census_secs: 0.0,
                 console_cursor: (-1.0, -1.0),
                 console_request: None,
                 random_state: 0x9E37_79B9,
@@ -657,6 +698,12 @@ impl AppState {
                 // could name a depth the swapchain does not have.
                 let latency = self.renderer.aux_frame_latency().unwrap_or_default();
                 let every_n = self.config.console.present_every_n.max(1);
+                // This session's totals start here. The renderer's own present
+                // and skip counts came with the new target; these are the
+                // shell's half of the same reconciliation.
+                self.hud.console_open_frames = 0;
+                self.hud.console_decimated = 0;
+                self.hud.console_census_secs = 0.0;
                 self.diagnostics.diag_log.note(&format!(
                     "console opened: {}x{}, present mode {}, frame latency {latency}, \
                      presented every {every_n} frame(s), {preview}",
@@ -676,16 +723,40 @@ impl AppState {
         }
     }
 
+    /// Write this console session's present, skip and decimation totals to
+    /// `diagnostics.log`.
+    ///
+    /// `label` says which moment the row was taken at — `open` for a running
+    /// census, `closed` for the final one. The four numbers reconcile:
+    /// presented + skipped + decimated is the frames the display loop ran while
+    /// the console was open, so a reader can tell a console that presented
+    /// every frame from one that acquired no texture all run (ADR-0172).
+    pub(crate) fn note_console_totals(&mut self, label: &str) {
+        // `unwrap_or_default` covers the detached case only, which the callers
+        // do not reach: both hold an open console.
+        let counts = self.renderer.aux_counts().unwrap_or_default();
+        let note = format!(
+            "console {label}: {} presented, {} skipped, {} decimated, {} frames while open",
+            counts.presented,
+            counts.skipped,
+            self.hud.console_decimated,
+            self.hud.console_open_frames,
+        );
+        self.diagnostics.diag_log.note(&note);
+    }
+
     /// Close the console and release its swapchain. Idempotent.
     pub(crate) fn close_console(&mut self) {
         if self.hud.console_window.take().is_some() {
+            // Before the detach: the present and skip counts live on the target
+            // and go away with it.
+            self.note_console_totals("closed");
             self.renderer.detach_aux();
             // Released with the window: while this is open the show is drawn
             // into an intermediate and copied out, so leaving it behind would
             // hold both the allocation and the extra copy for a console nobody
             // is looking at.
             self.renderer.close_preview();
-            self.diagnostics.diag_log.note("console closed");
         }
     }
 
@@ -944,12 +1015,27 @@ impl AppState {
         // controls how often the display thread spends a console present at
         // all, and the presenter itself has no view of the show's frame budget.
         // At 1 every frame presents, which is the shipped cadence.
-        if self
-            .hud
-            .console_frame
-            .is_multiple_of(self.config.console.present_every_n.max(1) as u64)
-        {
-            self.present_console();
+        //
+        // The frames a cadence spends nothing on are counted here, because
+        // nothing downstream can see them: `present_aux` is never called, so
+        // the target's own skip count says nothing about them and the three
+        // totals would not add up to the frames this loop ran (ADR-0172).
+        if self.hud.console_window.is_some() {
+            self.hud.console_open_frames = self.hud.console_open_frames.saturating_add(1);
+            if presents_console(self.hud.console_frame, self.config.console.present_every_n) {
+                self.present_console();
+            } else {
+                self.hud.console_decimated = self.hud.console_decimated.saturating_add(1);
+            }
+            // Re-tested: a present that failed closed the console inside the
+            // call above and has already written its final totals.
+            if self.hud.console_window.is_some() {
+                self.hud.console_census_secs += dt;
+                if self.hud.console_census_secs >= CONSOLE_CENSUS_SECS {
+                    self.hud.console_census_secs = 0.0;
+                    self.note_console_totals("open");
+                }
+            }
         }
         self.hud.console_frame = self.hud.console_frame.wrapping_add(1);
         // A dissolve's capture frame has now flipped the roster to the incoming
@@ -1520,8 +1606,82 @@ pub(crate) fn warn_cap_overflow(renderer: &Renderer) {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::rotate_for;
+    use super::{presents_console, rotate_for};
     use crate::config;
+
+    /// **The three console totals add up to the frames the loop ran.** The
+    /// identity is what makes a cost arm readable: presents and skips that do
+    /// not reconcile against a known frame count move the "did it run at all"
+    /// ambiguity rather than removing it (ADR-0172). Only the decimation half
+    /// is arithmetic — the present/skip split needs a real surface — so this
+    /// pins the half a test can reach, over the cadences the config accepts and
+    /// the 0 it clamps.
+    #[test]
+    fn every_frame_with_a_console_open_either_presents_or_decimates() {
+        const FRAMES: u64 = 1000;
+        for every_n in [0_u32, 1, 2, 3, 4] {
+            let mut presented = 0_u64;
+            let mut decimated = 0_u64;
+            for frame in 0..FRAMES {
+                if presents_console(frame, every_n) {
+                    presented += 1;
+                } else {
+                    decimated += 1;
+                }
+            }
+            assert_eq!(
+                presented + decimated,
+                FRAMES,
+                "at every {every_n} the totals lost {} frames",
+                FRAMES - (presented + decimated)
+            );
+            // Frame 0 presents, so a run of `FRAMES` frames carries the ceiling
+            // rather than the floor of the division.
+            assert_eq!(
+                presented,
+                FRAMES.div_ceil(u64::from(every_n.max(1))),
+                "cadence {every_n} presented {presented} of {FRAMES} frames"
+            );
+        }
+        // The shipped cadence spends a present on every frame, which is what
+        // makes a run with no new setting the measurement's baseline arm.
+        assert_eq!(
+            (0..FRAMES).filter(|f| presents_console(*f, 1)).count() as u64,
+            FRAMES
+        );
+    }
+
+    /// **A detached console reports no counts at all** — not zero, which is the
+    /// reading a console that presented nothing would give. The two have to be
+    /// distinguishable at the accessor, because that is where a caller decides
+    /// whether it has a session to report on.
+    ///
+    /// Needs a GPU device for the renderer, so it takes ADR-0016's skip shape.
+    #[test]
+    fn a_renderer_with_no_console_attached_has_nothing_to_count() {
+        use rlx_core::render::{HeadlessOptions, RenderError, Renderer};
+
+        let renderer = match Renderer::new_headless(HeadlessOptions {
+            width: 64,
+            height: 64,
+            prefer_software: true,
+        }) {
+            Ok(r) => r,
+            Err(RenderError::RequestAdapter(_)) => {
+                eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+                return;
+            }
+            Err(e) => panic!("headless renderer build failed: {e}"),
+        };
+
+        assert!(!renderer.aux_attached());
+        assert_eq!(
+            renderer.aux_counts(),
+            None,
+            "a detached console reports counts, which a caller cannot tell from \
+             a session that presented nothing"
+        );
+    }
 
     /// **A held preset turns the dwell timer off, and only a held one does.**
     /// Rotation is the operator's config in every other case, including a

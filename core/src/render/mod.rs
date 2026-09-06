@@ -80,9 +80,9 @@ use crate::preset::{
     Easing, Expr, LATCH_CAP, Latch, Layer, LayerJoin, Preset, SystemKind, Variables,
 };
 #[cfg(feature = "text")]
-pub use aux_target::AuxPresentMode;
-#[cfg(feature = "text")]
 use aux_target::AuxTarget;
+#[cfg(feature = "text")]
+pub use aux_target::{AuxCounts, AuxPresentMode};
 use background::Background;
 pub use capture::{CaptureImage, FrameTap};
 pub use capture_api::AudioCapture;
@@ -766,6 +766,16 @@ impl Renderer {
     #[cfg(feature = "text")]
     pub fn aux_frame_latency(&self) -> Option<u32> {
         self.aux.as_ref().map(AuxTarget::frame_latency)
+    }
+
+    /// What the secondary target's present path has done since it was attached,
+    /// or `None` when detached.
+    ///
+    /// The counts live with the target and die with it, so a caller that wants
+    /// a session's totals reads them **before** [`detach_aux`](Self::detach_aux).
+    #[cfg(feature = "text")]
+    pub fn aux_counts(&self) -> Option<AuxCounts> {
+        self.aux.as_ref().map(AuxTarget::counts)
     }
 
     /// Release the secondary target, its swapchain and its text atlas. Idempotent.
