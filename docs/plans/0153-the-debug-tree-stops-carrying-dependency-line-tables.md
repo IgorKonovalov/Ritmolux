@@ -1,6 +1,6 @@
 # 0153 — The debug tree stops carrying dependency line tables
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-04
 > **Owner skill(s):** dev
 > **Related ADRs:** [ADR-0165](../adrs/0165-dependencies-compile-without-debug-info-and-one-line-buys-it-back.md)
@@ -159,14 +159,25 @@ one key in one TOML table.
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `main`, no worktree
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The profile setting | dev | not started | |
+| 1 — The profile setting | dev | done | committed with this row |
 | 2 — The escape hatch, written down where it is needed | dev | not started | |
 
 ### Notes
+
+**Phase 1 measurements** — `x86_64-pc-windows-msvc`, rustc 1.97.1, main checkout, after
+`cargo test -p rlx-core --test easing --no-run`:
+
+- `easing-636d629356472676.pdb` — **15,073,280 B (15.07 MB)**, against the 40.5 MB ADR-0165 records
+  for the same artifact: 62.9 % smaller. Its `.exe` is 10,577,408 B (10.58 MB).
+- `librlx_core-be79abfedb629390.rlib` — **53,324,328 B (53.32 MB)**, inside the 52.9 MB +/- 5 %
+  band (50.26-55.55 MB). The two builds immediately preceding it, both under
+  `line-tables-only`, were 54,497,738 B and 54,523,934 B.
+- The dependency graph did not rebuild: the 2026-09-04 controlled measurement's `debug = 0`
+  artifacts were still in `deps/`, so cargo reused them and the build took 14.87 s.
 
 ### Close triggers
 

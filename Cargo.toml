@@ -57,8 +57,20 @@ debug = "line-tables-only"
 # a workspace-wide `opt-level` would optimize `rlx-core` itself, and inlining
 # muddies the line mapping the ADR-0033 coverage ratchet gates on - so the floor
 # would silently start measuring something other than what it was derived from.
+#
+# The block carries two settings argued from different evidence, and the
+# warning above is about `opt-level` alone - it does not transfer to `debug`.
+# ADR-0165: MSVC emits one .pdb per linked target and packs no split debuginfo,
+# so the dependency graph's line tables are duplicated into each of the
+# workspace's 46 test binaries - 25.5 MB per binary, measured. Cargo's "*" glob
+# reaches dependencies only, so `rlx-core` keeps profile.dev's
+# `line-tables-only` and the line mapping the coverage ratchet is derived from
+# is untouched. The price is that a backtrace frame inside wgpu, naga, winit or
+# windows-rs carries no line number; deleting the `debug` line and rebuilding
+# buys it back for a full dependency rebuild.
 [profile.dev.package."*"]
 opt-level = 2
+debug = 0
 
 # NFR section 4: small release binaries - LTO on, symbols stripped.
 [profile.release]
