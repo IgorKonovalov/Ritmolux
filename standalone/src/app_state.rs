@@ -376,12 +376,6 @@ pub(crate) struct AppState {
     pub(crate) diagnostics: Diagnostics,
 }
 
-/// The rotation config the director is built from, given the operator's
-/// `[rotate]` block and whatever `--preset` held.
-///
-/// A held preset opts out of the dwell timer and changes nothing else: the
-/// bounds stay the operator's, and `auto` is only ever narrowed — a config with
-/// `auto = false` and no flag is already the answer (ADR-0155).
 /// Whether the display loop spends a console present on frame `frame`, at
 /// cadence `every_n`.
 ///
@@ -394,6 +388,12 @@ pub(crate) fn presents_console(frame: u64, every_n: u32) -> bool {
     frame.is_multiple_of(u64::from(every_n.max(1)))
 }
 
+/// The rotation config the director is built from, given the operator's
+/// `[rotate]` block and whatever `--preset` held.
+///
+/// A held preset opts out of the dwell timer and changes nothing else: the
+/// bounds stay the operator's, and `auto` is only ever narrowed — a config with
+/// `auto = false` and no flag is already the answer (ADR-0155).
 pub(crate) fn rotate_for(config: &config::Rotate, held_preset: Option<&str>) -> config::Rotate {
     config::Rotate {
         auto: config.auto && held_preset.is_none(),
