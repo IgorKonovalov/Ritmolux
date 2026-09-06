@@ -13,7 +13,6 @@ mod capture_verdict;
 #[cfg(windows)]
 mod capture_win;
 mod cli;
-mod config;
 mod console;
 mod diaglog;
 mod director;

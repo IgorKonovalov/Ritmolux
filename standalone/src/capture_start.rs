@@ -16,7 +16,7 @@ use crate::capture_mac;
 use crate::capture_verdict::CaptureVerdict;
 #[cfg(windows)]
 use crate::capture_win;
-use crate::config;
+use standalone::config;
 
 /// Narrow alias so the non-Windows build, which has no capture, compiles the
 /// same struct shape.

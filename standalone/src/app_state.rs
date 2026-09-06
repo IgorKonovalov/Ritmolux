@@ -32,7 +32,6 @@ use crate::capture_verdict::CaptureVerdict;
 #[cfg(windows)]
 use crate::capture_win;
 use crate::cli::resolve_log_path;
-use crate::config::{self, Config};
 use crate::console;
 use crate::diaglog::DiagLog;
 use crate::director::Director;
@@ -44,6 +43,7 @@ use crate::preset_dir::{PRESET_POLL, dir_signature, reload_presets, startup_pres
 use crate::run::{App, resolve_display};
 use crate::settings::{SettingsAction, SettingsState, SettingsView, TierState};
 use crate::soak::SoakLog;
+use standalone::config::{self, Config};
 
 /// How often the render loop wakes to keep DSP fed while hidden (NFR 1:
 /// near-zero GPU in the background, analysis stays warm).
@@ -1460,7 +1460,7 @@ pub(crate) fn warn_cap_overflow(renderer: &Renderer) {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::rotate_for;
-    use crate::config;
+    use standalone::config;
 
     /// **A held preset turns the dwell timer off, and only a held one does.**
     /// Rotation is the operator's config in every other case, including a

@@ -180,7 +180,11 @@ export default defineConfig({
         },
         {
           label: 'Use it',
-          items: [{ label: 'Gallery', slug: 'gallery' }],
+          items: [
+            doc('docs/running.md'),
+            doc('docs/configuration.md'),
+            { label: 'Gallery', slug: 'gallery' },
+          ],
         },
         {
           label: 'Author presets',
@@ -204,6 +208,7 @@ export default defineConfig({
         {
           label: 'Contribute',
           items: [
+            doc('docs/developing.md'),
             doc('docs/releasing.md'),
             doc('docs/on-device-validation.md'),
             doc('docs/diffusion-filter.md'),

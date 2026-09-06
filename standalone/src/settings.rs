@@ -27,7 +27,7 @@
 
 use rlx_core::render::Tier;
 
-use crate::config::InputMode;
+use standalone::config::InputMode;
 
 /// Dwell edit step, in seconds. Coarse on purpose: this is a live-show control
 /// operated by eye, not a scheduler.

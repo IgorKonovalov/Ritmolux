@@ -11,7 +11,7 @@
 
 use rlx_core::dsp::AnalysisFrame;
 
-use crate::config;
+use standalone::config;
 
 /// Time constant (seconds) for the smoothed energy baseline. ~1.5 s means the
 /// baseline follows sustained level changes but ignores per-beat spikes, so a

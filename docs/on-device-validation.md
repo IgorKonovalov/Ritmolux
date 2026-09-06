@@ -500,7 +500,7 @@ front of house that is indistinguishable from a fixture that happens not to be m
 CI, and no synthetic run, can see the binding half.
 
 - [ ] **Re-point every OSC binding from `/lmv/v1/…` to `/rlx/v1/…`.** Fourteen addresses; the table
-      in `README.md`'s *Flags & environment* is the roster. Only the root changes — no payload,
+      in [Configuration](configuration.md#osc-addresses) is the roster. Only the root changes — no payload,
       argument type tag, address suffix, vocabulary or send cadence moved, so `/v1` stays and a
       binding that re-points its root and changes nothing else is correct. Report **each** of the
       fourteen driving what it drove before, confirmed against a playing track with

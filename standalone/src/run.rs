@@ -25,10 +25,10 @@ use crate::cli::{
     parse_osc_arg, parse_soak_arg, parse_tier_arg, print_help, resolve_config_path, resolve_input,
     resolve_osc, unrecognized_flag, valued_valueless_flag, windowed_flag,
 };
-use crate::config::{self, Config};
 use crate::console;
 use crate::preset_dir::startup_preset_names;
 use crate::stream;
+use standalone::config::{self, Config};
 
 pub(crate) struct App {
     /// Loaded once at startup; the window is created from it on `resumed` and

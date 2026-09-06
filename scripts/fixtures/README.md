@@ -372,9 +372,10 @@ node scripts/check-reader-prose.mjs scripts/fixtures/reader-prose
 ```
 
 Expect **exit 1 and exactly six breaks, across three files**. Unlike every other checker here this
-one does not walk a tree at all — it reads five fixed paths under the root, which is the scope
+one does not walk a tree at all — it reads seven fixed paths under the root, which is the scope
 boundary ADR-0168 draws — so this subdirectory mirrors those paths rather than seeding an
-arbitrary layout.
+arbitrary layout. **A path in the list and not in this tree is its own failure**, reported before
+the breaks are, which is why the two operator pages below are here at all.
 
 **One rejected form per line, and the counts are the instrument.** A branch of the citation
 alternation that stops matching shows up as a number that moved rather than as a silence.
@@ -386,6 +387,8 @@ alternation that stops matching shows up as a number that moved rather than as a
 | `docs/preset-palettes.md` | 1 | a citation at a block's end |
 | `docs/preset-guide.md` | 0 | clean, and must report `0 citation(s), 0 bare` rather than being skipped |
 | `docs/preset-tuning-walkthrough.md` | 0 | clean, with no citation of any kind |
+| `docs/running.md` | 0 | clean, with **one** citation inside a link — the run must report `1 citation(s), 0 bare`, so a counter that stopped counting is visible |
+| `docs/configuration.md` | 0 | clean, with a plan path inside a fenced block — hole 1, which must stay a hole |
 
 **The silences are the larger half of this fixture**, because every one of them is a shape the gate
 must NOT convict. `presets/README.md` carries all four markdown link forms — inline, full

@@ -34,6 +34,9 @@ export const REPO_ROOT = fileURLToPath(REPO_ROOT_URL);
  * unlikely, it is unrepresentable (ADR-0167).
  */
 export const PUBLISHED = {
+  // Use it
+  'docs/running.md': { route: 'use/running', title: 'Running the app' },
+  'docs/configuration.md': { route: 'use/configuration', title: 'Configuration' },
   // Author presets
   'docs/preset-guide.md': { route: 'guide/preset-guide', title: 'Preset guide' },
   'docs/presets.md': { route: 'guide/expression-language', title: 'Expression language' },
@@ -57,6 +60,7 @@ export const PUBLISHED = {
     title: 'Ring determinism',
   },
   // Contribute
+  'docs/developing.md': { route: 'contribute/developing', title: 'Developing' },
   'docs/diffusion-filter.md': { route: 'engine/diffusion-filter', title: 'Diffusion filter' },
   'docs/on-device-validation.md': {
     route: 'engine/on-device-validation',

@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use rlx_core::render::Tier;
 use standalone::{APP_DIR_NAME, preset_data_root};
 
-use crate::config;
+use standalone::config;
 
 /// Resolve `diagnostics.log` under the per-user app dir (alongside the shared
 /// `presets` dir). `None` if the OS data root can't be resolved — the logger
@@ -211,7 +211,10 @@ pub(crate) fn help_text() -> String {
     }
     text.push_str("\n-h is a synonym for --help.\n");
     text.push_str("A flag takes its value as `--flag value` or `--flag=value`.\n");
-    text.push_str("README.md says what each one is for; config.toml is the persistent form.\n");
+    text.push_str(
+        "https://igorkonovalov.github.io/Ritmolux/use/configuration/ says what each flag is\n",
+    );
+    text.push_str("for and what config.toml holds; config.toml is the persistent form.\n");
     text
 }
 

@@ -425,8 +425,8 @@ pub const PARAMS: &[ParamSpec] = &[
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The menu is organised by reader task | dev | done | committed with this row |
-| 2 — The operator surface has a reference | dev | not started | |
+| 1 — The menu is organised by reader task | dev | done | 7f2b0b9 |
+| 2 — The operator surface has a reference | dev | done | committed with this row |
 | 3 — The site renders diagrams, and How it works exists | dev | not started | |
 | 4 — The engine-side documents address a reader | dev | not started | |
 | 5 — The embedding surface | dev | not started | |
@@ -443,6 +443,20 @@ pub const PARAMS: &[ParamSpec] = &[
   path", and this one is a sentence containing a path.
 - The rewriter also unwraps `strong`/`emphasis` around a path, for
   `[**`docs/preset-tuning-walkthrough.md`**](…)` in `docs/preset-guide.md`.
+- **Phase 2 moved `standalone/src/config.rs` from the binary crate into the lib** (`lib.rs` declares
+  it, eight modules now say `standalone::config`). The phase's own done-when requires the test to
+  round-trip the documented `config.toml` **through `Config`**, and a `mod` in a `[[bin]]` is not
+  reachable from `standalone/tests/`. No behaviour changes; the move is the one `lib.rs` already
+  makes for `osc` and `shot`.
+- **Phase 2 edited four files outside its list**, each one a break it caused:
+  `standalone/src/cli.rs` (the `--help` footer said `README.md says what each one is for`, which
+  stopped being true), `docs/design-backlog.md` (entry 0163's probe searched `README.md` for an OSC
+  address that had moved — `check-backlog-claims.mjs` went red), `docs/plans/0103-…` (its
+  `Coordinates with` line, as this plan's Phase 2 note asks), and two new fixture files under
+  `scripts/fixtures/reader-prose/` (the gate reports a listed document that does not exist, so
+  growing its list means growing the fixture).
+- The flag half of the new test reads `ritmolux --help` rather than `FLAGS`, which is `pub(crate)`
+  in the binary. That is the roster's own stated authority, so the test reads it as a guard would.
 - **The site's content-collection cache hides a plugin edit.** A split document's chunks are stored
   under a digest of the chunk body, so a change to the *rewriter* re-renders nothing. `rm -rf
   site/.astro` before believing a build that a plugin edit should have changed.

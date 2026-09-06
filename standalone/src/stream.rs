@@ -289,8 +289,8 @@ unsafe extern "system" fn console_handler(_kind: u32) -> windows::core::BOOL {
 #[cfg(all(feature = "spout", windows))]
 pub fn run(
     request: &StreamRequest,
-    input: &crate::config::Input,
-    rotate: &crate::config::Rotate,
+    input: &standalone::config::Input,
+    rotate: &standalone::config::Rotate,
 ) -> Result<(), String> {
     use std::sync::atomic::Ordering;
     use std::time::Instant;
@@ -383,7 +383,7 @@ pub fn run(
     // stuck on one preset for a four-hour set is not what this mode is for. The
     // dwell bounds still come from the operator's config, and `--preset` opts
     // out entirely.
-    let mut director = crate::director::Director::from_config(&crate::config::Rotate {
+    let mut director = crate::director::Director::from_config(&standalone::config::Rotate {
         auto: request.preset.is_none(),
         ..rotate.clone()
     });
@@ -522,8 +522,8 @@ pub fn run(
 #[cfg(not(all(feature = "spout", windows)))]
 pub fn run(
     _request: &StreamRequest,
-    _input: &crate::config::Input,
-    _rotate: &crate::config::Rotate,
+    _input: &standalone::config::Input,
+    _rotate: &standalone::config::Rotate,
 ) -> Result<(), String> {
     Err(
         "--stream needs a build with the 'spout' feature on Windows; this binary was built \

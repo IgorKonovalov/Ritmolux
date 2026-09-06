@@ -3043,9 +3043,9 @@ which is the reason to have it written down before that plan is built rather tha
 
 ### What a fix looks like
 
-The cheap and probably sufficient shape is prose: one sentence in `README.md`'s telemetry table
-saying what `level/*` is normalized against and that it reaches 1.0 on every local peak, and the
-same note wherever Plan 0133's look grammar names its bindable terms. Beyond that there is a real
+The cheap and probably sufficient shape is prose: one sentence in the OSC address table in
+`docs/configuration.md` saying what `level/*` is normalized against and that it reaches 1.0 on every
+local peak, and the same note wherever Plan 0133's look grammar names its bindable terms. Beyond that there is a real
 design question that this entry does **not** answer - whether a lighting consumer wants a
 differently-shaped term (a slower level, a headroom reading, or `raw/*` scaled by an operator
 control) - and that is an ADR if it is ever wanted, not a patch.
@@ -3054,8 +3054,8 @@ control) - and that is an ADR if it is ever wanted, not a patch.
 - **Verified 2026-08-30** - the release is seconds-scale, so the ceiling is re-touched every kick rather than once a set: `present: RELEASE_TAU_SECS: f32 = 2\.5 in: core/src/dsp/gain.rs`
 - **Verified 2026-08-30** - `bass` is levelled by that normalizer at the published frame boundary: `present: bass_gain\.normalize in: core/src/dsp/mod.rs`
 - **Verified 2026-09-04** - the absolute twin the consumer needed is already published: `present: "/rlx/v1/raw/bass" in: standalone/src/osc.rs`
-- **Verified 2026-09-04** - and already documented, which is why this entry is about the missing property rather than a missing address: `present: /rlx/v1/raw/bass in: README.md`
-- `unprobeable:` that no surface states `level/*` reaches 1.0 by design is a negative about prose across `README.md`, `docs/` and the OSC table, not a match countable in one file
+- **Verified 2026-09-04** - and already documented, which is why this entry is about the missing property rather than a missing address: `present: /rlx/v1/raw/bass in: docs/configuration.md`
+- `unprobeable:` that no surface states `level/*` reaches 1.0 by design is a negative about prose across `docs/` and the OSC table, not a match countable in one file
 - **PROMOTED 2026-09-01 -> [Plan 0147](plans/0147-what-the-show-costs-and-what-its-numbers-mean.md) Phase 1**, as the documentation ask this entry says it is. The
   phase lands first in that plan because [Plan 0133](plans/0133-the-engine-drives-the-lights.md) is approved and meets this on its first evening.
 

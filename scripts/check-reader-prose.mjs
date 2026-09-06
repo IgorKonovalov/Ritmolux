@@ -66,7 +66,7 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = resolve(process.argv[2] ?? REPO_ROOT);
 
 /**
- * The Entrance A set: the documents a preset author reads.
+ * The reader set: the documents a preset author or an operator reads.
  *
  * Held as a literal list on purpose. "Reader-facing" is not a property a script
  * can infer from a path, and a heuristic that tried would either drag in
@@ -78,6 +78,12 @@ const READER_DOCS = [
   "docs/preset-palettes.md",
   "docs/preset-guide.md",
   "docs/preset-tuning-walkthrough.md",
+  // The operator pages, which are read by someone who installed the application
+  // and has never seen this repository (ADR-0169). They were the README's middle
+  // three hundred lines and carried no citation there either; the rule reaches
+  // them so they cannot acquire one.
+  "docs/running.md",
+  "docs/configuration.md",
 ];
 
 /**
@@ -174,7 +180,7 @@ for (const doc of READER_DOCS) {
   scanned.push(`  ${doc}: ${total} citation(s), ${bare} bare`);
 }
 
-console.log("reader prose: the Entrance A documents");
+console.log("reader prose: the reader documents");
 for (const s of scanned) console.log(s);
 
 if (missing.length > 0) {

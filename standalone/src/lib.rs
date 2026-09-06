@@ -32,6 +32,10 @@ use std::path::{Path, PathBuf};
 // the sender's, each against its own roster (ADR-0146). Not feature-gated:
 // the renderer half applies with or without a video-out, and the sender half
 // takes the roster as a slice so it compiles and tests without the SDK.
+// The per-user operator config. A library module rather than a binary one so
+// `standalone/tests/` can round-trip the documented `config.toml` through the
+// very type the app deserializes - the same reason `osc` and `shot` are here.
+pub mod config;
 pub mod gpu;
 pub mod osc;
 pub mod rss;

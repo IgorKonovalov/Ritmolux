@@ -322,7 +322,7 @@ fn view() -> crate::settings::SettingsView {
         display_count: 1,
         display_name: "display".to_owned(),
         diagnostics: false,
-        input_mode: crate::config::InputMode::Loopback,
+        input_mode: standalone::config::InputMode::Loopback,
         input_device_index: 0,
         input_device_count: 0,
         input_device_name: String::new(),
@@ -460,7 +460,7 @@ fn the_staged_name_is_the_one_the_rotation_then_takes() {
     // Zero dwell bounds so the timer fires on the first advance: this test is
     // about *which* preset a rotation takes, and the *when* has its own tests
     // next door in `director/tests.rs`.
-    let mut director = crate::director::Director::from_config(&crate::config::Rotate {
+    let mut director = crate::director::Director::from_config(&standalone::config::Rotate {
         auto: true,
         min_dwell_secs: 0,
         max_dwell_secs: 0,
