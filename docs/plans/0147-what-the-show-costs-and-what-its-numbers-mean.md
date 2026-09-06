@@ -373,7 +373,7 @@ pub struct ConsolePacing {
 | 2 — A failed activation and a dead endpoint stop reading alike | dev | done | `bdbba7f` |
 | 3 — Both console levers become reachable | dev | done | `9e7dee1` |
 | 3b — The console present becomes countable | dev | done | `76e3452` |
-| 3c — The give-up verdict is scoped to the incident the budget counts | dev | done | committed with this row |
+| 3c — The give-up verdict is scoped to the incident the budget counts | dev | done | `ada2b37` |
 | 4 — Human: four arms, one hands-off window | human | not started | |
 | 5 — The verdict becomes the default | dev | not started | |
 | 6 — Human: the first frame-time row that names the discrete GPU | human | not started | |
