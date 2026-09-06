@@ -374,7 +374,7 @@ pub struct ConsolePacing {
 | 3 — Both console levers become reachable | dev | done | `9e7dee1` |
 | 3b — The console present becomes countable | dev | done | `76e3452` |
 | 3c — The give-up verdict is scoped to the incident the budget counts | dev | done | `ada2b37` |
-| 4 — Human: four arms, one hands-off window | human | not started | |
+| 4 — Human: four arms, one hands-off window | human | partial — 4 of 5 arms | (a measurement; rows below) |
 | 5 — The verdict becomes the default | dev | not started | |
 | 6 — Human: the first frame-time row that names the discrete GPU | human | not started | |
 
@@ -432,6 +432,54 @@ was. The exact list at this tip:
   is where its twin was, and Phase 3 **removed** that sentence while rewriting the block to place
   the decimation. It was replaced with the cadence mechanism, not with the property Phase 5 owes, so
   nothing false stands there now — but the same claim in `hud.rs` was never touched.
+
+**Phase 4, 2026-09-06, second window: four of five arms, and the fifth was not taken.** The window
+was stopped after the fourth arm because the box was needed. Every arm below ran its full 95 s
+untouched, on an otherwise idle machine checked for `cargo` / `cargo-nextest` / `rustc` before the
+window and after it (none, both times). **`(latency 2, every 2nd)` is missing and is owed** before
+this reads as five arms.
+
+Adapter for every row, per ADR-0071: `AMD Radeon(TM) Graphics (Dx12, IntegratedGpu)`, driver
+30.0.13002.1001 — the integrated part, which is what an unflagged windowed run takes. Preset
+`Dragon` held with `--preset` (rotation off, so no switch moves a frame-time reading), `rich` tier
+from `config.toml`, output windowed, console 900x640 at present mode `Mailbox` on the same
+2048x1152 165 Hz display. 16 soak samples per arm after dropping the first 10 s.
+
+| arm | frame_latency | present_every_n | mean fps | `frame_ms_p99_steady` | presented | skipped | decimated | frames open |
+|---|---|---|---|---|---|---|---|---|
+| console closed (control) | — | — | **53.5** | 25.03 ms | — | — | — | — |
+| open, shipped default | 1 | 1 | **53.1** | 24.26 ms | 4,755 | 0 | 0 | 4,755 |
+| open | 2 | 1 | **52.3** | 25.56 ms | 4,676 | 0 | 0 | 4,676 |
+| open | 1 | 2 | **52.8** | 25.23 ms | 2,359 | 0 | 2,359 | 4,718 |
+| open | 2 | 2 | — | — | — | — | — | not taken |
+
+**The console costs 0.4 fps of 53.5, and that zero is witnessed rather than inferred.** Every open
+arm presented ~4,700 times with **zero skips**, so *"the console is cheap"* and *"the console never
+presented"* are separated here — which is the whole of what Phase 3b was for. Each arm's three
+totals reconcile against the frames the loop ran (the decimation arm: 2,359 + 0 + 2,359 = 4,718).
+
+**The window ran inside the regime**, which the 2026-09-06 first attempt could not: 53 fps is ~19 ms
+a frame, three vblanks at 165 Hz, against the ~16 ms the 61.7 -> 33.1 reading sat at. **Nothing here
+resembles that halving** — the largest gap between any open arm and the closed control is 1.2 fps.
+
+**Reaching the regime took a preset screen, and the roster's shape is a finding of its own.** Every
+figure below is a 22 s windowed run, console closed, same box and build:
+
+| preset | mean fps | p99 | | preset | mean fps | p99 |
+|---|---|---|---|---|---|---|
+| Ridge | 165.0 | 6.81 ms | | Supernova | 164.9 | 6.46 ms |
+| Smoke | 165.0 | 6.54 ms | | Whorl | 165.0 | 6.59 ms |
+| Stipple | 164.8 | 7.16 ms | | Thomas | 165.0 | 6.49 ms |
+| Etching | 165.0 | 6.58 ms | | Bower | 165.0 | 6.67 ms |
+| Cauldron | 165.0 | 6.53 ms | | Mitosis | 125.4 | 12.83 ms |
+| Wellhead | 165.0 | 6.70 ms | | **Dragon** | **52.9** | **25.21 ms** |
+| Lichen | 116.3 | 12.88 ms | | Clifford | 38.8 | 31.35 ms |
+| Verdigris | 109.8 | 12.92 ms | | Nebula | 30.4 | 42.56 ms |
+
+Sixteen presets: **one** lands between 45 and 90 fps. The rest sit at the 165 Hz vsync cap or below
+40. `--tier floor` does not fill the gap either — it overshoots it: Clifford 38.8 -> 119.4 and Nebula
+30.4 -> 109.4. Fullscreen was rejected as the lever because borderless fullscreen puts the show
+*over* the console window, and a covered console is the occluded-surface case that voids an arm.
 
 **How to run Phase 4's arms.** `[console] frame_latency` (1 or 2) and `[console] present_every_n`
 (1 or 2) in `config.toml`, then `ritmolux --soak --console`; the console-closed control is the same
