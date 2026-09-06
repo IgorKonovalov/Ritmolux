@@ -301,6 +301,14 @@ export default defineConfig({
             doc('core-cabi/include/rlx_core.h'),
             doc('docs/specs/0001-c-abi.md'),
             doc('docs/specs/0002-ring-determinism.md'),
+            // The rustdoc, built by its own Pages job from this same commit and
+            // unpacked into `dist/api/` before the site is uploaded (ADR-0169).
+            // A `link` rather than a `slug`, because it is not a content entry -
+            // nothing in the collection generates it. Starlight prefixes the
+            // configured base onto a root-relative link itself, so this must NOT
+            // spell the subpath the way index.mdx's buttons do; spelling it here
+            // produces /ritmolux/ritmolux/api/.
+            { label: 'Rust API', link: '/api/rlx_core/' },
           ],
         },
         {

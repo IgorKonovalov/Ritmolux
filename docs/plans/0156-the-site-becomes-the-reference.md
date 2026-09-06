@@ -429,8 +429,8 @@ pub const PARAMS: &[ParamSpec] = &[
 | 2 — The operator surface has a reference | dev | done | 786d687 |
 | 3 — The site renders diagrams, and How it works exists | dev | done | d2f2d24 |
 | 4 — The engine-side documents address a reader | dev | done | 5227878 |
-| 5 — The embedding surface | dev | done | committed with this row |
-| 6 — rustdoc joins the Pages artifact | dev | not started | |
+| 5 — The embedding surface | dev | done | 24ce616 |
+| 6 — rustdoc joins the Pages artifact | dev | done | committed with this row |
 | 7 — The parameter reference is generated from the engine | dev | not started | |
 | 8 — The live walk | human | not started | |
 
@@ -498,6 +498,27 @@ pub const PARAMS: &[ParamSpec] = &[
   `##` to cut at, and the route ceiling asserts a property of the splitter's output.
 - The header page was verified byte-for-byte by decoding the built code block's own line structure
   back to text and comparing it to `core-cabi/include/rlx_core.h`: 213 lines, equal.
+- **The plan's Phase 6 done-when names `/api/rlx_core_cabi/`; the crate emits `/api/rlx_core_c/`.**
+  `core-cabi/Cargo.toml` sets `[lib] name = "rlx_core_c"` deliberately — `rlx_core` collides with the
+  crate under test in `tests/ffi.rs` — and rustdoc uses the lib name. The menu links
+  `/api/rlx_core/`, which the plan also names, and the C ABI's own reference is the published
+  header rather than its rustdoc.
+- **`cargo doc --workspace --no-deps` under `-D warnings` is verified on Windows only.** It is green
+  here in 7.6 s warm and emits `rlx_core`, `rlx_core_c`, `rlx_ring`, `standalone`, `ritmolux` and
+  `milkconv` (26 MB, no root `index.html` — rustdoc emits one only for a single crate, which is why
+  the menu points at a crate rather than at `/api/`). **The `ubuntu-latest` arm the workflow uses is
+  unverified until the first push**, as the plan's Risks anticipate.
+- **The gate had to learn two things the plan did not name.** `dist/api/` is absent on any machine
+  that has not run `cargo doc`, so an unconditional check would leave the local gate permanently
+  red: an absent tree now skips `/api/` hrefs and says so, and the workflow passes `--require-api`,
+  which makes the absence a failure there. And the rustdoc's **own** pages are excluded from the
+  scan — they are another tool's generated output, and including them produced about a thousand
+  findings against a perfectly good rustdoc, mostly its script templates (`href="./static.files/${f}"`).
+- Starlight prefixes the configured base onto a sidebar `link` itself, so the menu entry is
+  `/api/rlx_core/` and not `${BASE}api/rlx_core/`; spelling the base produced `/ritmolux/ritmolux/api/`.
+- Backlog 0180's `present:` probe was inverted to `absent:`, since the fix is the disappearance of
+  the claim. The entry carries its `CLOSED` line in the body rather than in its heading, which is
+  where this file's other closed entries carry it, and which keeps the heading's slug stable.
 - **The site's content-collection cache hides a plugin edit.** A split document's chunks are stored
   under a digest of the chunk body, so a change to the *rewriter* re-renders nothing. `rm -rf
   site/.astro` before believing a build that a plugin edit should have changed.

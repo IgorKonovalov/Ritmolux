@@ -42,6 +42,7 @@ never will:
 | `src/plugins/rewrite-links.mjs` | rewrites every relative link: inside the published set to a site route, outside it to a GitHub URL (ADR-0154) |
 | `src/plugins/rewrite-links.mjs` | renames a link whose whole text is the target's path to the target's declared title, when the target is published (ADR-0169) |
 | `rehype-mermaid`, configured in `astro.config.mjs` | renders each mermaid fence to a `<picture>` with a light and a dark SVG, at build time, with no script on the page (ADR-0171) |
+| `src/content.config.ts` | fences a `wrap`ped, non-markdown source into a page — the C ABI header is published as the bytes it compiles from |
 
 ## Working on it
 
@@ -72,6 +73,24 @@ under it.
 Two of this project's own rules throw exactly that way — `rewrite-links.mjs` on a relative target
 that does not resolve, and `rehype-mermaid` on a fence that does not parse — and both are supposed
 to fail the build. Before the hook, neither did.
+
+## The Rust API reference
+
+`/api/` is **not built by this project**. A separate job in the Pages workflow runs
+`cargo doc --workspace --no-deps` under `RUSTDOCFLAGS=-D warnings`, uploads `target/doc` as an
+artifact, and the site job unpacks it into `site/dist/api/` before the gates run and before the
+artifact is uploaded — so the rustdoc and the site come from the same commit, which the footer
+stamp names (ADR-0169).
+
+A local `npm run build` therefore has no `dist/api/`, and that is expected:
+`scripts/check-site-links.mjs` skips `/api/` hrefs when the tree is absent and says so. The
+workflow passes `--require-api`, which makes the absence a failure there. To check them locally:
+
+```sh
+cargo doc --workspace --no-deps
+cp -r target/doc site/dist/api
+node scripts/check-site-links.mjs --require-api
+```
 
 ## What is published
 

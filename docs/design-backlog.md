@@ -3279,11 +3279,14 @@ next real broken link invisible.
 **Raised by:** `architect`, at [Plan 0150](plans/done/0150-the-application-becomes-ritmolux.md)'s
 close review (2026-09-02). **Owner if taken:** `dev`.
 
-- **Verified 2026-09-02** — the comment makes both claims:
-  `present: is still 4 in: core/src/diag/mod.rs`
+- **CLOSED 2026-09-06** by [Plan 0156](plans/0156-the-site-becomes-the-reference.md) Phase 6, which
+  made the comment public-facing: the path is corrected and neither figure is restated, so there is
+  no number left to falsify. The archive move is the close's.
+- **Verified 2026-09-06** — the comment names the file that exists and quotes no figure:
+  `absent: is still 4 in: core/src/diag/mod.rs`
 - **Verified 2026-09-02** — the header says otherwise:
   `present: #define RLX_ABI_VERSION 6u in: core-cabi/include/rlx_core.h`
-- **Verified 2026-09-02** — the file the comment names does not exist, and the real one does:
+- **Verified 2026-09-02** — the real test file:
   `present: fn abi_version_is_six in: core-cabi/tests/ffi.rs`
 
 ### The finding

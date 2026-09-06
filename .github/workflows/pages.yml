@@ -46,7 +46,37 @@ env:
   SITE_BASE: /Ritmolux/
 
 jobs:
+  # The Rust API reference, built from the same commit the site is (ADR-0169).
+  # A separate job so it runs BESIDE the site build rather than in front of it:
+  # a documentation edit still renders in under a minute, and only the deploy
+  # waits on a compile.
+  #
+  # `ubuntu-latest` is the first choice and CI's own `check` job runs `cargo doc`
+  # on Windows and macOS only, so this arm is the one nothing had exercised. The
+  # standalone carries a `not(any(windows, macos))` fallback, which is what makes
+  # a Linux build plausible; if it turns out not to build here, the fallback is
+  # this same job on `windows-latest` handing the artifact across.
+  rustdoc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # `--workspace` is load-bearing: `rlx-core-cabi` and `milkconv` sit outside
+      # the workspace default members, and the C ABI crate is exactly the one an
+      # embedder came to read. `-D warnings` is the same bar CI already holds
+      # rustdoc to, so a broken intra-doc link fails here rather than shipping.
+      - run: cargo doc --workspace --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rustdoc
+          path: target/doc
+          retention-days: 1
+
   build:
+    needs: rustdoc
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -78,11 +108,22 @@ jobs:
         working-directory: site
       - run: npm run build
         working-directory: site
+      # The rustdoc lands INSIDE the site's output, before either gate runs, so
+      # `check-site-links.mjs` resolves an `/api/` href like any other and a
+      # renamed crate breaks the gate rather than the reader.
+      - uses: actions/download-artifact@v4
+        with:
+          name: rustdoc
+          path: site/dist/api
       # The gate the source cannot replace. `scripts/check-doc-links.mjs` in the
       # `links` job checks the tree and passes over every defect this one exists
       # to catch, because the rewrite happens at build time and the source was
       # never the thing that broke.
-      - run: node scripts/check-site-links.mjs
+      # `--require-api` turns an absent `dist/api/` into a failure. Without it the
+      # gate skips `/api/` hrefs and says so, which is right on a laptop that has
+      # not run `cargo doc` and wrong here, where a silently-skipped download
+      # would publish a menu entry pointing at nothing.
+      - run: node scripts/check-site-links.mjs --require-api
       # The menu half of the same problem. A page added to `PUBLISHED` and not to
       # the sidebar builds, gets indexed, and is reachable only by search - which
       # looks like a working site from every angle except the one that matters.

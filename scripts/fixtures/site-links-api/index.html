@@ -1,0 +1,20 @@
+<!doctype html>
+<!--
+  Seeded bite check for the /api/ half of check-site-links.mjs property 2, run as
+  `node scripts/check-site-links.mjs scripts/fixtures/site-links-api`.
+
+  The rustdoc tree is present here, so /api/ hrefs are checked rather than
+  skipped, and exactly one of the two below resolves to nothing. That is the
+  defect a renamed crate produces: the menu entry still builds, and the reader
+  gets a 404 from a page nobody linked by hand.
+-->
+<html lang="en">
+  <body>
+    <div class="sl-markdown-content">
+      <!-- Not a defect: the crate is there. -->
+      <a href="/ritmolux/api/rlx_core/">Rust API</a>
+      <!-- The defect: a crate that no longer exists under that name. -->
+      <a href="/ritmolux/api/rlx_core_renamed/">Rust API, after a rename</a>
+    </div>
+  </body>
+</html>

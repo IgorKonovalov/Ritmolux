@@ -443,6 +443,31 @@ perfectly correct, so it is the one defect that ships silently.
 the run would report property 2 as well, and a fixture that fails two ways at once measures
 neither.
 
+## `site-links-api/` — for `check-site-links.mjs`'s `/api/` half
+
+```
+node scripts/check-site-links.mjs scripts/fixtures/site-links-api
+node scripts/check-site-links.mjs scripts/fixtures/site-links --require-api
+```
+
+Expect **exit 1 from both**, for two different reasons, and the pair is the point.
+
+The Rust API reference is built by its own Pages job and unpacked into `dist/api/` before the gate
+runs, so an `/api/` href is checked like any other and a renamed crate breaks the gate rather than
+the reader. A laptop that has not run `cargo doc` has no such tree, and failing there would make the
+local gate permanently red — so an absent tree **skips** `/api/` hrefs and says so, and
+`--require-api` turns the absence itself into a failure. Two behaviours, two roots:
+
+| Root | Flag | What it proves |
+|---|---|---|
+| `site-links-api/` | — | The tree is **there**, and one of its two `/api/` hrefs names a crate that is not. Reported under *A site-relative href resolves to nothing*, exactly like any other dead link |
+| `site-links/` | `--require-api` | The tree is **absent**, and the flag refuses to skip. This is the CI failure mode that matters: a download step that silently did nothing would otherwise publish a *Rust API* menu entry pointing at a 404 |
+
+**The rustdoc's own pages are never scanned.** `dist/api/` is another tool's generated output — its
+script templates are written as `href="./static.files/${f}"` and it cross-links itself a thousand
+times — so it is a destination here and never a source. Without that exclusion this gate reports
+about a thousand findings against a perfectly good rustdoc, which is how the exclusion was found.
+
 ## `toc/` — for `toc.mjs`
 
 ```

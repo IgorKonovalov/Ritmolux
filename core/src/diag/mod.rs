@@ -505,8 +505,10 @@ mod tests {
     /// putting the analysis values on their own type. This exhaustive destructure
     /// is what enforces it: adding a field to `Metrics` stops compiling here, so a
     /// later plan has to come and read this comment before widening the mirror.
-    /// `core/tests/ffi.rs` holds the other half — `RlxMetrics` is still 56 bytes
-    /// and `RLX_ABI_VERSION` is still 4.
+    /// `core-cabi/tests/ffi.rs` holds the other half: it asserts `RlxMetrics`'s
+    /// size and that the runtime version equals the `RLX_ABI_VERSION` constant.
+    /// Neither figure is restated here — a number written into prose is
+    /// falsified by every ABI change and nothing gates one.
     #[test]
     fn metrics_still_carries_exactly_the_mirrored_fields() {
         let Metrics {
