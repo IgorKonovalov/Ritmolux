@@ -37,7 +37,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0014](0014-preset-dir-override-for-dev-iteration.md) | Preset-directory override (`LMV_PRESET_DIR`) with a shared resolver, polling over a watcher | accepted |
 | [0015](0015-gpu-compute-particle-idiom.md) | GPU compute pipelines for particle scenes; the four render-idiom catalogue | accepted |
 | [0016](0016-gpu-tests-opt-in-ci-scope.md) | Headless GPU-capture tests skip when no adapter is present (keep GPU out of the CI contract) | accepted |
-| [0017](0017-preset-author-skill-lane.md) | A third skill lane: `preset-author` (preset content, not engine code) | accepted |
+| [0017](0017-preset-author-skill-lane.md) | A third skill lane: `preset-author` (preset content, not engine code) | accepted, extended by 0170 |
 | [0018](0018-engine-wide-scene-compositing.md) | Engine-wide scene compositing: shared view transform, background pre-pass, feedback trails, and screen-space post-effects (fixed order, not a render graph) | accepted |
 | [0019](0019-eased-parameters.md) | Eased (smoothed) parameters: render-layer one-pole filtering on injected `dt`, expression layer stays pure | accepted |
 | [0020](0020-preset-grammar-v2-branching-functions-tempo.md) | Preset expression grammar v2: branching, math functions, a tempo variable, and soft typo warnings | accepted |
@@ -175,7 +175,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0151](0151-palette-stops-are-authored-in-srgb-and-converted-at-load.md) | Palette stops are authored in sRGB and converted at load | accepted 2026-09-04 (Plan 0138), supersedes 0021 in part |
 | [0152](0152-the-frame-delta-is-sanitized-at-the-scene-seam.md) | The frame delta is sanitized once, at the scene seam | proposed 2026-08-29 (Plan 0140), extends 0135 |
 | [0153](0153-a-per-element-rate-integrates-per-element.md) | A per-element rate integrates per element | proposed 2026-08-29 (Plan 0140), extends 0132 |
-| [0154](0154-the-reader-facing-docs-publish-as-a-site.md) | The reader-facing docs publish as a site, and `docs/` stays the single source | accepted 2026-09-05 (Plan 0143), Outcome; extended by 0166, narrowed by 0167 |
+| [0154](0154-the-reader-facing-docs-publish-as-a-site.md) | The reader-facing docs publish as a site, and `docs/` stays the single source | accepted 2026-09-05 (Plan 0143), Outcome; extended by 0166, 0169, 0171, narrowed by 0167 |
 | [0155](0155-the-window-takes-the-adapter-and-the-preset-the-operator-names.md) | The window takes the adapter and the preset the operator names | accepted 2026-08-31 (Plan 0144), refines 0146 + 0148 |
 | [0156](0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md) | The per-phase gate is scoped, and the whole suite is owed once per plan | accepted 2026-08-31 (Plan 0145), extends 0033, Outcome |
 | [0157](0157-the-preset-sweeps-split-per-preset-and-the-phase-tier-samples-a-declared-representative.md) | The preset sweeps split per preset, and the per-phase tier samples a declared representative | accepted 2026-08-31 (Plan 0146), extends 0156, Outcome |
@@ -184,14 +184,14 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0160](0160-the-stroke-is-measured-where-the-screen-is-isotropic.md) | The stroke is measured where the screen is isotropic, not in NDC | accepted 2026-09-02 (Plan 0149), supersedes the metric half of 0041, unblocks 0158 |
 | [0161](0161-the-blot-anchor-becomes-a-defect-record-because-term-two-reads-the-fringe.md) | The blot anchor becomes a defect record, because term two reads the fringe | accepted 2026-09-02 (Plan 0149), falsifies 0130's default floor arm |
 | [0162](0162-the-application-is-renamed-to-ritmolux.md) | The application is renamed to Ritmolux, and the record keeps the old name | accepted 2026-09-02 (Plan 0150), Outcome |
-| [0163](0163-a-long-document-carries-a-generated-contents-block.md) | A long document carries a generated contents block, and spent prose archives at the close | accepted 2026-09-04 (Plan 0151), extends 0116 |
+| [0163](0163-a-long-document-carries-a-generated-contents-block.md) | A long document carries a generated contents block, and spent prose archives at the close | accepted 2026-09-04 (Plan 0151), extends 0116, extended by 0170 |
 | [0164](0164-the-osc-address-root-becomes-rlx-in-one-break.md) | The OSC address root becomes `/rlx`, in one break, and `/v1` does not move | accepted 2026-09-05 (Plan 0152), extends 0144 |
 | [0165](0165-dependencies-compile-without-debug-info-and-one-line-buys-it-back.md) | Dependencies compile without debug info, and one line buys it back | proposed 2026-09-04 (Plan 0153) |
 | [0166](0166-a-published-document-splits-into-routes-by-size.md) | A published document splits into routes by size, and a fragment map is the contract | accepted 2026-09-05 (Plan 0154), Outcome; extends 0154 |
-| [0167](0167-the-site-owns-its-entrance-and-the-install-page-is-the-testers-own-file.md) | The site owns its entrance, and the install page is the tester's own file | accepted 2026-09-05 (Plan 0154), narrows 0154 |
+| [0167](0167-the-site-owns-its-entrance-and-the-install-page-is-the-testers-own-file.md) | The site owns its entrance, and the install page is the tester's own file | accepted 2026-09-05 (Plan 0154), narrows 0154, extended by 0169 |
 | [0168](0168-the-reader-documents-address-a-reader-and-the-record-stays-a-link.md) | The reader documents address a reader, and the working record stays a link | accepted 2026-09-05 (Plan 0154), prose half landed in Plan 0155 |
-| [0169](0169-the-site-is-organised-by-reader-task-and-the-readme-stops-being-a-reference.md) | The site is organised by reader task, and the README stops being a reference | proposed (Plan 0156), extends 0154 and 0167 |
-| [0170](0170-a-parameters-reference-row-is-generated-from-the-declaration-the-engine-reads.md) | A parameter's reference row is generated from the declaration the engine reads | proposed (Plan 0156), extends 0017 and 0163 |
-| [0171](0171-a-diagram-is-mermaid-in-the-source-and-the-site-renders-it-at-build.md) | A diagram is mermaid in the source, and the site renders it at build | proposed (Plan 0156), extends 0154 |
+| [0169](0169-the-site-is-organised-by-reader-task-and-the-readme-stops-being-a-reference.md) | The site is organised by reader task, and the README stops being a reference | accepted 2026-09-06 (Plan 0156), extends 0154 and 0167 |
+| [0170](0170-a-parameters-reference-row-is-generated-from-the-declaration-the-engine-reads.md) | A parameter's reference row is generated from the declaration the engine reads | accepted 2026-09-06 (Plan 0156), Outcome; extends 0017 and 0163 |
+| [0171](0171-a-diagram-is-mermaid-in-the-source-and-the-site-renders-it-at-build.md) | A diagram is mermaid in the source, and the site renders it at build | accepted 2026-09-06 (Plan 0156), Outcome; extends 0154 |
 | [0172](0172-a-null-cost-measurement-names-the-witness-that-the-thing-ran.md) | A null-cost measurement names the witness that the thing ran | accepted 2026-09-06 (Plan 0147), supplements 0071 and 0143 |
 <!-- roster:end -->

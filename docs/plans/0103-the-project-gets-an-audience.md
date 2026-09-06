@@ -11,7 +11,7 @@
 > **Closes:** design-backlog 0102, design-backlog 0103
 > **Soft dependency:** [0101](done/0101-the-engine-renders-a-music-video.md) (nothing here can currently record motion)
 > **Hard dependency for Phase 5:** [0102](done/0102-the-component-ships.md)
-> **Coordinates with:** [0156](0156-the-site-becomes-the-reference.md) — its Phase 2 has moved the
+> **Coordinates with:** [0156](done/0156-the-site-becomes-the-reference.md) — its Phase 2 has moved the
 > operator and developer sections out of `README.md` into `docs/` (ADR-0169): the file Phase 2 here
 > reorders is now **355 lines, not 650**, and its operator material is
 > [running.md](../running.md) and [configuration.md](../configuration.md).

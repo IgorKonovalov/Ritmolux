@@ -1,8 +1,8 @@
 # ADR-0169 — The site is organised by reader task, and the README stops being a reference
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-06 (Plan 0156)
 > **Date:** 2026-09-06
-> **Related plan(s):** [0156](../plans/0156-the-site-becomes-the-reference.md)
+> **Related plan(s):** [0156](../plans/done/0156-the-site-becomes-the-reference.md)
 > **Extends:** [0154](0154-the-reader-facing-docs-publish-as-a-site.md) (what is published),
 > [0167](0167-the-site-owns-its-entrance-and-the-install-page-is-the-testers-own-file.md) (the entrance)
 > **Narrows:** the exclusion in [Plan 0103](../plans/0103-the-project-gets-an-audience.md), a second time

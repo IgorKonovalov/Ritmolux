@@ -1,8 +1,8 @@
 # ADR-0170 — A parameter's reference row is generated from the declaration the engine reads
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-06 (Plan 0156)
 > **Date:** 2026-09-06
-> **Related plan(s):** [0156](../plans/0156-the-site-becomes-the-reference.md) Phase 7
+> **Related plan(s):** [0156](../plans/done/0156-the-site-becomes-the-reference.md) Phase 7
 > **Extends:** [0017](0017-preset-author-skill-lane.md) (the roster is the lane's catalogue),
 > [0163](0163-a-long-document-carries-a-generated-contents-block.md) (a generated block is never hand-edited)
 
@@ -124,3 +124,29 @@ The schema already lists `GLOBAL_PARAMS` and validates a binding's name at load.
 there instead of beside each scene would centralise them and separate them from the code that
 applies them, which is the drift the three-copies test was written against. The spec lives where
 `set_param` lives.
+
+## Outcome (2026-09-06, at [Plan 0156](../plans/done/0156-the-site-becomes-the-reference.md)'s close)
+
+**The decision held and the one Consequence written as a guarantee was false when the plan shipped
+it.** That bullet says the plan *"requires that read, so the table cannot state a default the engine
+does not apply."* The read was required and it was not universal. `spectrum`'s `curve` reached the
+generated block declaring `default: 0.0`, `range: [-1.0, 1.0]` and a bipolar bend over an engine
+applying `DEFAULT_CURVE = 1.0` and `level.powf(curve.clamp(0.05, 4.0))` -
+[ADR-0040](0040-spectrum-level-curve-applies-before-the-easing.md)'s exponent, where `1.0` is the identity. It was the
+**only** `DEFAULT_*` constant in the tree that never adopted `default_of`, so the single-copy
+property this ADR rests on simply did not reach it, and no render, golden or behavioural gate could
+see the difference: the engine was right and only the published row was wrong.
+
+**A guarantee that lives in a `const fn` needs a gate that says every declaration uses it.** The
+repair is `a_parameter_default_is_declared_once`, a source scan over `core/src/render/` that finds
+128 spec/constant pairs and passes a pair only when one side derives from the other. **Two literals
+side by side is the finding whether or not they agree today** — `DEFAULT_ROTATION` in the same file
+was the same shape, agreeing and therefore latent, and a value comparison could have stated neither.
+
+The counts the Context measured at `567380d` moved on delivery: 24 `PARAMS` declarations became
+**26 rosters**, and the 33 hand-written tables became **19 generated ones** — 341 rows, 180 distinct
+parameters — because the generator composes a system's table from its own specs plus the shared
+blocks rather than from one table per hand-written section. The Neutral bullet on
+[ADR-0166](0166-a-published-document-splits-into-routes-by-size.md) resolved to the split arm: the
+block's `###` headings crossed the section threshold and the site now serves nineteen per-system
+routes.

@@ -199,6 +199,7 @@ accepted cost" are different documents and only one of them is honest.
 - [How this archive came to exist — three sweeps in ten days](#how-this-archive-came-to-exist--three-sweeps-in-ten-days)
 - [0110 — an attractor's sample budget ignores the render target, so a 1080p render reads as an upscale](#0110--an-attractors-sample-budget-ignores-the-render-target-so-a-1080p-render-reads-as-an-upscale)
 - [0164 - the operator console halves the output's frame rate, and two comments say it cannot](#0164---the-operator-console-halves-the-outputs-frame-rate-and-two-comments-say-it-cannot)
+- [0180 — A doc comment states the ABI version is 4 and points at a test file that does not exist](#0180--a-doc-comment-states-the-abi-version-is-4-and-points-at-a-test-file-that-does-not-exist)
 <!-- toc:end -->
 
 ## 0001 — reaction_diffusion reaches only 2 of the 5 Plan-0018 composite levers
@@ -8980,3 +8981,40 @@ which also carries the cross-refresh two-display run this entry left owed.
 The `cost the show nothing` reduction sat in a bullet stamped `Re-probed` rather than `Verified`,
 which `scripts/check-backlog-claims.mjs` does not parse, so it went red silently. The bullets were
 restamped at this close and the remaining breaks retire with this body.
+
+## 0180 — A doc comment states the ABI version is 4 and points at a test file that does not exist
+
+**Raised by:** `architect`, at [Plan 0150](plans/done/0150-the-application-becomes-ritmolux.md)'s
+close review (2026-09-02). **Owner if taken:** `dev`.
+
+- **CLOSED 2026-09-06** by [Plan 0156](plans/done/0156-the-site-becomes-the-reference.md) Phase 6, which
+  made the comment public-facing: the path is corrected and neither figure is restated, so there is
+  no number left to falsify. The archive move is the close's.
+- **Verified 2026-09-06** — the comment names the file that exists and quotes no figure:
+  `absent: is still 4 in: core/src/diag/mod.rs`
+- **Verified 2026-09-02** — the header says otherwise:
+  `present: #define RLX_ABI_VERSION 6u in: core-cabi/include/rlx_core.h`
+- **Verified 2026-09-02** — the real test file:
+  `present: fn abi_version_is_six in: core-cabi/tests/ffi.rs`
+
+### The finding
+
+`core/src/diag/mod.rs:508-509` reads *"`core/tests/ffi.rs` holds the other half — `RlxMetrics` is
+still 56 bytes and `RLX_ABI_VERSION` is still 4."* Both halves are wrong. The counter has been 6
+since before Plan 0150, and the test lives at `core-cabi/tests/ffi.rs` — it moved when ADR-0072
+split the C ABI into its own crate.
+
+The drift predates the rename and Plan 0150 deliberately did not fix it, which was the right call
+for that plan's scope. What the rename **did** do is rewrite `LMV_ABI_VERSION` to `RLX_ABI_VERSION`
+on that exact line, so a sentence that used to read as an obviously stale artifact now asserts a
+false fact in the vocabulary a reader trusts today. That is a small but real change in how
+misleading it is.
+
+**Why nothing catches it.** `check-comment-hygiene.mjs` gates relative links and plan-relative
+narration, not factual claims; `cargo doc` resolves intra-doc links but does not read prose. A
+comment naming a constant's value is exactly the class `CLAUDE.md` already warns about for the ABI
+roster count — *"a count is falsified by every ABI change and nothing gates one written in prose."*
+
+**What a fix looks like.** Correct the path, and either state the value by referring to the constant
+rather than restating it, or drop the number entirely — the comment's job is to say where the other
+half of the check lives, which does not require quoting either figure.

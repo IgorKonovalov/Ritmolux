@@ -59,7 +59,6 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0165 - the windowed app cannot ask for the discrete GPU, so every windowed frame-time figure this project has quoted is an integrated-GPU figure](#0165---the-windowed-app-cannot-ask-for-the-discrete-gpu-so-every-windowed-frame-time-figure-this-project-has-quoted-is-an-integrated-gpu-figure)
 - [0172 - the seeded preset directory is never pruned, so an operator's roster drifts from the shipped set and can hold two presets under one name](#0172---the-seeded-preset-directory-is-never-pruned-so-an-operators-roster-drifts-from-the-shipped-set-and-can-hold-two-presets-under-one-name)
 - [0179 — `cargo doc` is the one CI gate no local step mirrors, so making an item public cannot fail until after the push](#0179--cargo-doc-is-the-one-ci-gate-no-local-step-mirrors-so-making-an-item-public-cannot-fail-until-after-the-push)
-- [0180 — A doc comment states the ABI version is 4 and points at a test file that does not exist](#0180--a-doc-comment-states-the-abi-version-is-4-and-points-at-a-test-file-that-does-not-exist)
 - [0181 — Running the test suite migrates the developer's real `%APPDATA%` directory](#0181--running-the-test-suite-migrates-the-developers-real-appdata-directory)
 - [0182 — Thirty-seven of the forty-six test targets could share one binary, and nine `binary()` predicates are why the merge has to be partial](#0182--thirty-seven-of-the-forty-six-test-targets-could-share-one-binary-and-nine-binary-predicates-are-why-the-merge-has-to-be-partial)
 - [0183 — Nothing bounds the incremental cache, and 509 crate-hash directories accumulated inside a single day](#0183--nothing-bounds-the-incremental-cache-and-509-crate-hash-directories-accumulated-inside-a-single-day)
@@ -326,6 +325,7 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0153 | The palette consumes its stops as linear light, and the page calls the shift unavoidable | [ADR-0151](adrs/0151-palette-stops-are-authored-in-srgb-and-converted-at-load.md) + [Plan 0138](plans/done/0138-the-colour-surface-stops-misleading-its-authors.md). **Closed 2026-09-04** |
 | 0110 | An attractor's sample budget ignores the render target, so a 1080p render reads as an upscale | [ADR-0140](adrs/0140-a-sample-budget-is-a-density-against-the-render-target.md) + [Plan 0128](plans/done/0128-the-rendered-file-stops-looking-upscaled.md); see 0186. **Closed 2026-09-04** |
 | 0164 | The operator console halves the output's frame rate, and two comments say it cannot | [Plan 0147](plans/done/0147-what-the-show-costs-and-what-its-numbers-mean.md): four comment sites repaired, both levers measured with a witness, and the halving did not reproduce; see 0187. **Closed 2026-09-06** |
+| 0180 | A doc comment states the ABI version is 4 and points at a test file that does not exist | [Plan 0156](plans/done/0156-the-site-becomes-the-reference.md) Phase 6: the path corrected and neither figure restated, because rustdoc made the comment public. **Closed 2026-09-06** |
 <!-- roster:end -->
 
 ## Open entries
@@ -3257,43 +3257,6 @@ A third option worth naming only to reject: adding `#[allow(rustdoc::private_int
 the module level. It would have made this specific failure impossible and would also have made the
 next real broken link invisible.
 
-
-## 0180 — A doc comment states the ABI version is 4 and points at a test file that does not exist
-
-**Raised by:** `architect`, at [Plan 0150](plans/done/0150-the-application-becomes-ritmolux.md)'s
-close review (2026-09-02). **Owner if taken:** `dev`.
-
-- **CLOSED 2026-09-06** by [Plan 0156](plans/0156-the-site-becomes-the-reference.md) Phase 6, which
-  made the comment public-facing: the path is corrected and neither figure is restated, so there is
-  no number left to falsify. The archive move is the close's.
-- **Verified 2026-09-06** — the comment names the file that exists and quotes no figure:
-  `absent: is still 4 in: core/src/diag/mod.rs`
-- **Verified 2026-09-02** — the header says otherwise:
-  `present: #define RLX_ABI_VERSION 6u in: core-cabi/include/rlx_core.h`
-- **Verified 2026-09-02** — the real test file:
-  `present: fn abi_version_is_six in: core-cabi/tests/ffi.rs`
-
-### The finding
-
-`core/src/diag/mod.rs:508-509` reads *"`core/tests/ffi.rs` holds the other half — `RlxMetrics` is
-still 56 bytes and `RLX_ABI_VERSION` is still 4."* Both halves are wrong. The counter has been 6
-since before Plan 0150, and the test lives at `core-cabi/tests/ffi.rs` — it moved when ADR-0072
-split the C ABI into its own crate.
-
-The drift predates the rename and Plan 0150 deliberately did not fix it, which was the right call
-for that plan's scope. What the rename **did** do is rewrite `LMV_ABI_VERSION` to `RLX_ABI_VERSION`
-on that exact line, so a sentence that used to read as an obviously stale artifact now asserts a
-false fact in the vocabulary a reader trusts today. That is a small but real change in how
-misleading it is.
-
-**Why nothing catches it.** `check-comment-hygiene.mjs` gates relative links and plan-relative
-narration, not factual claims; `cargo doc` resolves intra-doc links but does not read prose. A
-comment naming a constant's value is exactly the class `CLAUDE.md` already warns about for the ABI
-roster count — *"a count is falsified by every ABI change and nothing gates one written in prose."*
-
-**What a fix looks like.** Correct the path, and either state the value by referring to the constant
-rather than restating it, or drop the number entirely — the comment's job is to say where the other
-half of the check lives, which does not require quoting either figure.
 
 ## 0181 — Running the test suite migrates the developer's real `%APPDATA%` directory
 

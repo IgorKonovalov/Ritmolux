@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0156 - The site becomes the reference](#0156---the-site-becomes-the-reference)
   - [0147 — What the show costs, and what its numbers mean](#0147--what-the-show-costs-and-what-its-numbers-mean)
   - [0155 — The reader documents stop explaining themselves](#0155--the-reader-documents-stop-explaining-themselves)
   - [0154 — The site becomes navigable](#0154--the-site-becomes-navigable)
@@ -161,6 +162,7 @@ hand-edited.
   - [0002 — Rust enforcement tooling](#0002--rust-enforcement-tooling)
   - [0001 — Core + standalone MVP, then foobar parity](#0001--core--standalone-mvp-then-foobar-parity)
 - [Prior sequencing notes (superseded)](#prior-sequencing-notes-superseded)
+  - [Moved 2026-09-06 from `README.md` - the 0156-is-drafted note](#moved-2026-09-06-from-readmemd---the-0156-is-drafted-note)
   - [Moved 2026-09-06 from `README.md` — the 0147-Phase-1-before-0133 note](#moved-2026-09-06-from-readmemd--the-0147-phase-1-before-0133-note)
   - [Moved 2026-09-05 from `README.md` — the 0152-before-0133-and-0147 note](#moved-2026-09-05-from-readmemd--the-0152-before-0133-and-0147-note)
   - [Moved 2026-09-05 from `README.md` — the 0151/0143 heading-layout note](#moved-2026-09-05-from-readmemd--the-01510143-heading-layout-note)
@@ -176,6 +178,85 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0156 - The site becomes the reference](done/0156-the-site-becomes-the-reference.md)
+
+- closed 2026-09-06. Seven `dev` phases in the `plan-0156-the-site-becomes-the-reference` lane
+(`WORK/rlx-plan-0156`): `7f2b0b9` (1, six menu groups and a title per page), `786d687` (2, the
+operator reference leaves the README), `d2f2d24` (3, mermaid renders at build and *How it works*
+exists), `5227878` (4, the engine-side documents address a reader and `capturing.md` splits),
+`24ce616` (5, the embedding guide and the published header), `070c549` (6, rustdoc joins the Pages
+artifact), `9db1f67` (7, the parameter reference is generated), plus `db384db`, the repair the Mode 4
+review asked for. Version: **0.110.0** (minor - `ParamSpec` replaces every bare `PARAMS` roster,
+`standalone/src/config.rs` moves into the lib, and two new test binaries ship). Review: **no
+blockers, one major, three minors.** Phase 8, the live walk, is `human` and outstanding: it needs the
+deploy this close triggers.
+
+**What landed.** Three of the four public surfaces got a page. The operator surface left `README.md`
+for `docs/running.md` and `docs/configuration.md`, the latter holding every flag and every
+`config.toml` key with a complete example that a `standalone` test round-trips through `Config` -
+which is why that module had to move from the binary crate into the lib, a `mod` in a `[[bin]]` being
+unreachable from `standalone/tests/`. The embedding surface got `docs/embedding.md` with a lifecycle
+`sequenceDiagram` and an illustrative C host, plus `core-cabi/include/rlx_core.h` published verbatim
+as a page (213 lines, verified byte-for-byte by decoding the built code block back to text). rustdoc
+lands at `/api/`. And the fourth surface, the preset format, stopped being 33 hand-written tables:
+**26 rosters converted to `ParamSpec`, 341 generated rows across 19 tables, 180 distinct
+parameters**, held current by a test that rewrites the block under `RLX_UPDATE_PARAM_REFERENCE=1`.
+
+**`default_of` is a `const fn`, and that is what makes the generated row trustworthy.** 150
+`DEFAULT_*` constants now read their literal off the spec at compile time; the other 50 name a
+parameter supplied through a shared spec parameterised on that constant, where the constant is
+already the only copy. A constant naming a parameter no spec declares is a compile error, because a
+const-eval panic is one.
+
+**The major, and what it convicted.** Phase 7's done-when *"every scene's applied default equals its
+spec's"* was not implemented. Implementing it as `a_parameter_default_is_declared_once` - a source
+scan over `core/src/render/`, 128 spec/constant pairs, a pair passing only when one side derives from
+the other - immediately convicted `spectrum`'s `curve`, whose spec published `default: 0.0`,
+`range: [-1.0, 1.0]` and a bipolar bend over an engine applying `DEFAULT_CURVE = 1.0` and
+`level.powf(curve.clamp(0.05, 4.0))`, ADR-0040's exponent. **The engine was right and only the
+published row was wrong**, which is the failure mode a generated reference exists to prevent and the
+one no render, golden or behavioural gate can see. `DEFAULT_CURVE` was the single constant in the
+tree that never adopted the `default_of` read, so the single-copy property did not reach it. The
+shipped presets confirm the engine's reading, not the row's: all six that set `curve` sit in
+0.45-0.62, and `spectrum_halo` comments *"dB-like: quiet elements stay legible"*, which is what an
+exponent below 1 does and what a bipolar bend at 0.5 would not. **Two literals side by side is the
+finding whether or not they agree today** - `DEFAULT_ROTATION` in the same file was the same shape,
+agreeing and so latent, and was converted with it. A value comparison could not have stated either.
+
+**Two done-whens were not met as written, both disclosed.** Phase 3's *"a fence with a syntax error
+fails `npm run build`"* does not hold by itself: Astro's content layer stores an entry whose render
+chain threw **without its html**, so the page builds with a title, a menu entry and an empty body and
+the build exits 0. The repair is an `astro:build:done` hook that fails on any empty page - and it
+immediately found a page **Phase 2 had already shipped empty**, `docs/configuration.md`, carrying a
+fragment moved verbatim out of the unpublished `README.md` where it had been stale with nothing able
+to see it. Phase 4's *"`capturing.md` under half its size"* reached 45 % (165,028 B to 91,080 B); the
+gap is one 26,928 B section of preset-author reference the tuning walkthrough links into three times,
+which stays. The section list was implemented as written and the byte figure was not reached.
+
+**What the generated block did on its own.** ADR-0166's size rule saw the new `###` headings and cut
+them, so the site serves `system-fragment_field`, `engine-stage-ink` and seventeen more, each with
+its own table - which is this plan's own Followups list, arriving unasked.
+
+**Two properties that outlive the plan.** The diagrams follow `prefers-color-scheme`, not Starlight's
+theme toggle: ADR-0171's `<picture>` is a media query and the toggle sets `data-theme` on the root,
+which a `<source>` cannot read, so a reader on a light OS who toggles the site to dark gets the light
+rendering. And the site's content-collection cache stores a split document's chunks under a digest of
+the **chunk body**, so a change to the rewriter re-renders nothing - `rm -rf site/.astro` before
+believing a build a plugin edit should have changed.
+
+**Unverified until the first push.** The Pages workflow's rustdoc job has never run.
+`cargo doc --workspace --no-deps` under `-D warnings` is green on Windows (7.6 s warm, 26 MB, six
+crates); the `ubuntu-latest` arm the workflow uses is the one arm CI has never exercised, which the
+plan's Risks anticipate and name a `windows-latest` fallback for. Note the crate emits
+`/api/rlx_core_c/` and not the `/api/rlx_core_cabi/` the plan's Phase 6 done-when names -
+`core-cabi/Cargo.toml` sets `[lib] name = "rlx_core_c"` deliberately, `rlx_core` colliding with the
+crate under test in `tests/ffi.rs`, and rustdoc uses the lib name.
+
+**Preset curation (step 3b): nothing to judge, and nothing made stale.** `presets/` was touched only
+in `README.md`; no `.toml` moved and the shipped set is the same 82 files. The workaround grep over
+all of them finds no header dodging a defect this plan fixed - the `curve` repair corrected a
+published row, not engine behaviour, so no preset was ever written around it.
 
 ### [0147 — What the show costs, and what its numbers mean](done/0147-what-the-show-costs-and-what-its-numbers-mean.md)
 
@@ -7148,6 +7229,26 @@ stays in `lmv-core`, and is out of the Miri job's scope, so the FFI pointer hand
 uncovered (its C side remains the Plan 0001 Phase-6 smoke program's job, per ADR-0003).
 
 ## Prior sequencing notes (superseded)
+
+### Moved 2026-09-06 from `README.md` - the 0156-is-drafted note
+
+Spent when [0156] closed on 2026-09-06. It sequenced the lane against [0140] and [0092] and named the
+README shortening [0103] Phase 2 then reorders; the lane merged `main` before its Phase 7 as the note
+asks, and both remaining dependents are recorded in the live index's own rows. Verbatim:
+
+> **Added 2026-09-06 - [0156] is drafted, and it is the documentation lane's next plan.** It
+> runs in its own worktree and touches no engine behaviour until its Phase 7, which edits every scene
+> file's `PARAMS` declaration - so it should merge `main` before that phase if [0140] or [0092] has
+> landed. It also moves the operator sections out of `README.md`, which [0103] Phase 2 then reorders.
+
+**What survives it.** [0103] Phase 2 still reorders a README, and the file it reorders is now the
+short front door rather than the operator reference - which is the live constraint its roster row
+carries.
+
+[0092]: 0092-the-engine-draws-an-authored-path.md
+[0103]: 0103-the-project-gets-an-audience.md
+[0140]: 0140-every-rate-integrates-for-real.md
+[0156]: done/0156-the-site-becomes-the-reference.md
 
 ### Moved 2026-09-06 from `README.md` — the 0147-Phase-1-before-0133 note
 

@@ -1,8 +1,8 @@
 # ADR-0171 — A diagram is mermaid in the source, and the site renders it at build
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-06 (Plan 0156)
 > **Date:** 2026-09-06
-> **Related plan(s):** [0156](../plans/0156-the-site-becomes-the-reference.md) Phase 3
+> **Related plan(s):** [0156](../plans/done/0156-the-site-becomes-the-reference.md) Phase 3
 > **Extends:** [0154](0154-the-reader-facing-docs-publish-as-a-site.md) (build-time transforms, one source)
 
 ## Context
@@ -101,3 +101,21 @@ The site is readable without them. Rejected because the brief asks for them, and
 four — the frame pipeline and the embedding sequence — are the two things a reader of the *public
 API* most needs to see rather than read: what order the host calls the ABI in, and where a
 parameter's value comes from.
+
+## Outcome (2026-09-06, at [Plan 0156](../plans/done/0156-the-site-becomes-the-reference.md)'s close)
+
+**The mechanism landed as decided and *"the diagram follows the theme"* is true of the reader's OS
+and not of the site.** The Decision's `<picture>` selects its source with a `prefers-color-scheme`
+media query; Starlight's theme control sets `data-theme` on the root element, which a `<source>`
+cannot read. So a reader on a light OS who toggles the site to dark gets the light rendering. That
+is precisely the capability Alternative A was rejected for needing — *"has to be told the theme by
+hand on every toggle"* — and the cost of not having it is a mismatch this ADR did not anticipate.
+The four diagrams ship; the toggle case is what Plan 0156's Phase 8 walk exists to judge.
+
+**The build-failure property the plan asked of this mechanism does not hold on its own.** Astro's
+content layer renders each entry inside a try and stores an entry whose chain threw **without its
+html**, so a malformed fence produces a page with a title, a menu entry and an empty body, and the
+build exits 0. The site build gained an `astro:build:done` hook that fails on any empty page, which
+is what makes a broken fence red — and which immediately caught a page shipped empty by an earlier
+phase for an unrelated reason, a stale fragment link. **A renderer that swallows its own failure
+needs a gate on the artifact, not on the renderer.**

@@ -1,17 +1,25 @@
 # 0156 — The site becomes the reference
 
-> **Status:** in-progress
+> **Status:** done - closed 2026-09-06. Seven `dev` phases in `plan-0156-the-site-becomes-the-reference`:
+> `7f2b0b9` (1), `786d687` (2), `d2f2d24` (3), `5227878` (4), `24ce616` (5), `070c549` (6), `9db1f67` (7),
+> plus `db384db`, the repair the review asked for. Mode 4 review 2026-09-06: **no blockers, one major,
+> three minors** - the major being that Phase 7's *every scene's applied default equals its spec's*
+> done-when was unimplemented, which on implementation convicted `spectrum`'s `curve` row (a published
+> default, range and meaning the engine does not apply). Re-verified at this close on the tip with
+> `main` merged: `cargo nextest run --workspace` **1556 passed, 5 skipped** (442.0 s), `fmt` and
+> `clippy --workspace --all-targets` clean, a clean `npm run build` and all nine Node gates green.
+> **Phase 8, the live walk, is `human` and outstanding** - it needs the deploy this close triggers.
 > **Created:** 2026-09-06
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0169](../adrs/0169-the-site-is-organised-by-reader-task-and-the-readme-stops-being-a-reference.md)
-> (the menu, the README, rustdoc), [0170](../adrs/0170-a-parameters-reference-row-is-generated-from-the-declaration-the-engine-reads.md)
-> (the generated parameter reference), [0171](../adrs/0171-a-diagram-is-mermaid-in-the-source-and-the-site-renders-it-at-build.md)
+> **Related ADRs:** [0169](../../adrs/0169-the-site-is-organised-by-reader-task-and-the-readme-stops-being-a-reference.md)
+> (the menu, the README, rustdoc), [0170](../../adrs/0170-a-parameters-reference-row-is-generated-from-the-declaration-the-engine-reads.md)
+> (the generated parameter reference), [0171](../../adrs/0171-a-diagram-is-mermaid-in-the-source-and-the-site-renders-it-at-build.md)
 > (diagrams)
 > **Closes:** design-backlog 0180 (Phase 6 makes that comment public-facing)
-> **Coordinates with:** [0103](0103-the-project-gets-an-audience.md) — Phase 2 here moves the
+> **Coordinates with:** [0103](../0103-the-project-gets-an-audience.md) — Phase 2 here moves the
 > operator and developer sections out of `README.md`; 0103 Phase 2 keeps the README's opening and
-> reorders a shorter file. [0140](0140-every-rate-integrates-for-real.md) and
-> [0092](0092-the-engine-draws-an-authored-path.md) edit scene files that Phase 7 here also edits.
+> reorders a shorter file. [0140](../0140-every-rate-integrates-for-real.md) and
+> [0092](../0092-the-engine-draws-an-authored-path.md) edit scene files that Phase 7 here also edits.
 > **Lane guidance:** a worktree — `WORK/rlx-plan-0156` on `plan-0156-the-site-becomes-the-reference`
 > — because Phases 2, 6 and 7 compile Rust and Phase 7 touches every scene file. The cost is a cold
 > `target/` (ADR-0147 puts a lane at 8–18 GB) and the fact that **nothing deploys until the close
