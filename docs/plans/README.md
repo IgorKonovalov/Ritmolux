@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0157** (ADRs are a separate sequence — next free there is **0172**.)
+**Next free number: 0157** (ADRs are a separate sequence — next free there is **0173**.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -46,7 +46,6 @@ place. The plan file carries the real link.
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | **Supersedes 0132's architecture, which a live set on 2026-08-29 bypassed entirely.** ADR-0145 (proposed): Art-Net straight to the fixtures. Phase 8 hard-depends on 0115 Phase 2; 1-7 do not. |
 | [0140](0140-every-rate-integrates-for-real.md) | Every rate integrates, for real | approved | dev, human | Backlog 0149 + 0150 (**0142 carried**). ADR-0152 + 0153 (proposed): `dt` sanitized at the scene seam, per-element rates integrate per element. Phase 3 moves goldens; Phase 2 must not. |
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
-| [0147](0147-what-the-show-costs-and-what-its-numbers-mean.md) | What the show costs, and what its numbers mean | in-progress | dev, human | Backlog 0164 + 0163; 0154 half, 0165 update. Phases 1-3 reviewed 2026-09-06; **3b + 3c added, Phase 4 re-scoped** after its first window produced an unwitnessed null. |
 | [0153](0153-the-debug-tree-stops-carrying-dependency-line-tables.md) | The debug tree stops carrying dependency line tables | draft | dev | ADR-0165 (proposed): dependencies compile with `debug = 0`; measured 40.5 MB -> 15.0 MB per test `.pdb`. Backlog 0182-0184 hold the larger levers. |
 | [0156](0156-the-site-becomes-the-reference.md) | The site becomes the reference | draft | dev, human | ADR-0169/0170/0171 (proposed): six menu groups, the operator reference leaves `README.md`, diagrams, the C ABI header and rustdoc published, a generated roster. **Phase 2 shortens the README 0103 reorders.** |
 <!-- roster:end -->
@@ -84,9 +83,11 @@ shape, because most of what it decided was sequencing rather than design:
   each deliberately re-bless the non-square line baselines. They must not run in parallel in any
   order, and the contention got worse when 0149 gained Phase 2a on 2026-09-01: `renderer.rs` and
   both its WGSL modules are now in scope too.
-- **[0147]'s Phase 1 wants to land before [0133] is built.** Backlog 0163 is one sentence of prose,
-  and 0133 brings in-house the exact consumer that was misled by its absence — a lighting look
-  multiplying a band term into a physical output. The rest of 0147 does not gate 0133.
+- ~~**[0147]'s Phase 1 wants to land before [0133] is built.**~~ — **spent 2026-09-06**, when
+  [0147] closed with that phase landed: `README.md` states the `level/*` ceiling property, so
+  [0133] meets it already written. The note is in [README-archive.md](README-archive.md) under
+  `## Prior sequencing notes (superseded)`. **Backlog 0163 stays live for its other half** —
+  `docs/presets.md` still does not state the property for the expression grammar.
 - ~~**[0148] was the free one, and it is now the only lane open.**~~ — **closed 2026-09-02**, all six
   phases. Phase 5's method constraint — no other lane building while the size series is taken — was
   satisfiable only in the window after [0136] and [0149] closed, and it was taken in that window.
@@ -103,8 +104,9 @@ shape, because most of what it decided was sequencing rather than design:
 - **Two entries were promoted only in part, deliberately.** Backlog 0154 gives up its *verdict* fix
   and keeps its mechanism question, because choosing between retry-in-place and a long-lived
   enumerator wants unplug evidence the box cannot produce. Backlog 0165 gives up its measurement
-  half; whether the console's dual-GPU degrade path is reachable stays open, and 0147 Phase 6 is
-  written so that "it stayed unexercised" is a recordable finding rather than a failure.
+  half; 0147 Phase 6 ran on 2026-09-06 and published the discrete row, and the degrade path **stayed
+  unexercised** — a recordable finding, as that phase was written to allow. Both entries keep the
+  half they were promoted without.
 - **What stayed filed, and why.** The engine/content entries no plan here takes — 0140 (the band
   contour), 0146 (`warp_mesh` colours at deposit), 0100, 0101, 0095, 0092, 0069 — are look-affecting
   and larger, and several price themselves as a redesign of the composite. Backlog 0021 and 0032
@@ -118,7 +120,7 @@ shape, because most of what it decided was sequencing rather than design:
   and does **not** touch the standalone exe's, which keeps its inherited value and gains only a unit.
 
 [0143]: done/0143-the-documentation-gets-a-front-end.md
-[0147]: 0147-what-the-show-costs-and-what-its-numbers-mean.md
+[0147]: done/0147-what-the-show-costs-and-what-its-numbers-mean.md
 [0148]: done/0148-the-shipped-artifacts-carry-their-own-guarantees.md
 [0149]: done/0149-the-line-corners-stop-being-blunt.md
 [0150]: done/0150-the-application-becomes-ritmolux.md
@@ -716,6 +718,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0147 — What the show costs, and what its numbers mean](done/0147-what-the-show-costs-and-what-its-numbers-mean.md) — closed 2026-09-06. Review: **no blockers, one major, four minors.** Version: **0.109.0** (minor). ADR-0172 accepted. [Write-up](README-archive.md).
 - [0155 — The reader documents stop explaining themselves](done/0155-the-reader-documents-stop-explaining-themselves.md) — closed 2026-09-05. Review: **no blockers, no majors, four minors, two nits.** Version: **none** (docs/chore-only). 235 bare citations -> 0, held by a new gate. [Write-up](README-archive.md).
 - [0154 — The site becomes navigable](done/0154-the-site-becomes-navigable.md) — closed 2026-09-05. Review: **no blockers, two majors, six minors, two nits.** Version: **0.108.0** (minor). ADR-0166 accepted with an `Outcome`; 0167 + 0168 accepted. [Write-up](README-archive.md).
 - [0152 — The OSC root becomes `/rlx`](done/0152-the-osc-root-becomes-rlx.md) — closed 2026-09-05. Review: **no blockers, no majors, four minors.** Version: **0.107.0** (minor). ADR-0164 accepted; ADR-0144 gained an `Outcome`. Phase 5 (`human`) extracted to `on-device-validation.md`. [Write-up](README-archive.md).

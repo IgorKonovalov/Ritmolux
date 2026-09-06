@@ -1,7 +1,7 @@
 # ADR-0172 — A null-cost measurement names the witness that the thing ran
 
-> **Status:** proposed 2026-09-06
-> **Related plan(s):** [0147 — What the show costs, and what its numbers mean](../plans/0147-what-the-show-costs-and-what-its-numbers-mean.md) Phase 3b
+> **Status:** accepted 2026-09-06 (Plan 0147 Phase 3b)
+> **Related plan(s):** [0147 — What the show costs, and what its numbers mean](../plans/done/0147-what-the-show-costs-and-what-its-numbers-mean.md) Phase 3b
 > **Related:** [ADR-0071](0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md) (a
 > numeric assertion states a property or names its machine),
 > [ADR-0143](0143-the-operator-console-is-a-second-surface-and-the-shell-owns-its-meaning.md)

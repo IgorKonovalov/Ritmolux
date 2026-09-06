@@ -91,7 +91,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0068](0068-the-projection-basis-is-a-per-family-property.md) | The 3-D projection basis is a per-family property: Lorenz renders x–z | accepted (Plan 0059) |
 | [0069](0069-the-attractor-trades-sample-count-for-trace-length.md) | The attractor trades sample count for trace length: `[particles] density` and the continuous-flow streak | accepted (Plan 0059; Outcome) |
 | [0070](0070-a-feedback-pass-addresses-its-own-target-in-framebuffer-space.md) | A feedback pass addresses its own target in framebuffer space | accepted (Plan 0059) |
-| [0071](0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md) | A numeric test contract states a property, or names the machine it was measured on | accepted |
+| [0071](0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md) | A numeric test contract states a property, or names the machine it was measured on | accepted, supplemented by 0172 |
 | [0072](0072-the-c-abi-ships-from-its-own-crate.md) | The C ABI ships from its own crate | accepted (Outcome) |
 | [0073](0073-the-windows-ci-critical-path.md) | The Windows CI critical path: the sweep gets one owner, and a shape claim stops sweeping | accepted (Outcome) |
 | [0074](0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) | A ratio against an in-run control is not automatically portable | accepted (Outcome) |
@@ -164,7 +164,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0140](0140-a-sample-budget-is-a-density-against-the-render-target.md) | An attractor's sample budget is a density against the render target, capped live and uncapped offline | accepted 2026-08-28 (Plan 0128), Outcome |
 | [0141](0141-one-artifact-store-serves-every-lane.md) | One artifact store serves every lane, and its config lives above the repo | accepted 2026-08-29 (Plan 0129), Outcome, superseded in part by 0147 |
 | [0142](0142-the-audio-input-is-switched-live-and-the-shell-owns-the-policy.md) | The audio input is switched live, and the shell owns the policy | accepted 2026-08-28 (Plan 0130), Outcome |
-| [0143](0143-the-operator-console-is-a-second-surface-and-the-shell-owns-its-meaning.md) | The operator console is a second surface on the render device, and the shell owns every pixel's meaning | accepted 2026-08-30 (Plan 0131), Outcome |
+| [0143](0143-the-operator-console-is-a-second-surface-and-the-shell-owns-its-meaning.md) | The operator console is a second surface on the render device, and the shell owns every pixel's meaning | accepted 2026-08-30 (Plan 0131), two Outcomes, supplemented by 0172 |
 | [0144](0144-the-lighting-feed-is-a-resolved-ndi-sender-and-a-fixed-osc-telemetry-set.md) | The lighting feed is a resolved NDI sender and a fixed OSC telemetry set | accepted 2026-08-29 (Plan 0132), Outcome, superseded in part by 0145 |
 | [0145](0145-the-engine-drives-the-fixtures-directly-over-art-net.md) | The engine drives the fixtures directly over Art-Net | proposed 2026-08-29 (Plan 0133), supersedes 0144 in part |
 | [0146](0146-one-name-selects-the-gpu-and-each-side-matches-its-own-roster.md) | One name selects the GPU, and each side matches its own roster | accepted 2026-08-30 (Plan 0115), Outcome, refines 0125 |
@@ -193,5 +193,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0169](0169-the-site-is-organised-by-reader-task-and-the-readme-stops-being-a-reference.md) | The site is organised by reader task, and the README stops being a reference | proposed (Plan 0156), extends 0154 and 0167 |
 | [0170](0170-a-parameters-reference-row-is-generated-from-the-declaration-the-engine-reads.md) | A parameter's reference row is generated from the declaration the engine reads | proposed (Plan 0156), extends 0017 and 0163 |
 | [0171](0171-a-diagram-is-mermaid-in-the-source-and-the-site-renders-it-at-build.md) | A diagram is mermaid in the source, and the site renders it at build | proposed (Plan 0156), extends 0154 |
-| [0172](0172-a-null-cost-measurement-names-the-witness-that-the-thing-ran.md) | A null-cost measurement names the witness that the thing ran | proposed (Plan 0147), supplements 0071 and 0143 |
+| [0172](0172-a-null-cost-measurement-names-the-witness-that-the-thing-ran.md) | A null-cost measurement names the witness that the thing ran | accepted 2026-09-06 (Plan 0147), supplements 0071 and 0143 |
 <!-- roster:end -->

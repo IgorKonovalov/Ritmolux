@@ -1,14 +1,20 @@
 # 0147 — What the show costs, and what its numbers mean
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-06. Eight phases in `plan-0147-show-costs`: `eacaf8c`
+> (1), `bdbba7f` (2), `9e7dee1` (3), `76e3452` (3b), `ada2b37` (3c), `8b7bf2d` (5), plus
+> Phases 4 and 6 as measurements recorded in the log (`cd7af11`, `7478fa2`). Mode 4 review
+> 2026-09-06: **no blockers, one major, four minors, one nit** — the full suite re-run at the
+> tip (1545 passed, 5 skipped), `fmt` + `clippy --workspace --all-targets` clean, and all four
+> falsified comment sites verified repaired. The major is that four new backlog probe bullets
+> escape `check-backlog-claims.mjs`, one of them already false; repaired at this close.
 > **Created:** 2026-09-01
 > **Owner skill(s):** dev, human
 > **Related ADRs:** none for Phases 1-3 and 6 — mechanism fixes and prose under decisions that
 > already exist. Phase 3b implements
-> [ADR-0172](../adrs/0172-a-null-cost-measurement-names-the-witness-that-the-thing-ran.md), written
+> [ADR-0172](../../adrs/0172-a-null-cost-measurement-names-the-witness-that-the-thing-ran.md), written
 > at the Phases 1-3 review after a first Phase 4 window produced a null nothing could read. Phase 5
 > writes a second `Outcome` onto
-> [ADR-0143](../adrs/0143-the-operator-console-is-a-second-surface-and-the-shell-owns-its-meaning.md) rather than superseding it,
+> [ADR-0143](../../adrs/0143-the-operator-console-is-a-second-surface-and-the-shell-owns-its-meaning.md) rather than superseding it,
 > and names the ADR a fifth phase would owe if neither lever moves the cost.
 > **Closes:** design-backlog 0164, 0163. **0154 is half-discharged, not closed** — see Phase 2.
 > **0165 stays live with a dated update** — see Phase 6.
@@ -22,7 +28,7 @@ input-gain control that provably cannot move it. A WASAPI activation that failed
 reads as a dead device. And every windowed frame-time figure this project has published is an
 integrated-GPU figure. The first visible behavior is one sentence in `README.md`'s telemetry table
 saying what `level/*` is normalized against — the cheapest item here and the one with a deadline,
-because [Plan 0133](0133-the-engine-drives-the-lights.md) brings a lighting consumer in-house and
+because [Plan 0133](../0133-the-engine-drives-the-lights.md) brings a lighting consumer in-house and
 will meet it on its first evening.
 
 ## Context & problem
@@ -76,7 +82,7 @@ reasons from one that failed because the endpoint is gone** — so a real loss w
 error would spend all three attempts on the wrong failure and write a `lost …` verdict about a
 device that was fine.
 
-**Every windowed frame-time figure is an iGPU figure.** [Plan 0144](done/0144-the-flags-mean-what-they-say.md)
+**Every windowed frame-time figure is an iGPU figure.** [Plan 0144](0144-the-flags-mean-what-they-say.md)
 landed `--gpu` on the windowed path and it was observed working. It deliberately left the unflagged
 request at `AdapterChoice::Default` so no existing number would move underneath a CLI change — which
 is right, and means the published figures are still iGPU figures, now **by choice rather than by
@@ -180,7 +186,7 @@ flowchart TB
   both **before any encoder work**, and `present_aux` propagates that `Ok`. Nothing counts. So *"the
   console costs nothing"* and *"the console never presented"* are the same reading from every
   surface this project has, and a null result from Phase 4 would be uninterpretable rather than
-  negative ([ADR-0172](../adrs/0172-a-null-cost-measurement-names-the-witness-that-the-thing-ran.md)).
+  negative ([ADR-0172](../../adrs/0172-a-null-cost-measurement-names-the-witness-that-the-thing-ran.md)).
   **The pattern already exists one file away**: the show's own `acquire` skip calls
   `record_dropped()`, `record_frame()` runs only after `queue.present`, and `frames_dropped` is a
   column in `diagnostics.log`. Do the same thing for the second surface.
@@ -354,7 +360,7 @@ pub struct ConsolePacing {
 - **It does not run the unplug test.** That is `docs/on-device-validation.md`'s carried item and
   still needs hardware the box lacks.
 - **It does not touch the OSC vocabulary.** Backlog 0157 and 0158 — the missing bar grid and the
-  unfolded tempo octave — are [Plan 0133](0133-the-engine-drives-the-lights.md) Phase 2's, and this
+  unfolded tempo octave — are [Plan 0133](../0133-the-engine-drives-the-lights.md) Phase 2's, and this
   plan must not pre-empt them. Phase 1 documents an existing term; it publishes nothing new.
 - **It does not move a published frame-time figure.** Phase 6 adds rows only.
 - **It does not present the console off the display thread.** That is a real design change and an
