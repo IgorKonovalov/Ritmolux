@@ -1242,6 +1242,26 @@ why "edit once, both frontends see it" works.
                                   into the binary)                     then loaded + watched
 ```
 
+What then happens to one file, from the moment it lands in that directory:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Seeded: first run writes<br/>every embedded preset<br/>that is not already there
+    Seeded --> OnDisk: your copy
+    OnDisk --> Edited: you save a change
+    Edited --> Parsed: the watcher notices<br/>(~150 ms)
+    Parsed --> Compiled: expressions compile once
+    Compiled --> Active: dissolves in
+    Parsed --> Rejected: a syntax or binding error
+    Rejected --> Active: the LAST GOOD set is kept<br/>and the error is printed
+    Active --> Active: evaluated once per frame
+    Active --> Dissolving: Space, the browser,<br/>or auto-rotate
+    Dissolving --> Active: the next preset
+```
+
+The one edge worth reading twice is `Rejected -> Active`: a bad edit never takes the picture down.
+The engine reports what it could not parse and keeps rendering what it had.
+
 1. **`presets/` at the repo root — the source of truth.** These `.toml` files are
    what a contributor edits. Nothing reads them at runtime directly.
 

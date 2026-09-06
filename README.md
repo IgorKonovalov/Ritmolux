@@ -40,36 +40,15 @@ preset that ships.
 
 ## Architecture
 
-```mermaid
-flowchart TD
-    subgraph external["Audio sources (external)"]
-        loop["OS loopback capture<br/>(WASAPI / ScreenCaptureKit)"]
-        fb["foobar2000<br/>visualisation_stream"]
-    end
+Two frontends over one shared Rust engine. The standalone app taps OS loopback audio; the
+foobar2000 component is handed samples by the player it lives in. Neither fact reaches the engine —
+it takes PCM frames and does not know where they came from, which is what lets one visual codebase
+serve both. The seam between audio and picture is a **lock-free ring buffer**: audio arrives at the
+device's cadence, frames render at the display's, and neither loop drives the other.
 
-    subgraph shells["Frontends"]
-        standalone["Standalone shell<br/>Rust: winit + wgpu surface"]
-        plugin["foobar plugin<br/>C++ shim over the C ABI"]
-    end
+**[How it works](https://igorkonovalov.github.io/Ritmolux/engine/how-it-works/)** has the diagram,
+and what happens to a sample on its way to a shape on screen.
 
-    subgraph core["core/ — shared Rust brain (source-agnostic, GPU-abstract)"]
-        ring["Lock-free ring buffer<br/>(SPSC seam)"]
-        dsp["DSP<br/>FFT / spectrum · beat / onset"]
-        scene["Scene graph"]
-        render["wgpu render engine"]
-        ring --> dsp --> scene --> render
-    end
-
-    loop --> standalone
-    fb --> plugin
-    standalone -->|"push PCM frames"| ring
-    plugin -->|"push PCM frames (C ABI)"| ring
-    render -->|Metal| macos["macOS"]
-    render -->|"DX12 / Vulkan"| windows["Windows"]
-```
-
-The seam between audio and render is the **lock-free ring buffer**: audio arrives at the
-device's cadence, frames render at the display's, and neither loop drives the other directly.
 
 ## Repository layout
 

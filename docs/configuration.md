@@ -100,7 +100,7 @@ no codec. Windows-only, and present only in a build with the `spout` feature —
 saying so. Presets rotate on the operator config's dwell timer exactly as they do in the window
 (rotation is **on** here even where `[rotate] auto` is off, since a headless source has nobody to
 press `Space`). Ctrl-C stops it and prints the run's frames, wall clock and scene clock. See
-[Headless capture and video](capturing.md#the-live-video-out-rlx---stream) for the TouchDesigner
+[Headless capture and video](capturing.md#the-live-video-out-ritmolux---stream) for the TouchDesigner
 side.
 
 **`--tier floor|rich`** pins the quality tier. Unpinned, the app starts on `rich` and a frame-time

@@ -41,18 +41,37 @@ never will:
 | `src/plugins/split-document.mjs` | cuts a document past the size threshold into one route per section, and emits the fragment map that keeps deep links resolving (ADR-0166 owns both constants) |
 | `src/plugins/rewrite-links.mjs` | rewrites every relative link: inside the published set to a site route, outside it to a GitHub URL (ADR-0154) |
 | `src/plugins/rewrite-links.mjs` | renames a link whose whole text is the target's path to the target's declared title, when the target is published (ADR-0169) |
+| `rehype-mermaid`, configured in `astro.config.mjs` | renders each mermaid fence to a `<picture>` with a light and a dark SVG, at build time, with no script on the page (ADR-0171) |
 
 ## Working on it
 
 ```sh
 cd site
-npm install     # first time only
-npm run dev     # http://localhost:4321/ritmolux/
-npm run build   # -> site/dist/
+npm install                        # first time only
+npx playwright install chromium    # first time only - the diagram renderer
+npm run dev                        # http://localhost:4321/ritmolux/
+npm run build                      # -> site/dist/
 ```
+
+**The browser is not optional.** `rehype-mermaid` renders every ```` ```mermaid ```` fence to an
+SVG at build time through a headless Chromium (ADR-0171), and a build without it fails rather than
+serving a page with a hole in it. It is a one-time ~150 MB install into a machine-local cache, not
+into `node_modules`; the Pages workflow installs and caches it the same way.
 
 `base` is `/ritmolux/`, so the dev server serves under that subpath too - a bare
 `http://localhost:4321/` is a 404 by design, not a fault.
+
+## The empty-page guard
+
+`astro.config.mjs` registers an `astro:build:done` hook that **fails the build if any page rendered
+to an empty body**, and it is load-bearing rather than defensive. Astro's content layer renders each
+entry inside a try: an entry whose remark or rehype chain throws is stored *without* its html and
+the build continues, so the page ships with a title, a menu entry, a search index entry and nothing
+under it.
+
+Two of this project's own rules throw exactly that way — `rewrite-links.mjs` on a relative target
+that does not resolve, and `rehype-mermaid` on a fence that does not parse — and both are supposed
+to fail the build. Before the hook, neither did.
 
 ## What is published
 

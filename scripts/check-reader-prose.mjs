@@ -84,6 +84,10 @@ const READER_DOCS = [
   // them so they cannot acquire one.
   "docs/running.md",
   "docs/configuration.md",
+  // The explanation a curious user reads. Sourced from the budgets, the grammar
+  // and the specs, and it links each of them rather than repeating a table -
+  // which is the same reason its citations have to be links.
+  "docs/how-it-works.md",
 ];
 
 /**

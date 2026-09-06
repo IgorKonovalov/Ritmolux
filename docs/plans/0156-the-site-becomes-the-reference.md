@@ -426,8 +426,8 @@ pub const PARAMS: &[ParamSpec] = &[
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The menu is organised by reader task | dev | done | 7f2b0b9 |
-| 2 — The operator surface has a reference | dev | done | committed with this row |
-| 3 — The site renders diagrams, and How it works exists | dev | not started | |
+| 2 — The operator surface has a reference | dev | done | 786d687 |
+| 3 — The site renders diagrams, and How it works exists | dev | done | committed with this row |
 | 4 — The engine-side documents address a reader | dev | not started | |
 | 5 — The embedding surface | dev | not started | |
 | 6 — rustdoc joins the Pages artifact | dev | not started | |
@@ -457,6 +457,22 @@ pub const PARAMS: &[ParamSpec] = &[
   growing its list means growing the fixture).
 - The flag half of the new test reads `ritmolux --help` rather than `FLAGS`, which is `pub(crate)`
   in the binary. That is the roster's own stated authority, so the test reads it as a guard would.
+- **Phase 3's done-when "a fence with a syntax error fails `npm run build`" did not hold, and does
+  not hold by itself.** Astro's content layer renders each entry inside a try and stores an entry
+  whose chain threw WITHOUT its html: the page builds with a title, a menu entry and an empty body,
+  and the build exits 0. `site/astro.config.mjs` gains an `astro:build:done` hook that fails on any
+  empty page, and both failure classes were then confirmed red — a broken fence and a link to a
+  file that does not exist.
+- **That hook found a page Phase 2 had already shipped empty:** `docs/configuration.md` carried
+  `capturing.md#the-live-video-out-rlx---stream`, moved verbatim out of `README.md`, and the real
+  slug is `…-ritmolux---stream`. `check-doc-links.mjs` does not validate fragments, and the README
+  is unpublished, so that link had been stale in the README with nothing able to see it.
+- **The diagrams follow `prefers-color-scheme`, not the site's theme toggle.** ADR-0171's
+  `<picture>` is a media query, and Starlight's toggle sets `data-theme` on the root, which a
+  `<source>` cannot read. A reader on a light OS who toggles the site to dark gets the light
+  rendering. Phase 8 walks both themes.
+- The forward link from `docs/how-it-works.md` to `docs/embedding.md` is not written: Phase 5
+  creates that file, and a link to a file that does not exist is now a red build.
 - **The site's content-collection cache hides a plugin edit.** A split document's chunks are stored
   under a digest of the chunk body, so a change to the *rewriter* re-renders nothing. `rm -rf
   site/.astro` before believing a build that a plugin edit should have changed.

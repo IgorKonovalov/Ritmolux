@@ -1,7 +1,10 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import rehypeMermaid from 'rehype-mermaid';
 import { SKIP, visit } from 'unist-util-visit';
 import { rewriteLinks } from './src/plugins/rewrite-links.mjs';
 import { stripProvenance } from './src/plugins/strip-provenance.mjs';
@@ -104,6 +107,34 @@ function scrollWideTables() {
   };
 }
 
+/**
+ * How a ```mermaid fence becomes a picture (ADR-0171).
+ *
+ * `img-svg` renders each fence to an SVG at BUILD time with the headless
+ * Chromium `playwright` installs, and emits a `<picture>` carrying a light and a
+ * dark rendering. Nothing about mermaid reaches the reader: the alternative is
+ * its runtime, over a megabyte on every page for four diagrams, rendered after
+ * the page paints and told the theme by hand on every toggle.
+ *
+ * The two themes are named rather than styled, and `themeVariables` sets the
+ * accent from the site's own violet - Starlight's typography does not reach
+ * inside mermaid's SVG, which carries its own inline styles, so this object is
+ * the one place a diagram's colour is decided.
+ *
+ * A fence that does not parse FAILS THE BUILD. That is the decision, not an
+ * accident of configuration: a broken diagram is a broken build, in the same
+ * place a broken link is.
+ */
+const MERMAID = {
+  strategy: 'img-svg',
+  dark: { theme: 'dark', themeVariables: { primaryColor: '#241d54', lineColor: '#7d6cf0' } },
+  mermaidConfig: {
+    theme: 'default',
+    themeVariables: { primaryColor: '#d8d3f7', lineColor: '#5b4bd6' },
+    fontFamily: 'var(--sl-font, system-ui, sans-serif)',
+  },
+};
+
 function stripLeadingHeading() {
   return (tree) => {
     const first = tree.children[0];
@@ -121,6 +152,71 @@ function stripLeadingHeading() {
  */
 const doc = (source) => sidebarGroup(source, PUBLISHED[source]);
 
+/**
+ * Fails the build when a page rendered to nothing.
+ *
+ * THIS IS THE ONLY THING THAT MAKES A CONTENT ERROR VISIBLE. Astro's content
+ * layer renders each entry inside a try, and an entry whose remark or rehype
+ * chain throws is stored WITHOUT its rendered html rather than aborting the
+ * sync: the page then builds, gets indexed, gets a menu entry, and serves a
+ * title over an empty body. Two of this project's own build-time rules throw
+ * exactly that way and would otherwise be silent - `rewrite-links.mjs` throws on
+ * a relative target that does not resolve, and `rehype-mermaid` throws on a
+ * fence that does not parse. Both are supposed to fail the build (ADR-0154,
+ * ADR-0171), and before this hook neither did.
+ *
+ * The test is emptiness rather than a diff, because emptiness is what the
+ * failure mode produces and it needs no baseline. A page with no
+ * `sl-markdown-content` at all is a template that does not have one, not a
+ * defect, so it is skipped.
+ */
+function failOnEmptyPages() {
+  const MARKER = '<div class="sl-markdown-content">';
+  return {
+    name: 'ritmolux-fail-on-empty-pages',
+    hooks: {
+      'astro:build:done': ({ dir, logger }) => {
+        const root = fileURLToPath(dir);
+        const empty = [];
+        const walk = (directory) => {
+          for (const entry of readdirSync(directory, { withFileTypes: true })) {
+            const full = path.join(directory, entry.name);
+            if (entry.isDirectory()) {
+              walk(full);
+            } else if (entry.name.endsWith('.html')) {
+              // Starlight's 404 is a title and a sentence in its own template,
+              // with a genuinely empty markdown body. It is the one page whose
+              // emptiness means nothing.
+              if (path.relative(root, full) === '404.html') continue;
+              const html = readFileSync(full, 'utf8');
+              if (!html.includes(MARKER)) continue;
+              // The container closing on the marker IS the empty case, exactly:
+              // Astro emits no whitespace between them, and a page with one
+              // character of content does not match.
+              if (html.includes(`${MARKER}</div>`)) {
+                empty.push(path.relative(root, full).split(path.sep).join('/'));
+              }
+            }
+          }
+        };
+        walk(root);
+        if (empty.length === 0) {
+          logger.info('every page has a body');
+          return;
+        }
+        throw new Error(
+          `${empty.length} page(s) rendered to an empty body:\n  ${empty.join('\n  ')}\n\n` +
+            `A page builds with a title and nothing under it when its markdown chain THREW and ` +
+            `Astro stored the entry unrendered. The two throws that reach here are a relative ` +
+            `link that resolves to nothing (rewrite-links.mjs) and a mermaid fence that does ` +
+            `not parse (rehype-mermaid); neither prints anything of its own. Check the source ` +
+            `document's links and fences.`,
+        );
+      },
+    },
+  };
+}
+
 export default defineConfig({
   site: 'https://igorkonovalov.github.io',
   base: BASE,
@@ -134,7 +230,7 @@ export default defineConfig({
       stripProvenance,
       [rewriteLinks, { base: BASE }],
     ],
-    rehypePlugins: [scrollWideTables],
+    rehypePlugins: [scrollWideTables, [rehypeMermaid, MERMAID]],
   },
   // The published set is read in place from the repository root, one level
   // above this project. Vite refuses to serve files outside its root in dev
@@ -150,6 +246,7 @@ export default defineConfig({
     },
   },
   integrations: [
+    failOnEmptyPages(),
     starlight({
       title: 'Ritmolux',
       customCss: ['./src/styles/site.css'],
@@ -203,7 +300,11 @@ export default defineConfig({
         },
         {
           label: 'How it works',
-          items: [doc('docs/nfr.md'), doc('docs/generative-techniques-catalogue.md')],
+          items: [
+            doc('docs/how-it-works.md'),
+            doc('docs/nfr.md'),
+            doc('docs/generative-techniques-catalogue.md'),
+          ],
         },
         {
           label: 'Contribute',

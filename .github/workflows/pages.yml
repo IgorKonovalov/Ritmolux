@@ -15,6 +15,11 @@
 # reports every internal link as broken, which looks like a catastrophe and is a
 # typo.
 #
+# DIAGRAMS ARE RENDERED HERE, and that is not a contradiction of the line below.
+# A mermaid fence is deterministic - the same source gives the same SVG on every
+# machine - so it is generated at build time rather than committed (ADR-0171).
+# A GPU render is not, which is why the pictures below are.
+#
 # NOT a render job. The gallery's 82 preset cards are committed PNGs, rendered
 # locally on a hardware GPU (ADR-0100) - CI never runs `shot` for the docs, and
 # adding that here would be a permanently red build, since a render is not
@@ -54,6 +59,22 @@ jobs:
       # exactly and fails if package.json and the lockfile disagree, which is the
       # only reason the lockfile is committed at all.
       - run: npm ci
+        working-directory: site
+      # The headless browser `rehype-mermaid` renders each diagram fence through
+      # (ADR-0171). `--with-deps` installs the shared libraries Chromium needs on
+      # a bare runner; the browser itself is cached by the key below, so the
+      # ~150 MB download happens on the first run after a playwright bump and
+      # not on every build. A missing browser must FAIL rather than render a
+      # blank - a broken diagram is a broken build.
+      - id: playwright-version
+        run: echo "version=$(node -p "require('./node_modules/playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+        working-directory: site
+      - uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+      - run: npx playwright install --with-deps chromium
         working-directory: site
       - run: npm run build
         working-directory: site

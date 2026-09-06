@@ -48,6 +48,7 @@ export const PUBLISHED = {
   'presets/README.md': { route: 'guide/parameter-roster', title: 'Parameter roster' },
   'docs/capturing.md': { route: 'engine/capturing', title: 'Headless capture and video' },
   // How it works
+  'docs/how-it-works.md': { route: 'engine/how-it-works', title: 'How it works' },
   'docs/nfr.md': { route: 'engine/nfr', title: 'Non-functional requirements' },
   'docs/generative-techniques-catalogue.md': {
     route: 'engine/techniques',
