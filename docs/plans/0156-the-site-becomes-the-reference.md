@@ -431,7 +431,7 @@ pub const PARAMS: &[ParamSpec] = &[
 | 4 — The engine-side documents address a reader | dev | done | 5227878 |
 | 5 — The embedding surface | dev | done | 24ce616 |
 | 6 — rustdoc joins the Pages artifact | dev | done | 070c549 |
-| 7 — The parameter reference is generated from the engine | dev | done | committed with this row |
+| 7 — The parameter reference is generated from the engine | dev | done | 9db1f67 |
 | 8 — The live walk | human | not started | |
 
 ### Notes
@@ -553,16 +553,40 @@ pub const PARAMS: &[ParamSpec] = &[
 
 ### Close triggers
 
-- **`presets/` touched:** _(yes — `presets/README.md` in Phases 4 and 7; no `.toml`)_
-- **Plan header `Closes:`** _(design-backlog 0180)_
-- **What shipped:** _(feature / fix-only / docs-chore-only)_
-- **Operator docs touched:** _(from Mode 4's sweep table — expect `README.md`, `presets/README.md`,
-  `docs/presets.md`, `docs/capturing.md`, `docs/on-device-validation.md`, `docs/nfr.md`, and the
-  new `docs/running.md` / `docs/configuration.md`, which join that table at the close)_
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** _(exit code, and any entry named)_
-- **Full suite:** _(the command as run — `cargo nextest run --workspace`, not `-P fast` — its exit
-  code, and the pass/skip counts off nextest's `Summary` line)_
-- **Outstanding `human` phases:** _(Phase 8, until walked)_
+- **`presets/` touched:** yes — `presets/README.md` only (Phase 4's front matter, Phase 7's
+  generated block and the contents block above it). **No `.toml` changed**; the shipped set is the
+  same 82 files.
+- **Plan header `Closes:`** design-backlog 0180, marked `CLOSED 2026-09-06` in the entry body at
+  Phase 6. Its `present:` probe was inverted to `absent:`, since the fix is the disappearance of
+  the claim. The archive move is the close's.
+- **What shipped:** feature. Two engine-visible changes — `ParamSpec` replaces every bare `PARAMS`
+  roster and `standalone/src/config.rs` moves from the binary crate into the lib — plus a new C ABI
+  test binary, a new `standalone` test binary, and the site's own build gaining `rehype-mermaid`,
+  a rustdoc job, an empty-page guard and a wrapped-source loader. No preset content moved and no
+  golden moved.
+- **Operator docs touched:** `README.md`, `presets/README.md`, `docs/presets.md`,
+  `docs/preset-guide.md`, `docs/preset-palettes.md`, `docs/preset-tuning-walkthrough.md`,
+  `docs/capturing.md`, `docs/nfr.md`, `docs/on-device-validation.md`, `docs/releasing.md`,
+  `docs/diffusion-filter.md`, `docs/generative-techniques-catalogue.md`, and six new files —
+  `docs/running.md`, `docs/configuration.md`, `docs/developing.md`, `docs/how-it-works.md`,
+  `docs/testing.md`, `docs/milkdrop-conversion.md`, `docs/embedding.md`. Both specs and
+  `docs/specs/README.md` also moved.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — 109 stated reductions hold
+  across all 46 live entries, 8 unprobeable. Two probes were re-pointed by this plan's own moves:
+  entry 0163's (the OSC table left `README.md`) and entry 0109's (the corpus ranking left
+  `docs/capturing.md`).
+- **Full suite:** `cargo nextest run --workspace`, exit 0 — **1546 tests run: 1546 passed
+  (21 slow), 5 skipped**, 542.6 s. Run at the end of Phase 7, before this block. No suite was run
+  under an upward override at an earlier phase; every earlier phase ran `-P fast` (1323 → 1326
+  tests, 223 skipped) and the site and doc gates.
+- **Outstanding `human` phases:** Phase 8, the live walk. It needs the close to fast-forward `main`
+  and Pages to deploy; nothing in phases 1–7 is verifiable on a laptop that is not already verified
+  by a gate here, except the two things that phase exists for — the diagrams on a dark theme and
+  `/api/` serving.
+- **Unverified until the first push:** the Pages workflow's `rustdoc` job has never run.
+  `cargo doc --workspace --no-deps` under `-D warnings` is green on Windows here; the
+  `ubuntu-latest` arm the workflow uses is the one CI has never exercised, which the plan's Risks
+  anticipate and name a fallback for.
 
 ## Followups (after this lands)
 
