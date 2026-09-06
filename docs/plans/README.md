@@ -46,9 +46,18 @@ place. The plan file carries the real link.
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | **Supersedes 0132's architecture, which a live set on 2026-08-29 bypassed entirely.** ADR-0145 (proposed): Art-Net straight to the fixtures. Phase 8 hard-depends on 0115 Phase 2; 1-7 do not. |
 | [0140](0140-every-rate-integrates-for-real.md) | Every rate integrates, for real | approved | dev, human | Backlog 0149 + 0150 (**0142 carried**). ADR-0152 + 0153 (proposed): `dt` sanitized at the scene seam, per-element rates integrate per element. Phase 3 moves goldens; Phase 2 must not. |
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
-| [0153](0153-the-debug-tree-stops-carrying-dependency-line-tables.md) | The debug tree stops carrying dependency line tables | draft | dev | ADR-0165 (proposed): dependencies compile with `debug = 0`; measured 40.5 MB -> 15.0 MB per test `.pdb`. Backlog 0182-0184 hold the larger levers. |
+| [0153](0153-the-debug-tree-stops-carrying-dependency-line-tables.md) | The debug tree stops carrying dependency line tables | approved | dev | ADR-0165 (proposed): dependencies compile with `debug = 0`; measured 40.5 MB -> 15.0 MB per test `.pdb`. Backlog 0182-0184 hold the larger levers. |
 | [0156](0156-the-site-becomes-the-reference.md) | The site becomes the reference | draft | dev, human | ADR-0169/0170/0171 (proposed): six menu groups, the operator reference leaves `README.md`, diagrams, the C ABI header and rustdoc published, a generated roster. **Phase 2 shortens the README 0103 reorders.** |
 <!-- roster:end -->
+
+**Added 2026-09-06 — [0153] is approved, and it is the one plan takeable beside the live [0156]
+lane.** It is `dev`-only, two phases, and touches `Cargo.toml` and `CLAUDE.md` and nothing else, so
+it contends with no plan on this roster. It was approved on the disk reading rather than on its
+place in the sequence: the box had **29 GB free** with 43 GB across two `target/` trees, which is
+the cost ADR-0165 measured. **ADR-0165 stays `proposed` until the close**, as every approved plan's
+paired ADR here does.
+
+[0153]: 0153-the-debug-tree-stops-carrying-dependency-line-tables.md
 
 **Added 2026-09-06 — [0156] is drafted, and it is the documentation lane's next plan.** It
 runs in its own worktree and touches no engine behaviour until its Phase 7, which edits every scene
