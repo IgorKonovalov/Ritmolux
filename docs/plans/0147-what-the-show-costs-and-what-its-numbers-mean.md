@@ -374,7 +374,7 @@ pub struct ConsolePacing {
 | 3 — Both console levers become reachable | dev | done | `9e7dee1` |
 | 3b — The console present becomes countable | dev | done | `76e3452` |
 | 3c — The give-up verdict is scoped to the incident the budget counts | dev | done | `ada2b37` |
-| 4 — Human: four arms, one hands-off window | human | partial — 4 of 5 arms | (a measurement; rows below) |
+| 4 — Human: four arms, one hands-off window | human | done — 5 arms + 2 extra regimes | (a measurement; rows below) |
 | 5 — The verdict becomes the default | dev | not started | |
 | 6 — Human: the first frame-time row that names the discrete GPU | human | not started | |
 
@@ -433,11 +433,10 @@ was. The exact list at this tip:
   the decimation. It was replaced with the cadence mechanism, not with the property Phase 5 owes, so
   nothing false stands there now — but the same claim in `hud.rs` was never touched.
 
-**Phase 4, 2026-09-06, second window: four of five arms, and the fifth was not taken.** The window
-was stopped after the fourth arm because the box was needed. Every arm below ran its full 95 s
-untouched, on an otherwise idle machine checked for `cargo` / `cargo-nextest` / `rustc` before the
-window and after it (none, both times). **`(latency 2, every 2nd)` is missing and is owed** before
-this reads as five arms.
+**Phase 4, 2026-09-06, second window: five arms, plus two regimes the plan did not ask for.** Taken
+in two sittings — four arms, then the fifth after an interruption for the box — each arm a 95 s
+hands-off run on an idle machine checked for `cargo` / `cargo-nextest` / `rustc` before and after
+(none, every time). The interruption fell **between** arms; no arm was touched while it ran.
 
 Adapter for every row, per ADR-0071: `AMD Radeon(TM) Graphics (Dx12, IntegratedGpu)`, driver
 30.0.13002.1001 — the integrated part, which is what an unflagged windowed run takes. Preset
@@ -451,7 +450,7 @@ from `config.toml`, output windowed, console 900x640 at present mode `Mailbox` o
 | open, shipped default | 1 | 1 | **53.1** | 24.26 ms | 4,755 | 0 | 0 | 4,755 |
 | open | 2 | 1 | **52.3** | 25.56 ms | 4,676 | 0 | 0 | 4,676 |
 | open | 1 | 2 | **52.8** | 25.23 ms | 2,359 | 0 | 2,359 | 4,718 |
-| open | 2 | 2 | — | — | — | — | — | not taken |
+| open | 2 | 2 | **54.5** | 24.91 ms | 2,431 | 0 | 2,431 | 4,862 |
 
 **The console costs 0.4 fps of 53.5, and that zero is witnessed rather than inferred.** Every open
 arm presented ~4,700 times with **zero skips**, so *"the console is cheap"* and *"the console never
@@ -460,7 +459,31 @@ totals reconcile against the frames the loop ran (the decimation arm: 2,359 + 0 
 
 **The window ran inside the regime**, which the 2026-09-06 first attempt could not: 53 fps is ~19 ms
 a frame, three vblanks at 165 Hz, against the ~16 ms the 61.7 -> 33.1 reading sat at. **Nothing here
-resembles that halving** — the largest gap between any open arm and the closed control is 1.2 fps.
+resembles that halving** — the five arms span 52.3 to 54.5 against a 53.5 closed control, which is
+noise in both directions, and the best arm is `(2, every-2nd)` by 1.0 fps over the control.
+
+**The verdict is the plan's "neither lever moves it", in its stronger form: there is no cost on this
+build for a lever to move.** That is a statement about this build, this box and this adapter, and
+**not** a refutation of the 61.7 -> 33.1 figures — those came from a different build and this plan
+forbids that comparison. What can be said is that the halving did not reproduce here, in the regime
+it was reported in, with a witness attached. Whether that is a build difference, a configuration
+difference, or an uncontrolled variable in the original reading is architect's to weigh.
+
+**Two regimes the plan did not ask for, because one frame time cannot separate "cheap" from
+"hidden".** A vblank at 165 Hz is 6.06 ms. Inside Dragon's ~19 ms frame that could hide; inside a
+6.5 ms frame it cannot, because it would nearly double it. So the same protocol ran at both ends —
+95 s, same build, same box, same adapter, `(1, every-frame)` against a closed control:
+
+| regime | preset | closed | console open | presented | skipped | decimated |
+|---|---|---|---|---|---|---|
+| vsync-capped, ~6.5 ms | Ridge | **165.0** fps, 6.55 ms | **165.0** fps, 6.29 ms | 14,797 | 0 | 0 |
+| heavy, ~31 ms | Nebula | **32.2** fps, 37.78 ms | **31.9** fps, 37.36 ms | 2,863 | 0 | 0 |
+
+**The capped arm is the one that carries the weight.** 14,797 console presents landed inside a
+6.5 ms frame budget and the output never left 165.0 fps. A console present that serialised behind
+the output's own vblank could not do that — it is the arm where the suspected mechanism has nowhere
+to hide, and it is also the arm ADR-0172 records as unreadable the first time round (`165.0 ->
+165.0`, no count). It reads now because the count is beside it.
 
 **Reaching the regime took a preset screen, and the roster's shape is a finding of its own.** Every
 figure below is a 22 s windowed run, console closed, same box and build:
