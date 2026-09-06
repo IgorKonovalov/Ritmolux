@@ -1,8 +1,10 @@
 # Releasing
 
-How the application version moves. The scheme is decided in
-[ADR-0005](adrs/0005-versioning-and-release-cadence.md); this note is the operational
-summary.
+How the version number moves and what pushing a tag builds. This is a **maintainer's page** — it
+describes the process a release goes through, not anything a user or a preset author needs.
+
+The scheme is decided in [ADR-0005](adrs/0005-versioning-and-release-cadence.md); what follows is
+the operational summary.
 
 ## One version, one command, once per plan
 

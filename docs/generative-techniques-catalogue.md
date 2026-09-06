@@ -1,15 +1,19 @@
 # Generative-technique catalogue (scene-family backlog)
 
-A reference list, not a plan. It catalogues generative / algorithmic / procedural art
-techniques worth adding as new scene families, organised by the **GPU render idiom** each
-needs, with an audio-reactivity and implementation-cost note per technique. Source: the
-2026-07-22 deep-research pass (fan-out web search + adversarial verification) plus a focused
-pass on walkers and *The Nature of Code*. Design decisions derived from this live in
-[ADR-0015](adrs/0015-gpu-compute-particle-idiom.md); the first plan it drives is
-[Plan 0016](plans/done/0016-gpu-compute-particle-scenes.md).
+A survey of generative, algorithmic and procedural art techniques worth drawing to music,
+organised by the **GPU render idiom** each one needs — a line strip, a compute-driven particle
+buffer, a texture that feeds back into itself, a full-screen fragment shader — with a note on how
+reactive and how expensive each is.
 
-Treat this as the backlog a future architect session shops from — pick a technique, check
-which idiom it needs, see whether that idiom exists yet, then interview + plan.
+It is a reference list rather than a plan. Four of the idioms already exist and the scene families
+you can name in a preset came out of them; the rest is what a technique would cost if someone
+wanted it. Read it to understand why the engine draws what it draws, or to shop for what it could
+draw next.
+
+Sourced from a 2026-07-22 research pass plus a focused pass on walkers and *The Nature of Code*.
+The decisions derived from it live in
+[ADR-0015](adrs/0015-gpu-compute-particle-idiom.md); the first plan it drove is
+[Plan 0016](plans/done/0016-gpu-compute-particle-scenes.md).
 
 ## The four render idioms (and what exists here)
 
@@ -22,24 +26,24 @@ unlocks its whole family, so the idiom — not the individual technique — is t
 
 | Idiom | What the engine needs | Repo status |
 |-------|-----------------------|-------------|
-| **A. Line / point strips** | vertex buffer of evaluated points (`LineRenderer`) | **Exists** — `render/scenes/lines/` (Plan 0010, closed): parametric curve, L-system, Hankin star |
-| **B. GPU particles** | storage buffer + compute step + additive/instanced draw | **Exists** — `render/scenes/particles/` (Plan 0016, closed): four strange-attractor families on the engine's first compute pipeline ([ADR-0015](adrs/0015-gpu-compute-particle-idiom.md)) |
-| **C. Texture-feedback ping-pong** | two offscreen textures, read one / write other, fade | **Exists** — `render/feedback.rs` `PingPongField` (Plan 0014, closed) + `render/scenes/reaction_diffusion.rs`; also reused by the `trails` composite stage ([ADR-0012](adrs/0012-stateful-feedback-render-system.md)) |
+| **A. Line / point strips** | vertex buffer of evaluated points (`LineRenderer`) | **Exists** — `render/scenes/lines/` ([Plan 0010](plans/done/0010-line-geometry-scenes.md), closed): parametric curve, L-system, Hankin star |
+| **B. GPU particles** | storage buffer + compute step + additive/instanced draw | **Exists** — `render/scenes/particles/` ([Plan 0016](plans/done/0016-gpu-compute-particle-scenes.md), closed): four strange-attractor families on the engine's first compute pipeline ([ADR-0015](adrs/0015-gpu-compute-particle-idiom.md)) |
+| **C. Texture-feedback ping-pong** | two offscreen textures, read one / write other, fade | **Exists** — `render/feedback.rs` `PingPongField` ([Plan 0014](plans/done/0014-reaction-diffusion-feedback-scene.md), closed) + `render/scenes/reaction_diffusion.rs`; also reused by the `trails` composite stage ([ADR-0012](adrs/0012-stateful-feedback-render-system.md)) |
 | **D. Full-screen fragment** | one quad, all colour in the pixel shader | **Exists** — `render/scenes/fragment_field.rs` |
 
 Since this catalogue was written the engine also grew a **composite layer** the idioms all
 ride — `background -> scene -> post chain (trails -> kaleidoscope) -> [transition blend] ->
 ink -> present`: a background pre-pass, a shared view transform, feedback trails and a
 screen-space kaleidoscope behind a `PostStage` chain, a two-input cross-preset dissolve, and
-a terminal ink tone-remap (ADR-0018 / 0024 / 0028 / 0031 / 0032), plus a shared palette LUT
-(ADR-0021). A new technique inherits all of that for free — including dissolving into and
+a terminal ink tone-remap ([ADR-0018](adrs/0018-engine-wide-scene-compositing.md) / 0024 / 0028 / 0031 / 0032), plus a shared palette LUT
+([ADR-0021](adrs/0021-shared-palette-system.md)). A new technique inherits all of that for free — including dissolving into and
 out of every other preset — so budget it as a *scene*, not as a whole look.
 
 Two facts that shape everything:
 
 - **We already have a stronger audio hook than the "standard" recipe.** Real-world visualizers
   (MilkDrop/projectM) feed a handful of fixed uniforms (bass/mid/treble/beat) into shaders. This
-  project's ADR-0002 layer-2 binds *arbitrary named parameters* to *expressions over the full
+  project's [ADR-0002](adrs/0002-layered-preset-architecture.md) layer-2 binds *arbitrary named parameters* to *expressions over the full
   analysis frame*. So idiom-D scenes need new **shaders**, never new audio plumbing.
 - **Techniques with a small scalar parameter set are the most audio-modulatable** — superformula
   `m/n1/n2/n3`, Gray-Scott `F/K`, Lenia `mu/sigma`, attractor coefficients `a,b,c,d`. A few knobs
@@ -47,7 +51,7 @@ Two facts that shape everything:
 
 ---
 
-## Idiom A — line / point strips (have it: `lines/`, Plan 0010 closed)
+## Idiom A — line / point strips (have it: `lines/`, [Plan 0010](plans/done/0010-line-geometry-scenes.md) closed)
 
 Cheap, plotter-clean, rides the existing `LineRenderer`. New entries here are mostly **content**
 (a new curve family + presets), not new infrastructure.
@@ -57,13 +61,13 @@ Cheap, plotter-clean, rides the existing `LineRenderer`. New entries here are mo
 | **Superformula / supershapes** | Gielis generalisation of the superellipse; `m` symmetry + `n1/n2/n3` exponents → huge range of organic 2D/3D forms | High — exponents morph the whole shape | Trivial (new parametric family) |
 | **Harmonograph** | sum of decaying sinusoids (simulated pendulums) → looping Lissajous-like figures | High — frequencies/phases/decay from bands | Trivial |
 | **Epicycloid / hypotrochoid (Fourier drawing)** | point traced by circles rolling on circles; the spirograph / Fourier-series curve | High — radii/ratios from spectrum | Trivial |
-| **L-systems / fractal branching** | rewriting grammar → turtle geometry (trees, ferns, Koch) | Med — branch angle → centroid, depth → energy, beat → regrow | Moderate (CPU-generate + cache; already in Plan 0010) |
+| **L-systems / fractal branching** | rewriting grammar → turtle geometry (trees, ferns, Koch) | Med — branch angle → centroid, depth → energy, beat → regrow | Moderate (CPU-generate + cache; already in [Plan 0010](plans/done/0010-line-geometry-scenes.md)) |
 
 Research note: superformula/harmonograph/epicycloid did **not** get a verified source in the
 main pass, but they are textbook math and near-trivial extensions of the existing curve system —
 absence of a citation reflects the verified-claim set, not any doubt about feasibility.
 
-## Idiom B — GPU particles (have it: `particles/`, Plan 0016 closed)
+## Idiom B — GPU particles (have it: `particles/`, [Plan 0016](plans/done/0016-gpu-compute-particle-scenes.md) closed)
 
 The genuine new capability. Compute shader steps particle state in a storage buffer; additive
 point-sprite draw; trails via a fade pass. Verified: state stays GPU-resident (no CPU round-trip);
@@ -72,19 +76,19 @@ a per-particle RK4 integrator.
 
 | Technique | What it is | Audio fit | Cost |
 |-----------|-----------|-----------|------|
-| **Strange attractors** (De Jong, Clifford, Thomas, Lorenz, Aizawa) | iterate a chaotic map/ODE per particle; the point cloud is the artifact | **High** — coefficients `a,b,c,d`; beat → reseed/kick | Cheapest high-impact particle family — **Plan 0016** |
+| **Strange attractors** (De Jong, Clifford, Thomas, Lorenz, Aizawa) | iterate a chaotic map/ODE per particle; the point cloud is the artifact | **High** — coefficients `a,b,c,d`; beat → reseed/kick | Cheapest high-impact particle family — **[Plan 0016](plans/done/0016-gpu-compute-particle-scenes.md)** |
 | **Curl-noise flow fields** | advect particles by curl of a noise field (divergence-free → swirly, incompressible) | **High** — noise scale + advection strength | Moderate (same compute path) |
 | **Fractal flames** (Electric Sheep / Apophysis) | IFS "chaos game": random non-linear *variation*, accumulate into a **log-density histogram**, log-tonemap | **High** — variation weights + affine coeffs | Moderate-heavy (needs histogram/atomic + tonemap pass) |
 | **Boids / flocking** | Reynolds steering: separation + alignment + cohesion over neighbours | High — neighbour radius → centroid, speed → amplitude | Moderate (needs spatial-hash grid to stay O(n)) |
 | **Particle systems** (emitter/lifespan) | beat → emission burst, amplitude → rate/velocity, band → colour | **Very high** (the archetypal visualizer scene) | Moderate (GPU particle buffer + additive) |
 
-## Idiom C — texture-feedback ping-pong (have it: `PingPongField`, Plan 0014 closed)
+## Idiom C — texture-feedback ping-pong (have it: `PingPongField`, [Plan 0014](plans/done/0014-reaction-diffusion-feedback-scene.md) closed)
 
 Read one texture, write the next, fade each step. Ideal iGPU fit — no per-cell branching cost.
 
 | Technique | What it is | Audio fit | Cost |
 |-----------|-----------|-----------|------|
-| **Reaction-diffusion (Gray-Scott)** | two chemicals diffuse + react → coral/spots/stripes/mitosis; knobs `F` (feed), `K` (kill), `Da/Db` | High — tiny F/K space onto bands | Moderate — **Plan 0014** |
+| **Reaction-diffusion (Gray-Scott)** | two chemicals diffuse + react → coral/spots/stripes/mitosis; knobs `F` (feed), `K` (kill), `Da/Db` | High — tiny F/K space onto bands | Moderate — **[Plan 0014](plans/done/0014-reaction-diffusion-feedback-scene.md)** |
 | **Lenia (continuous CA)** | states in [0,1]; `A += dt·G(K∗A)` — radial kernel convolution + unimodal growth `G(mu,sigma)` | High — mu/sigma/dt are small expressive knobs | Moderate; cost dominated by kernel radius `R` |
 | **Conway / discrete CA** | Game of Life + generalised grid rules | Med — beat → reseed, amplitude → update rate | Cheap |
 | **Walker trails** | any walker family (below) rendered into a fading feedback texture | see walkers | Trivial once the fade pass exists |
@@ -158,7 +162,7 @@ shipped, so what remains is ranked against the idioms as they now stand:
 2. **Idiom D → Chladni, then SDF** — new shaders on the existing fragment-field pattern; Chladni is
    nearly free and thematically on-point for a music visualizer.
 3. **Idiom B → curl-noise flow fields, then fractal flames** — the compute path, particle buffer and
-   trail accumulation from Plan 0016 are all reusable; flames additionally need a log-density
+   trail accumulation from [Plan 0016](plans/done/0016-gpu-compute-particle-scenes.md) are all reusable; flames additionally need a log-density
    histogram + tonemap pass.
 4. **Idiom C → Lenia** — the `PingPongField` and fixed-timestep accumulator exist; cost is dominated
    by kernel radius.

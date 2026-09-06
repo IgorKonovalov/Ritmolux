@@ -1527,7 +1527,7 @@ component from my layout" is a bad first impression.
   `present: array declaration in: milkconv/src/shader/parse.rs`
 - `unprobeable:` the counts (71, 218, 80.1 %) are a measurement of one corpus run (2026-08-16,
   dev box), reproducible with `milkconv --report`/`--render` over `WORK/milkdrop-corpus`, not a
-  property of this tree; both eras' tables are in `docs/capturing.md`.
+  property of this tree; both eras' tables are in `docs/milkdrop-conversion.md`.
 
 ### The finding
 
@@ -1552,14 +1552,14 @@ is wasted; re-run `--render` after they land and re-rank.
 **Raised by:** `architect`, at Plan 0108's planning sweep (2026-08-17), reading
 [ADR-0113](adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)'s
 Outcome and [Plan 0100](plans/done/0100-the-engine-speaks-milkdrop.md)'s followup list against
-`docs/capturing.md`'s measured corpus tables. **Owner if taken:** `architect` (it reopens a scoped
+`docs/milkdrop-conversion.md`'s measured corpus tables. **Owner if taken:** `architect` (it reopens a scoped
 exclusion and is ADR territory) then `dev`.
 
 - **Verified 2026-08-17** — the exclusion is a named rejection class, deliberately, and says so in
   its own message: `present: fn disk_texture in: milkconv/src/shader/emit.rs`,
   `present: deliberately out of scope in: milkconv/src/shader/emit.rs`
 - **Verified 2026-08-17** — the corpus tables this entry re-reads are in the operator doc, both
-  eras: `present: WHY A FILE DID NOT CONVERT, ranked in: docs/capturing.md`
+  eras: `present: WHY A FILE DID NOT CONVERT, ranked in: docs/milkdrop-conversion.md`
 - `unprobeable:` the counts (1 217 / 609 / 2 058 / 88.7 %) are a measurement of one corpus run
   (2026-08-16, dev box, `WORK/milkdrop-corpus`), reproducible with `milkconv --report`, not a
   property of this tree
@@ -1569,7 +1569,7 @@ exclusion and is ADR territory) then `dev`.
 **This entry claims nothing new about the mechanism. It claims the ranking was already decided and
 nobody carried it.** Plan 0100's followup list says *"MilkDrop's `textures/` support, if Phase 5's
 failure ranking says it is a large class."* Phase 5 ran, Phase 6 ran after it, and the ranking is
-in `docs/capturing.md`:
+in `docs/milkdrop-conversion.md`:
 
 | Rejection reason | Files | Share of corpus |
 |---|---|---|

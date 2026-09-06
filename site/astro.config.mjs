@@ -310,6 +310,8 @@ export default defineConfig({
           label: 'Contribute',
           items: [
             doc('docs/developing.md'),
+            doc('docs/testing.md'),
+            doc('docs/milkdrop-conversion.md'),
             doc('docs/releasing.md'),
             doc('docs/on-device-validation.md'),
             doc('docs/diffusion-filter.md'),

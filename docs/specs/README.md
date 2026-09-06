@@ -15,7 +15,7 @@ Three artifacts answer three different questions; keep them distinct:
 | **Plans** (`plans/`) | *What are we building next?* | Expire → `git mv` to `plans/done/` at close |
 | **ADRs** (`adrs/`) | *Why did we choose this over the alternatives?* | Append-only; superseded, never edited |
 | **Specs** (here) | *What does the system do now, by behavior?* | Living — reconciled best-effort at close |
-| `core/include/rlx_core.h` | *What is the mechanical C surface?* (signatures) | Mirrors `core/src/ffi.rs` |
+| `core-cabi/include/rlx_core.h` | *What is the mechanical C surface?* (signatures) | Mirrors `core-cabi/src/lib.rs` |
 
 A spec is **behavioral intent**, not mechanical surface: "`rlx_push_samples` MUST NOT
 allocate or block" belongs here; the exact C signature of `rlx_push_samples` belongs in the
@@ -36,8 +36,8 @@ statements + scenarios); CLAUDE.md is orientation. They must not drift apart.
 Per ADR-0004, this layer is deliberately lightweight:
 
 - **No CI freshness gate.** There is no `specs --check`. Two specs are eyeball-checkable.
-- **No mandatory reconcile ritual.** Each spec header carries an informational
-  `Reconciled-through: Plan NNNN` line (so the layer is forward-compatible with a gate if we
+- **No mandatory reconcile ritual.** Each spec's `## Provenance` section carries an
+  informational reconciliation record (so the layer is forward-compatible with a gate if we
   ever add one), but bumping it is **best-effort architect judgment at a plan's close**, not
   a machine-checked close-ceremony step. When a plan's close changed C-ABI or ring/DSP
   behavior, the closer *should* glance at the relevant spec and reconcile it — a soft step.
@@ -51,9 +51,12 @@ lightweight wins.
 
 ## Adding a spec
 
-1. Create `docs/specs/NNNN-<subsystem>.md` (next number above), with a header carrying
-   **Subsystem / Source / Reconciled-through / Governing ADRs**, then `## Invariants`,
-   `## Scenarios`, and `## Known gaps`.
+1. Create `docs/specs/NNNN-<subsystem>.md` (next number above). Open with two or three lines
+   saying **what the contract is for**, then a block carrying **Where it lives** and
+   **Governing ADRs**, then `## Invariants`, `## Scenarios`, and `## Known gaps`. The
+   reconciliation history goes in a closing `## Provenance` section, not in the header: a
+   reader arriving at a contract wants the contract, and the two existing specs had grown a
+   paragraph of dates above their first rule.
 2. Write invariants as MUST-statements a maintainer can hold the code to; write scenarios as
    observable `WHEN/THEN` behavior. Ground each claim in an ADR and, where useful, the source
    file that enforces it.

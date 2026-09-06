@@ -1,5 +1,9 @@
 # On-device validation — low-end Windows iGPU smoke
 
+The checks CI cannot run, because they need a real GPU, live system audio, a foobar2000 install or a
+lighting rig. This is a **maintainer's checklist** — the person who has that hardware works through
+it by hand and reports what they saw.
+
 > **Status:** standing / mostly hardware-gated — **does not block plan closes.** (Two items, the
 > Plan 0044 `Rich` calibration and the Plan 0102 foobar2000 component install, are runnable on the
 > dev box today; each has its own section. A third, the Plan 0152 OSC re-point, is gated on the

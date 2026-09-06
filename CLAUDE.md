@@ -93,7 +93,13 @@ docs/                # Full one-line-per-doc map: README.md "Repository layout".
 ├── presets.md       # Preset authoring guide: THE expression-language reference.
 ├── preset-palettes.md  # The colour surface: palettes, custom stops, A/B crossfade.
 ├── preset-tuning-walkthrough.md  # One preset tuned over five steps, picture + --report row each.
-├── capturing.md     # Headless `shot` CLI + the core/tests/ visual-QA harness + `--render` video.
+├── running.md       # What the app does once open: keys, menus, console, tiers, displays.
+├── configuration.md # Every flag, env var and config.toml key, with defaults and precedence.
+├── how-it-works.md  # The explanation: two frontends, one engine, and what happens each frame.
+├── capturing.md     # Headless `shot` CLI + `--render` video + the live `--stream` video-out.
+├── testing.md       # The core/tests/ visual-QA harness, and what a green gate is evidence of.
+├── milkdrop-conversion.md  # Reading what `milkconv` produced, and judging it.
+├── developing.md    # Building from a checkout, and every step the pre-push gate runs.
 ├── on-device-validation.md  # The manual checklist for what CI cannot run: real GPUs, live
 │                    #   loopback, installing the foobar2000 component.
 ├── design-backlog.md  # The preset-author -> architect inbox: captured friction not yet an ADR or

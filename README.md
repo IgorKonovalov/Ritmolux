@@ -88,7 +88,10 @@ docs/
 │                    #   --report row that changed at each one.
 ├── presets.md       # Preset authoring guide: the expression language, loading, and where files live.
 ├── preset-palettes.md  # The colour surface: built-in palettes, custom stops, the A/B crossfade.
-├── capturing.md     # Headless capture: the shot CLI, the core/tests/ checks, and --render (video).
+├── how-it-works.md  # The explanation: two frontends, one engine, what happens each frame.
+├── capturing.md     # Headless capture: the shot CLI, --render (video), and the --stream video-out.
+├── testing.md       # The core/tests/ visual-QA harness and what a green gate is evidence of.
+├── milkdrop-conversion.md  # Reading what milkconv produced, and judging it.
 ├── releasing.md     # The version-bump / release procedure (one bump per plan close).
 ├── on-device-validation.md  # The manual checklist for what CI cannot run: real GPUs, live loopback,
 │                    #   and installing the foobar2000 component (no runner can load foobar2000).

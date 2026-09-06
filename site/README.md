@@ -55,7 +55,7 @@ npm run build                      # -> site/dist/
 
 **The browser is not optional.** `rehype-mermaid` renders every ```` ```mermaid ```` fence to an
 SVG at build time through a headless Chromium (ADR-0171), and a build without it fails rather than
-serving a page with a hole in it. It is a one-time ~150 MB install into a machine-local cache, not
+serving a page with a hole in it. It is a one-time install into a machine-local cache rather than
 into `node_modules`; the Pages workflow installs and caches it the same way.
 
 `base` is `/ritmolux/`, so the dev server serves under that subpath too - a bare

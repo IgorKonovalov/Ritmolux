@@ -59,7 +59,7 @@ the behavior to avoid.
   **only `reactivity` drives PCM through the real analyzer** (Plan 0067 Phase 1); `sanity`,
   `animation`, `distinctness` and `golden` synthesize their analysis frames, which is correct for
   the questions they ask and means none of them would notice a preset that ignores the music.
-  [`docs/capturing.md`](../../../docs/capturing.md) carries the table.
+  [`docs/testing.md`](../../../docs/testing.md) carries the table.
 
 That's the whole ecosystem: you design, `dev` builds, `preset-author` composes content. The handoffs
 are `architect → dev` (the user's "go"), `dev → architect` (the close ceremony), and
@@ -261,7 +261,10 @@ not one phase. This is architectural integrity, not line-by-line style. Run five
   | **`presets/README.md`** | **any scene param added/renamed/re-defaulted, any engine-stage param, the structural/palette/smoothing tables** |
   | **`docs/presets.md`** | **the expression grammar — a variable, constant, function, operator, or the error surface** |
   | **`docs/preset-palettes.md`** | **palette names, custom-stop rules, per-scene colour params, A/B crossfade** |
-  | `docs/capturing.md` | `shot` CLI flags, the visual-QA harness |
+  | `docs/capturing.md` | `shot` CLI flags, `--render`, the live video-out |
+  | `docs/testing.md` | the `core/tests/` visual-QA harness, what a gate can and cannot see |
+  | `docs/running.md` | a hotkey, a menu row, the operator console, the now-playing banner |
+  | `docs/configuration.md` | a flag, an environment variable, a `config.toml` key, an OSC address |
   | `docs/on-device-validation.md` | anything the on-device checklist asserts |
   | `docs/nfr.md` | a quantified budget moved |
 

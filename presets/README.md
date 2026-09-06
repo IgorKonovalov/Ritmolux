@@ -27,18 +27,12 @@ and [`../docs/capturing.md`](../docs/capturing.md#editing-presets-live).
 
 **A preset ships when the behavioral suite is green
 ([ADR-0081](../docs/adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md)),
-so know what green is evidence of.** Five gates sweep this folder and **one of them
-plays audio**: `reactivity` drives four `core::signal` clips through the real FFT,
-band split and onset detector, so it is the only one that would notice a preset
-ignoring the music. `sanity`, `animation`, `distinctness` and
-`golden` construct an analysis frame directly — deliberately, because their
-questions are about the *frame* — and would pass a preset with every band binding
-deleted. The full table is in
-[`../docs/capturing.md`](../docs/capturing.md#what-the-five-preset-gates-can-and-cannot-see).
-Two things green still does not say: that the preset reacts *well* — see
-[the `[occupancy]` table](#a-clamp-is-a-limit-not-a-gain--the-occupancy-table)
-below, which is the gate for that — and that the **library** needs another one of
-these, which is `architect`'s judgement at the next plan close.
+so know what green is evidence of.** Five gates sweep this folder and **only one of them plays
+audio** — which means a green suite says the picture is lit, moving and distinct, and that the
+preset responds to at least one band of real sound. It does not say the preset responds *well*;
+[the `[occupancy]` table](#a-clamp-is-a-limit-not-a-gain--the-occupancy-table) below is the gate
+for that. Which gate sees what, and the four things none of them can see, is in
+[Testing and visual QA](../docs/testing.md#what-the-five-preset-gates-can-and-cannot-see).
 
 **Author against the floor tier.** Shipped presets are authored and gated on
 `Floor` — every `shot` capture and every CI gate (`sanity` / `reactivity` /

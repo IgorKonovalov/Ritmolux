@@ -101,8 +101,10 @@ Bypass once with `git push --no-verify`.
 
 ## What else there is to read
 
-- [Testing and visual QA](capturing.md) — the `shot` CLI and the `core/tests/` harness that hard-tests
-  every preset for reactivity, animation, shape sanity and beat response.
+- [Testing and visual QA](testing.md) — the `core/tests/` harness that hard-tests every preset for
+  reactivity, animation, shape sanity and beat response.
+- [Headless capture and video](capturing.md) — the `shot` CLI, `--render` and the live video-out.
+- [MilkDrop conversion](milkdrop-conversion.md) — reading what `milkconv` produced.
 - [On-device validation](on-device-validation.md) — the manual checklist for what CI cannot run:
   real GPUs, live loopback, installing the foobar2000 component.
 - [Releasing](releasing.md) — how the version moves and what a `v*` tag builds.

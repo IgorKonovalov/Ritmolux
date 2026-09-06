@@ -17,7 +17,7 @@
 //! path reaches the picture. This gate is the one ADR-0081 leans on to authorize
 //! shipped content, so it is the one that had to stop synthesizing; the other
 //! four preset gates ask questions about the frame and are correct as they stand
-//! (`docs/capturing.md`).
+//! (`docs/testing.md`).
 //!
 //! **The four columns are not orthogonal, and that is the analyzer being
 //! honest.** A hand-built frame can set exactly one band; real signals cannot. A

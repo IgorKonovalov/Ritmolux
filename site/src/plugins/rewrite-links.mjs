@@ -62,6 +62,11 @@ export const PUBLISHED = {
   },
   // Contribute
   'docs/developing.md': { route: 'contribute/developing', title: 'Developing' },
+  'docs/testing.md': { route: 'contribute/testing', title: 'Testing and visual QA' },
+  'docs/milkdrop-conversion.md': {
+    route: 'contribute/milkdrop-conversion',
+    title: 'MilkDrop conversion',
+  },
   'docs/diffusion-filter.md': { route: 'engine/diffusion-filter', title: 'Diffusion filter' },
   'docs/on-device-validation.md': {
     route: 'engine/on-device-validation',

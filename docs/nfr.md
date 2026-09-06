@@ -1,8 +1,12 @@
 # Non-functional requirements (v1)
 
-Agreed in the 2026-07-21 architecture interview. These are the numbers behind every
-"lightweight", "real-time", and "stable frame rate" in the plans. A done-when that
-contradicts this file is a plan bug — surface it, don't guess.
+The numbers this application is held to: how many frames a second on what hardware, how long a beat
+may take to reach the screen, how large the binary may be, what the audio thread may not do, and
+what has to be reproducible. Every "lightweight", "real-time" and "stable frame rate" claim
+elsewhere means one of the figures below.
+
+Each section is a budget with a measurement beside it, not an aspiration. Where a figure has moved,
+the decision that moved it is linked.
 
 ## 1. Performance — adaptive quality
 
@@ -27,24 +31,24 @@ contradicts this file is a plan bug — surface it, don't guess.
   sustained miss of the display's refresh budget — **once per session, one way**, reported in the
   diagnostics overlay and on stderr, never silently. There is no auto-promotion: a demotion is
   predictable and testable, where an oscillating or continuously feature-shedding design is
-  neither (ADR-0045 Alternatives A/B).
+  neither ([ADR-0045](adrs/0045-quality-tiers-floor-and-rich.md) Alternatives A/B).
 - **Pinning:** `--tier floor|rich`, `RLX_TIER`, or `config.toml`'s `[quality] tier`, in that
   precedence. A pin is honoured in both directions and the governor never touches it — which is
   the escape hatch for a capable machine that a transient stall demoted. An **in-app** change also
-  pins, and clears the governor's demotion latch: ADR-0045's "the latch is never cleared" narrows
-  to "never cleared *by the governor*" (ADR-0054). It writes `[quality] tier`, so the launch
+  pins, and clears the governor's demotion latch: [ADR-0045](adrs/0045-quality-tiers-floor-and-rich.md)'s "the latch is never cleared" narrows
+  to "never cleared *by the governor*" ([ADR-0054](adrs/0054-runtime-tier-switching-rebuilds-on-the-live-context.md)). It writes `[quality] tier`, so the launch
   precedence above is unchanged.
 - **Floor:** ≥ 60 fps at 1080p on the baseline hardware (below) at the `Floor` tier, whose values
   are exactly the pre-tier engine's. The floor commitment is unchanged by tiering: the governor
   means a mispredicted rich budget degrades to a known-good state instead of stuttering.
 - **Rich:** calibrated against a midrange discrete GPU (RTX 3060 / RX 6600 class) **on device**,
-  not asserted from a multiplier — Plan 0044 Phase 4.
+  not asserted from a multiplier — [Plan 0044](plans/done/0044-quality-tiers.md) Phase 4.
 - **Background cost:** when the window is minimized or fully occluded, rendering throttles to
   near-zero GPU; DSP may keep running so visuals resume in sync.
 - **`frame_ms_p99` spikes on a GPU resource rebuild, and a governor reading it bare would demote
   a preset that is running fine.** Read this before designing the governor — it qualifies the
   instrument the design is specified to read. Measured over three minutes at Rich tier, 1080p, with
-  preset switching and a fullscreen toggle (Plan 0046 Phase 5,
+  preset switching and a fullscreen toggle ([Plan 0046](plans/done/0046-transformed-feedback.md) Phase 5,
   [backlog 0082](design-backlog.md)):
 
   | | value |
@@ -67,7 +71,7 @@ contradicts this file is a plan bug — surface it, don't guess.
   taken, **the measurement above is the test case.**
 
   **The shipped governor does not read `p99` at all, and that is worth knowing before anyone
-  "fixes" it** (checked against `core/src/render/tier.rs` at Plan 0085 Phase 4, and it contradicts
+  "fixes" it** (checked against `core/src/render/tier.rs` at [Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md) Phase 4, and it contradicts
   backlog 0082's own premise that the governor "is specified to read p99"). `sustained_miss` counts
   what fraction of the raw frame-time series exceeds `budget × MISS_FACTOR` and demotes only when
   **75 % of at least 180 samples** miss. A preset switch contributes a handful of slow frames to a
@@ -79,28 +83,28 @@ contradicts this file is a plan bug — surface it, don't guess.
 
   The instrument for the third response exists anyway: `--soak` writes **`frame_ms_p99_steady`**
   beside the raw `frame_ms_p99`, the same statistic with the frames following a switch or
-  reconfigure left out, alongside a monotone `switches` counter (Plan 0085 Phase 3,
+  reconfigure left out, alongside a monotone `switches` counter ([Plan 0085](plans/done/0085-the-show-length-horizon-gets-an-instrument.md) Phase 3,
   [ADR-0099](adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md)). It is a
   **reading, not a gate** — nothing demotes on it today.
 - **Captures pin `Floor`.** Headless capture is floor-tier by construction (`Renderer::new_headless`
   cannot produce another tier, and `set_tier` is a **no-op on a surface-less context** — the guard
-  ADR-0054 adds so the runtime switch cannot reopen this), so every golden baseline stays
+  [ADR-0054](adrs/0054-runtime-tier-switching-rebuilds-on-the-live-context.md) adds so the runtime switch cannot reopen this), so every golden baseline stays
   byte-reproducible on the WARP
   software adapter and the suite's cost does not scale with the rich tier. `Rich` is covered by
   capture-level spot checks plus the on-device checklist — a real QA gap, named rather than solved
-  (ADR-0045 Consequences). See [capturing.md](capturing.md).
+  ([ADR-0045](adrs/0045-quality-tiers-floor-and-rich.md) Consequences). See [capturing.md](capturing.md).
 
 ## 2. Platform baseline
 
 - **Windows:** Windows 10 1903+, any DX12-capable GPU **including integrated** (~2015+ Intel/AMD iGPU).
 - **macOS:** macOS 13+ (ScreenCaptureKit floor), Metal via wgpu.
-- **foobar2000:** current stable release, Windows only (per ADR-0001).
+- **foobar2000:** current stable release, Windows only (per [ADR-0001](adrs/0001-rust-core-wgpu-cabi-foobar-shim.md)).
 - Scene code never branches on backend or OS; the baseline constrains shader features globally.
 
 ## 3. Latency — audio to visual
 
 - **Budget: < 60 ms end-to-end** from audible beat to visible reaction (~3 frames @ 60 Hz).
-- Working allocation (rough, tune in Plan 0001 Phase 3-4): capture/delivery ≤ 15 ms,
+- Working allocation (rough, tune in [Plan 0001](plans/done/0001-core-and-standalone-mvp.md) Phase 3-4): capture/delivery ≤ 15 ms,
   ring-buffer read-behind ≤ 20 ms, FFT hop ≤ ~11 ms (512 samples @ 48 kHz, window ≤ 2048),
   render + present ≤ 1-2 frames.
 - The ring buffer may hold more than 60 ms of *capacity*; the requirement is that the DSP
@@ -156,7 +160,7 @@ contradicts this file is a plan bug — surface it, don't guess.
 
 - DSP outputs (spectrum bins, onset envelope, beat estimate) are pure functions of the input
   window — no wall clock, no unseeded randomness. Visual randomness is explicitly seeded.
-- The grammar's `hash(x)`/`noise(x)` are that seeded randomness (Plan 0047 /
+- The grammar's `hash(x)`/`noise(x)` are that seeded randomness ([Plan 0047](plans/done/0047-expression-randomness.md) /
   [ADR-0051](adrs/0051-seeded-grammar-randomness-with-per-run-opt-in.md)): pure functions of
   their argument and a per-preset salt, never of a clock. A preset may set `seed = "random"`,
   which chooses **who supplies the seed** — OS entropy, once at load, in the live app — not
@@ -173,7 +177,7 @@ contradicts this file is a plan bug — surface it, don't guess.
   `default-members`, so the bare forms would silently stop testing and linting the C ABI entirely.
 - Plus **nine** single-runner gates: `cargo deny check` (supply chain), Miri over `rlx-ring`'s
   `unsafe` (UB), the coverage ratchet below, and the six Node doc gates that share the `links`
-  job — `check-doc-links.mjs` (every relative markdown link resolves — Plan 0061 Phase 2c),
+  job — `check-doc-links.mjs` (every relative markdown link resolves — [Plan 0061](plans/done/0061-the-build-stops-paying-for-what-it-is-not-building.md) Phase 2c),
   `check-index-rows.mjs` (every row inside a marked roster region stays a pointer under 320 bytes —
   [ADR-0116](adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md)),
   `check-backlog-claims.mjs` (every live backlog entry's probe still holds —
@@ -188,7 +192,7 @@ contradicts this file is a plan bug — surface it, don't guess.
   `--self-test` beside their check, because neither a detector that has quietly stopped matching
   nor an anchor rule that is merely plausible is visible in the check itself.
 - **The nine GPU-heavy suites run once per push, not twice**
-  ([ADR-0073](adrs/0073-the-windows-ci-critical-path.md), Plan 0061 Phase 2b). They render the shipped
+  ([ADR-0073](adrs/0073-the-windows-ci-critical-path.md), [Plan 0061](plans/done/0061-the-build-stops-paying-for-what-it-is-not-building.md) Phase 2b). They render the shipped
   preset library on WARP, and until that change ran uninstrumented in `check (windows-latest)` and
   instrumented in `coverage` at the same moment on two identical runners (≈ 1930 duplicated CPU-
   seconds). `check` now carries the same exclusion `.githooks/pre-push` does, which makes **`coverage`
@@ -202,16 +206,16 @@ contradicts this file is a plan bug — surface it, don't guess.
   stay manual — see [`on-device-validation.md`](on-device-validation.md).
 - **Coverage ratchet** ([ADR-0033](adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md)):
   a Windows-only job runs `cargo llvm-cov nextest -p rlx-core --fail-under-lines $COVERAGE_FLOOR`,
-  and since ADR-0072 a second, smaller gate beside it on `-p rlx-core-cabi` against
+  and since [ADR-0072](adrs/0072-the-c-abi-ships-from-its-own-crate.md) a second, smaller gate beside it on `-p rlx-core-cabi` against
   `$CABI_COVERAGE_FLOOR` — without which the C ABI's coverage would silently stop being watched the
   moment it left `rlx-core`. Neither gates `standalone/`: it is a `winit` event loop plus two platform
   capture backends no runner can execute. Both floors live in exactly one place, the `env:` block in
   `ci.yml`, and are a **ratchet, not a target**: set from measurement, raised at a close ceremony when
   a plan improves coverage, lowered only with a note naming the plan and the reason. `COVERAGE_FLOOR`
-  was **88** from Plan 0032's measured 90.13 %, and is **91** since Plan 0061 Phase 2 — a *moved
+  was **88** from [Plan 0032](plans/done/0032-testing-strategy-e2e-coverage-and-pre-push.md)'s measured 90.13 %, and is **91** since [Plan 0061](plans/done/0061-the-build-stops-paying-for-what-it-is-not-building.md) Phase 2 — a *moved
   denominator*, not better tests, since `ffi.rs` and its conformance suite left the gated crate.
   **That 91 was measured on the dev box, which has a hardware GPU where CI has WARP, so it is owed a
-  re-derive from a cache-warm CI run** (Plan 0061 Phase 9, outstanding); the margin is ~3 points rather
+  re-derive from a cache-warm CI run** ([Plan 0061](plans/done/0061-the-build-stops-paying-for-what-it-is-not-building.md) Phase 9, outstanding); the margin is ~3 points rather
   than the usual 2 for exactly that reason. `CABI_COVERAGE_FLOOR` is **54** against a measured 56.60 %,
   and it is low because most of `core-cabi` is error, null-handle and `catch_unwind` paths — recorded
   to catch a regression, not claimed as good coverage. A line-coverage floor is gameable by design — it
@@ -220,13 +224,13 @@ contradicts this file is a plan bug — surface it, don't guess.
 - **Local pre-push gate** (opt-in, per clone): `.githooks/pre-push`, enabled with
   `git config core.hooksPath .githooks`. Runs the fast subset — the six Node doc gates, `fmt`,
   `clippy --workspace`, and a narrowed `nextest --workspace -P fast` — whose `fast` profile
-  (ADR-0156) is where the excluded GPU-heavy suites are listed, and which nextest names on every
+  ([ADR-0156](adrs/0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md)) is where the excluded GPU-heavy suites are listed, and which nextest names on every
   run.
-  **Measured 48.6 s warm (2026-08-08, dev box), against the ~28 s recorded when ADR-0033 set it up.**
+  **Measured 48.6 s warm (2026-08-08, dev box), against the ~28 s recorded when [ADR-0033](adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md) set it up.**
   The number drifted with the suite it runs, not with the gate's design; it is recorded here rather
   than targeted, and the README's developer section carries the per-step breakdown. If it grows past
   the point where people start reaching for `--no-verify`, that is the signal to narrow it further —
-  ADR-0033's own argument is that a gate which hurts gets disabled.
+  [ADR-0033](adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md)'s own argument is that a gate which hurts gets disabled.
   `cargo deny`, doctests, Miri, and coverage stay in CI. An uninstalled clone silently has no gate;
   see the README's developer section. All six Node gates (`check-doc-links.mjs` ~50 ms,
   `check-index-rows.mjs`, `check-backlog-claims.mjs`, `check-filter-figures.mjs`,
@@ -254,7 +258,7 @@ because the repository is public.
 - All three zips carry a `READ-ME-FIRST.txt`; the two standalone ones also carry a reference
   copy of `presets/*.toml`.
 
-**The component ships as of Plan 0102** (2026-08-16). This paragraph previously read
+**The component ships as of [Plan 0102](plans/done/0102-the-component-ships.md)** (2026-08-16). This paragraph previously read
 "Standalone only — CI does not ship a `.fb2k-component`", on the grounds that the SDK is
 third-party, separately licensed and `.gitignore`'d, so no runner could build the shim. The
 licence was then read rather than assumed: it is BSD-style, permits binary redistribution, and
@@ -282,7 +286,7 @@ later plan + human task.
 **There is no Mac in this matrix, and that is the point of §8's macOS artifact.** An earlier
 revision of this table listed a "Mac, macOS 13+" as available hardware; it is not, which is why
 the dev box cannot link a Mach-O binary and a macOS runner is the only build host
-(ADR-0038). The macOS standalone path — Metal through wgpu, ScreenCaptureKit capture, glyphon's
+([ADR-0038](adrs/0038-tag-driven-release-unsigned-universal-mac-app.md)). The macOS standalone path — Metal through wgpu, ScreenCaptureKit capture, glyphon's
 font loading — is therefore validated by a **recipient**, not in-house, and until one reports
 back it has never executed on Apple hardware at all.
 
@@ -306,12 +310,12 @@ while a DJ mixes. This adds:
   lightweight MilkDrop-akin preset files with an optional scripting layer for staged,
   coherent per-track arcs and generative systems (walkers, flocks, 3D). Exact shape under
   exploration; the decision will land as an ADR before the preset-engine plan is drafted.
-  Plan 0001's built-in Rust scenes remain the walking skeleton and later become the
+  [Plan 0001](plans/done/0001-core-and-standalone-mvp.md)'s built-in Rust scenes remain the walking skeleton and later become the
   rendering vocabulary presets drive.
 
 ## 11. v1 UX scope (confirmed requirements, post-MVP plan)
 
-All four are v1 requirements, delivered as their own plan after the Plan 0001 MVP:
+All four are v1 requirements, delivered as their own plan after the [Plan 0001](plans/done/0001-core-and-standalone-mvp.md) MVP:
 
 - Fullscreen toggle (borderless, hotkey).
 - Multi-monitor choice (pick the display to fullscreen on).
@@ -323,15 +327,15 @@ All four are v1 requirements, delivered as their own plan after the Plan 0001 MV
 
 "Lightweight" (NFR §4) caps *binary* size but not *working set*. The original §12 target — "well under
 ~100 MB", to be hit primarily by compiling wgpu with only the per-OS backend — was **measured and
-disproved** by Plan 0011 (Phase 6 landed the backend-trim; Phase 7 measured it). On the reference AMD
+disproved** by [Plan 0011](plans/done/0011-diagnostics-and-memory-trim.md) (Phase 6 landed the backend-trim; Phase 7 measured it). On the reference AMD
 iGPU box, release build, the standalone sits at **~300 MB working set / 343 MB private commit** — the
 trim took effect (verified DX12-only, no Vulkan/GL mapped) but footprint is dominated by the **DX12
 driver stack's private heap** (`amdxc64.dll` + `d3dcompiler_47` + `D3D12Core` …), not by wgpu's
 compiled backend code (mapped DLL code is only ~135 MB, and shared). The <100 MB absolute is not
 reachable on a DX12/wgpu app; the backend-trim is retired as a *memory* lever (it stays as a binary-size
-win under §4). See ADR-0010 for the decision and rejected alternatives.
+win under §4). See [ADR-0010](adrs/0010-accept-gpu-driver-memory-floor.md) for the decision and rejected alternatives.
 
-Retargeted requirements — chosen to be enforceable by the Plan 0011 diagnostics harness
+Retargeted requirements — chosen to be enforceable by the [Plan 0011](plans/done/0011-diagnostics-and-memory-trim.md) diagnostics harness
 (`diagnostics.log`, `rlx_get_metrics`):
 
 - **No session growth (the requirement that matters).** Working set / private commit stays flat over a
@@ -340,9 +344,9 @@ Retargeted requirements — chosen to be enforceable by the Plan 0011 diagnostic
 - **State the cost of what we add.** The GPU driver stack is a fixed, vendor-dependent floor we do not
   own; the actionable lever is **our** additions — render-pipeline / shader / resource count. A new
   built-in system states its working-set delta on the reference box (harness-measured), so growth is a
-  recorded choice, not a surprise. (Footprint rose from ~200 MB to ~300 MB across Plans 0003/0010/0011,
+  recorded choice, not a surprise. (Footprint rose from ~200 MB to ~300 MB across Plans [0003](plans/done/0003-generative-scenes-and-presets.md)/[0010](plans/done/0010-line-geometry-scenes.md)/[0011](plans/done/0011-diagnostics-and-memory-trim.md),
   most plausibly from added pipelines — exactly this cost, previously untracked.) **Now quantified**
-  (Plan 0012, reference AMD iGPU box, private commit): the fixed driver floor is **~327 MB** and our
+  ([Plan 0012](plans/done/0012-memory-floor-measure-and-scene-cull.md), reference AMD iGPU box, private commit): the fixed driver floor is **~327 MB** and our
   entire visual system (2 scene pipelines + overlay + DSP + audio + presets) adds only **~11 MB (~3%)**;
   culling 3 dead scene pipelines saved ~2 MB, so pipeline count is a real but **weak** lever
   (~1 MB/pipeline) against a floor that dominates.
@@ -359,7 +363,7 @@ Retargeted requirements — chosen to be enforceable by the Plan 0011 diagnostic
   element sizes are `SegmentInstance` 44 B, `ArcInstance` 36 B, `Piece` 24 B, a walk point 8 B and
   a walk offset 4 B; at Rich's `max_segments = 60_000` the parametric-curve scene alone holds
   **5,760,008 B** across `segments`, `single_buf` and `points`. It held **11,760,008 B** until the
-  four fit buffers stopped being preallocated (Plan 0149 Phase 4, closing design-backlog 0135),
+  four fit buffers stopped being preallocated ([Plan 0149](plans/done/0149-the-line-corners-stop-being-blunt.md) Phase 4, closing design-backlog 0135),
   because `arcs`, `single_arcs`, `pieces` and `walk` are written only by a
   curve fit that no shipped preset takes.
 
@@ -383,9 +387,9 @@ Retargeted requirements — chosen to be enforceable by the Plan 0011 diagnostic
   Two orders of magnitude under the ~66 MB a single post chain costs, and the reason the tier's
   `emitter_objects` was sized for headroom rather than trimmed: the pool is bounded by cost of
   *drawing* the marks, not by the memory holding them. It adds **one** render pipeline, i.e. ~1 MB
-  by the Plan 0012 measurement above, which is the number that actually moves.
+  by the [Plan 0012](plans/done/0012-memory-floor-measure-and-scene-cull.md) measurement above, which is the number that actually moves.
 - **The linear-light composite is the largest single addition since this section was written**
-  (Plan 0045 / [ADR-0046](adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)). Every intermediate
+  ([Plan 0045](plans/done/0045-linear-light-and-bloom.md) / [ADR-0046](adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)). Every intermediate
   upstream of the tonemap moved from the surface format to `Rgba16Float` — 8 bytes a texel, not 4 — so
   the offscreens that were charged at the surface format doubled. The trails accumulation
   (`PingPongField`, two textures) was already float and did not move. At the floor post cap
@@ -402,7 +406,7 @@ Retargeted requirements — chosen to be enforceable by the Plan 0011 diagnostic
   | transition snapshot + live, while a dissolve runs | 8.3 x2 | 16.6 x2 |
   | ink input (stays 8-bit — the tonemap hands it display-referred pixels) | 8.3 | 8.3 |
 
-  Plan 0023's dual-live dissolve holds two whole chains, so the peak is ~133 MB rather than ~100, and
+  [Plan 0023](plans/done/0023-cross-preset-transitions.md)'s dual-live dissolve holds two whole chains, so the peak is ~133 MB rather than ~100, and
   the worst case — dual-live, every stage on including bloom, ink on — is **~246 MB** against the
   ~350 MB soft ceiling above, most of which is driver floor already. At the rich cap (2560x1440) the
   same arithmetic is ~118 MB per chain. **The post cap is the relief lever** if the float chain misses
@@ -415,16 +419,16 @@ Retargeted requirements — chosen to be enforceable by the Plan 0011 diagnostic
   a 60 Hz frame at Rich. **Both attractor readings predate
   [ADR-0140](adrs/0140-a-sample-budget-is-a-density-against-the-render-target.md) and describe a
   configuration that no longer ships:** they were taken when `Rich` drew a flat 150,000 samples at
-  any window size, and a window above the 640x360 anchor now draws up to 600,000. Plan 0128 Phase 1
+  any window size, and a window above the 640x360 anchor now draws up to 600,000. [Plan 0128](plans/done/0128-the-rendered-file-stops-looking-upscaled.md) Phase 1
   measured the marginal cost of that step on the same discrete GPU as **+1.454 ms p99**, on an
   instrument that omits the present and is therefore not comparable to these figures in absolute
   terms. Re-taking the pair windowed is owed to `docs/on-device-validation.md`, not to this page.
   The fullscreen and `Floor`-pinned runs, and the whole real-iGPU side, stay
   with `docs/on-device-validation.md`.
-- **Driver floor isolated (Plan 0012 Phase 2, resolved):** the once-optional dev spike ran —
+- **Driver floor isolated ([Plan 0012](plans/done/0012-memory-floor-measure-and-scene-cull.md) Phase 2, resolved):** the once-optional dev spike ran —
   `standalone/examples/floor.rs`, a scene-less window standing up only the wgpu context — and put the
-  hard **~327 MB private-commit** floor number on the split above. It confirms ADR-0010's diagnosis: the
-  cost is the driver stack, not our code. Does not change ADR-0010.
+  hard **~327 MB private-commit** floor number on the split above. It confirms [ADR-0010](adrs/0010-accept-gpu-driver-memory-floor.md)'s diagnosis: the
+  cost is the driver stack, not our code. Does not change [ADR-0010](adrs/0010-accept-gpu-driver-memory-floor.md).
 - **A show configuration is a different workload, and it plateaus near ~800 MB (measured
   2026-08-29/30, the first full live set).** 8h08m, 3,505,083 frames, **zero dropped**, 120.0 fps
   flat end to end, on the show notebook — **not** the reference AMD iGPU box — at Rich tier with the
@@ -446,5 +450,5 @@ Measurement method (repeatable): PowerShell `Get-Process ritmolux` → `WorkingS
 `.Modules` by mapped size, and which backend loader DLLs are mapped. The private-vs-working-set split is
 what proved the cost is driver heap, not our code.
 
-Not a Plan 0001 blocker; the leak-guard folds into the §10 live-features soak, the per-system delta into
+Not a [Plan 0001](plans/done/0001-core-and-standalone-mvp.md) blocker; the leak-guard folds into the §10 live-features soak, the per-system delta into
 each scene-adding plan.

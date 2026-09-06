@@ -1,9 +1,20 @@
 # Spec — Ring seam + DSP determinism
 
-> **Subsystem:** The lock-free SPSC ring buffer that decouples audio from render, and the pure-function DSP that consumes it (FFT/spectrum, onset, tempo/beat).
-> **Source:** `rlx-ring/` (the SPSC ring itself, a zero-dependency workspace member), `core/src/audio.rs` (format validation + the re-exported producer/consumer handles), `core/src/dsp/` (analysis).
-> **Reconciled-through:** Plan 0005 (ring extracted to `rlx-ring`, Miri gate live in CI); Plan 0032 (the ring→analyzer→renderer seam now has a test); Plan 0048 (analysis v2 — the dual-resolution axis, running normalization, and the beat/downbeat clock, which is what moved the determinism invariant below from *window* to *stream*); Plan 0060 (which scoped the bit-identity clause to one build on one machine, after a frozen-literal test read as though cross-architecture reproduction followed from it); Plan 0127 (the waveform joined the levelled outputs, so the trace is history-dependent too and publishes its divisor). Reconciled 2026-08-28.
-> **Governing ADRs:** [0001](../adrs/0001-rust-core-wgpu-cabi-foobar-shim.md) (core owns DSP + the audio/render split); [0049](../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) (normalization is analysis-layer state); [0050](../adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md) (the beat clock and the gated bar trio); [0139](../adrs/0139-the-waveform-is-levelled-at-the-analyzer-and-publishes-its-gain.md) (the waveform is levelled and its divisor published); CLAUDE.md non-negotiables; Plan 0005 (Miri UB gate).
+The behavioral contract for the seam between the audio thread and the render thread, and for the
+analysis that consumes it. It states what must be true, not how it is implemented.
+
+> **Where it lives:** `rlx-ring/` (the lock-free SPSC ring, a zero-dependency workspace member so
+> Miri can gate its `unsafe`), `core/src/audio.rs` (format validation and the producer/consumer
+> handles) and `core/src/dsp/` (the analysis).
+> **Governing ADRs:** [0001](../adrs/0001-rust-core-wgpu-cabi-foobar-shim.md) (the core owns the
+> analysis and the audio/render split),
+> [0049](../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) (normalization is
+> analysis-layer state),
+> [0050](../adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md) (the beat clock and
+> the gated bar trio) and
+> [0139](../adrs/0139-the-waveform-is-levelled-at-the-analyzer-and-publishes-its-gain.md) (the
+> waveform is levelled and its divisor published).
+> **How the contract got here** is at the end, under *Provenance*.
 
 ## Invariants
 
@@ -16,15 +27,15 @@
 - The ring MUST be **data-race-free** under concurrent single-producer/single-consumer access.
   It lives in `rlx-ring` — a workspace member with **no dependencies**, so Miri can interpret its
   `unsafe` without compiling the wgpu/naga graph — and the CI `miri` job proves it on every push.
-  (Plan 0005, `.github/workflows/ci.yml`)
+  ([Plan 0005](../plans/done/0005-miri-ring-extraction.md), `.github/workflows/ci.yml`)
 - DSP analysis (FFT bins, onset envelope, tempo/BPM estimate, the band axis, the normalized
   levels, the levelled waveform trace and its published gain, the beat/bar clock) MUST be a
   **pure function of the input stream**: no wall-clock reads, no unseeded randomness, no ambient
   state. The same sequence of hops fed to a freshly
   constructed `Analyzer` MUST produce a bit-identical sequence of analysis frames. (CLAUDE.md
   "determinism where it's testable")
-- **That bit-identity is scoped to one build on one machine** ([ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md), Plan 0060). It is exactly what `analysis_is_deterministic` asserts, and it asserts it by running both analyzers in a single process. Reproduction of the *same bits* across architectures, toolchains or optimization levels is deliberately **not** claimed: `f32::sin` lowers to the platform libm and `rustfft` dispatches NEON on aarch64 where it dispatches AVX/SSE on x86_64, so identical input legitimately lands tens of ULP apart — the `macos-26-arm64` runner reads within `2e-5` relative of the x86_64 `*_raw` levels. A test that freezes measured bits is therefore a measurement pinned to its architecture, not a consequence of this invariant.
-- **The unit of determinism is the stream, not the window** (Plan 0048 / ADR-0049 + ADR-0050).
+- **That bit-identity is scoped to one build on one machine** ([ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md), [Plan 0060](../plans/done/0060-a-test-number-states-a-property-or-names-its-machine.md)). It is exactly what `analysis_is_deterministic` asserts, and it asserts it by running both analyzers in a single process. Reproduction of the *same bits* across architectures, toolchains or optimization levels is deliberately **not** claimed: `f32::sin` lowers to the platform libm and `rustfft` dispatches NEON on aarch64 where it dispatches AVX/SSE on x86_64, so identical input legitimately lands tens of ULP apart — the `macos-26-arm64` runner reads within `2e-5` relative of the x86_64 `*_raw` levels. A test that freezes measured bits is therefore a measurement pinned to its architecture, not a consequence of this invariant.
+- **The unit of determinism is the stream, not the window** ([Plan 0048](../plans/done/0048-analysis-v2-and-the-retune.md) / [ADR-0049](../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) + [ADR-0050](../adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md)).
   The `*_raw` levels and BPM still resolve from their window, but `bass`/`mid`/`treb`/`onset`,
   the `spectrum` array and the `waveform` trace all divide by a running peak, and
   `beat_index`/`bar_index` count, so the *same* window read at two points in a stream
@@ -51,7 +62,7 @@
   behavioral claim the DSP tests defend).
 - WHEN the same audio window is analyzed twice THEN the onset envelope, tempo/BPM estimate, and
   band energies are bit-for-bit identical (no wall-clock, no unseeded RNG in the path).
-- WHEN `cargo +nightly miri test -p rlx-ring` runs (the CI `miri` job, Plan 0005) THEN the SPSC
+- WHEN `cargo +nightly miri test -p rlx-ring` runs (the CI `miri` job, [Plan 0005](../plans/done/0005-miri-ring-extraction.md)) THEN the SPSC
   ring's cross-thread test reports no undefined behavior.
 
 ## Known gaps / honest nulls
@@ -68,3 +79,19 @@
   truth) — only its **determinism**. Better tempo tracking is a named later roadmap item.
 - The overflow/underrun policy is stated behaviorally here; the exact capacity (~100 ms at
   48 kHz per the ring's sizing) and drop mechanics live in `core/src/audio.rs`.
+
+## Provenance
+
+How this contract reached its current shape. None of it is a rule — the invariants above are — and
+it is here so a reader who wants the history has it in one place rather than in the header.
+
+**Reconciled 2026-08-28**, through five plans:
+
+- **[Plan 0005](../plans/done/0005-miri-ring-extraction.md)** extracted the ring into `rlx-ring` and put the Miri UB gate in CI.
+- **[Plan 0032](../plans/done/0032-testing-strategy-e2e-coverage-and-pre-push.md)** gave the ring-to-analyzer-to-renderer seam a test.
+- **[Plan 0048](../plans/done/0048-analysis-v2-and-the-retune.md)** brought analysis v2 — the dual-resolution axis, running normalization and the
+  beat/downbeat clock — which is what moved the determinism invariant from *window* to *stream*.
+- **[Plan 0060](../plans/done/0060-a-test-number-states-a-property-or-names-its-machine.md)** scoped the bit-identity clause to one build on one machine, after a frozen-literal
+  test read as though cross-architecture reproduction followed from it.
+- **[Plan 0127](../plans/done/0127-the-picture-stops-depending-on-the-volume-slider.md)** brought the waveform into the levelled outputs, so the trace is history-dependent
+  too and publishes its divisor.

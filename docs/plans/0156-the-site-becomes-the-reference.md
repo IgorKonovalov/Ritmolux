@@ -427,8 +427,8 @@ pub const PARAMS: &[ParamSpec] = &[
 |---|---|---|---|
 | 1 — The menu is organised by reader task | dev | done | 7f2b0b9 |
 | 2 — The operator surface has a reference | dev | done | 786d687 |
-| 3 — The site renders diagrams, and How it works exists | dev | done | committed with this row |
-| 4 — The engine-side documents address a reader | dev | not started | |
+| 3 — The site renders diagrams, and How it works exists | dev | done | d2f2d24 |
+| 4 — The engine-side documents address a reader | dev | done | committed with this row |
 | 5 — The embedding surface | dev | not started | |
 | 6 — rustdoc joins the Pages artifact | dev | not started | |
 | 7 — The parameter reference is generated from the engine | dev | not started | |
@@ -473,6 +473,25 @@ pub const PARAMS: &[ParamSpec] = &[
   rendering. Phase 8 walks both themes.
 - The forward link from `docs/how-it-works.md` to `docs/embedding.md` is not written: Phase 5
   creates that file, and a link to a file that does not exist is now a red build.
+- **Phase 4's `capturing.md` size done-when is NOT met.** Moving exactly what the phase names —
+  the harness, the habit, `--downbeat-log` and `milkconv` — takes it from 165,028 B to 91,080 B, a
+  45 % cut against the "under half" the phase asks for. The gap is one section: *What the report's
+  columns mean* is 26,928 B and is preset-author reference the tuning walkthrough links into three
+  times, so it stays. The section list was implemented as written; the byte figure was not reached.
+- Phase 4's register pass converted **168 bare citations** across five documents to links, by
+  script, resolving each number against the actual ADR or plan filename. The four plural forms
+  (`Plans 0105, 0099 and 0102`) were done by hand so every number is linked, not just the first.
+- **Phase 4 edited eight files outside its list**, all naming content that moved:
+  `CLAUDE.md` and `README.md` (their `docs/` maps), `.claude/skills/architect/SKILL.md` and
+  `.claude/skills/preset-author/SKILL.md` (both routed a lane to `docs/capturing.md` for the gate
+  table), `core/tests/reactivity.rs` (same), `docs/design-backlog.md` (entry 0109's probe searched
+  `docs/capturing.md` for the corpus ranking), and two new fixture files.
+- **A stray figure from Phase 3 tripped `check-filter-figures.mjs`** and was removed here: the
+  Chromium download size, written into `site/README.md` and the Pages workflow. That gate is not in
+  this plan's per-phase list and was not run at Phase 3.
+- **`docs/capturing.md` was the reader-prose fixture's out-of-scope case and is now in scope.**
+  `docs/releasing.md` takes that role; the fixture's expected shape moves from six breaks across
+  three files to ten across four.
 - **The site's content-collection cache hides a plugin edit.** A split document's chunks are stored
   under a digest of the chunk body, so a change to the *rewriter* re-renders nothing. `rm -rf
   site/.astro` before believing a build that a plugin edit should have changed.

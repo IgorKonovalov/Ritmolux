@@ -371,11 +371,11 @@ quietly downgrade everything it finds.
 node scripts/check-reader-prose.mjs scripts/fixtures/reader-prose
 ```
 
-Expect **exit 1 and exactly six breaks, across three files**. Unlike every other checker here this
-one does not walk a tree at all — it reads seven fixed paths under the root, which is the scope
+Expect **exit 1 and exactly ten breaks, across four files**. Unlike every other checker here this
+one does not walk a tree at all — it reads thirteen fixed paths under the root, which is the scope
 boundary ADR-0168 draws — so this subdirectory mirrors those paths rather than seeding an
 arbitrary layout. **A path in the list and not in this tree is its own failure**, reported before
-the breaks are, which is why the two operator pages below are here at all.
+the breaks are, which is why every page below is here at all.
 
 **One rejected form per line, and the counts are the instrument.** A branch of the citation
 alternation that stops matching shows up as a number that moved rather than as a silence.
@@ -383,12 +383,18 @@ alternation that stops matching shows up as a number that moved rather than as a
 | File | Breaks | Seeded as |
 |------|-------:|-----------|
 | `presets/README.md` | 4 | the four citation forms: `ADR-0002` in a trailing parenthetical, `Plan 0063` woven into a sentence, `ADR‑0127` with a **U+2011** non-breaking hyphen, and `Plans 0027, 0078` — the **plural**, in a heading |
+| `docs/capturing.md` | 4 | the boundary that MOVED. This file was the out-of-scope check until the list widened to the whole published set; its four bare citations are breaks now, and a run that stops reporting them means the list narrowed back |
 | `docs/presets.md` | 1 | a citation inside a mid-sentence parenthetical |
 | `docs/preset-palettes.md` | 1 | a citation at a block's end |
 | `docs/preset-guide.md` | 0 | clean, and must report `0 citation(s), 0 bare` rather than being skipped |
 | `docs/preset-tuning-walkthrough.md` | 0 | clean, with no citation of any kind |
 | `docs/running.md` | 0 | clean, with **one** citation inside a link — the run must report `1 citation(s), 0 bare`, so a counter that stopped counting is visible |
 | `docs/configuration.md` | 0 | clean, with a plan path inside a fenced block — hole 1, which must stay a hole |
+| `docs/how-it-works.md` | 0 | clean, one inline link |
+| `docs/nfr.md` | 0 | clean, and its citation is a **collapsed reference** with the definition below — the form that made every use look bare before the definition scanner existed |
+| `docs/generative-techniques-catalogue.md` | 0 | clean, with no citation of any kind |
+| `docs/specs/0001-c-abi.md` | 0 | clean, and **one directory deeper** — the only path in the list that is not a direct child of `docs/` |
+| `docs/specs/0002-ring-determinism.md` | 0 | clean, with a citation-shaped filename inside a fenced block |
 
 **The silences are the larger half of this fixture**, because every one of them is a shape the gate
 must NOT convict. `presets/README.md` carries all four markdown link forms — inline, full
@@ -402,9 +408,12 @@ anchored at the start of a line cannot see it. A definition the scanner misses m
 look bare, so this one fixture line is what separates a working gate from one that reports two
 false positives on the shipped tree — which is what it did before this file existed.
 
-**`docs/capturing.md` is here and is deliberately out of scope.** It is an Entrance B document
-carrying four bare citations, and the run must never report them. If it ever does, the filename
-list inside the script has widened past what ADR-0168 decided.
+**`docs/releasing.md` is here and is deliberately out of scope.** It is a **Contribute** page
+carrying three bare citations, and the run must never report them: a contributor reading about the
+release process wants the working record, so that group keeps its bare citations. If those three
+are ever reported, the filename list inside the script has widened past what ADR-0168 decided.
+`docs/capturing.md` held this role until the list widened, and the two files swapping places is the
+clearest record of where the boundary now sits.
 
 ## `site-links/` — for `check-site-links.mjs`
 

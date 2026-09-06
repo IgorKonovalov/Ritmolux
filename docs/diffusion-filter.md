@@ -1,10 +1,14 @@
 # The diffusion filter
 
-`tools/sd-filter/` is a stage that sits between `shot --render` and `ffmpeg`.
-Attractors and mandalas go in; an **img2img pass with ControlNet holding their
-geometry** turns them into material — a canyon, a cathedral rose window, a
-creature — while the shape keeps tracking the music, because the control map is
-redrawn from every frame.
+An optional stage between a rendered frame and the encoder, for making a video look like
+*something* rather than like a diagram. Attractors and mandalas go in; an **img2img pass with
+ControlNet holding their geometry** turns them into material — a canyon, a cathedral rose window, a
+creature — while the shape keeps tracking the music, because the control map is redrawn from every
+frame.
+
+It is a Python sidecar in `tools/sd-filter/`, not part of the application: it never ships, and
+nothing in the engine depends on it. This is a **maintainer's page** — what it costs, and how to
+run it.
 
 **This page is the only one.** Profiles, `--size`, `--stride`, the cost table and
 the check are stated here and nowhere else; [`docs/capturing.md`](capturing.md),

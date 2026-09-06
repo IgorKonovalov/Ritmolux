@@ -369,7 +369,7 @@ cargo nextest run -p rlx-core
 ```
 
 Know what that green actually covers, because it is weaker than it reads and
-[`docs/capturing.md`](../../../docs/capturing.md) now spells it out: **`reactivity` is the only one
+[`docs/testing.md`](../../../docs/testing.md) now spells it out: **`reactivity` is the only one
 of the five that drives PCM through the real analyzer** (Plan 0067 Phase 1). The other four
 synthesize their analysis frames — correctly and more cheaply, since their questions are about the
 frame rather than about audio — which means they would **not** notice a preset that ignores the

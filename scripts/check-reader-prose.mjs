@@ -32,11 +32,14 @@
 // reason — close-ceremony archiving and index-row length were both conventions
 // first, and both needed a gate (ADR-0116).
 //
-// SCOPE IS ENTRANCE A, and the boundary is the list below rather than a rule a
-// script could infer. Entrance B — `docs/capturing.md`, `docs/nfr.md`,
-// `docs/on-device-validation.md`, `docs/releasing.md`, the specs and the
-// technique catalogue — KEEPS its bare citations, because its readers are
-// contributors for whom the working record is the point rather than the noise.
+// SCOPE IS EVERY PUBLISHED READER DOCUMENT, and the boundary is the list below
+// rather than a rule a script could infer. Two groups are out: the three install
+// pages, which are published exactly as they ship inside a release zip, and the
+// **Contribute** group — `docs/developing.md`, `docs/testing.md`,
+// `docs/milkdrop-conversion.md`, `docs/releasing.md`,
+// `docs/on-device-validation.md`, `docs/diffusion-filter.md` — which KEEPS its
+// bare citations, because its readers are contributors for whom the working
+// record is the point rather than the noise.
 // Two rules now apply in two places and the seam is this array; that cost is
 // named in ADR-0168's Consequences rather than discovered here.
 //
@@ -66,28 +69,48 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = resolve(process.argv[2] ?? REPO_ROOT);
 
 /**
- * The reader set: the documents a preset author or an operator reads.
+ * The reader set: every published document except the install pages and the
+ * contributor group.
  *
  * Held as a literal list on purpose. "Reader-facing" is not a property a script
- * can infer from a path, and a heuristic that tried would either drag in
- * Entrance B or quietly drop a file the day it was renamed.
+ * can infer from a path, and a heuristic that tried would either drag in a
+ * process page or quietly drop a file the day it was renamed. It is the same
+ * boundary the site's menu draws, spelled a second time, and that cost is named
+ * in ADR-0168 rather than discovered here.
+ *
+ * TWO GROUPS ARE DELIBERATELY OUT.
+ *
+ * The three `packaging/*\/READ-ME-FIRST.md` are published AS THEY SHIP inside a
+ * release zip (ADR-0167). A drift between the site's copy and the tester's is
+ * unrepresentable precisely because nothing may edit them to suit a renderer,
+ * and a gate that could demand an edit is that edit.
+ *
+ * The **Contribute** group - `docs/developing.md`, `docs/testing.md`,
+ * `docs/milkdrop-conversion.md`, `docs/releasing.md`,
+ * `docs/on-device-validation.md`, `docs/diffusion-filter.md` - keeps its bare
+ * citations, because a contributor reading about the release process wants the
+ * working record and a plan number is the shortest way to it. Each of those
+ * pages now OPENS by saying it is process; that is the register fix they get,
+ * and it is not this gate's business.
  */
 const READER_DOCS = [
+  // Author presets
   "presets/README.md",
   "docs/presets.md",
   "docs/preset-palettes.md",
   "docs/preset-guide.md",
   "docs/preset-tuning-walkthrough.md",
-  // The operator pages, which are read by someone who installed the application
-  // and has never seen this repository (ADR-0169). They were the README's middle
-  // three hundred lines and carried no citation there either; the rule reaches
-  // them so they cannot acquire one.
+  "docs/capturing.md",
+  // Use it
   "docs/running.md",
   "docs/configuration.md",
-  // The explanation a curious user reads. Sourced from the budgets, the grammar
-  // and the specs, and it links each of them rather than repeating a table -
-  // which is the same reason its citations have to be links.
+  // How it works
   "docs/how-it-works.md",
+  "docs/nfr.md",
+  "docs/generative-techniques-catalogue.md",
+  // Embed it
+  "docs/specs/0001-c-abi.md",
+  "docs/specs/0002-ring-determinism.md",
 ];
 
 /**
