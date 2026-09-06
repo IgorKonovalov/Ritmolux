@@ -610,7 +610,7 @@ here is the **definition**, and the essay is the **discussion**.
 |---|---|---|---|
 | `base` | `0.06` | `0` – `1` | Height the readout sits at when the band is silent. |
 | `scale` | `1.2` | `0` – `4` | How far a full band pushes the readout above its base. |
-| `curve` | `0` | `-1` – `1` | Bends the level response: below 0 quiet detail is lifted, above 0 it is pushed down. |
+| `curve` | `1` | `0.05` – `4` | Exponent on each band's level: 1 is linear, below 1 lifts quiet detail, above 1 pushes it down. |
 | `radius` | `0.35` | `0` – `1` | Radius of the ring the readout is drawn around, in the radial layouts. |
 | `span` | `1` | `0` – `1` | How much of the frequency axis is shown; below 1 the top end is cut. |
 | `baseline` | `-0.85` |  | Where the flat layout's zero line sits vertically. |

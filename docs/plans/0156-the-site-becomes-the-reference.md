@@ -551,6 +551,24 @@ pub const PARAMS: &[ParamSpec] = &[
   under a digest of the chunk body, so a change to the *rewriter* re-renders nothing. `rm -rf
   site/.astro` before believing a build that a plugin edit should have changed.
 
+- **Repair after the Mode 4 review, on the merged tip.** `spectrum`'s `curve` spec stated
+  `default: 0.0`, `range: [-1.0, 1.0]` and a doc line describing a bipolar bend, over an engine
+  that applies `DEFAULT_CURVE = 1.0` and runs `level.powf(curve.clamp(0.05, 4.0))` - ADR-0040's
+  exponent, where `1.0` is the identity. The spec now states `1.0` and `[CURVE_MIN, CURVE_MAX]`,
+  its doc line names the exponent, and `DEFAULT_CURVE` reads `default_of(PARAMS, "curve")`. It was
+  the **only** constant in the tree that never adopted that read, so the const-eval single-copy
+  property did not reach it and no render, golden or behavioural gate could: the engine was right
+  and only the published row was wrong. `DEFAULT_ROTATION` in the same file was the same
+  two-literal shape - agreeing, so latent - and was converted with it. The block was regenerated;
+  one row changed.
+- **`a_parameter_default_is_declared_once` is Phase 7's unimplemented done-when**, the one asking
+  that every scene's applied default equal its spec's. A source scan over `core/src/render/`: 128
+  spec/constant pairs, and a pair passes only when one side derives from the other - the constant
+  reads the roster, or the roster reads the constant. Two literals side by side is the finding
+  whether or not they agree today, which a value comparison could not have said. Confirmed red on
+  the original `curve` declaration before the fix went back in. It skips the shared blocks' `default`
+  field shorthand, where the spec states no literal and the one copy lives at the call site.
+
 ### Close triggers
 
 - **`presets/` touched:** yes — `presets/README.md` only (Phase 4's front matter, Phase 7's
@@ -578,7 +596,10 @@ pub const PARAMS: &[ParamSpec] = &[
 - **Full suite:** `cargo nextest run --workspace`, exit 0 — **1546 tests run: 1546 passed
   (21 slow), 5 skipped**, 542.6 s. Run at the end of Phase 7, before this block. No suite was run
   under an upward override at an earlier phase; every earlier phase ran `-P fast` (1323 → 1326
-  tests, 223 skipped) and the site and doc gates.
+  tests, 223 skipped) and the site and doc gates. **Re-run after the `main` merge and the two
+  review repairs above: exit 0 - 1556 tests run: 1556 passed (10 slow), 5 skipped**, 475.2 s,
+  alongside `fmt`, `clippy --workspace --all-targets`, a clean `npm run build` and the nine Node
+  gates.
 - **Outstanding `human` phases:** Phase 8, the live walk. It needs the close to fast-forward `main`
   and Pages to deploy; nothing in phases 1–7 is verifiable on a laptop that is not already verified
   by a gate here, except the two things that phase exists for — the diagrams on a dark theme and

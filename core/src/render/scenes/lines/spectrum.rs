@@ -130,7 +130,7 @@ const DEFAULT_BASELINE: f32 = default_of(PARAMS, "baseline");
 /// It applies to the **downsampled level, before the per-element smoother**, so
 /// `[spectrum] smoothing` eases the displayed quantity the way meter ballistics
 /// do. That ordering is the ADR's whole content; see [`curve_level`].
-const DEFAULT_CURVE: f32 = 1.0;
+const DEFAULT_CURVE: f32 = default_of(PARAMS, "curve");
 /// The range [`curve_level`] clamps the exponent into before the `powf`.
 ///
 /// **Totality is part of ADR-0040's decision, not an implementation detail.**
@@ -139,7 +139,7 @@ const DEFAULT_CURVE: f32 = 1.0;
 /// what rules out `pow(0, 0)` and `pow(0, -1)` for every author expression.
 const CURVE_MIN: f32 = 0.05;
 const CURVE_MAX: f32 = 4.0;
-const DEFAULT_ROTATION: f32 = 0.0;
+const DEFAULT_ROTATION: f32 = default_of(PARAMS, "rotation");
 // Shared view transform (ADR-0018): identity by default.
 const DEFAULT_ZOOM: f32 = 1.0;
 // Geometry mirror (Plan 0018 Phase 4): identity by default.
@@ -163,9 +163,9 @@ pub const PARAMS: &[ParamSpec] = &[
     },
     ParamSpec {
         name: "curve",
-        default: 0.0,
-        range: Some([-1.0, 1.0]),
-        doc: "Bends the level response: below 0 quiet detail is lifted, above 0 it is pushed down.",
+        default: 1.0,
+        range: Some([CURVE_MIN, CURVE_MAX]),
+        doc: "Exponent on each band's level: 1 is linear, below 1 lifts quiet detail, above 1 pushes it down.",
     },
     ParamSpec {
         name: "radius",

@@ -1396,6 +1396,175 @@ fn essays_that_state_a_default_are_reported() {
     );
 }
 
+/// A parameter's default exists **once**: either the constant reads the spec or
+/// the spec reads the constant, never two literals side by side (ADR-0170).
+///
+/// This is the guard behind the generated reference. `default_of` is a `const
+/// fn`, so wherever a scene's `DEFAULT_*` reads its roster the two cannot drift
+/// — a name no spec declares is a const-eval panic, which is a compile error.
+/// What that construction cannot do is notice a constant that never adopted it.
+///
+/// **That is the trap.** A `DEFAULT_X` written as a literal beside a `ParamSpec`
+/// that also states one is two copies of a number, and they are read by
+/// different things: the engine applies the constant at `reset_params`, while
+/// the generated reference in `presets/README.md` prints the spec. They can
+/// disagree — in the default, and equally in the range and the doc line written
+/// beside it — with every render, golden and behavioural gate green, because
+/// nothing about the picture is wrong. Only the published row is.
+///
+/// A **source scan** rather than a value comparison, and that is the point:
+/// comparing the two numbers passes on a pair that happens to agree today and
+/// says nothing about tomorrow. What is asserted is that there is only one
+/// number to compare. Same direction as the roster and header greps elsewhere in
+/// this suite — the declaration is the authority and the copy derives from it.
+#[test]
+fn a_parameter_default_is_declared_once() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/render");
+    let mut files = Vec::new();
+    collect_rust_sources(&root, &mut files);
+    assert!(
+        files.len() > 20,
+        "only {} source file(s) under core/src/render - the walk stopped \
+         finding the tree rather than the tree shrinking",
+        files.len(),
+    );
+
+    let mut pairs = 0usize;
+    let mut findings: Vec<String> = Vec::new();
+
+    for path in &files {
+        let text = std::fs::read_to_string(path)
+            .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+        let constants = default_constants(&text);
+
+        for (name, spec_default) in spec_defaults(&text) {
+            let constant_name = format!("DEFAULT_{}", name.to_uppercase());
+            let Some(constant_value) = constants.get(&constant_name) else {
+                continue;
+            };
+            pairs += 1;
+
+            // One copy, in either direction: the constant reads the roster, or
+            // the roster reads the constant.
+            if constant_value.contains("default_of") || spec_default.contains(&constant_name) {
+                continue;
+            }
+            findings.push(format!(
+                "  {}: `{name}` states its default twice - the spec says \
+                 `{spec_default}` and `{constant_name}` says `{constant_value}`",
+                path.file_name().unwrap_or_default().to_string_lossy(),
+            ));
+        }
+    }
+
+    assert!(
+        pairs > 100,
+        "only {pairs} spec/constant pair(s) found - this scan has stopped \
+         matching how a scene declares a parameter rather than the scenes \
+         having stopped declaring them",
+    );
+    assert!(
+        findings.is_empty(),
+        "{} parameter(s) state their default in two places:\n{}\n\
+         Make the constant read the roster - `const DEFAULT_X: f32 = \
+         default_of(PARAMS, \"x\");` - so the number exists once and the \
+         generated reference in presets/README.md cannot state a default the \
+         engine does not apply.",
+        findings.len(),
+        findings.join("\n"),
+    );
+}
+
+/// Every `.rs` file under `dir`, recursively.
+fn collect_rust_sources(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+    let entries = std::fs::read_dir(dir).unwrap_or_else(|e| panic!("read {}: {e}", dir.display()));
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_rust_sources(&path, out);
+        } else if path.extension().is_some_and(|e| e == "rs") {
+            out.push(path);
+        }
+    }
+}
+
+/// The `DEFAULT_*: f32` constants of one source file, with the expression each
+/// is initialised from.
+///
+/// A line scan: every one of these is written on a single line in this tree, and
+/// one that stops being is a pair this test stops seeing rather than one it
+/// misreads — which is what the pair-count floor above catches.
+fn default_constants(text: &str) -> std::collections::HashMap<String, String> {
+    let mut out = std::collections::HashMap::new();
+    for line in text.lines() {
+        let line = line.trim();
+        let Some(rest) = line
+            .strip_prefix("pub(crate) const ")
+            .or_else(|| line.strip_prefix("pub const "))
+            .or_else(|| line.strip_prefix("const "))
+        else {
+            continue;
+        };
+        let Some((name, tail)) = rest.split_once(':') else {
+            continue;
+        };
+        let name = name.trim();
+        let Some((ty, value)) = tail.split_once('=') else {
+            continue;
+        };
+        if !name.starts_with("DEFAULT_") || ty.trim() != "f32" {
+            continue;
+        }
+        out.insert(
+            name.to_owned(),
+            value.trim().trim_end_matches(';').trim().to_owned(),
+        );
+    }
+    out
+}
+
+/// The `(name, default expression)` of every `ParamSpec` literal in a source
+/// file.
+///
+/// Anchored on `ParamSpec` and not on a bare `name:`, so a struct literal that
+/// merely has a `name` field cannot enter the roster. `name` and `default` are
+/// the first two fields of every one of these, so each chunk is read forward
+/// from the anchor rather than by matching braces.
+fn spec_defaults(text: &str) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    for chunk in text.split("ParamSpec").skip(1) {
+        let Some(at) = chunk.find("name: \"") else {
+            continue;
+        };
+        let after = &chunk[at + "name: \"".len()..];
+        let Some(end) = after.find('"') else { continue };
+        let name = after[..end].to_owned();
+
+        let tail = &after[end + 1..];
+        let Some(d) = tail.find("default") else {
+            continue;
+        };
+        let rest = &tail[d + "default".len()..];
+        // `default,` is field shorthand for a `const fn`'s own parameter, which
+        // is the shared-block form: the spec states no literal, and the one copy
+        // of the number lives at the call site. Nothing to compare, so no pair.
+        let Some(value) = rest.strip_prefix(':') else {
+            continue;
+        };
+        let value = value
+            .split(',')
+            .next()
+            .unwrap_or("")
+            .trim()
+            .trim_end_matches('}')
+            .trim();
+        if !value.is_empty() {
+            out.push((name, value.to_owned()));
+        }
+    }
+    out
+}
+
 const PARAM_BLOCK_BEGIN: &str = "<!-- params:begin -->";
 const PARAM_BLOCK_END: &str = "<!-- params:end -->";
 
