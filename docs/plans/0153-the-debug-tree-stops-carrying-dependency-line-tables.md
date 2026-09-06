@@ -1,6 +1,6 @@
 # 0153 — The debug tree stops carrying dependency line tables
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-09-04
 > **Owner skill(s):** dev
 > **Related ADRs:** [ADR-0165](../adrs/0165-dependencies-compile-without-debug-info-and-one-line-buys-it-back.md)
