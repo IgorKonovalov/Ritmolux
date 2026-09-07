@@ -1,8 +1,8 @@
 # ADR-0173 — A cost probe takes the best of each duration, not the best difference
 
-> **Status:** proposed
+> **Status:** accepted
 > **Date:** 2026-09-07
-> **Related plan(s):** [0157](../plans/0157-the-cost-probes-estimate-a-duration.md)
+> **Related plan(s):** [0157](../plans/done/0157-the-cost-probes-estimate-a-duration.md)
 > **Extends:** [0071](0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
 > (a numeric test contract states a property or names its machine),
 > [0016](0016-gpu-tests-opt-in-ci-scope.md) (the software-rasterizer skip)
@@ -24,7 +24,8 @@ the **minimum of the difference**:
 ```
 
 The comment above `REPEATS` states the reasoning: *"The **minimum** is kept, not the mean: a
-scheduler hiccup can only add time, so the smallest reading is the one closest to the truth."*
+scheduler hiccup can only add time, so the smallest reading is the one least contaminated by
+everything that is not the render."*
 
 **That reasoning is sound for a duration and inverted for a difference of durations.** A hiccup
 landing in `long` adds to `long - short`, and a hiccup landing in `short` *subtracts* from it. So

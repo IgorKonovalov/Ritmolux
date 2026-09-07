@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0157 — The cost probes estimate a duration](#0157--the-cost-probes-estimate-a-duration)
   - [0153 — The debug tree stops carrying dependency line tables](#0153--the-debug-tree-stops-carrying-dependency-line-tables)
   - [0156 - The site becomes the reference](#0156---the-site-becomes-the-reference)
   - [0147 — What the show costs, and what its numbers mean](#0147--what-the-show-costs-and-what-its-numbers-mean)
@@ -163,6 +164,7 @@ hand-edited.
   - [0002 — Rust enforcement tooling](#0002--rust-enforcement-tooling)
   - [0001 — Core + standalone MVP, then foobar parity](#0001--core--standalone-mvp-then-foobar-parity)
 - [Prior sequencing notes (superseded)](#prior-sequencing-notes-superseded)
+  - [Moved 2026-09-07 from `README.md` - the 0157-is-drafted note](#moved-2026-09-07-from-readmemd---the-0157-is-drafted-note)
   - [Moved 2026-09-07 from `README.md` - the 0153-is-approved note](#moved-2026-09-07-from-readmemd---the-0153-is-approved-note)
   - [Moved 2026-09-06 from `README.md` - the 0156-is-drafted note](#moved-2026-09-06-from-readmemd---the-0156-is-drafted-note)
   - [Moved 2026-09-06 from `README.md` — the 0147-Phase-1-before-0133 note](#moved-2026-09-06-from-readmemd--the-0147-phase-1-before-0133-note)
@@ -180,6 +182,75 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0157 — The cost probes estimate a duration](done/0157-the-cost-probes-estimate-a-duration.md)
+
+- closed 2026-09-07. Two `dev` phases on `main`, no worktree: `084686a` (1, the estimator across
+all four cost probes plus `arc_cost`'s missing positivity guard) and `70ed4cc` (2, `api/` excluded
+from the route gate's walk). Review: **no blockers, no majors, two minors, one nit.**
+
+**Both defects were verified independently of the log, and the second was verified by running the
+gate rather than by reading it.** `cargo nextest run --workspace` re-run in full at the tip:
+**1556 passed, 5 skipped, 431.674 s**, matching `dev`'s counts. The four probes were then re-run
+alone with `--no-capture` on this box's AMD Radeon iGPU under DX12 — all four report positive,
+plausible durations (`collage` 1.165-2.901 ms across its five rungs at a steady +0.054 ms an
+element; `mark` 3.078-3.209 ms; `field` 0.536-1.222 ms), which is the reading the old estimator
+could not be trusted to produce. `clippy --workspace --all-targets -D warnings` and `fmt --all
+--check` clean; all seven pre-push Node gates and `toc --check` exit 0; `check-backlog-claims`
+reports 106 reductions holding across 45 live entries, no entry convicted.
+
+**Phase 2's bite check was re-run at the close and extended past what the plan asked.** Against
+this checkout's built site with `target/doc` copied into `site/dist/api/`,
+`check-site-routes.mjs` exits 0 on 162 routes and `check-site-links.mjs --require-api` exits 0 on
+164 pages — the two gates' division of the `api/` tree is consistent. A planted
+`site/dist/zzz-bite-check/index.html` is caught and named, so the narrowed gate still bites. The
+close added the case the plan did not name: the exclusion is guarded by `prefix === ""`, so a
+planted `site/dist/embed/api/index.html` is **also** caught. That matters because the property the
+phase narrowed is "rustdoc's tree at the artifact root", not "any directory called `api`", and
+nothing in the plan's own done-when distinguishes the two.
+
+**The estimator repair rests on a distinction the development configuration cannot make, and the
+plan says so in its own ADR.** ADR-0173's Context is the load-bearing paragraph: the probes skip on
+a software rasterizer because a WARP frame time says nothing about real hardware, but the estimator
+needs the machine to be *quiet* — and "is this adapter real?" and "is this machine quiet?" have the
+same answer on the reference box and different answers on a shared macOS runner. That is the
+Mode 4 lens-4 habit stated by the plan before the review reached for it, which is why this close
+records no finding against it.
+
+**Two minors.** ADR-0173's Context presented a **verbatim quotation** of the comment it argues
+against — *"the smallest reading is the one closest to the truth"* — and that string appears in no
+version of any of the four files; every one of them said *"least contaminated by everything that is
+not the render."* The argument is unaffected (both readings are the sound-for-a-duration reasoning
+the ADR shows is inverted for a difference), but an ADR is append-only once accepted, so it was
+corrected in the body at the close, before the status flip, rather than left to stand behind an
+`Outcome`. Second: `docs/plans/README.md` still advertised **0173** as the next free ADR number,
+which this plan's own ADR had consumed the same day it was drafted — the one index field a drafting
+session is expected to bump and the only one nothing gates.
+
+**One nit, unrepaired and recorded here instead.** All four probes still print `best of {REPEATS}
+interleaved repeats` in their report headers, a phrase that now describes each *leg* rather than
+the slope — which is exactly the thing this plan changed the meaning of. The `REPEATS` doc comment
+three lines above the format string spells the new mechanism out in full, so a reader of the source
+is not misled; a reader of the printed table alone could be. Not worth a commit against four files
+on its own; worth one line whenever a fifth probe is added or one of these is next edited.
+
+**No version bump, deliberately.** ADR-0005 governs the **application** version — the number in the
+window title, the release zip and the tag — and this plan changed `core/tests/` and one CI gate
+script. Nothing under `core/src/`, `standalone/`, `plugin-foobar/`, `core-cabi/`, `milkconv/`,
+`presets/` or `site/` moved, so every shipped artifact is byte-identical and no user-observable
+behaviour changed. `dev`'s close block said *"fix-only"*, which is true of the defect and not of
+the artifact; the level is the architect's call, and this is 0155's precedent (a new gate script
+plus docs took none) rather than 0126's (a refactor of shipped source took a patch). Recorded as a
+deliberate call, not a miss.
+
+**What outlives the plan.** Its own `## Followups` — watch the macOS arm, and if a probe goes red
+again the finding belongs in ADR-0173 as a dated `Outcome` and never in a tuned constant. ADR-0173
+Alternative A (split the portable pixel assertions from the timing measurement) is the recorded
+next move and stays available. Three of the plan's four `does NOT do` items are live design debt it
+declined on purpose: no fixture for `check-site-routes.mjs`, no shared cost-probe helper across the
+four copies, and no revisit of whether a timing measurement belongs in `-P fast` on every arm of
+every push — that last one is ADR-0156's scope and is the reason a shared CI runner was timing a
+GPU at all.
 
 ### [0153 — The debug tree stops carrying dependency line tables](done/0153-the-debug-tree-stops-carrying-dependency-line-tables.md)
 
@@ -7278,6 +7349,29 @@ stays in `lmv-core`, and is out of the Miri job's scope, so the FFI pointer hand
 uncovered (its C side remains the Plan 0001 Phase-6 smoke program's job, per ADR-0003).
 
 ## Prior sequencing notes (superseded)
+
+### Moved 2026-09-07 from `README.md` - the 0157-is-drafted note
+
+Spent when [0157] closed on 2026-09-07, hours after it was written. It said `main` was red and that
+this plan was the only thing that unblocked it; both phases landed, the full suite is green and the
+route gate passes against a built site with `dist/api/` populated, so neither half is live. Verbatim:
+
+> **Added 2026-09-07 - [0157] is drafted, and it is the only plan that unblocks `main`.** Both its
+> phases repair a gate or an estimator that has been wrong for longer than the failure is old: the
+> cost-probe defect predates every plan on this roster, and the route gate has never once run with
+> `dist/api/` present because the `rustdoc` job it depends on failed from the day it was added. It is
+> `dev`-only, two phases, and touches four test files plus one script - no engine code, no preset, no
+> document a reader sees - so it contends with nothing here and can run beside any lane. **Take it
+> before anything else**: every other plan's `dev` gate runs `-P fast`, which is exactly where the
+> cost probes live.
+
+**What survives it.** The last sentence is the durable part and it is now a property of the tree
+rather than a sequencing instruction: the cost probes still run in `-P fast` on every arm of every
+push, so every other plan's `dev` gate still carries them. That they no longer misreport a duration
+is what this plan bought; whether a timing measurement belongs in that profile at all is ADR-0156's
+question, which [0157] deliberately left standing.
+
+[0157]: done/0157-the-cost-probes-estimate-a-duration.md
 
 ### Moved 2026-09-07 from `README.md` - the 0153-is-approved note
 

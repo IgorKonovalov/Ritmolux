@@ -194,5 +194,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0170](0170-a-parameters-reference-row-is-generated-from-the-declaration-the-engine-reads.md) | A parameter's reference row is generated from the declaration the engine reads | accepted 2026-09-06 (Plan 0156), Outcome; extends 0017 and 0163 |
 | [0171](0171-a-diagram-is-mermaid-in-the-source-and-the-site-renders-it-at-build.md) | A diagram is mermaid in the source, and the site renders it at build | accepted 2026-09-06 (Plan 0156), Outcome; extends 0154 |
 | [0172](0172-a-null-cost-measurement-names-the-witness-that-the-thing-ran.md) | A null-cost measurement names the witness that the thing ran | accepted 2026-09-06 (Plan 0147), supplements 0071 and 0143 |
-| [0173](0173-a-cost-probe-takes-the-best-of-each-duration-not-the-best-difference.md) | A cost probe takes the best of each duration, not the best difference | proposed 2026-09-07 (Plan 0157), extends 0071 and 0016 |
+| [0173](0173-a-cost-probe-takes-the-best-of-each-duration-not-the-best-difference.md) | A cost probe takes the best of each duration, not the best difference | accepted 2026-09-07 (Plan 0157), extends 0071 and 0016 |
 <!-- roster:end -->

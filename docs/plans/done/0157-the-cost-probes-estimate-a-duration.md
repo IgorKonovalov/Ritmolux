@@ -1,13 +1,18 @@
 # 0157 — The cost probes estimate a duration, and the route gate stops counting rustdoc
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-07. Phase 1 `084686a`, Phase 2 `70ed4cc`.
+> Mode 4: **no blockers, no majors, two minors, one nit.** Verified independently of the
+> log: `cargo nextest run --workspace` green (1556 passed, 5 skipped), all four cost probes
+> re-run on a real adapter and reporting positive durations, and the route gate exercised
+> against a locally built site with `dist/api/` populated — exit 0, and still exit 1 on a
+> planted orphan both at the top level and nested under `embed/api`.
 > **Created:** 2026-09-07
 > **Owner skill(s):** dev
-> **Related ADRs:** [ADR-0173](../adrs/0173-a-cost-probe-takes-the-best-of-each-duration-not-the-best-difference.md)
-> (proposed — the estimator), [ADR-0169](../adrs/0169-the-site-is-organised-by-reader-task-and-the-readme-stops-being-a-reference.md)
-> (accepted — rustdoc is one menu entry), [ADR-0166](../adrs/0166-a-published-document-splits-into-routes-by-size.md),
-> [ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md),
-> [ADR-0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md)
+> **Related ADRs:** [ADR-0173](../../adrs/0173-a-cost-probe-takes-the-best-of-each-duration-not-the-best-difference.md)
+> (proposed — the estimator), [ADR-0169](../../adrs/0169-the-site-is-organised-by-reader-task-and-the-readme-stops-being-a-reference.md)
+> (accepted — rustdoc is one menu entry), [ADR-0166](../../adrs/0166-a-published-document-splits-into-routes-by-size.md),
+> [ADR-0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md),
+> [ADR-0016](../../adrs/0016-gpu-tests-opt-in-ci-scope.md)
 
 ## TL;DR
 
