@@ -1,8 +1,8 @@
 # ADR-0165 — Dependencies compile without debug info, and one line buys it back
 
-> **Status:** proposed
+> **Status:** accepted
 > **Date:** 2026-09-04
-> **Related plan(s):** [0153-the-debug-tree-stops-carrying-dependency-line-tables](../plans/0153-the-debug-tree-stops-carrying-dependency-line-tables.md)
+> **Related plan(s):** [0153-the-debug-tree-stops-carrying-dependency-line-tables](../plans/done/0153-the-debug-tree-stops-carrying-dependency-line-tables.md)
 
 ## Context
 

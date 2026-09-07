@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0153 — The debug tree stops carrying dependency line tables](#0153--the-debug-tree-stops-carrying-dependency-line-tables)
   - [0156 - The site becomes the reference](#0156---the-site-becomes-the-reference)
   - [0147 — What the show costs, and what its numbers mean](#0147--what-the-show-costs-and-what-its-numbers-mean)
   - [0155 — The reader documents stop explaining themselves](#0155--the-reader-documents-stop-explaining-themselves)
@@ -162,6 +163,7 @@ hand-edited.
   - [0002 — Rust enforcement tooling](#0002--rust-enforcement-tooling)
   - [0001 — Core + standalone MVP, then foobar parity](#0001--core--standalone-mvp-then-foobar-parity)
 - [Prior sequencing notes (superseded)](#prior-sequencing-notes-superseded)
+  - [Moved 2026-09-07 from `README.md` - the 0153-is-approved note](#moved-2026-09-07-from-readmemd---the-0153-is-approved-note)
   - [Moved 2026-09-06 from `README.md` - the 0156-is-drafted note](#moved-2026-09-06-from-readmemd---the-0156-is-drafted-note)
   - [Moved 2026-09-06 from `README.md` — the 0147-Phase-1-before-0133 note](#moved-2026-09-06-from-readmemd--the-0147-phase-1-before-0133-note)
   - [Moved 2026-09-05 from `README.md` — the 0152-before-0133-and-0147 note](#moved-2026-09-05-from-readmemd--the-0152-before-0133-and-0147-note)
@@ -178,6 +180,50 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0153 — The debug tree stops carrying dependency line tables](done/0153-the-debug-tree-stops-carrying-dependency-line-tables.md)
+
+- closed 2026-09-07. Two `dev` phases on `main`, no worktree: `96458c9` (1, `debug = 0` under
+`[profile.dev.package."*"]`) and `8503b25` (2, the escape hatch in `CLAUDE.md`). Review:
+**no blockers, no majors, one minor.**
+
+**Every measurement was re-taken rather than read off the log, and the tree carried more evidence
+than the plan asked for.** The plan's Phase 1 done-when named a single 40.5 MB baseline; `deps/`
+actually held **six** pre-change `easing` generations spanning 40.46-40.62 MB, dated across four
+days, so the baseline is a stable reading and not one build's accident. The post-change artifact is
+15,073,280 B — **62.9 %** off — and a second reduced generation at 16,793,600 B from the workspace
+run that followed. `librlx_core-be79abfedb629390.rlib` at 53,324,328 B sits inside the +/- 5 % band.
+`cargo nextest run --workspace` was re-run in full: **1556 passed, 5 skipped, 498.357 s**, matching
+`dev`'s counts. All seven repo gates and `toc --check` exit 0.
+
+**The plan's central risk was discharged by a stronger instrument than the one it specified.** Phase
+1 tested the "cargo's `"*"` glob does not reach a workspace member" claim through an rlib-size
+proxy, chosen because the ADR-0033 coverage ratchet runs in CI and not locally. That proxy is loose
+— pre-change rlibs already varied 52.36-54.52 MB — but it did not have to carry the weight: **CI's
+`coverage` job ran `cargo llvm-cov nextest -p rlx-core` against `d19e3db` under `debug = 0` and
+passed the floor.** The ratchet itself is the witness, and ADR-0165's "verified empirically rather
+than from documentation" now rests on the gate rather than on a correlate of it.
+
+**The close found `main` red, from a defect belonging to a plan closed the day before.** CI and
+Pages both fail at `d19e3db` on `core/src/render/aux_target.rs:258` — `pub fn new`'s doc comment
+links `[\`AUX_FRAME_LATENCY\`]`, a private `const`, and rustdoc's `private_intra_doc_links` lint is
+an error under the `RUSTDOCFLAGS: -D warnings` bar. Reproduced locally. It entered at `9e7dee1`
+(Plan 0147's console pacing levers) while that work sat on its own lane, and reached `main` in the
+0156 close merge — **the same merge that added `070c549`'s rustdoc job**, so the bar and its first
+violation arrived together. Plan 0153 neither caused it nor could see it: its own 1338 CI tests
+passed and `coverage`, `miri`, `links` and `deny` were all green. It is left for `dev`, unfixed
+here, because the architect lane writes no Rust. **Note what this says about the instrument**:
+`0b92e1d` had swept twelve links of exactly this class days earlier, and a lane-resident thirteenth
+still survived to reach `main` — a per-lane gate would have caught it, and the pre-push hook does
+not run `cargo doc` because its budget is ~28 s.
+
+**No version bump, deliberately.** `[profile.release]` is untouched, so every shipped artifact is
+byte-identical; the plan moved a dev-profile setting and one `CLAUDE.md` section. ADR-0005's "none
+for a genuinely docs/chore-only plan" is the paradigm case, and it also kept a `vX.Y.Z` tag off a
+commit whose CI is red. The minor recorded against the plan: its own `## Followups` re-measurement
+of the aggregate `target/` against the 15 GB post-sweep baseline is the only check that tests the
+thesis that motivated the work — every number that landed is per-artifact — and nothing schedules
+it.
 
 ### [0156 - The site becomes the reference](done/0156-the-site-becomes-the-reference.md)
 
@@ -7229,6 +7275,22 @@ stays in `lmv-core`, and is out of the Miri job's scope, so the FFI pointer hand
 uncovered (its C side remains the Plan 0001 Phase-6 smoke program's job, per ADR-0003).
 
 ## Prior sequencing notes (superseded)
+
+### Moved 2026-09-07 from `README.md` - the 0153-is-approved note
+
+Spent when [0153] closed on 2026-09-07. It recorded that the plan was approved on a disk reading
+rather than on its place in the sequence, and that ADR-0165 would stay `proposed` until the close;
+both phases landed and the ADR is accepted, so neither half is live. Verbatim:
+
+> **Added 2026-09-06 — [0153] is approved.** It was drafted as the one plan takeable beside the
+> then-live [0156] lane, which closed 2026-09-06. It is `dev`-only, two phases, and touches `Cargo.toml`
+> and `CLAUDE.md` and nothing else, so
+> it contends with no plan on this roster. It was approved on the disk reading rather than on its
+> place in the sequence: the box had **29 GB free** with 43 GB across two `target/` trees, which is
+> the cost ADR-0165 measured. **ADR-0165 stays `proposed` until the close**, as every approved plan's
+> paired ADR here does.
+
+[0153]: done/0153-the-debug-tree-stops-carrying-dependency-line-tables.md
 
 ### Moved 2026-09-06 from `README.md` - the 0156-is-drafted note
 

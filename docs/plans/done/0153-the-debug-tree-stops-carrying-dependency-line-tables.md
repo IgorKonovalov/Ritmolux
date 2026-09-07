@@ -1,9 +1,16 @@
 # 0153 — The debug tree stops carrying dependency line tables
 
-> **Status:** in-progress
+> **Status:** done
 > **Created:** 2026-09-04
+> **Closed:** 2026-09-07 — both phases landed (`96458c9`, `8503b25`). Mode 4 review: **no blockers, no majors,
+> one minor.** Verified independently of the log: the `easing` `.pdb` at 15,073,280 B against six
+> pre-change generations spanning 40.46-40.62 MB (62.9 %), `librlx_core` at 53,324,328 B inside the
+> band, `cargo nextest run --workspace` green at 1556 passed / 5 skipped / 498.357 s, and all seven
+> repo gates plus `toc --check` exit 0. **The `"*"` glob-scope claim is confirmed by CI rather than
+> by the rlib proxy this plan asked for**: the `coverage` job ran the ADR-0033 ratchet under
+> `debug = 0` on `d19e3db` and passed. No version bump — chore-only, `[profile.release]` untouched.
 > **Owner skill(s):** dev
-> **Related ADRs:** [ADR-0165](../adrs/0165-dependencies-compile-without-debug-info-and-one-line-buys-it-back.md)
+> **Related ADRs:** [ADR-0165](../../adrs/0165-dependencies-compile-without-debug-info-and-one-line-buys-it-back.md)
 
 ## TL;DR
 
@@ -29,7 +36,7 @@ target/{tmp,doc,dist}/     104 M
 
 Three findings came out of the breakdown, and only one of them is this plan's business.
 
-**First, the framing gap.** [ADR-0147](../adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md)
+**First, the framing gap.** [ADR-0147](../../adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md)
 priced the revoked artifact store at *"roughly 7-15 GB per live lane"* and named the defence as
 *"remove a finished lane's worktree - which is discipline and not a gate."* That defence does not
 reach the main checkout, which is where the 24 GB was.
@@ -143,12 +150,12 @@ one key in one TOML table.
 ## What this plan does NOT do
 
 - **It does not sweep or gate the incremental tree** (8.2 GB in one day, the largest single pile).
-  Filed as [backlog 0183](../design-backlog.md).
+  Filed as [backlog 0183](../../design-backlog.md).
 - **It does not merge test targets.** Folding the 37 non-`binary()`-gated suites into one would
   remove 36 links and 36 `.pdb` files and composes with this change, but it is structural and
-  touches ADR-0156's design. Filed as [backlog 0182](../design-backlog.md).
+  touches ADR-0156's design. Filed as [backlog 0182](../../design-backlog.md).
 - **It does not prune stale hash generations in `deps/`**, and cannot: `cargo clean --gc` is
-  `-Zgc`-gated and `rust-toolchain.toml` pins stable 1.97.1. Filed as [backlog 0184](../design-backlog.md).
+  `-Zgc`-gated and `rust-toolchain.toml` pins stable 1.97.1. Filed as [backlog 0184](../../design-backlog.md).
 - **It does not clean up `scratch()`'s accumulating per-run directories.** That is the surviving
   half of the nuisance, now bounded to `target/tmp/` and 52 MB.
 - **It does not touch `release`, `renders/` or `spike/`.** `renders/` held 1.1 GB of Plan 0106

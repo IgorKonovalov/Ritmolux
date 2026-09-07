@@ -3298,7 +3298,7 @@ effect at once. Migration-specific behaviour is already covered by the four unit
 
 ## 0182 — Thirty-seven of the forty-six test targets could share one binary, and nine `binary()` predicates are why the merge has to be partial
 
-**Raised by:** `architect`, while designing [Plan 0153](plans/0153-the-debug-tree-stops-carrying-dependency-line-tables.md)
+**Raised by:** `architect`, while designing [Plan 0153](plans/done/0153-the-debug-tree-stops-carrying-dependency-line-tables.md)
 (2026-09-04), from the artifact-size measurement that plan acts on. **Owner if taken:** `dev`.
 
 - **Verified 2026-09-04** — the fast tier selects by test *binary*, so the nine suites it excludes
@@ -3335,7 +3335,7 @@ multiply out to the same `.pdb` line item shrinking on both axes.
 
 ## 0183 — Nothing bounds the incremental cache, and 509 crate-hash directories accumulated inside a single day
 
-**Raised by:** `architect`, while designing [Plan 0153](plans/0153-the-debug-tree-stops-carrying-dependency-line-tables.md)
+**Raised by:** `architect`, while designing [Plan 0153](plans/done/0153-the-debug-tree-stops-carrying-dependency-line-tables.md)
 (2026-09-04), from the same disk measurement. **Owner if taken:** `dev`.
 
 - **Verified 2026-09-04** — CI does not disable incremental compilation:
@@ -3369,7 +3369,7 @@ cost measured inside one checkout rather than across lanes.
 
 ## 0184 — Cargo emits a new artifact generation per fingerprint change and never collects the old one, and the pinned stable toolchain has no GC
 
-**Raised by:** `architect`, while designing [Plan 0153](plans/0153-the-debug-tree-stops-carrying-dependency-line-tables.md)
+**Raised by:** `architect`, while designing [Plan 0153](plans/done/0153-the-debug-tree-stops-carrying-dependency-line-tables.md)
 (2026-09-04), from the same disk measurement. **Owner if taken:** `dev`.
 
 - **Verified 2026-09-04** — the toolchain is pinned to a stable channel, where `cargo clean --gc`
