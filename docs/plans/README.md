@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0157** (ADRs are a separate sequence — next free there is **0173**.)
+**Next free number: 0158** (ADRs are a separate sequence — next free there is **0173**.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -46,7 +46,19 @@ place. The plan file carries the real link.
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | **Supersedes 0132's architecture, which a live set on 2026-08-29 bypassed entirely.** ADR-0145 (proposed): Art-Net straight to the fixtures. Phase 8 hard-depends on 0115 Phase 2; 1-7 do not. |
 | [0140](0140-every-rate-integrates-for-real.md) | Every rate integrates, for real | approved | dev, human | Backlog 0149 + 0150 (**0142 carried**). ADR-0152 + 0153 (proposed): `dt` sanitized at the scene seam, per-element rates integrate per element. Phase 3 moves goldens; Phase 2 must not. |
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
+| [0157](0157-the-cost-probes-estimate-a-duration.md) | The cost probes estimate a duration | draft | dev | ADR-0173 (proposed): the four GPU cost probes take `min` of a *difference*, which selects the noisiest sample; a negative duration reddened macOS. Phase 2 unblocks Pages. **`main` is red until both land.** |
 <!-- roster:end -->
+
+**Added 2026-09-07 — [0157] is drafted, and it is the only plan that unblocks `main`.** Both its
+phases repair a gate or an estimator that has been wrong for longer than the failure is old: the
+cost-probe defect predates every plan on this roster, and the route gate has never once run with
+`dist/api/` present because the `rustdoc` job it depends on failed from the day it was added. It is
+`dev`-only, two phases, and touches four test files plus one script — no engine code, no preset, no
+document a reader sees — so it contends with nothing here and can run beside any lane. **Take it
+before anything else**: every other plan's `dev` gate runs `-P fast`, which is exactly where the
+cost probes live.
+
+[0157]: 0157-the-cost-probes-estimate-a-duration.md
 
 ~~**Added 2026-09-06 — [0153] is approved.**~~ — **closed 2026-09-07.** Both phases landed and ADR-0165 is accepted, so the disk reading the approval rested on is spent. The note is in [README-archive.md](README-archive.md) under `## Prior sequencing notes (superseded)`.
 
