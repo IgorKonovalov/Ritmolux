@@ -1,6 +1,6 @@
 # 0140 — Every rate integrates, for real
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-29
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0152](../adrs/0152-the-frame-delta-is-sanitized-at-the-scene-seam.md) (proposed),
@@ -258,3 +258,39 @@ flowchart TB
 - **It does not introduce a `Dt` newtype.** ADR-0152 Alternative B records it as the right long-term
   shape and defers it on diff size against Plan 0126's concurrent splits.
 - **It does not touch the six rates Plan 0122 already fixed**, or `Phase` itself.
+
+## Implementation log
+
+> Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
+> last one. **The phases above are the contract; everything here is what happened.**
+
+**Lane:** `WORK/rlx-0140-rates` on `plan-0140-every-rate-integrates-for-real`, branched from `main`
+at `775ef18`.
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — The operator doc stops teaching the defect | dev | done | committed with this row |
+| 2 — The frame delta is sanitized at the seam | dev | not started | |
+| 3 — The collage rates integrate per element | dev | not started | |
+| 4 — Measure the emitter's third case | dev | not started | |
+| 5 — The three collage presets are retuned | dev | not started | |
+| 6 — The dissolve note | dev | not started | |
+
+### Notes
+
+- **Phase 1's row is written to survive Phase 3, which is a narrower edit than the phase text
+  implies.** The done-when's "no longer describes a `rate · age` form as integrated" is met by
+  removing the claim; it is not met by documenting the defect, because Phase 3 lands in this same
+  plan and would falsify that within two commits. The row now states the frame-rate fact (true in
+  both worlds), says the motion accumulates over a canvas's life (true in both worlds), and gives
+  binding guidance that holds either way. **No phase owns the positive restatement** — that
+  `drift`/`spin` integrate per element — once Phase 3 lands; `presets/README.md` is not in Phase 3's
+  or Phase 5's file list.
+- **Phase 1 turned backlog 0149's first probe red**, which is the on-delivery behaviour its author
+  wrote it for, not decay: `docs/design-backlog.md:2575`
+  `present: Integrated against real elapsed time in: presets/README.md`. The entry is one this plan's
+  header claims to close. Left untouched — repairing it is an architect call.
+
+### Close triggers
+
+_(filled at the close.)_
