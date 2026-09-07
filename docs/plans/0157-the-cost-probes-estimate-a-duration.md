@@ -1,6 +1,6 @@
 # 0157 — The cost probes estimate a duration, and the route gate stops counting rustdoc
 
-> **Status:** draft
+> **Status:** in-progress
 > **Created:** 2026-09-07
 > **Owner skill(s):** dev
 > **Related ADRs:** [ADR-0173](../adrs/0173-a-cost-probe-takes-the-best-of-each-duration-not-the-best-difference.md)
@@ -195,14 +195,18 @@ name to an exclusion list. No types, no interfaces, no runtime behaviour.
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:**
+**Lane:** `main` directly, no worktree.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The cost probes estimate a duration | dev | not started | |
+| 1 — The cost probes estimate a duration | dev | done | committed with this row |
 | 2 — The route gate stops walking rustdoc's tree | dev | not started | |
 
 ### Notes
+
+- **Phase 1's Summary line**, as its done-when asks: `cargo nextest run --workspace` —
+  `Summary [423.967s] 1556 tests run: 1556 passed (9 slow), 5 skipped`. All four cost probes ran
+  (hardware adapter present) and passed, `arc_cost` under its new positivity guard.
 
 ### Close triggers
 
