@@ -78,13 +78,17 @@ flowchart TB
 
 ### Phase 1 — The operator doc stops teaching the defect
 - **Owner skill:** dev
-- **What:** Correct `presets/README.md:1536`, which describes the defective form as the safe one.
+- **What:** Correct `presets/README.md:2066`, which describes the defective form as the safe one.
 - **Files touched:** `presets/README.md`.
 - **Notes for the implementer:**
   - The sentence is *"Integrated against real elapsed time, so the canvas moves identically at any
     refresh rate."* It is **true about frame-rate independence and false about ADR-0132** — the rate
     scales the accumulation rather than being integrated into it. Correct the second claim without
     losing the first, which is still right.
+  - **The line number moved and the row did not** — the sentence was at `:1536` when this plan was
+    written and is at `:2066` now. It sits well clear of the ADR-0170 generated region
+    (`<!-- params:begin -->` … `<!-- params:end -->`, lines 403-845), so it is hand-written prose and
+    yours to edit. A correction inside those markers would be overwritten by the generator instead.
   - The `pump_*` row three lines below says *"drive the depth from the music"* and is load-bearing
     for the `preset-author` lane. Check it says something still true after this phase.
   - **This lands first on purpose.** It is one sentence, and it is the thing that produced three
@@ -95,26 +99,45 @@ flowchart TB
 ### Phase 2 — The frame delta is sanitized at the seam
 - **Owner skill:** dev
 - **What:** Implement ADR-0152. Sanitize `dt` in `draw_frame` before `Scene::advance`, delete the
-  four in-scene copies, and state the new contract on the trait.
+  **six** in-scene copies, and state the new contract on the trait.
 - **Files touched:** `core/src/render/mod.rs`, `core/src/render/scenes/mod.rs`,
   `fragment_field.rs`, `lines/parametric.rs`, `swarm.rs`, `warp_mesh/mod.rs`,
-  `particles/mod.rs`.
+  `warp_mesh/draw.rs`, `shape_collage.rs`, `particles/mod.rs`, `core/src/render/tests.rs`.
 - **Notes for the implementer:**
+  - **Read [ADR-0152](../adrs/0152-the-frame-delta-is-sanitized-at-the-scene-seam.md)'s
+    `## Correction — 2026-09-07` before starting.** The guard population is **six**, not the four
+    the ADR's Context lists — Plan 0126's splits added `shape_collage.rs:1165` and
+    `warp_mesh/draw.rs:235` after it was written — and the correction is what this file list and the
+    two bullets below are built from.
   - **Write the guarantee into `Scene::advance`'s doc comment**, or it is forgotten. ADR-0152's
-    Negative section says this is the only thing standing where four visible guards used to be.
-  - The four deleted guards each carry a separately-written comment giving the same reason. **That
+    Negative section says this is the only thing standing where six visible guards used to be.
+  - The six deleted guards each carry a separately-written comment giving the same reason. **That
     reasoning has to survive in one place**, at the seam — do not let the *why* go with the
     duplication.
-  - `FALLBACK_DT` moves to the seam and keeps its value.
-  - The attractor's `self.dt = dt` at `particles/mod.rs:1339` is the live hole; after this phase it is
-    safe **because of the seam**, not because it gained a guard. Do not add a fifth copy.
+  - `FALLBACK_DT` moves to the seam and keeps its value. **The six sites did not agree on a
+    fallback** — four substitute `FALLBACK_DT`, `shape_collage` freezes at `0.0`, and `Exposure`
+    substitutes rate `1.0`, which at `NOMINAL_FPS = 30.0` is `dt = 1/30` rather than `1/60`. One
+    seam makes that one policy; the divergence is unobservable afterwards because the branch is
+    unreachable, so this moves no golden.
+  - **At `Exposure::new` (`warp_mesh/draw.rs:235`) delete the guard and keep the
+    `.clamp(0.0, 4.0)`.** The clamp caps a long frame at four nominal frames and is not part of this
+    invariant.
+  - **`transition.rs:329` is NOT in scope and keeps its guard.** `Transition` is not a `Scene`, the
+    contract clause lands on `Scene::advance` and says nothing about it, and its guard **holds** the
+    dissolve rather than stepping it — a different policy, not a copy of this one.
+    `a_degenerate_dt_holds_progress` (`transition.rs:1203`) asserts exactly that. Do not delete
+    either. `now_playing.advance(dt)` (`mod.rs:974`) is called **before** `draw_frame` and is
+    likewise untouched.
+  - The attractor's `self.dt = dt` at `particles/mod.rs:1513` is the live hole; after this phase it is
+    safe **because of the seam**, not because it gained a guard. Do not add a seventh copy.
   - `FixedStep::advance` self-heals via `accumulator.min(step)`, which is why the omission read as
     safe. Leave that alone; it is correct.
 - **Done when:**
   - A test feeding `NaN`, a negative and a zero `dt` through `draw_frame` leaves every scene's `Phase`
     finite and advancing, **including the attractor's `spin_time`**, which today would be poisoned
     permanently.
-  - No `dt.is_finite() && dt > 0.0` remains in any scene.
+  - No `dt.is_finite() && dt > 0.0` remains in any scene. (`transition.rs` is not a scene and is
+    excluded by name — see the note above.)
   - The golden suite is unmoved and unblessed.
 
 ### Phase 3 — The collage rates integrate per element
@@ -122,13 +145,25 @@ flowchart TB
 - **What:** Implement ADR-0153 for `shape_collage`'s `drift` and `spin`.
 - **Files touched:** `core/src/render/scenes/shape_collage.rs`.
 - **Notes for the implementer:**
-  - **This is not `scenes::Phase`.** `Phase` is one accumulator per scene; these need one per element,
-    advanced with the element and reset when it is born or the canvas recomposes. That difference is
-    exactly why Plan 0122 scoped them out.
-  - The reset points are element birth and `recompose`. Getting the reset wrong reintroduces the
-    unbounded-`age` cliff in a new form.
-  - **Measure the per-frame cost.** ADR-0153 records the write-per-element-per-frame as a real
-    regression in a hot loop that must be measured, not assumed.
+  - **Read [ADR-0153](../adrs/0153-a-per-element-rate-integrates-per-element.md)'s
+    `## Correction — 2026-09-07` before starting.** Its Decision stands; its justification paragraph
+    and one Negative bullet do not, and the two bullets below replace them.
+  - **This is not `scenes::Phase`.** `Phase` is one accumulator per scene, reset never; these reset
+    per element-set. That difference is why Plan 0122 scoped them out.
+  - **The storage is two `f32` per set, not per element.** `age` is `self.elapsed - self.born` —
+    one value shared by every element in a set — so `drift` and `spin` each get one accumulator for
+    `live` and one for `outgoing`, four in total, advanced once per frame in `step`. The placement
+    becomes `p.spec.center + p.vel * drift_accum` and `p.spec.angle_deg + (p.spin * spin_accum)`.
+    Per-set and per-element coincide here because elements are born only when the canvas is
+    regenerated; there is no per-element birth anywhere in the scene.
+  - **There are TWO reset points, not one**, and both must zero both accumulators: `rebuild()`
+    (`shape_collage.rs:1124`, fires when the recipe moved) and the recompose edge (`:1183`). Each is
+    a site that already writes `self.born`, so the edit is one line beside each. Getting either
+    wrong reintroduces the unbounded-`age` cliff in a new form — and on the `outgoing` swap the
+    accumulator moves with the set, exactly as `outgoing_born = born` does today.
+  - **No cost measurement is owed.** The ADR's "write per element per frame" is falsified by the
+    per-set shape: the work is two adds per frame, constant in element count, and the per-element
+    read loses a multiply.
   - **Goldens will move here**, and that is expected rather than a finding — the response genuinely
     changes. Bless deliberately and say so in the log; do not bless anything from Phase 2.
 - **Done when:**
@@ -139,8 +174,8 @@ flowchart TB
 
 ### Phase 4 — Measure the emitter's third case
 - **Owner skill:** dev
-- **What:** Measure whether `emitter::sprite_angle`'s `base + rate * age` is observable, then repair
-  or document.
+- **What:** Measure whether `emitter::sprite_angle`'s `base + rate * age` (`emitter.rs:747`) is
+  observable, then repair or document.
 - **Files touched:** `core/src/render/scenes/emitter.rs`, `docs/design-backlog.md`.
 - **Notes for the implementer:**
   - Sprites are short-lived, so `age` is small and the defect **may be unobservable**. Backlog 0149
@@ -149,7 +184,7 @@ flowchart TB
     `parametric_curve`'s `spin` and `warp_mesh`'s `deposit_spin` had when ADR-0132 corrected them
     anyway. **A rate whose clock cannot grow is a different fact from a rate nobody happens to bind**,
     and the measurement is what separates them.
-  - **Do not repair `emitter.rs:375-376`'s `v0 * age`.** That is legitimate ballistics with a
+  - **Do not repair `emitter.rs:349-350`'s `v0 * age`.** That is legitimate ballistics with a
     spawn-baked velocity, and it is the reason the guard is not widened.
   - If left unrepaired, record it as a stated exception with the measurement behind it.
 - **Done when:** the sprite rotation is either integrated per element or documented as
@@ -190,6 +225,17 @@ flowchart TB
 
 ## Risks & open questions
 
+- **Both ADRs carry a dated `## Correction` written 2026-09-07, before acceptance, and the phases
+  above are built from them.** The tree moved under this plan between its drafting and its
+  implementation: ADR-0152's guard population is six rather than four, and ADR-0153's per-element
+  storage argument does not hold because `shape_collage` has no per-element birth. Neither Decision
+  changed. **Read the correction before the section it corrects** — the ADR bodies are unedited and
+  still state the falsified facts in their own voice.
+- **Phase 2 leaves one guard standing on purpose**, at `transition.rs:329`, and after this plan the
+  engine holds two policies for a degenerate frame — the seam steps a nominal `FALLBACK_DT`, the
+  transition holds. That is filed as design-backlog 0188 rather than settled here, because deciding
+  it needs a claim about what a stalled dissolve should look like that this plan has no business
+  making.
 - **Phase 3 moves goldens and Phase 2 must not.** Running them in one session risks blessing Phase
   2's suite by accident. Commit Phase 2 with an unmoved suite before starting Phase 3.
 - **Phase 5 is a retune under a `dev` owner tag**, which is the lane boundary's stated exception and

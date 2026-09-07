@@ -66,6 +66,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0185 — The `--help` banner still calls the application `ritmolux`](#0185--the---help-banner-still-calls-the-application-ritmolux)
 - [0186 — the density law scales a preset's *trace count*, so eight low-`density` worlds draw 4x the strokes at 1/4 the brightness on a large display](#0186--the-density-law-scales-a-presets-trace-count-so-eight-low-density-worlds-draw-4x-the-strokes-at-14-the-brightness-on-a-large-display)
 - [0187 — two measurements of the same console on the same adapter class disagree by 2x, and nothing explains which one the machine actually does](#0187--two-measurements-of-the-same-console-on-the-same-adapter-class-disagree-by-2x-and-nothing-explains-which-one-the-machine-actually-does)
+- [0188 — a stalled frame must either hold the dissolve or step it, and after the `dt` seam the engine will do both](#0188--a-stalled-frame-must-either-hold-the-dissolve-or-step-it-and-after-the-dt-seam-the-engine-will-do-both)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -3560,3 +3561,48 @@ shipped: the cost is a measurement, quoted with its adapter and its present coun
 - `unprobeable:` that no run anywhere has put the two surfaces on displays at different refresh
   rates is a negative about measurement history, not a match countable in any file
 
+
+## 0188 — a stalled frame must either hold the dissolve or step it, and after the `dt` seam the engine will do both
+
+[ADR-0152](adrs/0152-the-frame-delta-is-sanitized-at-the-scene-seam.md) sanitizes `dt` once in
+`draw_frame`, substituting `FALLBACK_DT` for a non-finite or non-positive delta, so every scene
+downstream **advances a nominal step** on a degenerate frame. `Transition::advance` reads the same
+`dt` from the same call and does the opposite: its own guard **holds** progress, and
+`a_degenerate_dt_holds_progress` asserts that with a doc comment naming the case — *"the frontend can
+inject either after a stall."* Both answers are defensible and the engine is about to hold both, one
+of them unreachable.
+
+- **Raised:** 2026-09-07, at Plan 0140's pre-implementation review, from ADR-0152's correction.
+  **Owner if taken:** `architect` — this is a policy question, not a repair.
+- **Verified 2026-09-07** — the transition keeps a guard the seam makes unreachable from the frame
+  path. The probe goes red **on the repair**, whichever way the policy lands, rather than on decay:
+  `present: dt\.is_finite\(\) && dt > 0\.0 in: core/src/render/transition.rs`
+- **Verified 2026-09-07** — and a passing test pins the *hold* half, so the two policies cannot
+  diverge silently without something going red:
+  `present: fn a_degenerate_dt_holds_progress in: core/src/render/transition.rs`
+
+### The finding
+
+The two are not in conflict today, because before the seam lands every reader sanitizes for itself
+and nobody compares the answers. Afterwards, `Transition::advance` cannot observe a bad `dt` at all —
+`draw_frame` replaced it upstream — so its guard becomes a live test pinning a branch the frame path
+can no longer reach. That is not a bug and nothing renders wrong; it is a stated behaviour that has
+quietly stopped being the behaviour.
+
+Which answer is right is a genuine question and the frame budget is what decides it. A stall long
+enough to produce a bad delta is a stall the viewer saw: stepping the dissolve one nominal frame
+keeps the crossfade on wall-clock and risks a visible jump on resume, and holding it keeps the
+crossfade smooth and lets a long stall stretch the dissolve past its authored duration. Nothing in
+this repo measures either, and no capture path produces a bad `dt`, which is why it is filed rather
+than decided.
+
+Two things this is **not**. It is not the four-copies problem ADR-0152 fixed — one copy of a policy
+nothing else holds is not duplication. And it is not `now_playing`, whose `advance` is called before
+`draw_frame` and so keeps receiving the raw delta by construction.
+
+### Priority
+
+**Low.** Unobserved, cheap to answer once someone decides what a stalled dissolve should look like,
+and bounded: two call sites, one test, one sentence of doc either way. It is filed because the seam
+is what creates the divergence, and the plan that lands the seam is the last moment anyone will be
+looking at both halves at once.

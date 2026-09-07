@@ -127,3 +127,34 @@ Discharges [design-backlog 0149](../design-backlog.md). The `presets/README.md:1
 worth making **whether or not the engine repair is taken**, costs one sentence, and stops the content
 lane writing more of these — it is the first phase of Plan 0140 rather than a consequence of this
 decision.
+
+## Correction — 2026-09-07, before acceptance
+
+Read against the tree at `775ef18`, before Plan 0140 Phase 3 was implemented. **The Decision stands
+unchanged.** Its operative clause — a rate integrates into state "advanced with the element and reset
+when the element is born or the canvas recomposes" — is satisfied exactly by the shape below. What
+does not stand is the paragraph justifying it and one Negative bullet, both of which describe the
+storage rather than the decision.
+
+**`shape_collage` has no per-element birth.** `age` is `self.elapsed - self.born`: one value shared
+by every element in a set, and `born` is written at exactly two sites, `rebuild()`
+(`shape_collage.rs:1124`, when the recipe moved) and the recompose edge (`:1183`). Both regenerate
+the whole canvas, so every element in a set is born at the same instant, always. Per-element and
+per-set therefore **coincide**, and the accumulators are two `f32` per set — `live` and `outgoing`,
+four in total — advanced once per frame in `step` and zeroed at both reset sites.
+
+Two claims above are falsified by that:
+
+- *"these need one per element … forcing them into `Phase` would either allocate a `Phase` per
+  element or pretend a shared one is per-element."* A shared-per-set accumulator **is** per-element
+  in this scene; it is not a pretence. The reason these still do not become `scenes::Phase` is
+  narrower than the paragraph claims and survives: `Phase` is one accumulator per **scene**, reset
+  never, and these reset per set at two canvas-regeneration sites.
+- Negative, *"per-element accumulators cost memory and a write per element per frame … a real
+  regression in a hot loop and must be measured, not assumed."* There is no such cost and nothing to
+  measure. The work is two adds per frame, constant in element count, and the read at placement time
+  gets cheaper — one multiply drops out of the per-element expression.
+
+The reset points remain the trap the Decision names, and there are **two** of them rather than one.
+Missing either reintroduces the unbounded-`age` cliff in a new form, which is the failure this ADR
+exists to remove.

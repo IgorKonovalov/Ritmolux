@@ -112,3 +112,38 @@ Discharges [design-backlog 0150](../design-backlog.md). The related question of 
 `hygiene.rs` guard should reach `* age` is **not** settled here — see
 [ADR-0153](0153-a-per-element-rate-integrates-per-element.md), which is the same rule against a
 different clock.
+
+## Correction — 2026-09-07, before acceptance
+
+Read against the tree at `775ef18`, before Plan 0140 Phase 2 was implemented. The Decision stands;
+two facts in the Context above do not, and both widen the phase rather than change it.
+
+**The population is six, not four.** Plan 0126's splits landed two more guards on scenes after this
+was written:
+
+```
+shape_collage.rs:1165    dt.is_finite() && dt > 0.0 else 0.0
+warp_mesh/draw.rs:235    dt.is_finite() && dt > 0.0 else rate 1.0   (Exposure::new)
+```
+
+Both are deleted with the four. At `Exposure::new` the surrounding `.clamp(0.0, 4.0)` is **not** part
+of this invariant — it caps a long frame at four nominal frames — and survives the deletion.
+
+**The four copies were never one policy, which strengthens the argument rather than weakening it.**
+The Context calls them "byte-identical", and the four `FALLBACK_DT` sites are. The two found since
+are not: `shape_collage` **freezes** on a degenerate frame and `Exposure` substitutes one nominal
+frame, which at `NOMINAL_FPS = 30.0` is `dt = 1/30` rather than `FALLBACK_DT`'s `1/60`. Three
+different answers to one question, none of them wrong at its own site and none of them reviewable
+against the others. That is what a list of sites costs even when every entry is defensible.
+
+**`transition.rs:329` is out of scope, and it is the boundary this correction exists to draw.**
+`Transition::advance` reads `dt` from inside `draw_frame` and so sits downstream of the seam, but
+`Transition` is not a `Scene`: the contract clause this ADR adds lands on `Scene::advance` and says
+nothing about it. Its guard **holds** the dissolve rather than stepping it, which is a different
+policy and not a copy of this one, and `a_degenerate_dt_holds_progress` (`transition.rs:1203`)
+asserts exactly that, documented as a stall the frontend can inject. Deleting it would trade a
+stated behaviour for an unstated one under a phase whose own done-when is that the golden suite does
+not move. It keeps its guard.
+
+Whether *hold* or *nominal step* is the right answer for a stalled frame is a real question this
+decision does not settle, and it is now filed rather than folded in.
