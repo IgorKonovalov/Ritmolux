@@ -200,22 +200,37 @@ name to an exclusion list. No types, no interfaces, no runtime behaviour.
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The cost probes estimate a duration | dev | done | `084686a` |
-| 2 — The route gate stops walking rustdoc's tree | dev | done | committed with this row |
+| 2 — The route gate stops walking rustdoc's tree | dev | done | `70ed4cc` |
 
 ### Notes
 
-- **Phase 1's Summary line**, as its done-when asks: `cargo nextest run --workspace` —
-  `Summary [423.967s] 1556 tests run: 1556 passed (9 slow), 5 skipped`. All four cost probes ran
-  (hardware adapter present) and passed, `arc_cost` under its new positivity guard.
-- **Phase 2's bite check and its control**, run against a local `site/dist/` with `target/doc`
-  copied to `site/dist/api/` (172 `index.html` under it): the gate at `1e7a00c` reported
-  **171 orphans**, all under `api/` — the same defect CI saw at 96, larger here because this
-  checkout's `target/doc` also holds stale pre-rename crate directories. After the change it exits
-  0 (`162 built routes, 160 from the published set`). A throwaway `site/dist/zz-orphan-bite/`
-  carrying an `index.html` still fails it, named, exit 1; removed afterwards.
-  `node scripts/check-site-links.mjs --require-api` exits 0 against the same tree.
+- The local orphan count under Phase 2's bite check was **171**, not the 96 this plan's Context
+  quotes from CI. This checkout's `target/doc` also holds pre-rename crate directories (`lmv`,
+  `lmv_core`, `lmv_core_c`, `lmv_ring`, `ritmolux`) left by earlier builds; CI's is a clean tree.
+  The extra 75 are that residue, not routes the site builds.
 
 ### Close triggers
+
+- **`presets/` touched:** none.
+- **Plan header `Closes:` entries:** none — the header carries only `Related ADRs`.
+- **What shipped:** fix-only, and in code no artifact ships: `core/tests/` (four cost probes) and
+  `scripts/check-site-routes.mjs`. No change under `core/src/`, `standalone/`, `plugin-foobar/`,
+  `core-cabi/`, `milkconv/`, `presets/` or `site/`.
+- **Operator docs moved:** none.
+- **`node scripts/check-backlog-claims.mjs`:** exit 0 — *"106 stated reductions still hold across
+  all 45 live entries (8 unprobeable)"*. No entry named as broken; its advisory section reports 65
+  probed paths moved since last read, none of them touched by this plan.
+- **Full suite:** `cargo nextest run --workspace`, exit 0 —
+  `Summary [415.690s] 1556 tests run: 1556 passed (9 slow), 5 skipped`, run at `70ed4cc`. The same
+  command at `084686a` read `[423.967s] 1556 passed (9 slow), 5 skipped`. No ADR-0156 upward
+  override was invoked at either phase: the four probes sit outside the nine deferred suites and
+  ran under both.
+- **Also run at the tip:** `cargo clippy --workspace --all-targets -- -D warnings` and
+  `cargo fmt --all --check` clean; the seven pre-push Node gates each exit 0; and, against a local
+  site build with `target/doc` copied to `site/dist/api/`, `node scripts/check-site-routes.mjs` and
+  `node scripts/check-site-links.mjs --require-api` both exit 0.
+- **`human` phases remaining:** none — both phases are `dev`-owned and both are done.
+- **ADR-0173 is still `proposed`.**
 
 ## Followups (after this lands)
 
