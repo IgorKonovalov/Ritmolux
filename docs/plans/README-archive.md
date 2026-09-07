@@ -211,11 +211,14 @@ an error under the `RUSTDOCFLAGS: -D warnings` bar. Reproduced locally. It enter
 (Plan 0147's console pacing levers) while that work sat on its own lane, and reached `main` in the
 0156 close merge — **the same merge that added `070c549`'s rustdoc job**, so the bar and its first
 violation arrived together. Plan 0153 neither caused it nor could see it: its own 1338 CI tests
-passed and `coverage`, `miri`, `links` and `deny` were all green. It is left for `dev`, unfixed
-here, because the architect lane writes no Rust. **Note what this says about the instrument**:
-`0b92e1d` had swept twelve links of exactly this class days earlier, and a lane-resident thirteenth
-still survived to reach `main` — a per-lane gate would have caught it, and the pre-push hook does
-not run `cargo doc` because its budget is ~28 s.
+passed and `coverage`, `miri`, `links` and `deny` were all green. The architect lane writes no Rust,
+so it was handed to `dev` in the same session and fixed at `a8e3dc1` — **as two errors, not one**:
+rustdoc stops at the crate that failed, so `could not document rlx-core` was masking a
+`redundant_explicit_links` error on `capture_start.rs:50` that only appeared once the first was
+repaired. **Note what this says about the instrument**: `0b92e1d` had swept twelve links of exactly
+this class days earlier, and a lane-resident thirteenth still survived to reach `main` — a per-lane
+gate would have caught it, and the pre-push hook does not run `cargo doc` because its budget is
+~28 s. That gap is unfiled and outlives this plan.
 
 **No version bump, deliberately.** `[profile.release]` is untouched, so every shipped artifact is
 byte-identical; the plan moved a dev-profile setting and one `CLAUDE.md` section. ADR-0005's "none
