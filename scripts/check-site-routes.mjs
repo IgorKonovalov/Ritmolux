@@ -28,7 +28,8 @@
 //
 //   1. Every route a published source contributes appears in the sidebar.
 //   2. Every route the build serves appears in the sidebar, except the landing
-//      page, which the site title links to instead.
+//      page, which the site title links to instead, and the `api/` tree, which
+//      is rustdoc's output rather than Starlight routes -- see `builtRoutes`.
 //   3. No route's markdown source exceeds ROUTE_SOURCE_CEILING bytes.
 //
 // A build that has not happened fails LOUDLY rather than passing vacuously,
@@ -72,6 +73,12 @@ function builtRoutes(dir) {
       if (!entry.isDirectory()) continue;
       // Astro's asset output and the Pagefind index are not routes.
       if (entry.name === "_astro" || entry.name === "pagefind") continue;
+      // Neither is `api/`. The Pages workflow unpacks `cargo doc` output there,
+      // so what is under it is rustdoc's tree: its interior navigation is
+      // rustdoc's own, and the site reaches it through the single menu entry
+      // ADR-0169 decision 3 specifies, one level above this. Walking it counts
+      // every generated module page as a Starlight route with no menu entry.
+      if (prefix === "" && entry.name === "api") continue;
       const route = prefix === "" ? entry.name : `${prefix}/${entry.name}`;
       if (existsSync(path.join(d, entry.name, "index.html"))) out.push(route);
       walk(path.join(d, entry.name), route);

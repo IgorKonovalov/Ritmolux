@@ -199,14 +199,21 @@ name to an exclusion list. No types, no interfaces, no runtime behaviour.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The cost probes estimate a duration | dev | done | committed with this row |
-| 2 — The route gate stops walking rustdoc's tree | dev | not started | |
+| 1 — The cost probes estimate a duration | dev | done | `084686a` |
+| 2 — The route gate stops walking rustdoc's tree | dev | done | committed with this row |
 
 ### Notes
 
 - **Phase 1's Summary line**, as its done-when asks: `cargo nextest run --workspace` —
   `Summary [423.967s] 1556 tests run: 1556 passed (9 slow), 5 skipped`. All four cost probes ran
   (hardware adapter present) and passed, `arc_cost` under its new positivity guard.
+- **Phase 2's bite check and its control**, run against a local `site/dist/` with `target/doc`
+  copied to `site/dist/api/` (172 `index.html` under it): the gate at `1e7a00c` reported
+  **171 orphans**, all under `api/` — the same defect CI saw at 96, larger here because this
+  checkout's `target/doc` also holds stale pre-rename crate directories. After the change it exits
+  0 (`162 built routes, 160 from the published set`). A throwaway `site/dist/zz-orphan-bite/`
+  carrying an `index.html` still fails it, named, exit 1; removed afterwards.
+  `node scripts/check-site-links.mjs --require-api` exits 0 against the same tree.
 
 ### Close triggers
 
