@@ -47,7 +47,7 @@ pub(crate) struct CaptureStart {
     /// refused — both of those touched an endpoint. It exists so the shell can
     /// tell what a spent recovery budget establishes: three reopens that all
     /// answered this way have concluded nothing about the device
-    /// ([`LossCause`](crate::capture_verdict::LossCause)).
+    /// ([`LossCause`]).
     pub(crate) failed_at_activation: bool,
 }
 
