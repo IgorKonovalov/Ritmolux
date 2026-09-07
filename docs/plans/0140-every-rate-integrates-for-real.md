@@ -142,8 +142,9 @@ flowchart TB
 
 ### Phase 3 — The collage rates integrate per element
 - **Owner skill:** dev
-- **What:** Implement ADR-0153 for `shape_collage`'s `drift` and `spin`.
-- **Files touched:** `core/src/render/scenes/shape_collage.rs`.
+- **What:** Implement ADR-0153 for `shape_collage`'s `drift` and `spin`, and state in
+  `presets/README.md` that they now integrate.
+- **Files touched:** `core/src/render/scenes/shape_collage.rs`, `presets/README.md`.
 - **Notes for the implementer:**
   - **Read [ADR-0153](../adrs/0153-a-per-element-rate-integrates-per-element.md)'s
     `## Correction — 2026-09-07` before starting.** Its Decision stands; its justification paragraph
@@ -166,11 +167,30 @@ flowchart TB
     read loses a multiply.
   - **Goldens will move here**, and that is expected rather than a finding — the response genuinely
     changes. Bless deliberately and say so in the log; do not bless anything from Phase 2.
+  - **This phase owns the `drift`/`spin` row in `presets/README.md`** (architect ruling, 2026-09-07,
+    on the resume note's question). Phase 1 removed the false *"Integrated against real elapsed
+    time"* claim and put nothing back; **this is the commit that makes the positive statement true**,
+    so the statement lands here rather than in Phase 5. Add one clause to the hand-written row
+    (currently `:2066`, the *"Both scale a motion that accumulates over the whole life of a canvas"*
+    sentence) saying the two **integrate a phase per canvas** in ADR-0132's sense: a binding that
+    moves steers the motion from that moment and does not rescale what is already on screen, and the
+    accumulation resets when the canvas is regenerated. The `swarm` paragraph at `:1063` is the
+    house phrasing for this and is worth reading first.
+  - **Do not write the row to satisfy a probe.** Backlog 0149's fifth verification asserts the old
+    sentence is *present* and went red on Phase 1's delivery; the entry's repair is architect's at
+    the close. Choose the wording that is true, not the wording that turns a probe green.
+  - **If any `ParamSpec` description in this file changes, regenerate the ADR-0170 block** —
+    `shape_collage`'s rows at `presets/README.md:742-748` are generated from the declarations beside
+    `set_param`, and `the_parameter_reference_block_is_current` goes red if the file is not
+    regenerated with `RLX_UPDATE_PARAM_REFERENCE=1`. Neither current description is falsified by
+    this phase, so the likely answer is that no declaration changes and the block does not move.
 - **Done when:**
   - A binding that moves changes the canvas from that moment forward and does not retroactively
     rescale an element's existing placement, asserted as a test over two frames with a moved binding.
   - The quiet-passage case — no onsets for a long stretch, then a bass hit — no longer lands an
     accumulated swing.
+  - `presets/README.md`'s `drift`/`spin` row states that the two integrate, in ADR-0132's sense,
+    and the row is still true of the frame-rate fact Phase 1 preserved.
 
 ### Phase 4 — Measure the emitter's third case
 - **Owner skill:** dev
@@ -321,6 +341,16 @@ the three presets.
 **What architect decides:** which phase owns the row, and amend that phase's `Files touched`. The
 candidate text is one row, and Phase 3 is the natural owner because it is the commit that makes the
 statement true. Phase 5 is the alternative, since it is already the content-facing phase.
+
+**Architect ruling — 2026-09-07: Phase 3 owns the row.** Its `Files touched`, notes and done-when are
+amended above. Reasons, for the record: a doc claim lands in the commit that makes it true, and
+Phases 3-4 would otherwise ship the rule with the operator doc silent on it; Phase 5 is preset
+content under a `dev` tag — the lane split's stated exception, and the one phase the plan already
+flags as handing off if it grows — so a reference-doc clause parked there is parked behind an escape
+hatch; and Phase 3 is already the phase that can move `presets/README.md` mechanically, since the
+ADR-0170 block's `shape_collage` rows are generated from declarations in its only other file.
+Phase 4 needs nothing here: the emitter's `spin` row (`presets/README.md:1256`) makes no integration
+claim, so whichever way its measurement falls, that row stays true.
 
 **Where to resume:** Phase 3, with the amended file list. Nothing else in the plan needs re-reading —
 the two ADR corrections dated 2026-09-07 are already folded into the phase notes.
