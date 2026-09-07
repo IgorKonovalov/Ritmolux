@@ -666,15 +666,7 @@ impl Scene for SwarmScene {
     }
 
     fn advance(&mut self, dt: f32) {
-        // A non-finite or negative `dt` degrades to the capture step rather than
-        // poisoning `field_phase`, which is the one piece of state here that a
-        // single bad frame could corrupt permanently — the damping `powf` below
-        // only loses the frame it is given.
-        self.dt = if dt.is_finite() && dt > 0.0 {
-            dt
-        } else {
-            FALLBACK_DT
-        };
+        self.dt = dt;
     }
 
     fn set_time(&mut self, time: f32) {

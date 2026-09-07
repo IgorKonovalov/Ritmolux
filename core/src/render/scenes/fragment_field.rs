@@ -417,14 +417,8 @@ impl Scene for FragmentFieldScene {
 
     fn advance(&mut self, dt: f32) {
         // Stored, not integrated: the rates this frame will use have not been
-        // set yet (ADR-0132). A non-finite or negative `dt` degrades to the
-        // capture step rather than poisoning the accumulators, which are the
-        // one piece of state here that a bad frame could corrupt permanently.
-        self.dt = if dt.is_finite() && dt > 0.0 {
-            dt
-        } else {
-            crate::render::scenes::FALLBACK_DT
-        };
+        // set yet (ADR-0132).
+        self.dt = dt;
     }
 
     fn set_occlude(&mut self, occlude: f32) {

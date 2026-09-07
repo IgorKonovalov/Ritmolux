@@ -269,8 +269,8 @@ at `775ef18`.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The operator doc stops teaching the defect | dev | done | committed with this row |
-| 2 — The frame delta is sanitized at the seam | dev | not started | |
+| 1 — The operator doc stops teaching the defect | dev | done | `d310598` |
+| 2 — The frame delta is sanitized at the seam | dev | done | committed with this row |
 | 3 — The collage rates integrate per element | dev | not started | |
 | 4 — Measure the emitter's third case | dev | not started | |
 | 5 — The three collage presets are retuned | dev | not started | |
@@ -290,6 +290,17 @@ at `775ef18`.
   wrote it for, not decay: `docs/design-backlog.md:2575`
   `present: Integrated against real elapsed time in: presets/README.md`. The entry is one this plan's
   header claims to close. Left untouched — repairing it is an architect call.
+- **`particles/mod.rs` is in Phase 2's file list and was not edited.** `self.dt = dt` is correct
+  once the seam runs, and the only edit available there was a comment saying so — which is the
+  list-of-sites the phase exists to end. The `Scene::advance` doc comment carries it instead.
+- **`FALLBACK_DT` did not move.** The phase says it "moves to the seam and keeps its value"; the
+  constant stays in `scenes/mod.rs` and the seam reads `scenes::FALLBACK_DT`. Moving the
+  declaration would edit `capture_api.rs` and `feedback.rs`, which read it for their own reasons
+  and are in no phase's file list. Only the guard moved.
+- **The Phase 2 test carries a negative control the done-when does not ask for.** Byte-equality
+  between a bad-delta run and a clean run is satisfied trivially by a scene that ignores `dt`, so
+  each probe first asserts that a *valid* longer first frame does change the final picture. All six
+  probes pass both halves.
 
 ### Close triggers
 

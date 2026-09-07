@@ -485,6 +485,15 @@ pub(crate) trait Scene {
     /// fixed-timestep accumulator here and a CPU-integrated scene (the swarm)
     /// scales its motion by `dt`, so both look identical over wall-clock time on
     /// any refresh rate. Stateless, purely `time`-driven scenes ignore it.
+    ///
+    /// **`dt` is finite and strictly positive.** The renderer guarantees it,
+    /// substituting [`FALLBACK_DT`] for a degenerate delta before this is called
+    /// (ADR-0152), so an implementor may store it, integrate it, or divide by it
+    /// without checking. **Do not re-check it per scene**: the guarantee is
+    /// invisible from inside a scene, and this sentence is the whole of what
+    /// stands between a shell's raw delta and every accumulator behind this
+    /// trait — a second copy at one site makes it a rule enforced by a list of
+    /// sites again, which is the failure the seam exists to end.
     fn advance(&mut self, _dt: f32) {}
 
     /// Set the shared scene clock (seconds). The renderer owns the single clock

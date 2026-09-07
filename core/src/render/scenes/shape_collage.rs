@@ -1162,7 +1162,6 @@ impl ShapeCollageScene {
     /// Split out of [`Scene::render`] so it can be driven — and inspected —
     /// without a GPU, which is what the frame-rate-independence assertion needs.
     fn step(&mut self, dt: f32) {
-        let dt = if dt.is_finite() && dt > 0.0 { dt } else { 0.0 };
         self.elapsed += dt;
 
         // **The recomposition edge.** Rising past the threshold recomposes once;

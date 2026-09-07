@@ -400,14 +400,8 @@ impl Scene for ParametricCurveScene {
 
     fn advance(&mut self, dt: f32) {
         // Stored, not integrated: the `spin` this frame will use has not been
-        // set yet. A non-finite or negative `dt` degrades to the capture step
-        // rather than poisoning the accumulator, which is the one piece of state
-        // here a bad frame could corrupt permanently.
-        self.dt = if dt.is_finite() && dt > 0.0 {
-            dt
-        } else {
-            FALLBACK_DT
-        };
+        // set yet.
+        self.dt = dt;
     }
 
     fn reset_params(&mut self) {

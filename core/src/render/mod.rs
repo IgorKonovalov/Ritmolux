@@ -1067,6 +1067,23 @@ impl Renderer {
         dt: f32,
         salt: SaltMode,
     ) -> u32 {
+        // **The one place a frame delta is checked.** Everything below reads this
+        // value and none of it re-checks: every `Scene::advance`, the composite's
+        // per-second decay, the transition's own step. A shell can hand over a
+        // `NaN` (a clock read across a device loss), a zero (two frames inside one
+        // timer tick) or a negative (a clock that jumped backwards).
+        //
+        // The trap it closes is one-way. `Phase::step` is `+= rate * dt` and the
+        // type has no other mutator, so one non-finite frame poisons an
+        // accumulator for the life of the process and nothing can ever clear it —
+        // and a scene that stores `dt` raw carries that into every rate it drives.
+        // The substitution is `FALLBACK_DT` rather than zero so a degenerate frame
+        // advances a nominal step instead of freezing the animation. ADR-0152.
+        let dt = if dt.is_finite() && dt > 0.0 {
+            dt
+        } else {
+            scenes::FALLBACK_DT
+        };
         let Self {
             ctx,
             // Read where the scenes are BUILT, not where they are drawn - a

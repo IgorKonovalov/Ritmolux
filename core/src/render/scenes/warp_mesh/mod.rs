@@ -775,13 +775,8 @@ impl Scene for WarpMeshScene {
 
     fn advance(&mut self, dt: f32) {
         // Every rate in this scene is per second, so the frame's own elapsed time
-        // is the whole of what `advance` carries. A non-finite or negative `dt`
-        // degrades to the capture step rather than poisoning `pow`.
-        self.dt = if dt.is_finite() && dt > 0.0 {
-            dt
-        } else {
-            super::FALLBACK_DT
-        };
+        // is the whole of what `advance` carries.
+        self.dt = dt;
     }
 
     fn set_occlude(&mut self, occlude: f32) {

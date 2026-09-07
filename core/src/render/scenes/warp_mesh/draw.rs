@@ -229,15 +229,13 @@ pub struct Exposure {
 }
 
 impl Exposure {
-    /// From this frame's `dt`. A degenerate frame is worth one nominal frame
-    /// rather than nothing.
+    /// From this frame's `dt`, capped at **four** nominal frames: a long frame
+    /// deposits proportionally more light, but a stall cannot deposit an
+    /// unbounded amount in one go.
     pub fn new(dt: f32) -> Self {
-        let rate = if dt.is_finite() && dt > 0.0 {
-            (dt * crate::milk::NOMINAL_FPS).clamp(0.0, 4.0)
-        } else {
-            1.0
-        };
-        Self { rate }
+        Self {
+            rate: (dt * crate::milk::NOMINAL_FPS).clamp(0.0, 4.0),
+        }
     }
 
     /// The producer's effective alpha this frame — its colour is premultiplied

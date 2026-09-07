@@ -1836,3 +1836,138 @@ fn every_capture_path_resolves_the_live_ceiling() {
         Some(Tier::Floor)
     );
 }
+
+// ---------------------------------------------------------------------------
+// The frame-delta seam (ADR-0152)
+// ---------------------------------------------------------------------------
+
+/// Seed the renderer to a deterministic start for `name`, drive `deltas` through
+/// `draw_frame` one frame each, and read the last frame back.
+///
+/// The clock advances one `FALLBACK_DT` per frame **regardless of `dt`**, so two
+/// calls differing only in `deltas` differ only in what the seam was handed. The
+/// seeding does not have to be complete — only identical between calls, which is
+/// what makes the comparison in the test below sound.
+///
+/// One encoder and one submit per frame, mirroring the capture path: a feedback
+/// scene's ping-pong needs the previous frame's writes visible.
+fn seam_run(renderer: &mut Renderer, name: &str, deltas: &[f32]) -> CaptureImage {
+    assert!(
+        renderer.select_preset_by_name_now(name),
+        "probe preset '{name}' is in the roster"
+    );
+    renderer.scenes = crate::render::scenes::create_all(
+        &renderer.ctx.device,
+        super::COMPOSITE_FORMAT,
+        &renderer.tier,
+        renderer.budget,
+    );
+    renderer.time = 0.0;
+    renderer.configure_active_scene();
+
+    let (width, height) = (renderer.ctx.config.width, renderer.ctx.config.height);
+    let format = renderer.ctx.surface_format();
+    let (texture, view) =
+        super::capture::create_target(&renderer.ctx.device, format, width, height);
+    let (buffer, padded_bpr) = super::capture::create_readback(&renderer.ctx.device, width, height);
+
+    let last = deltas.len() - 1;
+    for (i, &dt) in deltas.iter().enumerate() {
+        let mut encoder =
+            renderer
+                .ctx
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("rlx-test-seam"),
+                });
+        renderer.time += super::scenes::FALLBACK_DT;
+        super::capture::record_clear(&mut encoder, &view);
+        let _ = renderer.draw_frame(
+            &AnalysisFrame::default(),
+            &mut encoder,
+            &view,
+            (width, height),
+            dt,
+            super::SaltMode::Pinned,
+        );
+        if i == last {
+            super::capture::record_copy(&mut encoder, &texture, &buffer, padded_bpr, width, height);
+        }
+        renderer.ctx.queue.submit(std::iter::once(encoder.finish()));
+    }
+    super::capture::read_back(&renderer.ctx.device, &buffer, width, height, padded_bpr)
+        .expect("seam-run readback")
+}
+
+/// **A degenerate frame delta cannot reach a scene** (ADR-0152). `draw_frame`
+/// substitutes `FALLBACK_DT` for a `dt` that is not finite and positive, so a run
+/// fed one bad frame followed by clean frames is **byte-identical** to a run of
+/// the same length fed clean frames throughout.
+///
+/// The equality is exact and carries no threshold, because the substituted value
+/// *is* the clean run's value — a property rather than a measurement, and it
+/// holds on any adapter.
+///
+/// What it catches is one-way. `Phase::step` is `+= rate * dt` and the type has
+/// no other mutator, so one non-finite frame poisons an accumulator for the life
+/// of the process and nothing can clear it; `0.0 * NaN` is `NaN`, so a rate
+/// sitting at its default does not spare a scene. The attractor is the case that
+/// carries no guard of its own at any depth below the seam, and its `spin_time`
+/// is a `Phase`.
+///
+/// One preset per system that holds a `Phase` or reads `dt` raw.
+#[test]
+fn a_degenerate_frame_delta_cannot_reach_a_scene() {
+    let Some(mut renderer) = headless_or_skip(HeadlessOptions {
+        width: 64,
+        height: 64,
+        prefer_software: true,
+    }) else {
+        return;
+    };
+    let probes = [
+        ("SeamAttractor", "attractor", "spin = \"0.7\"\n"),
+        ("SeamSwarm", "swarm", "force = \"1.0\"\nspin = \"0.6\"\n"),
+        ("SeamField", "fragment_field", "warp = \"0.5\"\n"),
+        ("SeamCurve", "parametric_curve", "spin = \"0.8\"\n"),
+        ("SeamMesh", "warp_mesh", "deposit_spin = \"0.5\"\n"),
+        (
+            "SeamCollage",
+            "shape_collage",
+            "drift = \"0.9\"\nspin = \"0.7\"\n",
+        ),
+    ];
+    let built = |(name, system, params): &(&str, &str, &str)| {
+        Preset::from_toml_str(&format!(
+            "system = \"{system}\"\nname = \"{name}\"\n[params]\n{params}"
+        ))
+        .expect("seam probe preset is valid")
+    };
+    renderer.set_presets(probes.iter().map(built).collect());
+
+    let dt = super::scenes::FALLBACK_DT;
+    for (name, _, _) in probes {
+        let clean = seam_run(&mut renderer, name, &[dt, dt, dt, dt]);
+
+        // The negative control, and the equality below means nothing without it:
+        // a *valid* first delta of a different size must still reach the final
+        // frame. Without this a scene that ignores `dt` entirely — or a harness
+        // that reset away the accumulation — would satisfy every assertion in the
+        // loop that follows by rendering one unchanging picture.
+        let stretched = seam_run(&mut renderer, name, &[dt * 3.0, dt, dt, dt]);
+        assert_ne!(
+            stretched.rgba, clean.rgba,
+            "{name}: a longer first frame left the picture unchanged, so this \
+             probe cannot observe what the seam does"
+        );
+
+        for bad in [f32::NAN, -1.0, 0.0, f32::INFINITY] {
+            let fed = seam_run(&mut renderer, name, &[bad, dt, dt, dt]);
+            assert_eq!(
+                fed.rgba, clean.rgba,
+                "{name}: a {bad} frame delta changed the picture three clean \
+                 frames later, so it reached the scene"
+            );
+        }
+    }
+}
