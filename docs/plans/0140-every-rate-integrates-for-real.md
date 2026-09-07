@@ -302,6 +302,29 @@ at `775ef18`.
   each probe first asserts that a *valid* longer first frame does change the final picture. All six
   probes pass both halves.
 
+### Resume note — 2026-09-07, paused after Phase 2 (scaffolding; strip at the close)
+
+**Paused for an architect ruling, not blocked on code.** Phases 3-6 are untouched and nothing is
+half-landed: the tree at `2a50d1a` is green, `fmt` and `clippy --workspace --all-targets -D warnings`
+are clean, `-P fast` is 1339/1339, and `--test golden --test attractor` is 10/10 with no baseline
+blessed.
+
+**The question.** Phase 1 corrected `presets/README.md`'s `drift`/`spin` row by *removing* the false
+"Integrated against real elapsed time" claim rather than by documenting the defect — because Phase 3
+makes the form genuinely integrated two commits later, and a row describing the defect would have
+been false by then. The row as it stands is true both before and after Phase 3 and states the
+frame-rate fact, but it **no longer says the two integrate**, which is the engine-wide rule of
+ADR-0132 and the thing `preset-author` reads that file for. **No phase owns putting that back:**
+`presets/README.md` is in Phase 1's file list only, and Phases 3 and 5 name `shape_collage.rs` and
+the three presets.
+
+**What architect decides:** which phase owns the row, and amend that phase's `Files touched`. The
+candidate text is one row, and Phase 3 is the natural owner because it is the commit that makes the
+statement true. Phase 5 is the alternative, since it is already the content-facing phase.
+
+**Where to resume:** Phase 3, with the amended file list. Nothing else in the plan needs re-reading —
+the two ADR corrections dated 2026-09-07 are already folded into the phase notes.
+
 ### Close triggers
 
 _(filled at the close.)_
