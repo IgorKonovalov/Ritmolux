@@ -503,6 +503,185 @@ fn a_second_of_drift_is_a_second_at_any_frame_rate() {
     );
 }
 
+/// One element's placement at one instant: its centre, and its rotation as the
+/// composed `(cos, sin)` pair.
+type Placement = ([f32; 2], [f32; 2]);
+
+fn placements(scene: &ShapeCollageScene) -> Vec<Placement> {
+    scene
+        .composed()
+        .iter()
+        .map(|e| {
+            (
+                [e.center_size[0], e.center_size[1]],
+                [e.shape[0], e.shape[1]],
+            )
+        })
+        .collect()
+}
+
+/// Drive a canvas at `first` for `first_frames`, then at `second` for
+/// `second_frames`, and return where every element ended up. Each pair is
+/// `(drift, spin)`.
+fn two_segments(
+    ctx: &RenderContext,
+    first: (f32, f32),
+    first_frames: u32,
+    second: (f32, f32),
+    second_frames: u32,
+) -> Vec<Placement> {
+    const DT: f32 = 1.0 / 60.0;
+    let mut scene = scene(ctx);
+    scene.set_param("layout", 2.0);
+    scene.set_param("seed", 5.0);
+    // A zero-length step, so a canvas asked for zero frames still has a composed
+    // element array to report. Nothing else moves: `dt` of zero advances no
+    // clock and no accumulator.
+    scene.advance(0.0);
+    for (segment, frames) in [(first, first_frames), (second, second_frames)] {
+        scene.set_param("drift", segment.0);
+        scene.set_param("spin", segment.1);
+        for _ in 0..frames {
+            scene.advance(DT);
+        }
+    }
+    placements(&scene)
+}
+
+/// The signed gap between two wrapped canvas coordinates, taking the short way
+/// round: the canvas wraps at its edge, so two positions a hair apart across the
+/// seam are a hair apart and not a canvas-width apart.
+fn wrapped_gap(a: f32, b: f32, half: f32) -> f32 {
+    let d = a - b;
+    (d + half).rem_euclid(2.0 * half) - half
+}
+
+/// How far apart two elements sit, and how far apart they point.
+fn separation(a: &Placement, b: &Placement) -> (f32, f32) {
+    let dx = wrapped_gap(a.0[0], b.0[0], layout::CANVAS_X);
+    let dy = wrapped_gap(a.0[1], b.0[1], layout::CANVAS_Y);
+    // The rotation arrives as a `(cos, sin)` pair, so the angle between the two
+    // comes off their relative rotation rather than off two `atan2`s that would
+    // each have already lost the winding.
+    let angle = (b.1[1] * a.1[0] - b.1[0] * a.1[1]).atan2(a.1[0] * b.1[0] + a.1[1] * b.1[1]);
+    ((dx * dx + dy * dy).sqrt(), angle.abs())
+}
+
+/// The largest separation across a canvas, element by element.
+fn widest(a: &[Placement], b: &[Placement]) -> (f32, f32) {
+    assert_eq!(a.len(), b.len(), "the two runs composed different canvases");
+    assert!(!a.is_empty(), "the probe canvas is empty");
+    a.iter()
+        .zip(b.iter())
+        .fold((0.0f32, 0.0f32), |acc, (x, y)| {
+            let (d, r) = separation(x, y);
+            (acc.0.max(d), acc.1.max(r))
+        })
+}
+
+/// **A binding that moves steers the canvas from that instant; it does not
+/// rewrite where the canvas has already been** (ADR-0132, ADR-0153).
+///
+/// Two runs share a thirty-second history and differ only over the half second
+/// after it. Whatever they end up apart by is therefore owed entirely to that
+/// half second, so it must equal the ground a canvas covers in half a second at
+/// the *difference* between the two rates - which a third run measures. The
+/// defective form, where the rate multiplies the age instead of integrating,
+/// puts them 61x further apart than that: it rescales the whole thirty seconds.
+///
+/// The third run is what makes this a property rather than a frozen number.
+/// Nothing here names a velocity, a spin speed or a distance - the engine's own
+/// constants cancel out of both sides.
+#[test]
+fn a_moved_binding_steers_rather_than_rescaling_the_past() {
+    let Some(ctx) = context(64, 64) else {
+        return;
+    };
+    const HISTORY: u32 = 1800;
+    const AFTER: u32 = 30;
+    let (slow, fast) = ((0.5, 0.5), (1.5, 1.5));
+    let difference = (fast.0 - slow.0, fast.1 - slow.1);
+
+    let held = two_segments(&ctx, slow, HISTORY, slow, AFTER);
+    let moved = two_segments(&ctx, slow, HISTORY, fast, AFTER);
+    // What half a second at the difference between the two rates is worth,
+    // measured rather than asserted - a fresh canvas, so its history is empty
+    // and only the half second can be in the answer.
+    let owed = two_segments(&ctx, difference, AFTER, difference, 0);
+    let fresh = two_segments(&ctx, difference, 0, difference, 0);
+
+    let (drifted, spun) = widest(&held, &moved);
+    let (owed_drift, owed_spin) = widest(&owed, &fresh);
+
+    println!(
+        "moving the binding drifted {drifted:.6} canvas units and spun {spun:.6} rad; \
+         half a second at the difference is worth {owed_drift:.6} and {owed_spin:.6}"
+    );
+    assert!(
+        owed_drift > 1e-3 && owed_spin > 1e-3,
+        "the reference half second moved nothing, so this compared three still \
+         canvases: {owed_drift} units, {owed_spin} rad"
+    );
+    assert!(
+        (drifted - owed_drift).abs() < 1e-4,
+        "moving `drift` after {HISTORY} frames of history moved the canvas \
+         {drifted} units, but the half second it was moved for is worth only \
+         {owed_drift} - the rate is rescaling the history instead of integrating"
+    );
+    assert!(
+        (spun - owed_spin).abs() < 1e-4,
+        "moving `spin` after {HISTORY} frames of history turned the canvas \
+         {spun} rad, but the half second it was moved for is worth only \
+         {owed_spin} - the rate is rescaling the history instead of integrating"
+    );
+}
+
+/// **The quiet passage has no cliff in it**: what a binding does when it moves
+/// does not depend on how long the canvas has been alive.
+///
+/// `recompose` is gated on onsets, so a stretch with none never regenerates the
+/// canvas and its clock runs on unbounded. Under the defective form that clock
+/// multiplies the rate, so the first bass hit after a long silence lands the
+/// whole accumulated swing at once - thirty times the swing the same hit lands
+/// one second in. Integrated, the two are the same swing, which is what this
+/// asserts: same rates, same half second, two canvas ages, one answer.
+#[test]
+fn a_binding_moves_the_same_after_a_long_quiet_stretch() {
+    let Some(ctx) = context(64, 64) else {
+        return;
+    };
+    const AFTER: u32 = 30;
+    let (slow, fast) = ((0.5, 0.5), (1.5, 1.5));
+
+    let swing = |history: u32| {
+        let held = two_segments(&ctx, slow, history, slow, AFTER);
+        let moved = two_segments(&ctx, slow, history, fast, AFTER);
+        widest(&held, &moved)
+    };
+
+    let (near_drift, near_spin) = swing(60);
+    let (far_drift, far_spin) = swing(1800);
+
+    println!(
+        "a hit one second in swings {near_drift:.6} units / {near_spin:.6} rad; \
+         thirty seconds in, {far_drift:.6} / {far_spin:.6}"
+    );
+    assert!(
+        near_drift > 1e-3 && near_spin > 1e-3,
+        "the binding moved nothing at either age: {near_drift} units, {near_spin} rad"
+    );
+    assert!(
+        (far_drift - near_drift).abs() < 1e-4,
+        "the same hit swung the canvas {near_drift} units one second in and \
+         {far_drift} thirty seconds in - the swing is riding the canvas's age"
+    );
+    assert!(
+        (far_spin - near_spin).abs() < 1e-4,
+        "the same hit turned the canvas {near_spin} rad one second in and \
+         {far_spin} thirty seconds in - the swing is riding the canvas's age"
+    );
+}
+
 /// **Raising `density` never reorders or pops an already-live element.**
 ///
 /// Birth order is the array's own order and the gate is a prefix, so growing it

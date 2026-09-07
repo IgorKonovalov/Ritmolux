@@ -290,8 +290,8 @@ at `775ef18`.
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The operator doc stops teaching the defect | dev | done | `d310598` |
-| 2 — The frame delta is sanitized at the seam | dev | done | committed with this row |
-| 3 — The collage rates integrate per element | dev | not started | |
+| 2 — The frame delta is sanitized at the seam | dev | done | `2a50d1a` |
+| 3 — The collage rates integrate per element | dev | done | committed with this row |
 | 4 — Measure the emitter's third case | dev | not started | |
 | 5 — The three collage presets are retuned | dev | not started | |
 | 6 — The dissolve note | dev | not started | |
@@ -321,6 +321,33 @@ at `775ef18`.
   between a bad-delta run and a clean run is satisfied trivially by a scene that ignores `dt`, so
   each probe first asserts that a *valid* longer first frame does change the final picture. All six
   probes pass both halves.
+
+- **Phase 3's test landed outside the phase's file list.** The done-when asks for an assertion over
+  two frames with a moved binding; the phase names `core/src/render/scenes/shape_collage.rs` and
+  `presets/README.md`, and `shape_collage.rs:1681` is a bare `mod tests;`. The two tests and their
+  four helpers are in `core/src/render/scenes/shape_collage/tests.rs`.
+- **The plan's "Goldens will move here" did not happen, and the suite cannot see this phase at all.**
+  `--test golden` is 3/3 unmoved and nothing was blessed. Both fixtures — `shape_collage.toml` and
+  `shape_collage_roster.toml` — leave `drift` and `spin` at their `0` defaults, so both accumulators
+  stay zero and every element composes byte-identically under either form. No golden fixture in the
+  repo binds either rate. The shipped presets that do bind them are covered only by the pass/fail
+  sweeps, which are green: `animation`, `distinctness`, `sanity`, `reactivity`, `preset`,
+  `collage_layout` and `collage_cost` are 351/351.
+- **Phase 3 edited `core/src/render/tests.rs`, which is Phase 2's file, on the user's explicit
+  authorization.** Integrating the collage rates turned Phase 2's
+  `a_degenerate_frame_delta_cannot_reach_a_scene` red at its negative control. `evaluate_preset`
+  (`evaluate.rs:312`) advances a scene **before** it applies the preset's bindings, so frame 1 always
+  integrates at the scene's own defaults — zero for `drift` and `spin` — and the probe's stretched
+  *first* frame therefore lands nowhere for `SeamCollage`. The `rate * age` form was immune because
+  the current rate multiplied the whole age retroactively; that immunity is the defect. The repair
+  moves only the negative control's stretch to the second frame; the bad delta stays on the first,
+  where `0.0 * NaN` is `NaN` and the poisoning it guards is still reachable. All six probes pass.
+- **A followup noticed and not acted on:** the first frame of every preset integrates at the scene's
+  default rates rather than the preset's, for the six rates Plan 0122 converted as well as these two.
+  It is bounded at one frame and no gate observes it. Not filed — the entry is architect's call.
+- **The `presets/README.md` row was landed here** per the architect ruling recorded in the resume
+  note below. It states the integration, keeps Phase 1's frame-rate sentence and the wrap, and gives
+  the reason a rate still wants a band envelope rather than an onset.
 
 ### Resume note — 2026-09-07, paused after Phase 2 (scaffolding; strip at the close)
 

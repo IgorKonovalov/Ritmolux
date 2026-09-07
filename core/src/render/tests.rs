@@ -1950,11 +1950,21 @@ fn a_degenerate_frame_delta_cannot_reach_a_scene() {
         let clean = seam_run(&mut renderer, name, &[dt, dt, dt, dt]);
 
         // The negative control, and the equality below means nothing without it:
-        // a *valid* first delta of a different size must still reach the final
-        // frame. Without this a scene that ignores `dt` entirely — or a harness
-        // that reset away the accumulation — would satisfy every assertion in the
+        // a *valid* delta of a different size must still reach the final frame.
+        // Without this a scene that ignores `dt` entirely — or a harness that
+        // reset away the accumulation — would satisfy every assertion in the
         // loop that follows by rendering one unchanging picture.
-        let stretched = seam_run(&mut renderer, name, &[dt * 3.0, dt, dt, dt]);
+        //
+        // **The stretched frame is the second one, and it has to be.**
+        // `evaluate_preset` advances the scene before it applies the preset's
+        // bindings, so on the first frame every rate is still at the scene's own
+        // default — zero, for the collage's `drift` and `spin`. A rate that
+        // integrates turns that first frame's elapsed time into no motion at
+        // all, so stretching it would be unobservable for a reason that has
+        // nothing to do with the seam. The *bad* delta below stays on the first
+        // frame, where it belongs: `0.0 * NaN` is `NaN`, so a degenerate first
+        // frame poisons an accumulator whatever rate is multiplying it.
+        let stretched = seam_run(&mut renderer, name, &[dt, dt * 3.0, dt, dt]);
         assert_ne!(
             stretched.rgba, clean.rgba,
             "{name}: a longer first frame left the picture unchanged, so this \

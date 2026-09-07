@@ -890,10 +890,33 @@ pub struct ShapeCollageScene {
     /// at any refresh rate (ADR-0012).
     elapsed: f32,
     /// [`Self::elapsed`] when the live canvas was composed, so a recomposition
-    /// starts its drift from zero rather than teleporting.
+    /// starts from zero rather than teleporting. What it clocks is the **pump**;
+    /// drift and spin reset through their own accumulators below, which is why
+    /// every site that writes this one writes those too.
     born: f32,
     /// The same for [`Self::outgoing`].
     outgoing_born: f32,
+    /// **The integrated drift and spin of the live canvas**, in
+    /// rate-multiplier-seconds: `drift` and `spin` are rates, so what places an
+    /// element is the integral of the bound value over the canvas's life, never
+    /// the current value scaled by its age (ADR-0132, ADR-0153). A binding that
+    /// moves therefore steers the canvas from that instant and does not rewrite
+    /// where it has already been.
+    ///
+    /// Per-set rather than per-element, and the two coincide here: every element
+    /// in a set is generated at the same instant, so there is no per-element
+    /// birth for one to be measured against.
+    ///
+    /// **Both reset to zero wherever [`Self::born`] is rewritten**, and there
+    /// are two such sites — [`Self::rebuild`] and the recomposition edge in
+    /// [`Self::step`]. Missing either leaves an accumulator running under a
+    /// canvas that has been replaced.
+    drift_accum: f32,
+    spin_accum: f32,
+    /// The same pair for [`Self::outgoing`], which keeps accumulating under the
+    /// crossfade because the outgoing canvas keeps moving while it dissolves.
+    outgoing_drift_accum: f32,
+    outgoing_spin_accum: f32,
     /// How many recompositions have fired — the generator's recomposition index.
     recompose_count: u64,
     /// Previous frame's `recompose` level, for rising-edge detection.
@@ -1059,6 +1082,10 @@ impl ShapeCollageScene {
             elapsed: 0.0,
             born: 0.0,
             outgoing_born: 0.0,
+            drift_accum: 0.0,
+            spin_accum: 0.0,
+            outgoing_drift_accum: 0.0,
+            outgoing_spin_accum: 0.0,
             recompose_count: 0,
             prev_recompose: 0.0,
             built: None,
@@ -1122,6 +1149,8 @@ impl ShapeCollageScene {
         layout::generate(&mut self.live, &recipe);
         self.snap_fades();
         self.born = self.elapsed;
+        self.drift_accum = 0.0;
+        self.spin_accum = 0.0;
         self.built = Some(recipe);
     }
 
@@ -1164,6 +1193,21 @@ impl ShapeCollageScene {
     fn step(&mut self, dt: f32) {
         self.elapsed += dt;
 
+        // **The rates integrate** (ADR-0132, ADR-0153). Both canvases advance:
+        // the outgoing one keeps moving under the crossfade, exactly as its
+        // `age` keeps growing.
+        //
+        // `finite_or` before the add, not after: an accumulator is permanent
+        // state, so one NaN frame from a binding would poison the canvas for
+        // the rest of its life rather than for the frame that produced it. `dt`
+        // needs no such guard — the seam sanitizes it before `advance`.
+        let drift_rate = finite_or(self.drift, DEFAULT_DRIFT);
+        let spin_rate = finite_or(self.spin, DEFAULT_SPIN);
+        self.drift_accum += drift_rate * dt;
+        self.spin_accum += spin_rate * dt;
+        self.outgoing_drift_accum += drift_rate * dt;
+        self.outgoing_spin_accum += spin_rate * dt;
+
         // **The recomposition edge.** Rising past the threshold recomposes once;
         // a held gate does not fire again, which is why the previous level
         // survives `reset_params`.
@@ -1176,10 +1220,14 @@ impl ShapeCollageScene {
             self.recompose_count = self.recompose_count.wrapping_add(1);
             std::mem::swap(&mut self.live, &mut self.outgoing);
             self.outgoing_born = self.born;
+            self.outgoing_drift_accum = self.drift_accum;
+            self.outgoing_spin_accum = self.spin_accum;
             let recipe = self.recipe();
             layout::generate(&mut self.live, &recipe);
             self.snap_fades();
             self.born = self.elapsed;
+            self.drift_accum = 0.0;
+            self.spin_accum = 0.0;
             self.built = Some(recipe);
             self.blend_secs = applied_blend_secs(self.recompose_blend);
             // At zero seconds this is already finished, which is the hard cut.
@@ -1215,8 +1263,6 @@ impl ShapeCollageScene {
         if self.specs_override {
             return;
         }
-        let drift = finite_or(self.drift, DEFAULT_DRIFT);
-        let spin = finite_or(self.spin, DEFAULT_SPIN);
         let pump_size = finite_or(self.pump_size, DEFAULT_PUMP);
         let pump_alpha = finite_or(self.pump_alpha, DEFAULT_PUMP);
         let blend = self.blend.clamp(0.0, 1.0);
@@ -1242,14 +1288,26 @@ impl ShapeCollageScene {
             let age = self.elapsed - self.outgoing_born;
             for p in &self.outgoing {
                 self.elements.push(apply_time(
-                    p, age, drift, spin, pump_size, pump_alpha, out_alpha,
+                    p,
+                    age,
+                    self.outgoing_drift_accum,
+                    self.outgoing_spin_accum,
+                    pump_size,
+                    pump_alpha,
+                    out_alpha,
                 ));
             }
         }
         let age = self.elapsed - self.born;
         for p in &self.live {
             self.elements.push(apply_time(
-                p, age, drift, spin, pump_size, pump_alpha, in_alpha,
+                p,
+                age,
+                self.drift_accum,
+                self.spin_accum,
+                pump_size,
+                pump_alpha,
+                in_alpha,
             ));
         }
         self.dirty = true;
@@ -1331,18 +1389,26 @@ fn applied_blend_secs(blend: f32) -> f32 {
     }
 }
 
-/// **One element at one instant**: the generated element with `age` seconds of
-/// drift, spin and pumping applied, and its alpha scaled by the crossfade.
+/// **One element at one instant**: the generated element carried along its
+/// canvas's integrated drift and spin, pumped, and its alpha scaled by the
+/// crossfade.
 ///
-/// `age` is real seconds since this element's canvas was composed, accumulated
-/// from the **injected** `dt` — so the position is a pure function of elapsed
-/// time and not of how many frames it took to get there (ADR-0012). That is the
-/// property the frame-rate test asserts.
+/// Two clocks, and they are not interchangeable. `drift_accum` and `spin_accum`
+/// are the **integrals** of the two bound rates over the canvas's life, so a
+/// binding that moves changes the motion from here on rather than rescaling
+/// what is already on screen (ADR-0132, ADR-0153). `age` is real seconds since
+/// the canvas was composed, and only the pump reads it — the pump's rate is the
+/// engine's constant [`PUMP_RATE`] and cannot move, so there is nothing there
+/// to integrate.
+///
+/// Both are accumulated from the **injected** `dt`, never from a per-frame
+/// constant, so a held rate covers the same ground per second at any refresh
+/// rate (ADR-0012) — the property the frame-rate test asserts.
 fn apply_time(
     p: &layout::Placed,
     age: f32,
-    drift: f32,
-    spin: f32,
+    drift_accum: f32,
+    spin_accum: f32,
     pump_size: f32,
     pump_alpha: f32,
     canvas_alpha: f32,
@@ -1357,15 +1423,17 @@ fn apply_time(
     // Drift **wraps** into the canvas rather than travelling off it: over a long
     // set a linear drift empties the canvas entirely, and a wrap at the edge is
     // the cheaper artefact. It is also what keeps the position a pure function
-    // of `age`, which a bounce would not be.
+    // of `drift_accum`, which a bounce would not be — a bounce depends on which
+    // side the element approached from, so it would need per-element state of
+    // its own.
     let wrap = |v: f32, half: f32| (v + half).rem_euclid(2.0 * half) - half;
     Element::build(Spec {
         center: [
-            wrap(p.spec.center[0] + p.vel[0] * drift * age, layout::CANVAS_X),
-            wrap(p.spec.center[1] + p.vel[1] * drift * age, layout::CANVAS_Y),
+            wrap(p.spec.center[0] + p.vel[0] * drift_accum, layout::CANVAS_X),
+            wrap(p.spec.center[1] + p.vel[1] * drift_accum, layout::CANVAS_Y),
         ],
         half: [p.spec.half[0] * size, p.spec.half[1] * size],
-        angle_deg: p.spec.angle_deg + (p.spin * spin * age).to_degrees(),
+        angle_deg: p.spec.angle_deg + (p.spin * spin_accum).to_degrees(),
         alpha,
         ..p.spec
     })
