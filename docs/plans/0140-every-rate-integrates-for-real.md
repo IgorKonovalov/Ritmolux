@@ -292,8 +292,8 @@ at `775ef18`.
 | 1 — The operator doc stops teaching the defect | dev | done | `d310598` |
 | 2 — The frame delta is sanitized at the seam | dev | done | `2a50d1a` |
 | 3 — The collage rates integrate per element | dev | done | `1209b76` |
-| 4 — Measure the emitter's third case | dev | done | committed with this row |
-| 5 — The three collage presets are retuned | dev | not started | |
+| 4 — Measure the emitter's third case | dev | done | `2373775` |
+| 5 — The three collage presets are retuned | dev | done, no preset edited | committed with this row |
 | 6 — The dissolve note | dev | not started | |
 
 ### Notes
@@ -388,6 +388,29 @@ at `775ef18`.
   delivery — the two collage sites, the emitter site, and the `presets/README.md` sentence — and
   0150's `dt.is_finite() && dt > 0.0` probe has been red since Phase 2. Both entries are ones this
   plan's header claims to close.
+
+- **Phase 5 changed no preset, on the user's explicit ruling, and here is what was measured.** The
+  pre-Phase-3 scene was temporarily restored, `shot --presets presets --report family=shape_collage`
+  run, HEAD restored, and the report run again. **Three of the four presets are identical in every
+  column**; `Suprematist` alone moves, in the last digit — `rate` 0.0016+ -> 0.0015+, `level` 0.2122
+  -> 0.2119, `rise/fall` 38+/28+ -> 37+/32+. The phase's premise, that "the same numbers produce a
+  much smaller motion", is not what the instrument shows.
+- **Why it shows nothing, which is the finding rather than the reassurance.** `rate * age` and
+  `integral of rate dt` are *equal* while a rate is held, and diverge only as a canvas ages under a
+  rate that moves. Every instrument here is short-horizon: the report's probe is 48-frame windows,
+  and a plain `shot` drives a constant analysis frame, under which the two forms agree by
+  construction. **Nothing in this repo renders a moving stimulus over a long passage**, so the
+  change Phase 3 made is invisible to the gates, to the goldens and to the report alike. A retune
+  would have been four presets moved by feel against no target.
+- **There are four affected presets, not three.** `collage_nocturne.toml:112-113` binds `drift` and
+  `spin` to `bass`/`mid` under `[smoothing] 0.6`, exactly as the three the plan names. It is in
+  neither the plan nor ADR-0153, and it is absent from Phase 5's file list.
+- **"The moved goldens are blessed" has no referent.** No golden moved in Phase 3, Phase 4 or here,
+  and none could: the two collage fixtures leave `drift` and `spin` at their `0` defaults and there
+  is no preset-level golden for any of the four.
+- **The look over a long passage is unjudged, and is a `preset-author` question.** Nothing here says
+  the four still read as intended — only that no instrument in the repo can tell, and that the
+  measured response did not move.
 
 ### Resume note — 2026-09-07, paused after Phase 2 (scaffolding; strip at the close)
 
