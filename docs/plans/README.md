@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0157** (ADRs are a separate sequence — next free there is **0173**.)
+**Next free number: 0158** (ADRs are a separate sequence — next free there is **0174**.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -43,10 +43,14 @@ place. The plan file carries the real link.
 | [0120](0120-the-standalone-ships-on-ubuntu.md) | The standalone ships on Ubuntu | approved | dev, human | ADR-0131 (proposed): a PulseAudio capture arm plus an `ubuntu-latest` CI arm. **Phase 1 is a `human` stop gate before `dev`** — only one of its three outcomes lets `dev` start. |
 | [0092](0092-the-engine-draws-an-authored-path.md) | The engine draws an authored path | approved | dev, human | Hard dependency discharged: 0091 closed, and `shape_field` is the scene this draws into. Takeable even if 0087 stalls — Phase 4 may legitimately be empty. Expect morph degeneracy. |
 | [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | approved | dev, human | **A new Phase 1 fixes backlog 0102 + 0103 before anything advertises the component** — foobar's UI starves until playback starts. **Phases 4-6 unblocked, 0150 closed.** 0156 Phase 2 shortens the README first. |
-| [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | **Supersedes 0132's architecture, which a live set on 2026-08-29 bypassed entirely.** ADR-0145 (proposed): Art-Net straight to the fixtures. Phase 8 hard-depends on 0115 Phase 2; 1-7 do not. |
+| [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + **0174**: Art-Net to the fixtures, verified against `rlx-artnet-sim` because **the rig is unreachable**. Phases 1-8 need none; 9 is the rig session. Phase 8 hard-depends on 0115 Phase 2. |
 | [0140](0140-every-rate-integrates-for-real.md) | Every rate integrates, for real | approved | dev, human | Backlog 0149 + 0150 (**0142 carried**). ADR-0152 + 0153 (proposed): `dt` sanitized at the scene seam, per-element rates integrate per element. Phase 3 moves goldens; Phase 2 must not. |
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
 <!-- roster:end -->
+
+~~**Added 2026-09-07 - [0157] is drafted, and it is the only plan that unblocks `main`.**~~ - **closed 2026-09-07.** Both phases landed the same day the note was written; `main` is green and the route gate passes against a built site with `dist/api/` populated. The note is in [README-archive.md](README-archive.md) under `## Prior sequencing notes (superseded)`, which also records the one durable half: the cost probes still run in `-P fast` on every arm of every push.
+
+[0157]: done/0157-the-cost-probes-estimate-a-duration.md
 
 ~~**Added 2026-09-06 — [0153] is approved.**~~ — **closed 2026-09-07.** Both phases landed and ADR-0165 is accepted, so the disk reading the approval rested on is spent. The note is in [README-archive.md](README-archive.md) under `## Prior sequencing notes (superseded)`.
 
@@ -718,6 +722,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0157 — The cost probes estimate a duration](done/0157-the-cost-probes-estimate-a-duration.md) — closed 2026-09-07. Review: **no blockers, no majors, two minors, one nit.** Version: **none** (no shipped artifact moved). ADR-0173 accepted. [Write-up](README-archive.md).
 - [0153 — The debug tree stops carrying dependency line tables](done/0153-the-debug-tree-stops-carrying-dependency-line-tables.md) — closed 2026-09-07. Review: **no blockers, no majors, one minor.** Version: **none** (chore-only). ADR-0165 accepted. [Write-up](README-archive.md).
 - [0156 - The site becomes the reference](done/0156-the-site-becomes-the-reference.md) - closed 2026-09-06. Review: **no blockers, one major, three minors.** Version: **0.110.0** (minor). ADR-0169 + 0170 + 0171 accepted. Archived [backlog 0180](../design-backlog-archive.md). [Write-up](README-archive.md).
 - [0147 — What the show costs, and what its numbers mean](done/0147-what-the-show-costs-and-what-its-numbers-mean.md) — closed 2026-09-06. Review: **no blockers, one major, four minors.** Version: **0.109.0** (minor). ADR-0172 accepted. [Write-up](README-archive.md).

@@ -13,13 +13,15 @@
 //!
 //! Per ADR-0071 a numeric contract states a property or names the configuration
 //! it was taken on. A frame time is the second kind, so **there is no threshold
-//! here.** The test renders the cases, prints what it saw, and asserts only that
-//! it measured genuinely different figures. It skips on a software rasterizer:
+//! here.** The test renders the cases, prints what it saw, and asserts only two
+//! properties that hold on every machine CI offers: each reading is a positive,
+//! finite duration, and the cases measured genuinely different figures. It skips
+//! on a software rasterizer:
 //! WARP's frame time says nothing about the iGPU floor in `docs/nfr.md` §1, and
 //! a reading taken there would be a number that looks like evidence and is not.
 //! Its shape is `mark_cost.rs`'s — interleaved cases, a two-length slope to
-//! subtract the fixed costs, the minimum of several repeats — and that file's
-//! header explains each of those choices.
+//! subtract the fixed costs, each leg minimized across several repeats — and
+//! that file's header explains each of those choices.
 //!
 //! # Four probes, because the ring's cost is not one number
 //!
@@ -109,8 +111,14 @@ const FRAMES_SHORT: u32 = 30;
 const FRAMES_LONG: u32 = 210;
 
 /// How many times each case is measured. The **minimum** is kept, not the mean:
-/// a scheduler hiccup can only add time, so the smallest reading is the one
-/// least contaminated by everything that is not the render.
+/// a scheduler hiccup can only add time, so the smallest reading of a *duration*
+/// is the one least contaminated by everything that is not the render.
+///
+/// The short and long legs are minimized **separately** and subtracted once,
+/// after the loop, because a minimum over their *difference* rejects nothing: a
+/// hiccup in `short` subtracts from `long - short`, so the smallest difference
+/// is the repeat whose short leg was most inflated. That bias has one sign, it
+/// grows with contention, and it crosses zero on a busy machine. ADR-0173.
 const REPEATS: usize = 3;
 
 /// Forty copies, which is what a mandala's outer ring carries and what
@@ -186,14 +194,21 @@ fn per_frame_ms(renderer: &mut Renderer) -> (Vec<f64>, Vec<CaptureImage>) {
         .map(|name| run(renderer, name, FRAMES_SHORT).1)
         .collect();
 
-    let mut best = vec![f64::INFINITY; names.len()];
+    let mut best_short = vec![f64::INFINITY; names.len()];
+    let mut best_long = vec![f64::INFINITY; names.len()];
     for _ in 0..REPEATS {
-        for (slot, name) in best.iter_mut().zip(names.iter()) {
+        for (index, name) in names.iter().enumerate() {
             let (short, _) = run(renderer, name, FRAMES_SHORT);
             let (long, _) = run(renderer, name, FRAMES_LONG);
-            *slot = slot.min((long - short) / f64::from(FRAMES_LONG - FRAMES_SHORT));
+            best_short[index] = best_short[index].min(short);
+            best_long[index] = best_long[index].min(long);
         }
     }
+    let best: Vec<f64> = best_long
+        .iter()
+        .zip(best_short.iter())
+        .map(|(long, short)| (long - short) / f64::from(FRAMES_LONG - FRAMES_SHORT))
+        .collect();
     (best, images)
 }
 
@@ -243,8 +258,20 @@ fn a_forty_member_arc_ring_is_priced_against_the_floor_budget() {
     }
     println!();
 
-    // --- Non-vacuity: the probes must be different figures, or every delta
-    // above is a measurement of noise. ---
+    // --- Non-vacuity, first: every reading is a duration. A non-finite or
+    // negative figure means the estimator reported noise rather than the render,
+    // and the table above would publish it as evidence. ---
+    for (index, (label, _)) in CASES.iter().enumerate() {
+        let value = ms.get(index).copied().unwrap_or(f64::NAN);
+        assert!(
+            value.is_finite() && value > 0.0,
+            "the {} reading is not a time: {value}",
+            label.trim()
+        );
+    }
+
+    // --- Non-vacuity, second: the probes must be different figures, or every
+    // delta above is a measurement of noise. ---
     let lit_counts: Vec<usize> = images.iter().map(lit).collect();
     let rosette = lit_counts.first().copied().unwrap_or(0);
     assert!(

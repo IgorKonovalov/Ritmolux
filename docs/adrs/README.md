@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0173.** *(0120 was reserved for
+**Next free number: 0175.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -194,4 +194,6 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0170](0170-a-parameters-reference-row-is-generated-from-the-declaration-the-engine-reads.md) | A parameter's reference row is generated from the declaration the engine reads | accepted 2026-09-06 (Plan 0156), Outcome; extends 0017 and 0163 |
 | [0171](0171-a-diagram-is-mermaid-in-the-source-and-the-site-renders-it-at-build.md) | A diagram is mermaid in the source, and the site renders it at build | accepted 2026-09-06 (Plan 0156), Outcome; extends 0154 |
 | [0172](0172-a-null-cost-measurement-names-the-witness-that-the-thing-ran.md) | A null-cost measurement names the witness that the thing ran | accepted 2026-09-06 (Plan 0147), supplements 0071 and 0143 |
+| [0173](0173-a-cost-probe-takes-the-best-of-each-duration-not-the-best-difference.md) | A cost probe takes the best of each duration, not the best difference | accepted 2026-09-07 (Plan 0157), extends 0071 and 0016 |
+| [0174](0174-the-art-net-path-is-verified-against-a-simulated-rig.md) | The Art-Net path is verified against a simulated rig | proposed 2026-09-08 (Plan 0133) |
 <!-- roster:end -->

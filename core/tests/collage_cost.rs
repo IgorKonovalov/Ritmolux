@@ -170,8 +170,14 @@ const FRAMES_SHORT: u32 = 10;
 const FRAMES_LONG: u32 = 110;
 
 /// How many times each rung is measured. The **minimum** is kept, not the mean:
-/// a scheduler hiccup can only add time, so the smallest reading is the one
-/// least contaminated by everything that is not the render.
+/// a scheduler hiccup can only add time, so the smallest reading of a *duration*
+/// is the one least contaminated by everything that is not the render.
+///
+/// The short and long legs are minimized **separately** and subtracted once,
+/// after the loop, because a minimum over their *difference* rejects nothing: a
+/// hiccup in `short` subtracts from `long - short`, so the smallest difference
+/// is the repeat whose short leg was most inflated. That bias has one sign, it
+/// grows with contention, and it crosses zero on a busy machine. ADR-0173.
 const REPEATS: usize = 3;
 
 /// A `shape_collage` preset differing from its siblings **only** in how many
@@ -225,14 +231,21 @@ fn per_frame_ms(renderer: &mut Renderer) -> (Vec<f64>, Vec<CaptureImage>) {
         .map(|name| run(renderer, name, FRAMES_SHORT).1)
         .collect();
 
-    let mut best = vec![f64::INFINITY; names.len()];
+    let mut best_short = vec![f64::INFINITY; names.len()];
+    let mut best_long = vec![f64::INFINITY; names.len()];
     for _ in 0..REPEATS {
-        for (slot, name) in best.iter_mut().zip(names.iter()) {
+        for (index, name) in names.iter().enumerate() {
             let (short, _) = run(renderer, name, FRAMES_SHORT);
             let (long, _) = run(renderer, name, FRAMES_LONG);
-            *slot = slot.min((long - short) / f64::from(FRAMES_LONG - FRAMES_SHORT));
+            best_short[index] = best_short[index].min(short);
+            best_long[index] = best_long[index].min(long);
         }
     }
+    let best: Vec<f64> = best_long
+        .iter()
+        .zip(best_short.iter())
+        .map(|(long, short)| (long - short) / f64::from(FRAMES_LONG - FRAMES_SHORT))
+        .collect();
     (best, images)
 }
 

@@ -255,7 +255,9 @@ impl AuxTarget {
     /// Attach a secondary surface for `target` to `ctx`'s device.
     ///
     /// `frame_latency` is the swapchain's `desired_maximum_frame_latency`,
-    /// clamped to [`AUX_FRAME_LATENCY`]. It is a **pacing** control and not a
+    /// clamped to `1..=3` — the range `AUX_FRAME_LATENCY` holds, whose doc
+    /// comment carries why those bounds (private, hence named rather than
+    /// linked). It is a **pacing** control and not a
     /// picture one: at 1 the surface holds a single in-flight image, so
     /// `get_current_texture` waits for this surface's own previous present to
     /// retire before it returns — one vblank, spent on whichever thread calls
