@@ -2463,6 +2463,21 @@ advances twice.
   headless capture has no frame-time clock, so dual_live_eligible always answers Freeze and the path
   is reachable only through Transition::set_mode. The pointer is that function's own doc comment in
   core/src/render/transition.rs`
+- **Updated 2026-09-08** — [Plan 0140](plans/0140-every-rate-integrates-for-real.md) did **not**
+  repair this, and did not make it observable. Its Phase 2 sanitizes the frame delta once at the
+  scene seam ([ADR-0152](adrs/0152-the-frame-delta-is-sanitized-at-the-scene-seam.md)), which says
+  nothing about `evaluate_preset` running twice: a sanitized delta is applied twice exactly as an
+  unsanitized one was. The instrument problem below is untouched, and it remains the blocker.
+
+  **The population grew, and one thing above needs correcting.** `evaluate_preset` runs `set_time`,
+  `advance` *and* `update` (`core/src/render/evaluate.rs:311`, `:312`, `:412`), so the double-run
+  reaches `advance` too — which means `shape_collage` was already in this class through its own
+  `elapsed`, rather than joining it when its rates were converted. What actually changed is the
+  amount of state and the number of entry points: `shape_collage` carries **four** more
+  non-idempotent accumulators (`drift` and `spin`, for the live canvas and the outgoing one), and
+  `emitter` gained a `Scene::advance` where it previously had **none**, holding the integral its
+  sprite rotation is measured against. A scene affected only through `update` is now affected
+  through both.
 
 ### The finding
 

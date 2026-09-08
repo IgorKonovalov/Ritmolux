@@ -293,8 +293,8 @@ at `775ef18`.
 | 2 — The frame delta is sanitized at the seam | dev | done | `2a50d1a` |
 | 3 — The collage rates integrate per element | dev | done | `1209b76` |
 | 4 — Measure the emitter's third case | dev | done | `2373775` |
-| 5 — The three collage presets are retuned | dev | done, no preset edited | committed with this row |
-| 6 — The dissolve note | dev | not started | |
+| 5 — The three collage presets are retuned | dev | done, no preset edited | `36e52bb` |
+| 6 — The dissolve note | dev | done | committed with this row |
 
 ### Notes
 
@@ -411,6 +411,15 @@ at `775ef18`.
 - **The look over a long passage is unjudged, and is a `preset-author` question.** Nothing here says
   the four still read as intended — only that no instrument in the repo can tell, and that the
   measured response did not move.
+
+- **Phase 6 corrected the phase's own size claim while writing it.** The phase says `shape_collage`
+  *joins* the scenes carrying per-frame state that is not idempotent. It was already among them:
+  `evaluate_preset` double-runs `set_time`, `advance` **and** `update`
+  (`core/src/render/evaluate.rs:311`, `:312`, `:412`), and `shape_collage::step` — reached through
+  `advance` — has advanced `self.elapsed` all along. The dated update on backlog 0142 states what
+  actually changed instead: four more non-idempotent accumulators in `shape_collage`, and an
+  `emitter` that gained a `Scene::advance` where it had none, so a scene affected only through
+  `update` is now affected through both.
 
 ### Resume note — 2026-09-07, paused after Phase 2 (scaffolding; strip at the close)
 
