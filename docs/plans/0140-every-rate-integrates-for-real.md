@@ -294,7 +294,7 @@ at `775ef18`.
 | 3 — The collage rates integrate per element | dev | done | `1209b76` |
 | 4 — Measure the emitter's third case | dev | done | `2373775` |
 | 5 — The three collage presets are retuned | dev | done, no preset edited | `36e52bb` |
-| 6 — The dissolve note | dev | done | committed with this row |
+| 6 — The dissolve note | dev | done | `2f4ca19` |
 
 ### Notes
 
@@ -322,17 +322,15 @@ at `775ef18`.
   each probe first asserts that a *valid* longer first frame does change the final picture. All six
   probes pass both halves.
 
-- **Phase 3's test landed outside the phase's file list.** The done-when asks for an assertion over
-  two frames with a moved binding; the phase names `core/src/render/scenes/shape_collage.rs` and
-  `presets/README.md`, and `shape_collage.rs:1681` is a bare `mod tests;`. The two tests and their
-  four helpers are in `core/src/render/scenes/shape_collage/tests.rs`.
-- **The plan's "Goldens will move here" did not happen, and the suite cannot see this phase at all.**
-  `--test golden` is 3/3 unmoved and nothing was blessed. Both fixtures — `shape_collage.toml` and
-  `shape_collage_roster.toml` — leave `drift` and `spin` at their `0` defaults, so both accumulators
-  stay zero and every element composes byte-identically under either form. No golden fixture in the
-  repo binds either rate. The shipped presets that do bind them are covered only by the pass/fail
-  sweeps, which are green: `animation`, `distinctness`, `sanity`, `reactivity`, `preset`,
-  `collage_layout` and `collage_cost` are 351/351.
+- **Phase 3's test landed outside the phase's file list**, in
+  `core/src/render/scenes/shape_collage/tests.rs`: the done-when asks for an assertion, the phase
+  names only `shape_collage.rs`, and `shape_collage.rs:1681` is a bare `mod tests;`.
+- **The plan's "Goldens will move here" did not happen, and the suite cannot see this phase at
+  all.** `--test golden` is 3/3 unmoved, nothing blessed: both fixtures leave `drift` and `spin` at
+  their `0` defaults, so the accumulators stay zero and every element composes byte-identically
+  under either form. No golden fixture in the repo binds either rate. The presets that do are
+  covered only by the pass/fail sweeps — `animation`, `distinctness`, `sanity`, `reactivity`,
+  `preset`, `collage_layout`, `collage_cost` — which are 351/351.
 - **Phase 3 edited `core/src/render/tests.rs`, which is Phase 2's file, on the user's explicit
   authorization.** Integrating the collage rates turned Phase 2's
   `a_degenerate_frame_delta_cannot_reach_a_scene` red at its negative control. `evaluate_preset`
@@ -345,9 +343,9 @@ at `775ef18`.
 - **A followup noticed and not acted on:** the first frame of every preset integrates at the scene's
   default rates rather than the preset's, for the six rates Plan 0122 converted as well as these two.
   It is bounded at one frame and no gate observes it. Not filed — the entry is architect's call.
-- **The `presets/README.md` row was landed here** per the architect ruling recorded in the resume
-  note below. It states the integration, keeps Phase 1's frame-rate sentence and the wrap, and gives
-  the reason a rate still wants a band envelope rather than an onset.
+- **The `presets/README.md` row landed here** per the architect ruling in `d8b2c9f`, which also
+  amended this phase. The row states the integration, keeps Phase 1's frame-rate sentence and the
+  wrap, and gives the reason a rate still wants a band envelope rather than an onset.
 
 - **Phase 4's premise is false: the emitter's `spin` is bound to audio in shipped content.** The
   phase and ADR-0153 both say it is "bound only to constants today"; `presets/emitter_petalfall.toml:87`
@@ -359,27 +357,25 @@ at `775ef18`.
   **0.0835 rad** jump against a **0.0317 rad** nominal step — **2.64x**, against the collage's 24.7x
   at 30 s and growing. Across the whole param space rather than shipped content, `lifetime` caps at
   20 s (30 s at maximum spread).
-- **Repaired rather than documented, on the user's explicit ruling** — the two branches were put to
-  them because the file carries a third answer the phase did not consider: `Object`'s own doc says
-  the path is fixed at spawn (ADR-0057) and `gravity` is already carried per object for exactly this
-  reason, so baking `spin` at spawn — ADR-0153's rejected Alternative A — has a same-file precedent
-  and the emitter's ~3 s turnover defeats the grounds that rejection rests on. The user chose
-  integration. **No ADR was written and none is claimed**; if the architect judges the precedent
-  worth recording, the material is this bullet.
-- **The shape.** One scene-wide accumulator of the integral, plus one `f32` per object holding its
-  value at that object's birth; `sprite_angle` takes the span between them. Not one accumulator per
-  object: every object integrates the same `spin`, and what individuates them — the seeded sign, and
-  the point they measure from — is per object already. The rate stays live, so this is not the
-  spawn-baking `gravity` does.
+- **Repaired rather than documented, on the user's explicit ruling**, which was asked for because
+  the file carries a third answer the phase did not consider: `Object`'s doc says the path is fixed
+  at spawn (ADR-0057) and `gravity` is already carried per object for this exact reason, so baking
+  `spin` at spawn — ADR-0153's rejected Alternative A — has a same-file precedent, and the emitter's
+  ~3 s turnover defeats the grounds that rejection rests on. **No ADR was written and none is
+  claimed.**
+- **The shape.** One scene-wide accumulator, plus one `f32` per object holding its value at that
+  object's birth; `sprite_angle` takes the span between them. Not one per object: every object
+  integrates the same `spin`, and the seeded sign and the point measured from are per object
+  already. The rate stays live, so unlike `gravity` nothing is baked at spawn.
 - **`docs/design-backlog.md` is in Phase 4's file list and was not edited.** It is named for the
   "document the exception" branch, which the repair did not take. Backlog 0142's dated note is
   Phase 6's.
 - **Phase 4 edited two files outside its list.** `core/src/render/scenes/emitter/tests.rs` is
   compile-forced — `Spawn`, `Object` and `build`'s signature all moved — and carries the two new
   assertions. `docs/nfr.md` is a **quantified budget that moved**: `Object` is 40 -> 44 bytes, so
-  section 12's pool table goes 80 -> 88 KB at the floor and 240 -> 264 KB at the rich tier, totals
-  ~200 -> ~208 KB and ~600 -> ~624 KB. `the_pool_costs_what_the_nfr_says_it_does` exists to force
-  that pair of edits to be deliberate and it did.
+  §12's pool table goes 80 -> 88 KB at the floor, 240 -> 264 KB at the rich tier, totals ~200 ->
+  ~208 KB and ~600 -> ~624 KB. `the_pool_costs_what_the_nfr_says_it_does` forces that pair of edits
+  to be deliberate, and it did.
 - **Goldens did not move here either, and the reason is exact rather than lucky.** Under a *held*
   rate the integral equals `rate * age` to the bit, for back-dated prewarm spawns as well as fresh
   ones, so only a binding that *moves* changes any picture. No golden fixture binds `spin`.
@@ -389,71 +385,56 @@ at `775ef18`.
   0150's `dt.is_finite() && dt > 0.0` probe has been red since Phase 2. Both entries are ones this
   plan's header claims to close.
 
-- **Phase 5 changed no preset, on the user's explicit ruling, and here is what was measured.** The
-  pre-Phase-3 scene was temporarily restored, `shot --presets presets --report family=shape_collage`
-  run, HEAD restored, and the report run again. **Three of the four presets are identical in every
-  column**; `Suprematist` alone moves, in the last digit — `rate` 0.0016+ -> 0.0015+, `level` 0.2122
+- **Phase 5 changed no preset, on the user's explicit ruling, and here is the measurement.** The
+  pre-Phase-3 scene was temporarily restored and `shot --report family=shape_collage` run against
+  both trees. **Three of the four presets are identical in every column**; `Suprematist` alone
+  moves, in the last digit — `rate` 0.0016+ -> 0.0015+, `level` 0.2122
   -> 0.2119, `rise/fall` 38+/28+ -> 37+/32+. The phase's premise, that "the same numbers produce a
   much smaller motion", is not what the instrument shows.
-- **Why it shows nothing, which is the finding rather than the reassurance.** `rate * age` and
-  `integral of rate dt` are *equal* while a rate is held, and diverge only as a canvas ages under a
-  rate that moves. Every instrument here is short-horizon: the report's probe is 48-frame windows,
-  and a plain `shot` drives a constant analysis frame, under which the two forms agree by
-  construction. **Nothing in this repo renders a moving stimulus over a long passage**, so the
-  change Phase 3 made is invisible to the gates, to the goldens and to the report alike. A retune
-  would have been four presets moved by feel against no target.
+- **Why it shows nothing, which is the finding rather than the reassurance.** The two forms are
+  *equal* while a rate is held and diverge only as a canvas ages under one that moves. Every
+  instrument here is short-horizon — the report probes in 48-frame windows, and a plain `shot`
+  drives a constant analysis frame, under which they agree by construction. **Nothing in this repo
+  renders a moving stimulus over a long passage**, so Phase 3 is invisible to the gates, the goldens
+  and the report alike, and a retune would have moved four presets by feel against no target.
 - **There are four affected presets, not three.** `collage_nocturne.toml:112-113` binds `drift` and
   `spin` to `bass`/`mid` under `[smoothing] 0.6`, exactly as the three the plan names. It is in
   neither the plan nor ADR-0153, and it is absent from Phase 5's file list.
 - **"The moved goldens are blessed" has no referent.** No golden moved in Phase 3, Phase 4 or here,
   and none could: the two collage fixtures leave `drift` and `spin` at their `0` defaults and there
   is no preset-level golden for any of the four.
-- **The look over a long passage is unjudged, and is a `preset-author` question.** Nothing here says
-  the four still read as intended — only that no instrument in the repo can tell, and that the
-  measured response did not move.
+- **The look over a long passage is unjudged** — a `preset-author` question. Nothing here claims
+  the four still read as intended, only that no instrument can tell and the measured response did
+  not move.
 
-- **Phase 6 corrected the phase's own size claim while writing it.** The phase says `shape_collage`
-  *joins* the scenes carrying per-frame state that is not idempotent. It was already among them:
-  `evaluate_preset` double-runs `set_time`, `advance` **and** `update`
-  (`core/src/render/evaluate.rs:311`, `:312`, `:412`), and `shape_collage::step` — reached through
-  `advance` — has advanced `self.elapsed` all along. The dated update on backlog 0142 states what
-  actually changed instead: four more non-idempotent accumulators in `shape_collage`, and an
-  `emitter` that gained a `Scene::advance` where it had none, so a scene affected only through
-  `update` is now affected through both.
-
-### Resume note — 2026-09-07, paused after Phase 2 (scaffolding; strip at the close)
-
-**Paused for an architect ruling, not blocked on code.** Phases 3-6 are untouched and nothing is
-half-landed: the tree at `2a50d1a` is green, `fmt` and `clippy --workspace --all-targets -D warnings`
-are clean, `-P fast` is 1339/1339, and `--test golden --test attractor` is 10/10 with no baseline
-blessed.
-
-**The question.** Phase 1 corrected `presets/README.md`'s `drift`/`spin` row by *removing* the false
-"Integrated against real elapsed time" claim rather than by documenting the defect — because Phase 3
-makes the form genuinely integrated two commits later, and a row describing the defect would have
-been false by then. The row as it stands is true both before and after Phase 3 and states the
-frame-rate fact, but it **no longer says the two integrate**, which is the engine-wide rule of
-ADR-0132 and the thing `preset-author` reads that file for. **No phase owns putting that back:**
-`presets/README.md` is in Phase 1's file list only, and Phases 3 and 5 name `shape_collage.rs` and
-the three presets.
-
-**What architect decides:** which phase owns the row, and amend that phase's `Files touched`. The
-candidate text is one row, and Phase 3 is the natural owner because it is the commit that makes the
-statement true. Phase 5 is the alternative, since it is already the content-facing phase.
-
-**Architect ruling — 2026-09-07: Phase 3 owns the row.** Its `Files touched`, notes and done-when are
-amended above. Reasons, for the record: a doc claim lands in the commit that makes it true, and
-Phases 3-4 would otherwise ship the rule with the operator doc silent on it; Phase 5 is preset
-content under a `dev` tag — the lane split's stated exception, and the one phase the plan already
-flags as handing off if it grows — so a reference-doc clause parked there is parked behind an escape
-hatch; and Phase 3 is already the phase that can move `presets/README.md` mechanically, since the
-ADR-0170 block's `shape_collage` rows are generated from declarations in its only other file.
-Phase 4 needs nothing here: the emitter's `spin` row (`presets/README.md:1256`) makes no integration
-claim, so whichever way its measurement falls, that row stays true.
-
-**Where to resume:** Phase 3, with the amended file list. Nothing else in the plan needs re-reading —
-the two ADR corrections dated 2026-09-07 are already folded into the phase notes.
+- **Phase 6 corrected the phase's own size claim while writing it.** The phase says
+  `shape_collage` *joins* the scenes carrying non-idempotent per-frame state; it was already among
+  them, because `evaluate_preset` double-runs `set_time`, `advance` **and** `update`
+  (`core/src/render/evaluate.rs:311`, `:312`, `:412`) and `shape_collage::step` has advanced
+  `self.elapsed` through `advance` all along. The dated update states what did change: four more
+  accumulators there, and an `emitter` that gained a `Scene::advance` where it had none.
 
 ### Close triggers
 
-_(filled at the close.)_
+- **`presets/` touched:** **no preset content changed.** `presets/README.md` moved in Phase 1
+  (`d310598`) and Phase 3 (`1209b76`) — the parameter reference, not a `.toml`. Phase 5 edited
+  nothing.
+- **Plan header `Closes:`** — design-backlog **0149** and **0150**. Both are convicted by their own
+  probes on delivery rather than by decay; the entries are untouched, as ADR-0108 directs.
+  **0142 is carried, not closed**, and now holds a dated update (Phase 6).
+- **Backlog probes:** `node scripts/check-backlog-claims.mjs` exits **1 — 5 broken**, and every one
+  of them is this plan's own delivery: 0149's four (`p.spin * spin * age`, `p.vel[0] * drift * age`,
+  `base + rate * age`, and the `presets/README.md` sentence) and 0150's one
+  (`dt.is_finite() && dt > 0.0` in `swarm.rs`). The advisory's moved-path block printed 60 rows,
+  none about these entries.
+- **What shipped:** **feature.** Two scenes changed how a bound rate reaches the picture, one
+  quantified NFR budget moved, and one operator-doc claim was replaced.
+- **Operator docs moved:** `presets/README.md` (the `drift`/`spin` row, Phases 1 and 3) and
+  `docs/nfr.md` (§12's emitter pool table, Phase 4 — `Object` 40 -> 44 bytes). No hotkey, flag,
+  config key, palette name or grammar rule moved, so no other row of the sweep table applies.
+- **`human` phases remaining:** **none.** All six phases carry `**Owner skill:** dev` and all six
+  landed.
+- **Full suite:** `cargo nextest run --workspace` (not `-P fast`), run against the finished tree at
+  `2f4ca19`. **Exit 0 — 1561 passed, 0 failed, 5 skipped**, 457 s. The nine deferred GPU
+  suites are inside that run; `--test golden` was additionally run alone after Phase 3 and after
+  Phase 4, 3/3 both times. **No baseline was blessed at any point in this plan**, and none moved.
