@@ -291,8 +291,8 @@ at `775ef18`.
 |---|---|---|---|
 | 1 — The operator doc stops teaching the defect | dev | done | `d310598` |
 | 2 — The frame delta is sanitized at the seam | dev | done | `2a50d1a` |
-| 3 — The collage rates integrate per element | dev | done | committed with this row |
-| 4 — Measure the emitter's third case | dev | not started | |
+| 3 — The collage rates integrate per element | dev | done | `1209b76` |
+| 4 — Measure the emitter's third case | dev | done | committed with this row |
 | 5 — The three collage presets are retuned | dev | not started | |
 | 6 — The dissolve note | dev | not started | |
 
@@ -348,6 +348,46 @@ at `775ef18`.
 - **The `presets/README.md` row was landed here** per the architect ruling recorded in the resume
   note below. It states the integration, keeps Phase 1's frame-rate sentence and the wrap, and gives
   the reason a rate still wants a band envelope rather than an onset.
+
+- **Phase 4's premise is false: the emitter's `spin` is bound to audio in shipped content.** The
+  phase and ADR-0153 both say it is "bound only to constants today"; `presets/emitter_petalfall.toml:87`
+  is `spin = "1.1 + clamp(mid * 0.94, 0, 0.8)"` under `[smoothing] spin = 0.5`.
+- **The measurement, and it did not settle the phase on its own.** `age` is hard-bounded by the
+  object's lifetime, so there is no unbounded case: `petalfall`'s objects live
+  `2.6 * (1 +/- 0.45/2)` seconds, at most **3.185 s** and shortened by exit through a side. One
+  frame of the smoothed binding moves `spin` by `0.0328 * 0.8`, which at the oldest object is a
+  **0.0835 rad** jump against a **0.0317 rad** nominal step — **2.64x**, against the collage's 24.7x
+  at 30 s and growing. Across the whole param space rather than shipped content, `lifetime` caps at
+  20 s (30 s at maximum spread).
+- **Repaired rather than documented, on the user's explicit ruling** — the two branches were put to
+  them because the file carries a third answer the phase did not consider: `Object`'s own doc says
+  the path is fixed at spawn (ADR-0057) and `gravity` is already carried per object for exactly this
+  reason, so baking `spin` at spawn — ADR-0153's rejected Alternative A — has a same-file precedent
+  and the emitter's ~3 s turnover defeats the grounds that rejection rests on. The user chose
+  integration. **No ADR was written and none is claimed**; if the architect judges the precedent
+  worth recording, the material is this bullet.
+- **The shape.** One scene-wide accumulator of the integral, plus one `f32` per object holding its
+  value at that object's birth; `sprite_angle` takes the span between them. Not one accumulator per
+  object: every object integrates the same `spin`, and what individuates them — the seeded sign, and
+  the point they measure from — is per object already. The rate stays live, so this is not the
+  spawn-baking `gravity` does.
+- **`docs/design-backlog.md` is in Phase 4's file list and was not edited.** It is named for the
+  "document the exception" branch, which the repair did not take. Backlog 0142's dated note is
+  Phase 6's.
+- **Phase 4 edited two files outside its list.** `core/src/render/scenes/emitter/tests.rs` is
+  compile-forced — `Spawn`, `Object` and `build`'s signature all moved — and carries the two new
+  assertions. `docs/nfr.md` is a **quantified budget that moved**: `Object` is 40 -> 44 bytes, so
+  section 12's pool table goes 80 -> 88 KB at the floor and 240 -> 264 KB at the rich tier, totals
+  ~200 -> ~208 KB and ~600 -> ~624 KB. `the_pool_costs_what_the_nfr_says_it_does` exists to force
+  that pair of edits to be deliberate and it did.
+- **Goldens did not move here either, and the reason is exact rather than lucky.** Under a *held*
+  rate the integral equals `rate * age` to the bit, for back-dated prewarm spawns as well as fresh
+  ones, so only a binding that *moves* changes any picture. No golden fixture binds `spin`.
+- **Backlog probes, reported and not touched** (ADR-0108 leaves the repair to the architect):
+  `node scripts/check-backlog-claims.mjs` is **5 broken**. All four of entry 0149's are red on
+  delivery — the two collage sites, the emitter site, and the `presets/README.md` sentence — and
+  0150's `dt.is_finite() && dt > 0.0` probe has been red since Phase 2. Both entries are ones this
+  plan's header claims to close.
 
 ### Resume note — 2026-09-07, paused after Phase 2 (scaffolding; strip at the close)
 

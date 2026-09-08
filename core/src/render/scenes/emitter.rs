@@ -321,6 +321,17 @@ struct Object {
     /// and the moment it leaves the bound for good, solved at spawn so
     /// retirement is monotone in scene time (see the module docs).
     death_time: f32,
+    /// The scene's integrated `spin` at the instant this object was thrown, so
+    /// the angle it has turned through is the integral **since its own birth**
+    /// (ADR-0132, ADR-0153): one scene-wide accumulator minus this, rather than
+    /// the current rate multiplied by the object's age, which would re-turn
+    /// every second the object had already flown whenever a binding moved.
+    ///
+    /// Unlike [`Self::gravity`] this is not the rate baked at spawn — the rate
+    /// stays live, and an object in flight answers a moving `spin` from the
+    /// moment it moves. What is fixed at spawn is only where its rotation is
+    /// measured *from*.
+    spin0: f32,
     /// Drawn once at spawn. **Every** individuating quantity is a pure function
     /// of this and a preset distribution param (ADR-0057).
     seed: u32,
@@ -337,6 +348,7 @@ impl Object {
         lifetime: 1.0,
         gravity: 0.0,
         death_time: 0.0,
+        spin0: 0.0,
         seed: 0,
         alive: false,
     };
@@ -377,6 +389,11 @@ struct Spawn {
     /// Lifetimes of spawns to back-date at scene start, in `0..=`[`MAX_PREWARM`].
     /// Read once, on the field's first [`step`](Field::step), and never again.
     prewarm: f32,
+    /// This frame's `spin`, and the scene's integral of it at this frame's time.
+    /// A spawn needs both to place its own birth on that integral — see
+    /// [`build`].
+    spin: f32,
+    spin_integral: f32,
     /// Half-extents of the retirement bound, world units.
     bound: [f32; 2],
 }
@@ -475,7 +492,7 @@ impl Field {
         let mut spawned = 0usize;
         while t0 <= time && spawned < cap {
             let seed = (self.rng.next_u64() >> 32) as u32;
-            let object = build(seed, t0, cfg);
+            let object = build(seed, t0, time, cfg);
             if object.death_time > time
                 && let Some(index) = self.free.pop()
                 && let Some(slot) = self.objects.get_mut(index as usize)
@@ -516,7 +533,7 @@ impl Field {
         let mut spawned = 0usize;
         while self.next_spawn <= time && spawned < cap {
             let t0 = self.next_spawn;
-            self.spawn_at(t0, cfg);
+            self.spawn_at(t0, time, cfg);
             self.next_spawn += period;
             spawned += 1;
         }
@@ -529,12 +546,12 @@ impl Field {
     ///
     /// The RNG advances either way, so the seed sequence is a function of the
     /// spawn schedule alone and not of how full the pool happened to be.
-    fn spawn_at(&mut self, t0: f32, cfg: &Spawn) {
+    fn spawn_at(&mut self, t0: f32, now: f32, cfg: &Spawn) {
         let seed = (self.rng.next_u64() >> 32) as u32;
         let Some(index) = self.free.pop() else {
             return;
         };
-        let object = build(seed, t0, cfg);
+        let object = build(seed, t0, now, cfg);
         if let Some(slot) = self.objects.get_mut(index as usize) {
             *slot = object;
             self.live += 1;
@@ -571,11 +588,19 @@ mod channel {
     pub(super) const HUE: u32 = 8;
 }
 
-/// Build the object a `seed` spawned at `t0` under `cfg` describes.
+/// Build the object a `seed` spawned at `t0` under `cfg` describes. `now` is
+/// the frame's scene time, which a back-dated spawn sits behind.
 ///
 /// Free-standing and pure, so the closed-form path and the death-time solve can
 /// be exercised without a pool around them.
-fn build(seed: u32, t0: f32, cfg: &Spawn) -> Object {
+///
+/// **The birth's place on the spin integral is reconstructed, and exactly.** The
+/// accumulator's value is known at `now`, so a spawn back-dated by `now - t0`
+/// starts from `cfg.spin * (now - t0)` less of it. That is exact for a `spin`
+/// held across the interval, which is the only history a back-dated object has:
+/// it did not exist while the rate was doing anything else. A spawn at `now`
+/// takes the accumulator untouched and starts from zero turned.
+fn build(seed: u32, t0: f32, now: f32, cfg: &Spawn) -> Object {
     let angle = cfg.angle + (unit(seed, channel::ANGLE) - 0.5) * cfg.spread;
     let lifetime = (cfg.lifetime
         * (1.0 + (unit(seed, channel::LIFETIME) - 0.5) * cfg.lifetime_spread))
@@ -594,6 +619,7 @@ fn build(seed: u32, t0: f32, cfg: &Spawn) -> Object {
         lifetime,
         gravity: cfg.gravity,
         death_time: t0 + lifetime.min(exit),
+        spin0: cfg.spin_integral - cfg.spin * (now - t0),
         seed,
         alive: true,
     }
@@ -739,15 +765,23 @@ fn twinkle_factor(seed: u32, time: f32, twinkle: f32) -> f32 {
     (1.0 + twinkle * wave).max(0.0)
 }
 
-/// The sprite's orientation: a seeded base angle plus `spin` radians a second,
-/// signed per object so the field turns both ways.
+/// The sprite's orientation: a seeded base angle plus however far the object has
+/// turned, signed per object so the field turns both ways.
+///
+/// `span` is the scene's integrated `spin` **since this object was thrown** —
+/// [`Object::spin0`] subtracted from the live accumulator — so a binding that
+/// moves turns the field from that instant instead of re-turning the flight it
+/// has already made (ADR-0132, ADR-0153). The seeded sign is applied here rather
+/// than folded into the accumulator, because the accumulator is one value for
+/// the whole field and the sign is what individuates an object within it.
 ///
 /// The base exists at `spin = 0` too — a population of identically-oriented
-/// glints is the sheet this phase is about, and it costs nothing to scatter.
-fn sprite_angle(seed: u32, age: f32, spin: f32) -> f32 {
+/// glints is the sheet the distribution params exist to break up, and it costs
+/// nothing to scatter.
+fn sprite_angle(seed: u32, span: f32) -> f32 {
     let base = unit(seed, channel::ORIENT) * std::f32::consts::TAU;
-    let rate = (unit(seed, channel::SPIN) * 2.0 - 1.0) * spin;
-    base + rate * age
+    let sign = unit(seed, channel::SPIN) * 2.0 - 1.0;
+    base + sign * span
 }
 
 /// The object's size multiplier within `size_spread`. `1.0` exactly at zero
@@ -920,6 +954,17 @@ pub struct EmitterScene {
     size: f32,
     size_spread: f32,
     spin: f32,
+    /// The integral of [`Self::spin`] over the scene's life, in radians, advanced
+    /// from the injected `dt` (ADR-0132, ADR-0153). An object turns through the
+    /// span of this since its own [`Object::spin0`], so a moving binding steers
+    /// the field rather than re-turning the flight already made.
+    ///
+    /// **One accumulator for the whole field, not one per object.** Every object
+    /// integrates the same `spin`; what differs is the seeded sign it is read
+    /// with and the point it is measured from, and both of those are per object
+    /// already. Growth is unbounded in principle and bounded in practice by
+    /// `f32` — the same footing every other rate in the engine stands on.
+    spin_integral: f32,
     twinkle: f32,
     /// The shared palette knobs (ADR-0021).
     colour: common::PaletteParams,
@@ -1045,6 +1090,7 @@ impl EmitterScene {
             size: DEFAULT_SIZE,
             size_spread: DEFAULT_SIZE_SPREAD,
             spin: DEFAULT_SPIN,
+            spin_integral: 0.0,
             twinkle: DEFAULT_TWINKLE,
             colour: common::PaletteParams::new(DEFAULT_HUE, DEFAULT_BRIGHTNESS),
             pan: common::PanParams::default(),
@@ -1080,6 +1126,8 @@ impl EmitterScene {
             source_y: source_line_y(self.source_y, bound),
             prewarm: finite(self.prewarm, DEFAULT_PREWARM).clamp(0.0, MAX_PREWARM),
             bound,
+            spin: finite(self.spin, DEFAULT_SPIN),
+            spin_integral: self.spin_integral,
         }
     }
 }
@@ -1099,12 +1147,28 @@ impl Scene for EmitterScene {
         self.time = time;
     }
 
+    /// Advance the spin integral by `dt` real seconds.
+    ///
+    /// The rest of this scene is a closed form in scene time and needs no step;
+    /// a rate is the one thing that cannot be, because its own value moves
+    /// (ADR-0132). `finite` runs before the add rather than at the read: the
+    /// accumulator is permanent state, so one NaN frame from a binding would
+    /// poison every object's angle for the rest of the scene's life instead of
+    /// for the frame that produced it. `dt` needs no guard of its own — the
+    /// seam sanitizes it before this is called (ADR-0152).
+    fn advance(&mut self, dt: f32) {
+        self.spin_integral += finite(self.spin, DEFAULT_SPIN) * dt;
+    }
+
     fn set_palette(&mut self, palette: &Palette) {
         // CPU-sampled per object in `update`; a cheap array copy, off the hot
         // path (once per preset switch).
         self.palette = palette.clone();
     }
 
+    /// **The integral is not reset here.** `reset_params` runs every frame
+    /// before the bindings are applied; zeroing an accumulator there would put
+    /// every object's angle back to its base each frame.
     fn reset_params(&mut self) {
         self.spawn_rate = DEFAULT_SPAWN_RATE;
         self.gravity = DEFAULT_GRAVITY;
@@ -1181,7 +1245,7 @@ impl Scene for EmitterScene {
         // the whole population continuously instead of only the objects spawned
         // since the change.
         let size_spread = finite(self.size_spread, DEFAULT_SIZE_SPREAD).clamp(0.0, 2.0);
-        let spin = finite(self.spin, DEFAULT_SPIN);
+        let spin_integral = self.spin_integral;
         let twinkle = finite(self.twinkle, DEFAULT_TWINKLE);
         // A fraction of a life, so past 1 there is no more life to ramp over.
         // Resolved here rather than at spawn for the same reason as the three
@@ -1227,7 +1291,7 @@ impl Scene for EmitterScene {
                 center: pos,
                 size: size * size_factor(object.seed, size_spread),
                 color: [base[0] * bright, base[1] * bright, base[2] * bright],
-                attr: sprite_angle(object.seed, age, spin),
+                attr: sprite_angle(object.seed, spin_integral - object.spin0),
             };
             count += 1;
         }

@@ -402,11 +402,11 @@ Retargeted requirements — chosen to be enforceable by the [Plan 0011](plans/do
 
   | | floor (2 000 objects) | rich (6 000) |
   |---|---|---|
-  | CPU pool (`Object`, 40 B incl. padding) | 80 KB | 240 KB |
+  | CPU pool (`Object`, 44 B incl. padding) | 88 KB | 264 KB |
   | free list (`u32`) | 8 KB | 24 KB |
   | CPU instance mirror (28 B) | 56 KB | 168 KB |
   | GPU instance buffer (28 B) | 56 KB | 168 KB |
-  | **total** | **~200 KB** | **~600 KB** |
+  | **total** | **~208 KB** | **~624 KB** |
 
   Two orders of magnitude under the ~66 MB a single post chain costs, and the reason the tier's
   `emitter_objects` was sized for headroom rather than trimmed: the pool is bounded by cost of

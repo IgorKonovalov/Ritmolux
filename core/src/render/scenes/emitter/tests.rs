@@ -70,6 +70,8 @@ fn cfg(rate: f32, gravity: f32, speed: f32) -> Spawn {
         source_y: DEFAULT_SOURCE_Y,
         prewarm: 0.0,
         bound: bounds(ASPECT),
+        spin: 0.0,
+        spin_integral: 0.0,
     }
 }
 
@@ -95,6 +97,7 @@ fn an_object_follows_the_closed_form_parabola() {
             lifetime: 100.0,
             gravity: g,
             death_time: f32::INFINITY,
+            spin0: 0.0,
             seed: 0,
             alive: true,
         };
@@ -399,8 +402,8 @@ fn the_exit_time_is_the_last_crossing_not_the_first() {
 fn a_spawn_is_a_pure_function_of_its_seed() {
     let cfg = cfg(60.0, 1.5, 1.9);
     for seed in [0u32, 1, 7, 0xDEAD_BEEF, u32::MAX] {
-        let a = build(seed, 0.25, &cfg);
-        let b = build(seed, 0.25, &cfg);
+        let a = build(seed, 0.25, 0.25, &cfg);
+        let b = build(seed, 0.25, 0.25, &cfg);
         assert_eq!(a.p0, b.p0);
         assert_eq!(a.v0, b.v0);
         assert_eq!(a.death_time, b.death_time);
@@ -468,7 +471,7 @@ fn a_zero_source_width_is_a_point_source() {
         };
         for seed in [0u32, 1, 7, 0xDEAD_BEEF, u32::MAX] {
             assert_eq!(
-                build(seed, 0.25, &cfg).p0[0],
+                build(seed, 0.25, 0.25, &cfg).p0[0],
                 0.0,
                 "every object must leave from x = 0 exactly at source_width = {width}"
             );
@@ -478,7 +481,7 @@ fn a_zero_source_width_is_a_point_source() {
     let wide = cfg(60.0, 1.5, 1.9);
     let xs: Vec<f32> = [0u32, 1, 7, 0xDEAD_BEEF, u32::MAX]
         .iter()
-        .map(|&seed| build(seed, 0.25, &wide).p0[0])
+        .map(|&seed| build(seed, 0.25, 0.25, &wide).p0[0])
         .collect();
     assert!(
         xs.windows(2).any(|w| w[0] != w[1]),
@@ -511,7 +514,7 @@ fn a_source_past_the_bound_is_clamped_and_still_spawns_live_objects() {
             ..cfg(60.0, 1.5, 1.9)
         };
         for seed in [0u32, 1, 7, 0xDEAD_BEEF, u32::MAX] {
-            let object = build(seed, 0.25, &cfg);
+            let object = build(seed, 0.25, 0.25, &cfg);
             assert!(
                 object.death_time > 0.25 + FRAME,
                 "an object spawned from source_y = {asked} (clamped to {y}) \
@@ -910,6 +913,144 @@ fn a_prewarmed_pool_matches_one_that_actually_ran() {
     }
 }
 
+/// One live object at the end of a run: when it was thrown, its seed, and the
+/// angle it has turned to.
+type Turned = (f32, u32, f32);
+
+/// Step two stretches of frames at `rates[0]` then `rates[1]`, carrying the spin
+/// accumulator the way the scene does, and report every object still alive.
+///
+/// The accumulator is advanced before the field is stepped, so an object
+/// spawning on a frame is placed on the value that frame's own instant carries —
+/// the scene's order, and the thing `build` reconstructs a back-dated spawn
+/// against.
+fn spun_field(rates: [f32; 2], lengths: [u32; 2]) -> Vec<Turned> {
+    let base = cfg(60.0, 1.5, 1.9);
+    let mut field = Field::new(4096);
+    let (mut time, mut integral) = (0.0f32, 0.0f32);
+    for (rate, frames) in rates.iter().zip(lengths.iter()) {
+        for _ in 0..*frames {
+            time += FRAME;
+            integral += rate * FRAME;
+            field.step(
+                time,
+                &Spawn {
+                    spin: *rate,
+                    spin_integral: integral,
+                    ..base
+                },
+            );
+        }
+    }
+    let mut out: Vec<Turned> = field
+        .objects
+        .iter()
+        .filter(|o| o.alive)
+        .map(|o| (o.t0, o.seed, sprite_angle(o.seed, integral - o.spin0)))
+        .collect();
+    out.sort_by(|a, b| a.0.total_cmp(&b.0));
+    out
+}
+
+/// A frame at 60 Hz, for the runs above.
+const FRAME: f32 = 1.0 / 60.0;
+
+/// **A moving `spin` turns the field from the moment it moves** (ADR-0132,
+/// ADR-0153).
+///
+/// An object turns through the integral since **its own** birth, so a binding
+/// that changes steers it from that instant and does not re-turn the flight it
+/// has already made — which `base + rate * age` did, by multiplying the object's
+/// whole age by whatever the rate had become.
+///
+/// Two fields see an identical first stretch and differ only over the second, so
+/// whatever an object already in flight ends up turned by is owed to the second
+/// stretch alone. The expectation is read out of `sprite_angle` at the same seed
+/// rather than written down as a number: the seeded sign is what individuates an
+/// object, it is not the claim under test, and it belongs on both sides.
+///
+/// Only objects thrown **before** the change are compared. One thrown after it
+/// has less of the second stretch to have turned through, which is the same rule
+/// and not a separate one — the sibling test covers the rate reaching new
+/// objects at all.
+#[test]
+fn a_moved_spin_turns_the_field_from_that_moment() {
+    const HISTORY: u32 = 120;
+    const AFTER: u32 = 30;
+    let (slow, fast) = (0.5f32, 1.5f32);
+
+    let held = spun_field([slow, slow], [HISTORY, AFTER]);
+    let moved = spun_field([slow, fast], [HISTORY, AFTER]);
+    assert_eq!(
+        held.len(),
+        moved.len(),
+        "the two runs must hold the same population: only the rate differs, and \
+         a rate touches neither the spawn schedule nor the seeds"
+    );
+
+    // What the second stretch is worth on its own, at the difference between the
+    // two rates. Every object in flight across it owes exactly this, signed.
+    let owed = (fast - slow) * AFTER as f32 * FRAME;
+    let born_before = HISTORY as f32 * FRAME + FRAME * 0.5;
+    let (mut compared, mut widest) = (0usize, 0.0f32);
+
+    for (i, (&(t0, seed, a), &(t0b, _, b))) in held.iter().zip(moved.iter()).enumerate() {
+        assert_eq!(t0, t0b, "object {i} was thrown at a different instant");
+        if t0 > born_before {
+            continue;
+        }
+        let expect = sprite_angle(seed, owed) - sprite_angle(seed, 0.0);
+        widest = widest.max(expect.abs());
+        compared += 1;
+        assert!(
+            ((b - a) - expect).abs() < 1e-4,
+            "an object thrown at {t0} turned {} rad when the half second it was \
+             moved for is worth {expect} — the rate is re-turning the flight it \
+             had already made",
+            b - a
+        );
+    }
+
+    assert!(
+        compared > 20,
+        "only {compared} objects were still in flight across the change, so \
+         there is nothing here to have re-turned"
+    );
+    assert!(
+        widest > 1e-3,
+        "the whole population owed less than {widest} rad, so this compared two \
+         fields that never turned"
+    );
+}
+
+/// **A `spin` held at zero never turns the field**: every object sits on the
+/// angle it was thrown with, which is the identity the spin distribution
+/// collapses to and the reason `sprite_angle` has a base at all.
+#[test]
+fn a_zero_spin_leaves_every_object_on_its_thrown_angle() {
+    let still = spun_field([0.0, 0.0], [120, 30]);
+    assert!(still.len() > 20, "the assertion needs a population");
+    for &(t0, seed, angle) in &still {
+        assert_eq!(
+            angle,
+            sprite_angle(seed, 0.0),
+            "an object thrown at {t0} turned under a spin that never left zero"
+        );
+    }
+
+    // ...and falsifiably: the same schedule under a rate that does move puts
+    // them somewhere else.
+    let turned = spun_field([0.0, 0.4], [120, 30]);
+    assert!(
+        still
+            .iter()
+            .zip(turned.iter())
+            .any(|(&(_, _, a), &(_, _, b))| (a - b).abs() > 1e-3),
+        "a field that never spun and one that did must differ, or the assertion \
+         above holds vacuously"
+    );
+}
+
 /// **`prewarm = 0` leaves the pool starting empty**, which is today's behaviour
 /// and the reason this is a param rather than a fix.
 ///
@@ -1078,13 +1219,16 @@ fn objects_alive_at_one_instant_differ_and_a_zero_spread_collapses_them() {
     for &s in &seeds {
         assert_eq!(size_factor(s, 0.0), 1.0);
         assert_eq!(twinkle_factor(s, 3.7, 0.0), 1.0);
-        assert_eq!(sprite_angle(s, 2.0, 0.0), sprite_angle(s, 5.0, 0.0));
     }
+    // Spin's collapse is not a property of `sprite_angle`: the function takes
+    // the span already integrated, so `spin = 0` collapsing it is the
+    // accumulator's claim and is asserted in
+    // `a_zero_spin_leaves_every_object_on_its_thrown_angle`.
     let sizes: Vec<f32> = seeds.iter().map(|&s| size_factor(s, 0.7)).collect();
     let twinkles: Vec<f32> = seeds.iter().map(|&s| twinkle_factor(s, 3.7, 0.8)).collect();
     let spins: Vec<f32> = seeds
         .iter()
-        .map(|&s| sprite_angle(s, 5.0, 1.0) - sprite_angle(s, 2.0, 1.0))
+        .map(|&s| sprite_angle(s, 5.0) - sprite_angle(s, 2.0))
         .collect();
     for (label, series) in [("size", &sizes), ("twinkle", &twinkles), ("spin", &spins)] {
         let lo = series.iter().copied().fold(f32::INFINITY, f32::min);
@@ -1378,8 +1522,8 @@ fn the_pool_costs_what_the_nfr_says_it_does() {
     use std::mem::size_of;
     assert_eq!(
         size_of::<Object>(),
-        40,
-        "docs/nfr.md section 12 charges the emitter pool at 40 bytes an object"
+        44,
+        "docs/nfr.md section 12 charges the emitter pool at 44 bytes an object"
     );
     assert_eq!(
         size_of::<QuadInstance>(),
