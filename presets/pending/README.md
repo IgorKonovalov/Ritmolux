@@ -9,7 +9,9 @@ subdirectory is skipped by construction. Files here are version-controlled, revi
 and reach neither the binary nor the behavioral suite.
 
 **Shipping one is a `git mv` into `presets/`**, gated on `cargo nextest run -p rlx-core` — the same
-gate every other preset passes. Nothing else has to change.
+gate every other preset passes. The one thing that may change on the way out is the **filename**:
+the shipped set is named `<system>_<look>.toml` and `ls` is its roster, so a held file named any
+other way is renamed as it lands (both authored-path worlds below were).
 
 **To work on one in the running app**, point `RLX_PRESET_DIR` at this directory (ADR-0014); the app
 hot-reloads it on a ~150 ms poll exactly as it does the shipped folder.
@@ -20,29 +22,36 @@ as that blocker lifts.
 
 ## Held today
 
-**None.** Both entries left on 2026-09-09.
+**None.** The directory is empty of held content; the record below is what it has carried.
 
-`path_maple.toml` and `path_lion.toml` — the first authored content anywhere to use a `[path]` table
-(Plan 0092, ADR-0107), a maple leaf and a maned lion mask, each one closed contour of 54 SVG commands
-drawn as the shape field's banded emblem. They passed the look gate in the running app on 2026-09-09
-and were held the same day, because both authored `d` with the figure inverted to compensate for the
-engine reading an SVG contour in clip space.
+## What left, and why the record is worth keeping
 
-Plan 0092 Phase 7 negated y at parse and re-flipped both files' `d` in the same commit, which is
-exactly the condition the row below named. **The blocker is discharged and neither file carries a
-workaround any more**; both stay here only until the content lane judges the look on its merits,
-which is a curation call rather than an engine one.
+### `shape_maple.toml` and `shape_lion.toml` — shipped 2026-09-09
 
-| Preset | Was blocked by | Discharged |
-|--------|----------------|-----------|
-| `path_maple.toml` | The authored-path Y-flip: `[path] d` was read in clip space (Y-up) against SVG's Y-down, so `d` was authored inverted | Plan 0092 Phase 7, 2026-09-09 — the parser negates y and both `d` strings were re-flipped in that commit |
-| `path_lion.toml` | The same Y-flip | The same |
+Two authored-path worlds, a maple leaf and a maned lion mask, each one closed contour of 54 SVG
+commands drawn as the shape field's banded emblem. They were the first content anywhere to use a
+`[path]` table ([Plan 0092](../../docs/plans/done/0092-the-engine-draws-an-authored-path.md),
+[ADR-0107](../../docs/adrs/0107-an-authored-path-is-inline-svg-data-and-it-morphs-by-resampling.md)),
+and they were held for **less than a day** — authored, look-gated and blocked on 2026-09-09, released
+by that plan's own Phase 7 the same evening.
 
-### What left, and why the record is worth keeping
+The blocker was the engine's, not the look's: `[path] d` was read in clip space, y-up, against SVG's
+y-down, so **every pasted path arrived mirrored top to bottom** and both files authored `d` inverted
+to compensate. Phase 7 negated y at parse and re-flipped both `d` strings in the same commit — the
+workaround and the defect had to leave together or the presets would have rendered upside down the
+moment the engine was right.
 
-`fragment_tiledmono.toml` shipped on 2026-08-26 ([Plan 0119](../../docs/plans/done/0119-the-flatness-gate-gets-its-second-term.md)
-Phase 4) after being held from Plan 0113. It is the only entry this directory has ever had, and its
-history is the argument for the directory existing.
+The reason to keep this short entry is that it is the **cheap** case, and it reads as the argument
+for the directory rather than against it. Nothing was tuned around the defect except the one string
+that had to be; the header named the blocker, so the fix knew exactly what to undo; and the presets
+went out under their shipped names on their own merits at the Plan 0092 close ceremony, not as a
+by-product of the fix.
+
+### `fragment_tiledmono.toml` — shipped 2026-08-26
+
+It shipped ([Plan 0119](../../docs/plans/done/0119-the-flatness-gate-gets-its-second-term.md)
+Phase 4) after being held from Plan 0113. It is the directory's expensive case, and its history is
+the argument for the directory existing.
 
 It was blocked by exactly one number — `tonal_flatness = 0.9413` against a `0.90` ceiling — while
 clearing every other gate. Three attempts to treat that as a measurement error failed:

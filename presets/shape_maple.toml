@@ -1,5 +1,5 @@
 # Maple - an authored silhouette drawn as a banded emblem.
-# scratch, Plan 0092 Phase 6. NOT in the shipped library.
+# The first shipped preset anywhere to carry a [path] table (Plan 0092, ADR-0107).
 #
 # The figure is 54 SVG commands / 314 coordinates as one closed contour: five
 # sharp tips, four deep reflex sinuses, a tooth on every lobe edge, a hairline
@@ -40,9 +40,8 @@
 # measured ceiling, not a tuning choice: at this figure's complexity the arc-chain
 # fit is discarded for exceeding MAX_ARC_PIECES, and `samples` caps at 64.
 #
-# NOT BLOCKED. `d` is ordinary SVG, y-down, the way a design tool exports it -
-# the engine negates y at parse and this file carries no workaround. Whether it
-# ships is a curation call on the look, not an engine question.
+# `d` is ordinary SVG, y-down, the way a design tool exports it - the engine
+# negates y at parse and this file carries no workaround.
 #
 # LOOK GATE: smoke test passed in the running app, 2026-09-09 (user), on the
 # Plan 0092 lane build.

@@ -215,8 +215,16 @@ field**, which makes the palette coordinate a *distance*: turn `palette_steps` u
 concentric **offset contours of that shape**, not concentric circles. `palette_contour` then draws a
 hairline at each band edge.
 
+It is also the one system where the figure itself can be **authored rather than selected**. A
+`[path]` table takes inline SVG path data — one closed contour, pasted out of a design tool and
+rendered as the same distance field, so `palette_steps` and `palette_contour` band an outline nobody
+put in the roster. `presets/shape_maple.toml` and `presets/shape_lion.toml` are that: a leaf and a
+lion mask, each 54 commands. A second contour in `morph_to` gives the bindable `morph`, so a figure
+can *become* another figure on the beat.
+
 **Reach for this when** the subject is a **figure and its echoes**: nested outlines, a breathing
-heart, rings travelling outward from a shape. The full parameter roster and three worked reactivity
+heart, rings travelling outward from a shape — or one specific emblem the five names do not reach.
+The full parameter roster, the `[path]` subset and its arity ceiling, and three worked reactivity
 recipes are in [`../presets/README.md`](../presets/README.md).
 
 ### `warp_mesh`

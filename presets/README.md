@@ -4824,3 +4824,4 @@ Presets worth reading as **worked examples** of one control each:
 | `star_rosewindow` | **`rings`** — concentric motifs giving a rosette an interior |
 | `fragment_vitrail` | the **`[layer]` table** — a crisp `over` layer with a bindable `mix`, and per-beat `draw_progress` on the layer |
 | `fragment_sumi` | a **stateful layer** — the attractor as `[layer]` scene, `add`-blended over a field |
+| `shape_maple` | the **`[path]` table** — an authored silhouette, and the band-alignment arithmetic that makes it read crisp (`color_center` moves in whole `1 / palette_steps` steps, `color_span` is never bound) |

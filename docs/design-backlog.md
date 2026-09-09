@@ -3630,12 +3630,13 @@ a magnitude"*. The counters are not part of that treatment. `beat_index` and `ba
 capture as `AnalysisFrame::default()` left them and **do not advance across the captured frames**.
 
 So a preset whose musical event is a counter reads as dead. Both of Plan 0092's authored-path worlds
-step their ring family one band per onset via `color_center = mod(k + beat_index/16, 1)`, and the
-report gives them `onset 0.000` and `mid 0.000`, with only `bass` showing. Nothing is broken and no
+— `presets/shape_maple.toml` and `presets/shape_lion.toml` — step their ring family one band per
+onset via `color_center = mod(k + beat_index/16, 1)`, and the report gives them `onset 0.000` and
+`mid 0.000`, with only `bass` showing. Nothing is broken and no
 gate fires; the instrument simply cannot express the question.
 
-- **Raised:** 2026-09-09, by the `preset-author` lane while landing `path_maple` and `path_lion`
-  (Plan 0092, `presets/pending/`). Routed here rather than into Plan 0160 because the fix perturbs a
+- **Raised:** 2026-09-09, by the `preset-author` lane while landing the two authored-path worlds
+  (Plan 0092; they shipped as `shape_maple` and `shape_lion` at that plan's close). Routed here rather than into Plan 0160 because the fix perturbs a
   shared instrument. **Owner if taken:** `architect` first — this is an interview, not an edit.
 - **Verified 2026-09-09** - the stimulus holds `beat` as a boolean event and says why:
   `present: beat: true, in: standalone/src/shot/report.rs`

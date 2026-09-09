@@ -1,5 +1,5 @@
 # Lion - a maned mask drawn as a banded emblem.
-# scratch, Plan 0092 Phase 6. NOT in the shipped library.
+# One of the two shipped presets carrying a [path] table (Plan 0092, ADR-0107).
 #
 # 54 SVG commands as one closed contour, authored in POLAR and mirrored so the
 # mane is symmetric to the pixel. Three things carry the reading, and all three
@@ -33,9 +33,8 @@
 # `color_center` may move only in WHOLE BAND STEPS, `color_span` may not be bound
 # at all, and `gamma` is safe because 1^g = 1 and it cannot move the edge.
 #
-# NOT BLOCKED. `d` is ordinary SVG, y-down, the way a design tool exports it -
-# the engine negates y at parse and this file carries no workaround. Whether it
-# ships is a curation call on the look, not an engine question.
+# `d` is ordinary SVG, y-down, the way a design tool exports it - the engine
+# negates y at parse and this file carries no workaround.
 #
 # LOOK GATE: smoke test passed in the running app, 2026-09-09 (user), on the
 # Plan 0092 lane build.
