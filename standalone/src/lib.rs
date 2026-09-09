@@ -37,6 +37,7 @@ use std::path::{Path, PathBuf};
 // very type the app deserializes - the same reason `osc` and `shot` are here.
 pub mod config;
 pub mod control;
+pub mod events;
 pub mod gpu;
 pub mod osc;
 pub mod rss;

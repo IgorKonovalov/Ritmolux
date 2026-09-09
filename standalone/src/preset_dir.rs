@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use rlx_core::render::Renderer;
+use standalone::events::{Event, Events, line_col};
 use standalone::{PRESET_DIR_ENV, PresetDir, resolve_preset_dir};
 
 use crate::app_state::warn_cap_overflow;
@@ -111,7 +112,7 @@ pub(crate) fn dir_signature(dir: &Path) -> Option<(u128, usize)> {
 /// Non-fatal warnings (an unknown parameter name — usually a typo) are printed
 /// too: the preset still loads and renders, and the mistake is not silent
 /// (ADR-0020).
-pub(crate) fn reload_presets(renderer: &mut Renderer, dir: &Path) {
+pub(crate) fn reload_presets(renderer: &mut Renderer, dir: &Path, events: Option<&mut Events>) {
     let report = rlx_core::preset::load_dir(dir);
     for (path, err) in &report.errors {
         eprintln!("preset {}: {err}", path.display());
@@ -132,4 +133,45 @@ pub(crate) fn reload_presets(renderer: &mut Renderer, dir: &Path) {
         renderer.set_presets(report.presets);
         warn_cap_overflow(renderer);
     }
+
+    // The structured half, after the human half and never instead of it: a
+    // parent reading events and an operator reading the console are two
+    // audiences, and the events exist because the operator's lines are prose
+    // (ADR-0176).
+    let Some(events) = events else {
+        return;
+    };
+    for (path, err) in &report.errors {
+        // The parser gives a byte offset, not a position: turning it into a line
+        // and column needs the source, which the loader read and dropped. Reading
+        // the file again is an error-path cost, and it is what puts a cursor in
+        // the right place in an editor rather than a sentence in a log.
+        let position = err.span().and_then(|span| {
+            std::fs::read_to_string(path)
+                .ok()
+                .map(|source| line_col(&source, span.start))
+        });
+        events.emit(&Event::PresetError {
+            file: path,
+            message: &err.to_string(),
+            line: position.map(|(line, _)| line),
+            col: position.map(|(_, col)| col),
+            param: err.param(),
+        });
+    }
+    for (path, warning) in &report.warnings {
+        events.emit(&Event::PresetWarning {
+            file: path,
+            message: warning,
+        });
+    }
+    // The roster on **every** reload, whatever changed: a studio's library view
+    // is a list of names, and it has no other way to know one moved.
+    let names: Vec<String> = renderer.preset_names().map(str::to_owned).collect();
+    events.emit(&Event::Roster { names: &names });
+    // No `preset` event here: the active preset is reported from what is
+    // actually on screen, once per frame, rather than from each of the six sites
+    // that can change it — see `AppState::report_active_preset`. A switch
+    // dissolves, so a site that announced its own would name the incoming preset
+    // a frame before it was drawn.
 }

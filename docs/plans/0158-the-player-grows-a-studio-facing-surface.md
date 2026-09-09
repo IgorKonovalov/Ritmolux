@@ -293,8 +293,8 @@ to a layout.
 |---|---|---|---|
 | 1 — A parameter moves in place | dev | done | `ab0ec26` |
 | 2 — The player listens | dev | done | `b2d77ec` |
-| 3 — The player reports | dev | not started | |
-| 4 — The engine states what a preset can contain | dev | done | committed with this row |
+| 3 — The player reports | dev | done | committed with this row |
+| 4 — The engine states what a preset can contain | dev | done | `d7bdee8` |
 | 5 — The headless tap writes to a pipe | dev | not started | |
 | 6 — The windowed show gets a preview copy | dev | not started | |
 | 7 — The on-device check | human | not started | |
@@ -373,6 +373,43 @@ to a layout.
   fails the shipped-preset walk with five named files. Both were run and reverted.
 - **`--schema` prints 59 KB on one line**: 12 systems, 7 engine stages, 343 parameters and 16
   structural tables, hash `0965e83a83985c0e` at this commit. It parses as JSON.
+
+- **Phase 3's `hello` is the first EVENT, not the first line, and it cannot be the first line.**
+  The greeting carries the control port actually bound; that port comes from the operator config;
+  the config path resolves under the per-user directory; and that directory may still need
+  migrating. So `migrate_app_dir`'s notice, and the tier and input lines a configured rig prints,
+  precede it — observed on this machine, where all three appear. The invariant is recorded in
+  `docs/specs/0003` as the narrower claim, and `stream_split.rs` asserts that narrower claim plus
+  the stronger one that actually matters: the human diagnostics are **byte-identical** with
+  `--events` and without it.
+- **Phase 3's grep-shaped test carries an allowlist of five leading placeholders.** The done-when
+  asks that every `eprintln!` format string begin with something other than `{`; nineteen existing
+  call sites are `eprintln!("{msg}")` and friends, whose *rendered* line never begins with a brace.
+  Rewording them would change operator-visible stderr, which the fourth done-when forbids. So
+  `standalone/tests/stream_split.rs` allows a leading placeholder from a named list — four
+  shell-built message variables and one constant whose value is fixed in the crate — and fails on
+  any other, including a literal `{{`. It found one real case (`{PRESET_DIR_ENV}`) on its first run.
+- **Phase 3 touched three files outside its list.** `core/src/diag/mod.rs` and
+  `core/src/render/mod.rs` gained `frame_ms_p50`: `health` wants a median and `Metrics` mirrors the
+  C ABI's `RlxMetrics`, so a field there would widen that surface — it is a native-only accessor
+  beside the analysis snapshot instead, generalising the existing p99 into one percentile function.
+  `core/src/preset/schema/error.rs` gained `PresetError::span()` and `param()`, which is what the
+  plan's own risk note said to do if the span did not survive the loader's error type. It does
+  survive — `PresetError::Toml` holds the whole `toml::de::Error` — so the accessor is a delegation
+  rather than a new field. `standalone/src/input.rs`, `standalone/src/app_state.rs` and
+  `standalone/src/cli.rs` were also touched, for the emission sites and the flag.
+- **`preset` is reported from what is on screen, once per frame**, rather than from each of the six
+  sites that can change the active preset. A switch dissolves, so a site announcing its own would
+  name the incoming preset a frame before it was drawn.
+- **An expression error carries no line or column, and that is structural**: it is raised after the
+  document has been parsed into values, which carry no position. The done-when asks for the
+  position "whenever the TOML parser's span provides them", and for this class it never does — the
+  parameter name is what that arm carries instead, and the test asserts the span is absent so the
+  expectation moves visibly if the loader ever grows one.
+- **`health` carries two counters the plan's illustrative shape does not name** — `ctl_dropped`
+  (actions the bounded queue had no room for) beside `ctl_rejected` (datagrams the decoder
+  refused), plus `ctl_refused` (overrides the engine refused). Three different failures with three
+  different fixes; one number would have hidden which.
 
 ### Close triggers
 

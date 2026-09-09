@@ -16,6 +16,7 @@ use std::time::{Duration, Instant};
 use rlx_core::audio::{AudioFormat, SampleConsumer};
 use rlx_core::dsp::Analyzer;
 use rlx_core::render::{AdapterChoice, CapOverflow, Renderer, RendererOptions, Tier};
+use standalone::events::Event;
 use standalone::osc::{OscSink, Telemetry, rms_of};
 use standalone::rss;
 use winit::event_loop::ActiveEventLoop;
@@ -375,6 +376,22 @@ pub(crate) struct AppState {
 
     pub(crate) diagnostics: Diagnostics,
 
+    /// The structured event stream (ADR-0176), present only when `--events`
+    /// turned it on. Absent otherwise, so the frame path is a `None` test and
+    /// standard error carries exactly what it always did.
+    pub(crate) events: Option<standalone::events::Events>,
+
+    /// The preset name last reported through the event stream, so `preset` is
+    /// emitted on a **change** rather than every frame. Empty until the first
+    /// frame reports one.
+    pub(crate) reported_preset: String,
+
+    /// When the next `health` event is due. The stream's own cadence, not the
+    /// diagnostics log's: that one writes a file an operator reads afterwards,
+    /// and this one feeds a parent watching now, so neither should be able to
+    /// silence the other by being configured off.
+    pub(crate) next_health: Instant,
+
     /// The studio control-in listener (ADR-0176), present only when `--control`
     /// or `[control] enabled` turned it on. Absent otherwise, so the frame path
     /// is a `None` test and no socket is bound.
@@ -383,6 +400,14 @@ pub(crate) struct AppState {
     /// run *reports*, and this is what drives it.
     pub(crate) control: Option<standalone::control::Control>,
 }
+
+/// How often a `health` event goes out while frames are being drawn.
+///
+/// One second, which is the cadence ADR-0176 names and the same one the
+/// diagnostics log samples at — a parent plotting frame time and an operator
+/// reading the file afterwards are looking at the same rate, so the two readings
+/// are comparable rather than merely similar.
+const HEALTH_INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
 
 /// Whether the display loop spends a console present on frame `frame`, at
 /// cadence `every_n`.
@@ -468,7 +493,7 @@ impl AppState {
         // embedded defaults and record the signature so later edits hot-reload.
         // Any failure degrades to the embedded defaults (NFR 10).
         let preset_dir = startup_preset_dir();
-        reload_presets(&mut renderer, &preset_dir);
+        reload_presets(&mut renderer, &preset_dir, app.events.as_mut());
         let preset_sig = dir_signature(&preset_dir);
 
         // `--preset` holds one scene for the run. The name was checked against
@@ -572,6 +597,15 @@ impl AppState {
                 reported_demotion: false,
             },
             control: app.control.take(),
+            events: app.events.take(),
+            reported_preset: String::new(),
+            // Due immediately, so a parent gets a first reading on the first
+            // drawn second rather than after one.
+            #[allow(
+                clippy::disallowed_methods,
+                reason = "the health cadence is shell frame pacing; core analysis stays clock-free"
+            )]
+            next_health: Instant::now(),
         };
         // **Which GPU is rendering the show**, once, at startup. Unflagged, the
         // window takes whatever wgpu returns for the surface, which on a hybrid
@@ -890,7 +924,11 @@ impl AppState {
             return;
         }
         self.presets.preset_sig = sig;
-        reload_presets(&mut self.renderer, &self.presets.preset_dir);
+        reload_presets(
+            &mut self.renderer,
+            &self.presets.preset_dir,
+            self.events.as_mut(),
+        );
         // `reload_presets` announced any truncation itself; re-baseline so the
         // frame loop reports only what changes from here.
         self.diagnostics.reported_overflow = self.renderer.cap_overflow().copied();
@@ -899,6 +937,64 @@ impl AppState {
         let names = self.roster_names();
         let refs: Vec<&str> = names.iter().map(String::as_str).collect();
         self.hud.browse.on_roster_changed(&refs);
+    }
+
+    /// Emit a `preset` event when the preset **on screen** has changed.
+    ///
+    /// Reported from what was actually drawn rather than from each of the six
+    /// sites that can change it — the director's rotation, a hotkey, the browse
+    /// overlay, the console's strip, `--preset`, and `ctl/preset`. A switch
+    /// dissolves, so a site announcing its own would name the incoming preset a
+    /// frame before it was drawn, and six announcements would be six chances to
+    /// disagree about that.
+    pub(crate) fn report_active_preset(&mut self) {
+        let Some(events) = self.events.as_mut() else {
+            return;
+        };
+        let name = self.renderer.preset_name();
+        if name == self.reported_preset {
+            return;
+        }
+        let index = self
+            .renderer
+            .preset_names()
+            .position(|candidate| candidate == name)
+            .unwrap_or(0);
+        events.emit(&Event::Preset { name, index });
+        self.reported_preset = name.to_owned();
+    }
+
+    /// Emit a `health` event once a second while frames are being drawn.
+    ///
+    /// Tied to the drawn frame rather than to a timer of its own, so a stalled
+    /// or hidden player goes quiet: a parent watching this stream reads silence
+    /// as "no frames", which is the fact it wants and which a timer that kept
+    /// ticking would hide.
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "the health cadence is shell frame pacing; core analysis stays clock-free"
+    )]
+    pub(crate) fn report_health(&mut self, now: Instant) {
+        let Some(events) = self.events.as_mut() else {
+            return;
+        };
+        if now < self.next_health {
+            return;
+        }
+        self.next_health = now + HEALTH_INTERVAL;
+        let metrics = self.renderer.metrics();
+        let (rejected, dropped, refused) = self
+            .control
+            .as_ref()
+            .map_or((0, 0, 0), |c| (c.rejected(), c.dropped(), c.refused()));
+        events.emit(&Event::Health {
+            fps: metrics.fps,
+            frame_ms_p50: self.renderer.frame_ms_p50(),
+            frame_ms_p99: metrics.frame_ms_p99,
+            ctl_rejected: rejected,
+            ctl_dropped: dropped,
+            ctl_refused: refused,
+        });
     }
 
     /// Drain whatever audio arrived since last frame into the analyzer.
@@ -1018,6 +1114,10 @@ impl AppState {
         if let Err(err) = self.renderer.render(&frame, dt) {
             eprintln!("render error: {err}");
         }
+        // The structured stream, after the frame that produced the figures it
+        // reports (ADR-0176). Both are no-ops without `--events`.
+        self.report_active_preset();
+        self.report_health(now);
         // After the show's present, never before it and never inside it.
         //
         // The cadence is decided here rather than inside `present_console`,

@@ -93,6 +93,12 @@ pub(crate) const FLAGS: &[FlagSpec] = &[
         help: "print the audio capture endpoints and exit (Windows-only)",
     },
     FlagSpec {
+        name: "--events",
+        takes_value: false,
+        requires: None,
+        help: "report as JSON lines on stderr, for a parent process",
+    },
+    FlagSpec {
         name: "--schema",
         takes_value: false,
         requires: None,
@@ -659,6 +665,15 @@ pub(crate) fn resolve_osc(flag: Option<String>, config: &config::Osc) -> Option<
         None if config.enabled => Some((config.target.clone(), config.rate_hz)),
         None => None,
     }
+}
+
+/// Whether `--events` was passed.
+///
+/// A bare presence test like `--console`'s: the flag turns the stream on and
+/// carries nothing, because the roster is the protocol's and not the operator's
+/// to narrow.
+pub(crate) fn parse_events_flag() -> bool {
+    std::env::args().skip(1).any(|arg| arg == "--events")
 }
 
 /// `--control <host:port>`, or `None` when the flag is absent.

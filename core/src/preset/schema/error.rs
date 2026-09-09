@@ -29,6 +29,36 @@ pub enum PresetError {
     Io(String),
 }
 
+impl PresetError {
+    /// The byte range in the preset source this error points at, when the parser
+    /// gave one.
+    ///
+    /// Only the TOML arm can have one: every other variant is raised by the
+    /// loader's own validation, which runs against parsed values rather than
+    /// against the document, and a value carries no position. A caller turns the
+    /// offset into a line and column against the source it read — which it still
+    /// has and this module never did.
+    pub fn span(&self) -> Option<std::ops::Range<usize>> {
+        match self {
+            PresetError::Toml(err) => err.span(),
+            _ => None,
+        }
+    }
+
+    /// The parameter whose expression failed to compile, for the arm that has
+    /// one.
+    ///
+    /// The name is already in [`Display`](fmt::Display)'s sentence; this is the
+    /// same fact as a field, so a structured consumer does not have to read it
+    /// back out of prose.
+    pub fn param(&self) -> Option<&str> {
+        match self {
+            PresetError::Expr { param, .. } => Some(param),
+            _ => None,
+        }
+    }
+}
+
 impl fmt::Display for PresetError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

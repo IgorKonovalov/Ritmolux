@@ -303,6 +303,9 @@ impl AppState {
         let Some(mut control) = self.control.take() else {
             return;
         };
+        // Recorded inside the block and applied after it: the counter lives on the
+        // listener, and the drained buffer holds a borrow of it until here.
+        let refused;
         {
             let drained = control.drain();
             if drained.is_empty() {
@@ -322,8 +325,18 @@ impl AppState {
             if applied.switched {
                 self.on_preset_switched();
             }
-            control.note_refused(applied.refused);
+            // The one message that is answered individually (ADR-0176): OSC
+            // carries no acknowledgement, so `ping` exists precisely so a studio
+            // can tell a dead player from a quiet one, and the answer goes back
+            // on the stream that cannot drop.
+            if let Some(events) = self.events.as_mut() {
+                for nonce in drained.pings() {
+                    events.emit(&standalone::events::Event::Pong { nonce: *nonce });
+                }
+            }
+            refused = applied.refused;
         }
+        control.note_refused(refused);
         self.control = Some(control);
     }
 

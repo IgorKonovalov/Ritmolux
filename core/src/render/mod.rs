@@ -910,6 +910,17 @@ impl Renderer {
         self.diag.metrics()
     }
 
+    /// Median frame time over the diagnostics window, in milliseconds.
+    ///
+    /// **Native-only**, beside the analysis snapshot below and for its reason:
+    /// [`Metrics`] mirrors the C ABI's `RlxMetrics`, so a field added there
+    /// widens that surface (ADR-0052). A median beside the p99 is what makes a
+    /// frame-time reading legible — typical against worst — where the mean the
+    /// snapshot already carries sits between them saying neither.
+    pub fn frame_ms_p50(&self) -> f32 {
+        self.diag.frame_ms_p50()
+    }
+
     /// The last drawn frame's analysis snapshot — the levels and the downbeat
     /// lock state. **Native-only**: deliberately absent from the C ABI, so the
     /// foobar plugin has no counterpart (ADR-0052).

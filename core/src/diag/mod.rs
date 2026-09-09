@@ -201,9 +201,31 @@ impl FrameStats {
         self.sum() / self.len as f32 * 1000.0
     }
 
-    /// 99th-percentile frame time over the window, in milliseconds. Copies the
-    /// retained samples into a fixed local buffer and sorts — no allocation.
+    /// 99th-percentile frame time over the window, in milliseconds.
     pub fn frame_ms_p99(&self) -> f32 {
+        self.frame_ms_percentile(0.99)
+    }
+
+    /// **Median** frame time over the window, in milliseconds.
+    ///
+    /// The pair with [`frame_ms_p99`](Self::frame_ms_p99) is what makes a
+    /// frame-time reading legible: the median says what a typical frame costs and
+    /// the p99 says what the worst ones do, and a mean sits between them saying
+    /// neither. Native-only, like the analysis snapshot beside it — it is not on
+    /// [`Metrics`], which mirrors the C ABI's `RlxMetrics` and cannot grow a
+    /// field without widening that surface (ADR-0052's split).
+    pub fn frame_ms_p50(&self) -> f32 {
+        self.frame_ms_percentile(0.5)
+    }
+
+    /// The frame time at quantile `q` over the window, in milliseconds. Copies
+    /// the retained samples into a fixed local buffer and sorts — no allocation.
+    ///
+    /// **Nearest-rank**, `index = round(q * (n - 1))`: with a window of a few
+    /// hundred samples an interpolating definition moves the answer by less than
+    /// the measurement's own noise, and this one always returns a sample that
+    /// actually occurred.
+    fn frame_ms_percentile(&self, q: f32) -> f32 {
         if self.len == 0 {
             return 0.0;
         }
@@ -217,8 +239,7 @@ impl FrameStats {
             return 0.0;
         };
         slice.sort_by(f32::total_cmp);
-        // Nearest-rank on the retained samples: index round(0.99 * (n-1)).
-        let idx = ((n - 1) as f32 * 0.99).round() as usize;
+        let idx = ((n - 1) as f32 * q.clamp(0.0, 1.0)).round() as usize;
         slice.get(idx).copied().unwrap_or(0.0) * 1000.0
     }
 
@@ -341,6 +362,13 @@ impl Diag {
     /// Set the draw/render-pass count issued on the last frame.
     pub fn set_draw_calls(&mut self, n: u32) {
         self.draw_calls = n;
+    }
+
+    /// The current rolling snapshot.
+    /// Median frame time over the window, in milliseconds — the native-only
+    /// half of the frame-time pair (see [`FrameStats::frame_ms_p50`]).
+    pub fn frame_ms_p50(&self) -> f32 {
+        self.stats.frame_ms_p50()
     }
 
     /// The current rolling snapshot.

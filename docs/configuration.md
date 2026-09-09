@@ -22,6 +22,7 @@ telemetry.
 | `--list-devices` | — | Enumerate audio capture endpoints and exit (Windows-only) |
 | `--list-adapters` | — | Enumerate graphics adapters and exit, from both rosters |
 | `--schema` | — | Print the preset schema as JSON on stdout and exit |
+| `--events` | — | Report as JSON lines on stderr, for a parent process |
 | `--input` | `loopback` \| `line-in` | Where audio comes from (Windows-only) |
 | `--device` | `"<friendly name>"` | Which capture endpoint to open |
 | `--tier` | `floor` \| `rich` | Pin the quality tier instead of letting the engine pick |
@@ -44,6 +45,18 @@ than silence.
 
 **`--help`** writes to stdout and creates no window, no GPU device and no capture client, so a
 script can probe the flag surface without starting a show.
+
+**`--events`** turns on the structured report a parent process reads
+([the control protocol](specs/0003-studio-control-protocol.md)). One JSON object per line on
+**standard error**: `hello` with this build's version, the schema hash and the control port
+actually bound; `preset` and `roster` as the show moves; `preset_error` and `preset_warning` with
+the file, the message and — when the TOML parser gives a position — the line and column;
+`health` once a second while frames are being drawn; and `pong` answering a `ctl/ping`.
+
+Every event line begins with `{` and no human diagnostic does, so a parent splits the two on the
+first byte and needs no framing. The flag is purely **additive**: without it standard error carries
+exactly the lines it always did, and with it those same lines are still there, unchanged, beside
+the events.
 
 **`--schema`** answers the other question a program asks before it starts driving the player: what
 a preset may contain. It prints one JSON object on stdout — every system and engine stage with its

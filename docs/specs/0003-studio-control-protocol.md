@@ -7,7 +7,9 @@ standard error. It states what must be true of the running system, not how it is
 > **Where it lives:** `standalone/src/osc/decode.rs` (the vocabulary and the wire decoder),
 > `standalone/src/osc/encode.rs` (the wire encoder both directions share),
 > `standalone/src/control.rs` (the listener, the bounded queue and the renderer-side applier),
-> `standalone/src/config.rs` (`[control]`) and `standalone/src/cli.rs` (`--control`).
+> `standalone/src/events.rs` (the event roster and its writer),
+> `standalone/src/config.rs` (`[control]`) and `standalone/src/cli.rs` (`--control`,
+> `--events`).
 > **Governing ADRs:** [0176](../adrs/0176-the-player-is-driven-over-osc-control-in-and-reports-on-its-standard-streams.md)
 > (the transports, the versioning rule and the two rosters),
 > [0175](../adrs/0175-the-studio-is-a-separate-application-that-never-draws-a-frame.md) (why the
@@ -31,6 +33,22 @@ changing or removing one moves the version segment.
 | `/rlx/v1/ctl/preset` | `s name` | Dissolve to the named preset |
 | `/rlx/v1/ctl/transport` | `s next\|prev\|auto\|hold` | The console's transport, by name |
 | `/rlx/v1/ctl/ping` | `i nonce` | Answered by a `pong` event carrying the nonce |
+
+## The event roster
+
+One JSON object per line on standard error, each carrying `"v"` and `"ev"` before anything else.
+Adding an event or a field is additive under the same `v`; changing or removing one moves it.
+
+| `ev` | Fields | When |
+|------|--------|------|
+| `hello` | `version`, `schema`, `control` | Once, before the window exists |
+| `preset` | `name`, `index` | The preset **on screen** changed |
+| `roster` | `names` | Every preset reload |
+| `preset_error` | `file`, `message`, `line`, `col`, `param` | A preset failed to load |
+| `preset_warning` | `file`, `message` | A preset loaded with a non-fatal problem |
+| `health` | `fps`, `frame_ms_p50`, `frame_ms_p99`, `ctl_rejected`, `ctl_dropped`, `ctl_refused` | Once a second while frames are drawn |
+| `stream` | `width`, `height`, `fps`, `format` | Once, before the first frame on standard output |
+| `pong` | `nonce` | Answering a `ctl/ping` |
 
 ## Invariants
 
@@ -68,6 +86,30 @@ changing or removing one moves the version segment.
 - An override MUST survive until it is cleared, and MUST be dropped by a preset change and by any
   preset reload — the file is the durable channel and the socket the live one, so a save wins.
   (ADR-0176)
+- The event stream MUST be **off unless asked for**, and MUST be purely **additive** when it is on:
+  the human diagnostics are byte-identical with `--events` and without it. An operator reading the
+  console cannot tell the flag was passed.
+- Every event line MUST begin with `{`, end with a newline, be one balanced JSON object, and carry
+  `"v"` and `"ev"` as its first two fields. No human diagnostic line may begin with `{`, so a parent
+  routes on the first byte with no framing.
+- A preset name or a file path MUST be escaped, so one preset on disk cannot produce a line the
+  parent cannot parse.
+- `hello` MUST be the first **event**, and MUST carry this build's version, the schema document's
+  hash and the control port **actually bound** — which is not the port requested when the operator
+  asked for an ephemeral one. It is not necessarily the first *line*: it reports a port that comes
+  from the operator config, which cannot be read until the per-user directory has been resolved and
+  migrated, so that migration's own notice and the tier and input lines can precede it.
+- `preset` MUST report the preset **on screen**, from one site, rather than from each of the six
+  that can change it. A switch dissolves, so a site announcing its own would name the incoming
+  preset a frame before it was drawn.
+- `preset_error` MUST carry the file and the message, and the line and column **whenever the TOML
+  parser provides a span**. An expression error carries the parameter name instead: it is raised
+  after the document was parsed into values that no longer carry a position, so it has no span, and
+  the missing position is reported as `null` rather than omitted.
+- `health` MUST be tied to the drawn frame, so a stalled or hidden player goes quiet rather than
+  reporting a stale figure on a timer of its own.
+- The writer MUST NOT fail the show: standard error may be closed or full, and a lost line is a
+  better outcome than a player that stopped drawing because a parent stopped reading.
 
 ## Scenarios
 
@@ -88,13 +130,22 @@ changing or removing one moves the version segment.
 - WHEN a truncated, over-long or mistyped datagram arrives THEN it is refused and counted, the
   queue is untouched, and the process continues.
 - WHEN `ctl/transport auto` arrives while rotation is already on THEN nothing happens.
+- WHEN a `ctl/ping` arrives THEN a `pong` carrying the same nonce goes out on the event stream —
+  the one message answered individually, because it exists to tell a dead player from a quiet one.
+- WHEN the player starts without `--events` THEN standard error carries no line beginning with `{`.
+- WHEN the player starts with `--events` THEN the human diagnostics are exactly the lines the same
+  run without it produced, and the events are interleaved among them.
+- WHEN a preset fails to parse THEN a `preset_error` names the file and the line the author's
+  mistake is on, so an editor can put a cursor there.
 
 ## Known gaps
 
-- **The event stream is not contracted here yet.** ADR-0176 decides both directions and this
-  spec's title names both; the `--events` roster (`hello`, `preset`, `roster`, `preset_error`,
-  `preset_warning`, `health`, `stream`, `pong`) lands with the phase that builds it, and its
-  invariants belong in this file when it does.
+- **`stream` is declared here and emitted by the sink that carries the frames.** Its row is in the
+  roster above because the geometry is part of this contract; the pipe that announces it is the
+  headless video-out's.
+- **Nothing asserts the whole ordering of a live run.** `hello` before the rest is asserted from a
+  spawned process, and each event's own shape is asserted at the writer — but the sequence a
+  ten-minute show produces is what the plan's on-device phase looks at instead.
 - **No test drives a transport verb through a window.** The verb-to-action mapping is asserted
   against the strip's own `action_for` in `standalone/src/console/tests.rs`, and the applier it
   reaches is the one a click reaches — but the click-to-picture leg needs a window, which is
@@ -113,7 +164,10 @@ and it is here so a reader who wants the history has it in one place rather than
 **Written 2026-09-09**, from one plan:
 
 - **[Plan 0158](../plans/0158-the-player-grows-a-studio-facing-surface.md)** built the listener,
-  the decoder and the bounded queue as its second phase, against ADR-0176's vocabulary table.
-  The `auto`/`hold`-as-positions rule is the one place the implementation is narrower than that
-  table's prose, and it is narrower on purpose: the ADR names four verbs against a strip whose
-  rotation control is a toggle, and a control surface needs to be able to state a position.
+  the decoder and the bounded queue as its second phase, against ADR-0176's vocabulary table, and
+  the event stream as its third. Two places the implementation is narrower than that ADR's prose,
+  both on purpose and both recorded above as invariants: `auto`/`hold` are **positions** rather
+  than presses, because the console strip's rotation control is a toggle and a control surface
+  needs to be able to state a position; and `hello` is the first *event* rather than the first
+  *line*, because the port it reports cannot be known until the per-user directory has been
+  migrated and the config read, and those steps have their own things to say.

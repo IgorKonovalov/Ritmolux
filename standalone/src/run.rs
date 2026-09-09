@@ -22,7 +22,7 @@ use crate::app_state::{APP_TITLE, AppState, HIDDEN_TICK};
 use crate::capture_start::list_devices_and_exit;
 use crate::cli::{
     InputSource, missing_companion, parse_console_flag, parse_control_arg, parse_downbeat_log_arg,
-    parse_input_args, parse_osc_arg, parse_soak_arg, parse_tier_arg, print_help,
+    parse_events_flag, parse_input_args, parse_osc_arg, parse_soak_arg, parse_tier_arg, print_help,
     resolve_config_path, resolve_control, resolve_input, resolve_osc, unrecognized_flag,
     valued_valueless_flag, windowed_flag,
 };
@@ -31,6 +31,7 @@ use crate::preset_dir::startup_preset_names;
 use crate::stream;
 use standalone::config::{self, Config};
 use standalone::control::Control;
+use standalone::events::{Event, Events};
 
 pub(crate) struct App {
     /// Loaded once at startup; the window is created from it on `resumed` and
@@ -67,6 +68,10 @@ pub(crate) struct App {
     /// rather than a window that opens and then reports one. `None` when nothing
     /// asked for one, and then no socket exists at all (ADR-0176).
     pub(crate) control: Option<Control>,
+    /// The structured event stream, already greeted in `main`. `None` when
+    /// `--events` was not passed, and then standard error carries exactly the
+    /// human diagnostics it always did (ADR-0176).
+    pub(crate) events: Option<Events>,
     /// `--console` was passed. Held beside `config` rather than written into it,
     /// so the flag opens the console for this launch without persisting itself
     /// — the same shape `--input` / `--device` / `--osc` follow (ADR-0142).
@@ -604,6 +609,21 @@ pub fn run() {
         None => None,
     };
 
+    // `hello` is the **first** event line, and it is emitted here rather than in
+    // `resumed` because a studio spawns this process and waits for it: a hello
+    // that arrived after the window opened would leave the parent with no way to
+    // tell a slow start from a dead one. It carries the control port actually
+    // bound, which is why it sits after the block above rather than beside the
+    // flag parsing.
+    let mut events = parse_events_flag().then(Events::new);
+    if let Some(events) = events.as_mut() {
+        events.emit(&Event::Hello {
+            version: env!("CARGO_PKG_VERSION"),
+            schema: &rlx_core::preset::export::hash_hex(),
+            control: control.as_ref().map(Control::local_addr),
+        });
+    }
+
     // Resolved before the event loop exists, so a `--gpu` with no value is a
     // usage error rather than a window that opens and then reports one — the
     // shape `--tier` and `--osc` already follow.
@@ -650,6 +670,7 @@ pub fn run() {
         input,
         osc,
         control,
+        events,
         console_flag: parse_console_flag(),
         state: None,
     };
