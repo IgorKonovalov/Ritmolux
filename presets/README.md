@@ -688,7 +688,7 @@ here is the **definition**, and the essay is the **discussion**.
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
 | `palette_contour` | `0` | `0` – `1` | Draws a line at each band edge when the palette is stepped; 0 draws none. |
 | `gamma` | `1` | `0.25` – `4` | Shapes the falloff from the shape's edge; below 1 it bites sooner. |
-| `coord_mode` | `0` | `0` – `2` | Which coordinate frame the distance is measured in, which changes the shape's whole geometry. |
+| `coord_mode` | `0` | `0` – `1` | Which coordinate frame the distance is measured in, which changes the shape's whole geometry. |
 | `rotation` | `0` | `0` – `1` | Turns the shape, as a fraction of a full turn. |
 | `stroke` | `0` | `0` – `1` | Draws the outline instead of the filled figure, at this half-width; 0 fills. |
 | `morph` | `0` | `0` – `1` | Travels the authored path towards its morph_to silhouette; inert without one. |
@@ -4568,6 +4568,10 @@ signed distance field the roster is rendered as — so an authored figure gets
 | `d`        | SVG path data         | The silhouette, as one closed contour. **Required** — the table exists to carry it.                     |
 | `morph_to` | SVG path data         | A second silhouette the bindable `morph` param travels towards. Optional; absent, `morph` is inert.      |
 | `samples`  | integer `3..=64`      | The arity both contours are resampled to, by arc length. Default 64. Optional — and a lever **downward**. |
+
+**Coordinates read the way SVG writes them: `y` increases *downward*, so `M 0,-1`
+sits above `M 0,1`.** That is what a design tool exports and what a browser draws,
+so a path pasted out of one arrives the right way up with nothing to edit.
 
 ```toml
 system = "shape_field"

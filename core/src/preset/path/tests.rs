@@ -278,8 +278,13 @@ fn the_signed_area_reports_the_winding_direction() {
     // Counter-clockwise in a y-up frame is positive; the same square written
     // backwards is the same figure with the opposite sign. This is the quantity
     // a morph pair has to agree on.
-    let ccw = shape("M -1,-1 L 1,-1 L 1,1 L -1,1 Z");
-    let cw = shape("M -1,-1 L -1,1 L 1,1 L 1,-1 Z");
+    //
+    // The winding is the one an author sees, because the stored contour is y-up
+    // while `d` is y-down. Reading the first literal as SVG does — upper-left,
+    // upper-right, lower-right, lower-left — it is clockwise on screen, so it is
+    // the negative one.
+    let cw = shape("M -1,-1 L 1,-1 L 1,1 L -1,1 Z");
+    let ccw = shape("M -1,-1 L -1,1 L 1,1 L 1,-1 Z");
     assert!(ccw.signed_area() > 0.0, "got {}", ccw.signed_area());
     assert!(cw.signed_area() < 0.0, "got {}", cw.signed_area());
     assert!(
@@ -287,6 +292,51 @@ fn the_signed_area_reports_the_winding_direction() {
         "same figure, opposite sign: {} vs {}",
         ccw.signed_area(),
         cw.signed_area()
+    );
+}
+
+/// The parsed contour is y-up, so a `d` string's topmost point comes back as the
+/// contour's **largest** y.
+///
+/// Every other literal in this file is y-symmetric as a figure, which is exactly
+/// why none of them can see the axis: a reflection maps such a contour onto
+/// itself and every assertion here survives it. This one is a triangle with its
+/// apex at the SVG top and its base below, and it is the only shape in the suite
+/// whose parse would change sign-for-sign if the negation were removed.
+#[test]
+fn the_svg_top_of_a_contour_becomes_the_engine_top() {
+    // Apex at y = -1, which SVG draws at the TOP; base at y = +1, below it.
+    let apex_up = shape("M 0,-1 L 1,1 L -1,1 Z");
+
+    let (top, bottom) = apex_up
+        .points()
+        .iter()
+        .fold((f32::NEG_INFINITY, f32::INFINITY), |(hi, lo), p| {
+            (hi.max(p[1]), lo.min(p[1]))
+        });
+    assert!(
+        top > bottom,
+        "degenerate contour: top {top}, bottom {bottom}"
+    );
+
+    // The apex is one point and the base is an edge, so the lone extreme is the
+    // apex. Which end of the contour that extreme sits at is the whole question:
+    // count the points within a tenth of each end of the y range, and the apex
+    // end must be the sparse one.
+    let span = top - bottom;
+    let near = |y: f32| {
+        apex_up
+            .points()
+            .iter()
+            .filter(|p| (p[1] - y).abs() < span * 0.1)
+            .count()
+    };
+    assert!(
+        near(top) < near(bottom),
+        "the apex must be at the engine's TOP: {} points near top {top}, {} near bottom {bottom} \
+         — an unflipped parse renders this triangle upside down",
+        near(top),
+        near(bottom)
     );
 }
 
@@ -352,13 +402,15 @@ fn areas_across(from: &PathShape, to: &PathShape) -> Vec<f32> {
         .collect()
 }
 
-/// A square, wound counter-clockwise in a y-up frame.
-const SQUARE_CCW: &str = "M -1,-1 L 1,-1 L 1,1 L -1,1 Z";
+/// A square, wound **clockwise** as an author sees it: the parsed contour is
+/// y-up while `d` is y-down, so this traversal reads upper-left, upper-right,
+/// lower-right, lower-left on screen.
+const SQUARE_CW: &str = "M -1,-1 L 1,-1 L 1,1 L -1,1 Z";
 /// The same figure as `path_cost.rs`'s leaf, **mirrored in x** — so it is the
 /// same outline wound the other way. An author reaching for two silhouettes has
 /// no reason to have drawn them in the same direction, which is the whole point
 /// of normalizing winding rather than requiring it.
-const LEAF_CW: &str = "M 0,-1 C -0.9,-0.4 -0.9,0.4 0,1 C 0.9,0.4 0.9,-0.4 0,-1 Z";
+const LEAF_CCW: &str = "M 0,-1 C -0.9,-0.4 -0.9,0.4 0,1 C 0.9,0.4 0.9,-0.4 0,-1 Z";
 
 /// **Winding is normalized by signed area, and the negative control is
 /// asserted** (ADR-0107).
@@ -373,10 +425,10 @@ const LEAF_CW: &str = "M 0,-1 C -0.9,-0.4 -0.9,0.4 0,1 C 0.9,0.4 0.9,-0.4 0,-1 Z
 /// one must not go near it.
 #[test]
 fn winding_is_normalized_and_a_misaligned_pair_provably_collapses() {
-    let from = shape(SQUARE_CCW);
-    let raw = shape(LEAF_CW);
+    let from = shape(SQUARE_CW);
+    let raw = shape(LEAF_CCW);
     assert!(
-        from.signed_area() > 0.0 && raw.signed_area() < 0.0,
+        from.signed_area() < 0.0 && raw.signed_area() > 0.0,
         "the fixtures must disagree on winding for this test to mean anything: \
          {} and {}",
         from.signed_area(),
@@ -396,20 +448,24 @@ fn winding_is_normalized_and_a_misaligned_pair_provably_collapses() {
          is the figure turning inside out. Saw {lo} to {hi}"
     );
 
-    // And the aligned pair does not.
+    // And the aligned pair does not. Asserted on the sign the SOURCE has rather
+    // than on a positive one: alignment's contract is agreement with `from`, and
+    // which sign that is depends on how the author happened to wind `d`.
     let aligned = raw.aligned_to(&from).expect("the pair aligns");
-    assert!(
+    assert_eq!(
         aligned.signed_area() > 0.0,
-        "alignment must agree with the source's winding, got {}",
+        from.signed_area() > 0.0,
+        "alignment must agree with the source's winding: source {}, aligned {}",
+        from.signed_area(),
         aligned.signed_area()
     );
     let areas = areas_across(&from, &aligned);
-    let floor = from.signed_area().min(aligned.signed_area()) * 0.25;
+    let floor = from.signed_area().abs().min(aligned.signed_area().abs()) * 0.25;
     for (k, &a) in areas.iter().enumerate() {
         assert!(
-            a > floor,
-            "at morph {:.3} the aligned pair encloses {a}, which is under a \
-             quarter of the smaller endpoint ({floor}) — the figure is \
+            a.abs() > floor,
+            "at morph {:.3} the aligned pair encloses {a}, whose magnitude is \
+             under a quarter of the smaller endpoint ({floor}) — the figure is \
              collapsing through the middle",
             k as f32 / 64.0
         );
@@ -428,7 +484,7 @@ fn winding_is_normalized_and_a_misaligned_pair_provably_collapses() {
 fn the_start_point_is_rotated_to_the_cheapest_correspondence() {
     // One corner apart, and both counter-clockwise so winding is not what is
     // being tested here.
-    let from = PathShape::parse(SQUARE_CCW, 8).expect("parses");
+    let from = PathShape::parse(SQUARE_CW, 8).expect("parses");
     let rotated = PathShape::parse("M 1,-1 L 1,1 L -1,1 L -1,-1 Z", 8).expect("parses");
 
     let worst = |a: &PathShape, b: &PathShape| -> f32 {
@@ -464,8 +520,8 @@ fn the_start_point_is_rotated_to_the_cheapest_correspondence() {
 #[test]
 fn a_morph_pair_meets_at_one_arity() {
     for samples in [MIN_SAMPLES, 8, 32, MAX_SAMPLES] {
-        let from = PathShape::parse(SQUARE_CCW, samples).expect("parses");
-        let to = PathShape::parse(LEAF_CW, samples).expect("parses");
+        let from = PathShape::parse(SQUARE_CW, samples).expect("parses");
+        let to = PathShape::parse(LEAF_CCW, samples).expect("parses");
         let aligned = to.aligned_to(&from).expect("the pair aligns");
         assert_eq!(aligned.points().len(), samples);
         assert_eq!(from.points().len(), samples);
@@ -473,8 +529,8 @@ fn a_morph_pair_meets_at_one_arity() {
 
     // A pair of different arities has no correspondence to build, and is refused
     // rather than truncated onto the shorter one.
-    let from = PathShape::parse(SQUARE_CCW, 16).expect("parses");
-    let to = PathShape::parse(LEAF_CW, 32).expect("parses");
+    let from = PathShape::parse(SQUARE_CW, 16).expect("parses");
+    let to = PathShape::parse(LEAF_CCW, 32).expect("parses");
     assert!(to.aligned_to(&from).is_none());
 }
 
@@ -499,8 +555,8 @@ fn the_arc_fit_reports_what_a_curve_costs_in_pieces() {
     /// One pixel at 1080p, in contour units, for a figure drawn at `scale = 2`.
     const BUDGET: f32 = 1.0 / 1080.0;
     let cases: [(&str, &str); 5] = [
-        ("leaf (2 cubics)   ", LEAF_CW),
-        ("square (4 corners)", SQUARE_CCW),
+        ("leaf (2 cubics)   ", LEAF_CCW),
+        ("square (4 corners)", SQUARE_CW),
         (
             "circle (4 cubics) ",
             "M 1,0 C 1,0.5523 0.5523,1 0,1 C -0.5523,1 -1,0.5523 -1,0 \

@@ -15,8 +15,8 @@ use super::{
 };
 use crate::dsp::AnalysisFrame;
 use crate::preset::Preset;
-use crate::render::scenes::declares;
 use crate::render::scenes::marks;
+use crate::render::scenes::{ParamSpec, declares};
 use crate::render::{CaptureImage, HeadlessOptions, RenderError, Renderer};
 
 /// A preset driving this scene, with `extra` spliced into `[params]`.
@@ -599,6 +599,42 @@ fn the_coordinate_mode_clamps_rounds_and_falls_back() {
     }
     assert_eq!(COORD_MODES, ["distance", "radius"]);
     assert!(declares(PARAMS, "coord_mode"));
+}
+
+/// **A parameter that selects from a roster declares a range that ends at the
+/// roster's last index** — because ADR-0170 prints that range verbatim into
+/// `presets/README.md`, and a value above the last index is not a mode.
+///
+/// `ParamSpec::range` is documentation-only ("the range that reads"), so nothing
+/// clamps against it and nothing else would notice the disagreement: a preset
+/// binding the advertised top gets quantized down to the real one and renders a
+/// mode it did not ask for, silently.
+///
+/// Two selectors today. The value is the third: a roster added with a range
+/// nobody rechecked would ship a reference row that lies, and the only reader who
+/// finds out is an author who wrote the number the table gave them.
+#[test]
+fn a_roster_selecting_param_advertises_exactly_its_roster() {
+    let cases: [(&str, &[ParamSpec], usize); 2] = [
+        ("coord_mode", PARAMS, COORD_MODES.len()),
+        ("shape", marks::PARAMS, marks::SHAPES.len()),
+    ];
+    for (name, specs, roster) in cases {
+        let spec = specs
+            .iter()
+            .find(|s| s.name == name)
+            .unwrap_or_else(|| panic!("`{name}` is not declared in its own PARAMS"));
+        let range = spec
+            .range
+            .unwrap_or_else(|| panic!("`{name}` selects from a roster, so it is bounded"));
+        let last = roster as f32 - 1.0;
+        assert_eq!(
+            range,
+            [0.0, last],
+            "`{name}` advertises {range:?} against a {roster}-entry roster, so \
+             presets/README.md offers modes that do not exist"
+        );
+    }
 }
 
 /// **Under the radius mode a contour is a SCALED COPY of the outline, and under
@@ -1272,6 +1308,93 @@ fn an_authored_contour_draws_a_figure_the_roster_cannot_select() {
         (ratio - LEAF_ASPECT).abs() < 0.08,
         "the figure is {half_w} x {half_h} px (ratio {ratio:.3}), not the leaf's \
          {LEAF_ASPECT:.3}. A disc or any rostered arm at this scale would read 1.0"
+    );
+}
+
+/// **A pasted path renders the way the design tool drew it** — the axis survives
+/// the whole chain, not only the parse.
+///
+/// `core/src/preset/path/tests.rs` pins the negation on the contour. This pins
+/// that nothing between the contour and the frame undoes it: normalization, the
+/// resample, the pack into the uniform and the field evaluation are all between
+/// the two, and a flip that is right in `points()` and wrong in the picture is
+/// exactly the failure the contour test alone cannot see.
+///
+/// **The frame's own orientation is not assumed here, it is established
+/// elsewhere**: `core/tests/backdrop_ramp.rs` and `lines/renderer/tests.rs` both
+/// record that image row 0 is NDC y = +1. So the engine's largest y is the
+/// image's TOP row.
+///
+/// `APEX_UP` puts its apex at `y = -1`, which SVG draws at the top and a browser
+/// renders at the top. It is therefore narrow at the top of the frame and wide at
+/// the bottom, and the lit mass sits in the bottom half. No margin is claimed
+/// beyond "the halves are not equal" — the triangle's own area sets the gap, and
+/// the failure this catches is a *reversal*, not a drift.
+#[test]
+fn an_authored_contour_renders_the_way_the_d_string_reads() {
+    /// A triangle with its apex at the SVG top: one point up, an edge across the
+    /// bottom. The suite's other path literals are y-symmetric as figures, so a
+    /// reflection maps them onto themselves and they cannot see this.
+    const APEX_UP: &str = "M 0,-1 L 1,1 L -1,1 Z";
+    /// The same figure written upside down, as the negative control: whatever
+    /// the predicate reports for one, it must report the opposite for the other,
+    /// or the measurement is reading something that is not the figure.
+    const APEX_DOWN: &str = "M 0,1 L 1,-1 L -1,-1 Z";
+
+    const SIZE: u32 = 320;
+    let Some(mut renderer) = headless(SIZE, SIZE) else {
+        return;
+    };
+    renderer.set_presets(vec![
+        path_preset("apex_up", APEX_UP, ""),
+        path_preset("apex_down", APEX_DOWN, ""),
+    ]);
+
+    // The share of the figure's lit mass in the image's BOTTOM half. "Lit" is
+    // "differs from the frame's corner", which is background at this scale.
+    let mass_low = |img: &CaptureImage| -> f32 {
+        let bg = luma(img, 0, 0);
+        let mut low = 0u32;
+        let mut high = 0u32;
+        for y in 0..SIZE {
+            for x in 0..SIZE {
+                if (luma(img, x, y) - bg).abs() > 8.0 {
+                    if y >= SIZE / 2 {
+                        low += 1;
+                    } else {
+                        high += 1;
+                    }
+                }
+            }
+        }
+        assert!(
+            low + high > 0,
+            "nothing differs from the background — the figure did not render"
+        );
+        low as f32 / (low + high) as f32
+    };
+
+    let up = mass_low(
+        &renderer
+            .capture_preset("apex_up", &AnalysisFrame::default(), 2)
+            .expect("capture the apex-up triangle"),
+    );
+    let down = mass_low(
+        &renderer
+            .capture_preset("apex_down", &AnalysisFrame::default(), 2)
+            .expect("capture the apex-down triangle"),
+    );
+    println!("apex-up: {up:.3} of the figure low; apex-down: {down:.3}");
+
+    assert!(
+        up > 0.5,
+        "`M 0,-1` is the SVG TOP, so the apex belongs at the top of the frame and \
+         the wide base at the bottom — but only {up:.3} of the figure's mass is in \
+         the bottom half. The figure is rendering upside down."
+    );
+    assert!(
+        down < 0.5,
+        "the negative control must be the other way round, got {down:.3} low"
     );
 }
 

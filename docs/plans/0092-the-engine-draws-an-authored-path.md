@@ -328,7 +328,8 @@ stroke = "0.0"       # 0 = filled; > 0 strokes at abs(d) < w
 | 3 — Two paths morph | dev | done | `987c758` |
 | 4 — Arcs, if Plan 0087 delivered them | dev | done | `85e41b7` |
 | 5 — The authoring surface is documented | dev | done | `d66c3c6` |
-| 6 — The look gate | human | not started | — |
+| 6 — The look gate | human | done | — (2026-09-09, in the running app) |
+| 7 — The pasted path is the path the browser drew | dev | done | committed with this row |
 
 ### Notes
 
@@ -444,19 +445,55 @@ stroke = "0.0"       # 0 = filled; > 0 strokes at abs(d) < w
 - Not acted on, noticed at the sweep: `docs/preset-guide.md` — the illustrated entrance, one picture
   per system — has no picture for an authored path, and Phase 5's file list does not name it.
 
+**Phase 7.**
+
+- **The phase's premise that no golden would move is false, and the golden moved.**
+  `core/tests/golden/shape_field_path.png` was re-blessed; the other nine baselines the bless rewrote
+  byte-wise were restored, so the commit carries exactly the one that changed. The figure is
+  unchanged — what moved is its discretization, because the negation reverses the contour's start
+  point and traversal direction and **both the arc-length resample and the greedy biarc fit depend on
+  those**. Probed on the golden's own leaf literal: **53 of 64** resampled points and **2 of 16** arc-
+  piece boundaries coincide as a set. Decoding the two baselines: 2677 of 16384 pixels differ,
+  **2669 of them by under 32/255**, four by 32-63 and four by 128-159 — mean channel difference
+  **0.0005** against a `MEAN_TOL` of `0.02`, with the max outlier of 142 coming from four pixels
+  crossing the two-band palette's hard seam.
+- **The phase's other premise, that every path literal in the suite is y-symmetric, is also false.**
+  `TRIANGLE` and `STAR5` in `shape_field/tests.rs` are not; they pass because every assertion that
+  uses them compares two figures to each other, which a global reflection leaves invariant. The
+  golden fixture does use the y-symmetric leaf, which is why only one baseline was ever in question.
+- **Two existing tests asserted a winding the negation inverts**, and both were repaired as claims
+  rather than as expectations: the literals in `the_signed_area_reports_the_winding_direction` and
+  the `SQUARE_CCW`/`LEAF_CW` fixtures swapped names, because the stored contour is now y-up and a
+  square reading clockwise in a browser reports negative. The second test's tail was also made
+  sign-agnostic — alignment's contract is agreement with the source's winding, not positivity.
+- Both new tests were confirmed to bite: with the negation reverted, both fail.
+- Both pending presets' `d` were re-flipped by script and verified: every y negated, every x and
+  command letter unchanged, the transform round-trips byte for byte, and both render right way up.
+  **Only `d` was changed** — if another parameter was tuned around the inversion this phase did not
+  go looking, and correcting one is `preset-author`'s. **Neither preset was moved into `presets/`**;
+  `pending/README.md` records the blocker as discharged.
+- **`path_cost::the_contour_arity_is_priced_against_the_floor_tier` failed once under full-suite
+  parallel load** (`samples = 8` at 12.778 ms against `samples = 48` at 7.560 ms) and passes in
+  isolation both with this change and with it stashed. It is a wall-clock measurement contending with
+  fifteen other test binaries.
+
 ### Close triggers
 
-- **`presets/` touched:** yes — `presets/README.md` only. **No preset `.toml` was added**: nothing in
-  the shipped library declares a `[path]`, so the feature ships with no content on it.
+- **`presets/` touched:** yes — `presets/README.md`, and under `presets/pending/` the two authored
+  worlds `path_maple.toml` and `path_lion.toml` plus that directory's `README.md`. **Nothing was
+  added to the shipped set**: `pending/` is not embedded (ADR-0022's non-recursive `read_dir`), so
+  nothing in the shipped library declares a `[path]`.
 - **Plan header `Closes:`** none — the header names no `design-backlog` entry.
 - **What shipped:** feature. A new `[path]` structural table, two new `shape_field` params (`stroke`,
   `morph`), and a new load-error class.
-- **Operator docs touched:** `presets/README.md` (the `[path]` section, the `shape_field` essay's
-  pointer and param rows, the structural-config section title, the generated param block) and
-  `docs/presets.md` (the `[path]` table section, the optional-table roster, the hard-error list).
+- **Operator docs touched:** `presets/README.md` (the `[path]` section including its new axis
+  paragraph, the `shape_field` essay's pointer and param rows, the structural-config section title,
+  the generated param block — whose `coord_mode` row now reads `0` - `1`) and `docs/presets.md` (the
+  `[path]` table section, the optional-table roster, the hard-error list).
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit `0`, no entry named.
-- **Full suite:** `cargo nextest run --workspace`, exit `0`, **1593 passed, 6 skipped**, 483.8 s.
+- **Full suite:** `cargo nextest run --workspace --no-fail-fast`, exit `0`, **1596 passed, 0 failed,
+  6 skipped**, 477.4 s — re-run at Phase 7 against the finished tree, after the one blessed baseline.
   Upward overrides were also run at Phases 2, 3 and 4 (`golden`, `sanity`, `reactivity`, `animation`,
   `distinctness`), because each of those phases changed a scene and the preset engine.
-- **Outstanding `human` phases:** Phase 6, the look gate — the morph judged in motion, and whether
-  the paste-render-adjust loop is usable. It gates nothing.
+- **Outstanding `human` phases:** none. Phase 6's look gate ran in the running app on 2026-09-09 and
+  answered its second question with the defect Phase 7 fixes.

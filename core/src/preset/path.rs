@@ -23,6 +23,18 @@
 //! Both refusals name what they found, because an author meeting one is holding
 //! a file a browser renders correctly.
 //!
+//! # The y axis points down, as SVG's does
+//!
+//! A `d` string is read exactly as a browser reads it: `y` increases *downward*,
+//! so `M 0,-1` is above `M 0,1`. The contour this module hands out is in the
+//! engine's frame, where y increases upward, and [`PathShape::parse`] negates
+//! once during normalization to get there.
+//!
+//! The consequence worth stating is the one an author sees: a path pasted out of
+//! a design tool renders the way that tool drew it, with no editing. Every
+//! coordinate below that point — [`PathShape::points`], [`PathShape::signed_area`]
+//! and the morph alignment — is already y-up and needs no further flip.
+//!
 //! # A malformed path is an error with a character offset
 //!
 //! Not a fallback shape. A silently mis-parsed path renders as a *plausible
@@ -234,6 +246,10 @@ impl PathShape {
     /// Twice the shoelace sum: positive when the contour winds
     /// counter-clockwise in a y-up frame, negative when it winds clockwise.
     ///
+    /// The stored contour *is* in that frame — `parse` negates SVG's downward y
+    /// — so this sign is the winding an author sees on screen, and a `d` string
+    /// that reads clockwise in a browser reports negative here.
+    ///
     /// The sign is what a morph pair has to agree on (ADR-0107) — a clockwise
     /// contour interpolating into a counter-clockwise one turns inside out
     /// through the middle, passing through zero area on the way.
@@ -377,10 +393,20 @@ impl PathShape {
                 kind: PathErrorKind::Degenerate,
             });
         }
+        // **The y negation is here, and here is the only place it may be.** SVG
+        // measures y downward; every consumer of `points` below — the resample,
+        // the arc fit, `signed_area`, the morph's winding and start-point
+        // alignment — measures it upward, the way clip space does. Negating in
+        // this loop puts the contour in that frame once, before any of them
+        // reads it, so none of them has to know which frame it is holding.
+        //
+        // Applying it later would not be the same edit: the winding normalization
+        // and the cyclic start-point search would then align geometry in the
+        // opposite frame from the one it renders in, and both are sign-sensitive.
         let scale = 1.0 / half;
         for p in &mut dense {
             p[0] = (p[0] - center[0]) * scale;
-            p[1] = (p[1] - center[1]) * scale;
+            p[1] = -(p[1] - center[1]) * scale;
         }
 
         let points = resample(&dense, samples).ok_or(PathError {

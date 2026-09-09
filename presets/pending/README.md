@@ -20,21 +20,22 @@ as that blocker lifts.
 
 ## Held today
 
-**Two, and they share one blocker.** `path_maple.toml` and `path_lion.toml` are the first authored
-content anywhere to use a `[path]` table (Plan 0092, ADR-0107) — a maple leaf and a maned lion mask,
-each one closed contour of 50-odd SVG commands, drawn as the shape field's banded emblem. Both passed
-the look gate in the running app on 2026-09-09.
+**None.** Both entries left on 2026-09-09.
 
-Neither may ship, because **both carry the same workaround in their path data.** The engine evaluates
-an authored contour in clip space, which is Y-up, while SVG path data is Y-down, and nothing
-reconciles the two — so a path pasted out of a design tool arrives mirrored top-to-bottom. Both files
-compensate by authoring `d` with the figure inverted. That is a preset written around an engine
-defect, and shipping one is the failure the close ceremony's curation sweep exists to catch: the day
-the parser is corrected, both figures silently turn upside down and no gate in this repo can see it.
+`path_maple.toml` and `path_lion.toml` — the first authored content anywhere to use a `[path]` table
+(Plan 0092, ADR-0107), a maple leaf and a maned lion mask, each one closed contour of 54 SVG commands
+drawn as the shape field's banded emblem. They passed the look gate in the running app on 2026-09-09
+and were held the same day, because both authored `d` with the figure inverted to compensate for the
+engine reading an SVG contour in clip space.
 
-| Preset | Blocked by | Leaves when |
-|--------|-----------|-------------|
-| `path_maple.toml` | The authored-path Y-flip: `[path] d` is read in clip space (Y-up) against SVG's Y-down, so `d` here is authored inverted | The parser negates y, and both files' `d` are re-flipped in the same commit |
+Plan 0092 Phase 7 negated y at parse and re-flipped both files' `d` in the same commit, which is
+exactly the condition the row below named. **The blocker is discharged and neither file carries a
+workaround any more**; both stay here only until the content lane judges the look on its merits,
+which is a curation call rather than an engine one.
+
+| Preset | Was blocked by | Discharged |
+|--------|----------------|-----------|
+| `path_maple.toml` | The authored-path Y-flip: `[path] d` was read in clip space (Y-up) against SVG's Y-down, so `d` was authored inverted | Plan 0092 Phase 7, 2026-09-09 — the parser negates y and both `d` strings were re-flipped in that commit |
 | `path_lion.toml` | The same Y-flip | The same |
 
 ### What left, and why the record is worth keeping

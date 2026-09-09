@@ -1145,7 +1145,10 @@ pub const PARAMS: &[ParamSpec] = &[
     ParamSpec {
         name: "coord_mode",
         default: 0.0,
-        range: Some([0.0, 2.0]),
+        // The top of the range is the roster's last index, which is where
+        // `applied_coord_mode` clamps. A range above it advertises a mode that
+        // silently resolves to another one.
+        range: Some([MIN_COORD_MODE, MAX_COORD_MODE]),
         doc: "Which coordinate frame the distance is measured in, which changes the shape's whole geometry.",
     },
     ParamSpec {
