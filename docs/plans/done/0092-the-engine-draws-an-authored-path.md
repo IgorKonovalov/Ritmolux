@@ -560,6 +560,22 @@ The general shape is worth carrying: **a plan that renames a heading in a publis
 grep for that heading's slug**, because the one link the generator does not own is the one that
 breaks.
 
+**A finding against this close rather than against the plan, recorded because the lesson is the
+ceremony's own.** Shipping a preset is not a `git mv`: `core/tests/hygiene.rs`'s
+`every_shipped_preset_has_a_gallery_card` holds `scripts/docs-shots.mjs`'s `CARDS` list and the
+shipped set equal in **both** directions, and requires a committed render at
+`docs/images/gallery/presets/<name>.png`. The close ran the **full** `--workspace` suite before the
+two presets moved and only a narrowed behavioral selection after — `sanity`, `animation`,
+`distinctness`, `reactivity`, `golden`, `preset`, `easing`, all of which passed, and none of which is
+the `hygiene` binary. The `pre-push` hook caught it and refused the push. That is the same asymmetry
+the ceremony already warns about one level up (`--workspace`, never `-p <crate>`), met one level
+down: **the run that matters is the one after the last change, at full scope.** Repaired by adding
+both names to `CARDS` and rendering the two cards with the manifest's own recipe
+(`--signal dynamic:110 --frame-at 300 --size 640x360 --tier rich`) rather than by running
+`docs-shots.mjs` bare, which would have rewritten every committed PNG byte-wise for two new files.
+`presets/pending/README.md` said *"Nothing else has to change"* about the `git mv` — that sentence is
+what made the omission easy, and it is now corrected in place.
+
 **What outlives the plan.** Phase 5's unacted note that `docs/preset-guide.md` owed the authored path
 a mention is discharged; what it did *not* buy is a **picture** — the guide's `shape_field` frame is
 still `shape_pulse`, and `node scripts/docs-shots.mjs` would now have two authored figures to choose

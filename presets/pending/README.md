@@ -8,10 +8,21 @@ non-recursive `read_dir` over `presets/` plus a `*.toml` extension filter (ADR-0
 subdirectory is skipped by construction. Files here are version-controlled, reviewable and diffable,
 and reach neither the binary nor the behavioral suite.
 
-**Shipping one is a `git mv` into `presets/`**, gated on `cargo nextest run -p rlx-core` — the same
-gate every other preset passes. The one thing that may change on the way out is the **filename**:
-the shipped set is named `<system>_<look>.toml` and `ls` is its roster, so a held file named any
-other way is renamed as it lands (both authored-path worlds below were).
+**Shipping one is a `git mv` into `presets/`** — plus **two things the move does not do for you**,
+both of which `core/tests/hygiene.rs` refuses a push over:
+
+- **A gallery card.** Add the name to `CARDS` in `scripts/docs-shots.mjs` and commit a render at
+  `docs/images/gallery/presets/<name>.png`. `every_shipped_preset_has_a_gallery_card` holds the two
+  sets equal in **both** directions, so a card without a preset fails too. The recipe is the
+  manifest's: `--signal dynamic:110 --frame-at 300 --size 640x360 --tier rich`. Running
+  `scripts/docs-shots.mjs` bare regenerates the *whole* manifest and rewrites every committed PNG
+  byte-wise — render the one card by hand instead.
+- **The filename.** The shipped set is `<system>_<look>.toml` and `ls` is its roster, so a held file
+  named any other way is renamed as it lands (both authored-path worlds below were).
+
+Then the gate every other preset passes: `cargo nextest run -p rlx-core`. **The whole binary, not a
+narrowed selection** — the behavioral sweeps and `hygiene` live in different binaries, and a
+selection that names the first and not the second passes a preset that cannot be pushed.
 
 **To work on one in the running app**, point `RLX_PRESET_DIR` at this directory (ADR-0014); the app
 hot-reloads it on a ~150 ms poll exactly as it does the shipped folder.

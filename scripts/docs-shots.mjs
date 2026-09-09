@@ -198,11 +198,13 @@ const CARDS = [
   "collage_nocturne",
   "collage_onwhite",
   "collage_suprematist",
-  // shape_field (6)
+  // shape_field (8)
   "shape_aperture",
   "shape_contourmono",
   "shape_facet",
   "shape_heartmono",
+  "shape_lion",
+  "shape_maple",
   "shape_pulse",
   "shape_ringmono",
   // spectrum (5)
