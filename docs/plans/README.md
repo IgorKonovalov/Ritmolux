@@ -41,13 +41,12 @@ place. The plan file carries the real link.
 | Plan | Title | Status | Owner | Live constraint |
 |------|-------|--------|-------|-----------------|
 | [0120](0120-the-standalone-ships-on-ubuntu.md) | The standalone ships on Ubuntu | approved | dev, human | ADR-0131 (proposed): a PulseAudio capture arm plus an `ubuntu-latest` CI arm. **Phase 1 is a `human` stop gate before `dev`** — only one of its three outcomes lets `dev` start. |
-| [0092](0092-the-engine-draws-an-authored-path.md) | The engine draws an authored path | approved | dev, human | Hard dependency discharged: 0091 closed, and `shape_field` is the scene this draws into. Takeable even if 0087 stalls — Phase 4 may legitimately be empty. Expect morph degeneracy. |
 | [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | approved | dev, human | **A new Phase 1 fixes backlog 0102 + 0103 before anything advertises the component** — foobar's UI starves until playback starts. **Phases 4-6 unblocked, 0150 closed.** 0156 Phase 2 shortens the README first. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + **0174**: Art-Net to the fixtures, verified against `rlx-artnet-sim` because **the rig is unreachable**. Phases 1-8 need none; 9 is the rig session. Phase 8 hard-depends on 0115 Phase 2. |
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
 | [0158](0158-the-player-grows-a-studio-facing-surface.md) | The player grows a studio-facing surface | approved | dev, human | ADR-0175 + ADR-0176: override, OSC control-in, events, schema export, pipe sink, preview readback. **0159 needs Phases 1-5.** Touches `run.rs` beside 0133 and 0120: merge `main` first. |
 | [0159](0159-the-studio-opens.md) | The studio opens | approved | studio-builder, dev, human | ADR-0177 + ADR-0178: the Electron studio under `studio/`, first lane of its kind. **Hard dependency: 0158 Phases 1-5.** Two `human` gates at the end: a tester zip and the on-device check. |
-| [0160](0160-the-silhouettes-preconditions-stop-being-silent.md) | The silhouette's preconditions stop being silent | draft | dev, human | ADR-0179: four preconditions on `[path]` that fail silently. **Hard dependency: 0092**, whose own Phase 7 fixes the axis. Phase 2 is prose in `presets/README.md`. |
+| [0160](0160-the-silhouettes-preconditions-stop-being-silent.md) | The silhouette's preconditions stop being silent | draft | dev, human | ADR-0179: four preconditions on `[path]` that fail silently. **0092 closed 2026-09-09**, so its Phase 7 axis fix is in. Phase 2 is prose in `presets/README.md`. |
 <!-- roster:end -->
 
 **Added 2026-09-09 — [0158] and [0159] are drafted, and they are a program rather than a
@@ -211,9 +210,9 @@ and the ADR's Alternative E becomes live), and whether uniform area sampling rea
 should be Phase 1, the author's own model on screen and untuned, because that is the cheapest moment
 to learn that weighted sampling was never optional.
 
-**Sequencing: both new plans run after [0087] and [0092].** [0098] contends with [0092] on
-`shape_field.rs` and [0087]'s stop condition is worth resolving before more line-adjacent work; the
-choice was the user's at the planning interview. [0099] contended with nothing and did not have to
+**Sequencing: both new plans ran after [0087] and [0092]** — all three are now closed. [0098]
+contended with [0092] on `shape_field.rs` and [0087]'s stop condition was worth resolving before more
+line-adjacent work; the choice was the user's at the planning interview. [0099] contended with nothing and did not have to
 wait — **it was taken by a free session and closed 2026-08-16**, which is the note working exactly
 as intended.
 
@@ -379,7 +378,7 @@ build is no longer a reason to keep a finished worktree around.
   cost measurement and Phase 4 look gate can send it to
   [ADR-0098](../adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md)'s
   Alternative C, and two other plans carry phases scoped as if it lands
-  ([0092](0092-the-engine-draws-an-authored-path.md) Phase 4, [0104] Phase 4). Learning that late
+  ([0092](done/0092-the-engine-draws-an-authored-path.md) Phase 4, [0104] Phase 4). Learning that late
   wastes work written around it.
 
 > **Amended 2026-08-25 — Lane B changed hands.** 0087 reached its Phase 4 look gate and cleared both
@@ -415,12 +414,10 @@ would revert most quietly.
 ### Then, in this order
 
 1. ~~**[0098]**~~ — **closed 2026-08-27**, which discharges what 2 and 4 below were waiting on.
-2. **[0092](0092-the-engine-draws-an-authored-path.md)** — **unblocked**: it rewrites
-   `core/src/render/scenes/shape_field.rs`, which [0098] has now finished with. Take it from the
-   post-close `main`, not from a base predating it — that file gained a `coord_mode` branch and a
-   `rotation` term. Its Phase 4 reads [0087]'s outcome, which **now exists**: the arc primitive
-   shipped and ADR-0098's Alternative C was not taken, so a polyline distance field is not the only
-   route.
+2. ~~**[0092](done/0092-the-engine-draws-an-authored-path.md)**~~ — **closed 2026-09-09.** It was
+   taken from the post-close `main` as this note asked, and its Phase 4 did read [0087]'s outcome:
+   the arc chain landed, and Phase 2's measurement had by then made it load-bearing rather than
+   optional. The full record is in [README-archive.md](README-archive.md).
 4. **[0104]** — ~~once [0087] and 0098 have resolved~~; **both closed 2026-08-27, so it is
    unblocked in full.** Phase 2's `shape_field` cohort now has two coordinates to author against and
    a `rotation` lever, and [0087]'s Phase 4 means `star_pattern` can be authored on the arc
@@ -460,10 +457,12 @@ file is the one that meets it.
 
 ### What this sequence assumes
 
-- **[0087] failing at its stop condition is the live risk, and it is priced rather than hedged.** If
-  it ends at ADR-0098's Alternative C, [0092]'s Phase 4 may legitimately be empty and [0104]'s
-  Phase 4 needs rescoping *before* it is authored — which is precisely the information early
-  placement buys.
+- ~~**[0087] failing at its stop condition is the live risk, and it is priced rather than hedged.**~~
+  — **spent 2026-09-09.** [0087] did not fail: the arc primitive shipped, and [0092] closed with a
+  Phase 4 that was **not** empty and in fact carried the plan — its own Phase 2 measurement made the
+  arc chain the thing that made a per-pixel contour viable, which is the inverse of the risk this
+  bullet priced. [0104]'s Phase 4 still reads it, and needs no rescoping. The note is in
+  [README-archive.md](README-archive.md) under `## Prior sequencing notes (superseded)`.
 - **Two lanes is the ceiling here, not a target.** Only three groups are genuinely disjoint
   (`lines/`, `shape_field.rs`, and `dsp/` + `tools/`); a third lane starts forcing plans that share
   files into one window.
@@ -534,7 +533,7 @@ at 60 Hz or at capture `dt` stays correct as written.
 [0080]: done/0080-the-sky-gets-a-horizon.md
 [0081]: done/0081-the-sky-gets-a-galaxy.md
 [0082]: done/0082-the-gradient-stops-banding.md
-[0092]: 0092-the-engine-draws-an-authored-path.md
+[0092]: done/0092-the-engine-draws-an-authored-path.md
 [ADR-0037]: ../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md
 [backlog 0038]: ../design-backlog.md
 [backlog 0058]: ../design-backlog.md
@@ -734,6 +733,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0092 — The engine draws an authored path](done/0092-the-engine-draws-an-authored-path.md) — closed 2026-09-09. Review: **no blockers, no majors, three minors, one nit.** Version: **0.112.0** (minor). ADR-0107 already accepted. `shape_maple` + `shape_lion` shipped. [Write-up](README-archive.md).
 - [0140 — Every rate integrates, for real](done/0140-every-rate-integrates-for-real.md) — closed 2026-09-08. Review: **no blockers, two majors, three minors, one nit.** Version: **0.111.1**. ADR-0152 + 0153 accepted. Archived [backlog 0149 + 0150](../design-backlog-archive.md). [Write-up](README-archive.md).
 - [0157 — The cost probes estimate a duration](done/0157-the-cost-probes-estimate-a-duration.md) — closed 2026-09-07. Review: **no blockers, no majors, two minors, one nit.** Version: **none** (no shipped artifact moved). ADR-0173 accepted. [Write-up](README-archive.md).
 - [0153 — The debug tree stops carrying dependency line tables](done/0153-the-debug-tree-stops-carrying-dependency-line-tables.md) — closed 2026-09-07. Review: **no blockers, no majors, one minor.** Version: **none** (chore-only). ADR-0165 accepted. [Write-up](README-archive.md).

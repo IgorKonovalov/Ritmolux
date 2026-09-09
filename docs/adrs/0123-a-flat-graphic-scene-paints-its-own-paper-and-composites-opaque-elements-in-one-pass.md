@@ -155,7 +155,7 @@ are in Plan 0113's scope: Malevich's suprematist canvases (floating flat quads, 
 triangles on white) and Kandinsky's *On White II* (the same vocabulary plus thin lines, arcs,
 concentric rings, checkerboard patches and translucent crossings). Malevich's figurative
 constructivism is authored bespoke geometry, adjacent to
-[Plan 0092](../plans/0092-the-engine-draws-an-authored-path.md); Severini's fragmented collage is a
+[Plan 0092](../plans/done/0092-the-engine-draws-an-authored-path.md); Severini's fragmented collage is a
 subdivision field and a different mechanism entirely.
 
 **The element-count requirement is counted from those references, not estimated**: 14 elements in

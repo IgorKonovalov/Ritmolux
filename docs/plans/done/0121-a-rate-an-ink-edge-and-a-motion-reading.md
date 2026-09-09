@@ -298,7 +298,7 @@ fn band_contour(
   per-pixel cost, and `docs/nfr.md`'s frame budget is the thing to watch if a Rich-tier preset on the
   affected scenes moves.
 - **Phase 5 contends with two approved plans on `shape_field.rs`** — [0098](0098-the-figure-nests-properly.md)
-  and [0092](../0092-the-engine-draws-an-authored-path.md), which both own that file. Run this plan and
+  and [0092](0092-the-engine-draws-an-authored-path.md), which both own that file. Run this plan and
   those in sequence or in separate worktree lanes; the collision is in the shader's fragment body,
   which is where all three edit.
 - **Phase 4 has no regression evidence and cannot get any.** No shipped preset binds `warp_speed`, so

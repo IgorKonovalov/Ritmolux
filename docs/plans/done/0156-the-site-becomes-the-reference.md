@@ -19,7 +19,7 @@
 > **Coordinates with:** [0103](../0103-the-project-gets-an-audience.md) — Phase 2 here moves the
 > operator and developer sections out of `README.md`; 0103 Phase 2 keeps the README's opening and
 > reorders a shorter file. [0140](0140-every-rate-integrates-for-real.md) and
-> [0092](../0092-the-engine-draws-an-authored-path.md) edit scene files that Phase 7 here also edits.
+> [0092](0092-the-engine-draws-an-authored-path.md) edit scene files that Phase 7 here also edits.
 > **Lane guidance:** a worktree — `WORK/rlx-plan-0156` on `plan-0156-the-site-becomes-the-reference`
 > — because Phases 2, 6 and 7 compile Rust and Phase 7 touches every scene file. The cost is a cold
 > `target/` (ADR-0147 puts a lane at 8–18 GB) and the fact that **nothing deploys until the close

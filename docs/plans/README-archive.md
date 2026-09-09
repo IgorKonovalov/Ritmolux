@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0092 — The engine draws an authored path](#0092--the-engine-draws-an-authored-path)
   - [0140 — Every rate integrates, for real](#0140--every-rate-integrates-for-real)
   - [0157 — The cost probes estimate a duration](#0157--the-cost-probes-estimate-a-duration)
   - [0153 — The debug tree stops carrying dependency line tables](#0153--the-debug-tree-stops-carrying-dependency-line-tables)
@@ -165,6 +166,7 @@ hand-edited.
   - [0002 — Rust enforcement tooling](#0002--rust-enforcement-tooling)
   - [0001 — Core + standalone MVP, then foobar parity](#0001--core--standalone-mvp-then-foobar-parity)
 - [Prior sequencing notes (superseded)](#prior-sequencing-notes-superseded)
+  - [Moved 2026-09-09 from `README.md` — the 0087-stop-condition risk](#moved-2026-09-09-from-readmemd--the-0087-stop-condition-risk)
   - [Moved 2026-09-08 from `README.md` — the 0140/0125 contention note](#moved-2026-09-08-from-readmemd--the-01400125-contention-note)
   - [Moved 2026-09-07 from `README.md` - the 0157-is-drafted note](#moved-2026-09-07-from-readmemd---the-0157-is-drafted-note)
   - [Moved 2026-09-07 from `README.md` - the 0153-is-approved note](#moved-2026-09-07-from-readmemd---the-0153-is-approved-note)
@@ -184,6 +186,82 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0092 — The engine draws an authored path](done/0092-the-engine-draws-an-authored-path.md)
+
+- closed 2026-09-09. Seven phases in the `WORK/rlx-plan-0092` worktree on
+`plan-0092-the-engine-draws-an-authored-path`: `6cd20de` (1, the parser and its refusals), `bad073f` (2, the contour becomes a field and the arity ceiling is measured), `987c758` (3, two
+paths morph), `85e41b7` (4, the arc chain, and the win measured), `d66c3c6` (5, the authoring
+surface), `cec8e73` (6's output, two worlds into `pending/`) and `51831ab` (7, the axis). Review:
+**no blockers, no majors, three minors, one nit.** Version: **0.112.0** (minor). ADR-0107 was already
+accepted at approval; ADR-0179 stays `proposed`, paired with Plan 0160.
+
+**The plan's central bet was that its own cost estimate might be wrong, and it was — by an order of
+magnitude.** ADR-0107 constructed ~2 % of a nominal integrated GPU at `N = 32` from pixels × segments
+× ops and labelled it an estimate; Phase 2's `core/tests/path_cost.rs` measured **26 %** there, a flat
+~0.105 ms per segment at 1920x1080 on the floor tier's own adapter class, with `samples = 192` at
+21.22 ms — over the whole 16.67 ms budget on its own. `MAX_SAMPLES` fell from the 192 Phase 1 had
+committed to **64**. That is the plan's `Decision` paragraph working exactly as written: the ceiling
+was an *output* of the measurement rather than an input to it.
+
+**The consequence was that Phase 4 stopped being optional.** ADR-0107's Risks named the scenario
+where *"Plan 0087's arcs stop being an optimisation and become the thing that makes this viable"*, and
+the Phase 2 reading is that scenario. The fitted arc chain draws the same figures 30–72 % cheaper
+(leaf 4.15 ms against 7.09; circle 1.99 against 7.12), because an arc piece costs ~1.6 segments and
+the fit needs about four times fewer of them. Two things put a figure back on the polyline and both
+are the chain's own limits, refused rather than invented: a morph in flight (two arc chains have no
+point correspondence — ADR-0075's representation problem) and `coord_mode = 1`.
+
+**Phase 7 exists because the look gate found a defect where a verdict was expected.** SVG measures y
+downward and clip space upward, nothing negated between them, and **every pasted path arrived
+mirrored top to bottom** — against a `[path]` table sold on a file *"a browser renders correctly"*.
+No test saw it because the suite's path literals were y-symmetric *as figures*, so a global
+reflection maps them onto themselves. The phase's real deliverable is the first y-asymmetric literal
+in the suite. Two of the phase's own premises were falsified in the doing and `dev` recorded both:
+`TRIANGLE` and `STAR5` are not y-symmetric either (they pass because every assertion using them
+compares two figures to each other), and the golden **did** move — the negation reverses the
+contour's start point and traversal direction, and both the arc-length resample and the greedy biarc
+fit depend on those, so 53 of 64 resampled points and 2 of 16 arc-piece boundaries survived. Mean
+channel difference 0.0005 against a 0.02 tolerance; the four-pixel outlier of 142 is the two-band
+palette's hard seam.
+
+**Three minors.** `path_cost.rs` closes with `assert!(ceiling > coarse)` — an inequality between two
+wall-clock readings, which `dev` observed failing once under full-suite parallel load (`samples = 8`
+at 12.778 ms against `samples = 48` at 7.560 ms) and which passes in isolation both with and without
+the change. Its two siblings `field_cost.rs` and `mark_cost.rs` assert **only** pixel-difference
+non-vacuity and never a timing comparison, and this file already carries that same pixel assertion
+three lines above, which alone proves the arity drew different figures. Exposure is bounded: the
+probe skips on a software rasterizer, so CI never reaches it and only a local `--workspace` run on
+real hardware is at risk. Second: `docs/preset-guide.md`'s `shape_field` entry still said the system
+draws *one of five silhouettes*, on the page the site publishes as the illustrated entrance —
+repaired at the close. Third, marginal and left alone: the implementation log runs 182 lines against
+the phases section's 178.
+
+**One nit, pre-existing and routed rather than repaired.** A `[path]` table declared on a
+non-`shape_field` system is silently dropped by `build_config`'s other arms. No structural table in
+this engine is checked against its system, so it is a class rather than this plan's drift, and it
+sits inside ADR-0179's scope, which Plan 0160 owns.
+
+**Curation: both authored-path worlds shipped, renamed on the way out.**
+`presets/pending/path_maple.toml` and `path_lion.toml` became **`presets/shape_maple.toml`** and
+**`presets/shape_lion.toml`** — the shipped set is `<system>_<look>.toml` and `ls` is its roster, so
+a `path_` prefix would have read as a thirteenth system that does not exist. They were held for less
+than a day: authored, look-gated and blocked on 2026-09-09 by the Y-flip, released the same evening
+by this plan's own Phase 7. The verdict rests on evidence — the whole behavioral suite green with
+both embedded (364 passed, 3 skipped), and `shot --report family=shape_field` reporting **no
+near-duplicate geometry below shape 0.08** against the six presets already in the family, with bass
+reactivity 0.167 and 0.175 sitting mid-family. Their `onset 0.000` is
+[backlog 0192](../design-backlog.md) rather than a dead preset: the report holds a frame, so
+`beat_index` never advances and a counter-driven response is invisible to every column it prints.
+The stale-workaround sweep is clean — no shipped preset writes `coord_mode = "2"`, so nothing was
+silently getting mode 1 from the `ParamSpec` range Phase 7 corrected.
+
+**What outlives the plan.** The guide now names the authored path but still shows `shape_pulse`'s
+frame; `node scripts/docs-shots.mjs` would have two authored figures to choose from. Backlog 0192 is
+live and is `architect`'s interview, not an edit — the fix perturbs an instrument the close ceremony
+curates on. ADR-0179's four silent preconditions are Plan 0160's. And the `does NOT do` list holds
+exactly as written: no runtime asset path, no tessellation, no second curve representation, no
+multi-shape composition, and the `marks` roster untouched.
 
 ### [0140 — Every rate integrates, for real](done/0140-every-rate-integrates-for-real.md)
 
@@ -7447,6 +7525,34 @@ uncovered (its C side remains the Plan 0001 Phase-6 smoke program's job, per ADR
 
 ## Prior sequencing notes (superseded)
 
+### Moved 2026-09-09 from `README.md` — the 0087-stop-condition risk
+
+Spent when [0092] closed on 2026-09-09. The note priced a risk that inverted: it assumed [0087]
+might end at ADR-0098's Alternative C, leaving [0092]'s Phase 4 legitimately empty. [0087] shipped
+the arc primitive instead, and Phase 4 was not merely non-empty — Phase 2's measurement (~0.105 ms
+per polyline segment at 1920x1080, an order of magnitude worse than ADR-0107's construction) turned
+the arc chain from an optimisation into the thing that made a per-pixel authored contour viable at
+all. Kept because the fact it records outlived both plans: [0104]'s Phase 4 still reads [0087]'s
+outcome and needs no rescoping. Verbatim:
+
+> - **[0087] failing at its stop condition is the live risk, and it is priced rather than hedged.**
+>   If it ends at ADR-0098's Alternative C, [0092]'s Phase 4 may legitimately be empty and [0104]'s
+>   Phase 4 needs rescoping *before* it is authored — which is precisely the information early
+>   placement buys.
+
+And the item it sequenced, from `### Then, in this order`:
+
+> 2. **[0092]** — **unblocked**: it rewrites `core/src/render/scenes/shape_field.rs`, which [0098]
+>    has now finished with. Take it from the post-close `main`, not from a base predating it — that
+>    file gained a `coord_mode` branch and a `rotation` term. Its Phase 4 reads [0087]'s outcome,
+>    which **now exists**: the arc primitive shipped and ADR-0098's Alternative C was not taken, so a
+>    polyline distance field is not the only route.
+
+[0087]: done/0087-the-line-renderer-draws-a-curve.md
+[0092]: done/0092-the-engine-draws-an-authored-path.md
+[0098]: done/0098-the-figure-nests-properly.md
+[0104]: done/0104-the-library-stops-being-lopsided.md
+
 ### Moved 2026-09-08 from `README.md` — the 0140/0125 contention note
 
 Spent when [0140] closed on 2026-09-08. The contention it tracked was discharged twice over: [0125]
@@ -7514,7 +7620,7 @@ asks, and both remaining dependents are recorded in the live index's own rows. V
 short front door rather than the operator reference - which is the live constraint its roster row
 carries.
 
-[0092]: 0092-the-engine-draws-an-authored-path.md
+[0092]: done/0092-the-engine-draws-an-authored-path.md
 [0103]: 0103-the-project-gets-an-audience.md
 [0140]: done/0140-every-rate-integrates-for-real.md
 [0156]: done/0156-the-site-becomes-the-reference.md

@@ -506,7 +506,7 @@ The provisional parameter surface, for Phase 8's roster: `paper`, `count`, `dens
   the render graph twice and both rejections stand.
 - **It does not deliver Malevich's figurative constructivism** (reference image 1). Figures
   assembled from colour blocks are authored bespoke geometry, which is
-  [Plan 0092](../0092-the-engine-draws-an-authored-path.md)'s territory.
+  [Plan 0092](0092-the-engine-draws-an-authored-path.md)'s territory.
 - **It does not deliver the Severini collage** (reference image 5). A dense fragmented-facet field
   is a subdivision mechanism, not a shape roster, and would be its own ADR.
 - **It does not add `paper_alpha`**, so `shape_collage` composes as the lower ADR-0090 layer only.

@@ -1,11 +1,13 @@
 # 0092 — The engine draws an authored path
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-09. Seven phases on `plan-0092-the-engine-draws-an-authored-path`
+> (`6cd20de` → `51831ab`). Mode 4 review: **no blockers, no majors, three minors, one nit.** Full
+> suite re-run at the tip: 1596 passed, 6 skipped. Both authored-path worlds shipped at the close.
 > **Created:** 2026-08-13
 > **Approved:** 2026-08-13 (user)
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0107](../adrs/0107-an-authored-path-is-inline-svg-data-and-it-morphs-by-resampling.md) (an authored path is inline SVG data, and it morphs by resampling)
-> **Depends on:** [Plan 0091](done/0091-the-figure-fills-the-frame.md) (hard — the field scene this draws into). [Plan 0087](done/0087-the-line-renderer-draws-a-curve.md) is a **soft** dependency; see the sequencing note below.
+> **Related ADRs:** [0107](../../adrs/0107-an-authored-path-is-inline-svg-data-and-it-morphs-by-resampling.md) (an authored path is inline SVG data, and it morphs by resampling)
+> **Depends on:** [Plan 0091](0091-the-figure-fills-the-frame.md) (hard — the field scene this draws into). [Plan 0087](0087-the-line-renderer-draws-a-curve.md) is a **soft** dependency; see the sequencing note below.
 
 ## TL;DR
 
@@ -19,24 +21,24 @@ so a figure can become another figure on the beat.
 ## Context & problem
 
 Every silhouette this engine can draw is one of five names (`marks.rs:63`), and a closed roster by
-construction answers only the asks someone has already had. [ADR-0084](../adrs/0084-a-particle-marks-silhouette-is-a-signed-distance-function.md)
-made that a deliberate consequence and [ADR-0105](../adrs/0105-the-mark-roster-becomes-a-fullscreen-distance-field.md)
+construction answers only the asks someone has already had. [ADR-0084](../../adrs/0084-a-particle-marks-silhouette-is-a-signed-distance-function.md)
+made that a deliberate consequence and [ADR-0105](../../adrs/0105-the-mark-roster-becomes-a-fullscreen-distance-field.md)
 restated it; this plan is the escape hatch, taken as a decision rather than by widening the roster
 one name at a time.
 
 **The six star references that raised the question do not motivate it**, and the plan says so up
 front because it is the honest framing: five of them are the existing `star` arm wanting three
-parameters, which is [Plan 0091](done/0091-the-figure-fills-the-frame.md) Phase 5. What motivates this is
+parameters, which is [Plan 0091](0091-the-figure-fills-the-frame.md) Phase 5. What motivates this is
 the general capability — and the sixth reference, a cartoon star **with eyes**, which is the one
 silhouette in the batch that no parameter reaches.
 
-[ADR-0107](../adrs/0107-an-authored-path-is-inline-svg-data-and-it-morphs-by-resampling.md) settles
+[ADR-0107](../../adrs/0107-an-authored-path-is-inline-svg-data-and-it-morphs-by-resampling.md) settles
 the four forks and carries the reasoning. Two of its findings shape every phase below:
 
 - **Fill and stroke are one field, not two routes.** A signed distance gives both, which is why the
   interview's "both" answer costs a shader branch rather than a second renderer.
 - **ADR-0098's vertex bead does not transfer.** That artifact belongs to the instanced-quad line
-  renderer, where [ADR-0041](../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)'s
+  renderer, where [ADR-0041](../../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)'s
   joins overlap and the additive composite sums them. A `min` over segment distances has no quads
   and is exactly correct at every join — so dense resampling costs ALU and compounds nothing.
 
@@ -155,7 +157,7 @@ flowchart LR
     the brute-force search is affordable and no cleverness is owed.
   - **Mid-morph states are inspected, not assumed.** Plan 0079 swept twenty tuple pairs and *four*
     were refused by measurement because intermediate states collapsed to zero extent;
-    [ADR-0075](../adrs/0075-ifs-family-morphs-in-singular-value-space.md) exists because naive
+    [ADR-0075](../../adrs/0075-ifs-family-morphs-in-singular-value-space.md) exists because naive
     interpolation of the obvious representation was wrong. This phase renders a strip across the
     morph for each shipped pair and **records what it saw** — a degenerate interval is a finding to
     write down, not a bug to tune away.
@@ -311,7 +313,7 @@ stroke = "0.0"       # 0 = filled; > 0 strokes at abs(d) < w
   plan as it was before it.
 - **It does not close the roster question.** `marks`' five shapes stay exactly as they are; a path
   is an alternative source of a silhouette, not a replacement for them.
-- **It does not shade.** The chrome register is [backlog 0092](../design-backlog.md), gated on Plan
+- **It does not shade.** The chrome register is [backlog 0092](../../design-backlog.md), gated on Plan
   0091 and independent of this.
 
 ## Implementation log
@@ -497,3 +499,58 @@ stroke = "0.0"       # 0 = filled; > 0 strokes at abs(d) < w
   `distinctness`), because each of those phases changed a scene and the preset engine.
 - **Outstanding `human` phases:** none. Phase 6's look gate ran in the running app on 2026-09-09 and
   answered its second question with the defect Phase 7 fixes.
+
+### Close (architect, 2026-09-09)
+
+**Mode 4 verdict: no blockers, no majors, three minors, one nit.** The full suite was re-run at the
+lane tip rather than trusted: `cargo nextest run --workspace --no-fail-fast`, **1596 passed, 6
+skipped, exit 0, 485.6 s** — matching the log's `Full suite` bullet exactly. All seven pre-push Node
+gates plus `toc --check` exit 0; `check-backlog-claims` reports 110 reductions holding across 48 live
+entries with no entry convicted.
+
+**Three minors.** `path_cost.rs`'s last assertion compares two wall-clock readings
+(`ceiling > coarse`), which `dev` observed failing once under full-suite parallel load; its two
+siblings `field_cost.rs` and `mark_cost.rs` assert only pixel-difference non-vacuity, and this file
+already carries that same assertion three lines above. Exposure is bounded — the probe skips on a
+software rasterizer, so CI never reaches it. Second: `docs/preset-guide.md`'s `shape_field` entry
+still described the system as drawing one of five silhouettes, on the page the site publishes as the
+illustrated entrance; Phase 5's file list did not name it and `dev` flagged the gap without acting,
+which was correct for that lane. **Repaired at the close.** Third, marginal: this log runs 182 lines
+against the phases section's 178 — 2 % over the rule that the report must not outweigh the contract,
+and left alone, because the excess is three measured tables that exist nowhere else.
+
+**One nit, recorded rather than repaired.** A `[path]` table declared on a non-`shape_field` system
+is silently dropped: `build_config`'s other arms return `Ok(None)`. It is a **pre-existing class** —
+no structural table is checked against its system — and it sits inside ADR-0179's scope, which Plan
+0160 owns.
+
+**What the review confirmed rather than took on trust.** Every test the plan named was opened. The
+Phase 7 pair bites in the right places: the contour assertion counts points near each y extreme
+rather than trusting one coordinate, so it convicts a reversal and not a drift, and the rendered one
+carries a negative control and claims no threshold beyond *the halves are not equal*. The repair to
+`winding_is_normalized_and_a_misaligned_pair_provably_collapses` is a **claim** corrected, not an
+expectation adjusted — its tail is now sign-agnostic, because alignment's contract is agreement with
+the source's winding rather than positivity. `path_cost.rs` is otherwise a model of ADR-0071: no
+threshold, machine named, skips on WARP with a notice, and the two readings the ceiling put out of
+reach recorded as prose.
+
+**Curation (step 3b): both authored-path worlds ship.** `presets/pending/path_maple.toml` and
+`path_lion.toml` land as **`presets/shape_maple.toml`** and **`presets/shape_lion.toml`** — renamed
+because the shipped set is `<system>_<look>.toml` and `ls` is its roster, so a `path_` prefix would
+have read as a thirteenth system. The verdict rests on evidence, not on the look: the whole
+behavioral suite is green with both embedded (364 passed, 3 skipped), and
+`shot --report family=shape_field` reports **no near-duplicate geometry below shape 0.08** against
+the six presets already in the family, with bass reactivity 0.167 and 0.175 sitting mid-family.
+Their `onset 0.000` is [backlog 0192](../../design-backlog.md) — the report holds a frame, so
+`beat_index` never advances and a counter-driven response measures as inert — and not a dead preset.
+The stale-workaround sweep comes back clean: no shipped preset writes `coord_mode = "2"`, so nothing
+was silently getting mode 1 from the `ParamSpec` range Phase 7 corrected, and no preset other than
+these two has ever carried a `[path]` to work around.
+
+**What outlives the plan.** Phase 5's unacted note that `docs/preset-guide.md` owed the authored path
+a mention is discharged; what it did *not* buy is a **picture** — the guide's `shape_field` frame is
+still `shape_pulse`, and `node scripts/docs-shots.mjs` would now have two authored figures to choose
+from. ADR-0179 stays `proposed`: it is paired with Plan 0160, not with this one, and the four silent
+preconditions it names are that plan's to discharge. The `does NOT do` list holds as written — no
+runtime asset path, no tessellation, no second curve representation, no multi-shape composition, and
+the `marks` roster is untouched.
