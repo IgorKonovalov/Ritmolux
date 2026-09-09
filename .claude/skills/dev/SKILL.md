@@ -41,11 +41,20 @@ Then wait. The reads below are task-grounded, not startup routines.
   (every embedded preset parses) plus the `sanity`/`reactivity`/`animation` gates, which iterate the
   whole set — so a weak preset fails CI for everyone, and that's the real gate on curation.
 
-You own all code (Rust core, standalone, C++ plugin) — there is no sibling *implementer* skill.
-The handoffs are `architect → you` (the user's "go" at Step 2), `you → architect` (the
-close-ceremony prompt at Step 4), and `preset-author → architect` (engine-gap feedback, which
-reaches you as a plan). All are manual and their value is the fresh-context boundary — don't try to
-collapse them into one session.
+- **`studio-builder`** — the fourth lane (added per
+  [ADR-0177](../../../docs/adrs/0177-a-fourth-skill-lane-builds-the-studio.md)). Owns everything
+  under `studio/`, the Electron application that drives the player over the control protocol
+  (ADR-0176). It never writes Rust or C++; the player side of that protocol — the listener, the
+  events, the schema export, the pipe sink — is **yours**, and a gap it finds reaches you as a plan
+  through `architect`, never as a request to shim something in the studio.
+
+You own all Rust and C++ (core, standalone, plugin). The one sibling *implementer* is
+`studio-builder`, and it owns only `studio/`. The handoffs are `architect → you` (the user's "go"
+at Step 2), `you → architect` (the close-ceremony prompt at Step 4), `preset-author → architect`
+(engine-gap feedback, which reaches you as a plan), and `you ↔ studio-builder` at a phase whose
+owner tag is the other lane (commit, verify `git status` is clean, and name the plan, phase and
+owner in your final line — the user opens the other lane). All are manual and their value is the
+fresh-context boundary — don't try to collapse them into one session.
 
 ## How plans ship
 
@@ -101,6 +110,8 @@ For **each phase in order**:
 1. **Re-anchor and check the owner tag.** Re-read the phase block — it lists files to touch and
    the done-when. Read `**Owner skill:**`:
    - `dev`: proceed (your phase).
+   - `studio-builder`: not yours — commit what is done, verify `git status` is clean, and **stop**,
+     naming the plan, the phase and the owner in your final line.
    - `human`: surface that this is a user task and **stop** — don't infer or "get it ready".
    - **Override:** if at Step 2 the user explicitly authorized doing a `human` phase's mechanical
      part, echo the override in one sentence and proceed. Otherwise stop.
