@@ -296,7 +296,7 @@ to a layout.
 | 3 — The player reports | dev | done | `fee2cfd` |
 | 4 — The engine states what a preset can contain | dev | done | `d7bdee8` |
 | 5 — The headless tap writes to a pipe | dev | done | `efb99f7` |
-| 6 — The windowed show gets a preview copy | dev | done | committed with this row |
+| 6 — The windowed show gets a preview copy | dev | done | `715a777` |
 | 7 — The on-device check | human | not started | |
 
 ### Notes
@@ -478,13 +478,29 @@ to a layout.
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** no. `git diff --stat main...HEAD -- presets/` is empty; the generated
+  parameter block in `presets/README.md` is unchanged, which
+  `the_parameter_reference_block_is_current` confirms from the other direction.
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** a feature. Six new operator-visible surfaces — `--control`, `--events`,
+  `--schema`, `--stream --sink stdout`, `--preview stdout`, and `[control]` in `config.toml` — plus
+  a new public core API (`set_param_override` and its two clears, the preview readback, the schema
+  export, `frame_ms_p50`, `PresetError::span`/`param`). The C ABI is untouched:
+  `git diff main...HEAD -- core-cabi/` is empty, so `docs/specs/0001-c-abi.md` needs no reconcile.
+- **Operator docs touched:** `docs/configuration.md` (the five flags, `[control]`, the precedence
+  rows, the complete example), `docs/capturing.md` (the two sinks and what the pipe promises),
+  `docs/running.md` (mirroring the show). Also `docs/specs/0003-studio-control-protocol.md`, new,
+  and its row in `docs/specs/README.md` — **that spec is not in the site's `PUBLISHED` map** while
+  both of its siblings are, so the link `docs/configuration.md` carries to it is rewritten to a
+  github blob URL. Left as it is: what joins the site is not a `dev` call.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0.
+- **Full suite:** `cargo nextest run --workspace`, exit 0 — **1672 tests run, 1672 passed, 6
+  skipped**, 465 s, on the reference machine with a hardware adapter and a live capture endpoint.
+  The nine GPU suites ADR-0156 defers ran. `cargo clippy --workspace --all-targets -- -D warnings`
+  and `cargo fmt --all --check` are clean, as are all seven Node gates.
+- **Outstanding `human` phases:** **Phase 7**, both halves. Nothing in CI can send a real OSC
+  datagram from another program or watch a projector for ten minutes, and Phase 6's frame-time
+  figures above are a debug-build shape rather than the release reading that phase asks for.
 
 ## Followups (after this lands)
 
