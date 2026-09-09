@@ -661,10 +661,16 @@ pub(super) fn build_config(
         }
         // The shape field takes an OPTIONAL `[path]` table (ADR-0107): the
         // roster is still a closed list selected by the numeric `shape` param
-        // (ADR-0084/ADR-0105), and a preset naming no path takes exactly the
-        // `None` every shape_field preset took before — the table is an
-        // alternative source of a silhouette, not a replacement for the roster.
-        SystemKind::ShapeField => path.map(RawPath::into_config).transpose(),
+        // (ADR-0084/ADR-0105), and a preset naming no path draws it exactly as
+        // it did before — the table is an alternative source of a silhouette,
+        // not a replacement for the roster.
+        //
+        // Config is always `Some` so `configure` runs on every preset switch
+        // (clearing the contour — never stale), which is why the absent table is
+        // a `None` INSIDE the variant rather than an absent config.
+        SystemKind::ShapeField => Ok(Some(GeneratorConfig::Path {
+            shape: path.map(RawPath::into_shape).transpose()?,
+        })),
         // Reaction-diffusion drives its regime through named params (feed/kill/
         // flow), not a declarative structural table. `shape_collage`'s structure
         // is an authored element list compiled into the scene, and its seeded

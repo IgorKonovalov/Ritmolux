@@ -329,8 +329,12 @@ pub enum GeneratorConfig {
     /// `marks` roster exactly as it did before paths existed.
     Path {
         /// The contour, normalized into `[-1, 1]` and resampled to the arity
-        /// `[path] samples` asked for.
-        shape: crate::preset::path::PathShape,
+        /// `[path] samples` asked for. `None` — a `shape_field` preset that
+        /// declares no table — is what makes this config **always `Some`**: it
+        /// is handed over on every preset switch precisely so `configure` runs
+        /// and clears the outgoing preset's contour, the same reason the
+        /// attractor's and the spectrum's configs are unconditional.
+        shape: Option<crate::preset::path::PathShape>,
     },
 }
 

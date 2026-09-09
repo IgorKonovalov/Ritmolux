@@ -105,6 +105,11 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
 ///   or `blur_level`, and `warp_mesh/shader.rs` is built only for a bundle that
 ///   declares them. The one baseline executing a translated shader module, a
 ///   procedural noise texture, or a level of the blur chain.
+/// - `shape_field_path` — the rostered `shape_field.toml` draws a `marks` arm,
+///   so its `[path]` table is absent and not one line of the parser or of the
+///   shader's contour walk executes. The only baseline whose silhouette is
+///   **authored** rather than selected, and the only one that would still render
+///   a plausible figure — the roster's disc — if the whole feature were ignored.
 /// - `shape_collage_roster` — the rostered fixture runs the scene's defaults, so
 ///   at `layout = 0` the seeded layout grammar is unreached and at `roster = 0`
 ///   no line of `sd_bar`, `sd_ring`, `sd_segment`, `sd_arc` or `sd_checker`
@@ -116,7 +121,7 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
 /// was, so adding an entry here moves none of them — which matters on WARP,
 /// where building GPU resources mid-run is documented to change what a later
 /// capture resolves to. For the same reason a new entry goes at the **end**.
-const EXTRA_FIXTURES: [(&str, &str); 9] = [
+const EXTRA_FIXTURES: [(&str, &str); 10] = [
     (
         "attractor_depth",
         include_str!("fixtures/attractor_depth.toml"),
@@ -138,6 +143,10 @@ const EXTRA_FIXTURES: [(&str, &str); 9] = [
         include_str!("fixtures/shape_collage_roster.toml"),
     ),
     ("warp_mesh_stroke", FIXTURES_WARP_MESH_STROKE),
+    (
+        "shape_field_path",
+        include_str!("fixtures/shape_field_path.toml"),
+    ),
 ];
 
 /// The stroke fixture's text, named once so the roster entry above and the guard

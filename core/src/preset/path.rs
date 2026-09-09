@@ -50,9 +50,25 @@ pub const MIN_SAMPLES: usize = 3;
 /// pixel of every frame**, so this is a per-pixel `O(N)` budget rather than a
 /// memory one — which is why exceeding it is a load error rather than a silent
 /// decimation.
-pub const MAX_SAMPLES: usize = 192;
+///
+/// **The number is measured, and the measurement disagreed with ADR-0107's
+/// construction by an order of magnitude.** `core/tests/path_cost.rs` prices the
+/// contour walk at ~0.105 ms per segment at 1920x1080 on the integrated adapter
+/// `docs/nfr.md` §1's floor is calibrated against; the ADR predicted ~2 % of
+/// such a GPU at 32 segments and measured 26 %. At **64** the field alone is
+/// 46 % of the floor's 16.67 ms frame budget, which is the most that can be
+/// spent while leaving the composite chain room — so this is where the ceiling
+/// sits, and it is the same value as [`DEFAULT_SAMPLES`] because that is where
+/// the two independent answers landed.
+pub const MAX_SAMPLES: usize = 64;
 
 /// The arity a `[path]` resamples to when it names none.
+///
+/// The arity at which a *smooth* contour stops reading as faceted: the chord
+/// sagitta of a 64-gon inscribed in the normalized figure is under a pixel at
+/// 1080p, and at 32 it is around two and a half. A polygonal silhouette wants
+/// far fewer and should say so — `samples` is a lever downward, because
+/// [`MAX_SAMPLES`] leaves it none upward.
 pub const DEFAULT_SAMPLES: usize = 64;
 
 /// How finely a Bezier is flattened before the contour is resampled, as a

@@ -1,0 +1,53 @@
+# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+#
+# The authored-silhouette baseline (Plan 0092 Phase 2, ADR-0107): a `[path]`
+# contour drawn as the same signed-distance field the `marks` roster is drawn
+# as, and banded into the same concentric offset contours. What it pins is that
+# a figure NOBODY PUT IN THE ROSTER reaches the frame.
+#
+# The figure is a leaf - two cubics meeting at a cusp top and bottom - and it is
+# chosen for exactly that: no combination of `shape` and `points` draws it. The
+# roster's five arms are a disc, a ring, a polygon, a star and a heart, and a
+# regression that quietly ignored `[path]` and fell back to the `shape` default
+# would render a DISC here, which is as different from this picture as a
+# baseline can be.
+#
+#  - the two `C` commands are what make this baseline non-vacuous on the parser
+#    as well as on the scene: a straight-line-only path would pass through
+#    `flatten` without ever evaluating a cubic.
+#  - `samples` is absent, so the contour resamples at the default arity, which
+#    is also the ceiling `core/tests/path_cost.rs` measured. A baseline pinned
+#    at some other arity would be pinning a number this fixture does not own.
+#  - `palette_steps = "7"` bands the coordinate, so the frame carries the offset
+#    family rather than one smooth ramp - the same reason `shape_field.toml`
+#    turns it up, and what makes a wrong inradius visible as bands landing in the
+#    wrong place rather than as a slightly different gradient.
+#  - `palette_contour = "0.6"` draws the thin outlines at those boundaries.
+#
+# Adapter-compared before blessing (the ADR-0058 standing rule) at 160x160 over
+# 2 frames: hardware mean rgb 102.535 150.984 102.304 against WARP 102.573
+# 150.998 102.286, frame_diff 0.000231. Inside the noise floor, so this baseline
+# pins a picture hardware also draws. The scene's bind-group layout is unchanged
+# by the path work - the contour rides the existing uniform rather than adding a
+# storage entry, which would have made this layout's shape byte-identical to the
+# collage's - so the rule is confirmed here rather than newly at risk.
+system = "shape_field"
+name   = "fixture_shape_field_path"
+
+[path]
+d = "M 0,-1 C 0.9,-0.4 0.9,0.4 0,1 C -0.9,0.4 -0.9,-0.4 0,-1 Z"
+
+[palette]
+stops = [
+  { at = 0.0,  color = "#06301f" },
+  { at = 0.4,  color = "#2f8f63" },
+  { at = 0.75, color = "#b9d97a" },
+  { at = 1.0,  color = "#f4f1cf" },
+]
+
+[params]
+scale           = "0.55"
+color_span      = "0.45"
+color_center    = "0.0"
+palette_steps   = "7"
+palette_contour = "0.6"

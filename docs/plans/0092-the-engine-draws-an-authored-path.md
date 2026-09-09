@@ -263,8 +263,8 @@ stroke = "0.0"       # 0 = filled; > 0 strokes at abs(d) < w
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The parser, and what it refuses | dev | done | committed with this row |
-| 2 — The path becomes a field | dev | not started | — |
+| 1 — The parser, and what it refuses | dev | done | `6cd20de` |
+| 2 — The path becomes a field | dev | done | committed with this row |
 | 3 — Two paths morph | dev | not started | — |
 | 4 — Arcs, if Plan 0087 delivered them | dev | not started | — |
 | 5 — The authoring surface is documented | dev | not started | — |
@@ -273,7 +273,41 @@ stroke = "0.0"       # 0 = filled; > 0 strokes at abs(d) < w
 ### Notes
 
 - Phase 1 ships `[path] d` and `samples` only; `morph_to` lands with the morph in Phase 3.
-- `MAX_SAMPLES` is `192` as committed at Phase 1, ahead of the Phase 2 measurement that sets it.
+- **The Phase 2 measurement came back an order of magnitude worse than ADR-0107's construction, and
+  `MAX_SAMPLES` fell from the `192` Phase 1 committed to `64`.** `core/tests/path_cost.rs`, 1920x1080
+  (NFR §1's own floor resolution), floor tier, AMD Radeon(TM) Graphics (IntegratedGpu), DX12, debug,
+  best of three interleaved: roster control 1.03 ms; path at `samples` 16/32/64/128/192 →
+  2.69 / 4.33 / 7.70 / 14.51 / 21.22 ms, a flat **~0.105 ms per segment**. The ADR predicted ~2 % of
+  such a GPU at 32 and ~8 % at 128; measured 26 % and 87 %, with 192 over the whole 16.67 ms budget
+  on its own. The ceiling is where the field alone stays under half that budget. The 128 and 192
+  readings are now unreachable from the test (an arity over the ceiling is a load error) and are
+  recorded in that file's header as prose.
+- **`GeneratorConfig::Path`'s field became `Option<PathShape>` and the config is now always `Some`**
+  for `shape_field`. `Scene::configure` runs only when the config is `Some`, so a preset declaring no
+  `[path]` had to hand one over anyway or the outgoing preset's contour survived the switch. Pinned
+  by `switching_away_from_a_path_preset_clears_the_contour`.
+- Phase 2 touched three files outside its list: `core/src/render/scenes/mod.rs` (the `Option` above),
+  `core/src/preset/schema/load.rs` + `raw/path.rs` (the same), and `presets/README.md` — the last
+  mechanically, `RLX_UPDATE_PARAM_REFERENCE=1` regenerating one row for the new `stroke` param
+  (ADR-0170's block is generated, and its gate is red until it is). The hand-written `[path]` prose
+  is still Phase 5's.
+- The scene's rendered tests live in `core/src/render/scenes/shape_field/tests.rs` rather than in
+  `core/tests/` as the phase's file list says — that is where the scene's existing rendered tests
+  are, including the ADR-0037 aspect one. Only the cost probe went to `core/tests/`.
+- **`stroke` is a scene param, so it applies to the `marks` roster too**, not only to an authored
+  contour. It falls out of both silhouettes sharing one coordinate and could only have been withheld
+  by a branch that asked where the figure came from.
+- The plan and ADR write fill and stroke as `d < 0` and `abs(d) < w`; this scene's coordinate is that
+  signed distance normalized to `1` on the outline, so they ship as `d < 1` and `abs(d - 1) < w` —
+  the same two tests on the same one evaluation, shifted by one.
+- `coord_mode = 1` (the scaled-copy coordinate) works on an authored contour as well as on the
+  roster, via a second ray-crossing walk. The phase's done-when named only the distance.
+- **No committed golden baseline moved**: the suite passes unblessed against every existing baseline
+  with the change in place; `core/tests/golden/shape_field_path.png` is the one file added. A bless
+  rewrites nine PNGs byte-wise on this box without moving a pixel, which is the drift CLAUDE.md's
+  control warns about — the unblessed pass is what was trusted.
+- Deferred GPU suites run under ADR-0156's upward override (this phase changes a scene and the preset
+  engine): `golden`, `sanity`, `reactivity`, `animation`, `distinctness` — 280 passed, 3 skipped.
 
 ### Close triggers
 

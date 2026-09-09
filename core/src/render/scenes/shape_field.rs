@@ -52,6 +52,24 @@
 //! figure this scene can be cannot drift apart, and the roster stays closed at
 //! five names (ADR-0084's consequence, restated in ADR-0105).
 //!
+//! # A silhouette can also be authored (ADR-0107)
+//!
+//! A `[path]` table hands this scene a closed contour parsed from inline SVG
+//! path data, and it takes the place of the roster's arm in exactly one spot:
+//! where the shader asks for the figure's coordinate. Everything downstream —
+//! both `coord_mode`s, `gamma`, the banding, the contours, the palette — is the
+//! same code reading the same `d`, so an authored figure gets the whole colour
+//! surface for free. The roster is untouched and still closed at five names; a
+//! preset naming no path executes not one instruction of the contour walk.
+//!
+//! Two things fall out of the distance being a **`min` over segments**. It is
+//! `O(N)` per pixel and the field is fullscreen, so the arity is a per-frame
+//! cost paid whether or not the figure is on screen — `MAX_SAMPLES` is where
+//! `core/tests/path_cost.rs` measured that becoming half the floor tier's frame
+//! budget, and asking for more is a load error. And **fill and stroke stop
+//! being two routes**: the interior is `d < 1` and the outline is
+//! `abs(d - 1) < w` on the one evaluation, which is what the `stroke` param is.
+//!
 //! What *is* new is that this scene reads the field **outside** the silhouette,
 //! where the particle path never looked. Plan 0091 Phase 2 measured that region
 //! and repaired the two arms that were wrong out there; see `marks.rs`'s own
@@ -82,8 +100,31 @@ use super::Scene;
 use super::common;
 use super::marks;
 use crate::dsp::AnalysisFrame;
+use crate::preset::path::MAX_SAMPLES;
 use crate::render::palette::{self, Palette};
 use crate::render::scenes::{ParamSpec, default_of};
+
+/// How many `vec4` the contour is packed into: two points per `vec4`, so the
+/// array is half [`MAX_SAMPLES`].
+///
+/// The contour rides the **uniform** buffer rather than a storage one, and that
+/// is an ADR-0058 choice rather than a performance one: a fragment-visible
+/// read-only storage entry after this layout's uniform would make its shape
+/// byte-identical to `shape-collage-bind-layout`, which is live in the same
+/// frame during a preset dissolve. Two layouts of one shape alias on the DX12
+/// WARP adapter the whole golden suite captures on, so the collision would be
+/// blessed rather than caught. Packing into the uniform leaves the layout's
+/// four entries exactly as they were.
+const PATH_VEC4S: usize = MAX_SAMPLES / 2;
+
+/// The WGSL below spells the array length as a literal — `format!` cannot reach
+/// into a raw string full of braces — so the two are held together here. Raise
+/// [`MAX_SAMPLES`] and this fails the build rather than letting the shader read
+/// past what the uniform carries.
+const _: () = assert!(
+    PATH_VEC4S == 32,
+    "the WGSL `path` array must be PATH_VEC4S long"
+);
 
 /// `scale` default — the figure's outline sits at 0.6 of the frame's short
 /// half-axis, which leaves room for several contour bands around it before they
@@ -109,6 +150,15 @@ const MAX_SCALE: f32 = 20.0;
 /// inside; a non-finite binding falls back to the identity because `cos(NaN)`
 /// would take the whole frame with it.
 const DEFAULT_ROTATION: f32 = default_of(PARAMS, "rotation");
+
+/// `stroke` default — **0, the filled figure, and an exact arithmetic
+/// identity**: the shader tests for it and skips the stroke mask entirely.
+const DEFAULT_STROKE: f32 = default_of(PARAMS, "stroke");
+/// Largest `stroke`. One coordinate unit is the figure's whole interior — 0 at
+/// its deepest point, 1 on the outline — so a half-width of 1 is a band
+/// reaching from the centre to twice the outline, and past that the stroke has
+/// stopped being an outline of anything.
+const MAX_STROKE: f32 = 1.0;
 
 /// `gamma` default — **the identity**, and it is exactly `1.0` on the way to the
 /// uniform because the shader's identity branch tests for it (`pow(x, 1.0)` is
@@ -190,6 +240,16 @@ struct Params {
     // xyz: the star arm's shape params (valley, curve, jitter), conditioned
     // CPU-side. Inert on every other silhouette.
     e: vec4<f32>,
+    // x: path point count (0 = no authored contour, and every line of the path
+    // arms below is unreached), y: the contour's inradius — the divisor that
+    // makes the distance 0 at its deepest interior point, measured CPU-side,
+    // z: stroke half-width in coordinate units (exactly 0.0 = filled), w: unused.
+    f: vec4<f32>,
+    // The authored contour (ADR-0107), TWO POINTS PER ELEMENT: point `i` is
+    // `path[i >> 1].xy` for even `i` and `.zw` for odd. Packed because a uniform
+    // array's elements are 16-byte aligned, so an `array<vec2<f32>, N>` would
+    // spend half the buffer on padding.
+    path: array<vec4<f32>, 32>,
 }
 
 // **One bind group, sampler first and uniform last — and that arrangement is
@@ -284,6 +344,90 @@ fn band_contour(
     return 1.0 - clamp(amount, 0.0, 1.0) * (1.0 - smoothstep(0.0, w, d));
 }
 
+// Point `i` of the authored contour, unpacked from the two-per-vec4 array.
+fn path_pt(i: u32) -> vec2<f32> {
+    let v = params.path[i >> 1u];
+    if ((i & 1u) == 0u) {
+        return v.xy;
+    }
+    return v.zw;
+}
+
+// **The authored contour's signed distance**: `min` over the distance to each
+// closing segment, signed by a crossing count (ADR-0107).
+//
+// The sign is a RAY-CROSSING PARITY rather than an orientation test, so it does
+// not care which way the author wound their path — which is what lets Phase 1
+// keep the contour's own winding and leave the alignment to the morph.
+//
+// `min` over segment distances has no quads, no overlap and no vertex bead: it
+// is exactly correct at every join, which is why ADR-0098's faceting objection
+// against a polyline stroke does not transfer to a polyline FILL. The cost is
+// `O(n)` per pixel and it is paid at every pixel of the frame whether or not the
+// figure is on screen, which is what the arity ceiling exists to bound.
+fn path_sd(p: vec2<f32>, n: u32) -> f32 {
+    var best = 1e20;
+    var s = 1.0;
+    // The previous point is carried rather than re-indexed, so each iteration
+    // makes one dynamically indexed uniform read instead of two. It measured as
+    // free — `path_cost.rs` reports the same ms/frame either way, so the loop's
+    // cost is its arithmetic and not its loads — and it stays because it is the
+    // simpler loop, not because it bought anything.
+    var b = path_pt(n - 1u);
+    for (var i = 0u; i < n; i = i + 1u) {
+        let a = path_pt(i);
+        let e = b - a;
+        let w = p - a;
+        // The nearest point ON THE SEGMENT, not on its infinite line: the clamp
+        // is what makes a sample beyond an end measure to the vertex.
+        let t = clamp(dot(w, e) / max(dot(e, e), 1e-20), 0.0, 1.0);
+        let q = w - e * t;
+        best = min(best, dot(q, q));
+        let c1 = p.y >= a.y;
+        let c2 = p.y < b.y;
+        let c3 = e.x * w.y > e.y * w.x;
+        if ((c1 && c2 && c3) || (!c1 && !c2 && !c3)) {
+            s = -s;
+        }
+        b = a;
+    }
+    return s * sqrt(best);
+}
+
+// The contour's radius along the ray from the figure's centre through `p` — the
+// divisor of `coord_mode = 1`'s scaled-copy coordinate (ADR-0111), on an
+// authored contour instead of a rostered arm.
+//
+// The OUTERMOST crossing is taken. A single closed contour that is star-shaped
+// about its centre has exactly one, and the choice only shows on one that is
+// not (a crescent), where the outer edge is the boundary and the concavity is
+// interior to the coordinate.
+fn path_boundary_radius(p: vec2<f32>, n: u32) -> f32 {
+    let l = length(p);
+    if (l < 1e-6) {
+        return 1e-6;
+    }
+    let u = p / l;
+    var r = 0.0;
+    var b = path_pt(n - 1u);
+    for (var i = 0u; i < n; i = i + 1u) {
+        let a = path_pt(i);
+        let e = b - a;
+        // Cross both sides of `s*u = a + e*t` with `u` to drop `s`, then solve
+        // for the segment parameter `t`.
+        let denom = e.x * u.y - e.y * u.x;
+        if (abs(denom) > 1e-9) {
+            let t = (a.y * u.x - a.x * u.y) / denom;
+            if (t >= 0.0 && t <= 1.0) {
+                let s = dot(a + e * t, u);
+                r = max(r, s);
+            }
+        }
+        b = a;
+    }
+    return max(r, 1e-6);
+}
+
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let aspect = params.a.x;
@@ -301,6 +445,9 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let coord_mode = params.d.z;
     let rotation = params.d.w;
     let star = params.e.xyz;
+    let path_n = u32(params.f.x);
+    let path_inradius = params.f.y;
+    let stroke = params.f.z;
 
     // Square units, from the RENDER TARGET's aspect (ADR-0037): stretching x
     // makes one unit of `uv` the same length on both axes, so the figure below
@@ -345,8 +492,27 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // both arms, and the second arm here is a whole second shape evaluation. The
     // mode is a per-draw uniform, so this branch is uniform across a warp and
     // the hardware takes one arm rather than both.
+    //
+    // An authored contour takes the same two modes on the same terms
+    // (ADR-0107): what changes is where the silhouette came from, not what a
+    // band of the coordinate is a band of. `path_n` is 0 for every preset that
+    // declares no `[path]`, so those take the roster arms below and not one
+    // instruction of the contour walk executes.
     var d: f32;
-    if (coord_mode < 0.5) {
+    if (path_n >= 3u) {
+        if (coord_mode < 0.5) {
+            // `1 + sd / inradius` — the SAME normalization `mark_distance`
+            // applies to the roster, so an authored figure reads 0 at its
+            // deepest interior point and exactly 1 on its outline like every
+            // other silhouette this scene draws. Held at 0 from below because
+            // the inradius is measured on a grid and can land a hair short of
+            // the true deepest point; a negative coordinate would be a NaN
+            // under a bound `gamma` (`pow` of a negative base).
+            d = max(1.0 + path_sd(p, path_n) / max(path_inradius, 1e-6), 0.0);
+        } else {
+            d = length(p) / path_boundary_radius(p, path_n);
+        }
+    } else if (coord_mode < 0.5) {
         // Mode 0 — a band of the coordinate is a band of constant DISTANCE,
         // which is the definition of an offset curve (ADR-0105). This is the
         // default and it is bit-for-bit the arithmetic that shipped.
@@ -358,6 +524,12 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         // keeps the notch, which is the construction the reference images are.
         d = length(p) / max(mark_boundary_radius(p, shape, points, star), 1e-6);
     }
+
+    // **The stroke's screen width, taken before any branch.** A derivative has
+    // to be evaluated in uniform control flow, and hoisting it is what keeps
+    // that true however the branch below is compiled — `band_contour` hoists
+    // its own for the same reason.
+    let d_width = max(fwidth(d), 1e-5);
     // The response exponent, applied to the distance BEFORE it becomes a palette
     // coordinate — so it reshapes where the contours sit rather than which
     // colours they take. Above 1 the bands crowd toward the centre, which is what
@@ -377,6 +549,20 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     );
     col = apply_saturation(col, saturation);
 
+    // **Fill and stroke are one field, not two routes** (ADR-0107). `d` is the
+    // single evaluation above; the interior is `d < 1` and the outline is
+    // `abs(d - 1) < w`, so a stroke cannot drift off the fill it belongs to
+    // because there is nothing for it to drift from. (The ADR writes the pair
+    // as `d < 0` and `abs(d) < w` against a raw signed distance; this scene's
+    // coordinate is that distance normalized to 1 on the outline, so the two
+    // tests are the same two tests shifted by one.)
+    //
+    // Exactly 0 is the identity and takes the branch away, which is what keeps
+    // every shipped preset and every golden baseline on the arithmetic it has.
+    if (stroke > 0.0) {
+        col = col * (1.0 - smoothstep(stroke - d_width, stroke + d_width, abs(d - 1.0)));
+    }
+
     // Alpha: this field covers every pixel, which is the coverage it honestly
     // has (ADR-0056). `occlude` scales how much of that the backdrop underneath
     // resolves against (ADR-0085). Reached only when no post stage is active;
@@ -393,6 +579,13 @@ struct Params {
     c: [f32; 4],
     d: [f32; 4],
     e: [f32; 4],
+    f: [f32; 4],
+    /// The authored contour, two points per element — see the WGSL's `path_pt`.
+    /// Written every frame with the rest of the struct; it changes only on a
+    /// preset switch, and 1.5 KB of `write_buffer` is far below the cost of
+    /// splitting it into a second binding whose layout shape would then have to
+    /// be argued against ADR-0058.
+    path: [[f32; 4]; PATH_VEC4S],
 }
 
 /// A fullscreen signed-distance figure from the shared mark roster, coloured
@@ -433,6 +626,27 @@ pub struct ShapeFieldScene {
     /// The figure's own turn, in radians, raw as the preset bound it. Applied
     /// about the figure's centre rather than the frame's — see the shader.
     rotation: f32,
+    /// The stroke half-width in coordinate units, raw as the preset bound it;
+    /// [`applied_stroke`] conditions it on the way to the uniform. `0` — the
+    /// default — is the filled figure and an exact arithmetic identity.
+    stroke: f32,
+    /// The authored contour, packed for the uniform, and how many of its points
+    /// are live (ADR-0107). Both are set by [`Scene::configure`] on a preset
+    /// switch and by nothing else — geometry is structural, not a param, so
+    /// `reset_params` does not touch them.
+    ///
+    /// A count below 3 means no authored contour and the scene draws the `marks`
+    /// roster, which is what every preset declaring no `[path]` gets.
+    path: Box<[[f32; 4]; PATH_VEC4S]>,
+    path_count: usize,
+    /// The contour's inradius — the distance from its deepest interior point to
+    /// its own outline, measured by [`contour_inradius`] at configure time.
+    ///
+    /// It is the divisor that makes the authored figure's coordinate `0` at that
+    /// deepest point and `1` on the outline, which is the contract every
+    /// silhouette in this scene meets (`marks`' own header states it for the
+    /// roster). Meaningless — and unread — when `path_count` is below 3.
+    path_inradius: f32,
     /// How much of this field's (total) coverage the backdrop resolves against
     /// (ADR-0085). Set by the renderer every frame — **not** a named param, so
     /// it is not reset by `reset_params`.
@@ -519,6 +733,10 @@ impl ShapeFieldScene {
             gamma: DEFAULT_GAMMA,
             coord_mode: DEFAULT_COORD_MODE,
             rotation: DEFAULT_ROTATION,
+            stroke: DEFAULT_STROKE,
+            path: Box::new([[0.0; 4]; PATH_VEC4S]),
+            path_count: 0,
+            path_inradius: 1.0,
             occlude: crate::render::post::DEFAULT_OCCLUDE,
         }
     }
@@ -608,6 +826,109 @@ fn applied_gamma(gamma: f32) -> f32 {
     }
 }
 
+/// The `stroke` the shader is handed: held inside its range, with a non-finite
+/// binding falling back to the filled figure.
+///
+/// **`0` survives as exactly `0`**, which the shader's identity branch tests
+/// for: a filled figure must execute none of the stroke arithmetic, so every
+/// shipped preset and every golden baseline stays on what it has (ADR-0092's
+/// care, the same reason `gamma` and `rotation` have identity branches).
+fn applied_stroke(stroke: f32) -> f32 {
+    if stroke.is_finite() {
+        stroke.clamp(0.0, MAX_STROKE)
+    } else {
+        DEFAULT_STROKE
+    }
+}
+
+/// The contour's **inradius**: the distance from its deepest interior point to
+/// its own outline, in the normalized `[-1, 1]` frame the contour lives in.
+///
+/// Measured rather than derived, because a closed contour has no closed form for
+/// it. A coarse grid over the box finds the deepest cell, then three rounds of
+/// local search shrink around it — so the reading is the grid's resolution only
+/// until the refinement, and the refinement halves its neighbourhood each round.
+///
+/// **It can still land a hair short**, which is why the shader clamps the
+/// coordinate at 0 from below rather than trusting this. Short is the safe
+/// direction: it makes the innermost sliver of the figure read as the palette's
+/// first texel, where over-reporting would leave the interior never reaching it.
+fn contour_inradius(points: &[[f32; 2]]) -> f32 {
+    /// Cells per axis of the first pass, over the `[-1, 1]` box.
+    const GRID: i32 = 96;
+    /// Local refinement rounds, each halving the search radius.
+    const REFINE: u32 = 12;
+
+    let depth_at = |p: [f32; 2]| -> f32 {
+        // Unsigned distance to the closing polygon, and a crossing parity for
+        // whether `p` is inside it — the CPU counterpart of the WGSL's
+        // `path_sd`, kept to the one quantity the shader needs from the CPU
+        // rather than mirroring the whole field.
+        let n = points.len();
+        let mut best = f32::INFINITY;
+        let mut inside = false;
+        for i in 0..n {
+            let (Some(&a), Some(&b)) = (points.get(i), points.get((i + n - 1) % n)) else {
+                continue;
+            };
+            let e = [b[0] - a[0], b[1] - a[1]];
+            let w = [p[0] - a[0], p[1] - a[1]];
+            let ee = (e[0] * e[0] + e[1] * e[1]).max(1e-20);
+            let t = ((w[0] * e[0] + w[1] * e[1]) / ee).clamp(0.0, 1.0);
+            let q = [w[0] - e[0] * t, w[1] - e[1] * t];
+            best = best.min(q[0] * q[0] + q[1] * q[1]);
+            let c1 = p[1] >= a[1];
+            let c2 = p[1] < b[1];
+            let c3 = e[0] * w[1] > e[1] * w[0];
+            if (c1 && c2 && c3) || (!c1 && !c2 && !c3) {
+                inside = !inside;
+            }
+        }
+        if inside { best.sqrt() } else { 0.0 }
+    };
+
+    let mut best_p = [0.0f32, 0.0];
+    let mut best_d = depth_at(best_p);
+    for gy in 0..=GRID {
+        for gx in 0..=GRID {
+            let p = [
+                (gx as f32 / GRID as f32) * 2.0 - 1.0,
+                (gy as f32 / GRID as f32) * 2.0 - 1.0,
+            ];
+            let d = depth_at(p);
+            if d > best_d {
+                best_d = d;
+                best_p = p;
+            }
+        }
+    }
+    let mut radius = 2.0 / GRID as f32;
+    for _ in 0..REFINE {
+        for (dx, dy) in [
+            (-1.0f32, 0.0f32),
+            (1.0, 0.0),
+            (0.0, -1.0),
+            (0.0, 1.0),
+            (-1.0, -1.0),
+            (1.0, -1.0),
+            (-1.0, 1.0),
+            (1.0, 1.0),
+        ] {
+            let p = [best_p[0] + dx * radius, best_p[1] + dy * radius];
+            let d = depth_at(p);
+            if d > best_d {
+                best_d = d;
+                best_p = p;
+            }
+        }
+        radius *= 0.5;
+    }
+    // A contour with no interior the search could find would divide the whole
+    // frame by zero; the floor keeps the coordinate finite and the figure reads
+    // as all exterior, which is what a zero-area contour is.
+    best_d.max(1e-4)
+}
+
 /// The palette coordinate this scene hands the LUT, as a CPU mirror of the
 /// shader's two lines — so the exponent's properties are testable without a GPU
 /// (the arrangement `ink::key` and `tonemap::map` both use).
@@ -670,6 +991,12 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Turns the shape, as a fraction of a full turn.",
     },
+    ParamSpec {
+        name: "stroke",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Draws the outline instead of the filled figure, at this half-width; 0 fills.",
+    },
 ];
 
 impl Scene for ShapeFieldScene {
@@ -699,6 +1026,51 @@ impl Scene for ShapeFieldScene {
         self.gamma = DEFAULT_GAMMA;
         self.coord_mode = DEFAULT_COORD_MODE;
         self.rotation = DEFAULT_ROTATION;
+        self.stroke = DEFAULT_STROKE;
+    }
+
+    /// The `[path]` table (ADR-0107), which is the only structural config this
+    /// scene takes.
+    ///
+    /// **Called on every `shape_field` preset switch, table or no table** — the
+    /// loader hands `Some(Path { shape: None })` for a preset that declares
+    /// none, exactly so this runs and clears the contour. Without that, a switch
+    /// from a path preset to a roster one would keep drawing the outgoing
+    /// preset's silhouette.
+    fn configure(
+        &mut self,
+        cfg: &super::lines::GeneratorConfig,
+    ) -> Option<super::lines::CapOverflow> {
+        if let super::lines::GeneratorConfig::Path { shape } = cfg {
+            *self.path = [[0.0; 4]; PATH_VEC4S];
+            match shape {
+                Some(contour) => {
+                    let points = contour.points();
+                    self.path_count = points.len().min(MAX_SAMPLES);
+                    // The load boundary already refused an arity above the
+                    // ceiling, so the `min` above is a belt on a boundary that
+                    // holds rather than a decimation an author is not told about.
+                    for (i, p) in points.iter().take(self.path_count).enumerate() {
+                        let slot = i >> 1;
+                        let half = (i & 1) * 2;
+                        if let Some(v) = self.path.get_mut(slot) {
+                            if let Some(x) = v.get_mut(half) {
+                                *x = p[0];
+                            }
+                            if let Some(y) = v.get_mut(half + 1) {
+                                *y = p[1];
+                            }
+                        }
+                    }
+                    self.path_inradius = contour_inradius(points);
+                }
+                None => {
+                    self.path_count = 0;
+                    self.path_inradius = 1.0;
+                }
+            }
+        }
+        None
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
@@ -719,6 +1091,7 @@ impl Scene for ShapeFieldScene {
             "gamma" => self.gamma = value,
             "coord_mode" => self.coord_mode = value,
             "rotation" => self.rotation = value,
+            "stroke" => self.stroke = value,
             _ => {}
         }
     }
@@ -769,6 +1142,13 @@ impl Scene for ShapeFieldScene {
                 marks::star_jitter(self.star_jitter),
                 0.0,
             ],
+            f: [
+                self.path_count as f32,
+                self.path_inradius,
+                applied_stroke(self.stroke),
+                0.0,
+            ],
+            path: *self.path,
         };
         self.gpu.write_uniform(queue, &params);
         self.gpu

@@ -689,6 +689,7 @@ here is the **definition**, and the essay is the **discussion**.
 | `gamma` | `1` | `0.25` – `4` | Shapes the falloff from the shape's edge; below 1 it bites sooner. |
 | `coord_mode` | `0` | `0` – `2` | Which coordinate frame the distance is measured in, which changes the shape's whole geometry. |
 | `rotation` | `0` | `0` – `1` | Turns the shape, as a fraction of a full turn. |
+| `stroke` | `0` | `0` – `1` | Draws the outline instead of the filled figure, at this half-width; 0 fills. |
 
 ### System: `warp_mesh`
 

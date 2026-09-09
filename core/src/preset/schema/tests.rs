@@ -348,14 +348,19 @@ fn shape_field_path(table: &str) -> Result<Preset, PresetError> {
     ))
 }
 
-/// The `[path]` table is optional, and a `shape_field` preset without one takes
-/// the `None` it always took — an authored silhouette is an alternative source
-/// of a figure, not a replacement for the `marks` roster (ADR-0107).
+/// The `[path]` table is optional, and a `shape_field` preset without one
+/// carries an **empty** contour rather than no config at all — the config is
+/// handed over on every preset switch precisely so `configure` runs and clears
+/// the outgoing preset's silhouette (ADR-0107). An authored silhouette is an
+/// alternative source of a figure, not a replacement for the `marks` roster.
 #[test]
-fn a_shape_field_preset_without_a_path_table_carries_no_config() {
+fn a_shape_field_preset_without_a_path_table_carries_an_empty_contour() {
     let preset = Preset::from_toml_str("system = \"shape_field\"\nname = \"t\"\n")
         .expect("a shape_field preset needs no table");
-    assert!(preset.config.is_none());
+    match preset.config {
+        Some(GeneratorConfig::Path { shape: None }) => {}
+        other => panic!("expected an empty Path config, got {other:?}"),
+    }
 }
 
 #[test]
@@ -363,14 +368,16 @@ fn a_path_table_becomes_a_contour_at_the_arity_it_asked_for() {
     let preset =
         shape_field_path("d = \"M 0,0 H 10 V 10 H 0 Z\"\nsamples = 24").expect("a square parses");
     match preset.config {
-        Some(GeneratorConfig::Path { shape }) => assert_eq!(shape.points().len(), 24),
+        Some(GeneratorConfig::Path { shape: Some(shape) }) => {
+            assert_eq!(shape.points().len(), 24)
+        }
         other => panic!("a [path] preset carries a Path config, got {other:?}"),
     }
 
     // No `samples` key takes the default arity rather than the flatten's own.
     let defaulted = shape_field_path("d = \"M 0,0 H 10 V 10 H 0 Z\"").expect("parses");
     match defaulted.config {
-        Some(GeneratorConfig::Path { shape }) => {
+        Some(GeneratorConfig::Path { shape: Some(shape) }) => {
             assert_eq!(shape.points().len(), crate::preset::path::DEFAULT_SAMPLES);
         }
         other => panic!("expected a Path config, got {other:?}"),

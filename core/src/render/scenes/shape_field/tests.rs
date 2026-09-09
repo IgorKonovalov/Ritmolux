@@ -1145,3 +1145,405 @@ fn the_figure_turns_about_its_own_centre_and_does_not_orbit() {
         }
     }
 }
+
+// -----------------------------------------------------------------------
+// The authored contour (Plan 0092 Phase 2 / ADR-0107)
+// -----------------------------------------------------------------------
+
+/// A leaf: two cubics meeting at a cusp top and bottom. **No combination of
+/// `shape` and `points` draws it** — the roster's arms are a disc, a ring, a
+/// polygon, a star and a heart — which is what makes it the right figure to
+/// assert on. Its bounding box is 1.35 wide by 2 tall, so after normalization it
+/// spans the full `[-1, 1]` in y and ±0.675 in x.
+const LEAF: &str = "M 0,-1 C 0.9,-0.4 0.9,0.4 0,1 C -0.9,0.4 -0.9,-0.4 0,-1 Z";
+
+/// The leaf's own width as a fraction of its height, from the path data: the
+/// cubic's extreme is at `t = 0.5`, where `x = 3/8 * (0.9 + 0.9)`.
+const LEAF_ASPECT: f32 = 0.675;
+
+/// The two-band look every path test here renders through, spliced into both
+/// the `[path]` and roster presets so the two are comparable.
+///
+/// **The band boundary sits exactly on the outline**: `color_span = 1/16` maps
+/// the coordinate's `1` — the outline, by the scene's contract — onto `0.0625`,
+/// and `palette_steps = 16` puts a band edge there. So the interior and the
+/// exterior are two flat colours with a hard seam on the figure itself, and the
+/// seam is *exact* rather than a ramp — which is what lets a walk out from the
+/// centre measure the figure's own extent.
+///
+/// **The span is small because the palette LUT repeat-addresses.** The
+/// coordinate keeps growing outward — past `d = 5` in this frame's corners — so
+/// a span that let `coord` reach 1 anywhere would wrap the LUT and paint the far
+/// exterior in the interior's colour, putting a second seam out near the frame
+/// edge. At `1/16` the whole frame stays inside one wrap.
+const TWO_BAND_PARAMS: &str =
+    "scale = \"0.55\"\ncolor_span = \"0.0625\"\ncolor_center = \"0.0\"\npalette_steps = \"16\"\n";
+
+/// The palette those two bands read from, **flat above the seam on purpose**.
+/// Sixteen bands means fifteen of them sit outside the figure; holding the stops
+/// constant across everything above the first makes them all one colour, so the
+/// only seam in the frame is the figure's own outline.
+const TWO_BAND_PALETTE: &str = "[palette]\nstops = [\
+    { at = 0.0, color = \"#8a8ac0\" }, { at = 0.06, color = \"#8a8ac0\" }, \
+    { at = 0.07, color = \"#ffffff\" }, { at = 1.0, color = \"#ffffff\" }]\n";
+
+/// A `shape_field` preset with a `[path]` table, under the two-band look above.
+fn path_preset(name: &str, d: &str, extra: &str) -> Preset {
+    let toml = format!(
+        "name = \"{name}\"\nsystem = \"shape_field\"\n\
+         [path]\nd = \"{d}\"\n{TWO_BAND_PALETTE}\
+         [params]\n{TWO_BAND_PARAMS}{extra}"
+    );
+    Preset::from_toml_str(&toml).unwrap_or_else(|e| panic!("{name} failed to load: {e}"))
+}
+
+/// The same look with no `[path]` table, so the scene draws its rostered
+/// silhouette instead.
+fn roster_preset(name: &str) -> Preset {
+    let toml = format!(
+        "name = \"{name}\"\nsystem = \"shape_field\"\n{TWO_BAND_PALETTE}\
+         [params]\n{TWO_BAND_PARAMS}"
+    );
+    Preset::from_toml_str(&toml).unwrap_or_else(|e| panic!("{name} failed to load: {e}"))
+}
+
+/// **An authored contour reaches the frame, and it is a figure the roster
+/// cannot select** (ADR-0107).
+///
+/// Two claims in one render, because either alone would pass while the feature
+/// did nothing: the path preset must differ from the same preset without a
+/// `[path]` table (or the table was ignored), and the figure it draws must have
+/// the **leaf's** proportions rather than the disc's (or something drew a
+/// fallback shape that merely happens to differ).
+#[test]
+fn an_authored_contour_draws_a_figure_the_roster_cannot_select() {
+    const SIZE: u32 = 320;
+    let Some(mut renderer) = headless(SIZE, SIZE) else {
+        return;
+    };
+    renderer.set_presets(vec![path_preset("leaf", LEAF, ""), roster_preset("roster")]);
+    let leaf = renderer
+        .capture_preset("leaf", &AnalysisFrame::default(), 2)
+        .expect("capture the authored contour");
+    let roster = renderer
+        .capture_preset("roster", &AnalysisFrame::default(), 2)
+        .expect("capture the roster default");
+
+    let differing = leaf
+        .rgba
+        .chunks_exact(4)
+        .zip(roster.rgba.chunks_exact(4))
+        .filter(|(a, b)| a[..3] != b[..3])
+        .count();
+    let total = (SIZE * SIZE) as usize;
+    assert!(
+        differing * 20 > total,
+        "the `[path]` preset drew the roster's figure: only {differing} of \
+         {total} pixels differ, so the table reached nothing"
+    );
+
+    // The figure's own extent, walked out from the centre to the band seam —
+    // the same measurement `the_figure_is_round_at_a_non_sixteen_by_nine_target`
+    // makes, and it works here for the same reason: the seam is a real edge.
+    let (cx, cy) = (SIZE / 2, SIZE / 2);
+    let centre = luma(&leaf, cx, cy);
+    let differs = |v: f32| (v - centre).abs() > 8.0;
+    let mut half_w = 0u32;
+    while cx + half_w + 1 < SIZE && !differs(luma(&leaf, cx + half_w + 1, cy)) {
+        half_w += 1;
+    }
+    let mut half_h = 0u32;
+    while cy + half_h + 1 < SIZE && !differs(luma(&leaf, cx, cy + half_h + 1)) {
+        half_h += 1;
+    }
+    let ratio = half_w as f32 / half_h as f32;
+    println!("leaf extent {half_w} x {half_h} px, ratio {ratio:.3}, want {LEAF_ASPECT:.3}");
+    assert!(
+        (ratio - LEAF_ASPECT).abs() < 0.08,
+        "the figure is {half_w} x {half_h} px (ratio {ratio:.3}), not the leaf's \
+         {LEAF_ASPECT:.3}. A disc or any rostered arm at this scale would read 1.0"
+    );
+}
+
+/// **Fill and stroke come from one field, so the stroke lies on the fill's own
+/// boundary** (ADR-0107).
+///
+/// The claim a second rendering route could not make. Two captures differ only
+/// in `stroke`; the filled one gives the interior/exterior partition and the
+/// stroked one gives the lit band, and the property is asserted **both ways** —
+/// every lit pixel sits near the partition's seam, and every seam pixel has a
+/// lit pixel near it. One direction alone is satisfied by a stroke that draws
+/// nothing, or by one that lights the whole frame.
+///
+/// **Confirmed to bite.** Testing the band at `abs(d - 0.6)` instead — a stroke
+/// on the same field but not on the fill's boundary — leaves 81 of 3285 lit
+/// pixels more than 22 px from the seam and fails here.
+#[test]
+fn the_stroke_lies_on_the_fill_boundary_because_both_come_from_one_field() {
+    const SIZE: u32 = 320;
+    /// Coordinate half-width of the stroke. The coordinate runs 0 at the
+    /// figure's centre to 1 on its outline, so this is a band of about 8 % of
+    /// the figure's own half-extent either side of the outline.
+    const STROKE: &str = "0.08";
+    /// How far a lit pixel may be from the seam, in pixels. The figure's
+    /// interior spans about 88 px here (`scale` 0.55 of a 320 px half-frame), so
+    /// a 0.08 coordinate band is roughly 7 px and this is a generous bound on
+    /// it rather than a tight fit.
+    const NEAR_SEAM: i32 = 22;
+    /// How far a seam pixel may be from the nearest lit one. The stroke covers
+    /// the seam, so this is small on purpose: a stroke drawn somewhere else
+    /// entirely would fail here while passing the other direction.
+    const COVERED: i32 = 3;
+
+    let Some(mut renderer) = headless(SIZE, SIZE) else {
+        return;
+    };
+    renderer.set_presets(vec![
+        path_preset("filled", LEAF, ""),
+        path_preset("stroked", LEAF, &format!("stroke = \"{STROKE}\"\n")),
+    ]);
+    let filled = renderer
+        .capture_preset("filled", &AnalysisFrame::default(), 2)
+        .expect("capture the filled figure");
+    let stroked = renderer
+        .capture_preset("stroked", &AnalysisFrame::default(), 2)
+        .expect("capture the stroked figure");
+
+    // The two band colours, read off the image rather than predicted from the
+    // palette: the centre pixel is interior and the corner is exterior by
+    // construction, whatever the LUT bake did to the stops.
+    let inside_luma = luma(&filled, SIZE / 2, SIZE / 2);
+    let outside_luma = luma(&filled, 2, 2);
+    assert!(
+        (inside_luma - outside_luma).abs() > 20.0,
+        "the two bands are not distinguishable ({inside_luma:.1} inside, \
+         {outside_luma:.1} outside), so this test cannot see a seam"
+    );
+    assert!(
+        inside_luma.min(outside_luma) > 40.0,
+        "a band is too dark to tell from the stroke's masked-out black \
+         ({inside_luma:.1}, {outside_luma:.1})"
+    );
+
+    let is_fill = |x: u32, y: u32| {
+        let v = luma(&filled, x, y);
+        (v - inside_luma).abs() < (v - outside_luma).abs()
+    };
+    let is_lit = |x: u32, y: u32| luma(&stroked, x, y) > 25.0;
+
+    // The seam: a filled pixel with a neighbour on the other side of it.
+    let mut seam = Vec::new();
+    for y in 1..SIZE - 1 {
+        for x in 1..SIZE - 1 {
+            let here = is_fill(x, y);
+            if here != is_fill(x + 1, y) || here != is_fill(x, y + 1) {
+                seam.push((x, y));
+            }
+        }
+    }
+    let lit: Vec<(u32, u32)> = (0..SIZE)
+        .flat_map(|y| (0..SIZE).map(move |x| (x, y)))
+        .filter(|&(x, y)| is_lit(x, y))
+        .collect();
+    println!(
+        "{} seam px, {} lit px of {} total",
+        seam.len(),
+        lit.len(),
+        SIZE * SIZE
+    );
+
+    // Non-vacuity on both sides before the property itself.
+    assert!(
+        seam.len() > 200,
+        "the filled capture has no seam to be on ({} px)",
+        seam.len()
+    );
+    let total = (SIZE * SIZE) as usize;
+    assert!(
+        !lit.is_empty() && lit.len() * 4 < total,
+        "the stroke lit {} of {total} pixels, which is either nothing or the \
+         whole frame — neither is an outline",
+        lit.len()
+    );
+
+    // A `near` test that walks a window rather than every pair: the frame is
+    // 320x320 and the two sets are thousands of pixels each, so the quadratic
+    // form would be minutes.
+    let within = |set: &[(u32, u32)], x: u32, y: u32, r: i32| -> bool {
+        set.iter()
+            .any(|&(sx, sy)| (sx as i32 - x as i32).abs() <= r && (sy as i32 - y as i32).abs() <= r)
+    };
+    let mut grid_seam = vec![false; total];
+    for &(x, y) in &seam {
+        if let Some(slot) = grid_seam.get_mut((y * SIZE + x) as usize) {
+            *slot = true;
+        }
+    }
+    let near_seam = |x: u32, y: u32, r: i32| -> bool {
+        for dy in -r..=r {
+            for dx in -r..=r {
+                let (nx, ny) = (x as i32 + dx, y as i32 + dy);
+                if nx < 0 || ny < 0 || nx >= SIZE as i32 || ny >= SIZE as i32 {
+                    continue;
+                }
+                if grid_seam
+                    .get((ny as u32 * SIZE + nx as u32) as usize)
+                    .copied()
+                    .unwrap_or(false)
+                {
+                    return true;
+                }
+            }
+        }
+        false
+    };
+
+    // Direction one: every lit pixel is on the fill's boundary.
+    let stray: Vec<(u32, u32)> = lit
+        .iter()
+        .copied()
+        .filter(|&(x, y)| !near_seam(x, y, NEAR_SEAM))
+        .collect();
+    assert!(
+        stray.is_empty(),
+        "{} of {} lit pixels are more than {NEAR_SEAM} px from the fill's own \
+         boundary (first at {:?}). The stroke is `abs(d - 1) < w` on the SAME \
+         `d` the fill tests, so a lit pixel away from the seam means the two \
+         are reading different fields",
+        stray.len(),
+        lit.len(),
+        stray.first()
+    );
+
+    // Direction two: the whole boundary is stroked, so the outline is closed.
+    let uncovered: Vec<(u32, u32)> = seam
+        .iter()
+        .copied()
+        .filter(|&(x, y)| !within(&lit, x, y, COVERED))
+        .collect();
+    assert!(
+        uncovered.is_empty(),
+        "{} of {} seam pixels have no lit pixel within {COVERED} px (first at \
+         {:?}), so the stroke does not close around the fill",
+        uncovered.len(),
+        seam.len(),
+        uncovered.first()
+    );
+}
+
+/// **A `shape_field` preset that declares no `[path]` clears the outgoing
+/// preset's contour**, which is why the loader hands this scene a config on
+/// every switch rather than only when a table is present.
+///
+/// Rendered rather than reasoned about: the failure is a *stale* contour, and
+/// nothing about the second preset's own state can see it.
+#[test]
+fn switching_away_from_a_path_preset_clears_the_contour() {
+    const SIZE: u32 = 256;
+    let Some(mut renderer) = headless(SIZE, SIZE) else {
+        return;
+    };
+    renderer.set_presets(vec![
+        roster_preset("roster_first"),
+        path_preset("leaf", LEAF, ""),
+        roster_preset("roster_after"),
+    ]);
+
+    let first = renderer
+        .capture_preset("roster_first", &AnalysisFrame::default(), 2)
+        .expect("capture the roster before any path");
+    let _leaf = renderer
+        .capture_preset("leaf", &AnalysisFrame::default(), 2)
+        .expect("capture the path");
+    let after = renderer
+        .capture_preset("roster_after", &AnalysisFrame::default(), 2)
+        .expect("capture the roster after the path");
+
+    let differing = first
+        .rgba
+        .chunks_exact(4)
+        .zip(after.rgba.chunks_exact(4))
+        .filter(|(a, b)| a[..3] != b[..3])
+        .count();
+    assert_eq!(
+        differing, 0,
+        "the same roster preset rendered differently before and after a path \
+         preset ({differing} px), so the contour survived the switch"
+    );
+}
+
+/// **The two adapters agree on the authored-contour fixture** — the ADR-0058
+/// standing rule, run before its golden baseline is blessed.
+///
+/// The whole golden suite captures on the DX12 WARP software adapter, and two
+/// bind-group layouts of one shape alias there: a pass is handed another pass's
+/// resources, and a mis-render is blessed rather than caught. This scene's
+/// layout is unchanged by the `[path]` work — the contour rides the existing
+/// uniform precisely so it stays a shape nothing else holds — so this is
+/// confirming that rather than discovering it.
+///
+/// Ignored by default and skipped on a one-adapter machine, which is the CI
+/// case; the recorded reading is what the fixture's own comment points at.
+///
+/// **Measured on the development box (Windows 10, DX12), 160x160 over 2 frames,
+/// before the baseline was blessed: hardware mean rgb
+/// `102.535 150.984 102.304`, WARP `102.573 150.998 102.286`, `frame_diff`
+/// `0.000231`.** Agreement to well under one 8-bit level.
+#[test]
+#[ignore = "needs both a hardware and a software adapter; run locally before blessing"]
+fn the_adapters_agree_on_the_authored_contour() {
+    const SIZE: u32 = 160;
+    let build = |prefer_software: bool| -> Option<Renderer> {
+        match Renderer::new_headless(HeadlessOptions {
+            width: SIZE,
+            height: SIZE,
+            prefer_software,
+        }) {
+            Ok(r) => Some(r),
+            Err(RenderError::RequestAdapter(_)) => None,
+            Err(e) => panic!("headless renderer build failed: {e}"),
+        }
+    };
+    let (Some(mut hardware), Some(mut software)) = (build(false), build(true)) else {
+        eprintln!("skipped: this machine does not expose both adapters");
+        return;
+    };
+
+    let capture = |renderer: &mut Renderer| -> CaptureImage {
+        let preset = Preset::from_toml_str(include_str!(
+            "../../../../tests/fixtures/shape_field_path.toml"
+        ))
+        .expect("the path fixture parses");
+        let name = preset.name.clone();
+        renderer.set_presets(vec![preset]);
+        renderer
+            .capture_preset(&name, &AnalysisFrame::default(), 2)
+            .expect("capture the path fixture")
+    };
+    let hw = capture(&mut hardware);
+    let sw = capture(&mut software);
+
+    let mean = |img: &CaptureImage| -> [f64; 3] {
+        let mut sums = [0f64; 3];
+        for px in img.rgba.chunks_exact(4) {
+            for (sum, c) in sums.iter_mut().zip(px) {
+                *sum += f64::from(*c);
+            }
+        }
+        let n = (img.rgba.len() / 4) as f64;
+        [sums[0] / n, sums[1] / n, sums[2] / n]
+    };
+    let difference = crate::render::metrics::frame_diff(&hw, &sw);
+    println!(
+        "[shape_field_path] hardware mean rgb {:?}, WARP mean rgb {:?}, frame_diff {difference:.6}",
+        mean(&hw),
+        mean(&sw)
+    );
+    assert!(
+        difference < 0.05,
+        "the two adapters disagree by {difference:.4} on the authored-contour \
+         fixture. That is the shape of an ADR-0058 layout collision — check \
+         `shape-field-bind-layout` against the crate's enumeration before \
+         blessing anything"
+    );
+}
