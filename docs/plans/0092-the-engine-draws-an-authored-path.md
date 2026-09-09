@@ -207,6 +207,66 @@ flowchart LR
   - **May carry forward** to `docs/content-brief.md` under the rule Plan 0083's and Plan 0088's
     Phase 7 both followed. It gates nothing.
 
+### Phase 7 — The pasted path is the path the browser drew
+
+Phase 6's look gate answered its second question — *paste a path from a design tool, see it render,
+adjust* — with a defect rather than a verdict: **every pasted path arrives mirrored top to bottom.**
+`M 0,-1 L 1,1 L -1,1 Z` is a triangle with its apex at the SVG top and renders apex-down. SVG's y
+axis points down; this engine's clip space points up (`core/src/render/gpu.rs`, and ADR-0070 on the
+same asymmetry one layer lower), and nothing between the two negates it. Neither `path.rs`'s module
+docs nor `presets/README.md`'s `[path]` section mentions an axis convention, and both sell the table
+on a file *"a browser renders correctly"*.
+
+No test sees it because **every path literal in the suite is y-symmetric** — the leaf, the diamond,
+the triangle pair. That is the phase's real deliverable: a y-**asymmetric** figure in the suite,
+which is what makes the axis assertable at all.
+
+The `coord_mode` range row rides here because it is one line in the same `ParamSpec` block, found by
+the same look gate: `COORD_MODES` has two entries and `applied_coord_mode` clamps to `0..=1`, but the
+spec declares `[0.0, 2.0]`, so ADR-0170's generated row in `presets/README.md` advertises `0` - `2`.
+An author writing `coord_mode = "2"` silently gets mode 1. `range` is documentation-only
+(`scenes/mod.rs`: *"the range that reads"* — not a clamp), so the spec is the fix and the
+hand-written prose beside it is already correct. `marks::shape` is `[0.0, 4.0]` against five entries
+and is right, so this is a typo rather than a class — but nothing holds a selector's declared range
+to its roster, which is why the guard below is cheap and worth having.
+
+- **Owner skill:** dev
+- **Files:** `core/src/preset/path.rs`, `core/src/render/scenes/shape_field.rs`,
+  `core/src/preset/path/tests.rs` (or wherever the parser's tests sit),
+  `core/src/render/scenes/shape_field/tests.rs`, `presets/README.md`,
+  `presets/pending/path_maple.toml`, `presets/pending/path_lion.toml`,
+  `presets/pending/README.md`
+- **Done when:**
+  - **The negation happens once, at parse, on the raw coordinates — before anything consults
+    winding.** `signed_area`'s doc comment already says *"positive when it winds counter-clockwise in
+    a y-up frame"*; today that frame is not the one the points are in, and after this it is. A flip
+    applied later — at pack time, or in the shader — would leave the morph's winding normalization
+    and start-point search reasoning in the opposite frame from the geometry they align.
+  - **A y-asymmetric literal is in the suite, and it is asserted on the contour, not only on
+    pixels.** The point of minimum SVG `y` in `d` must come back as the point of *maximum* engine
+    `y`. That is exact, needs no GPU, and is the assertion that fails today.
+  - **One rendered assertion covers the whole chain** — parse, normalize, pack, field — so a flip
+    that is correct in the contour and undone downstream cannot pass. The property is that the
+    figure's lit mass sits in the half of the frame the `d` string puts it in; no threshold beyond
+    "the two halves are not equal" is claimed, because the figure's own area is what sets the margin.
+  - **Both pending presets are re-flipped in the same commit.** `path_maple.toml` and
+    `path_lion.toml` author `d` inverted to work around this; the workaround and the defect must
+    leave together or the presets render upside down the moment the engine is right. Their headers
+    and `presets/pending/README.md` lose the blocker.
+  - **The two presets are no longer blocked from shipping** — whether they *ship* is the close
+    ceremony's curation call (step 3b), not this phase's. Moving them out of `pending/` is the
+    `preset-author` lane's, on its own judgement of the look.
+  - `presets/README.md`'s `[path]` section states the axis convention in one line: coordinates are
+    read as SVG reads them, y down, which is what a design tool exports and what a browser draws.
+  - **`coord_mode`'s `ParamSpec` range is `[0.0, 1.0]`** and the regenerated row reads `0` - `1`
+    (`RLX_UPDATE_PARAM_REFERENCE=1`; ADR-0170's gate is red until it is).
+  - **A test holds every roster-selecting param's declared range to its roster length** — `shape`
+    against `marks::SHAPES`, `coord_mode` against `COORD_MODES`. Two entries today; the value is that
+    a third roster cannot be added with a range nobody rechecked.
+  - The full suite is green, and the goldens are unmoved: this changes no roster figure and no
+    existing path literal's rendering, because all of them are y-symmetric. **A moved golden is a
+    finding, not a bless.**
+
 ## Data shapes
 
 ```toml

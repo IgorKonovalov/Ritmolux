@@ -68,6 +68,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0189 — `self.time` takes the raw delta one call above the seam that sanitizes it, so a single `NaN` from a host poisons the shared scene clock for the life of the process](#0189--selftime-takes-the-raw-delta-one-call-above-the-seam-that-sanitizes-it-so-a-single-nan-from-a-host-poisons-the-shared-scene-clock-for-the-life-of-the-process)
 - [0190 — the `dt` seam's comment names three downstream sites as unguarded, and all three still carry a guard, on three different policies](#0190--the-dt-seams-comment-names-three-downstream-sites-as-unguarded-and-all-three-still-carry-a-guard-on-three-different-policies)
 - [0191 — `evaluate_preset` advances the scene before it applies the preset's bindings, so the first frame after every switch integrates at the scene's defaults](#0191--evaluate_preset-advances-the-scene-before-it-applies-the-presets-bindings-so-the-first-frame-after-every-switch-integrates-at-the-scenes-defaults)
+- [0192 - `--report` cannot see a `beat_index`-driven response, so a deliberately musical preset measures as inert](#0192-----report-cannot-see-a-beat_index-driven-response-so-a-deliberately-musical-preset-measures-as-inert)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -3619,3 +3620,49 @@ settle it.
 
 **Low.** One frame, at a preset switch, at a default rather than a wild value. It is filed because it
 is a *structural* ordering and the population it affects is growing, not because anyone has seen it.
+
+## 0192 - `--report` cannot see a `beat_index`-driven response, so a deliberately musical preset measures as inert
+
+`shot --report`'s four reactivity columns and its `drive` column each capture a **held** analysis
+frame: one band scalar raised to a level, the matching slice of the log spectrum lit to match, and
+`beat: true` set on purpose because, as `standalone/src/shot/report.rs` puts it, it *"is an event, not
+a magnitude"*. The counters are not part of that treatment. `beat_index` and `bar_index` arrive at the
+capture as `AnalysisFrame::default()` left them and **do not advance across the captured frames**.
+
+So a preset whose musical event is a counter reads as dead. Both of Plan 0092's authored-path worlds
+step their ring family one band per onset via `color_center = mod(k + beat_index/16, 1)`, and the
+report gives them `onset 0.000` and `mid 0.000`, with only `bass` showing. Nothing is broken and no
+gate fires; the instrument simply cannot express the question.
+
+- **Raised:** 2026-09-09, by the `preset-author` lane while landing `path_maple` and `path_lion`
+  (Plan 0092, `presets/pending/`). Routed here rather than into Plan 0160 because the fix perturbs a
+  shared instrument. **Owner if taken:** `architect` first — this is an interview, not an edit.
+- **Verified 2026-09-09** - the stimulus holds `beat` as a boolean event and says why:
+  `present: beat: true, in: standalone/src/shot/report.rs`
+- **Verified 2026-09-09** - and no counter is set anywhere in the report's stimulus construction:
+  `absent: beat_index in: standalone/src/shot/report.rs`
+
+### The finding
+
+The class is wider than the one preset that found it. Any binding driven by a **counter** rather than
+by a magnitude — `beat_index`, `bar_index`, and anything derived from them — is invisible to every
+column the report prints, including `anim`, because a counter that does not move produces no
+inter-frame motion either. The report's own doc comment already anticipates the neighbouring failure
+(a preset reading several bands together measuring low on each) and added `drive` for it; this is the
+same shape on the axis of time rather than of spectrum.
+
+It is filed rather than fixed because the obvious repair is not free. Advancing a counter inside the
+driven capture changes what every existing preset's columns are measured against, and those numbers
+are what the close ceremony's curation step reads (`--report`, near-duplicate flags, per-band
+reactivity). Moving them silently would make every prior curation verdict incomparable with every
+later one. The candidates are at least three - advance the counters only in the combined-stimulus
+`drive` capture; add a fifth column driven by a counter ramp and leave the four alone; or leave the
+instrument and document the blind spot in `docs/testing.md`'s table - and choosing needs the
+interview this entry is asking for.
+
+### Priority
+
+**Medium.** Nothing renders wrong and no gate is unsound: the report is a reading, not a gate. What
+it costs is judgement — a curator reading `onset 0.000` concludes a preset ignores the music, when the
+preset may be the most rhythmically driven thing in the set. That misreading has now happened once,
+to the author who could tell the difference.
