@@ -36,6 +36,7 @@ use std::path::{Path, PathBuf};
 // `standalone/tests/` can round-trip the documented `config.toml` through the
 // very type the app deserializes - the same reason `osc` and `shot` are here.
 pub mod config;
+pub mod control;
 pub mod gpu;
 pub mod osc;
 pub mod rss;

@@ -21,14 +21,16 @@ use winit::window::{Fullscreen, Window, WindowId};
 use crate::app_state::{APP_TITLE, AppState, HIDDEN_TICK};
 use crate::capture_start::list_devices_and_exit;
 use crate::cli::{
-    InputSource, missing_companion, parse_console_flag, parse_downbeat_log_arg, parse_input_args,
-    parse_osc_arg, parse_soak_arg, parse_tier_arg, print_help, resolve_config_path, resolve_input,
-    resolve_osc, unrecognized_flag, valued_valueless_flag, windowed_flag,
+    InputSource, missing_companion, parse_console_flag, parse_control_arg, parse_downbeat_log_arg,
+    parse_input_args, parse_osc_arg, parse_soak_arg, parse_tier_arg, print_help,
+    resolve_config_path, resolve_control, resolve_input, resolve_osc, unrecognized_flag,
+    valued_valueless_flag, windowed_flag,
 };
 use crate::console;
 use crate::preset_dir::startup_preset_names;
 use crate::stream;
 use standalone::config::{self, Config};
+use standalone::control::Control;
 
 pub(crate) struct App {
     /// Loaded once at startup; the window is created from it on `resumed` and
@@ -60,6 +62,11 @@ pub(crate) struct App {
     /// startup error rather than a window that opens and then reports one.
     /// `None` when the sink is off.
     pub(crate) osc: Option<OscSink>,
+    /// The studio control-in listener, already bound in `main` for the reason
+    /// the telemetry sink is: an address that cannot be bound is a startup error
+    /// rather than a window that opens and then reports one. `None` when nothing
+    /// asked for one, and then no socket exists at all (ADR-0176).
+    pub(crate) control: Option<Control>,
     /// `--console` was passed. Held beside `config` rather than written into it,
     /// so the flag opens the console for this launch without persisting itself
     /// — the same shape `--input` / `--device` / `--osc` follow (ADR-0142).
@@ -554,6 +561,38 @@ pub fn run() {
         None => None,
     };
 
+    // The studio control-in listener (ADR-0176), flag over config, and bound
+    // here for the reason the telemetry sink above is. The same split on where
+    // the address came from: one typed for this run is a usage error, one left
+    // in `config.toml` degrades to no listener and says so (NFR 10). Loopback is
+    // the config default rather than a rule enforced here — an operator who
+    // names another host has said what they meant.
+    let control_flag = match parse_control_arg() {
+        Ok(listen) => listen,
+        Err(msg) => {
+            eprintln!("{msg}");
+            std::process::exit(1);
+        }
+    };
+    let control_from_flag = control_flag.is_some();
+    let control = match resolve_control(control_flag, &config.control) {
+        Some(listen) => match Control::bind(&listen) {
+            Ok(listener) => {
+                eprintln!("control in on {}", listener.local_addr());
+                Some(listener)
+            }
+            Err(msg) if control_from_flag => {
+                eprintln!("{msg}");
+                std::process::exit(1);
+            }
+            Err(msg) => {
+                eprintln!("{msg}; control in off");
+                None
+            }
+        },
+        None => None,
+    };
+
     // Resolved before the event loop exists, so a `--gpu` with no value is a
     // usage error rather than a window that opens and then reports one — the
     // shape `--tier` and `--osc` already follow.
@@ -599,6 +638,7 @@ pub fn run() {
         held_preset,
         input,
         osc,
+        control,
         console_flag: parse_console_flag(),
         state: None,
     };

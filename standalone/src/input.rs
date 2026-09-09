@@ -240,7 +240,18 @@ impl AppState {
         let Some(button) = console::hit_test(size.width as f32, size.height as f32, x, y) else {
             return;
         };
-        match console::action_for(button, &self.settings_view()) {
+        let action = console::action_for(button, &self.settings_view());
+        self.apply_console_action(action);
+    }
+
+    /// Carry out a resolved [`console::ConsoleAction`].
+    ///
+    /// Split from the click handler above because the console's pointer is no
+    /// longer its only source: `ctl/transport` (ADR-0176) resolves the **same**
+    /// `ConsoleAction` and lands here, so a verb sent over the wire and a click
+    /// on the strip are one code path rather than two that agree today.
+    pub(crate) fn apply_console_action(&mut self, action: console::ConsoleAction) {
+        match action {
             console::ConsoleAction::Next => self.rotate_to_next(),
             console::ConsoleAction::Prev => {
                 let count = self.renderer.preset_names().count();
@@ -267,6 +278,53 @@ impl AppState {
             }
             console::ConsoleAction::Settings(action) => self.apply_settings_action(action),
         }
+    }
+
+    /// Drain the control-in queue and apply one frame's worth of it (ADR-0176).
+    ///
+    /// A `None` listener costs a branch, which is the whole of what an
+    /// unconfigured run pays for this feature existing.
+    ///
+    /// **The listener is moved out of `self` for the duration** rather than
+    /// borrowed from it: the drained buffer borrows the listener, every applier
+    /// below takes `&mut self`, and copying the buffer out to satisfy the borrow
+    /// checker would put an allocation per name on the render thread — the cost
+    /// the inline `Name` exists to avoid on the other thread.
+    ///
+    /// The order is the one `standalone::control`'s module docs fix, and it is
+    /// load-bearing: a preset switch drops every override, so the switch has to
+    /// precede the values, and a wholesale clear has to precede the values that
+    /// survive it.
+    ///
+    /// A parameter name nothing claims is refused by the core and **counted**,
+    /// not printed: OSC has no reply channel, and a sender scrubbing a mistyped
+    /// name at slider rate would otherwise produce a line per frame.
+    pub(crate) fn apply_control(&mut self) {
+        let Some(mut control) = self.control.take() else {
+            return;
+        };
+        {
+            let drained = control.drain();
+            if drained.is_empty() {
+                self.control = Some(control);
+                return;
+            }
+            for verb in drained.transport() {
+                let view = self.settings_view();
+                let auto = self.director.auto_enabled();
+                if let Some(action) = console::action_for_transport(*verb, auto, &view) {
+                    self.apply_console_action(action);
+                }
+            }
+            // The renderer-only half, through the same function the loopback
+            // test drives, so the shell is not a second copy of the order.
+            let applied = standalone::control::apply_to_renderer(drained, &mut self.renderer);
+            if applied.switched {
+                self.on_preset_switched();
+            }
+            control.note_refused(applied.refused);
+        }
+        self.control = Some(control);
     }
 
     /// A left-button press: toggle fullscreen when it lands within

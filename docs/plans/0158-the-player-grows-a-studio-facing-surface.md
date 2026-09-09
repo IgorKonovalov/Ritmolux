@@ -291,8 +291,8 @@ to a layout.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — A parameter moves in place | dev | done | committed with this row |
-| 2 — The player listens | dev | not started | |
+| 1 — A parameter moves in place | dev | done | `ab0ec26` |
+| 2 — The player listens | dev | done | committed with this row |
 | 3 — The player reports | dev | not started | |
 | 4 — The engine states what a preset can contain | dev | not started | |
 | 5 — The headless tap writes to a pipe | dev | not started | |
@@ -320,6 +320,36 @@ to a layout.
   handed over on the rebind path, so a save that moved a `[palette]` still applies; the one
   non-idempotent hand-off, the `[layer]` scene construction, is skipped only while the layer's
   system is unchanged.
+
+- **Phase 2 put `control.rs` in the standalone's LIBRARY**, not its binary: `standalone/src/lib.rs`
+  declares it beside `osc`, so the file is at the path the plan names but reachable from
+  `standalone/tests/`. That is what let the socket-to-pixels claim be tested at all.
+- **Phase 2 added two files the plan does not list.** `standalone/tests/control_loopback.rs`
+  carries the done-when's first bullet end to end — a real datagram on a real loopback port
+  moving a rendered frame — which `standalone/src/osc/tests.rs` cannot reach, since it opens no
+  socket and builds no renderer. `standalone/src/console/tests.rs` gained two tests holding a
+  `ctl/transport` verb to the strip's own `action_for`. It also touched `standalone/src/input.rs`,
+  `standalone/src/console.rs`, `standalone/src/main.rs`, `standalone/src/lib.rs` and
+  `standalone/src/app_state.rs`, none of which the plan's file list names: the queue has to reach
+  the renderer and the transport verbs have to reach the console's applier.
+- **Phase 2's flood done-when is asserted in two places, and only one of them is the socket.**
+  "The frame after sees only the last" is deterministic against the queue
+  (`a_flood_of_one_name_leaves_one_slot_holding_the_last_value`) and is **not** assertable
+  through a real socket: UDP may drop under a ten-thousand-datagram burst, so the last value
+  received need not be the last sent, and a test that asserted otherwise would be asserting the
+  kernel's buffer size. The socket test asserts the property that does survive that — a burst is
+  handed to a frame one slot wide.
+- **`auto` and `hold` are implemented as positions rather than presses**, which is narrower than
+  ADR-0176's table reads: the console strip's rotation control is a toggle, and a control surface
+  that repeats its state would otherwise turn rotation off with its second `auto`. Recorded in
+  the spec's Provenance as the one place the implementation narrows the ADR.
+- **Two comments landed in Phase 1 that `scripts/check-comment-hygiene.mjs` rejects**
+  (`core/tests/override.rs`, plan-relative narration). Fixed inside Phase 2's commit rather than
+  Phase 1's, so Phase 1's commit does not pass the pre-push gate on its own.
+- **`docs/specs/0003-studio-control-protocol.md` is NOT published to the site.** Both sibling
+  specs are in `site/src/plugins/rewrite-links.mjs`'s `PUBLISHED` map and this one is not, so the
+  link `docs/configuration.md` now carries to it is rewritten to a github blob URL. Left as it
+  is: what joins the site is not a `dev` call.
 
 ### Close triggers
 

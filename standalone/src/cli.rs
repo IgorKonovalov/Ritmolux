@@ -123,6 +123,12 @@ pub(crate) const FLAGS: &[FlagSpec] = &[
         help: "<host:port> publish analyzer telemetry as OSC over UDP",
     },
     FlagSpec {
+        name: "--control",
+        takes_value: true,
+        requires: None,
+        help: "<host:port> listen for studio control messages as OSC over UDP",
+    },
+    FlagSpec {
         name: "--soak",
         takes_value: true,
         requires: None,
@@ -649,6 +655,47 @@ pub(crate) fn resolve_osc(flag: Option<String>, config: &config::Osc) -> Option<
     }
 }
 
+/// `--control <host:port>`, or `None` when the flag is absent.
+///
+/// The mirror of [`parse_osc_arg`] and deliberately the same shape: the two
+/// flags aim opposite directions of the same transport, and an operator who has
+/// learned one has learned the other.
+pub(crate) fn parse_control_arg() -> Result<Option<String>, String> {
+    parse_control_arg_from(std::env::args().skip(1))
+}
+
+/// [`parse_control_arg`]'s rule as a pure function of the argument list.
+pub(crate) fn parse_control_arg_from(
+    args: impl Iterator<Item = String>,
+) -> Result<Option<String>, String> {
+    let mut args = args.peekable();
+    let mut listen = None;
+    while let Some(arg) = args.next() {
+        if let Some(value) = flag_value(&arg, "--control", &mut args) {
+            let value = value?;
+            if value.trim().is_empty() {
+                return Err("--control: expected an address as host:port".to_owned());
+            }
+            listen = Some(value);
+        }
+    }
+    Ok(listen)
+}
+
+/// Resolve the control-in address: `--control` over `[control]`. `None` means no
+/// socket is bound — the constructor is never called, so there is nothing to
+/// enumerate.
+///
+/// The flag both aims the listener and turns it on, for [`resolve_osc`]'s
+/// reason.
+pub(crate) fn resolve_control(flag: Option<String>, config: &config::Control) -> Option<String> {
+    match flag {
+        Some(listen) => Some(listen),
+        None if config.enabled => Some(config.listen.clone()),
+        None => None,
+    }
+}
+
 /// Default soak-log location: under the per-user app dir, or `soak.log` in the
 /// current directory if that can't be resolved — so `--soak` always logs
 /// somewhere.
@@ -670,8 +717,9 @@ pub(crate) fn default_downbeat_log_path() -> PathBuf {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::{
-        FLAGS, InputSource, config, help_text, missing_companion, parse_input_args_from,
-        parse_osc_arg_from, resolve_input, resolve_osc, unrecognized_flag, valued_valueless_flag,
+        FLAGS, InputSource, config, help_text, missing_companion, parse_control_arg_from,
+        parse_input_args_from, parse_osc_arg_from, resolve_control, resolve_input, resolve_osc,
+        unrecognized_flag, valued_valueless_flag,
     };
 
     /// `--osc` in both spellings, and the empty value refused for the same
@@ -728,6 +776,64 @@ pub(crate) mod tests {
         assert_eq!(
             resolve_osc(Some("10.0.0.4:7700".to_owned()), &on),
             Some(("10.0.0.4:7700".to_owned(), 30))
+        );
+    }
+
+    /// A run that asked for no listener resolves no address, which is where the
+    /// "no socket is opened" promise is actually kept: `Control::bind` is
+    /// reached only through a `Some` from here, so there is no bound port to go
+    /// looking for.
+    #[test]
+    fn a_run_that_asked_for_nothing_binds_no_control_socket() {
+        // The done-when's "the listener is None": the decision is made here, and
+        // the constructor is only reached when this answers `Some`.
+        let off = config::Control::default();
+        assert!(
+            !off.enabled,
+            "the shipped default does not listen, so a machine that installed \
+             the app binds no port"
+        );
+        assert_eq!(
+            resolve_control(None, &off),
+            None,
+            "no flag and a config that is off resolves to no address at all"
+        );
+        assert_eq!(
+            resolve_control(
+                None,
+                &config::Control {
+                    enabled: true,
+                    ..off.clone()
+                }
+            ),
+            Some(off.listen.clone()),
+            "the config alone turns the listener on at its own address"
+        );
+        assert_eq!(
+            resolve_control(Some("127.0.0.1:7777".to_owned()), &off),
+            Some("127.0.0.1:7777".to_owned()),
+            "the flag both aims the listener and turns it on, over a config \
+             that says otherwise"
+        );
+    }
+
+    /// `--control` takes the same two spellings every value flag here does, and
+    /// an empty value is a usage error rather than a bind of nothing.
+    #[test]
+    fn the_control_flag_takes_both_spellings_and_refuses_an_empty_value() {
+        let split = ["--control".to_owned(), "127.0.0.1:9001".to_owned()];
+        let joined = ["--control=127.0.0.1:9001".to_owned()];
+        assert_eq!(
+            parse_control_arg_from(split.into_iter()),
+            Ok(Some("127.0.0.1:9001".to_owned()))
+        );
+        assert_eq!(
+            parse_control_arg_from(joined.into_iter()),
+            Ok(Some("127.0.0.1:9001".to_owned()))
+        );
+        assert!(
+            parse_control_arg_from(["--control=".to_owned()].into_iter()).is_err(),
+            "an empty address is a usage error, not a bind of nothing"
         );
     }
 

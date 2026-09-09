@@ -370,6 +370,34 @@ pub fn action_for(button: Button, view: &crate::settings::SettingsView) -> Conso
     }
 }
 
+/// Resolve a `ctl/transport` verb (ADR-0176) against the live values the
+/// settings menu displays, or `None` when it asks for the state already held.
+///
+/// **The wire vocabulary resolves the strip's own actions**, so a verb sent by a
+/// studio and a click on the console reach one applier rather than two that
+/// agree today. `auto` and `hold` are the two *positions* of one toggle control:
+/// a control surface sends a position and expects to land there, so sending
+/// `auto` twice must not turn rotation off — which is what `auto_enabled` is
+/// read for, and the only asymmetry between the two sources.
+pub fn action_for_transport(
+    verb: standalone::osc::decode::Transport,
+    auto_enabled: bool,
+    view: &crate::settings::SettingsView,
+) -> Option<ConsoleAction> {
+    use standalone::osc::decode::Transport;
+    Some(match verb {
+        Transport::Next => action_for(Button::Next, view),
+        Transport::Prev => action_for(Button::Prev, view),
+        Transport::Auto | Transport::Hold => {
+            let want = matches!(verb, Transport::Auto);
+            if auto_enabled == want {
+                return None;
+            }
+            action_for(Button::ToggleAuto, view)
+        }
+    })
+}
+
 // ---------------------------------------------------------------------------
 // Staging — what the rotation will take
 // ---------------------------------------------------------------------------

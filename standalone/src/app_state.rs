@@ -374,6 +374,14 @@ pub(crate) struct AppState {
     pub(crate) hud: Hud,
 
     pub(crate) diagnostics: Diagnostics,
+
+    /// The studio control-in listener (ADR-0176), present only when `--control`
+    /// or `[control] enabled` turned it on. Absent otherwise, so the frame path
+    /// is a `None` test and no socket is bound.
+    ///
+    /// Held here rather than in [`Diagnostics`] because that struct is what the
+    /// run *reports*, and this is what drives it.
+    pub(crate) control: Option<standalone::control::Control>,
 }
 
 /// Whether the display loop spends a console present on frame `frame`, at
@@ -563,6 +571,7 @@ impl AppState {
                 reported_overflow: renderer_overflow,
                 reported_demotion: false,
             },
+            control: app.control.take(),
         };
         // **Which GPU is rendering the show**, once, at startup. Unflagged, the
         // window takes whatever wgpu returns for the surface, which on a hybrid
@@ -932,6 +941,12 @@ impl AppState {
 
         self.poll_input_lost(dt);
         self.pump_audio();
+        // Control input, drained between frames and applied before anything this
+        // frame reads a parameter (ADR-0176). Ahead of the hidden return on
+        // purpose: an occluded window is still a running player, and a control
+        // surface that stopped answering when someone covered it would be
+        // indistinguishable from a dead one.
+        self.apply_control();
 
         if self.hidden() {
             return;

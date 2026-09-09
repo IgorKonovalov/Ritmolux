@@ -30,6 +30,7 @@ statements + scenarios); CLAUDE.md is orientation. They must not drift apart.
 |------|-----------|----------------|
 | [0001-c-abi.md](0001-c-abi.md) | The versioned `extern "C"` surface the foobar plugin links | 0003, 0001 |
 | [0002-ring-determinism.md](0002-ring-determinism.md) | SPSC ring seam + pure-function DSP determinism | 0001 (+ CLAUDE.md non-negotiables); Plan 0005 |
+| [0003-studio-control-protocol.md](0003-studio-control-protocol.md) | The OSC control-in vocabulary a studio drives the player through | 0176, 0175, 0164, 0143 |
 
 ## Posture: minimal and lazy (no gate, no ritual yet)
 

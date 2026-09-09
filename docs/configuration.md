@@ -25,6 +25,7 @@ telemetry.
 | `--device` | `"<friendly name>"` | Which capture endpoint to open |
 | `--tier` | `floor` \| `rich` | Pin the quality tier instead of letting the engine pick |
 | `--osc` | `<host:port>` | Publish analyzer telemetry as OSC over UDP, and turn the sink on |
+| `--control` | `<host:port>` | Listen for studio control messages as OSC over UDP, and turn the listener on |
 | `--soak` | `[path]` | Write a long-run frame-time trace; bare, a default path |
 | `--downbeat-log` | `[path]` | Write the per-beat downbeat decomposition; bare, a default path |
 | `--stream` | — | Run headless and publish every frame as a Spout sender (Windows-only) |
@@ -211,6 +212,28 @@ installed the app.
 `--osc` overrides `target` and turns the sink on, and leaves `rate_hz` to the file — the one key it
 has no spelling for.
 
+### `[control]`
+
+The studio control-in listener — the socket a studio, a lighting console or a MIDI bridge drives
+this player from ([the control protocol](specs/0003-studio-control-protocol.md)). **Off by
+default, and loopback by default**, and those are two separate promises: off means a machine that
+was never asked to be driven binds no port at all, and loopback means one that *was* asked, and
+named no host, is reachable only from itself.
+
+| Key | Default | What it means |
+|---|---|---|
+| `enabled` | `false` | Listen for control messages |
+| `listen` | `"127.0.0.1:9001"` | Where to listen, as `host:port`. Inert until `enabled` (or `--control`) turns the listener on |
+
+`--control` overrides `listen` and turns the listener on, exactly as `--osc` does for the sink.
+The port is one above `[osc] target`'s so the two OSC surfaces read as a pair and a machine
+running both needs neither moved.
+
+**Binding anywhere but loopback is a decision, not a default.** Anything that can reach the port
+can move a parameter on the running show, which is the whole feature and also the whole of the
+exposure — there is no authentication, and OSC has no channel to carry one. On a venue network,
+leave it on `127.0.0.1` and run the studio on the same machine.
+
 ### `[console]`
 
 The operator console's second window. **Off by default**, for the reason every optional surface
@@ -269,6 +292,10 @@ enabled = false
 target = "127.0.0.1:9000"
 rate_hz = 60
 
+[control]
+enabled = false
+listen = "127.0.0.1:9001"
+
 [console]
 enabled = false
 display = 1
@@ -289,9 +316,11 @@ running app *for that session*.
 | Input device | `--device` | | `[input] device` | the mode's default endpoint |
 | OSC target | `--osc` | | `[osc] target` | — |
 | OSC on/off | `--osc` (on) | | `[osc] enabled` | off |
+| Control address | `--control` | | `[control] listen` | — |
+| Control on/off | `--control` (on) | | `[control] enabled` | off |
 | Console on/off | `--console` (on) | | `[console] enabled` | off |
 
-`--input`, `--device`, `--osc` and `--console` pin a **run** and never write themselves into
+`--input`, `--device`, `--osc`, `--control` and `--console` pin a **run** and never write themselves into
 `config.toml`; the file is the persistent form. There is no environment variable for the input
 selection, because an input is a property of a rig and already persists to the config.
 

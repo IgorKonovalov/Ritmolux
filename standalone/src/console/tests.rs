@@ -622,3 +622,53 @@ fn a_roster_with_no_alternative_has_no_random_cut() {
 fn the_random_control_is_a_cut_and_not_a_settings_row() {
     assert_eq!(action_for(Button::Random, &view()), ConsoleAction::Random);
 }
+
+// --- the control vocabulary's transport verbs (ADR-0176) --------------------
+
+/// A `ctl/transport` verb resolves the **same** action the strip's own control
+/// does, so a studio and a pointer cannot drift into two behaviours.
+///
+/// Asserted against `action_for` rather than against a literal, which is the
+/// point: a `ConsoleAction` written out here would be a second copy of the
+/// mapping and would keep passing after the strip's changed.
+#[test]
+fn a_transport_verb_resolves_the_strips_own_action() {
+    use standalone::osc::decode::Transport;
+    let view = view();
+    assert_eq!(
+        action_for_transport(Transport::Next, view.auto_rotate, &view),
+        Some(action_for(Button::Next, &view))
+    );
+    assert_eq!(
+        action_for_transport(Transport::Prev, view.auto_rotate, &view),
+        Some(action_for(Button::Prev, &view))
+    );
+}
+
+/// `auto` and `hold` are positions, not presses: each is inert when rotation is
+/// already where it asks for, and each resolves the strip's toggle when it is
+/// not.
+///
+/// The failure this rules out is the one a bare toggle produces — two `auto`
+/// messages from a control surface that repeats its state would leave rotation off.
+#[test]
+fn auto_and_hold_are_positions_rather_than_presses() {
+    use standalone::osc::decode::Transport;
+    let view = view();
+    for (verb, already) in [(Transport::Auto, true), (Transport::Hold, false)] {
+        assert_eq!(
+            action_for_transport(verb, already, &view),
+            None,
+            "`{}` is inert when rotation is already there",
+            verb.as_str()
+        );
+    }
+    for (verb, already) in [(Transport::Auto, false), (Transport::Hold, true)] {
+        assert_eq!(
+            action_for_transport(verb, already, &view),
+            Some(action_for(Button::ToggleAuto, &view)),
+            "`{}` reaches the strip's own toggle across a difference",
+            verb.as_str()
+        );
+    }
+}

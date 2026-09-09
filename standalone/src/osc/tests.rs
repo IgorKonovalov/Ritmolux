@@ -1,5 +1,5 @@
-//! The encoder against OSC 1.0's own padding rules, and the fixed address table
-//! against itself.
+//! The encoder against OSC 1.0's own padding rules, the fixed address table
+//! against itself, and the **decoder against the encoder**.
 //!
 //! Every assertion here is **exact and dimensionless** — a byte count derivable
 //! from the spec on paper, or a big-endian bit pattern. Nothing tolerances, and
@@ -7,6 +7,7 @@
 //! wall-clock paced and leaves the process, so the only part of it that can be
 //! tested at all is this one, and it is tested exactly.
 
+use super::decode::{Action, Name, Reject, Transport, decode};
 use super::{ADDRESS_COUNT, ADDRESS_PREFIX, Arg, Telemetry, encode, rms_of};
 
 /// A telemetry snapshot with distinguishable values, so a transposed field in
@@ -228,4 +229,247 @@ fn rms_matches_its_closed_form() {
         "sine RMS was {}, expected {expected}",
         rms_of(&sine)
     );
+}
+
+// ---------------------------------------------------------------------------
+// The decoder (ADR-0176). Every assertion below is against the **encoder**
+// rather than against a hand-built byte string: the two are a mirror pair, and
+// a hand-built reference would only prove that whoever wrote the test read the
+// same paragraph of the spec twice.
+// ---------------------------------------------------------------------------
+
+/// A short inline name, for the vocabulary rows that carry one.
+fn name(text: &str) -> Name {
+    Name::new(text).expect("a short test name fits inline")
+}
+
+/// Every row of the control vocabulary, in the order the spec's table prints
+/// them. This array **is** the roster the tests below walk, so a row added to
+/// the decoder without one here is a row nothing round-trips.
+fn vocabulary() -> Vec<Action> {
+    vec![
+        Action::Param {
+            name: name("bg_bright"),
+            value: 0.625,
+        },
+        Action::ClearParam {
+            name: name("bg_bright"),
+        },
+        Action::ClearParams,
+        Action::Preset {
+            name: name("aurora"),
+        },
+        Action::Transport(Transport::Next),
+        Action::Transport(Transport::Prev),
+        Action::Transport(Transport::Auto),
+        Action::Transport(Transport::Hold),
+        Action::Ping(0x0BAD_F00D),
+    ]
+}
+
+/// Every message the vocabulary names survives encode -> decode -> encode with
+/// the same bytes and the same action.
+///
+/// Both halves matter and neither implies the other: equal actions with
+/// different bytes would mean the encoder is not deterministic, and equal bytes
+/// with a different action would mean the decoder is reading a field it did not
+/// write.
+#[test]
+fn every_control_message_round_trips_byte_for_byte() {
+    let mut first = Vec::new();
+    let mut second = Vec::new();
+    for action in vocabulary() {
+        action.encode(&mut first);
+        assert!(
+            first.len() % 4 == 0,
+            "{}: an OSC packet is a whole number of 4-byte words",
+            action.address()
+        );
+        let decoded = decode(&first)
+            .unwrap_or_else(|err| panic!("{}: did not decode: {err:?}", action.address()));
+        assert_eq!(
+            decoded,
+            action,
+            "{}: decoded to a different action",
+            action.address()
+        );
+        decoded.encode(&mut second);
+        assert_eq!(
+            first,
+            second,
+            "{}: re-encoding the decoded action produced different bytes",
+            action.address()
+        );
+    }
+}
+
+/// The vocabulary's addresses all live under the versioned control prefix, and
+/// no two rows share one.
+#[test]
+fn the_control_addresses_are_versioned_and_free_of_collisions() {
+    let mut seen: Vec<&str> = Vec::new();
+    for action in vocabulary() {
+        let address = action.address();
+        assert!(
+            address.starts_with(super::decode::CONTROL_PREFIX),
+            "{address} is not under the versioned control prefix"
+        );
+        assert!(
+            address.starts_with(ADDRESS_PREFIX),
+            "{address} does not share the telemetry root, so a console mapping \
+             would need two"
+        );
+        if !seen.contains(&address) {
+            seen.push(address);
+        }
+    }
+    // Two transport verbs share `ctl/transport` by design; the collision that
+    // would matter is two *actions of different kinds* on one address.
+    assert_eq!(seen.len(), 6, "the vocabulary has six addresses");
+}
+
+/// A well-formed message to an address this player does not know is refused as
+/// an unknown address, not coerced into a neighbouring one.
+#[test]
+fn an_unknown_address_is_refused_rather_than_guessed() {
+    let mut buf = Vec::new();
+    encode(&mut buf, "/rlx/v1/ctl/teleport", &[Arg::F(1.0)]);
+    assert_eq!(decode(&buf), Err(Reject::UnknownAddress));
+
+    // ...and a known address under the *next* version is equally unknown, which
+    // is the whole of what putting the version in the address buys.
+    encode(
+        &mut buf,
+        "/rlx/v2/ctl/param",
+        &[Arg::S("warp"), Arg::F(1.0)],
+    );
+    assert_eq!(decode(&buf), Err(Reject::UnknownAddress));
+}
+
+/// A known address with the wrong argument types is refused rather than
+/// coerced. The sender is a program; a coerced argument is a bug that presents
+/// as the picture doing something odd.
+#[test]
+fn a_known_address_with_the_wrong_arguments_is_refused() {
+    let mut buf = Vec::new();
+    for args in [
+        // `param` wants `s f`.
+        vec![Arg::S("warp")],
+        vec![Arg::F(1.0), Arg::S("warp")],
+        vec![Arg::S("warp"), Arg::I(1)],
+        vec![Arg::S("warp"), Arg::F(1.0), Arg::F(2.0)],
+    ] {
+        encode(&mut buf, "/rlx/v1/ctl/param", &args);
+        assert_eq!(
+            decode(&buf),
+            Err(Reject::WrongArguments),
+            "an argument list of {} was accepted for ctl/param",
+            args.len()
+        );
+    }
+    // `params/clear` takes none, so anything at all is wrong.
+    encode(&mut buf, "/rlx/v1/ctl/params/clear", &[Arg::I(0)]);
+    assert_eq!(decode(&buf), Err(Reject::WrongArguments));
+}
+
+/// A name past the inline capacity is refused, and a transport verb the
+/// vocabulary does not name is refused. **Neither is truncated or nudged onto a
+/// neighbour** — a truncated parameter name would silently drive the wrong
+/// parameter, which is worse than doing nothing.
+#[test]
+fn an_unusable_name_or_verb_is_refused_rather_than_truncated() {
+    let mut buf = Vec::new();
+    let long = "x".repeat(Name::CAP + 1);
+    encode(&mut buf, "/rlx/v1/ctl/param", &[Arg::S(&long), Arg::F(1.0)]);
+    assert_eq!(decode(&buf), Err(Reject::Unusable));
+
+    // Exactly at the cap still fits, so the boundary is where it is documented.
+    let exact = "x".repeat(Name::CAP);
+    encode(
+        &mut buf,
+        "/rlx/v1/ctl/param",
+        &[Arg::S(&exact), Arg::F(1.0)],
+    );
+    assert!(
+        matches!(decode(&buf), Ok(Action::Param { .. })),
+        "a name of exactly Name::CAP bytes is inside the capacity"
+    );
+
+    encode(&mut buf, "/rlx/v1/ctl/transport", &[Arg::S("rewind")]);
+    assert_eq!(decode(&buf), Err(Reject::Unusable));
+}
+
+/// Truncated, over-long and mistyped packets: none panics, and every one is
+/// refused.
+///
+/// The listener hands this whatever arrived on a public socket, so the property
+/// under test is **totality** — that no input reaches a panic — and a rejection
+/// is the only other outcome allowed. The corpus is derived from the shipped
+/// vocabulary rather than invented, so it stays a corpus of *nearly*-valid
+/// packets, which is the population a real sender produces.
+#[test]
+fn no_malformed_packet_panics_and_every_one_is_counted_as_rejected() {
+    let mut buf = Vec::new();
+    let mut refused = 0usize;
+    let mut cases = 0usize;
+
+    for action in vocabulary() {
+        action.encode(&mut buf);
+        let whole = buf.clone();
+
+        // Every truncation, including the empty one.
+        for len in 0..whole.len() {
+            cases += 1;
+            if decode(whole.get(..len).unwrap_or_default()).is_err() {
+                refused += 1;
+            }
+        }
+        // Trailing bytes past the declared arguments, at every alignment.
+        for extra in 1..=8 {
+            let mut over = whole.clone();
+            over.extend(std::iter::repeat_n(0xFFu8, extra));
+            cases += 1;
+            if decode(&over).is_err() {
+                refused += 1;
+            }
+        }
+        // One byte flipped at every position — the mistyped-packet case, which
+        // reaches the address, the type tags and the arguments in turn.
+        for i in 0..whole.len() {
+            let mut flipped = whole.clone();
+            if let Some(byte) = flipped.get_mut(i) {
+                *byte ^= 0xFF;
+            }
+            cases += 1;
+            if decode(&flipped).is_err() {
+                refused += 1;
+            }
+        }
+    }
+
+    // Reaching here at all is the totality claim: `decode` returned for every
+    // one of these instead of panicking.
+    // A vacuity guard rather than a target: the corpus is derived from the
+    // vocabulary, so this says each row contributed a real spread of near-misses
+    // instead of the loops having quietly collapsed to nothing.
+    let rows = vocabulary().len();
+    assert!(
+        cases >= 32 * rows,
+        "the corpus is {cases} cases across {rows} vocabulary rows, which is          too thin to be evidence of anything"
+    );
+    // A flipped byte inside a float argument produces a different *valid*
+    // message, so not every case is a rejection - the claim is that the great
+    // majority are, and that none of them panicked.
+    assert!(
+        refused * 2 > cases,
+        "only {refused} of {cases} near-miss packets were refused, so the \
+         decoder is accepting things it should not"
+    );
+
+    // A truncated packet whose length is not a whole number of words is the
+    // shape a partial send produces, and it is refused before anything is read.
+    assert_eq!(decode(&[0u8; 3]), Err(Reject::Malformed));
+    assert_eq!(decode(&[]), Err(Reject::Malformed));
+    // A string with no terminator inside a well-sized packet runs off the end.
+    assert_eq!(decode(&[b'/'; 8]), Err(Reject::Malformed));
 }

@@ -228,8 +228,10 @@ fn a_name_nothing_claims_is_refused() {
     );
 }
 
-/// A preset switch and a preset reload both drop every override — the preset a
-/// held value named is no longer the preset being drawn.
+/// A preset switch and a preset reload both drop every override.
+///
+/// A held value names a parameter on the preset it was set against, and after
+/// either of those that is not the preset being drawn.
 #[test]
 fn a_switch_and_a_reload_both_drop_every_override() {
     let roster = || vec![lit("dim", "0.2"), lit("other", "0.2")];
@@ -313,8 +315,8 @@ fn a_switch_and_a_reload_both_drop_every_override() {
 /// another (a replacement). Everything else about the two runs is identical, so
 /// the difference between the two jumps is the reset path and nothing else.
 ///
-/// The property is the plan's: the frame after a rebind moves by the same step
-/// the run was already moving by, not by a fresh smoother's snap. The
+/// The property: the frame after a rebind moves by the same step the run was
+/// already moving by, not by a fresh smoother's snap. The
 /// replacement arm is what makes that a measurement rather than an assumption —
 /// without it, an engine that had never reset anything would pass.
 #[test]

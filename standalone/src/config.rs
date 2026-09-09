@@ -27,7 +27,43 @@ pub struct Config {
     pub quality: Quality,
     pub hud: Hud,
     pub osc: Osc,
+    pub control: Control,
     pub console: Console,
+}
+
+/// `[control]` — the studio control-in listener (ADR-0176).
+///
+/// **Off by default and loopback by default**, and the two are separate
+/// promises. Off means a machine that was never asked to be driven binds no
+/// port at all; loopback means one that *was* asked, and named no host, is
+/// reachable only from itself. A show machine on a venue network is the case
+/// both defaults are written for.
+///
+/// `--control <host:port>` overrides the address *and* turns the listener on for
+/// that run without writing itself into the file, the same shape `--osc` follows
+/// (ADR-0142).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Control {
+    /// Listen for control messages. False out of the box.
+    pub enabled: bool,
+    /// Where to listen, as `host:port`.
+    ///
+    /// One above `[osc] target`'s port, so the two OSC surfaces read as a pair
+    /// and a machine running both needs neither moved. Binding anywhere but
+    /// loopback is the operator's explicit choice: anything that can reach the
+    /// port can move a parameter, which is the feature and also the whole of the
+    /// exposure.
+    pub listen: String,
+}
+
+impl Default for Control {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            listen: "127.0.0.1:9001".to_owned(),
+        }
+    }
 }
 
 /// `[console]` — the operator console, a second window on a second display
