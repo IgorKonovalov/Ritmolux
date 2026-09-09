@@ -61,6 +61,7 @@ impl Preset {
             raw.curve,
             raw.generator,
             raw.particles,
+            raw.path,
             raw.spectrum,
             raw.mesh,
             raw.milk,
@@ -537,6 +538,7 @@ pub(super) fn build_layer(
         raw.curve,
         raw.generator,
         raw.particles,
+        raw.path,
         raw.spectrum,
         raw.mesh,
         // A `[layer]` carries no `[milk]` table: a converted preset is a whole
@@ -591,6 +593,7 @@ pub(super) fn build_config(
     curve: Option<RawCurve>,
     generator: Option<RawGenerator>,
     particles: Option<RawParticles>,
+    path: Option<RawPath>,
     spectrum: Option<RawSpectrum>,
     mesh: Option<RawMesh>,
     milk: Option<RawMilk>,
@@ -656,20 +659,21 @@ pub(super) fn build_config(
                     .into_config(bundle.map(Box::new), salt)?,
             ))
         }
+        // The shape field takes an OPTIONAL `[path]` table (ADR-0107): the
+        // roster is still a closed list selected by the numeric `shape` param
+        // (ADR-0084/ADR-0105), and a preset naming no path takes exactly the
+        // `None` every shape_field preset took before — the table is an
+        // alternative source of a silhouette, not a replacement for the roster.
+        SystemKind::ShapeField => path.map(RawPath::into_config).transpose(),
         // Reaction-diffusion drives its regime through named params (feed/kill/
-        // flow), not a declarative structural table. `shape_field` is here for a
-        // sharper reason: its structure is the `marks` roster, which is a closed
-        // list selected by a numeric `shape` param (ADR-0084/ADR-0105), so there
-        // is nothing declarative for a table to carry.
-        // `shape_collage` joins them at Plan 0113 Phase 1 with the same answer
-        // and a different reason: its structure is an authored element list
-        // compiled into the scene. Phase 4's seeded layout grammar is selected by
-        // named params too, so this arm is expected to stay where it is.
+        // flow), not a declarative structural table. `shape_collage`'s structure
+        // is an authored element list compiled into the scene, and its seeded
+        // layout grammar is selected by named params too, so that arm is
+        // expected to stay where it is.
         SystemKind::FragmentField
         | SystemKind::Swarm
         | SystemKind::ReactionDiffusion
         | SystemKind::Emitter
-        | SystemKind::ShapeField
         | SystemKind::ShapeCollage => Ok(None),
     }
 }

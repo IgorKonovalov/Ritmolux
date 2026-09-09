@@ -1,6 +1,6 @@
 # 0092 — The engine draws an authored path
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-13
 > **Approved:** 2026-08-13 (user)
 > **Owner skill(s):** dev, human
@@ -253,3 +253,28 @@ stroke = "0.0"       # 0 = filled; > 0 strokes at abs(d) < w
   is an alternative source of a silhouette, not a replacement for them.
 - **It does not shade.** The chrome register is [backlog 0092](../design-backlog.md), gated on Plan
   0091 and independent of this.
+
+## Implementation log
+
+> Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
+> last one. **The phases above are the contract; everything here is what happened.**
+
+**Lane:** `WORK/rlx-plan-0092` on `plan-0092-the-engine-draws-an-authored-path`
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — The parser, and what it refuses | dev | done | committed with this row |
+| 2 — The path becomes a field | dev | not started | — |
+| 3 — Two paths morph | dev | not started | — |
+| 4 — Arcs, if Plan 0087 delivered them | dev | not started | — |
+| 5 — The authoring surface is documented | dev | not started | — |
+| 6 — The look gate | human | not started | — |
+
+### Notes
+
+- Phase 1 ships `[path] d` and `samples` only; `morph_to` lands with the morph in Phase 3.
+- `MAX_SAMPLES` is `192` as committed at Phase 1, ahead of the Phase 2 measurement that sets it.
+
+### Close triggers
+
+_(filled at the last phase)_

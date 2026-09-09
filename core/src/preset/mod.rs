@@ -7,7 +7,9 @@
 //! learning it.
 //!
 //! [`expr`] compiles and evaluates expression strings; [`schema`] parses a
-//! TOML preset into compiled [`Binding`]s. This module also loads presets in
+//! TOML preset into compiled [`Binding`]s; [`path`] parses the one thing here
+//! that is not an expression, a `[path] d` string, into an authored silhouette
+//! (ADR-0107). This module also loads presets in
 //! bulk: [`default_presets`] embeds the shipped examples (so the C-ABI/foobar
 //! path always has visuals without a preset directory), [`seed_dir`] writes the
 //! embedded curated set into a per-user directory on first run (write-if-absent,
@@ -16,6 +18,7 @@
 //! the caller keeps the last good set (NFR 10).
 
 pub mod expr;
+pub mod path;
 pub mod schema;
 
 use std::path::{Path, PathBuf};

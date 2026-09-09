@@ -34,6 +34,11 @@ pub(in crate::preset::schema) struct RawPreset {
     /// the attractor family for the compute-particle scene.
     #[serde(default)]
     pub(in crate::preset::schema) particles: Option<RawParticles>,
+    /// The optional `[path]` structural-config table (ADR-0107): an authored
+    /// silhouette as inline SVG path data, for the shape field. Absent means the
+    /// scene draws the `marks` roster, exactly as it did before paths existed.
+    #[serde(default)]
+    pub(in crate::preset::schema) path: Option<RawPath>,
     /// The optional `[spectrum]` structural-config table (Plan 0034): the element
     /// count, layout and per-element easing of the spectrum readout.
     #[serde(default)]
@@ -118,6 +123,8 @@ pub(in crate::preset::schema) struct RawLayer {
     pub(in crate::preset::schema) generator: Option<RawGenerator>,
     #[serde(default)]
     pub(in crate::preset::schema) particles: Option<RawParticles>,
+    #[serde(default)]
+    pub(in crate::preset::schema) path: Option<RawPath>,
     #[serde(default)]
     pub(in crate::preset::schema) spectrum: Option<RawSpectrum>,
     #[serde(default)]

@@ -341,3 +341,91 @@ fn every_system_round_trips_through_its_one_roster() {
         seen.push(name);
     }
 }
+
+fn shape_field_path(table: &str) -> Result<Preset, PresetError> {
+    Preset::from_toml_str(&format!(
+        "system = \"shape_field\"\nname = \"t\"\n[path]\n{table}"
+    ))
+}
+
+/// The `[path]` table is optional, and a `shape_field` preset without one takes
+/// the `None` it always took — an authored silhouette is an alternative source
+/// of a figure, not a replacement for the `marks` roster (ADR-0107).
+#[test]
+fn a_shape_field_preset_without_a_path_table_carries_no_config() {
+    let preset = Preset::from_toml_str("system = \"shape_field\"\nname = \"t\"\n")
+        .expect("a shape_field preset needs no table");
+    assert!(preset.config.is_none());
+}
+
+#[test]
+fn a_path_table_becomes_a_contour_at_the_arity_it_asked_for() {
+    let preset =
+        shape_field_path("d = \"M 0,0 H 10 V 10 H 0 Z\"\nsamples = 24").expect("a square parses");
+    match preset.config {
+        Some(GeneratorConfig::Path { shape }) => assert_eq!(shape.points().len(), 24),
+        other => panic!("a [path] preset carries a Path config, got {other:?}"),
+    }
+
+    // No `samples` key takes the default arity rather than the flatten's own.
+    let defaulted = shape_field_path("d = \"M 0,0 H 10 V 10 H 0 Z\"").expect("parses");
+    match defaulted.config {
+        Some(GeneratorConfig::Path { shape }) => {
+            assert_eq!(shape.points().len(), crate::preset::path::DEFAULT_SAMPLES);
+        }
+        other => panic!("expected a Path config, got {other:?}"),
+    }
+}
+
+/// **An arity outside the ceiling is a load error naming both numbers**, not a
+/// silent decimation: the cost is paid on every pixel of every frame whether or
+/// not the figure is on screen, so an author who pasted a traced logo is told.
+#[test]
+fn an_arity_outside_the_ceiling_is_refused_naming_the_ceiling_and_the_count() {
+    use crate::preset::path::{MAX_SAMPLES, MIN_SAMPLES};
+    let over = MAX_SAMPLES + 1;
+    let err = shape_field_path(&format!("d = \"M 0,0 H 1 V 1 H 0 Z\"\nsamples = {over}"))
+        .expect_err("over the ceiling");
+    let text = err.to_string();
+    assert!(
+        text.contains(&MAX_SAMPLES.to_string()),
+        "names the ceiling: {text}"
+    );
+    assert!(
+        text.contains(&over.to_string()),
+        "names the count asked for: {text}"
+    );
+
+    // The floor is refused on the same terms — a two-point contour is not a
+    // silhouette.
+    let under = MIN_SAMPLES - 1;
+    let err = shape_field_path(&format!("d = \"M 0,0 H 1 V 1 H 0 Z\"\nsamples = {under}"))
+        .expect_err("under the floor");
+    assert!(err.to_string().contains(&MIN_SAMPLES.to_string()));
+}
+
+/// A malformed path reaches the author as a load error carrying its character
+/// offset, rather than as a fallback shape (ADR-0107).
+#[test]
+fn a_malformed_path_surfaces_its_offset_through_the_load_error() {
+    let err = shape_field_path("d = \"M 0,0 A 1 1 0 0 1 2,2 Z\"").expect_err("arcs are refused");
+    let text = err.to_string();
+    assert!(
+        text.contains("[path] d"),
+        "the message names the key: {text}"
+    );
+    assert!(
+        text.contains("at character 6"),
+        "and carries the offset: {text}"
+    );
+    assert!(text.contains("elliptical arc"), "and what it found: {text}");
+}
+
+/// An unknown key in `[path]` is a load error rather than a silent typo — the
+/// table is `deny_unknown_fields`, which is what makes `sample = 32` say so.
+#[test]
+fn an_unknown_path_key_is_refused() {
+    let err =
+        shape_field_path("d = \"M 0,0 H 1 V 1 H 0 Z\"\nsample = 32").expect_err("a mistyped key");
+    assert!(err.to_string().contains("sample"), "{err}");
+}

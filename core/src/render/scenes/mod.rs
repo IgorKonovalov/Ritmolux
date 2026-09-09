@@ -319,6 +319,19 @@ pub enum GeneratorConfig {
         /// behaviour, and that is stated rather than discovered.
         salt: u32,
     },
+    /// The shape field's `[path]` table (ADR-0107): an authored silhouette, as a
+    /// closed contour parsed once at load from inline SVG path data.
+    ///
+    /// The one variant here carrying **geometry** rather than a selector or a
+    /// size. It rides `configure` for the reason every other structural table
+    /// does — it is fixed for as long as the preset is loaded — and a
+    /// `shape_field` preset declaring no table gets `None` and draws the closed
+    /// `marks` roster exactly as it did before paths existed.
+    Path {
+        /// The contour, normalized into `[-1, 1]` and resampled to the arity
+        /// `[path] samples` asked for.
+        shape: crate::preset::path::PathShape,
+    },
 }
 
 impl GeneratorConfig {
@@ -336,7 +349,8 @@ impl GeneratorConfig {
             | GeneratorConfig::LSystem { .. }
             | GeneratorConfig::Star { .. }
             | GeneratorConfig::Particles { .. }
-            | GeneratorConfig::WarpMesh { .. } => 0,
+            | GeneratorConfig::WarpMesh { .. }
+            | GeneratorConfig::Path { .. } => 0,
         }
     }
 }
