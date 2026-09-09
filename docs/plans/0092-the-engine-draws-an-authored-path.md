@@ -265,8 +265,8 @@ stroke = "0.0"       # 0 = filled; > 0 strokes at abs(d) < w
 |---|---|---|---|
 | 1 — The parser, and what it refuses | dev | done | `6cd20de` |
 | 2 — The path becomes a field | dev | done | `bad073f` |
-| 3 — Two paths morph | dev | done | committed with this row |
-| 4 — Arcs, if Plan 0087 delivered them | dev | not started | — |
+| 3 — Two paths morph | dev | done | `987c758` |
+| 4 — Arcs, if Plan 0087 delivered them | dev | done | committed with this row |
 | 5 — The authoring surface is documented | dev | not started | — |
 | 6 — The look gate | human | not started | — |
 
@@ -337,6 +337,41 @@ stroke = "0.0"       # 0 = filled; > 0 strokes at abs(d) < w
 - `morph` is clamped to `0..=1` rather than extrapolated past either end.
 - Phase 3 touched `presets/README.md` again, mechanically, for the `morph` row (as Phase 2 did for
   `stroke`).
+
+**Phase 4 — not empty. Plan 0087's fitter landed, so the first branch applied.**
+
+- **The arc chain is a large win and it is measured, not asserted.** `core/tests/path_cost.rs`'s
+  second test, same machine and configuration as Phase 2's:
+
+  | figure | pieces | arcs | polyline (64 pts) | |
+  |---|---|---|---|---|
+  | leaf, 2 cubics | 16 | 4.15 ms | 7.09 ms | **−41 %** |
+  | circle, 4 cubics | 6 | 1.99 ms | 7.12 ms | **−72 %** |
+  | blob, 4 cubics | 24 | 4.98 ms | 7.10 ms | **−30 %** |
+
+  An arc piece costs ~0.17 ms against a segment's ~0.105 — about 1.6× — and the fit needs about four
+  times fewer of them. **This is the scenario ADR-0107's Risks named**: after Phase 2's reading, arcs
+  stopped being an optimisation.
+- **The fit reads the dense flattened contour, not the resample.** So an arc figure's fidelity stops
+  depending on `samples` at all; the polyline arity governs only the polyline route.
+- **Two things put a figure back on the polyline, and both are the chain's own limits:** a morph in
+  flight (two arc chains have no point correspondence — ADR-0075's representation problem, refused
+  rather than invented), and `coord_mode = 1` (the scaled-copy coordinate needs a boundary radius
+  along a ray, a second intersection routine the chain does not carry). Both are decided CPU-side per
+  frame in `pack_path`.
+- The chain is also dropped when it did not collapse the count (`pieces * 2 > points`) or would not
+  fit `MAX_ARC_PIECES` — a polygon comes back from the fitter as the lines it went in as and lands
+  there.
+- **`MAX_SAMPLES` was not raised.** It bounds the polyline, which is still what a morph and the
+  scaled-copy coordinate use, and that route's cost did not change.
+- **`core/tests/golden/shape_field_path.png` was re-blessed**: the fixture's leaf is now drawn by the
+  chain. Mean 0.0009 against the Phase 2 baseline with a max outlier of 142 on band-edge pixels —
+  the picture, moved by the fit's own lateral error. Adapter-compared again first (hardware vs WARP
+  `frame_diff` 0.000232). **No other baseline moved**: the bless rewrote nine PNGs byte-wise, all
+  nine were restored, and the suite passes unblessed against them.
+- The arc chain and the polyline are asserted to draw the same figure —
+  `the_arc_chain_draws_the_same_figure_as_the_polyline` forces the polyline route with
+  `morph_to = d` and compares: 14 of 57600 px differ at 240x240.
 
 ### Close triggers
 

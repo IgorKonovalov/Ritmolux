@@ -56,6 +56,29 @@
 //! rather than measured here, and the slope is what carries them. What the test
 //! still checks is that the slope exists — that the arity, not something else,
 //! is what it priced.
+//!
+//! # The arc chain, against the polyline it replaces
+//!
+//! ADR-0107 recorded, as its live risk, the scenario where "Plan 0087's arcs
+//! stop being an optimisation and become the thing that makes this viable". The
+//! reading above is that scenario, and the second test here is the answer to it.
+//! Same machine and same configuration:
+//!
+//! | figure | pieces | arcs | polyline (64 pts) | |
+//! |---|---|---|---|---|
+//! | leaf, 2 cubics | 16 | 4.15 ms | 7.09 ms | **-41 %** |
+//! | circle, 4 cubics | 6 | 1.99 ms | 7.12 ms | **-72 %** |
+//! | blob, 4 cubics | 24 | 4.98 ms | 7.10 ms | **-30 %** |
+//!
+//! **An arc piece costs about 1.6 segments and the fit needs about four times
+//! fewer of them**, so a curved figure comes out 30 % to 72 % cheaper depending
+//! on how few pieces its curvature collapses into. Subtracting the 1.03 ms
+//! roster baseline puts a piece at ~0.17 ms against a segment's ~0.105.
+//!
+//! That also sets the *other* ceiling: at [`MAX_ARC_PIECES`] the chain is
+//! 1.03 + 32 x 0.17 = 6.4 ms, or 38 % of the floor budget — under what the
+//! polyline ceiling spends, which is what keeps one bound from quietly
+//! overrunning the other.
 
 // The determinism gate bans wall-clock reads because analysis must be a pure
 // function of its input (clippy.toml, NFR §6). This file is the deliberate
@@ -75,7 +98,7 @@ use std::time::Instant;
 
 use rlx_core::dsp::AnalysisFrame;
 use rlx_core::preset::Preset;
-use rlx_core::preset::path::MAX_SAMPLES;
+use rlx_core::preset::path::{MAX_ARC_PIECES, MAX_SAMPLES};
 use rlx_core::render::{CaptureImage, Renderer, Tier};
 
 /// **`docs/nfr.md` §1's own floor resolution**, not a convenient smaller one.
@@ -269,4 +292,162 @@ fn the_contour_arity_is_priced_against_the_floor_tier() {
         MAX_SAMPLES,
         ARITIES[0]
     );
+}
+
+/// The figures the arc comparison below prices, and why each is here.
+const CURVES: [(&str, &str); 3] = [
+    ("leaf (2 cubics) ", LEAF),
+    (
+        "circle (4 cubic)",
+        "M 1,0 C 1,0.5523 0.5523,1 0,1 C -0.5523,1 -1,0.5523 -1,0 \
+         C -1,-0.5523 -0.5523,-1 0,-1 C 0.5523,-1 1,-0.5523 1,0 Z",
+    ),
+    (
+        "blob (4 cubics) ",
+        "M 0,-1 C 0.8,-0.7 1,0.2 0.5,0.8 C 0.2,1 -0.2,1 -0.5,0.8 \
+         C -1,0.2 -0.8,-0.7 0,-1 Z",
+    ),
+];
+
+/// The polyline route, forced: a `morph_to` identical to `d` puts the scene on
+/// its point representation at `morph = 0` — a morph in flight cannot use arcs —
+/// while drawing the same silhouette. So the pair differs in the representation
+/// and in nothing else.
+fn polyline_probe(index: usize, d: &str) -> Preset {
+    let toml = format!(
+        "system = \"shape_field\"\nname = \"arc_cost_lines_{index}\"\n\
+         [path]\nd = \"{d}\"\nmorph_to = \"{d}\"\n[params]\n{LOOK}morph = \"0\"\n"
+    );
+    Preset::from_toml_str(&toml).expect("the polyline probe preset parses")
+}
+
+fn arc_probe(index: usize, d: &str) -> Preset {
+    let toml = format!(
+        "system = \"shape_field\"\nname = \"arc_cost_arcs_{index}\"\n\
+         [path]\nd = \"{d}\"\n[params]\n{LOOK}"
+    );
+    Preset::from_toml_str(&toml).expect("the arc probe preset parses")
+}
+
+/// **What the arc chain costs against the polyline it replaces** — Plan 0092
+/// Phase 4's measurement, and the one number that says whether consuming
+/// ADR-0098's primitive was worth it here.
+///
+/// The fit collapses a smooth outline into a handful of pieces, but an arc piece
+/// costs more per pixel than a line segment: a sector test and, where the scan
+/// line meets the circle, an `atan2` per root. Neither half of that trade can be
+/// read off the other, so both are measured together and the ratio is the
+/// finding.
+///
+/// Reports; the only assertion is that the two routes really are two.
+#[test]
+fn the_arc_chain_is_priced_against_the_polyline_it_replaces() {
+    let Some(mut renderer) = hardware() else {
+        return;
+    };
+
+    let mut presets = Vec::new();
+    let mut names = Vec::new();
+    let mut pieces = Vec::new();
+    for (index, (_, d)) in CURVES.iter().enumerate() {
+        let shape = rlx_core::preset::path::PathShape::parse(d, MAX_SAMPLES)
+            .expect("the probe figure parses");
+        // A figure whose fit was discarded draws through the polyline, so its
+        // "arcs" column would silently be a second polyline reading.
+        assert!(
+            (1..=MAX_ARC_PIECES).contains(&shape.piece_count()),
+            "the fit for this probe figure was not kept ({} pieces against a \
+             cap of {MAX_ARC_PIECES}), so there is no arc route to price",
+            shape.piece_count()
+        );
+        pieces.push(shape.piece_count());
+        for preset in [arc_probe(index, d), polyline_probe(index, d)] {
+            names.push(preset.name.clone());
+            presets.push(preset);
+        }
+    }
+    renderer.set_presets(presets);
+
+    let frame = AnalysisFrame {
+        bass: 0.6,
+        mid: 0.5,
+        treb: 0.6,
+        onset: 0.4,
+        ..Default::default()
+    };
+    let run = |renderer: &mut Renderer, name: &str, frames: u32| -> (f64, CaptureImage) {
+        let start = Instant::now();
+        let image = renderer
+            .capture_preset(name, &frame, frames)
+            .expect("capture the cost probe");
+        (start.elapsed().as_secs_f64() * 1000.0, image)
+    };
+    let images: Vec<CaptureImage> = names
+        .iter()
+        .map(|name| run(&mut renderer, name, FRAMES_SHORT).1)
+        .collect();
+
+    let mut best_short = vec![f64::INFINITY; names.len()];
+    let mut best_long = vec![f64::INFINITY; names.len()];
+    for _ in 0..REPEATS {
+        for (index, name) in names.iter().enumerate() {
+            let (short, _) = run(&mut renderer, name, FRAMES_SHORT);
+            let (long, _) = run(&mut renderer, name, FRAMES_LONG);
+            best_short[index] = best_short[index].min(short);
+            best_long[index] = best_long[index].min(long);
+        }
+    }
+    let best: Vec<f64> = best_long
+        .iter()
+        .zip(best_short.iter())
+        .map(|(long, short)| (long - short) / f64::from(FRAMES_LONG - FRAMES_SHORT))
+        .collect();
+
+    let mut report = format!(
+        "arc chain against the {MAX_SAMPLES}-point polyline it replaces, at {WIDTH}x{HEIGHT}, \
+         floor tier, best of {REPEATS}, interleaved, on {} (ADR-0071 report):\n  \
+         {:<18} {:>7} {:>12} {:>12} {:>10}",
+        renderer.adapter_description(),
+        "figure",
+        "pieces",
+        "arcs",
+        "polyline",
+        "vs lines"
+    );
+    for (index, (label, _)) in CURVES.iter().enumerate() {
+        let (arcs, lines) = (best[index * 2], best[index * 2 + 1]);
+        report.push_str(&format!(
+            "\n  {label:<18} {:>7} {arcs:>9.3} ms {lines:>9.3} ms {:>+9.1} %",
+            pieces[index],
+            (arcs / lines - 1.0) * 100.0
+        ));
+    }
+    eprintln!("{report}");
+
+    for (index, name) in names.iter().enumerate() {
+        assert!(
+            best[index].is_finite() && best[index] > 0.0,
+            "the {name} reading is not a time: {}",
+            best[index]
+        );
+    }
+
+    // The only assertion: each pair really rendered two representations. They
+    // draw the same figure, so they agree almost everywhere — what convicts the
+    // harness is agreeing EXACTLY, which means one route was never taken.
+    for (index, (label, _)) in CURVES.iter().enumerate() {
+        let differing = images[index * 2]
+            .rgba
+            .chunks_exact(4)
+            .zip(images[index * 2 + 1].rgba.chunks_exact(4))
+            .filter(|(a, b)| a[..3] != b[..3])
+            .count();
+        eprintln!("  {} differs in {differing} px", label.trim());
+        assert!(
+            differing > 0,
+            "{}: the arc and polyline probes rendered byte-identically, so this \
+             timed one representation twice",
+            label.trim()
+        );
+    }
 }

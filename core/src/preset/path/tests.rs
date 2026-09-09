@@ -477,3 +477,78 @@ fn a_morph_pair_meets_at_one_arity() {
     let to = PathShape::parse(LEAF_CW, 32).expect("parses");
     assert!(to.aligned_to(&from).is_none());
 }
+
+// ----------------------------------------------------------------- the arcs
+
+/// **What a curve costs in pieces once it is fitted to arcs, against what it
+/// costs in segments** (ADR-0098's primitive, consumed here).
+///
+/// A report with one assertion. The question the fit exists to answer is how far
+/// the piece count drops for a given fidelity, and the answer is a property of
+/// each figure rather than a number to gate on — a polygon is all corners and
+/// the fit correctly gives it back unchanged, while a smooth outline collapses
+/// to a handful.
+///
+/// The budget is quoted in the contour's own units, where the figure spans
+/// `[-1, 1]`: one pixel at 1080p is `1/540` of the renderer's world y, and a
+/// figure drawn at `scale = 2` — twice the frame, past anything an author would
+/// use — puts that at `1/1080` here. Fitting to a budget that tight is the
+/// conservative direction: a figure drawn smaller needs fewer pieces still.
+#[test]
+fn the_arc_fit_reports_what_a_curve_costs_in_pieces() {
+    /// One pixel at 1080p, in contour units, for a figure drawn at `scale = 2`.
+    const BUDGET: f32 = 1.0 / 1080.0;
+    let cases: [(&str, &str); 5] = [
+        ("leaf (2 cubics)   ", LEAF_CW),
+        ("square (4 corners)", SQUARE_CCW),
+        (
+            "circle (4 cubics) ",
+            "M 1,0 C 1,0.5523 0.5523,1 0,1 C -0.5523,1 -1,0.5523 -1,0 \
+             C -1,-0.5523 -0.5523,-1 0,-1 C 0.5523,-1 1,-0.5523 1,0 Z",
+        ),
+        (
+            "teardrop          ",
+            "M 0,-1 C 0.7,-0.3 0.6,0.6 0,1 C -0.6,0.6 -0.7,-0.3 0,-1 Z",
+        ),
+        (
+            "blob (4 cubics)   ",
+            "M 0,-1 C 0.8,-0.7 1,0.2 0.5,0.8 C 0.2,1 -0.2,1 -0.5,0.8 \
+             C -1,0.2 -0.8,-0.7 0,-1 Z",
+        ),
+    ];
+
+    // The same figures at four budgets, because the answer depends on how large
+    // the figure is drawn and a single column would read as a fact about the fit
+    // rather than about the fidelity asked of it. Each budget is one pixel at
+    // 1080p divided by the `scale` the figure is drawn at.
+    const SCALES: [f32; 4] = [2.0, 1.0, 0.6, 0.3];
+    let _ = BUDGET;
+
+    let mut report = String::from(
+        "arc pieces against the 64 segments they replace, by the `scale` the figure is drawn at\n  \
+         figure                 scale=2   scale=1 scale=0.6 scale=0.3",
+    );
+    let mut leaf_pieces = usize::MAX;
+    for (label, d) in cases {
+        let contour = PathShape::parse(d, MAX_SAMPLES).expect("parses");
+        report.push_str(&format!("\n  {label}"));
+        for scale in SCALES {
+            let pieces = contour.refit(1.0 / (540.0 * scale)).len();
+            report.push_str(&format!("{pieces:>10}"));
+            if label.starts_with("leaf") && scale == 0.6 {
+                leaf_pieces = pieces;
+            }
+        }
+    }
+    println!("{report}");
+
+    // The one assertion: a smooth curve really does collapse at the scale a
+    // figure is actually drawn at. Without it this file would report a table
+    // that could be all sixty-fours and say nothing.
+    assert!(
+        leaf_pieces * 4 <= MAX_SAMPLES,
+        "the leaf's two cubics fitted to {leaf_pieces} pieces at the default \
+         drawing scale, not under a quarter of the {MAX_SAMPLES} segments they \
+         were sampled at, so the fit is buying nothing here"
+    );
+}

@@ -1588,6 +1588,74 @@ fn the_morph_strip_is_rendered_and_its_extent_recorded() {
     );
 }
 
+/// **The arc chain draws the same figure the polyline did** (ADR-0098's
+/// primitive, consumed by ADR-0107's figure).
+///
+/// The pair is forced with `morph_to = d`: a target identical to the source puts
+/// the scene on its **polyline** route at `morph = 0` — a morph in flight cannot
+/// use arcs — while drawing the same silhouette. So the two captures differ in
+/// the representation and in nothing else, which is the only way to see the fit's
+/// own error rather than a look change.
+///
+/// A rendered agreement rather than a byte comparison: the chain approximates
+/// the outline to the fit's lateral budget, so a small disagreement is the
+/// feature working. What would not be small is a chain that closed in the wrong
+/// place or whose inside test disagreed — that moves whole regions, not edges.
+#[test]
+fn the_arc_chain_draws_the_same_figure_as_the_polyline() {
+    const SIZE: u32 = 240;
+    // The fit has to have been kept, or this test compares the polyline with
+    // itself and passes on anything.
+    let fitted = crate::preset::path::PathShape::parse(LEAF, 64).expect("the leaf parses");
+    println!(
+        "leaf: {} arc pieces against {} polyline points",
+        fitted.pieces().len(),
+        fitted.points().len()
+    );
+    assert!(
+        !fitted.pieces().is_empty(),
+        "the leaf's fit was discarded, so this test would compare the polyline \
+         route with itself"
+    );
+
+    let Some(mut renderer) = headless(SIZE, SIZE) else {
+        return;
+    };
+    renderer.set_presets(vec![
+        path_preset("arcs", LEAF, ""),
+        morph_preset("lines", LEAF, LEAF, 0.0),
+    ]);
+    let arcs = renderer
+        .capture_preset("arcs", &AnalysisFrame::default(), 2)
+        .expect("capture the arc chain");
+    let lines = renderer
+        .capture_preset("lines", &AnalysisFrame::default(), 2)
+        .expect("capture the polyline");
+
+    let total = (SIZE * SIZE) as usize;
+    let differing = arcs
+        .rgba
+        .chunks_exact(4)
+        .zip(lines.rgba.chunks_exact(4))
+        .filter(|(a, b)| a[..3] != b[..3])
+        .count();
+    println!(
+        "arc chain vs polyline: {differing} of {total} px differ ({:.2} %)",
+        differing as f32 / total as f32 * 100.0
+    );
+    assert!(
+        differing * 50 < total,
+        "the arc chain and the polyline disagree on {differing} of {total} \
+         pixels — more than the fit's lateral budget can account for, which is \
+         the shape of a chain that closes wrong or an inside test that does"
+    );
+    assert!(
+        differing > 0,
+        "the two routes rendered byte-identically, so one of them is not being \
+         taken and this test is comparing something with itself"
+    );
+}
+
 /// `morph` is an ordinary bindable param under the existing grammar, and
 /// `[smoothing]` reaches it like any other — there is no second vocabulary for
 /// travelling between two silhouettes.
@@ -1632,8 +1700,8 @@ fn morph_is_an_ordinary_binding_that_smoothing_reaches() {
 ///
 /// **Measured on the development box (Windows 10, DX12), 160x160 over 2 frames,
 /// before the baseline was blessed: hardware mean rgb
-/// `102.535 150.984 102.304`, WARP `102.573 150.998 102.286`, `frame_diff`
-/// `0.000231`.** Agreement to well under one 8-bit level.
+/// `102.584 151.021 102.340`, WARP `102.621 151.036 102.322`, `frame_diff`
+/// `0.000232`.** Agreement to well under one 8-bit level.
 #[test]
 #[ignore = "needs both a hardware and a software adapter; run locally before blessing"]
 fn the_adapters_agree_on_the_authored_contour() {

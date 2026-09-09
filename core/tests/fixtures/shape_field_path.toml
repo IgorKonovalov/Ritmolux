@@ -14,10 +14,13 @@
 #
 #  - the two `C` commands are what make this baseline non-vacuous on the parser
 #    as well as on the scene: a straight-line-only path would pass through
-#    `flatten` without ever evaluating a cubic.
-#  - `samples` is absent, so the contour resamples at the default arity, which
-#    is also the ceiling `core/tests/path_cost.rs` measured. A baseline pinned
-#    at some other arity would be pinning a number this fixture does not own.
+#    `flatten` without ever evaluating a cubic. They are also what puts this
+#    baseline on the ARC CHAIN rather than the polyline - the fit collapses the
+#    leaf to 16 pieces and the scene draws those, so this is the only baseline
+#    in the suite that executes `arc_chain_sd`.
+#  - `samples` is absent, so the polyline behind the fit is the default arity.
+#    It is not what gets drawn here; it is what the fit was checked against and
+#    what a `morph_to` would put this figure back onto.
 #  - `palette_steps = "7"` bands the coordinate, so the frame carries the offset
 #    family rather than one smooth ramp - the same reason `shape_field.toml`
 #    turns it up, and what makes a wrong inradius visible as bands landing in the
@@ -25,8 +28,8 @@
 #  - `palette_contour = "0.6"` draws the thin outlines at those boundaries.
 #
 # Adapter-compared before blessing (the ADR-0058 standing rule) at 160x160 over
-# 2 frames: hardware mean rgb 102.535 150.984 102.304 against WARP 102.573
-# 150.998 102.286, frame_diff 0.000231. Inside the noise floor, so this baseline
+# 2 frames: hardware mean rgb 102.584 151.021 102.340 against WARP 102.621
+# 151.036 102.322, frame_diff 0.000232. Inside the noise floor, so this baseline
 # pins a picture hardware also draws. The scene's bind-group layout is unchanged
 # by the path work - the contour rides the existing uniform rather than adding a
 # storage entry, which would have made this layout's shape byte-identical to the

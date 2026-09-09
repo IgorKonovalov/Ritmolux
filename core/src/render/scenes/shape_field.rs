@@ -100,14 +100,20 @@ use super::Scene;
 use super::common;
 use super::marks;
 use crate::dsp::AnalysisFrame;
-use crate::preset::path::MAX_SAMPLES;
+use crate::preset::path::{MAX_ARC_PIECES, MAX_SAMPLES};
 use crate::render::palette::{self, Palette};
 use crate::render::scenes::{ParamSpec, default_of};
 
-/// How many `vec4` the contour is packed into: two points per `vec4`, so the
-/// array is half [`MAX_SAMPLES`].
+/// How many `vec4` one arc piece occupies: its circle, its sector test, its two
+/// endpoints, and its signed sweep. See the WGSL's `arc_chain_sd` for what each
+/// field is for.
+const VEC4S_PER_PIECE: usize = 4;
+
+/// How many `vec4` the uniform's geometry array holds — enough for
+/// [`MAX_ARC_PIECES`] arc pieces, which is more than the polyline's two points
+/// per element ever needs.
 ///
-/// The contour rides the **uniform** buffer rather than a storage one, and that
+/// The geometry rides the **uniform** buffer rather than a storage one, and that
 /// is an ADR-0058 choice rather than a performance one: a fragment-visible
 /// read-only storage entry after this layout's uniform would make its shape
 /// byte-identical to `shape-collage-bind-layout`, which is live in the same
@@ -115,15 +121,15 @@ use crate::render::scenes::{ParamSpec, default_of};
 /// WARP adapter the whole golden suite captures on, so the collision would be
 /// blessed rather than caught. Packing into the uniform leaves the layout's
 /// four entries exactly as they were.
-const PATH_VEC4S: usize = MAX_SAMPLES / 2;
+const PATH_VEC4S: usize = VEC4S_PER_PIECE * MAX_ARC_PIECES;
 
 /// The WGSL below spells the array length as a literal — `format!` cannot reach
 /// into a raw string full of braces — so the two are held together here. Raise
-/// [`MAX_SAMPLES`] and this fails the build rather than letting the shader read
+/// either bound and this fails the build rather than letting the shader read
 /// past what the uniform carries.
 const _: () = assert!(
-    PATH_VEC4S == 32,
-    "the WGSL `path` array must be PATH_VEC4S long"
+    PATH_VEC4S == 128 && PATH_VEC4S >= MAX_SAMPLES / 2,
+    "the WGSL `path` array must be PATH_VEC4S long, and hold either geometry"
 );
 
 /// `scale` default — the figure's outline sits at 0.6 of the frame's short
@@ -249,13 +255,24 @@ struct Params {
     // x: path point count (0 = no authored contour, and every line of the path
     // arms below is unreached), y: the contour's inradius — the divisor that
     // makes the distance 0 at its deepest interior point, measured CPU-side,
-    // z: stroke half-width in coordinate units (exactly 0.0 = filled), w: unused.
+    // z: stroke half-width in coordinate units (exactly 0.0 = filled),
+    // w: arc piece count — nonzero means `path` holds an ARC CHAIN rather than
+    // a polyline, and `x` is then unread.
     f: vec4<f32>,
-    // The authored contour (ADR-0107), TWO POINTS PER ELEMENT: point `i` is
+    // The authored contour (ADR-0107), in one of two packings.
+    //
+    // **As a polyline** (`f.w == 0`): TWO POINTS PER ELEMENT, point `i` at
     // `path[i >> 1].xy` for even `i` and `.zw` for odd. Packed because a uniform
     // array's elements are 16-byte aligned, so an `array<vec2<f32>, N>` would
     // spend half the buffer on padding.
-    path: array<vec4<f32>, 32>,
+    //
+    // **As an arc chain** (`f.w > 0`): FOUR ELEMENTS PER PIECE, piece `i` at
+    // `path[i * 4 ..]`:
+    //   +0  (kind, cx, cy, radius)    kind 0 = straight run, 1 = arc
+    //   +1  (mx, my, cos_half, 0)     the sector's mid direction and half-angle
+    //   +2  (ax, ay, bx, by)          the piece's two endpoints
+    //   +3  (start, sweep, 0, 0)      the signed sweep, for the crossing test
+    path: array<vec4<f32>, 128>,
 }
 
 // **One bind group, sampler first and uniform last — and that arrangement is
@@ -400,6 +417,92 @@ fn path_sd(p: vec2<f32>, n: u32) -> f32 {
     return s * sqrt(best);
 }
 
+// **The authored contour's signed distance, as a chain of circular arcs**
+// (ADR-0098's primitive, ADR-0107's figure).
+//
+// The same two quantities as `path_sd` — a `min` over pieces for the magnitude,
+// a ray-crossing parity for the sign — over a chain that a curve needs FIVE TO
+// TEN TIMES fewer of than the polyline it was fitted from. A piece costs more
+// than a segment; whether that trade is a win is `path_cost.rs`'s reading, not
+// an assertion here.
+//
+// **No `atan2` on the distance path.** Whether the nearest point on the circle
+// lies within the piece's sweep is a sector test, and a sector test is a dot
+// product against the sweep's mid direction — both precomputed CPU-side. The
+// crossing test below does need the angle, but only for a piece the scan line
+// actually meets, which is a small minority of them.
+fn arc_chain_sd(p: vec2<f32>, n: u32) -> f32 {
+    let TAU = 6.28318530718;
+    var best = 1e20;
+    var crossings = 0u;
+    for (var i = 0u; i < n; i = i + 1u) {
+        let base = i * 4u;
+        let head = params.path[base];
+        let ends = params.path[base + 2u];
+        let a = ends.xy;
+        let b = ends.zw;
+
+        if (head.x < 0.5) {
+            // A straight run — the fitter emits these for a corner it must keep
+            // and for an arc whose radius is too large to shade stably, so this
+            // arm carries a real share of a polygonal figure.
+            let e = b - a;
+            let w = p - a;
+            let t = clamp(dot(w, e) / max(dot(e, e), 1e-20), 0.0, 1.0);
+            let q = w - e * t;
+            best = min(best, dot(q, q));
+            // The half-open rule on y, exactly as the polyline uses it: a joint
+            // lying on the scan line belongs to one piece, not to both.
+            let c1 = p.y >= a.y;
+            let c2 = p.y < b.y;
+            let c3 = e.x * w.y > e.y * w.x;
+            if ((c1 && c2 && c3) || (!c1 && !c2 && !c3)) {
+                crossings = crossings + 1u;
+            }
+            continue;
+        }
+
+        let c = head.yz;
+        let r = head.w;
+        let sector = params.path[base + 1u];
+        let sweep = params.path[base + 3u];
+        let w = p - c;
+        let l = length(w);
+        // Inside the sweep, the nearest point on the circle is the nearest point
+        // on the arc; outside it, the nearest point is whichever end is closer.
+        if (l > 1e-9 && dot(w / l, sector.xy) >= sector.z) {
+            let d = abs(l - r);
+            best = min(best, d * d);
+        } else {
+            best = min(best, min(dot(p - a, p - a), dot(p - b, p - b)));
+        }
+
+        // The crossing test: where the scan line `y = p.y` meets this circle, to
+        // the RIGHT of `p`, and inside the sweep.
+        let dy = p.y - c.y;
+        let disc = r * r - dy * dy;
+        if (disc > 0.0) {
+            let sx = sqrt(disc);
+            for (var k = 0u; k < 2u; k = k + 1u) {
+                let xr = c.x + select(-sx, sx, k == 1u);
+                if (xr <= p.x) {
+                    continue;
+                }
+                // Half-open on the sweep — `u < span`, not `<=` — so a joint on
+                // the scan line is counted by the piece that starts there and
+                // not also by the one that ends there.
+                let ang = atan2(dy, xr - c.x);
+                var u = (ang - sweep.x) * sign(sweep.y);
+                u = u - TAU * floor(u / TAU);
+                if (u < abs(sweep.y)) {
+                    crossings = crossings + 1u;
+                }
+            }
+        }
+    }
+    return select(1.0, -1.0, (crossings & 1u) == 1u) * sqrt(best);
+}
+
 // The contour's radius along the ray from the figure's centre through `p` — the
 // divisor of `coord_mode = 1`'s scaled-copy coordinate (ADR-0111), on an
 // authored contour instead of a rostered arm.
@@ -454,6 +557,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let path_n = u32(params.f.x);
     let path_inradius = params.f.y;
     let stroke = params.f.z;
+    let path_arcs = u32(params.f.w);
 
     // Square units, from the RENDER TARGET's aspect (ADR-0037): stretching x
     // makes one unit of `uv` the same length on both axes, so the figure below
@@ -505,7 +609,13 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // declares no `[path]`, so those take the roster arms below and not one
     // instruction of the contour walk executes.
     var d: f32;
-    if (path_n >= 3u) {
+    if (path_arcs >= 1u) {
+        // The arc chain, chosen CPU-side and only where it can serve: the
+        // distance coordinate, and no morph in flight. `path_inradius` is the
+        // POLYLINE's, which describes the same figure to within the fit's own
+        // lateral budget — a sub-pixel difference in a divisor.
+        d = max(1.0 + arc_chain_sd(p, path_arcs) / max(path_inradius, 1e-6), 0.0);
+    } else if (path_n >= 3u) {
         if (coord_mode < 0.5) {
             // `1 + sd / inradius` — the SAME normalization `mark_distance`
             // applies to the roster, so an authored figure reads 0 at its
@@ -647,6 +757,11 @@ pub struct ShapeFieldScene {
     /// inert and the packed contour is `path_from` verbatim.
     path_from: Vec<[f32; 2]>,
     path_to: Vec<[f32; 2]>,
+    /// The same authored outline as a **G1-continuous chain of circular arcs**,
+    /// fitted at load through the line renderer's own fitter (ADR-0098). Empty
+    /// where the fit was not worth keeping, and unread while a morph is in
+    /// flight or under the scaled-copy coordinate — see [`Self::pack_path`].
+    pieces: Vec<crate::render::scenes::lines::biarc::Piece>,
     /// The contour packed for the uniform — the interpolation of the two above
     /// at this frame's `morph`, rebuilt in `render`.
     ///
@@ -766,6 +881,7 @@ impl ShapeFieldScene {
             morph: DEFAULT_MORPH,
             path_from: Vec::new(),
             path_to: Vec::new(),
+            pieces: Vec::new(),
             path: Box::new([[0.0; 4]; PATH_VEC4S]),
             path_inradius: 1.0,
             path_inradius_to: 1.0,
@@ -1065,12 +1181,31 @@ impl ShapeFieldScene {
     /// At `morph = 0`, or with no target, the authored contour is copied
     /// verbatim and no interpolation runs — the identity every other param on
     /// this scene keeps.
-    fn pack_path(&mut self) -> (usize, f32) {
+    fn pack_path(&mut self, coord_mode: f32) -> (usize, usize, f32) {
         let n = self.path_from.len().min(MAX_SAMPLES);
         if n < 3 {
-            return (0, 1.0);
+            return (0, 0, 1.0);
         }
-        let t = if self.path_to.len() == self.path_from.len() {
+        let morphing = self.path_to.len() == self.path_from.len();
+
+        // **The arc chain serves where it can, and the polyline everywhere
+        // else.** Two things put a figure back on points, and both are the
+        // chain's own limits rather than a preference:
+        //
+        // - **a morph in flight.** Phase-correspondent points interpolate; two
+        //   arc chains have no such correspondence, and inventing one is the
+        //   representation problem ADR-0075 exists about. So a morphing pair
+        //   travels on the polyline it was aligned as.
+        // - **the scaled-copy coordinate.** `coord_mode = 1` needs the boundary
+        //   radius along a ray, which is a second intersection routine the chain
+        //   does not carry.
+        if !morphing && coord_mode < 0.5 && !self.pieces.is_empty() {
+            let pieces = self.pieces.len().min(MAX_ARC_PIECES);
+            self.pack_pieces(pieces);
+            return (0, pieces, self.path_inradius);
+        }
+
+        let t = if morphing {
             applied_morph(self.morph)
         } else {
             0.0
@@ -1095,7 +1230,50 @@ impl ShapeFieldScene {
             }
         }
         let inradius = self.path_inradius + (self.path_inradius_to - self.path_inradius) * t;
-        (n, inradius.max(1e-4))
+        (n, 0, inradius.max(1e-4))
+    }
+
+    /// Pack the fitted arc chain into the uniform: four elements per piece, in
+    /// the layout the WGSL's `Params.path` comment spells out.
+    ///
+    /// The sector test's mid direction and half-angle are computed **here**, so
+    /// the fragment's own test is a dot product rather than an `atan2` per piece
+    /// per pixel. Same for the endpoints, which the outside-the-sweep arm needs.
+    fn pack_pieces(&mut self, count: usize) {
+        use crate::render::scenes::lines::biarc::Piece;
+        for i in 0..count {
+            let Some(&piece) = self.pieces.get(i) else {
+                continue;
+            };
+            let base = i * VEC4S_PER_PIECE;
+            let (a, b) = (piece.start_point(), piece.end_point());
+            let (head, sector, sweep) = match piece {
+                Piece::Arc {
+                    centre,
+                    radius,
+                    start,
+                    sweep,
+                } => {
+                    let mid = start + sweep * 0.5;
+                    (
+                        [1.0, centre[0], centre[1], radius],
+                        [mid.cos(), mid.sin(), (sweep.abs() * 0.5).cos(), 0.0],
+                        [start, sweep, 0.0, 0.0],
+                    )
+                }
+                Piece::Line { .. } => ([0.0; 4], [0.0; 4], [0.0; 4]),
+            };
+            for (offset, value) in [
+                (0, head),
+                (1, sector),
+                (2, [a[0], a[1], b[0], b[1]]),
+                (3, sweep),
+            ] {
+                if let Some(slot) = self.path.get_mut(base + offset) {
+                    *slot = value;
+                }
+            }
+        }
     }
 }
 
@@ -1145,6 +1323,7 @@ impl Scene for ShapeFieldScene {
         if let super::lines::GeneratorConfig::Path { shape, morph_to } = cfg {
             self.path_from.clear();
             self.path_to.clear();
+            self.pieces.clear();
             self.path_inradius = 1.0;
             self.path_inradius_to = 1.0;
             if let Some(contour) = shape {
@@ -1154,6 +1333,7 @@ impl Scene for ShapeFieldScene {
                 self.path_from
                     .extend(contour.points().iter().take(MAX_SAMPLES).copied());
                 self.path_inradius = contour_inradius(&self.path_from);
+                self.pieces.extend_from_slice(contour.pieces());
             }
             // The pair is aligned at load; a target of a different arity would
             // mean the loader let one through, so it is dropped rather than
@@ -1210,7 +1390,8 @@ impl Scene for ShapeFieldScene {
         // not about the raw binding.
         let shape = marks::mark_shape(self.shape);
         self.gpu.flush_palette(queue);
-        let (path_count, path_inradius) = self.pack_path();
+        let coord_mode = applied_coord_mode(self.coord_mode, shape);
+        let (path_count, path_arcs, path_inradius) = self.pack_path(coord_mode);
 
         let params = Params {
             // `aspect` is the argument the chain hands down for the target this
@@ -1231,7 +1412,7 @@ impl Scene for ShapeFieldScene {
             d: [
                 self.occlude,
                 applied_gamma(self.gamma),
-                applied_coord_mode(self.coord_mode, shape),
+                coord_mode,
                 applied_rotation(self.rotation),
             ],
             e: [
@@ -1244,7 +1425,7 @@ impl Scene for ShapeFieldScene {
                 path_count as f32,
                 path_inradius,
                 applied_stroke(self.stroke),
-                0.0,
+                path_arcs as f32,
             ],
             path: *self.path,
         };

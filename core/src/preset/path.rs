@@ -62,6 +62,24 @@ pub const MIN_SAMPLES: usize = 3;
 /// the two independent answers landed.
 pub const MAX_SAMPLES: usize = 64;
 
+/// The most arc pieces a fitted contour may carry before the fit is discarded
+/// and the figure stays a polyline.
+///
+/// A bound on the uniform the chain rides in, and a bound on the point of doing
+/// it at all: an arc piece costs more per pixel than a line segment, so a fit
+/// that did not collapse the count is not worth evaluating. The measured counts
+/// at the tightest budget below sit at 25 and under.
+pub const MAX_ARC_PIECES: usize = 32;
+
+/// The lateral error the arc fit is held to, in the contour's own normalized
+/// units — one pixel at 1080p for a figure drawn at `scale = 2`.
+///
+/// The fit happens at parse time, where the `scale` the preset will bind is not
+/// known and can move per frame, so the budget is fixed at the **tightest**
+/// figure size an author would reach for. A figure drawn smaller than that is
+/// fitted more finely than it needs, which costs pieces and never fidelity.
+const ARC_FIT_BUDGET: f32 = 1.0 / 1080.0;
+
 /// The arity a `[path]` resamples to when it names none.
 ///
 /// The arity at which a *smooth* contour stops reading as faceted: the chord
@@ -172,6 +190,14 @@ impl std::error::Error for PathError {}
 #[derive(Debug, Clone, PartialEq)]
 pub struct PathShape {
     points: Vec<[f32; 2]>,
+    /// The same outline as a **G1-continuous chain of circular arcs**, fitted
+    /// through the line renderer's own fitter (ADR-0098) — or empty where the
+    /// fit was not worth keeping.
+    ///
+    /// Fitted from the **dense flattened** contour rather than from `points`, so
+    /// the chain is not limited by the resample's arity: `samples` governs the
+    /// polyline's fidelity and the fit's own budget governs the chain's.
+    pieces: Vec<crate::render::scenes::lines::biarc::Piece>,
     source_center: [f32; 2],
     source_scale: f32,
 }
@@ -281,9 +307,39 @@ impl PathShape {
         }
         Some(Self {
             points,
+            pieces: Vec::new(),
             source_center: self.source_center,
             source_scale: self.source_scale,
         })
+    }
+
+    /// The fitted arc chain, or empty where the figure stays a polyline.
+    pub(crate) fn pieces(&self) -> &[crate::render::scenes::lines::biarc::Piece] {
+        &self.pieces
+    }
+
+    /// How many arc pieces the fit kept — `0` where the figure stays a polyline.
+    ///
+    /// The count rather than the chain, so a caller outside the crate can report
+    /// what a curve cost without [`biarc::Piece`](crate::render::scenes::lines::biarc)
+    /// being public API.
+    pub fn piece_count(&self) -> usize {
+        self.pieces.len()
+    }
+
+    /// Re-fit this contour's **points** to arcs at an arbitrary budget, for
+    /// measuring what a curve costs in pieces at a given fidelity.
+    ///
+    /// Not the chain the scene draws — that one is fitted from the dense
+    /// contour, at [`ARC_FIT_BUDGET`], and is [`pieces`](Self::pieces). This
+    /// exists so the relationship between fidelity and piece count can be
+    /// reported as a table rather than argued.
+    #[cfg(test)]
+    pub(crate) fn refit(&self, lateral: f32) -> Vec<crate::render::scenes::lines::biarc::Piece> {
+        let mut out = Vec::new();
+        let mut at = Vec::new();
+        crate::render::scenes::lines::biarc::fit(&self.points, true, lateral, &mut out, &mut at);
+        out
     }
 
     /// This contour resampled to `samples` points, evenly spaced by arc length
@@ -292,6 +348,7 @@ impl PathShape {
     pub fn resampled(&self, samples: usize) -> Option<Self> {
         Some(Self {
             points: resample(&self.points, samples)?,
+            pieces: Vec::new(),
             source_center: self.source_center,
             source_scale: self.source_scale,
         })
@@ -330,8 +387,33 @@ impl PathShape {
             offset: 0,
             kind: PathErrorKind::Degenerate,
         })?;
+
+        // **The fit reads the dense contour, not the resample.** A chain fitted
+        // from `points` could be no more faithful than the polyline it came
+        // from; fitted from the flatten it is limited only by its own budget, so
+        // an arc figure's fidelity stops depending on `samples` at all.
+        //
+        // The chain is kept only where it is worth evaluating: it has to fit the
+        // uniform, and it has to have collapsed the count — an arc piece costs
+        // more per pixel than a line segment, so a chain the same length as the
+        // polyline is strictly worse. A figure that is all corners (a polygon)
+        // comes back from the fitter as the lines it went in as, and lands here.
+        let mut pieces = Vec::new();
+        let mut at = Vec::new();
+        crate::render::scenes::lines::biarc::fit(
+            &dense,
+            true,
+            ARC_FIT_BUDGET,
+            &mut pieces,
+            &mut at,
+        );
+        if pieces.len() > MAX_ARC_PIECES || pieces.len() * 2 > points.len() {
+            pieces.clear();
+        }
+
         Ok(Self {
             points,
+            pieces,
             source_center: center,
             source_scale: scale,
         })
