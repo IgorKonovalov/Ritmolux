@@ -156,7 +156,7 @@ pub(crate) const FLAGS: &[FlagSpec] = &[
         name: "--stream",
         takes_value: false,
         requires: None,
-        help: "run headless and publish every frame as a Spout sender",
+        help: "run headless and publish every frame to a sink (see --sink)",
     },
     FlagSpec {
         name: "--size",
@@ -175,6 +175,12 @@ pub(crate) const FLAGS: &[FlagSpec] = &[
         takes_value: true,
         requires: None,
         help: "<name|index> which graphics adapter to render on",
+    },
+    FlagSpec {
+        name: "--sink",
+        takes_value: true,
+        requires: Some("--stream"),
+        help: "<spout|stdout> where the published frames go (default spout)",
     },
     FlagSpec {
         name: "--sender",

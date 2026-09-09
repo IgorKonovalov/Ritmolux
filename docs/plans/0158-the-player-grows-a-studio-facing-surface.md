@@ -293,9 +293,9 @@ to a layout.
 |---|---|---|---|
 | 1 — A parameter moves in place | dev | done | `ab0ec26` |
 | 2 — The player listens | dev | done | `b2d77ec` |
-| 3 — The player reports | dev | done | committed with this row |
+| 3 — The player reports | dev | done | `fee2cfd` |
 | 4 — The engine states what a preset can contain | dev | done | `d7bdee8` |
-| 5 — The headless tap writes to a pipe | dev | not started | |
+| 5 — The headless tap writes to a pipe | dev | done | committed with this row |
 | 6 — The windowed show gets a preview copy | dev | not started | |
 | 7 — The on-device check | human | not started | |
 
@@ -410,6 +410,34 @@ to a layout.
   (actions the bounded queue had no room for) beside `ctl_rejected` (datagrams the decoder
   refused), plus `ctl_refused` (overrides the engine refused). Three different failures with three
   different fixes; one number would have hidden which.
+
+- **Phase 5's Spout arm is not compiled anywhere I can reach, and the restructure moved it.**
+  `--features spout` needs the third-party SDK staged by `packaging/spout/fetch-sdk.ps1`, which is
+  not on this machine, and the only workflow that builds with it is `release.yml` on a `v*` tag —
+  CI's `check` job does not. So `SpoutFrameSink` and the Spout half of `open_sink` are the one part
+  of this plan the compiler has never seen. I kept the body a mechanical move of the code that was
+  there and checked every call against `standalone/src/spout/mod.rs`'s signatures by hand
+  (`SpoutSender::new(&str, u32, u32, Option<u32>) -> Result<Self, SpoutError>`,
+  `send(&[u8], u32, u32)`, `name() -> &str`, `gpu::sender_adapter(Option<&str>, &str, &[String])`),
+  but a hand check is what it is. **This is the highest-risk thing in the plan and it wants a
+  reviewer's eyes.**
+- **The `stream` event needs `--events`, which the plan's done-when does not say.** The frames
+  flow either way; the geometry announcement is part of the structured stream and rides its flag.
+  Documented in `docs/capturing.md` as the reason the studio always passes both.
+- **`health` is not emitted on the headless path.** `render_tapped` does not record frame stats —
+  only the windowed `render()` calls `diag.record_frame()` — so `Renderer::metrics()` would report
+  zeros there. Emitting a `health` of zeros would be worse than emitting none. `hello` and `stream`
+  are emitted on that path, which is what makes the pipe test able to see them.
+- **Phase 5's stdout gate is an allowlist of files, not of call sites.** The done-when asks that
+  nothing but the sink print to standard output; five files do (`--help`, `--list-devices`,
+  `--schema`, and two in the `shot` CLI, a different binary), each on a path that exits before a
+  sink could exist. `STDOUT_WRITERS` names them with that reason, and the test fails both on a new
+  file and on an entry that stopped writing. It also had to learn an identifier boundary:
+  `eprintln!(` contains `println!(`, so the naive search reported every diagnostic in the crate.
+- **Phase 5 added `standalone/tests/stream_pipe.rs`**, which the plan's file list does not name —
+  the done-when is about a process boundary and nothing inside the process can see it. It skips
+  with a notice on a runner with no capture endpoint or no adapter; on this machine both were
+  present and all three tests ran.
 
 ### Close triggers
 

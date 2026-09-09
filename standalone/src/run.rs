@@ -468,7 +468,22 @@ pub fn run() {
                 .as_deref()
                 .map(Config::load)
                 .unwrap_or_default();
-            if let Err(message) = stream::run(&request, &config.input, &config.rotate) {
+            // The headless path greets too, and it greets **here**: a parent that
+            // spawned this to read the pipe needs the version and the schema hash
+            // before the geometry, and the geometry before the first frame. No
+            // control listener is opened on this path, so the port is `null`
+            // rather than a number nothing is bound to.
+            let mut events = parse_events_flag().then(Events::new);
+            if let Some(events) = events.as_mut() {
+                events.emit(&Event::Hello {
+                    version: env!("CARGO_PKG_VERSION"),
+                    schema: &rlx_core::preset::export::hash_hex(),
+                    control: None,
+                });
+            }
+            if let Err(message) =
+                stream::run(&request, &config.input, &config.rotate, events.as_mut())
+            {
                 eprintln!("{message}");
                 std::process::exit(1);
             }

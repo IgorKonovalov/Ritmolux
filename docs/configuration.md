@@ -30,9 +30,10 @@ telemetry.
 | `--control` | `<host:port>` | Listen for studio control messages as OSC over UDP, and turn the listener on |
 | `--soak` | `[path]` | Write a long-run frame-time trace; bare, a default path |
 | `--downbeat-log` | `[path]` | Write the per-beat downbeat decomposition; bare, a default path |
-| `--stream` | — | Run headless and publish every frame as a Spout sender (Windows-only) |
-| `--size` | `WxH` | Published frame size, default `1280x720`. Needs `--stream` |
-| `--fps` | `<n>` | Published frame rate, default `60`. Needs `--stream` |
+| `--stream` | — | Run headless and publish every frame to a sink |
+| `--sink` | `spout` \| `stdout` | Where the published frames go, default `spout`. Needs `--stream` |
+| `--size` | `WxH` | Published frame size; default `1280x720` on `--sink spout`, `640x360` on `--sink stdout`. Needs `--stream` |
+| `--fps` | `<n>` | Published frame rate; default `60` on `--sink spout`, `30` on `--sink stdout`. Needs `--stream` |
 | `--sender` | `<name>` | The published Spout sender name, default `ritmolux`. Needs `--stream` |
 | `--frames` | `<n>` | Stop after this many frames. Needs `--stream` |
 | `--gpu` | `<name\|index>` | Which graphics adapter to render on — the window and `--stream` both |

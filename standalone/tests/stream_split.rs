@@ -75,18 +75,111 @@ fn opening_literal(rest: &str) -> Option<&str> {
 }
 
 /// Every use of `macro` in `source`, as its format literal.
+///
+/// The name is matched on an identifier boundary, which is load-bearing rather
+/// than tidy: `eprintln!(` **contains** `println!(`, so a search without it
+/// would report every diagnostic in the crate as a write to standard output.
 fn format_literals(source: &str, macro_name: &str) -> Vec<String> {
     let needle = format!("{macro_name}!(");
     let mut out = Vec::new();
     let mut at = 0usize;
     while let Some(found) = source.get(at..).and_then(|s| s.find(&needle)) {
-        let start = at + found + needle.len();
-        if let Some(literal) = source.get(start..).and_then(opening_literal) {
+        let opens = at + found;
+        let start = opens + needle.len();
+        let preceded_by_identifier = source
+            .get(..opens)
+            .and_then(|before| before.chars().next_back())
+            .is_some_and(|ch| ch.is_alphanumeric() || ch == '_');
+        if !preceded_by_identifier
+            && let Some(literal) = source.get(start..).and_then(opening_literal)
+        {
             out.push(literal.to_owned());
         }
         at = start;
     }
     out
+}
+
+/// Every file under `standalone/src/` that writes to standard output at all,
+/// paired with why it is allowed to.
+///
+/// **Standard output is the frame pipe's** while a sink is open (ADR-0176), and
+/// the pipe writes bytes rather than lines — so nothing in this list may be
+/// reachable from a running `--stream`. Each entry below either exits the
+/// process before a sink could exist, or belongs to a different binary
+/// entirely. A new file writing to stdout fails the test until somebody has
+/// checked which of those it is.
+const STDOUT_WRITERS: [(&str, &str); 5] = [
+    (
+        "capture_win.rs",
+        "--list-devices prints the roster and exits",
+    ),
+    ("cli.rs", "--help prints the flag roster and exits"),
+    ("run.rs", "--schema prints the document and exits"),
+    (
+        "horizon.rs",
+        "the `shot` CLI, a separate binary that opens no sink",
+    ),
+    (
+        "report.rs",
+        "the `shot` CLI, a separate binary that opens no sink",
+    ),
+];
+
+/// Standard output is written only by the places that exit before a sink could
+/// be open, and by the sink itself.
+#[test]
+fn nothing_writes_prose_to_standard_output_while_a_sink_could_be_open() {
+    let allowed: Vec<&str> = STDOUT_WRITERS.iter().map(|(file, _)| *file).collect();
+    let mut findings = Vec::new();
+    for path in sources() {
+        let Ok(source) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        let writes =
+            format_literals(&source, "println").len() + format_literals(&source, "print").len();
+        if writes == 0 {
+            continue;
+        }
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        if !allowed.contains(&name.as_str()) {
+            findings.push(format!(
+                "  {}: {writes} write(s) to standard output",
+                path.display()
+            ));
+        }
+    }
+    assert!(
+        findings.is_empty(),
+        "{} file(s) write to standard output and are not in STDOUT_WRITERS:
+{}
+         Standard output carries the frame pipe while --stream --sink stdout is          open, so prose on it corrupts the stream. Either move the line to          stderr, or add the file with the reason it can never be reached from a          running stream.",
+        findings.len(),
+        findings.join("
+"),
+    );
+
+    // ...and the allowlist does not outlive what it describes.
+    let mut unused: Vec<&str> = Vec::new();
+    for (file, _) in STDOUT_WRITERS {
+        let found = sources().iter().any(|path| {
+            path.file_name().is_some_and(|n| n == file)
+                && std::fs::read_to_string(path).is_ok_and(|source| {
+                    !format_literals(&source, "println").is_empty()
+                        || !format_literals(&source, "print").is_empty()
+                })
+        });
+        if !found {
+            unused.push(file);
+        }
+    }
+    assert!(
+        unused.is_empty(),
+        "these files are allowlisted for standard output and no longer write to          it: {unused:?}"
+    );
 }
 
 /// Whether `literal` can render a line that begins with `{`.

@@ -34,6 +34,8 @@ analysis is deterministic too, so a render is reproducible and diff-able.
   - [Editing presets live](#editing-presets-live)
   - [Examples](#examples)
 - [The live video-out: `ritmolux --stream`](#the-live-video-out-ritmolux---stream)
+  - [`--sink spout`: another application on the same machine](#--sink-spout-another-application-on-the-same-machine)
+  - [`--sink stdout`: raw frames on a pipe](#--sink-stdout-raw-frames-on-a-pipe)
   - [The TouchDesigner side](#the-touchdesigner-side)
   - [Which GPU, and why it is not a preference](#which-gpu-and-why-it-is-not-a-preference)
   - [Presets, and stopping](#presets-and-stopping)
@@ -1381,27 +1383,67 @@ means *not observed under this stimulus*.
 ## The live video-out: `ritmolux --stream`
 
 Every other instrument on this page writes a **file**. This one writes a **live
-video stream** into another application on the same machine — TouchDesigner,
-Resolume, OBS, anything that receives [Spout](https://spout.zeal.co/) — with no
-window on our side, no codec anywhere, and a latency of a frame or two
+video stream** into another program, with no window on our side, no codec
+anywhere, and a latency of a frame or two
 ([ADR-0125](adrs/0125-the-live-video-out-is-a-spout-sender-fed-by-a-frame-tap.md)).
 
+There are two sinks, and `--sink` picks between them.
+
 ```bash
-# The whole thing. Open a Syphon Spout In TOP in TouchDesigner and set its
+# Spout, the default. Open a Syphon Spout In TOP in TouchDesigner and set its
 # Sender Name to `ritmolux`.
 ritmolux --stream --size 1280x720 --fps 60
+
+# A pipe. Raw RGBA8 frames on stdout, for a parent process that spawned this.
+ritmolux --stream --sink stdout --events | your-program
 ```
 
-**It exists only in a build with the `spout` feature.** The shipped release
-`ritmolux.exe` has it; a plain `cargo build` does not, and `--stream` there fails
-with a named error rather than starting and publishing nowhere. To build it
-yourself you need the SDK staged first — it is third-party, pinned by hash and
-never committed:
+### `--sink spout`: another application on the same machine
+
+TouchDesigner, Resolume, OBS — anything that receives
+[Spout](https://spout.zeal.co/). **It exists only in a build with the `spout`
+feature.** The shipped release `ritmolux.exe` has it; a plain `cargo build` does
+not, and `--sink spout` there fails with a named error rather than starting and
+publishing nowhere. To build it yourself you need the SDK staged first — it is
+third-party, pinned by hash and never committed:
 
 ```bash
 powershell -File packaging/spout/fetch-sdk.ps1
 cargo run -p standalone --bin ritmolux --features spout --release -- --stream
 ```
+
+### `--sink stdout`: raw frames on a pipe
+
+**Every platform, no feature, nothing installed.** The frames go to standard
+output as tight `width x height x 4` bytes of RGBA8, in order, with nothing
+between them — no header, no length prefix, no padding. A reader cuts the stream
+into frames by multiplying the geometry, which it learns from the `stream` event
+on standard error before the first byte arrives:
+
+```
+{"v":1,"ev":"stream","width":640,"height":360,"fps":30,"format":"rgba8"}
+```
+
+That event needs `--events`, which is what turns the structured report on at all
+([Configuration](configuration.md)). Without it the frames still flow and the
+reader has to know the geometry some other way — which is why the studio always
+passes both.
+
+**The default is 640x360 at 30 fps**, not the Spout path's 1280x720 at 60: this
+sink exists to feed a preview canvas, and asking the engine for four times the
+pixels to shrink them into a panel costs the readback and the pipe for a picture
+nobody sees at that size. `--size` and `--fps` override it in either direction.
+
+**The writer blocks; it never drops.** A reader that stops reading fills the
+pipe and stalls this process, and the deadline pacing absorbs that: frame `n`
+stays due at `n * period` from the start of the run, so a stalled second costs
+the frames that fell inside it and the run resumes at the frame index the wall
+clock has reached rather than drifting behind it. That is the right policy for a
+loop with no present deadline; a windowed preview has one and drops instead.
+
+**Standard output carries nothing else** while this sink is open — every
+human-readable line goes to standard error, and a test holds the whole crate to
+that.
 
 ### The TouchDesigner side
 
@@ -1488,10 +1530,12 @@ stream: 36000 frames, 600.00 s wall, 599.99 s scene clock, on NVIDIA GeForce RTX
 
 **Two stages, not three.** `render+readback` is the engine drawing the frame
 *and* pulling it back to the CPU: the readback blocks, so no CPU-visible instant
-separates them and splitting them would need GPU timestamp queries. `spout send`
-is the upload into the sender's own device. The split answers the question that
-matters — whether the sink is what limits the rate — and on the development
-machine it is not, by an order of magnitude.
+separates them and splitting them would need GPU timestamp queries. The second
+stage is the sink's own, and it is **named for the sink** — `spout send` is the
+upload into the sender's device, `pipe write` is the blocking write to standard
+output — so a figure copied out of a log says which one produced it. The split
+answers the question that matters, whether the sink is what limits the rate, and
+on the development machine it is not, by an order of magnitude.
 
 **Measured, on one machine, once** (RTX 3080 Laptop, 1280x720 at 60 fps, one
 preset held, nothing else on the GPU): a **30-minute run emitted 108,000 frames
@@ -1509,14 +1553,19 @@ frames emitted against `fps x wall` to see whether the rate was held.
 
 ### What it does not do
 
-- **Windows only.** Spout has no macOS form; the analogue there is Syphon,
-  a different SDK against a Metal/IOSurface seam.
-- **No audio.** Spout is a video transport. TouchDesigner takes audio from its
-  own source.
-- **Same machine only.** Spout shares GPU memory between processes on one box;
-  there is nothing to send over a network. A remote sink would be `--render`'s
-  `ffmpeg` pipe pointed at SRT or RTSP, which is not built.
-- **Nothing in the test suite covers it.** The mode is wall-clock paced, so its
-  output is not reproducible and no golden can assert on it. Every claim about
-  this path is either a byte-identity claim against a deterministic capture or a
-  human looking at a receiver.
+- **`--sink spout` is Windows only.** Spout has no macOS form; the analogue there
+  is Syphon, a different SDK against a Metal/IOSurface seam. `--sink stdout` runs
+  wherever the player does.
+- **No audio, on either sink.** Both are video transports. A receiver takes audio
+  from its own source.
+- **Spout is same-machine only.** It shares GPU memory between processes on one
+  box; there is nothing to send over a network. The pipe reaches whatever spawned
+  the player and no further — a remote sink would be `--render`'s `ffmpeg` pipe
+  pointed at SRT or RTSP, which is not built.
+- **No golden covers the picture.** The mode is wall-clock paced, so its output
+  is not reproducible and no baseline can assert on it. What *is* asserted, from
+  outside the process, is the pipe's **shape**: a bounded run puts exactly one
+  frame's bytes on stdout per frame, the geometry is announced before them, and a
+  reader stalled for a second loses none. Whether the picture is right is still a
+  byte-identity claim against a deterministic capture, or a human looking at a
+  receiver.

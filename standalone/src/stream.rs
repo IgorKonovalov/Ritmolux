@@ -2,8 +2,20 @@
 //!
 //! No window and no swapchain. Loopback audio drives the analyzer, the renderer
 //! draws through the same `draw_frame` the window presents through, the frame
-//! tap reads each frame back, and a Spout sender publishes it. TouchDesigner
-//! picks it up with a `Syphon Spout In` TOP on the same machine.
+//! tap reads each frame back, and a **sink** publishes it.
+//!
+//! ## Two sinks, one loop
+//!
+//! [`Sink::Spout`] hands the frame to a Spout sender, which TouchDesigner picks
+//! up with a `Syphon Spout In` TOP on the same machine. It needs Windows and the
+//! `spout` feature. [`Sink::Stdout`] writes the raw pixels to standard output,
+//! which needs neither and works wherever the player runs — it is how a parent
+//! process that spawned this player watches what it is drawing.
+//!
+//! Everything between the analyzer and the sink is identical for both, which is
+//! the point of the trait: the cost line below reports the same two stages
+//! whichever is open, so the readback-versus-zero-copy question ADR-0125 leaves
+//! open has one measurement rather than two.
 //!
 //! **Pacing is deadline-based, not sleep-per-frame.** Frame `n` is due at
 //! `n * period` measured from the start of the run, so a frame that overruns
@@ -15,20 +27,10 @@
 //! Everything above [`run`] is a pure function of its arguments and is unit
 //! tested with no GPU, no audio device and no Spout SDK.
 
-// With no Spout sink compiled there is no `run` to call the pure half, and
-// dead-code analysis does not see the unit tests that do. These are the mode's
-// argument and pacing contract; they stay compiled and checked on every
-// configuration rather than being cfg'd out alongside the sink, so a change to
-// them is caught by an ordinary featureless build.
-#![cfg_attr(
-    not(all(feature = "spout", windows)),
-    allow(
-        dead_code,
-        reason = "the pure half's only non-test caller is the Spout-gated `run`"
-    )
-)]
-
+use std::io::Write;
 use std::time::Duration;
+
+use standalone::events::{Event, Events};
 
 /// The sender name a receiver lists, unless `--sender` overrides it. Not
 /// necessarily the name that gets registered: a stale registration from a
@@ -39,6 +41,75 @@ pub const DEFAULT_SENDER: &str = "Ritmolux";
 const DEFAULT_WIDTH: u32 = 1280;
 const DEFAULT_HEIGHT: u32 = 720;
 const DEFAULT_FPS: u32 = 60;
+
+/// The pipe sink's own defaults: a preview, not a second show.
+///
+/// 640x360 at 30 fps is what a studio's canvas actually displays, and asking the
+/// engine for a 1280x720 frame sixty times a second to shrink it into a panel
+/// would cost the readback and the pipe four times over for a picture nobody
+/// sees at that size. `--size` and `--fps` still say otherwise where a caller
+/// wants them to.
+const PREVIEW_WIDTH: u32 = 640;
+const PREVIEW_HEIGHT: u32 = 360;
+const PREVIEW_FPS: u32 = 30;
+
+/// The pixel format on the wire, named in the `stream` event so a reader is not
+/// guessing at the channel order.
+pub const STREAM_FORMAT: &str = "rgba8";
+
+/// Where `--stream` publishes its frames.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Sink {
+    /// A Spout sender another application on the same machine opens by name.
+    /// Windows, and a build with the `spout` feature.
+    #[default]
+    Spout,
+    /// Raw frames on standard output, in order, with nothing between them.
+    ///
+    /// Every platform and no feature: a parent that spawned this player reads
+    /// its own child's pipe, which needs no shared-texture API and no name to
+    /// collide on.
+    Stdout,
+}
+
+impl Sink {
+    /// Parse a `--sink` value, or `None` if unknown.
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "spout" => Some(Sink::Spout),
+            "stdout" => Some(Sink::Stdout),
+            _ => None,
+        }
+    }
+
+    /// The canonical name — [`from_name`](Self::from_name)'s inverse, and what
+    /// the usage error lists.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Sink::Spout => "spout",
+            Sink::Stdout => "stdout",
+        }
+    }
+
+    /// Every sink, for the usage error and the round-trip test.
+    pub const ALL: [Sink; 2] = [Sink::Spout, Sink::Stdout];
+
+    /// The size and rate a request takes when the caller named neither.
+    fn default_geometry(self) -> (u32, u32, u32) {
+        match self {
+            Sink::Spout => (DEFAULT_WIDTH, DEFAULT_HEIGHT, DEFAULT_FPS),
+            Sink::Stdout => (PREVIEW_WIDTH, PREVIEW_HEIGHT, PREVIEW_FPS),
+        }
+    }
+
+    /// What the cost line calls this sink's send stage.
+    fn send_label(self) -> &'static str {
+        match self {
+            Sink::Spout => "spout send",
+            Sink::Stdout => "pipe write",
+        }
+    }
+}
 
 /// Upper bound on a requested frame rate. Not a capability claim - it rejects a
 /// typo (`--fps 6000`) before it becomes a busy loop.
@@ -64,6 +135,8 @@ pub struct StreamRequest {
     pub gpu: Option<String>,
     /// The sender name to claim.
     pub sender: String,
+    /// Where the frames go.
+    pub sink: Sink,
     /// Stop after this many frames, for a bounded measured run. `None` runs
     /// until Ctrl-C.
     pub frames: Option<u64>,
@@ -80,6 +153,7 @@ impl Default for StreamRequest {
             fps: DEFAULT_FPS,
             gpu: None,
             sender: DEFAULT_SENDER.to_owned(),
+            sink: Sink::Spout,
             frames: None,
             preset: None,
         }
@@ -102,19 +176,35 @@ pub fn parse(args: &[String]) -> Result<Option<StreamRequest>, String> {
         return Ok(None);
     }
     let mut request = StreamRequest::default();
+    // Held aside rather than written straight into the request: the size and
+    // rate a caller did NOT name depend on the sink, and `--sink` may arrive
+    // after them on the command line.
+    let mut size = None;
+    let mut fps = None;
     let mut rest = args.iter();
     while let Some(arg) = rest.next() {
         match arg.as_str() {
             "--stream" => {}
             "--size" => {
                 let raw = rest.next().ok_or("--size: expected WIDTHxHEIGHT")?;
-                let (width, height) = parse_size(raw)?;
-                request.width = width;
-                request.height = height;
+                size = Some(parse_size(raw)?);
             }
             "--fps" => {
                 let raw = rest.next().ok_or("--fps: expected a frame rate")?;
-                request.fps = parse_fps(raw)?;
+                fps = Some(parse_fps(raw)?);
+            }
+            "--sink" => {
+                let raw = rest.next().ok_or("--sink: expected a sink name")?;
+                request.sink = Sink::from_name(raw).ok_or_else(|| {
+                    format!(
+                        "--sink: unknown sink '{raw}' (expected one of: {})",
+                        Sink::ALL
+                            .iter()
+                            .map(|sink| sink.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
+                })?;
             }
             "--gpu" => {
                 let raw = rest
@@ -149,6 +239,11 @@ pub fn parse(args: &[String]) -> Result<Option<StreamRequest>, String> {
             _ => {}
         }
     }
+    let (default_width, default_height, default_fps) = request.sink.default_geometry();
+    let (width, height) = size.unwrap_or((default_width, default_height));
+    request.width = width;
+    request.height = height;
+    request.fps = fps.unwrap_or(default_fps);
     Ok(Some(request))
 }
 
@@ -220,7 +315,8 @@ pub const REPORT_EVERY: u64 = 1800;
 pub struct StageCosts {
     /// Time inside `render_tapped`: draw, submit and the blocking readback.
     pub render: Duration,
-    /// Time inside the Spout send: the upload into the sender's own device.
+    /// Time inside the sink's send: the upload into a Spout sender's own
+    /// device, or the blocking write into the pipe.
     pub send: Duration,
     /// Frames these totals cover.
     pub frames: u64,
@@ -228,14 +324,19 @@ pub struct StageCosts {
 
 impl StageCosts {
     /// Mean per-frame cost of each stage over the accumulated window.
-    pub fn line(&self) -> String {
+    ///
+    /// `sink` names the second stage, so a figure copied out of a log says which
+    /// sink produced it — the two are not comparable, and a line that called a
+    /// pipe write a Spout send would be read as though they were.
+    pub fn line(&self, sink: Sink) -> String {
         if self.frames == 0 {
             return "stream: no frames to cost".to_owned();
         }
         let per = |total: Duration| total.as_secs_f64() * 1000.0 / self.frames as f64;
         format!(
-            "stream: render+readback {:.2} ms, spout send {:.2} ms, mean over {} frames",
+            "stream: render+readback {:.2} ms, {} {:.2} ms, mean over {} frames",
             per(self.render),
+            sink.send_label(),
             per(self.send),
             self.frames
         )
@@ -269,9 +370,107 @@ pub fn summary(frames: u64, wall: Duration, scene: f64, adapter: &str) -> String
 // The loop
 // ---------------------------------------------------------------------------
 
+/// Where a rendered frame goes.
+///
+/// A trait rather than an enum with two arms in the loop, because the two
+/// implementations have nothing in common but this call: one needs a Windows
+/// shared-texture API and a build feature, the other needs a file descriptor.
+/// The loop names neither.
+pub trait FrameSink {
+    /// Publish one frame. `rgba` is tight `width * height * 4` bytes.
+    fn send(&mut self, rgba: &[u8], width: u32, height: u32) -> Result<(), String>;
+
+    /// The startup line saying what was actually opened.
+    fn opened(&self) -> String;
+}
+
+/// Raw frames on standard output.
+///
+/// **Blocking, never dropping.** A parent that stops reading stalls this writer,
+/// and the deadline pacing above absorbs that: frame `n` stays due at
+/// `n * period` from the start of the run, so a stalled second costs the frames
+/// that fell inside it and the run resumes at the frame index the wall clock has
+/// reached rather than drifting behind it. That is the right policy *here* and
+/// the wrong one on a windowed run, which has a present deadline it cannot miss
+/// (ADR-0125); the windowed preview drops instead, and the two are deliberate.
+pub struct StdoutSink {
+    /// The geometry announced before the first frame, so a frame of another size
+    /// is refused rather than silently reinterpreted by whatever is reading.
+    width: u32,
+    height: u32,
+}
+
+impl StdoutSink {
+    /// A sink that will write `width` x `height` frames.
+    pub fn new(width: u32, height: u32) -> Self {
+        Self { width, height }
+    }
+}
+
+impl FrameSink for StdoutSink {
+    fn send(&mut self, rgba: &[u8], width: u32, height: u32) -> Result<(), String> {
+        if (width, height) != (self.width, self.height) {
+            return Err(format!(
+                "the stream announced {}x{} and this frame is {width}x{height}; a reader \
+                 taking fixed-size frames would resynchronize on nothing",
+                self.width, self.height
+            ));
+        }
+        let expected = width as usize * height as usize * 4;
+        if rgba.len() != expected {
+            return Err(format!(
+                "expected {expected} bytes for a {width}x{height} frame and the tap \
+                 produced {}",
+                rgba.len()
+            ));
+        }
+        let mut out = std::io::stdout().lock();
+        out.write_all(rgba)
+            .map_err(|err| format!("writing a frame to standard output: {err}"))?;
+        // Flushed per frame: a reader takes whole frames, and a partial one left
+        // in a buffer is a reader blocked on bytes this process is holding.
+        out.flush()
+            .map_err(|err| format!("flushing a frame to standard output: {err}"))
+    }
+
+    fn opened(&self) -> String {
+        format!(
+            "publishing {}x{} as raw {STREAM_FORMAT} frames on standard output",
+            self.width, self.height
+        )
+    }
+}
+
+/// The Spout sender as a [`FrameSink`].
+#[cfg(all(feature = "spout", windows))]
+struct SpoutFrameSink {
+    sender: standalone::spout::SpoutSender,
+    width: u32,
+    height: u32,
+    fps: u32,
+}
+
+#[cfg(all(feature = "spout", windows))]
+impl FrameSink for SpoutFrameSink {
+    fn send(&mut self, rgba: &[u8], width: u32, height: u32) -> Result<(), String> {
+        self.sender
+            .send(rgba, width, height)
+            .map_err(|err| err.to_string())
+    }
+
+    fn opened(&self) -> String {
+        format!(
+            "publishing {}x{} at {} fps as Spout sender '{}'",
+            self.width,
+            self.height,
+            self.fps,
+            self.sender.name()
+        )
+    }
+}
+
 /// Set by the console control handler so the loop can leave through its own
 /// exit path and print the summary, rather than being torn down mid-frame.
-#[cfg(all(feature = "spout", windows))]
 static STOPPING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// Ctrl-C, Ctrl-Break and console close all mean "stop after this frame".
@@ -279,31 +478,119 @@ static STOPPING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::
 /// Returning `TRUE` claims the event, so the default terminate handler does not
 /// run and the exit summary gets a chance to print. The handler runs on its own
 /// thread and touches nothing but the flag.
-#[cfg(all(feature = "spout", windows))]
+#[cfg(windows)]
 unsafe extern "system" fn console_handler(_kind: u32) -> windows::core::BOOL {
     STOPPING.store(true, std::sync::atomic::Ordering::Relaxed);
     true.into()
 }
 
+/// Install the stop-after-this-frame handler, or say why it could not be.
+///
+/// Windows-only because the flag it sets is: elsewhere the loop leaves on
+/// `--frames` or on the default signal disposition, and a run with no frame
+/// limit is torn down rather than summarised. Stated here rather than left as an
+/// absent `cfg` so a reader on either platform can see which they have.
+fn install_stop_handler() {
+    #[cfg(windows)]
+    {
+        // SAFETY: registering a console handler with no state of its own; the
+        // callback writes one atomic and returns.
+        if unsafe {
+            windows::Win32::System::Console::SetConsoleCtrlHandler(Some(console_handler), true)
+        }
+        .is_err()
+        {
+            eprintln!(
+                "note     : could not install a Ctrl-C handler; the exit summary may not print"
+            );
+        }
+    }
+}
+
+/// Open the sink `request` asks for.
+///
+/// `adapter` is the renderer's own adapter description, which only the Spout arm
+/// reads: on a hybrid machine the sender's device decides whether a receiver can
+/// open the texture at all (ADR-0146), and the pipe has no such question.
+#[cfg_attr(
+    not(all(feature = "spout", windows)),
+    allow(
+        unused_variables,
+        reason = "only the Spout arm reads the renderer's adapter, and it is not compiled here"
+    )
+)]
+fn open_sink(request: &StreamRequest, adapter: &str) -> Result<Box<dyn FrameSink>, String> {
+    match request.sink {
+        Sink::Stdout => Ok(Box::new(StdoutSink::new(request.width, request.height))),
+        #[cfg(all(feature = "spout", windows))]
+        Sink::Spout => {
+            use standalone::gpu::{self, SenderAdapter};
+            use standalone::spout::{SpoutSender, adapters};
+
+            let roster = adapters();
+            let sender_index = match gpu::sender_adapter(request.gpu.as_deref(), adapter, &roster) {
+                Ok(SenderAdapter::Pinned(index)) => {
+                    eprintln!(
+                        "sender   : adapter [{index}] {}",
+                        roster.get(index as usize).map_or("?", String::as_str)
+                    );
+                    Some(index)
+                }
+                // Never silent: on a hybrid machine the D3D11 default is the
+                // power-saving GPU, and a receiver on the other one reports only
+                // that it could not open the sender.
+                Ok(SenderAdapter::Default { reason }) => {
+                    eprintln!("sender   : the D3D11 default - {reason}");
+                    None
+                }
+                Err(message) => return Err(format!("--stream: {message}")),
+            };
+            if request.gpu.is_none() && roster.len() > 1 {
+                eprintln!(
+                    "note     : this machine has {} graphics adapters and --gpu was not given. \
+                     If the receiver cannot open the sender, re-run with --gpu naming the GPU it \
+                     renders on.",
+                    roster.len()
+                );
+            }
+            let sender =
+                SpoutSender::new(&request.sender, request.width, request.height, sender_index)
+                    .map_err(|err| format!("--stream: {err}"))?;
+            Ok(Box::new(SpoutFrameSink {
+                sender,
+                width: request.width,
+                height: request.height,
+                fps: request.fps,
+            }))
+        }
+        #[cfg(not(all(feature = "spout", windows)))]
+        Sink::Spout => Err(
+            "--stream --sink spout needs a build with the 'spout' feature on Windows; this \
+             binary was built without it, so there is no Spout sender to publish to. \
+             `--sink stdout` writes the frames to standard output on every platform."
+                .to_owned(),
+        ),
+    }
+}
+
 /// Run the headless source until Ctrl-C or `--frames`.
-#[cfg(all(feature = "spout", windows))]
 pub fn run(
     request: &StreamRequest,
     input: &standalone::config::Input,
     rotate: &standalone::config::Rotate,
+    mut events: Option<&mut Events>,
 ) -> Result<(), String> {
     use std::sync::atomic::Ordering;
     use std::time::Instant;
 
     use rlx_core::dsp::Analyzer;
     use rlx_core::render::{HeadlessOptions, Renderer, Tier};
-    use standalone::gpu::{self, SenderAdapter};
+    use standalone::gpu;
     use standalone::shot::render::ResidentSet;
-    use standalone::spout::{SpoutSender, adapters};
 
-    // The renderer's adapter is a frame-rate choice; the sender's, below, is a
-    // correctness one. Both come from one `--gpu`, resolved against their own
-    // rosters (ADR-0146).
+    // The renderer's adapter is a frame-rate choice; the sender's, resolved
+    // inside `open_sink`, is a correctness one. Both come from one `--gpu`,
+    // resolved against their own rosters (ADR-0146).
     let mut renderer = Renderer::new_headless_on(
         HeadlessOptions {
             width: request.width,
@@ -319,33 +606,9 @@ pub fn run(
     let adapter = renderer.adapter_description().to_owned();
     eprintln!("renderer : {adapter}");
 
-    let roster = adapters();
-    let sender_index = match gpu::sender_adapter(request.gpu.as_deref(), &adapter, &roster) {
-        Ok(SenderAdapter::Pinned(index)) => {
-            eprintln!(
-                "sender   : adapter [{index}] {}",
-                roster.get(index as usize).map_or("?", String::as_str)
-            );
-            Some(index)
-        }
-        // Never silent: on a hybrid machine the D3D11 default is the
-        // power-saving GPU, and a receiver on the other one reports only that
-        // it could not open the texture.
-        Ok(SenderAdapter::Default { reason }) => {
-            eprintln!("sender   : the D3D11 default - {reason}");
-            None
-        }
-        Err(message) => return Err(format!("--stream: {message}")),
-    };
-    if request.gpu.is_none() && roster.len() > 1 {
-        eprintln!(
-            "note     : this machine has {} graphics adapters and --gpu was not given. If the \
-             receiver cannot open the sender, re-run with --gpu naming the GPU it renders on.",
-            roster.len()
-        );
-    }
+    let mut sink = open_sink(request, &adapter)?;
 
-    let capture = crate::start_capture(input);
+    let capture = crate::capture_start::start_capture(input);
     let Some(mut consumer) = capture.consumer else {
         return Err(
             "--stream: no audio capture device is available, so there is nothing to visualize"
@@ -358,25 +621,9 @@ pub fn run(
     let _capture_handle = capture.handle;
 
     let mut tap = renderer.open_tap();
-    let mut sender = SpoutSender::new(&request.sender, request.width, request.height, sender_index)
-        .map_err(|err| format!("--stream: {err}"))?;
-    eprintln!(
-        "publishing {}x{} at {} fps as Spout sender '{}'",
-        request.width,
-        request.height,
-        request.fps,
-        sender.name()
-    );
+    eprintln!("{}", sink.opened());
 
-    // SAFETY: registering a console handler with no state of its own; the
-    // callback writes one atomic and returns.
-    if unsafe {
-        windows::Win32::System::Console::SetConsoleCtrlHandler(Some(console_handler), true)
-    }
-    .is_err()
-    {
-        eprintln!("note     : could not install a Ctrl-C handler; the exit summary may not print");
-    }
+    install_stop_handler();
 
     // A headless source has nobody to press Space, so rotation is ON here even
     // though `[rotate] auto` defaults off for the window (ADR-0027): a source
@@ -399,6 +646,18 @@ pub fn run(
             "rotation : on, dwell {}-{} s from the operator config",
             rotate.min_dwell_secs, rotate.max_dwell_secs
         );
+    }
+
+    // **Before the first frame**, which is the contract: a parent reading the
+    // pipe has to know the geometry before it has bytes to cut up, and a
+    // `stream` that arrived after them would leave the first frame unreadable.
+    if let Some(events) = events.as_mut() {
+        events.emit(&Event::Stream {
+            width: request.width,
+            height: request.height,
+            fps: request.fps,
+            format: STREAM_FORMAT,
+        });
     }
 
     let period = request.period();
@@ -467,8 +726,7 @@ pub fn run(
             reason = "stage costing reads the wall clock; core analysis stays clock-free"
         )]
         let sent = Instant::now();
-        sender
-            .send(&image.rgba, image.width, image.height)
+        sink.send(&image.rgba, image.width, image.height)
             .map_err(|err| format!("--stream: frame {frames}: {err}"))?;
         #[allow(
             clippy::disallowed_methods,
@@ -482,7 +740,7 @@ pub fn run(
 
         if should_report(frames, REPORT_EVERY) {
             resident.sample();
-            eprintln!("{}", costs.line());
+            eprintln!("{}", costs.line(request.sink));
             eprintln!(
                 "{}",
                 resident.summary(frames.min(u64::from(u32::MAX)) as u32)
@@ -507,7 +765,7 @@ pub fn run(
     let wall = started.elapsed();
     resident.sample();
     if costs.frames > 0 {
-        eprintln!("{}", costs.line());
+        eprintln!("{}", costs.line(request.sink));
     }
     eprintln!(
         "{}",
@@ -515,21 +773,6 @@ pub fn run(
     );
     eprintln!("{}", summary(frames, wall, scene, &adapter));
     Ok(())
-}
-
-/// Without the `spout` feature (or off Windows) there is no sink, and the mode
-/// says so rather than starting and publishing nowhere.
-#[cfg(not(all(feature = "spout", windows)))]
-pub fn run(
-    _request: &StreamRequest,
-    _input: &standalone::config::Input,
-    _rotate: &standalone::config::Rotate,
-) -> Result<(), String> {
-    Err(
-        "--stream needs a build with the 'spout' feature on Windows; this binary was built \
-         without it, so there is no Spout sender to publish to"
-            .to_owned(),
-    )
 }
 
 #[cfg(test)]
@@ -694,7 +937,7 @@ mod tests {
             send: Duration::from_millis(100),
             frames: 100,
         };
-        let line = costs.line();
+        let line = costs.line(Sink::Spout);
         assert!(line.contains("render+readback 8.00 ms"), "{line}");
         assert!(line.contains("spout send 1.00 ms"), "{line}");
         assert!(line.contains("over 100 frames"), "{line}");
@@ -702,7 +945,11 @@ mod tests {
 
     #[test]
     fn an_empty_window_costs_nothing_rather_than_dividing_by_zero() {
-        assert!(StageCosts::default().line().contains("no frames"));
+        assert!(
+            StageCosts::default()
+                .line(Sink::Spout)
+                .contains("no frames")
+        );
     }
 
     /// Each report covers the interval since the last one, so a slow stretch
@@ -731,5 +978,145 @@ mod tests {
         assert!(line.contains("600.12 s wall"), "{line}");
         assert!(line.contains("600.05 s scene clock"), "{line}");
         assert!(line.contains("NVIDIA RTX 3080"), "{line}");
+    }
+}
+
+#[cfg(test)]
+mod sink_tests {
+    use super::*;
+
+    fn args(raw: &[&str]) -> Vec<String> {
+        raw.iter().map(|s| (*s).to_owned()).collect()
+    }
+
+    fn request(raw: &[&str]) -> StreamRequest {
+        parse(&args(raw))
+            .expect("valid arguments")
+            .expect("--stream was given")
+    }
+
+    /// Every sink round-trips its name, so the usage error's roster and the
+    /// parser cannot list different things.
+    #[test]
+    fn every_sink_round_trips_its_name() {
+        for sink in Sink::ALL {
+            assert_eq!(
+                Sink::from_name(sink.as_str()),
+                Some(sink),
+                "`{}` does not parse back to itself",
+                sink.as_str()
+            );
+        }
+        assert_eq!(Sink::from_name("syphon"), None);
+    }
+
+    /// The default sink is Spout, so a command line that says nothing about it
+    /// asks for exactly what it asked for before the flag existed.
+    #[test]
+    fn the_default_sink_leaves_the_spout_path_as_it_was() {
+        let request = request(&["--stream"]);
+        assert_eq!(request.sink, Sink::Spout);
+        assert_eq!(
+            (request.width, request.height, request.fps),
+            (1280, 720, 60)
+        );
+    }
+
+    /// The pipe sink is a **preview**: smaller and slower by default, because a
+    /// studio's canvas displays it at that size and asking the engine for four
+    /// times the pixels would cost the readback and the pipe for a picture
+    /// nobody sees.
+    #[test]
+    fn the_pipe_sink_defaults_to_the_preview_geometry() {
+        let request = request(&["--stream", "--sink", "stdout"]);
+        assert_eq!(request.sink, Sink::Stdout);
+        assert_eq!((request.width, request.height, request.fps), (640, 360, 30));
+    }
+
+    /// An explicit size or rate wins over the sink's default, **whichever order
+    /// they appear in** — the flag that decides the default can arrive last.
+    #[test]
+    fn an_explicit_size_or_rate_wins_over_the_sinks_default() {
+        for raw in [
+            &[
+                "--stream",
+                "--sink",
+                "stdout",
+                "--size",
+                "1920x1080",
+                "--fps",
+                "24",
+            ][..],
+            &[
+                "--stream",
+                "--size",
+                "1920x1080",
+                "--fps",
+                "24",
+                "--sink",
+                "stdout",
+            ][..],
+        ] {
+            let request = request(raw);
+            assert_eq!(
+                (request.width, request.height, request.fps),
+                (1920, 1080, 24),
+                "the sink's default overrode an explicit request in {raw:?}"
+            );
+        }
+    }
+
+    /// An unknown sink is a usage error naming the ones that exist, rather than
+    /// a silent fall back to the default.
+    #[test]
+    fn an_unknown_sink_is_refused_and_the_roster_named() {
+        let err = parse(&args(&["--stream", "--sink", "syphon"]))
+            .expect_err("`syphon` is not a sink this build has");
+        assert!(
+            err.contains("syphon"),
+            "the message does not name the value: {err}"
+        );
+        for sink in Sink::ALL {
+            assert!(
+                err.contains(sink.as_str()),
+                "the message does not offer `{}`: {err}",
+                sink.as_str()
+            );
+        }
+    }
+
+    /// The cost line names the sink it measured, so a figure copied out of a log
+    /// says which one produced it.
+    #[test]
+    fn the_cost_line_names_the_sink_it_measured() {
+        let costs = StageCosts {
+            render: Duration::from_millis(20),
+            send: Duration::from_millis(10),
+            frames: 10,
+        };
+        let spout = costs.line(Sink::Spout);
+        let pipe = costs.line(Sink::Stdout);
+        assert!(spout.contains("spout send"), "{spout}");
+        assert!(pipe.contains("pipe write"), "{pipe}");
+        // Both report the stage that is the same either way, at the same figure.
+        for line in [&spout, &pipe] {
+            assert!(line.contains("render+readback 2.00 ms"), "{line}");
+        }
+    }
+
+    /// A frame of the wrong size is refused rather than written, because a
+    /// reader taking fixed-size frames would resynchronize on nothing.
+    #[test]
+    fn the_pipe_sink_refuses_a_frame_of_another_size() {
+        let mut sink = StdoutSink::new(4, 2);
+        let right = vec![0u8; 4 * 2 * 4];
+        assert!(
+            sink.send(&right[..right.len() - 4], 4, 2).is_err(),
+            "a short buffer for the announced size was accepted"
+        );
+        assert!(
+            sink.send(&right, 8, 1).is_err(),
+            "a frame of another shape was accepted"
+        );
     }
 }

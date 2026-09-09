@@ -564,7 +564,8 @@ bg_bright =
         let (line, col) = line_col(source, span.start);
         assert_eq!(
             line, 4,
-            "the error was reported on line {line}, not the line the fixture              put it on"
+            "the error was reported on line {line}, not the line the fixture put \
+             it on"
         );
 
         let file = Path::new("probe.toml");
@@ -609,7 +610,9 @@ bg_bright = \"nope(1)\"
         );
         assert!(
             err.span().is_none(),
-            "an expression error is raised after the document was parsed, so it              has no span; if it grows one, the line and column below become              reportable and this expectation should move"
+            "an expression error is raised after the document was parsed, so it \
+             has no span; if it grows one, the line and column below become \
+             reportable and this expectation should move"
         );
 
         let message = err.to_string();
