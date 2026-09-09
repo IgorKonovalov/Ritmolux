@@ -76,6 +76,35 @@ impl LatchBank {
         *self = Self::default();
     }
 
+    /// Re-key the carried windows and holds from latch roster `from` to roster
+    /// `to`, **by name**, so a hot-reload that only rewrote expressions keeps a
+    /// latch that is mid-hold mid-hold.
+    ///
+    /// A slot is a latch's position in `Preset::latches` and nothing else, so a
+    /// latch inserted above another moves that other one's slot; carrying the
+    /// array across unchanged would hand a latch its neighbour's armed window.
+    /// A name with no counterpart lands disarmed and at rest, which is where a
+    /// reset would have left it.
+    ///
+    /// `values` is not carried: `advance` rewrites every slot it reads before
+    /// anything evaluates against them, and a preset with no latches reads none.
+    pub(super) fn remap(&mut self, from: &[Latch], to: &[Latch]) {
+        let carried = self.state;
+        *self = Self::default();
+        for (slot, latch) in to.iter().enumerate().take(LATCH_CAP) {
+            let Some(previous) = from
+                .iter()
+                .position(|held| held.name == latch.name)
+                .and_then(|index| carried.get(index))
+            else {
+                continue;
+            };
+            if let Some(state) = self.state.get_mut(slot) {
+                *state = *previous;
+            }
+        }
+    }
+
     /// Advance every latch of `latches` by `dt` against `vars`, and return
     /// `vars` with the reserved slots bound to this frame's outputs.
     ///
@@ -278,6 +307,55 @@ impl SaltMode {
     }
 }
 
+/// Apply one value to whatever its resolved [`ParamRoute`] names.
+///
+/// Extracted because it has **two** callers on the same frame — the preset's own
+/// bindings and the live overrides that shadow them — and a second copy of this
+/// match is a place for a new route arm to be added once.
+fn apply_route(
+    route: ParamRoute,
+    name: &str,
+    value: f32,
+    scene: &mut Box<dyn Scene>,
+    side: &mut CompositeSide,
+    terminal: &mut Option<Terminal<'_>>,
+) {
+    match route {
+        ParamRoute::Background => {
+            side.background.set_param(name, value);
+        }
+        ParamRoute::Stage(stage) => {
+            side.chain.set_stage_param(stage, name, value);
+        }
+        ParamRoute::Composite => {
+            side.chain.set_chain_param(name, value);
+        }
+        ParamRoute::Tonemap => {
+            if let Some(terminal) = terminal.as_mut() {
+                terminal.tonemap.set_param(name, value);
+            }
+        }
+        ParamRoute::Ink => {
+            if let Some(terminal) = terminal.as_mut() {
+                terminal.ink.set_param(name, value);
+            }
+        }
+        ParamRoute::Scene => {
+            scene.set_param(name, value);
+        }
+        ParamRoute::StageAndScene(stage) => {
+            side.chain.set_stage_param(stage, name, value);
+            scene.set_param(name, value);
+        }
+        ParamRoute::SceneAndBackdrop => {
+            scene.set_param(name, value);
+            side.background.set_shared_colour_param(name, value);
+        }
+        // Nothing consumes it. Surfaced at load, silent here (ADR-0020).
+        ParamRoute::Unclaimed => {}
+    }
+}
+
 /// Evaluate one preset's bindings into a composite side, an optional ink pass,
 /// and its scene. **Routing only** — nothing is encoded here, because the frame's
 /// destination is not known until ink's activity is (ADR-0032).
@@ -300,7 +378,11 @@ pub(super) fn evaluate_preset(
     inputs: &FrameInputs<'_>,
     scratch: Scratch<'_>,
 ) {
-    let Active { preset, routes } = active;
+    let Active {
+        preset,
+        routes,
+        overrides,
+    } = active;
     let &FrameInputs {
         vars,
         frame,
@@ -362,41 +444,20 @@ pub(super) fn evaluate_preset(
         let value = smoother.smooth(index, raw, binding.tau, dt);
         // Dispatch on the resolved destination — no map lookup, no walk over the
         // stages, no chained fallthrough. The owner was decided at load.
-        match *route {
-            ParamRoute::Background => {
-                side.background.set_param(&binding.name, value);
-            }
-            ParamRoute::Stage(stage) => {
-                side.chain.set_stage_param(stage, &binding.name, value);
-            }
-            ParamRoute::Composite => {
-                side.chain.set_chain_param(&binding.name, value);
-            }
-            ParamRoute::Tonemap => {
-                if let Some(terminal) = terminal.as_mut() {
-                    terminal.tonemap.set_param(&binding.name, value);
-                }
-            }
-            ParamRoute::Ink => {
-                if let Some(terminal) = terminal.as_mut() {
-                    terminal.ink.set_param(&binding.name, value);
-                }
-            }
-            ParamRoute::Scene => {
-                scene.set_param(&binding.name, value);
-            }
-            ParamRoute::StageAndScene(stage) => {
-                side.chain.set_stage_param(stage, &binding.name, value);
-                scene.set_param(&binding.name, value);
-            }
-            ParamRoute::SceneAndBackdrop => {
-                scene.set_param(&binding.name, value);
-                side.background
-                    .set_shared_colour_param(&binding.name, value);
-            }
-            // Nothing consumes it. Surfaced at load, silent here (ADR-0020).
-            ParamRoute::Unclaimed => {}
-        }
+        apply_route(*route, &binding.name, value, scene, side, &mut terminal);
+    }
+    // The live overrides (ADR-0176), **after** the binding walk, which is what
+    // makes them shadow it: the same name written twice into the same sink
+    // leaves the second value standing. Their routes were resolved against this
+    // preset's system when they were set, so an override reaches a parameter the
+    // preset never bound — nothing in the walk above would have visited it.
+    //
+    // Not eased and not smoothed: a sender dragging a slider is already
+    // producing a continuous path, and the smoother's own state is left holding
+    // the *binding's* eased value, which is what lets a clear resume from where
+    // the preset actually was rather than from the held number.
+    for (name, route, value) in overrides.map_or(&[][..], ParamOverrides::entries) {
+        apply_route(*route, name, *value, scene, side, &mut terminal);
     }
     // The `[per_vertex]` table (Plan 0100 Phase 1), after the scalars — so a
     // per-vertex binding overrides the scalar of the same name for this frame
@@ -480,6 +541,11 @@ pub(super) fn evaluate_layer(
 pub(super) struct Active<'a> {
     pub(super) preset: &'a Preset,
     pub(super) routes: &'a [ParamRoute],
+    /// The live overrides shadowing this side's bindings (ADR-0176), or `None`
+    /// for a side that takes none — the **outgoing** half of a dissolve, whose
+    /// parameters are being faded out rather than edited, and every capture
+    /// path, which must stay a pure function of its inputs (NFR 6).
+    pub(super) overrides: Option<&'a ParamOverrides>,
 }
 
 /// One frame's shared evaluation inputs: the variable bundle a binding is

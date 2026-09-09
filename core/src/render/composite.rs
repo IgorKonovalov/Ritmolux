@@ -245,6 +245,10 @@ pub(super) fn encode_outgoing_side(
             active: Active {
                 preset: outgoing,
                 routes: out_routes,
+                // The outgoing preset is being faded out, not edited: a live
+                // override names a parameter on the preset the operator is
+                // looking at, which during a dissolve is the incoming one.
+                overrides: None,
             },
             scene: out_scene,
             composite: side,

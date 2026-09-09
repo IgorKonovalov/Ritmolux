@@ -1,6 +1,6 @@
 # 0158 — The player grows a studio-facing surface
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-09
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0175](../adrs/0175-the-studio-is-a-separate-application-that-never-draws-a-frame.md) (proposed),
@@ -287,12 +287,11 @@ to a layout.
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(`main` directly, or the worktree path plus its branch — `WORK/rlx-plan-0158` on
-`plan-0158-<slug>`)_
+**Lane:** `WORK/rlx-plan-0158` on `plan-0158-studio-facing-surface`.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — A parameter moves in place | dev | not started | |
+| 1 — A parameter moves in place | dev | done | committed with this row |
 | 2 — The player listens | dev | not started | |
 | 3 — The player reports | dev | not started | |
 | 4 — The engine states what a preset can contain | dev | not started | |
@@ -301,6 +300,26 @@ to a layout.
 | 7 — The on-device check | human | not started | |
 
 ### Notes
+
+- **Phase 1, the field clause of the second done-when, could not be satisfied as stated.** The
+  criterion asks for a test asserting "the accumulated field is not cleared" across a reload. The
+  accumulation is cleared **only** by `PostStage::reset_resources`, and the only callers of that are
+  `reset_for_capture` and `capture_audio_after_warmup` in `core/src/render/capture_api.rs` —
+  `set_presets` never cleared it on either path, before this phase or after. A test on the field
+  would therefore pass identically against the pre-phase engine. What I asserted instead is the
+  clause that *is* observable, the eased values, in
+  `a_rebind_keeps_the_eased_values_and_a_replacement_snaps_them` — and it carries a **control arm**
+  (the same preset reloaded under a different name, which takes the full path) plus an assertion
+  that the two arms differ by more than 10x, so a green run is evidence rather than a tautology.
+  The latch half is asserted at unit level in `core/src/render/tests.rs`.
+- **Phase 1 touched one file outside its list:** `core/src/render/composite.rs`, for the single
+  `overrides: None` field on the outgoing side's `Active` — the outgoing half of a dissolve takes no
+  overrides. Commit is the phase's own.
+- **Phase 1 narrowed `set_presets`' rebind predicate to the two things the plan names** (roster
+  shape and system), which is what `Roster::is_rebind_of` tests. The structural tables are still
+  handed over on the rebind path, so a save that moved a `[palette]` still applies; the one
+  non-idempotent hand-off, the `[layer]` scene construction, is skipped only while the layer's
+  system is unchanged.
 
 ### Close triggers
 

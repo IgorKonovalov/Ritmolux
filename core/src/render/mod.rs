@@ -169,6 +169,7 @@ mod tier_governor;
 
 use composite::*;
 use evaluate::*;
+pub use roster::ParamError;
 use roster::*;
 use routing::*;
 
@@ -358,6 +359,14 @@ pub struct Renderer {
     /// prefix.
     vertex_scratch: Vec<f32>,
     param_smoother: ParamSmoother,
+    /// Live per-name parameter overrides on the active preset (ADR-0176) — what a
+    /// control surface holds while a slider is being dragged, shadowing the
+    /// preset's own binding until it is cleared.
+    ///
+    /// Empty on every path but a driven one, and an empty bank costs the frame a
+    /// slice length check. Cleared on every active-preset change and on every
+    /// `set_presets`, so an override can never outlive the preset it named.
+    overrides: ParamOverrides,
     /// The active preset's `[latch]` state (ADR-0137). Reset wherever
     /// [`param_smoother`](Self::param_smoother) is, and handed to the outgoing
     /// bank at the same roster flip — a latch mid-hold keeps reading through a
@@ -459,6 +468,7 @@ impl Renderer {
             series_scratch: vec![0.0; scenes::lines::spectrum::MAX_ELEMENTS],
             vertex_scratch: vec![0.0; scenes::warp_mesh::vertex_count(scenes::warp_mesh::MAX_MESH)],
             param_smoother: ParamSmoother::default(),
+            overrides: ParamOverrides::default(),
             latches: LatchBank::default(),
             outgoing_latches: LatchBank::default(),
             layer_smoother: ParamSmoother::default(),
@@ -1113,6 +1123,7 @@ impl Renderer {
             series_scratch,
             vertex_scratch,
             param_smoother,
+            overrides,
             layer_smoother,
             outgoing_smoother,
             outgoing_layer_smoother,
@@ -1236,7 +1247,13 @@ impl Renderer {
             view,
             surface,
             ActiveSide {
-                active: Active { preset, routes },
+                active: Active {
+                    preset,
+                    routes,
+                    // The only side that takes them: the active preset is the one
+                    // a control surface is addressing (ADR-0176).
+                    overrides: Some(overrides),
+                },
                 scene,
                 composite: live_side,
                 smoother: param_smoother,

@@ -7,8 +7,8 @@
 #![allow(clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
 
 use super::{
-    AdapterChoice, AnalysisMetrics, CaptureImage, HeadlessOptions, LatchBank, ParamRoute,
-    ParamSmoother, RenderError, Renderer, RendererOptions, Roster, SampleBudget, Tier,
+    AdapterChoice, AnalysisMetrics, CaptureImage, HeadlessOptions, LatchBank, ParamOverrides,
+    ParamRoute, ParamSmoother, RenderError, Renderer, RendererOptions, Roster, SampleBudget, Tier,
     element_prefix, evaluate_series, resolve_route,
 };
 // `Mode` is named from its own module now: `render/mod.rs` stopped importing it
@@ -1980,4 +1980,218 @@ fn a_degenerate_frame_delta_cannot_reach_a_scene() {
             );
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// The live control surface's pure half (ADR-0176): the override bank, the two
+// by-name state carries a rebind performs, and the predicate that decides
+// whether a reload is a rebind at all. GPU-free, like the roster contract above.
+// ---------------------------------------------------------------------------
+
+/// A preset on a named system, for the rebind predicate — which reads exactly
+/// the name and the system and nothing else.
+fn preset_on(name: &str, system: &str) -> Preset {
+    Preset::from_toml_str(&format!("system = \"{system}\"\nname = \"{name}\""))
+        .expect("hand-written test preset is valid")
+}
+
+/// The bank holds **one** value per name: a slider being dragged sends a new
+/// value thirty times a second, and each replaces the last rather than growing
+/// the walk the frame path makes.
+#[test]
+fn an_override_bank_holds_the_last_value_per_name() {
+    let mut bank = ParamOverrides::default();
+    bank.set("warp", ParamRoute::Scene, 0.2);
+    bank.set("warp", ParamRoute::Scene, 0.7);
+    bank.set("bg_bright", ParamRoute::Background, 0.4);
+
+    assert_eq!(
+        bank.entries().len(),
+        2,
+        "two names were set, however many values arrived for each"
+    );
+    let warp = bank
+        .entries()
+        .iter()
+        .find(|(name, ..)| name == "warp")
+        .expect("`warp` is held");
+    assert_eq!(
+        warp.2, 0.7,
+        "the last value sent for a name is the one held"
+    );
+}
+
+/// Clearing is by name, and wholesale — the two the control vocabulary offers
+/// (`ctl/param/clear` and `ctl/params/clear`).
+#[test]
+fn an_override_bank_clears_by_name_and_wholesale() {
+    let mut bank = ParamOverrides::default();
+    bank.set("warp", ParamRoute::Scene, 0.2);
+    bank.set("bg_bright", ParamRoute::Background, 0.4);
+
+    bank.clear("warp");
+    assert_eq!(
+        bank.entries().len(),
+        1,
+        "clearing one name leaves the other"
+    );
+    bank.clear("never_set");
+    assert_eq!(
+        bank.entries().len(),
+        1,
+        "clearing a name that holds nothing is a no-op, not an error"
+    );
+
+    bank.clear_all();
+    assert!(bank.entries().is_empty(), "clear_all drops every name");
+}
+
+/// A rebind carries the eased values **by name**, so a binding inserted above
+/// another does not hand that other one its neighbour's value.
+///
+/// The failure this rules out is the one an index-keyed carry produces: `params`
+/// is name-sorted, so adding `alpha` shifts `warp` from slot 0 to slot 1, and a
+/// raw `Vec` carry would leave `warp` reading whatever `alpha` should have.
+#[test]
+fn a_smoother_carries_its_eased_values_across_a_rebind_by_name() {
+    let mut smoother = ParamSmoother::default();
+    let slow = Easing::symmetric(1_000_000.0);
+    let dt = 1.0 / 60.0;
+
+    // Seed two slots with values that cannot be confused for each other.
+    smoother.smooth(0, 0.25, slow, dt);
+    smoother.smooth(1, 0.75, slow, dt);
+    assert_eq!(smoother.carried(0), Some(0.25));
+    assert_eq!(smoother.carried(1), Some(0.75));
+
+    // A save that inserted `alpha` ahead of both, alphabetically.
+    smoother.remap(&["warp", "zoom"], &["alpha", "warp", "zoom"]);
+
+    assert_eq!(
+        smoother.carried(0),
+        None,
+        "`alpha` had no counterpart, so it snaps to its own first value"
+    );
+    assert_eq!(
+        smoother.carried(1),
+        Some(0.25),
+        "`warp` kept its eased value across the shift"
+    );
+    assert_eq!(
+        smoother.carried(2),
+        Some(0.75),
+        "`zoom` kept its eased value across the shift"
+    );
+}
+
+/// A slot with no carried value snaps to its first raw value rather than easing
+/// up from a stale one — the same behaviour the first frame after a reset has.
+#[test]
+fn a_smoother_slot_with_no_history_snaps() {
+    let mut smoother = ParamSmoother::default();
+    let slow = Easing::symmetric(1_000_000.0);
+    let dt = 1.0 / 60.0;
+
+    let first = smoother.smooth(0, 0.9, slow, dt);
+    assert_eq!(
+        first, 0.9,
+        "a slot with no history takes its raw value whole, however long the tau"
+    );
+}
+
+/// A dropped binding takes its slot with it, and the surviving names keep theirs.
+#[test]
+fn a_smoother_forgets_a_binding_a_rebind_removed() {
+    let mut smoother = ParamSmoother::default();
+    let slow = Easing::symmetric(1_000_000.0);
+    let dt = 1.0 / 60.0;
+    smoother.smooth(0, 0.25, slow, dt);
+    smoother.smooth(1, 0.75, slow, dt);
+
+    smoother.remap(&["warp", "zoom"], &["zoom"]);
+
+    assert_eq!(smoother.carried(0), Some(0.75), "`zoom` moved down a slot");
+    assert_eq!(
+        smoother.carried(1),
+        None,
+        "the vacated slot carries nothing forward"
+    );
+}
+
+/// A latch mid-hold stays mid-hold across a rebind, and stays paired with **its
+/// own** name when the roster order moved under it.
+#[test]
+fn a_latch_bank_carries_its_windows_across_a_rebind_by_name() {
+    fn latch(name: &str) -> Latch {
+        Latch {
+            name: name.to_owned(),
+            arm: compile("1").expect("constant arm expression"),
+            fire: compile("0").expect("constant fire expression"),
+            hold: 1.0,
+        }
+    }
+
+    let mut bank = LatchBank::default();
+    bank.state[0] = super::LatchState {
+        armed: true,
+        hold_left: 0.4,
+        arm_last: true,
+        fire_last: false,
+    };
+    bank.state[1] = super::LatchState {
+        armed: false,
+        hold_left: 0.9,
+        arm_last: false,
+        fire_last: true,
+    };
+
+    let before = [latch("drop"), latch("swell")];
+    let after = [latch("bloom"), latch("drop"), latch("swell")];
+    bank.remap(&before, &after);
+
+    assert!(
+        !bank.state[0].armed && bank.state[0].hold_left == 0.0,
+        "`bloom` is new, so it starts disarmed and at rest"
+    );
+    assert!(
+        bank.state[1].armed && bank.state[1].hold_left == 0.4,
+        "`drop` kept its armed window and its remaining hold across the shift"
+    );
+    assert!(
+        bank.state[2].fire_last && bank.state[2].hold_left == 0.9,
+        "`swell` kept its state across the shift"
+    );
+}
+
+/// A reload is a **rebind** only when the roster is the same presets, in the
+/// same order, on the same systems — the two things that make carried frame
+/// state mean anything.
+#[test]
+fn a_roster_is_a_rebind_only_when_the_names_and_systems_all_match() {
+    let held = roster(&["a", "b"]);
+
+    assert!(
+        held.is_rebind_of(&[preset("a"), preset("b")]),
+        "the same names on the same systems is a rebind, whatever the expressions"
+    );
+    assert!(
+        !held.is_rebind_of(&[preset("a")]),
+        "a shorter roster re-points indices, so it is not a rebind"
+    );
+    assert!(
+        !held.is_rebind_of(&[preset("a"), preset("b"), preset("c")]),
+        "a longer roster is not a rebind either"
+    );
+    assert!(
+        !held.is_rebind_of(&[preset("a"), preset("c")]),
+        "a renamed preset is a different preset"
+    );
+    assert!(
+        !held.is_rebind_of(&[preset_on("a", "swarm"), preset_on("b", "emitter")]),
+        "a preset that changed system drives a different scene"
+    );
+    assert!(
+        !held.is_rebind_of(&[]),
+        "an empty replacement is ignored entirely, so it is never a rebind"
+    );
 }
