@@ -193,9 +193,18 @@ hand-edited.
 sanitized once in `draw_frame` and six in-scene guards are deleted), `1209b76` (3, the collage
 `drift`/`spin` integrate per canvas), `2373775` (4, the emitter's sprite rotation integrates per
 object), `36e52bb` (5, no preset retuned and why) and `2f4ca19` (6, the dissolve note). Review:
-**no blockers, two majors, three minors, one nit.** Version **0.111.0** (minor). Closed
+**no blockers, two majors, three minors, one nit.** Version **0.111.1**. Closed
 [backlog 0149 + 0150](../design-backlog-archive.md), carried 0142 with a dated size update, filed
 0189-0191.
+
+- **This close carries two `chore: Release` commits, and only the second one counts.** The close
+bumped `0.110.0 -> 0.111.0` (minor: the plan shipped a feature), and a parallel actor in the main
+checkout bumped `0.111.0 -> 0.111.1` thirty-six seconds later. Neither had been pushed. The user's
+call was to keep `0.111.1` and drop the now-redundant `v0.111.0` tag, so **`v0.111.1` is the tag for
+Plan 0140** and `c0f272e` is a release commit no tag points at. Nothing was reverted and no history
+was rewritten. It is recorded because [ADR-0005](../adrs/0005-versioning-and-release-cadence.md)
+says the version moves once per plan, and the log here shows it moving twice — the rule was not
+broken by a decision, it was overtaken by a concurrent one.
 
 - **The full suite was verified, not taken from the log.** ADR-0156 defers the nine GPU suites to
 one run per plan, so the close block's `**Full suite:**` bullet is the only record that the goldens

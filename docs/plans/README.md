@@ -719,7 +719,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
-- [0140 — Every rate integrates, for real](done/0140-every-rate-integrates-for-real.md) — closed 2026-09-08. Review: **no blockers, two majors, three minors, one nit.** Version: **0.111.0**. ADR-0152 + 0153 accepted. Archived [backlog 0149 + 0150](../design-backlog-archive.md). [Write-up](README-archive.md).
+- [0140 — Every rate integrates, for real](done/0140-every-rate-integrates-for-real.md) — closed 2026-09-08. Review: **no blockers, two majors, three minors, one nit.** Version: **0.111.1**. ADR-0152 + 0153 accepted. Archived [backlog 0149 + 0150](../design-backlog-archive.md). [Write-up](README-archive.md).
 - [0157 — The cost probes estimate a duration](done/0157-the-cost-probes-estimate-a-duration.md) — closed 2026-09-07. Review: **no blockers, no majors, two minors, one nit.** Version: **none** (no shipped artifact moved). ADR-0173 accepted. [Write-up](README-archive.md).
 - [0153 — The debug tree stops carrying dependency line tables](done/0153-the-debug-tree-stops-carrying-dependency-line-tables.md) — closed 2026-09-07. Review: **no blockers, no majors, one minor.** Version: **none** (chore-only). ADR-0165 accepted. [Write-up](README-archive.md).
 - [0156 - The site becomes the reference](done/0156-the-site-becomes-the-reference.md) - closed 2026-09-06. Review: **no blockers, one major, three minors.** Version: **0.110.0** (minor). ADR-0169 + 0170 + 0171 accepted. Archived [backlog 0180](../design-backlog-archive.md). [Write-up](README-archive.md).
