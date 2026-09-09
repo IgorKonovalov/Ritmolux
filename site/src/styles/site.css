@@ -239,3 +239,103 @@
 .build-stamp code {
   font-size: inherit;
 }
+
+/* ---------------------------------------------------------------------------
+ * The frame lightbox: the modal a thumbnail opens into.
+ *
+ * A frame used to navigate to the full-size WebP, which leaves the site for a
+ * bare image on a browser-chrome background and costs a back-navigation to
+ * return. The modal keeps the reader on the page and carries the caption's
+ * destination as a labelled link, so "look closer" and "read the detail" are
+ * one gesture apart instead of two page loads.
+ *
+ * The dialog element is the frame around the picture and nothing else: no
+ * padding, no background, no border. That is deliberate - a click landing on it
+ * came from the backdrop, which is how the close-on-outside-click in
+ * `Frame.astro` can be one identity test. All of the surface is on the body
+ * inside it.
+ * ------------------------------------------------------------------------- */
+.frame-modal {
+  /* A modal `<dialog>` centres itself on `margin: auto` against `inset: 0`, and
+   * the stock reset this site loads sets `margin: 0` on everything - left
+   * alone, the picture opens pinned to the top-left corner. */
+  margin: auto;
+  max-width: min(94vw, 72rem);
+  max-height: 92vh;
+  padding: 0;
+  border: none;
+  background: transparent;
+  overflow: visible;
+  color: var(--sl-color-white);
+}
+
+.frame-modal::backdrop {
+  background: rgb(0 0 0 / 0.72);
+}
+
+.frame-modal-body {
+  position: relative;
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.75rem;
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 0.75rem;
+  background: var(--sl-color-bg);
+}
+
+/* `max-height` is the viewport minus the body's own chrome - the padding, the
+ * caption row and the gap - so a tall picture shrinks to fit rather than
+ * pushing the caption off screen. */
+.frame-modal-image {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: calc(92vh - 5rem);
+  margin: 0 auto;
+  border-radius: 0.5rem;
+  background: var(--sl-color-gray-6);
+}
+
+.frame-modal-caption {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0;
+  font-size: var(--sl-text-sm);
+}
+
+.frame-modal-detail {
+  color: var(--sl-color-text-accent);
+}
+
+/* Escape closes the dialog natively; this is the same exit for a reader who is
+ * using a pointer. It sits over the picture's top corner rather than in the
+ * caption row, which is where a reader looks for it. */
+.frame-modal-close {
+  position: absolute;
+  top: 1.1rem;
+  right: 1.1rem;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 999px;
+  background: var(--sl-color-bg);
+  color: var(--sl-color-white);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.frame-modal-close:hover {
+  background: var(--sl-color-gray-6);
+}
+
+.frame-modal-close:focus-visible,
+.frame-modal-detail:focus-visible {
+  outline: 2px solid var(--sl-color-text-accent);
+  outline-offset: 2px;
+}

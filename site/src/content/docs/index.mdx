@@ -48,10 +48,12 @@ export const gallery = Object.entries(
   .sort((a, b) => a.system.localeCompare(b.system));
 
 {/*
-  Two destinations per frame, and `Frame` carries both: the picture opens itself
-  at full size, the caption goes to the gallery section holding that system's
-  presets. It is also what keeps this strip from shipping the originals - see
-  the component.
+  Two destinations per frame, and `Frame` carries both: the picture opens at
+  full size in a modal over this page, the caption goes to the gallery section
+  holding that system's presets - and the modal repeats that second destination
+  as `detailLabel`, so a reader who opened the picture can follow it without
+  closing the modal first. `Frame` is also what keeps this strip from shipping
+  the originals - see the component.
 */}
 
 <div class="gallery-strip" role="list">
@@ -60,6 +62,7 @@ export const gallery = Object.entries(
       image={image}
       href={`${import.meta.env.BASE_URL}gallery/#${system}`}
       label={system}
+      detailLabel={`See every ${system} preset`}
       alt={`The ${system} rendering system`}
       sizes="(min-width: 46rem) 15rem, 45vw"
     />
