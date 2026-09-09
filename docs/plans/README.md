@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0160** (ADRs are a separate sequence — next free there is **0179**.)
+**Next free number: 0161** (ADRs are a separate sequence — next free there is **0180**.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -47,6 +47,7 @@ place. The plan file carries the real link.
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
 | [0158](0158-the-player-grows-a-studio-facing-surface.md) | The player grows a studio-facing surface | approved | dev, human | ADR-0175 + ADR-0176: override, OSC control-in, events, schema export, pipe sink, preview readback. **0159 needs Phases 1-5.** Touches `run.rs` beside 0133 and 0120: merge `main` first. |
 | [0159](0159-the-studio-opens.md) | The studio opens | approved | studio-builder, dev, human | ADR-0177 + ADR-0178: the Electron studio under `studio/`, first lane of its kind. **Hard dependency: 0158 Phases 1-5.** Two `human` gates at the end: a tester zip and the on-device check. |
+| [0160](0160-the-silhouettes-preconditions-stop-being-silent.md) | The silhouette's preconditions stop being silent | draft | dev, human | ADR-0179: four preconditions on `[path]` that fail silently. **Hard dependency: 0092**, whose own Phase 7 fixes the axis. Phase 2 is prose in `presets/README.md`. |
 <!-- roster:end -->
 
 **Added 2026-09-09 — [0158] and [0159] are drafted, and they are a program rather than a
