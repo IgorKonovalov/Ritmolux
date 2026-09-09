@@ -267,7 +267,7 @@ stroke = "0.0"       # 0 = filled; > 0 strokes at abs(d) < w
 | 2 — The path becomes a field | dev | done | `bad073f` |
 | 3 — Two paths morph | dev | done | `987c758` |
 | 4 — Arcs, if Plan 0087 delivered them | dev | done | `85e41b7` |
-| 5 — The authoring surface is documented | dev | done | committed with this row |
+| 5 — The authoring surface is documented | dev | done | `d66c3c6` |
 | 6 — The look gate | human | not started | — |
 
 ### Notes
@@ -381,6 +381,22 @@ stroke = "0.0"       # 0 = filled; > 0 strokes at abs(d) < w
 - `presets/README.md`'s structural-config section was retitled — it said "line systems and the
   attractor", and the shape field now joins it.
 
+- Not acted on, noticed at the sweep: `docs/preset-guide.md` — the illustrated entrance, one picture
+  per system — has no picture for an authored path, and Phase 5's file list does not name it.
+
 ### Close triggers
 
-_(filled at the last phase)_
+- **`presets/` touched:** yes — `presets/README.md` only. **No preset `.toml` was added**: nothing in
+  the shipped library declares a `[path]`, so the feature ships with no content on it.
+- **Plan header `Closes:`** none — the header names no `design-backlog` entry.
+- **What shipped:** feature. A new `[path]` structural table, two new `shape_field` params (`stroke`,
+  `morph`), and a new load-error class.
+- **Operator docs touched:** `presets/README.md` (the `[path]` section, the `shape_field` essay's
+  pointer and param rows, the structural-config section title, the generated param block) and
+  `docs/presets.md` (the `[path]` table section, the optional-table roster, the hard-error list).
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit `0`, no entry named.
+- **Full suite:** `cargo nextest run --workspace`, exit `0`, **1593 passed, 6 skipped**, 483.8 s.
+  Upward overrides were also run at Phases 2, 3 and 4 (`golden`, `sanity`, `reactivity`, `animation`,
+  `distinctness`), because each of those phases changed a scene and the preset engine.
+- **Outstanding `human` phases:** Phase 6, the look gate — the morph judged in motion, and whether
+  the paste-render-adjust loop is usable. It gates nothing.
