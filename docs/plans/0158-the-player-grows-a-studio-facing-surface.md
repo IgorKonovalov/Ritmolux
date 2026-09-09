@@ -295,8 +295,8 @@ to a layout.
 | 2 — The player listens | dev | done | `b2d77ec` |
 | 3 — The player reports | dev | done | `fee2cfd` |
 | 4 — The engine states what a preset can contain | dev | done | `d7bdee8` |
-| 5 — The headless tap writes to a pipe | dev | done | committed with this row |
-| 6 — The windowed show gets a preview copy | dev | not started | |
+| 5 — The headless tap writes to a pipe | dev | done | `efb99f7` |
+| 6 — The windowed show gets a preview copy | dev | done | committed with this row |
 | 7 — The on-device check | human | not started | |
 
 ### Notes
@@ -438,6 +438,43 @@ to a layout.
   the done-when is about a process boundary and nothing inside the process can see it. It skips
   with a notice on a runner with no capture endpoint or no adapter; on this machine both were
   present and all three tests ran.
+
+- **Phase 6 reads back at the intermediate's size, which is the window's, not a smaller "preview
+  size".** The plan's *What* says "copies it to a staging buffer at the preview size", and the
+  preview intermediate is built against the output's configured target — an exact
+  `copy_texture_to_texture` has one extent, which is ADR-0143's whole guarantee. Anything smaller
+  needs a **scaling blit**, which is a new render pass in `core` that no done-when asks for. So
+  `--preview stdout` on a 1920x1080 window announces 1920x1080 and writes 8.3 MB a frame. Measured
+  on this machine: **68 MB/s at ~22 fps in a debug build**, and at 165 Hz it would be 1.4 GB/s.
+  **A downscale is worth deciding on before the studio drives this**, and it is the plan's call
+  rather than mine.
+- **Phase 6's cost is measured, and here are both arms.** Debug build, 1920x1080, ~7 s each, one
+  machine, closed with a real window close so the exit line fires:
+  `preview at exit: readback on, frame_ms p50 37.18 p99 76.44, 52 frames written, 0 dropped` and
+  `preview at exit: readback off, frame_ms p50 30.72 p99 76.24`. So ~6.5 ms at the median and
+  nothing at the p99, on a build whose show already runs at 30 fps. **A release-build reading at
+  the projector is Phase 7's**, and these two are too short a sample to be more than a shape.
+  The frame counts are ADR-0172's witness: the `on` arm delivered 52 frames, so it is a reading
+  about a readback that ran.
+- **The `wait_indefinitely` scan found a third legitimate site the done-when does not name.**
+  `core/src/render/scenes/particles/mod.rs`'s `read_particles` is a `#[cfg(test)]` instrument that
+  no shipped build compiles. Rather than allowlist the file and let a shipped wait hide there
+  later, the test asserts that file's wait still sits **after** the `#[cfg(test)]` attribute that
+  gates it.
+- **The readback advances on the capture path as well as the present path.** Stating the rule as
+  "a readback advances on every frame drawn through the intermediate" is what lets the one-frame-late
+  contract, the byte identity and the 300-frame residency all be asserted with no window — the
+  capture path already routes through the same intermediate by the same recorded commands.
+- **Phase 6 touched five files outside its list**: `standalone/src/cli.rs` and
+  `standalone/src/app_state.rs` (the flag and the frame-loop hook), `core/src/render/capture.rs`
+  (`unpad_rows` widened to `pub(super)`), `core/src/render/capture_api.rs` (the capture-path step),
+  and `standalone/tests/help_cli.rs` + `standalone/tests/console_preview_memory.rs` for the tests.
+- **The windowed path was smoke-tested by hand**, since nothing in the suite opens a window:
+  `--preview stdout --events` on this machine emitted `hello`, `roster`,
+  `{"ev":"stream","width":1920,"height":1080,"fps":165,"format":"rgba8"}`, `preset` and `health`
+  with live figures, and put 182 MB of whole frames on the pipe across 8 s. The first `health` read
+  all zeros until the cadence was moved to start one interval in — the diagnostics window is empty
+  before the first frame, and a row of zeros is indistinguishable from a stalled player.
 
 ### Close triggers
 

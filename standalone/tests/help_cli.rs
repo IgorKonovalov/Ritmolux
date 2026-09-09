@@ -237,3 +237,25 @@ fn schema_answers_on_stdout_and_exits_without_starting_the_app() {
         "the document is missing the hash or the systems roster"
     );
 }
+
+/// `--preview` with a sink this build does not have exits without a window,
+/// naming the one it does.
+///
+/// The same rule every windowed flag follows: a value typed for this run that
+/// cannot be honoured is a usage error, not a window that opens and then reports
+/// one. The default — the flag absent — is covered by every other case in this
+/// file, all of which pass no `--preview` and none of which mirrors anything.
+#[test]
+fn an_unknown_preview_sink_exits_without_starting() {
+    let (code, _, stderr, elapsed) = run_both(&["--preview", "syphon"]);
+    assert_eq!(code, Some(2), "a bad flag value is a usage error");
+    assert!(
+        elapsed < RESPONDS_WITHIN,
+        "--preview syphon took {elapsed:?}, which is long enough that it may \
+         have opened a window before refusing"
+    );
+    assert!(
+        stderr.contains("syphon") && stderr.contains("stdout"),
+        "the refusal does not name the value and the sink that exists: {stderr}"
+    );
+}

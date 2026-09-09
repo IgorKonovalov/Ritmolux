@@ -96,6 +96,34 @@ the cadence actually in force, and a periodic `console open:` note carries the p
 / decimated totals, which is what makes a cost reading on some other machine believable rather
 than merely low.
 
+### Mirroring the show to another program
+
+`--preview stdout` sends the frames the projector is showing to whatever spawned the player, as
+raw RGBA8 on standard output. It is how an editor watches the **real** show rather than a second
+headless one, and it rides the same intermediate the console's corner preview does — the frame is
+drawn into it, copied to its real destination unchanged, and copied a second time to a staging
+buffer for the mirror.
+
+**The display loop never waits for it.** The staging copy rides the frame's own submission and its
+mapping is taken on the **next** frame with a non-blocking poll, so a frame that is not ready yet
+costs the show nothing at all. The mirror is therefore one frame behind the projector, which is
+the whole price of never stalling.
+
+**It drops rather than stalls.** A reader slower than the show loses frames; the show carries on.
+That is the opposite of the headless `--sink stdout`, which blocks — a headless loop has no
+present deadline to miss and this one does.
+
+It needs no console, and closing the console does not take it away: the two are separate consumers
+of one intermediate. The geometry is the **output's**, announced before the first frame by the
+`stream` event on standard error (with `--events`), so a reader knows how to cut the pipe up.
+
+**What it costs is written down, not assumed.** On exit, and when the console closes,
+`diagnostics.log` gains a `preview` note naming the regime, the show's frame-time p50 and p99, and
+— when the mirror was on — how many frames it wrote and how many it dropped. The frame counts are
+what make the reading a reading: a run reporting a frame time and zero frames written measured a
+mirror that never delivered. Comparing a run with the flag against one without it is what prices
+the feature; the note names its regime so the two are never confused.
+
 ## Now playing
 
 When the track changes, the **artist and title fade in** over the visuals in the

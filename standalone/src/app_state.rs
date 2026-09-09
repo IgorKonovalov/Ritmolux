@@ -376,6 +376,20 @@ pub(crate) struct AppState {
 
     pub(crate) diagnostics: Diagnostics,
 
+    /// The windowed show's preview writer, present only with `--preview stdout`
+    /// (Plan 0158 Phase 6). Absent otherwise, and then the preview intermediate
+    /// and its readback are never opened either — so a run without the flag
+    /// draws exactly what it drew before the flag existed.
+    pub(crate) preview_pipe: Option<crate::stream::PreviewPipe>,
+
+    /// Whether `--preview stdout` holds the intermediate open independently of
+    /// the console.
+    ///
+    /// The two consumers are separate: closing the console must not take a
+    /// preview a parent process is reading, and opening one must not be needed
+    /// to start it.
+    pub(crate) preview_pinned: bool,
+
     /// The structured event stream (ADR-0176), present only when `--events`
     /// turned it on. Absent otherwise, so the frame path is a `None` test and
     /// standard error carries exactly what it always did.
@@ -597,15 +611,19 @@ impl AppState {
                 reported_demotion: false,
             },
             control: app.control.take(),
+            preview_pipe: None,
+            preview_pinned: app.preview_pipe,
             events: app.events.take(),
             reported_preset: String::new(),
-            // Due immediately, so a parent gets a first reading on the first
-            // drawn second rather than after one.
+            // Due one interval from now, not immediately: the diagnostics
+            // window is empty before the first frame, so a reading taken at
+            // startup is a row of zeros — which a parent cannot tell from a
+            // player that has stalled.
             #[allow(
                 clippy::disallowed_methods,
                 reason = "the health cadence is shell frame pacing; core analysis stays clock-free"
             )]
-            next_health: Instant::now(),
+            next_health: Instant::now() + HEALTH_INTERVAL,
         };
         // **Which GPU is rendering the show**, once, at startup. Unflagged, the
         // window takes whatever wgpu returns for the surface, which on a hybrid
@@ -783,18 +801,54 @@ impl AppState {
         self.diagnostics.diag_log.note(&note);
     }
 
+    /// Write the preview readback's cost to the diagnostics log.
+    ///
+    /// **The frame time of the show, and the witness that the readback ran**
+    /// (ADR-0172). The readback is either on for a whole run or off for it, so
+    /// the "on and off" comparison the cost needs is two runs of the same
+    /// command with and without `--preview stdout`, and this line is what makes
+    /// the two comparable: it names the regime, so a reader is never subtracting
+    /// figures from runs that were in the same one.
+    ///
+    /// `written` is the witness. A run that reports a frame time and zero frames
+    /// written measured a readback that never delivered, which is not a reading
+    /// about the readback at all — and a run with `off` has nothing to witness,
+    /// which is why the two shapes differ.
+    pub(crate) fn note_preview_cost(&mut self, label: &str) {
+        let p50 = self.renderer.frame_ms_p50();
+        let p99 = self.renderer.metrics().frame_ms_p99;
+        let note = match self.preview_pipe.as_ref().map(|pipe| pipe.totals()) {
+            Some((written, dropped)) => format!(
+                "preview {label}: readback on, frame_ms p50 {p50:.2} p99 {p99:.2}, \
+                 {written} frames written, {dropped} dropped"
+            ),
+            None => format!("preview {label}: readback off, frame_ms p50 {p50:.2} p99 {p99:.2}"),
+        };
+        self.diagnostics.diag_log.note(&note);
+    }
+
     /// Close the console and release its swapchain. Idempotent.
     pub(crate) fn close_console(&mut self) {
         if self.hud.console_window.take().is_some() {
             // Before the detach: the present and skip counts live on the target
             // and go away with it.
             self.note_console_totals("closed");
+            // The preview's own cost, taken with the console's: both are readings
+            // about what the show paid for a second consumer, and a reader wants
+            // them from the same moment.
+            self.note_preview_cost("at console close");
             self.renderer.detach_aux();
             // Released with the window: while this is open the show is drawn
             // into an intermediate and copied out, so leaving it behind would
             // hold both the allocation and the extra copy for a console nobody
             // is looking at.
-            self.renderer.close_preview();
+            //
+            // Unless `--preview stdout` is holding it: the console and the pipe
+            // are two consumers of one intermediate, and closing the window one
+            // of them lives in must not take the other's picture away.
+            if !self.preview_pinned {
+                self.renderer.close_preview();
+            }
         }
     }
 
@@ -937,6 +991,62 @@ impl AppState {
         let names = self.roster_names();
         let refs: Vec<&str> = names.iter().map(String::as_str).collect();
         self.hud.browse.on_roster_changed(&refs);
+    }
+
+    /// Open the windowed preview pipe, if `--preview stdout` asked for one.
+    ///
+    /// Three things in order, and the order is the contract: the intermediate,
+    /// the readback that copies out of it, then the `stream` event announcing
+    /// the geometry a parent will cut the pipe into frames by — before the
+    /// writer thread that could put a byte on it exists.
+    ///
+    /// A refusal is not fatal. The surface may not accept the exact copy the
+    /// preview rests on, and then the show runs without a mirror rather than
+    /// running through an inexact path — the same choice the console makes.
+    pub(crate) fn open_preview_pipe(&mut self) {
+        if !self.preview_pinned {
+            return;
+        }
+        if let Err(err) = self
+            .renderer
+            .open_preview()
+            .and_then(|()| self.renderer.open_preview_readback())
+        {
+            eprintln!("--preview: unavailable on this surface, the show runs without it: {err}");
+            self.preview_pinned = false;
+            return;
+        }
+        let Some((width, height)) = self.renderer.preview_readback_size() else {
+            return;
+        };
+        // The **display's** rate, not a requested one: a windowed run is paced by
+        // the swapchain, so the number a reader wants is what the projector
+        // refreshes at. `0` where the platform will not say, which reads as
+        // "unpaced" rather than as a rate nothing runs at.
+        let fps = display_hz(&self.window).map_or(0, |hz| hz.round().max(0.0) as u32);
+        if let Some(events) = self.events.as_mut() {
+            events.emit(&Event::Stream {
+                width,
+                height,
+                fps,
+                format: crate::stream::STREAM_FORMAT,
+            });
+        }
+        self.preview_pipe = Some(crate::stream::PreviewPipe::spawn(width, height));
+    }
+
+    /// Hand this frame's readback to the writer, if one landed.
+    ///
+    /// `None` is the ordinary case on every other frame: the readback is
+    /// consumed one frame late, so it yields at most one picture per frame and
+    /// the display loop never waits for it.
+    pub(crate) fn feed_preview_pipe(&mut self) {
+        let Some(pipe) = self.preview_pipe.as_ref() else {
+            return;
+        };
+        if let Some(image) = self.renderer.take_preview_frame() {
+            pipe.send(image);
+        }
     }
 
     /// Emit a `preset` event when the preset **on screen** has changed.
@@ -1114,6 +1224,9 @@ impl AppState {
         if let Err(err) = self.renderer.render(&frame, dt) {
             eprintln!("render error: {err}");
         }
+        // The preview mirror, after the frame whose predecessor it carries.
+        // A no-op without `--preview stdout`.
+        self.feed_preview_pipe();
         // The structured stream, after the frame that produced the figures it
         // reports (ADR-0176). Both are no-ops without `--events`.
         self.report_active_preset();

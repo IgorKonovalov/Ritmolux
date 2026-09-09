@@ -469,6 +469,102 @@ impl FrameSink for SpoutFrameSink {
     }
 }
 
+/// The windowed run's preview writer: a thread, a bounded queue, and a count of
+/// what it could not take.
+///
+/// **This one drops; the headless sink blocks.** The two policies are opposite
+/// and both are deliberate. A headless loop has no present deadline, so a
+/// blocked write costs frames and nothing else. A windowed run has one it cannot
+/// miss, and a reader that stopped reading must not be able to take the show
+/// down with it — so the frame is dropped, counted, and the show carries on.
+///
+/// The count is what makes the cost measurable rather than assumed: a preview
+/// that delivered nothing and a preview that cost nothing look identical without
+/// it (ADR-0172).
+pub struct PreviewPipe {
+    tx: Option<std::sync::mpsc::SyncSender<rlx_core::render::CaptureImage>>,
+    writer: Option<std::thread::JoinHandle<()>>,
+    /// Frames the queue had no room for.
+    dropped: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    /// Frames handed to the writer.
+    sent: std::sync::Arc<std::sync::atomic::AtomicU64>,
+}
+
+/// How many frames may wait for the writer.
+///
+/// Two: one being written and one behind it. A deeper queue would not help a
+/// reader that is slower than the show — it would only make the picture it
+/// eventually sees older.
+const PREVIEW_QUEUE: usize = 2;
+
+impl PreviewPipe {
+    /// Start the writer thread for `width` x `height` frames.
+    pub fn spawn(width: u32, height: u32) -> Self {
+        let (tx, rx) =
+            std::sync::mpsc::sync_channel::<rlx_core::render::CaptureImage>(PREVIEW_QUEUE);
+        let dropped = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let sent = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let writer = std::thread::Builder::new()
+            .name("rlx-preview".to_owned())
+            .spawn(move || {
+                let mut sink = StdoutSink::new(width, height);
+                // Ends when the sender is dropped, which is what closes this
+                // down: no flag, no timeout, no way to leave the thread running
+                // past the show.
+                while let Ok(image) = rx.recv() {
+                    if sink.send(&image.rgba, image.width, image.height).is_err() {
+                        // The reader went away. Nothing to report to and nothing
+                        // to do but stop taking frames; the show keeps drawing.
+                        break;
+                    }
+                }
+            })
+            .ok();
+        Self {
+            tx: Some(tx),
+            writer,
+            dropped,
+            sent,
+        }
+    }
+
+    /// Hand a frame to the writer, or drop it and count that.
+    pub fn send(&self, image: rlx_core::render::CaptureImage) {
+        use std::sync::atomic::Ordering;
+        let Some(tx) = self.tx.as_ref() else {
+            self.dropped.fetch_add(1, Ordering::Relaxed);
+            return;
+        };
+        match tx.try_send(image) {
+            Ok(()) => {
+                self.sent.fetch_add(1, Ordering::Relaxed);
+            }
+            Err(_) => {
+                self.dropped.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+    }
+
+    /// Frames written, and frames dropped — the pair a cost line reports.
+    pub fn totals(&self) -> (u64, u64) {
+        use std::sync::atomic::Ordering;
+        (
+            self.sent.load(Ordering::Relaxed),
+            self.dropped.load(Ordering::Relaxed),
+        )
+    }
+}
+
+impl Drop for PreviewPipe {
+    /// Close the queue and wait for the writer to finish the frame it holds.
+    fn drop(&mut self) {
+        self.tx = None;
+        if let Some(writer) = self.writer.take() {
+            let _ = writer.join();
+        }
+    }
+}
+
 /// Set by the console control handler so the loop can leave through its own
 /// exit path and print the summary, rather than being torn down mid-frame.
 static STOPPING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);

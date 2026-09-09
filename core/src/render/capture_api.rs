@@ -94,8 +94,19 @@ impl Renderer {
             p.record_copy_to(&mut encoder, &texture);
         }
         self.preview = preview;
+        // The preview readback advances on **every** frame drawn through the
+        // intermediate, which is this path as much as the present path: the two
+        // record the same clear, draw and copy, and stating the rule once is
+        // what lets the readback's own claims be asserted with no window
+        // (`core/tests/console_preview.rs`). It changes nothing about the image
+        // returned below — it is an extra copy out of the intermediate, not a
+        // change to what was drawn into it.
+        let recorded = self.step_preview_readback(&mut encoder);
         capture::record_copy(&mut encoder, &texture, &buffer, padded_bpr, width, height);
         self.ctx.queue.submit(std::iter::once(encoder.finish()));
+        if recorded {
+            self.arm_preview_readback();
+        }
 
         #[cfg(feature = "text")]
         self.text_layer.end_frame();

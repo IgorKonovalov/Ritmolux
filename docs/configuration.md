@@ -23,6 +23,7 @@ telemetry.
 | `--list-adapters` | — | Enumerate graphics adapters and exit, from both rosters |
 | `--schema` | — | Print the preset schema as JSON on stdout and exit |
 | `--events` | — | Report as JSON lines on stderr, for a parent process |
+| `--preview` | `stdout` | Mirror the windowed show's frames to a parent process |
 | `--input` | `loopback` \| `line-in` | Where audio comes from (Windows-only) |
 | `--device` | `"<friendly name>"` | Which capture endpoint to open |
 | `--tier` | `floor` \| `rich` | Pin the quality tier instead of letting the engine pick |
@@ -58,6 +59,21 @@ Every event line begins with `{` and no human diagnostic does, so a parent split
 first byte and needs no framing. The flag is purely **additive**: without it standard error carries
 exactly the lines it always did, and with it those same lines are still there, unchanged, beside
 the events.
+
+**`--preview stdout`** mirrors a **windowed** run's frames to whatever spawned it, in the same raw
+RGBA8 form `--stream --sink stdout` uses and announced by the same `stream` event. It is how a
+studio watches the show that is actually on the projector, rather than a second headless one.
+
+**Off by default**, and the default matters: with the flag absent nothing is allocated, no frame is
+copied twice, and the show draws exactly what it drew before the flag existed. With it on, the
+frame is routed through the operator console's own intermediate, copied to a staging buffer, and
+read back **one frame late** with a non-blocking poll — so the display loop never waits for it.
+
+**It drops rather than stalls.** A reader slower than the show loses frames and the show carries
+on; the count of what was dropped is written to `diagnostics.log` beside the frame-time figures,
+so the cost of the mirror is measurable rather than assumed. That is the opposite of the headless
+`--sink stdout` policy, which blocks — a headless loop has no present deadline and a windowed one
+does. See [Capturing](capturing.md).
 
 **`--schema`** answers the other question a program asks before it starts driving the player: what
 a preset may contain. It prints one JSON object on stdout — every system and engine stage with its

@@ -50,6 +50,7 @@ pub(crate) mod grid;
 pub(crate) mod ink;
 pub(crate) mod kaleidoscope;
 pub mod preview;
+mod preview_readback;
 // The `over`-join blend pass (ADR-0090 / Plan 0076 Phase 3) — driven by the
 // `PostChain`, whose walk knows the junction; nothing else reaches it.
 pub(crate) mod layer_blend;
@@ -336,6 +337,18 @@ pub struct Renderer {
     /// allocated, no copy is encoded and the frame path is what it was — which
     /// is what makes the console free when it is closed.
     preview: Option<preview::PreviewTarget>,
+    /// The preview's non-blocking readback (Plan 0158 Phase 6), `None` unless a
+    /// shell opened one. While it is `Some` each frame drawn through the
+    /// intermediate records one `copy_texture_to_buffer` and polls the previous
+    /// frame's map; while it is `None` nothing is allocated and the frame path
+    /// costs one `Option` test.
+    preview_readback: Option<preview_readback::PreviewReadback>,
+    /// The most recent frame the readback produced and nothing has taken.
+    ///
+    /// One slot rather than a queue: a preview wants the newest picture, and a
+    /// consumer that fell behind is better served by the current frame than by
+    /// the backlog it missed.
+    preview_frame: Option<CaptureImage>,
     /// The now-playing banner (ADR-0110): a string a shell pushes in, plus the
     /// `dt`-driven envelope that fades it. Present in every build — a plugin
     /// build without the `text` feature holds the state and draws nothing.
@@ -463,6 +476,8 @@ impl Renderer {
             #[cfg(feature = "text")]
             aux: None,
             preview: None,
+            preview_readback: None,
+            preview_frame: None,
             now_playing: NowPlaying::default(),
             cap_overflow: None,
             series_scratch: vec![0.0; scenes::lines::spectrum::MAX_ELEMENTS],
@@ -697,6 +712,10 @@ impl Renderer {
         // The intermediate's copy extent is fixed at construction, so a live
         // preview is rebuilt at the new size rather than left disagreeing with
         // the destination it copies into.
+        // A readback sized against the outgoing intermediate would ask for a copy
+        // of the wrong extent, so it is rebuilt with it — and only when one was
+        // open, so a resize on a run that never asked for one allocates nothing.
+        let readback_open = self.preview_readback.is_some();
         if self.preview.is_some() {
             self.preview = Some(preview::PreviewTarget::new(
                 &self.ctx.device,
@@ -704,6 +723,11 @@ impl Renderer {
                 self.ctx.config.width,
                 self.ctx.config.height,
             ));
+            if readback_open {
+                // Failure here means the preview it was rebuilt for is gone,
+                // which the branch above just ruled out.
+                let _ = self.open_preview_readback();
+            }
         }
     }
 
@@ -733,8 +757,14 @@ impl Renderer {
 
     /// Release the intermediate. Idempotent, and the frame path returns to
     /// drawing straight at its destination on the very next frame.
+    ///
+    /// Takes any readback with it: the readback copies out of the intermediate,
+    /// so one left behind would hold a staging buffer for a texture that no
+    /// longer exists and never yield another frame.
     pub fn close_preview(&mut self) {
         self.preview = None;
+        self.preview_readback = None;
+        self.preview_frame = None;
     }
 
     /// The open preview's size and identity, or `None` when closed.
@@ -1043,9 +1073,17 @@ impl Renderer {
             p.record_copy_to(&mut encoder, &surface_tex.texture);
         }
         self.preview = preview;
+        // The readback rides this frame's own submission and takes the previous
+        // frame's map on the way past, without waiting for either. `false` when
+        // no readback is open, when the map has not landed, or when the
+        // intermediate has been rebuilt under it.
+        let recorded = self.step_preview_readback(&mut encoder);
 
         self.ctx.queue.submit(std::iter::once(encoder.finish()));
         self.ctx.queue.present(surface_tex);
+        if recorded {
+            self.arm_preview_readback();
+        }
 
         // Free atlas glyphs unused this frame and clear the queue for the next.
         #[cfg(feature = "text")]
@@ -1128,6 +1166,10 @@ impl Renderer {
             now_playing: _,
             // Set at preset load, surfaced by the frontend — not a per-frame concern.
             cap_overflow: _,
+            // Stepped either side of the submission in `render`, which is where
+            // the encoder and the queue both are; a frame encode never sees them.
+            preview_readback: _,
+            preview_frame: _,
             // The caller decided which view this frame draws into and owns the
             // copy out of it; from in here the intermediate is just the target.
             preview: _,

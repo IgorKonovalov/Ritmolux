@@ -282,7 +282,7 @@ fn f16_to_f32(bits: u16) -> f32 {
 
 /// Copy the tight `width*4` bytes out of each padded row into a contiguous
 /// buffer. A short final row (never expected) is skipped rather than panicking.
-fn unpad_rows(padded: &[u8], width: u32, height: u32, padded_bpr: u32) -> Vec<u8> {
+pub(super) fn unpad_rows(padded: &[u8], width: u32, height: u32, padded_bpr: u32) -> Vec<u8> {
     let tight_bpr = (width * BYTES_PER_PIXEL) as usize;
     let mut out = Vec::with_capacity(tight_bpr * height as usize);
     for row in padded.chunks_exact(padded_bpr as usize) {

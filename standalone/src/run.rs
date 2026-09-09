@@ -22,9 +22,9 @@ use crate::app_state::{APP_TITLE, AppState, HIDDEN_TICK};
 use crate::capture_start::list_devices_and_exit;
 use crate::cli::{
     InputSource, missing_companion, parse_console_flag, parse_control_arg, parse_downbeat_log_arg,
-    parse_events_flag, parse_input_args, parse_osc_arg, parse_soak_arg, parse_tier_arg, print_help,
-    resolve_config_path, resolve_control, resolve_input, resolve_osc, unrecognized_flag,
-    valued_valueless_flag, windowed_flag,
+    parse_events_flag, parse_input_args, parse_osc_arg, parse_preview_arg, parse_soak_arg,
+    parse_tier_arg, print_help, resolve_config_path, resolve_control, resolve_input, resolve_osc,
+    unrecognized_flag, valued_valueless_flag, windowed_flag,
 };
 use crate::console;
 use crate::preset_dir::startup_preset_names;
@@ -72,6 +72,10 @@ pub(crate) struct App {
     /// `--events` was not passed, and then standard error carries exactly the
     /// human diagnostics it always did (ADR-0176).
     pub(crate) events: Option<Events>,
+    /// `--preview stdout` was passed: the windowed show's frames are mirrored
+    /// to a parent process. Off by default, and a run without it draws exactly
+    /// what it drew before the flag existed (ADR-0176).
+    pub(crate) preview_pipe: bool,
     /// `--console` was passed. Held beside `config` rather than written into it,
     /// so the flag opens the console for this launch without persisting itself
     /// — the same shape `--input` / `--device` / `--osc` follow (ADR-0142).
@@ -107,6 +111,10 @@ impl ApplicationHandler for App {
             match event_loop.create_window(attrs) {
                 Ok(window) => {
                     let mut state = AppState::new(Arc::new(window), self, display_index);
+                    // The preview pipe, after the surface exists: the
+                    // intermediate is built against the swapchain's format and
+                    // size, so it cannot be opened before there is one.
+                    state.open_preview_pipe();
                     state.window.request_redraw();
                     // `--console` and `[console] enabled` are one path with the
                     // hotkey and the settings row: both set the same pending
@@ -203,7 +211,13 @@ impl ApplicationHandler for App {
         }
 
         match event {
-            WindowEvent::CloseRequested => event_loop.exit(),
+            WindowEvent::CloseRequested => {
+                // The run's own cost line, written before the loop unwinds:
+                // after `exit()` there is no guaranteed frame in which to take a
+                // reading, and this is the one a ten-minute show produces.
+                state.note_preview_cost("at exit");
+                event_loop.exit();
+            }
             WindowEvent::Resized(size) => {
                 state.renderer.resize(size.width, size.height);
                 // A reconfigure rebuilds GPU resources exactly as a preset
@@ -624,6 +638,17 @@ pub fn run() {
         None => None,
     };
 
+    // Resolved before the window exists, so an unknown sink is a usage error
+    // rather than a window that opens and then reports one — the shape every
+    // other windowed flag follows.
+    let preview_pipe = match parse_preview_arg() {
+        Ok(wanted) => wanted,
+        Err(err) => {
+            eprintln!("{err}");
+            std::process::exit(2);
+        }
+    };
+
     // `hello` is the **first** event line, and it is emitted here rather than in
     // `resumed` because a studio spawns this process and waits for it: a hello
     // that arrived after the window opened would leave the parent with no way to
@@ -686,6 +711,7 @@ pub fn run() {
         osc,
         control,
         events,
+        preview_pipe,
         console_flag: parse_console_flag(),
         state: None,
     };

@@ -93,6 +93,12 @@ pub(crate) const FLAGS: &[FlagSpec] = &[
         help: "print the audio capture endpoints and exit (Windows-only)",
     },
     FlagSpec {
+        name: "--preview",
+        takes_value: true,
+        requires: None,
+        help: "<stdout> mirror the windowed show's frames to a parent process",
+    },
+    FlagSpec {
         name: "--events",
         takes_value: false,
         requires: None,
@@ -671,6 +677,23 @@ pub(crate) fn resolve_osc(flag: Option<String>, config: &config::Osc) -> Option<
         None if config.enabled => Some((config.target.clone(), config.rate_hz)),
         None => None,
     }
+}
+
+/// `--preview <sink>`, validated against the one sink a windowed run offers.
+///
+/// A value rather than a bare flag, because the sink is the thing that varies:
+/// `stdout` is what a parent process reads, and a future one would be a new
+/// spelling here rather than a second flag.
+pub(crate) fn parse_preview_arg() -> Result<bool, String> {
+    let Some(value) = windowed_flag("--preview")? else {
+        return Ok(false);
+    };
+    if value == "stdout" {
+        return Ok(true);
+    }
+    Err(format!(
+        "--preview: unknown sink '{value}' (expected one of: stdout)"
+    ))
 }
 
 /// Whether `--events` was passed.

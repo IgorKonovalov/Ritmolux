@@ -209,3 +209,90 @@ fn closing_the_preview_returns_the_resident_set_toward_its_baseline() {
          is not releasing: {after_line}"
     );
 }
+
+/// One preview **readback** sustains the same long run (Plan 0158 Phase 6).
+///
+/// The readback holds a staging buffer and a map in flight, and the natural way
+/// to get it wrong is a fresh buffer per frame — one `map_async` whose result
+/// nobody consumes leaves the buffer mapped forever, and the obvious repair is
+/// to allocate another. That defect grows the resident set linearly, which is
+/// exactly what this measures.
+///
+/// The frame count and the ceiling are the ones the test above uses, so the two
+/// readings are comparable: the difference between them is the readback.
+#[test]
+fn one_preview_readback_carries_three_hundred_frames_without_growing() {
+    let Some(mut renderer) = headless() else {
+        return;
+    };
+    let frame = AnalysisFrame::default();
+
+    renderer.open_preview().expect("a preview opens");
+    renderer
+        .open_preview_readback()
+        .expect("a readback opens against an open preview");
+    assert_eq!(
+        renderer.preview_readback_size(),
+        Some((WIDTH, HEIGHT)),
+        "the readback follows the intermediate's size"
+    );
+
+    let mut resident = ResidentSet::default();
+    // Before the first frame, so the baseline holds the renderer, the
+    // intermediate and the staging buffer — but none of the run.
+    resident.sample();
+
+    let every = (FRAMES / SAMPLE_POINTS).max(1);
+    let mut delivered = 0u32;
+    let mut any_content = false;
+    for index in 0..FRAMES {
+        renderer
+            .capture_frame(&frame)
+            .unwrap_or_else(|e| panic!("frame {index} of {FRAMES} through the readback: {e}"));
+        if let Some(preview) = renderer.take_preview_frame() {
+            delivered += 1;
+            assert_eq!(
+                (preview.width, preview.height),
+                (WIDTH, HEIGHT),
+                "frame {index} read back at a size the readback was not opened at"
+            );
+            any_content |= preview.rgba.iter().any(|&b| b != 0);
+        }
+        if index > 0 && index.is_multiple_of(every) {
+            resident.sample();
+        }
+    }
+    resident.sample();
+
+    // The witness that the readback ran at all: a run that delivered nothing
+    // would hold the resident set flat for the wrong reason entirely.
+    assert!(
+        delivered > FRAMES / 2,
+        "the readback delivered {delivered} of {FRAMES} frames; it is consumed \
+         one frame late, so a run this long should deliver all but the first"
+    );
+    assert!(
+        any_content,
+        "every frame the readback delivered was pure black, so a flat resident \
+         set says nothing about a loop that draws"
+    );
+
+    let line = resident.summary(FRAMES);
+    eprintln!("readback: {line}");
+    if resident.samples.is_empty() {
+        return;
+    }
+    assert!(
+        resident.samples.len() > 10,
+        "the resident set was sampled {} times across {FRAMES} frames, which \
+         cannot separate steady growth from a single startup step: {line}",
+        resident.samples.len()
+    );
+    let growth = growth_mb(&line);
+    assert!(
+        growth < CEILING_MB,
+        "the resident set grew {growth:.1} MB across {FRAMES} frames with the \
+         readback open — the staging buffer is supposed to be built once in \
+         open_preview_readback and re-recorded into per frame: {line}"
+    );
+}
