@@ -116,6 +116,7 @@ const full = await getImage({ src: image, format: 'webp', quality: 80 });
    * inside it.
    */
   let dialog: HTMLDialogElement | null = null;
+  let body: HTMLElement;
   let picture: HTMLImageElement;
   let name: HTMLElement;
   let detail: HTMLAnchorElement;
@@ -139,22 +140,79 @@ const full = await getImage({ src: image, format: 'webp', quality: 80 });
     });
     document.body.append(node);
 
+    body = node.querySelector('.frame-modal-body') as HTMLElement;
     picture = node.querySelector('.frame-modal-image') as HTMLImageElement;
+
+    // The one `<img>` is reused across opens, and a browser keeps painting the
+    // picture it last decoded until a new `src` has finished loading - so a
+    // second frame would open showing the FIRST one for as long as its bytes
+    // took to arrive. Emptying the image on close leaves nothing to paint: the
+    // next open starts from the placeholder box. Every exit fires `close` -
+    // the button, the backdrop, Escape.
+    node.addEventListener('close', () => {
+      picture.removeAttribute('src');
+      picture.style.width = '';
+      picture.style.height = '';
+    });
+    // Once the bytes have landed the stylesheet's `max-width`/`max-height`
+    // fit the picture from its intrinsic size, and they keep fitting it when
+    // the window is resized while the placeholder's fixed size would not - so
+    // the placeholder hands over here. The two agree to the pixel, because the
+    // placeholder was computed from the same rules.
+    picture.addEventListener('load', () => {
+      picture.style.width = '';
+      picture.style.height = '';
+    });
     name = node.querySelector('.frame-modal-label') as HTMLElement;
     detail = node.querySelector('.frame-modal-detail') as HTMLAnchorElement;
     dialog = node;
     return node;
   }
 
+  /**
+   * The size the stylesheet will give a picture of `width` x `height` once it
+   * has loaded: shrunk to fit the dialog's width limit less the body's own
+   * chrome and the image's height limit, never enlarged. Read from computed
+   * style so the numbers live in `site.css` only - `min()` and `calc()` of
+   * viewport and rem units resolve to pixels at computed-value time, and a
+   * closed dialog still computes.
+   */
+  function fit(node: HTMLDialogElement, width: number, height: number) {
+    const modal = getComputedStyle(node);
+    const chrome = getComputedStyle(body);
+    const image = getComputedStyle(picture);
+    const maxWidth =
+      parseFloat(modal.maxWidth) -
+      parseFloat(chrome.paddingLeft) -
+      parseFloat(chrome.paddingRight) -
+      parseFloat(chrome.borderLeftWidth) -
+      parseFloat(chrome.borderRightWidth);
+    const maxHeight = parseFloat(image.maxHeight);
+    const scale = Math.min(
+      1,
+      ...[maxWidth / width, maxHeight / height].filter(Number.isFinite),
+    );
+    return { width: Math.round(width * scale), height: Math.round(height * scale) };
+  }
+
   function open(link: HTMLAnchorElement) {
     const node = dialog ?? build();
     const data = link.dataset;
 
-    // The intrinsic size goes on the element so the box is the picture's shape
-    // before the bytes land; `max-width`/`max-height` in the stylesheet do the
-    // fitting from there.
-    picture.width = Number(data.width ?? 0);
-    picture.height = Number(data.height ?? 0);
+    // The box is the picture's shape and size BEFORE the bytes land, so a slow
+    // load shows a grey placeholder where the picture will be instead of a
+    // caption strip that jumps open when it arrives. The size attributes alone
+    // do not buy that - the stylesheet's `width: auto` wins over them and an
+    // unloaded image with no size collapses - so the fitted size is set
+    // inline, computed from the SAME limits the stylesheet fits the loaded
+    // picture with, read back from it rather than restated here.
+    const width = Number(data.width ?? 0);
+    const height = Number(data.height ?? 0);
+    picture.width = width;
+    picture.height = height;
+    const fitted = fit(node, width, height);
+    picture.style.width = `${fitted.width}px`;
+    picture.style.height = `${fitted.height}px`;
     picture.src = link.href;
     picture.alt = data.alt ?? '';
     name.textContent = data.label ?? '';
