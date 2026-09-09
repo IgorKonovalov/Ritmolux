@@ -1,11 +1,18 @@
 # 0140 — Every rate integrates, for real
 
-> **Status:** in-progress
+> **Status:** done
 > **Created:** 2026-08-29
-> **Owner skill(s):** dev, human
-> **Related ADRs:** [0152](../adrs/0152-the-frame-delta-is-sanitized-at-the-scene-seam.md) (proposed),
-> [0153](../adrs/0153-a-per-element-rate-integrates-per-element.md) (proposed)
+> **Owner skill(s):** dev
+> **Related ADRs:** [0152](../../adrs/0152-the-frame-delta-is-sanitized-at-the-scene-seam.md) (accepted),
+> [0153](../../adrs/0153-a-per-element-rate-integrates-per-element.md) (accepted)
 > **Closes:** design-backlog 0149, 0150. **0142 is carried, not closed** — see Phase 6.
+> **Closed:** 2026-09-08. Six phases, six commits (`d310598` through `2f4ca19`), full suite green on
+> the merged tree — 1561 passed, 0 failed, 5 skipped — with no baseline blessed at any point and none
+> moved. Mode 4: **no blockers, two majors, three minors, one nit.** Both majors are about the seam's
+> *reach* rather than its correctness — `self.time += dt` reads the raw delta one call above it, and
+> the seam's own comment names two sites as unguarded that both still carry guards — and both are
+> filed as design-backlog 0189 and 0190 rather than repaired here. Backlog 0191 carries the
+> first-frame-at-defaults behaviour this plan's own Phase 2 test had to be built around.
 
 ## TL;DR
 
@@ -45,8 +52,8 @@ same defect is a ~49x single-frame jitter on `spin` and ~35x on `drift`.
 **Fix the documentation first, then the invariant, then the rates.** Phase 1 is the
 `presets/README.md` correction — ADR-0153 says explicitly it is worth making whether or not the
 engine repair is taken, and it is what stops the content lane writing a fourth affected preset.
-Phase 2 implements [ADR-0152](../adrs/0152-the-frame-delta-is-sanitized-at-the-scene-seam.md).
-Phases 3-5 implement [ADR-0153](../adrs/0153-a-per-element-rate-integrates-per-element.md), with the
+Phase 2 implements [ADR-0152](../../adrs/0152-the-frame-delta-is-sanitized-at-the-scene-seam.md).
+Phases 3-5 implement [ADR-0153](../../adrs/0153-a-per-element-rate-integrates-per-element.md), with the
 emitter's third case **measured before it is repaired**. Phase 6 is the honest note on backlog 0142.
 
 We rejected copying the fourth `dt` guard into `particles/mod.rs` — it leaves five copies, which is
@@ -104,7 +111,7 @@ flowchart TB
   `fragment_field.rs`, `lines/parametric.rs`, `swarm.rs`, `warp_mesh/mod.rs`,
   `warp_mesh/draw.rs`, `shape_collage.rs`, `particles/mod.rs`, `core/src/render/tests.rs`.
 - **Notes for the implementer:**
-  - **Read [ADR-0152](../adrs/0152-the-frame-delta-is-sanitized-at-the-scene-seam.md)'s
+  - **Read [ADR-0152](../../adrs/0152-the-frame-delta-is-sanitized-at-the-scene-seam.md)'s
     `## Correction — 2026-09-07` before starting.** The guard population is **six**, not the four
     the ADR's Context lists — Plan 0126's splits added `shape_collage.rs:1165` and
     `warp_mesh/draw.rs:235` after it was written — and the correction is what this file list and the
@@ -146,7 +153,7 @@ flowchart TB
   `presets/README.md` that they now integrate.
 - **Files touched:** `core/src/render/scenes/shape_collage.rs`, `presets/README.md`.
 - **Notes for the implementer:**
-  - **Read [ADR-0153](../adrs/0153-a-per-element-rate-integrates-per-element.md)'s
+  - **Read [ADR-0153](../../adrs/0153-a-per-element-rate-integrates-per-element.md)'s
     `## Correction — 2026-09-07` before starting.** Its Decision stands; its justification paragraph
     and one Negative bullet do not, and the two bullets below replace them.
   - **This is not `scenes::Phase`.** `Phase` is one accumulator per scene, reset never; these reset
@@ -264,7 +271,7 @@ flowchart TB
 - **The guard still cannot see this class after this plan.** ADR-0153 declines to widen `hygiene.rs`
   for good reasons, which means the next per-element rate has nothing catching it but review — the
   exact route these three arrived by. Phase 1 is the only durable mitigation, and it is a doc.
-- **Phase 2 contends with [Plan 0125](done/0125-the-scenes-share-their-gpu-boilerplate.md)** — that plan
+- **Phase 2 contends with [Plan 0125](0125-the-scenes-share-their-gpu-boilerplate.md)** — that plan
   touches all twelve scenes' boilerplate and this one edits five of them. Take them in series.
 - **The 49x and 35x figures are computed, not measured**, from a one-pole at `tau = 0.6` and
   `SPIN_SPEED = 0.07`. Per ADR-0071 do not assert them; they justify the work, they are not a

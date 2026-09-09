@@ -18,7 +18,7 @@
 > **Closes:** design-backlog 0180 (Phase 6 makes that comment public-facing)
 > **Coordinates with:** [0103](../0103-the-project-gets-an-audience.md) — Phase 2 here moves the
 > operator and developer sections out of `README.md`; 0103 Phase 2 keeps the README's opening and
-> reorders a shorter file. [0140](../0140-every-rate-integrates-for-real.md) and
+> reorders a shorter file. [0140](0140-every-rate-integrates-for-real.md) and
 > [0092](../0092-the-engine-draws-an-authored-path.md) edit scene files that Phase 7 here also edits.
 > **Lane guidance:** a worktree — `WORK/rlx-plan-0156` on `plan-0156-the-site-becomes-the-reference`
 > — because Phases 2, 6 and 7 compile Rust and Phase 7 touches every scene file. The cost is a cold

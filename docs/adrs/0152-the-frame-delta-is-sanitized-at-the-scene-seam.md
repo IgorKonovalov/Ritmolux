@@ -1,9 +1,9 @@
 # ADR-0152 — The frame delta is sanitized once, at the scene seam
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-08
 > **Date:** 2026-08-29
 > **Extends:** [ADR-0135](0135-every-scene-rate-integrates-through-one-shared-phase.md)
-> **Related plan(s):** [0140](../plans/0140-every-rate-integrates-for-real.md)
+> **Related plan(s):** [0140](../plans/done/0140-every-rate-integrates-for-real.md)
 
 ## Context
 
@@ -147,3 +147,35 @@ not move. It keeps its guard.
 
 Whether *hold* or *nominal step* is the right answer for a stalled frame is a real question this
 decision does not settle, and it is now filed rather than folded in.
+
+## Outcome — 2026-09-08, at Plan 0140's close
+
+The Decision is implemented and holds: one guard in `draw_frame`, six in-scene copies deleted, the
+guarantee stated on `Scene::advance`, and a six-probe test asserting that a `NaN`, a negative, a zero
+and an infinity fed one frame in leave the picture byte-identical three clean frames later. The full
+suite is green and no golden moved. **Two things this ADR asserts about the tree are false, and both
+concern the seam's reach rather than its correctness.**
+
+**The seam sits one call too deep to be "the one place a frame delta is checked."** `render()` does
+`self.time += dt` (`core/src/render/mod.rs:971`) **before** it calls `draw_frame`. `self.time` is a
+bare `f32` with no reset on the live path, and it reaches every scene through `set_time`. The C ABI
+passes `dt_seconds` through unvalidated, so one `NaN` from a host poisons the shared scene clock for
+the life of the process — the identical one-way trap this ADR was written to close, on the largest
+accumulator in the engine, immediately upstream of the guard that closes it. Filed as
+design-backlog 0189.
+
+**All three sites the seam comment names as unguarded still carry a guard, on three different
+policies.** The comment reads *"Everything below reads this value and none of it re-checks: every
+`Scene::advance`, the composite's per-second decay, the transition's own step."* Every clause is
+false. `trails.rs:557` **keeps the previous frame's value**; `transition.rs:329` **holds** progress,
+by Plan 0140's explicit design, which is what design-backlog 0188 exists to record; and
+`milk/mod.rs:626`, reached from `warp_mesh`'s `update` under a `Scene::advance`, **freezes** the
+`*_att` envelope at `alpha = 0`. The seam's own `FALLBACK_DT` — a nominal step — is a fourth answer.
+The Negative section above calls that comment the only thing standing where six visible guards used
+to be; it currently says "there is nothing else" about a tree that has three, which is the belief
+that lets a fourth copy land unnoticed. The `milk/` site is the one no document in this class names
+at all. Filed as design-backlog 0190.
+
+Neither changes the Decision. Both say the population this ADR reasoned over was drawn from a grep
+for one spelling inside `scenes/` — the same failure mode ADR-0135 was written against, and one this
+ADR's own Correction had already caught once before implementation started.

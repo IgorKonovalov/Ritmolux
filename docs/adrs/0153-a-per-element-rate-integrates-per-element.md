@@ -1,9 +1,9 @@
 # ADR-0153 — A per-element rate integrates per element
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-08
 > **Date:** 2026-08-29
 > **Extends:** [ADR-0132](0132-a-rate-parameter-integrates-a-phase.md)
-> **Related plan(s):** [0140](../plans/0140-every-rate-integrates-for-real.md)
+> **Related plan(s):** [0140](../plans/done/0140-every-rate-integrates-for-real.md)
 
 ## Context
 

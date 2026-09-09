@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0158** (ADRs are a separate sequence — next free there is **0174**.)
+**Next free number: 0158** (ADRs are a separate sequence — next free there is **0175**.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -44,7 +44,6 @@ place. The plan file carries the real link.
 | [0092](0092-the-engine-draws-an-authored-path.md) | The engine draws an authored path | approved | dev, human | Hard dependency discharged: 0091 closed, and `shape_field` is the scene this draws into. Takeable even if 0087 stalls — Phase 4 may legitimately be empty. Expect morph degeneracy. |
 | [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | approved | dev, human | **A new Phase 1 fixes backlog 0102 + 0103 before anything advertises the component** — foobar's UI starves until playback starts. **Phases 4-6 unblocked, 0150 closed.** 0156 Phase 2 shortens the README first. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + **0174**: Art-Net to the fixtures, verified against `rlx-artnet-sim` because **the rig is unreachable**. Phases 1-8 need none; 9 is the rig session. Phase 8 hard-depends on 0115 Phase 2. |
-| [0140](0140-every-rate-integrates-for-real.md) | Every rate integrates, for real | approved | dev, human | Backlog 0149 + 0150 (**0142 carried**). ADR-0152 + 0153 (proposed): `dt` sanitized at the scene seam, per-element rates integrate per element. Phase 3 moves goldens; Phase 2 must not. |
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
 <!-- roster:end -->
 
@@ -278,8 +277,6 @@ claimed entries — leaving **32 of 58 unclaimed**. Five clusters came out; thre
   natural pickup for [0103] Phase 1, which rewrites the same handler.
 - **[0142] is the least show-compatible plan on the roster.** Three of its six phases need a free
   GPU and the `foo_vis_milk2` rig staged. It carries the backlog's **only High**.
-- **[0140]'s contention with [0125] is discharged — 0125 closed 2026-08-31.** It still edits five
-  scenes, whose rate params now sit beside `scenes::common`'s colour and framing blocks.
 - **Declined, and the record is the reason.** Backlog 0038 is routed to `preset-author` as a content
   pass — *"no engine change and no ADR"* — and is §4 of `content-brief.md`. Backlog 0075's remaining
   half is ADR-0102, **proposed with no plan by the user's call**, holding until a look asks for the
@@ -722,6 +719,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0140 — Every rate integrates, for real](done/0140-every-rate-integrates-for-real.md) — closed 2026-09-08. Review: **no blockers, two majors, three minors, one nit.** Version: **0.111.0**. ADR-0152 + 0153 accepted. Archived [backlog 0149 + 0150](../design-backlog-archive.md). [Write-up](README-archive.md).
 - [0157 — The cost probes estimate a duration](done/0157-the-cost-probes-estimate-a-duration.md) — closed 2026-09-07. Review: **no blockers, no majors, two minors, one nit.** Version: **none** (no shipped artifact moved). ADR-0173 accepted. [Write-up](README-archive.md).
 - [0153 — The debug tree stops carrying dependency line tables](done/0153-the-debug-tree-stops-carrying-dependency-line-tables.md) — closed 2026-09-07. Review: **no blockers, no majors, one minor.** Version: **none** (chore-only). ADR-0165 accepted. [Write-up](README-archive.md).
 - [0156 - The site becomes the reference](done/0156-the-site-becomes-the-reference.md) - closed 2026-09-06. Review: **no blockers, one major, three minors.** Version: **0.110.0** (minor). ADR-0169 + 0170 + 0171 accepted. Archived [backlog 0180](../design-backlog-archive.md). [Write-up](README-archive.md).
@@ -951,7 +949,7 @@ Later, unordered: better tempo tracking, preset sharing/library, signed installe
 [0137]: done/0137-the-metrics-measure-light.md
 [0138]: done/0138-the-colour-surface-stops-misleading-its-authors.md
 [0139]: done/0139-the-render-path-validates-before-it-spends.md
-[0140]: 0140-every-rate-integrates-for-real.md
+[0140]: done/0140-every-rate-integrates-for-real.md
 [0141]: done/0141-the-plugin-seams-stop-drifting.md
 [0142]: 0142-the-milkdrop-import-earns-its-verdict.md
 [0145]: done/0145-the-per-phase-gate-stops-paying-for-the-preset-library.md

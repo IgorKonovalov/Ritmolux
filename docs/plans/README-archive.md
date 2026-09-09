@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0140 — Every rate integrates, for real](#0140--every-rate-integrates-for-real)
   - [0157 — The cost probes estimate a duration](#0157--the-cost-probes-estimate-a-duration)
   - [0153 — The debug tree stops carrying dependency line tables](#0153--the-debug-tree-stops-carrying-dependency-line-tables)
   - [0156 - The site becomes the reference](#0156---the-site-becomes-the-reference)
@@ -164,6 +165,7 @@ hand-edited.
   - [0002 — Rust enforcement tooling](#0002--rust-enforcement-tooling)
   - [0001 — Core + standalone MVP, then foobar parity](#0001--core--standalone-mvp-then-foobar-parity)
 - [Prior sequencing notes (superseded)](#prior-sequencing-notes-superseded)
+  - [Moved 2026-09-08 from `README.md` — the 0140/0125 contention note](#moved-2026-09-08-from-readmemd--the-01400125-contention-note)
   - [Moved 2026-09-07 from `README.md` - the 0157-is-drafted note](#moved-2026-09-07-from-readmemd---the-0157-is-drafted-note)
   - [Moved 2026-09-07 from `README.md` - the 0153-is-approved note](#moved-2026-09-07-from-readmemd---the-0153-is-approved-note)
   - [Moved 2026-09-06 from `README.md` - the 0156-is-drafted note](#moved-2026-09-06-from-readmemd---the-0156-is-drafted-note)
@@ -182,6 +184,92 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0140 — Every rate integrates, for real](done/0140-every-rate-integrates-for-real.md)
+
+- closed 2026-09-08. Six `dev` phases in the `rlx-0140-rates` worktree on
+`plan-0140-every-rate-integrates-for-real`, branched at `775ef18`: `d310598` (1, the
+`presets/README.md` row stops calling `rate · age` integrated), `2a50d1a` (2, the frame delta is
+sanitized once in `draw_frame` and six in-scene guards are deleted), `1209b76` (3, the collage
+`drift`/`spin` integrate per canvas), `2373775` (4, the emitter's sprite rotation integrates per
+object), `36e52bb` (5, no preset retuned and why) and `2f4ca19` (6, the dissolve note). Review:
+**no blockers, two majors, three minors, one nit.** Version **0.111.0** (minor). Closed
+[backlog 0149 + 0150](../design-backlog-archive.md), carried 0142 with a dated size update, filed
+0189-0191.
+
+- **The full suite was verified, not taken from the log.** ADR-0156 defers the nine GPU suites to
+one run per plan, so the close block's `**Full suite:**` bullet is the only record that the goldens
+and the preset sweeps ever met the finished tree. `cargo nextest run --workspace` was re-run here
+**after** `git merge main` — the first moment the two lanes' code had met — at **1561 passed, 0
+failed, 5 skipped**, 515 s, matching the claim. `fmt`, `clippy --workspace --all-targets` and all
+seven Node gates clean. **No baseline was blessed at any point in the plan and none moved**, which
+is the unusual part: the plan predicted goldens would move in Phase 3 and they did not.
+
+- **The two majors are both about the seam's reach, and neither is a departure from the plan.**
+`render()` does `self.time += dt` (`core/src/render/mod.rs:971`) **before** it calls `draw_frame`,
+where the sanitization lives, so the shared scene clock — an `f32` with no reset on the live path,
+handed to every scene through `set_time` — takes the raw delta. `rlx_render_dt` passes
+`dt_seconds` through unvalidated, so one `NaN` from a host poisons it for the life of the process:
+the exact one-way trap ADR-0152 was written to close, on the largest accumulator in the engine, one
+call above the seam that closes it. And the seam's own comment asserts that *"everything below reads
+this value and none of it re-checks: every `Scene::advance`, the composite's per-second decay, the
+transition's own step"* — where **all three named sites still carry a guard, on three different
+policies**: `trails.rs:557` keeps the previous frame's value, `transition.rs:329` holds progress by
+the plan's explicit design (design-backlog 0188 is the record that it is deliberate), and
+`milk/mod.rs:626` — reached from `warp_mesh`'s `update` under a `Scene::advance`, and named by no
+document in this class — freezes the `*_att` envelope at `alpha = 0`. ADR-0152's Negative section
+calls that comment the only thing standing where six visible guards used to be; it currently says
+"there is nothing else" about a tree that has three. Filed as backlog **0189** and **0190**.
+
+  **The close sharpened this one rather than copying it forward.** The review as first written had
+  it as two sites and a "seventh live copy"; re-running the population over `core/src` rather than
+  `core/src/render` found the `milk/` guard, which is the same widening — a grep scoped to where the
+  author expected the answer — that this very finding is about.
+
+- **The log falsified four of the plan's own premises and reported every one.** The guard population
+was six rather than the ADR's four (Plan 0126's splits had landed two more). The emitter's `spin` is
+**not** "bound only to constants" — `emitter_petalfall.toml:87` is `1.1 + clamp(mid * 0.94, 0, 0.8)`
+under `[smoothing] spin = 0.5`, which is what turned Phase 4 from a measurement into a repair. There
+are **four** affected collage presets, not three: `collage_nocturne.toml:112-113` binds the pair to
+`bass`/`mid` under the same `0.6` smoothing and appears in neither the plan nor ADR-0153. And Phase
+5's premise — *"the same numbers produce a much smaller motion"* — is not what the instrument shows:
+three of the four presets are identical in every `--report` column and `Suprematist` moves in the
+last digit. `dev` changed no preset and said why, on the user's explicit ruling.
+
+- **The reason Phase 5 could not have been done by feel is the durable half.** The defective and the
+integrated forms are *equal* while a rate is held and diverge only as a canvas ages under one that
+moves. Every instrument in this repo is short-horizon — `--report` probes in 48-frame windows, a
+plain `shot` drives a constant analysis frame — so **nothing here renders a moving stimulus over a
+long passage**, and Phase 3's whole behavioural change is invisible to the goldens, the sweeps and
+the report alike. That is why no golden moved, and it is a gap in the instrument rather than a
+reassurance about the repair. Whether the four collage presets and `emitter_petalfall` still read as
+intended over a passage is unjudged and is a `preset-author` question.
+
+- **Phase 4 took ADR-0153's rejected Alternative A, deliberately, and said so.** `Object`'s doc
+already fixes the flight path at spawn (ADR-0057) and carries `gravity` per object for exactly that
+reason, so baking at spawn had a same-file precedent, and the emitter's ~3 s object turnover defeats
+the grounds the rejection rests on. The shape that landed is narrower than either: one scene-wide
+accumulator plus one `f32` per object holding its value at that object's birth, so the **rate stays
+live** and only the point it is measured from is fixed. `Object` went 40 → 44 bytes, which moved a
+quantified NFR budget (§12's pool table, 80 → 88 KB at the floor) — and
+`the_pool_costs_what_the_nfr_says_it_does` is what forced that pair of edits to be deliberate.
+
+- **What the tests are worth.** Both new property tests measure their own expectation with a third
+run rather than freezing a number, so nothing in either names a velocity, a spin speed or a distance
+— the engine's constants cancel out of both sides (ADR-0071). Phase 2's seam test carries a negative
+control the done-when never asked for: byte-equality between a bad-delta run and a clean run is
+satisfied trivially by a scene that ignores `dt`, so each of the six probes first asserts that a
+*valid* longer frame does change the picture. That control is also what exposed the behaviour filed
+as backlog **0191** — `evaluate_preset` advances the scene **before** it applies the preset's
+bindings (`evaluate.rs:312`), so the first frame after every preset switch integrates all eight
+converted rates at the scene's own defaults rather than the preset's.
+
+- **Curation: nothing landed and nothing went stale.** No `.toml` changed; `presets/README.md` moved
+in Phases 1 and 3. The workaround grep over `presets/*.toml` comes back clean for this class — no
+preset header anywhere documents a `rate · age` dodge, and `collage_mono.toml:108`'s *"they multiply
+each element's OWN seeded velocity"* survives the repair unchanged. The one operator-doc gap the
+close repaired by hand: the emitter's `spin` gained the same integrate-a-phase property the collage
+pair did and its hand-written section said nothing, while the collage row got a full clause.
 
 ### [0157 — The cost probes estimate a duration](done/0157-the-cost-probes-estimate-a-duration.md)
 
@@ -7350,6 +7438,19 @@ uncovered (its C side remains the Plan 0001 Phase-6 smoke program's job, per ADR
 
 ## Prior sequencing notes (superseded)
 
+### Moved 2026-09-08 from `README.md` — the 0140/0125 contention note
+
+Spent when [0140] closed on 2026-09-08. The contention it tracked was discharged twice over: [0125]
+closed 2026-08-31, and 0140 itself is now closed, so neither half names a live constraint. Kept
+because the fact it records outlived both plans — the five scenes 0140 edited carry their rate params
+beside `scenes::common`'s colour and framing blocks, which is where 0125 put them. Verbatim:
+
+> - **[0140]'s contention with [0125] is discharged — 0125 closed 2026-08-31.** It still edits five
+>   scenes, whose rate params now sit beside `scenes::common`'s colour and framing blocks.
+
+[0140]: done/0140-every-rate-integrates-for-real.md
+[0125]: done/0125-the-scenes-share-their-gpu-boilerplate.md
+
 ### Moved 2026-09-07 from `README.md` - the 0157-is-drafted note
 
 Spent when [0157] closed on 2026-09-07, hours after it was written. It said `main` was red and that
@@ -7406,7 +7507,7 @@ carries.
 
 [0092]: 0092-the-engine-draws-an-authored-path.md
 [0103]: 0103-the-project-gets-an-audience.md
-[0140]: 0140-every-rate-integrates-for-real.md
+[0140]: done/0140-every-rate-integrates-for-real.md
 [0156]: done/0156-the-site-becomes-the-reference.md
 
 ### Moved 2026-09-06 from `README.md` — the 0147-Phase-1-before-0133 note

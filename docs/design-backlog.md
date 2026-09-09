@@ -48,8 +48,6 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0140 — the band contour can only ever be an anti-aliased grey, so on a hard-banded palette it is the one thing that puts shading into a two-ink print](#0140--the-band-contour-can-only-ever-be-an-anti-aliased-grey-so-on-a-hard-banded-palette-it-is-the-one-thing-that-puts-shading-into-a-two-ink-print)
 - [0142 — a same-system dissolve runs `Scene::update` twice in one frame, so every stateful scene advances at 2x for its duration](#0142--a-same-system-dissolve-runs-sceneupdate-twice-in-one-frame-so-every-stateful-scene-advances-at-2x-for-its-duration)
 - [0146 — `warp_mesh` colours its light at deposit time, so the palette cannot band the accumulated field](#0146--warp_mesh-colours-its-light-at-deposit-time-so-the-palette-cannot-band-the-accumulated-field)
-- [0149 — three bindable rates multiply a per-element `age` instead of integrating, and the guard ADR-0135 shipped cannot see any of them](#0149--three-bindable-rates-multiply-a-per-element-age-instead-of-integrating-and-the-guard-adr-0135-shipped-cannot-see-any-of-them)
-- [0150 — `Phase::step` accepts any `dt`, so the guard against a poisoned accumulator is four copies in the callers and the attractor has none](#0150--phasestep-accepts-any-dt-so-the-guard-against-a-poisoned-accumulator-is-four-copies-in-the-callers-and-the-attractor-has-none)
 - [0154 — a swap spawns a thread that creates a COM object, and one activation in 22 failed with `REGDB_E_CLASSNOTREG` where the retry budget cannot tell that from a dead device](#0154--a-swap-spawns-a-thread-that-creates-a-com-object-and-one-activation-in-22-failed-with-regdb_e_classnotreg-where-the-retry-budget-cannot-tell-that-from-a-dead-device)
 - [0157 - the fixed telemetry set omits the bar grid the engine already computes, so a consumer reconstructs a worse one by hand](#0157---the-fixed-telemetry-set-omits-the-bar-grid-the-engine-already-computes-so-a-consumer-reconstructs-a-worse-one-by-hand)
 - [0158 - the tempo octave is unsettled by design, so every consumer folds it, and the rig observed the fold running the opposite way from the documented bias](#0158---the-tempo-octave-is-unsettled-by-design-so-every-consumer-folds-it-and-the-rig-observed-the-fold-running-the-opposite-way-from-the-documented-bias)
@@ -67,6 +65,9 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0186 — the density law scales a preset's *trace count*, so eight low-`density` worlds draw 4x the strokes at 1/4 the brightness on a large display](#0186--the-density-law-scales-a-presets-trace-count-so-eight-low-density-worlds-draw-4x-the-strokes-at-14-the-brightness-on-a-large-display)
 - [0187 — two measurements of the same console on the same adapter class disagree by 2x, and nothing explains which one the machine actually does](#0187--two-measurements-of-the-same-console-on-the-same-adapter-class-disagree-by-2x-and-nothing-explains-which-one-the-machine-actually-does)
 - [0188 — a stalled frame must either hold the dissolve or step it, and after the `dt` seam the engine will do both](#0188--a-stalled-frame-must-either-hold-the-dissolve-or-step-it-and-after-the-dt-seam-the-engine-will-do-both)
+- [0189 — `self.time` takes the raw delta one call above the seam that sanitizes it, so a single `NaN` from a host poisons the shared scene clock for the life of the process](#0189--selftime-takes-the-raw-delta-one-call-above-the-seam-that-sanitizes-it-so-a-single-nan-from-a-host-poisons-the-shared-scene-clock-for-the-life-of-the-process)
+- [0190 — the `dt` seam's comment names three downstream sites as unguarded, and all three still carry a guard, on three different policies](#0190--the-dt-seams-comment-names-three-downstream-sites-as-unguarded-and-all-three-still-carry-a-guard-on-three-different-policies)
+- [0191 — `evaluate_preset` advances the scene before it applies the preset's bindings, so the first frame after every switch integrates at the scene's defaults](#0191--evaluate_preset-advances-the-scene-before-it-applies-the-presets-bindings-so-the-first-frame-after-every-switch-integrates-at-the-scenes-defaults)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -327,6 +328,8 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0110 | An attractor's sample budget ignores the render target, so a 1080p render reads as an upscale | [ADR-0140](adrs/0140-a-sample-budget-is-a-density-against-the-render-target.md) + [Plan 0128](plans/done/0128-the-rendered-file-stops-looking-upscaled.md); see 0186. **Closed 2026-09-04** |
 | 0164 | The operator console halves the output's frame rate, and two comments say it cannot | [Plan 0147](plans/done/0147-what-the-show-costs-and-what-its-numbers-mean.md): four comment sites repaired, both levers measured with a witness, and the halving did not reproduce; see 0187. **Closed 2026-09-06** |
 | 0180 | A doc comment states the ABI version is 4 and points at a test file that does not exist | [Plan 0156](plans/done/0156-the-site-becomes-the-reference.md) Phase 6: the path corrected and neither figure restated, because rustdoc made the comment public. **Closed 2026-09-06** |
+| 0149 | Three bindable rates multiply a per-element `age` instead of integrating, and ADR-0135's guard cannot see any of them | [ADR-0153](adrs/0153-a-per-element-rate-integrates-per-element.md) + [Plan 0140](plans/done/0140-every-rate-integrates-for-real.md) Phases 1, 3 and 4. **Closed 2026-09-08** |
+| 0150 | `Phase::step` accepts any `dt`, so the guard is four copies in the callers and the attractor has none | [ADR-0152](adrs/0152-the-frame-delta-is-sanitized-at-the-scene-seam.md) + [Plan 0140](plans/done/0140-every-rate-integrates-for-real.md) Phase 2; six copies, not four. See 0189, 0190. **Closed 2026-09-08** |
 <!-- roster:end -->
 
 ## Open entries
@@ -2463,7 +2466,7 @@ advances twice.
   headless capture has no frame-time clock, so dual_live_eligible always answers Freeze and the path
   is reachable only through Transition::set_mode. The pointer is that function's own doc comment in
   core/src/render/transition.rs`
-- **Updated 2026-09-08** — [Plan 0140](plans/0140-every-rate-integrates-for-real.md) did **not**
+- **Updated 2026-09-08** — [Plan 0140](plans/done/0140-every-rate-integrates-for-real.md) did **not**
   repair this, and did not make it observable. Its Phase 2 sanitizes the frame delta once at the
   scene seam ([ADR-0152](adrs/0152-the-frame-delta-is-sanitized-at-the-scene-seam.md)), which says
   nothing about `evaluate_preset` running twice: a sanitized delta is applied twice exactly as an
@@ -2564,155 +2567,6 @@ cohort has four systems that do work. It rises if `warp_mesh` is wanted for a li
 specifically, because nothing else in the engine makes a decay contour.
 
 ---
-
-## 0149 — three bindable rates multiply a per-element `age` instead of integrating, and the guard ADR-0135 shipped cannot see any of them
-
-[ADR-0132](adrs/0132-a-rate-parameter-integrates-a-phase.md) decides that **every bindable rate
-parameter in this engine integrates a phase**. [ADR-0135](adrs/0135-every-scene-rate-integrates-through-one-shared-phase.md)
-and [Plan 0122](plans/done/0122-every-rate-integrates.md) delivered that for the six rates measured
-against `self.time`, and added a `hygiene.rs` guard that fails the build on
-`self.<field> * self.time`. **Three more rates multiply a per-element `age` instead**, which is the
-same defect against a different clock — and the guard matches the shared clock by name, so it passes
-all three.
-
-- **Raised:** 2026-08-27, at Plan 0122's Mode 4 close review, by grepping for the *mechanism*
-  (`* age`) rather than for the spelling the guard knows. **Owner if taken:** `architect` first — the
-  repair shape is a real design question (see below) — then `dev`, then `preset-author` for the three
-  affected worlds.
-- **Verified 2026-08-27** — the collage rotation multiplies the element's age:
-  `present: p\.spin \* spin \* age in: core/src/render/scenes/shape_collage.rs`
-- **Verified 2026-08-27** — and so does its translation:
-  `present: p\.vel\[0\] \* drift \* age in: core/src/render/scenes/shape_collage.rs`
-- **Verified 2026-08-27** — the emitter's sprite rotation, the latent third:
-  `present: base \+ rate \* age in: core/src/render/scenes/emitter.rs`
-- **Verified 2026-08-27** — and shipped content binds one of them to a band:
-  `present: clamp\(mid \* 0\.59, 0, 0\.5\) in: presets/collage_suprematist.toml`
-- **Verified 2026-08-27** — the operator doc still describes the defective form as the safe one:
-  `present: Integrated against real elapsed time in: presets/README.md`
-
-### The finding
-
-`shape_collage::apply_time` computes an element's placement from its age:
-
-    center:    p.spec.center + p.vel * drift * age      (shape_collage.rs:1320-1321)
-    angle_deg: p.spec.angle_deg + (p.spin * spin * age) (shape_collage.rs:1324)
-
-`drift` and `spin` are both in that scene's `PARAMS` roster, so both are bindable, and a binding that
-*moves* retroactively rescales every second of the element's life. `emitter::sprite_angle` has the
-same shape (`base + rate * age`, `emitter.rs:776`) with `spin` bound only to constants today —
-exactly the status `parametric_curve`'s `spin` and `warp_mesh`'s `deposit_spin` had when ADR-0132
-corrected them anyway rather than leave counterexamples.
-
-**Three shipped presets bind the collage pair to audio**, which is more content than the `swarm` pair
-Plan 0122 existed to fix:
-
-    collage_onwhite.toml:108-109      drift bass swing 0.4   spin mid swing 0.35   [smoothing] 0.6
-    collage_suprematist.toml:116-117  drift bass swing 0.6   spin mid swing 0.5    [smoothing] 0.6
-    collage_mono.toml:43-44           drift bass swing 0.60  spin mid swing 0.30   [smoothing] 0.60
-
-**Size, computed rather than measured.** A one-pole at `tau = 0.6` closes 2.74 % of its gap per 60 Hz
-frame, so `collage_suprematist`'s `spin` moves 0.0137 in a frame across its 0.5 swing. With
-`SPIN_SPEED = 0.07` the angle jumps `0.07 · 0.0137 · age` — at `age = 30 s` that is 0.029 rad in one
-frame against a nominal `0.07 · 0.5 / 60 = 0.00058`, about **49x**; `drift` is ~35x by the same
-route. **Milder than `swarm`'s 210x and bounded differently**: `age` resets on each `recompose`,
-where `swarm`'s `time` never resets, so in normal playback this stays a jitter rather than a
-teleport. The exception is the case with no onsets — `recompose` is gated on `hash(beat_index)`, so
-in a quiet passage it never fires, `age` grows unbounded, and the first bass hit after it lands the
-full accumulated swing.
-
-**`presets/README.md:1536` documents the defect as the safe form**, which is how three presets came
-to bind it: *"Integrated against real elapsed time, so the canvas moves identically at any refresh
-rate."* True about frame-rate independence, false about ADR-0132 — the rate scales the accumulation
-rather than being integrated into it — and the `pump_*` row three lines below says "drive the depth
-from the music". That row is load-bearing for the `preset-author` lane and should be corrected
-whether or not the engine repair is taken.
-
-- **What a fix looks like**, and it is **not** `scenes::Phase`:
-  - `Phase` is one accumulator per scene. These need **one per element**, advanced with the element
-    and reset when it is born or the canvas recomposes — a different shape, and the reason Plan 0122
-    scoped them out rather than folding them in.
-  - The cheap alternative is to bake the rate at spawn the way `emitter` already bakes `v0`, so a
-    moving binding affects new elements only. That changes what the parameter *means* (it stops
-    steering the live canvas), so it is a design call, not a refactor.
-  - The emitter's `spin` may be a third case again: sprites are short-lived, so `age` is small and
-    the defect may be unobservable. Worth measuring before spending anything on it.
-- **The guard question is the durable half.** ADR-0135's guard makes one spelling impossible and says
-  nothing about the rule; this entry is the proof. Whether it should reach `* age` is genuinely open
-  — `emitter.rs:375-376`'s `v0 * age` ballistics are legitimate (the velocity is baked at spawn), so
-  a naive widening false-positives on correct code.
-
-### Priority
-
-**Medium.** Three shipped presets carry it against `swarm`'s two, and the doc actively teaches the
-defective form — but the magnitude is 4-6x smaller than the defect Plan 0122 fixed and `age`'s reset
-bounds it in ordinary playback. The half worth doing immediately and cheaply is the
-`presets/README.md` correction, which costs one sentence and stops the content lane from writing more
-of these.
-
----
-
-## 0150 — `Phase::step` accepts any `dt`, so the guard against a poisoned accumulator is four copies in the callers and the attractor has none
-
-[ADR-0135](adrs/0135-every-scene-rate-integrates-through-one-shared-phase.md) put every bindable
-rate behind one `scenes::Phase`, whose whole reason to exist is that `+= rate · dt` becomes the only
-way an accumulator moves. It does not constrain what `dt` may be. A single non-finite frame writes
-`NaN` into a `Phase` **permanently** — the type has no other mutator, so nothing can ever clear it —
-and the defence against that lives, byte-identical, in four separate `Scene::advance` impls. The one
-scene holding a `Phase` that does *not* carry it is `attractor`.
-
-- **Raised:** 2026-08-28, at Plan 0122's close, from the Mode 4 review's second `minor`. **Owner if
-  taken:** `architect` first — where the guard belongs is a real design call, see below — then `dev`.
-- **Verified 2026-08-28** — the shared type takes `dt` on trust:
-  `present: pub\(crate\) fn step\(&mut self, rate: f32, dt: f32\) in: core/src/render/scenes/mod.rs`
-- **Verified 2026-08-28** — and the attractor stores the frame's `dt` raw beside a `Phase`. The
-  probe discriminates: this spelling matches only the two unguarded scenes and none of the four
-  guarded ones, so it goes red on the repair rather than on decay:
-  `present: self\.dt = dt; in: core/src/render/scenes/particles/mod.rs`
-- **Verified 2026-08-28** — while four callers each re-derive the same three lines:
-  `present: dt\.is_finite\(\) && dt > 0\.0 in: core/src/render/scenes/swarm.rs`
-
-### The finding
-
-`Phase::step` is `self.0 += rate * dt` with no precondition (`scenes/mod.rs:87`). Four scenes sanitize
-`dt` on the way in, with the same expression each time and four separately-written comments giving
-the same reason:
-
-    fragment_field.rs:446    dt.is_finite() && dt > 0.0 else FALLBACK_DT
-    lines/parametric.rs:330  dt.is_finite() && dt > 0.0 else FALLBACK_DT
-    swarm.rs:724             dt.is_finite() && dt > 0.0 else FALLBACK_DT
-    warp_mesh/mod.rs:1712    dt.is_finite() && dt > 0.0 else FALLBACK_DT
-
-`particles/mod.rs:1339` writes `self.dt = dt` unguarded, and `update` then runs
-`self.spin_time.step(self.spin, self.dt)`. `spin_time` is a `Phase`; a `NaN` or negative `dt` from
-the shell — a suspended window, a clock that jumps backwards, a `dt` computed across a device loss —
-lands in it and stays. Every attractor world's display rotation is dead for the rest of the process.
-`FixedStep::advance` on the line above **self-heals** (`accumulator.min(step)` returns `step` when
-one operand is `NaN`), which is exactly why the omission reads as safe on inspection.
-
-**This is the shape ADR-0135 was written against, one level down.** That ADR's own Context calls four
-copies of the same three lines *"a rule enforced by a list of sites"* and rejects Alternative A on the
-grounds that the duplication is how the defect returns. Four copies of the `dt` guard is that
-sentence again, and the site with no copy is the one it predicts.
-
-- **What a fix looks like**, and the choice is not obvious:
-  - **Sanitize inside `Phase::step`.** One line, kills all four copies, and the invariant sits on the
-    type that exists to hold invariants. But `self.dt` has readers that are **not** `Phase` —
-    `swarm`'s damping `powf`, `warp_mesh`'s `pow` — so the four callers would still want their own
-    guard and the duplication survives with a narrower job.
-  - **Sanitize at the trait seam**, in `draw_frame` before `Scene::advance` is called, so no scene
-    ever sees a bad `dt`. Fixes every reader at once and deletes all four copies. Widens what the
-    renderer promises about the argument, which is an ADR-0002 question rather than an edit.
-  - **A `Dt` newtype** that cannot be constructed non-finite, taken by `advance` and by `step`.
-    Strongest, and the largest diff.
-- **What it is not:** copying the fourth guard into `particles/mod.rs`. That closes the one live hole
-  and leaves five copies, which is the option ADR-0135 already rejected once by name.
-
-### Priority
-
-**Low-medium.** Nothing observed — the shells feed real elapsed time and no capture path produces a
-bad `dt`, which is why it survived a plan whose whole subject was these accumulators. It is filed at
-this size because the cost of the repair only grows: `Phase` is now the engine's one rate mechanism,
-so every rate added after this inherits whichever answer is not chosen.
 
 ## 0154 — a swap spawns a thread that creates a COM object, and one activation in 22 failed with `REGDB_E_CLASSNOTREG` where the retry budget cannot tell that from a dead device
 
@@ -3621,3 +3475,147 @@ nothing else holds is not duplication. And it is not `now_playing`, whose `advan
 and bounded: two call sites, one test, one sentence of doc either way. It is filed because the seam
 is what creates the divergence, and the plan that lands the seam is the last moment anyone will be
 looking at both halves at once.
+
+## 0189 — `self.time` takes the raw delta one call above the seam that sanitizes it, so a single `NaN` from a host poisons the shared scene clock for the life of the process
+
+[ADR-0152](adrs/0152-the-frame-delta-is-sanitized-at-the-scene-seam.md) closes a one-way trap:
+`Phase::step` is `+= rate * dt` with no other mutator, so one non-finite frame poisons an
+accumulator forever. The guard it shipped sits in `draw_frame`. **`Renderer::render` does
+`self.time += dt` before it calls `draw_frame`** — `core/src/render/mod.rs:971` — and `self.time` is
+a bare `f32` (`mod.rs:318`) with no reset on the live path, handed to every scene each frame through
+`Scene::set_time`. It is the largest accumulator in the engine and it is the one the seam does not
+cover.
+
+- **Raised:** 2026-09-08, at Plan 0140's close, from the Mode 4 review of ADR-0152's own reach.
+  **Owner if taken:** `architect` then `dev` — the repair is small but the placement is a decision.
+- **Verified 2026-09-08** — the accumulator is written once, upstream of the guard, and there is no
+  second write that could clear it:
+  `present: self\.time \+= dt; in: core/src/render/mod.rs`
+- **Verified 2026-09-08** — and the C ABI hands the frontend's delta straight through, so the
+  untrusted value reaches that line unexamined:
+  `present: renderer\.render\(&frame, dt_seconds\) in: core-cabi/src/lib.rs`
+
+### The finding
+
+`rlx_render_dt` takes `dt_seconds: f32` from the C++ shim and passes it to `renderer.render` with no
+check (`core-cabi/src/lib.rs:307` and `:325`). That is the project's own **validate at the boundary**
+rule pointing at a boundary where nothing is validated, and the value's first use on the other side
+is an unguarded `+=` into a clock every scene reads.
+
+The failure is total and silent. Once `self.time` is `NaN`, `set_time` distributes it to every scene
+every frame; nothing in the engine can clear it, because there is no other write to that field and
+no reset outside construction. A restart is the only recovery, and the symptom — every animation
+that reads absolute time stops or goes undefined while the ones driven by `Phase` keep running — is
+not obviously a `dt` problem to whoever sees it.
+
+Two things this is **not**. It is not a duplicate of what ADR-0152 fixed: that ADR's population was
+drawn from a grep inside `scenes/`, and this line is two directories up, which is exactly why it
+survived. And it is not reachable from any capture path — `shot` and the golden harness synthesize
+their deltas — so no gate here can see it, which is the same reason `now_playing.advance(dt)` on the
+line below has carried its own guard since it was written.
+
+### Priority
+
+**Medium.** Unobserved in practice, cheap to fix, and the blast radius is the whole engine. The
+question worth one paragraph before the edit is *where*: sanitizing in `render` duplicates the
+`draw_frame` guard the ADR just spent six deletions consolidating, so the honest shapes are to hoist
+the guard to the top of `render` and let `draw_frame` trust it, or to validate at the C ABI boundary
+where the rule says validation belongs. See 0190, which is the same population question one level
+down.
+
+## 0190 — the `dt` seam's comment names three downstream sites as unguarded, and all three still carry a guard, on three different policies
+
+The seam at `core/src/render/mod.rs:1082` opens with *"**The one place a frame delta is checked.**
+Everything below reads this value and none of it re-checks: every `Scene::advance`, the composite's
+per-second decay, the transition's own step."* Each of the three named sites still holds a live
+guard, and no two of them agree on what a degenerate frame should do:
+
+| Site | Guard | Policy on a bad `dt` |
+|---|---|---|
+| `render/trails.rs:557` (`set_dt`, the composite's per-second decay) | `dt.is_finite() && dt >= 0.0` | **keep the previous frame's value** |
+| `render/transition.rs:329` (the transition's own step) | `dt.is_finite() && dt > 0.0` | **hold** progress |
+| `milk/mod.rs:626` (reached from `warp_mesh`'s `update`, under a `Scene::advance`) | `dt > 0.0 && dt.is_finite()` | **freeze** the `*_att` envelope at `alpha = 0` |
+
+The seam itself substitutes `FALLBACK_DT` — a **nominal step** — which is a fourth answer.
+
+- **Raised:** 2026-09-08, at Plan 0140's close. **Owner if taken:** `architect` — deciding which
+  guards are redundant and which are policy is the work; deleting them is not.
+- **Verified 2026-09-08** — the comment makes the claim, in the file the guards are in:
+  `present: none of it re-checks in: core/src/render/mod.rs`
+- **Verified 2026-09-08** — and all three named sites still guard:
+  `present: dt\.is_finite\(\) && dt >= 0\.0 in: core/src/render/trails.rs`
+- **Verified 2026-09-08** — the transition half, which 0188 records as deliberate:
+  `present: dt\.is_finite\(\) && dt > 0\.0 in: core/src/render/transition.rs`
+- **Verified 2026-09-08** — and the MilkDrop runtime's, which no plan or ADR in this class names:
+  `present: dt > 0\.0 && dt\.is_finite\(\) in: core/src/milk/mod.rs`
+
+### The finding
+
+None of these is a bug today; all three are unreachable-but-harmless, because the seam substitutes
+upstream and the bad value never arrives. The defect is the **comment**, and what it costs is
+specific. ADR-0152's Negative section says in as many words that after six visible guards were
+deleted, this comment is the only thing standing between the invariant and the next person who adds
+a scene — so a reader who believes it, greps for `is_finite` to confirm, and finds three hits will
+either re-add a fourth copy or delete one of the three without knowing that `transition.rs:329` is
+deliberate (see 0188, which is the record that it is).
+
+The `milk/mod.rs` hit is the one that matters most, because nothing in ADR-0152, ADR-0153 or Plan
+0140 mentions it at all. Its population came from a grep for one spelling inside `scenes/`, and the
+MilkDrop runtime lives in `core/src/milk/`. That is the identical failure mode ADR-0135 was written
+against, and ADR-0152's own `Correction` had already caught it once before implementation started —
+the guard count went from four to six there for the same reason.
+
+**What a fix looks like:** the comment states what is true — the seam is where a delta from the
+frontend is sanitized, and the sites below hold their own policies for reasons named — with the
+three sites and their policies listed, or a decision that reduces them to one. It is a doc repair
+unless the decision goes the other way.
+
+### Priority
+
+**Medium.** Nothing renders wrong and nothing is unsafe. It is filed at this weight because the
+comment is load-bearing by ADR-0152's own argument, and because it is currently the mechanism by
+which the next `dt` guard gets added or removed for the wrong reason. See 0189 for the same
+population question one level up.
+
+## 0191 — `evaluate_preset` advances the scene before it applies the preset's bindings, so the first frame after every switch integrates at the scene's defaults
+
+`core/src/render/evaluate.rs` calls `scene.set_time(time)` and `scene.advance(dt)` at lines 312-313,
+`side.chain.set_dt(dt)` at 316, and only then `scene.reset_params()` at 320 followed by the loop that
+evaluates the preset's bindings. So the advance for frame *N* runs against the parameter values left
+by frame *N-1*.
+
+For a preset that is merely continuing, that is a one-frame lag and invisible. **On the frame a
+preset switch takes effect it is not a lag** — the incoming scene has no previous frame, so every
+rate it integrates that frame integrates at the scene's own default, not at the value the preset
+asked for.
+
+- **Raised:** 2026-09-08, at Plan 0140's close. It surfaced from that plan's own Phase 2 seam test,
+  whose negative control had to be built around this ordering. **Owner if taken:** `dev`, if the
+  answer is "move two lines"; `architect` first if it is not.
+- **Verified 2026-09-08** — the advance precedes the reset and the binding loop in the same function:
+  `present: scene\.advance\(dt\); in: core/src/render/evaluate.rs`
+- **Verified 2026-09-08** — and the reset that begins the binding pass is below it:
+  `present: scene\.reset_params\(\); in: core/src/render/evaluate.rs`
+
+### The finding
+
+The magnitude is one frame of one preset's rates at the wrong value, which at 60 Hz is ~17 ms and
+almost certainly invisible for a rate. It is filed rather than fixed for two reasons.
+
+The first is that **the population is growing**: Plan 0140 converted the collage `drift` and `spin`
+and the emitter's sprite rotation to integrate per element, which means each newly-converted rate
+joins the set this ordering starts at a default. The class gets one member wider every time a rate is
+done properly, so the cost of the ordering rises with exactly the work being done to the rate system.
+
+The second is that the reordering is not obviously free. `scene.advance` before the bindings is what
+lets a binding read a value the scene computed this frame; moving the advance below the loop changes
+which frame's parameters drive which frame's integration for *every* preset, not only a switching
+one, and that is a golden-moving change. Whether it moves any *visible* pixel is unknown, and this
+repo's instruments are short-horizon — Plan 0140's own close records that the whole integration
+change was invisible to the goldens, the sweeps and `--report` alike — so a green suite would not
+settle it.
+
+### Priority
+
+**Low.** One frame, at a preset switch, at a default rather than a wild value. It is filed because it
+is a *structural* ordering and the population it affects is growing, not because anyone has seen it.

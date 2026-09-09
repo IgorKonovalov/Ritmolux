@@ -153,10 +153,10 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0129](0129-the-structural-term-is-measured-at-composition-scale-not-pixel-scale.md) | The structural term is measured at composition scale, not at pixel scale | accepted 2026-08-26 (Plan 0119), Outcome - Decision superseded by 0130, its stop condition stands |
 | [0130](0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md) | The structural term is boundary density, and conditioning the population is what made it work | accepted 2026-08-26 (Plan 0119), default floor arm falsified by 0161 |
 | [0131](0131-the-linux-standalone-captures-through-pulseaudios-simple-api.md) | The Linux standalone captures system audio through PulseAudio's simple API, on a third platform arm | proposed 2026-08-26 (Plan 0120) |
-| [0132](0132-a-rate-parameter-integrates-a-phase.md) | A rate parameter integrates a phase; multiplying scene time makes an audio-bound rate a teleport | accepted 2026-08-27 (Plan 0121), Outcome |
+| [0132](0132-a-rate-parameter-integrates-a-phase.md) | A rate parameter integrates a phase; multiplying scene time makes an audio-bound rate a teleport | accepted 2026-08-27 (Plan 0121), Outcome, extended by 0153 |
 | [0133](0133-the-band-contour-fires-where-the-ink-changes.md) | The band contour fires where the ink changes, and equality is the test | accepted 2026-08-27 (Plan 0121), Outcome |
 | [0134](0134-motion-is-two-readings-and-anchoring-is-why-neither-can-be-a-threshold.md) | Motion is two readings, and anchoring is why neither can be a threshold | accepted 2026-08-27 (Plan 0121) |
-| [0135](0135-every-scene-rate-integrates-through-one-shared-phase.md) | Every scene rate integrates through one shared `Phase`, and a guard asserts it | accepted 2026-08-28 (Plan 0122) |
+| [0135](0135-every-scene-rate-integrates-through-one-shared-phase.md) | Every scene rate integrates through one shared `Phase`, and a guard asserts it | accepted 2026-08-28 (Plan 0122), extended by 0152 |
 | [0136](0136-the-animation-gate-asks-its-question-in-both-readings.md) | The animation gate asks its question in both readings | accepted 2026-08-28 (Plan 0123), Outcome |
 | [0137](0137-a-latch-is-render-layer-state-and-its-name-resolves-to-a-slot-at-load.md) | A latch is render-layer state, and its name resolves to a slot at load | accepted 2026-08-28 (Plan 0123) |
 | [0138](0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md) | Limited ink is a supported palette class, defined at the draw seam | accepted 2026-08-28 (Plan 0123), Outcome |
@@ -173,8 +173,8 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0149](0149-a-backlog-reference-is-a-bare-number-and-a-file-link.md) | A backlog reference is a bare number and a file link, never a fragment | accepted 2026-09-02 (Plan 0136), extends 0127, Outcome |
 | [0150](0150-the-level-question-is-asked-in-linear-light.md) | The level question is asked in linear light, over the lit set | accepted 2026-09-01 (Plan 0137), Outcome |
 | [0151](0151-palette-stops-are-authored-in-srgb-and-converted-at-load.md) | Palette stops are authored in sRGB and converted at load | accepted 2026-09-04 (Plan 0138), supersedes 0021 in part |
-| [0152](0152-the-frame-delta-is-sanitized-at-the-scene-seam.md) | The frame delta is sanitized once, at the scene seam | proposed 2026-08-29 (Plan 0140), extends 0135 |
-| [0153](0153-a-per-element-rate-integrates-per-element.md) | A per-element rate integrates per element | proposed 2026-08-29 (Plan 0140), extends 0132 |
+| [0152](0152-the-frame-delta-is-sanitized-at-the-scene-seam.md) | The frame delta is sanitized once, at the scene seam | accepted 2026-09-08 (Plan 0140; Outcome; extends 0135) |
+| [0153](0153-a-per-element-rate-integrates-per-element.md) | A per-element rate integrates per element | accepted 2026-09-08 (Plan 0140; extends 0132) |
 | [0154](0154-the-reader-facing-docs-publish-as-a-site.md) | The reader-facing docs publish as a site, and `docs/` stays the single source | accepted 2026-09-05 (Plan 0143), Outcome; extended by 0166, 0169, 0171, narrowed by 0167 |
 | [0155](0155-the-window-takes-the-adapter-and-the-preset-the-operator-names.md) | The window takes the adapter and the preset the operator names | accepted 2026-08-31 (Plan 0144), refines 0146 + 0148 |
 | [0156](0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md) | The per-phase gate is scoped, and the whole suite is owed once per plan | accepted 2026-08-31 (Plan 0145), extends 0033, Outcome |
