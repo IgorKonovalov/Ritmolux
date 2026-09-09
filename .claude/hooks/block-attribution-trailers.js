@@ -9,18 +9,28 @@
 //
 // Wired up in .claude/settings.json under hooks.PreToolUse with matcher
 // "Bash|PowerShell". The matcher only filters by tool name; this script decides
-// whether to deny (see the pass-through early return below).
+// whether to deny (see the pass-through early returns below).
+//
+// Editing this file with the Bash tool trips the hook on its own text, because
+// the literals it searches for are spelled out below. Edit it with the Write or
+// Edit tool, which the matcher does not cover.
 
 const { readFileSync } = require("fs");
 
 const input = JSON.parse(readFileSync(0, "utf8"));
 const cmd = (input.tool_input && input.tool_input.command) || "";
 
-// Only commit-authoring commands are inspected, so that grepping the history or
-// this very file for "Co-Authored-By" stays possible.
-const AUTHORS_A_MESSAGE =
-  /\bgit\s+(commit|merge|revert|cherry-pick|tag)\b|\bgh\s+pr\s+(create|edit)\b|\bgh\s+release\s+(create|edit)\b/;
-if (!AUTHORS_A_MESSAGE.test(cmd)) {
+// Only commands that actually author a message are inspected. BOTH a verb and a
+// message-bearing flag must be present, so read-only history work is never
+// blocked: `git log --grep=...`, `git tag | wc -l` and grepping this very file
+// all pass. A clustered short option (`git commit -am "..."`) still counts.
+// Both tests run against the whole command line rather than a split segment,
+// because a message body may itself contain shell separators.
+const VERB =
+  /\bgit\s+(commit|merge|revert|cherry-pick|tag)\b|\bgh\s+(pr|release)\s+(create|edit)\b/;
+const MESSAGE_FLAG =
+  /(^|\s)(--(message|file|body|body-file|notes|notes-file|template)|-[A-Za-z]*[mFt])(=|\s|$)/;
+if (!VERB.test(cmd) || !MESSAGE_FLAG.test(cmd)) {
   process.stdout.write("{}");
   process.exit(0);
 }
