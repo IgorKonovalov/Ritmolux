@@ -125,13 +125,14 @@ headroom as headroom.
 - [An event with a memory — the `[latch]` table](#an-event-with-a-memory--the-latch-table)
 - [A clamp is a limit, not a gain — the `[occupancy]` table](#a-clamp-is-a-limit-not-a-gain--the-occupancy-table)
 - [A world-space param is not bounded by its clamp — the frame is the bound](#a-world-space-param-is-not-bounded-by-its-clamp--the-frame-is-the-bound)
-- [Structural config (line systems and the attractor)](#structural-config-line-systems-and-the-attractor)
+- [Structural config (line systems, the attractor, and the shape field)](#structural-config-line-systems-the-attractor-and-the-shape-field)
   - [`[curve]` — for `parametric_curve`](#curve--for-parametric_curve)
   - [`[generator]` — for `lsystem`](#generator--for-lsystem)
   - [`[generator]` — for `star_pattern`](#generator--for-star_pattern)
   - [`[particles]` — for `attractor`](#particles--for-attractor)
   - [`tuple` picks a whole figure, framing included](#tuple-picks-a-whole-figure-framing-included)
   - [`[spectrum]` — for `spectrum`](#spectrum--for-spectrum)
+  - [`[path]` — for `shape_field`](#path--for-shape_field)
 - [The second layer — the `[layer]` table](#the-second-layer--the-layer-table)
   - [The two joins](#the-two-joins)
   - [The `over` join's blend and mix](#the-over-joins-blend-and-mix)
@@ -1460,6 +1461,14 @@ thing from a big particle: the palette coordinate becomes the *distance* to the
 figure, so banding it draws **concentric offset contours of the shape**
 ([ADR-0105](../docs/adrs/0105-the-mark-roster-becomes-a-fullscreen-distance-field.md)).
 
+> **The roster is not the only source of a silhouette here.** A
+> [`[path]` table](#path--for-shape_field) hands this scene a figure you drew
+> yourself, as inline SVG path data, and everything below applies to it
+> unchanged — the same coordinate, the same banding, the same contours. It also
+> brings two params the roster shares: `stroke`, which draws the figure's outline
+> instead of filling it, and `morph`, which travels between two authored
+> silhouettes.
+
 ```toml
 system = "shape_field"
 
@@ -1481,6 +1490,8 @@ color_span      = "0.45"     # how much gradient the figure's interior spans
 | `rotation` | turns the figure **about its own centre**, in radians. Default `0`, an exact identity, unclamped — an angle wraps. Applied after `pan_*`, so a panned figure spins in place rather than orbiting the frame |
 | `gamma` | the **response exponent** on the figure coordinate, before it becomes a palette coordinate — where the contours crowd. Default `1.0` (evenly spaced, and an exact identity), clamped to `0.05`..`20` |
 | `coord_mode` | **which coordinate the palette is handed.** `0` (default) is the distance, whose contours are offset curves; `1` is `r / r_boundary(theta)`, whose contours are **scaled copies** of the outline. Stepped, like `shape`. See [Two coordinates](#two-coordinates--offsets-and-scaled-copies) |
+| `stroke` | draws the figure's **outline** at this half-width instead of filling it, in coordinate units — `0.08` is a band 8 % of the figure's half-extent either side of the outline. Default `0`, the filled figure and an exact identity. Fill and stroke are the same field, so the outline cannot drift off the figure it belongs to |
+| `morph` | travels an authored `[path]` towards its `morph_to` silhouette, `0`..`1`. Inert on a roster figure and on a path that names no target |
 
 > **`gamma` is well defined on a curved or jittered star, and the arithmetic behind that is worth
 > knowing** ([backlog 0097](../docs/design-backlog.md)). Those two params take the star arm's curved
@@ -3815,7 +3826,7 @@ over-scale that clips only the tips costs almost no pixels, so the number comes
 back healthy. **Nothing automated will catch a tip that leaves the frame.** That
 one is yours to check.
 
-## Structural config (line systems and the attractor)
+## Structural config (line systems, the attractor, and the shape field)
 
 Declarative data the generator/sampler consumes once at load — **not**
 expressions. Validated at load; a bad value is a surfaced error.
@@ -4543,6 +4554,116 @@ Two attractor params behave unlike anything else in the set:
 
   The seed box survives where it is correct — the initial fill and a family change,
   the two places there is no existing cloud to disturb.
+
+### `[path]` — for `shape_field`
+
+The one table that carries **geometry** rather than a selector or a size, and the
+only place a preset draws a silhouette nobody put in the `marks` roster. Inline
+SVG path data, parsed once at load into a closed contour, rendered as the same
+signed distance field the roster is rendered as — so an authored figure gets
+`palette_steps`, `palette_contour`, `gamma` and both `coord_mode`s for free.
+
+| Key        | Values                | Notes                                                                                                 |
+|------------|-----------------------|-------------------------------------------------------------------------------------------------------|
+| `d`        | SVG path data         | The silhouette, as one closed contour. **Required** — the table exists to carry it.                     |
+| `morph_to` | SVG path data         | A second silhouette the bindable `morph` param travels towards. Optional; absent, `morph` is inert.      |
+| `samples`  | integer `3..=64`      | The arity both contours are resampled to, by arc length. Default 64. Optional — and a lever **downward**. |
+
+```toml
+system = "shape_field"
+
+[path]
+d        = "M 0,-1 C 0.9,-0.4 0.9,0.4 0,1 C -0.9,0.4 -0.9,-0.4 0,-1 Z"
+morph_to = "M 0,-1 L 0.87,0.5 L -0.87,0.5 Z"
+
+[params]
+morph  = "beat"    # an ordinary binding; [smoothing] reaches it like any other
+stroke = "0"       # 0 fills the figure; above 0 draws its outline at that width
+```
+
+#### The subset, and what it refuses
+
+Accepted: **`M m L l H h V v C c S s Q q T t Z z`** — moveto, the three line
+forms, cubic and quadratic Béziers with their smooth-continuation shorthands, and
+closepath. Relative commands, implicit repeats (`M x y x y` is a moveto and a
+lineto), missing separators and exponent notation all parse, because that is what
+an exported file actually contains. A path with no `Z` is closed anyway: a filled
+silhouette has no open form.
+
+Two things are **refused by name**, and you will meet them holding a file a
+browser renders correctly:
+
+- **`A` / `a`, the elliptical arc.** Every design tool can re-export the same
+  curve as cubics; look for a "convert arcs to paths" or "flatten" option.
+- **A second subpath** — a second `M` anywhere after the first. Any letterform
+  with a counter has one, as does any shape with a hole. There is no natural point
+  correspondence between two paths with different subpath counts, which is what a
+  morph needs, so the pair that could not be aligned is refused at the one path
+  rather than guessed at the morph.
+
+Everything else that goes wrong is a **load error carrying the character offset**
+into `d` — a mis-parsed path would otherwise render as a plausible wrong figure,
+which reads as a design decision rather than as a mistake.
+
+#### The arity ceiling, and the measurement behind it
+
+`samples` is capped at **64**, and asking for more is a load error naming both
+your number and the ceiling. It is not a memory bound: the field is fullscreen
+and evaluates a distance to every segment at **every pixel of every frame**,
+whether or not the figure is on screen.
+
+The number is measured rather than reasoned. At 1920x1080 on an integrated GPU —
+the class [`docs/nfr.md`](../docs/nfr.md)'s floor tier is calibrated against — the
+contour walk costs about **0.105 ms per segment**, so 64 segments is 46 % of the
+60 fps frame budget and 128 would be 87 %. A traced logo pasted at 500 points is
+refused rather than quietly decimated, because a reduced contour would draw a
+figure you did not author and never say so.
+
+**A curved path is cheaper than that suggests**, because it is not drawn as
+segments. A contour whose outline is smooth is fitted at load to a chain of
+circular arcs, and the same figure needs four or five times fewer of them: the
+leaf above costs 4.15 ms as 16 arc pieces where its 64-point polyline costs
+7.09 ms. Nothing in the table selects this — a smooth figure gets it, a polygon
+does not need it, and a figure carrying a `morph_to` cannot use it (see below).
+
+**Set `samples` low for a polygonal figure.** A hexagon needs 6, not 64, and pays
+for what it asks.
+
+#### What morphs well
+
+A pair travels well when **both are single closed contours of comparable
+complexity**. That is the thing you can act on; the alignment does the rest:
+
+- **Winding is normalized for you.** A clockwise path morphing into a
+  counter-clockwise one would turn inside out through the middle — every
+  intermediate frame a valid shape, the whole motion wrong — so the target is
+  reversed where the two disagree. You do not have to draw them the same way
+  round.
+- **The start point is chosen for you**, by minimising how far the points travel
+  in total. Without it a square morphing into the same square from another corner
+  unwinds through a spiral.
+- **Both endpoints resample by arc length**, not per command, so a shape whose
+  commands are unevenly sized does not bunch its correspondence where you
+  happened to click.
+
+What no alignment fixes is a mismatch of *kind*. Two figures of very different
+complexity — a triangle into a thirty-point starburst — correspond point for
+point, so most of the starburst's detail collapses onto three corners on the way.
+Sweep the travel and look at the middle rather than at the two ends: the
+intermediate is a shape nobody authored, and it is where a bad pair shows.
+
+**A morphing pair draws through its polyline**, not through the arc fit — two arc
+chains have no point correspondence to interpolate. So a `morph_to` costs the
+`samples` arity above, and a figure that does not morph does not.
+
+#### A long path stops being readable
+
+This is a real cost of the feature and not something to discover in review. A
+64-point traced outline is one very long unreadable line in a file format whose
+whole value has been that a person can read what a look does. Prefer a path you
+could redraw from the numbers — a dozen commands, round coordinates — and keep
+the shapes that genuinely need tracing rare. If a preset's `d` is longer than the
+rest of the file put together, the file has stopped explaining itself.
 
 ## The second layer — the `[layer]` table
 

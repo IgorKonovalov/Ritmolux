@@ -266,8 +266,8 @@ stroke = "0.0"       # 0 = filled; > 0 strokes at abs(d) < w
 | 1 — The parser, and what it refuses | dev | done | `6cd20de` |
 | 2 — The path becomes a field | dev | done | `bad073f` |
 | 3 — Two paths morph | dev | done | `987c758` |
-| 4 — Arcs, if Plan 0087 delivered them | dev | done | committed with this row |
-| 5 — The authoring surface is documented | dev | not started | — |
+| 4 — Arcs, if Plan 0087 delivered them | dev | done | `85e41b7` |
+| 5 — The authoring surface is documented | dev | done | committed with this row |
 | 6 — The look gate | human | not started | — |
 
 ### Notes
@@ -372,6 +372,14 @@ stroke = "0.0"       # 0 = filled; > 0 strokes at abs(d) < w
 - The arc chain and the polyline are asserted to draw the same figure —
   `the_arc_chain_draws_the_same_figure_as_the_polyline` forces the polyline route with
   `morph_to = d` and compares: 14 of 57600 px differ at 240x240.
+
+**Phase 5.**
+
+- The `preset-author` sweep found that reference's `systems.md` catalogues **9 of the 12 systems** —
+  `shape_field`, `warp_mesh` and `shape_collage` have never had an entry. `shape_field` gained one
+  here because this plan changed it; the other two are left as they were found.
+- `presets/README.md`'s structural-config section was retitled — it said "line systems and the
+  attractor", and the shape field now joins it.
 
 ### Close triggers
 

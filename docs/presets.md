@@ -119,6 +119,8 @@ Rules:
 Beyond `[params]`, a preset may carry optional tables — `[curve]` / `[generator]`
 (structural config for the line systems), `[particles]` (attractor family and
 sample density),
+`[path]` (an authored silhouette for the shape field, as inline SVG path data —
+summarised [below](#the-path-table)),
 `[spectrum]` (the readout's element count, layout and per-element easing —
 summarised [below](#the-spectrum-table)), `[feedback]` (how an accumulation reads
 its own past — [below](#the-feedback-table)), `[smoothing]` (per-parameter
@@ -236,6 +238,37 @@ Two things still follow from a stage being a *resample*:
   is deliberately fixed and independent of the window, but the field is
   **toroidal**, so `pan_*` is a seamless infinite scroll and `zoom > 1` tiles rather
   than running out of field.
+
+### The `[path]` table
+
+The `shape_field` system draws a silhouette from a closed roster of five names.
+A `[path]` table is the escape hatch: **inline SVG path data**, parsed once at
+load into a closed contour and rendered as the same signed-distance field, so a
+preset can author a figure nobody put in the roster.
+
+```toml
+system = "shape_field"
+
+[path]
+d        = "M 0,-1 C 0.9,-0.4 0.9,0.4 0,1 C -0.9,0.4 -0.9,-0.4 0,-1 Z"
+morph_to = "M 0,-1 L 0.87,0.5 L -0.87,0.5 Z"   # optional; `morph` travels to it
+samples  = 64                                   # 3..=64, default 64
+```
+
+The supported subset is `M m L l H h V v C c S s Q q T t Z z`. **`A`/`a` (the
+elliptical arc) and a second subpath are refused by name**, each with an error
+saying what it found — an author meeting one is holding a file a browser renders
+correctly, so "invalid path" would be a cruel thing to say. Anything else that
+goes wrong is a load error carrying the **character offset** into `d`, because a
+mis-parsed path renders as a plausible wrong figure rather than as a mistake.
+
+`morph` is an ordinary binding under this document's language, and `[smoothing]`
+reaches it like any other — the pair is aligned once at load (winding, start
+point, arc-length arity) so nothing per frame re-derives a correspondence.
+
+[`presets/README.md`](../presets/README.md) carries the rest: the arity ceiling
+and the measurement it came from, which pairs morph well, and the plain fact that
+a long path stops a preset being readable.
 
 ### The `[spectrum]` table
 
@@ -1211,8 +1244,9 @@ that merely waste a line. Neither ever crashes a running visual (NFR 10).
 - An unknown `system` name.
 - An expression that fails to compile — an unknown identifier, a bad number, a
   wrong argument count, an unbalanced parenthesis, a stray character.
-- An invalid structural table (`[curve]`, `[generator]`, `[particles]`,
-  `[spectrum]`, `[palette]`, `[smoothing]`, `[latch]`).
+- An invalid structural table (`[curve]`, `[generator]`, `[particles]`, `[path]`,
+  `[spectrum]`, `[palette]`, `[smoothing]`, `[latch]`) - including a `[path] d`
+  the parser refuses, which names the character offset it stopped at.
 
 **Warnings — the preset still loads and renders:**
 

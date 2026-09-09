@@ -13,7 +13,7 @@
 system = "attractor"        # required — one of the nine; unknown rejects the file
 name   = "Lorenz Drift"     # optional — display name, and what `--preset` matches
 
-[particles]                 # structural config: [curve] | [generator] | [particles]
+[particles]                 # structural config: [curve] | [generator] | [particles] | [path]
 family = "lorenz"
 
 [generator]                 # any system may carry one just for the seed
@@ -62,7 +62,7 @@ write `min(a > b, b > c)`.
 **Hard error — the whole file is rejected and the app keeps its last good set (never crashes):**
 malformed TOML; unknown `system`; an expression that fails to compile (unknown identifier, wrong
 arity, unbalanced parens, stray character, `1 2` trailing tokens); an invalid `[curve]` /
-`[generator]` / `[particles]` / `[palette]` / `[smoothing]` value.
+`[generator]` / `[particles]` / `[path]` / `[palette]` / `[smoothing]` value.
 
 **Warning — the preset loads and everything else applies:** a binding whose param name no system or
 engine stage consumes. The message names the param and the system.
@@ -89,6 +89,12 @@ negative outside a `select`) becomes broken geometry, not an error. You clamp; t
   `contact_angle_deg` finite (default 30).
 - **`[particles]`** — `attractor` only. `family` ∈ `de_jong|clifford|thomas|lorenz` (default
   `de_jong`).
+- **`[path]`** — `shape_field` only, and the one structural table carrying **geometry**. `d` is
+  inline SVG path data for one closed contour (required); `morph_to` is a second contour the
+  bindable `morph` travels to (optional); `samples` is the arity both resample to, `3..=64`,
+  default 64. The subset is `M m L l H h V v C c S s Q q T t Z z` — **`A`/`a` and a second subpath
+  are refused by name**, and every other failure is a load error carrying the character offset into
+  `d`. Absent, the scene draws the `marks` roster as it always did.
 - **`[palette]` / `[palette_b]`** — a built-in `name` (`spectrum|ember|ice|mono|aurora`) **or**
   custom `stops` (≥2, each `at` in `0..=1` and ascending, colour `#rrggbb` or `[r,g,b]` floats).
   Setting both, or neither, is a load error. Reaches **every** scene since Plan 0054 / ADR-0059 —

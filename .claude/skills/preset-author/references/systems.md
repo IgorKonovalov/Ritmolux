@@ -179,6 +179,37 @@ easing an already-slow curve only lags it. Full table and the per-roster notes:
 
 ---
 
+## `shape_field` — one silhouette at frame scale
+
+*Emblematic, graphic, still.* The `marks` roster drawn as a **fullscreen
+signed-distance field**: the palette coordinate is the *distance* to the figure, so
+`palette_steps` draws concentric offset contours of the shape rather than of a
+circle, and `palette_contour` outlines them. It draws opaquely and reads no audio
+itself. `coord_mode = 1` swaps the coordinate for `r / r_boundary(theta)`, whose
+contours are **scaled copies** of the outline instead of offsets — that is the one
+to reach for when a notch or a corner must stay sharp at every ring.
+
+**A `[path]` table replaces the roster with a silhouette you drew** — inline SVG
+path data, one closed contour. Two params come with it, and both work on a
+rostered figure too:
+
+| Param | Typical | Controls / natural driver |
+|-------|---------|---------------------------|
+| `stroke` | `0.04 – 0.15` | draws the figure's **outline** at this half-width instead of filling it, in coordinate units (`1` is the whole interior). `0` fills, and is an exact identity. Fill and outline are the same field, so a stroke cannot drift off its figure. |
+| `morph` | `0 – 1` | travels a `[path]` towards its `morph_to` silhouette. Inert without one. This is the param to hang a `beat` or a `[latch]` on — a figure *becoming* another figure is the whole reason the table takes a second contour. |
+
+**Three walls worth knowing before you author against it**, all of them the
+engine's rather than yours: `samples` is capped at **64** and asking for more is a
+load error; **`A`/`a` and a second subpath are refused by name**, so a traced
+letterform with a counter and most rounded-corner exports do not load as drawn;
+and a **morphing** pair costs more per frame than a static one, because a static
+curve is drawn as a fitted arc chain and a morphing one cannot be. The subset,
+the refusals, the measurement behind the ceiling and the rules for which pairs
+morph well are all in
+[`presets/README.md`](../../../../presets/README.md#path--for-shape_field).
+
+---
+
 ## `spectrum` — the frequency-axis readout (Plan 0034)
 
 *A measurement you can look at.* A line system like the three above, but its figure is the engine's
