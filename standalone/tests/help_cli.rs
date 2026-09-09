@@ -195,3 +195,45 @@ fn an_unknown_preset_exits_without_opening_a_window() {
         "the refusal did not list the roster: {stderr:?}"
     );
 }
+
+/// `--schema` answers and exits, on stdout, with nothing else on it.
+///
+/// The same property `--help` is spawned for, on the other query a program asks
+/// before it drives the player: a studio runs this once at startup, so a
+/// `--schema` that opened a window or waited for a GPU would hang the thing that
+/// spawned it. The content is asserted in `core` (against the published
+/// reference and against its own hash); what only a subprocess can show is that
+/// the document is **alone** on standard output, which is what lets a parent
+/// pipe it straight into a parser.
+#[test]
+fn schema_answers_on_stdout_and_exits_without_starting_the_app() {
+    let (code, stdout, stderr, elapsed) = run_both(&["--schema"]);
+    assert_eq!(code, Some(0), "--schema exits cleanly");
+    assert!(
+        elapsed < RESPONDS_WITHIN,
+        "--schema took {elapsed:?}, which is long enough that it may have \
+         started something"
+    );
+    assert!(
+        stderr.is_empty(),
+        "--schema wrote to stderr, so a parent reading both streams sees noise \
+         beside the document: {stderr}"
+    );
+
+    let trimmed = stdout.trim_end_matches(['\r', '\n']);
+    assert!(
+        trimmed.starts_with('{') && trimmed.ends_with('}'),
+        "standard output is not one JSON object; it begins `{}` and ends `{}`",
+        trimmed.chars().take(20).collect::<String>(),
+        trimmed.chars().rev().take(20).collect::<String>(),
+    );
+    assert!(
+        !trimmed.contains('\n'),
+        "the document spans more than one line, so a parent reading a line at a \
+         time cannot take it in one"
+    );
+    assert!(
+        trimmed.contains("\"hash\":\"") && trimmed.contains("\"systems\":["),
+        "the document is missing the hash or the systems roster"
+    );
+}

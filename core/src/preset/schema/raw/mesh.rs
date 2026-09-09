@@ -50,3 +50,33 @@ impl RawMesh {
         })
     }
 }
+
+// ---------------------------------------------------------------------------
+// The schema descriptor (Plan 0158 Phase 4). A second statement of this table's
+// shape, and one on purpose: serde carries a field's name and type and none of
+// what an editor needs -- the closed roster a string is drawn from, the default
+// the loader substitutes, the sentence saying what the key does. What holds the
+// two together is `schema::tests`, which reads the field roster serde derived
+// and asserts it is exactly what the rows below name.
+// ---------------------------------------------------------------------------
+
+/// The `[mesh]` table.
+pub(in crate::preset::schema) const MESH: TableDesc = TableDesc {
+    name: "mesh",
+    doc: "The warp mesh's grid, in cells. Clamped to the tier at both consumers rather \
+          than at load.",
+    keys: &[
+        KeyDesc {
+            name: "x",
+            kind: KeyKind::Int,
+            default: "32",
+            doc: "Cells across.",
+        },
+        KeyDesc {
+            name: "y",
+            kind: KeyKind::Int,
+            default: "24",
+            doc: "Cells down.",
+        },
+    ],
+};

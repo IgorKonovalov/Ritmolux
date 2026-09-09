@@ -292,9 +292,9 @@ to a layout.
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — A parameter moves in place | dev | done | `ab0ec26` |
-| 2 — The player listens | dev | done | committed with this row |
+| 2 — The player listens | dev | done | `b2d77ec` |
 | 3 — The player reports | dev | not started | |
-| 4 — The engine states what a preset can contain | dev | not started | |
+| 4 — The engine states what a preset can contain | dev | done | committed with this row |
 | 5 — The headless tap writes to a pipe | dev | not started | |
 | 6 — The windowed show gets a preview copy | dev | not started | |
 | 7 — The on-device check | human | not started | |
@@ -350,6 +350,29 @@ to a layout.
   specs are in `site/src/plugins/rewrite-links.mjs`'s `PUBLISHED` map and this one is not, so the
   link `docs/configuration.md` now carries to it is rewritten to a github blob URL. Left as it
   is: what joins the site is not a `dev` call.
+
+- **Phases 3 and 4 were implemented in the other order.** Phase 3's third done-when has `hello`
+  carry "the schema hash Phase 4 defines", so Phase 3 cannot satisfy its own criteria until Phase 4
+  has landed. Building 4 first makes both phases' done-whens true at their own commits and changes
+  nothing about the final state; no phase block was edited.
+- **Phase 4 touched seven files outside its list, all to give a closed roster one home.**
+  `core/src/render/scenes/lines/mod.rs` (`CurveFamily::ALL`/`as_str`),
+  `core/src/render/palette.rs` (`NamedPalette::ALL`/`as_str`),
+  `core/src/render/feedback.rs` (`Deposit::ALL`/`as_str`/`from_name`),
+  `core/src/render/scenes/particles/family.rs` (`AttractorFamily::MAPS`/`as_str`),
+  `core/src/render/scenes/lines/hankin.rs` (`TILINGS`),
+  `core/src/preset/schema/mod.rs` (`LayerJoin::ALL`/`as_str`) and
+  `core/src/preset/schema/raw/feedback.rs` (the loader's own `max`/`add` pair, now read off
+  `Deposit::ALL`). The export's `KeyKind::Roster` names a type rather than listing strings, so
+  without these the document would have carried a second copy of every roster in the engine.
+  `core/src/preset/schema/tests.rs` and `standalone/tests/help_cli.rs` also gained tests.
+- **The descriptor-versus-serde check is real reflection, and both directions were verified to
+  fail.** `FieldProbe` in `core/src/preset/schema/tests.rs` is a `Deserializer` that answers
+  nothing and records the field roster `#[derive(Deserialize)]` asks it for. Adding an undescribed
+  field to `RawMesh` fails the test; deleting the `layout` row from the `[spectrum]` descriptor
+  fails the shipped-preset walk with five named files. Both were run and reverted.
+- **`--schema` prints 59 KB on one line**: 12 systems, 7 engine stages, 343 parameters and 16
+  structural tables, hash `0965e83a83985c0e` at this commit. It parses as JSON.
 
 ### Close triggers
 

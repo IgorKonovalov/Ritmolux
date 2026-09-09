@@ -499,3 +499,347 @@ fn a_malformed_morph_target_names_the_key_it_came_from() {
     );
     assert!(text.contains("elliptical arc"), "{text}");
 }
+
+// ---------------------------------------------------------------------------
+// The exported schema (Plan 0158 Phase 4): the descriptors against serde, the
+// rosters against their own parsers, and both against every preset that ships.
+// ---------------------------------------------------------------------------
+
+/// The one error the probe below produces. Carries nothing: it is a control-flow
+/// signal, not a diagnosis.
+#[derive(Debug)]
+struct Probed;
+
+impl fmt::Display for Probed {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("field probe")
+    }
+}
+
+impl std::error::Error for Probed {}
+
+impl serde::de::Error for Probed {
+    fn custom<T: fmt::Display>(_: T) -> Self {
+        Probed
+    }
+}
+
+/// A `Deserializer` that answers nothing and records the field roster serde
+/// asked it for.
+///
+/// **This is the reflection Rust does not otherwise have.** `#[derive(Deserialize)]`
+/// emits a call to `deserialize_struct` carrying the exact list of fields it
+/// knows about; nothing else in the language reports that list. Capturing it is
+/// what makes "a key added to a serde struct without a descriptor row fails the
+/// test" a fact rather than a hope — a hand-written roster here would need the
+/// same edit the descriptor needs, and would fail to catch exactly the omission
+/// it was written for.
+struct FieldProbe<'a>(&'a mut Option<&'static [&'static str]>);
+
+impl<'de> serde::Deserializer<'de> for FieldProbe<'_> {
+    type Error = Probed;
+
+    fn deserialize_struct<V: serde::de::Visitor<'de>>(
+        self,
+        _name: &'static str,
+        fields: &'static [&'static str],
+        _visitor: V,
+    ) -> Result<V::Value, Probed> {
+        *self.0 = Some(fields);
+        Err(Probed)
+    }
+
+    fn deserialize_any<V: serde::de::Visitor<'de>>(self, _visitor: V) -> Result<V::Value, Probed> {
+        Err(Probed)
+    }
+
+    serde::forward_to_deserialize_any! {
+        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
+        bytes byte_buf option unit unit_struct newtype_struct seq tuple
+        tuple_struct map enum identifier ignored_any
+    }
+}
+
+/// The field names serde derived for `T`.
+fn serde_fields<'de, T: Deserialize<'de>>() -> &'static [&'static str] {
+    let mut captured = None;
+    let _ = T::deserialize(FieldProbe(&mut captured));
+    captured.expect("the derived Deserialize asks deserialize_struct for its fields")
+}
+
+/// One table's descriptor beside the field roster serde derived for it.
+type DescriptorPair = (&'static TableDesc, &'static [&'static str]);
+
+/// Every raw table, paired with the descriptor that is supposed to describe it.
+///
+/// A function rather than a const because each entry has to name a *type*, which
+/// only a call can do. Adding a table means adding a row here; a table with no
+/// row is invisible to the check below, which is the one hole this shape has and
+/// the reason `every_descriptor_is_reachable_from_the_root` exists beside it.
+fn descriptor_pairs() -> Vec<DescriptorPair> {
+    vec![
+        (&raw::PRESET, serde_fields::<raw::RawPreset>()),
+        (&raw::LAYER, serde_fields::<raw::RawLayer>()),
+        (&raw::LATCH, serde_fields::<raw::RawLatch>()),
+        (&raw::CURVE, serde_fields::<raw::RawCurve>()),
+        (&raw::GENERATOR, serde_fields::<raw::RawGenerator>()),
+        (&raw::RING, serde_fields::<raw::RawRing>()),
+        (&raw::PARTICLES, serde_fields::<raw::RawParticles>()),
+        (&raw::PATH, serde_fields::<raw::RawPath>()),
+        (&raw::SPECTRUM, serde_fields::<raw::RawSpectrum>()),
+        (&raw::MESH, serde_fields::<raw::RawMesh>()),
+        (&raw::MILK, serde_fields::<raw::RawMilk>()),
+        (&raw::MILK_ELEMENT, serde_fields::<raw::RawMilkElement>()),
+        (&raw::FEEDBACK, serde_fields::<raw::RawFeedback>()),
+        (&raw::OCCUPANCY, serde_fields::<raw::RawOccupancy>()),
+        (&raw::PALETTE, serde_fields::<raw::RawPalette>()),
+        (&raw::STOP, serde_fields::<raw::RawStop>()),
+    ]
+}
+
+/// Every key the loader deserializes has a descriptor row, and every row names a
+/// key the loader deserializes.
+///
+/// Both directions, because they fail differently: a field with no row is a key
+/// an editor cannot offer, and a row with no field is a key an editor would
+/// offer and the loader would ignore.
+#[test]
+fn every_serde_field_has_a_descriptor_row_and_the_reverse() {
+    let mut findings = Vec::new();
+    for (table, fields) in descriptor_pairs() {
+        let described: Vec<&str> = table.keys.iter().map(|key| key.name).collect();
+        for field in fields {
+            if !described.contains(field) {
+                findings.push(format!(
+                    "  [{}] {field}: deserialized by the loader, named by no descriptor row",
+                    table.name
+                ));
+            }
+        }
+        for key in &described {
+            if !fields.contains(key) {
+                findings.push(format!(
+                    "  [{}] {key}: named by a descriptor row, deserialized by nothing",
+                    table.name
+                ));
+            }
+        }
+    }
+    assert!(
+        findings.is_empty(),
+        "{} key(s) disagree between serde and the schema descriptors:\n{}\n\
+         The rosters here are read off the derived Deserialize itself, so a field \
+         added to a Raw* struct lands in this list until a row joins it.",
+        findings.len(),
+        findings.join("\n"),
+    );
+}
+
+/// Every descriptor in the export's roster is reachable from the root, and every
+/// table a key refers to exists.
+///
+/// The hole the pairing above cannot see: a table with no row in
+/// `descriptor_pairs` is unchecked, and a table nothing refers to is
+/// unreachable. Walking the references from `preset` closes both.
+#[test]
+fn every_descriptor_is_reachable_from_the_root_and_every_reference_resolves() {
+    let mut reached = vec!["preset"];
+    let mut frontier = vec![&raw::PRESET];
+    while let Some(table) = frontier.pop() {
+        for key in table.keys {
+            let mut kind = &key.kind;
+            // A `map` or `list` of a table refers through one level of wrapper.
+            while let KeyKind::Map(of) | KeyKind::List(of) = kind {
+                kind = of;
+            }
+            let KeyKind::Table(name) = kind else {
+                continue;
+            };
+            let target = export::table(name).unwrap_or_else(|| {
+                panic!(
+                    "[{}] {} refers to unknown table `{name}`",
+                    table.name, key.name
+                )
+            });
+            if !reached.contains(name) {
+                reached.push(name);
+                frontier.push(target);
+            }
+        }
+    }
+    let unreachable: Vec<&str> = export::TABLES
+        .iter()
+        .map(|table| table.name)
+        .filter(|name| !reached.contains(name))
+        .collect();
+    assert!(
+        unreachable.is_empty(),
+        "these tables are exported but no key refers to them, so nothing can \
+         reach them from a preset document: {unreachable:?}"
+    );
+    assert_eq!(
+        reached.len(),
+        descriptor_pairs().len(),
+        "every reachable table needs a serde pairing above; reached {reached:?}"
+    );
+}
+
+/// Every value a roster publishes is one the type's own parser accepts.
+///
+/// The export renders these rosters into the document a studio builds its
+/// dropdowns from, so a value here that the loader rejects would be an option
+/// that produces a load error when chosen.
+#[test]
+fn every_roster_value_parses_through_its_owners_parser() {
+    use crate::render::scenes::lines::star::Motif;
+    use crate::render::scenes::lines::{CurveFamily, SpectrumLayout, hankin};
+    use crate::render::scenes::particles::AttractorFamily;
+    use crate::render::scenes::particles::ifs::IfsFigure;
+
+    /// A roster beside the parser that owns it.
+    type RosterCheck = (Roster, fn(&str) -> bool);
+
+    let checks: [RosterCheck; 12] = [
+        (Roster::System, |n| SystemKind::from_name(n).is_some()),
+        (Roster::CurveFamily, |n| CurveFamily::from_name(n).is_some()),
+        (Roster::AttractorFamily, |n| {
+            AttractorFamily::from_name(n).is_some()
+        }),
+        (Roster::IfsFigure, |n| IfsFigure::from_name(n).is_some()),
+        (Roster::SpectrumLayout, |n| {
+            SpectrumLayout::from_name(n).is_some()
+        }),
+        (Roster::Warp, |n| Warp::from_name(n).is_some()),
+        (Roster::Deposit, |n| Deposit::from_name(n).is_some()),
+        (Roster::Palette, |n| NamedPalette::from_name(n).is_some()),
+        (Roster::LayerJoin, |n| LayerJoin::from_name(n).is_some()),
+        (Roster::LayerBlend, |n| LayerBlend::from_name(n).is_some()),
+        (Roster::Motif, |n| Motif::from_name(n).is_some()),
+        // `none` is the loader's own special case — it draws no interlace, so it
+        // never reaches `tiling_order`. Stated here rather than pushed into that
+        // function, whose answer is an order and has none to give.
+        (Roster::Tiling, |n| {
+            n == "none" || hankin::tiling_order(n).is_some()
+        }),
+    ];
+
+    for (roster, parses) in checks {
+        let values = roster.values();
+        assert!(
+            !values.is_empty(),
+            "{roster:?} published an empty roster, so a dropdown built from it \
+             would offer nothing"
+        );
+        for value in values {
+            assert!(
+                parses(value),
+                "{roster:?} publishes `{value}`, which its own parser rejects"
+            );
+        }
+    }
+}
+
+/// Every key every shipped preset writes is a key the descriptor names.
+///
+/// The direction that catches a table an author reached for and the export never
+/// heard of. Walks the embedded set and the teaching presets under
+/// `docs/examples/` — the two populations that are *known* to load — against the
+/// descriptor tree, following table references exactly as an editor would.
+#[test]
+fn every_key_a_shipped_preset_writes_is_one_the_descriptor_names() {
+    let mut findings = Vec::new();
+    for (file, source) in crate::preset::EMBEDDED {
+        check_document(file, source, &mut findings);
+    }
+    let examples = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("core has a workspace-root parent")
+        .join("docs/examples");
+    if let Ok(entries) = std::fs::read_dir(&examples) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().is_some_and(|ext| ext == "toml")
+                && let Ok(source) = std::fs::read_to_string(&path)
+            {
+                let name = path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_default();
+                check_document(&name, &source, &mut findings);
+            }
+        }
+    }
+    assert!(
+        findings.is_empty(),
+        "{} key(s) in shipped presets are named by no descriptor row:\n{}",
+        findings.len(),
+        findings.join("\n"),
+    );
+}
+
+/// Walk one preset document against the root descriptor, collecting keys nothing
+/// describes.
+fn check_document(file: &str, source: &str, findings: &mut Vec<String>) {
+    let Ok(value) = toml::from_str::<toml::Value>(source) else {
+        // A file that does not parse as TOML is another suite's problem; this one
+        // is about which keys exist.
+        return;
+    };
+    check_table(file, "", &value, &raw::PRESET, findings);
+}
+
+/// One table's keys against `desc`, recursing through table references.
+fn check_table(
+    file: &str,
+    path: &str,
+    value: &toml::Value,
+    desc: &TableDesc,
+    findings: &mut Vec<String>,
+) {
+    let Some(table) = value.as_table() else {
+        return;
+    };
+    for (key, child) in table {
+        let Some(described) = desc.keys.iter().find(|k| k.name == key) else {
+            findings.push(format!("  {file}: {path}{key} (in table `{}`)", desc.name));
+            continue;
+        };
+        let here = format!("{path}{key}.");
+        match described.kind {
+            // A map's own keys are the author's to choose; its *values* are
+            // checked when they are tables.
+            KeyKind::Map(of) => {
+                if let KeyKind::Table(name) = of
+                    && let Some(target) = export::table(name)
+                    && let Some(entries) = child.as_table()
+                {
+                    for (entry, entry_value) in entries {
+                        check_table(
+                            file,
+                            &format!("{here}{entry}."),
+                            entry_value,
+                            target,
+                            findings,
+                        );
+                    }
+                }
+            }
+            KeyKind::List(of) => {
+                if let KeyKind::Table(name) = of
+                    && let Some(target) = export::table(name)
+                    && let Some(items) = child.as_array()
+                {
+                    for (i, item) in items.iter().enumerate() {
+                        check_table(file, &format!("{here}{i}."), item, target, findings);
+                    }
+                }
+            }
+            KeyKind::Table(name) => {
+                if let Some(target) = export::table(name) {
+                    check_table(file, &here, child, target, findings);
+                }
+            }
+            _ => {}
+        }
+    }
+}

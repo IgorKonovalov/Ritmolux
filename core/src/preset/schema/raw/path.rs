@@ -71,3 +71,39 @@ impl RawPath {
         Ok(ParsedPath { shape, morph_to })
     }
 }
+
+// ---------------------------------------------------------------------------
+// The schema descriptor (Plan 0158 Phase 4). A second statement of this table's
+// shape, and one on purpose: serde carries a field's name and type and none of
+// what an editor needs -- the closed roster a string is drawn from, the default
+// the loader substitutes, the sentence saying what the key does. What holds the
+// two together is `schema::tests`, which reads the field roster serde derived
+// and asserts it is exactly what the rows below name.
+// ---------------------------------------------------------------------------
+
+/// The `[path]` table.
+pub(in crate::preset::schema) const PATH: TableDesc = TableDesc {
+    name: "path",
+    doc: "An authored silhouette for the shape field, as inline SVG path data.",
+    keys: &[
+        KeyDesc {
+            name: "d",
+            kind: KeyKind::Text,
+            default: "",
+            doc: "The contour, as SVG path data. Required.",
+        },
+        KeyDesc {
+            name: "morph_to",
+            kind: KeyKind::Text,
+            default: "",
+            doc: "A second silhouette morph travels towards; absent makes morph inert.",
+        },
+        KeyDesc {
+            name: "samples",
+            kind: KeyKind::Int,
+            default: "64",
+            doc: "The arity both contours are resampled to, and what the per-pixel field \
+                  costs O(N) in.",
+        },
+    ],
+};

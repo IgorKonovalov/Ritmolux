@@ -32,9 +32,35 @@ use std::f32::consts::TAU;
 use super::PLACEHOLDER_WIDTH;
 use super::renderer::{SegmentInstance, miter_extension};
 
+/// The `[generator] tiling` spellings, in roster order — every alias
+/// [`tiling_order`] accepts, plus the `none` that draws no interlace at all.
+///
+/// Three spellings per order because a preset author reaches for whichever they
+/// know: the polygon's name, its order as a number, or its vertex configuration.
+/// The list is here rather than in the schema export so there is one roster and
+/// the round-trip test can hold it to [`tiling_order`].
+pub const TILINGS: [&str; 13] = [
+    "square",
+    "4",
+    "4.4.4.4",
+    "hexagon",
+    "6",
+    "6.6.6",
+    "octagon",
+    "8",
+    "4.8.8",
+    "dodecagon",
+    "12",
+    "3.12.12",
+    "none",
+];
+
 /// Map a `tiling` name to its star order `n`. Accepts a few named/numeric
 /// regular tilings (the v1 set); returns `None` for anything else so the loader
 /// can reject it.
+///
+/// `none` is not answered here: it selects no interlace at all, and this
+/// function's answer is an order. The loader takes that case before asking.
 pub fn tiling_order(tiling: &str) -> Option<u32> {
     Some(match tiling.trim() {
         "square" | "4" | "4.4.4.4" => 4,

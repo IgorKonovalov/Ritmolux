@@ -149,6 +149,28 @@ pub enum NamedPalette {
 }
 
 impl NamedPalette {
+    /// Every built-in palette, in roster order — the closed set, and the list
+    /// the schema export renders rather than restating.
+    pub const ALL: [NamedPalette; 5] = [
+        NamedPalette::Spectrum,
+        NamedPalette::Ember,
+        NamedPalette::Ice,
+        NamedPalette::Mono,
+        NamedPalette::Aurora,
+    ];
+
+    /// The `[palette] name` this parses from — [`from_name`](Self::from_name)'s
+    /// inverse.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            NamedPalette::Spectrum => "spectrum",
+            NamedPalette::Ember => "ember",
+            NamedPalette::Ice => "ice",
+            NamedPalette::Mono => "mono",
+            NamedPalette::Aurora => "aurora",
+        }
+    }
+
     /// Parse a `[palette] name` string, or `None` if unknown.
     pub fn from_name(name: &str) -> Option<Self> {
         Some(match name {

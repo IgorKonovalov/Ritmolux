@@ -40,13 +40,16 @@ impl RawFeedback {
         };
         let blend = match self.blend.as_deref() {
             None => Deposit::default(),
-            Some("max") => Deposit::Max,
-            Some("add") => Deposit::Add,
-            Some(name) => {
-                return Err(PresetError::Config(format!(
-                    "unknown [feedback] blend '{name}' (expected one of: max, add)"
-                )));
-            }
+            Some(name) => Deposit::from_name(name).ok_or_else(|| {
+                PresetError::Config(format!(
+                    "unknown [feedback] blend '{name}' (expected one of: {})",
+                    Deposit::ALL
+                        .iter()
+                        .map(|d| d.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ))
+            })?,
         };
         Ok(FeedbackConfig { warp, blend })
     }
@@ -59,3 +62,46 @@ pub(in crate::preset::schema) struct RawOccupancy {
     #[serde(default)]
     pub(in crate::preset::schema) exempt: Vec<String>,
 }
+
+// ---------------------------------------------------------------------------
+// The schema descriptor (Plan 0158 Phase 4). A second statement of this table's
+// shape, and one on purpose: serde carries a field's name and type and none of
+// what an editor needs -- the closed roster a string is drawn from, the default
+// the loader substitutes, the sentence saying what the key does. What holds the
+// two together is `schema::tests`, which reads the field roster serde derived
+// and asserts it is exactly what the rows below name.
+// ---------------------------------------------------------------------------
+
+/// The `[feedback]` table.
+pub(in crate::preset::schema) const FEEDBACK: TableDesc = TableDesc {
+    name: "feedback",
+    doc: "Which curated warp the accumulation buffers resample their past through, and \
+          how this frame's light is deposited onto it.",
+    keys: &[
+        KeyDesc {
+            name: "warp",
+            kind: KeyKind::Roster(Roster::Warp),
+            default: "none",
+            doc: "The warp the accumulation reads its previous frame through.",
+        },
+        KeyDesc {
+            name: "blend",
+            kind: KeyKind::Roster(Roster::Deposit),
+            default: "max",
+            doc: "How this frame is deposited: bounded by the source maximum, or summed.",
+        },
+    ],
+};
+
+/// The `[occupancy]` table.
+pub(in crate::preset::schema) const OCCUPANCY: TableDesc = TableDesc {
+    name: "occupancy",
+    doc: "Parameters whose clamp bounds are meant to pin, exempted from the saturation \
+          gate. Harness-only; nothing per-frame reads it.",
+    keys: &[KeyDesc {
+        name: "exempt",
+        kind: KeyKind::List(&KeyKind::Text),
+        default: "",
+        doc: "Parameter names whose clamps may sit at their bound.",
+    }],
+};

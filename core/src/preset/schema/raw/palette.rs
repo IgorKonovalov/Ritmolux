@@ -142,3 +142,53 @@ pub(in crate::preset::schema) fn validate_stops(
     }
     Ok(out)
 }
+
+// ---------------------------------------------------------------------------
+// The schema descriptor (Plan 0158 Phase 4). A second statement of this table's
+// shape, and one on purpose: serde carries a field's name and type and none of
+// what an editor needs -- the closed roster a string is drawn from, the default
+// the loader substitutes, the sentence saying what the key does. What holds the
+// two together is `schema::tests`, which reads the field roster serde derived
+// and asserts it is exactly what the rows below name.
+// ---------------------------------------------------------------------------
+
+/// The `[palette]` and `[palette_b]` tables — one shape, two sites.
+pub(in crate::preset::schema) const PALETTE: TableDesc = TableDesc {
+    name: "palette",
+    doc: "The colour gradient: a built-in name, or explicit stops. The two are mutually \
+          exclusive.",
+    keys: &[
+        KeyDesc {
+            name: "name",
+            kind: KeyKind::Roster(Roster::Palette),
+            default: "spectrum",
+            doc: "A built-in gradient.",
+        },
+        KeyDesc {
+            name: "stops",
+            kind: KeyKind::List(&KeyKind::Table("stop")),
+            default: "",
+            doc: "An explicit gradient, as positioned colours.",
+        },
+    ],
+};
+
+/// One `[palette] stops` entry.
+pub(in crate::preset::schema) const STOP: TableDesc = TableDesc {
+    name: "stop",
+    doc: "One gradient stop: where it sits, and what colour it is. Authored in sRGB.",
+    keys: &[
+        KeyDesc {
+            name: "at",
+            kind: KeyKind::Float,
+            default: "",
+            doc: "Position along the gradient, 0 to 1. Required.",
+        },
+        KeyDesc {
+            name: "color",
+            kind: KeyKind::Colour,
+            default: "",
+            doc: "The colour, as #rrggbb or [r, g, b] in 0..1. Required.",
+        },
+    ],
+};

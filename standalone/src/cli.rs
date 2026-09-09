@@ -93,6 +93,12 @@ pub(crate) const FLAGS: &[FlagSpec] = &[
         help: "print the audio capture endpoints and exit (Windows-only)",
     },
     FlagSpec {
+        name: "--schema",
+        takes_value: false,
+        requires: None,
+        help: "print the preset schema as JSON and exit",
+    },
+    FlagSpec {
         name: "--list-adapters",
         takes_value: false,
         requires: None,

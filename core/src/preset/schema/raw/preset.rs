@@ -214,3 +214,251 @@ impl serde::de::Visitor<'_> for RawSeedVisitor {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// The schema descriptor (Plan 0158 Phase 4). A second statement of this table's
+// shape, and one on purpose: serde carries a field's name and type and none of
+// what an editor needs -- the closed roster a string is drawn from, the default
+// the loader substitutes, the sentence saying what the key does. What holds the
+// two together is `schema::tests`, which reads the field roster serde derived
+// and asserts it is exactly what the rows below name.
+// ---------------------------------------------------------------------------
+
+/// The document root.
+pub(in crate::preset::schema) const PRESET: TableDesc = TableDesc {
+    name: "preset",
+    doc: "The preset document: which scene it drives, what drives its parameters, \
+          and the structural tables that shape both.",
+    keys: &[
+        KeyDesc {
+            name: "system",
+            kind: KeyKind::Roster(Roster::System),
+            default: "",
+            doc: "Which built-in scene this preset drives. Required.",
+        },
+        KeyDesc {
+            name: "name",
+            kind: KeyKind::Text,
+            default: "",
+            doc: "Human-readable name; absent means the system's own name.",
+        },
+        KeyDesc {
+            name: "representative",
+            kind: KeyKind::Bool,
+            default: "false",
+            doc: "Whether this preset is one of its family's samples for the narrowed test tier.",
+        },
+        KeyDesc {
+            name: "params",
+            kind: KeyKind::Map(&KeyKind::Expr),
+            default: "",
+            doc: "One expression per named parameter; an unbound parameter keeps its default.",
+        },
+        KeyDesc {
+            name: "per_vertex",
+            kind: KeyKind::Map(&KeyKind::Expr),
+            default: "",
+            doc: "Bindings evaluated once per mesh vertex, with x/y/rad/ang in scope.",
+        },
+        KeyDesc {
+            name: "smoothing",
+            kind: KeyKind::Map(&KeyKind::Easing),
+            default: "",
+            doc: "Per-parameter easing in seconds; an unlisted parameter is applied instantly.",
+        },
+        KeyDesc {
+            name: "latch",
+            kind: KeyKind::Map(&KeyKind::Table("latch")),
+            default: "",
+            doc: "Named armed-and-fired events an expression can read as a variable.",
+        },
+        KeyDesc {
+            name: "curve",
+            kind: KeyKind::Table("curve"),
+            default: "",
+            doc: "The parametric curve's family.",
+        },
+        KeyDesc {
+            name: "generator",
+            kind: KeyKind::Table("generator"),
+            default: "",
+            doc: "The L-system's grammar or the star pattern's tiling, plus the preset's seed.",
+        },
+        KeyDesc {
+            name: "particles",
+            kind: KeyKind::Table("particles"),
+            default: "",
+            doc: "The attractor family, its density, and what morph travels towards.",
+        },
+        KeyDesc {
+            name: "path",
+            kind: KeyKind::Table("path"),
+            default: "",
+            doc: "An authored silhouette for the shape field, as inline SVG path data.",
+        },
+        KeyDesc {
+            name: "spectrum",
+            kind: KeyKind::Table("spectrum"),
+            default: "",
+            doc: "How the readout divides the frequency axis and what figure it forms.",
+        },
+        KeyDesc {
+            name: "mesh",
+            kind: KeyKind::Table("mesh"),
+            default: "",
+            doc: "The warp mesh's grid, in cells.",
+        },
+        KeyDesc {
+            name: "milk",
+            kind: KeyKind::Table("milk"),
+            default: "",
+            doc: "A converted MilkDrop preset's compiled programs and shaders.",
+        },
+        KeyDesc {
+            name: "feedback",
+            kind: KeyKind::Table("feedback"),
+            default: "",
+            doc: "Which warp the accumulation buffers resample their past through, and how \
+                  this frame is deposited onto it.",
+        },
+        KeyDesc {
+            name: "palette",
+            kind: KeyKind::Table("palette"),
+            default: "",
+            doc: "The colour gradient; absent means the built-in spectrum.",
+        },
+        KeyDesc {
+            name: "palette_b",
+            kind: KeyKind::Table("palette"),
+            default: "",
+            doc: "The crossfade target a bindable palette_mix travels towards.",
+        },
+        KeyDesc {
+            name: "occupancy",
+            kind: KeyKind::Table("occupancy"),
+            default: "",
+            doc: "Parameters whose clamp bounds are meant to pin, exempted from the saturation gate.",
+        },
+        KeyDesc {
+            name: "layer",
+            kind: KeyKind::Table("layer"),
+            default: "",
+            doc: "A second scene drawn with the first.",
+        },
+    ],
+};
+
+/// The `[layer]` sub-preset: everything a preset has except the tables that
+/// belong to the frame as a whole.
+pub(in crate::preset::schema) const LAYER: TableDesc = TableDesc {
+    name: "layer",
+    doc: "A second scene drawn with the first, with its own system, bindings and structure.",
+    keys: &[
+        KeyDesc {
+            name: "system",
+            kind: KeyKind::Roster(Roster::System),
+            default: "",
+            doc: "Which built-in scene the layer draws. Required.",
+        },
+        KeyDesc {
+            name: "join",
+            kind: KeyKind::Roster(Roster::LayerJoin),
+            default: "under",
+            doc: "Where the layer joins: into the main scene's target, or into the chain \
+                  as its own image.",
+        },
+        KeyDesc {
+            name: "blend",
+            kind: KeyKind::Roster(Roster::LayerBlend),
+            default: "screen",
+            doc: "How an over-joined layer blends into the chain. Inert on an under join.",
+        },
+        KeyDesc {
+            name: "mix",
+            kind: KeyKind::Expr,
+            default: "",
+            doc: "The over junction's amount; absent means full strength.",
+        },
+        KeyDesc {
+            name: "params",
+            kind: KeyKind::Map(&KeyKind::Expr),
+            default: "",
+            doc: "The layer's own parameter bindings, namespaced to its scene.",
+        },
+        KeyDesc {
+            name: "per_vertex",
+            kind: KeyKind::Map(&KeyKind::Expr),
+            default: "",
+            doc: "The layer's per-vertex bindings, for a warp-mesh layer.",
+        },
+        KeyDesc {
+            name: "smoothing",
+            kind: KeyKind::Map(&KeyKind::Easing),
+            default: "",
+            doc: "Per-parameter easing for the layer's bindings.",
+        },
+        KeyDesc {
+            name: "curve",
+            kind: KeyKind::Table("curve"),
+            default: "",
+            doc: "The layer's parametric curve family.",
+        },
+        KeyDesc {
+            name: "generator",
+            kind: KeyKind::Table("generator"),
+            default: "",
+            doc: "The layer's L-system grammar or star tiling.",
+        },
+        KeyDesc {
+            name: "particles",
+            kind: KeyKind::Table("particles"),
+            default: "",
+            doc: "The layer's attractor family.",
+        },
+        KeyDesc {
+            name: "path",
+            kind: KeyKind::Table("path"),
+            default: "",
+            doc: "The layer's authored silhouette.",
+        },
+        KeyDesc {
+            name: "spectrum",
+            kind: KeyKind::Table("spectrum"),
+            default: "",
+            doc: "The layer's readout configuration.",
+        },
+        KeyDesc {
+            name: "mesh",
+            kind: KeyKind::Table("mesh"),
+            default: "",
+            doc: "The layer's warp-mesh grid.",
+        },
+    ],
+};
+
+/// One `[latch]` entry.
+pub(in crate::preset::schema) const LATCH: TableDesc = TableDesc {
+    name: "latch",
+    doc: "A gate armed on one condition and fired by the first rising edge of another \
+          inside the arming window.",
+    keys: &[
+        KeyDesc {
+            name: "arm",
+            kind: KeyKind::Expr,
+            default: "",
+            doc: "While this holds above 0.5 the latch is armed; its fall re-arms it. Required.",
+        },
+        KeyDesc {
+            name: "fire",
+            kind: KeyKind::Expr,
+            default: "",
+            doc: "The rising edge that fires an armed latch. Required.",
+        },
+        KeyDesc {
+            name: "hold",
+            kind: KeyKind::Float,
+            default: "0",
+            doc: "How long the fired latch reads 1, in seconds. 0 is a single frame.",
+        },
+    ],
+};

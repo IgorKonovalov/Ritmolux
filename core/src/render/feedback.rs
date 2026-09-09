@@ -107,6 +107,29 @@ pub enum Deposit {
     Add,
 }
 
+impl Deposit {
+    /// Both blends, for the load error's "expected one of" listing and for the
+    /// schema export, which renders this rather than restating it.
+    pub const ALL: [Deposit; 2] = [Deposit::Max, Deposit::Add];
+
+    /// The canonical `[feedback] blend` name.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Deposit::Max => "max",
+            Deposit::Add => "add",
+        }
+    }
+
+    /// Parse a `[feedback] blend` value, or `None` if unknown.
+    pub fn from_name(name: &str) -> Option<Self> {
+        Some(match name {
+            "max" => Deposit::Max,
+            "add" => Deposit::Add,
+            _ => return None,
+        })
+    }
+}
+
 /// A preset's `[feedback]` table: the two load-time choices about how an
 /// accumulation reads its own past (ADR-0048).
 ///

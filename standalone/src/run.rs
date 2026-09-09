@@ -401,6 +401,17 @@ pub fn run() {
         std::process::exit(2);
     }
 
+    // What a preset may contain, as JSON on stdout, then exit (ADR-0176). Before
+    // the directory migration below and before every startup aid, because this
+    // is a **query**: a studio spawns it once to build its panels, and a query
+    // that moved a directory on the way past would be a side effect nobody asked
+    // for. Like `--help` it creates no window, no GPU device and no capture
+    // client.
+    if std::env::args().skip(1).any(|arg| arg == "--schema") {
+        println!("{}", rlx_core::preset::export::document());
+        return;
+    }
+
     // Carry a per-user directory left under the earlier name across to
     // APP_DIR_NAME, before anything reads or seeds it. It runs here rather than
     // inside the resolver so that resolving a path never moves a directory, and

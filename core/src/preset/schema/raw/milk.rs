@@ -133,3 +133,133 @@ impl RawMilk {
         Ok(bundle)
     }
 }
+
+// ---------------------------------------------------------------------------
+// The schema descriptor (Plan 0158 Phase 4). A second statement of this table's
+// shape, and one on purpose: serde carries a field's name and type and none of
+// what an editor needs -- the closed roster a string is drawn from, the default
+// the loader substitutes, the sentence saying what the key does. What holds the
+// two together is `schema::tests`, which reads the field roster serde derived
+// and asserts it is exactly what the rows below name.
+// ---------------------------------------------------------------------------
+
+/// The `[milk]` table.
+pub(in crate::preset::schema) const MILK: TableDesc = TableDesc {
+    name: "milk",
+    doc: "A converted MilkDrop preset's compiled programs, its two shaders, and the \
+          frame-level choices that ride with them. Produced by the converter, not \
+          hand-authored.",
+    keys: &[
+        KeyDesc {
+            name: "per_frame_init",
+            kind: KeyKind::Text,
+            default: "",
+            doc: "The once-at-load program, as assembly text.",
+        },
+        KeyDesc {
+            name: "per_frame",
+            kind: KeyKind::Text,
+            default: "",
+            doc: "The once-per-frame program, as assembly text.",
+        },
+        KeyDesc {
+            name: "per_vertex",
+            kind: KeyKind::Text,
+            default: "",
+            doc: "The once-per-mesh-vertex program, as assembly text.",
+        },
+        KeyDesc {
+            name: "waves",
+            kind: KeyKind::List(&KeyKind::Table("milk_element")),
+            default: "",
+            doc: "The custom waves, each with its own programs.",
+        },
+        KeyDesc {
+            name: "shapes",
+            kind: KeyKind::List(&KeyKind::Table("milk_element")),
+            default: "",
+            doc: "The custom shapes, each with its own programs.",
+        },
+        KeyDesc {
+            name: "warp_shader",
+            kind: KeyKind::Text,
+            default: "",
+            doc: "The emitted warp shader body.",
+        },
+        KeyDesc {
+            name: "comp_shader",
+            kind: KeyKind::Text,
+            default: "",
+            doc: "The emitted composite shader body.",
+        },
+        KeyDesc {
+            name: "blur_level",
+            kind: KeyKind::Int,
+            default: "0",
+            doc: "How many blur levels the shaders sample, 0 to 3.",
+        },
+        KeyDesc {
+            name: "quantize_steps",
+            kind: KeyKind::Float,
+            default: "",
+            doc: "The warp field's quantization, in steps.",
+        },
+    ],
+};
+
+/// One `[milk] waves` or `[milk] shapes` entry.
+pub(in crate::preset::schema) const MILK_ELEMENT: TableDesc = TableDesc {
+    name: "milk_element",
+    doc: "One custom wave or shape: its programs, how many instances it draws, and how \
+          it is stroked.",
+    keys: &[
+        KeyDesc {
+            name: "init",
+            kind: KeyKind::Text,
+            default: "",
+            doc: "The once-at-load program, as assembly text.",
+        },
+        KeyDesc {
+            name: "per_frame",
+            kind: KeyKind::Text,
+            default: "",
+            doc: "The once-per-frame program, as assembly text.",
+        },
+        KeyDesc {
+            name: "per_point",
+            kind: KeyKind::Text,
+            default: "",
+            doc: "The once-per-point program, as assembly text.",
+        },
+        KeyDesc {
+            name: "count",
+            kind: KeyKind::Int,
+            default: "0",
+            doc: "Points along the element.",
+        },
+        KeyDesc {
+            name: "instances",
+            kind: KeyKind::Int,
+            default: "1",
+            doc: "How many copies are drawn.",
+        },
+        KeyDesc {
+            name: "use_dots",
+            kind: KeyKind::Bool,
+            default: "false",
+            doc: "Draw points rather than a connected line.",
+        },
+        KeyDesc {
+            name: "thick",
+            kind: KeyKind::Bool,
+            default: "false",
+            doc: "Stroke at the thick width.",
+        },
+        KeyDesc {
+            name: "additive",
+            kind: KeyKind::Bool,
+            default: "false",
+            doc: "Add into the frame rather than blending over it.",
+        },
+    ],
+};

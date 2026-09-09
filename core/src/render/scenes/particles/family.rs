@@ -41,6 +41,17 @@ pub enum AttractorFamily {
 }
 
 impl AttractorFamily {
+    /// The four **map** families, in roster order. The IFS arm is not listed
+    /// here because it is `IfsFigure::ALL` — one roster, reached through the
+    /// type that owns it, so the schema export renders both without a copy of
+    /// either.
+    pub const MAPS: [AttractorFamily; 4] = [
+        AttractorFamily::DeJong,
+        AttractorFamily::Clifford,
+        AttractorFamily::Thomas,
+        AttractorFamily::Lorenz,
+    ];
+
     /// Parse a `[particles] family` name, or `None` if unknown.
     ///
     /// The IFS figures sit in the **same** namespace as the map families rather
@@ -55,6 +66,18 @@ impl AttractorFamily {
             "lorenz" => AttractorFamily::Lorenz,
             _ => AttractorFamily::Ifs(IfsFigure::from_name(name)?),
         })
+    }
+
+    /// The `[particles] family` name this parses from —
+    /// [`from_name`](Self::from_name)'s inverse.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AttractorFamily::DeJong => "de_jong",
+            AttractorFamily::Clifford => "clifford",
+            AttractorFamily::Thomas => "thomas",
+            AttractorFamily::Lorenz => "lorenz",
+            AttractorFamily::Ifs(figure) => figure.name(),
+        }
     }
 
     /// The IFS figure this family draws, or `None` for the four map families.

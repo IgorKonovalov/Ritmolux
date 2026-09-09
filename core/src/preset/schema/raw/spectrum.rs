@@ -73,3 +73,39 @@ impl RawSpectrum {
         })
     }
 }
+
+// ---------------------------------------------------------------------------
+// The schema descriptor (Plan 0158 Phase 4). A second statement of this table's
+// shape, and one on purpose: serde carries a field's name and type and none of
+// what an editor needs -- the closed roster a string is drawn from, the default
+// the loader substitutes, the sentence saying what the key does. What holds the
+// two together is `schema::tests`, which reads the field roster serde derived
+// and asserts it is exactly what the rows below name.
+// ---------------------------------------------------------------------------
+
+/// The `[spectrum]` table.
+pub(in crate::preset::schema) const SPECTRUM: TableDesc = TableDesc {
+    name: "spectrum",
+    doc: "How the readout divides the frequency axis, what figure the elements form, \
+          and how fast each element follows its band.",
+    keys: &[
+        KeyDesc {
+            name: "elements",
+            kind: KeyKind::Int,
+            default: "24",
+            doc: "Element count. A readout finer than the band array is refused.",
+        },
+        KeyDesc {
+            name: "layout",
+            kind: KeyKind::Roster(Roster::SpectrumLayout),
+            default: "bars",
+            doc: "Which figure the elements form.",
+        },
+        KeyDesc {
+            name: "smoothing",
+            kind: KeyKind::Easing,
+            default: "0",
+            doc: "Per-element easing in seconds, in the [smoothing] table's own vocabulary.",
+        },
+    ],
+};

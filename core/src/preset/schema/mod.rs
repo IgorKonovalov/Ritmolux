@@ -28,12 +28,14 @@ use crate::render::scenes::particles::ifs::IfsFigure;
 // compiled shape a preset becomes.
 mod easing;
 mod error;
+pub mod export;
 mod load;
 mod raw;
 mod system;
 
 pub use easing::Easing;
 pub use error::PresetError;
+pub use export::{KeyDesc, KeyKind, Roster, TableDesc};
 pub use system::{GLOBAL_PARAMS, SystemKind, is_known_param};
 
 use raw::*;
@@ -53,6 +55,10 @@ pub enum LayerJoin {
 }
 
 impl LayerJoin {
+    /// Both join points, for the load error's "expected one of" listing and for
+    /// the schema export, which renders this rather than restating it.
+    pub const ALL: [LayerJoin; 2] = [LayerJoin::Under, LayerJoin::Over];
+
     /// Parse the canonical `join = "..."` value, or `None` if unknown.
     pub fn from_name(name: &str) -> Option<Self> {
         Some(match name {
@@ -60,6 +66,14 @@ impl LayerJoin {
             "over" => LayerJoin::Over,
             _ => return None,
         })
+    }
+
+    /// The canonical name — [`from_name`](Self::from_name)'s inverse.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            LayerJoin::Under => "under",
+            LayerJoin::Over => "over",
+        }
     }
 }
 

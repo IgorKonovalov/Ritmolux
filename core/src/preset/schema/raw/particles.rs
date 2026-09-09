@@ -126,3 +126,53 @@ impl RawParticles {
         Ok(d)
     }
 }
+
+// ---------------------------------------------------------------------------
+// The schema descriptor (Plan 0158 Phase 4). A second statement of this table's
+// shape, and one on purpose: serde carries a field's name and type and none of
+// what an editor needs -- the closed roster a string is drawn from, the default
+// the loader substitutes, the sentence saying what the key does. What holds the
+// two together is `schema::tests`, which reads the field roster serde derived
+// and asserts it is exactly what the rows below name.
+// ---------------------------------------------------------------------------
+
+/// The `[particles]` table.
+pub(in crate::preset::schema) const PARTICLES: TableDesc = TableDesc {
+    name: "particles",
+    doc: "Which strange attractor the compute-particle scene iterates, how much of the \
+          tier's budget it draws, and what morph travels towards.",
+    keys: &[
+        KeyDesc {
+            name: "family",
+            kind: KeyKind::Roster(Roster::AttractorFamily),
+            default: "",
+            doc: "The attractor family: one of the four maps, or an IFS figure. Required.",
+        },
+        KeyDesc {
+            name: "density",
+            kind: KeyKind::Float,
+            default: "1",
+            doc: "Fraction of the tier's particle budget actually drawn.",
+        },
+        KeyDesc {
+            name: "morph_to",
+            kind: KeyKind::Roster(Roster::IfsFigure),
+            default: "",
+            doc: "The IFS figure morph travels towards; absent pins the figure and makes \
+                  morph inert. An error on a map family.",
+        },
+        KeyDesc {
+            name: "tuple_from",
+            kind: KeyKind::Int,
+            default: "0",
+            doc: "Map families: the near end of the tuple path morph walks, as a roster index.",
+        },
+        KeyDesc {
+            name: "tuple_to",
+            kind: KeyKind::Int,
+            default: "",
+            doc: "Map families: the far end, and the key that turns the walk on. An error \
+                  on an IFS figure.",
+        },
+    ],
+};

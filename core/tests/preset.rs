@@ -1571,42 +1571,21 @@ const PARAM_BLOCK_END: &str = "<!-- params:end -->";
 /// Every roster the reference prints, in the order it prints them: one per
 /// system, then the engine-wide stages any preset may bind whatever its system.
 fn reference_rosters() -> Vec<(&'static str, &'static [rlx_core::render::scenes::ParamSpec])> {
-    use rlx_core::preset::SystemKind;
-    let mut out: Vec<(&'static str, &'static [rlx_core::render::scenes::ParamSpec])> =
-        SystemKind::ALL
-            .iter()
-            .map(|kind| (kind.as_str(), kind.param_specs()))
-            .collect();
-    out.extend(engine_stage_rosters());
-    out
+    // **The one walk** (ADR-0170): the same function `ritmolux --schema` renders
+    // its parameter half from, so the published table and the exported document
+    // cannot state different defaults for a name. It lives in `core` rather than
+    // here because both readers have to reach it, and a copy per reader is the
+    // drift ADR-0170 exists to end.
+    rlx_core::preset::export::param_rosters()
 }
 
 /// The engine-wide stages, labelled as a reader meets them rather than as the
-/// modules are named.
+/// modules are named — the tail of [`reference_rosters`].
 fn engine_stage_rosters() -> Vec<(&'static str, &'static [rlx_core::render::scenes::ParamSpec])> {
-    // Zipped against `GLOBAL_PARAMS` rather than naming each module, because
-    // those modules are crate-private and because that array is already the one
-    // statement of which stages a preset may bind whatever its system. The
-    // labels are in its order, and the length assert is what holds them there.
-    const LABELS: [&str; 7] = [
-        "background",
-        "trails",
-        "kaleidoscope",
-        "bloom",
-        "composite",
-        "tonemap",
-        "ink",
-    ];
-    assert_eq!(
-        LABELS.len(),
-        rlx_core::preset::GLOBAL_PARAMS.len(),
-        "a stage joined GLOBAL_PARAMS without a label here, so the reference          would print it under the wrong heading"
-    );
-    LABELS
-        .iter()
-        .copied()
-        .zip(rlx_core::preset::GLOBAL_PARAMS)
-        .collect()
+    let mut all = reference_rosters();
+    let stages = rlx_core::preset::export::stage_count();
+    let head = all.len().saturating_sub(stages);
+    all.split_off(head)
 }
 
 /// The reference itself: one table per system, then one per engine stage.
@@ -3290,5 +3269,172 @@ fn every_family_carries_at_least_two_representatives() {
     assert!(
         short.is_empty(),
         "these families are under the representative floor: {short:#?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// The exported schema (Plan 0158 Phase 4) against the published reference and
+// against itself.
+// ---------------------------------------------------------------------------
+
+/// The `(name, default, range)` triples the schema document carries for its
+/// parameters.
+///
+/// A **scan**, not a parse, and deliberately: the emitter is one file away and
+/// its shape is fixed, and pulling a JSON crate into this workspace to read our
+/// own output is exactly what Phase 4's no-new-dependency rule refuses. The
+/// discriminator between a parameter object and a structural key's is the
+/// `default` field's type — a parameter's is a JSON number, a key's is a string.
+fn schema_param_rows(doc: &str) -> Vec<(String, String, String)> {
+    let mut rows = Vec::new();
+    for chunk in doc.split("{\"name\":\"").skip(1) {
+        let Some((name, rest)) = chunk.split_once("\",") else {
+            continue;
+        };
+        let Some(rest) = rest.strip_prefix("\"default\":") else {
+            continue;
+        };
+        if rest.starts_with('"') {
+            continue; // a structural key, whose default is written as a string
+        }
+        let Some((head, _)) = rest.split_once(",\"doc\":") else {
+            continue;
+        };
+        let Some((default, range)) = head.split_once(",\"range\":") else {
+            continue;
+        };
+        rows.push((name.to_owned(), default.to_owned(), range.to_owned()));
+    }
+    rows
+}
+
+/// The published reference and the exported schema agree, parameter for
+/// parameter, on the name, the default and the range.
+///
+/// Both are rendered from `export::param_rosters()` — one walk over the same
+/// `ParamSpec` declarations the loader checks a binding against (ADR-0170) — so
+/// this is the assertion that the two *renderings* of that walk did not diverge.
+/// It compares the two rendered artifacts rather than the walk with itself,
+/// which is the only version of this check that can fail.
+#[test]
+fn the_published_reference_and_the_exported_schema_agree() {
+    let document = rlx_core::preset::export::document();
+    let exported = schema_param_rows(&document);
+
+    // The reference's own rows, read back out of the block this suite generates.
+    let reference = render_parameter_reference();
+    let mut published = Vec::new();
+    for line in reference.lines() {
+        let cells: Vec<&str> = line.split('|').map(str::trim).collect();
+        // `| `name` | `default` | range | doc |` — five splits with empty ends.
+        let (Some(name), Some(default), Some(range)) = (cells.get(1), cells.get(2), cells.get(3))
+        else {
+            continue;
+        };
+        let (Some(name), Some(default)) = (
+            name.strip_prefix('`').and_then(|n| n.strip_suffix('`')),
+            default.strip_prefix('`').and_then(|d| d.strip_suffix('`')),
+        ) else {
+            continue; // the header row and its rule
+        };
+        published.push((name.to_owned(), default.to_owned(), (*range).to_owned()));
+    }
+
+    assert_eq!(
+        exported.len(),
+        published.len(),
+        "the schema carries {} parameters and the published reference {} — one \
+         of the two renderings dropped or invented rows",
+        exported.len(),
+        published.len()
+    );
+    for ((ex_name, ex_default, ex_range), (pub_name, pub_default, pub_range)) in
+        exported.iter().zip(&published)
+    {
+        assert_eq!(ex_name, pub_name, "the two renderings disagree on an order");
+        // The two print the same number differently on purpose — the reference
+        // is read by a person and the document by a program — so they are
+        // compared as values.
+        let ex_value: f32 = ex_default.parse().unwrap_or(f32::NAN);
+        let pub_value: f32 = pub_default.parse().unwrap_or(f32::NAN);
+        assert_eq!(
+            ex_value, pub_value,
+            "`{ex_name}`: the schema says default {ex_default}, the reference says {pub_default}"
+        );
+        // A `null` range in the document is a blank cell in the reference: both
+        // say "unbounded, or world-space, and inventing a number would be a
+        // claim nothing holds".
+        let unbounded = ex_range == "null";
+        assert_eq!(
+            unbounded,
+            pub_range.is_empty(),
+            "`{ex_name}`: the schema says range {ex_range}, the reference cell \
+             is `{pub_range}` — one of them claims a bound the other does not"
+        );
+        if !unbounded {
+            let numbers: Vec<f32> = ex_range
+                .trim_matches(['[', ']'])
+                .split(',')
+                .filter_map(|n| n.parse().ok())
+                .collect();
+            let published: Vec<f32> = pub_range
+                .split('–')
+                .filter_map(|n| n.trim().trim_matches('`').parse().ok())
+                .collect();
+            assert_eq!(
+                numbers, published,
+                "`{ex_name}`: the schema says range {ex_range}, the reference \
+                 says {pub_range}"
+            );
+        }
+    }
+    assert!(
+        !exported.is_empty(),
+        "the schema carried no parameters at all, so this comparison is vacuous"
+    );
+}
+
+/// The hash is a function of the emitted document: two renders on one build
+/// agree, and a document with one default moved hashes differently.
+#[test]
+fn the_schema_hash_is_stable_and_moves_with_the_document() {
+    use rlx_core::preset::export;
+
+    let first = export::document();
+    let second = export::document();
+    assert_eq!(
+        first, second,
+        "two renders on one build produced different bytes, so nothing about \
+         this document is a stable identity"
+    );
+    assert!(
+        first.contains(&format!("\"hash\":\"{}\"", export::hash_hex())),
+        "the document does not carry the hash `hash_hex` reports"
+    );
+
+    // The body is what the hash is over — the document without its own `v` and
+    // `hash`, which would otherwise be hashing their own output.
+    let body = first
+        .split_once(",\"systems\":")
+        .map(|(_, rest)| format!("\"systems\":{rest}"))
+        .expect("the document opens with its version and hash, then the systems");
+    assert_eq!(
+        export::hash_str(&body),
+        export::hash(),
+        "the printed hash is not the body's"
+    );
+
+    // One default moved and nothing else — exactly the edit a changed
+    // `ParamSpec` would produce in this document.
+    let moved = body.replacen("\"default\":", "\"default\":-", 1);
+    assert_ne!(
+        moved, body,
+        "the perturbation changed nothing, so the assertion below is vacuous"
+    );
+    assert_ne!(
+        export::hash_str(&moved),
+        export::hash(),
+        "a document with one default moved hashed the same, so the hash cannot \
+         tell a studio its panels are stale"
     );
 }

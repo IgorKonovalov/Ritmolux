@@ -227,3 +227,122 @@ impl RawGenerator {
         })
     }
 }
+
+// ---------------------------------------------------------------------------
+// The schema descriptor (Plan 0158 Phase 4). A second statement of this table's
+// shape, and one on purpose: serde carries a field's name and type and none of
+// what an editor needs -- the closed roster a string is drawn from, the default
+// the loader substitutes, the sentence saying what the key does. What holds the
+// two together is `schema::tests`, which reads the field roster serde derived
+// and asserts it is exactly what the rows below name.
+// ---------------------------------------------------------------------------
+
+/// The `[curve]` table.
+pub(in crate::preset::schema) const CURVE: TableDesc = TableDesc {
+    name: "curve",
+    doc: "Which parametric family the curve scene samples.",
+    keys: &[KeyDesc {
+        name: "family",
+        kind: KeyKind::Roster(Roster::CurveFamily),
+        default: "",
+        doc: "The curve family. Required.",
+    }],
+};
+
+/// The `[generator]` table — the L-system's keys, the star pattern's, and the
+/// preset-wide seed that lives here for historical reasons.
+pub(in crate::preset::schema) const GENERATOR: TableDesc = TableDesc {
+    name: "generator",
+    doc: "The L-system's grammar or the star pattern's tiling, plus the salt every \
+          system's hash() and noise() mix in.",
+    keys: &[
+        KeyDesc {
+            name: "axiom",
+            kind: KeyKind::Text,
+            default: "",
+            doc: "L-system: the starting string. Required on an lsystem preset.",
+        },
+        KeyDesc {
+            name: "rules",
+            kind: KeyKind::Map(&KeyKind::Text),
+            default: "",
+            doc: "L-system: production rules, each key a single predecessor character.",
+        },
+        KeyDesc {
+            name: "angle_deg",
+            kind: KeyKind::Float,
+            default: "25",
+            doc: "L-system: turn angle for + and -, in degrees.",
+        },
+        KeyDesc {
+            name: "max_depth",
+            kind: KeyKind::Int,
+            default: "4",
+            doc: "L-system: how many iterations to expand and cache.",
+        },
+        KeyDesc {
+            name: "seed",
+            kind: KeyKind::Seed,
+            default: "0",
+            doc: "The salt hash() and noise() mix into their argument; \"random\" draws one \
+                  per launch and pins to 0 on every capture path.",
+        },
+        KeyDesc {
+            name: "tiling",
+            kind: KeyKind::Roster(Roster::Tiling),
+            default: "",
+            doc: "Star pattern: the regular tiling the rosette is built on, or \"none\" for \
+                  the ring ornament alone. Required on a star_pattern preset.",
+        },
+        KeyDesc {
+            name: "contact_angle_deg",
+            kind: KeyKind::Float,
+            default: "30",
+            doc: "Star pattern: the contact angle the interlace is struck at, in degrees.",
+        },
+        KeyDesc {
+            name: "rings",
+            kind: KeyKind::List(&KeyKind::Table("ring")),
+            default: "",
+            doc: "Star pattern: concentric rings of repeated motifs filling the interior.",
+        },
+    ],
+};
+
+/// One `[generator] rings` entry.
+pub(in crate::preset::schema) const RING: TableDesc = TableDesc {
+    name: "ring",
+    doc: "One ring of repeated motifs inside a star rosette.",
+    keys: &[
+        KeyDesc {
+            name: "motif",
+            kind: KeyKind::Roster(Roster::Motif),
+            default: "",
+            doc: "Which motif to repeat. Required.",
+        },
+        KeyDesc {
+            name: "count",
+            kind: KeyKind::Int,
+            default: "",
+            doc: "Copies around the ring. Required.",
+        },
+        KeyDesc {
+            name: "radius",
+            kind: KeyKind::Float,
+            default: "",
+            doc: "Distance from the frame centre to each copy's centre. Required.",
+        },
+        KeyDesc {
+            name: "scale",
+            kind: KeyKind::Float,
+            default: "0.25",
+            doc: "Motif size multiplier.",
+        },
+        KeyDesc {
+            name: "phase",
+            kind: KeyKind::Float,
+            default: "0",
+            doc: "Angular offset of copy 0, in radians.",
+        },
+    ],
+};

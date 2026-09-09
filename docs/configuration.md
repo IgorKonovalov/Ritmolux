@@ -21,6 +21,7 @@ telemetry.
 | `--console` | — | Open the operator console at launch, on a display other than the show's |
 | `--list-devices` | — | Enumerate audio capture endpoints and exit (Windows-only) |
 | `--list-adapters` | — | Enumerate graphics adapters and exit, from both rosters |
+| `--schema` | — | Print the preset schema as JSON on stdout and exit |
 | `--input` | `loopback` \| `line-in` | Where audio comes from (Windows-only) |
 | `--device` | `"<friendly name>"` | Which capture endpoint to open |
 | `--tier` | `floor` \| `rich` | Pin the quality tier instead of letting the engine pick |
@@ -43,6 +44,17 @@ than silence.
 
 **`--help`** writes to stdout and creates no window, no GPU device and no capture client, so a
 script can probe the flag surface without starting a show.
+
+**`--schema`** answers the other question a program asks before it starts driving the player: what
+a preset may contain. It prints one JSON object on stdout — every system and engine stage with its
+parameters (name, default, range, and the line that says what each does), every structural table
+with its keys and the closed rosters they draw from, and a `hash` of all of it. Like `--help` it
+creates nothing and exits, and it moves no files on the way.
+
+The parameter half is rendered from the same declarations the reference table in
+[the preset library's README](../presets/README.md) is, so the two cannot disagree. The `hash`
+changes when and only when the document does: a studio that cached the schema compares it against
+the one the player reports on startup to know whether its panels are stale.
 
 **`--console`** is a presence flag with no value: it turns the console **on** for this run and
 never off, and it does not write itself into `config.toml` (the same shape `--input`, `--device`

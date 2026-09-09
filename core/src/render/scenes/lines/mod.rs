@@ -249,12 +249,24 @@ pub enum CurveFamily {
 }
 
 impl CurveFamily {
+    /// Every family, in roster order — the closed set, and the list the schema
+    /// export renders rather than restating.
+    pub const ALL: [CurveFamily; 1] = [CurveFamily::MaurerRose];
+
     /// Parse a `[curve] family` name, or `None` if unknown.
     pub fn from_name(name: &str) -> Option<Self> {
         Some(match name {
             "maurer_rose" => CurveFamily::MaurerRose,
             _ => return None,
         })
+    }
+
+    /// The `[curve] family` name this parses from — [`from_name`](Self::from_name)'s
+    /// inverse.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            CurveFamily::MaurerRose => "maurer_rose",
+        }
     }
 }
 
