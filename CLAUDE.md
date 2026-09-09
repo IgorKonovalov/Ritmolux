@@ -233,9 +233,10 @@ was added per [ADR-0017](docs/adrs/0017-preset-author-skill-lane.md)):
 | `architect`     | `docs/` — plans, ADRs, diagrams, reviews         | "how should we build X", "design the …", "should we A or B", "plan the …", "review plan N" |
 | `dev`           | all code — `core/`, `standalone/`, `plugin-foobar/` | "implement plan N", "do the DSP phase", "code up the …" |
 | `preset-author` | preset **content** — `.toml` presets, expression bindings, `[curve]`/`[generator]` config; never engine Rust | "make an aurora-style preset", "a look that pulses on the beat", "tune rose_star", "make it more organic", "design a preset for the drop" |
+| `studio-builder` | `studio/` — the Electron studio that drives the player (ADR-0177, proposed); never Rust or C++, never a protocol widening | "build the param panel", "the preview canvas stutters", "implement phase 3 of plan 0159", "add a palette editor" |
 
-**The hard split: `architect` designs, `dev` builds, `preset-author` composes content — never
-invert.** The architect never writes production code; `dev` authors no ADRs and writes only two
+**The hard split: `architect` designs, `dev` and `studio-builder` build, `preset-author` composes
+content — never invert.** The architect never writes production code; `dev` authors no ADRs and writes only two
 things inside a plan — the `Status:` line and the `## Implementation log` — and never reviews its
 own work; `preset-author` never touches engine Rust (a look needing a new scene, param,
 or grammar capability routes back to `architect` + `dev` as feedback, and `dev` — not the author —
@@ -260,8 +261,8 @@ interview  ->  ADR (if a real tradeoff)  ->  plan (phased)  ->  implement phase-
   taking and future-you would want to know why, write an ADR (`docs/adrs/`). If you can't
   name a rejected alternative, you don't need an ADR — just a comment.
 - **Plan before implementing.** Non-trivial work gets a numbered plan in `docs/plans/`
-  with **ordered phases**, each tagged `**Owner skill:**` — vocabulary `dev` (all code) or
-  `human` (a task only the user can do). Each phase ships as its own commit with a clear
+  with **ordered phases**, each tagged `**Owner skill:**` — vocabulary `dev` (all Rust and
+  C++), `studio-builder` (everything under `studio/`) or `human` (a task only the user can do). Each phase ships as its own commit with a clear
   "done when". `dev` implements the whole plan in one session, no review between phases.
 - **Review at plan end** (architect Mode 4), in a fresh session, not per phase. Check the
   implementation against the plan and the cross-cutting rules below, then flip the plan to

@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0158** (ADRs are a separate sequence — next free there is **0175**.)
+**Next free number: 0160** (ADRs are a separate sequence — next free there is **0179**.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -45,7 +45,21 @@ place. The plan file carries the real link.
 | [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | approved | dev, human | **A new Phase 1 fixes backlog 0102 + 0103 before anything advertises the component** — foobar's UI starves until playback starts. **Phases 4-6 unblocked, 0150 closed.** 0156 Phase 2 shortens the README first. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + **0174**: Art-Net to the fixtures, verified against `rlx-artnet-sim` because **the rig is unreachable**. Phases 1-8 need none; 9 is the rig session. Phase 8 hard-depends on 0115 Phase 2. |
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
+| [0158](0158-the-player-grows-a-studio-facing-surface.md) | The player grows a studio-facing surface | approved | dev, human | ADR-0175 + ADR-0176: override, OSC control-in, events, schema export, pipe sink, preview readback. **0159 needs Phases 1-5.** Touches `run.rs` beside 0133 and 0120: merge `main` first. |
+| [0159](0159-the-studio-opens.md) | The studio opens | approved | studio-builder, dev, human | ADR-0177 + ADR-0178: the Electron studio under `studio/`, first lane of its kind. **Hard dependency: 0158 Phases 1-5.** Two `human` gates at the end: a tester zip and the on-device check. |
 <!-- roster:end -->
+
+**Added 2026-09-09 — [0158] and [0159] are drafted, and they are a program rather than a
+pair.** Four ADRs frame it: 0175 (the studio is a separate Electron application that never draws
+a frame), 0176 (the player is driven over OSC control-in and reports on its standard streams),
+0177 (a fourth lane, `studio-builder`, owns `studio/`), 0178 (the shell conventions, lifted from
+the sibling repository's ADR-0008 with the divergences named). The order is fixed by dependency:
+**0158 first, on the player**, then 0159 on the studio. Clip rendering, show projects and the
+diffusion pass from the studio are each a later plan with its own interview; ADR-0175 records the
+`render` subcommand decision that the first of those needs, and nothing has built it.
+
+[0158]: 0158-the-player-grows-a-studio-facing-surface.md
+[0159]: 0159-the-studio-opens.md
 
 ~~**Added 2026-09-07 - [0157] is drafted, and it is the only plan that unblocks `main`.**~~ - **closed 2026-09-07.** Both phases landed the same day the note was written; `main` is green and the route gate passes against a built site with `dist/api/` populated. The note is in [README-archive.md](README-archive.md) under `## Prior sequencing notes (superseded)`, which also records the one durable half: the cost probes still run in `-P fast` on every arm of every push.
 

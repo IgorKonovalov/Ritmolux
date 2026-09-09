@@ -12,16 +12,18 @@ same capture: the synthesized `dynamic:110` clip at its loudest hop, at the Rich
 the settings [`scripts/docs-shots.mjs`](../../../../scripts/docs-shots.mjs)
 records for every committed picture in this repository.
 
-**Click a frame to open it full size; click the name under it to read the preset that drew
-it.** A preset is a text file — [the preset guide](../../../../docs/preset-guide.md) opens the
-smallest one worth looking at, and [the parameter roster](../../../../presets/README.md) lists
-every named parameter each of these systems takes.
+**Click a frame to open it full size without leaving this page; click the name under it — or
+the link inside that window — to read the preset that drew it.** A preset is a text file —
+[the preset guide](../../../../docs/preset-guide.md) opens the smallest one worth looking at,
+and [the parameter roster](../../../../presets/README.md) lists every named parameter each of
+these systems takes.
 
 {/*
-  Where a frame's CAPTION links to - the picture itself opens at full size, which
-  `Frame` handles. A preset has no page of its own on this site: it IS a text
-  file, so the file is the destination. `blob/main` rather than a tag, because
-  the gallery is rebuilt from the same tree it links into.
+  Where a frame's CAPTION links to - the picture itself opens at full size in a
+  modal, which `Frame` handles, and that modal offers this same destination
+  under `detailLabel`. A preset has no page of its own on this site: it IS a
+  text file, so the file is the destination. `blob/main` rather than a tag,
+  because the gallery is rebuilt from the same tree it links into.
 */}
 
 export const SOURCE = 'https://github.com/IgorKonovalov/Ritmolux/blob/main/presets/';
@@ -73,6 +75,7 @@ export const families = [
           image={image}
           href={`${SOURCE}${preset}.toml`}
           label={preset}
+          detailLabel="Read the preset"
           alt={`The ${preset} preset, drawn with the ${system} system`}
           sizes="(min-width: 46rem) 13rem, 45vw"
         />

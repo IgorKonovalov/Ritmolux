@@ -79,3 +79,8 @@ spike/
 site/node_modules/
 site/dist/
 site/.astro/
+
+# Playwright MCP session output - console logs and screenshots the browser
+# tool drops beside whatever it was pointed at while a change is checked in a
+# real browser. Per-session scratch, never evidence for anything committed.
+.playwright-mcp/

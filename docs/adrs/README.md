@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0175.** *(0120 was reserved for
+**Next free number: 0179.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -196,4 +196,8 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0172](0172-a-null-cost-measurement-names-the-witness-that-the-thing-ran.md) | A null-cost measurement names the witness that the thing ran | accepted 2026-09-06 (Plan 0147), supplements 0071 and 0143 |
 | [0173](0173-a-cost-probe-takes-the-best-of-each-duration-not-the-best-difference.md) | A cost probe takes the best of each duration, not the best difference | accepted 2026-09-07 (Plan 0157), extends 0071 and 0016 |
 | [0174](0174-the-art-net-path-is-verified-against-a-simulated-rig.md) | The Art-Net path is verified against a simulated rig | proposed 2026-09-08 (Plan 0133) |
+| [0175](0175-the-studio-is-a-separate-application-that-never-draws-a-frame.md) | The studio is a separate application that never draws a frame, and the player stays the only renderer | proposed 2026-09-09 (Plans 0158, 0159), extends 0143 |
+| [0176](0176-the-player-is-driven-over-osc-control-in-and-reports-on-its-standard-streams.md) | The player is driven over OSC control-in, and reports on its standard streams | proposed 2026-09-09 (Plan 0158), extends 0164 |
+| [0177](0177-a-fourth-skill-lane-builds-the-studio.md) | A fourth skill lane, `studio-builder`, builds the studio and never touches the engine | proposed 2026-09-09 (Plan 0159), extends 0017 |
+| [0178](0178-the-studio-shell-conventions.md) | The studio shell conventions: three processes, a mirrored protocol, and the same security defaults as the sibling repository | proposed 2026-09-09 (Plan 0159) |
 <!-- roster:end -->

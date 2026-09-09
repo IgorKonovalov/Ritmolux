@@ -140,10 +140,15 @@ Key sections: **Context & problem**, **Decision** (which option, one sentence wh
 NOT do**.
 
 **Every phase MUST carry a single `**Owner skill:**` line** with exactly one value from the
-fixed vocabulary: **`dev`** or **`human`**. `dev` owns all code (Rust core, standalone, C++
-plugin); `human` marks a task only the user can do (obtain a signing cert, install BlackHole,
-make a product call). No missing tags, no inline-prose ownership — the tag is machine-readable
-and `dev` branches on it. A plan missing an owner tag on any phase fails Mode 4 as a blocker.
+fixed vocabulary: **`dev`**, **`studio-builder`** or **`human`**. `dev` owns all Rust and C++
+(core, standalone, plugin); `studio-builder` owns everything under `studio/`, the Electron
+studio ([ADR-0177](../../../docs/adrs/0177-a-fourth-skill-lane-builds-the-studio.md)); `human`
+marks a task only the user can do (obtain a signing cert, install BlackHole, make a product
+call). No missing tags, no inline-prose ownership — the tag is machine-readable and each
+implementing lane branches on it. A plan missing an owner tag on any phase fails Mode 4 as a
+blocker. Prefer a plan owned by one implementing lane plus `human` gates; a plan that has to
+alternate `dev` and `studio-builder` costs a session boundary per handoff and is usually two
+plans.
 
 **Do the arithmetic on every numeric done-when before the plan ships.** A done-when is the contract
 `dev` is held to, so an unchecked number costs either a mid-phase stop to litigate it or — worse — an
@@ -226,7 +231,8 @@ not one phase. This is architectural integrity, not line-by-line style. Run five
   `## Implementation phases` section is also a `minor`**: the report is not allowed to outweigh the
   contract, and since nothing gates that property, this check is the only thing behind it.
 - Did the implementation do the phases in the plan? Any missing or added without note?
-- Does every phase have a single, in-vocabulary `**Owner skill:**` tag (`dev` / `human`)?
+- Does every phase have a single, in-vocabulary `**Owner skill:**` tag (`dev` / `studio-builder` /
+  `human`)?
   Missing/malformed tags are a **blocker**.
 - Were any ADR decisions silently reversed (e.g. ADR-0001 says wgpu, the code pulls in raw
   OpenGL; or a WASAPI type leaked into `core/`)? If so, either the code changes or a new ADR

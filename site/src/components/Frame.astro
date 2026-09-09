@@ -2,11 +2,19 @@
 /**
  * One captured frame in a thumbnail strip, carrying its two destinations.
  *
- * The picture links to itself at full size and the caption links to the thing
- * the picture is OF - on the home page a rendering system, so the caption goes
- * to the gallery section holding that system's presets; in the gallery a
- * preset, so it goes to that preset's `.toml`. Each link sits on the element
- * whose meaning matches it, which is why one link is not enough.
+ * The picture opens itself at full size IN A MODAL over the page, and the
+ * caption links to the thing the picture is OF - on the home page a rendering
+ * system, so the caption goes to the gallery section holding that system's
+ * presets; in the gallery a preset, so it goes to that preset's `.toml`. Each
+ * destination sits on the element whose meaning matches it, which is why one is
+ * not enough - and the modal repeats the caption's destination as a labelled
+ * link, so a reader who opened the picture can follow through to the detail
+ * without first closing it and hunting for the caption.
+ *
+ * The picture's anchor still HAS the image file as its `href`: the modal is
+ * progressive enhancement, so the frame keeps working with the script blocked,
+ * and a middle-click or a modified click still opens the file in a tab because
+ * the handler declines those.
  *
  * An `.astro` component rather than the JSX the two pages used to inline,
  * because `getImage` is async and MDX has no top-level await.
@@ -15,7 +23,7 @@
  * the whole reason this component exists. A source frame is a PNG of hundreds
  * of kilobytes to two megabytes; the strip paints it into a cell a couple of
  * hundred pixels wide. `<Image>` emits the downscaled WebP the strip actually
- * needs, and `getImage` emits a native-resolution WebP for the link to open -
+ * needs, and `getImage` emits a native-resolution WebP for the modal to show -
  * about 26 kB a frame, because these are synthesised renders rather than
  * photographs and WebP compresses them hard. Linking the source PNG instead
  * would serve fifty times the bytes for the same picture.
@@ -38,6 +46,12 @@ interface Props {
   label: string;
   alt: string;
   /**
+   * The wording the modal's follow-through link gets. It names what `href` is
+   * on THIS page, because "view details" is the same phrase for a gallery
+   * section and for a preset's source and the reader is choosing between them.
+   */
+  detailLabel?: string;
+  /**
    * The strip's cell width, for the browser's `srcset` choice. It differs per
    * page because the home page is a splash layout and the gallery sits in the
    * narrower documentation column.
@@ -45,13 +59,30 @@ interface Props {
   sizes?: string;
 }
 
-const { image, href, label, alt, sizes = '(min-width: 46rem) 14rem, 45vw' } = Astro.props;
+const {
+  image,
+  href,
+  label,
+  alt,
+  detailLabel = 'View details',
+  sizes = '(min-width: 46rem) 14rem, 45vw',
+} = Astro.props;
 
 const full = await getImage({ src: image, format: 'webp', quality: 80 });
 ---
 
 <figure role="listitem">
-  <a href={full.src} aria-label={`${alt}, at full size`}>
+  <a
+    href={full.src}
+    aria-label={`${alt}, at full size`}
+    data-frame-open
+    data-alt={alt}
+    data-label={label}
+    data-detail={href}
+    data-detail-label={detailLabel}
+    data-width={image.width}
+    data-height={image.height}
+  >
     <Image
       src={image}
       widths={[240, 480, 720]}
@@ -64,3 +95,145 @@ const full = await getImage({ src: image, format: 'webp', quality: 80 });
   </a>
   <figcaption><a href={href}><code>{label}</code></a></figcaption>
 </figure>
+
+<script>
+  /**
+   * The strip's lightbox: one `<dialog>` per page, shared by every frame on it.
+   *
+   * Astro hoists and bundles a component's script once per page however many
+   * times the component is rendered, so this runs once and listens on the
+   * document rather than binding a handler per figure - a gallery page carries
+   * over a hundred frames.
+   *
+   * The dialog is built on the first open, not at load: a reader who never
+   * clicks a frame pays for none of it, and the markup has one definition here
+   * instead of a second copy in the page.
+   *
+   * `showModal()` is what buys the focus trap, the Escape key, the inert page
+   * behind it and the `::backdrop` - all of it native. The dialog element
+   * itself carries no padding, so a click whose target IS the dialog came from
+   * the backdrop and means "close"; every click on the content hits the body
+   * inside it.
+   */
+  let dialog: HTMLDialogElement | null = null;
+  let body: HTMLElement;
+  let picture: HTMLImageElement;
+  let name: HTMLElement;
+  let detail: HTMLAnchorElement;
+
+  function build(): HTMLDialogElement {
+    const node = document.createElement('dialog');
+    node.className = 'frame-modal';
+    node.innerHTML = `
+      <div class="frame-modal-body">
+        <button class="frame-modal-close" type="button" aria-label="Close">&times;</button>
+        <img class="frame-modal-image" alt="" />
+        <p class="frame-modal-caption">
+          <code class="frame-modal-label"></code>
+          <a class="frame-modal-detail"></a>
+        </p>
+      </div>
+    `;
+    node.addEventListener('click', (event) => {
+      const target = event.target as Element;
+      if (target === node || target.closest('.frame-modal-close')) node.close();
+    });
+    document.body.append(node);
+
+    body = node.querySelector('.frame-modal-body') as HTMLElement;
+    picture = node.querySelector('.frame-modal-image') as HTMLImageElement;
+
+    // The one `<img>` is reused across opens, and a browser keeps painting the
+    // picture it last decoded until a new `src` has finished loading - so a
+    // second frame would open showing the FIRST one for as long as its bytes
+    // took to arrive. Emptying the image on close leaves nothing to paint: the
+    // next open starts from the placeholder box. Every exit fires `close` -
+    // the button, the backdrop, Escape.
+    node.addEventListener('close', () => {
+      picture.removeAttribute('src');
+      picture.style.width = '';
+      picture.style.height = '';
+    });
+    // Once the bytes have landed the stylesheet's `max-width`/`max-height`
+    // fit the picture from its intrinsic size, and they keep fitting it when
+    // the window is resized while the placeholder's fixed size would not - so
+    // the placeholder hands over here. The two agree to the pixel, because the
+    // placeholder was computed from the same rules.
+    picture.addEventListener('load', () => {
+      picture.style.width = '';
+      picture.style.height = '';
+    });
+    name = node.querySelector('.frame-modal-label') as HTMLElement;
+    detail = node.querySelector('.frame-modal-detail') as HTMLAnchorElement;
+    dialog = node;
+    return node;
+  }
+
+  /**
+   * The size the stylesheet will give a picture of `width` x `height` once it
+   * has loaded: shrunk to fit the dialog's width limit less the body's own
+   * chrome and the image's height limit, never enlarged. Read from computed
+   * style so the numbers live in `site.css` only - `min()` and `calc()` of
+   * viewport and rem units resolve to pixels at computed-value time, and a
+   * closed dialog still computes.
+   */
+  function fit(node: HTMLDialogElement, width: number, height: number) {
+    const modal = getComputedStyle(node);
+    const chrome = getComputedStyle(body);
+    const image = getComputedStyle(picture);
+    const maxWidth =
+      parseFloat(modal.maxWidth) -
+      parseFloat(chrome.paddingLeft) -
+      parseFloat(chrome.paddingRight) -
+      parseFloat(chrome.borderLeftWidth) -
+      parseFloat(chrome.borderRightWidth);
+    const maxHeight = parseFloat(image.maxHeight);
+    const scale = Math.min(
+      1,
+      ...[maxWidth / width, maxHeight / height].filter(Number.isFinite),
+    );
+    return { width: Math.round(width * scale), height: Math.round(height * scale) };
+  }
+
+  function open(link: HTMLAnchorElement) {
+    const node = dialog ?? build();
+    const data = link.dataset;
+
+    // The box is the picture's shape and size BEFORE the bytes land, so a slow
+    // load shows a grey placeholder where the picture will be instead of a
+    // caption strip that jumps open when it arrives. The size attributes alone
+    // do not buy that - the stylesheet's `width: auto` wins over them and an
+    // unloaded image with no size collapses - so the fitted size is set
+    // inline, computed from the SAME limits the stylesheet fits the loaded
+    // picture with, read back from it rather than restated here.
+    const width = Number(data.width ?? 0);
+    const height = Number(data.height ?? 0);
+    picture.width = width;
+    picture.height = height;
+    const fitted = fit(node, width, height);
+    picture.style.width = `${fitted.width}px`;
+    picture.style.height = `${fitted.height}px`;
+    picture.src = link.href;
+    picture.alt = data.alt ?? '';
+    name.textContent = data.label ?? '';
+    detail.href = data.detail ?? '#';
+    detail.textContent = data.detailLabel ?? 'View details';
+
+    node.showModal();
+  }
+
+  document.addEventListener('click', (event) => {
+    // A modified or non-primary click keeps its native meaning - open the image
+    // file in a tab, save it, follow it in a new window.
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return;
+    }
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const link = target.closest('a[data-frame-open]');
+    if (!link) return;
+
+    event.preventDefault();
+    open(link as HTMLAnchorElement);
+  });
+</script>
