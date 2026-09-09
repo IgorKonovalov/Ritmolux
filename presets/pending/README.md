@@ -20,16 +20,22 @@ as that blocker lifts.
 
 ## Held today
 
-**Nothing.** The directory is empty of presets and that is the state to keep it in — an entry here
-is a preset the library cannot have yet, not a shelf.
+**Two, and they share one blocker.** `path_maple.toml` and `path_lion.toml` are the first authored
+content anywhere to use a `[path]` table (Plan 0092, ADR-0107) — a maple leaf and a maned lion mask,
+each one closed contour of 50-odd SVG commands, drawn as the shape field's banded emblem. Both passed
+the look gate in the running app on 2026-09-09.
 
-The mechanism above is live and the directory keeps its purpose with nothing in it: the next preset
-blocked by a named engine or harness gap lands here, with its blocker in its own header and a row in
-the table below.
+Neither may ship, because **both carry the same workaround in their path data.** The engine evaluates
+an authored contour in clip space, which is Y-up, while SVG path data is Y-down, and nothing
+reconciles the two — so a path pasted out of a design tool arrives mirrored top-to-bottom. Both files
+compensate by authoring `d` with the figure inverted. That is a preset written around an engine
+defect, and shipping one is the failure the close ceremony's curation sweep exists to catch: the day
+the parser is corrected, both figures silently turn upside down and no gate in this repo can see it.
 
 | Preset | Blocked by | Leaves when |
 |--------|-----------|-------------|
-| *(none)* | | |
+| `path_maple.toml` | The authored-path Y-flip: `[path] d` is read in clip space (Y-up) against SVG's Y-down, so `d` here is authored inverted | The parser negates y, and both files' `d` are re-flipped in the same commit |
+| `path_lion.toml` | The same Y-flip | The same |
 
 ### What left, and why the record is worth keeping
 
