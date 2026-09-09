@@ -329,7 +329,7 @@ stroke = "0.0"       # 0 = filled; > 0 strokes at abs(d) < w
 | 4 — Arcs, if Plan 0087 delivered them | dev | done | `85e41b7` |
 | 5 — The authoring surface is documented | dev | done | `d66c3c6` |
 | 6 — The look gate | human | done | — (2026-09-09, in the running app) |
-| 7 — The pasted path is the path the browser drew | dev | done | committed with this row |
+| 7 — The pasted path is the path the browser drew | dev | done | `51831ab` |
 
 ### Notes
 
