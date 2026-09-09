@@ -2889,7 +2889,7 @@ you want; if you want something *in* that space, put it in `bg_*`.
 
 Two **structural** choices about the same accumulation, in a table rather than as
 params because each selects a code path rather than a quantity — `[curve] family`'s
-rule (and see [Structural config](#structural-config-line-systems-and-the-attractor)
+rule (and see [Structural config](#structural-config-line-systems-the-attractor-and-the-shape-field)
 for the others). An unknown value is a **load error**: the preset is rejected with a
 message naming what was expected, rather than quietly rendering the default.
 

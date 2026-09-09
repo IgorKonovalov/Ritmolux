@@ -193,7 +193,7 @@ hand-edited.
 `plan-0092-the-engine-draws-an-authored-path`: `6cd20de` (1, the parser and its refusals), `bad073f` (2, the contour becomes a field and the arity ceiling is measured), `987c758` (3, two
 paths morph), `85e41b7` (4, the arc chain, and the win measured), `d66c3c6` (5, the authoring
 surface), `cec8e73` (6's output, two worlds into `pending/`) and `51831ab` (7, the axis). Review:
-**no blockers, no majors, three minors, one nit.** Version: **0.112.0** (minor). ADR-0107 was already
+**no blockers, one major, three minors, one nit.** Version: **0.112.0** (minor). ADR-0107 was already
 accepted at approval; ADR-0179 stays `proposed`, paired with Plan 0160.
 
 **The plan's central bet was that its own cost estimate might be wrong, and it was — by an order of
@@ -255,6 +255,19 @@ reactivity 0.167 and 0.175 sitting mid-family. Their `onset 0.000` is
 `beat_index` never advances and a counter-driven response is invisible to every column it prints.
 The stale-workaround sweep is clean — no shipped preset writes `coord_mode = "2"`, so nothing was
 silently getting mode 1 from the `ParamSpec` range Phase 7 corrected.
+
+**A fourth finding, and a `major`, found only by building the site after the merge.** Phase 2
+retitled `presets/README.md`'s structural-config section — *"line systems and the attractor"* gained
+*"and the shape field"* — and the hand-written cross-reference at `presets/README.md:2892` kept
+pointing at the old slug. **No gate this project runs before a push can see that.**
+`check-doc-links.mjs` validates paths and deliberately never validates fragments; `toc.mjs`
+regenerated the contents row above it correctly, which is exactly what makes the surviving
+hand-written one invisible. Only ADR-0166's heading map catches it, and that runs in the Astro build
+inside `pages.yml` — **after** the push. Repaired on `main` at the close, with the build re-run to
+prove it: 165 pages, both site gates green, largest split route 27,854 B against the 30,000 cap.
+The general shape is worth carrying: **a plan that renames a heading in a published document owes a
+grep for that heading's slug**, because the one link the generator does not own is the one that
+breaks.
 
 **What outlives the plan.** The guide now names the authored path but still shows `shape_pulse`'s
 frame; `node scripts/docs-shots.mjs` would have two authored figures to choose from. Backlog 0192 is

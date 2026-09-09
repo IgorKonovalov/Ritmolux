@@ -1,7 +1,7 @@
 # 0092 — The engine draws an authored path
 
 > **Status:** done — closed 2026-09-09. Seven phases on `plan-0092-the-engine-draws-an-authored-path`
-> (`6cd20de` → `51831ab`). Mode 4 review: **no blockers, no majors, three minors, one nit.** Full
+> (`6cd20de` → `51831ab`). Mode 4 review: **no blockers, one major, three minors, one nit.** Full
 > suite re-run at the tip: 1596 passed, 6 skipped. Both authored-path worlds shipped at the close.
 > **Created:** 2026-08-13
 > **Approved:** 2026-08-13 (user)
@@ -502,7 +502,7 @@ stroke = "0.0"       # 0 = filled; > 0 strokes at abs(d) < w
 
 ### Close (architect, 2026-09-09)
 
-**Mode 4 verdict: no blockers, no majors, three minors, one nit.** The full suite was re-run at the
+**Mode 4 verdict: no blockers, one major, three minors, one nit.** The full suite was re-run at the
 lane tip rather than trusted: `cargo nextest run --workspace --no-fail-fast`, **1596 passed, 6
 skipped, exit 0, 485.6 s** — matching the log's `Full suite` bullet exactly. All seven pre-push Node
 gates plus `toc --check` exit 0; `check-backlog-claims` reports 110 reductions holding across 48 live
@@ -546,6 +546,19 @@ Their `onset 0.000` is [backlog 0192](../../design-backlog.md) — the report ho
 The stale-workaround sweep comes back clean: no shipped preset writes `coord_mode = "2"`, so nothing
 was silently getting mode 1 from the `ParamSpec` range Phase 7 corrected, and no preset other than
 these two has ever carried a `[path]` to work around.
+
+**A fourth finding, and a `major`, found only by building the site after the merge.** Phase 2
+retitled `presets/README.md`'s structural-config section — *"line systems and the attractor"* gained
+*"and the shape field"* — and the hand-written cross-reference at `presets/README.md:2892` kept
+pointing at the old slug. **No gate this project runs before a push can see that.**
+`check-doc-links.mjs` validates paths and deliberately never validates fragments; `toc.mjs`
+regenerated the contents row above it correctly, which is exactly what makes the surviving
+hand-written one invisible. Only ADR-0166's heading map catches it, and that runs in the Astro build
+inside `pages.yml` — **after** the push. Repaired on `main` at the close, with the build re-run to
+prove it: 165 pages, both site gates green, largest split route 27,854 B against the 30,000 cap.
+The general shape is worth carrying: **a plan that renames a heading in a published document owes a
+grep for that heading's slug**, because the one link the generator does not own is the one that
+breaks.
 
 **What outlives the plan.** Phase 5's unacted note that `docs/preset-guide.md` owed the authored path
 a mention is discharged; what it did *not* buy is a **picture** — the guide's `shape_field` frame is

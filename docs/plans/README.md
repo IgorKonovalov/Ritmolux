@@ -733,7 +733,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
-- [0092 — The engine draws an authored path](done/0092-the-engine-draws-an-authored-path.md) — closed 2026-09-09. Review: **no blockers, no majors, three minors, one nit.** Version: **0.112.0** (minor). ADR-0107 already accepted. `shape_maple` + `shape_lion` shipped. [Write-up](README-archive.md).
+- [0092 — The engine draws an authored path](done/0092-the-engine-draws-an-authored-path.md) — closed 2026-09-09. Review: **no blockers, one major, three minors, one nit.** Version: **0.112.0** (minor). ADR-0107 already accepted. `shape_maple` + `shape_lion` shipped. [Write-up](README-archive.md).
 - [0140 — Every rate integrates, for real](done/0140-every-rate-integrates-for-real.md) — closed 2026-09-08. Review: **no blockers, two majors, three minors, one nit.** Version: **0.111.1**. ADR-0152 + 0153 accepted. Archived [backlog 0149 + 0150](../design-backlog-archive.md). [Write-up](README-archive.md).
 - [0157 — The cost probes estimate a duration](done/0157-the-cost-probes-estimate-a-duration.md) — closed 2026-09-07. Review: **no blockers, no majors, two minors, one nit.** Version: **none** (no shipped artifact moved). ADR-0173 accepted. [Write-up](README-archive.md).
 - [0153 — The debug tree stops carrying dependency line tables](done/0153-the-debug-tree-stops-carrying-dependency-line-tables.md) — closed 2026-09-07. Review: **no blockers, no majors, one minor.** Version: **none** (chore-only). ADR-0165 accepted. [Write-up](README-archive.md).
@@ -807,13 +807,13 @@ archive first.
 - [0085 — The show-length horizon gets an instrument](done/0085-the-show-length-horizon-gets-an-instrument.md) — closed 2026-08-15. Review: **no blockers, one major, three minors, one nit.**
 - [0089 — The framing contract stops lying, and two doc gaps close](done/0089-the-framing-contract-stops-lying.md) — closed 2026-08-15. Review: **no blockers, no majors, one minor, three nits.**
 - [0088 — The docs get pictures](done/0088-the-docs-get-pictures.md) — closed 2026-08-13. Review: **no blockers, no majors, three minors, two nits.**
-- [0084 — Two gates stop lying about what they check](done/0084-two-gates-stop-lying-about-what-they-check.md) — closed 2026-08-13. Review: **no blockers, no majors, three minors, one nit.**
+- [0084 — Two gates stop lying about what they check](done/0084-two-gates-stop-lying-about-what-they-check.md) — closed 2026-08-13. Review: **no blockers, one major, three minors, one nit.**
 - [0083 — The build says why it hears nothing](done/0083-the-build-says-why-it-hears-nothing.md) — closed 2026-08-13. Review: **no blockers, no majors, one minor, two nits.**
 - [0079 — The attractor learns new figures: the tuple roster with per-tuple framing, and measured morph paths](done/0079-the-attractor-learns-new-figures.md) — closed 2026-08-13. Review: **no blockers, no majors, four minors, two nits.**
 - [0081 — The sky gets a galaxy: the backdrop paints a curved band](done/0081-the-sky-gets-a-galaxy.md) — closed 2026-08-12. Review: **no blockers, no majors, two minors, two nits.**
 - [0082 — The gradient stops banding: the display write dithers](done/0082-the-gradient-stops-banding.md) — closed 2026-08-12. Review: **no blockers, one major, five minors, three nits.**
-- [0080 — The sky gets a horizon: the backdrop paints a directional ramp](done/0080-the-sky-gets-a-horizon.md) — closed 2026-08-12. Review: **no blockers, no majors, three minors, one nit.**
-- [0078 — The ink learns to bite: a contrast exponent on the terminal remap](done/0078-the-ink-learns-to-bite.md) — closed 2026-08-12. Review: **no blockers, no majors, three minors, one nit.**
+- [0080 — The sky gets a horizon: the backdrop paints a directional ramp](done/0080-the-sky-gets-a-horizon.md) — closed 2026-08-12. Review: **no blockers, one major, three minors, one nit.**
+- [0078 — The ink learns to bite: a contrast exponent on the terminal remap](done/0078-the-ink-learns-to-bite.md) — closed 2026-08-12. Review: **no blockers, one major, three minors, one nit.**
 - [0077 — The quiet sky: the sparse idiom becomes gateable and the swarm individuates](done/0077-the-quiet-sky.md) — closed 2026-08-12. Review: **no blockers, no majors, two minors.**
 - [0075 — The content renaissance: the library is rebuilt as worlds, by replacement cohorts](done/0075-the-content-renaissance.md) — closed 2026-08-11. Review: **no blockers, no majors, two minors, two nits.**
 - [0076 — The second layer: a preset composes two scenes (R3)](done/0076-the-second-layer.md) — closed 2026-08-11. Review: **no blockers, no majors.**
