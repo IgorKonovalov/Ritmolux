@@ -264,8 +264,8 @@ stroke = "0.0"       # 0 = filled; > 0 strokes at abs(d) < w
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The parser, and what it refuses | dev | done | `6cd20de` |
-| 2 — The path becomes a field | dev | done | committed with this row |
-| 3 — Two paths morph | dev | not started | — |
+| 2 — The path becomes a field | dev | done | `bad073f` |
+| 3 — Two paths morph | dev | done | committed with this row |
 | 4 — Arcs, if Plan 0087 delivered them | dev | not started | — |
 | 5 — The authoring surface is documented | dev | not started | — |
 | 6 — The look gate | human | not started | — |
@@ -308,6 +308,35 @@ stroke = "0.0"       # 0 = filled; > 0 strokes at abs(d) < w
   control warns about — the unblessed pass is what was trusted.
 - Deferred GPU suites run under ADR-0156's upward override (this phase changes a scene and the preset
   engine): `golden`, `sanity`, `reactivity`, `animation`, `distinctness` — 280 passed, 3 skipped.
+
+**Phase 3.**
+
+- **The morph strip, rendered at 200x200, figure area in pixels across the travel** — the phase's
+  "inspected, not assumed". No pair collapses; the gate (a quarter of the smaller endpoint) is not
+  approached by any of them.
+
+  | pair | t=0 | 0.25 | 0.5 | 0.75 | 1 |
+  |---|---|---|---|---|---|
+  | square → leaf | 12100 | 10328 | 8648 | 7056 | 5552 |
+  | leaf → star(5) | 5552 | 5286 | 4892 | 4392 | 3740 |
+  | triangle → square | 5274 | 6880 | 8598 | 10342 | 12100 |
+  | leaf → leaf turned 90° | 5552 | 5636 | 5652 | 5636 | 5552 |
+
+  The last row is the one worth reading: the same outline at a quarter turn, where a lost
+  correspondence would sweep the figure through a spiral. Its area moves by under 2 % across the
+  whole travel.
+- **The morph is interpolated on the CPU, once per frame, not per pixel in the shader.** The
+  alternative — both contours in the uniform, lerped inside the distance loop — doubles the uniform
+  and the per-pixel loads to re-derive at 2 M pixels a value that changes once a frame. Consequence:
+  the shipped per-pixel cost of a morphing path is the same as a static one, so `path_cost.rs`'s
+  ceiling covers both.
+- **The interpolated contour's inradius is the interpolation of the two endpoints' inradii, not a
+  measurement of the interpolated shape.** The true value needs the load-time grid search. The error
+  is one-sided where it matters — the shader clamps the coordinate at 0 from below — and is noted on
+  the field.
+- `morph` is clamped to `0..=1` rather than extrapolated past either end.
+- Phase 3 touched `presets/README.md` again, mechanically, for the `morph` row (as Phase 2 did for
+  `stroke`).
 
 ### Close triggers
 

@@ -215,6 +215,77 @@ impl PathShape {
         signed_area(&self.points)
     }
 
+    /// **This contour re-expressed so that interpolating toward it from `from`
+    /// is a morph rather than a scramble** (ADR-0107).
+    ///
+    /// The two alignment problems ADR-0107 says have answers, solved in the
+    /// order they have to be:
+    ///
+    /// 1. **Winding, by signed area.** A clockwise contour interpolating into a
+    ///    counter-clockwise one turns inside out through the middle — every
+    ///    intermediate frame is a valid shape and the motion is wrong — and the
+    ///    contour passes through zero enclosed area on the way. When the two
+    ///    signs disagree, the target is walked backwards.
+    /// 2. **Start point, by minimising total displacement over cyclic
+    ///    offsets.** Without it a star morphing into a star can unwind through a
+    ///    spiral: each point travels to a *correspondent* rather than to its
+    ///    neighbour, and every intermediate frame is again valid. `O(N^2)` at
+    ///    load, which at this arity is thousands of operations, so the
+    ///    brute-force search is affordable and no cleverness is owed.
+    ///
+    /// The third — two paths with different **subpath counts** — has no answer,
+    /// and is refused at the parser rather than guessed at here.
+    ///
+    /// Both contours must already carry the same number of points; `None` if
+    /// they do not, which the load boundary prevents by parsing the pair at one
+    /// arity.
+    pub fn aligned_to(&self, from: &Self) -> Option<Self> {
+        let n = self.points.len();
+        if n != from.points.len() || n < 3 {
+            return None;
+        }
+
+        // 1 — winding. `rev` walks the target backwards, which flips its signed
+        // area and leaves the same figure.
+        let flip = signed_area(&self.points) * signed_area(&from.points) < 0.0;
+        let oriented: Vec<[f32; 2]> = if flip {
+            self.points.iter().rev().copied().collect()
+        } else {
+            self.points.clone()
+        };
+
+        // 2 — start point. The cost is the sum of SQUARED displacements, which
+        // has the same minimiser as the sum of distances and no square roots in
+        // the inner loop.
+        let mut best_offset = 0usize;
+        let mut best_cost = f32::INFINITY;
+        for offset in 0..n {
+            let mut cost = 0.0f32;
+            for i in 0..n {
+                let (Some(&a), Some(&b)) = (from.points.get(i), oriented.get((i + offset) % n))
+                else {
+                    return None;
+                };
+                let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+                cost += dx * dx + dy * dy;
+            }
+            if cost < best_cost {
+                best_cost = cost;
+                best_offset = offset;
+            }
+        }
+
+        let mut points = Vec::with_capacity(n);
+        for i in 0..n {
+            points.push(*oriented.get((i + best_offset) % n)?);
+        }
+        Some(Self {
+            points,
+            source_center: self.source_center,
+            source_scale: self.source_scale,
+        })
+    }
+
     /// This contour resampled to `samples` points, evenly spaced by arc length
     /// from its own first point. `None` when the contour or the request is
     /// degenerate.

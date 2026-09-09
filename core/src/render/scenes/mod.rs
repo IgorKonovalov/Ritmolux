@@ -335,6 +335,15 @@ pub enum GeneratorConfig {
         /// and clears the outgoing preset's contour, the same reason the
         /// attractor's and the spectrum's configs are unconditional.
         shape: Option<crate::preset::path::PathShape>,
+        /// The silhouette the bindable `morph` param travels **towards**, from
+        /// `[path] morph_to`. `None` — the default — pins the figure, so `morph`
+        /// is inert, exactly as the attractor's own `morph_to` does.
+        ///
+        /// Already **aligned** to `shape` at load: same arity, same winding, and
+        /// the cyclic start that minimises total displacement (ADR-0107). The
+        /// render layer interpolates the two point lists and re-derives none of
+        /// that, which is what keeps an `O(N^2)` search off the frame.
+        morph_to: Option<crate::preset::path::PathShape>,
     },
 }
 

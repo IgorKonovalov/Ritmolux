@@ -320,9 +320,9 @@ fn a_curve_is_flattened_finely_enough_that_the_resample_sets_the_fidelity() {
         "M 1,0 C 1,{K} {K},1 0,1 C -{K},1 -1,{K} -1,0 C -1,-{K} -{K},-1 0,-1 \
          C {K},-1 1,-{K} 1,0 Z"
     );
-    let circle = PathShape::parse(&d, 128).expect("parses");
-    // The inscribed polygon's own sagitta at 128 points: 1 - cos(pi/128).
-    let sagitta = 1.0 - (std::f32::consts::PI / 128.0).cos();
+    let circle = PathShape::parse(&d, MAX_SAMPLES).expect("parses");
+    // The inscribed polygon's own sagitta at this arity: 1 - cos(pi/N).
+    let sagitta = 1.0 - (std::f32::consts::PI / MAX_SAMPLES as f32).cos();
     for p in circle.points() {
         let r = (p[0] * p[0] + p[1] * p[1]).sqrt();
         assert!(
@@ -331,4 +331,149 @@ fn a_curve_is_flattened_finely_enough_that_the_resample_sets_the_fidelity() {
              resample's own chord error"
         );
     }
+}
+
+// ------------------------------------------------------- the morph alignment
+
+/// The contour halfway between two aligned endpoints — what a frame at
+/// `morph = t` actually draws, computed the way the scene computes it.
+fn interpolate(from: &PathShape, to: &PathShape, t: f32) -> Vec<[f32; 2]> {
+    from.points()
+        .iter()
+        .zip(to.points())
+        .map(|(a, b)| [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t])
+        .collect()
+}
+
+/// The signed area across a whole morph, at 65 steps.
+fn areas_across(from: &PathShape, to: &PathShape) -> Vec<f32> {
+    (0..=64)
+        .map(|k| signed_area(&interpolate(from, to, k as f32 / 64.0)))
+        .collect()
+}
+
+/// A square, wound counter-clockwise in a y-up frame.
+const SQUARE_CCW: &str = "M -1,-1 L 1,-1 L 1,1 L -1,1 Z";
+/// The same figure as `path_cost.rs`'s leaf, **mirrored in x** — so it is the
+/// same outline wound the other way. An author reaching for two silhouettes has
+/// no reason to have drawn them in the same direction, which is the whole point
+/// of normalizing winding rather than requiring it.
+const LEAF_CW: &str = "M 0,-1 C -0.9,-0.4 -0.9,0.4 0,1 C 0.9,0.4 0.9,-0.4 0,-1 Z";
+
+/// **Winding is normalized by signed area, and the negative control is
+/// asserted** (ADR-0107).
+///
+/// A clockwise contour interpolating into a counter-clockwise one turns inside
+/// out through the middle. Every intermediate frame is a valid closed shape, so
+/// nothing about the *shapes* catches it — what catches it is that the enclosed
+/// area has to pass through zero on its way from positive to negative.
+///
+/// Both directions, because the positive one alone would pass on an alignment
+/// that did nothing: the mis-aligned pair **must** cross zero, and the aligned
+/// one must not go near it.
+#[test]
+fn winding_is_normalized_and_a_misaligned_pair_provably_collapses() {
+    let from = shape(SQUARE_CCW);
+    let raw = shape(LEAF_CW);
+    assert!(
+        from.signed_area() > 0.0 && raw.signed_area() < 0.0,
+        "the fixtures must disagree on winding for this test to mean anything: \
+         {} and {}",
+        from.signed_area(),
+        raw.signed_area()
+    );
+
+    // The negative control: interpolate towards the target AS AUTHORED.
+    let crossings = areas_across(&from, &raw);
+    let (lo, hi) = crossings
+        .iter()
+        .fold((f32::INFINITY, f32::NEG_INFINITY), |(lo, hi), &a| {
+            (lo.min(a), hi.max(a))
+        });
+    assert!(
+        lo < 0.0 && hi > 0.0,
+        "a pair of opposite winding must pass through zero enclosed area — that \
+         is the figure turning inside out. Saw {lo} to {hi}"
+    );
+
+    // And the aligned pair does not.
+    let aligned = raw.aligned_to(&from).expect("the pair aligns");
+    assert!(
+        aligned.signed_area() > 0.0,
+        "alignment must agree with the source's winding, got {}",
+        aligned.signed_area()
+    );
+    let areas = areas_across(&from, &aligned);
+    let floor = from.signed_area().min(aligned.signed_area()) * 0.25;
+    for (k, &a) in areas.iter().enumerate() {
+        assert!(
+            a > floor,
+            "at morph {:.3} the aligned pair encloses {a}, which is under a \
+             quarter of the smaller endpoint ({floor}) — the figure is \
+             collapsing through the middle",
+            k as f32 / 64.0
+        );
+    }
+}
+
+/// **The start point is chosen by minimising total displacement over cyclic
+/// offsets** (ADR-0107).
+///
+/// The same square authored from two different corners is the same figure with
+/// its point list rotated. Without the search each point travels to a
+/// *correspondent* rather than to its neighbour, and a square morphing into
+/// itself sweeps through a spiral — every intermediate frame valid, the whole
+/// motion wrong.
+#[test]
+fn the_start_point_is_rotated_to_the_cheapest_correspondence() {
+    // One corner apart, and both counter-clockwise so winding is not what is
+    // being tested here.
+    let from = PathShape::parse(SQUARE_CCW, 8).expect("parses");
+    let rotated = PathShape::parse("M 1,-1 L 1,1 L -1,1 L -1,-1 Z", 8).expect("parses");
+
+    let worst = |a: &PathShape, b: &PathShape| -> f32 {
+        a.points()
+            .iter()
+            .zip(b.points())
+            .map(|(p, q)| ((p[0] - q[0]).powi(2) + (p[1] - q[1]).powi(2)).sqrt())
+            .fold(0.0f32, f32::max)
+    };
+
+    // The negative control first: as authored, the correspondence is wrong by
+    // half the figure.
+    let before = worst(&from, &rotated);
+    assert!(
+        before > 1.0,
+        "the fixture must start mis-rotated for this to mean anything, saw {before}"
+    );
+
+    // Aligned, every point lands on its own neighbour: the same square, and the
+    // morph between them is motionless.
+    let aligned = rotated.aligned_to(&from).expect("the pair aligns");
+    let after = worst(&from, &aligned);
+    assert!(
+        after < 1e-4,
+        "a square aligned to the same square should correspond exactly, worst \
+         displacement {after} (was {before})"
+    );
+}
+
+/// Both endpoints reach a common arity **by arc length**, whatever arity each
+/// was parsed at — which is what `[path]`'s single `samples` key delivers by
+/// parsing the pair together.
+#[test]
+fn a_morph_pair_meets_at_one_arity() {
+    for samples in [MIN_SAMPLES, 8, 32, MAX_SAMPLES] {
+        let from = PathShape::parse(SQUARE_CCW, samples).expect("parses");
+        let to = PathShape::parse(LEAF_CW, samples).expect("parses");
+        let aligned = to.aligned_to(&from).expect("the pair aligns");
+        assert_eq!(aligned.points().len(), samples);
+        assert_eq!(from.points().len(), samples);
+    }
+
+    // A pair of different arities has no correspondence to build, and is refused
+    // rather than truncated onto the shorter one.
+    let from = PathShape::parse(SQUARE_CCW, 16).expect("parses");
+    let to = PathShape::parse(LEAF_CW, 32).expect("parses");
+    assert!(to.aligned_to(&from).is_none());
 }

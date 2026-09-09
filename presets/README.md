@@ -690,6 +690,7 @@ here is the **definition**, and the essay is the **discussion**.
 | `coord_mode` | `0` | `0` – `2` | Which coordinate frame the distance is measured in, which changes the shape's whole geometry. |
 | `rotation` | `0` | `0` – `1` | Turns the shape, as a fraction of a full turn. |
 | `stroke` | `0` | `0` – `1` | Draws the outline instead of the filled figure, at this half-width; 0 fills. |
+| `morph` | `0` | `0` – `1` | Travels the authored path towards its morph_to silhouette; inert without one. |
 
 ### System: `warp_mesh`
 

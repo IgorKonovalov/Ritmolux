@@ -358,7 +358,7 @@ fn a_shape_field_preset_without_a_path_table_carries_an_empty_contour() {
     let preset = Preset::from_toml_str("system = \"shape_field\"\nname = \"t\"\n")
         .expect("a shape_field preset needs no table");
     match preset.config {
-        Some(GeneratorConfig::Path { shape: None }) => {}
+        Some(GeneratorConfig::Path { shape: None, .. }) => {}
         other => panic!("expected an empty Path config, got {other:?}"),
     }
 }
@@ -368,7 +368,9 @@ fn a_path_table_becomes_a_contour_at_the_arity_it_asked_for() {
     let preset =
         shape_field_path("d = \"M 0,0 H 10 V 10 H 0 Z\"\nsamples = 24").expect("a square parses");
     match preset.config {
-        Some(GeneratorConfig::Path { shape: Some(shape) }) => {
+        Some(GeneratorConfig::Path {
+            shape: Some(shape), ..
+        }) => {
             assert_eq!(shape.points().len(), 24)
         }
         other => panic!("a [path] preset carries a Path config, got {other:?}"),
@@ -377,7 +379,9 @@ fn a_path_table_becomes_a_contour_at_the_arity_it_asked_for() {
     // No `samples` key takes the default arity rather than the flatten's own.
     let defaulted = shape_field_path("d = \"M 0,0 H 10 V 10 H 0 Z\"").expect("parses");
     match defaulted.config {
-        Some(GeneratorConfig::Path { shape: Some(shape) }) => {
+        Some(GeneratorConfig::Path {
+            shape: Some(shape), ..
+        }) => {
             assert_eq!(shape.points().len(), crate::preset::path::DEFAULT_SAMPLES);
         }
         other => panic!("expected a Path config, got {other:?}"),
@@ -435,4 +439,63 @@ fn an_unknown_path_key_is_refused() {
     let err =
         shape_field_path("d = \"M 0,0 H 1 V 1 H 0 Z\"\nsample = 32").expect_err("a mistyped key");
     assert!(err.to_string().contains("sample"), "{err}");
+}
+
+/// **`morph_to` is parsed at the same arity and aligned to `d` at load**
+/// (ADR-0107): the pair meets at one arity because one `samples` key sizes both,
+/// and the `O(N^2)` start-point search is a fact about the pair rather than
+/// about the frame.
+#[test]
+fn a_morph_target_is_parsed_at_the_same_arity_and_aligned_at_load() {
+    let preset = shape_field_path(
+        "d = \"M -1,-1 L 1,-1 L 1,1 L -1,1 Z\"\n\
+         morph_to = \"M 0,-1 L 0.866,0.5 L -0.866,0.5 Z\"\n\
+         samples = 24",
+    )
+    .expect("a morph pair parses");
+    match preset.config {
+        Some(GeneratorConfig::Path {
+            shape: Some(shape),
+            morph_to: Some(target),
+        }) => {
+            assert_eq!(shape.points().len(), 24);
+            assert_eq!(
+                target.points().len(),
+                24,
+                "both endpoints meet at one arity"
+            );
+            assert!(
+                shape.signed_area() * target.signed_area() > 0.0,
+                "the aligned target must share the source's winding, got {} and {}",
+                shape.signed_area(),
+                target.signed_area()
+            );
+        }
+        other => panic!("expected an aligned morph pair, got {other:?}"),
+    }
+
+    // An absent `morph_to` pins the figure, which is what makes `morph` inert on
+    // a preset that mentions neither.
+    let pinned = shape_field_path("d = \"M -1,-1 L 1,-1 L 1,1 L -1,1 Z\"").expect("parses");
+    match pinned.config {
+        Some(GeneratorConfig::Path { morph_to: None, .. }) => {}
+        other => panic!("expected no morph target, got {other:?}"),
+    }
+}
+
+/// A malformed `morph_to` names **which** of the two silhouettes was wrong. Both
+/// are `d` strings and both can be pasted wrong, so an error that said only
+/// "[path] d" would send an author to the other one.
+#[test]
+fn a_malformed_morph_target_names_the_key_it_came_from() {
+    let err = shape_field_path(
+        "d = \"M -1,-1 L 1,-1 L 1,1 L -1,1 Z\"\nmorph_to = \"M 0,0 A 1 1 0 0 1 2,2 Z\"",
+    )
+    .expect_err("arcs are refused in the target too");
+    let text = err.to_string();
+    assert!(
+        text.contains("[path] morph_to"),
+        "the message names the target rather than the source: {text}"
+    );
+    assert!(text.contains("elliptical arc"), "{text}");
 }

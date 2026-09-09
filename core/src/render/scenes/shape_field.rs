@@ -160,6 +160,12 @@ const DEFAULT_STROKE: f32 = default_of(PARAMS, "stroke");
 /// stopped being an outline of anything.
 const MAX_STROKE: f32 = 1.0;
 
+/// `morph` default — **0, the authored figure**, and an exact identity: at 0 the
+/// packed contour is `[path] d` verbatim, with no interpolation run at all. A
+/// preset declaring no `morph_to` has nothing to travel towards and this is
+/// inert whatever it is bound to, exactly as the attractor's `morph` is.
+const DEFAULT_MORPH: f32 = default_of(PARAMS, "morph");
+
 /// `gamma` default — **the identity**, and it is exactly `1.0` on the way to the
 /// uniform because the shader's identity branch tests for it (`pow(x, 1.0)` is
 /// not bit-exact, ADR-0092's care).
@@ -630,23 +636,46 @@ pub struct ShapeFieldScene {
     /// [`applied_stroke`] conditions it on the way to the uniform. `0` — the
     /// default — is the filled figure and an exact arithmetic identity.
     stroke: f32,
-    /// The authored contour, packed for the uniform, and how many of its points
-    /// are live (ADR-0107). Both are set by [`Scene::configure`] on a preset
-    /// switch and by nothing else — geometry is structural, not a param, so
-    /// `reset_params` does not touch them.
+    /// The authored contour, and the one `morph` travels towards (ADR-0107).
+    /// Both are set by [`Scene::configure`] on a preset switch and by nothing
+    /// else — geometry is structural, not a param, so `reset_params` does not
+    /// touch them.
     ///
-    /// A count below 3 means no authored contour and the scene draws the `marks`
-    /// roster, which is what every preset declaring no `[path]` gets.
+    /// Fewer than 3 points in `path_from` means no authored contour and the
+    /// scene draws the `marks` roster, which is what every preset declaring no
+    /// `[path]` gets. An empty `path_to` means no morph target, so `morph` is
+    /// inert and the packed contour is `path_from` verbatim.
+    path_from: Vec<[f32; 2]>,
+    path_to: Vec<[f32; 2]>,
+    /// The contour packed for the uniform — the interpolation of the two above
+    /// at this frame's `morph`, rebuilt in `render`.
+    ///
+    /// A field rather than a local so the per-frame pack writes into an
+    /// allocation made once. This is the render thread, not the audio callback,
+    /// but the rule that a per-frame path does not allocate is the same one.
     path: Box<[[f32; 4]; PATH_VEC4S]>,
-    path_count: usize,
-    /// The contour's inradius — the distance from its deepest interior point to
-    /// its own outline, measured by [`contour_inradius`] at configure time.
+    /// The two contours' inradii — the distance from each one's deepest interior
+    /// point to its own outline, measured by [`contour_inradius`] at configure
+    /// time.
     ///
     /// It is the divisor that makes the authored figure's coordinate `0` at that
     /// deepest point and `1` on the outline, which is the contract every
     /// silhouette in this scene meets (`marks`' own header states it for the
-    /// roster). Meaningless — and unread — when `path_count` is below 3.
+    /// roster).
+    ///
+    /// **Mid-morph the two are interpolated rather than re-measured.** The true
+    /// inradius of an interpolated contour is not the interpolation of the two
+    /// inradii, and measuring it is a grid search — load-time work, not
+    /// per-frame. The error is bounded and one-sided in the direction that
+    /// matters: the shader clamps the coordinate at 0 from below, so an
+    /// underestimate costs nothing and an overestimate leaves the innermost
+    /// sliver short of the palette's first texel.
     path_inradius: f32,
+    path_inradius_to: f32,
+    /// How far along `path_from` -> `path_to` the figure is, raw as the preset
+    /// bound it. `0` — the default — is the authored figure, and an exact
+    /// identity: the interpolation is skipped entirely.
+    morph: f32,
     /// How much of this field's (total) coverage the backdrop resolves against
     /// (ADR-0085). Set by the renderer every frame — **not** a named param, so
     /// it is not reset by `reset_params`.
@@ -734,9 +763,12 @@ impl ShapeFieldScene {
             coord_mode: DEFAULT_COORD_MODE,
             rotation: DEFAULT_ROTATION,
             stroke: DEFAULT_STROKE,
+            morph: DEFAULT_MORPH,
+            path_from: Vec::new(),
+            path_to: Vec::new(),
             path: Box::new([[0.0; 4]; PATH_VEC4S]),
-            path_count: 0,
             path_inradius: 1.0,
+            path_inradius_to: 1.0,
             occlude: crate::render::post::DEFAULT_OCCLUDE,
         }
     }
@@ -838,6 +870,21 @@ fn applied_stroke(stroke: f32) -> f32 {
         stroke.clamp(0.0, MAX_STROKE)
     } else {
         DEFAULT_STROKE
+    }
+}
+
+/// The `morph` the contour is interpolated at: held inside `0..=1`, with a
+/// non-finite binding falling back to the authored figure.
+///
+/// Clamped rather than wrapped, and not extrapolated past either end: outside
+/// `0..=1` the interpolation leaves both authored silhouettes behind and the
+/// figure is one nobody drew — which is a different thing from the mid-morph
+/// shapes nobody drew, because those at least lie between two that someone did.
+fn applied_morph(morph: f32) -> f32 {
+    if morph.is_finite() {
+        morph.clamp(0.0, 1.0)
+    } else {
+        DEFAULT_MORPH
     }
 }
 
@@ -997,7 +1044,60 @@ pub const PARAMS: &[ParamSpec] = &[
         range: Some([0.0, 1.0]),
         doc: "Draws the outline instead of the filled figure, at this half-width; 0 fills.",
     },
+    ParamSpec {
+        name: "morph",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Travels the authored path towards its morph_to silhouette; inert without one.",
+    },
 ];
+
+impl ShapeFieldScene {
+    /// Pack this frame's contour into the uniform array and report `(point
+    /// count, inradius)` for the uniform's scalars.
+    ///
+    /// **The morph is interpolated here, on the CPU, once per frame** — not per
+    /// pixel in the shader. The alternative was to hand the GPU both contours
+    /// and lerp inside the distance loop, which would double the uniform, double
+    /// the per-pixel loads, and re-derive at 2 M pixels a value that changes once
+    /// a frame. `morph` is a parameter, not geometry.
+    ///
+    /// At `morph = 0`, or with no target, the authored contour is copied
+    /// verbatim and no interpolation runs — the identity every other param on
+    /// this scene keeps.
+    fn pack_path(&mut self) -> (usize, f32) {
+        let n = self.path_from.len().min(MAX_SAMPLES);
+        if n < 3 {
+            return (0, 1.0);
+        }
+        let t = if self.path_to.len() == self.path_from.len() {
+            applied_morph(self.morph)
+        } else {
+            0.0
+        };
+        for i in 0..n {
+            let Some(&a) = self.path_from.get(i) else {
+                continue;
+            };
+            let p = match self.path_to.get(i) {
+                Some(&b) if t != 0.0 => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t],
+                _ => a,
+            };
+            let slot = i >> 1;
+            let half = (i & 1) * 2;
+            if let Some(v) = self.path.get_mut(slot) {
+                if let Some(x) = v.get_mut(half) {
+                    *x = p[0];
+                }
+                if let Some(y) = v.get_mut(half + 1) {
+                    *y = p[1];
+                }
+            }
+        }
+        let inradius = self.path_inradius + (self.path_inradius_to - self.path_inradius) * t;
+        (n, inradius.max(1e-4))
+    }
+}
 
 impl Scene for ShapeFieldScene {
     fn name(&self) -> &'static str {
@@ -1027,6 +1127,7 @@ impl Scene for ShapeFieldScene {
         self.coord_mode = DEFAULT_COORD_MODE;
         self.rotation = DEFAULT_ROTATION;
         self.stroke = DEFAULT_STROKE;
+        self.morph = DEFAULT_MORPH;
     }
 
     /// The `[path]` table (ADR-0107), which is the only structural config this
@@ -1041,33 +1142,28 @@ impl Scene for ShapeFieldScene {
         &mut self,
         cfg: &super::lines::GeneratorConfig,
     ) -> Option<super::lines::CapOverflow> {
-        if let super::lines::GeneratorConfig::Path { shape } = cfg {
-            *self.path = [[0.0; 4]; PATH_VEC4S];
-            match shape {
-                Some(contour) => {
-                    let points = contour.points();
-                    self.path_count = points.len().min(MAX_SAMPLES);
-                    // The load boundary already refused an arity above the
-                    // ceiling, so the `min` above is a belt on a boundary that
-                    // holds rather than a decimation an author is not told about.
-                    for (i, p) in points.iter().take(self.path_count).enumerate() {
-                        let slot = i >> 1;
-                        let half = (i & 1) * 2;
-                        if let Some(v) = self.path.get_mut(slot) {
-                            if let Some(x) = v.get_mut(half) {
-                                *x = p[0];
-                            }
-                            if let Some(y) = v.get_mut(half + 1) {
-                                *y = p[1];
-                            }
-                        }
-                    }
-                    self.path_inradius = contour_inradius(points);
-                }
-                None => {
-                    self.path_count = 0;
-                    self.path_inradius = 1.0;
-                }
+        if let super::lines::GeneratorConfig::Path { shape, morph_to } = cfg {
+            self.path_from.clear();
+            self.path_to.clear();
+            self.path_inradius = 1.0;
+            self.path_inradius_to = 1.0;
+            if let Some(contour) = shape {
+                // The load boundary already refused an arity above the ceiling,
+                // so the `take` is a belt on a boundary that holds rather than a
+                // decimation an author is not told about.
+                self.path_from
+                    .extend(contour.points().iter().take(MAX_SAMPLES).copied());
+                self.path_inradius = contour_inradius(&self.path_from);
+            }
+            // The pair is aligned at load; a target of a different arity would
+            // mean the loader let one through, so it is dropped rather than
+            // interpolated against the wrong correspondent.
+            if let Some(target) = morph_to
+                .as_ref()
+                .filter(|t| t.points().len() == self.path_from.len())
+            {
+                self.path_to.extend(target.points().iter().copied());
+                self.path_inradius_to = contour_inradius(&self.path_to);
             }
         }
         None
@@ -1092,6 +1188,7 @@ impl Scene for ShapeFieldScene {
             "coord_mode" => self.coord_mode = value,
             "rotation" => self.rotation = value,
             "stroke" => self.stroke = value,
+            "morph" => self.morph = value,
             _ => {}
         }
     }
@@ -1113,6 +1210,7 @@ impl Scene for ShapeFieldScene {
         // not about the raw binding.
         let shape = marks::mark_shape(self.shape);
         self.gpu.flush_palette(queue);
+        let (path_count, path_inradius) = self.pack_path();
 
         let params = Params {
             // `aspect` is the argument the chain hands down for the target this
@@ -1143,8 +1241,8 @@ impl Scene for ShapeFieldScene {
                 0.0,
             ],
             f: [
-                self.path_count as f32,
-                self.path_inradius,
+                path_count as f32,
+                path_inradius,
                 applied_stroke(self.stroke),
                 0.0,
             ],

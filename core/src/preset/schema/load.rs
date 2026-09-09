@@ -668,9 +668,13 @@ pub(super) fn build_config(
         // Config is always `Some` so `configure` runs on every preset switch
         // (clearing the contour — never stale), which is why the absent table is
         // a `None` INSIDE the variant rather than an absent config.
-        SystemKind::ShapeField => Ok(Some(GeneratorConfig::Path {
-            shape: path.map(RawPath::into_shape).transpose()?,
-        })),
+        SystemKind::ShapeField => {
+            let parsed = path.map(RawPath::into_parsed).transpose()?;
+            Ok(Some(GeneratorConfig::Path {
+                shape: parsed.as_ref().map(|p| p.shape.clone()),
+                morph_to: parsed.and_then(|p| p.morph_to),
+            }))
+        }
         // Reaction-diffusion drives its regime through named params (feed/kill/
         // flow), not a declarative structural table. `shape_collage`'s structure
         // is an authored element list compiled into the scene, and its seeded

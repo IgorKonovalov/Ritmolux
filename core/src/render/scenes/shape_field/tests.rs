@@ -1197,6 +1197,16 @@ fn path_preset(name: &str, d: &str, extra: &str) -> Preset {
     Preset::from_toml_str(&toml).unwrap_or_else(|e| panic!("{name} failed to load: {e}"))
 }
 
+/// A morphing `[path]` preset pinned at one point along its travel.
+fn morph_preset(name: &str, from: &str, to: &str, morph: f32) -> Preset {
+    let toml = format!(
+        "name = \"{name}\"\nsystem = \"shape_field\"\n\
+         [path]\nd = \"{from}\"\nmorph_to = \"{to}\"\n{TWO_BAND_PALETTE}\
+         [params]\n{TWO_BAND_PARAMS}morph = \"{morph}\"\n"
+    );
+    Preset::from_toml_str(&toml).unwrap_or_else(|e| panic!("{name} failed to load: {e}"))
+}
+
 /// The same look with no `[path]` table, so the scene draws its rostered
 /// silhouette instead.
 fn roster_preset(name: &str) -> Preset {
@@ -1469,6 +1479,141 @@ fn switching_away_from_a_path_preset_clears_the_contour() {
         differing, 0,
         "the same roster preset rendered differently before and after a path \
          preset ({differing} px), so the contour survived the switch"
+    );
+}
+
+/// The other silhouettes the morph sweep travels between. Chosen so the four
+/// pairs below each price a different alignment hazard rather than four
+/// variations of one.
+const SQUARE: &str = "M -1,-1 L 1,-1 L 1,1 L -1,1 Z";
+const TRIANGLE: &str = "M 0,-1 L 0.866,0.5 L -0.866,0.5 Z";
+const STAR5: &str = "M 0,-1 L 0.2245,-0.309 L 0.9511,-0.309 L 0.3633,0.118 \
+                     L 0.5878,0.809 L 0,0.382 L -0.5878,0.809 L -0.3633,0.118 \
+                     L -0.9511,-0.309 L -0.2245,-0.309 Z";
+/// The leaf turned a quarter turn — the same outline, so any change in the
+/// figure's area across this morph is the correspondence and nothing else.
+const LEAF_TURNED: &str = "M -1,0 C -0.4,0.9 0.4,0.9 1,0 C 0.4,-0.9 -0.4,-0.9 -1,0 Z";
+
+/// **Mid-morph states are inspected, not assumed** (ADR-0107).
+///
+/// Plan 0079 swept twenty tuple pairs and refused *four* by measurement, because
+/// their intermediate states collapsed to zero extent; ADR-0075 exists because
+/// naive interpolation of the obvious representation was wrong. There is no
+/// reason to expect this feature to be the one that escapes that class, so this
+/// renders a strip across each pair and **reports the figure's own area at every
+/// step**.
+///
+/// A collapse is a finding to write down rather than a bug to tune away, so the
+/// gate is deliberately loose — a quarter of the smaller endpoint. What it
+/// catches is the failure mode that class actually has: an intermediate frame
+/// with nothing in it.
+#[test]
+fn the_morph_strip_is_rendered_and_its_extent_recorded() {
+    const SIZE: u32 = 200;
+    /// The strip: both endpoints and three steps between them.
+    const STEPS: [f32; 5] = [0.0, 0.25, 0.5, 0.75, 1.0];
+    const PAIRS: [(&str, &str, &str); 4] = [
+        ("square -> leaf   ", SQUARE, LEAF),
+        ("leaf -> star(5)  ", LEAF, STAR5),
+        ("triangle -> squar", TRIANGLE, SQUARE),
+        ("leaf -> leaf turn", LEAF, LEAF_TURNED),
+    ];
+
+    let Some(mut renderer) = headless(SIZE, SIZE) else {
+        return;
+    };
+    let mut presets = Vec::new();
+    for (index, (_, from, to)) in PAIRS.iter().enumerate() {
+        for (step, t) in STEPS.iter().enumerate() {
+            presets.push(morph_preset(&format!("m{index}_{step}"), from, to, *t));
+        }
+    }
+    renderer.set_presets(presets);
+
+    let mut report = String::from("shape_field morph strip: figure area in px, across the travel");
+    report.push_str(&format!("\n  {:<20}", "pair"));
+    for t in STEPS {
+        report.push_str(&format!("{:>10}", format!("t={t}")));
+    }
+
+    let mut findings: Vec<String> = Vec::new();
+    for (index, (label, _, _)) in PAIRS.iter().enumerate() {
+        let mut areas = Vec::new();
+        for step in 0..STEPS.len() {
+            let name = format!("m{index}_{step}");
+            let img = renderer
+                .capture_preset(&name, &AnalysisFrame::default(), 2)
+                .unwrap_or_else(|e| panic!("capture {name}: {e}"));
+            // The interior's own pixel count: the centre is inside every figure
+            // here and the corner is outside every one, so "closer to the centre
+            // than to the corner" is the fill without knowing the palette bake.
+            let inside = luma(&img, SIZE / 2, SIZE / 2);
+            let outside = luma(&img, 2, 2);
+            let count = (0..SIZE)
+                .flat_map(|y| (0..SIZE).map(move |x| (x, y)))
+                .filter(|&(x, y)| {
+                    let v = luma(&img, x, y);
+                    (v - inside).abs() < (v - outside).abs()
+                })
+                .count();
+            areas.push(count);
+        }
+        report.push_str(&format!("\n  {label:<20}"));
+        for a in &areas {
+            report.push_str(&format!("{a:>10}"));
+        }
+
+        let ends = areas
+            .first()
+            .copied()
+            .unwrap_or(0)
+            .min(areas.last().copied().unwrap_or(0));
+        let dip = areas.iter().copied().min().unwrap_or(0);
+        if dip * 4 < ends {
+            findings.push(format!(
+                "{}: dips to {dip} px against endpoints of {ends}",
+                label.trim()
+            ));
+        }
+    }
+    println!("{report}");
+
+    assert!(
+        findings.is_empty(),
+        "a morph pair collapses through the middle:\n  {}\n\nThat is ADR-0075's \
+         class, and the recorded response is to change the interpolated \
+         REPRESENTATION rather than to tune the endpoints until one still frame \
+         looks acceptable",
+        findings.join("\n  ")
+    );
+}
+
+/// `morph` is an ordinary bindable param under the existing grammar, and
+/// `[smoothing]` reaches it like any other — there is no second vocabulary for
+/// travelling between two silhouettes.
+#[test]
+fn morph_is_an_ordinary_binding_that_smoothing_reaches() {
+    assert!(declares(PARAMS, "morph"));
+    let toml = format!(
+        "name = \"m\"\nsystem = \"shape_field\"\n\
+         [path]\nd = \"{LEAF}\"\nmorph_to = \"{SQUARE}\"\n\
+         [params]\nmorph = \"beat\"\n[smoothing]\nmorph = 0.35\n"
+    );
+    let preset = Preset::from_toml_str(&toml).expect("a bound, smoothed morph loads");
+    assert!(
+        preset.warnings.is_empty(),
+        "binding morph should not warn, got {:?}",
+        preset.warnings
+    );
+    let binding = preset
+        .params
+        .iter()
+        .find(|b| b.name == "morph")
+        .expect("the morph binding survives the load");
+    assert!(
+        binding.tau.attack > 0.0,
+        "the [smoothing] entry should have folded into the binding, got {:?}",
+        binding.tau
     );
 }
 
