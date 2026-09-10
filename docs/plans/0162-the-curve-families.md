@@ -243,8 +243,8 @@ struct FamilySample {
 | 2 — hypotrochoid and epicycloid | dev | done | 1e23aef |
 | 3 — the superformula | dev | done | 792525a |
 | 4 — the harmonograph | dev | done | 6376e88 |
-| 5 — per-family ranges in the reference | dev | done | committed with this row |
-| 6 — the documentation sweep | dev | not started | |
+| 5 — per-family ranges in the reference | dev | done | caeb435 |
+| 6 — the documentation sweep | dev | done | committed with this row |
 
 ### Notes
 
@@ -307,6 +307,19 @@ struct FamilySample {
   per-family cell when the schema's pair is one of its ranges.
 - Phase 5 rewrote the `n`, `d` and `phase` doc lines in `parametric.rs` to name each family's reading.
   They had described the rose alone.
+- Phase 6's pictures render teaching presets, because no shipped preset draws the four new families
+  and the plan authors none. Four new files, `docs/examples/curves/*.toml`, sit outside the phase's
+  file list. So does the manifest block added to `scripts/docs-shots.mjs`, which writes to
+  `docs/images/curves/` - outside `gallery/`, whose flat stems `hygiene.rs` reads as system names.
+- Phase 6 ran `node scripts/docs-shots.mjs` end to end. Only the four new images are committed; every
+  previously committed image it rewrote was restored to its committed bytes. The run rewrote 18 of
+  them: 13 of the 1280x720 renders across the families, `parametric_curve.png` included, plus five
+  non-curve cards. All five `curve_*` preset cards re-rendered byte-identical. The same machine drift
+  shows in the golden re-bless noted under Phase 1, and freshness of the existing set is ADR-0100's
+  human duty, not this phase's.
+- Phase 6: `docs/presets.md` gains a `### The [curve] table` section - a five-row table with `n`,
+  `d`, `phase` and each family's own levers - and its systems row for `parametric_curve` now names
+  the five families.
 
 ### Close triggers
 

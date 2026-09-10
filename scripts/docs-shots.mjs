@@ -282,6 +282,23 @@ const IMAGES = [
     tier: "rich",
   })),
 
+  // --- the curve families: one per `[curve] family` beyond the rose --------
+  //
+  // The guide's `parametric_curve` section pictures the rose through the
+  // gallery entry below; these four picture the other families. No shipped
+  // preset draws them yet, so each renders a teaching preset from
+  // docs/examples/curves/ - the guide prints the file name under the picture,
+  // and the file is the whole recipe. Filed OUTSIDE docs/images/gallery/, whose
+  // flat stems `core/tests/hygiene.rs` reads as system names.
+  ...["lissajous", "hypotrochoid", "superformula", "harmonograph"].map((family) => ({
+    out: `docs/images/curves/${family}.png`,
+    presetFile: `docs/examples/curves/${family}.toml`,
+    signal: "dynamic:110",
+    hop: 300,
+    size: "1280x720",
+    tier: "rich",
+  })),
+
   // --- the gallery: one per SystemKind ------------------------------------
 
   {

@@ -1,0 +1,19 @@
+# The `hypotrochoid` curve family, for the illustrated guide's picture of it.
+# A circle 1/2.5 the size of the fixed one rolls inside it for five cusps'
+# worth of walk, with the pen at 0.7 of its radius: the classic spirograph.
+system = "parametric_curve"
+name = "Spirograph 5:2"
+
+[curve]
+family = "hypotrochoid"
+
+[params]
+n          = "2.5"
+d          = "5"
+pen        = "0.7"
+samples    = "900"
+scale      = "0.82 + clamp(bass * 0.1, 0, 0.08)"
+spin       = "0"
+thickness  = "2.5"
+hue        = "0.08"
+hue_spread = "0.35"

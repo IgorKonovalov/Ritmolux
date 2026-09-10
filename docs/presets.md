@@ -162,7 +162,7 @@ that table is maintained alongside the presets and is the authoritative list.
 |-------------|---------------|
 | `fragment_field` | A fullscreen domain-warped light field (fragment shader). |
 | `swarm` | ~10k CPU-simulated particles on an evolving flow field. |
-| `parametric_curve` | A sampled line curve — the Maurer rose. |
+| `parametric_curve` | A sampled line curve from one of five families — the Maurer rose, Lissajous, hypotrochoid, superformula or harmonograph ([below](#the-curve-table)). |
 | `lsystem` | An L-system turtle figure, precomputed per depth. |
 | `star_pattern` | A Hankin star pattern over a regular tiling. |
 | `reaction_diffusion` | A Gray-Scott reaction-diffusion field. |
@@ -242,6 +242,51 @@ Two things still follow from a stage being a *resample*:
   is deliberately fixed and independent of the window, but the field is
   **toroidal**, so `pan_*` is a seamless infinite scroll and `zoom > 1` tiles rather
   than running out of field.
+
+### The `[curve]` table
+
+A `parametric_curve` preset picks its figure with one line:
+
+```toml
+system = "parametric_curve"
+
+[curve]
+family = "superformula"   # one of the five below; any other name is a load error
+```
+
+`family` is read once, at load, and is **not bindable** — the params animate the
+figure, they do not choose it. A preset with no `[curve]` table draws the Maurer
+rose.
+
+The five families share one parameter surface, following
+[ADR-0180](adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md):
+**`n`, `d` and `phase` mean something different on each**, and five further levers
+are read by one family only and do nothing on the rest.
+
+| `family` | The figure | `n` | `d` | `phase` | Its own levers |
+|---|---|---|---|---|---|
+| `maurer_rose` | `r = sin(n θ + phase) + radial_offset`, walked at a fixed step | petal frequency | the step between samples, in degrees | added inside the sine, in radians | `radial_offset` |
+| `lissajous` | `x = sin(n t + phase)`, `y = sin(d t)` | x frequency | y frequency | offset between the axes, as a fraction of a turn | none |
+| `hypotrochoid` | a circle rolling inside the fixed one (outside, for a negative `n`), traced by a pen | signed radius ratio: positive rolls inside, negative draws the epicycloid | cusps walked | where the pen starts on the rolling circle, as a fraction of a turn | `pen` |
+| `superformula` | Gielis' `r = (\|cos(m θ/4)\|^n2 + \|sin(m θ/4)\|^n3)^(-1/n1)` | inert | skew between the lobe exponents, `n3 = lobe * d` | inert | `sym` (`m`), `sharpness` (`n1`), `lobe` (`n2`) |
+| `harmonograph` | the Lissajous figure damped by `exp(-decay t)` over four turns, spiralling inward | x frequency | y frequency | offset between the axes, as a fraction of a turn | `decay` |
+
+Three things about the table are worth saying out loud:
+
+- **Bind `n` and `d` on every family but the rose.** Their defaults, `6` and `71`, are the rose's,
+  and they read as face values elsewhere: an unbound Lissajous is a 6:71 figure, and an unbound
+  superformula takes `d = 71` as its maximum skew.
+- **Whole numbers close the figure.** A Lissajous with whole `n` and `d`, a harmonograph with
+  those and `decay = 0`, a hypotrochoid whose `d / |n|` is whole, and a superformula with `d = 1` or
+  an even `sym` all come back to their start and are drawn as one unbroken loop. Anything else is an
+  open trace, and it morphs continuously as an expression sweeps it.
+- **The four new families are drawn as smooth arcs, not chords.** The rose keeps its chord web at a
+  large step. The harmonograph falls back to chords only when a hard `decay` has collapsed its inner
+  turns below what the fit can resolve.
+
+The range that reads for each of these parameters **on each family** is printed in the
+`parametric_curve` table of [`presets/README.md`](../presets/README.md), which also marks every
+family a parameter is inert on.
 
 ### The `[path]` table
 

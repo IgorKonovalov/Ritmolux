@@ -1,0 +1,20 @@
+# The `harmonograph` curve family, for the illustrated guide's picture of it.
+# Two pendulums a hair off 3:2 and slowly damped: the figure drifts as it
+# spirals inward, which is what a real harmonograph's pen does.
+system = "parametric_curve"
+name = "Harmonograph"
+
+[curve]
+family = "harmonograph"
+
+[params]
+n          = "3"
+d          = "2.02"
+phase      = "0.25"
+decay      = "0.05"
+samples    = "2048"
+scale      = "0.85"
+spin       = "0"
+thickness  = "1.5"
+hue        = "0.6"
+hue_spread = "0.5"

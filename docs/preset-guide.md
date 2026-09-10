@@ -75,8 +75,10 @@ the params then animate it.
 
 One image each, captured under the same stimulus at the same moment in the clip, so they are
 comparable. Each is a real shipped preset — the file name is under the picture. All twelve systems
-have one; the **parameter reference** — every parameter of every system, with its default, the
-range that reads and what it does — is [`../presets/README.md`](../presets/README.md).
+have one, and `parametric_curve` adds four more, one per curve family no shipped preset draws yet,
+rendered from teaching presets instead. The **parameter reference** — every parameter of every
+system, with its default, the range that reads and what it does — is
+[`../presets/README.md`](../presets/README.md).
 
 ### `fragment_field`
 
@@ -113,11 +115,49 @@ straight interlacing chords](images/gallery/parametric_curve.png)
 
 *`presets/curve_nightbloom.toml`*
 
-One continuous line, sampled every frame from a closed-form `t → (x, y)` curve — the Maurer rose —
-and drawn as thick glowing segments. Because it is resampled per frame rather than cached, audio can
-sweep the *shape* itself, not just its colour and scale.
+One continuous line, sampled every frame from a closed-form `t → (x, y)` curve and drawn as thick
+glowing strokes. Because it is resampled per frame rather than cached, audio can sweep the *shape*
+itself, not just its colour and scale.
 
 **Reach for this when** you want precise line art whose geometry is the reaction.
+
+The picture above is the **Maurer rose**, one of five **curve families** a `[curve] family` line
+picks between. The other four are below, each rendered from a small teaching preset — the file under
+the picture is the whole recipe. What `n`, `d` and `phase` mean on each family, and which levers
+belong to which, is the [`[curve]` table](presets.md#the-curve-table) in the grammar reference.
+
+![A 3:2 Lissajous figure: one closed looping line crossing itself seven times, shading from orange
+through yellow to teal on black](images/curves/lissajous.png)
+
+*`family = "lissajous"` — [`docs/examples/curves/lissajous.toml`](examples/curves/lissajous.toml)*
+
+Two sine waves at right angles, one per axis. Whole frequencies close the figure; a fractional one
+leaves it open and drifting.
+
+![A spirograph pentagram: one looping line tracing a five-pointed star with rounded tips, magenta
+shading to cyan, on black](images/curves/hypotrochoid.png)
+
+*`family = "hypotrochoid"` — [`docs/examples/curves/hypotrochoid.toml`](examples/curves/hypotrochoid.toml)*
+
+The spirograph: a circle rolling inside a fixed one, traced by a pen. `pen` moves the pen from
+rounded loops through sharp cusps to overlapping petals, and a negative `n` rolls the circle outside.
+
+![A superformula starfish: one closed outline with five pointed arms and softly curved waists,
+orange shading to violet, on black](images/curves/superformula.png)
+
+*`family = "superformula"` — [`docs/examples/curves/superformula.toml`](examples/curves/superformula.toml)*
+
+Starfish, flowers, polygons and rounded shells from four numbers. `sym` is a whole count of lobes,
+which makes it the family that most rewards a `[hold]` on the bar.
+
+![A harmonograph trace: one line looping round a drifting figure of eight and spiralling inward over
+several turns, green on the outside shading to pink at the centre](images/curves/harmonograph.png)
+
+*`family = "harmonograph"` — [`docs/examples/curves/harmonograph.toml`](examples/curves/harmonograph.toml)*
+
+Two damped pendulums: a Lissajous figure whose swing dies away along the trace, so it spirals inward
+rather than closing. It is the family that best rewards `draw_progress`, which draws the trace on
+from the outside in.
 
 ### `lsystem`
 

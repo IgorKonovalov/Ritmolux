@@ -1,0 +1,20 @@
+# The `superformula` curve family, for the illustrated guide's picture of it.
+# Five-fold symmetry at a low sharpness draws a starfish; `d = 1` keeps the
+# two lobe exponents equal, so the lobes are symmetric about their tips.
+system = "parametric_curve"
+name = "Superformula Starfish"
+
+[curve]
+family = "superformula"
+
+[params]
+sym        = "5"
+sharpness  = "0.45"
+lobe       = "1.4"
+d          = "1"
+samples    = "720"
+scale      = "0.82 + clamp(bass * 0.1, 0, 0.08)"
+spin       = "0"
+thickness  = "2.5"
+hue        = "0.9"
+hue_spread = "0.3"
