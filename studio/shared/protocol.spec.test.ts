@@ -16,6 +16,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   CTL_ADDRESSES,
+  PIXEL_FORMATS,
   PLAYER_EVENT_NAMES,
   TRANSPORT_VERBS,
   eventFields,
@@ -79,6 +80,27 @@ function code(cell: string): string {
 /** Every backticked name in a cell, in order — the `Fields` column's shape. */
 function codes(cell: string): string[] {
   return [...cell.matchAll(/`([^`]+)`/g)].map((match) => match[1])
+}
+
+/**
+ * A `Fields` cell split into the field names and any closed value set the spec
+ * annotates one of them with.
+ *
+ * `stream` reads `` `width`, `height`, `fps`, `format` (`rgba8` \| `bgra8`) ``
+ * since ADR-0187 made the channel order a set rather than a constant. A plain
+ * `codes` over that cell reports six fields where the line carries four, so the
+ * parenthesised group is lifted out first and keyed by the field it follows.
+ */
+function fieldsCell(cell: string): { names: string[]; values: Record<string, string[]> } {
+  const values: Record<string, string[]> = {}
+  const bare = cell.replace(
+    /`([^`]+)`\s*\(([^)]+)\)/g,
+    (_match: string, name: string, group: string) => {
+      values[name] = codes(group)
+      return '`' + name + '`'
+    },
+  )
+  return { names: codes(bare), values }
 }
 
 describe('the vocabulary table and the CtlAction union', () => {
@@ -149,17 +171,37 @@ describe('the event roster table and the fields each union member carries', () =
   it('reads a Fields column that still looks like the one this test was written for', () => {
     const hello = rows.find((cs) => code(cs[0]) === 'hello')
     if (hello === undefined) throw new Error('the spec declares no hello row')
-    expect(codes(hello[1])).toEqual(['version', 'schema', 'control'])
+    expect(fieldsCell(hello[1]).names).toEqual(['version', 'schema', 'control'])
   })
 
   it('agrees with the spec on every field of every event, both ways', () => {
     for (const row of rows) {
       const ev = code(row[0]) as (typeof PLAYER_EVENT_NAMES)[number]
-      const spec = codes(row[1])
+      const spec = fieldsCell(row[1]).names
       const ours = eventFields(ev)
       // Order is part of it: the spec's column reads in the order the writer
       // emits, and a reader following the table gets the line's own shape.
       expect(ours, `the fields of ${ev}`).toEqual(spec)
     }
+  })
+
+  it('carries exactly the pixel formats the spec names for the stream', () => {
+    // The row that stopped being a constant (ADR-0187). Both ways, like every
+    // other diff here: an order the player can announce and the studio cannot
+    // name is a blank preview, and one the studio paints and the player never
+    // sends is dead code that looks like coverage.
+    const row = rows.find((cs) => code(cs[0]) === 'stream')
+    if (row === undefined) throw new Error('the spec declares no stream row')
+    expect(fieldsCell(row[1]).values.format).toEqual([...PIXEL_FORMATS])
+  })
+
+  it('annotates a closed set on exactly the fields that have one', () => {
+    // Guards the parse above: if the group syntax were mis-read, every cell
+    // would report no values and the assertion before this would pass vacuously
+    // on an empty object.
+    const annotated = rows.flatMap((row) =>
+      Object.keys(fieldsCell(row[1]).values).map((field) => `${code(row[0])}.${field}`),
+    )
+    expect(annotated).toEqual(['stream.format'])
   })
 })

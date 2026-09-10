@@ -14,7 +14,12 @@
 import { spawn as nodeSpawn } from 'node:child_process'
 import type { Readable } from 'node:stream'
 
-import { frameBytes, isKnownPlayerVersion, type PlayerEvent } from '@shared/protocol'
+import {
+  frameBytes,
+  isKnownPixelFormat,
+  isKnownPlayerVersion,
+  type PlayerEvent,
+} from '@shared/protocol'
 
 import { EventReader } from './events'
 import { FramePump, FrameSplitter } from './frames'
@@ -66,7 +71,11 @@ export interface SupervisorSinks {
   onEvent: (event: PlayerEvent) => void
   onDiagnostic: (line: string) => void
   onMalformed: (line: string, reason: string) => void
-  /** The player is not one this studio drives; it has been stopped. */
+  /**
+   * Something the studio will not drive, named. A player whose version it does
+   * not know has been stopped; a frame pipe whose channel order it cannot name
+   * is left unread while the player goes on drawing.
+   */
   onRefused: (reason: string) => void
   onExit: (code: number | null, signal: NodeJS.Signals | null) => void
 }
@@ -82,6 +91,8 @@ export class PlayerSupervisor {
   private splitter: FrameSplitter | undefined
   /** Output read before `stream` said how big a frame is. */
   private preStream: Buffer[] = []
+  /** The pipe was refused, so its bytes are read and dropped rather than held. */
+  private unreadable = false
   private stopping = false
 
   readonly pump = new FramePump()
@@ -142,6 +153,21 @@ export class PlayerSupervisor {
       }
     }
     if (event.ev === 'stream') {
+      if (!isKnownPixelFormat(event.format)) {
+        // No splitter, so nothing is posted and nothing is painted on a guess.
+        // The player keeps drawing: it is still a valid show, and taking the
+        // projector down because the studio cannot name a channel order would
+        // be the worse failure. The renderer shows the refusal where the
+        // picture would be.
+        this.preStream = []
+        this.unreadable = true
+        this.options.onRefused(
+          `the player announced its frames as \`${event.format}\`, ` +
+            `a channel order this studio does not know; the preview is not painted`,
+        )
+        this.options.onEvent(event)
+        return
+      }
       const bytes = frameBytes(event)
       this.splitter = new FrameSplitter(bytes, (frame) => this.pump.post(frame))
       const held = this.preStream
@@ -152,6 +178,9 @@ export class PlayerSupervisor {
   }
 
   private output(chunk: Buffer): void {
+    // Dropped rather than held: without this the pre-stream list would grow for
+    // as long as a refused player keeps writing, which is the whole run.
+    if (this.unreadable) return
     if (this.splitter === undefined) {
       this.preStream.push(chunk)
       return

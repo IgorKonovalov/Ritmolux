@@ -110,13 +110,39 @@ export const healthSchema = z.object({
   preview_dropped: z.number().int().nullable(),
 })
 
+/**
+ * The channel orders a frame pipe can carry.
+ *
+ * A closed set rather than one value (ADR-0187): the headless path renders into
+ * an offscreen the engine chooses and is always `rgba8`, while the windowed
+ * mirror carries whatever the swapchain negotiated, which on a DX12 backend is
+ * commonly `bgra8`. The player names the order it actually produces and the
+ * studio reads it — a consumer that assumed one would draw the right picture in
+ * the wrong colours, which reads as an authoring mistake and not a protocol one.
+ */
+export const PIXEL_FORMATS = ['rgba8', 'bgra8'] as const
+export type PixelFormat = (typeof PIXEL_FORMATS)[number]
+
+export function isKnownPixelFormat(format: string): format is PixelFormat {
+  return (PIXEL_FORMATS as readonly string[]).includes(format)
+}
+
 export const streamSchema = z.object({
   ...base,
   ev: z.literal('stream'),
   width: z.number().int().positive(),
   height: z.number().int().positive(),
   fps: z.number().int().nonnegative(),
-  format: z.literal('rgba8'),
+  /**
+   * A string here and **not** a `z.enum`, deliberately.
+   *
+   * An enum would make a line naming an order this build does not know a
+   * malformed `stream`, and a dropped `stream` is a studio that never learns
+   * its geometry: a blank canvas and a count in a log. The line is accepted so
+   * the refusal can be shown where the picture would be, which is the treatment
+   * an unknown `hello` version already gets. `isKnownPixelFormat` is the guard.
+   */
+  format: z.string().min(1),
 })
 
 export const pongSchema = z.object({
@@ -170,9 +196,7 @@ export const PLAYER_EVENT_NAMES = Object.keys(PLAYER_EVENT_SCHEMAS) as PlayerEve
  * they are dropped here rather than special-cased at the comparison.
  */
 export function eventFields(ev: PlayerEvent['ev']): string[] {
-  return Object.keys(PLAYER_EVENT_SCHEMAS[ev].shape).filter(
-    (key) => key !== 'v' && key !== 'ev',
-  )
+  return Object.keys(PLAYER_EVENT_SCHEMAS[ev].shape).filter((key) => key !== 'v' && key !== 'ev')
 }
 
 /**

@@ -8,7 +8,7 @@ import { PassThrough } from 'node:stream'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { FrameMessage } from '@shared/frames'
-import { EXPECTED_PLAYER_VERSION, type PlayerEvent } from '@shared/protocol'
+import { EXPECTED_PLAYER_VERSION, PIXEL_FORMATS, type PlayerEvent } from '@shared/protocol'
 
 import { PlayerSupervisor, DEFAULT_PLAYER_ARGS, type SpawnFn } from './supervisor'
 import type { FramePort } from './frames'
@@ -67,12 +67,16 @@ describe('PlayerSupervisor', () => {
     ])
   })
 
-  it('names no geometry, because the player reports it', () => {
+  it('names no geometry and no channel order, because the player reports both', () => {
     // A size or a rate here would be a guess at a windowed run's swapchain and
     // surface, and the frame splitter would then cut the pipe by the guess
-    // rather than by what arrived. The `stream` event is the only source.
+    // rather than by what arrived. The `stream` event is the only source, and
+    // since ADR-0187 that is true of the channel order as well.
     for (const flag of ['--size', '--fps']) {
       expect(DEFAULT_PLAYER_ARGS).not.toContain(flag)
+    }
+    for (const format of PIXEL_FORMATS) {
+      expect(DEFAULT_PLAYER_ARGS).not.toContain(format)
     }
   })
 
@@ -111,6 +115,23 @@ describe('PlayerSupervisor', () => {
     h.child.stdout.write(Buffer.alloc(8, 7))
     expect(h.posted).toHaveLength(1)
     expect(h.posted[0].frame.byteLength).toBe(8)
+  })
+
+  it('reads no frames from a pipe whose channel order it cannot name', () => {
+    const h = harness()
+    h.child.stderr.write(hello(EXPECTED_PLAYER_VERSION))
+    h.child.stderr.write(STREAM.replace('rgba8', 'rgbx9'))
+
+    expect(h.refusals).toHaveLength(1)
+    expect(h.refusals[0]).toContain('rgbx9')
+    // The event still reaches the renderer, which is what puts the refusal
+    // where the picture would be rather than leaving a blank canvas.
+    expect(h.events.map((e) => e.ev)).toEqual(['hello', 'stream'])
+    // The player keeps drawing: it is a valid show, and its frames are read and
+    // dropped rather than painted on a guess or held until memory runs out.
+    expect(h.child.kill).not.toHaveBeenCalled()
+    h.child.stdout.write(Buffer.alloc(8, 7))
+    expect(h.posted).toHaveLength(0)
   })
 
   it('holds output that arrives before the stream event rather than losing it', () => {
