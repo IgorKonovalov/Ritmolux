@@ -108,6 +108,32 @@ Alternative E verbatim: an `lto = "fat"` release build is minutes of gate time a
 packaging question. The dev-profile check buys the observed defect class at a fraction of the cost,
 and the tag push remains the full-fidelity build by design.
 
+## Outcome — 2026-09-10, at Plan 0165's close review
+
+Two facts found while reviewing the implementation, both of which the Context above understates.
+Recorded here rather than edited into the body, so what was known when the decision was taken stays
+readable.
+
+**The `E0425` cost two releases, not one.** `v0.108.0` failed on 2026-09-05 with the identical
+`cannot find function start_capture in the crate root` — run `33992293177`, `windows` red at the
+`Build, stage, zip and verify` step, `macos` and `foobar` green, `release` skipped. That is four
+days and four tags before `v0.112.0`. So the defect survived **two** release attempts before an
+unrelated refactor repaired it, and the Context's "worked example" framing reads as a single
+incident. This strengthens the decision rather than qualifying it: the window between a gated call
+site breaking and anyone noticing was weeks, not days.
+
+**The sibling finding's hazard was already realized.** ADR-0181's Notes and backlog 0194 describe
+a `workflow_dispatch` on a tag ref as a latent publish path. It is not latent — run `31955362251`
+**published `v0.70.0`** from a dispatch on that tag, `release` job green in 7 s. It appears to have
+been used deliberately, to recover a tag whose own push produced no Release run.
+
+That second fact carries a consequence for Plan 0165 Phase 2, which is worth stating because the
+plan does not: **narrowing the condition to the push event removes that recovery.** After Phase 2
+the only way to publish a tag whose push fired no run is the delete-and-re-push in
+`docs/releasing.md`. The narrowing is still right — a rehearsal that can publish is not a
+rehearsal — but it is a net removal of one path, not a pure tightening, and the recovery it leaves
+standing is now load-bearing.
+
 ## Notes
 
 - The reduction behind the "nothing compiles it" claim is backlog entry 0193's probe:

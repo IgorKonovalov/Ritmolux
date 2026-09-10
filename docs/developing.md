@@ -97,6 +97,19 @@ hook — they push it into minutes, and a gate that hurts gets disabled
 ([ADR-0033](adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md) Alternative F).
 They are also the checks least likely to break from a local edit.
 
+The **`spout` compile job** (ADR-0181) is outside the hook too, and for neither of those reasons.
+It stages a third-party SDK over the network before it compiles anything, which does not fit the
+hook's budget at all — and it is the one CI gate that *is* likely to break from an ordinary local
+edit, because code behind `#[cfg(feature = "spout")]` is not type-checked when the feature is off,
+so every `cargo build`, `clippy --all-targets` and `nextest` run here is blind to it by
+construction. If you are refactoring anything `standalone/src/stream.rs` reaches, compile it
+yourself before pushing:
+
+```powershell
+powershell -File packaging/spout/fetch-sdk.ps1   # once per checkout
+cargo check -p standalone --features spout
+```
+
 Bypass once with `git push --no-verify`.
 
 ## What else there is to read

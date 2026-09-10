@@ -96,12 +96,16 @@ To rehearse the builds, run the workflow from the Actions tab (`workflow_dispatc
 all three zips as **run artifacts**. Note that a `workflow_dispatch` is only offered once the
 workflow file exists on the default branch.
 
-**Rehearse on a branch, never on a tag.** The `release` job's condition reads the *ref* and not the
-event — `if: startsWith(github.ref, 'refs/tags/v')` — so a dispatch launched against a `v*` tag
-satisfies it and **publishes for real**. Dispatching on `main` is the genuine dry run: the job is
-skipped and no release is created. [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md)
-Phase 2 narrows that condition to the push event, after which any dispatch is safe on any ref; until
-it lands, the ref you pick is the whole difference between a rehearsal and a publish.
+**A dispatch never publishes, on any ref — a tag included.** The `release` job's condition names
+the event as well as the ref, `if: github.event_name == 'push' && startsWith(github.ref,
+'refs/tags/v')`, so the rehearsal is safe wherever you launch it and you do not have to pick the
+ref carefully to stay out of trouble. Plan 0165 Phase 2 made that true; before it, the condition
+read the ref alone, a dispatch on a `v*` tag satisfied it, and **the safest-looking rehearsal was
+the one that published** — which is not hypothetical here: run `31955362251` published `v0.70.0`
+from a dispatch on that tag.
+
+**The consequence: a dispatch is no longer a way to publish a tag whose push produced no run.**
+That recovery is the delete-and-re-push above, and it is now the only one.
 
 The component job can also be rehearsed locally, and unlike the macOS bundle it runs on the
 box this project is developed on:

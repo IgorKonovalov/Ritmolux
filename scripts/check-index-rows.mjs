@@ -490,8 +490,15 @@ if (errors.length > 0) {
 }
 
 if (violations.length === 0 && errors.length === 0 && misshaped.length === 0) {
+  // Names the enumeration on the GREEN path too, not only in the fallback
+  // notice above. A silent pass cannot distinguish "git listed the tracked set"
+  // from "git could not answer and the walk agreed anyway", and the second is
+  // the reading that measures files no clone holds (ADR-0016, ADR-0182).
+  // check-doc-links.mjs says it the same way, in its own success line.
+  const via = enumeration === "git" ? "tracked files" : "a filesystem walk";
   console.log(
-    "index rows: OK (every row inside a marked region is within its cap and matches its region)",
+    `index rows: OK (every row inside a marked region is within its cap and ` +
+      `matches its region, across ${via})`,
   );
   process.exit(0);
 }

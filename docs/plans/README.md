@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0166** (ADRs are a separate sequence — next free there is **0181**.)
+**Next free number: 0166** (ADRs are a separate sequence — next free there is **0183**.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)

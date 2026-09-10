@@ -1,5 +1,6 @@
 # NFR section 7: build, test, doctests, clippy, fmt on Windows + macOS for every
-# push, plus three single-runner gates - cargo-deny (supply chain), the rlx-core
+# push, plus five single-runner gates - the `spout` feature compile (ADR-0181),
+# the doc-link and roster checks, cargo-deny (supply chain), the rlx-core
 # coverage ratchet (ADR-0033), and Miri over rlx-ring's unsafe.
 #
 # Live audio is out of CI scope. GPU rendering partly is not: on Windows the DX12
@@ -156,7 +157,11 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      # No toolchain action, matching `check` and `coverage`: rustup on the
+      # runner auto-installs whatever rust-toolchain.toml pins on the first
+      # cargo invocation. A `dtolnay/rust-toolchain@stable` step here was inert
+      # - the pin wins inside the directory either way - but it installed a
+      # second toolchain and read as if this job ran on stable.
       - uses: Swatinem/rust-cache@v2
       # Mirrors release.yml's `windows` job exactly; standalone/build.rs
       # consumes whatever is staged at standalone/spout-sdk/ and does not care
