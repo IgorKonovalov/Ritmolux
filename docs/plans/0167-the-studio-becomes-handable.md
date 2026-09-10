@@ -300,9 +300,9 @@ flowchart TB
 | 1 — The preview pipe stops moving under the reader | dev | done | 80fc61c |
 | 2 — The `stream` event names the format it actually carries | dev | done | fbae516 |
 | 3 — `--schema` declares the grammar | dev | done | 2cd608a |
-| 4 — The studio paints what it was told | studio-builder | not started | |
-| 5 — The player mode is a per-machine setting | studio-builder | not started | |
-| 6 — The two debts, discharged | studio-builder | not started | |
+| 4 — The studio paints what it was told | studio-builder | done | a001a52 |
+| 5 — The player mode is a per-machine setting | studio-builder | done | 428a2ee, a967927 |
+| 6 — The two debts, discharged | studio-builder | done | d033ce6 |
 | 7 — The tester handoff | human | not started | |
 | 8 — The on-device check | human | not started | |
 
@@ -391,15 +391,134 @@ variants.
 **Phase 3 — files outside the list**: `docs/configuration.md` (the `--schema` paragraph names the
 new object).
 
+**Phase 4 — the reading the phase asked for, taken before the paint path was chosen.** A CPU swap
+over one preview frame at the fixed 640x360 Phase 1 gave it: 0.326 ms to view the buffer, 0.551 ms
+to view and swap it, so **0.225 ms of swap** — 3.7 % of one core at 165 frames a second, and in the
+renderer process rather than on the show's thread. A WebGL upload with the swizzle in a fragment
+shader would save that 0.225 ms and cost a GL context, a program and a disposal path in a component
+that has none. CPU, in `shared/frames.ts`, in place. (At 1920x1080 the same swap is 2.15 ms, which
+is the case Phase 1's fixed shape stopped arising.)
+
+**Phase 4 — the refusal is narrower than "the same treatment `hello` gets".** An unknown `hello`
+version **stops** the player. An unknown `format` does not: the supervisor opens no splitter and
+reads the pipe into nothing, and the preview shows the refusal where the picture would be. Killing
+a valid show because the studio cannot name a channel order takes the projector down over a preview
+question. Both halves of "visible, not a guess, not a blank canvas" hold; the stop does not.
+
+**Phase 4 — `format` is a `z.string()` and not a `z.enum`.** An enum makes a line naming an unknown
+order a *malformed* `stream`, and a dropped `stream` is a studio that never learns its geometry — a
+blank canvas and a count in a log, which is the failure this phase exists to end.
+`isKnownPixelFormat` is the guard, after the line is accepted.
+
+**Phase 4 — the spec-diff test was already red at this phase's parent commit.** Phase 2 wrote the
+closed set into spec 0003's `Fields` column and `codes()` reported six fields for a four-field line.
+The cell parser now lifts a parenthesised group out and keys it by the field it follows, and two
+tests hold it: the value set equals `PIXEL_FORMATS`, and exactly one field in the whole roster
+carries such a set — the second is what stops the first passing vacuously on an empty object.
+
+**Phase 4 — no `bgra8` picture was seen.** As Phase 2 recorded, this machine's adapter negotiates
+RGBA; the capture taken at Phase 6 announced `rgba8`. The swizzle is exercised by
+`Preview.test.tsx`, which feeds both orders of one picture through a stubbed 2D context and asserts
+the painted bytes are equal, and not by a photograph.
+
+**Phase 5 — how "no window" is asserted.** `MainWindowHandle` on Windows only; there is no
+cross-platform way to ask the OS whether a child opened one, and the other platforms get a printed
+notice. Verified non-vacuous by hand: a windowed run of the same build reports `2558100` where the
+windowless run reports `0`. The frames half is asserted everywhere — whole frames, of exactly the
+geometry the `stream` event announced, with nothing left over.
+
+**Phase 5 — the settings surface, and one bug it hid.** A panel off the header rather than a sixth
+editor tab (the plan rules the editing surface out) and rather than an application menu (main has
+none, and building one to hold one control is a larger change than the control). A capture of the
+built window then showed the radio on `windowed` while `settings.json` said `windowless`, with the
+note reading *"Saved."* and nothing saved: `running` arrives one IPC round trip after mount and
+`useState(running)` had frozen the pre-info default. Fixed in `a967927`, with tests that rerender
+with a changed `running` — the originals passed a settled value and could not see it.
+
+**Phase 5 — files outside the list**: `studio/shared/player-mode.ts` (new — the vocabulary has to be
+free of Node because the renderer offers the choice and `electron/settings.ts` imports `node:fs`),
+`studio/shared/ipc-channels.ts`, `studio/electron/main.ts`, `studio/electron/preload/api/app.ts`,
+`studio/renderer/App.tsx`. `writeSettings` is new in `settings.ts`, whose header said the file was
+"never written by this phase".
+
+**Phase 6 — why `[hold]` had no editor, which is not what the plan assumed.** The plan reads as
+though a component were missing. What was missing is a *reach*: `hold` is declared only as a map
+**element** kind (`map` of `hold`, on the root and on `[layer]`), and Plan 0159 Phase 8's walk read
+`key.kind` and stopped at `map`. So the walk never saw `hold`, `editorForKind` was never asked for
+one, and the row rendered as the word `(map)`. The walk now reaches past a composite, and one test
+asserts exactly that reach.
+
+**Phase 6 — the walk's hand-kept fallback roster is deleted, not extended.** `fields.test.ts` held a
+`KINDS` array "for the no-player fallback". Adding `hold` to it is the edit this phase's done-when
+forbids, and keeping it without `hold` would leave a list claiming to be "every kind the engine
+declares today" that was not. It now skips with a notice when there is no built player, in the shape
+`templates.test.ts` already uses.
+
+**Phase 6 — `[hold]`'s home, and where it is not.** The root's map keys have no `TableSpec` of their
+own and `structuralTables` drops the root, so they had nowhere to render; they are now a section of
+the structure tab, filtered by `mapElementEditor` rather than by name. `[layer.hold]` renders too,
+through `TableEditor`. Two element kinds are held back and neither by name: `expr` (the parameter
+panel and the file tab already own those lines) and anything resolving to `readonly` (not one line).
+`easing` moved from the `enum` control — a `<select>` with no options — to the same `scalar` control,
+which is what lets `[smoothing]` arrive from this code. An author's inline `{ attack, release }` is
+carried back unchanged rather than quoted.
+
+**Phase 6 — a third roster in the editor, matching Phase 3's third in the export.** `Grammar` gains
+`constants` and a `grammarConstant` token, because `pi` and `tau` are names an author may write and
+an uncoloured one reads as a typo.
+
+**Phase 6 — files outside the list**: `studio/shared/toml.ts` (`removeKey` — a map row needs a way
+off), `studio/shared/fields.ts`, `studio/renderer/components/MapEditor.tsx` (new),
+`studio/renderer/components/PresetEditor.tsx` (it takes the roster),
+`studio/renderer/views/Editor.tsx`, `studio/electron/player/schema.test.ts` (its fixture predates
+`grammar`). `studio/renderer/hooks/useSchema.ts` is **not touched** — the document already carries
+the grammar, so nothing there had to change.
+
+**Phase 6 — what a capture of the built window shows.** `windowless`, the Clifford attractor in
+`rgba8` at 640x360, `[smoothing]` listing eleven real entries including one whose value is an inline
+easing table preserved as its own literal, and `[hold]` below it. Saved under
+`target/studio-shots/`, uncommitted.
+
+**Not fixed, and it stands in front of Phase 7.** `EXPECTED_PLAYER_VERSION` is `0.113.0` and
+`[workspace.package] version` is `0.115.0`, so **the studio in this checkout refuses the player in
+this checkout** — on screen as *"This player is not one the studio drives"*. The two packaging
+scripts override `studio/package.json`'s version at build time, but that constant is compiled into
+the renderer bundle and nothing rewrites it, so a packaged studio would refuse the player it
+carries. Nothing gates the two against each other. Left for the close's version bump, or for a
+decision to gate it; the captures above were taken with the constant overridden locally, and it was
+reverted.
+
 ### Close triggers
 
-- **`presets/` touched:**
+> Filled after Phase 6. **Phases 7 and 8 have not run**, so this is a partial brief and the two
+> readings that need the whole plan — the suite and the backlog — are stated as they stand.
+
+- **`presets/` touched:** none. No file under `presets/` is in any of the six phase commits.
 - **Plan header `Closes:`** design-backlog 0199, 0200, 0201
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** fix, plus one feature. Across Phases 4–6 (`a001a52`, `428a2ee`, `a967927`,
+  `d033ce6`): 40 files under `studio/` — 19 in `renderer/`, 11 in `shared/`, 9 in `electron/`, plus
+  its README — and one under `packaging/`. 2 283 insertions, 229 deletions. No Rust and no C++.
+- **Operator docs touched:** `studio/README.md` and `packaging/studio/READ-ME-FIRST.md`. Phases 1–3
+  touched `docs/capturing.md`, `docs/configuration.md`, `docs/presets.md` and
+  `docs/specs/0003-studio-control-protocol.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 1 — **3 broken, and all three
+  are this plan's own `Closes:` list coming due**. 0200's two `present:` probes were falsified by
+  Phase 2 (`STREAM_FORMAT` is gone from `standalone/src/stream.rs`, and `show.rs` no longer reads
+  it); 0199's `absent: --stream in: studio/electron/player/supervisor.ts` was falsified by Phase 5,
+  which is what putting it there means. 0201 is `unprobeable`. Repairing or closing them is the
+  `architect` call the script's own summary names, at the close.
+- **Full suite:** **not run, and deliberately.** `C:` has **5.2 GB free of 954 GB (100 % used)**, and
+  `cargo nextest run --workspace` builds every test binary in debug — the disk-filling failure
+  ADR-0053's *"disk cost is severe and recurring"* describes, live on this machine. Phases 4–6
+  touched **no Rust and no C++**, so the Rust suite's last meaningful reading is the one the `dev`
+  lane took at Phase 3. The studio's own gate is green at `d033ce6`: `npm run typecheck` (four
+  projects), `npm run lint`, and `npm test` — **24 files, 237 tests, all passing**, including the
+  two that spawn the real player.
+- **Outstanding `human` phases:** **both** — 7 (the tester handoff) and 8 (the on-device check).
+  Neither can be started from this lane. **One thing stands in front of Phase 7**, recorded in the
+  notes above: `EXPECTED_PLAYER_VERSION` (`0.113.0`) disagrees with `[workspace.package] version`
+  (`0.115.0`), so the studio refuses the player — including, as far as anything here can tell, the
+  one a packaged studio would carry.
 
 ## Followups (after this lands)
 
