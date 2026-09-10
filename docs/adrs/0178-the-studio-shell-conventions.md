@@ -1,8 +1,8 @@
 # ADR-0178 — The studio shell conventions: three processes, a mirrored protocol, and the same security defaults as the sibling repository
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-10 (Plan 0159), with an Outcome
 > **Date:** 2026-09-09
-> **Related plan(s):** [0159 — The studio opens](../plans/0159-the-studio-opens.md)
+> **Related plan(s):** [0159 — The studio opens](../plans/done/0159-the-studio-opens.md)
 > **Related:** [ADR-0175](0175-the-studio-is-a-separate-application-that-never-draws-a-frame.md),
 > [ADR-0176](0176-the-player-is-driven-over-osc-control-in-and-reports-on-its-standard-streams.md),
 > [ADR-0177](0177-a-fourth-skill-lane-builds-the-studio.md),
@@ -193,3 +193,27 @@ The reference implementation for every adopted convention is
 `../trading/market-analyzer/desktop/`, which is not part of this repository and is cited as a
 worked example only. The double-CSP header hook and the `ELECTRON_RENDERER_URL` contract are the
 two pieces most worth copying line by line.
+
+## Outcome — 2026-09-10, Plan 0159
+
+Two claims in the Decision above did not survive the build. Recorded here rather than edited into
+the body, which is append-only once accepted.
+
+**The frame does not cross as a transferable buffer, and it cannot.** The `player:frame` row above
+says the frame moves "as a transferable `ArrayBuffer`, so the copy across processes is one move
+rather than a structured clone". Electron's `MessagePortMain.postMessage(message, transfer)` accepts
+**only `MessagePortMain` objects** in `transfer`, and main and the renderer are separate OS
+processes, so a frame's bytes are serialized whatever is asked for. What the implementation does
+instead is avoid a *second* copy on each side: the buffer is cut once out of the pipe's chunks and
+viewed in place by `ImageData`. The performance argument the row makes is not available in that
+direction; the shape it prescribes is still what shipped.
+
+**The dropped-frame counter does not make the preview's cost honest.** This ADR leans on that
+reading twice. `FramePump` counts a drop only when a frame arrives while one is unacknowledged, so
+loss upstream of it — in the OS pipe, or in main's read cadence — is invisible: Plan 0159 Phase 4
+measured the counter at `0` while the studio painted 59 frames in ~15 s against a show drawing 42/s.
+And the dominant cost is not a dropped frame at all. The same phase measured the show falling from
+~42 fps to 35.4 fps with the studio attached, which is the player **blocking on a full pipe** — the
+mechanism `studio/electron/player/frames.ts`'s own header names as the thing being avoided. An
+accounting that can see either would be a real change, not a counter fix; see
+[backlog 0201](../design-backlog.md), which this blindness is what made undiagnosable.

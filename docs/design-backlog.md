@@ -3931,9 +3931,31 @@ one frame and never updated again. Not a hang — both processes stayed `Respond
 drawing at ~49 fps and kept writing `diagnostics.log`, and the studio's UI stayed interactive. Only
 the picture stopped.
 
-**Undiagnosed.** What is known is where it is not: the player is fine, and the studio's window is
-fine, so the stall is in the pipe, in main's read of it, or in the pump-and-acknowledge handshake
-between main and the renderer.
+**Diagnosed 2026-09-10 at Plan 0159's close, and it is the third candidate: the player's writer
+thread exits on the first frame after any resize of the show window, and says nothing.** The chain
+is four links, each of them deliberate on its own:
+
+1. `open_preview_pipe` runs **once**, at window creation (`standalone/src/run.rs`), and spawns a
+   `PreviewPipe` for the readback's size at that moment. Nothing calls it again.
+2. `WindowEvent::Resized` calls `Renderer::resize`, which **rebuilds the preview target and reopens
+   the readback at the new size** (`core/src/render/mod.rs`). From that frame on the images
+   `take_preview_frame` yields are a different size than the pipe was spawned for.
+3. `StdoutSink::send` refuses a frame whose size is not the announced one — correctly, because a
+   reader cutting a fixed stride cannot be handed a different one silently.
+4. The writer thread's loop is `if sink.send(..).is_err() { break; }`. So the refusal **ends the
+   thread**, permanently, and the `Err`'s message — which names both sizes — is discarded rather
+   than printed.
+
+Every observed symptom follows: standard output goes quiet, so the canvas holds its last frame; the
+studio's `FramePump` never sees another frame, so its counter stays at `0`; the player is untouched
+and keeps drawing; and nothing reaches standard error. The trigger is **any** resize or fullscreen
+toggle of the show window, which is what a one-screen user does to the window backlog 0199 is about.
+
+**The repair is a choice, not a line.** Either the resize path re-emits `stream` and respawns the
+pipe at the new size — which makes `stream` a repeatable event and is therefore a spec 0003 change —
+or the show window is not resizable while a preview is open. Whichever is taken, the writer must not
+exit silently: a `break` that discards a named error is what turned a size disagreement into an
+undiagnosable freeze.
 
 **The instrumentation that would answer it is the instrumentation Plan 0159 Phase 4 already
 recorded as blind.** `FramePump` counts a drop only when a frame arrives while one is
@@ -3948,10 +3970,19 @@ a resize changes it, after which no whole frame is ever completed), or the playe
 stopped. The first two are studio-side and the third is not.
 
 - **Raised:** 2026-09-10, from running the Plan 0159 Phase 9 packaged artifact.
-  **Owner if taken:** `studio-builder`, unless the third candidate is the one — start by making the
-  accounting able to tell them apart, because none of the three is currently distinguishable.
+  **Owner if taken:** `dev`. The third candidate is the one, so the fault is in `standalone/`; the
+  studio side is correct and needs no change. Making the accounting able to tell the three apart is
+  still worth doing and is `studio-builder`'s, but it is no longer what blocks a fix.
 - **Verified 2026-09-10** — the drop counter is in-flight-based, so it reads 0 for loss that happens
   before the pump: `present: private inFlight = false in: studio/electron/player/frames.ts`
+- **Verified 2026-09-10** — the pipe is spawned at window creation, and this is its only call site — nothing respawns it after a resize:
+  `present: state\.open_preview_pipe\(\); in: standalone/src/run.rs`
+- **Verified 2026-09-10** — while the resize path rebuilds the preview at the surface's new size:
+  `present: self\.preview = Some\(preview::PreviewTarget::new\( in: core/src/render/mod.rs`
+- **Verified 2026-09-10** — and the sink refuses a frame whose size is not the announced one:
+  `present: if \(width, height\) != \(self\.width, self\.height\) in: standalone/src/stream.rs`
+- **Verified 2026-09-10** — which ends the writer thread, discarding the message:
+  `present: if sink\.send\(&image\.rgba, image\.width, image\.height\)\.is_err\(\) in: standalone/src/stream.rs`
 - **Verified 2026-09-10** — and the splitter's frame size is fixed at construction, which is the
   desynchronisation candidate:
   `present: private readonly frameBytes: number, in: studio/electron/player/frames.ts`

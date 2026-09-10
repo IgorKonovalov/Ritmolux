@@ -1,8 +1,8 @@
 # ADR-0184 — The player reports what it loaded, and the studio re-derives nothing
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-10 (Plan 0159)
 > **Date:** 2026-09-10
-> **Related plan(s):** [0159](../plans/0159-the-studio-opens.md) Phase 5
+> **Related plan(s):** [0159](../plans/done/0159-the-studio-opens.md) Phase 5
 
 ## Context
 

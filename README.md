@@ -61,12 +61,16 @@ core-cabi/           # The C ABI and nothing else — the only crate emitting a 
 rlx-ring/            # The lock-free SPSC ring, split out zero-dependency so Miri can check it in CI.
 standalone/          # Rust binary + lib — winit window, wgpu surface, loopback capture, the shot example.
 plugin-foobar/       # C++ shim: foobar2000 SDK integration, links the core's C ABI. Windows-first.
+studio/              # The Electron studio (ADR-0175, ADR-0178): a third application that edits a
+                     #   preset by driving the player and never draws a frame itself. TypeScript
+                     #   only; nothing shipped depends on it, and no cargo command builds it — but
+                     #   a `v*` tag ships it as two more zips, each carrying a player inside.
 milkconv/            # The MilkDrop `.milk` -> preset converter (ADR-0113, Plan 0100). Never ships,
                      #   nothing shipped depends on it, so it is outside `default-members` too.
 presets/             # The curated preset library (*.toml) — embedded at build time, seeded on first run.
-scripts/             # Repo maintenance: the six Node gates the pre-push hook and CI's `links` job
+scripts/             # Repo maintenance: the seven Node gates the pre-push hook and CI's `links` job
                      #   run (see "Developer setup" below), plus check-site-links.mjs and
-                     #   check-site-routes.mjs, a seventh and eighth that run in neither because they
+                     #   check-site-routes.mjs, an eighth and ninth that run in neither because they
                      #   need a built site — both live in the Pages workflow. And scripts/fixtures/
                      #   seeded bite checks.
 site/                # The documentation site: an Astro Starlight front end publishing the
@@ -75,7 +79,8 @@ site/                # The documentation site: an Astro Starlight front end publ
                      #   copied, and links are rewritten at build time. See ADR-0154.
 packaging/           # What a `v*` tag ships, one recipe per artifact, each doing its own verification
                      #   so a local run is held to CI's bar: macos/bundle.sh (build, lipo, sign, zip,
-                     #   verify) and foobar/ (fetch the pinned SDK, build, stamp, package, verify).
+                     #   verify), foobar/ (fetch the pinned SDK, build, stamp, package, verify) and
+                     #   studio/ (the same recipe per platform for the studio zip).
                      #   Plus the READ-ME-FIRST.md testers get in each zip. See ADR-0038, ADR-0115.
 docs/
 ├── running.md       # What the app does once it is open: keys, menus, console, tiers, displays.

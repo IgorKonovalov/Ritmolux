@@ -1,8 +1,8 @@
 # ADR-0177 — A fourth skill lane, `studio-builder`, builds the studio and never touches the engine
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-10 (Plan 0159)
 > **Date:** 2026-09-09
-> **Related plan(s):** [0159 — The studio opens](../plans/0159-the-studio-opens.md)
+> **Related plan(s):** [0159 — The studio opens](../plans/done/0159-the-studio-opens.md)
 > **Related:** [ADR-0017](0017-preset-author-skill-lane.md) (the precedent: a lane is added by ADR, not by widening `dev`),
 > [ADR-0175](0175-the-studio-is-a-separate-application-that-never-draws-a-frame.md) (what the studio is),
 > [ADR-0178](0178-the-studio-shell-conventions.md) (how the studio is built)

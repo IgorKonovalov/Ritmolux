@@ -213,7 +213,7 @@ the decision that moved it is linked.
 - Plus **ten** single-runner gates: `cargo deny check` (supply chain), Miri over `rlx-ring`'s
   `unsafe` (UB), the coverage ratchet below, the `studio` job (the studio's typecheck, lint and
   Vitest suite — the only automated reading of `studio/`, since the pre-push hook's studio step
-  skips itself on a clone with no `studio/node_modules`), and the six Node doc gates that share
+  skips itself on a clone with no `studio/node_modules`), and the seven Node doc gates that share
   the `links` job — `check-doc-links.mjs` (every relative markdown link resolves — [Plan 0061](plans/done/0061-the-build-stops-paying-for-what-it-is-not-building.md) Phase 2c),
   `check-index-rows.mjs` (every row inside a marked roster region stays a pointer under 320 bytes —
   [ADR-0116](adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md)),
@@ -223,9 +223,11 @@ the decision that moved it is linked.
   [ADR-0122](adrs/0122-a-sidecar-tool-documents-itself-in-one-place.md)),
   `check-comment-hygiene.mjs` (no `.rs` comment carries a relative link or plan-relative narration —
   [ADR-0127](adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md)),
-  and `toc.mjs` (every generated contents block still matches the headings beneath it —
-  [ADR-0163](adrs/0163-a-long-document-carries-a-generated-contents-block.md)). Six gates but
-  **eight invocations** in each carrier: `check-index-rows.mjs` and `toc.mjs` each run a
+  `toc.mjs` (every generated contents block still matches the headings beneath it —
+  [ADR-0163](adrs/0163-a-long-document-carries-a-generated-contents-block.md)),
+  and `check-reader-prose.mjs` (every Plan/ADR citation in a reader document sits inside a link —
+  [ADR-0168](adrs/0168-the-reader-documents-address-a-reader-and-the-record-stays-a-link.md)). Seven gates but
+  **nine invocations** in each carrier: `check-index-rows.mjs` and `toc.mjs` each run a
   `--self-test` beside their check, because neither a detector that has quietly stopped matching
   nor an anchor rule that is merely plausible is visible in the check itself.
 - **The nine GPU-heavy suites run once per push, not twice**

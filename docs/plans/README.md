@@ -44,7 +44,6 @@ place. The plan file carries the real link.
 | [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | approved | dev, human | **A new Phase 1 fixes backlog 0102 + 0103 before anything advertises the component** — foobar's UI starves until playback starts. **Phases 4-6 unblocked, 0150 closed.** 0156 Phase 2 shortens the README first. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + **0174**: Art-Net to the fixtures, verified against `rlx-artnet-sim` because **the rig is unreachable**. Phases 1-8 need none; 9 is the rig session. Phase 8 hard-depends on 0115 Phase 2. |
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
-| [0159](0159-the-studio-opens.md) | The studio opens | in-progress | studio-builder, dev, human | ADR-0177 + ADR-0178: the Electron studio under `studio/`. Phases 1-4 landed 2026-09-10; ADR-0184 then added Phase 5 and renumbered the rest to 11. |
 | [0160](0160-the-silhouettes-preconditions-stop-being-silent.md) | The silhouette's preconditions stop being silent | approved | dev, human | ADR-0179: four preconditions on `[path]` that fail silently. **0092 closed 2026-09-09**, so its Phase 7 axis fix is in. Phase 2 is prose in `presets/README.md`. |
 | [0162](0162-the-curve-families.md) | The curve families | approved | dev | ADR-0180 rule 1: Lissajous, hypotrochoid, superformula and harmonograph as `CurveFamily` arms. The catalogue's #1 payoff-per-effort item since 2026-07-25. **Needs 0161.** |
 | [0163](0163-the-analytic-field.md) | The analytic field | approved | dev | ADR-0180 rules 1+3: a 13th system holding `chladni` and `escape_time`, with Voronoi, quasicrystal and hyperbolic placed. Fills the roadmap's fractal-spiral gap. **Needs 0161.** |
@@ -53,16 +52,14 @@ place. The plan file carries the real link.
 <!-- roster:end -->
 
 ~~**Added 2026-09-09 — [0158] and [0159] are drafted, and they are a program rather than a
-pair.**~~ — **half spent 2026-09-10**, when [0158] closed on its six `dev` phases and ADR-0175 and
-ADR-0176 were accepted. The dependency the note existed to fix is discharged: **[0159] is startable
-now**, and it is the studio's own lane rather than a plan waiting on the player. What is still live
-is the tail — clip rendering, show projects and the diffusion pass from the studio are each a later
-plan with its own interview, and ADR-0175's `render` subcommand decision is recorded with nothing
-built against it. The full note is in [README-archive.md](README-archive.md) under
-`## Prior sequencing notes (superseded)`.
+pair.**~~ — **fully spent 2026-09-10**, when [0159] closed behind [0158]. Both halves of the
+program landed in the order the note argued. What survives it is the tail it always named: clip
+rendering, show projects and the diffusion pass from the studio are each a later plan with its own
+interview, and ADR-0175's `render` subcommand decision is still recorded with nothing built against
+it. The note is [in the archive](README-archive.md#prior-sequencing-notes-superseded).
 
 [0158]: done/0158-the-player-grows-a-studio-facing-surface.md
-[0159]: 0159-the-studio-opens.md
+[0159]: done/0159-the-studio-opens.md
 [0160]: 0160-the-silhouettes-preconditions-stop-being-silent.md
 [0161]: done/0161-the-structural-parameter-is-held.md
 [0162]: 0162-the-curve-families.md
@@ -600,10 +597,11 @@ by nobody yet; each is a family arm on a system 0163 or 0164 creates.
 **Added 2026-09-10, spent 2026-09-10 when [0161] closed.** That note paired [0161] and [0159] as
 the two lanes to open, and named the schema as their one coupling. It is
 [in the archive](README-archive.md#prior-sequencing-notes-superseded); what survives it is a debt.
-**[0159] now owes a schema re-export and a `[hold]` editor**: 0161 landed `kind` on every
-`ParamSpec` and two `[hold]` table descriptors in the exported document, additively, with
+**That debt outlived [0159], which closed on 2026-09-10 without taking it**: 0161 landed `kind` on
+every `ParamSpec` and two `[hold]` table descriptors in the exported document, additively, with
 `SCHEMA_VERSION` deliberately still at 1 - the body hash is what moved, which is the staleness
-signal the studio already compares. A follow-up in the `studio-builder` lane, not a rebase.
+signal the studio already compares. So **a schema re-export and a `[hold]` editor are owed by the
+next `studio-builder` plan**, not by a rebase and not by anything now in flight.
 
 **One ordering this still does not license.** 0162, 0163 and 0164 touch disjoint scene paths but
 each **blesses new baselines**, so they merge in series even if they are built in parallel: the
@@ -769,6 +767,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0159 — The studio opens](done/0159-the-studio-opens.md) — closed 2026-09-10. Review: **no blockers, four majors, four minors.** Version: **0.114.0**. ADR-0177 + 0178 + 0183 + 0184 accepted. **Phases 10-11 (`human`) unrun**, behind [backlog 0199-0201](../design-backlog.md). [Write-up](README-archive.md).
 - [0161 — The structural parameter is held](done/0161-the-structural-parameter-is-held.md) — closed 2026-09-10. Review: **no blockers, one major, six minors.** Version: **0.114.0** (minor). ADR-0180 accepted with an Outcome. Filed [backlog 0197 + 0198](../design-backlog.md). [Write-up](README-archive.md).
 - [0165 — The release path stops being the first compile](done/0165-the-release-path-stops-being-the-first-compile.md) — closed 2026-09-10. Review: **no blockers, three majors, four minors.** Version: **none** (chore-only). ADR-0181 + ADR-0182 accepted. [Write-up](README-archive.md).
 - [0158 — The player grows a studio-facing surface](done/0158-the-player-grows-a-studio-facing-surface.md) — closed 2026-09-10. Review: **no blockers, two majors, six minors.** Version: **0.113.0**. ADR-0175 + 0176 accepted. Phase 7 open, on [on-device](../on-device-validation.md). [Write-up](README-archive.md).

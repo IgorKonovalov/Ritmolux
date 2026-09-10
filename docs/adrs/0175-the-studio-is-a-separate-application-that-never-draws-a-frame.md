@@ -3,7 +3,7 @@
 > **Status:** accepted 2026-09-10 (Plan 0158)
 > **Date:** 2026-09-09
 > **Related plan(s):** [0158 — The player grows a studio-facing surface](../plans/done/0158-the-player-grows-a-studio-facing-surface.md),
-> [0159 — The studio opens](../plans/0159-the-studio-opens.md)
+> [0159 — The studio opens](../plans/done/0159-the-studio-opens.md)
 
 ## Context
 

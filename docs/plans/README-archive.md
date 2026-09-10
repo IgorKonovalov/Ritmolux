@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0159 - The studio opens](#0159---the-studio-opens)
   - [0161 - The structural parameter is held](#0161---the-structural-parameter-is-held)
   - [0165 - The release path stops being the first compile](#0165---the-release-path-stops-being-the-first-compile)
   - [0158 - The player grows a studio-facing surface](#0158---the-player-grows-a-studio-facing-surface)
@@ -169,6 +170,7 @@ hand-edited.
   - [0002 — Rust enforcement tooling](#0002--rust-enforcement-tooling)
   - [0001 — Core + standalone MVP, then foobar parity](#0001--core--standalone-mvp-then-foobar-parity)
 - [Prior sequencing notes (superseded)](#prior-sequencing-notes-superseded)
+  - [Moved 2026-09-10 from `README.md` — the 0158/0159 program note, spent](#moved-2026-09-10-from-readmemd--the-01580159-program-note-spent)
   - [Superseded 2026-09-10 by Plan 0158's close (was in `README.md`)](#superseded-2026-09-10-by-plan-0158s-close-was-in-readmemd)
   - [Moved 2026-09-09 from `README.md` — the 0087-stop-condition risk](#moved-2026-09-09-from-readmemd--the-0087-stop-condition-risk)
   - [Moved 2026-09-08 from `README.md` — the 0140/0125 contention note](#moved-2026-09-08-from-readmemd--the-01400125-contention-note)
@@ -191,6 +193,108 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0159 - The studio opens](done/0159-the-studio-opens.md)
+
+- closed 2026-09-10. Nine phases in the worktree lane `WORK/rlx-plan-0159` on
+`plan-0159-the-studio-opens`, alternating `studio-builder` and `dev`: `f2be445` (1, the skeleton),
+`d80b7a4` (2, the protocol), `163b330` (3, the show loop extracted), `97a6294` (4, the studio drives
+the one player), `bd037d4` (5, the player reports what it loaded), `ce70952` (6, parameters move),
+`658472f` (7, expressions and palettes), `6b85624` (8, composition and the library), `9a4410a`
+(9, the release job and the gate). Review: **no blockers, four majors, four minors.** Version:
+**0.114.0** (minor - a feature plan). ADR-0175 and 0176 were already accepted; 0177, 0178, 0183 and
+0184 accepted at this close.
+
+**Phases 10 and 11 did not run, and the plan closes owing them.** Both are `human` - the tester
+handoff and the on-device check - and both were deferred on the user's direction on 2026-09-10,
+after the Phase 9 artifact was run on the development machine and produced three High backlog
+entries. That is a deliberate call recorded here rather than a phase quietly dropped: **0199** (the
+studio always spawns a windowed player, so a one-screen machine gets a show window in the way),
+**0200** (the `stream` event declares `rgba8` while the windowed preview intermediate is the
+negotiated swapchain format, so the studio paints red and blue swapped) and **0201** (the preview
+stops updating mid-session). None of the three is a thing to hand a VJ, and the deferral is right.
+
+**The gate was re-run at the close on the merged tree, not taken from the log.**
+`cargo nextest run --workspace` gave **1704 passed / 6 skipped in 653.0 s**, exit 0 - which is the
+third full-suite reading of this tree and the second green one. The log records a **red** first run
+whose single failure was `standalone::stream_show
+every_system_is_reported_by_the_key_the_schema_labels_its_roster_with` (`left: 1, right: 12`,
+303.1 s), and a green second run in which the same test passed in 3.483 s. The close run agrees with
+the second. **The intermittency is real and is not fixed** - see the majors below. The studio's own
+gate was also re-run: typecheck, lint and 173 Vitest tests across 19 files, all green.
+
+**Backlog 0201 was diagnosed at this close and is no longer undiagnosed.** The entry listed three
+candidates and could not distinguish them; reading the code settles it as the third. The chain:
+`open_preview_pipe` runs once, at window creation, and spawns a `PreviewPipe` for the readback's
+size at that moment; `WindowEvent::Resized` calls `Renderer::resize`, which rebuilds the preview
+target and reopens the readback **at the new size**; `StdoutSink::send` refuses a frame whose size
+is not the announced one; and the writer thread's loop is `if sink.send(..).is_err() { break; }`, so
+the refusal ends the thread permanently and discards the `Err`'s message. Every symptom follows -
+standard output goes quiet, the canvas holds its last frame, the studio's counter stays at 0, the
+player keeps drawing, and nothing reaches standard error. The trigger is any resize or fullscreen
+toggle of the show window, which is exactly what a one-screen user does to the window 0199 is about.
+The owner moves from `studio-builder` to `dev`, and the repair is a choice: re-emit `stream` and
+respawn the pipe on resize (which makes `stream` a repeatable event and so a spec 0003 change), or
+refuse to resize the show window while a preview is open. Either way the writer must stop exiting
+silently.
+
+**The four majors.**
+
+1. **The preview's drop accounting cannot see the loss it exists to measure.** `FramePump` counts a
+drop only when a frame arrives while one is unacknowledged, so loss upstream of it is invisible; the
+Phase 4 note records the counter reading `0` while the studio painted 59 frames in ~15 s against a
+show drawing 42/s. Worse, the dominant cost is not a drop at all - the log measured the show falling
+from ~42 fps to 35.4 fps with the studio attached, which is the player **blocking on a full pipe**,
+exactly the mechanism `frames.ts`'s own header describes as the thing being avoided. ADR-0178 leans
+on this reading to make the preview's cost honest, and it does not.
+
+2. **Backlog 0200 is a shipped contract violation, not a wrong constant.** `STREAM_FORMAT` is the
+fixed string `rgba8` and is emitted on both run modes, while the windowed preview intermediate is
+built at the negotiated swapchain format. The headless path renders into `Rgba8UnormSrgb`, so the
+label is **true there and false on the windowed path** - one declared format naming two byte layouts
+depending on how the player was started. This is the lens-4 pattern the review checklist names: two
+sources that agree on the one configuration everything was tested at and disagree on another.
+
+3. **`every_system_is_reported_by_the_key_...` is structurally flaky and nothing isolates it.** It
+spawns a player and needs timely frames from it while the rest of the suite renders thousands of
+frames on the same adapter; `.config/nextest.toml` carries no `test-threads`, no `threads-required`
+on the soaks and no `slow-timeout`. Its own `LINE_DEADLINE` comment claims *"the wait is only ever
+paid in full by a genuine failure"* - which the red run falsified. A red CI push from this is a
+matter of scheduling luck.
+
+4. **Phase 7's second done-when is unmet.** The language mode was to generate its token list from
+the schema's function and variable roster; `--schema` declares systems, stages and tables and
+carries no such roster, and `VAR_NAMES` / `Func::from_name` are not exported. `presetLanguage` takes
+a roster and colours exactly what it is given, which today is nothing - so an expression's
+identifiers are uncoloured in the editor the phase exists to build. Honestly disclosed, and the fix
+is a `grammar` section in the schema export.
+
+**The four minors.** The implementation log is **383 lines against the plan's own 226-line
+`## Implementation phases`**, which inverts the rule that the report may not outweigh the contract.
+The plan alternates `dev` and `studio-builder` five times, costing a session boundary per handoff -
+forced by discovery here (Phases 3 and 5 were inserted mid-flight), but the shape the planning rule
+warns about. `packaging/studio/READ-ME-FIRST.md` is not in the site's `PUBLISHED` map, so unlike the
+other three it publishes as no install page - disclosed in `CLAUDE.md`, still a gap. And
+`studio/package.json` carries a `version` field `cargo-release` does not touch; the packaging
+scripts override it at build time and the macOS script cross-checks against the plist, so it is
+handled - but the file is stale between releases by construction.
+
+**Fixed during the close.** Root `README.md`'s "Repository layout" had no `studio/` row at all - a
+third shipped application, two more release zips, and the project's front page silent on it - and
+its `packaging/` row named only two recipes. Both repaired. Separately, `README.md` and `docs/nfr.md`
+both said "the six Node doc gates" where the `links` job runs **seven**, and `nfr.md`'s enumeration
+omitted `check-reader-prose.mjs` entirely while its trailing sentence said "Six gates but eight
+invocations"; corrected to seven and nine. That count was wrong before this plan and this plan
+edited the sentence around it.
+
+**The second ADR-0183 double-claim, settled.** This lane's studio/show-loop ADR and Plan 0166's
+translation ADR both took 0183 on 2026-09-10, ten minutes past ten and three past three
+respectively. **0183 stays with Plan 0159**: it was written first, it is implemented, and it is
+cited from [spec 0003](../specs/0003-studio-control-protocol.md), from
+[`docs/capturing.md`](../capturing.md) and from a live backlog probe naming its filename, against
+Plan 0166's four markdown citations in a plan that has not started. Plan 0166's ADR renumbered to
+**0185**. That is the fourth collision in this repository (0120, 0160, 0181, 0183) and the note in
+`docs/adrs/README.md` records all four.
 
 ### [0161 - The structural parameter is held](done/0161-the-structural-parameter-is-held.md)
 
@@ -7750,6 +7854,23 @@ uncovered (its C side remains the Plan 0001 Phase-6 smoke program's job, per ADR
 
 ## Prior sequencing notes (superseded)
 
+### Moved 2026-09-10 from `README.md` — the 0158/0159 program note, spent
+
+Fully spent when [0159] closed on 2026-09-10 behind [0158]. Kept as the record of how the two were
+sequenced. The live index carries only what survives it.
+
+> ~~**Added 2026-09-09 — [0158] and [0159] are drafted, and they are a program rather than a
+> pair.**~~ — **half spent 2026-09-10**, when [0158] closed on its six `dev` phases and ADR-0175
+> and ADR-0176 were accepted. The dependency the note existed to fix is discharged: **[0159] is
+> startable now**, and it is the studio's own lane rather than a plan waiting on the player. What
+> is still live is the tail — clip rendering, show projects and the diffusion pass from the studio
+> are each a later plan with its own interview, and ADR-0175's `render` subcommand decision is
+> recorded with nothing built against it.
+
+[0158]: done/0158-the-player-grows-a-studio-facing-surface.md
+[0159]: done/0159-the-studio-opens.md
+
+
 **Superseded 2026-09-10, when [0161] closed.** Kept as the record of how the two lanes were
 paired and what the schema coupling was understood to be at the time.
 
@@ -7784,7 +7905,7 @@ diffusion pass from the studio are each a later plan with its own interview; ADR
 `render` subcommand decision that the first of those needs, and nothing has built it.
 
 [0158]: done/0158-the-player-grows-a-studio-facing-surface.md
-[0159]: 0159-the-studio-opens.md
+[0159]: done/0159-the-studio-opens.md
 [0160]: 0160-the-silhouettes-preconditions-stop-being-silent.md
 [0164]: 0164-the-cellular-system.md
 

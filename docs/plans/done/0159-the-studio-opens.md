@@ -1,17 +1,23 @@
 # 0159 — The studio opens
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-10. Phases 1 to 9 landed across nine commits (`f2be445`
+> to `9a4410a`); the two `human` phases, 10 (the tester handoff) and 11 (the on-device check),
+> were **deferred on the user's direction** behind backlog 0199, 0200 and 0201, and are carried
+> forward as followups rather than done. Mode 4 review: **no blockers, four majors, four
+> minors** — `cargo nextest run --workspace` green on the merged tree (1704 passed, 6 skipped,
+> 653.0 s), the studio's own gate green (typecheck, lint, 173 Vitest tests), all seven Node doc
+> gates green. Backlog 0201 was diagnosed at the close and is no longer undiagnosed.
 > **Created:** 2026-09-09
 > **Owner skill(s):** studio-builder, dev, human
-> **Related ADRs:** [0175](../adrs/0175-the-studio-is-a-separate-application-that-never-draws-a-frame.md)
+> **Related ADRs:** [0175](../../adrs/0175-the-studio-is-a-separate-application-that-never-draws-a-frame.md)
 > (accepted, with a 2026-09-10 `Outcome` this plan wrote),
-> [0176](../adrs/0176-the-player-is-driven-over-osc-control-in-and-reports-on-its-standard-streams.md) (accepted),
-> [0177](../adrs/0177-a-fourth-skill-lane-builds-the-studio.md) (proposed),
-> [0178](../adrs/0178-the-studio-shell-conventions.md) (proposed),
-> [0183](../adrs/0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md) (proposed),
-> [0184](../adrs/0184-the-player-reports-what-it-loaded-and-the-studio-re-derives-nothing.md) (proposed),
-> [0038](../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md)
-> **Depends on:** [0158](done/0158-the-player-grows-a-studio-facing-surface.md) Phases 1 to 5 landed
+> [0176](../../adrs/0176-the-player-is-driven-over-osc-control-in-and-reports-on-its-standard-streams.md) (accepted),
+> [0177](../../adrs/0177-a-fourth-skill-lane-builds-the-studio.md) (proposed),
+> [0178](../../adrs/0178-the-studio-shell-conventions.md) (proposed),
+> [0183](../../adrs/0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md) (proposed),
+> [0184](../../adrs/0184-the-player-reports-what-it-loaded-and-the-studio-re-derives-nothing.md) (proposed),
+> [0038](../../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md)
+> **Depends on:** [0158](0158-the-player-grows-a-studio-facing-surface.md) Phases 1 to 5 landed
 > (the override, the listener, the events, the schema, the pipe sink). **Phase 6 of 0158 — the
 > windowed preview copy — is now required**: ADR-0183 makes it the mechanism the studio's preview
 > uses, and it shipped.
@@ -36,7 +42,7 @@ ADR-0175's Decision said. That path binds no control listener, emits two of the 
 and — decisively — never resolves, seeds, watches or reloads the preset directory, because
 `standalone/src/preset_dir.rs` is imported by `app_state.rs` alone. The editing loop this plan
 exists to close does not run there.
-[ADR-0183](../adrs/0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md) settles
+[ADR-0183](../../adrs/0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md) settles
 it: the studio drives **one windowed player** that is both the show and the preview source, and
 the show loop is extracted so the headless path stops being a silent subset of it. Two phases
 below are new because of it, and the phases after them are renumbered.
@@ -183,7 +189,7 @@ flowchart LR
 
 ### Phase 5 — The player reports what it loaded
 - **Owner skill:** dev
-- **What:** [ADR-0184](../adrs/0184-the-player-reports-what-it-loaded-and-the-studio-re-derives-nothing.md).
+- **What:** [ADR-0184](../../adrs/0184-the-player-reports-what-it-loaded-and-the-studio-re-derives-nothing.md).
   Four additive fields under the same `v`, each read at the site that already holds the value:
   `preset` gains `system` (the schema's own key, `SystemKind::as_str()`, not the `Scene::name()`
   display string) and `file`; `roster` gains `dir`; `health` gains `preview_sent` and
@@ -459,7 +465,9 @@ lists.**
   — everything this project wrote**. The NFR row records rather than caps.
 - **The bundled-player done-when is verified from the extracted archive.**
   Unpacked to a scratch directory, no settings file, `Ritmolux Studio.exe`
-  launched: it spawned `...esources\playeritmolux.exe --preview stdout
+  launched: it spawned `...
+esources\player
+itmolux.exe --preview stdout
   --events --control 127.0.0.1:0`.
 - **Nothing macOS was executed.** `bundle-studio.sh` is `bash -n` clean and
   carries `packaging/macos/bundle.sh`'s assertions plus two — the bundled
@@ -494,7 +502,7 @@ stream does not report it.
 The studio can resolve the directory itself, by applying `RLX_PRESET_DIR` else
 the OS data root plus `Ritmolux/presets`. That is a second copy of a resolution
 rule, and two copies that agree today are what
-[ADR-0183](../adrs/0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md)
+[ADR-0183](../../adrs/0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md)
 was written about; a studio that resolved differently would edit files the player
 is not watching. Reading the path out of the `loaded N preset(s) from ...`
 diagnostic is the same bet on prose the event stream exists to end.
@@ -507,7 +515,7 @@ see it.
 
 > **Architect, 2026-09-10.** Answered, and the answer is a phase: the three facts
 > travel on the event stream from the sites that already hold them
-> ([ADR-0184](../adrs/0184-the-player-reports-what-it-loaded-and-the-studio-re-derives-nothing.md)),
+> ([ADR-0184](../../adrs/0184-the-player-reports-what-it-loaded-and-the-studio-re-derives-nothing.md)),
 > carried by the new **Phase 5** above, owned by `dev`. The refusal of a second
 > resolver stands; what the note does not reach is that the system has two names
 > here, and Phase 5's first done-when is written against it. The **preview
@@ -703,7 +711,7 @@ reports nothing.
 > **Architect, 2026-09-10.** The interim decision recorded here — keep the studio
 > headless and bind the listener on that path — was superseded the same day, once
 > the missing watcher was found alongside the missing listener. See
-> [ADR-0183](../adrs/0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md)
+> [ADR-0183](../../adrs/0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md)
 > and Phases 3 and 4 above.
 
 **Two places the implementation differs from what a phase or an ADR says.**
@@ -753,6 +761,28 @@ reports nothing.
   postpone the human smoke until those are fixed.
 
 ## Followups (after this lands)
+
+**Owed by this plan, not optional.** Phases 10 and 11 did not run:
+
+- **The tester handoff (Phase 10) and the on-device check (Phase 11)**, both `human`, both deferred
+  on 2026-09-10 behind backlog 0199, 0200 and 0201 — a one-screen tester gets a show window in the
+  way, the preview draws red and blue swapped, and the preview stops updating after a resize. None
+  of the three is a thing to hand a VJ. They are the first work after those three close.
+- **The three backlog entries themselves**: 0199 (`architect` to amend ADR-0183, then
+  `studio-builder`), 0200 (`architect` to choose between converting and reporting, then `dev`) and
+  0201 (`dev` — diagnosed at this close: the preview writer thread exits on the first frame after
+  any show-window resize, silently).
+- **The schema export needs a `grammar` section.** Phase 7's second done-when is unmet because
+  `--schema` declares no function or variable roster; `presetLanguage` takes a roster and is handed
+  nothing, so an expression's identifiers are uncoloured. `dev` work behind an `architect` call on
+  the schema's shape.
+- **`ritmolux --check`** — Phase 8 named the fallback and used it, and the absent flag is the
+  feedback note the done-when itself called for.
+- **`packaging/studio/READ-ME-FIRST.md` publishes as no install page.** The other three are routes
+  in the site's `PUBLISHED` map (ADR-0167); a fourth artifact's tester doc reaching no reader is a
+  gap that needs a route and a menu entry, which `check-site-routes.mjs` will require together.
+
+**Wanted, and each its own plan:**
 
 - Clip rendering from the studio (needs the `render` subcommand).
 - Show projects (needs an interview and an ADR on the file's shape).

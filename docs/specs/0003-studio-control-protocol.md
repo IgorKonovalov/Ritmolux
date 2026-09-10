@@ -205,7 +205,7 @@ and it is here so a reader who wants the history has it in one place rather than
 
 **Added 2026-09-10**, from one plan:
 
-- **[Plan 0159](../plans/0159-the-studio-opens.md) Phase 5** added the four fields the invariants
+- **[Plan 0159](../plans/done/0159-the-studio-opens.md) Phase 5** added the four fields the invariants
   above govern, on ADR-0184's decision, after the studio stopped at a parameter panel it could not
   render: the stream said which preset was on screen and neither which system it drove nor which
   file it came from, and nothing said where the watcher was looking. Each field is read at a site

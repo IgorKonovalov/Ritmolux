@@ -1,8 +1,8 @@
 # ADR-0183 — The studio drives one player, and the show loop is extracted so every mode runs it
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-10 (Plan 0159), with an Outcome
 > **Date:** 2026-09-10
-> **Related plan(s):** [0159 — The studio opens](../plans/0159-the-studio-opens.md)
+> **Related plan(s):** [0159 — The studio opens](../plans/done/0159-the-studio-opens.md)
 > **Related:** [ADR-0175](0175-the-studio-is-a-separate-application-that-never-draws-a-frame.md)
 > (the studio never renders; its Decision named the headless run as the preview — see its
 > `Outcome`), [ADR-0176](0176-the-player-is-driven-over-osc-control-in-and-reports-on-its-standard-streams.md)
@@ -132,3 +132,22 @@ tap writing raw frames to the studio over a pipe, and later the windowed player 
 copy of its output"*. This inverts that ordering: the windowed preview copy is the mechanism, and
 the headless run is what the extraction repairs. ADR-0175 is accepted and append-only, so that is
 recorded as a dated `Outcome` there rather than by editing its body.
+
+## Outcome — 2026-09-10, Plan 0159
+
+**The Decision reads as though the windowless path were gone, and it is not.** Plan 0159 Phase 3
+extracted the show loop precisely so `--stream --sink stdout` runs the same management the window
+does, and it does; what shipped is a studio whose `DEFAULT_PLAYER_ARGS` are fixed at
+`--preview stdout`, with no way to ask for the windowless one. On a one-screen machine that is a
+show window permanently in the way of the editor — a cost this ADR's own Negative priced, and which
+turned out to be the first thing a user hit. [backlog 0199](../design-backlog.md) carries it, and
+the repair is mostly already built.
+
+**A resize of the show window silently ends the preview.** `open_preview_pipe` runs once, at window
+creation; `Renderer::resize` rebuilds the preview target at the new size; `StdoutSink::send` refuses
+a frame whose size is not the announced one; and the writer thread breaks on that error, discarding
+its message. So the preview this ADR makes a copy of the show's own output stops the first time the
+show's output changes shape, and nothing says so. [backlog 0201](../design-backlog.md) carries the
+diagnosis. Whichever repair is taken — re-emitting `stream` on resize, or refusing the resize while
+a preview is open — the first is a change to [spec 0003](../specs/0003-studio-control-protocol.md),
+because it makes `stream` a repeatable event rather than a once-before-the-first-frame one.

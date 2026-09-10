@@ -198,13 +198,13 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0174](0174-the-art-net-path-is-verified-against-a-simulated-rig.md) | The Art-Net path is verified against a simulated rig | proposed 2026-09-08 (Plan 0133) |
 | [0175](0175-the-studio-is-a-separate-application-that-never-draws-a-frame.md) | The studio is a separate application that never draws a frame, and the player stays the only renderer | accepted 2026-09-10 (Plans 0158, 0159), extends 0143, Outcome, revised by 0183 |
 | [0176](0176-the-player-is-driven-over-osc-control-in-and-reports-on-its-standard-streams.md) | The player is driven over OSC control-in, and reports on its standard streams | accepted 2026-09-10 (Plan 0158), extends 0164 |
-| [0177](0177-a-fourth-skill-lane-builds-the-studio.md) | A fourth skill lane, `studio-builder`, builds the studio and never touches the engine | proposed 2026-09-09 (Plan 0159), extends 0017 |
-| [0178](0178-the-studio-shell-conventions.md) | The studio shell conventions: three processes, a mirrored protocol, and the same security defaults as the sibling repository | proposed 2026-09-09 (Plan 0159) |
+| [0177](0177-a-fourth-skill-lane-builds-the-studio.md) | A fourth skill lane, `studio-builder`, builds the studio and never touches the engine | accepted 2026-09-10 (Plan 0159), extends 0017 |
+| [0178](0178-the-studio-shell-conventions.md) | The studio shell conventions: three processes, a mirrored protocol, and the same security defaults as the sibling repository | accepted 2026-09-10 (Plan 0159); Outcome |
 | [0179](0179-a-precondition-is-checked-at-load-or-it-is-written-down.md) | A precondition on a figure is checked at load, or it is written down | proposed 2026-09-09 (Plan 0160), extends 0107, 0111 |
 | [0180](0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md) | A mathematical world joins a system as a family, and a structural parameter is quantized and held | accepted 2026-09-10 (Plans 0161-0164), extends 0007, 0015, Outcome |
 | [0181](0181-the-gate-compiles-every-feature-a-release-ships.md) | The per-push gate compiles every feature a release ships | accepted 2026-09-10 (Plan 0165); Outcome |
 | [0182](0182-a-plan-lane-may-live-inside-the-repository.md) | A plan lane may live inside the repository, and a tool that enumerates from git already knows it | accepted 2026-09-10 (Plan 0165), supplements 0053 |
-| [0183](0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md) | The studio drives one player, and the show loop is extracted so every mode runs it | proposed 2026-09-10 (Plan 0159), revises 0175 |
-| [0184](0184-the-player-reports-what-it-loaded-and-the-studio-re-derives-nothing.md) | The player reports what it loaded, and the studio re-derives nothing | proposed 2026-09-10 (Plan 0159), extends 0176 |
+| [0183](0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md) | The studio drives one player, and the show loop is extracted so every mode runs it | accepted 2026-09-10 (Plan 0159), revises 0175; Outcome |
+| [0184](0184-the-player-reports-what-it-loaded-and-the-studio-re-derives-nothing.md) | The player reports what it loaded, and the studio re-derives nothing | accepted 2026-09-10 (Plan 0159), extends 0176 |
 | [0185](0185-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md) | The documentation translates a slice, and a stamp makes staleness visible | proposed 2026-09-10 (Plan 0166), extends 0154, 0167 |
 <!-- roster:end -->
