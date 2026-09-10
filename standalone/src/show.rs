@@ -15,7 +15,7 @@
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use rlx_core::render::Renderer;
+use rlx_core::render::{PixelOrder, Renderer};
 use standalone::config;
 use standalone::control::Control;
 use standalone::events::{Event, Events};
@@ -157,16 +157,19 @@ impl Show {
     /// Announce the geometry a parent cuts the frame pipe into pictures by.
     ///
     /// **Before the first frame**, which is the contract: a `stream` that
-    /// arrived after them would leave the first frame unreadable. The numbers
-    /// differ per path — a requested size and rate headless, the readback's size
-    /// and the display's rate windowed — so the caller supplies them.
-    pub(crate) fn emit_stream(&mut self, width: u32, height: u32, fps: u32) {
+    /// arrived after them would leave the first frame unreadable. Every value
+    /// differs per path — a requested size and rate headless, the mirror's size
+    /// and the display's rate windowed, and a channel order that is the
+    /// headless offscreen's on one path and whatever the swapchain negotiated on
+    /// the other — so the caller supplies them, read from what the renderer is
+    /// actually producing rather than from a constant (ADR-0187).
+    pub(crate) fn emit_stream(&mut self, width: u32, height: u32, fps: u32, order: PixelOrder) {
         if let Some(events) = self.events.as_mut() {
             events.emit(&Event::Stream {
                 width,
                 height,
                 fps,
-                format: crate::stream::STREAM_FORMAT,
+                format: order.as_str(),
             });
         }
     }

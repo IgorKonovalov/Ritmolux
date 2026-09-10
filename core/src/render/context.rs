@@ -30,6 +30,14 @@ pub enum RenderError {
     RequestDevice(RequestDeviceError),
     /// The surface reported no supported configuration on this adapter.
     UnsupportedSurface,
+    /// Frames are being produced at a texture format whose channel order has no
+    /// name a frame consumer knows.
+    ///
+    /// Refused rather than published under a guessed name: a consumer reading
+    /// four bytes per pixel and told the wrong order draws the right picture in
+    /// the wrong colours, which looks like an authoring mistake rather than a
+    /// protocol one (ADR-0187).
+    UnnameablePixelOrder(wgpu::TextureFormat),
     /// Acquiring the frame raised a validation error — a bug, not a
     /// recoverable surface state.
     SurfaceValidation,
@@ -90,6 +98,12 @@ impl std::fmt::Display for RenderError {
             RenderError::RequestAdapter(e) => write!(f, "no suitable GPU adapter: {e}"),
             RenderError::RequestDevice(e) => write!(f, "device request failed: {e}"),
             RenderError::UnsupportedSurface => write!(f, "surface has no supported config"),
+            RenderError::UnnameablePixelOrder(format) => write!(
+                f,
+                "frames are produced at {format:?}, whose channel order has no \
+                 name a frame consumer knows (expected an 8-bit RGBA or BGRA \
+                 format)"
+            ),
             RenderError::SurfaceValidation => {
                 write!(f, "surface texture acquisition failed validation")
             }

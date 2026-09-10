@@ -267,6 +267,52 @@ pub enum SampleBudget {
     Offline,
 }
 
+/// The channel order the four bytes of a pixel arrive in, for a consumer
+/// reading frames off a pipe or a buffer (ADR-0187).
+///
+/// **A closed set of two**, because a frame this engine hands out is 8 bits per
+/// channel in one of the two orders a swapchain negotiates. sRGB and linear
+/// variants of a format are the same order — the transfer function is what a
+/// consumer's own colour handling deals with and the byte layout is what it has
+/// to be told.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PixelOrder {
+    /// Red, green, blue, alpha — what a headless run always produces, and what
+    /// an `ImageData` on a canvas means by its bytes.
+    Rgba8,
+    /// Blue, green, red, alpha — what a swapchain commonly negotiates on
+    /// Windows, and the order a consumer assuming the other one paints with red
+    /// and blue swapped.
+    Bgra8,
+}
+
+impl PixelOrder {
+    /// The name a frame pipe's announcement carries.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            PixelOrder::Rgba8 => "rgba8",
+            PixelOrder::Bgra8 => "bgra8",
+        }
+    }
+
+    /// Every name, for a consumer enumerating the closed set.
+    pub const ALL: [PixelOrder; 2] = [PixelOrder::Rgba8, PixelOrder::Bgra8];
+
+    /// The order `format` stores its channels in, or `None` where it is not an
+    /// 8-bit four-channel format and so has no order this vocabulary can name.
+    pub(crate) fn of(format: wgpu::TextureFormat) -> Option<Self> {
+        match format {
+            wgpu::TextureFormat::Rgba8Unorm | wgpu::TextureFormat::Rgba8UnormSrgb => {
+                Some(PixelOrder::Rgba8)
+            }
+            wgpu::TextureFormat::Bgra8Unorm | wgpu::TextureFormat::Bgra8UnormSrgb => {
+                Some(PixelOrder::Bgra8)
+            }
+            _ => None,
+        }
+    }
+}
+
 /// Owns the GPU context, the built-in systems, and the loaded presets; renders
 /// one frame per call by evaluating the active preset into the active system.
 pub struct Renderer {
@@ -771,6 +817,23 @@ impl Renderer {
     /// The open preview's size and identity, or `None` when closed.
     pub fn preview_state(&self) -> Option<((u32, u32), u64)> {
         self.preview.as_ref().map(|p| (p.size(), p.generation()))
+    }
+
+    /// **The channel order every frame this renderer hands a consumer carries.**
+    ///
+    /// One answer for every path, because there is one source: the frame tap's
+    /// target, the capture target and the preview's intermediate are all built
+    /// at the context's configured format, so a windowed run reports whatever
+    /// the swapchain negotiated and a headless one reports `HEADLESS_FORMAT`.
+    /// A caller announcing a frame pipe reads this instead of naming a constant
+    /// — a constant is true on one of those two paths and false on the other
+    /// (ADR-0187).
+    ///
+    /// `Err` where that format has no name a consumer knows, which is a refusal
+    /// to publish bytes under a guess.
+    pub fn pixel_order(&self) -> Result<PixelOrder, RenderError> {
+        let format = self.ctx.surface_format();
+        PixelOrder::of(format).ok_or(RenderError::UnnameablePixelOrder(format))
     }
 
     /// Attach a **secondary present target** — a second window's surface, on

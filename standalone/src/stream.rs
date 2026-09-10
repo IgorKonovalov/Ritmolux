@@ -30,6 +30,7 @@
 use std::io::Write;
 use std::time::Duration;
 
+use rlx_core::render::PixelOrder;
 use standalone::events::Events;
 
 /// The sender name a receiver lists, unless `--sender` overrides it. Not
@@ -57,10 +58,6 @@ const PREVIEW_FPS: u32 = 30;
 /// is the other producer of a preview-shaped pipe. One constant rather than two
 /// so the two paths cannot drift into different pictures of the same thing.
 pub(crate) const DEFAULT_PREVIEW_SIZE: (u32, u32) = (PREVIEW_WIDTH, PREVIEW_HEIGHT);
-
-/// The pixel format on the wire, named in the `stream` event so a reader is not
-/// guessing at the channel order.
-pub const STREAM_FORMAT: &str = "rgba8";
 
 /// Capacity reserved for the transport verbs one drained control frame carries,
 /// matching the listener's own per-frame cap. A frame that somehow carried more
@@ -409,12 +406,19 @@ pub struct StdoutSink {
     /// is refused rather than silently reinterpreted by whatever is reading.
     width: u32,
     height: u32,
+    /// The channel order announced with it, carried so the opening line names
+    /// what the bytes are rather than a format this sink assumed.
+    order: PixelOrder,
 }
 
 impl StdoutSink {
-    /// A sink that will write `width` x `height` frames.
-    pub fn new(width: u32, height: u32) -> Self {
-        Self { width, height }
+    /// A sink that will write `width` x `height` frames of `order`.
+    pub fn new(width: u32, height: u32, order: PixelOrder) -> Self {
+        Self {
+            width,
+            height,
+            order,
+        }
     }
 }
 
@@ -446,8 +450,10 @@ impl FrameSink for StdoutSink {
 
     fn opened(&self) -> String {
         format!(
-            "publishing {}x{} as raw {STREAM_FORMAT} frames on standard output",
-            self.width, self.height
+            "publishing {}x{} as raw {} frames on standard output",
+            self.width,
+            self.height,
+            self.order.as_str()
         )
     }
 }
@@ -510,7 +516,7 @@ const PREVIEW_QUEUE: usize = 2;
 
 impl PreviewPipe {
     /// Start the writer thread for `width` x `height` frames.
-    pub fn spawn(width: u32, height: u32) -> Self {
+    pub fn spawn(width: u32, height: u32, order: PixelOrder) -> Self {
         let (tx, rx) =
             std::sync::mpsc::sync_channel::<rlx_core::render::CaptureImage>(PREVIEW_QUEUE);
         let dropped = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
@@ -518,7 +524,7 @@ impl PreviewPipe {
         let writer = std::thread::Builder::new()
             .name("rlx-preview".to_owned())
             .spawn(move || {
-                let mut sink = StdoutSink::new(width, height);
+                let mut sink = StdoutSink::new(width, height, order);
                 // Ends when the sender is dropped, which is what closes this
                 // down: no flag, no timeout, no way to leave the thread running
                 // past the show.
@@ -626,9 +632,17 @@ fn install_stop_handler() {
         reason = "only the Spout arm reads the renderer's adapter, and it is not compiled here"
     )
 )]
-fn open_sink(request: &StreamRequest, adapter: &str) -> Result<Box<dyn FrameSink>, String> {
+fn open_sink(
+    request: &StreamRequest,
+    adapter: &str,
+    order: PixelOrder,
+) -> Result<Box<dyn FrameSink>, String> {
     match request.sink {
-        Sink::Stdout => Ok(Box::new(StdoutSink::new(request.width, request.height))),
+        Sink::Stdout => Ok(Box::new(StdoutSink::new(
+            request.width,
+            request.height,
+            order,
+        ))),
         #[cfg(all(feature = "spout", windows))]
         Sink::Spout => {
             use standalone::gpu::{self, SenderAdapter};
@@ -713,7 +727,13 @@ pub fn run(
     let adapter = renderer.adapter_description().to_owned();
     eprintln!("renderer : {adapter}");
 
-    let mut sink = open_sink(request, &adapter)?;
+    // Read off the renderer, not named here: a headless run draws into the
+    // offscreen format and is RGBA by construction, but the question and its one
+    // source are the same on both run modes (ADR-0187).
+    let order = renderer
+        .pixel_order()
+        .map_err(|err| format!("--stream: {err}"))?;
+    let mut sink = open_sink(request, &adapter, order)?;
 
     let capture = crate::capture_start::start_capture(&config.input);
     let Some(mut consumer) = capture.consumer else {
@@ -767,7 +787,8 @@ pub fn run(
     // **Before the first frame**, which is the contract: a parent reading the
     // pipe has to know the geometry before it has bytes to cut up, and a
     // `stream` that arrived after them would leave the first frame unreadable.
-    show.emit_stream(request.width, request.height, request.fps);
+    //
+    show.emit_stream(request.width, request.height, request.fps, order);
     // Sized once for the listener's per-frame transport cap, so a frame carrying
     // verbs reuses this rather than growing it.
     let mut transports = Vec::with_capacity(TRANSPORT_SCRATCH);
@@ -1335,7 +1356,7 @@ mod sink_tests {
     /// reader taking fixed-size frames would resynchronize on nothing.
     #[test]
     fn the_pipe_sink_refuses_a_frame_of_another_size() {
-        let mut sink = StdoutSink::new(4, 2);
+        let mut sink = StdoutSink::new(4, 2, PixelOrder::Rgba8);
         let right = vec![0u8; 4 * 2 * 4];
         assert!(
             sink.send(&right[..right.len() - 4], 4, 2).is_err(),

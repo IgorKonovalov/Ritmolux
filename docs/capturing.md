@@ -1464,6 +1464,12 @@ That event needs `--events`, which is what turns the structured report on at all
 reader has to know the geometry some other way — which is why the studio always
 passes both.
 
+**`format` is `rgba8` here because a headless run renders into an offscreen this
+engine chooses, and it is read off that texture rather than asserted.** The
+windowed mirror below is the path where it can be the other value, so a reader
+that hard-codes one order works on this sink and paints red and blue swapped on
+that one.
+
 **The default is 640x360 at 30 fps**, not the Spout path's 1280x720 at 60: this
 sink exists to feed a preview canvas, and asking the engine for four times the
 pixels to shrink them into a panel costs the readback and the pipe for a picture
@@ -1509,7 +1515,15 @@ is actually seeing.
 | the show | headless, no window | a window, unchanged |
 | the frames | **exact**, at `--size` | a **scaled, letterboxed copy** |
 | the geometry | the size you asked for | fixed at 640x360, or `@WIDTHxHEIGHT` |
+| `format` | always `rgba8` | `rgba8` **or** `bgra8` — read it |
 | a slow reader | blocks the run | drops frames, the show carries on |
+
+**Read `format`.** The mirror carries whatever the swapchain negotiated, which on
+a DX12 backend is commonly BGRA, and the `stream` event names the order the bytes
+are actually in. A reader that assumes RGBA paints the show's oranges blue and
+its blues orange — a picture that looks like a colour-grading mistake rather than
+a decoding one, which is why the player refuses to open the pipe at all rather
+than guess a name for a format it cannot describe.
 
 `--sink stdout` is an exact feed for `ffmpeg`, so its frames are the size named
 on the command line and nothing scales them. `--preview` is a mirror for a

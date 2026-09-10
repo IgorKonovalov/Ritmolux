@@ -8,8 +8,8 @@
 
 use super::{
     AdapterChoice, AnalysisMetrics, BindingState, CaptureImage, HeadlessOptions, LatchBank,
-    ParamHold, ParamOverrides, ParamRoute, ParamSmoother, RenderError, Renderer, RendererOptions,
-    Roster, SampleBudget, Tier, element_prefix, evaluate_series, resolve_route,
+    ParamHold, ParamOverrides, ParamRoute, ParamSmoother, PixelOrder, RenderError, Renderer,
+    RendererOptions, Roster, SampleBudget, Tier, element_prefix, evaluate_series, resolve_route,
 };
 // `Mode` is named from its own module now: `render/mod.rs` stopped importing it
 // when `dissolve_mode` moved next to the transition code (Plan 0061 Phase 3).
@@ -2471,4 +2471,166 @@ fn a_roster_is_a_rebind_only_when_the_names_and_systems_all_match() {
         !held.is_rebind_of(&[]),
         "an empty replacement is ignored entirely, so it is never a rebind"
     );
+}
+// -----------------------------------------------------------------------
+// The channel order a frame pipe announces (Plan 0167 Phase 2, ADR-0187)
+// -----------------------------------------------------------------------
+
+/// **The mapping is total over the formats a target can be built at**, and a
+/// format outside that set is refused rather than named `rgba8`.
+///
+/// The defect this closes was a constant: `"rgba8"` was emitted on both run
+/// modes, which is true of the headless offscreen and false of a swapchain that
+/// negotiated BGRA. A mapping with a `_ => Rgba8` arm would be the same defect
+/// wearing a `match`.
+#[test]
+fn every_eight_bit_four_channel_format_has_a_name_and_nothing_else_does() {
+    use wgpu::TextureFormat as F;
+
+    for format in [F::Rgba8Unorm, F::Rgba8UnormSrgb] {
+        assert_eq!(
+            PixelOrder::of(format),
+            Some(PixelOrder::Rgba8),
+            "{format:?} stores red first"
+        );
+    }
+    for format in [F::Bgra8Unorm, F::Bgra8UnormSrgb] {
+        assert_eq!(
+            PixelOrder::of(format),
+            Some(PixelOrder::Bgra8),
+            "{format:?} stores blue first"
+        );
+    }
+    // The sRGB and linear variants of one order are the same order: the
+    // transfer function is the consumer's colour problem and the byte layout is
+    // what it has to be told.
+    assert_eq!(
+        PixelOrder::of(F::Rgba8Unorm),
+        PixelOrder::of(F::Rgba8UnormSrgb)
+    );
+
+    for format in [F::Rgba16Float, F::Rgb10a2Unorm, F::R8Unorm, F::Rgba32Float] {
+        assert_eq!(
+            PixelOrder::of(format),
+            None,
+            "{format:?} was given a four-byte channel order it does not have"
+        );
+    }
+
+    // The names are the two spellings a `stream` event may carry, and `ALL` is
+    // the roster a consumer enumerating the closed set walks.
+    assert_eq!(PixelOrder::Rgba8.as_str(), "rgba8");
+    assert_eq!(PixelOrder::Bgra8.as_str(), "bgra8");
+    assert_eq!(PixelOrder::ALL.len(), 2);
+    assert!(PixelOrder::ALL.contains(&PixelOrder::Rgba8));
+    assert!(PixelOrder::ALL.contains(&PixelOrder::Bgra8));
+}
+
+/// **The declared order is the order the frames are actually produced at, on
+/// either negotiation** (ADR-0187, backlog 0200).
+///
+/// The frame tap and the preview mirror are the two things that hand a consumer
+/// bytes, and both are built at the context's configured format — so the
+/// assertion is that `pixel_order` and the wgpu textures themselves agree, read
+/// off the textures and not off a constant.
+///
+/// **The BGRA half is reached by moving the configured format**, which is the
+/// one variable a headless test cannot otherwise vary: a software adapter has
+/// no swapchain to negotiate one. Nothing is drawn after the move — the scene
+/// pipelines were built against the original format and a draw would be a
+/// validation error, not a picture — and nothing needs to be: the claim is
+/// about what the frames' textures are, and those are built on demand.
+#[test]
+fn the_declared_pixel_order_is_the_one_the_frames_carry() {
+    let Some(mut renderer) = headless_or_skip(HeadlessOptions {
+        width: 64,
+        height: 64,
+        prefer_software: true,
+    }) else {
+        return;
+    };
+
+    for format in [
+        wgpu::TextureFormat::Rgba8UnormSrgb,
+        wgpu::TextureFormat::Bgra8UnormSrgb,
+    ] {
+        renderer.ctx.config.format = format;
+        let declared = renderer
+            .pixel_order()
+            .expect("an 8-bit four-channel format has a name");
+
+        // The headless / `--stream` path: the tap's own target.
+        let tap = renderer.open_tap();
+        assert_eq!(
+            PixelOrder::of(tap.texture.format()),
+            Some(declared),
+            "the frame tap produces {:?} and the run would announce {}",
+            tap.texture.format(),
+            declared.as_str()
+        );
+
+        // The windowed `--preview` path: the mirror the readback copies out of.
+        renderer.open_preview().expect("a preview opens");
+        renderer
+            .open_preview_readback(32, 18)
+            .expect("a readback opens at a nameable format");
+        let mirror = renderer
+            .preview_readback
+            .as_ref()
+            .expect("the readback is open")
+            .tap
+            .texture()
+            .format();
+        assert_eq!(
+            PixelOrder::of(mirror),
+            Some(declared),
+            "the preview mirror produces {mirror:?} and the run would announce {}",
+            declared.as_str()
+        );
+        renderer.close_preview();
+    }
+}
+
+/// A format with no name is a **named error** on every path that would have to
+/// announce it, rather than a silent `rgba8`.
+///
+/// The failure this phase exists to end is a pipe labelled with an order it does
+/// not carry. Reaching that same state by a different road — a target format
+/// nothing in the closed set covers — must fail loudly rather than fall through
+/// to the commoner of the two.
+#[test]
+fn a_format_with_no_name_is_refused_rather_than_guessed() {
+    let Some(mut renderer) = headless_or_skip(HeadlessOptions {
+        width: 64,
+        height: 64,
+        prefer_software: true,
+    }) else {
+        return;
+    };
+    renderer.open_preview().expect("a preview opens");
+
+    renderer.ctx.config.format = wgpu::TextureFormat::Rgba16Float;
+    assert!(
+        matches!(
+            renderer.pixel_order(),
+            Err(RenderError::UnnameablePixelOrder(
+                wgpu::TextureFormat::Rgba16Float
+            ))
+        ),
+        "a format outside the closed set was given a name: {:?}",
+        renderer.pixel_order()
+    );
+    // And the readback refuses to open at all, so the announcement that would
+    // follow it never has to lie.
+    renderer
+        .open_preview()
+        .expect("a preview reopens at the new format");
+    assert!(
+        matches!(
+            renderer.open_preview_readback(32, 18),
+            Err(RenderError::UnnameablePixelOrder(_))
+        ),
+        "a readback opened at a format its frames could not be described in"
+    );
+    assert_eq!(renderer.preview_readback_size(), None);
 }

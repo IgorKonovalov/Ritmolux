@@ -141,6 +141,10 @@ fn a_bounded_run_writes_whole_frames_and_announces_the_geometry_first() {
         "\"width\":640",
         "\"height\":360",
         "\"fps\":60",
+        // Read off the offscreen this path renders into, not a constant: the
+        // windowed mirror announces whatever its swapchain negotiated and can
+        // say `bgra8` (ADR-0187). `rgba8` is this sink's answer because a
+        // headless run has no swapchain to negotiate the other one.
         "\"format\":\"rgba8\"",
     ] {
         assert!(

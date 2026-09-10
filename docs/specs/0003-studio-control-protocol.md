@@ -51,7 +51,7 @@ Adding an event or a field is additive under the same `v`; changing or removing 
 | `preset_error` | `file`, `message`, `line`, `col`, `param` | A preset failed to load |
 | `preset_warning` | `file`, `message` | A preset loaded with a non-fatal problem |
 | `health` | `fps`, `frame_ms_p50`, `frame_ms_p99`, `ctl_rejected`, `ctl_dropped`, `ctl_refused`, `preview_sent`, `preview_dropped` | Once a second while frames are drawn |
-| `stream` | `width`, `height`, `fps`, `format` | Once, before the first frame on a frame pipe |
+| `stream` | `width`, `height`, `fps`, `format` (`rgba8` \| `bgra8`) | Once, before the first frame on a frame pipe |
 | `pong` | `nonce` | Answering a `ctl/ping` |
 
 ## Invariants
@@ -132,6 +132,19 @@ Adding an event or a field is additive under the same `v`; changing or removing 
   way to see what was never sent, so a count taken there measures its own back-pressure and not
   delivery. `null` rather than `0`: "no preview" and "a preview that lost nothing" are different
   claims. (ADR-0184)
+- `stream.format` MUST name the channel order the pipe **actually carries**, out of the closed set
+  `rgba8` and `bgra8`, and a consumer MUST read it rather than assume one. The headless
+  `--stream --sink stdout` path renders into an offscreen the engine chooses and is always `rgba8`;
+  the windowed `--preview stdout` path mirrors the swapchain and carries whatever that negotiated,
+  which on a DX12 backend is commonly `bgra8`. A player that cannot name its own order MUST refuse
+  to open the pipe rather than announce the commoner value — a consumer told the wrong order draws
+  the right picture in the wrong colours, which reads as an authoring mistake and not a protocol
+  one. (ADR-0187)
+- `stream.width` and `stream.height` MUST hold for the **whole run**. The windowed mirror is a
+  fixed-size, letterboxed copy of the show for exactly this reason: the frames carry no header, so
+  a geometry that changed mid-stream would leave a reader with bytes it cannot align and no mark
+  saying where the new size began. Resizing, maximizing or fullscreening the show window MUST NOT
+  move them. (ADR-0187)
 - `preset_error` MUST carry the file and the message, and the line and column **whenever the TOML
   parser provides a span**. An expression error carries the parameter name instead: it is raised
   after the document was parsed into values that no longer carry a position, so it has no span, and
@@ -171,9 +184,10 @@ Adding an event or a field is additive under the same `v`; changing or removing 
 ## Known gaps
 
 - **`stream` is declared here and emitted by whichever sink carries the frames.** Its row is in
-  the roster above because the geometry is part of this contract, and the numbers in it are the
-  sink's: a requested size and rate from the headless video-out, the readback's size and the
-  display's rate from a windowed run's `--preview stdout`.
+  the roster above because the geometry is part of this contract, and the values in it are the
+  sink's: a requested size and rate from the headless video-out, the mirror's size and the
+  display's rate from a windowed run's `--preview stdout`, and a channel order read off the
+  texture the frames are produced at on either path.
 - **Nothing asserts the whole ordering of a live run.** `hello` before the rest is asserted from a
   spawned process, and each event's own shape is asserted at the writer — but the sequence a
   ten-minute show produces is what the plan's on-device phase looks at instead.

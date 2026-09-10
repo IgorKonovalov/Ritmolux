@@ -55,7 +55,7 @@ pub(super) struct PreviewReadback {
     /// The tap the buffer copies out of. Owned here rather than beside the
     /// intermediate because its whole purpose is to give this readback one
     /// geometry for the life of the run (ADR-0187).
-    tap: preview::PreviewTap,
+    pub(super) tap: preview::PreviewTap,
     buffer: wgpu::Buffer,
     width: u32,
     height: u32,
@@ -192,13 +192,21 @@ impl Renderer {
     ///
     /// Calling it again replaces the readback, which is how a caller changes the
     /// size it asked for.
+    ///
+    /// Refused when the frames would come out at a format no consumer can be
+    /// told the order of, so the announcement that follows can always be true
+    /// (ADR-0187).
     pub fn open_preview_readback(&mut self, width: u32, height: u32) -> Result<(), RenderError> {
         let Some(preview) = self.preview.as_ref() else {
             return Err(RenderError::CaptureReadback);
         };
+        let format = preview.format();
+        if PixelOrder::of(format).is_none() {
+            return Err(RenderError::UnnameablePixelOrder(format));
+        }
         self.preview_readback = Some(PreviewReadback::new(
             &self.ctx.device,
-            preview.format(),
+            format,
             width,
             height,
         ));

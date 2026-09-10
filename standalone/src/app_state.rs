@@ -962,13 +962,28 @@ impl AppState {
         let Some((width, height)) = self.renderer.preview_readback_size() else {
             return;
         };
+        // Read rather than assumed: the mirror carries whatever the swapchain
+        // negotiated, which on a DX12 backend is commonly BGRA (ADR-0187). The
+        // open above already refused a format with no name, so this cannot fail
+        // — but it is reported rather than defaulted, since a wrong order here
+        // is a picture with red and blue swapped and nothing that looks like an
+        // error.
+        let order = match self.renderer.pixel_order() {
+            Ok(order) => order,
+            Err(err) => {
+                eprintln!("--preview: {err}; the show runs without it");
+                self.preview_pinned = None;
+                self.renderer.close_preview_readback();
+                return;
+            }
+        };
         // The **display's** rate, not a requested one: a windowed run is paced by
         // the swapchain, so the number a reader wants is what the projector
         // refreshes at. `0` where the platform will not say, which reads as
         // "unpaced" rather than as a rate nothing runs at.
         let fps = display_hz(&self.window).map_or(0, |hz| hz.round().max(0.0) as u32);
-        self.show.emit_stream(width, height, fps);
-        self.preview_pipe = Some(crate::stream::PreviewPipe::spawn(width, height));
+        self.show.emit_stream(width, height, fps, order);
+        self.preview_pipe = Some(crate::stream::PreviewPipe::spawn(width, height, order));
     }
 
     /// Hand this frame's readback to the writer, if one landed.

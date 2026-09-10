@@ -297,8 +297,8 @@ flowchart TB
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The preview pipe stops moving under the reader | dev | done | committed with this row |
-| 2 — The `stream` event names the format it actually carries | dev | not started | |
+| 1 — The preview pipe stops moving under the reader | dev | done | 80fc61c |
+| 2 — The `stream` event names the format it actually carries | dev | done | committed with this row |
 | 3 — `--schema` declares the grammar | dev | not started | |
 | 4 — The studio paints what it was told | studio-builder | not started | |
 | 5 — The player mode is a per-machine setting | studio-builder | not started | |
@@ -346,6 +346,28 @@ converting `bgra8` to `rgba8` there would cost the same as the format-preserving
 which is not the per-frame CPU pass over 8 MB that ADR-0187 rejects under Alternative C. If that is
 right, `format` could stay a single value and Phases 2 and 4 would have nothing to do. Implemented as
 the ADR specifies; recording the observation rather than acting on it.
+
+**Phase 2 — where the mapping and the refusal live.** The plan puts the mapping in
+`standalone/src/stream.rs`; it is in `core/src/render/mod.rs` instead, as `PixelOrder` with
+`Renderer::pixel_order()`, because `standalone` has no `wgpu` dependency and so cannot name a
+`TextureFormat`. The refusal is `RenderError::UnnameablePixelOrder` and fires at
+`open_preview_readback` and at `pixel_order()`, so no pipe opens at a format its announcement could
+not describe. `standalone/src/show.rs`, `app_state.rs` and `stream.rs` pass what the renderer says.
+
+One source serves both run modes: the frame tap, the capture target and the preview intermediate are
+all built at `ctx.surface_format()`, so there is one question and not two.
+
+**Phase 2 — how the BGRA half is reached.** A software adapter negotiates nothing, so
+`the_declared_pixel_order_is_the_one_the_frames_carry` moves `ctx.config.format` and asserts the
+textures the frames come out of follow it, on both orders. Nothing is drawn after the move — the
+scene pipelines were built at the original format — and the claim is about what the textures are.
+The **visible** half of backlog 0200 was not reproduced on this machine: the reading in Phase 1 was
+taken on an adapter that negotiates RGBA, so no locally-rendered frame has had its channels swapped
+and the swizzle Phase 4 adds will be exercised by its own test rather than by a picture.
+
+**Phase 2 — files outside the list**: `standalone/tests/stream_pipe.rs` (a comment on why `rgba8` is
+this sink's answer), `core/src/render/context.rs` (the new `RenderError` variant),
+`core/src/render/preview_readback.rs` and `core/src/render/tests.rs` (the refusal and the tests).
 
 ### Close triggers
 
