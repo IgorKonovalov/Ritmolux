@@ -274,15 +274,62 @@ export type PlayerEvent =
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The skeleton shows the picture | studio-builder | done | `f2be445` |
-| 2 — The protocol is typed once | studio-builder | done | |
-| 3 — Parameters move | studio-builder | not started | |
-| 4 — Expressions and palettes | studio-builder | not started | |
-| 5 — Composition and the library | studio-builder | not started | |
+| 2 — The protocol is typed once | studio-builder | done | `d80b7a4` |
+| 3 — Parameters move | studio-builder | blocked | |
+| 4 — Expressions and palettes | studio-builder | blocked | |
+| 5 — Composition and the library | studio-builder | blocked | |
 | 6 — The release job and the gate | dev | not started | |
 | 7 — The tester handoff | human | not started | |
 | 8 — The on-device check | human | not started | |
 
 ### Notes
+
+**The headless path the plan spawns emits two events and binds no listener.**
+Phase 1 spawns `--stream --sink stdout --events --control` as the plan's phase
+says. On that invocation `standalone/src/run.rs` returns at the headless branch
+before `resolve_control` is reached, so `--control` is accepted as a token and
+no socket is bound; `hello` reports `"control":null`, which the studio's footer
+shows as `control none`. The only two events the path emits are `hello`
+(`run.rs`, the headless branch) and `stream` (`stream.rs`). `preset`, `roster`,
+`preset_error`, `preset_warning` and `health` are emitted from `app_state.rs`
+only, and the path publishes no OSC telemetry either.
+
+What that leaves unmet, by phase, is the half of each that needs the player to
+say or do anything:
+
+| Phase | Done-when it cannot reach today |
+|---|---|
+| 3 | A drag moving the picture (no listener); a `preset_error` shown after a save (not emitted) |
+| 3 | Which system to render a panel for (the `preset` event is not emitted) |
+| 4 | Error markers placed from `preset_error` events (not emitted) |
+| 5 | The library view of the roster (the `roster` event is not emitted) |
+| 5 | A click dissolving the player to a preset (no listener) |
+
+The halves that do not depend on it are untouched and buildable: `--schema`
+works and exports 59 KB covering every system's params with defaults, ranges and
+prose, and the atomic round-tripping preset writer is a filesystem question.
+
+The user's decision on 2026-09-10 was to keep the studio headless and have the
+listener bound on that path rather than spawn the player windowed with
+`--preview stdout` — which is the leg Plan 0158 Phase 6 shipped, and which does
+bind the listener and emit the full roster. The lane stopped at the Phase 2/3
+boundary rather than build panels against a player that reports nothing.
+
+**Two places the implementation differs from what a phase or an ADR says.**
+
+- ADR-0178's preview path says frames cross "as transferable buffers, so the
+  copy across processes is one move rather than a structured clone".
+  `MessagePortMain.postMessage(message, transfer)` accepts **only
+  `MessagePortMain` objects** in `transfer` (`electron.d.ts:8841`), and main and
+  the renderer are separate OS processes, so a frame is serialized whatever is
+  asked for. The frame is cut once out of the pipe's chunks and viewed in place
+  by `ImageData`; there is no second copy on either side, but the mechanism the
+  ADR names is not available in that direction.
+- Phase 2 asks the OSC fixture to be "captured from the player's own test
+  suite". The player *encodes* telemetry and only *decodes* `ctl`, and the
+  headless path publishes no telemetry, so `shared/fixtures/osc-packets.json` is
+  fourteen packets captured off a short **windowed** run's encoder over UDP. All
+  three argument types on the `ctl` roster appear in it.
 
 ### Close triggers
 
