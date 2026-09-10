@@ -397,6 +397,40 @@ export type PlayerEvent =
 
 ### Notes
 
+**The close was reached with two `human` phases unstarted and three High backlog
+entries open against what Phase 9 packaged.** Running the packaged artifact on
+the development machine produced all three: **0199** the studio always spawns a
+windowed player, **0200** the `stream` event declares `rgba8` while the windowed
+preview intermediate is built at the negotiated swapchain format, so the studio
+paints red and blue swapped, **0201** the preview stops updating while the show
+keeps drawing, undiagnosed. 0200 and 0201 are in the surface Phases 1, 4 and 5
+built; none is a Phase 9 regression, which touched no Rust.
+
+**ADR-0183 is claimed twice, the second time this plan has hit the collision.**
+This branch carries
+`docs/adrs/0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md`;
+`main` carries `docs/adrs/0183-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md`
+(Plan 0166), written independently. The two rosters disagree on the next free
+number — `main` says 0184, this branch says 0185. The earlier 0181 collision is
+recorded further down and was settled by an architect ruling; this one is
+unsettled. Every citation in this branch links by filename, so nothing resolves
+to the wrong document meanwhile, and 0184 is claimed only here.
+
+**The full suite's single failure did not reproduce outside the full suite, and
+the second run is what says it is
+intermittent.** A second `cargo nextest run --workspace`, same tree, same
+machine, exited **0**: 1683 passed, 6 skipped, 536.5 s. The test that failed the
+first run passed it in **3.483 s**, and the two runs scheduled it differently —
+**1683/1683** in the red run, taking 303.1 s, against **1490/1683** in the green
+one. The whole suite was also slower in the red run, 879.6 s against 536.5 s.
+Nothing in
+`.config/nextest.toml` isolates the test: there is no `test-threads`, no
+`threads-required` on the soaks and no `slow-timeout`, so a spawned-process
+control test that needs timely frames from its child runs concurrently with
+tests that render 9,000 frames each on the same adapter. The walk's own
+mechanism is a 60 s `LINE_DEADLINE` per line and a `break` on the first miss,
+which is why a starved child reports `1` rather than a partial count.
+
 **Phase 9 — one done-when written before Plan 0102, and four files outside the
 lists.**
 
@@ -690,13 +724,33 @@ reports nothing.
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** none. No file under `presets/` is in any of the nine phase commits.
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** feature. A third application and a third and fourth release artifact, plus
+  additive engine work in `standalone/` and `core/`. Across the nine phase commits: 101 files under
+  `studio/`, 12 under `standalone/`, 5 under `core/`, 3 under `packaging/`, 2 under `.github/`, and
+  one each of `CLAUDE.md`, `.gitignore` and `.githooks/`.
+- **Operator docs touched:** `docs/capturing.md`, `docs/nfr.md`, `docs/releasing.md`, and
+  `docs/specs/0003-studio-control-protocol.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — 126 stated reductions hold
+  across all 52 live entries, 10 unprobeable. Three of those entries were filed by this plan's
+  Phase 9 session and are new since the last run: **0199** (`fd451aa`), **0200** and **0201**
+  (`d72ea98`).
+- **Full suite:** `cargo nextest run --workspace` — **exit 100**. 1683 run, **1682 passed, 1 failed**,
+  6 skipped, 879.6 s. The failure is
+  `standalone::stream_show every_system_is_reported_by_the_key_the_schema_labels_its_roster_with`
+  (`left: 1, right: 12`, 303.1 s), which is Phase 5's twelve-system walk. Four other readings of the
+  same test, taken after it: it passes **alone** in 3.06 s; it passes under **`-P fast`**, which
+  its binary is not excluded from, in the pre-push run at the Phase 9 commit; it passes in 3.58 s
+  run **alongside the three heaviest soak tests**; and a **second full-suite run of the same tree
+  exited 0** (1683 passed, 6 skipped, 536.5 s), with that test passing in 3.483 s. Both full-suite
+  readings and the scheduling difference between them are in `### Notes`. No upward suite override
+  was taken at any earlier phase — Phases 3, 5 and 9 touched no scene, composite, preset engine or
+  embedded preset.
+- **Outstanding `human` phases:** **both** — 10 (the tester handoff) and 11 (the on-device check),
+  neither started. Deferred on the user's direction on 2026-09-10, after the Phase 9 artifact was
+  run on the development machine and produced backlog 0199, 0200 and 0201; the direction was to
+  postpone the human smoke until those are fixed.
 
 ## Followups (after this lands)
 
