@@ -1,6 +1,6 @@
 # 0165 — The release path stops being the first compile
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-10
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0181-the-gate-compiles-every-feature-a-release-ships](../adrs/0181-the-gate-compiles-every-feature-a-release-ships.md),
@@ -231,11 +231,11 @@ the smaller plan to resolve the larger one's workflow edits.
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `main`, in the main checkout at `WORK/Ritmolux` — no worktree. Phase 0's done-when needs a nested lane present to be observable, and `.claude/worktrees/plan-0161-structural-hold` was live and `locked` throughout.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 0 — The index-rows gate enumerates from git | dev | not started | |
+| 0 — The index-rows gate enumerates from git | dev | done | committed with this row |
 | 1 — The gate compiles the `spout` feature | dev | not started | |
 | 2 — A dispatch cannot publish | dev | not started | |
 | 3 — The missed version gets published | human | not started | |
