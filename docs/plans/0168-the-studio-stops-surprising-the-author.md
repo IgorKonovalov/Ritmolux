@@ -1,6 +1,6 @@
 # 0168 — The studio stops surprising the author
 
-> **Status:** draft
+> **Status:** in-progress
 > **Created:** 2026-09-10
 > **Owner skill(s):** studio-builder
 > **Related ADRs:** [0189](../adrs/0189-an-edit-forks-the-preset-and-the-studio-holds-rotation.md) (proposed —
@@ -215,11 +215,58 @@ flowchart TB
 > from the plan or an unmet done-when is always disclosed. Stays shorter than
 > `## Implementation phases` above.
 
+**Lane:** `main` directly.
+
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — An edit forks the preset, and rotation is held | studio-builder | not started | |
-| 2 — Every problem is reachable | studio-builder | not started | |
-| 3 — The handoff note stops promising an audio setup | studio-builder | not started | |
+| 1 — An edit forks the preset, and rotation is held | studio-builder | done | 4221c6a |
+| 2 — Every problem is reachable | studio-builder | done | 231424d |
+| 3 — The handoff note stops promising an audio setup | studio-builder | done | dadce82 |
+
+### Notes
+
+**Phase 1 — the two calls the plan left to this lane.** The prompt is an inline name field in the
+editor's status strip, replacing the path line while a gesture is held; no overlay, and the preview
+is never covered at the instant a slider was released. Fork identity is **session-scoped** — a set
+of paths in the hook, so a relaunch asks again and makes a second fork. Both were put to the owner
+before the phase started.
+
+**Phase 1 — what an embedded preset's fork is made of.** No event carries the embedded document's
+text and ADR-0184 forbids the studio resolving one, so the fork is `templateFor` on the system the
+`preset` event named, plus the gesture's edit. It is a real file and editable from there on, but it
+is **not** a copy of what was on screen: the embedded preset's own bindings are not in it. Visible
+in `Editor.tsx`'s `base` memo and in the embedded test's assertions.
+
+**Phase 1 — five files beyond the phase's list, and one path in it that needed nothing.**
+`shared/ipc-channels.ts`, `electron/ipc/presetHandlers.ts` and `electron/preload/api/preset.ts` carry
+a `preset:create` OS channel beside `preset:write`, because the create-new in `writer.ts` refuses a
+name that exists and that refusal has to reach the renderer. `components/ForkPrompt.tsx` and
+`components/Rotation.tsx` are the two surfaces. The five editor components the plan listed take
+`writable` as a prop and needed no edit — only `Editor.tsx`'s computation of it moved.
+
+**Phase 1 — the library's new preset goes through the same create.** It previously used
+`preset.write`, which would have overwritten a curated preset whose name collided; it is now the
+create that refuses, and the file it makes is registered as this session's own so editing it does
+not ask for a name.
+
+**Phase 1 — the refusal is a check plus a rename, not an atomic no-clobber.** Node has no portable
+one, and `open` with `wx` would claim the name with an empty `.toml` the watcher reads as a broken
+preset. Recorded in `createPresetFile`'s own comment.
+
+**Phase 2 — one file beyond the phase's list.** `components/Banner.tsx` gained an optional `action`
+so the count can sit on the banner it summarises; every existing caller renders as before.
+`usePlayerEvents.ts` needed nothing — the length was already reachable.
+
+**Phase 3 — one line beyond the phase's list.** Section 5 promised six things and listed seven;
+corrected while the file was open.
+
+**The gate, after each phase:** `npm run typecheck`, `npm run lint`, `npm test` in `studio/` — 29
+files, 263 tests, green. `shared/toml.test.ts` and `renderer/editor/diagnostics.test.ts` were not
+edited. `shared/protocol.ts` and `docs/specs/` are untouched by the whole plan.
+
+**Not run:** the studio was built (`npm run build`) but not launched against a real player. Every
+done-when here is a test; what a person would see — the prompt mid-drag, the held-rotation line on a
+projector — is Plan 0167's Phase 7 and Phase 8.
 
 [backlog 0202]: ../design-backlog.md
 [backlog 0203]: ../design-backlog.md
