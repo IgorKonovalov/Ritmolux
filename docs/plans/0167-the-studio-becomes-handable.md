@@ -488,6 +488,14 @@ carries. Nothing gates the two against each other. Left for the close's version 
 decision to gate it; the captures above were taken with the constant overridden locally, and it was
 reverted.
 
+**Settled, after the phase commits, on the user's direction** (`be9f2e7`). Both studio copies follow
+`Cargo.toml` at `0.115.0`, and `studio/shared/version.test.ts` holds all three equal so the next bump
+fails the studio's suite until they do. Verified it bites: reverting the constant alone fails with
+*expected '0.113.0' to be '0.115.0'*. The **Full suite** trigger's disk figure was also settled the
+same way — `target/debug`, `target/tmp`, `target/doc` and `target/aarch64-apple-darwin` were deleted,
+taking `C:` from 5.2 GB free to 70.8 GB. Those are build caches; `target/release` was kept because
+two studio tests and the smoke run spawn the player out of it.
+
 ### Close triggers
 
 > Filled after Phase 6. **Phases 7 and 8 have not run**, so this is a partial brief and the two
