@@ -71,7 +71,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0192 - `--report` cannot see a `beat_index`-driven response, so a deliberately musical preset measures as inert](#0192-----report-cannot-see-a-beat_index-driven-response-so-a-deliberately-musical-preset-measures-as-inert)
 - [0193 — the `spout` feature is compiled for the first time by the job that publishes it, and that has already cost a release](#0193--the-spout-feature-is-compiled-for-the-first-time-by-the-job-that-publishes-it-and-that-has-already-cost-a-release)
 - [0194 — `release.yml` promises a dry run it cannot provide, because the publish gate reads the ref and not the event](#0194--releaseyml-promises-a-dry-run-it-cannot-provide-because-the-publish-gate-reads-the-ref-and-not-the-event)
-- [0195 — four Node gates walk a nested worktree, so one lane's gate convicts on another lane's fixture and one renderer can write into another lane's checkout](#0195--four-node-gates-walk-a-nested-worktree-so-one-lanes-gate-convicts-on-another-lanes-fixture-and-one-renderer-can-write-into-another-lanes-checkout)
+- [0195 — `check-index-rows.mjs` is the one gate that never adopted the tracked-set enumeration, so a lane opened inside the repository blocks every push](#0195--check-index-rowsmjs-is-the-one-gate-that-never-adopted-the-tracked-set-enumeration-so-a-lane-opened-inside-the-repository-blocks-every-push)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -3758,7 +3758,7 @@ the comment side by side with a specific question in mind.
 blast radius is a premature public prerelease rather than a broken build — recoverable, but
 outward-facing and not quietly so.
 
-## 0195 — four Node gates walk a nested worktree, so one lane's gate convicts on another lane's fixture and one renderer can write into another lane's checkout
+## 0195 — `check-index-rows.mjs` is the one gate that never adopted the tracked-set enumeration, so a lane opened inside the repository blocks every push
 
 `check-doc-links.mjs`, `check-index-rows.mjs`, `check-comment-hygiene.mjs` and `toc.mjs` each walk
 the tree with the same exclusion — `SKIP_DIRS = new Set(["target", "node_modules", ".git"])` — and
@@ -3767,7 +3767,8 @@ Plan 0161 lane sat at `.claude/worktrees/plan-0161-structural-hold/`, a full sec
 ignored by git via `.git/info/exclude` and invisible to `git status`. Every one of those four walks
 descended into it.
 
-Two distinct consequences, and the second is the dangerous one.
+Two consequences were claimed when this was filed. ~~The second is the dangerous one.~~ **Only the
+first is real** — see the correction bullet below.
 
 **The gate convicts on a fixture that is supposed to be convicted.** `check-index-rows.mjs` skips
 its own seeded trees by **absolute path**, anchored at the real repo root:
@@ -3779,20 +3780,33 @@ wrong. The gate runs at pre-push, so **every push from the main checkout fails w
 exists**, and CI stays green because a fresh checkout has no nested copy. That inverts the usual
 relationship: the local gate is red and the un-bypassable one is green.
 
-**`toc.mjs` does not only read.** It rewrites the contents block of any long document it finds, so a
-routine `node scripts/toc.mjs` in the main checkout can edit markdown **inside another lane's
-working tree** — a lane that may be mid-phase, whose session did not make the edit and will find it
-as unexplained drift. The 2026-09-10 run rewrote only `docs/design-backlog.md` because the nested
-copy's blocks happened to be current. Nothing prevented the other outcome.
+~~**`toc.mjs` does not only read.** It rewrites the contents block of any long document it finds, so
+a routine `node scripts/toc.mjs` in the main checkout can edit markdown **inside another lane's
+working tree**.~~ **False, corrected the same day.** `toc.mjs:119` enumerates from `git ls-files` and
+walks only when git cannot answer, so an untracked nested checkout is never in its list. The hazard
+exists only in that fallback, which announces itself. The 2026-09-10 run rewrote one file for the
+ordinary reason: it was the only one whose block had drifted.
 
 - **Raised:** 2026-09-10, when `check-index-rows.mjs` went red against a clean main checkout while
   capturing two unrelated findings. **Owner if taken:** `dev`, on an architect call about which
   exclusion is correct.
+- **CORRECTED 2026-09-10, hours after filing — two of this entry's claims were false, and they are
+  struck below rather than deleted.** The title said *four Node gates*; the body said `toc.mjs` can
+  write into a lane. Reading how those four enumerate their inputs shows `toc.mjs`,
+  `check-doc-links.mjs` and `check-comment-hygiene.mjs` all take their file list from
+  **`git ls-files`**, walking only when git cannot answer — so a nested lane, being untracked, is
+  already invisible to them, and `toc.mjs` cannot rewrite what it never lists.
+  `check-filter-figures.mjs` scans the working tree deliberately but leaves the exit code to the
+  tracked half, so it can report a nested hit and not convict on one. **`check-index-rows.mjs` is
+  the only gate that convicts**, because it is the only full-tree walker with no tracked-set filter.
+  The entry stands because the blocked push is real; what it blamed was four times too wide.
 - **PROMOTED 2026-09-10 → [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md)
-  Phase 0**, which takes the **skip any directory holding a `.git` entry** shape — the rule the
-  gates actually mean — and goes first in that plan, because the blocked push blocks the plan's own
-  phases. The `.claude`-in-`SKIP_DIRS` shape was rejected: `check-doc-links.mjs` covers
-  `.claude/skills/**` and found five broken links there on its first run.
+  Phase 0** and [ADR-0182](adrs/0182-a-plan-lane-may-live-inside-the-repository.md), which accept the
+  inside-the-repo lane as a supported shape and make the enumeration rule explicit:
+  **`check-index-rows.mjs` adopts `git ls-files`**, like the three gates that already do. The
+  `.git`-probe shape and the `.claude`-in-`SKIP_DIRS` shape are both recorded as rejected there — the
+  first solves a problem four of the five walkers do not have, the second silences
+  `check-doc-links.mjs` over `.claude/skills/**`, where it found five broken links on its first run.
 - **Verified 2026-09-10** — the exclusion set has no notion of a nested checkout:
   `present: SKIP_DIRS = new Set\(\["target", "node_modules", "\.git"\]\) in: scripts/check-index-rows.mjs`
 - **Verified 2026-09-10** — and the fixture skip is anchored to one absolute root, which a second
@@ -3812,16 +3826,13 @@ the repository breaks that assumption silently, and the two lanes live on 2026-0
 across both shapes: `WORK/rlx-plan-0159` and `WORK/rlx-plan-0161` outside, and
 `.claude/worktrees/plan-0161-structural-hold` inside.
 
-The repair is a line, and choosing which line is the architect's part. Excluding `.claude` from the
-four walks is the smallest change and leaves the gates unable to check anything that might one day
-live there. Excluding any directory containing a `.git` entry states the real rule — *do not walk
-into another checkout* — and costs a `statSync` per directory. Making the fixture skip relative
-rather than root-anchored fixes the conviction but not the write hazard, so it is not sufficient on
-its own. Whichever is taken, the same exclusion belongs in all four, because they already share the
-constant by copy.
+The repair is one script adopting a convention three of its siblings already follow, and ADR-0182
+records why the three wider shapes lost. What makes this entry worth keeping after its correction is
+the shape of the mistake: the four scripts **share the `SKIP_DIRS` constant by copy**, which reads
+like shared behaviour and is not — three of them never reach that constant unless git is
+unavailable. A copied constant invited the inference that a copied consequence followed.
 
 ### Priority
 
-**High** for the blocked push, which is immediate and affects every session in the main checkout
-while a nested lane exists; **Medium** for the write hazard, which is latent, silent, and would be
-read as someone else's mistake.
+**High**, for the blocked push alone — immediate, affecting every session in the main checkout while
+a nested lane exists. ~~Medium for the write hazard~~, which does not exist.

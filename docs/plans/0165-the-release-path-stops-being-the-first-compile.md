@@ -3,7 +3,8 @@
 > **Status:** approved
 > **Created:** 2026-09-10
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0181-the-gate-compiles-every-feature-a-release-ships](../adrs/0181-the-gate-compiles-every-feature-a-release-ships.md)
+> **Related ADRs:** [0181-the-gate-compiles-every-feature-a-release-ships](../adrs/0181-the-gate-compiles-every-feature-a-release-ships.md),
+> [0182-a-plan-lane-may-live-inside-the-repository](../adrs/0182-a-plan-lane-may-live-inside-the-repository.md)
 > **Closes:** design-backlog 0193, design-backlog 0194, design-backlog 0195
 
 ## TL;DR
@@ -45,16 +46,17 @@ rewrite force-pushed 131 of them. So the tag exists at `c5a08f1`, has zero Relea
 newest published release remains `v0.103.0`. The trap is now written into `docs/releasing.md`;
 publishing the missed version is Phase 3.
 
-**4. Four Node gates walk a worktree opened inside the repository.** `check-doc-links.mjs`,
-`check-index-rows.mjs`, `check-comment-hygiene.mjs` and `toc.mjs` share one exclusion by copy —
-`SKIP_DIRS = new Set(["target", "node_modules", ".git"])` — and a lane at
-`.claude/worktrees/plan-NNNN-*/` is a full second checkout that is none of those. `check-index-rows`
-then reads the seeded **red** fixture inside that copy, whose skip is anchored to the real repo
-root's absolute path, and convicts; the gate runs at `.githooks/pre-push:147`, so **every push from
-the main checkout fails** while such a lane exists, with nothing wrong in the pushed tree. Worse,
-`toc.mjs` rewrites what it walks, so it can edit markdown inside a live lane's working tree. Backlog
-0195 carries the probes; Phase 0 repairs it, and goes first because nothing else here can be pushed
-until it does.
+**4. One gate never adopted the tracked-set enumeration, and a lane opened inside the repository
+blocks every push because of it.** `toc.mjs`, `check-doc-links.mjs` and `check-comment-hygiene.mjs`
+take their file lists from `git ls-files` and walk only when git cannot answer, so a nested
+checkout — untracked by definition — is already invisible to them. `check-filter-figures.mjs` scans
+the working tree on purpose but leaves its exit code to the tracked half. `check-index-rows.mjs`
+walks unconditionally, so it reads the seeded **red** fixture inside
+`.claude/worktrees/plan-0161-structural-hold/`, whose skip is anchored to the real repo root's
+absolute path and cannot match a second copy, and it convicts. That gate runs at
+`.githooks/pre-push:147`, so **a clean main checkout cannot be pushed** while such a lane exists,
+while CI stays green. ADR-0182 accepts the inside-the-repo lane and makes the enumeration rule
+explicit; backlog 0195 carries the probes and the record of its own correction.
 
 ## Decision
 
@@ -89,29 +91,28 @@ flowchart LR
 
 ## Implementation phases
 
-### Phase 0 — The gates stop walking into another lane's checkout
+### Phase 0 — The index-rows gate enumerates from git, like its siblings
 - **Owner skill:** `dev`
-- **What:** Teach the four tree walks to skip any subdirectory that **contains a `.git` entry**,
-  which states the real rule — never walk into another checkout — and covers a lane opened anywhere
-  rather than only under `.claude`. The entry must be accepted as either a directory *or a file*: a
-  linked worktree's `.git` is a gitlink **file**, which is exactly the case that bit us. Apply the
-  same change to all four, because they carry the exclusion by copy: `scripts/check-doc-links.mjs`,
-  `scripts/check-index-rows.mjs`, `scripts/check-comment-hygiene.mjs`, `scripts/toc.mjs`. Leave the
-  existing `SKIP_DIRS` and both fixture-tree skips alone — a fixture tree holds no `.git`, so it is
-  unaffected, and each must still be scanned when it **is** the root, which is how its bite checks
-  work.
-- **Files touched:** `scripts/check-doc-links.mjs`, `scripts/check-index-rows.mjs`,
-  `scripts/check-comment-hygiene.mjs`, `scripts/toc.mjs`
-- **Done when:** `node scripts/check-index-rows.mjs` exits 0 in a main checkout that has a worktree
-  under `.claude/worktrees/` — the exact condition that reds it today, and the one to reproduce
-  before changing anything, because a fix verified only against a tree without a nested lane has
-  tested nothing. Both `--self-test` runs the hook invokes (`check-index-rows.mjs --self-test` and
-  `toc.mjs --self-test`) still pass, so the seeded fixtures are still reachable as roots. And
-  `node scripts/toc.mjs` rewrites nothing outside the checkout it was run from.
-- **Trap — do not reach for the one-token fix.** Adding `.claude` to `SKIP_DIRS` is smaller and
-  wrong: `check-doc-links.mjs` deliberately covers `.claude/skills/**`, where it found five broken
-  links the first time it ran, and a name-based skip silences that check forever. The rejected
-  alternatives are recorded in backlog 0195.
+- **What:** `check-index-rows.mjs` takes its `.md` list from `git ls-files` instead of an
+  unconditional filesystem walk, falling back to the existing walk only when git cannot answer and
+  **saying which source it used** — the shape `toc.mjs:119` and `check-doc-links.mjs` already
+  implement, and ADR-0016's rule about a check that quietly measures less than it claims. Keep the
+  existing `SKIP_DIRS`, keep both `SEEDED_TREES` skips, and keep `--self-test` working: the fixtures
+  are tracked, so `git ls-files` reaches them, but note that its output is relative to the **cwd**
+  rather than to the scan root — `check-backlog-claims.mjs` carries a comment on exactly that trap
+  and is the reference. Then add `.claude/worktrees/` to the committed `.gitignore`, so the
+  supported shape is visible to every clone instead of only to a machine-local
+  `.git/info/exclude`.
+- **Files touched:** `scripts/check-index-rows.mjs`, `.gitignore`
+- **Done when:** `node scripts/check-index-rows.mjs` exits 0 in a main checkout that **has** a
+  worktree under `.claude/worktrees/` — the exact condition that reds it today, and the one to
+  reproduce before changing anything, because a fix verified against a tree without a nested lane
+  has tested nothing. `node scripts/check-index-rows.mjs --self-test` still asserts the fixtures'
+  exact counts, both roots still separable. The gate still convicts a genuinely over-cap row in
+  `docs/`: add one, watch it fail, remove it.
+- **Do not take the three shapes ADR-0182 rejected** — a `.git`-entry probe on every walk, `.claude`
+  in `SKIP_DIRS`, or a relative fixture skip alone. The reasons are recorded there, and the first
+  two were the chosen shape until the evidence arrived.
 
 ### Phase 1 — The gate compiles the `spout` feature
 - **Owner skill:** `dev`
@@ -177,13 +178,13 @@ flowchart LR
   Release runs for `v0.113.0` — but it was not verified against a documented limit in this session.
   If the re-push also produces no run, that inference is wrong and the cause is elsewhere; say so
   rather than re-pushing a third time.
-- **A `.git` probe costs one filesystem stat per directory, on four walks.** Unmeasured here, and
-  expected to disappear next to reading every `.md` in the tree — but it is a cost, and if it shows
-  up in the hook's ~28 s budget the measurement belongs in the commit message.
-- **`check-comment-hygiene.mjs` has the same blindness and has not yet convicted.** It scans `.rs`,
-  `.cpp` and `.h`, so it reads another lane's in-progress Rust today and stays green only because
-  that lane's comments happen to comply. Phase 0 fixes it in the same edit rather than waiting for
-  it to fire.
+- **The fallback walk stays reachable.** In a tree git cannot answer for, Phase 0's gate falls back
+  to the walk and a nested lane becomes visible again. That is accepted in ADR-0182 and made legible
+  by the source notice rather than removed.
+- **`check-filter-figures.mjs` can still report a nested hit.** It scans the working tree by design,
+  because an untracked scratch file holding a cost figure is still a second page. Its exit code comes
+  from the tracked half, so this is noise and not a conviction — out of scope here, named so the
+  next reader does not mistake it for the same bug.
 - **`v0.112.0` can never be built from its own tree.** Its run is pinned to `f207c46`, a
   pre-rewrite SHA that no longer exists on `origin`, so `actions/checkout` cannot fetch it. The
   version is skipped, permanently. That is a consequence of the history rewrite and is recorded
@@ -210,7 +211,7 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 0 — The gates stop walking into another lane's checkout | dev | not started | |
+| 0 — The index-rows gate enumerates from git | dev | not started | |
 | 1 — The gate compiles the `spout` feature | dev | not started | |
 | 2 — A dispatch cannot publish | dev | not started | |
 | 3 — The missed version gets published | human | not started | |
