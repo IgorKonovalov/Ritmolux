@@ -344,7 +344,7 @@ export type PlayerEvent =
 |---|---|---|---|
 | 1 — The skeleton shows the picture | studio-builder | done | `f2be445` |
 | 2 — The protocol is typed once | studio-builder | done | `d80b7a4` |
-| 3 — The show loop is extracted | dev | done | committed with this row |
+| 3 — The show loop is extracted | dev | done | `163b330` |
 | 4 — The studio drives the one player | studio-builder | not started | |
 | 5 — Parameters move | studio-builder | not started | |
 | 6 — Expressions and palettes | studio-builder | not started | |
@@ -354,6 +354,14 @@ export type PlayerEvent =
 | 10 — The on-device check | human | not started | |
 
 ### Notes
+
+**ADR number 0181 is claimed twice.** This lane's studio/show-loop decision and
+main's `0181-the-gate-compiles-every-feature-a-release-ships.md` (Plan 0165) were
+both written on 2026-09-10 and both files now exist in this branch. The merge
+that brought them together kept both roster rows and moved the next free number
+to 0183; which of the two renames is an architect call, as it was for 0120 and
+0160. Every citation of either is by its own filename, so nothing resolves to the
+wrong document in the meantime.
 
 **Phase 3 — two things outside what the phase names.**
 
