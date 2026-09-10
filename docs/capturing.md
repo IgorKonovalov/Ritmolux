@@ -33,6 +33,7 @@ analysis is deterministic too, so a render is reproducible and diff-able.
   - [Which preset library a shot uses](#which-preset-library-a-shot-uses)
   - [Editing presets live](#editing-presets-live)
   - [Examples](#examples)
+  - [Held bindings: the scene may not be seeing this frame's value](#held-bindings-the-scene-may-not-be-seeing-this-frames-value)
 - [The live video-out: `ritmolux --stream`](#the-live-video-out-ritmolux---stream)
   - [`--sink spout`: another application on the same machine](#--sink-spout-another-application-on-the-same-machine)
   - [`--sink stdout`: raw frames on a pipe](#--sink-stdout-raw-frames-on-a-pipe)
@@ -1373,12 +1374,45 @@ is reading a different statistic.
 
 `reachability` carries `dead_branches`, `unapproached_ceilings` and
 `saturated_clamps` counts, the full `gates` list (each with `param`, `source`,
-`kind`, and one of `always` / `peak_fraction_of_bound` / `occupancy`), and a
-`probe` object naming the signal, BPM and duration they were observed under.
+`kind`, and one of `always` / `peak_fraction_of_bound` / `occupancy`), a `holds`
+list (each with `param` and `edge` — see [held bindings](#held-bindings-the-scene-may-not-be-seeing-this-frames-value)),
+and a `probe` object naming the signal, BPM and duration they were observed
+under. `holds` is the one member read off the compiled preset rather than
+observed, so the `probe` provenance does not apply to it.
 `kind` is `"select"`, `"compare"`, `"clamp"` or `"saturated"` — matching the
 `GATE` / `COMP` / `CEIL` / `SAT` lines above — and `dead_branches` counts the
 first two together. Keep the provenance when you consume it: a flag only ever
 means *not observed under this stimulus*.
+
+### Held bindings: the scene may not be seeing this frame's value
+
+A preset may declare a [`[hold]`](../presets/README.md) table
+([ADR-0180](adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md) rule 2): a binding
+listed there is still evaluated every frame, and the value the scene receives
+changes only on a named musical edge — `beat`, `bar`, or a period in seconds.
+
+Every column on this page is a **rendered** measurement, so a hold is already
+inside the numbers. What is not inside them is the reading a person does over
+the same table: a binding that names `bass` is read as responding to bass, and a
+held one responds to bass once a bar. So the report names them, one line each,
+under the family they belong to:
+
+```text
+  held bindings: the scene sees the value the named edge last took, not this
+  frame's — so read the columns above as the response the hold allows, not as
+  the expression's own
+  HELD: my_rose n on bar
+  HELD: my_rose [layer] mix on 2.5 s
+```
+
+The block is **absent** when no preset in the family holds anything — no shipped
+preset declares a `[hold]` table, so the whole library is in that case and the
+lines above are from a hand-written fixture. `--json` carries the same pairs as
+`reachability.holds`.
+
+This is containment for `[hold]`, not a fix for the report's blindness to
+`beat_index`-driven response — that is
+[design-backlog 0192](design-backlog.md), and it is a larger hole.
 
 ## The live video-out: `ritmolux --stream`
 

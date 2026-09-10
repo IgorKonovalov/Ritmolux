@@ -126,6 +126,8 @@ summarised [below](#the-spectrum-table)), `[feedback]` (how an accumulation read
 its own past — [below](#the-feedback-table)), `[smoothing]` (per-parameter
 easing), `[latch]` (an event armed on one condition and fired by another —
 [below](#the-latch-table--arm-on-one-thing-fire-on-another)),
+`[hold]` (a binding re-sampled on a musical edge rather than every frame —
+[below](#the-hold-table--re-sample-on-a-musical-edge-hold-in-between)),
 `[palette]` / `[palette_b]` (colour), and `[layer]` (a second scene
 composed under or over the main one — the expression language inside
 `[layer.params]` is exactly this document's). All are documented in
@@ -140,11 +142,13 @@ inside one.
 Two things bend that sentence without breaking it. A binding naming
 [`index`](#index--one-binding-evaluated-once-per-element) is evaluated once *per
 element* by the `spectrum` system rather than once per frame; it is still the same
-pure expression over the same frame. And a
-[`[latch]`](#the-latch-table--arm-on-one-thing-fire-on-another) variable is the
-**one part of the preset surface whose value depends on the frames before this
-one** — the state lives in the engine, not in the expression, and the expression
-still just reads a variable.
+pure expression over the same frame. And **two tables depend on the frames
+before this one** — in both, the state lives in the engine rather than in the
+expression, which goes on being a pure function of what it is handed. A
+[`[latch]`](#the-latch-table--arm-on-one-thing-fire-on-another) is a variable
+whose value the engine carries; a
+[`[hold]`](#the-hold-table--re-sample-on-a-musical-edge-hold-in-between) leaves
+the expression alone and changes **which frame's result the scene is shown**.
 
 ---
 
@@ -1230,6 +1234,94 @@ binding naming it would silently read the built-in. And a latch's own `arm` and
 
 Full reference, including where the cap comes from:
 [`presets/README.md`](../presets/README.md).
+
+---
+
+### The `[hold]` table — re-sample on a musical edge, hold in between
+
+`[latch]` answered the **event** half of *"`[smoothing]` shapes a value over time
+but never holds one"*. `[hold]` answers the **value** half.
+
+Bind an integer the obvious way and it re-picks itself every frame:
+
+```toml
+[params]
+n = "3 + floor(bass * 5)"       # a rose that flickers between 3 and 8 petals
+```
+
+Sixty times a second, that is not a rose changing its mind on the music — it is
+noise. A `[hold]` entry says *when* the value is allowed to change:
+
+```toml
+[params]
+n = "3 + floor(bass * 5)"
+
+[hold]
+n = "bar"                       # take the value on the downbeat; hold it until the next
+```
+
+The expression is still evaluated every frame — the grammar stays a pure
+function of its variables ([ADR-0180](adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md)).
+What the hold decides is which frame's value the scene is shown.
+
+**The vocabulary.** Three spellings, one per entry:
+
+| entry | when the value is re-taken |
+|---|---|
+| `"beat"` | every frame the beat detector fires. That is the onset gate — the same one `beat` reads in an expression — which fires 1.2x-2.3x per musical beat depending on the material. |
+| `"bar"` | every time the bar counter moves. **Read the caveat below before you reach for this.** |
+| a number | every `n` seconds of render time, `n > 0`. Write it bare (`2.5`) or quoted (`"2.5"`); both mean seconds. The one edge that still steps on a silent stream. |
+
+Anything else is a load error naming what was written and what was expected.
+
+> **`bar` is only as good as the downbeat tracker, and the downbeat tracker
+> locks about 3 % of audible time** ([backlog 0042](design-backlog.md)). The rest
+> of the time the bar counter is **derived from the beat count** rather than
+> estimated — it steps on something regular and musical, but it is not a
+> promise that you are on the downbeat. What `[hold] n = "bar"` reliably buys is
+> *slow*: roughly one change every four detected beats instead of sixty a second.
+> Where you want the change on a hit rather than on a phrase, `"beat"` says what
+> it means.
+
+**The first frame always takes a value.** A held binding samples on the frame the
+preset becomes active, before any edge has fired — a preset never opens on a
+default it did not ask for. That is also what makes `"bar"` correct on silence,
+where the counter never moves.
+
+**With `[smoothing]`, the order is evaluate → hold → smooth.** The smoother eases
+toward the *held* value exactly as it eases toward any other, so a parameter that
+is both held and eased **travels** to each new figure instead of stepping to it:
+
+```toml
+[hold]
+n = "bar"
+[smoothing]
+n = 0.35            # the petal count glides to its new value over a third of a second
+```
+
+Leave the parameter out of `[smoothing]` for a clean jump. Note that a
+**structural** parameter walks through the intervening whole numbers on the way —
+see the two groups in
+[`presets/README.md`](../presets/README.md#systems-and-their-named-parameters).
+
+**What cannot be held.** A binding that reads `index` or lives in `[per_vertex]`
+is evaluated many times per frame and has no single value to hold, so a `[hold]`
+entry naming one is a **load error** — not the warning the equivalent
+`[smoothing]` entry gets. An easing constant has a degraded form to fall back to
+and a hold has none: the binding would go on flickering while the table looked
+applied. An entry naming a parameter the preset does not bind is a warning, like
+an `[occupancy] exempt` entry that names nothing.
+
+**A layer holds its own.** `[layer.hold]` reaches the layer's `[layer.params]`
+and its bindable `mix`, indexed within the layer, exactly as `[layer.smoothing]`
+does.
+
+> **A hold weakens the static reading of a preset, in one specific way.** The
+> reachability walk sees a live expression naming `bass`; it cannot see that the
+> engine took that expression's value once this bar. So a held preset can *look*
+> more reactive on paper than it is. `shot --report` names every held binding and
+> its edge on a `HELD:` line for exactly this reason — read the reactivity
+> columns beside it as the response the hold allows.
 
 ---
 

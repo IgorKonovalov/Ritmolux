@@ -123,6 +123,7 @@ headroom as headroom.
 - [Eased parameters — the `[smoothing]` table](#eased-parameters--the-smoothing-table)
   - [Snap up, glide down — the `{ attack, release }` form](#snap-up-glide-down--the--attack-release--form)
 - [An event with a memory — the `[latch]` table](#an-event-with-a-memory--the-latch-table)
+- [A value with a memory — the `[hold]` table](#a-value-with-a-memory--the-hold-table)
 - [A clamp is a limit, not a gain — the `[occupancy]` table](#a-clamp-is-a-limit-not-a-gain--the-occupancy-table)
 - [A world-space param is not bounded by its clamp — the frame is the bound](#a-world-space-param-is-not-bounded-by-its-clamp--the-frame-is-the-bound)
 - [Structural config (line systems, the attractor, and the shape field)](#structural-config-line-systems-the-attractor-and-the-shape-field)
@@ -397,6 +398,19 @@ the engine’s own declarations** ([ADR-0170](../docs/adrs/0170-a-parameters-ref
 — the same ones the loader checks a binding against and the scene applies at
 reset — so it cannot name a default the engine does not use, and a parameter
 cannot be missing from it.
+
+Each system's parameters are printed in **two groups**
+([ADR-0180](../docs/adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md) rule 4).
+**Structural** parameters say *what is drawn* — a count, a mode, a family — and
+the engine rounds one to a whole number before the scene sees it, so easing one
+walks it through the intervening integers. **Modal** parameters say *how it
+looks*, and every value in their range means something. The distinction is worth
+knowing before you bind: [backlog 0030](../docs/design-backlog.md) measured that
+presets binding audio to **geometry** score two to four times better on the
+animation metric than presets binding it to brightness, and these two groups are
+where that choice is visible. A parameter with an integer-sounding name printed
+under **Modal** is there because its scene reads the fraction; its own row says
+so.
 
 The essays below the block are hand-written and are where depth lives: a line
 here is the **definition**, and the essay is the **discussion**.
@@ -3803,6 +3817,65 @@ rejected, and a latch's `arm`/`fire` may not name another latch.
 > **A latch nothing reads is a load warning**, in the shape an inert
 > `[occupancy] exempt` entry gets and for the same reason: you would otherwise
 > believe an event was wired up while nothing consumed it.
+
+## A value with a memory — the `[hold]` table
+
+An optional top-level `[hold]` table names bindings the engine **re-samples on a
+musical edge** and holds between edges
+([ADR-0180](../docs/adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md) rule 2).
+It sits beside `[smoothing]` and `[latch]` in every sense — same place in the
+file, same resolved-once-at-load treatment, same reset on a preset switch — and
+between the three of them the sentence is finished: `[smoothing]` shapes a value
+over time, `[latch]` holds an **event**, `[hold]` holds a **value**.
+
+```toml
+[params]
+n = "3 + floor(bass * 5)"   # a rose that would flicker between 3 and 8 petals
+
+[hold]
+n = "bar"                   # ...takes its petal count once a bar instead
+```
+
+The expression is still evaluated every frame; the entry decides which frame's
+result the scene is shown.
+
+| entry | when the value is re-taken |
+|---|---|
+| `"beat"` | every frame the beat detector fires — the same gate the `beat` variable reads. |
+| `"bar"` | every time the bar counter moves. |
+| a number | every `n` seconds of render time, `n > 0`, bare (`2.5`) or quoted. |
+
+Anything else is a load error. The first frame a held binding is seen **always**
+takes a value, so a preset never opens on a default it did not ask for.
+
+> **`bar` rides the downbeat estimator, and that estimator locks about 3 % of
+> audible time** ([backlog 0042](../docs/design-backlog.md)). The rest of the
+> time the bar counter is derived from the beat count rather than tracked — it
+> steps on something regular, not on a guaranteed downbeat. What the entry
+> reliably buys is *slow*. Where you want the change on a hit, `"beat"` says so.
+
+**With `[smoothing]`, the order is evaluate → hold → smooth → quantize.** The
+smoother eases toward the held value, so a parameter that is both held and eased
+travels to each new figure rather than stepping to it — and a **Structural**
+parameter walks through the whole numbers on the way. Leave it out of
+`[smoothing]` for a clean jump.
+
+**A binding that reads `index`, or lives in `[per_vertex]`, cannot be held**: it
+is evaluated many times per frame and has no single value to hold, so an entry
+naming one is a **load error** rather than the warning the equivalent
+`[smoothing]` entry gets. An easing constant degrades to instant and still
+renders what you wrote; a hold has no degraded form, and the binding would go on
+flickering while the table looked applied. An entry naming a parameter the preset
+does not bind is a warning, like an inert `[occupancy] exempt` entry.
+
+`[layer.hold]` reaches the layer's own bindings and its `mix`, exactly as
+`[layer.smoothing]` does.
+
+> **A hold makes a preset read as more reactive than it is.** The static
+> reachability walk sees a live expression naming `bass` and cannot see that the
+> engine took its value once this bar. `shot --report` prints a `HELD:` line per
+> held binding with its edge for that reason — read the reactivity columns
+> beside it as the response the hold allows.
 
 ## A clamp is a limit, not a gain — the `[occupancy]` table
 

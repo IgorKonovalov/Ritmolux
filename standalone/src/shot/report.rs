@@ -763,8 +763,12 @@ const CEILINGS_NAMED: usize = 3;
 /// reading a person does over the same table — a binding that names `bass` is
 /// read as responding to bass, and a held one responds to bass once a bar.
 /// Naming the hold says which rows to read that way. This is containment for
-/// `[hold]`; it is not a fix for the report's blindness to `beat_index`-driven
+/// `[hold]`; it is not a fix for the report's blindness to counter-driven
 /// response (design-backlog 0192), which is a different and larger hole.
+///
+/// The counter is deliberately not named here: 0192's own probe asserts that
+/// this file mentions it nowhere, and a regex cannot tell prose from a
+/// stimulus field.
 ///
 /// Silent for a family with no held binding, which is the whole shipped
 /// library: a line per family saying nothing happened is the noise the

@@ -247,8 +247,8 @@ struct ParamHold {
 | 2 — `ParamKind` and quantization | dev | done | 4eeeba8 |
 | 3 — the audit | dev | done | 7c70cba |
 | 4 — the reference prints the two surfaces | dev | done | de9fb94 |
-| 5 — `--report` learns about holds | dev | done | committed with this row |
-| 6 — the documentation sweep | dev | not started | |
+| 5 — `--report` learns about holds | dev | done | 7b53a13 |
+| 6 — the documentation sweep | dev | done | committed with this row |
 
 ### Notes
 
@@ -396,6 +396,26 @@ lines; nothing in it was hand-edited.
 - **`docs/capturing.md` is the `--report` reference and now describes a block and a JSON key it did
   not carry.** Updated in Phase 6, which is the documentation sweep; Phase 6's file list names only
   `docs/presets.md` and `presets/README.md`.
+
+**Phase 6 — the documentation sweep.**
+
+- **`docs/capturing.md` joined the phase's file list**, for the reason above: it is the `--report`
+  reference, it enumerates the JSON's keys, and Phase 5 added one. A new *Held bindings* section
+  and a widened `reachability` paragraph.
+- **`docs/presets.md` gained two things beyond the `[hold]` section.** The anatomy list of optional
+  tables named every table but this one, and the paragraph declaring `[latch]` *"the one part of
+  the preset surface whose value depends on the frames before this one"* had stopped being true.
+  Both corrected.
+- **`presets/README.md`'s Structural/Modal paragraph cites [backlog 0030](../design-backlog.md)**,
+  which measured that presets binding audio to geometry score 2-4x better on the animation metric
+  than presets binding it to brightness. ADR-0180's Consequences names that measurement as the
+  thing rule 4's two groups make pointable-at, and the paragraph is where an author meets it.
+- **One comment reworded to keep another lane's gate honest.** `write_holds`'s doc named
+  `beat_index` while pointing at [backlog 0192](../design-backlog.md), and 0192's own executable
+  probe is `absent: beat_index in: standalone/src/shot/report.rs`. `check-backlog-claims.mjs` broke
+  on it. The comment now says *counter-driven* and states why it does not name the counter — a
+  regex cannot tell prose from a stimulus field, and rewriting the entry's probe is
+  `architect`'s call, not this lane's.
 
 ### Close triggers
 
