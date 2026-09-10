@@ -9,11 +9,20 @@ import { useEffect, useState } from 'react'
 
 import type { HealthEvent, HelloEvent, PlayerEvent, StreamEvent } from '@shared/protocol'
 
-/** A preset that failed or complained, as the banner and the list show it. */
+/**
+ * A preset that failed or complained, as the banner shows it and as the editor
+ * places it.
+ *
+ * `col` and `param` are carried because the editor needs one of them: a TOML
+ * failure has a position, and an expression failure has only the parameter's
+ * name, which is enough to find the line it is bound on (spec 0003).
+ */
 export interface Problem {
   file: string
   message: string
   line: number | null
+  col: number | null
+  param: string | null
   kind: 'error' | 'warning'
 }
 
@@ -73,6 +82,8 @@ function reduce(state: PlayerState, event: PlayerEvent): PlayerState {
             file: event.file,
             message: event.message,
             line: event.line,
+            col: event.col,
+            param: event.param,
             kind: 'error',
           } satisfies Problem,
           ...state.problems,
@@ -86,6 +97,8 @@ function reduce(state: PlayerState, event: PlayerEvent): PlayerState {
             file: event.file,
             message: event.message,
             line: null,
+            col: null,
+            param: null,
             kind: 'warning',
           } satisfies Problem,
           ...state.problems,

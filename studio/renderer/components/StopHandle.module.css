@@ -1,0 +1,31 @@
+.stop {
+  display: grid;
+  grid-template-columns: 1.6rem 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.1rem 0;
+}
+
+.swatch {
+  background: none;
+  border: 1px solid var(--panel-edge);
+  border-radius: 3px;
+  height: 1.3rem;
+  padding: 0;
+  width: 100%;
+  cursor: pointer;
+}
+
+.position {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.at {
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  min-width: 2.6rem;
+  text-align: right;
+}

@@ -91,7 +91,10 @@ interface Entry {
   trailer: string
 }
 
-function scan(lines: string[]): { entries: Entry[]; paramsStart: number; paramsEnd: number } {
+function scan(
+  lines: string[],
+  wanted: string,
+): { entries: Entry[]; paramsStart: number; paramsEnd: number } {
   let table: string | undefined
   let paramsStart = -1
   let paramsEnd = -1
@@ -99,12 +102,12 @@ function scan(lines: string[]): { entries: Entry[]; paramsStart: number; paramsE
   for (let i = 0; i < lines.length; i += 1) {
     const header = TABLE.exec(lines[i])
     if (header !== null) {
-      if (table === 'params') paramsEnd = i
+      if (table === wanted) paramsEnd = i
       table = header[1].trim()
-      if (table === 'params') paramsStart = i
+      if (table === wanted) paramsStart = i
       continue
     }
-    if (table !== 'params') continue
+    if (table !== wanted) continue
     const entry = ENTRY.exec(lines[i])
     if (entry === null) continue
     const { value, trailer } = splitTrailer(entry[4])
@@ -123,7 +126,7 @@ function scan(lines: string[]): { entries: Entry[]; paramsStart: number; paramsE
 
 /** Every binding the `[params]` table declares, in file order. */
 export function readParams(text: string): Binding[] {
-  const { entries } = scan(text.split('\n'))
+  const { entries } = scan(text.split('\n'), 'params')
   return entries.map((entry): Binding => {
     const quoted = QUOTED.exec(entry.value)
     if (quoted === null) {
@@ -179,7 +182,7 @@ function lineEnding(lines: string[]): string {
  */
 export function setConstant(text: string, name: string, value: number): string {
   const lines = text.split('\n')
-  const { entries, paramsStart, paramsEnd } = scan(lines)
+  const { entries, paramsStart, paramsEnd } = scan(lines, 'params')
   const eol = lineEnding(lines)
   const rendered = formatValue(value)
 
@@ -212,5 +215,120 @@ export function setConstant(text: string, name: string, value: number): string {
   const inTable = entries.filter((entry) => entry.line > paramsStart && entry.line < paramsEnd)
   const at = inTable.length > 0 ? inTable[inTable.length - 1].line + 1 : paramsStart + 1
   lines.splice(at, 0, fresh)
+  return lines.join('\n')
+}
+
+// ---------------------------------------------------------------------------
+// The `[palette]` table
+// ---------------------------------------------------------------------------
+
+/** One stop of a custom palette, with the line it sits on. */
+export interface Stop {
+  at: number
+  color: string
+  line: number
+}
+
+export interface Palette {
+  /** A built-in palette's name, when the preset names one. */
+  name: string | undefined
+  /** The custom stops, in file order. Empty when the preset declares none. */
+  stops: Stop[]
+}
+
+/**
+ * One stop written as an inline table on its own line.
+ *
+ * The shipped presets write exactly this shape, one per line, usually with a
+ * trailing comment naming the colour — which is why a stop is edited by
+ * splicing its two values back into the line rather than by re-rendering the
+ * array. Re-rendering would drop those comments, and they are the author's
+ * record of what each colour is for.
+ */
+const STOP = /(\{\s*at\s*=\s*)([^,\s]+)(\s*,\s*color\s*=\s*)(["'])([^"']*)\4(\s*\})/
+
+/** The `[palette]` table's built-in name and its custom stops. */
+export function readPalette(text: string): Palette {
+  const lines = text.split('\n')
+  const { entries, paramsStart, paramsEnd } = scan(lines, 'palette')
+  const named = entries.find((entry) => entry.name === 'name')
+  const quoted = named === undefined ? null : QUOTED.exec(named.value)
+
+  const stops: Stop[] = []
+  if (paramsStart !== -1) {
+    for (let i = paramsStart; i < paramsEnd; i += 1) {
+      const stop = STOP.exec(lines[i])
+      if (stop === null) continue
+      const at = Number(stop[2])
+      if (!Number.isFinite(at)) continue
+      stops.push({ at, color: stop[5], line: i })
+    }
+  }
+  return { name: quoted === null ? undefined : quoted[2], stops }
+}
+
+/**
+ * `text` with the `[palette]` table naming `name`, and nothing else changed.
+ *
+ * Refuses a preset that declares custom stops: a `name` beside a `stops` array
+ * is two palettes in one table, and which one wins is the loader's business
+ * rather than something this editor should decide by writing both.
+ */
+export function setPaletteName(text: string, name: string): string {
+  const lines = text.split('\n')
+  const { entries, paramsStart, paramsEnd } = scan(lines, 'palette')
+  if (readPalette(text).stops.length > 0) {
+    throw new Error('this preset defines its own stops; clear them before naming a built-in')
+  }
+  const existing = entries.find((entry) => entry.name === 'name')
+  if (existing !== undefined) {
+    const quoted = QUOTED.exec(existing.value)
+    const quote = quoted === null ? '"' : quoted[1]
+    lines[existing.line] =
+      `${existing.indent}name${existing.equals}${quote}${name}${quote}${existing.trailer}`
+    return lines.join('\n')
+  }
+  const eol = lineEnding(lines)
+  const fresh = `name = "${name}"${eol}`
+  if (paramsStart === -1) {
+    const tail = lines.length > 0 && lines[lines.length - 1] === '' ? lines.length - 1 : lines.length
+    lines.splice(tail, 0, `${eol}`, `[palette]${eol}`, fresh)
+    return lines.join('\n')
+  }
+  const inTable = entries.filter((entry) => entry.line > paramsStart && entry.line < paramsEnd)
+  const at = inTable.length > 0 ? inTable[inTable.length - 1].line + 1 : paramsStart + 1
+  lines.splice(at, 0, fresh)
+  return lines.join('\n')
+}
+
+/**
+ * `text` with stop `index` moved to `at` and/or recoloured, and nothing else
+ * changed.
+ *
+ * The two values are spliced into the line the stop already occupies, so its
+ * indentation, its trailing comma and the comment naming the colour all
+ * survive. `at` is written to two decimals, which is the precision the shipped
+ * palettes are authored at and finer than a drag can resolve on any plausible
+ * ramp width.
+ */
+export function setStop(
+  text: string,
+  index: number,
+  next: { at?: number; color?: string },
+): string {
+  const lines = text.split('\n')
+  const stops = readPalette(text).stops
+  const stop = stops[index]
+  if (stop === undefined) throw new Error(`this preset has no stop ${index}`)
+  const match = STOP.exec(lines[stop.line])
+  if (match === null) throw new Error(`stop ${index} is not on the line it was read from`)
+
+  const at = next.at === undefined ? match[2] : (Math.round(next.at * 100) / 100).toFixed(2)
+  const color = next.color ?? match[5]
+  if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
+    throw new Error(`\`${color}\` is not a colour a preset can hold`)
+  }
+  const replaced = `${match[1]}${at}${match[3]}${match[4]}${color}${match[4]}${match[6]}`
+  lines[stop.line] = lines[stop.line].replace(match[0], replaced)
   return lines.join('\n')
 }

@@ -84,6 +84,7 @@ export function App(): JSX.Element {
             system={player.preset?.system}
             file={player.preset?.file}
             reloads={player.reloads}
+            problems={player.problems}
             onProblem={setSaveProblem}
           />
         </div>

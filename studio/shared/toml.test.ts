@@ -12,7 +12,14 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { formatValue, readParams, setConstant } from './toml'
+import {
+  formatValue,
+  readPalette,
+  readParams,
+  setConstant,
+  setPaletteName,
+  setStop,
+} from './toml'
 
 const PRESETS = join(__dirname, '..', '..', 'presets')
 
@@ -185,5 +192,84 @@ describe('the value a preset is written with', () => {
   it('refuses a value no preset can hold', () => {
     expect(() => formatValue(Number.NaN)).toThrow()
     expect(() => formatValue(Number.POSITIVE_INFINITY)).toThrow()
+  })
+})
+
+describe('the palette table', () => {
+  const custom = [
+    '[palette]',
+    'stops = [',
+    '  { at = 0.00, color = "#475a93" },  # lapis - the trunks',
+    '  { at = 0.62, color = "#7fa650" },',
+    ']',
+    '',
+  ].join('\n')
+
+  it('reads the stops a preset declares, with the line each sits on', () => {
+    expect(readPalette(custom)).toEqual({
+      name: undefined,
+      stops: [
+        { at: 0, color: '#475a93', line: 2 },
+        { at: 0.62, color: '#7fa650', line: 3 },
+      ],
+    })
+  })
+
+  it('reads a built-in palette by name', () => {
+    expect(readPalette('[palette]\nname = "ember"\n')).toEqual({ name: 'ember', stops: [] })
+  })
+
+  it('finds no palette in a preset that declares none', () => {
+    expect(readPalette('name = "Probe"\n')).toEqual({ name: undefined, stops: [] })
+  })
+
+  it('moves one stop and keeps the comment that names its colour', () => {
+    const moved = setStop(custom, 0, { at: 0.25 })
+    expect(moved.split('\n')[2]).toBe(
+      '  { at = 0.25, color = "#475a93" },  # lapis - the trunks',
+    )
+    expect(moved.split('\n')[3]).toBe(custom.split('\n')[3])
+  })
+
+  it('recolours one stop and leaves its position alone', () => {
+    const painted = setStop(custom, 1, { color: '#112233' })
+    expect(painted.split('\n')[3]).toBe('  { at = 0.62, color = "#112233" },')
+  })
+
+  it('refuses a colour a preset cannot hold', () => {
+    expect(() => setStop(custom, 0, { color: 'rebeccapurple' })).toThrow(/not a colour/)
+    expect(() => setStop(custom, 0, { color: '#abc' })).toThrow(/not a colour/)
+  })
+
+  it('refuses a stop that is not there', () => {
+    expect(() => setStop(custom, 7, { at: 0.5 })).toThrow(/no stop 7/)
+  })
+
+  it('names a built-in in a preset that has a palette table already', () => {
+    expect(setPaletteName('[palette]\nname = "ember"\n', 'ice')).toBe('[palette]\nname = "ice"\n')
+  })
+
+  it('adds the table when the preset has no palette at all', () => {
+    expect(setPaletteName('name = "Probe"\n', 'ice')).toBe('name = "Probe"\n\n[palette]\nname = "ice"\n')
+  })
+
+  it('refuses to name a built-in over a preset that authored its own stops', () => {
+    // Both keys in one table is two palettes, and which wins is the loader's
+    // business rather than something this editor decides by writing both.
+    expect(() => setPaletteName(custom, 'ice')).toThrow(/clear them/)
+  })
+
+  it('changes exactly one line when it moves a stop in a shipped preset', () => {
+    let checked = 0
+    for (const { name, text } of shippedPresets()) {
+      const palette = readPalette(text)
+      if (palette.stops.length === 0) continue
+      checked += 1
+      const changes = diff(text, setStop(text, 0, { at: 0.11 }))
+      expect(changes.length, `${name}: ${changes.length} lines changed`).toBe(1)
+      expect(changes[0].line).toBe(palette.stops[0].line)
+      expect(readPalette(setStop(text, 0, { at: 0.11 })).stops[0].at).toBe(0.11)
+    }
+    expect(checked).toBeGreaterThan(5)
   })
 })

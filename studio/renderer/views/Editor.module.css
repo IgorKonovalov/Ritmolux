@@ -24,3 +24,36 @@
   font-family: var(--mono);
   overflow-wrap: anywhere;
 }
+
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.4rem 0.5rem 0;
+}
+
+.tab,
+.tabOn {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px 3px 0 0;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  padding: 0.25rem 0.6rem;
+  text-transform: uppercase;
+}
+
+.tabOn {
+  background: var(--panel);
+  border-color: var(--panel-edge);
+  color: var(--text);
+}
+
+.pane {
+  flex: 1;
+  min-height: 0;
+  padding: 0.75rem;
+  overflow-y: auto;
+}

@@ -1,0 +1,42 @@
+.editor {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  border: 1px solid var(--panel-edge);
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--panel);
+}
+
+.bar {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.35rem 0.6rem;
+  border-bottom: 1px solid var(--panel-edge);
+}
+
+.path {
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dirty {
+  color: var(--warn);
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  margin-left: auto;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.host {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}

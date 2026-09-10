@@ -12,7 +12,7 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 
-import { readParams, setConstant, type Binding } from '@shared/toml'
+import { readPalette, readParams, setConstant, type Binding, type Palette } from '@shared/toml'
 
 export type PresetFileState =
   /** No preset reported yet. */
@@ -20,7 +20,13 @@ export type PresetFileState =
   /** On screen, but from the embedded set: there is no file to edit. */
   | { status: 'embedded' }
   | { status: 'loading'; path: string }
-  | { status: 'ready'; path: string; text: string; bindings: Binding[] }
+  | {
+      status: 'ready'
+      path: string
+      text: string
+      bindings: Binding[]
+      palette: Palette
+    }
   | { status: 'failed'; path: string; reason: string }
 
 export interface ActivePreset {
@@ -34,6 +40,14 @@ export interface ActivePreset {
    * picture back to the old value for as long as the watcher's poll takes.
    */
   commit: (name: string, value: number) => Promise<string | undefined>
+  /**
+   * Write a whole document back, atomically.
+   *
+   * What the text editor's save and every `[palette]` edit go through: those
+   * rewrite a line this hook does not model, so the caller builds the next
+   * document with the editors in `@shared/toml` and hands it over whole.
+   */
+  write: (next: string) => Promise<string | undefined>
 }
 
 export function useActivePreset(file: string | null | undefined, reloads: number): ActivePreset {
@@ -59,6 +73,7 @@ export function useActivePreset(file: string | null | undefined, reloads: number
               path: result.value.path,
               text: result.value.text,
               bindings: readParams(result.value.text),
+              palette: readPalette(result.value.text),
             }
           : { status: 'failed', path: file, reason: result.reason },
       )
@@ -87,5 +102,15 @@ export function useActivePreset(file: string | null | undefined, reloads: number
     [state],
   )
 
-  return { file: state, commit }
+  const write = useCallback(
+    async (next: string): Promise<string | undefined> => {
+      if (state.status !== 'ready') return 'there is no file behind this preset'
+      if (next === state.text) return undefined
+      const result = await window.api.preset.write(state.path, next)
+      return result.ok ? undefined : result.reason
+    },
+    [state],
+  )
+
+  return { file: state, commit, write }
 }

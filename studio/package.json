@@ -20,6 +20,12 @@
     "typecheck": "tsc --noEmit --project tsconfig.main.json && tsc --noEmit --project tsconfig.preload.json && tsc --noEmit --project tsconfig.renderer.json && tsc --noEmit --project tsconfig.test.json"
   },
   "dependencies": {
+    "@codemirror/commands": "6.8.0",
+    "@codemirror/language": "6.10.8",
+    "@codemirror/lint": "6.8.4",
+    "@codemirror/state": "6.5.2",
+    "@codemirror/view": "6.36.2",
+    "@lezer/highlight": "1.2.1",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "zod": "3.23.8"
