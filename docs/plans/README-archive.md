@@ -243,16 +243,20 @@ asked to be held to.
 carries an embedded preset's own text and ADR-0184 forbids the studio resolving one, so the fork is
 `templateFor` on the system the `preset` event named plus the gesture's edit - the embedded
 preset's own bindings are not in it. That is the honest answer available and it is disclosed in the
-right three places; it is worth knowing that a tester who forks a shipped preset gets the system's
-defaults, not the look they were auditioning.
+right two developer-facing places - and **not in the third**, which was a finding.
+`packaging/studio/READ-ME-FIRST.md` told the tester the studio *"saves the whole thing under that
+name"*, which is true of a preset with a file and false of a built-in one, so a tester who copied a
+shipped look and found it rendering differently would have reported the wrong defect. That is the
+same shape as the audio sentence Phase 3 was written to remove. Repaired at this close (`d5f51d0`),
+named as an exception in the tester's own words.
 
 **The findings.** One **major**: the missing `### Close triggers` block above. Three **minors**:
 `useHeldRotation`'s load-bearing invariant - that `hello` is referentially stable, so a resume is
 not silently undone by the next render - is undefended, because the test rerenders with a *fresh*
 `hello()` each time and therefore asserts the re-fire rather than the identity (it holds today
 because `reducePlayerEvent` carries the same object forward and `usePlayerActions` memoizes on
-`[]`, both one edit from being false); the embedded fork's lossiness has no test asserting what is
-*absent* from the written document, only what is present; and `packaging/studio/READ-ME-FIRST.md`
+`[]`, both one edit from being false); the tester note's copy promise did not hold for a built-in
+preset, repaired at this close as described above; and `packaging/studio/READ-ME-FIRST.md`
 gained a Phase 3 line beyond its phase's list (a "six things" count corrected to "a few"), disclosed
 but the kind of drift a count invites. One **nit**: a second held gesture relabels the fork prompt
 with the *current* preset's name while still carrying the first gesture's document, so a library
