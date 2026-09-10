@@ -1,9 +1,9 @@
 # 0054 — The line scenes catch up: every one honours the palette, and the star stops cutting between shapes
 
 > **Status:** **done** — closed 2026-08-03. All four `dev` phases landed on the
-> `plan-0054-line-scenes` worktree branch: `e03598f` the L-system's generation-depth colour,
-> `86bba60` the parametric curve's path axis plus the star's measured-flat radial one, `4df5d21`
-> `variant` as a continuous contact angle, `9362793` the docs. Mode 4 review: **no blockers, no
+> `plan-0054-line-scenes` worktree branch: `9d3a4f0` the L-system's generation-depth colour,
+> `47abdfe` the parametric curve's path axis plus the star's measured-flat radial one, `ccd9ca6`
+> `variant` as a continuous contact angle, `3177749` the docs. Mode 4 review: **no blockers, no
 > majors**; three minors, all fixed in the close commit.
 > [ADR-0059](../../adrs/0059-line-scenes-colour-along-their-generator-axis.md) and
 > [ADR-0060](../../adrs/0060-star-pattern-variants-interpolate.md) are **accepted, each with an

@@ -1,6 +1,6 @@
 # 0005 — Extract the lock-free ring into a wgpu-free crate for Miri
 
-> **Status:** done (2026-07-21) — landed in `de0fe24` (Phase 1 extraction) and `6af7865`
+> **Status:** done (2026-07-21) — landed in `bbf641a` (Phase 1 extraction) and `d70c9ad`
 > (Phase 2 Miri CI job); passed Mode 4 review with no blockers and no majors. The SPSC ring
 > now lives in the zero-dep `lmv-ring` crate, re-exported unchanged from `core::audio`, with a
 > fast `cargo +nightly miri test -p lmv-ring` UB gate in CI. Behavior-preserving; build,

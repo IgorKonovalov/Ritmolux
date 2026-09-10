@@ -1,7 +1,7 @@
 # 0077 — The quiet sky: the sparse idiom becomes gateable and the swarm individuates
 
-> **Status:** done (closed 2026-08-12 — the four `dev` phases landed as `698b734` /
-> `fae16e6` / `3bfc7c8` / `b1ca4e9`, every done-when verified at the Mode 4 review:
+> **Status:** done (closed 2026-08-12 — the four `dev` phases landed as `178fab1` /
+> `ec927c2` / `5651f11` / `8b186b7`, every done-when verified at the Mode 4 review:
 > no blockers, no majors, two minors both repaired in the close series. **Phase 5 is
 > `human` and deliberately outstanding — see the plans README's Standing section**:
 > the content lane authors Perseids' quiet sky through the Plan 0067 route, with the

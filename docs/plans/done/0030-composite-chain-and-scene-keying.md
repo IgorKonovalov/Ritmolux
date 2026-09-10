@@ -12,9 +12,9 @@
 
 ## Close summary (Mode 4, 2026-07-25)
 
-Four `dev` phase commits — `023777d` (the `PostStage` trait, pure routing, and the `PostChain` that
-replaced the ladder), `55c7109` (two chains against one device proven independent), `9c02953`
-(kind-keyed scenes, `system_slot` deleted), `d711760` (docs describe the chain that now runs the
+Four `dev` phase commits — `97fda4e` (the `PostStage` trait, pure routing, and the `PostChain` that
+replaced the ladder), `a856058` (two chains against one device proven independent), `9b7d734`
+(kind-keyed scenes, `system_slot` deleted), `fa6ecc5` (docs describe the chain that now runs the
 composite). **No blockers.**
 
 The central claim holds: **every golden baseline is byte-identical, with no re-bless** — the diff

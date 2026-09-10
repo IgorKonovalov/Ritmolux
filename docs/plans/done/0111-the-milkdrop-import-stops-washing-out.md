@@ -1,7 +1,7 @@
 # 0111 — The MilkDrop import stops washing out
 
 > **Status:** done — 2026-08-20. Phases 1, 2, 4 and 5 landed across seven commits
-> (`b8c8524`..`afc65d6`); Phase 3 did not run, on Phase 2's stop condition; **Phase 6 is void
+> (`ee758b5`..`5296026`); Phase 3 did not run, on Phase 2's stop condition; **Phase 6 is void
 > rather than un-run** — see its section. Mode 4 review: **no blockers, one major, two minors.**
 > The plan's premise did not survive it: the wash is at the **field**, not downstream.
 > **Created:** 2026-08-19
@@ -429,7 +429,7 @@ does, tell that lane), and [0106](0106-the-frame-stream-passes-through-a-diffusi
 ### Phase 1 — done in the working tree, **not committed**, and it is blocked on an ADR question
 
 Written 2026-08-19 by `dev`, in the lane `WORK/lmv-plan-0111` on branch
-`plan-0111-milkdrop-wash`, branched from `5cf592d` at v0.75.0.
+`plan-0111-milkdrop-wash`, branched from `ac4f955` at v0.75.0.
 
 **The change.** `FrameSlots::read`'s `None` arm now returns
 `convert(d.$field, Rate::$rate, d.$field)` rather than `d.$field`. `convert` widened to

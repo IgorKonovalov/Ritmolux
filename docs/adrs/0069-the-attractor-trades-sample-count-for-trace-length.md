@@ -163,7 +163,7 @@ what made building it safe.
 
 ## Outcome (added at Plan 0059's close, 2026-08-04)
 
-Phase 4 — the one content pass, `990fedc` — answered both questions this ADR routed to it. One
+Phase 4 — the one content pass, `e360ac1` — answered both questions this ADR routed to it. One
 answer settles an alternative; the other **falsifies a Consequence written here as shipped fact.**
 
 **`density` + `fade` holds a legible curve, so Alternative D does not get its case.** The

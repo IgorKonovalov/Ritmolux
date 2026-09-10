@@ -12,7 +12,7 @@
 
 ## Outcome (closed 2026-07-25)
 
-All three phases landed — `0e3b84a` (ink stage), `5f79dc6` (surface-sized trail field), `5daddfa`
+All three phases landed — `37bb664` (ink stage), `6b7a658` (surface-sized trail field), `6aa2881`
 (curated preset + authoring docs). Mode 4 verdict: **no blockers, two majors, four minors**.
 Verified at review: `cargo nextest run -p lmv-core` 90/90 green including `golden`, `sanity`,
 `animation` and `reactivity` over the new `attractor_ink` preset; `clippy -p lmv-core --all-targets

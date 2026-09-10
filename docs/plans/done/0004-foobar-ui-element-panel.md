@@ -6,7 +6,7 @@
 > **Related ADRs:** none (no C ABI change — see Decision)
 >
 > **Done 2026-07-21** — passed Mode 4 review (no blockers, no majors). All four phases landed
-> in `plugin-foobar/foo_lmv.cpp` (commits `ef9193f`, `be3f90c`, `49ed225`, `855ccba`): the
+> in `plugin-foobar/foo_lmv.cpp` (commits `cb392e4`, `5dce26b`, `89fd414`, `8efb217`): the
 > file-scope globals became a single claimable `VizSession` (one `LmvHandle` + stream + pump +
 > render timer); a Default UI `ui_element` panel and the existing View pop-out both host the core
 > through one HWND, claiming/releasing the shared session so only one wgpu surface ever exists;

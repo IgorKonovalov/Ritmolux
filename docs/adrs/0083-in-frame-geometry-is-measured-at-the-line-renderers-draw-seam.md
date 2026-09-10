@@ -124,7 +124,7 @@ the finding that makes a new measure necessary at all.
 
 - Non-vacuity fixtures already exist and any proposal here can be tested against both before it is
   trusted: `core/tests/sanity.rs` carries `pre_repair_spectrum_ridge` as a frozen fixture (the total
-  case), and `git show 2efb80e^:presets/spectrum_comb.toml` is the partial case.
+  case), and `git show aab1195^:presets/spectrum_comb.toml` is the partial case.
 - The world rectangle is `[-aspect, aspect] x [-1, 1]` — the line renderer maps two world units to
   the frame **height**, which is also why [backlog 0016](../design-backlog-archive.md)'s
   `span` is a world quantity rather than a fraction of the width.

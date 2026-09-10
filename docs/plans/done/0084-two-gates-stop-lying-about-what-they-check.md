@@ -9,8 +9,8 @@
 
 ## Close summary (2026-08-13)
 
-All four phases shipped: `33436f0` (the checker sees the second link form), `83cfb67` (repair the
-seven breaks it named), `0e5216a` (`capture_audio_after_warmup`), `79b9b9b` (the gate stops
+All four phases shipped: `37dbf9c` (the checker sees the second link form), `a07160c` (repair the
+seven breaks it named), `c48488b` (`capture_audio_after_warmup`), `3225f38` (the gate stops
 rendering its warm-up). Suite 718 passed / 1 skipped; `fmt` and `clippy` clean; the checker exits 0
 with all three classes live.
 

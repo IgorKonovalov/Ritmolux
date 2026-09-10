@@ -319,10 +319,10 @@ Four `dev` phase commits plus one architect close commit:
 
 | Commit | Phase |
 |--------|-------|
-| `332720f` | 1 — `core/tests/chain.rs`, the ring→analyzer→renderer e2e suite |
-| `108e21a` | 2 — `standalone/tests/shot_cli.rs`, the `shot` binary as a subprocess |
-| `ee89905` | 3 — `.githooks/pre-push` + the README developer section |
-| `a4b7045` | 4 — the `coverage` CI job, the `COVERAGE_FLOOR` ratchet, `docs/nfr.md` §7 |
+| `bc6e9b1` | 1 — `core/tests/chain.rs`, the ring→analyzer→renderer e2e suite |
+| `6c8385d` | 2 — `standalone/tests/shot_cli.rs`, the `shot` binary as a subprocess |
+| `6ad1bf3` | 3 — `.githooks/pre-push` + the README developer section |
+| `0f3e7b1` | 4 — the `coverage` CI job, the `COVERAGE_FLOOR` ratchet, `docs/nfr.md` §7 |
 
 Phase 5 is `human`: `core.hooksPath` is now `.githooks` in the user's clone (verified at review).
 The other half of its done-when — a misformatted file causing a real `git push` to be refused — is

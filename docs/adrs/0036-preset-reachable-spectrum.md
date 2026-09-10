@@ -178,7 +178,7 @@ replication at 48 kHz:
 - **A consequence the ADR did not anticipate:** below the crossover the mapping depends on
   `sample_rate / 2048`, so the same `bin(x)` names a different frequency at 44.1 kHz than at 48 kHz.
 
-The documentation obligation the ADR correctly identified is discharged in `4d41884`
+The documentation obligation the ADR correctly identified is discharged in `8dec9ab`
 (`docs/presets.md` and `presets/README.md` carry a measured position table and both consequences),
 and the surviving question — whether the half-linear axis is a defect to fix or a characteristic to
 live with — is **[design-backlog 0015](../design-backlog.md)**, with three weighed alternatives. It

@@ -1,7 +1,7 @@
 # 0044 — Quality tiers: `Floor` and `Rich`, a governor, and the constants that move
 
-> **Status:** done 2026-07-30 — Phases 1, 2, 3, 5 landed in `e44b3a6`, `89d4ad4`, `6292286`,
-> `3e807f4`. **Phase 4 (`human`, the Rich calibration) is carried forward unrun** — see the
+> **Status:** done 2026-07-30 — Phases 1, 2, 3, 5 landed in `58e31d4`, `25305fd`, `20f1609`,
+> `5b5c567`. **Phase 4 (`human`, the Rich calibration) is carried forward unrun** — see the
 > phase and the close note below. Mode 4 review: no blockers, one major (the governor's
 > `MIN_SAMPLES` depends on `diag::RING` with nothing tying them), two minor.
 > **Created:** 2026-07-30
@@ -191,7 +191,7 @@ re-blessed** — which is Phase 1's byte-identical done-when proved rather than 
 Verified rather than assumed:
 
 - **`TierConfig::FLOOR` is the pre-tier engine, field for field**, compared against each
-  constant's former definition site at `92579ef`: `(1920, 1080)`, `50_000`, `(2560, 1440)`,
+  constant's former definition site at `b5fb9df`: `(1920, 1080)`, `50_000`, `(2560, 1440)`,
   `10_000`, `20_000`. `the_floor_is_the_pre_tier_engine` pins all five with file:line comments.
 - **The tests are non-vacuous.** `the_rich_tier_raises_the_grid_only_where_the_floor_cap_binds`
   asserts both directions — larger where the cap binds, *exactly equal* where it does not — and

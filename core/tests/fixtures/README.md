@@ -333,7 +333,7 @@ They pin no pixels, have no baselines, and `RLX_BLESS` does not touch them.
 
 They are **frozen defects** rather than fixtures authored for a look: each is a
 shipped preset exactly as it shipped over-scaled, recovered from
-`git show 2efb80e^:presets/<name>.toml` with the comments stripped and the `name`
+`git show aab1195^:presets/<name>.toml` with the comments stripped and the `name`
 suffixed. Both were tuned before ADR-0049 normalized the bands to `0..1` and
 afterwards multiplied a value roughly five times larger, so the comb's bars stood
 more than two frame-heights above the top edge and the corona's spokes ran off

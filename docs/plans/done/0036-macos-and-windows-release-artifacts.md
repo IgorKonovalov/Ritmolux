@@ -1,8 +1,8 @@
 # 0036 — macOS and Windows release artifacts: a tag-driven Release with a universal `.app`
 
 > **Status:** **done 2026-08-04** — Phases 1-3 shipped on lane `plan-0036-release-artifacts`
-> (Phase 1 `0329adf` + fix `be031eb`, Phase 2 `cc7a43f`, Phase 3 `aa9dfec`), merged to `main` at
-> `d081dfd` with the full gate green over both live lanes' code. Mode 4 review: **no blockers,
+> (Phase 1 `3f9e045` + fix `8b3c0ad`, Phase 2 `5f3deee`, Phase 3 `8fce33a`), merged to `main` at
+> `40d7472` with the full gate green over both live lanes' code. Mode 4 review: **no blockers,
 > one minor, one nit**. A `workflow_dispatch` dry run (`30944179623`) went green on the first
 > attempt and every check in `packaging/macos/bundle.sh` executed against real Apple tooling.
 > **Phase 4 (`human`) is NOT done and is carried forward** — see the plans index. It closes here
@@ -22,7 +22,7 @@
 > alongside §8. Two citations have drifted since 2026-07-26: the silence-driven render path
 > is `standalone/src/main.rs:998` (the `ScreenCaptureKit capture unavailable ...; rendering
 > without audio` arm), not `:677`; and `README.md`'s macOS paragraph was rewritten on
-> 2026-08-04 (`f7035a2`) to say the capture path is implemented-but-unvalidated and to name
+> 2026-08-04 (`e18b0dd`) to say the capture path is implemented-but-unvalidated and to name
 > this plan as the missing piece — Phase 3's Download section lands **beside** that, and the
 > "no Mac build to download yet" bullet in Platform notes comes out when it does.
 

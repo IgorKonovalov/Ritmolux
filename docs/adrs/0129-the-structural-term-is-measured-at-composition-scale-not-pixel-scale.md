@@ -235,7 +235,7 @@ are achromatic, so a hue-spread term reads zero for the preset it is meant to re
 ## Notes
 
 Every number in Context comes from re-running Plan 0116 Phase 8's own instrument at the Plan 0113
-close tip (`0b9a486`, `v0.79.0`), unmodified:
+close tip (`fd8645f`, `v0.79.0`), unmodified:
 
 ```text
 cargo nextest run -p lmv-core --test sanity --run-ignored all \

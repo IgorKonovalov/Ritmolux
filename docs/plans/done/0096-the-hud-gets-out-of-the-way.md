@@ -9,8 +9,8 @@
 
 ## Close note (2026-08-16)
 
-All three phases landed, one commit each: `5e5ce0d` (Phase 1, the visibility rule),
-`6c9694f` (Phase 2, `Escape`), `ad86ff8` (Phase 3, the settings row). Mode 4 review:
+All three phases landed, one commit each: `e5ec8b5` (Phase 1, the visibility rule),
+`aa916c0` (Phase 2, `Escape`), `10be3be` (Phase 3, the settings row). Mode 4 review:
 **no blockers, no majors, two minors and a nit.** Gates green — `fmt`, `clippy --workspace
 --all-targets`, `nextest -p standalone` 136/136, `check-doc-links`, `check-backlog-claims`.
 

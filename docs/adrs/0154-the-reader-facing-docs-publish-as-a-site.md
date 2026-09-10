@@ -204,7 +204,7 @@ and the per-system gallery holds **12** images, not 9.
 
 ## Notes
 
-Measurements in this ADR were taken on 2026-08-30 against the working tree at commit `a94fd18`.
+Measurements in this ADR were taken on 2026-08-30 against the working tree at commit `c9ad2f3`.
 The 1,059/926 link split was produced by extracting relative `.md` link targets from `README.md`,
 `docs/*.md` and `presets/README.md` and bucketing them by destination directory.
 

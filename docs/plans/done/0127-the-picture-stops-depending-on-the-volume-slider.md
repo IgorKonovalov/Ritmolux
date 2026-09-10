@@ -1,6 +1,6 @@
 # 0127 — The picture stops depending on the volume slider
 
-> **Status:** done — closed 2026-08-28. Phases 1, 2 and 5 landed (`afd8aa5`, `3560eed`, `e606889`);
+> **Status:** done — closed 2026-08-28. Phases 1, 2 and 5 landed (`a694c67`, `e77c43c`, `af6c2a1`);
 > Phase 3's human capture returned both readings; Phase 4 was skipped on that measurement, by the
 > user's call, because applying the derived 1.047 pushes the corpus `p90` to exactly the frame edge.
 > Mode 4 review: **no blockers, no majors, four minors, two nits** — the merged workspace is green
@@ -282,11 +282,11 @@ The normalizer itself is the existing `PeakNormalizer` shape applied to an array
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The analyzer levels the trace | dev | done | `afd8aa5` |
-| 2 — The trace spans the width | dev | done | `3560eed` |
+| 1 — The analyzer levels the trace | dev | done | `a694c67` |
+| 2 — The trace spans the width | dev | done | `e77c43c` |
 | 3 — One reference capture | human | done — both readings taken | |
 | 4 — The base amplitude constant | dev | **skipped — see notes** | |
-| 5 — The docs say what the contract is | dev | done | `e606889` |
+| 5 — The docs say what the contract is | dev | done | `af6c2a1` |
 
 ### Notes
 
@@ -351,7 +351,7 @@ The normalizer itself is the existing `PeakNormalizer` shape applied to an array
   buffer size only, so the condition is unmet.
 - Phase 5 touched `core/src/render/scenes/warp_mesh/tests.rs`, which its file list does not name.
   `check-comment-hygiene.mjs` failed at line 426 on plan-relative narration (`the aspect divide
-  that used to separate this pair`), introduced by Phase 2 in `3560eed`; the phase's done-when
+  that used to separate this pair`), introduced by Phase 2 in `e77c43c`; the phase's done-when
   requires that gate to exit 0, so the sentence was restated as a property of the code.
 - Phase 5's edit to `docs/specs/0002-ring-determinism.md` goes one clause beyond the waveform. The
   "unit of determinism" bullet listed the `spectrum` among what "still resolve[s] from their

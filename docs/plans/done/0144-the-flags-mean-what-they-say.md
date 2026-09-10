@@ -10,8 +10,8 @@
 > (the `--gpu` question this answers), [ADR-0127](../../adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md)
 > (the gate Phase 4 extends)
 >
-> **Close summary.** All six phases landed (`1b29936`, `3872605`, `cb6a037`, `7399ab5`, `8e7bfe3`,
-> `2c5dc2a`) plus two review-fix commits (`a2f7627`, `0a687f0`). Mode 4 verdict: **no blockers, no
+> **Close summary.** All six phases landed (`1280f6d`, `47c2d01`, `5ff0e8b`, `68e8c0b`, `4faea0f`,
+> `7ab6adf`) plus two review-fix commits (`df28f3e`, `bd3eed1`). Mode 4 verdict: **no blockers, no
 > majors, five minors, three nits.** Verified independently of the log: `fmt` clean; `clippy
 > --workspace --all-targets -D warnings` clean; `RUSTDOCFLAGS="-D warnings" cargo doc --workspace
 > --no-deps` **zero warnings after `cargo clean --doc`**; `cargo nextest run --workspace` **1230
@@ -342,13 +342,13 @@ pub struct RendererOptions {
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The roster states a dependency | dev | done | 1b29936 |
-| 2 — `--gpu` reaches the window | dev | done | 3872605 |
-| 3 — `--preset` holds a scene in the window | dev | done | cb6a037 |
-| 4 — The broken literal becomes a scanned class | dev | done, with a deviation | 7399ab5 |
-| 5 — The dead attribute goes and the last skip blocks fold in | dev | done, with a deviation | 8e7bfe3 |
-| 6 — `cargo doc` becomes a gate | dev | done | 2c5dc2a |
-| (review fixes, not a phase) | dev | done | a2f7627, 0a687f0 |
+| 1 — The roster states a dependency | dev | done | 1280f6d |
+| 2 — `--gpu` reaches the window | dev | done | 47c2d01 |
+| 3 — `--preset` holds a scene in the window | dev | done | 5ff0e8b |
+| 4 — The broken literal becomes a scanned class | dev | done, with a deviation | 68e8c0b |
+| 5 — The dead attribute goes and the last skip blocks fold in | dev | done, with a deviation | 4faea0f |
+| 6 — `cargo doc` becomes a gate | dev | done | 7ab6adf |
+| (review fixes, not a phase) | dev | done | df28f3e, bd3eed1 |
 
 ### Notes
 
@@ -380,7 +380,7 @@ chosen shape is a run of 12+ spaces in a single-line literal, which yields **zer
 zero `hygiene-allow` escapes**. The rejected alternative was a threshold of four with roughly thirty
 escapes. It is silent on narrow instances, of which one existed at six spaces
 (`core/src/dsp/mod.rs`) and was **left unrepaired by this phase** — this note and the one in the
-script both said otherwise until `a2f7627` joined it by hand.
+script both said otherwise until `df28f3e` joined it by hand.
 
 **P4 — 15 convictions repaired**, and four comments written by this plan's own earlier phases
 tripped the pre-existing narration rules and were rewritten.
@@ -407,7 +407,7 @@ target is `pub(crate)`/`pub(super)`/private, so the link never rendered without
 `--document-private-items` — all 52 reduce to a code span); 8 `broken_intra_doc_links` from renames
 and removals, **five of which resolve** while three name things gone under every name; 2 more broken
 because the target is `#[cfg(test)]`; 7 `redundant_explicit_links`. **Nothing was feature-gated** —
-the fourth class this could have had. Per-item detail is in `2c5dc2a`'s message.
+the fourth class this could have had. Per-item detail is in `7ab6adf`'s message.
 
 **P6 — one scripted rewrite was wrong, and no gate would have caught it.** `shape_collage.rs` carried
 a link followed immediately by a second code span, so stripping the brackets left two adjacent spans,
@@ -421,7 +421,7 @@ failed once at 1.086 s while behaving correctly — a reading about load on the 
 (ADR-0071). Both new spawning tests drop the bound; `output()` waiting for exit is what carries the
 no-window property.
 
-**Review fixes (`a2f7627`) — four items, one of them a defect this plan shipped.**
+**Review fixes (`df28f3e`) — four items, one of them a defect this plan shipped.**
 `lmv --stream=1 --fps 30` passed both gates, started windowed and ignored `--fps`: `flag_name`
 reduces `--stream=1` to a rostered name, while every scanner claiming a valueless flag compares the
 whole argument. A third `Claimed` variant carries it out of `walk_flags`, refused **ahead of**
@@ -432,11 +432,11 @@ asserting against its own closure. **The `--preset` miss message named the wrong
 
 **A pre-existing `dead_code` warning is live on `main`.** `RenderContext`'s `instance` and `gpu`
 fields are never read under `cargo check -p lmv-core --lib`; `--workspace --all-targets` unifies
-features and it disappears. Reproduced on `main` at `da38c09`, untouched here.
+features and it disappears. Reproduced on `main` at `7f4656c`, untouched here.
 
 ### Close triggers
 
-- **`presets/` touched:** no. `git diff --name-only 77a2e23..HEAD -- presets/` is empty.
+- **`presets/` touched:** no. `git diff --name-only 105129e..HEAD -- presets/` is empty.
 - **Plan header `Closes:`** design-backlog 0167, 0168, 0169. **All three are discharged** — 0169 by
   Phase 6, which ran after `plan-0125` merged.
 - **What shipped:** a **feature** — `--gpu` and `--preset` now reach the windowed path, which is new

@@ -13,8 +13,8 @@
 
 ## Close (2026-08-15)
 
-**All three phases shipped, in one `dev` session:** `e23bd04` (Phase 1 — the framing contract and
-its property test), `d4570e7` (Phase 2 — `kaleido_tile`'s bindability), `52b1dc3` (Phase 3 — the
+**All three phases shipped, in one `dev` session:** `8ceabb1` (Phase 1 — the framing contract and
+its property test), `a9f0987` (Phase 2 — `kaleido_tile`'s bindability), `a74ce44` (Phase 3 — the
 gain rule's exception class).
 
 **Mode 4 verdict: no blockers, no majors, one minor and three nits.** Verified rather than trusted:
@@ -43,7 +43,7 @@ target's aspect, which a resizable window can take below 1 — where the bound r
 `dev`'s test scopes its own version of the claim to 16:9 correctly, so no code carries the error.
 
 **Two deviations, both correct.** Phase 3's shipped instance moved from `chthonic_coral_oracle.toml`
-to the three `reaction_*` presets: the coral **was retired on 2026-08-10 in `d92dcb2`**, three days
+to the three `reaction_*` presets: the coral **was retired on 2026-08-10 in `eb03e1c`**, three days
 before this plan was written, and this plan inherited the name from backlog 0081's body where it is
 right as *provenance* and wrong as a shipped file. The substitution keeps the coral as where the
 finding came from and quotes `reaction_etching`'s `feed` line as the treatment. Phase 1's fern header

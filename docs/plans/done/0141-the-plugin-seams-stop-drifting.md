@@ -1,8 +1,8 @@
 # 0141 — The plugin's seams stop drifting
 
-> **Status:** done — closed 2026-09-01. Four phases, one commit each: `a7354b8` (menu selects by
-> name), `e6f71f1` (the size table becomes a dated series), `c6a6449` (the growth attributed to
-> Plan 0100), `c4165f6` (the recipe reads the staged SDK's version). Mode 4 review: **no blockers,
+> **Status:** done — closed 2026-09-01. Four phases, one commit each: `9cf0380` (menu selects by
+> name), `4f3538f` (the size table becomes a dated series), `238d75d` (the growth attributed to
+> Plan 0100), `ef32d5c` (the recipe reads the staged SDK's version). Mode 4 review: **no blockers,
 > two majors, three minors** — all five repaired in the close commit. Verified independently of the
 > log: `lmv_select_preset` now has exactly one call site repo-wide; the bisect's byte deltas are
 > corroborated by the diffstats of their own windows (34 lines / 9,386 lines / 823 lines of
@@ -193,14 +193,14 @@ flowchart TB
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** `WORK/lmv-plan-0141` on `plan-0141-plugin-seams`, branched from `main` at `f2b37d5`.
+**Lane:** `WORK/lmv-plan-0141` on `plan-0141-plugin-seams`, branched from `main` at `f4098d9`.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The preset menu selects by name | dev | done | `a7354b8` |
-| 2 — The size table becomes a dated series | dev | done | `e6f71f1` |
-| 3 — Attribute the 400 KB | dev | done | `c6a6449` |
-| 4 — The recipe reads the SDK's own version | dev | done | `c4165f6` |
+| 1 — The preset menu selects by name | dev | done | `9cf0380` |
+| 2 — The size table becomes a dated series | dev | done | `4f3538f` |
+| 3 — Attribute the 400 KB | dev | done | `238d75d` |
+| 4 — The recipe reads the SDK's own version | dev | done | `ef32d5c` |
 
 ### Notes
 
@@ -252,7 +252,7 @@ flowchart TB
   loop, which is still true and always will be — the defect was the dispatch, not the reload — and
   **0118**'s probe asserts `8,879,104 B` is still in the spec, which the dated series deliberately
   keeps as its second row, so that probe can no longer distinguish a stale spec from a current one.
-- **Full suite:** `cargo nextest run --workspace` on the lane at `c4165f6`, **exit 0** —
+- **Full suite:** `cargo nextest run --workspace` on the lane at `ef32d5c`, **exit 0** —
   `Summary [520.668s] 1492 tests run: 1492 passed (19 slow), 5 skipped`, across 59 binaries. This is
   ADR-0156's once-per-plan run and the nine deferred GPU suites are inside it; no suite was run
   under an upward override at an earlier phase, because no phase touched Rust. `cargo fmt --all

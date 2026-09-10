@@ -23,7 +23,7 @@ frame: the trail grid rounds up and presents as a normalized stretch ([ADR-0037]
 **Why it is newly visible is the part that matters for how we weigh it.** The reseed gates were
 *dead* for most of this project's life — every attractor shipped with `reseed` written against raw
 levels it could not reach, `attractor_clifford.toml`'s own header saying it "never fired once".
-Plan 0041's content re-gain (`e9a1c3c`) made them fire for the first time and Plan 0048's retune
+Plan 0041's content re-gain (`ab382f2`) made them fire for the first time and Plan 0048's retune
 rescaled them onto the normalized axis, so the artifact is **as old as the scene and as new as the
 gate working**. `Rich` then triples the particle count into the same rectangle
 ([backlog 0031](../design-backlog.md)).

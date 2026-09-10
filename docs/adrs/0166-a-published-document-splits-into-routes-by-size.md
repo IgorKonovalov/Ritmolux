@@ -11,7 +11,7 @@
 route per document, and Plan 0143 built it that way. The site is live, and the largest problem it
 was written to fix is still there — moved rather than solved.
 
-Measured 2026-09-05 against the working tree at `9dc2183`:
+Measured 2026-09-05 against the working tree at `f92ffeb`:
 
 | Source | Bytes | What the site does with it today |
 |---|---:|---|
@@ -134,7 +134,7 @@ routes from four documents**, against 15 routes for the whole site today.
 The decision stands and the mechanism is in the tree. One measurement in **Why these two numbers**
 was wrong when this ADR was written, and it changed the output rather than only the prose.
 
-**`docs/on-device-validation.md` is 48,219 bytes, not 37,241** — and 45,417 at `9dc2183`, the commit
+**`docs/on-device-validation.md` is 48,219 bytes, not 37,241** — and 45,417 at `f92ffeb`, the commit
 the Notes say every figure was taken against, so the number was never right. Three consequences,
 none of which is repaired by editing the body:
 
@@ -195,7 +195,7 @@ the defects Plan 0154 fixes. A size rule needs no maintenance and cannot disagre
 
 ## Notes
 
-Measurements were taken 2026-09-05 against the working tree at `9dc2183`, summing bytes between
+Measurements were taken 2026-09-05 against the working tree at `f92ffeb`, summing bytes between
 headings with `awk` over the source files. Byte counts are of markdown source, not rendered HTML;
 the 484 KB figure for the roster's built page was measured from `site/dist/` during Plan 0143 and is
 recorded in that plan's implementation log.

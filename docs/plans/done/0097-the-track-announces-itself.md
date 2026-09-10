@@ -5,8 +5,8 @@
 > **Approved:** 2026-08-16 (user)
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0110](../../adrs/0110-now-playing-is-a-shell-supplied-string-and-the-core-owns-the-banner.md)
-> **Closed:** 2026-08-16 — all five `dev` phases (`c9f7a3e`, `3621030`, `cb41dee`, `1c96327`,
-> `51d4489`) plus one approved out-of-plan fix (`1016777`), and the `human` Phase 6 run the same day.
+> **Closed:** 2026-08-16 — all five `dev` phases (`fe2ef7c`, `f093343`, `6aff4c9`, `89c2525`,
+> `e49ec1e`) plus one approved out-of-plan fix (`6f2862c`), and the `human` Phase 6 run the same day.
 > Review: **no blockers, no majors, three minors and a nit.** Phase 4's stop condition did not fire —
 > the shipped `foo_lmv.dll` went 6,774,784 -> 8,879,104 B (+31.1 %) against NFR 4's ~10 MB cap, so
 > glyphon stays and ADR-0110's Alternative A is unused. **Both facts ADR-0110 flagged unverified are

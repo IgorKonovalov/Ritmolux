@@ -317,13 +317,13 @@ sized at the ceiling; `active = round(budget * density)` is unchanged from ADR-0
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Measure the three constants | dev | done | `7387579` |
-| 2 — The law, live | dev | done | `9243255` |
-| 3 — The offline ceiling | dev | done | `1890df7` |
+| 1 — Measure the three constants | dev | done | `8fdf133` |
+| 2 — The law, live | dev | done | `065b050` |
+| 3 — The offline ceiling | dev | done | `fc0a8a5` |
 | 4 — Does it still look upscaled? | human | done | verdict below |
 | 5 — The diffusion side-by-side | human | not started | |
-| 6 — The statistic names its capture | dev | superseded, residue done | `9239bb3` |
-| 7 — The Mode 4 repairs | dev | done | `de72c22` |
+| 6 — The statistic names its capture | dev | superseded, residue done | `f7947bc` |
+| 7 — The Mode 4 repairs | dev | done | `4dafaac` |
 
 ### Phase 1 readings
 
@@ -581,12 +581,12 @@ at that size. Peak resident set 970 MB, growth -68.9 MB across the run.
 ### Phase 6 — superseded
 
 **design-backlog 0130 was closed 2026-09-01 by
-[Plan 0137](0137-the-metrics-measure-light.md) Phase 4** (`98977ff`), four days
+[Plan 0137](0137-the-metrics-measure-light.md) Phase 4** (`3d9b6a6`), four days
 after this plan was written. Both halves of the done-when had landed there: the
 resolution paragraph on `boundary_density`, and both floors in
 `core/tests/sanity.rs` naming the 96x96 capture — so that file needed no change.
 
-**One clause was still open**, and `9239bb3` is it: the summary sentence read *"a
+**One clause was still open**, and `f7947bc` is it: the summary sentence read *"a
 hatched, stroked or tiled figure is almost all rim and reads near one **however
 small**"*, which is the scale-free reading the entry objects to and which
 contradicts the same docstring's 4x4 block eleven lines later.
@@ -595,16 +595,16 @@ The plan header's `Closes: design-backlog 0130` is stale.
 
 ### Close triggers
 
-- **`presets/` touched:** none. `git diff --name-only 5ae5d60..HEAD -- presets/` is empty.
+- **`presets/` touched:** none. `git diff --name-only ca4fcdf..HEAD -- presets/` is empty.
 - **Plan header `Closes:`** design-backlog 0110, 0130 (0125 probed, not closed).
   **0130 is already closed** — 2026-09-01, against Plan 0137 Phase 4, in
   `docs/design-backlog.md`; the header entry is stale and Phase 6's own section says
   what was left. **0110 turns on Phase 4**, which is a `human` phase and has not run:
   the entry's claim is *"the grain is judged by eye"* and `check-backlog-claims.mjs`
   lists it among the 8 unprobeable ones.
-- **What shipped:** a **feature**, in two commits — `9243255` (the density law, live)
-  and `1890df7` (the offline ceiling and `--render`) — plus one docs-only commit,
-  `9239bb3`, and Phase 7's non-behavioral repair commit, which deletes two dead
+- **What shipped:** a **feature**, in two commits — `065b050` (the density law, live)
+  and `fc0a8a5` (the offline ceiling and `--render`) — plus one docs-only commit,
+  `f7947bc`, and Phase 7's non-behavioral repair commit, which deletes two dead
   accessors and moves no rendered pixel.
 - **Operator docs touched:** `docs/capturing.md` — a new block under `--render`
   (the two-ceiling table, the three consequences, the measured resident set) and a

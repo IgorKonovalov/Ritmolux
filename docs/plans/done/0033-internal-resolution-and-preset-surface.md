@@ -1,7 +1,7 @@
 # 0033 — Internal resolution follows the target, plus the preset-surface and harness gaps behind it
 
-> **Status:** done — 2026-07-26. Phases 1-3 and 5-7 landed in `978405a`, `cf65c4a`, `8c0ff2b`,
-> `08714c7`, `3f3b652`, `621fa7b`; **Phase 4 skipped** per ADR-0034's if-and-only-if (the
+> **Status:** done — 2026-07-26. Phases 1-3 and 5-7 landed in `2503303`, `9b387b4`, `57cb272`,
+> `757bf9f`, `d00498c`, `7996b96`; **Phase 4 skipped** per ADR-0034's if-and-only-if (the
 > reconstruction fix resolved the artifact, so the RD grid stays 256 and no coral preset takes a look
 > change). Phase 8 is `human` and remains open. Passed Mode 4 review: **no blockers, three majors,
 > four minors** — see the Close section below.
@@ -363,7 +363,7 @@ baseline touched, so both re-bless scope claims hold in fact.
    the capped grid with the aspect preserved, plus the done-when's actual point: not 1280x720.
 3. **Phase 3 done-when 3 is unmet and is not satisfiable as specified.** It asks a pixel-domain
    scanline second-difference statistic to detect a geometric property of a 1-D contour curve; five
-   measured attempts are in `8c0ff2b`'s body. The premise fails at 8 bits — a C0 reconstruction's
+   measured attempts are in `57cb272`'s body. The premise fails at 8 bits — a C0 reconstruction's
    slope discontinuity over a smooth Gray-Scott field at 8x upscale is below one output quantum, so
    every luminance aggregate mixes it back into the field's own content. **No followup metric is
    owed:** the RD golden is a real pixel-regression guard for exactly this shader, it moved, and it
@@ -399,7 +399,7 @@ stages render at a fixed 1280x720" note — preset content, so it rides with Pha
 `post.rs::internal_grid_size` is a line-for-line copy of `particles/mod.rs::trail_grid_size`, which
 is the opposite of ADR-0034's "one shared function" consequence and a divergence risk the moment
 major 1 is fixed on one of them; (3) the RD reconstruction's real cost is **unmeasured** — the +16 %
-WARP figure was retracted in `3f3b652` as run-to-run noise, the 45 fetches/fragment is real, and the
+WARP figure was retracted in `d00498c` as run-to-run noise, the 45 fetches/fragment is real, and the
 on-device checklist gained trails items but no RD item; (4) `presets/README.md`'s "an ultrawide keeps
 its proportions" overclaims under the 256 px round-up (3440x1440 comes back 1.88 against 2.39).
 

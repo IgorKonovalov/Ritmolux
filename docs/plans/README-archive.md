@@ -192,9 +192,9 @@ hand-edited.
 ### [0158 - The player grows a studio-facing surface](done/0158-the-player-grows-a-studio-facing-surface.md)
 
 - closed 2026-09-10. Six `dev` phases in the `WORK/rlx-plan-0158` worktree on
-`plan-0158-studio-facing-surface`: `ab0ec26` (1, the in-place override and the rebinding reload),
-`b2d77ec` (2, the control-in socket), `fee2cfd` (3, the event stream), `d7bdee8` (4, the schema
-export), `efb99f7` (5, the pipe sink) and `715a777` (6, the preview readback). Review: **no
+`plan-0158-studio-facing-surface`: `80123f0` (1, the in-place override and the rebinding reload),
+`a7e8a24` (2, the control-in socket), `6d18fc6` (3, the event stream), `f512a2c` (4, the schema
+export), `e9b27a2` (5, the pipe sink) and `367c3a7` (6, the preview readback). Review: **no
 blockers, two majors, six minors.** Version: **0.113.0** (minor). ADR-0175 and ADR-0176 accepted at
 this close; ADR-0177 and ADR-0178 stay `proposed`, paired with Plan 0159.
 
@@ -231,7 +231,7 @@ so Phase 7 - the only outstanding `human` gate - would have moved into `plans/do
 it was extracted at the close into a `## Rig-gated` section, carrying the debug-build pair
 (`p50 37.18 / p99 76.44` on, `p50 30.72 / p99 76.24` off) as the figure the release reading must
 beat, and ADR-0172's frame-count witness as the condition for a run to count as a reading at all.
-And `ab0ec26` carries `Co-Authored-By` and `Claude-Session` trailers that CLAUDE.md forbids; the
+And `80123f0` carries `Co-Authored-By` and `Claude-Session` trailers that CLAUDE.md forbids; the
 other six phase commits are clean because `block-attribution-trailers.js` landed on `main`
 *mid-plan*. The user's call at the close was to accept it rather than rewrite history, since the
 no-rewrite rule wins and the hook now prevents recurrence - recorded here so the record shows it
@@ -267,9 +267,9 @@ with its own edit to `site/`, not a line added to a map.
 ### [0092 — The engine draws an authored path](done/0092-the-engine-draws-an-authored-path.md)
 
 - closed 2026-09-09. Seven phases in the `WORK/rlx-plan-0092` worktree on
-`plan-0092-the-engine-draws-an-authored-path`: `6cd20de` (1, the parser and its refusals), `bad073f` (2, the contour becomes a field and the arity ceiling is measured), `987c758` (3, two
-paths morph), `85e41b7` (4, the arc chain, and the win measured), `d66c3c6` (5, the authoring
-surface), `cec8e73` (6's output, two worlds into `pending/`) and `51831ab` (7, the axis). Review:
+`plan-0092-the-engine-draws-an-authored-path`: `c61fbf0` (1, the parser and its refusals), `c8bdf32` (2, the contour becomes a field and the arity ceiling is measured), `0dd0a3c` (3, two
+paths morph), `965831b` (4, the arc chain, and the win measured), `bd04d36` (5, the authoring
+surface), `1b392d2` (6's output, two worlds into `pending/`) and `e4a92ef` (7, the axis). Review:
 **no blockers, one major, three minors, one nit.** Version: **0.112.0** (minor). ADR-0107 was already
 accepted at approval; ADR-0179 stays `proposed`, paired with Plan 0160.
 
@@ -372,11 +372,11 @@ multi-shape composition, and the `marks` roster untouched.
 ### [0140 — Every rate integrates, for real](done/0140-every-rate-integrates-for-real.md)
 
 - closed 2026-09-08. Six `dev` phases in the `rlx-0140-rates` worktree on
-`plan-0140-every-rate-integrates-for-real`, branched at `775ef18`: `d310598` (1, the
-`presets/README.md` row stops calling `rate · age` integrated), `2a50d1a` (2, the frame delta is
-sanitized once in `draw_frame` and six in-scene guards are deleted), `1209b76` (3, the collage
-`drift`/`spin` integrate per canvas), `2373775` (4, the emitter's sprite rotation integrates per
-object), `36e52bb` (5, no preset retuned and why) and `2f4ca19` (6, the dissolve note). Review:
+`plan-0140-every-rate-integrates-for-real`, branched at `634773b`: `5f7316e` (1, the
+`presets/README.md` row stops calling `rate · age` integrated), `cf6c713` (2, the frame delta is
+sanitized once in `draw_frame` and six in-scene guards are deleted), `4f484ce` (3, the collage
+`drift`/`spin` integrate per canvas), `49bed04` (4, the emitter's sprite rotation integrates per
+object), `e05746f` (5, no preset retuned and why) and `402d8d2` (6, the dissolve note). Review:
 **no blockers, two majors, three minors, one nit.** Version **0.111.1**. Closed
 [backlog 0149 + 0150](../design-backlog-archive.md), carried 0142 with a dated size update, filed
 0189-0191.
@@ -385,7 +385,7 @@ object), `36e52bb` (5, no preset retuned and why) and `2f4ca19` (6, the dissolve
 bumped `0.110.0 -> 0.111.0` (minor: the plan shipped a feature), and a parallel actor in the main
 checkout bumped `0.111.0 -> 0.111.1` thirty-six seconds later. Neither had been pushed. The user's
 call was to keep `0.111.1` and drop the now-redundant `v0.111.0` tag, so **`v0.111.1` is the tag for
-Plan 0140** and `c0f272e` is a release commit no tag points at. Nothing was reverted and no history
+Plan 0140** and `7977443` is a release commit no tag points at. Nothing was reverted and no history
 was rewritten. It is recorded because [ADR-0005](../adrs/0005-versioning-and-release-cadence.md)
 says the version moves once per plan, and the log here shows it moving twice — the rule was not
 broken by a decision, it was overtaken by a concurrent one.
@@ -466,8 +466,8 @@ pair did and its hand-written section said nothing, while the collage row got a 
 
 ### [0157 — The cost probes estimate a duration](done/0157-the-cost-probes-estimate-a-duration.md)
 
-- closed 2026-09-07. Two `dev` phases on `main`, no worktree: `084686a` (1, the estimator across
-all four cost probes plus `arc_cost`'s missing positivity guard) and `70ed4cc` (2, `api/` excluded
+- closed 2026-09-07. Two `dev` phases on `main`, no worktree: `1b30f92` (1, the estimator across
+all four cost probes plus `arc_cost`'s missing positivity guard) and `283c9c4` (2, `api/` excluded
 from the route gate's walk). Review: **no blockers, no majors, two minors, one nit.**
 
 **Both defects were verified independently of the log, and the second was verified by running the
@@ -535,8 +535,8 @@ GPU at all.
 
 ### [0153 — The debug tree stops carrying dependency line tables](done/0153-the-debug-tree-stops-carrying-dependency-line-tables.md)
 
-- closed 2026-09-07. Two `dev` phases on `main`, no worktree: `96458c9` (1, `debug = 0` under
-`[profile.dev.package."*"]`) and `8503b25` (2, the escape hatch in `CLAUDE.md`). Review:
+- closed 2026-09-07. Two `dev` phases on `main`, no worktree: `6e18cc5` (1, `debug = 0` under
+`[profile.dev.package."*"]`) and `fe4412d` (2, the escape hatch in `CLAUDE.md`). Review:
 **no blockers, no majors, one minor.**
 
 **Every measurement was re-taken rather than read off the log, and the tree carried more evidence
@@ -552,22 +552,22 @@ run that followed. `librlx_core-be79abfedb629390.rlib` at 53,324,328 B sits insi
 1 tested the "cargo's `"*"` glob does not reach a workspace member" claim through an rlib-size
 proxy, chosen because the ADR-0033 coverage ratchet runs in CI and not locally. That proxy is loose
 — pre-change rlibs already varied 52.36-54.52 MB — but it did not have to carry the weight: **CI's
-`coverage` job ran `cargo llvm-cov nextest -p rlx-core` against `d19e3db` under `debug = 0` and
+`coverage` job ran `cargo llvm-cov nextest -p rlx-core` against `53d9d35` under `debug = 0` and
 passed the floor.** The ratchet itself is the witness, and ADR-0165's "verified empirically rather
 than from documentation" now rests on the gate rather than on a correlate of it.
 
 **The close found `main` red, from a defect belonging to a plan closed the day before.** CI and
-Pages both fail at `d19e3db` on `core/src/render/aux_target.rs:258` — `pub fn new`'s doc comment
+Pages both fail at `53d9d35` on `core/src/render/aux_target.rs:258` — `pub fn new`'s doc comment
 links `[\`AUX_FRAME_LATENCY\`]`, a private `const`, and rustdoc's `private_intra_doc_links` lint is
-an error under the `RUSTDOCFLAGS: -D warnings` bar. Reproduced locally. It entered at `9e7dee1`
+an error under the `RUSTDOCFLAGS: -D warnings` bar. Reproduced locally. It entered at `0330b01`
 (Plan 0147's console pacing levers) while that work sat on its own lane, and reached `main` in the
-0156 close merge — **the same merge that added `070c549`'s rustdoc job**, so the bar and its first
+0156 close merge — **the same merge that added `4919fb3`'s rustdoc job**, so the bar and its first
 violation arrived together. Plan 0153 neither caused it nor could see it: its own 1338 CI tests
 passed and `coverage`, `miri`, `links` and `deny` were all green. The architect lane writes no Rust,
-so it was handed to `dev` in the same session and fixed at `a8e3dc1` — **as two errors, not one**:
+so it was handed to `dev` in the same session and fixed at `313e1b8` — **as two errors, not one**:
 rustdoc stops at the crate that failed, so `could not document rlx-core` was masking a
 `redundant_explicit_links` error on `capture_start.rs:50` that only appeared once the first was
-repaired. **Note what this says about the instrument**: `0b92e1d` had swept twelve links of exactly
+repaired. **Note what this says about the instrument**: `d2a9077` had swept twelve links of exactly
 this class days earlier, and a lane-resident thirteenth still survived to reach `main` — a per-lane
 gate would have caught it, and the pre-push hook does not run `cargo doc` because its budget is
 ~28 s. That gap is unfiled and outlives this plan.
@@ -583,11 +583,11 @@ it.
 ### [0156 - The site becomes the reference](done/0156-the-site-becomes-the-reference.md)
 
 - closed 2026-09-06. Seven `dev` phases in the `plan-0156-the-site-becomes-the-reference` lane
-(`WORK/rlx-plan-0156`): `7f2b0b9` (1, six menu groups and a title per page), `786d687` (2, the
-operator reference leaves the README), `d2f2d24` (3, mermaid renders at build and *How it works*
-exists), `5227878` (4, the engine-side documents address a reader and `capturing.md` splits),
-`24ce616` (5, the embedding guide and the published header), `070c549` (6, rustdoc joins the Pages
-artifact), `9db1f67` (7, the parameter reference is generated), plus `db384db`, the repair the Mode 4
+(`WORK/rlx-plan-0156`): `065be02` (1, six menu groups and a title per page), `5312976` (2, the
+operator reference leaves the README), `c3c00c9` (3, mermaid renders at build and *How it works*
+exists), `047c05f` (4, the engine-side documents address a reader and `capturing.md` splits),
+`1ad9c6f` (5, the embedding guide and the published header), `4919fb3` (6, rustdoc joins the Pages
+artifact), `4208de5` (7, the parameter reference is generated), plus `4957a52`, the repair the Mode 4
 review asked for. Version: **0.110.0** (minor - `ParamSpec` replaces every bare `PARAMS` roster,
 `standalone/src/config.rs` moves into the lib, and two new test binaries ship). Review: **no
 blockers, one major, three minors.** Phase 8, the live walk, is `human` and outstanding: it needs the
@@ -662,12 +662,12 @@ published row, not engine behaviour, so no preset was ever written around it.
 ### [0147 — What the show costs, and what its numbers mean](done/0147-what-the-show-costs-and-what-its-numbers-mean.md)
 
 — closed 2026-09-06. Eight phases in the `plan-0147-show-costs` lane (`WORK/lmv-plan-0147`):
-`eacaf8c` (1, `level/*` states its normalization), `bdbba7f` (2, the activation verdict),
-`9e7dee1` (3, both console pacing levers), `76e3452` (3b, the present becomes countable),
-`ada2b37` (3c, the give-up verdict is scoped to the budget's incident), `8b7bf2d` (5, the four
+`a5f4130` (1, `level/*` states its normalization), `39ebe73` (2, the activation verdict),
+`0330b01` (3, both console pacing levers), `f9b95c6` (3b, the present becomes countable),
+`c4b48f6` (3c, the give-up verdict is scoped to the budget's incident), `5d72a72` (5, the four
 comments and the two documented keys), plus the two `human` measurement phases recorded in the log
-(`cd7af11` for Phase 4, `7478fa2` for Phase 6). Phases 3b and 3c were added mid-plan at a Phases 1-3
-review (`c2c18de`) after the first Phase 4 window produced a null nothing could read. Version:
+(`32541dd` for Phase 4, `31b1957` for Phase 6). Phases 3b and 3c were added mid-plan at a Phases 1-3
+review (`6956fdb`) after the first Phase 4 window produced a null nothing could read. Version:
 **0.109.0** (minor — Phase 3 shipped two operator-settable keys and Phase 3b shipped counters plus
 new `diagnostics.log` lines). Review: **no blockers, one major, four minors, one nit.**
 
@@ -743,9 +743,9 @@ to the close instead.
 ### [0155 — The reader documents stop explaining themselves](done/0155-the-reader-documents-stop-explaining-themselves.md)
 
 — closed 2026-09-05. Five `dev` phases on `main` directly with no worktree, per the plan's own lane
-guidance: `3fdd391` (1, the palette surface), `2bce9be` (2, the expression reference), `3bbcaf0`
-(3, the roster front matter and small sections), `0dc85dd` (4, the three large roster sections),
-`18ee259` (5, the gate and the sweep). Version: **none** (docs/chore-only — no `core/`,
+guidance: `05472e6` (1, the palette surface), `bbd6389` (2, the expression reference), `274ae37`
+(3, the roster front matter and small sections), `ab1eb84` (4, the three large roster sections),
+`ce26be7` (5, the gate and the sweep). Version: **none** (docs/chore-only — no `core/`,
 `standalone/` or `plugin-foobar/` file moved, no default, parameter name or behaviour changed, and
 the one new artifact is a repo-maintenance gate that ships in nothing; the same call Plan 0151 took
 for the same shape). Review: **no blockers, no majors, four minors, two nits.**
@@ -780,13 +780,13 @@ the tree rather than reading the log's claims:
   after, citations stripped, multisets compared. The only figures that left are the ones the log's
   own "information deliberately removed" table names: the downbeat fold's superseded column, the
   fixed 1280x720 post grid and its 28 % stretch, two polyline segment counts in the mandala budget,
-  and `17.37` with commit `00d99d0`. Nothing else. `1.75` and `396`/`432` belong to two of those
+  and `17.37` with commit `095af15`. Nothing else. `1.75` and `396`/`432` belong to two of those
   four rows.
 - **The site build and both site gates** — 137 pages, 135 routes, largest split route 26,893 B
   against ADR-0166's 30,000 cap. Matches the log exactly.
 
 Two removals were checked separately and are corrections rather than losses: `fragment_kaleido` and
-`reaction_gilt` are genuinely retired presets (`c8e5cad`, `d92dcb2`), and `` `0 = falloff` `` lost
+`reaction_gilt` are genuinely retired presets (`9b61f23`, `eb03e1c`), and `` `0 = falloff` `` lost
 only its code span — the value and the name both stay in the `kaleido_edge` table above it.
 
 **What the review found.** Four minors and two nits, none of them in the prose:
@@ -827,9 +827,9 @@ its own Decision section rather than working around it, which is the right handl
 ### [0154 — The site becomes navigable](done/0154-the-site-becomes-navigable.md)
 
 — closed 2026-09-05. Seven `dev` phases on `main` directly with no worktree, per the plan's own lane
-guidance: `3e5f6d6` (1, the provenance strip), `2a77539` (2, the roster splits), `f7b5676` (3, the
-fragment gate), `f3c8bb2` (4, the rule generalises), `22a0371` (5, the entrance), `96e5806` (6, the
-gates and the build stamp), `3924b60` (7, the visual pass). Phase 8 (`human`) verified on the
+guidance: `db9d087` (1, the provenance strip), `db6e934` (2, the roster splits), `5b0a521` (3, the
+fragment gate), `4bb5b79` (4, the rule generalises), `5b4cc19` (5, the entrance), `01f4466` (6, the
+gates and the build stamp), `ce173f5` (7, the visual pass). Phase 8 (`human`) verified on the
 deployed site with no commit. Version: **0.108.0** (minor — the same shape as Plan 0143, which took
 a minor for building the site in the first place; nothing here ships, and the version is still the
 application's). Review: **no blockers, two majors, six minors, two nits.**
@@ -879,7 +879,7 @@ hand.
 **The second major, and the one worth quoting later: a justification figure that was wrong when
 written, and changed the output.** ADR-0166 argued its 40 KB threshold partly by naming the next
 document below it — *"`docs/on-device-validation.md` at 37,241 bytes, which is a checklist read top
-to bottom."* That document is **48,219 bytes**, and was 45,417 at `9dc2183`, the commit the ADR's
+to bottom."* That document is **48,219 bytes**, and was 45,417 at `f92ffeb`, the commit the ADR's
 own Notes say every figure was taken against. So the figure was never right, 40 KB selects **five**
 documents rather than four, and the document named as the reason the threshold is correct is on the
 wrong side of it — served as ten routes, three of them under 800 bytes, with its own `## Checklist`
@@ -906,8 +906,8 @@ nothing asserts the two agree. Measured clean at this close (51 of 51), gated by
 ### [0152 — The OSC root becomes `/rlx`](done/0152-the-osc-root-becomes-rlx.md)
 
 — closed 2026-09-05. Four `dev` phases in the worktree lane `plan-0152-the-osc-root-becomes-rlx`:
-`aec2381` (Phase 1, the wire), `7644cc3` (2, the operator's table), `56f8a69` (3, the record),
-`c594fa5` (4, the two seed comments). The lane sat unmerged for a day while `main` took Plans 0128
+`65dd6b2` (Phase 1, the wire), `e0f9b39` (2, the operator's table), `65711ea` (3, the record),
+`d92166d` (4, the two seed comments). The lane sat unmerged for a day while `main` took Plans 0128
 and 0143; `main` was merged into it at this close and the whole gate re-run on the combination,
 which is the first moment the two trees met. Version: **0.107.0** (minor — Phase 1 changes what the
 sink puts on the wire). Review: **no blockers, no majors, four minors.**
@@ -979,8 +979,8 @@ this plan's.
 
 — closed 2026-09-05. Five `dev` phases on `main` directly rather than in a worktree — the plan's own
 Lane guidance, and correct: every phase but 5 is JavaScript, markdown and config, so a fresh lane
-would have bought an 8-18 GB cold `target/` to run `shot --release` once. Commits `41c77c5`
-(Phase 1), `44d1ec3` (2), `03a9588` (3), `eeac887` (5), `cb3529c` (6), plus the `human` Phase 7 on
+would have bought an 8-18 GB cold `target/` to run `shot --release` once. Commits `c5bc794`
+(Phase 1), `77381c6` (2), `f2cf115` (3), `c15dc6b` (5), `cd047f0` (6), plus the `human` Phase 7 on
 2026-09-05 with no commit at all. Version: **0.106.0** (minor). Review: **no blockers, no majors,
 four minors and three nits.**
 
@@ -1095,9 +1095,9 @@ true at every target size. And the offline ceiling is a **whole multiple of each
 the device wall, so a tier still means something offline instead of both converging at 4K.
 
 **Minors recorded and not repaired.** The close-trigger bullets were written two commits before the
-tip and went stale — the cited `git diff 5ae5d60..HEAD -- presets/` now lists 70 files (the merge
+tip and went stale — the cited `git diff ca4fcdf..HEAD -- presets/` now lists 70 files (the merge
 pulled in Plan 0138's palette sweep), though the conclusion is right against the real base
-(`15dfe7f..HEAD -- 'presets/*.toml'` is empty), and three swept operator docs are unnamed. Phase 3's
+(`ec6c6c7..HEAD -- 'presets/*.toml'` is empty), and three swept operator docs are unnamed. Phase 3's
 *"inside the bound Phase 1 named"* is unfalsifiable — no total-process bound was ever stated; the
 delta arithmetic (+224 MB measured against 201.6 MB predicted) is the real check. Phase 2's
 *"byte-identical on both adapters"* has no recorded hardware-adapter golden run, though the
@@ -1105,7 +1105,7 @@ structural argument covers it. Phase 4 judged one file rather than the promised 
 original render and its source track went with a removed lane. And the log runs 312 lines against a
 138-line phases section, most of it the three measurement tables the plan itself ordered into it.
 
-**Curation verdict (step 3b).** No preset `.toml` moved — `git diff 15dfe7f..HEAD -- 'presets/*.toml'`
+**Curation verdict (step 3b).** No preset `.toml` moved — `git diff ec6c6c7..HEAD -- 'presets/*.toml'`
 is empty — so nothing new to weigh against the set. The *stale* half of the sweep is the finding:
 this plan fixed an engine defect, and two headers now state counts it made conditional —
 `presets/attractor_thomas.toml:25` (*"At the full 50 000 particles"*, plus its own measured
@@ -1120,13 +1120,13 @@ README calls the only side-by-side of what the larger pixel budget buys.
 
 **Phase 6 was superseded before it ran.** design-backlog 0130 was closed 2026-09-01 by Plan 0137
 Phase 4, four days after this plan was written; both halves of the done-when had already landed. One
-clause was still open — `boundary_density`'s summary sentence still read scale-free — and `9239bb3`
+clause was still open — `boundary_density`'s summary sentence still read scale-free — and `f7947bc`
 is that clause and nothing else. The plan header's `Closes: 0130` was stale and is corrected at this
 close.
 
 ### [0138 — The colour surface stops misleading its authors](done/0138-the-colour-surface-stops-misleading-its-authors.md)
 — closed 2026-09-04. Four `dev` phases in the `WORK/rlx-0138-colour-surface` lane,
-`8438a1d`..`7cc4139`, plus the close commits `900be65` (both majors) and the bookkeeping. Version:
+`5df7c39`..`3bcebf1`, plus the close commits `841ae30` (both majors) and the bookkeeping. Version:
 **0.104.0** (minor) — an authoring-contract change and a new load-time warning. Phase 5, the
 `human` look gate, was **waived by the user at the close**. Review: **no blockers, two majors, two
 minors.**
@@ -1165,7 +1165,7 @@ same drift one level down: the collage system's single authoring rule — *keep 
 channel at or under linear 0.6* — was left in units the author no longer writes, with
 `collage_nocturne` still giving the cap as the linear *byte 0x99*. Every migrated collage stop
 already caps at sRGB `0xcb`, so the presets were right and only the guidance was not. Both repaired
-in `900be65`.
+in `841ae30`.
 
 **The curation grep did not find any of it.** Close-ceremony step 3b's stale-workaround sweep keys on
 a preset header naming an ADR or plan number; `curve_broadside`'s names none. The seven headers
@@ -1185,9 +1185,9 @@ skipped, exit 0**, matching the log exactly. Zero golden PNGs changed. `fmt`, `c
 was archived. Backlog **0099** and **0153** both fully discharged and archived.
 
 ### [0151 — The long documents become navigable](done/0151-the-long-documents-become-navigable.md)
-— closed 2026-09-04. Nine `dev` phases in the `WORK/rlx-plan-0151` lane, `e450092`..`a77a0be`:
+— closed 2026-09-04. Nine `dev` phases in the `WORK/rlx-plan-0151` lane, `fa0f7a0`..`83f2a27`:
 six as planned, then three as a repair pass after the first Mode 4 review. Close commits
-`327af9c` (the major) and the bookkeeping. Version: **none** — docs/chore-only under
+`0c15580` (the major) and the bookkeeping. Version: **none** — docs/chore-only under
 [ADR-0005](../adrs/0005-versioning-and-release-cadence.md), on the [0145] precedent: no Rust,
 C++ or preset file moved, and the three files under a crate are one comment line each. Review:
 **no blockers, one major, four minors.**
@@ -1212,7 +1212,7 @@ prose moved from `README.md` into `## Prior sequencing notes (superseded)` — a
 existed since [0061] and had never once been used at a close — and the second copy of the
 backlog probe grammar was deleted in favour of a pointer at
 `scripts/check-backlog-claims.mjs`, which is its parser and therefore its authority. The move
-was re-diffed against `0964385` at the close: **byte-identical**, 335 lines. Seventeen shortcut
+was re-diffed against `8281270` at the close: **byte-identical**, 335 lines. Seventeen shortcut
 `[label]: target` definitions had to travel with it, which is the trap step 1b exists for and
 which the plan predicted (at 27).
 
@@ -1223,7 +1223,7 @@ bracket and a destroyed link — 40 entries, found by the first Mode 4 review an
 Phase 8. Where it wrapped *after* the link, the heading swallowed the close prose that
 preceded the newline — 44 entries, 32 with a dangling em-dash and 12 with a truncated fragment
 (`0088 — The docs get pictures — closed 2026-08-13 (all`). `dev` disclosed twelve of those and
-correctly left them as architect's call. Repaired at this close in `327af9c`, before the
+correctly left them as architect's call. Repaired at this close in `0c15580`, before the
 anchors could be linked from anywhere.
 
 **What made both classes invisible is worth keeping.** The `±5 lines` done-when passed because
@@ -1253,8 +1253,8 @@ Backlog 0179's two staleness advisories are informational and its claims still h
 them moves anchors and wants an inbound sweep of its own.
 
 ### [0126 — The large files split along their seams](done/0126-the-large-files-split-along-their-seams.md)
-— closed 2026-09-03. Eight `dev` phases in the `WORK/rlx-plan-0126` lane, `0d50935`..`463cf2d`
-plus `cb49877` (Phase 7 was taken after Phase 8, out of plan order). 68 files, +15,038 / -12,935.
+— closed 2026-09-03. Eight `dev` phases in the `WORK/rlx-plan-0126` lane, `42f0eac`..`1779520`
+plus `ee38a00` (Phase 7 was taken after Phase 8, out of plan order). 68 files, +15,038 / -12,935.
 Version: **0.103.1** (patch) — eight refactor commits, no feature, and the two behavioural changes
 that rode along are invisible from outside. Review: **no blockers, no majors against the code; one
 major doc-freshness repair, five minors.**
@@ -1351,14 +1351,14 @@ behavioural changes were a compile-time roster guard and a plugin file share mod
 
 ### [0150 — The application becomes Ritmolux](done/0150-the-application-becomes-ritmolux.md)
 — closed 2026-09-02. Nine phases (seven `dev`, two `human`) on `main` directly with no worktree,
-`c093dc7`..`688ae88`. Version: **0.103.0** (minor) — the binary, the component, the release zips,
+`3c42f78`..`7fa3f66`. Version: **0.103.0** (minor) — the binary, the component, the release zips,
 seven environment variables, the Spout sender and the per-user directory all changed name, which
 every operator sees. Review: **no blockers, four majors, two minors.**
 
 **The plan's central safety property held, and it was the right property to choose.** Nothing here
 was supposed to change what is rendered, and nothing did: the full suite re-run at the close is
-1518 passed / 5 skipped / 0 failed in 419.5 s, and `git diff 47432ca..HEAD` over the golden
-baselines is empty. `dev` took a pre-rename baseline on `47432ca` before touching a file, so "no
+1518 passed / 5 skipped / 0 failed in 419.5 s, and `git diff 4755144..HEAD` over the golden
+baselines is empty. `dev` took a pre-rename baseline on `4755144` before touching a file, so "no
 golden moved" is measured rather than asserted. The one bless that did run — to prove `RLX_BLESS`
 was actually wired, since an unread variable and a satisfied one are indistinguishable from a
 passing test — rewrote `shape_collage.png` with the local re-encode drift already on record here,
@@ -1415,7 +1415,7 @@ banner and `use` statements had to re-sort.
 
 ### [0148 — The shipped artifacts carry their own guarantees](done/0148-the-shipped-artifacts-carry-their-own-guarantees.md)
 — closed 2026-09-02. Six `dev` phases, no `human` phase, in the `lmv-plan-0148` lane on
-`plan-0148-the-shipped-artifacts-carry-their-own-guarantees`, `d527820`..`65ac7c1`. Version:
+`plan-0148-the-shipped-artifacts-carry-their-own-guarantees`, `5f41765`..`99b627b`. Version:
 **0.102.0** (minor) — the recipe's size guard is new capability, and nothing else in the plan
 moves a pixel or a byte of encoded output.
 
@@ -1448,7 +1448,7 @@ project's `dev → architect` seam exists to provide, and it is the known gap in
 
 ### [0149 — The line corners stop being blunt](done/0149-the-line-corners-stop-being-blunt.md)
 — closed 2026-09-02. Six `dev` phases and one `human` phase in the `lmv-plan-0149` lane on
-`plan-0149-the-line-corners-stop-being-blunt`, `7128ba6`..`d0d596e`. Mode 4: **no blockers, two
+`plan-0149-the-line-corners-stop-being-blunt`, `17d53d3`..`30b5f79`. Mode 4: **no blockers, two
 majors, three minors.** Version: **0.101.0** (minor) — the plan is framed as defect repair and
 `dev` reported it as a fix, but Phase 2 reverses an accepted architectural decision (ADR-0041
 priced a mitred corner as indistinguishable from a rounded one) to deliver visibly different
@@ -1516,7 +1516,7 @@ disagreement is invisible.
 
 ### [0136 — The gates can convict](done/0136-the-gates-can-convict.md)
 — closed 2026-09-02. Nine `dev` phases and one `human` phase in thirteen commits in the
-`lmv-plan-0136` lane on `plan-0136-the-gates-can-convict`, `df9b7a1`..`93e40bb`, plus `53e5aa1`
+`lmv-plan-0136` lane on `plan-0136-the-gates-can-convict`, `129a35d`..`2eb9c19`, plus `f8b92b2`
 for the review blocker. Mode 4: **one blocker, two majors, two minors, one nit.** Version:
 **0.100.1** (patch) — five gates, one test helper, one packaging script and twelve images; no
 engine, app or C ABI change.
@@ -1569,7 +1569,7 @@ verbatim, and it fell outside every phase's file list.
 
 ### [0137 — The metrics measure light](done/0137-the-metrics-measure-light.md)
 — closed 2026-09-01. Six `dev` phases in eight commits in the `lmv-plan-0137` lane on
-`plan-0137-metrics-light`, `efde516`..`32754b5`. Mode 4: **no blockers, one major, four minors,
+`plan-0137-metrics-light`, `4dc4343`..`e6b35ed`. Mode 4: **no blockers, one major, four minors,
 one nit.** Version: **0.100.0** (minor) — a new statistic and a new `--report`/`--json` column.
 
 **What landed.** `metrics` gained `mean_lit_level` — mean linear light over the set `coverage`
@@ -1623,7 +1623,7 @@ which is exactly the rot the load-bearing-docs rule exists to stop; it now point
 `docs/capturing.md` instead of carrying a copy.
 ### [0141 — The plugin's seams stop drifting](done/0141-the-plugin-seams-stop-drifting.md)
 — closed 2026-09-01. Four `dev` phases in the `lmv-plan-0141` lane on `plan-0141-plugin-seams`,
-`a7354b8`..`c4165f6`. Mode 4: **no blockers, two majors, three minors, two nits** — all five
+`9cf0380`..`ef32d5c`. Mode 4: **no blockers, two majors, three minors, two nits** — all five
 repaired in the close commit. Version: **0.99.1** (patch) — one behavioral fix in shipped code,
 one in release tooling, two documentation phases, no new capability and no Rust touched.
 
@@ -1663,7 +1663,7 @@ trusting a carried-forward check*. (a) is re-opened with the interesting case na
 preset while a reload lands under the open menu.
 
 Three minors: the spec's two tables gave **two different numbers for the same labelled point**
-(9,218,048 B in the series, 9,204,736 B rebuilt at `22bb460` — 13,312 B apart under the same build
+(9,218,048 B in the series, 9,204,736 B rebuilt at `2c8f588` — 13,312 B apart under the same build
 command), and the doc generalized *"the two linkers are interchangeable at this precision"* from
 the **other** point, which happened to agree within 1,536 B. The spec now states both gaps, says
 the cause is not established, sets ~13 KB as the column's working noise floor — which puts the
@@ -1688,7 +1688,7 @@ re-opened on-device item against a rebuilt component.
 
 ### [0139 — The render path validates before it spends](done/0139-the-render-path-validates-before-it-spends.md)
 — closed 2026-09-01. Three `dev` phases in the `lmv-plan-0139` lane on
-`plan-0139-render-validates`, `5cf50bc`..`4d8e4c8`. Mode 4: **no blockers, one major, four minors,
+`plan-0139-render-validates`, `fdbbbba`..`fecdc7d`. Mode 4: **no blockers, one major, four minors,
 three nits.** Version: **0.99.0** (minor) — Phase 1 is a fix but `--crf` is a new flag.
 
 **What landed.** `render::run()` gained `resolve_preset`, which tests `--preset` against the
@@ -1750,8 +1750,8 @@ generically true and conservative, and correcting only the two `docs/` copies wo
 out of step with the CLI's own help, so all four were left as they are.
 
 ### [0146 — The preset sweeps stop being one long test](done/0146-the-preset-sweeps-stop-being-one-long-test.md)
-— closed 2026-08-31. Seven `dev` phases on `main` rather than a worktree, `c2fa99f`..`af4d2b1`,
-with an architect commit (`d009f50`) between Phases 1 and 2. Mode 4: **one blocker, four majors,
+— closed 2026-08-31. Seven `dev` phases on `main` rather than a worktree, `f466320`..`79cbc44`,
+with an architect commit (`835ca92`) between Phases 1 and 2. Mode 4: **one blocker, four majors,
 eight minors, three nits**, all repaired at the close. Version: **0.98.0** (minor) — a new preset
 schema key is a new authoring surface.
 
@@ -1833,10 +1833,10 @@ phases` section it reports against — noted, not rewritten, because the log is 
 direction only; the closing fix is a test and is filed as a followup on the plan.
 
 ### [0145 — The per-phase gate stops paying for the preset library](done/0145-the-per-phase-gate-stops-paying-for-the-preset-library.md)
-— closed 2026-08-31. Six `dev` phases on `main` rather than a worktree, `8b1d7b0`..`a1b9559`:
-the baseline (`8b1d7b0`), the `fast` nextest profile (`f5431dc`), the hook and CI citing it
-(`975c31b`), `dev`'s per-phase tier (`b90e382`), the recorded full-suite fact (`05a6f5d`) and the
-re-measurement (`a1b9559`). Mode 4: **no blockers, no majors, three minors.** Version: **none** —
+— closed 2026-08-31. Six `dev` phases on `main` rather than a worktree, `cb9ce64`..`c1fccc5`:
+the baseline (`cb9ce64`), the `fast` nextest profile (`3549e51`), the hook and CI citing it
+(`6726c5b`), `dev`'s per-phase tier (`795947c`), the recorded full-suite fact (`cf7a0d0`) and the
+re-measurement (`c1fccc5`). Mode 4: **no blockers, no majors, three minors.** Version: **none** —
 docs/chore-only, no Rust, C++ or preset file changed, so no shipped artifact moved.
 
 **What it decided.** ADR-0156, accepted with an `Outcome`: the per-phase gate narrows to
@@ -1891,12 +1891,12 @@ per preset, at no coverage cost — is sequenced next and is the lever this plan
 critical-path finding points at.
 
 ### [0144 — The flags mean what they say](done/0144-the-flags-mean-what-they-say.md)
-— closed 2026-08-31. Six `dev` commits in the `lmv-plan-0144` worktree, one per phase: `1b29936`
-(`FlagSpec.requires` + the companion refusal), `3872605` (`--gpu` reaches the window), `cb6a037`
-(`--preset` holds a scene), `7399ab5` (the hygiene gate scans string literals), `8e7bfe3` (the
-last eleven skip blocks fold into `core/tests/common/`) and `2c5dc2a` (`cargo doc` becomes a CI
-gate, 71 intra-doc links cleared), plus `a2f7627` and `0a687f0` for review fixes and `55e16b6`
-/ `b7fff62` / `75df3b8` for the log. 65 files, `+1532 / -451`.
+— closed 2026-08-31. Six `dev` commits in the `lmv-plan-0144` worktree, one per phase: `1280f6d`
+(`FlagSpec.requires` + the companion refusal), `47c2d01` (`--gpu` reaches the window), `5ff0e8b`
+(`--preset` holds a scene), `68e8c0b` (the hygiene gate scans string literals), `4faea0f` (the
+last eleven skip blocks fold into `core/tests/common/`) and `7ab6adf` (`cargo doc` becomes a CI
+gate, 71 intra-doc links cleared), plus `df28f3e` and `bd3eed1` for review fixes and `f822e8f`
+/ `a208cae` / `4f67f76` for the log. 65 files, `+1532 / -451`.
 
 **What it was for.** [ADR-0148](../adrs/0148-the-cli-refuses-an-argument-no-scanner-claimed.md)
 promised that `lmv` refuses an argument no scanner claimed, and design-backlog 0167 found the case
@@ -1952,10 +1952,10 @@ feature plan). Archived [backlog 0167 + 0168 + 0169](../design-backlog-archive.m
 [backlog 0173](../design-backlog.md); `dev` filed 0171 and 0172 during the lane.
 
 ### [0125 — The scenes share their GPU boilerplate](done/0125-the-scenes-share-their-gpu-boilerplate.md)
-— closed 2026-08-31. Five `dev` commits in the `lmv-plan-0125` worktree, one per phase: `8d2d590`
-(`gpu::color_pass` + `gpu::uniform_buffer`), `672cd85` (`palette::LutPair`), `c7dab47`
-(`scenes::common::{PaletteParams, PanParams}`), `60f57a7` (`gpu::FullscreenScene`) and `1310de3`
-(`marks::InstancedQuads`), plus `30d87cd` for the log. 40 files, `+1934 / -1918`.
+— closed 2026-08-31. Five `dev` commits in the `lmv-plan-0125` worktree, one per phase: `bbe7e10`
+(`gpu::color_pass` + `gpu::uniform_buffer`), `90d4dc6` (`palette::LutPair`), `02b14ef`
+(`scenes::common::{PaletteParams, PanParams}`), `f18ece6` (`gpu::FullscreenScene`) and `e9602f8`
+(`marks::InstancedQuads`), plus `ed28d4d` for the log. 40 files, `+1934 / -1918`.
 
 **Review: no blockers, no majors, four minors, four nits.** The plan's whole acceptance oracle was
 *golden-identical, unblessed, at every commit*, and that was verified against the tree rather than
@@ -2018,10 +2018,10 @@ capture readback; the clean re-run is the one recorded. That disclosure is worth
 shape a machine-caused red takes on this box.
 
 ### [0124 — The review fixes that move no pixels](done/0124-the-review-fixes-that-move-no-pixels.md)
-— closed 2026-08-30. Five `dev` commits in the `lmv-plan-0124` worktree: `709544f` (the shared
-`core/tests/common/` harness), `cf8c47a` (six rejoined literals plus the `#[allow]` move),
-`fdb0fed` (the widened hygiene gate and 72 rewritten comments), `7c87aad` (the ABI clause) and
-`4780f9e` (the unwired scripts). **Phase 4 produced no commit** — it had landed out of band on
+— closed 2026-08-30. Five `dev` commits in the `lmv-plan-0124` worktree: `fd856ee` (the shared
+`core/tests/common/` harness), `e3e9b75` (six rejoined literals plus the `#[allow]` move),
+`0979eec` (the widened hygiene gate and 72 rewritten comments), `04e69f7` (the ABI clause) and
+`91003e1` (the unwired scripts). **Phase 4 produced no commit** — it had landed out of band on
 2026-08-29 during a documentation audit and the plan block said so; `dev` verified it rather than
 redoing it, which is the right reading.
 
@@ -2076,7 +2076,7 @@ renderers. The done-when is met by its first branch for all ten `.mjs`. Two cost
 would have carried, both real: closed Plan 0114 references the pair at nine places, and
 design-backlog 0161 holds a live `unprobeable:` verification on them.
 
-**Curation: not triggered** — `git diff --name-only e6028bd..704a0e2 -- presets/` is empty, and
+**Curation: not triggered** — `git diff --name-only 46edac8..ba20328 -- presets/` is empty, and
 the plan fixed no engine defect a preset could have been written around.
 
 **Still parked, deliberately:** the plan's own open question — `core/src` measured at 37 % comment
@@ -2086,8 +2086,8 @@ asked. Also filed at this close: **design-backlog 0169**, `cargo doc --workspace
 intra-doc-link warnings over 31 files and neither `pre-push` nor CI runs `cargo doc`.
 
 ### [0135 — The show-night surfaces stop lying](done/0135-the-show-night-surfaces-stop-lying.md)
-— closed 2026-08-30. Four `dev` phases in the `lmv-plan-0135` worktree: `915fc74` (the roster
-gate), `c937026` (`--help`), `e0fd1a7` (an operator swap resets the incident) and `6c717d5` (the
+— closed 2026-08-30. Four `dev` phases in the `lmv-plan-0135` worktree: `c8672d0` (the roster
+gate), `53f12a9` (`--help`), `4bb47e4` (an operator swap resets the incident) and `a20fd16` (the
 settle window in seconds). **Phase 5 is `human` and did not run** — no removable audio interface
 on the box — so it is carried to the on-device unplug checkbox and a Standing bullet, and
 design-backlog 0154 stays live with a dated update saying so. Review: **no blockers, one major,
@@ -2150,9 +2150,9 @@ complete — it is correct today (the `"--x"` literals in `gpu.rs` and `lib.rs` 
 and a display string), but a scanner in a third file would be invisible to it.
 
 ### [0131 — The operator gets a console](done/0131-the-operator-gets-a-console.md)
-— closed 2026-08-30. Five `dev` phases on `main`, no worktree: `9ab7726` (Phases 1 + 3 in one
-commit), `b9edb61` (two defects found by driving it), `f0760bb` (Phase 2), `03b4b01` (Phases 4 + 5
-in one commit) and `eaba5b0` (an operator-feedback round). Phase 6 (`human`) is **part-run** and
+— closed 2026-08-30. Five `dev` phases on `main`, no worktree: `982fac4` (Phases 1 + 3 in one
+commit), `d720bd3` (two defects found by driving it), `03ecde9` (Phase 2), `f65f48e` (Phases 4 + 5
+in one commit) and `fc0fa72` (an operator-feedback round). Phase 6 (`human`) is **part-run** and
 its remainder lives on the on-device checklist. Review: **no blockers, two majors, five minors,
 two nits.** Version **0.94.0** (minor). Closed no backlog entry; filed 0164 and 0165. Curation not
 triggered — `presets/` untouched across every commit in the plan's range.
@@ -2226,8 +2226,8 @@ future console binding inherits that exposure.
 
 ### [0134 - The lanes stop sharing a store](done/0134-the-lanes-stop-sharing-a-store.md)
 - closed 2026-08-30. Three phases of three, taken on `main` with no worktree because the plan
-changes one machine-local file and no repository code: `2c15cc2` (Phase 2) and `d9ee224`
-(Phase 3), plus `713893f`, which landed Phase 3's file edits out of band the previous evening.
+changes one machine-local file and no repository code: `2c5a041` (Phase 2) and `571030f`
+(Phase 3), plus `7f50cd9`, which landed Phase 3's file edits out of band the previous evening.
 Review: **no blockers, one major, four minors.** Version **none** - docs/chore-only, deliberate
 under ADR-0005, and it also avoids colliding with the Plan 0131 close running in parallel. Closed
 no backlog entry. Curation: not triggered - `presets/` untouched.
@@ -2277,7 +2277,7 @@ a mechanism ADR-0147 took back; its behaviour is correct either way and 0161 cov
 
 ### [0115 — The engine becomes a live video source](done/0115-the-engine-becomes-a-live-video-source.md)
 — closed 2026-08-30. Seven planned phases plus a `dev`-added Phase 3b, in the `lmv-plan-0115`
-lane, `b50592a`..`7e870aa` plus the close block and the out-of-band auto-rotate fix `64758ad`.
+lane, `ad348cd`..`d869655` plus the close block and the out-of-band auto-rotate fix `ac311ac`.
 Review: **no blockers, two majors, three minors.** Version **0.93.0** (minor). Closed no backlog
 entry. Curation: not triggered — `presets/` untouched.
 
@@ -2319,7 +2319,7 @@ at 1280x1280, so ADR-0125's 1920x1080 bandwidth figures were never confirmed end
 **Two things outlived the plan and are worth more than the feature.** Phase 5 found that
 **auto-rotate had not rotated in the shipped windowed app since 2026-07-26** — the shell's branch
 called `on_preset_switched()`, which is bookkeeping *about* a switch and performs none; fixed in
-`64758ad`, and the reason it shipped is that `AppState` needs a real window, so nothing in the
+`ac311ac`, and the reason it shipped is that `AppState` needs a real window, so nothing in the
 suite can assert what the event loop's branch calls. And this lane is where the **shared artifact
 store** was caught serving one worktree another's compiled `lmv-core` (`no method named open_tap`
 against source that defines it), which became ADR-0147 and Plan 0134.
@@ -2332,7 +2332,7 @@ rather than acted on.
 
 ### [0104 — The library stops being lopsided](done/0104-the-library-stops-being-lopsided.md)
 — closed 2026-08-29. Six phases plus a `dev`-added Phase 4b, in the `lmv-plan-0104` lane,
-`7561492`..`be385c9` plus the close. Review: **one blocker, three majors, three minors, two nits.**
+`4eb9cef`..`8799203` plus the close. Review: **one blocker, three majors, three minors, two nits.**
 Version **0.92.0** (minor). Closed no backlog entry; **corrected** 0038 and **withdrew** a
 followup against 0099.
 
@@ -2405,7 +2405,7 @@ paths under `lmv-plan-0104` — before re-running `fmt`, `clippy --workspace --a
 
 ### [0129 — The build stops being paid three times](done/0129-the-build-stops-being-paid-three-times.md)
 — closed 2026-08-29. Seven phases of seven, taken in the main checkout rather than a lane (which
-is what the plan asked for), `b17d8cc`..`952d5c3` plus the close's `6371136`. Review: **no
+is what the plan asked for), `1476e9c`..`a2654df` plus the close's `0658965`. Review: **no
 blockers, one major, four minors.** Version **0.91.1** (patch). Closed no backlog entry; filed
 0160 + 0161. Curation: not triggered — `presets/` untouched.
 
@@ -2466,7 +2466,7 @@ names as weaker than a gate and accepts.
 
 ### [0132 — The lighting rig follows the visuals](done/0132-the-lighting-rig-follows-the-visuals.md)
 — closed 2026-08-29. Two phases of eight on `plan-0132-the-lighting-rig-follows-the-visuals` in
-`WORK/lmv-plan-0132`, `c8bdcd5`..`36c1cdf` plus the close's `e8e3a9b`. Review: **no blockers, one
+`WORK/lmv-plan-0132`, `4be8e4a`..`728827c` plus the close's `74b7007`. Review: **no blockers, one
 major** (discharged at the close), **three minors, two nits.** Version **0.91.0** (minor). Closed
 no backlog entry; converted 0157's `unprobeable:` opt-out into a real probe, which this merge is
 what made possible.
@@ -2539,7 +2539,7 @@ probes that actually ran the show.
 
 ### [0130 — The audio input becomes an operator surface](done/0130-the-audio-input-becomes-an-operator-surface.md)
 — closed 2026-08-28. Six phases on `plan-0130-the-audio-input-becomes-an-operator-surface` in
-`WORK/lmv-plan-0130`, `9005a8d`..`85bd59b` plus the Phase 5 log commits. Review: **no blockers,
+`WORK/lmv-plan-0130`, `43ff748`..`1bbe54e` plus the Phase 5 log commits. Review: **no blockers,
 two majors** (both about what the close would strand, both discharged here), **two minors, two
 nits.** Version **0.89.0** (minor). Closed no backlog entry; filed 0154, 0155 and 0156.
 
@@ -2580,7 +2580,7 @@ restore the device (ADR-0142 Alternative D), the file was the only record of whi
 rig wants. That review also found the row matcher disagreeing with `pick_device`'s rule, a retry
 bound a single live frame could reset, a flag claiming to have been applied on platforms that
 ignore it, and a valueless `--device` meaning the opposite of a selection. All five landed in
-`85bd59b` before this close.
+`1bbe54e` before this close.
 
 **What outlived the plan.** `CaptureVerdict` is current state rather than a startup fact, and the
 live token now carries the endpoint (`live WASAPI 48000/2 Speakers (Realtek(R) Audio)`) — a format
@@ -2594,7 +2594,7 @@ surface, so the verdict reads `live` while nothing is delivering, which is the o
 
 ### [0122 — Every rate integrates](done/0122-every-rate-integrates.md)
 — closed 2026-08-28. Five phases on `plan-0122-every-rate-integrates` in `WORK/lmv-plan-0122`,
-`5c258d0`..`7ac363f`. Review: **no blockers, two majors** (both discharged before the close),
+`3c52739`..`bd57e07`. Review: **no blockers, two majors** (both discharged before the close),
 **two minors.** Version **0.87.0** (minor). Closed [design-backlog 0141](../design-backlog.md);
 filed 0149 and 0150.
 
@@ -2602,7 +2602,7 @@ filed 0149 and 0150.
 again inside the plan.** ADR-0132 named two bindable rates; Plan 0121's close found a third;
 planning this found two more and built ADR-0135 around six; this plan's own Mode 4 review found
 **three more**, bringing the tally to nine. The ADR's body was corrected while it was still
-`proposed` (`e186bd2`) rather than accepted with an Outcome, which is the point — a document that
+`proposed` (`46f3069`) rather than accepted with an Outcome, which is the point — a document that
 has not been accepted is still a draft, and the correction is an edit rather than a reversal. Its
 Notes section now says four attempts were needed and tells a tenth rate's author to grep for the
 mechanism instead of reading the table.
@@ -2629,7 +2629,7 @@ one parameter whose behaviour actually changed for authors; fixed in the close c
 
 **`dev`'s own log convicted a Phase 3 measurement, which is the reading worth keeping.** The
 before/after `drive`/`rate`/`cover` table named five swarm presets; three of them —
-`Dense`, `Starfield`, `Storm` — were retired 2026-08-11 by `9bf2b23` and were never in the tree
+`Dense`, `Starfield`, `Storm` — were retired 2026-08-11 by `6f4e9a7` and were never in the tree
 the plan ran against. `shot --report family=swarm` with no `--presets` resolves to the seeded
 `%APPDATA%` copy, and seeding is write-if-absent and never deletes. The plan's done-when *"read
 against their family neighbours"* was therefore **unsatisfiable as written**: the swarm family is
@@ -2637,7 +2637,7 @@ two presets and both bind `spin`, so no unaffected control exists. Confirmed at 
 `shot --presets presets --report family=swarm` reports exactly two.
 
 **Phase 5's verdict went to the retuned variants on both presets**, taken in the running app
-against a `b250d0d` build on one track. The finding inside it: `swarm_drift`'s `spin` carries a
+against a `573ce0c` build on one track. The finding inside it: `swarm_drift`'s `spin` carries a
 `sin(time)` term the plan's analysis had missed, and multiplied by elapsed time its derivative
 carried a `0.00019 · t` piece, so by t = 300 s the field periodically ran **backwards**, unbounded.
 Also swept at the close: `curve_nightbloom.toml`'s header justified a constant `spin` with a
@@ -2646,7 +2646,7 @@ header cites no ADR, plan or backlog number at all.
 
 ### [0098 — The figure nests properly](done/0098-the-figure-nests-properly.md)
 — closed 2026-08-27. Eight phases (1, 2, 3, 4, 4b, 5, 6, 7) on `plan-0098-nested-figure` in
-`WORK/lmv-plan-0098`, `28336c3`..`7411663`. Review: **no blockers, no majors, five minors, two
+`WORK/lmv-plan-0098`, `b0b8f28`..`89e8676`. Review: **no blockers, no majors, five minors, two
 nits.** Version **0.86.0** (minor). Closed [design-backlog 0096 + 0097](../design-backlog.md);
 filed 0144.
 
@@ -2737,8 +2737,8 @@ removed. One item the plan made stale that nobody has touched: `presets/shape_co
 further with every ring outward"*, the exact property `coord_mode` now makes optional. Its header
 frames that rounding as deliberate, so this is a `preset-author` question and not a defect.
 ### [0118 — The comments stop narrating the plans that wrote them](done/0118-the-comments-stop-narrating-the-plans-that-wrote-them.md)
-— closed 2026-08-27. Seven phases on `main` directly, no worktree: `37868d4`, `6ae4245`
-(+ `b4d0cba`), `0003f42`, `add5710`, `29a0a9d`, `52c3bcb`, `6e48021`, plus `807b6ef` repairing the
+— closed 2026-08-27. Seven phases on `main` directly, no worktree: `57a2b9b`, `b71b177`
+(+ `82db614`), `d6a285a`, `424c8b2`, `0e228ac`, `3f4e451`, `e98583f`, plus `3a4b12f` repairing the
 first review's two majors. Review: **no blockers, no majors, five minors, one nit.**
 Version: **0.85.0** (minor — **0.84.0** was already tagged on the unmerged
 `plan-0098-nested-figure` branch, so `main` took the next free number). Closed [design-backlog 0129](../design-backlog-archive.md), whose
@@ -2779,10 +2779,10 @@ comment claiming a fixed 16:9 internal resolution that ADR-0034 retired, and the
 miscitation the first review caught.
 
 ### [0087 — The line renderer draws a curve](done/0087-the-line-renderer-draws-a-curve.md)
-— closed 2026-08-27. Seven phases across two lanes: 1, 1b, 2, 3 (`3f9e828`, `b97ff64`,
-`509eaff`, `82c031f`) in `lmv-plan-0087` on `plan-0087-arc-primitive`, which reached `main` inside
+— closed 2026-08-27. Seven phases across two lanes: 1, 1b, 2, 3 (`1ca72ca`, `68b721f`,
+`1cf7294`, `7f270b4`) in `lmv-plan-0087` on `plan-0087-arc-primitive`, which reached `main` inside
 [0114](done/0114-the-line-stroke-reads-as-a-drawn-line.md)'s close merge; 5, 6 and the preset
-(`af4f118`, `8179f25`, `a7d7cd0`) in `lmv-plan-0087-biarc`. Phases 4 and 7 are `human`. Review:
+(`c6b31eb`, `3c08a3a`, `3697f30`) in `lmv-plan-0087-biarc`. Phases 4 and 7 are `human`. Review:
 **no blockers, one major, five minors, two nits.** Version **0.82.0** (minor).
 
 **What landed.** `LineRenderer` gained an `ArcInstance` drawn as one bounding quad whose stroke is
@@ -2861,7 +2861,7 @@ and makes the committed gallery re-render genuinely owed — still blocked on
 [backlog 0133](../design-backlog.md), since `docs-shots.mjs` cannot run at all.
 
 ### [0114 — The line stroke reads as a drawn line](done/0114-the-line-stroke-reads-as-a-drawn-line.md)
-— closed 2026-08-26. Ten phases, `e2eb8fc`..`1d0185a`, in the `lmv-plan-0114` worktree on
+— closed 2026-08-26. Ten phases, `5cb14b1`..`471f11e`, in the `lmv-plan-0114` worktree on
 `plan-0114-line-stroke`. Review: **no blockers, one major, three minors** — no code finding; the major is the plan header's own false merge/version claim, repaired at the close. Version **0.81.0**
 (minor: a new authorable scene parameter, a moved default, a new golden baseline and a
 six-preset retune).
@@ -2913,12 +2913,12 @@ refreshed. Filed as [design-backlog 0133](../design-backlog.md).
 this close merged **Plan 0087 Phases 1-4** to `main` as well; 0087 stays open at Phase 5, now
 resuming from `main` instead of from its own branch. And the plan's header had claimed the
 `v0.80.0` bump was taken at a "`dev`-arm close" and that phases 1-5 and 7-9 were already merged
-— both false: that tag sits on `601293d`, Plan 0119's release commit, and no part of 0114 was on
+— both false: that tag sits on `696aae7`, Plan 0119's release commit, and no part of 0114 was on
 `main` until this close. `dev`'s close block caught the discrepancy, refused to edit the header,
 and left it here, which is exactly the split the lanes are for.
 
 ### [0119 — The flatness gate gets its second term](done/0119-the-flatness-gate-gets-its-second-term.md)
-— closed 2026-08-26. Five phases, `8389f2a`..`40398d4`, on `main` in the primary
+— closed 2026-08-26. Five phases, `e68e538`..`8c58ecf`, on `main` in the primary
 worktree. Review: **no blockers, one major, four minors.** Version **0.80.0** (minor:
 `metrics::boundary_density` is new production code and one preset joined the embedded
 set, 42 → 43).
@@ -2954,7 +2954,7 @@ the clause was reaching for. Deviation logged, and correct.
 
 **The review re-measured rather than graded the log.** `cargo nextest run --workspace` 995
 passed / 5 skipped; `fmt` and `clippy --workspace --all-targets` clean; the frozen
-`HELD_OUT_TOML` verified byte-identical to `26b20b3^:presets/pending/fragment_tiledmono.toml`
+`HELD_OUT_TOML` verified byte-identical to `a00d4cc^:presets/pending/fragment_tiledmono.toml`
 *and* to the shipped copy; and every calibration number re-read off a live gate run —
 `Tiled Rosette Mono` `0.9413 / 0.3602 / coverage 0.4952`, `Suprematist` `0.2565`, `On White`
 `0.3064`, and the exposure printing exactly `22 of 43`.
@@ -2977,8 +2977,8 @@ design-backlog 0130 (the resolution coupling) and 0131 (`shot --report` truncate
 names at 14 characters, and this plan shipped the library's first collision).
 
 ### [0113 — The engine paints a canvas](done/0113-the-engine-paints-a-canvas.md)
-— closed 2026-08-26. Ten phases, `046b9f3`..`02b6de9`. Phases 1-8 ran in the
-`lmv-plan-0113` worktree on `plan-0113-shape-collage` and merged at `b20ba21`; 6b, 9 and
+— closed 2026-08-26. Ten phases, `6987056`..`38ab987`. Phases 1-8 ran in the
+`lmv-plan-0113` worktree on `plan-0113-shape-collage` and merged at `aacfafe`; 6b, 9 and
 10 landed on `main` directly. Two `human` gates, both decided in their own phase blocks.
 **Two Mode 4 reviews, which is the shape worth remembering about this close.** The first
 found three `major`s and became **Phase 9**; the second found **no blockers and one
@@ -3065,8 +3065,8 @@ test support.
 
 ### [0116 — The sanity lens finds the ground](done/0116-the-sanity-lens-finds-the-ground.md)
 — closed 2026-08-26, in the `lmv-plan-0116` worktree on `plan-0116-sanity-ground`, branched from
-`e022a5d`. Six `dev` phase commits (`8d4a9a9`, `debd803`, `5d97abd`, `86106af`, `022e4c5`,
-`c2dc0dc`), two `human` gates (Phases 2 and 5), and **one phase that deliberately did not run**.
+`ff556c3`. Six `dev` phase commits (`9b5a945`, `11ffa21`, `7927495`, `7c8fe30`, `590b822`,
+`9a0cfcb`), two `human` gates (Phases 2 and 5), and **one phase that deliberately did not run**.
 Review: **one blocker, two majors, four minors.** Version: **patch**, `0.78.0` → `0.78.1` — the
 engine renders exactly what it rendered; every file touched is a test, a metric or a document.
 
@@ -3120,7 +3120,7 @@ different axis. `MIN_GROUND_SHARE`'s doc comment now says so.
 
 **The blocker was an ADR number collision.** This lane took `0127` for the tonal-flatness decision on
 2026-08-26 while `main` had already published a different ADR-0127 (Plan 0118's "a comment carries the
-mechanism", `577fceb`, 2026-08-25). It surfaced at the close's `git merge main`, and the lane's ADR was
+mechanism", `3dc92e6`, 2026-08-25). It surfaced at the close's `git merge main`, and the lane's ADR was
 renumbered to **0128** across 26 references. Root cause: **both** next-free-number lines were stale —
 `docs/adrs/README.md` said 0128 with 0127 already consumed, and `docs/plans/README.md` said 0127 with
 0127 already consumed. Both corrected to 0129.
@@ -3137,9 +3137,9 @@ one-sided, firing when a floor sits too far *below* its family and never when it
 where six families now are.
 
 ### [0117 — The downbeat log sees the counter it folds over](done/0117-the-downbeat-log-sees-the-counter-it-folds-over.md)
-— closed 2026-08-25, two phase commits on `main` directly (`fa5f040`, `28641ec`) plus the close
-block at `b02244d`. No worktree: the plan's whole subject was that `main` was red and unpushed at
-`c0869e6`, so there was no branch to merge back. Review: **no blockers, one major, six minors, two
+— closed 2026-08-25, two phase commits on `main` directly (`639ff5d`, `aa1f704`) plus the close
+block at `102b96a`. No worktree: the plan's whole subject was that `main` was red and unpushed at
+`8cc0fb0`, so there was no branch to merge back. Review: **no blockers, one major, six minors, two
 nits.** Version: **minor**, `0.77.0` → `0.78.0`.
 
 **What shipped.** `DownbeatTerms` gained `fold_beat` and `grid_bar_phase`, recorded by
@@ -3185,8 +3185,8 @@ now exists and **has measured nothing** — spending a capture through it is a `
 whichever plan runs it owns the amendment to ADR-0109.
 
 ### [0095 — The downbeat fold gets a musical beat](done/0095-the-downbeat-fold-gets-a-musical-beat.md)
-— closed 2026-08-25, seven phase commits on `plan-0095-musical-bar-grid` from `5bdce91` to
-`4caac3c`, merged at `6507f41`. **Reviewed twice**: 2026-08-25 over phases 1-6 (no blockers, four
+— closed 2026-08-25, seven phase commits on `plan-0095-musical-bar-grid` from `6f57fca` to
+`ca0e1ec`, merged at `0babb90`. **Reviewed twice**: 2026-08-25 over phases 1-6 (no blockers, four
 majors, all one shape), and again at the close over **Phase 7**, which was authored in the session
 that produced the first review and had therefore never had a fresh-context read — no blockers, one
 major, three minors, one nit. Version: **minor**, `0.76.0` → `0.77.0` — Phases 2, 3, 4 and 7a all
@@ -3258,8 +3258,8 @@ arithmetic is a `preset-author` followup — Phase 6 and 7 corrected their comme
 expression, verified: the `presets/*.toml` diff across the whole plan contains no non-comment line.
 
 ### [0106 — The frame stream passes through a diffusion model](done/0106-the-frame-stream-passes-through-a-diffusion-model.md)
-— closed 2026-08-25, eleven commits on `plan-0106-diffusion-filter` from `3c15e79` to
-`b1647a6`, merged at `a5c4407`. Review: **no blockers, no majors, five minors** (all repaired at
+— closed 2026-08-25, eleven commits on `plan-0106-diffusion-filter` from `7ee8168` to
+`d5d20e5`, merged at `3fac183`. Review: **no blockers, no majors, five minors** (all repaired at
 the close). Version: **minor**, a feature plan — though it moves **no release artifact**:
 `core/`, `core-cabi/`, `plugin-foobar/`, `lmv-ring/` and `packaging/` are untouched and the only
 Rust is 85 lines of test.
@@ -3330,8 +3330,8 @@ anchors that `scripts/check-doc-links.mjs` does not validate, and a `_control` c
 `quality`'s 2.53x that nothing has measured.
 
 ### [0112 — The handoff stops being a chat message](done/0112-the-handoff-stops-being-a-chat-message.md)
-— closed 2026-08-25, three `dev` phases on `main` (`9d8b359`, `51053b0`, `1708b79`) plus the
-close block `f4ee668`. Review: **no blockers, no majors, two minors.** Harness only: no Rust, no
+— closed 2026-08-25, three `dev` phases on `main` (`b139ebc`, `5e9c792`, `e93a03a`) plus the
+close block `61c2139`. Review: **no blockers, no majors, two minors.** Harness only: no Rust, no
 `presets/`, no `scripts/`, no CI. Version: **none** — a deliberate docs/chore-only call under
 [ADR-0005](../adrs/0005-versioning-and-release-cadence.md), since the plan moves no shipping
 artifact.
@@ -3384,7 +3384,7 @@ the plan scoped it out. `dev` had disclosed the frontmatter one itself under `##
 the counterweight rule working on its first run.
 
 ### [0111 — The MilkDrop import stops washing out](done/0111-the-milkdrop-import-stops-washing-out.md)
-— closed 2026-08-20, four `dev` phases across seven commits `b8c8524`..`afc65d6`. Review: **no
+— closed 2026-08-20, four `dev` phases across seven commits `ee758b5`..`5296026`. Review: **no
 blockers, one major, two minors.** Phase 3 did not run, on Phase 2's stop condition; **Phase 6
 (`human`) is void rather than open** — see below.
 
@@ -3481,7 +3481,7 @@ next free ADR number. `presets/` untouched, so no curation sweep was owed. Versi
 `0.75.1`: one fix, everything else tests and docs.
 
 ### [0110 — The shader surface stops being invisible](done/0110-the-shader-surface-stops-being-invisible.md)
-— closed 2026-08-19, five `dev` phases in `4595e14`, `c2b36cc`, `916df90`, `e46232f`, `2b639fe`.
+— closed 2026-08-19, five `dev` phases in `5e031b7`, `2fe26ab`, `a1c8744`, `baaa351`, `82e10f7`.
 Review: **no blockers, one major, three minors.** **Phase 6 (`human`) is deliberately still
 open** — nothing is pushed, so the CI reading this plan exists to turn green has not happened.
 
@@ -3534,8 +3534,8 @@ byte-identical to `v0.74.0` and a tag push publishes release zips. `docs/releasi
 "no bump" for a chore-only plan as a choice, and this was made as one rather than missed.
 
 ### [0107 — The foobar menu picks a preset](done/0107-the-foobar-menu-picks-a-preset.md)
-— closed 2026-08-18, four `dev` phases in `1ea486b`, `bdadf47`, `2919b7b`, `4d1f450`. Review:
-**no blockers, two majors (both repaired at the close in `cc1b7ef`), four minors, two nits.**
+— closed 2026-08-18, four `dev` phases in `59e353a`, `9113b5d`, `ec97261`, `6252e67`. Review:
+**no blockers, two majors (both repaired at the close in `f8efbf7`), four minors, two nits.**
 
 **What shipped.** [ADR-0117](../adrs/0117-c-abi-v6-the-host-reads-the-roster-and-selects-a-preset.md)'s
 two functions and nothing else — `lmv_get_presets` (caller-buffer roster snapshot, call-twice
@@ -3596,7 +3596,7 @@ convicts a menu of two items that is now five items and a submenu, so the entry 
 stays live.
 
 ### [0108 — The MilkDrop import gets its tone back](done/0108-the-milkdrop-import-gets-its-tone-back.md)
-— closed 2026-08-17, four dev phases in `b02cd45`, `60674da`, `6e92eb3`, `a07b0c6`, with Phases 2
+— closed 2026-08-17, four dev phases in `766a931`, `3249097`, `3a3533a`, `e664ee8`, with Phases 2
 and 6 (`human`) run as one live look-gate session at the close. Review: **no blockers, two majors
 (both repaired at the review), three minors, one nit.**
 
@@ -3632,7 +3632,7 @@ too, so an odd-length trace inverts every frame at the display's refresh rate, b
 but **unverified against the reference**.
 
 ### [0101 — The engine renders a music video](done/0101-the-engine-renders-a-music-video.md)
-— closed 2026-08-17, four dev phases in commits `39b36e6`–`0ab8400`, Phase 5 (`human`) run live at
+— closed 2026-08-17, four dev phases in commits `a3b2e3c`–`cc463fd`, Phase 5 (`human`) run live at
 the close. Review: **no blockers, no majors, five minors and nits** — two of which were found by
 *running* the feature rather than reading it. **`shot --render` walks a WAV at a fixed injected
 `dt` and streams Y4M to a user-supplied `ffmpeg`; no encoder ships and `lmv.exe` did not change
@@ -3673,7 +3673,7 @@ validated, so a typo'd name leaves a 262-byte audio-only MP4 at `--out`
 no size lever — 3.73 GB and 106 Mbit/s for 4:41, about 9x a typical 1080p60 upload rate
 ([0112](../design-backlog.md)). Version: **0.71.0 → 0.72.0**.
 ### [0100 — The engine speaks MilkDrop](done/0100-the-engine-speaks-milkdrop.md)
-— closed 2026-08-16, six dev phases in commits `2603309`–`0948cf2` across two sessions (one `wip:`
+— closed 2026-08-16, six dev phases in commits `3dc3f1b`–`af24b0f` across two sessions (one `wip:`
 checkpoint kept unsquashed by the no-rewrite rule), Phases 7 and 8 (`human`) run live at the close.
 Review: **no blockers, one major, two minors.** The major was the review's own operator-doc sweep
 firing: `warp_mesh` is a full palette participant — per-pixel fragment-stage LUT, so both
@@ -3699,7 +3699,7 @@ near-duplicate sweep was owed; the workaround grep is unchanged by this plan. Si
 +383 KB / +376 KB against the plan's "near zero" expectation, honestly recorded as optimistic by
 ~140 KB; cdylib at ~8.8 MiB under NFR §4's ~10 MB soft cap.
 ### [0102 — The component ships](done/0102-the-component-ships.md)
-— closed 2026-08-16, Phases 1-4 in three commits (`e5e03de`, `07f1573`, `56c3edf`), one session.
+— closed 2026-08-16, Phases 1-4 in three commits (`0ffe3df`, `760c6c6`, `82aa077`), one session.
 Review: **no blockers, three majors, four minors.** **Phase 1's `human` question — the one this
 had been waiting on for sixty plans — took one reading:** the foobar2000 SDK licence is
 BSD-style, permits binary redistribution, and puts a notice obligation only on redistributed
@@ -3746,7 +3746,7 @@ tag this close writes has not yet produced; it is carried to
 SDK-staleness watcher `sdk-pin.ps1`'s header admits nothing guards is a followup, not a gap.
 
 ### [0099 — The horizon reaches its own length](done/0099-the-horizon-reaches-its-own-length.md)
-— closed 2026-08-16, all three `dev` phases in two commits (`b0a5ba0`, `cb8a434`), one session.
+— closed 2026-08-16, all three `dev` phases in two commits (`caacf89`, `6e512db`), one session.
 Review: **no blockers, no majors, four minors and a nit.** **The plan's discriminator was the
 whole value of it, and it returned a third answer rather than either of the two on offer.**
 `reaction_etching` — the RD world the original measurement missed — fails like its two siblings,
@@ -3807,8 +3807,8 @@ defect"* Negative, which now carries the one conditional Plan 0101 Phase 4 needs
 that submits its own passes outside `step_offscreen` inherits the defect and none of the fix.
 
 ### [0105 — The indexes go back to being indexes](done/0105-the-indexes-go-back-to-being-indexes.md)
-— closed 2026-08-16, all six `dev` phases (`5791d25`, `0171fdf`, `f17be77`, `665eb0e`, `34b72ea`,
-`7903351`) in one session. Review: **no blockers, two majors, two minors, one nit.** The three
+— closed 2026-08-16, all six `dev` phases (`0d639d1`, `a2d6cb4`, `8857754`, `7143b75`, `05ae80f`,
+`c208380`) in one session. Review: **no blockers, two majors, two minors, one nit.** The three
 roster files went **477,594 -> 220,626 bytes** — `docs/adrs/README.md` alone 189,305 -> 21,085, an
 89 % cut against the ~24 KB [ADR-0116](../adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md)
 predicted — and `scripts/check-index-rows.mjs` now holds every row inside a
@@ -3833,7 +3833,7 @@ section had been emptied once by Plan 0061 Phase 7b and then regrew entirely fre
 was never the problem, which is precisely ADR-0116's argument. Moving that prose stranded **9
 reference-link uses** from their definitions, the third break class, caught by
 `check-doc-links.mjs`. In the backlog ledger exactly **one** datum survived both the archive and
-the pointed-at document — commit `3732fb4` in row 0056, which is in git and in no document at all
+the pointed-at document — commit `ce5f064` in row 0056, which is in git and in no document at all
 — and it stayed in the row. **Two majors, both outside the trim.** First, **the gate has no
 assertion that it can convict**: its fixture is the only one in `scripts/fixtures/` that asserts
 exit 0, and a mutation that makes the row matcher match nothing still exits 0 there and on the
@@ -3856,8 +3856,8 @@ lane that causes the defect is the lane it fires on — and this close was its f
 
 ### [0097 — The track announces itself](done/0097-the-track-announces-itself.md)
 — closed
-2026-08-16, all five `dev` phases (`c9f7a3e`, `3621030`, `cb41dee`, `1c96327`, `51d4489`) plus
-one **approved out-of-plan fix** (`1016777`), with the `human` Phase 6 run the same day on the
+2026-08-16, all five `dev` phases (`fe2ef7c`, `f093343`, `6aff4c9`, `89c2525`, `e49ec1e`) plus
+one **approved out-of-plan fix** (`6f2862c`), with the `human` Phase 6 run the same day on the
 user's machine. Review: **no blockers, no majors, three minors and a nit.** A track change now
 fades a two-line artist/title banner in over the visuals; the **core owns it** (string, `dt`
 envelope, layout, truncation) and each shell only supplies a string, so the two frontends
@@ -3875,7 +3875,7 @@ first contact, because two **pre-existing** defects sit between a working core a
 banner — a panel that attaches its surface at 1x1 ([backlog 0102](../design-backlog.md)) and a
 context menu that shadows foobar's layout menu ([backlog 0103](../design-backlog.md)) — plus a
 third, a render timer that once killed had nothing able to re-arm it, fixed under an explicitly
-approved scope expansion (`1016777`, with a watchdog that re-derives visibility from the window
+approved scope expansion (`6f2862c`, with a watchdog that re-derives visibility from the window
 rather than trusting edges). Diagnosing them cost **four wrong hypotheses**, each killed by a
 measurement the next one should have started from: font-system cost (19 ms, 327 faces — not a
 stall), a new DLL dependency (`dumpbin`: import tables byte-identical to the pre-plan build), a
@@ -3886,7 +3886,7 @@ did not fire; carries no `Closes:` header, so nothing was archived.
 
 ### [0096 — The HUD gets out of the way](done/0096-the-hud-gets-out-of-the-way.md)
 — closed
-2026-08-16, all three `dev` phases (`5e5ce0d`, `6c9694f`, `ad86ff8`), the same day it was
+2026-08-16, all three `dev` phases (`e5ec8b5`, `aa916c0`, `10be3be`), the same day it was
 written. Review: **no blockers, no majors, two minors and a nit.** Three shell-local UX nits
 from a user report, and it stayed shell-local: every file under `standalone/` plus `README.md`,
 no core change, no ABI change, no dependency. The preset name is now a **pure, unit-tested
@@ -3909,7 +3909,7 @@ curation sweep nor the archive step fired.
 
 ### [0091 — The figure fills the frame](done/0091-the-figure-fills-the-frame.md)
 — closed
-2026-08-16, Phases 1-5 (`e2dd537`, `7f93b3e`, `78d1671`, `080a7ef`, `82c7471`). The `human` **Phase
+2026-08-16, Phases 1-5 (`a6fd0c6`, `595d15f`, `1707664`, `e4cd03e`, `e7e30f0`). The `human` **Phase
 6 carries forward** (Standing / content brief item 6) and **Phase 7 was cut** — see [backlog
 0095](../design-backlog.md). Review: **no blockers, no majors, three minors.** `shape_field` is
 the **tenth system**: the shared `marks` roster drawn as a fullscreen distance, so the palette
@@ -3946,7 +3946,7 @@ only, by design (ADR-0081) — so no near-duplicate sweep owed, and the workarou
 
 ### [0090 — The emitter's source moves](done/0090-the-emitters-source-moves.md)
 — closed
-2026-08-15, all four `dev` phases (`a274a48`, `10072ed`, `1c87eb7`, `669c6bd`), **and the
+2026-08-15, all four `dev` phases (`3d4a86d`, `8f83c37`, `763f711`, `62cd952`), **and the
 `human` Phase 5 was judged hours later the same day** — so the plan is complete on all five. **Both
 of ADR-0104's argued negatives held under a look**: `spawn_fade = 0.35` hides the pop of a
 source on the screen midline (against a paired `spawn_fade = 0` control), and a prewarmed world
@@ -3989,8 +3989,8 @@ pattern matches `design-backlog 00NN` and this header says the bare `backlog 006
 
 ### [0094 — The two doc gates check what they claim to](done/0094-the-two-doc-gates-check-what-they-claim-to.md)
 — closed 2026-08-15, the day it
-was written and hours after the plan it repairs, all three `dev` phases (`38addde`, `a9f8c70`,
-`24c85dd`). Review: **no blockers, no majors, two minors, two nits** — and neither minor is
+was written and hours after the plan it repairs, all three `dev` phases (`7292c0a`, `b035d8e`,
+`7ce120d`). Review: **no blockers, no majors, two minors, two nits** — and neither minor is
 against the implementation. **Both markdown gates now cover what they claimed to.** The link
 gate skipped any directory *named* `fixtures`, which silently swallowed `core/tests/fixtures/`
 and its three READMEs — twelve relative links, four of them into `docs/plans/done/`, which is
@@ -4037,8 +4037,8 @@ requirement for it — pre-existing, narrow today because preambles precede thei
 
 ### [0093 — The backlog stops asserting things about a repo it has not read](done/0093-the-backlog-stops-asserting-things-about-a-repo-it-has-not-read.md)
 — closed
-2026-08-15, the day it was written, all four `dev` phases (`ee471fb`, `7a975ad`, `0ab3331`,
-`9d8b1ff`). Review: **no blockers, two majors, one minor, two nits** — all three substantive
+2026-08-15, the day it was written, all four `dev` phases (`a81a870`, `7233c9d`, `c0bfc4f`,
+`a0e7f0b`). Review: **no blockers, two majors, one minor, two nits** — all three substantive
 findings are in the machinery rather than the plan, and all three are carried by
 [0094](done/0094-the-two-doc-gates-check-what-they-claim-to.md). **A backlog claim about the
 repo now carries a probe a script re-runs**
@@ -4062,7 +4062,7 @@ nobody has re-tested.
 
 ### [0085 — The show-length horizon gets an instrument](done/0085-the-show-length-horizon-gets-an-instrument.md)
 — closed 2026-08-15 (four
-`dev` phases: `3280136`, `a1e62e5`, `97b7227`, `9514e2b`; **the `human` Phase 5 was then run
+`dev` phases: `21ef9db`, `937daa5`, `a3173ed`, `33e6ebb`; **the `human` Phase 5 was then run
 the same day — all five phases complete, see Standing**). Review: **no blockers, one major,
 three minors, one nit**. **The first instrument in this repo that measures past half a
 second.** `shot --horizon <minutes>` renders N *simulated* minutes at the fixed capture step
@@ -4112,7 +4112,7 @@ the plan called the expected outcome.
 
 ### [0089 — The framing contract stops lying, and two doc gaps close](done/0089-the-framing-contract-stops-lying.md)
 — closed 2026-08-15 (three phases, one
-`dev` session: `e23bd04`, `d4570e7`, `52b1dc3`). Review: **no blockers, no majors, one minor,
+`dev` session: `8ceabb1`, `a9f0987`, `a74ce44`). Review: **no blockers, no majors, one minor,
 three nits**. **A stated invariant stopped being false without a pixel moving.** `FRAME_FILL = 0.88`
 documented that a fitted IFS figure sits inside the frame; the fit measures an *axis-aligned*
 box and `project` then rotates it at `spin`'s default of one revolution per 34.9 s, so only a
@@ -4129,7 +4129,7 @@ dated `Outcome` correcting the plan's own arithmetic: horizontal binding is unsa
 `aspect >= 1/FRAME_FILL = 1.136`, not at every `aspect >= 1`, and the whole derivation assumes
 a landscape target. **Two `dev` deviations, both correct** — Phase 3's shipped instance moved
 to the three `reaction_*` presets because `chthonic_coral_oracle.toml` had been retired three
-days before the plan was written (`d92dcb2`), and the fern's header says something different
+days before the plan was written (`eb03e1c`), and the fern's header says something different
 from the other two because the measurement says the fern is the one figure that *satisfies* the
 rotated bound. Phases 2 and 3 closed the two doc gaps that had each named a home and never got
 a carrier: `kaleido_tile`'s bindability and the clipped border cell, and the gain rule's
@@ -4143,13 +4143,13 @@ reading as a workaround while the fern's and volute's stop reading as taste.
 — closed 2026-08-13 (all
 seven phases, written and landed the same day; six `dev` commits plus the `human` Phase 7 look
 call **run at the close rather than carried forward**). Review: **no blockers, no majors, three
-minors, two nits**, all repaired in `5dda709`. **Eighty-eight plans of a real-time graphics
+minors, two nits**, all repaired in `cd1bc95`. **Eighty-eight plans of a real-time graphics
 project, and this is the first committed image of any kind.** Sixteen of them
 ([ADR-0100](../adrs/0100-documentation-images-are-committed-headless-renders.md)): nine
 gallery, one hero, six walkthrough, every one a 1280x720 `shot` render captured **under real
 audio** through the real analyzer and driven from an argument-free `scripts/docs-shots.mjs`
 whose manifest is the only record of what produced each file. The capability came first — `shot --frame-at
-<hop>` (`476a989`), because the filmstrip path scales every frame to a **363x208 bordered
+<hop>` (`715d40e`), because the filmstrip path scales every frame to a **363x208 bordered
 tile** and nothing in the tool could produce a full-resolution frame under real audio. Two new
 documents on top of the three references rather than merged into them
 ([ADR-0101](../adrs/0101-the-preset-docs-gain-a-tutorial-layer-rather-than-a-merge.md)):
@@ -4583,7 +4583,7 @@ sweep owed; the workaround grep lists two headers for the content lane — `frag
 ### [0075 — The content renaissance: the library is rebuilt as worlds, by replacement cohorts](done/0075-the-content-renaissance.md)
 — closed 2026-08-11. Review: **no blockers, no
 majors, two minors, two nits** (minors: rustfmt drift on two test files the lane touched,
-repaired in the close series as `6a5a9c6` — the "557/557 green" handoff claim was nextest,
+repaired in the close series as `064828e` — the "557/557 green" handoff claim was nextest,
 which does not check fmt, and the fmt-running pre-push hook never fired because the lane never
 pushed; the roster row's "the library is 28 worlds" against a measured 25 after cohort 5, moot
 with the row's deletion here. nits: `standalone/src/shot/report.rs` reaches the extent
@@ -4680,7 +4680,7 @@ by `dev` under the user's explicit authorization at the gate.**
 
 ### [0046 — Transformed feedback: the past learns to move](done/0046-transformed-feedback.md)
 — **done 2026-08-09**, Mode 4 review **no blockers, no majors, four minors, two nits**. Five phases
-as `f2e6ed6` / `24f4bfc` / `0816516` / `429396d` / `16802ae` (the Phase 5 verdict), in the
+as `8564231` / `d1bc235` / `f184466` / `93add38` / `d3afa9f` (the Phase 5 verdict), in the
 `lmv-plan-0046` worktree. Full gate re-run at the close **after `git merge main`** — the first
 moment this lane's code met Plan 0068's, which had landed an hour earlier at `v0.48.1`: doc links,
 `fmt`, `clippy --workspace --all-targets -D warnings`, `nextest --workspace`. Closed **second** by
@@ -4812,7 +4812,7 @@ three minutes, with no no-feedback control beside it).
 
 ### [0068 — Why the downbeat rarely locks: an instrument, an ablation, and a verdict](done/0068-why-the-downbeat-rarely-locks.md)
 — **done 2026-08-09**, Mode 4 review **no blockers, no majors, two minors, one nit**. Four phases as
-`be39985` (the probe) / `c6a7de3` (the ladder) / `62ade74` (the verdict and the doc qualification),
+`7132fea` (the probe) / `f35b499` (the ladder) / `1326d5b` (the verdict and the doc qualification),
 in the `lmv-plan-0068` worktree, with **Phase 3 run by the user on 2026-08-09**. Full gate re-run at
 the close after `git merge main` (a no-op — the lane branched from `main`'s tip and `main` had not
 moved): doc links, `fmt`, `clippy --workspace --all-targets -D warnings`, `nextest --workspace`.
@@ -4967,8 +4967,8 @@ in scope, 3 moved). Zero golden baselines changed.
 
 ### [0074 — The figure colours by how far it has come](done/0074-the-figure-colours-by-how-far-it-has-come.md)
 — **done 2026-08-08**, Mode 4 review **no blockers, four minor items (three repaired at the
-close)**. All six phases as `79c08a9` / `6c928f6` (the Phase 2 gate verdict) / `22956e0` /
-`776d6da` / `57965df` / `dcc88ba`, on `main` rather than in the `lmv-plan-0074` worktree — that
+close)**. All six phases as `b0c346f` / `d7533d6` (the Phase 2 gate verdict) / `9c96a77` /
+`fdec79b` / `ddd50ce` / `307214e`, on `main` rather than in the `lmv-plan-0074` worktree — that
 lane was created and never used, and is stale at the approval commit. Full gate re-run at the
 close (`fmt`, `clippy --workspace --all-targets -D warnings`, `nextest` 589/589, doc links), and
 **`attractor_ifs.png` is the only baseline that moved** — twice, as the plan predicted — verified
@@ -5000,7 +5000,7 @@ stays, and now drives a bindable `emergence`.
 raised by Phase 6 against its own Phase 5); `core/tests/fixtures/attractor_ifs.toml` had picked up
 a **UTF-8 BOM** at Phase 5 (the standing `Set-Content` trap); and `core/tests/attractor.rs`'s
 header comment still named `age_tint` where the body binds `root_tint`.
-**The fourth was repaired the same session** (`3ca736f`), at the user's ask: the step shader
+**The fourth was repaired the same session** (`fe4b5b0`), at the user's ask: the step shader
 claimed the reseed dispatch skipping `root` was "a stronger version of the same reason" it skips
 `map`, where it is **weaker** — `map` survives a kick because sub-copy membership does, `root`
 does not because it is a pure function of position, so a kicked particle carries a stale distance
@@ -5011,8 +5011,8 @@ particle and flashes the figure to the palette's anchor colour on every reseed.
 succeeded, confirming the branch was fully merged.
 ### [0073 — The fern unfurls and colours by what made it](done/0073-the-fern-unfurls-and-colours-by-what-made-it.md)
 — **done 2026-08-06**, Mode 4 review **no blockers, two minor doc items repaired at the close**.
-All six phases as `c2c8c76` / `339a178` / `7ef5270` / `b69ca4e` / `50c4eda` / `6e335b2` on
-`plan-0073-the-fern-unfurls`, with `52b34e0` merging `main` mid-plan and `40fd1ee` amending
+All six phases as `1ff550f` / `c0eb657` / `ec6f9ef` / `cf4cf40` / `15d1d1c` / `6d00a5b` on
+`plan-0073-the-fern-unfurls`, with `f7e475c` merging `main` mid-plan and `3a1d0b8` amending
 Phase 2's done-when. Full gate green on the merged tip (`fmt`, `clippy --all-targets -D warnings`,
 `nextest`, doc links resolve), and **`attractor_ifs.png` is the only baseline that moved** —
 verified as a diffstat against `main`, not taken on report.
@@ -5043,8 +5043,8 @@ Followups the plan names and did not take: a bindable churn rate (Phase 6 did no
 the `IfsFigure::frame()` comment fix Plan 0062's review raised.
 ### [0065 — The mandala interior: `star_pattern` stops being hollow](done/0065-the-mandala-interior.md)
 — **done 2026-08-06**, Mode 4 review **no blockers**. Phases 1, 2, 4, 5, 7 as
-`33e5efc` / `1904469` / `419418f` / `a35485a` / `b026ff3` on `plan-0065-mandala-interior`, with
-`3c0e56a` recording the Phase 3 human verdict and `d4030b2` merging `main`. Full gate green on the
+`682d073` / `bc0e587` / `6dca973` / `4e0882d` / `f622efb` on `plan-0065-mandala-interior`, with
+`1125690` recording the Phase 3 human verdict and `428f7b2` merging `main`. Full gate green on the
 merged tip (`fmt`, `clippy --all-targets -D warnings`, **566/566 nextest, 0 skipped**, doc links
 resolve) and **no golden baseline moved or was added** — `git diff main -- core/tests/golden/` is
 empty and `LMV_BLESS` was never run.
@@ -5060,7 +5060,7 @@ twelve-fold interlace — both since retired, see below).
   solid-stroke retune approved, eight rings cut as lace, `rings in weave` kept against the
   reviewing session's reading of the sample. Still open going in: counter-rotation against real
   music, and `glow` + `thickness` together on adjacent thin rings.
-- **That pass ran the same day and retired all three presets** (`654304a`). It came back against
+- **That pass ran the same day and retired all three presets** (`91b37e3`). It came back against
   neither of those, but against the mechanism — the motifs are sampled polylines, so the vertices
   show and a circle reads as a polygon, *after* the solid-stroke retune had already removed the
   inflated-glow explanation ([backlog 0073](../design-backlog.md)). The `star_pattern` coverage
@@ -5087,7 +5087,7 @@ twelve-fold interlace — both since retired, see below).
   in the entries' own header block.
 ### [0069 — The instrument that sees a figure leave the frame](done/0069-the-instrument-that-sees-a-figure-leave-the-frame.md)
 — **done 2026-08-06**, Mode 4 review **no blockers, three minor, one nit**. Phases 1-4
-`c3ce524` / `a359b67` / `9289a7c` / `1abf3a9` on `plan-0069-in-frame-geometry`; `main` was already
+`2e047cc` / `337872a` / `56f5739` / `9e444ac` on `plan-0069-in-frame-geometry`; `main` was already
 an ancestor of the branch, so **no merge commit** — a straight fast-forward. Full gate green on the
 tip (`fmt`, `clippy --all-targets -D warnings`, **546/546 nextest, 0 skipped**, doc links resolve)
 and **no golden baseline moved or was added**, as the plan promised.
@@ -5136,9 +5136,9 @@ back inside the frame would leave the gate true of nothing. One doc error was fi
 
 ### [0070 — Shaped marks](done/0070-shaped-marks.md)
 — **done 2026-08-05**, Mode 4 review **no
-blockers, one minor**. Phases 1-5 `5d21e76` / `c15112a` / `564f3bd` / `d922ce1` / `a87e05b` on
-`plan-0070-shaped-marks`, merged `main` in as `7d5e43f` per ADR-0053 and fast-forwarded; the
-terminal `human` Phase 6 landed at this close as `20657a8`. Full gate green on the merged tip with
+blockers, one minor**. Phases 1-5 `6340a83` / `593a149` / `ebf3ef7` / `0f5298c` / `c41e387` on
+`plan-0070-shaped-marks`, merged `main` in as `309325f` per ADR-0053 and fast-forwarded; the
+terminal `human` Phase 6 landed at this close as `4c28e76`. Full gate green on the merged tip with
 the preset embedded (`fmt`, `clippy --all-targets -D warnings`, **538/538 nextest, 0 skipped**),
 doc links resolve, **no existing golden baseline moved** (one added).
 [ADR-0084](../adrs/0084-a-particle-marks-silhouette-is-a-signed-distance-function.md) is
@@ -5178,9 +5178,9 @@ has exactly the `twinkle` a starfield wants — cannot hold one, because its fix
 
 ### [0066 — The level lever](done/0066-the-level-lever.md)
 — **done 2026-08-05**, Mode 4 review **no
-blockers, one minor**. Phases 1-4 `2a4f65c` / `2e2cc32` / `0f10f18` / `3502c2e`, the terminal
-`human` Phase 5 `d7bf78c`. Ran in a worktree on `plan-0066-the-level-lever`, merged `main` in as
-`a0c3486` per ADR-0053, then fast-forwarded. Full gate green on the merged tip (`fmt`, `clippy
+blockers, one minor**. Phases 1-4 `252f7d2` / `9fc34fe` / `3f7b130` / `102972d`, the terminal
+`human` Phase 5 `34271eb`. Ran in a worktree on `plan-0066-the-level-lever`, merged `main` in as
+`78b5760` per ADR-0053, then fast-forwarded. Full gate green on the merged tip (`fmt`, `clippy
 --all-targets -D warnings`, **538/538 nextest, 0 skipped**), doc links resolve.
 [ADR-0080](../adrs/0080-the-attractor-owns-its-level-and-bloom-thresholds-exposed-light.md) is
 **accepted with an Outcome section**.
@@ -5208,9 +5208,9 @@ before, because at the old ceiling every value in it rendered the same picture. 
 
 ### [0062 — The chaos game grows a fern](done/0062-the-chaos-game-grows-a-fern.md)
 — **done
-2026-08-05**, Mode 4 review **no blockers, one major, four minor**. Phase 1 `8c621fa`, Phase 2
-`7cdd34e`, Phase 3 `18a088c`, Phase 4 `b4aa911`, Phase 5 `daf59c6`, Phase 6 `7cab347`, the `human`
-Phase 7 content pass `cf977f9`. Ran **in the main checkout on `main`, not in a worktree** — the
+2026-08-05**, Mode 4 review **no blockers, one major, four minor**. Phase 1 `b6f449d`, Phase 2
+`86fcf54`, Phase 3 `b31e287`, Phase 4 `808965c`, Phase 5 `99ec2de`, Phase 6 `e3787a8`, the `human`
+Phase 7 content pass `6957097`. Ran **in the main checkout on `main`, not in a worktree** — the
 same ADR-0053 deviation [0063] took the day before. Full gate green (**521 tests, 0 skipped**),
 `fmt` and `clippy --all-targets -D warnings` clean, **no existing golden baseline moved**, doc
 links resolve. [ADR-0075](../adrs/0075-ifs-family-morphs-in-singular-value-space.md) is **accepted
@@ -5263,8 +5263,8 @@ easing a `morph` that preset no longer binds.
 
 ### [0063 — The attractor keeps its depth](done/0063-the-attractor-keeps-its-depth.md)
 — **done
-2026-08-04**, Mode 4 review **no blockers, one major, two minor**. Phase 1 `1f0fc41`, Phase 2
-`6cd0d52`, Phase 3 `c3c43d8`, Phase 4 `6f27462`, the `human` Phase 5 content pass `1855340`. Ran
+2026-08-04**, Mode 4 review **no blockers, one major, two minor**. Phase 1 `e28b4c3`, Phase 2
+`ad09c55`, Phase 3 `f340799`, Phase 4 `f2857ec`, the `human` Phase 5 content pass `d9243f6`. Ran
 **in the main checkout on `main`, not in a worktree** — a deliberate ADR-0053 deviation, recorded
 here because it shaped the whole day: it occupied the main working tree, so [0036] had to open its
 own lane, and the two closes had to be sequenced rather than raced.
@@ -5307,14 +5307,14 @@ incomplete description (Phase 4 swept `core/tests/fixtures/README.md` but not th
 measured ([backlog 0062](../design-backlog.md)): it is a *hue* cue only on a constant-lightness
 hue-travel ramp, it wraps above `2 * min(hue_center, 1 - hue_center)`, and it is dead under
 `ink_amount = 1`. One bookkeeping note, not a defect: Phase 4's `presets/README.md` sweep landed in
-a **parallel session's** commit (`9d2de68`) rather than in the phase commit, which the dev commit
+a **parallel session's** commit (`30c69ed`) rather than in the phase commit, which the dev commit
 message says outright.
 
 ### [0036 — macOS and Windows release artifacts](done/0036-macos-and-windows-release-artifacts.md)
 —
-**done 2026-08-04**, Mode 4 review **no blockers, one minor, one nit**. Phase 1 `0329adf` (+ fix
-`be031eb`), Phase 2 `cc7a43f`, Phase 3 `aa9dfec`, on lane `plan-0036-release-artifacts` (ADR-0053),
-merged to `main` at `d081dfd` with the full gate green (487 tests) over both lanes' code.
+**done 2026-08-04**, Mode 4 review **no blockers, one minor, one nit**. Phase 1 `3f9e045` (+ fix
+`8b3c0ad`), Phase 2 `5f3deee`, Phase 3 `8fce33a`, on lane `plan-0036-release-artifacts` (ADR-0053),
+merged to `main` at `40d7472` with the full gate green (487 tests) over both lanes' code.
 [ADR-0038](../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md) is **accepted**.
 Approved 2026-07-26, sat unbuilt for nine days, and was taken the day the user asked whether a Mac
 build was possible.
@@ -5346,9 +5346,9 @@ the configuration you test at and disagrees elsewhere.
 
 ### [0055 — The fold edge becomes a choice](done/0055-the-fold-edge-becomes-a-choice.md)
 — **done
-2026-08-04**, Mode 4 review **no blockers**. Phase 1 `5eac2d7`, the `human` Phase 2 A/B judged
+2026-08-04**, Mode 4 review **no blockers**. Phase 1 `1526aec`, the `human` Phase 2 A/B judged
 2026-08-04 (**verdict preserved above** — it is a human decision no commit can re-derive), Phase 3
-`feba426`, Phase 4 `752eb69`, second adoption `2c618de`, on lane `plan-0055-fold-edge` (ADR-0053),
+`20190f7`, Phase 4 `73cad28`, second adoption `aa80d68`, on lane `plan-0055-fold-edge` (ADR-0053),
 **reviewed together with [0052] against one merged tip**.
 [ADR-0061](../adrs/0061-kaleidoscope-edge-treatment-is-a-per-preset-choice.md) is **accepted with
 an Outcome section**. Closes [backlog 0037](../design-backlog.md); raises
@@ -5378,7 +5378,7 @@ makes it a property rather than a machine measurement. The re-scoped disc guard 
 still non-vacuous against the pre-ADR-0047 shader (peak 199, 6052/6052 out-of-disc pixels lit).
 ### [0052 — The emitter: objects that spawn, fall on a parabola, and die](done/0052-the-emitter-objects-that-spawn-fall-and-die.md)
 — **done 2026-08-04**, Mode 4 review
-**no blockers**. Phase 1 `2470a50`, Phase 2 `d155615`, Phase 3 `52a756c`, Phase 4 `53a896e`, on
+**no blockers**. Phase 1 `ac8cc6f`, Phase 2 `98464ce`, Phase 3 `f612a57`, Phase 4 `908e50b`, on
 lane `plan-0052-emitter` (ADR-0053), **reviewed together with [0055] against one merged tip**.
 [ADR-0057](../adrs/0057-emitter-scene-analytic-ballistics-seeded-individuation.md) is **accepted**.
 Closes [backlog 0034](../design-backlog.md); [backlog 0033](../design-backlog.md) (shaped marks)
@@ -5402,8 +5402,8 @@ matrix would say nothing. It is left out rather than lowered or waived, and the 
 lives in `core/tests/distinctness.rs` beside the curated family list.
 ### [0059 — Lorenz finds its plane, and the attractor can trade samples for curves](done/0059-lorenz-finds-its-plane.md)
 — **done 2026-08-04**, Mode 4 review **no blockers**.
-Phase 1 `357a17e`, Phase 1b `1c47de5`, Phase 2 `4fb4a81`, Phase 3 `642aec0`, and the `human`
-Phase 4 content pass `990fedc`.
+Phase 1 `8d26587`, Phase 1b `a860884`, Phase 2 `9ba3efe`, Phase 3 `af863a0`, and the `human`
+Phase 4 content pass `e360ac1`.
 [ADR-0068](../adrs/0068-the-projection-basis-is-a-per-family-property.md),
 [ADR-0069](../adrs/0069-the-attractor-trades-sample-count-for-trace-length.md) (**with an Outcome
 section**) and [ADR-0070](../adrs/0070-a-feedback-pass-addresses-its-own-target-in-framebuffer-space.md)
@@ -5440,8 +5440,8 @@ is still Leviathan at `0.3442` against the `0.18` floor (1.91x slack), because L
 untouched and nothing new sank below it.
 ### [0060 — a test number states a property, or names its machine](done/0060-a-test-number-states-a-property-or-names-its-machine.md)
 — **done 2026-08-04**,
-Mode 4 review **no blockers**. Phase 1 `1d56600` + `31073f6`, Phase 2 the `human` push (CI run
-**30903871856**, green on all three jobs), Phase 3 `a324b21` + `ae4c215`.
+Mode 4 review **no blockers**. Phase 1 `f49ac14` + `10f84f4`, Phase 2 the `human` push (CI run
+**30903871856**, green on all three jobs), Phase 3 `3aae7e2` + `a45c6c0`.
 [ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md) and
 [ADR-0074](../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md) are
 both **accepted**, 0074 with an **Outcome** section (see below). Gate on `main` before the bump:
@@ -5479,9 +5479,9 @@ Both ADR corollaries are now in the `architect` skill's lens 4, as the plan's Fo
 ### [0050 — in-app settings, live quality, and a browse overlay that fits](done/0050-in-app-settings-and-a-browse-overlay-that-fits.md)
 — **done 2026-08-04**, Mode 4
 review **no blockers, no majors**. All six phases landed including the `human` Phase 6:
-`14cd9e2` `Renderer::set_tier` + the `[` / `]` swap, `bed0274` the browser opens where you are and
-wraps and repeats, `46b38f6` the list flows into columns, `d81a24a` the settings modal on `S`,
-`19096f1` the operator docs, and the eyes-on pass on 2026-08-04.
+`a8fdcde` `Renderer::set_tier` + the `[` / `]` swap, `e972c7f` the browser opens where you are and
+wraps and repeats, `f69def6` the list flows into columns, `d9ebcb5` the settings modal on `S`,
+`c02abbf` the operator docs, and the eyes-on pass on 2026-08-04.
 [ADR-0054](../adrs/0054-runtime-tier-switching-rebuilds-on-the-live-context.md) is **accepted with
 an Outcome section**. Gate on `main` before the bump: `fmt` clean, `clippy -D warnings` clean, full
 `nextest` green. C ABI stays v4 (the tier deliberately does **not** reach it), no new dependency,
@@ -5536,9 +5536,9 @@ the four code phases' diff for a `[params]` name, rather than by assumption.
 
 ### [0058 — the gate can see an empty frame, and "loud" has to mean more picture](done/0058-the-gate-can-see-an-empty-frame.md)
 — **done 2026-08-03**, Mode 4 review **no
-blockers, no majors**. All four phases landed including the `human` Phase 4: `96a914f` coverage
-measures the scene, `a0ce1c9` the floors are re-measured, `8e79aa3` the excitation ratio ships as
-a report, `2efb80e` the comb and the corona come back inside the frame.
+blockers, no majors**. All four phases landed including the `human` Phase 4: `84a70e3` coverage
+measures the scene, `419247d` the floors are re-measured, `7e51d6b` the excitation ratio ships as
+a report, `aab1195` the comb and the corona come back inside the frame.
 [ADR-0067](../adrs/0067-coverage-measures-the-scene-not-the-backdrop.md) is **accepted with an
 Outcome section**, implemented in full. Closes design-backlog **0053**, retires **0052**, raises
 **0054**. Gate on `main`: fmt clean, clippy `-D warnings` clean, **427/427, 0 skipped**. C ABI
@@ -5602,8 +5602,8 @@ rewritten all 19 baselines to no purpose. Same shape as [0054]'s close.
 ### [0057 — the attractor's compute path: the deposit, the reseed, the butterfly, and one retune](done/0057-the-attractors-compute-path.md)
 — **done 2026-08-03**, Mode 4 review **no
 blockers, no majors**; three minors, all doc bookkeeping, fixed in the close commit. Phase
-commits: `8c95cf2` the two instruments, `4d77bff` the deposit, `5bb36c2` the reseed, `9d717fc` the
-Lorenz diagnosis, `b2be2d3` the one content pass.
+commits: `ae03b0d` the two instruments, `14a2b37` the deposit, `4e0f538` the reseed, `6898bbe` the
+Lorenz diagnosis, `95b88ad` the one content pass.
 [ADR-0064](../adrs/0064-a-capture-may-pin-the-rich-tier.md),
 [ADR-0065](../adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md) and
 [ADR-0066](../adrs/0066-a-reseed-disturbs-the-cloud-rather-than-replacing-it.md) are **accepted,
@@ -5656,9 +5656,9 @@ sat at 0.50-0.75 because a reseed used to erase the drawing, so reluctance was p
 disturbance is not destructive, so the same threshold only withholds the accent. Re-measured
 against what real material produces (onset means 0.033 / 0.153 / 0.391 across three stimuli; music
 near 0.20), the band moved to 0.28-0.45 with rank preserved. **The re-raise is halfway and a full
-revert is wrong**, rendered rather than reasoned: `00d99d0` did *two* things — it lowered three
+revert is wrong**, rendered rather than reasoned: `095af15` did *two* things — it lowered three
 presets *and* added a bloom stage sized to the lowered figure — so restoring the old numbers puts
-Clifford's interior back to a flat salmon mass, the exact failure `00d99d0` fixed arriving by
+Clifford's interior back to a flat salmon mass, the exact failure `095af15` fixed arriving by
 another route. Flatness **fell** on all three (Clifford `0.2053 -> 0.1302`), so the figures gained
 tonal structure, and reactivity at realistic levels roughly doubled.
 **One thing Phase 6 changed that has not been judged**, and it says so: `attractor_ink` and
@@ -5670,9 +5670,9 @@ raised in the same pass — speed and travel are separate levers. It does not sh
 ### [0056 — clamp occupancy: the instrument that would have caught a saturated library, plus the axis anchor](done/0056-clamp-occupancy-and-the-axis-anchor.md)
 — **done 2026-08-03**, Mode 4 review
 **no blockers, no majors**; three minors, all doc bookkeeping, all fixed in the close commit.
-Five `dev` phase commits on the `plan-0056-clamp-occupancy` worktree branch: `a704d30` occupancy
-on the walk, `f607915` the `occ` column and `SAT` lines, `3430cdc` the HARD gate with its measured
-threshold, `d389c96` the axis anchor, `9b07ede` the tonal-flatness statistic in `sanity`.
+Five `dev` phase commits on the `plan-0056-clamp-occupancy` worktree branch: `3fb0039` occupancy
+on the walk, `640574c` the `occ` column and `SAT` lines, `fff03b6` the HARD gate with its measured
+threshold, `b20cbdd` the axis anchor, `06e212b` the tonal-flatness statistic in `sanity`.
 [ADR-0062](../adrs/0062-clamp-occupancy-is-the-saturation-instrument.md) is **accepted with an
 Outcome section**, implemented in full;
 [ADR-0063](../adrs/0063-address-the-spectrum-by-frequency.md) is **accepted with an Outcome
@@ -5685,7 +5685,7 @@ new dependency, nothing on the per-frame path touched.
 **Both thresholds are measured, and each measurement is recorded on its own constant** — which is
 the plan's central discipline and the reason to read the constants rather than this summary.
 **Occupancy: `0.9`, measured on both libraries**, 339 clamped bindings each — today's and the
-pre-retune one at `80c5dff^` that Plan 0048 Phase 7 found saturated. Today's highest is `0.609`
+pre-retune one at `6c7fa2c^` that Plan 0048 Phase 7 found saturated. Today's highest is `0.609`
 (`Aurora.warp`), next `0.444`, nothing else above `0.45`; the pre-retune set puts **145 bindings
 across 23 of 35 presets** above `0.9`. **So the answer to the plan's title is yes: the gate would
 have failed the build the day ADR-0049 landed**, naming `Glacier.glow`, `Dense.force`,
@@ -5695,8 +5695,8 @@ that fires on good content buys exemptions, which are the thing that dulls the i
 **No shipped preset needed the exemption**, against the plan's own expectation, so `[occupancy]`
 ships exercised only by fixtures.
 **Phase 5's honest answer is the finding worth carrying, and the plan asked for it in advance.**
-Of the four presets `00d99d0` repaired, **none** would have been caught by the new flat-frame
-gate — measured at `00d99d0^` through the gate itself, not reasoned: Clifford `0.231`, De Jong
+Of the four presets `095af15` repaired, **none** would have been caught by the new flat-frame
+gate — measured at `095af15^` through the gate itself, not reasoned: Clifford `0.231`, De Jong
 `0.444`, Leviathan `0.137`, Lorenz `0.256`, against a threshold this library's own distribution
 could never put below `0.9`. The reason is the one the plan anticipated: that saturation is a
 **`Rich`-tier** effect (150k particles into the same texels, `One/One` with no normalization) and
@@ -5740,9 +5740,9 @@ Version **minor 0.30.0 → 0.31.0** (a preset-facing surface, a report column an
 ### [0054 — the line scenes catch up: every one honours the palette, and the star stops cutting between shapes](done/0054-the-line-scenes-catch-up.md)
 — **done 2026-08-03**, Mode 4 review **no
 blockers, no majors**; three minors, all fixed in the close commit. Four `dev` phase commits on
-the `plan-0054-line-scenes` worktree branch: `e03598f` the L-system's generation-depth colour,
-`86bba60` the parametric curve's path axis plus the star's measured-flat radial one, `4df5d21`
-`variant` as a continuous contact angle, `9362793` the docs.
+the `plan-0054-line-scenes` worktree branch: `9d3a4f0` the L-system's generation-depth colour,
+`47abdfe` the parametric curve's path axis plus the star's measured-flat radial one, `ccd9ca6`
+`variant` as a continuous contact angle, `3177749` the docs.
 [ADR-0059](../adrs/0059-line-scenes-colour-along-their-generator-axis.md) and
 [ADR-0060](../adrs/0060-star-pattern-variants-interpolate.md) are **accepted, each with an
 Outcome section**. Closes design-backlog **0026** and the *transition* half of **0007**.
@@ -5802,10 +5802,10 @@ Version **minor 0.29.0 → 0.30.0** (a feature plan).
 — **done 2026-08-03**, Mode 4
 review **no blockers, no majors**; four minors, all doc bookkeeping, all fixed in the close
 commit. Five `dev` phase commits plus the Phase 3 refactor, on the `plan-0048-analysis-v2` branch
-fast-forwarded into `main` as it went: `bfd892b` the dual-resolution axis, `ef3b772` normalization
-+ the `*_raw` escapes, `910a6d1` the shared `Variables::from_frame`, `81b21d5` ADR-0050 Layer 1,
-`7a06676` the gated downbeat estimator, `909ae4a` the harness/docs recalibration. Then the two
-`human` phases: `0fb26d4` Phase 6's verdicts, and `80c5dff` + `bea5c1e` + `fc698cd` Phase 7's
+fast-forwarded into `main` as it went: `65f762c` the dual-resolution axis, `7b045ff` normalization
++ the `*_raw` escapes, `3f4cf29` the shared `Variables::from_frame`, `029558c` ADR-0050 Layer 1,
+`b4062b9` the gated downbeat estimator, `c5e00bf` the harness/docs recalibration. Then the two
+`human` phases: `f779452` Phase 6's verdicts, and `6c7fa2c` + `d02d96d` + `dd1d9d7` Phase 7's
 library retune, its backlog notes and the axis-block regeneration.
 [ADR-0049](../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) and
 [ADR-0050](../adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md) are **accepted,
@@ -5851,8 +5851,8 @@ Version **minor 0.28.1 → 0.29.0** (a feature plan).
 — **done 2026-08-01**, Mode 4 review **no blockers**, one `major` (an operator-doc gap, fixed at
 close), four `minor`. Three `dev` phase commits **directly on `main`** rather than in a worktree
 lane — a deliberate exception for a three-commit single-session fix, so there was no merge to
-reconcile: `708b80b` the swarm seam plus the shared `gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE`
-constant and its guard, `63dd501` the line seam and its guard, `1828ac3` the docs.
+reconcile: `4631bfd` the swarm seam plus the shared `gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE`
+constant and its guard, `7fbc334` the line seam and its guard, `ca2f291` the docs.
 [ADR-0056](../adrs/0056-additive-scenes-emit-premultiplied-alpha.md) is **accepted with an
 Outcome section**. Gate at the close: fmt, clippy `-D warnings`, **388/388**.
 **One baseline moved, and the plan predicted none would.** The no-op argument was sound; the
@@ -5873,8 +5873,8 @@ swarm's gets 52 651, with a `glow = 0` fourth capture sketched as the stronger p
 — **done 2026-07-31**, passed two Mode 4 reviews
 (**no blockers**; one `major` routed out as [backlog 0039](../design-backlog.md)). Six `dev`
 phase commits on the `plan-0045-linear-light` worktree branch, fast-forwarded into `main` at
-`2f4a804`: `6f282e7` / `b67b9c2` the fold, `c334b0e` the backdrop leaving the chain, `f7ab148`
-the float composite + tonemap, `96780e1` the bloom stage, `23703dc` the halo's alpha clamp.
+`2df0f1a`: `7c1d9d3` / `d8ca422` the fold, `1003df0` the backdrop leaving the chain, `1df0a16`
+the float composite + tonemap, `c8234a4` the bloom stage, `2b4803d` the halo's alpha clamp.
 [ADR-0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md) and
 [ADR-0055](../adrs/0055-backdrop-leaves-the-post-chain.md) are **accepted**; ADR-0047 was already
 accepted with an Outcome. **Delivers roadmap R1** and closes design-backlog **0005**, **0010**
@@ -5909,9 +5909,9 @@ Version **minor 0.27.0 → 0.28.0** (a feature plan).
 ### [0049 — the analysis diagnostics surface: making [0048] Phase 6 measurable (and the kaleidoscope seam)](done/0049-analysis-diagnostics-surface.md)
 — **done 2026-07-30**, passed Mode 4 review
 (**no blockers, no majors**; four minors and a nit — three minors and the nit fixed in the close
-commit). Seven `dev` phase commits: `a335f35` the integral fold order, `69761b9`
-`AnalysisMetrics` plumbed to the render seam, `a387909` the overlay rows, `4dabb3f` the six log
-columns, and `38dc792` / `44c96a9` / `d5c9bd7` for Phase 5's four review items.
+commit). Seven `dev` phase commits: `bd459a8` the integral fold order, `682fa02`
+`AnalysisMetrics` plumbed to the render seam, `8d17ec8` the overlay rows, `a26077f` the six log
+columns, and `748eac9` / `988254c` / `972d1ea` for Phase 5's four review items.
 [ADR-0052](../adrs/0052-analysis-diagnostics-are-native-only.md) is **accepted with an Outcome
 section**. **Unblocks [0048] Phase 6**, which is now the next thing to run.
 **The reproduction needed a non-zero `kaleido_angle`, and that is the finding worth carrying.**
@@ -5970,8 +5970,8 @@ Version **minor 0.26.0 → 0.27.0** (a feature plan).
 
 ### [0044 — quality tiers: `Floor` and `Rich`, a governor, and the constants that move](done/0044-quality-tiers.md)
 — **done 2026-07-30**, passed Mode 4 review (**no blockers**;
-one major, two minor). Four `dev` phase commits: `e44b3a6` `TierConfig` + resolution + the post
-cap, `89d4ad4` the frame-time governor, `6292286` the remaining capacity constants, `3e807f4` the
+one major, two minor). Four `dev` phase commits: `58e31d4` `TierConfig` + resolution + the post
+cap, `25305fd` the frame-time governor, `20f1609` the remaining capacity constants, `5b5c567` the
 docs sweep. [ADR-0045](../adrs/0045-quality-tiers-floor-and-rich.md) is **accepted**.
 **Delivers roadmap R0** — the license every later richness item spends.
 **Phase 4 (`human`, the `Rich` calibration) did not run** and is carried to
@@ -6005,7 +6005,7 @@ with two now-stale "lower this constant" pointers to constants that moved into `
 — **done 2026-07-30**, passed Mode 4 review
 (**no blockers, no majors**; three minors, the two doc ones fixed in the close commit). Three
 `dev` phase commits on the `plan-0047-expression-randomness` worktree branch, merged to `main`:
-`96d39c1` the two salted functions, `d72a4cc` `seed = "random"` + the capture pin, `8f7fc13` the
+`c617ffe` the two salted functions, `fd45d36` `seed = "random"` + the capture pin, `aeb4507` the
 docs sweep. [ADR-0051](../adrs/0051-seeded-grammar-randomness-with-per-run-opt-in.md) is
 **accepted**. **Delivers the first R5 item** — the grammar is 17 functions, and the
 incommensurate-sine non-repetition idiom is retired for new work (`noise(time * 0.3)` in one
@@ -6035,8 +6035,8 @@ clarifying sentence; §6 was already true, so this states *why* rather than carv
 ### [0043 — the swarm gets a depth axis and a domain that follows the target](done/0043-swarm-depth-and-domain.md)
 — **done 2026-07-30**, passed Mode 4 review
 (**no blockers**; two minors and a nit — both minors fixed in the close commit). Four `dev` phase
-commits: `ae6f638` the target-sized domain, `7f54e2a` `field_freq`, `7eaa848` the depth axis,
-`de707cb` the family cut to three and re-authored. **Closes design-backlog 0029 and 0025 in full.**
+commits: `1c1e975` the target-sized domain, `729e23d` `field_freq`, `4f0b4dc` the depth axis,
+`d87da35` the family cut to three and re-authored. **Closes design-backlog 0029 and 0025 in full.**
 [ADR-0044](../adrs/0044-swarm-world-is-a-25d-torus-sized-from-the-target.md) is **accepted**.
 **The user-reported bright bar is gone at its cause**, not hidden: `BOUND_Y = 1.0` *was* the NDC
 frame edge, so the toroidal seam was the one place on screen every wrapping particle was guaranteed
@@ -6077,8 +6077,8 @@ a field structure larger than the frame packs it edge to edge.
 ### [0042 — reachability sees every comparison, and the library is re-audited against it](done/0042-reachability-sees-every-comparison.md)
 — **done 2026-07-30**, passed Mode 4 review
 (**no blockers**; one major, two minors, one nit — the major and both minors fixed in the close
-commit). Three `dev` phase commits: `8c170a3` observe every comparison, `e7a40b7` report a
-one-sided one unless a `select()` already names it, `f50e8cf` the Phase 3 re-audit. **Closes
+commit). Three `dev` phase commits: `ddcd253` observe every comparison, `469137b` report a
+one-sided one unless a `select()` already names it, `1762a8c` the Phase 3 re-audit. **Closes
 design-backlog 0028.** [ADR-0043](../adrs/0043-reachability-reports-comparison-nodes.md) is
 **accepted**.
 **The library is clean, and that is a measurement rather than an assumption** — re-run at review
@@ -6087,7 +6087,7 @@ single-BPM false positive, **0 genuinely dead**. The two negative results are th
 and neither was obtainable before this plan: the band halves inside `min(tempo > 132, bass + mid >
 0.055)` and `min(tempo > 124, bass + treb > 0.1)` each stayed unflagged while their tempo half
 emitted a `COMP`, and all seven bare-comparison bindings (six `attractor_* reseed`, plus
-`rose_web.mirror_reflect`) score clean — direct confirmation the `e9a1c3c` content re-gain took.
+`rose_web.mirror_reflect`) score clean — direct confirmation the `ab382f2` content re-gain took.
 **The blocker on CI gating has changed identity:** the library was the precondition and it is met;
 what remains is the instrument, so a multi-BPM probe or an explicit `tempo` exemption is now the
 single thing between here and a meaningful green gate. `docs/capturing.md` no longer justifies the
@@ -6096,8 +6096,8 @@ advisory posture with the nine-failing-presets figure this plan measured to zero
 ### [0041 — `--report` reads at two levels, and expression reachability is measured on the AST](done/0041-report-two-level-stimuli-and-expression-reachability.md)
 — **done 2026-07-29**,
 passed Mode 4 review (**no blockers**; one major, four minors, three nits — one minor fixed in the
-close commit). Four `dev` phase commits: `1c8f216` the realistic-level stimulus, `5901e0e` probed
-evaluation, `27c84cd` the report surface, `efd25bb` the doc sweep. **Closes design-backlog 0022 and
+close commit). Four `dev` phase commits: `9ec4f8a` the realistic-level stimulus, `cf39379` probed
+evaluation, `c4fd5a5` the report surface, `ada24d9` the doc sweep. **Closes design-backlog 0022 and
 0027 outright, and 0020's harness half.**
 [ADR-0042](../adrs/0042-reachability-measured-on-the-expression-tree.md) is **accepted with an
 Outcome section**.
@@ -6171,9 +6171,9 @@ Version **minor 0.21.1 → 0.22.0** (a feature plan).
 
 ### [0040 — Line joins, finished: the star's other half, and a pin under the reported defect](done/0040-line-joins-finish-the-job.md)
 — **done 2026-07-28**, passed Mode 4 review
-(**no blockers, no majors**; two minors, two nits). Three `dev` commits: `4c68bbd` the pixel pin
-under the polyline joint, `434ac1d` the join bits generated into the shader plus a swap test,
-`0bc33a6` the star rosette's contact points. **Closes backlog 0024.** No new ADR —
+(**no blockers, no majors**; two minors, two nits). Three `dev` commits: `b38df68` the pixel pin
+under the polyline joint, `c78714c` the join bits generated into the shader plus a swap test,
+`d1ca109` the star rosette's contact points. **Closes backlog 0024.** No new ADR —
 [ADR-0041](../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md) had already
 decided the mechanism and now carries a **Plan 0040 note in its Outcome**.
 **The star rosette is fully joined.** Both segments at a contact point take `JOINED_A | JOINED_B`,
@@ -6232,7 +6232,7 @@ target's uniform, and the non-square coverage for it lives in `composite.rs`'s 1
 fixtures — `line_joints.rs` is square **on purpose**, so its world coordinates are NDC and the
 probe arithmetic is derivable.
 **Minors:** (1) `dev`'s close report that `--test transition`'s 12 tests "are not executing on this
-machine" is **wrong, though the crash it rests on is real**. The abort reproduces at `3e4dec5` in a
+machine" is **wrong, though the crash it rests on is real**. The abort reproduces at `4b7d606` in a
 scratch worktree, so it is genuinely pre-existing — but it is the known in-process parallel-GPU
 teardown fault ([0035]'s close recorded the same thing for `--lib render::post`), and all 12 tests
 pass in 3.2 s under `cargo nextest run -p lmv-core --test transition`. There is no coverage gap.
@@ -6252,9 +6252,9 @@ Version **patch 0.21.0 → 0.21.1** (a fix/coverage/refactor plan, no feature).
 —
 **done 2026-07-28**, passed Mode 4 review (**no blockers**; one major, three minors, two nits —
 nothing fixed in the close commit, the major is deliberately backlogged instead). Four `dev`
-commits: `5dfc81c` the per-endpoint `joined` bitfield plus the shader extension, `b184021` the
-spectrum polyline and the new `core/tests/line_joints.rs`, `12e6ab2` the rose / L-system / star,
-`f78ff2f` the doc sweep. **Closes backlog 0023; opens backlog 0024.**
+commits: `2418b91` the per-endpoint `joined` bitfield plus the shader extension, `c9ceab4` the
+spectrum polyline and the new `core/tests/line_joints.rs`, `3845438` the rose / L-system / star,
+`2f571ca` the doc sweep. **Closes backlog 0023; opens backlog 0024.**
 [ADR-0041](../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md) is **accepted with
 an Outcome section**. The design's load-bearing claim held in fact: with every producer flagging
 nothing, **no line-scene baseline moved** — so the later re-blesses are attributable to specific
@@ -6273,9 +6273,9 @@ half of them. **Phase 5 (`human`) is open** — `spectrum_ridge`'s `thickness` r
 ### [0038 — The line family's unreachable levers: `glow`, the readout's geometry, a level curve, and `log`](done/0038-line-family-unreachable-levers.md)
 — **done 2026-07-28**, passed Mode 4 review
 (**no blockers**; one major, five minors, two nits — the major and three minors **fixed in the
-close commit**). Ten commits: eight `dev` phases (`a1c67f4` `glow`, `f3945be` `span`/`baseline`,
-`c9121fd` `curve`, `e31ae88` `log(x)`, `a3f5d04` the doc sweep, `9739232` the settle gate,
-`4863bdd` the marked transient cell, `9a62754` the non-finite guard) plus `8e84acf` + `ea781d0`,
+close commit**). Ten commits: eight `dev` phases (`32650b3` `glow`, `c535f11` `span`/`baseline`,
+`a2b70ee` `curve`, `b30da20` `log(x)`, `35fd0c3` the doc sweep, `e14ded1` the settle gate,
+`427c4a9` the marked transient cell, `401ecc8` the non-finite guard) plus `52a15ea` + `3386211`,
 the Phase 6 `preset-author` adoption pass. **Closes backlog 0016, 0017, 0018 and 0019 outright.**
 The plan's central safety claim **held in fact**: `core/tests/golden/` is **byte-untouched across
 the whole range**, so every one of the four new params really does default to the constant it
@@ -6330,9 +6330,9 @@ non-vacuously**: reverting `WINDOW` to 96 fails the shared probe on the **asymme
 (scalar both directions and asymmetric rise still pass), printing exactly the predicted `61`; and
 deleting the `Easing::step` finite check fails
 `a_non_finite_value_cannot_poison_a_smoother_permanently`. The `--report` table was re-run
-independently over `presets/` and matches `ea781d0`'s numbers.
+independently over `presets/` and matches `3386211`'s numbers.
 **Major, fixed here:** `spectrum_comb` and `spectrum_ridge` shipped headers whose stated
-arithmetic is for a **superseded** tuning — `ea781d0` retuned the bindings and swept only part of
+arithmetic is for a **superseded** tuning — `3386211` retuned the bindings and swept only part of
 the prose. The comb argued `curve = 0.72` with a 4.2x / 1.9x lift while shipping `0.85` (where the
 same levels lift **2.2x / 1.4x**), and named `base` 0.08, `scale` 7.0 and a `12 -> 20` stroke
 against shipped `0.13`, `10.0` and `13`; the ridge's whole retune paragraph was for `curve 0.55`
@@ -6340,7 +6340,7 @@ and described `scale` as a **2.75x cut** where it shipped as a **2.05x rise** (2
 opposite direction. That matters because Phase 6 done-when 4 made "says so in its header, with the
 factor" a contract precisely so the content lane stops guessing, and `spectrum_corona` (whose
 numbers are correct) shows the intended standard. Every figure recomputed against the shipped
-bindings; **no binding changed**. `ea781d0`'s commit body carries the same 4.2x / 1.9x slip and
+bindings; **no binding changed**. `3386211`'s commit body carries the same 4.2x / 1.9x slip and
 stands as the historical record.
 **Minors:** (1) backlog 0016–0019 carried no closure markers though the plan header names them —
 **added here**; (2) backlog 0023 said `spectrum_ridge` "now carries `thickness = 3.2`" where it
@@ -6368,8 +6368,8 @@ Version **minor 0.19.0 → 0.20.0** (a feature plan).
 ### [0037 — Verifying easing: a transient probe, a signal with dynamics, and the levels authors calibrate against](done/0037-verifying-easing-transient-probe-and-dynamic-signal.md)
 — **done
 2026-07-27**, passed Mode 4 review (**no blockers, no majors**; four minors, four nits). Five phase
-commits (`ece3291` the time-varying stimulus + the step-response measure, `29bc035` the `--report`
-columns, `6de5ad0` `--signal dynamic`, `bca1457` the doc sweep, `b3f18a6` the `human` measurement).
+commits (`84ea104` the time-varying stimulus + the step-response measure, `5067647` the `--report`
+columns, `09116fb` `--signal dynamic`, `7eb6b13` the doc sweep, `3feb1c0` the `human` measurement).
 **`[smoothing]` is observable.** `Renderer::capture_preset_over(name, stimulus)` renders one frame
 per `AnalysisFrame` and reads each back; `metrics::step_response(rise, fall) -> StepResponse` turns
 two segments into frames-to-settle each way. The identity ADR-0039 opened with — the report is the
@@ -6392,7 +6392,7 @@ is earned. The scene's visual response is what hides the magnitude, exactly as A
 and it is why **no CI gate** ships. `--signal dynamic:<bpm>` is the first generator with dynamics —
 three layers on a beat grid under an 8-beat build-and-rest phrase, `max/mean` 2.67 / 3.07 / 5.45
 against `bass:60`'s exactly 1.000 — and its test asserts that comparison against noise measured **in
-the same run** rather than a remembered constant. Three design dead ends are recorded in `6de5ad0`
+the same run** rather than a remembered constant. Three design dead ends are recorded in `09116fb`
 and worth reading before touching it: a bare 220/277/330 chord puts almost nothing in `mid` (that
 band is a *mean* over 250 Hz–4 kHz), a 1 %-duty tick is "silence with a good crest factor", and peak
 normalization makes three layers **zero-sum**, so it soft-clips with `tanh` instead. **Phase 4
@@ -6406,7 +6406,7 @@ are badly over-gained — `capturing.md` now carries the ladder from `--set 0.8`
 untouched (**C ABI stays v4**, `Scene` unchanged, no new dependency, no preset `.toml` change).
 **Non-vacuity reproduced independently** — swapping the two fixtures' `[smoothing]` tables fails at
 `easing.rs:194` reporting *rise 3 fall 61 (ratio 20.33)* where it demands symmetry — and **Phase 2's
-statistic recomputed** from the JSON report over `presets/`, matching `29bc035` to a rounding digit
+statistic recomputed** from the JSON report over `presets/`, matching `5067647` to a rounding digit
 across a debug→release build change. **One edit outside a phase's file list, disclosed in its
 commit and accepted:** one `print_usage` line enumerating the `--signal` kinds. **The plan's seed
 swatches for backlog 0014 were wrong and are corrected in both places** — the recorded names are the
@@ -6437,10 +6437,10 @@ Version **minor 0.18.0 -> 0.19.0**.
 
 ### [0034 — Preset-reachable spectrum: `bin(x)`, a spectrum scene, and per-element evaluation](done/0034-preset-reachable-spectrum.md)
 — **done 2026-07-27**, passed Mode 4 review
-(**no blockers**; two majors, four minors, two nits, **all fixed in `ca99cb1`** rather than
-carried). Five `dev` phase commits (`a379b28` `bin(x)`, `2450c2a` the `spectrum` system, `a553b2e`
-the `[spectrum]` table, `6950c94` per-element `index`, `fe11659` the operator sweep) plus
-`ca99cb1` the review fixes and `4d41884` the band-axis documentation correction. Closes backlog
+(**no blockers**; two majors, four minors, two nits, **all fixed in `ff2c4d9`** rather than
+carried). Five `dev` phase commits (`4b0e262` `bin(x)`, `72451f3` the `spectrum` system, `ef8b1df`
+the `[spectrum]` table, `2b3449b` per-element `index`, `0100789` the operator sweep) plus
+`ff2c4d9` the review fixes and `8dec9ab` the band-axis documentation correction. Closes backlog
 0002, the capability the user asked for twice. The scoping claim **held**: no new DSP, no new
 render idiom, no `Scene`-trait change, **C ABI stays v4**, no new dependency — the 64-band array
 already existed on `AnalysisFrame`, every scene already received it, and `LineRenderer` already
@@ -6460,7 +6460,7 @@ the log edges — 23.4 Hz at 2048 — which binds to **band 30 (~750 Hz)**, so *
 linear**. Band 0 spans 23–47 Hz, *a full octave in one number*; resolution peaks near 500–800 Hz and
 settles at ~1.7 semitones above 1 kHz, so **the low end is the coarsest region musically, not the
 finest** — and below the crossover the mapping moves with the sample rate. The error propagated once
-before it was caught (`037825d` annotated its probes from the log-edge curve, **up to 2.9x wrong**
+before it was caught (`564ac3b` annotated its probes from the log-edge curve, **up to 2.9x wrong**
 below the crossover; bindings were tuned by effect and unchanged, comments corrected).
 **[ADR-0036](../adrs/0036-preset-reachable-spectrum.md) accepted with an Outcome section.**
 **Verified at close:** `fmt --check` + `clippy --workspace --all-targets -D warnings` clean,
@@ -6472,8 +6472,8 @@ if acted on**) and [0016](../design-backlog.md) the readout's missing `span`/`wi
 ### [0035 — The composite's aspect is the target's: the grid-shape stretch, one grid policy, and a pixel guard for the post stages](done/0035-composite-aspect-and-grid-policy.md)
 — **done
 2026-07-26**, passed Mode 4 review (**no blockers, no majors**; four minors, one nit). Four `dev`
-phase commits (`d4f98f8` the aspect fix, `687621b` the two post-stage baselines, `bc11b23` one grid
-policy, `f9f9e79` the docs). Turning `trails` or `kaleido_*` on now changes the picture's
+phase commits (`ba14bad` the aspect fix, `b081c08` the two post-stage baselines, `8183c6b` one grid
+policy, `cb082ba` the docs). Turning `trails` or `kaleido_*` on now changes the picture's
 **softness and nothing else**: `SceneTarget::aspect` comes from `surface`, the kaleidoscope folds
 about the render target's ratio, and `Scene::set_target_size` keeps the grid because that one
 genuinely is a texel count. The two stretches cancel — a scene told the target's aspect draws
@@ -6525,7 +6525,7 @@ also fixed here:** backlog 0010's "fixing 0010 and closing major 3 belong in the
 (narrowing means moving `core/tests/attractor.rs` into the crate); `presets/swarm_dense.toml`'s
 false "six stays clean at 16:9" is `preset-author` content already in backlog 0010; and `cargo test
 -p lmv-core --lib render::post`'s `STATUS_ACCESS_VIOLATION` under in-process parallel GPU tests
-**predates this plan** (verified against a stashed tree at `a1e3e26`; `nextest` and
+**predates this plan** (verified against a stashed tree at `8a1eb08`; `nextest` and
 `--test-threads=1` are clean). **⚠ On-device carry-forward:** the composite now rasterizes up to one
 256 px step of texels it does not show on one axis, on top of the full-resolution ping-pong [0033]'s
 item already watches; and Phase 4 put the RD reconstruction's ~45 texture fetches per fragment on
@@ -6535,10 +6535,10 @@ because reverting costs the coral look. **[ADR-0037] accepted.** Version **patch
 
 ### [0033 — Internal resolution follows the target, plus the preset-surface and harness gaps behind it](done/0033-internal-resolution-and-preset-surface.md)
 — **done 2026-07-26**, passed Mode 4
-review (**no blockers**; three majors, four minors). Six `dev` phase commits (`978405a` `shot`
-reaches `tempo`/`novelty` + band levels, `cf65c4a` `{ attack, release }` smoothing, `8c0ff2b`
-Catmull-Rom reconstruction, `08714c7` the wrapped RD sampler, `3f3b652` target-sized post stages,
-`621fa7b` the operator sweep). **Phase 4 skipped** under ADR-0034's if-and-only-if — the
+review (**no blockers**; three majors, four minors). Six `dev` phase commits (`2503303` `shot`
+reaches `tempo`/`novelty` + band levels, `9b387b4` `{ attack, release }` smoothing, `57cb272`
+Catmull-Rom reconstruction, `757bf9f` the wrapped RD sampler, `d00498c` target-sized post stages,
+`7996b96` the operator sweep). **Phase 4 skipped** under ADR-0034's if-and-only-if — the
 reconstruction fix resolved the coral artifact, so the Gray-Scott grid stays 256, no coral preset
 takes a look change, and the ~4x sub-step cost is not spent. Takes four of the eight
 [design-backlog](../design-backlog.md) entries from the 2026-07-26 `preset-author` batch.
@@ -6574,7 +6574,7 @@ at every texel centre, and `line_d`'s `fwidth` gain renders that as one scallope
 **Phase 3's done-when 3 is unmet and is not satisfiable as specified** — it asks a pixel-domain
 scanline second-difference statistic to detect a geometric property of a 1-D contour curve, and at
 8 bits the slope discontinuity over a smooth field is below one output quantum (five measured
-attempts in `8c0ff2b`). Accepted with cause; **no followup metric is owed**, since the RD golden is
+attempts in `57cb272`). Accepted with cause; **no followup metric is owed**, since the RD golden is
 a real pixel guard for exactly this shader, it moved, and it passes. **Majors, all routed to a
 followup fix plan rather than reworked here:** (1) the 256 px round-up makes the grid's aspect
 differ from the target's, and because `post.rs:445` derives the scene's aspect from the **grid**
@@ -6595,7 +6595,7 @@ headers plus `attractor_ink.toml:22` still teach the retired fixed-1280x720 rule
 rides with Phase 8); `post.rs::internal_grid_size` is a line-for-line copy of
 `particles/mod.rs::trail_grid_size`, the opposite of ADR-0034's "one shared function" consequence;
 the RD reconstruction's real cost is **unmeasured** (the +16 % WARP figure was retracted in
-`3f3b652` as run-to-run noise — 193.6 / 224.2 / 105.2 s on the same suite — leaving 45 fetches per
+`d00498c` as run-to-run noise — 193.6 / 224.2 / 105.2 s on the same suite — leaving 45 fetches per
 fragment as the only real number, and the on-device checklist gained trails items but no RD item);
 `presets/README.md`'s "an ultrawide keeps its proportions" overclaims under the round-up
 (3440x1440 comes back 1.88 against 2.39). **⚠ On-device carry-forward:** full-resolution trails
@@ -6611,8 +6611,8 @@ presets. Version **minor 0.16.1 -> 0.17.0** at close (a feature plan).
 ### [0031 — Cleanup pass: testable `shot` helpers, one construction path, load-time param routing, and the accumulated close-review debt](done/0031-composite-cleanup-and-debt.md)
 — **done 2026-07-26**,
 passed Mode 4 review (**no blockers, no majors**; five minors, three nits). Six `dev` phase commits
-(`5244fd2` `shot`'s helpers into the lib, `83706a3` `from_context`, `6755014` load-time routes +
-`tau`, `64e7145` three per-frame stops, `fb024fc` `render/gpu.rs` + the attractor split, `609b9c9`
+(`0a4b308` `shot`'s helpers into the lib, `708e979` `from_context`, `2d37879` load-time routes +
+`tau`, `8144b75` three per-frame stops, `d8d23f9` `render/gpu.rs` + the attractor split, `98b057b`
 the accumulated debt). Clears the non-blocking half of the 2026-07-25 codebase-health review **plus
 the minors four earlier closes logged and nobody returned for**. `standalone/examples/shot.rs` went
 1028 -> 803 lines: its pure helpers (the 16-bit WAV parse, `filmstrip_indices` + the strip layout,
@@ -6678,8 +6678,8 @@ a feature).
 ### [0032 — Testing strategy: full-chain e2e, `shot` CLI coverage, a core coverage ratchet, and a pre-push gate](done/0032-testing-strategy-e2e-coverage-and-pre-push.md)
 — **done 2026-07-26**,
 passed Mode 4 review (**no blockers, no majors**; four minors, two nits). Four `dev` phase commits
-(`332720f` the e2e chain suite, `108e21a` `shot` as a subprocess, `ee89905` the pre-push gate,
-`a4b7045` the coverage ratchet). Answers the three questions that opened it — coverage threshold,
+(`bc6e9b1` the e2e chain suite, `6c8385d` `shot` as a subprocess, `6ad1bf3` the pre-push gate,
+`0f3e7b1` the coverage ratchet). Answers the three questions that opened it — coverage threshold,
 e2e tests, happy paths covered — with a number instead of an opinion. **`core/tests/chain.rs` is
 the first test that crosses the seam CLAUDE.md opens with**: synthetic PCM into a real
 `audio::intake` SPSC pair in 20 ms capture-callback-sized bursts, drained through `pop_samples`
@@ -6737,9 +6737,9 @@ rule applies; stays **0.16.0**.
 ### [0023 — Cross-preset visual transitions: MilkDrop-style dissolves between presets](done/0023-cross-preset-transitions.md)
 —
 **done 2026-07-26**, passed Mode 4 review (**no blockers, no majors**; five minors, one nit). Five
-`dev` phase commits (`2a40f83` ink leaves the chain, `4fefce3` the walking-skeleton controller +
-frozen crossfade, `918ae89` the blend library, `5ab441a` adaptive dual-live + the budget governor,
-`9c0d468` every switch path + re-entrancy + docs). A preset switch is no longer an index bump: an
+`dev` phase commits (`c99d748` ink leaves the chain, `f89abe2` the walking-skeleton controller +
+frozen crossfade, `b3b2b2f` the blend library, `7c898d6` adaptive dual-live + the budget governor,
+`a93e94a` every switch path + re-entrancy + docs). A preset switch is no longer an index bump: an
 engine `Transition` drives it as a **dissolve** over ~1 s on the injected `dt` (no wall clock, so a
 captured show reproduces frame-for-frame), through a **deterministic rotation** over four blend
 kinds — crossfade, additive burn, luma-dissolve, wipe — each a variant of one two-input shader that
@@ -6792,9 +6792,9 @@ the heavy attractor <-> reaction-diffusion pair holding 60 fps @ 1080p on a low-
 
 ### [0030 — Composite chain + scene keying: a `PostStage` trait, an instantiable `PostChain`, and kind-keyed scenes](done/0030-composite-chain-and-scene-keying.md)
 — **done 2026-07-25**, passed
-Mode 4 review (**no blockers**; three minors, one nit). Four `dev` phase commits (`023777d` trait +
-pure routing + chain, `55c7109` the two-chain independence proof, `9c02953` kind-keyed scenes,
-`d711760` docs). `draw_frame`'s ~70-line composite branch ladder over `trailing`/`kaleidoing`/
+Mode 4 review (**no blockers**; three minors, one nit). Four `dev` phase commits (`97fda4e` trait +
+pure routing + chain, `a856058` the two-chain independence proof, `9b7d734` kind-keyed scenes,
+`fa6ecc5` docs). `draw_frame`'s ~70-line composite branch ladder over `trailing`/`kaleidoing`/
 `inking` is gone: the three post stages sit behind a crate-internal `PostStage` trait in a
 `PostChain` array whose order is a **compile-time constant** (ADR-0018's feedback-then-fold plus
 ADR-0028's ink-last, pinned by `debug_assert`s so reordering the literal trips in a debug build).
@@ -6819,8 +6819,8 @@ not the close.
 ### [0019 — Preset expression grammar v2: branching, math functions, tempo, typo warnings](done/0019-preset-grammar-v2.md)
 —
 **done 2026-07-25**, passed Mode 4 review (**no blockers**; one major, three minors, one nit). Five
-`dev` phase commits (`c4f76fc` math functions + constants, `c33e996` comparisons + `select`,
-`b36a3de` `tempo`/`novelty`, `462422b` warn-but-load unknown params, `66b1abb` the `docs/presets.md`
+`dev` phase commits (`f324972` math functions + constants, `0f179fd` comparisons + `select`,
+`781efd9` `tempo`/`novelty`, `8fb5a80` warn-but-load unknown params, `6bcdc47` the `docs/presets.md`
 rewrite). The preset expression language roughly doubles, on the walls the `preset-author` lane
 actually hit (ADR-0020, now **accepted**): `cos`, `sqrt`, `pow`, floored `mod` (`mod(-0.2, 1.0)` is
 `0.8`, so a cyclic hue never jumps), `smoothstep`, the constants `pi`/`tau`, the six comparison
@@ -6870,8 +6870,8 @@ user-gated. Version **minor 0.14.0 -> 0.15.0** at close (a feature plan).
 ### [0015 — Preset-directory override + live iteration](done/0015-preset-dir-override-and-live-iteration.md)
 —
 **done 2026-07-25**, passed Mode 4 review (**no blockers**; one major, three minors, two nits).
-Three `dev` phase commits (`82d33dc` shared resolver + `LMV_PRESET_DIR`, `9e59211` `shot
---presets` / `--preset-file`, `45bf613` docs). Editing a **version-controlled** `presets/*.toml`
+Three `dev` phase commits (`711874a` shared resolver + `LMV_PRESET_DIR`, `9000914` `shot
+--presets` / `--preset-file`, `1c9c2a4` docs). Editing a **version-controlled** `presets/*.toml`
 is now live in the running app within ~150 ms and in the next headless capture, with no rebuild
 and no relaunch. The per-OS resolver that was hand-copied into `main.rs` and `examples/shot.rs` is
 now one module, `standalone/src/lib.rs` (a new `[lib]` target beside the `[[bin]]`, per ADR-0014):
@@ -6921,8 +6921,8 @@ on-device visual check. Version **minor 0.13.1 -> 0.14.0** at close (a feature p
 ### [0029 — Attractor resize cost + ink-stage followups](done/0029-attractor-resize-cost-and-ink-followups.md)
 —
 **done 2026-07-25**, passed Mode 4 review (**no blockers, no majors**; two minors, two nits). Five
-`dev` phase commits (`773d437` resource split, `9b927ea` quantize + aspect-preserving cap,
-`59aa298` ink golden, `dd74d41` rename + doc corrections, `e375c2e` project at the target aspect).
+`dev` phase commits (`f7360d2` resource split, `97edc44` quantize + aspect-preserving cap,
+`cd34013` ink golden, `824107f` rename + doc corrections, `35e6664` project at the target aspect).
 Closes the two majors from the Plan 0027 review. `Resources` is split along the axis that actually
 varies: `PipelineResources` (four shader modules, every pipeline, the 50k-particle buffer, both LUT
 textures, the uniforms, the layouts and sampler) is built **once and survives every size change**,
@@ -6974,8 +6974,8 @@ constant if it reads wrong on device. Version **patch 0.13.0 -> 0.13.1** at clos
 —
 **done 2026-07-25**, passed Mode 4 review (no blockers; two majors and four minors, all routed to
 [Plan 0029](done/0029-attractor-resize-cost-and-ink-followups.md) or [ADR-0030](../adrs/0030-scene-target-size-hot-path-hook.md)
-rather than reworked). Three `dev` phase commits (`0e3b84a` ink stage, `5f79dc6` surface-sized trail
-field, `5daddfa` curated preset + docs). Delivers the "ink on paper" look the `preset-author` lane
+rather than reworked). Three `dev` phase commits (`37bb664` ink stage, `6b7a658` surface-sized trail
+field, `6aa2881` curated preset + docs). Delivers the "ink on paper" look the `preset-author` lane
 could not reach: `render/ink.rs` is a final, skippable composite stage that reads each pixel's
 luminance as an *ink density* and repaints the finished frame to `mix(paper, ink, d)` — the
 **darkening** step the additive scene pipelines structurally cannot express. Default poles are
@@ -7000,8 +7000,8 @@ close; version bumped 0.12.0 -> 0.13.0.
 ### [0025 — Full composite coverage: background + view transform for reaction-diffusion and attractor](done/0025-full-composite-coverage.md)
 —
 **done 2026-07-24**, passed Mode 4 review (no blockers, no majors; one minor, one nit). Five `dev`
-phase commits (`06b4007` RD alpha-present, `ae17d57` RD zoom/pan, `265045b` attractor alpha-present,
-`566fcf8` attractor zoom/pan, `6c570ec` docs) plus the pre-cleared `8d0e17a`
+phase commits (`3ea983f` RD alpha-present, `79975b3` RD zoom/pan, `5406539` attractor alpha-present,
+`69fb2fc` attractor zoom/pan, `27667cd` docs) plus the pre-cleared `d664422`
 (`Renderer::adapter_is_software()`). Finishes ADR-0018's engine-wide promise: both fullscreen/
 accumulating scenes switched their final present from opaque `REPLACE` to
 `PREMULTIPLIED_ALPHA_BLENDING` over the `bg_*` backdrop (RD alpha = the V-field `structure` term;
@@ -7026,7 +7026,7 @@ now **accepted**. Version **minor 0.11.0 -> 0.12.0** at close.
 ### [0028 — Parametric-curve shape params: radial offset + phase (audio-morphable rose geometry)](done/0028-parametric-curve-shape-params.md)
 —
 **done 2026-07-24**, passed Mode 4 review (no blockers, no majors; one minor, one nit). Two `dev`
-phase commits (`f37dde0` Phase 1 — core sampler + scene + tests; `20cd7f7` Phase 2 — docs). Added
+phase commits (`8f267cf` Phase 1 — core sampler + scene + tests; `7630d0d` Phase 2 — docs). Added
 two named zero-defaulted per-frame **shape** params to `parametric_curve` (ADR-0029, now
 **accepted**, supplements ADR-0007): `phase` (radians inside the sine) and `radial_offset` (added
 to the radius), so the Maurer sampler becomes `r = sin(n*theta + phase) + radial_offset`. Threaded
@@ -7057,9 +7057,9 @@ motion 0.0078) is not part of this plan. Version **minor 0.10.0 -> 0.11.0** at c
 ### [0020 — Shared palette system: gradient LUT, named + custom palettes, bindable color (all four scenes)](done/0020-shared-palette-system.md)
 —
 **done 2026-07-24**, passed Mode 4 review (no blockers, no majors; two minor, two nits). Six `dev`
-phase commits (`e64908c` shared `core/src/render/palette.rs` + fragment through a 256-entry baked LUT,
-`b518130` custom gradient `stops`, `81ede9e` swarm through the LUT, `53c944e` A/B `palette_mix`
-crossfade, `9281c23` reaction-diffusion + attractor through the palette, `d00ce16` palette-surface
+phase commits (`279195d` shared `core/src/render/palette.rs` + fragment through a 256-entry baked LUT,
+`6bd9193` custom gradient `stops`, `ed4e90f` swarm through the LUT, `4bcc5db` A/B `palette_mix`
+crossfade, `d11eab7` reaction-diffusion + attractor through the palette, `b197c22` palette-surface
 docs). Landed the shared color axis (ADR-0021, now **accepted**, supplements ADR-0002): a preset
 declares an optional `[palette]` (built-in `name` — `spectrum`/`ember`/`ice`/`mono`/`aurora` — **or**
 custom `stops`, validated at the load boundary) baked once into a 256-entry RGB LUT that **all four**
@@ -7103,8 +7103,8 @@ to exploit named/custom palettes and `hue_spread`/`color_span`; refresh the skil
 ### [0026 — Calmer scene rotation: hold one scene by default, longer dwell, softened drop bias](done/0026-calmer-scene-rotation.md)
 —
 **done 2026-07-24**, passed Mode 4 review (no blockers, no majors; one minor, one nit). Three `dev`
-phase commits (`f3dab1c` hold-one-scene default, `49600a2` longer dwell + softened drop gate,
-`f4fd2c7` operator docs). Reverses Plan 0009's "lively unattended show" default (ADR-0027, now
+phase commits (`b1f1358` hold-one-scene default, `e878f49` longer dwell + softened drop gate,
+`6b823a0` operator docs). Reverses Plan 0009's "lively unattended show" default (ADR-0027, now
 **accepted**): `Rotate::default().auto` flips **`true` -> `false`** so a fresh install (no
 `config.toml`) holds one scene until the operator opts in via the `A` hotkey (`toggle_auto`) or
 `auto = true`; manual `Space` next-scene works either way. When auto **is** on the cadence is calm:
@@ -7137,10 +7137,10 @@ at close.
 ### [0018 — Engine-wide visual enrichment: zoom, atmosphere, easing, mirrors](done/0018-engine-wide-visual-enrichment.md)
 —
 **done 2026-07-23**, passed Mode 4 review (no blockers, no majors; three minor, two nits). Eight
-`dev` phase commits (`bade3eb` shared `ViewTransform` + zoom/pan on line scenes, `0faa087`
-ViewTransform to fragment+swarm, `02b16e6` engine background pre-pass + scenes `Clear`->`Load`,
-`536b8c9` geometry mirror for line scenes, `822cc94` eased params via render-layer one-pole,
-`e67f217` feedback trails, `56d0460` screen-space kaleidoscope, `52673e0` curated presets + doc).
+`dev` phase commits (`428fd6c` shared `ViewTransform` + zoom/pan on line scenes, `20287d2`
+ViewTransform to fragment+swarm, `264950a` engine background pre-pass + scenes `Clear`->`Load`,
+`eeecb89` geometry mirror for line scenes, `24a7c85` eased params via render-layer one-pole,
+`0857eac` feedback trails, `06030ce` screen-space kaleidoscope, `488cffe` curated presets + doc).
 Landed the **fixed-order engine composite** ([ADR-0018](../adrs/0018-engine-wide-scene-compositing.md),
 now **accepted**) — background pre-pass (owns the clear) -> active scene under a shared
 `ViewTransform` (zoom/pan, applied per family: line vertex shader, fragment sample coords, swarm
@@ -7182,9 +7182,9 @@ resolution presented stretched (same documented v1 limitation as the RD/attracto
 ### [0024 — Single-source the foobar component version + refresh stale plugin descriptions](done/0024-foobar-component-version-single-source.md)
 —
 **done 2026-07-23**, passed Mode 4 review cold (**no blockers, no majors, no minors** — one nit).
-Two `dev` commits: `08df308` (Phase 1: `build.ps1` reads `[workspace.package].version` from root
+Two `dev` commits: `4689c99` (Phase 1: `build.ps1` reads `[workspace.package].version` from root
 `Cargo.toml` and generates `build/foo_lmv_version.h`; `foo_lmv.cpp` includes it guarded with a
-`0.0.0-dev` fallback and feeds `FOO_LMV_VERSION` to `DECLARE_COMPONENT_VERSION`) and `a8effb9`
+`0.0.0-dev` fallback and feeds `FOO_LMV_VERSION` to `DECLARE_COMPONENT_VERSION`) and `6a4396b`
 (Phase 2: refreshed both stale scene-description strings). foobar's Components list stops showing a
 frozen `0.1.0` — the component version now **tracks the workspace version** through a build-time
 generated header (ADR-0025, now **accepted**). Verified: the `Cargo.toml` regex is anchored to
@@ -7200,8 +7200,8 @@ now exactly the number the plugin will display, by design.
 ### [0021 — Decouple preset content from code: build-time embedding + single-source system names](done/0021-decouple-preset-content-from-code.md)
 —
 **done 2026-07-23**, passed Mode 4 review (**no blockers, no majors, no minors, no nits** — a clean
-landing). Three commits: `e1e4f1f` (Phase 1: `core/build.rs` generates `EMBEDDED` from
-`presets/*.toml`), `11798c3` (rustfmt of `build.rs`), `0241b7d` (Phase 2: single-source `SystemKind`
+landing). Three commits: `982dddf` (Phase 1: `core/build.rs` generates `EMBEDDED` from
+`presets/*.toml`), `53aec98` (rustfmt of `build.rs`), `704e94d` (Phase 2: single-source `SystemKind`
 name↔kind mapping). Shipping a preset stops being a code change: the project's **first build script**
 (zero-dependency std `read_dir` + sort + string emit) globs `presets/*.toml` at build time and emits
 `pub static EMBEDDED: &[(&str, &str)]` as filename-sorted `(name, include_str!(<abs path>))` tuples —
@@ -7229,8 +7229,8 @@ the generated embedding instead of the hand-maintained array. Version **minor 0.
 ### [0016 — GPU compute-particle scenes: strange attractors](done/0016-gpu-compute-particle-scenes.md)
 —
 **done 2026-07-23**, passed Mode 4 review (no blockers, no majors; two minor, three nits). Five
-`dev` phase commits (`79b6cf0` skeleton, `937fdfb` trails, `9acc415` audio params, `7ec850a`
-family set, `aa34d25` coverage guard + contract). Landed the engine's **first GPU compute
+`dev` phase commits (`192f0cb` skeleton, `6912dd1` trails, `3a74adc` audio params, `da9cd89`
+family set, `3e50498` coverage guard + contract). Landed the engine's **first GPU compute
 pipeline** (ADR-0015 idiom B, now **accepted**): a 50k-particle `wgpu` storage buffer stepped
 through a strange-attractor map by a compute shader each frame (`STORAGE|VERTEX|COPY_DST`, read
 back as an instance vertex buffer — no CPU round-trip) and drawn as additive point-sprites with
@@ -7266,17 +7266,17 @@ follow-ups on the same compute path. Version **minor 0.5.0 → 0.6.0** at close.
 ### [0022 — Decouple the golden drift guard from shipped presets (per-system frozen fixtures)](done/0022-golden-fixtures-decouple-content.md)
 —
 **done 2026-07-23**, passed Mode 4 review (no blockers, no majors; one minor, one nit). Two `dev`
-phase commits (`def9b24` per-system fixtures + repointed golden; `19e7123` engine-vs-content doc
+phase commits (`480a8a7` per-system fixtures + repointed golden; `ee1a6be` engine-vs-content doc
 split). Golden (`core/tests/golden.rs`) previously pinned baselines to three **shipped, curated
 presets** (`Aurora`/`Warp Drive`/`Drift`), so every intended content tune tripped the engine-drift
-alarm and reds CI (concretely `76a2fb4`). Repointed it at six **test-only frozen fixtures** under
+alarm and reds CI (concretely `8f86d9a`). Repointed it at six **test-only frozen fixtures** under
 `core/tests/fixtures/` — one per `SystemKind`, keyed by an **exhaustive `match`** with no wildcard
 arm so a new scene fails to compile until its fixture exists — loaded via `set_presets` and
 captured by name; baselines blessed on WARP. Closes the prior **zero** golden coverage of the three
 line-family systems (`parametric_curve`/`lsystem`/`star_pattern`, each feeding the shared line
 renderer through a different generator). The three shipped baselines are **deleted**; no test pins a
 shipped preset by name, and the shipped roster keeps its behavioral floors (`sanity`/`reactivity`/
-`animation`, all iterating `default_presets()`). **Landing this greened `main`** from the `76a2fb4`
+`animation`, all iterating `default_presets()`). **Landing this greened `main`** from the `8f86d9a`
 drift. Verified: `cargo test -p lmv-core --test golden` green on WARP with a **real comparison**
 (not an adapterless skip); all six variants have exactly one fixture + baseline. Per
 [ADR-0023](../adrs/0023-golden-drift-guard-uses-frozen-fixtures.md) (now **accepted**). **Test +
@@ -7290,7 +7290,7 @@ shipped-artifact change (chore-only per ADR-0005/`docs/releasing.md`, a delibera
 ### [0014 — Reaction-diffusion feedback scene + frame-rate-independent render clock](done/0014-reaction-diffusion-feedback-scene.md)
 —
 **done 2026-07-23**, passed Mode 4 review (no blockers, no majors; two minor, two nits). Six `dev`
-phase commits (`345be23`, `13148b7`, `39b6091`, `cb71057`, `9fcfc95`, `8a05cea`). Landed the
+phase commits (`13d3fd0`, `2ea1a5d`, `0a187cb`, `cc6ac3d`, `95f72ad`, `104814d`). Landed the
 engine's **first stateful feedback scene** — Gray-Scott reaction-diffusion on a reusable
 `render::feedback::PingPongField` (two `Rgba16Float` offscreen textures, fixed 256² grid) with an
 iso-contour + hatch + cosine-palette present look, driven by named params (`feed`/`kill`/`flow`/
@@ -7313,15 +7313,15 @@ hitch once, against `cycle_preset`'s "never hitches" doc. **Nits:** stale `SCENE
 holds, 0022 retires the swarm golden pin). **⚠ On-device carry-forwards** (like prior plans): Phase 2
 same-speed eyeball, Phase 4 "reads as the reference family" (dev verified via real-GPU PNGs), Phase 5
 live-foobar plugin `dt` (C++ shim not compiled here). **⚠ `main` stays red on `golden`** (pre-existing
-from `76a2fb4`, blessed cross-GPU; 0014's swarm `dt`-change also perturbs `Drift`) — **Plan 0022
+from `8f86d9a`, blessed cross-GPU; 0014's swarm `dt`-change also perturbs `Drift`) — **Plan 0022
 greens it**, not this close. Version **minor 0.4.0 → 0.5.0** at close.
 
 ### [0009 — Live performance features (standalone)](done/0009-live-performance-features.md)
 —
 **done 2026-07-23**, passed Mode 4 review (no blockers, no majors; two minor deviations, both
-pre-flagged and reconciled). Five `dev` phase commits (`6e048d0` per-user config + borderless-
-fullscreen on a chosen display, `3891272` line-in / audio-interface capture selection, `bb9a1e2`
-drop-biased scene director + hotkeys, `d693c69` experimental track-change novelty nudge, `d49f377`
+pre-flagged and reconciled). Five `dev` phase commits (`72875a4` per-user config + borderless-
+fullscreen on a chosen display, `639a9e9` line-in / audio-interface capture selection, `ec029b9`
+drop-biased scene director + hotkeys, `f1a3ad0` experimental track-change novelty nudge, `f72c246`
 `--soak` long-run instrumentation). Made the standalone drive a live DJ show: `Fullscreen::
 Borderless` on the config-selected display (`F`/`D` hotkeys, name-over-index monitor match),
 WASAPI **capture**-endpoint enumeration for line-in alongside loopback (`--list-devices`, graceful
@@ -7351,7 +7351,7 @@ Delivers roadmap item 2 (live performance features). Version **minor 0.3.1 → 0
 ### [0017 — Green CI: reasoned ttf-parser advisory ignore + adapter-skip for headless GPU tests](done/0017-ci-green-advisory-and-gpu-tests.md)
 —
 **done 2026-07-23**, passed Mode 4 review (no blockers, no majors, no minors; two non-actionable
-nits). Two `dev` phase commits (`95bf510`, `134d4e3`) unbreaking `main` (CI run 29985131075) after
+nits). Two `dev` phase commits (`927f09f`, `0d1303f`) unbreaking `main` (CI run 29985131075) after
 two **environmental** failures. **Phase 1** silenced `RUSTSEC-2026-0192` — `ttf-parser` flagged
 **unmaintained** (not a vulnerability), load-bearing via the glyphon text stack (`ttf-parser →
 fontdb → cosmic-text → glyphon → lmv-core`, both shipped targets, ADR-0009's `text` feature),
@@ -7374,7 +7374,7 @@ silent-no-op tradeoff ADR-0016 accepts; and the parallel session's untracked `sk
 ### [0010 — Line-geometry scenes: parametric curves, L-systems, star patterns](done/0010-line-geometry-scenes.md)
 —
 **done 2026-07-23**, passed Mode 4 review (no blockers, no majors; three minor, two nits). Five
-`dev` phase commits (`110eab7`, `cd0e518`, `4b9ea05`, `1cc7fa1`, `3e2dcc1`) implementing
+`dev` phase commits (`ca44522`, `758b421`, `5a29305`, `59a958e`, `e52306c`) implementing
 [ADR-0007](../adrs/0007-line-geometry-generators.md) (now **accepted**). Added a **line-art
 category** to the built-in vocabulary on one shared `LineRenderer` (segments → thick glowing
 instanced quads, additive blend, fixed 20k-segment buffer) under two build models: a **parametric**
@@ -7402,8 +7402,8 @@ carry-forward (`docs/on-device-validation.md`).
 ### [0013 — Headless scene capture + differential visual QA + golden images + shot CLI](done/0013-headless-scene-capture.md)
 —
 **done 2026-07-22**, passed Mode 4 review (no blockers, no majors; one minor, one nit). Eight
-`dev` phase commits (`ecc50e5`, `ba68026`, `d11a7f0`, `889f4e3`, `26a3180`, `4b54d1e`, `8152943`,
-`4364464`) plus the `assets/test` gitignore (`a16be92`). Gave the agent a **windowless
+`dev` phase commits (`bb625b9`, `117ff43`, `9df27a8`, `b7f6ed0`, `f1ead97`, `1a7e581`, `30c7049`,
+`0cf3640`) plus the `assets/test` gitignore (`05e915d`). Gave the agent a **windowless
 visual-feedback + QA harness**: `RenderContext::new_headless` (a surface-less device+queue, `None`
 surface so the on-surface present path is byte-unchanged) + a shared `draw_frame` extracted from
 `render`, feeding an offscreen `render/capture.rs` (clear-to-black → draw → 256-byte-aligned
@@ -7437,7 +7437,7 @@ it's within the plan's own "only if it carries per-frame indexing" guidance.
 ### [0008 — In-app preset browse overlay (standalone)](done/0008-preset-browse-overlay.md)
 —
 **done 2026-07-22**, passed Mode 4 review (no blockers, no majors). Four `dev` phase commits
-(`3bef1a8`, `b0bb95e`, `43f3b39`, `9cc3234`). Landed the codebase's first text rendering:
+(`19603d5`, `f959585`, `8be2d59`, `f1c4419`). Landed the codebase's first text rendering:
 **glyphon** behind a non-default core `text` feature ([ADR-0009](../adrs/0009-glyphon-text-rendering.md),
 now **accepted**) via a reusable `render::text::TextLayer` seam (a second load-pass compositing
 positioned `TextRun`s over the scene in one frame; Plan 0009's HUD reuses it). The standalone draws
@@ -7462,7 +7462,7 @@ overlay's type-to-filter drops whitespace, so a preset name containing a space c
 ### [0012 — Measure the driver-memory floor + cull dead scenes](done/0012-memory-floor-measure-and-scene-cull.md)
 —
 **done 2026-07-22**, passed Mode 4 review (no blockers, no majors). Two `dev` phase commits
-(`50a7ea0`, `3de5611`); the third phase (human, low-end iGPU) was **extracted** to the standing
+(`f217f56`, `8ae22fa`); the third phase (human, low-end iGPU) was **extracted** to the standing
 `docs/on-device-validation.md` checklist so the plan could close on completed work rather than wait on
 hardware. **Phase 1** culled the three dead legacy scenes (`spectrum`/`pulse`/`starfield` — built +
 driver-compiled at startup, addressed by no preset; closes the Plan 0003 carry-forward), leaving
@@ -7483,8 +7483,8 @@ new ADR.** **⚠ Carry-forward (human):** the low-end iGPU / second-vendor captu
 ### [0011 — Diagnostics harness + quick-win memory/perf trim](done/0011-diagnostics-and-memory-trim.md)
 —
 **done 2026-07-22**, passed Mode 4 review (no blockers, no majors; two nits). Seven phase commits
-(`7ad00df`, `166043f`, `5a9f67b`, `1ace817`, `82c7134`, `d266c08`) plus two post-review fixes
-(`10a4796`, `894a2fc`). Built the runtime diagnostics brain in `core`: a pure `FrameStats`
+(`f52d264`, `3c6a264`, `88860b3`, `47dd250`, `0cd65f3`, `a214a91`) plus two post-review fixes
+(`b1e5b38`, `4067410`). Built the runtime diagnostics brain in `core`: a pure `FrameStats`
 accumulator (fps / frame-ms / p99 from a fixed 240-sample ring, unit-tested, no clock) wrapped by a
 `Diag` holding the **single gated `Instant::now()` read** — the only wall-clock read in `core`,
 quarantined behind `collecting` so NFR §6 determinism (fixed `SCENE_DT`) holds. A `render/overlay.rs`
@@ -7512,7 +7512,7 @@ checks: live-foobar overlay/log (like Plan 0004) and macOS RSS (`rss.rs`, pendin
 ### [0007 — Curated preset library: robust loading + seed-on-first-run + C ABI v2](done/0007-curated-preset-library.md)
 —
 **done 2026-07-22**, passed Mode 4 review (no blockers, no majors). Four phase commits
-(`448b54b`, `ac5e7d0`, `cf8fb5b`, `ed67807`): `core::preset::seed_dir` (write-if-absent) +
+(`407a955`, `b768dfd`, `8558582`, `9ea0f0c`): `core::preset::seed_dir` (write-if-absent) +
 a hand-rolled per-OS data-root resolver in the standalone seed `%APPDATA%\light-music-visualizer\presets`
 on first run, then load + hot-reload it; the foobar shim resolves the **same** dir and calls
 the new `lmv_load_presets` after every `ensure_handle`, gated on an `lmv_abi_version()`
@@ -7534,7 +7534,7 @@ rename silently un-shares them; a cross-referencing comment is the follow-up.
 ### [0004 — foo_lmv as an embeddable Default UI panel](done/0004-foobar-ui-element-panel.md)
 —
 **done 2026-07-21**, passed Mode 4 review (no blockers, no majors). All four phases landed in
-`plugin-foobar/foo_lmv.cpp` (commits `ef9193f`, `be3f90c`, `49ed225`, `855ccba`): the file-scope
+`plugin-foobar/foo_lmv.cpp` (commits `cb392e4`, `5dce26b`, `89fd414`, `8efb217`): the file-scope
 globals became one claimable `VizSession` (single `LmvHandle` + stream + pump + render timer); a
 Default UI `ui_element` panel and the View pop-out both host the core through one HWND, sharing
 the session so only one wgpu surface exists; ownership arbitration (400 ms poll) hands the session
@@ -7548,14 +7548,14 @@ implements each; behavioral confirmation is pending an on-device run.
 ### [0005 — Extract the lock-free ring into a wgpu-free crate for Miri](done/0005-miri-ring-extraction.md)
 —
 **done 2026-07-21**, passed Mode 4 review (no blockers, no majors). Implements Plan 0002's
-deferred Phase 5. Phase 1 (`de0fe24`) pulled the SPSC ring — `RingShared`, `SampleProducer`,
+deferred Phase 5. Phase 1 (`bbf641a`) pulled the SPSC ring — `RingShared`, `SampleProducer`,
 `SampleConsumer`, `spsc()`, and the four SPSC unit tests — out of `core/src/audio.rs` into a
 new zero-dependency `lmv-ring` crate, re-exported unchanged from `core::audio` (public API and
 the C ABI intact). The ring types carry a bare `channels: u16` instead of the core-owned
 `AudioFormat` (which stays at the `intake()` boundary with its validation), driving one
 documented `capture_win.rs` call-site edit — the plan's own Risks-section fallback.
 `hygiene.rs` guards extended to cover `lmv-ring` in both the exact-pin and hot-path-pragma
-checks. Phase 2 (`6af7865`) added the `miri` CI job (`cargo +nightly miri test -p lmv-ring`) —
+checks. Phase 2 (`d70c9ad`) added the `miri` CI job (`cargo +nightly miri test -p lmv-ring`) —
 fast because no wgpu graph compiles; the probe (Release→Relaxed → data-race UB) confirmed the
 gate bites. No ADR (internal refactor; the rejected feature-gate-wgpu alternative is recorded
 in the plan). **⚠ Carry-forward:** the Miri job's green-in-CI is a runtime check pending the
@@ -7566,12 +7566,12 @@ former module-private constructor; the `channels`-validated-by-caller contract i
 ### [0003 — Generative scenes + data-driven presets](done/0003-generative-scenes-and-presets.md)
 —
 **done 2026-07-21**, passed Mode 4 review (no blockers). Phases 0-5 landed (commits
-`ae2c035..df16c48`): scenes relocated under `render/` + brought under the panic-pragma guard
+`2a04ba1..01da747`): scenes relocated under `render/` + brought under the panic-pragma guard
 (closing the 0002 review gap), a fragment-field system and a ~10k CPU particle swarm, DSP
 enriched with bass/mid/treb bands + a deterministic hop-clock tempo/BPM, a pure
 allocation-free expression evaluator, and TOML presets driving both systems with disk
 hot-reload. Implements **[ADR-0002](../adrs/0002-layered-preset-architecture.md) layers 1-2**
-(now **accepted**). Two review fixes at close (`6b7135b`): thread-isolated the zero-alloc test
+(now **accepted**). Two review fixes at close (`ecefd33`): thread-isolated the zero-alloc test
 so both `cargo test` and nextest pass, and added `preset/expr.rs` to the hygiene guard.
 **⚠ Carry-forward (minor, non-blocking):**
 1. The three legacy scenes (spectrum/pulse/starfield) stay compiled and constructed but no
@@ -7931,7 +7931,7 @@ to drive it. **Still outstanding at that close, user-gated:** the `preset-author
 (`SKILL.md`, `references/grammar.md`, `references/render-loop.md`) still described the **v1**
 grammar and still taught the pre-`LMV_PRESET_DIR` `%APPDATA%` copy-over. **Both halves of that note
 are now obsolete and it is kept only for the history** — the skill docs were rewritten 2026-07-26
-(`1412a9b`) and have been swept since (`bin` at [0034], `hash`/`noise` at [0047]), and
+(`0e1e500`) and have been swept since (`bin` at [0034], `hash`/`noise` at [0047]), and
 `.claude/skills/**` turned out to be editable after all: writes there are classifier-dependent,
 not blocked, so a stale skill doc is a close-ceremony sweep like any other.)
 
@@ -8430,7 +8430,7 @@ references any defect this plan fixed.
 Three walls the mono cohort hit in one session, taken down together with the instrument first.
 `fragment_field` gained `field_speed` and `fold_speed`; `palette_contour` learned to read the LUT so
 it fires at ink changes rather than at every band edge; `shot --report` gained `drive` and `rate`.
-Six phases, six commits, `63461ee` through `d74fa37`, on `plan-0121-rate-ink-motion`.
+Six phases, six commits, `b5eea01` through `61d5ed9`, on `plan-0121-rate-ink-motion`.
 
 **Review: no blockers, one major, four minors, two nits.** Gate green on the branch — `fmt`,
 `clippy --workspace --all-targets -D warnings`, `cargo nextest run --workspace` at **1044 passed /
@@ -8576,8 +8576,8 @@ proportion is the thing nothing else gates.
 
 ### 0127 — The picture stops depending on the volume slider (closed 2026-08-28)
 
-**Review: no blockers, no majors, four minors, two nits.** Three `dev` phases landed (`afd8aa5`,
-`3560eed`, `e606889`), the `human` stop gate ran and returned both readings, and Phase 4 was
+**Review: no blockers, no majors, four minors, two nits.** Three `dev` phases landed (`a694c67`,
+`e77c43c`, `af6c2a1`), the `human` stop gate ran and returned both readings, and Phase 4 was
 skipped. Verified on the merged tree rather than from the log: `fmt` and
 `clippy --workspace --all-targets` clean, `cargo nextest run --workspace` **1109 passed / 0 failed**,
 doc-links, comment-hygiene and index-rows green, and `check-backlog-claims` red on exactly the one

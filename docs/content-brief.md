@@ -159,7 +159,7 @@ over a lit backdrop — **one pass, not two.**
 **Two record corrections that matter to whoever runs this:**
 
 - The plan's own text says to run this "with 0038 and 0058". **0058 closed by content on 2026-08-04**
-  (`859ec66`, all thirteen fold-binding presets now name a `kaleido_edge`), five days before Plan 0071
+  (`ca43dff`, all thirteen fold-binding presets now name a `kaleido_edge`), five days before Plan 0071
   reached Phase 5. The three-way pass is a two-way pass.
 - `docs/plans/README.md` states that "the *tonemap-knee* half of that pairing is now measured away" by
   Plan 0080 Phase 7. **It is not.** What that phase retired is a different suspicion — that

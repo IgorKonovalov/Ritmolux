@@ -7,10 +7,10 @@
 > **Related ADRs:** [0007-line-geometry-generators](../../adrs/0007-line-geometry-generators.md) (accepted at close); extends [0002-layered-preset-architecture](../../adrs/0002-layered-preset-architecture.md) layer 2
 
 > **Close summary (2026-07-23, Mode 4 — no blockers, no majors).** All five phases
-> landed: `110eab7` (line renderer + static Maurer rose), `cd0e518` (parametric
-> presets + audio sweep + the optional `Scene::configure` hook), `4b9ea05` (L-system
-> generator: grammar + turtle + cached-per-depth build), `1cc7fa1` (Hankin star
-> generator + contact-angle variants), `3e2dcc1` (7 curated presets across all three
+> landed: `ca44522` (line renderer + static Maurer rose), `758b421` (parametric
+> presets + audio sweep + the optional `Scene::configure` hook), `5a29305` (L-system
+> generator: grammar + turtle + cached-per-depth build), `59a958e` (Hankin star
+> generator + contact-angle variants), `e52306c` (7 curated presets across all three
 > families + `presets/README.md` authoring note). Verified: `cargo test -p lmv-core`
 > green (grammar exact-string, turtle cap-report, Hankin count + 2π/n-symmetry,
 > zero-per-frame-alloc, bad-config rejection all present and non-tautological); clippy

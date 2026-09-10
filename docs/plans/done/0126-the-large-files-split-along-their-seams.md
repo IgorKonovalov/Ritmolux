@@ -1,6 +1,6 @@
 # 0126 — The large files split along their seams
 
-> **Status:** done - closed 2026-09-03. Eight dev phases, `0d50935`..`463cf2d` plus `cb49877`.
+> **Status:** done - closed 2026-09-03. Eight dev phases, `42f0eac`..`1779520` plus `ee38a00`.
 > Mode 4 review: **no blockers, no majors against the code; one major doc-freshness repair (stale
 > `standalone/src/main.rs` citations in Plans 0120/0133/0147 and design-backlog 0164, repaired at
 > this close), five minors.** Independently verified: `cargo nextest run --workspace` 1520 passed /
@@ -285,14 +285,14 @@ const TABLE: [(SystemKind, &str, &[&str]); VARIANT_COUNT] = [
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `warp_mesh/` takes the `particles/` shape | dev | done | `0d50935` |
-| 2 — `render/mod.rs` keeps the `Renderer` and nothing else | dev | done | `aacc984` |
-| 3 — `schema.rs` becomes a directory, `SystemKind` one table | dev | done | `58ccc24` |
-| 4 — `GeneratorConfig` stops editing scenes that do not use it | dev | done | `9e53124` |
-| 5 — `star.rs` splits; `shape_collage` gets an `enum Kind` | dev | done | `111dff5` |
-| 6 — The two seams go home | dev | done | `d2b1efa` |
-| 7 — `standalone/main.rs` becomes shell glue | dev | done | `cb49877` |
-| 8 — `foo_ritmolux.cpp` splits and `build.ps1` learns a list | dev | done | `463cf2d` |
+| 1 — `warp_mesh/` takes the `particles/` shape | dev | done | `42f0eac` |
+| 2 — `render/mod.rs` keeps the `Renderer` and nothing else | dev | done | `785dc9d` |
+| 3 — `schema.rs` becomes a directory, `SystemKind` one table | dev | done | `3b42c7b` |
+| 4 — `GeneratorConfig` stops editing scenes that do not use it | dev | done | `e2eb7a8` |
+| 5 — `star.rs` splits; `shape_collage` gets an `enum Kind` | dev | done | `ae9067d` |
+| 6 — The two seams go home | dev | done | `6df8619` |
+| 7 — `standalone/main.rs` becomes shell glue | dev | done | `ee38a00` |
+| 8 — `foo_ritmolux.cpp` splits and `build.ps1` learns a list | dev | done | `1779520` |
 
 ### Notes
 
@@ -531,7 +531,7 @@ and **one repair is not this phase's**:
 - **`docs/design-backlog.md`: eight live probes repointed**, `in:` paths only,
   no claim touched. Six are this phase's. **Two are Phase 8's** — entry 0102's
   pair still named `foo_ritmolux.cpp` after that phase moved both strings into
-  `viz_session.cpp`, so `check-backlog-claims.mjs` has been red since `463cf2d`.
+  `viz_session.cpp`, so `check-backlog-claims.mjs` has been red since `1779520`.
 - **`core/tests/chain.rs`: two comments** naming the file that owns
   `pump_audio` and the drain scratch, both now `app_state.rs`.
 
@@ -611,7 +611,7 @@ samples that led up to it on disk.
   `README.md`, `docs/capturing.md` and `docs/on-device-validation.md` are
   unchanged.
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit **0**.
-  It was **red at `463cf2d`** and Phase 7 repointed the eight it named — 0102
+  It was **red at `1779520`** and Phase 7 repointed the eight it named — 0102
   (x2, Phase 8's, `foo_ritmolux.cpp` -> `viz_session.cpp`), 0154, 0164 (x2),
   0165 (x2) and 0181 (`main.rs` -> `capture_start.rs` / `app_state.rs` /
   `run.rs`). `in:` paths only; no claim edited.
@@ -623,8 +623,8 @@ samples that led up to it on disk.
   `cargo build --workspace` green. `check-doc-links`, `check-index-rows`,
   `check-comment-hygiene` and `check-filter-figures` all exit 0.
 - **Outstanding `human` phases:** none — all eight phases are `dev`.
-- **Lane state:** `main` was merged into the lane at `ac01a37` before Phase 7,
-  which brought `38eb942` and the four `docs(plans)` commits. The lane is not
+- **Lane state:** `main` was merged into the lane at `4af34e2` before Phase 7,
+  which brought `2b9340f` and the four `docs(plans)` commits. The lane is not
   merged back.
 
 ## Followups (after this lands)

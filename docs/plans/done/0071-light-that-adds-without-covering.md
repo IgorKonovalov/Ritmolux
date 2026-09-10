@@ -1,7 +1,7 @@
 # 0071 — Light that adds without covering: `occlude`, decided from a sample set
 
-> **Status:** **done 2026-08-09** — Phases 1-4 shipped as `05b7c7c` (the mechanism) / `21d50bf` (the
-> sample-set note) / `b4e7611` (the docs). **Phase 5 is `human` and deliberately outstanding**: it is
+> **Status:** **done 2026-08-09** — Phases 1-4 shipped as `f6cd949` (the mechanism) / `ab2e49f` (the
+> sample-set note) / `1d65c57` (the docs). **Phase 5 is `human` and deliberately outstanding**: it is
 > the `preset-author` retune, to run as one pass with design-backlog 0038 (the plan's text says "0038
 > and 0058"; 0058 closed by content on 2026-08-04, corrected at the phase below), and closing this
 > plan does not discharge it — see `docs/plans/README.md` → Standing.
@@ -194,7 +194,7 @@ Two observations, offered as orientation and **not** as the Phase 3 verdict:
   three times.
 
 > **Corrected at the close (2026-08-09): backlog 0058 had already closed when this was written.** It
-> was closed by content on 2026-08-04 (`859ec66` — all thirteen fold-binding presets now name a
+> was closed by content on 2026-08-04 (`ca43dff` — all thirteen fold-binding presets now name a
 > `kaleido_edge`), four days before this plan's `dev` session. The pass is **this phase plus backlog
 > 0038**, not three entries. Carried in `docs/plans/README.md` → Standing.
 

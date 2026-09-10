@@ -1,8 +1,8 @@
 # 0066 — The level lever: the attractor gets a `brightness`, and bloom stops thresholding unexposed light
 
 > **Status:** **done 2026-08-05** — all five phases landed on the `plan-0066-the-level-lever`
-> branch and fast-forwarded to `main`. Phases 1-4 as `2a4f65c` / `2e2cc32` / `0f10f18` / `3502c2e`,
-> and the terminal `human` Phase 5 as `d7bf78c`. Mode 4 review 2026-08-05: **no blockers**, one
+> branch and fast-forwarded to `main`. Phases 1-4 as `252f7d2` / `9fc34fe` / `3f7b130` / `102972d`,
+> and the terminal `human` Phase 5 as `34271eb`. Mode 4 review 2026-08-05: **no blockers**, one
 > minor (the ADR did not anticipate the backdrop coupling Phase 5 found — recorded as ADR-0080's
 > `Outcome`). **Verified:** the no-pixels claim held exactly — `git diff --name-status` over the
 > whole range adds `composite_bloom_exposed.png` and modifies **zero** existing baselines; both
@@ -45,7 +45,7 @@ Two things then go wrong, both recorded in the backlog entry and both verified:
    saying to read it as *capped, not tuned*.
 
 The unit of the second defect is the point: a threshold expressed in pre-exposure linear units is
-only meaningful while every preset sits near `exposure = 1.0`. That was true until `990fedc` and is
+only meaningful while every preset sits near `exposure = 1.0`. That was true until `e360ac1` and is
 not true now.
 
 ## Decision

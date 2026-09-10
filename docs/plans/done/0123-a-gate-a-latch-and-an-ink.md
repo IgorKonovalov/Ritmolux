@@ -2,8 +2,8 @@
 
 > **Status:** done
 > **Created:** 2026-08-27
-> **Closed:** 2026-08-28 - all nine phases landed (`c96f0fa`, `77dadd9`, `ba9c042`, `696fca9`,
-> `96d88b9`, `60b3508`, `e745c45`, `a9a16b9`, `687d0c1`). Mode 4 review: **no blockers, two
+> **Closed:** 2026-08-28 - all nine phases landed (`46010bd`, `acd21ec`, `58fb8c1`, `2ab86b8`,
+> `2c8e271`, `07649ae`, `77a7023`, `3a08c9c`, `337d413`). Mode 4 review: **no blockers, two
 > majors, three minors.** Verified on the merged tree: `fmt` + `clippy --workspace --all-targets`
 > clean, `cargo nextest run --workspace` **1084 passed / 0 failed**, doc-links and index-rows
 > green. The gate, the latch and the seam were each re-measured rather than taken from the log -
@@ -328,15 +328,15 @@ struct LatchBank {
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the gate asks both readings | dev | done | `c96f0fa` |
-| 2 — `collage_mono`'s sway comes back down | human | done | `77dadd9` |
-| 3 — `[latch]` parses and resolves to a slot | dev | done | `ba9c042` |
-| 4 — the latch bank runs | dev | done | `696fca9` |
-| 5 — the grammar docs learn the latch | dev | done | `96d88b9` |
-| 6 — `collage_mono` recomposes on the music | human | done | `60b3508` |
-| 7 — the line family gets a seam | dev | done | `e745c45` |
-| 8 — the class is written down | dev | done | `a9a16b9` |
-| 9 — a mono line world | human | done | `687d0c1` |
+| 1 — the gate asks both readings | dev | done | `46010bd` |
+| 2 — `collage_mono`'s sway comes back down | human | done | `acd21ec` |
+| 3 — `[latch]` parses and resolves to a slot | dev | done | `58fb8c1` |
+| 4 — the latch bank runs | dev | done | `2ab86b8` |
+| 5 — the grammar docs learn the latch | dev | done | `2c8e271` |
+| 6 — `collage_mono` recomposes on the music | human | done | `07649ae` |
+| 7 — the line family gets a seam | dev | done | `77a7023` |
+| 8 — the class is written down | dev | done | `3a08c9c` |
+| 9 — a mono line world | human | done | `337d413` |
 
 ### Notes
 
@@ -400,7 +400,7 @@ struct LatchBank {
   `t = 90`; with the same clip zeroed across those ten seconds it does not re-cut
   at any hop through `t = 150 s`.
 - **"A quiet window costs a cycle" was overstated, and the header is corrected**
-  (`17ff0ba`). The clip's breakdown — chords and hats, no kick — sits across the
+  (`5bb86f3`). The clip's breakdown — chords and hats, no kick — sits across the
   arm window and the latch **fired in it anyway**. `onset` is a fraction of its
   own *decaying* recent peak, so a few seconds after a loud passage a pad crosses
   `0.6` as readily as a kick did. Only **near-silence** skips a window. The
@@ -466,7 +466,7 @@ struct LatchBank {
 - **A pre-existing defect, left alone** (Phase 3). `core/src/preset/schema.rs:756`
   and its `[layer]` twin build a warning string whose line continuation was lost
   (`...(x/y/rad/ang), which                      reads 0...`). On `main` since
-  `4bd33fd`; cosmetic, and outside the phase.
+  `9028945`; cosmetic, and outside the phase.
 
 - **The palette bakes its stops as LINEAR light, and a limited-ink author must
   pre-convert** (Phase 9). `LUT_TEXTURE_FORMAT` is `Rgba8Unorm` and
@@ -522,11 +522,11 @@ struct LatchBank {
   user-directed during the post-plan smoke and both landed here because they
   **depend on the `[latch]` and the driven gate this plan ships**, which exist
   nowhere else yet:
-  - `collage_suprematist.toml` (`fe9cbe3`) — its `recompose` moved off
+  - `collage_suprematist.toml` (`762be28`) — its `recompose` moved off
     `hash(beat_index) > 0.88` (a re-cut every few seconds, the same ADR-0109
     trap 0147 filed) onto a `recut` latch at 100-160 s, and its pan rates
     `0.62`/`0.81` → `0.08`/`0.11`, which the driven branch is what permits.
-  - `curve_ionwake.toml` (`b1f1a90`) — `n` 5 → 4, and a recorded finding that
+  - `curve_ionwake.toml` (`8086294`) — `n` 5 → 4, and a recorded finding that
     `d` is very nearly inert on that file.
 
   **The close should decide whether these two stay in this plan's history or are
@@ -557,7 +557,7 @@ struct LatchBank {
   tree's tip is red on this gate and `pre-push` runs it.** Nothing here edited
   `docs/design-backlog.md` — the backlog is architect's lane.
 - **Outstanding `human` phases:** none. All nine phases have landed; Phases 2, 6
-  and 9 were `preset-author` sessions and are `77dadd9`, `60b3508` and `687d0c1`.
+  and 9 were `preset-author` sessions and are `acd21ec`, `07649ae` and `337d413`.
 
 ## Followups (after this lands)
 

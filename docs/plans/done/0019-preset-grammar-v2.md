@@ -3,9 +3,9 @@
 > **Status:** done
 > **Created:** 2026-07-23
 > **Closed:** 2026-07-25 — passed the Mode 4 review (no blockers; one major, three
-> minors, one nit). Five `dev` phase commits: `c4f76fc` math functions + constants,
-> `c33e996` comparisons + `select`, `b36a3de` `tempo`/`novelty`, `462422b`
-> warn-but-load unknown params, `66b1abb` the `docs/presets.md` rewrite. Verified at
+> minors, one nit). Five `dev` phase commits: `f324972` math functions + constants,
+> `0f179fd` comparisons + `select`, `781efd9` `tempo`/`novelty`, `8fb5a80`
+> warn-but-load unknown params, `6bcdc47` the `docs/presets.md` rewrite. Verified at
 > review rather than taken on trust: `cargo test -p lmv-core` green (the `preset`
 > suite 22/22, every new assertion body read and non-vacuous), `cargo clippy
 > --workspace --all-targets -D warnings` clean, the hot-path panic pragma on

@@ -10,8 +10,8 @@
 
 ## Close summary (Mode 4, 2026-07-25)
 
-Five `dev` phase commits — `773d437` (resource split), `9b927ea` (quantize + aspect-preserving cap),
-`59aa298` (ink golden), `dd74d41` (rename + doc corrections), `e375c2e` (project at the target
+Five `dev` phase commits — `f7360d2` (resource split), `97edc44` (quantize + aspect-preserving cap),
+`cd34013` (ink golden), `824107f` (rename + doc corrections), `35e6664` (project at the target
 aspect). Passed the close review with **no blockers and no majors**; two minors and two nits, all
 non-blocking and recorded in `docs/plans/README.md`.
 
@@ -57,7 +57,7 @@ is too blunt, plus four smaller items:
    every `WindowEvent::Resized`, so a live drag hits this nearly every frame. Worse, the rebuild sets
    `needs_clear`/`needs_upload`, so the field is wiped and particles re-seeded each time and the
    attractor never converges to anything visible during the drag. The double-click fullscreen toggle
-   (commit `566fcf8`) is the single-shot version: one rebuild, one trail flash, one visible pop as the
+   (commit `69fb2fc`) is the single-shot version: one rebuild, one trail flash, one visible pop as the
    cloud snaps back to its seed scatter. The existing code comment
    (`particles/mod.rs:515`) acknowledges rebuilding the whole block as a simplification, but reasoned
    about it as a one-off first-frame build, not a per-frame event.

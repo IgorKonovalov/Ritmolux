@@ -140,7 +140,7 @@ adapter — the config write is the same either way.
 
 ## Outcome (added at Plan 0050's close, 2026-08-04)
 
-Implemented as designed in `14cd9e2`, and **operated** on 2026-08-04 in Plan 0050's Phase 6.
+Implemented as designed in `a8fdcde`, and **operated** on 2026-08-04 in Plan 0050's Phase 6.
 
 - **The core decision held under use.** The hitch is a brief trails re-accumulation, not a freeze, a
   hang or a device loss; it survives repeated swaps (15 consecutive in one session) and survives

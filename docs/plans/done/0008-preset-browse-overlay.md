@@ -1,7 +1,7 @@
 # 0008 — In-app preset browse overlay (standalone): on-canvas text + keyboard picker
 
-> **Status:** done (2026-07-22) — all four phases landed (`3bef1a8`, `b0bb95e`, `43f3b39`,
-> `9cc3234`); passed Mode 4 review (no blockers, no majors). glyphon `text` seam +
+> **Status:** done (2026-07-22) — all four phases landed (`19603d5`, `f959585`, `8be2d59`,
+> `f1c4419`); passed Mode 4 review (no blockers, no majors). glyphon `text` seam +
 > on-canvas name, `Renderer::preset_names`/`select_preset` (pure `Roster`, unit-tested),
 > pure `OverlayState` (Tab open / arrows / type-to-filter / Enter-absolute-index / Esc), and
 > hot-reload re-clamp. 41/41 tests green; clippy clean on the `--features text` build;

@@ -1,7 +1,7 @@
 # 0138 — The colour surface stops misleading its authors
 
-> **Status:** done — closed 2026-09-04. Phases 1-4 landed as `8438a1d`, `d3e6c08`, `7dc5aca`,
-> `7cc4139`; the Mode 4 review's two majors were repaired in `900be65`. Phase 5 (`human`) was
+> **Status:** done — closed 2026-09-04. Phases 1-4 landed as `5df7c39`, `b02e6e0`, `40ce803`,
+> `3bcebf1`; the Mode 4 review's two majors were repaired in `841ae30`. Phase 5 (`human`) was
 > **waived by the user** — see the close note below. Review: **no blockers, two majors (repaired),
 > two minors.**
 > **Created:** 2026-08-29
@@ -202,10 +202,10 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The page stops telling authors to give up | dev | done | `8438a1d` |
-| 2 — Stops are sRGB, and the library is re-based | dev | done | `d3e6c08` |
-| 3 — The colour docs describe the new contract | dev | done | `7dc5aca` |
-| 4 — A narrow `color_span` warns | dev | done | `7cc4139` |
+| 1 — The page stops telling authors to give up | dev | done | `5df7c39` |
+| 2 — Stops are sRGB, and the library is re-based | dev | done | `b02e6e0` |
+| 3 — The colour docs describe the new contract | dev | done | `40ce803` |
+| 4 — A narrow `color_span` warns | dev | done | `3bcebf1` |
 | 5 — The look gate | human | not started | |
 
 ### Notes
@@ -299,7 +299,7 @@ all 71 `presets/` files are the mechanical re-basing, with rendered output held 
 construction. The stale-workaround sweep is the half that mattered here, because this plan fixed an
 engine defect: **seven preset headers were still teaching the reversed contract**, and
 `curve_broadside.toml` was carrying a hand pre-conversion recipe the engine now performs. All
-repaired in `900be65`. **The prescribed grep did not find them** — it keys on a header naming an ADR
+repaired in `841ae30`. **The prescribed grep did not find them** — it keys on a header naming an ADR
 or plan number, and `curve_broadside`'s names none; they surfaced from a colour-space grep instead.
 
 ### Findings the review raised

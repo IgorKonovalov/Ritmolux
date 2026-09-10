@@ -3,9 +3,9 @@
 > **Status:** done
 > **Created:** 2026-07-23
 > **Closed:** 2026-07-24 — passed Mode 4 review (no blockers, no majors; two minor, two nits).
-> Six `dev` phase commits (`e64908c` shared palette module + fragment through the LUT, `b518130`
-> custom gradient stops, `81ede9e` swarm through the LUT, `53c944e` A/B `palette_mix` crossfade,
-> `9281c23` reaction-diffusion + attractor through the palette, `d00ce16` palette-surface docs).
+> Six `dev` phase commits (`279195d` shared palette module + fragment through the LUT, `6bd9193`
+> custom gradient stops, `ed4e90f` swarm through the LUT, `4bcc5db` A/B `palette_mix` crossfade,
+> `d11eab7` reaction-diffusion + attractor through the palette, `b197c22` palette-surface docs).
 > All four shader-colored scenes (fragment, swarm, reaction-diffusion, attractor) color through the
 > shared `core/src/render/palette.rs` baked LUT; the default `spectrum` reproduces the prior cosine so
 > the shipped presets are visually unchanged (only the reaction-diffusion golden was re-blessed for the
@@ -18,7 +18,7 @@
 > **Scope note (2026-07-23):** extended to **all four** shader-colored scenes. The reaction-diffusion
 > and attractor scenes — deferred to a followup when this plan was first drafted — were folded into
 > scope (new **Phase 5**) at the user's direction, prompted by `preset-author`-lane evidence: authoring
-> the warm coral trio (commit `5b64ad2`) hit RD's fixed `v*0.85` rainbow, the same wall this plan lifts
+> the warm coral trio (commit `b2db222`) hit RD's fixed `v*0.85` rainbow, the same wall this plan lifts
 > for fragment/swarm. The docs sweep moved to Phase 6.
 
 ## TL;DR
@@ -39,10 +39,10 @@ instead of the fixed rainbow, and the shipped presets look **unchanged** because
 `particles/mod.rs:260` attractor vertex-shader `palette()`), so a preset's only color lever is a
 scalar `hue` offset that rotates one rainbow. The `preset-author` lane hit this wall on every one of
 them:
-- fragment fields can't hold a cohesive mood — the `field*0.6` span is fixed (commit `76a2fb4`);
+- fragment fields can't hold a cohesive mood — the `field*0.6` span is fixed (commit `8f86d9a`);
 - swarm color is unreachable — per-particle hue is random across the full wheel, so `hue` is a
-  visual no-op (commit `76a2fb4`);
-- reaction-diffusion is locked to a rainbow — authoring the warm coral trio (commit `5b64ad2`) the
+  visual no-op (commit `8f86d9a`);
+- reaction-diffusion is locked to a rainbow — authoring the warm coral trio (commit `b2db222`) the
   lane could only *rotate* RD's fixed `v*0.85` sweep, never narrow it to a single coral tone;
 - the attractor repeats the swarm's failure — a hardcoded `seed*0.15` per-particle hue jitter is its
   only spread, unbindable.
@@ -282,7 +282,7 @@ impl Palette {
 - **No C ABI change** — palette lives entirely in core's preset + render layers; the plugin already
   loads presets over C ABI v3.
 - **No preset re-authoring.** Updating the shipped presets (especially the field/flock ones from
-  commit `76a2fb4`) to exploit palettes is a `preset-author` followup, not a `dev` phase here.
+  commit `8f86d9a`) to exploit palettes is a `preset-author` followup, not a `dev` phase here.
 - **No new scene, no background color** (that is ADR-0018's `bg_hue`), no grammar change (that is
   Plan 0019).
 - **No arbitrary N-palette selection** — bindable selection is the A/B crossfade only.
@@ -290,7 +290,7 @@ impl Palette {
 ## Followups (after this lands)
 
 - **`preset-author`:** re-author the field/flock presets **and the reaction-diffusion coral set**
-  (commit `5b64ad2`) to use named/custom palettes and `hue_spread`/`color_span` — e.g. a true
+  (commit `b2db222`) to use named/custom palettes and `hue_spread`/`color_span` — e.g. a true
   single-tone coral once RD honors `color_span`; flag strong ship candidates for `dev` to embed.
 - Consider OKLab interpolation in the bake for perceptually even gradients (ADR-0021 Alt E).
 - Refresh the `preset-author` skill's `systems.md`/`grammar.md` snapshots for the new color surface.

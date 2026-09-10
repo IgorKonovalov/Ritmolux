@@ -192,8 +192,8 @@ pub enum NodeObservation {
 
 ## Outcome (2026-07-29 — Mode 4 close)
 
-Landed in four `dev` commits — `1c8f216` the second stimulus, `5901e0e` probed evaluation,
-`27c84cd` the report surface, `efd25bb` the docs. Passed Mode 4 review: **no blockers**, one major,
+Landed in four `dev` commits — `9ec4f8a` the second stimulus, `cf39379` probed evaluation,
+`c4fd5a5` the report surface, `ada24d9` the docs. Passed Mode 4 review: **no blockers**, one major,
 four minors, three nits. `--report` now flags `attractor_dejong`, `attractor_lorenz` and
 `fragment_warp` and clears `fragment_kaleido`, `reaction_reef` and `lsystem_arrowhead`, which is
 Phase 3's acceptance contrast reproduced at review; it also caught `lsystem_fern` and `star_rosette`,

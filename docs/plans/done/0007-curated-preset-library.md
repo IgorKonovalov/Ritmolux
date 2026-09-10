@@ -3,9 +3,9 @@
 > **Status:** done
 > **Created:** 2026-07-21
 > **Closed:** 2026-07-22 — passed Mode 4 review (no blockers, no majors). Four phase
-> commits landed (`448b54b` seed_dir + per-OS resolver + standalone; `ac5e7d0`
-> `lmv_load_presets` + ABI v2 + first FFI test; `cf8fb5b` foobar shim loads the shared dir
-> over v2; `ed67807` curated set expanded 4 -> 10). Verified: 21/21 `nextest` green incl.
+> commits landed (`407a955` seed_dir + per-OS resolver + standalone; `b768dfd`
+> `lmv_load_presets` + ABI v2 + first FFI test; `8558582` foobar shim loads the shared dir
+> over v2; `9ea0f0c` curated set expanded 4 -> 10). Verified: 21/21 `nextest` green incl.
 > the new `seed_dir` write-if-absent test and the ABI round-trip/null-path FFI test; clippy
 > `-D warnings` clean; header prototype matches `ffi.rs`; ABI grew by exactly one function
 > (v2). A `pending_presets` stash on `RenderState` (drained by `lmv_attach_window`) resolves

@@ -1,7 +1,7 @@
 # 0074 — The figure colours by how far it has come: distance from the skeleton, and the age channel retires
 
-> **Status:** **done 2026-08-08** — all six phases landed as `79c08a9` (1), the Phase 2 gate verdict
-> in `6c928f6` (2), `22956e0` (3), `776d6da` (4), `57965df` (5) and `dcc88ba` (6), all on `main`.
+> **Status:** **done 2026-08-08** — all six phases landed as `b0c346f` (1), the Phase 2 gate verdict
+> in `d7533d6` (2), `9c96a77` (3), `fdec79b` (4), `ddd50ce` (5) and `307214e` (6), all on `main`.
 > Mode 4 review **no blockers**; four minor items, three repaired at the close. Full gate re-run on
 > the close tip: `fmt`, `clippy --workspace --all-targets -D warnings`, `nextest`, `check-doc-links`.
 > **`attractor_ifs.png` is the only baseline that moved**, twice as the plan predicted, verified by

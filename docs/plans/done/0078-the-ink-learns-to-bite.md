@@ -14,7 +14,7 @@
 
 ## Close note (2026-08-12)
 
-Both `dev` phases landed — `758c904` (the lever), `161a24c` + `531a5f4` (the docs). Mode 4
+Both `dev` phases landed — `5d2d195` (the lever), `2e871ab` + `7d457db` (the docs). Mode 4
 review: **no blockers, no majors, three minors, one nit.**
 
 **The zero-baseline claim holds, and by a stronger chain than the phase report states.** Phase 1

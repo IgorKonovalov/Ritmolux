@@ -127,7 +127,7 @@ edited in place** (this ADR is append-only; same treatment as
 [ADR-0034](0034-internal-resolution-follows-the-target.md) and
 [ADR-0036](0036-preset-reachable-spectrum.md)).
 
-Plan 0038 Phase 3 (`c9121fd`) shipped the ordering as written and measured it both ways round through
+Plan 0038 Phase 3 (`a2b70ee`) shipped the ordering as written and measured it both ways round through
 one renderer, per the plan's done-when 6. The finding routed back here is correct in its decisive
 part and overstated in another; both are recorded below, because the overstated half is a defect in
 the *instrument* that will otherwise mislead the next easing measurement.

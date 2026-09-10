@@ -1,7 +1,7 @@
 # 0086 — the downbeat finds a cue that is not the kick
 
 > **Status:** done (2026-08-15) — **closed at Phase 2, by its own gate.** Phase 1 landed
-> (`52dac85`, plus instrument follow-up `50ab2a1`); Phase 2 ran on three genres and its verdict
+> (`3c446ac`, plus instrument follow-up `e8aa46d`); Phase 2 ran on three genres and its verdict
 > named a defect **upstream** of every cue on the shortlist, so Phases 3-5 are superseded by
 > [Plan 0095](0095-the-downbeat-fold-gets-a-musical-beat.md) and
 > [ADR-0109](../../adrs/0109-the-beat-clock-counts-onsets-not-beats.md) rather than executed here.
@@ -242,8 +242,8 @@ than a second percussive band.
 
 ## Outcome (2026-08-15)
 
-**Phase 1 landed** (`52dac85`): `--downbeat-log` writes one row per detected beat, the estimator
-is provably unchanged by being observed, and no C ABI moved. A **follow-up commit** (`50ab2a1`)
+**Phase 1 landed** (`3c446ac`): `--downbeat-log` writes one row per detected beat, the estimator
+is provably unchanged by being observed, and no C ABI moved. A **follow-up commit** (`e8aa46d`)
 appended `bpm`, `time_since_beat` and `unix_ms` after the first two captures proved the reading
 needed all three and the row carried none of them — the plan's own instrument was incomplete for
 the phase it was built for, which is worth knowing before the next log is designed.

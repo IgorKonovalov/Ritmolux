@@ -1,7 +1,7 @@
 # 0155 — The reader documents stop explaining themselves
 
-> **Status:** done — closed 2026-09-05. Five phases landed (`3fdd391`, `2bce9be`, `3bbcaf0`,
-> `0dc85dd`, `18ee259`): 235 bare citations across the five Entrance A documents went to 0, the
+> **Status:** done — closed 2026-09-05. Five phases landed (`05472e6`, `bbd6389`, `274ae37`,
+> `ab1eb84`, `ce26be7`): 235 bare citations across the five Entrance A documents went to 0, the
 > 121 that remain are all inside links, and `scripts/check-reader-prose.mjs` holds the result at
 > pre-push and in CI. Mode 4 review: **no blockers, no majors, four minors, two nits.** Verified
 > independently — `cargo nextest run --workspace` 1536/1536 pass (including
@@ -42,7 +42,7 @@ earned it, and `CLAUDE.md` extends the habit to documentation. It has worked —
 unusually free of assertions nobody can check. It also addresses the wrong audience in the documents
 a user reads.
 
-Measured 2026-09-05 against the tree at `9dc2183`:
+Measured 2026-09-05 against the tree at `f92ffeb`:
 
 | Document | Bytes | Citations | Already links | **Bare, in scope** |
 |---|---:|---:|---:|---:|
@@ -231,11 +231,11 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the rule, on the smallest real case | dev | done | `3fdd391` |
-| 2 — the expression language | dev | done | `2bce9be` |
-| 3 — the roster's own sections | dev | done | `3bbcaf0` |
-| 4 — the three sections that are most of the document | dev | done | `0dc85dd` |
-| 5 — the gate, and the sweep | dev | done | `18ee259` |
+| 1 — the rule, on the smallest real case | dev | done | `05472e6` |
+| 2 — the expression language | dev | done | `bbd6389` |
+| 3 — the roster's own sections | dev | done | `274ae37` |
+| 4 — the three sections that are most of the document | dev | done | `ab1eb84` |
+| 5 — the gate, and the sweep | dev | done | `ce26be7` |
 
 ### Notes
 
@@ -255,7 +255,7 @@ flowchart LR
 - **P1's `toc.mjs` done-when is vacuous for its file.** `docs/preset-palettes.md` carries no
   `toc:begin` block. It was run; it reports the repository's six blocks current.
 - **P1's commit carried two link repairs that were not mine.** Another session committed plan
-  0154's close (`9b48c22`) into this working tree mid-phase, and its repair of the two `0154` links
+  0154's close (`004bac0`) into this working tree mid-phase, and its repair of the two `0154` links
   in this plan's own header was in the tree when P1 committed. Nothing was lost. Every phase here
   used `git commit -- <paths>` rather than `git add`, because that session's staged rename was
   sitting in the index.
@@ -268,7 +268,7 @@ behaviour the engine no longer has. The current figures are kept and the superse
 | `docs/presets.md`, `presets/README.md` | the downbeat-lock fold's old column (`0.00`, `0.79`, `4.16`); the three current figures stay, and techno's paragraph now argues from four-on-the-floor having no bar accent |
 | `docs/presets.md`, `presets/README.md` | the fixed 1280x720 post grid and its 28 % stretch |
 | `presets/README.md` | two polyline segment counts in the mandala budget; `492`, `1 092`, `20 000` and `576` against `24` stay |
-| `presets/README.md` | `17.37`, the `Rich` luminance of the un-normalized attractor deposit, and the commit SHA `00d99d0`; the live pair `10.86` / `10.34` stays |
+| `presets/README.md` | `17.37`, the `Rich` luminance of the un-normalized attractor deposit, and the commit SHA `095af15`; the live pair `10.86` / `10.34` stays |
 
 **Counts, and what was compared rather than read.** 235 bare citations to 0 across the five; 121
 citations remain, all inside links. 450,330 to 442,992 bytes (-1.6 %). Per phase, the
@@ -278,7 +278,7 @@ backtick-quoted vocabulary of each file was listed before and after and diffed:
 |---|---:|---|---|
 | 1 | 30 to 0 | 65,009 to 64,473 | none |
 | 2 | 48 to 0 | 75,816 to 73,841 | none; grammar surface identical — 66 table row heads, 20 call forms |
-| 3 | 41 to 0 | 273,211 to 271,801 | `00d99d0`, `17.37` |
+| 3 | 41 to 0 | 273,211 to 271,801 | `095af15`, `17.37` |
 | 4 | 100 to 0 | 271,801 to 268,403 | `` `0 = falloff` `` as a code span, whose value and name both stay in the table above it; and the retired presets `fragment_kaleido` and `reaction_gilt` |
 
 **A citation form nothing in the repository was matching.**
@@ -317,7 +317,7 @@ any of the five with a `#fragment`, so the 18 renames reach none of them.
 ### Close triggers
 
 - **`presets/` touched:** `presets/README.md` only, in Phases 3 and 4. **No `.toml` was touched** —
-  `git diff --name-only 3fdd391^..18ee259 -- 'presets/*.toml'` is empty — so nothing about the
+  `git diff --name-only 05472e6^..ce26be7 -- 'presets/*.toml'` is empty — so nothing about the
   shipped preset set, the embedded table or `core/build.rs`'s glob is affected.
 - **Plan header `Closes:`** none
 - **What shipped:** docs-chore-only, plus one new gate. No `core/`, `standalone/` or

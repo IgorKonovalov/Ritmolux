@@ -1,7 +1,7 @@
 # 0082 — The gradient stops banding: the display write dithers
 
-> **Status:** **done 2026-08-12** — all five phases landed (`b6743fa`, `ad7f39b`, `1492877`,
-> `8c3aae7`, plus the self-repair `b6b5940` and the `human` verdict `e64a61b`). Mode 4 review:
+> **Status:** **done 2026-08-12** — all five phases landed (`54e89bf`, `0e685f9`, `4aa2e2d`,
+> `a0713de`, plus the self-repair `da5254d` and the `human` verdict `be705a4`). Mode 4 review:
 > **no blockers, one major, five minors, three nits**. The major is this plan's own ADR — see
 > [Close notes](#close-notes--2026-08-12) below, and
 > [ADR-0096's Outcome](../../adrs/0096-the-display-write-dithers.md#outcome--2026-08-12-at-plan-0082s-close),
@@ -284,12 +284,12 @@ rather than edited into its body.
 
 ### Minors and nits
 
-- **The corrected WARP explanation lives in prose only.** `b6b5940` replaced a false claim (WARP
+- **The corrected WARP explanation lives in prose only.** `da5254d` replaced a false claim (WARP
   "never produces" bytes 17/14/11) with a true, narrower one — and the disproof, that an undithered
   WARP ramp contains every byte from 6 to 18 with no gaps, is the entire justification for the
   `bound = 2` branch yet nothing asserts it. Cheap to add later; the test already holds the control
   image. **Not owed.**
-- **The two "before" figures for the dusk probe disagree by 2.3x** — `b6743fa`'s `136 px at value 80`
+- **The two "before" figures for the dusk probe disagree by 2.3x** — `54e89bf`'s `136 px at value 80`
   against the survey's `58 px at value 11`, both described identically. The axis each was scanned on
   was not recorded and is not recoverable. Repaired at the close as a *stated discrepancy* rather
   than an invented explanation, in `scratch-0082/README.md`, naming the before/after pair as the
@@ -303,7 +303,7 @@ rather than edited into its body.
   the **loose** bound and the tight hardware claim rests on a doc-comment measurement. Fine as
   landed — the mean-|delta| assertion (a *derived* 1/3, +/- 0.05) is the adapter-robust guard and it
   is the one that catches a deleted slope term.
-- *Nit.* `core/Cargo.toml:31`'s surviving mojibake from `d442f7a`, correctly scoped out by `dev`,
+- *Nit.* `core/Cargo.toml:31`'s surviving mojibake from `5fb9be6`, correctly scoped out by `dev`,
   repaired at the close. It was the last instance in the tree.
 - *Nit, both benign and both recorded by `dev` in the phase commits.* The plan named `hash_unit` /
   `hash3` as the pair to promote; the pair actually promoted to `gpu::HASH_WGSL` is `mix32` /

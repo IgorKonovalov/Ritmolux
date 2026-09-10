@@ -2,8 +2,8 @@
 
 > **Status:** done
 > **Created:** 2026-08-15
-> **Closed:** 2026-08-15, the day it was written — all three `dev` phases (`38addde`, `a9f8c70`,
-> `24c85dd`). Mode 4 verdict: **no blockers, no majors, two minors, two nits**, neither minor against
+> **Closed:** 2026-08-15, the day it was written — all three `dev` phases (`7292c0a`, `b035d8e`,
+> `7ce120d`). Mode 4 verdict: **no blockers, no majors, two minors, two nits**, neither minor against
 > the implementation. Every phase re-verified independently at the close: the walk goes **249 -> 252**
 > with exactly the three `core/tests/fixtures/` READMEs regained and exactly the six under
 > `scripts/fixtures/` still skipped (258 markdown files exist); `--self-test` 9/9 with the fixture at

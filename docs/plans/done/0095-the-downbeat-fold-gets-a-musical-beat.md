@@ -1,7 +1,7 @@
 # 0095 — the downbeat fold gets a musical beat
 
-> **Status:** done — closed 2026-08-25. Phases 1-7 landed in `5bdce91`, `09abdee`, `cae98a5`,
-> `d4e7cec`, Phase 5's `human` capture, `80f346f`, and `cd00aa1` + `4caac3c`. Second Mode 4
+> **Status:** done — closed 2026-08-25. Phases 1-7 landed in `6f57fca`, `603d01e`, `125f73d`,
+> `3b78ae4`, Phase 5's `human` capture, `28b29b0`, and `6727baf` + `ca0e1ec`. Second Mode 4
 > review (2026-08-25, fresh session, over Phase 7 as unreviewed work): **no blockers, one
 > major, three minors, one nit.** Verified: the whole-bar handover offset is real and its test drives
 > PCM through the analyzer; `grid.running` is a one-way latch, so the offset cannot be
@@ -311,17 +311,17 @@ than the 1.20x-2.28x these captures measured.
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** `WORK/lmv-plan-0095` on `plan-0095-musical-bar-grid`, branched from `main` at `1be71c8`.
+**Lane:** `WORK/lmv-plan-0095` on `plan-0095-musical-bar-grid`, branched from `main` at `79ead51`.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the tempo estimate is measured | dev | done | `5bdce91` |
-| 2 — the octave repair | dev | done | `09abdee` |
-| 3 — the bar grid | dev | done | `cae98a5` |
-| 4 — the fold folds over the grid | dev | done | `d4e7cec` |
+| 1 — the tempo estimate is measured | dev | done | `6f57fca` |
+| 2 — the octave repair | dev | done | `603d01e` |
+| 3 — the bar grid | dev | done | `125f73d` |
+| 4 — the fold folds over the grid | dev | done | `3b78ae4` |
 | 5 — re-measure through the instrument | human | ran 2026-08-25 | n/a (captures are gitignored) |
-| 6 — the authoring docs | dev | done | `80f346f` |
-| 7 — the review findings are repaired | dev | done | code `cd00aa1`, docs `4caac3c` |
+| 6 — the authoring docs | dev | done | `28b29b0` |
+| 7 — the review findings are repaired | dev | done | code `6727baf`, docs `ca0e1ec` |
 
 **Phase 6 took `.claude/skills/preset-author/SKILL.md:105-107` as the skill-lane target instead of
 the `references/` the phase names.** No file under `references/` mentions `beat_index` or the bar
@@ -472,8 +472,8 @@ not needed and both rate tests hold the sibling's 0.05. The estimate averaged 18
   Phase 7f. Comments only in every `.toml` — the diff over `presets/*.toml` across the whole plan
   contains no non-comment line.
 - **`Closes:` entries in the plan header:** none — the header carries no `Closes:` line.
-- **What shipped:** feature (Phases 2-4 and 7a change analysis behaviour: `fix(dsp)` `09abdee`,
-  `feat(dsp)` `cae98a5`, `feat(dsp)` `d4e7cec`, and Phase 7a's `fix(dsp)`) plus test-only `5bdce91`
+- **What shipped:** feature (Phases 2-4 and 7a change analysis behaviour: `fix(dsp)` `603d01e`,
+  `feat(dsp)` `125f73d`, `feat(dsp)` `3b78ae4`, and Phase 7a's `fix(dsp)`) plus test-only `6f57fca`
   and the two docs phases.
 - **Operator docs moved:** `docs/presets.md`, `presets/README.md`,
   `.claude/skills/preset-author/SKILL.md`. Not moved: `docs/nfr.md`, `docs/capturing.md`,

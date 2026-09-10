@@ -8,8 +8,8 @@
 >
 > **Close summary (Mode 4, fresh session).** Passed review — no blockers, no majors;
 > two minor deviations, both pre-flagged and sound. Five `dev` phase commits
-> (`6e048d0` config + fullscreen, `3891272` line-in capture, `bb9a1e2` scene
-> director, `d693c69` track-change novelty, `d49f377` `--soak`). Delivered the
+> (`72875a4` config + fullscreen, `639a9e9` line-in capture, `ec029b9` scene
+> director, `f1a3ad0` track-change novelty, `f72c246` `--soak`). Delivered the
 > live-show set in the standalone plus **one deterministic scalar** on the native
 > `AnalysisFrame` (`novelty`) — **C ABI untouched (still v3)**, no ADR. Verified:
 > `cargo test -p lmv-core` green (18 lib+integration incl. `novelty_spikes_at_a_
@@ -31,7 +31,7 @@
 > (loopback + `--list-devices` smoke-verified live); auto-rotate "feel" tuning
 > (`NOVELTY_REF`, dwell/drop constants intentionally in code/config for on-rig
 > calibration). Version: **minor bump 0.3.1 → 0.4.0** at close (the mid-plan patch
-> `c919089` was the wrong level for a feature plan / plausibly Plan 0017's).
+> `3565ee9` was the wrong level for a feature plan / plausibly Plan 0017's).
 
 ## TL;DR
 

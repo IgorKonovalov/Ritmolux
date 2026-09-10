@@ -1,15 +1,15 @@
 # 0151 — The long documents become navigable
 
 > **Status:** done - closed 2026-09-04. Nine dev phases in the `WORK/rlx-plan-0151` lane,
-> `e450092`..`a77a0be` (six as planned, three as a repair pass after the first Mode 4 review),
-> plus the close commits `327af9c` (the major), `cac7c94` and `9f52bfe`. Mode 4 review:
+> `fa0f7a0`..`83f2a27` (six as planned, three as a repair pass after the first Mode 4 review),
+> plus the close commits `0c15580` (the major), `60f171b` and `ac42b8d`. Mode 4 review:
 > **no blockers, one major
 > (44 of the 133 archive headings still carried close prose after the Phase 8 repair; repaired
-> at this close in `327af9c`), four minors.** Independently verified at the merged tip:
+> at this close in `0c15580`), four minors.** Independently verified at the merged tip:
 > `cargo nextest run --workspace` **1520 passed / 5 skipped / exit 0** (481 s), `fmt` clean,
 > `clippy --workspace --all-targets` zero warnings, all six Node gates exit 0 with
 > `toc.mjs --check` at 6 blocks / 458 rows. The 335-line sequencing move was re-diffed against
-> `0964385` and is byte-identical; the Phase 8 repair was reproduced independently from the
+> `8281270` and is byte-identical; the Phase 8 repair was reproduced independently from the
 > pre-Phase-4 file and diffs clean apart from the 40 leads it deliberately splits; the
 > whitespace-normalized digest of the archive's write-up section is invariant across this
 > close's own 44 further splits. Version: **none** - docs/chore-only under ADR-0005, no Rust,
@@ -152,7 +152,7 @@ flowchart TB
 - **What:** The self-declared-superseded sequencing notes move verbatim from `docs/plans/README.md`
   into `docs/plans/README-archive.md`'s existing `## Prior sequencing notes (superseded)` section.
 - **Files touched:** `docs/plans/README.md`, `docs/plans/README-archive.md`.
-- **Scope, precisely:** `docs/plans/README.md` lines **455–789** as of commit `0964385` — 335 lines.
+- **Scope, precisely:** `docs/plans/README.md` lines **455–789** as of commit `8281270` — 335 lines.
   The block opens at the line `**Superseded 2026-08-18, kept as the record.** The 2026-08-16
   sequence follows.` and ends at the line before
   `### The baseline-drift control any pixel-touching plan inherits`.
@@ -364,15 +364,15 @@ const anchor = (heading) =>
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The generator, proved on one real document | dev | done | `e450092` |
-| 2 — `plans/README.md` gives up the superseded sequencing prose | dev | done | `a428ad1` |
-| 3 — `design-backlog.md` loses its duplicate and its spent history | dev | done | `69d7c80` |
-| 4 — `README-archive.md`'s 133 write-ups become addressable | dev | done | `eee1b38` |
-| 5 — The remaining four documents carry blocks | dev | done | `e6d5dd5` |
-| 6 — The carrier | dev | done | `b9f9ac9` |
-| 7 — `flattenLinks` survives a bracketed label | dev | done | `78024a4` |
-| 8 — The 40 damaged write-ups are repaired | dev | done | `b61fada` |
-| 9 — The sixth gate's count reaches the sites that state it | dev | done | `a77a0be` |
+| 1 — The generator, proved on one real document | dev | done | `fa0f7a0` |
+| 2 — `plans/README.md` gives up the superseded sequencing prose | dev | done | `345298c` |
+| 3 — `design-backlog.md` loses its duplicate and its spent history | dev | done | `b5aa9ff` |
+| 4 — `README-archive.md`'s 133 write-ups become addressable | dev | done | `a18ccfc` |
+| 5 — The remaining four documents carry blocks | dev | done | `6597c31` |
+| 6 — The carrier | dev | done | `58f4ad9` |
+| 7 — `flattenLinks` survives a bracketed label | dev | done | `758f303` |
+| 8 — The 40 damaged write-ups are repaired | dev | done | `4dfb4ea` |
+| 9 — The sixth gate's count reaches the sites that state it | dev | done | `83f2a27` |
 
 ### Notes
 
@@ -410,7 +410,7 @@ previous move. `check-doc-links.mjs` reported all of them by name before the cop
 
 **One live paragraph the plan did not name had to be handled the same way as line 208's pointer.**
 The `**Added 2026-09-02 — [0151] is docs-only and precedes [0143].**` note was added to
-`### What this sequence assumes` by commit `0964385` — the same commit that wrote this plan — so the
+`### What this sequence assumes` by commit `8281270` — the same commit that wrote this plan — so the
 plan's structural done-when ("the two headings with exactly the two live bullets between them and
 nothing else") could not hold with it in place. Its live half is the 0143 sequencing decision, which
 is not spent. It was **moved up** to sit with the other dated `Added ...` notes directly under
@@ -500,7 +500,7 @@ rather than left with the one 114-column line the edit introduced.
 **Phase 5's corpus total is corrected in this commit, 442 → 457.** 36 + 11 + 141 + 55 + 161 + 53 is
 457, and it is what `--check` reports; 442 was arithmetic, and it was wrong.
 
-**One commit on this branch belongs to no phase.** `11a320e`, *"the product name is capitalized
+**One commit on this branch belongs to no phase.** `f2b0048`, *"the product name is capitalized
 Ritmolux in prose"*, moved twelve prose sites from `ritmolux` to `Ritmolux` — including the H1 of
 `README.md` and of `CLAUDE.md` — and repaired three `%APPDATA%
 itmolux\` sites that Plan 0150's
@@ -523,7 +523,7 @@ stand.**
    .github/workflows/ci.yml last touched 2026-09-04` and the same for `.githooks/pre-push`. The
    claims themselves — `present: RUSTDOCFLAGS in ci.yml`, `absent: cargo doc in pre-push` — are
    unaffected: this plan added `toc.mjs`, not `cargo doc`. Re-stamping is architect's call.
-3. **The lower-case usage banner is takeable, and the merge moved it.** `11a320e` deliberately left
+3. **The lower-case usage banner is takeable, and the merge moved it.** `f2b0048` deliberately left
    it lower-case (`"ritmolux — a real-time music visualizer"`) because `main.rs` was live in
    `WORK/rlx-plan-0126`. 0126 has since closed and its lane is gone — `git worktree list` prints
    this lane and `main` — and its split moved the banner out of `main.rs` entirely. It is now
@@ -555,7 +555,7 @@ the line count is unchanged (`120 insertions / 120 deletions` — 80 join lines 
 
 **One check beyond the done-whens, because "every restored title is the full plan title" is not
 mechanically checkable as stated.** The whole `## Recently closed (full entries)` section was
-reproduced independently from the **pre-Phase-4** file at `a428ad1` by a script that unwraps a
+reproduced independently from the **pre-Phase-4** file at `345298c` by a script that unwraps a
 wrapped bullet lead *first* and only then converts and de-indents — the order Phase 4 had
 backwards — and the result **diffs clean** against the repaired section. That proves both halves
 at once: the 40 titles are exactly the titles the bullets carried, and the 93 undamaged entries
@@ -607,14 +607,14 @@ close, after `git merge main`, where they are answering a question the merge act
 ### Close triggers
 
 Rewritten after the repair pass and after `git merge main`. Every figure below is from the merged
-tip, not from `b9f9ac9`.
+tip, not from `58f4ad9`.
 
 - **`presets/` touched:** `presets/README.md` and nothing else. `git diff --name-only main...HEAD --
   presets/` prints that one path; it is the 53-row contents block Phase 5 inserted. No `.toml`, no
   scene param, no default.
 - **Plan header `Closes:`** none
 - **What shipped:** a **docs chore**, plus one new gate. No pixel moves and no engine behaviour
-  changes: the only files under a crate are three comment or doc-comment lines from `11a320e`
+  changes: the only files under a crate are three comment or doc-comment lines from `f2b0048`
   (`core-cabi/include/rlx_core.h`, `core/src/lib.rs`, `standalone/src/config.rs`). What is
   genuinely new is `scripts/toc.mjs` and its six fixtures, wired at pre-push and in CI — so the
   repository gained a gate, and six documents gained 457 contents rows between them. The repair
@@ -622,7 +622,7 @@ tip, not from `b9f9ac9`.
   in `README-archive.md`, Phase 9 moved a count in five files.
 - **Operator docs touched:** `docs/capturing.md` (+39, the block only — no CLI flag, no assertion,
   no `--report` column moved) and `presets/README.md` (+56, likewise). `packaging/windows/` and
-  `packaging/foobar/READ-ME-FIRST.md` each corrected one `%APPDATA%` path at `11a320e`.
+  `packaging/foobar/READ-ME-FIRST.md` each corrected one `%APPDATA%` path at `f2b0048`.
   **`README.md` and `docs/nfr.md` are now touched too**, by Phase 9 — the gate count, `nfr.md`'s
   single-runner arithmetic, and `README.md`'s pre-push step table.
   `docs/on-device-validation.md` remains untouched.
@@ -633,7 +633,7 @@ tip, not from `b9f9ac9`.
 - **Full suite:** at the merged tip, `cargo nextest run --workspace` — **1520 run, 1520 passed
   (12 slow), 5 skipped, exit 0**, 473.564 s, `LMV_BLESS` unset and `git status` clean at its end,
   so no baseline file was rewritten by the run. The count is 1520 rather than the 1518 recorded at
-  `b9f9ac9` because `main`'s 0126 close landed two tests, not because anything here added one.
+  `58f4ad9` because `main`'s 0126 close landed two tests, not because anything here added one.
   Also clean on the merged tip: `cargo fmt --all --check` and
   `cargo clippy --workspace --all-targets -- -D warnings` (exit 0). All six Node gates green,
   `toc.mjs --check` at `OK (6 blocks, 457 rows, current)` and `--self-test` at `33 of 33`.

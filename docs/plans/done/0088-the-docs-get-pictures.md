@@ -9,13 +9,13 @@
 
 ## Close (2026-08-13)
 
-**All seven phases shipped.** Six by `dev` in one session — `476a989` (`--frame-at`), `c574a0b`
-(the manifest script + hero), `b7fd7ae` (the nine-image gallery), `7549f17`
-([`docs/preset-guide.md`](../../preset-guide.md)), `984494f`
-([`docs/preset-tuning-walkthrough.md`](../../preset-tuning-walkthrough.md)), `30b9eb4` (README +
-the dead-example sweep) — and Phase 7, the `human` look call, at this close (`5dda709`).
+**All seven phases shipped.** Six by `dev` in one session — `715d40e` (`--frame-at`), `7b2f151`
+(the manifest script + hero), `c7991a5` (the nine-image gallery), `68428f2`
+([`docs/preset-guide.md`](../../preset-guide.md)), `2f17857`
+([`docs/preset-tuning-walkthrough.md`](../../preset-tuning-walkthrough.md)), `ad4dac8` (README +
+the dead-example sweep) — and Phase 7, the `human` look call, at this close (`cd1bc95`).
 
-**Mode 4 verdict: no blockers, no majors, three minors and two nits**, all repaired in `5dda709`.
+**Mode 4 verdict: no blockers, no majors, three minors and two nits**, all repaired in `cd1bc95`.
 Verified rather than trusted: the hop arithmetic re-derived from `core/src/signal.rs:144`
 (`beat % 8 → 6|7 => 0.04`, rest begins at hop 306.8 — `dev`'s deviation is correct and **this
 plan's hop 340 was wrong**); nine gallery files against the nine arms of `SystemKind::from_name`;

@@ -1,8 +1,8 @@
 # 0061 — The build stops paying for what it is not building, and the two oversized modules come apart
 
-> **Status:** **done 2026-08-08** — all ten `dev` phases landed (`02a03ba` 1, `e7a68a1` 1b, `d442f7a` 2,
-> `55388b2` 2b, `49ca599` 2c, `b449b45` 2d, `f74cb1d` 3, `5bb754c` 4, `1c55476` 4b, `ab5de61` 5,
-> `3d36715` 6, `fa76fc5` 7, `800f102` 7b). Mode 4 review: **no blockers, two majors, three minors** —
+> **Status:** **done 2026-08-08** — all ten `dev` phases landed (`431eb86` 1, `aa55b99` 1b, `5fb9be6` 2,
+> `8d1ad8b` 2b, `0db727a` 2c, `f957d3e` 2d, `56efd30` 3, `bb4d6b2` 4, `33f5705` 4b, `d5ba009` 5,
+> `3214440` 6, `8041809` 7, `84c7617` 7b). Mode 4 review: **no blockers, two majors, three minors** —
 > all five were doc drift, all five repaired in the close commit. Every phase carries a valid
 > `**Owner skill:**` tag; no ADR decision was reversed; `core/tests/golden/` is byte-identical across
 > the whole plan by `git diff` (checked as a diff, never as a green suite — `LMV_BLESS` was never set).
@@ -24,7 +24,7 @@
 > otherwise flip ADR-0073's Alternative A. Recorded under *Standing* in
 > [`docs/plans/README.md`](../README.md) and in ADR-0073's `Outcome`.
 >
-> **Phase 4b's scoping half landed early and out of sequence** as `1c55476` (2026-08-04, at the
+> **Phase 4b's scoping half landed early and out of sequence** as `33f5705` (2026-08-04, at the
 > user's direct request); see the note on that phase for what it satisfies, the one accepted
 > deviation, and the coverage gap it opened — **now closed by Phase 4**.
 > **Every file measurement was re-taken 2026-08-08** (fourth amendment). The build and CI numbers —
@@ -37,10 +37,10 @@
 > **Created:** 2026-08-04
 > **Amended:** 2026-08-04 — four phases added (1b, 2b, 4b, 9) covering CI wall time, after run
 > 30903871856 made the first green measurement available; [ADR-0073](../../adrs/0073-the-windows-ci-critical-path.md)
-> **Amended:** 2026-08-04 (second pass) — Phase 4b reconciled against `1c55476`, which implemented
+> **Amended:** 2026-08-04 (second pass) — Phase 4b reconciled against `33f5705`, which implemented
 > it ahead of its sequence
 > **Amended:** 2026-08-04 (third pass) — **Phase 2c added**: a CI counterpart for the doc-link
-> check. The checker and its pre-push step landed at Plan 0060's close (`06d198f`, `cdcd750`) after
+> check. The checker and its pre-push step landed at Plan 0060's close (`1095d78`, `28ea3c4`) after
 > 74 broken links were found across 23 files; the CI half comes here because this plan owns every
 > `ci.yml` edit in flight. Independent of 2b/4b and separable from them.
 > **Amended:** 2026-08-08 (fourth pass) — **Phases 2d and 7b added, Phase 3's target corrected,
@@ -126,8 +126,8 @@ the biggest files — `core/src/render/tonemap.rs` is 1034 lines holding **10** 
 | `standalone/examples/shot.rs` | 1622 | 0 | 506 | **1116** |
 | `standalone/src/main.rs` | 1415 | 0 | 428 | **987** |
 
-*(Re-measured 2026-08-08 at `f0dbf57`. The 2026-08-04 drafting figures were 3077 / 3272 / — / 1878 /
-1621 / 1414 total; `ifs.rs` did not exist in the table because it landed the same day, as `8c621fa`.)*
+*(Re-measured 2026-08-08 at `b9695cc`. The 2026-08-04 drafting figures were 3077 / 3272 / — / 1878 /
+1621 / 1414 total; `ifs.rs` did not exist in the table because it landed the same day, as `b6f449d`.)*
 
 `expr.rs` is a tokenizer + parser + evaluator + gate analyzer, which is a defensible unit at ~1024
 lines; it is **out of scope**. The two that are not defensible:
@@ -274,7 +274,7 @@ That belongs next to the setting rather than in a third ADR, so Phase 1b's done-
 comment.
 
 **Phase 6 is gated on Plan 0059.** That plan is in flight and actively editing
-`particles/mod.rs` (Phase 1 landed `357a17e`; Phase 1b re-blesses `attractor.png`). Since 0061 runs
+`particles/mod.rs` (Phase 1 landed `8d26587`; Phase 1b re-blesses `attractor.png`). Since 0061 runs
 last the gate will most likely already be satisfied — it exists so the ordering is explicit rather
 than tribal.
 
@@ -454,7 +454,7 @@ stops being an expectation.
 - **Owner skill:** dev
 - **What:** Add a small `links` job so the doc-link check is enforced for everyone, rather than only
   by an opt-in hook. `scripts/check-doc-links.mjs` and its `.githooks/pre-push` step already exist
-  (`06d198f`, `cdcd750`); this phase adds the CI half and retires the caveat those commits had to
+  (`1095d78`, `28ea3c4`); this phase adds the CI half and retires the caveat those commits had to
   write in four places.
 - **Files touched:** `.github/workflows/ci.yml`, `.githooks/pre-push` (comment only), `README.md`,
   `docs/nfr.md`, `.claude/skills/architect/SKILL.md`
@@ -576,7 +576,7 @@ stops being an expectation.
   (`shot.rs:602`-EOF) is ~1020 of them, so 1200 is reachable with room. Unlike Phase 3's, this number
   was always sound.*
 - **Carries Phase 4b's one outstanding item**, restated here because 4b landed early and this is where
-  the item is now taken: **the `--size` / `--frames` reduction for `--report`**, which `1c55476` did
+  the item is now taken: **the `--size` / `--frames` reduction for `--report`**, which `33f5705` did
   not take. It was written as "check, don't assume" and is still unchecked — confirm `--report`
   honours those flags before relying on them. It is worth having and is **not** a substitute for 4b's
   scoping; it is the half that keeps the cost from growing with a preset library that grows every
@@ -584,7 +584,7 @@ stops being an expectation.
 
 ### Phase 4b — A shape claim stops sweeping the library (ADR-0073) (added 2026-08-04)
 
-> **LANDED EARLY, out of sequence, as `1c55476` (2026-08-04)** — at the user's direct request, in
+> **LANDED EARLY, out of sequence, as `33f5705` (2026-08-04)** — at the user's direct request, in
 > the same window this plan was being written, and reconciled here rather than reverted. The change
 > is correct and the win is real (**85 s → 5.0 s** locally on the one test; the CI figure is Phase
 > 9's to read), so reverting a correct fix to satisfy a sequencing preference would cost the wall
@@ -608,7 +608,7 @@ stops being an expectation.
 >   shipped preset through the real CLI any more** (ADR-0073's accepted cost) *and* nothing yet
 >   tests the generator in-process. Phase 4 closes it; until then, treat a `--report` change as
 >   under-covered.
-> - **Still owed from this phase:** the `--size` / `--frames` reduction, which `1c55476` did not
+> - **Still owed from this phase:** the `--size` / `--frames` reduction, which `33f5705` did not
 >   take. It was written as "check, don't assume" and remains unchecked. It is worth having and is
 >   not a substitute for the scoping — take it with Phase 4.
 
@@ -678,7 +678,7 @@ stops being an expectation.
   `particles/projection_mirror.rs`. It stays a child of `particles`, so it keeps reaching the shader
   constants after they move.*
 
-- **The measurement, 2026-08-08 at `f0dbf57`, in this plan's own four columns.**
+- **The measurement, 2026-08-08 at `b9695cc`, in this plan's own four columns.**
 
   | | total | tests | doc/blank | **code** |
   |---|---|---|---|---|
@@ -718,8 +718,8 @@ stops being an expectation.
   `mod.rs` at **1302**. That is a judgment call about whether scene-plus-encode reads as one unit,
   **not** a threshold question — both targets pass without it. Take it if the residual reads badly
   once split; do not take it to satisfy a number.
-- **Sequencing against Plan 0074: discharged.** 0074 **closed 2026-08-08** (`1618a90`), and the
-  measurement above is taken at `f0dbf57`, after it. **No live plan touches `particles/` any more**,
+- **Sequencing against Plan 0074: discharged.** 0074 **closed 2026-08-08** (`708c770`), and the
+  measurement above is taken at `b9695cc`, after it. **No live plan touches `particles/` any more**,
   so this phase has the file to itself — which is also why Phase 2d can take its 2,753 test lines
   without racing anyone.
 

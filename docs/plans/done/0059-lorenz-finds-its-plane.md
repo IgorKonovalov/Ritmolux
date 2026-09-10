@@ -1,9 +1,9 @@
 # 0059 — Lorenz finds its plane, and the attractor can trade samples for curves
 
-> **Status:** **done 2026-08-04** — all five phases landed: Phase 1 `357a17e`, Phase 1b `1c47de5`,
-> Phase 2 `4fb4a81`, Phase 3 `642aec0`, and the `human` Phase 4 content pass `990fedc`. Phases 1-3
+> **Status:** **done 2026-08-04** — all five phases landed: Phase 1 `8d26587`, Phase 1b `a860884`,
+> Phase 2 `9ba3efe`, Phase 3 `af863a0`, and the `human` Phase 4 content pass `e360ac1`. Phases 1-3
 > were reviewed 2026-08-04 (Mode 4, no blockers, no majors); Phase 4 was reviewed at this close.
-> **`f09f1fe` was judged as part of Phase 4 rather than inherited**, exactly as this header
+> **`29adccd` was judged as part of Phase 4 rather than inherited**, exactly as this header
 > instructed: its bass rebalance on the three map presets carries unchanged, and its
 > `kaleido_order = 2` on `attractor_clifford` is **promoted from provisional to shipped** — with the
 > zoom peak pulled `1.42 → 0.94`, because the fold had arrived with the unfolded framing still under
@@ -40,7 +40,7 @@
 > as the butterfly for only part of the spin cycle — is a real question and moves to Phase 4, where
 > it can be judged in motion.
 >
-> **Amended 2026-08-04, after Phase 1 landed (`357a17e`).** Phase 1's basis is correct and its
+> **Amended 2026-08-04, after Phase 1 landed (`8d26587`).** Phase 1's basis is correct and its
 > measurable done-whens are met, but its *described* criterion — "Lorenz reads as the butterfly at
 > rest" — was still not satisfied, and the reason is not the basis. **The attractor trail mirrors
 > itself vertically**: the decay pass samples the accumulation target with the unflipped fullscreen
@@ -234,7 +234,7 @@ flowchart TB
     state the residual. If they are *not* near-mirrors, something beyond orientation moved and this
     phase stops.
 
-    **Architect correction, 2026-08-04 (asked for by `1c47de5` and owed to it).** This done-when
+    **Architect correction, 2026-08-04 (asked for by `a860884` and owed to it).** This done-when
     predicted the wrong outcome and would have stopped the phase for the wrong reason. The new
     capture is **near-identical, not near-mirrored** — residual `5.84` against a `54.68` asymmetry
     scale — and that is the *stronger* result, not a failure of the check. RD writes its init blobs
@@ -252,7 +252,7 @@ flowchart TB
     **Amended by implementation, and the amendment is right.** ADR-0070 called the reversal neutral;
     measured, it is not — `pan_y = +0.12` moved the field **up** 86 px before and **down** 86 px
     after, while the attractor moves its figure up. So the flip would have broken a cross-scene
-    agreement that had always held and that nothing documents. `1c47de5` negates `pan.y` in the RD
+    agreement that had always held and that nothing documents. `a860884` negates `pan.y` in the RD
     present shader instead, restoring shipped behaviour for all four presets, and that is the right
     call: this phase fixes a mirror, and silently inverting a bound param is not its job. It also
     resolved a `report_coverage_distribution` failure — reversed, Coral moved to `0.1546` and put
@@ -282,7 +282,7 @@ flowchart TB
     key. **Pick the floor from the arithmetic, not by feel**: state what the smallest allowed value
     resolves to at both tiers and why a cloud that sparse is still a picture.
 
-    **The arithmetic was wrong and the captures corrected it (`4fb4a81`) — recorded because the
+    **The arithmetic was wrong and the captures corrected it (`9ba3efe`) — recorded because the
     plan asked for the wrong instrument.** Reasoning from ADR-0065's `50_000 / active` weighting
     gave a floor of `0.01` (500 particles at Floor), on the argument that anything sparser "must
     clip to white before it reads as a curve". Rendered at `fade = 0.95` it does not: the trail

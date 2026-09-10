@@ -1,9 +1,9 @@
 # 0073 — The fern unfurls and colours by what made it: age, last map, and the end of the startup rectangle
 
 > **Status:** **done 2026-08-06**. All six phases shipped —
-> `c2c8c76` (the map channel), `339a178` (the fixed points, and the startup rectangle stops
-> existing), `7ef5270` (the churn), `b69ca4e` (age as colour), `50c4eda` (the fixture + doc sweep),
-> `6e335b2` (the `preset-author` content pass). `main` was merged in mid-plan at `52b34e0`.
+> `1ff550f` (the map channel), `c0eb657` (the fixed points, and the startup rectangle stops
+> existing), `ec6f9ef` (the churn), `cf4cf40` (age as colour), `15d1d1c` (the fixture + doc sweep),
+> `6d00a5b` (the `preset-author` content pass). `main` was merged in mid-plan at `f7e475c`.
 > Mode 4 verdict: **landed cleanly, no blockers**; two minor doc items repaired at the close.
 > **What the review verified rather than took on report:** `attractor_ifs.png` is the only baseline
 > that moved (a diffstat, not a claim); the fixed-point residual measures `2.198e-7` against its

@@ -1,6 +1,6 @@
 # 0100 — The engine speaks MilkDrop
 
-> **Status:** done — closed 2026-08-16. Six dev phases in commits `2603309`–`0948cf2`; Mode 4
+> **Status:** done — closed 2026-08-16. Six dev phases in commits `3dc3f1b`–`af24b0f`; Mode 4
 > review: no blockers, one major (the `warp_mesh` palette surface missing from
 > `docs/preset-palettes.md`, repaired at the close), two index-row minors. Phases 7/8 run at the
 > close: fidelity **mostly there, with defects** (four filed, backlog 0106–0108); HDR **merely
@@ -366,7 +366,7 @@ the work up without re-deriving it. Everything below is *what happened*; the
 phases above are still the contract.
 
 **Lane:** worktree `WORK/lmv-plan-0100`, branch
-`plan-0100-the-engine-speaks-milkdrop`, branched from local `main` at `657d103`
+`plan-0100-the-engine-speaks-milkdrop`, branched from local `main` at `a8e5ea1`
 (**not** `origin/main`, which was behind it — the corpus-census commit this plan
 is sized by is only local).
 
@@ -374,10 +374,10 @@ is sized by is only local).
 
 | phase | state |
 |---|---|
-| 1 — the warp mesh is a native scene | **done**, committed `2603309` |
-| 2 — the EEL2 machine | **done**, committed `bfb5536` |
-| 3 — the converter reads a real preset | **done**, committed `ebbf395` |
-| 4 — the draw layer | **done**, committed `aec8f15` (built at `9941129`, finished at `aec8f15`) |
+| 1 — the warp mesh is a native scene | **done**, committed `3dc3f1b` |
+| 2 — the EEL2 machine | **done**, committed `be69d1c` |
+| 3 — the converter reads a real preset | **done**, committed `661e03f` |
+| 4 — the draw layer | **done**, committed `75a4c6d` (built at `b71976e`, finished at `75a4c6d`) |
 | 5 — what actually converts | **done**, committed below |
 | 6 — the shaders | **done**, committed below (fresh session, 2026-08-16) |
 | 7, 8 — human | not started, and not `dev`'s |
@@ -386,7 +386,7 @@ is sized by is only local).
 --workspace --all-targets`, `cargo fmt --all --check` and
 `scripts/check-doc-links.mjs` are clean.
 
-There is one **`wip:` commit** in this branch's history (`dc9612f`). It is the
+There is one **`wip:` commit** in this branch's history (`0efe2e1`). It is the
 checkpoint a bisect control needed — the composite goldens had to be run against
 the pre-change tree — and it is not squashed because this project does not rewrite
 history. Fold it at merge if you want to.
@@ -612,7 +612,7 @@ their name says.
 
 **The size delta, measured.** Release builds, `strip = symbols`:
 
-| binary | pre-Phase-6 (`f06f7dd`) | after Phase 6 | Phase 6 delta | current `main` (`ffe34db`) | whole-plan delta |
+| binary | pre-Phase-6 (`dccb2fe`) | after Phase 6 | Phase 6 delta | current `main` (`4de65cc`) | whole-plan delta |
 |---|---|---|---|---|---|
 | `lmv.exe` | 9 474 048 B | 9 613 312 B | **+139 264 B** | 9 230 336 B | +382 976 B |
 | `lmv_core_c.dll` | 9 071 616 B | 9 211 904 B | **+140 288 B** | 8 835 584 B | +376 320 B |

@@ -1,10 +1,10 @@
 # 0119 — The flatness gate gets its second term
 
-> **Status:** done 2026-08-26 — five phases, five commits (`8389f2a`, `53d3e8b`, `26b20b3`,
-> `7b552f7`, `40398d4`). Mode 4 review: **no blockers, one major, four minor.** Verified against a
+> **Status:** done 2026-08-26 — five phases, five commits (`e68e538`, `9ddb52b`, `a00d4cc`,
+> `aa21a3e`, `8c58ecf`). Mode 4 review: **no blockers, one major, four minor.** Verified against a
 > live run rather than the log — `cargo nextest run --workspace` 995 passed / 5 skipped, `fmt` and
 > `clippy --workspace --all-targets` clean, and every calibration number re-measured: the frozen
-> `HELD_OUT_TOML` is byte-identical to `26b20b3^:presets/pending/fragment_tiledmono.toml` and to
+> `HELD_OUT_TOML` is byte-identical to `a00d4cc^:presets/pending/fragment_tiledmono.toml` and to
 > the shipped copy, `Tiled Rosette Mono` reads `flatness 0.9413 / boundary 0.3602 / coverage
 > 0.4952`, `Suprematist` `0.2565`, `On White` `0.3064`, and the gate prints exactly the 22-of-43
 > exposure the plan claims. The major: `boundary_density`'s reading scales with the capture
@@ -166,7 +166,7 @@ flowchart TB
     ADR-0130's Context.
   - **Each arm's docstring states its own derivation, and they are different kinds of number**
     (ADR-0071). The `0.31` default is a **measurement**: the midpoint of `0.2631` (the frozen
-    `Blown Out` fixture) and `0.3602` (`Tiled Rosette Mono`, measured 2026-08-26 at `8389f2a`),
+    `Blown Out` fixture) and `0.3602` (`Tiled Rosette Mono`, measured 2026-08-26 at `e68e538`),
     `1.18x` above the defect and `1.16x` below the composition — and it says in plain words that the
     conditional population had two members and that half-the-sparsest-legitimate-content was
     unavailable, because the one legitimate member is the preset being admitted. The `0.13`
@@ -300,11 +300,11 @@ flowchart TB
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The fourth candidate joins the table | dev | done | `8389f2a` |
-| 2 — The stop gate | human | decided: continue on the control | `53d3e8b` |
-| 3 — The gate takes two terms | dev | done | `26b20b3` |
-| 4 — The preset ships | dev | done | `7b552f7` |
-| 5 — Documentation | dev | done | `40398d4` |
+| 1 — The fourth candidate joins the table | dev | done | `e68e538` |
+| 2 — The stop gate | human | decided: continue on the control | `9ddb52b` |
+| 3 — The gate takes two terms | dev | done | `a00d4cc` |
+| 4 — The preset ships | dev | done | `aa21a3e` |
+| 5 — Documentation | dev | done | `8c58ecf` |
 
 ### Notes
 

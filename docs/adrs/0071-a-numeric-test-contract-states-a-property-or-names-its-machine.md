@@ -15,8 +15,8 @@ CI went red on 2026-07-30 and stayed red across five consecutive pushes. Two tes
 different runners, for what looks like two unrelated reasons — and is one.
 
 **`raw_levels_are_bit_identical_to_the_pre_normalization_build`** (`core/tests/dsp.rs`) asserts
-that four `f32` levels reproduce, **bit for bit**, literals measured against commit `92579ef` on
-the developer's x86_64 box. It landed in `ef3b772` and reached `main` in the `554c3aa` release. It
+that four `f32` levels reproduce, **bit for bit**, literals measured against commit `b5fb9df` on
+the developer's x86_64 box. It landed in `7b045ff` and reached `main` in the `e622a37` release. It
 has **never passed on macOS** — not once. On `macos-26-arm64` the first value diverges by
 `8.4e-6` relative (about 71 ULP), and it cannot do otherwise: the fixture generates its own input
 with `f32::sin`, which lowers to the platform libm, and `rustfft` dispatches NEON on aarch64 where
@@ -132,7 +132,7 @@ whether they are worth defending.
 
 ## Notes
 
-Measurements taken 2026-08-04 at `4ab383c`, on the software adapter
+Measurements taken 2026-08-04 at `36e453e`, on the software adapter
 (`Microsoft Basic Render Driver`, DX12, driver 10.0.19041.5794):
 
 | statistic | local WARP | CI WARP (10.0.26100) |

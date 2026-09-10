@@ -115,7 +115,7 @@ different clock.
 
 ## Correction — 2026-09-07, before acceptance
 
-Read against the tree at `775ef18`, before Plan 0140 Phase 2 was implemented. The Decision stands;
+Read against the tree at `634773b`, before Plan 0140 Phase 2 was implemented. The Decision stands;
 two facts in the Context above do not, and both widen the phase rather than change it.
 
 **The population is six, not four.** Plan 0126's splits landed two more guards on scenes after this

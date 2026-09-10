@@ -15,7 +15,7 @@
 > [ADR-0145](../../adrs/0145-the-engine-drives-the-fixtures-directly-over-art-net.md) +
 > [Plan 0133](../0133-the-engine-drives-the-lights.md) carry the replacement architecture. Mode 4
 > verdict: **no blockers, one major, three minors, two nits.** The major was Phase 8's shipping half — `--osc`
-> and `[osc]` shipped with no document naming either — and it was written at this close (`e8e3a9b`,
+> and `[osc]` shipped with no document naming either — and it was written at this close (`74b7007`,
 > `README.md`'s *Flags & environment*), with the `/lmv/v1` table transcribed from
 > `Telemetry::messages` and diffed against it address for address.
 >
@@ -392,14 +392,14 @@ flowchart LR
 > last one. **The phases above are the contract; everything here is what happened.**
 
 **Lane:** `plan-0132-the-lighting-rig-follows-the-visuals`, worktree
-`C:/Users/Igor Konovalov/WORK/lmv-plan-0132`, branched from `main` at `1ec19f2`
+`C:/Users/Igor Konovalov/WORK/lmv-plan-0132`, branched from `main` at `da21544`
 (after Plan 0127's close).
 
 | phase | owner | state | commit |
 |-------|-------|-------|--------|
 | 1a | human | partly answered by Phase 2's probe — see Notes | — |
 | 1b | human | RETIRED — no NDI receiver | — |
-| 2 | dev | done | c8bdcd5 |
+| 2 | dev | done | 4be8e4a |
 | 3 | dev | done — inline send ships, no code change | committed with this row |
 | 4 | human | not started | — |
 | 5 | dev | RETIRED — moves to Plan 0133 Phase 8 | — |

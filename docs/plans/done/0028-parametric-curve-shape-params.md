@@ -3,11 +3,11 @@
 > **Status:** done
 > **Created:** 2026-07-24
 > **Closed:** 2026-07-24 — passed Mode 4 review (no blockers, no majors; one minor, one nit).
-> Two `dev` phase commits: `f37dde0` (Phase 1 — `radial_offset`/`phase` threaded through
+> Two `dev` phase commits: `8f267cf` (Phase 1 — `radial_offset`/`phase` threaded through
 > `curves.rs` + `parametric.rs`, sampler now `r = sin(n*theta + phase) + radial_offset`, both
 > zero-defaulted; four tests: the zero-default no-op pin, radial-offset-shifts-by-a-constant,
 > phase-changes-geometry, and a `capture_preset` binding proof under a bass stimulus) and
-> `20cd7f7` (Phase 2 — docs). **Verified:** the 6 `curves` unit tests + the binding test green;
+> `7630d0d` (Phase 2 — docs). **Verified:** the 6 `curves` unit tests + the binding test green;
 > `golden` unchanged (**no re-bless**, confirming the zero-default no-op property); `hygiene`
 > confirms the `curves.rs`/`parametric.rs` panic pragmas intact; `clippy -p lmv-core
 > --all-targets -D warnings` clean. **Minor:** Phase 1 also edited `core/src/render/mod.rs`

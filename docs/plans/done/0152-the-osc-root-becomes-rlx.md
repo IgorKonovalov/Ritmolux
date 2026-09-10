@@ -1,8 +1,8 @@
 # 0152 — The OSC root becomes `/rlx`
 
 > **Status:** done — closed 2026-09-05. Four `dev` phases in the lane
-> `plan-0152-the-osc-root-becomes-rlx`: `aec2381` (Phase 1, the wire), `7644cc3` (2, the operator's
-> table), `56f8a69` (3, the record), `c594fa5` (4, the two seed comments). `main` was merged into the
+> `plan-0152-the-osc-root-becomes-rlx`: `65dd6b2` (Phase 1, the wire), `e0f9b39` (2, the operator's
+> table), `65711ea` (3, the record), `d92166d` (4, the two seed comments). `main` was merged into the
 > lane at the close and the whole gate re-run on the combination. Mode 4 review: **no blockers, no
 > majors, four minors.** Verified: `ADDRESS_PREFIX` is `/rlx/v1`, all fourteen literals and every
 > test assertion follow, the OSC padding arithmetic was re-checked rather than assumed (both roots
@@ -148,7 +148,7 @@ flowchart LR
 - **Files touched:** `core/src/render/scenes/swarm.rs`, `core/src/render/scenes/reaction_diffusion.rs`.
 - **Why it rides along:** same origin — Plan 0150's close reports *"Only the comments moved"* on the
   seven ASCII seeds, and for these two the comments were **removed**. At the pre-rename baseline
-  `47432ca`, `swarm.rs:27` carried `// "LMV_SWRM"` and `reaction_diffusion.rs:66` carried
+  `4755144`, `swarm.rs:27` carried `// "LMV_SWRM"` and `reaction_diffusion.rs:66` carried
   `// "LMV_RD_1"`; both now sit as bare hex. No other plan touches these files —
   [0126](0126-the-large-files-split-along-their-seams.md)'s eight phases do not name either.
 - **Done when:**
@@ -233,10 +233,10 @@ before                      after
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The wire moves, and the probes it falsifies move with it | dev | done | `aec2381` |
-| 2 — The operator's table | dev | done | `7644cc3` |
-| 3 — The record | dev | done | `56f8a69` |
-| 4 — Two seed comments come back | dev | done | `c594fa5` |
+| 1 — The wire moves, and the probes it falsifies move with it | dev | done | `65dd6b2` |
+| 2 — The operator's table | dev | done | `e0f9b39` |
+| 3 — The record | dev | done | `65711ea` |
+| 4 — Two seed comments come back | dev | done | `d92166d` |
 | 5 — Re-point the rig | human | app side verified, rig outstanding | |
 
 ### Notes
@@ -270,7 +270,7 @@ before                      after
   cannot re-derive, so the ASCII was added to the existing comment rather than a deleted comment
   restored. Both bytes were decoded from the literals rather than copied from the plan:
   `0x4C4D_565F_5357_524D` is `LMV_SWRM` and `0x4C4D_565F_5244_5F31` is `LMV_RD_1`, matching the
-  values the plan cites at baseline `47432ca`. Both done-when clauses hold as written.
+  values the plan cites at baseline `4755144`. Both done-when clauses hold as written.
 
 ### Phase 5 reading — the app side, 2026-09-05
 
@@ -319,11 +319,11 @@ Two observations, recorded rather than diagnosed:
 
 ### Close triggers
 
-- **`presets/` touched:** none. `git diff --name-only 15dfe7f..HEAD -- presets/` is empty.
+- **`presets/` touched:** none. `git diff --name-only ec6c6c7..HEAD -- presets/` is empty.
 - **Plan header `Closes:`** none
-- **What shipped:** a **feature**, in one commit — `aec2381`, which changes what the sink puts on
-  the wire. The other three move no behaviour: `7644cc3` and `56f8a69` are documentation, and
-  `c594fa5` is two comments.
+- **What shipped:** a **feature**, in one commit — `65dd6b2`, which changes what the sink puts on
+  the wire. The other three move no behaviour: `e0f9b39` and `65711ea` are documentation, and
+  `d92166d` is two comments.
 - **Operator docs touched:** `README.md` — the OSC telemetry block. Fourteen address rows moved to
   `/rlx/v1`, and the paragraph above them was rewritten from a stability promise into a break notice
   naming the old root, saying why `/v1` did not move, and saying that a missed binding reports
@@ -333,7 +333,7 @@ Two observations, recorded rather than diagnosed:
   probes across Phases 1 and 2 bought. `check-doc-links.mjs`, `check-index-rows.mjs`,
   `check-comment-hygiene.mjs` and `toc.mjs --check` also exit 0.
 - **Full suite:** `cargo nextest run --workspace`, exit **0** — 1523 tests run, 1523 passed, 5
-  skipped, 9 slow, 407.955 s. Run at `c594fa5`'s tree. `cargo fmt --all --check` and
+  skipped, 9 slow, 407.955 s. Run at `d92166d`'s tree. `cargo fmt --all --check` and
   `cargo clippy --workspace --all-targets -- -D warnings` clean at the same tree. **No golden
   baseline moved** — `core/tests/golden/` is clean in the working tree after the run, which is
   Phase 4's own done-when.
@@ -342,8 +342,8 @@ Two observations, recorded rather than diagnosed:
   run took the app side instead (the reading is above): fourteen addresses, all under `/rlx/v1`,
   correct type tags, live values, complete sets. The binding half is untouched by that and is still
   the only detector this break has.
-- **The lane is behind `main`, and a merge is owed before it lands.** Base is `15dfe7f`; `main`
-  advanced to `89c8c99` during the session, when Plan 0128 closed and merged. The two trees overlap
+- **The lane is behind `main`, and a merge is owed before it lands.** Base is `ec6c6c7`; `main`
+  advanced to `f5dbbdb` during the session, when Plan 0128 closed and merged. The two trees overlap
   on `docs/design-backlog.md` — 0128's close archived backlog 0110 and filed 0186, while this lane
   edits five entry bodies — and `main` also moved `docs/plans/README.md`, which this lane does not
   touch. Different regions, so a 3-way merge handles it, which is what the plan's Risks section

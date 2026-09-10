@@ -130,7 +130,7 @@ decision.
 
 ## Correction — 2026-09-07, before acceptance
 
-Read against the tree at `775ef18`, before Plan 0140 Phase 3 was implemented. **The Decision stands
+Read against the tree at `634773b`, before Plan 0140 Phase 3 was implemented. **The Decision stands
 unchanged.** Its operative clause — a rate integrates into state "advanced with the element and reset
 when the element is born or the canvas recomposes" — is satisfied exactly by the shape below. What
 does not stand is the paragraph justifying it and one Negative bullet, both of which describe the

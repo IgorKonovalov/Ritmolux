@@ -1,7 +1,7 @@
 # 0055 — The fold edge becomes a choice: five treatments behind one stepped param, decided in motion
 
-> **Status:** **done 2026-08-04** — Phase 1 `5eac2d7`, the `human` Phase 2 A/B judged 2026-08-04,
-> Phase 3 `feba426`, Phase 4 `752eb69`, and the second adoption `2c618de`, on lane
+> **Status:** **done 2026-08-04** — Phase 1 `1526aec`, the `human` Phase 2 A/B judged 2026-08-04,
+> Phase 3 `20190f7`, Phase 4 `73cad28`, and the second adoption `aa80d68`, on lane
 > `plan-0055-fold-edge`, closed together with
 > [0052](0052-the-emitter-objects-that-spawn-fall-and-die.md) against one merged tip. Mode 4
 > verdict: **landed cleanly, no blockers.** Verified independently of the lane's report — exactly one

@@ -1,8 +1,8 @@
 # 0156 — The site becomes the reference
 
 > **Status:** done - closed 2026-09-06. Seven `dev` phases in `plan-0156-the-site-becomes-the-reference`:
-> `7f2b0b9` (1), `786d687` (2), `d2f2d24` (3), `5227878` (4), `24ce616` (5), `070c549` (6), `9db1f67` (7),
-> plus `db384db`, the repair the review asked for. Mode 4 review 2026-09-06: **no blockers, one major,
+> `065be02` (1), `5312976` (2), `c3c00c9` (3), `047c05f` (4), `1ad9c6f` (5), `4919fb3` (6), `4208de5` (7),
+> plus `4957a52`, the repair the review asked for. Mode 4 review 2026-09-06: **no blockers, one major,
 > three minors** - the major being that Phase 7's *every scene's applied default equals its spec's*
 > done-when was unimplemented, which on implementation convicted `spectrum`'s `curve` row (a published
 > default, range and meaning the engine does not apply). Re-verified at this close on the tip with
@@ -52,7 +52,7 @@ that all four surfaces are in scope, that the site serves users, embedders **and
 that the parameter reference is generated from the core, that sources may be restructured, that the
 work is one plan, and that the operator reference moves out of the README.
 
-Measured on the live site at `567380d`, 2026-09-05:
+Measured on the live site at `3614c87`, 2026-09-05:
 
 | Criterion | Finding |
 |---|---|
@@ -310,7 +310,7 @@ Each phase ships as its own commit. `dev` runs all phases in one session. Every 
 - **Files touched:** `core/src/render/scenes/mod.rs` or `common.rs` (`ParamSpec { name, default,
   range: Option<[f32; 2]>, doc: &'static str }` and the helpers that compose a system's roster from
   its own specs plus the shared blocks — the composition `set_param` already performs), every file
-  declaring `PARAMS` today (the 24 on the tree at `567380d`: the scenes, `background`, `bloom`,
+  declaring `PARAMS` today (the 24 on the tree at `3614c87`: the scenes, `background`, `bloom`,
   `feedback`, `ink`, `kaleidoscope`, `post`, `tonemap`, `trails`, `marks`, `warp_mesh`'s three
   lists), each scene's `reset_params` / `Default` (the default comes *from* the spec, so there is
   one copy), `core/src/preset/schema/system.rs` (`GLOBAL_PARAMS` composed from the specs rather than
@@ -433,13 +433,13 @@ pub const PARAMS: &[ParamSpec] = &[
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The menu is organised by reader task | dev | done | 7f2b0b9 |
-| 2 — The operator surface has a reference | dev | done | 786d687 |
-| 3 — The site renders diagrams, and How it works exists | dev | done | d2f2d24 |
-| 4 — The engine-side documents address a reader | dev | done | 5227878 |
-| 5 — The embedding surface | dev | done | 24ce616 |
-| 6 — rustdoc joins the Pages artifact | dev | done | 070c549 |
-| 7 — The parameter reference is generated from the engine | dev | done | 9db1f67 |
+| 1 — The menu is organised by reader task | dev | done | 065be02 |
+| 2 — The operator surface has a reference | dev | done | 5312976 |
+| 3 — The site renders diagrams, and How it works exists | dev | done | c3c00c9 |
+| 4 — The engine-side documents address a reader | dev | done | 047c05f |
+| 5 — The embedding surface | dev | done | 1ad9c6f |
+| 6 — rustdoc joins the Pages artifact | dev | done | 4919fb3 |
+| 7 — The parameter reference is generated from the engine | dev | done | 4208de5 |
 | 8 — The live walk | human | not started | |
 
 ### Notes

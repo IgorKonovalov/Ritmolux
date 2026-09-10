@@ -1,7 +1,7 @@
 # 0042 — Reachability sees every comparison, and the library is re-audited against it
 
-> **Status:** done 2026-07-30 — all three phases landed (`8c170a3` observe every comparison,
-> `e7a40b7` report one-sided unless a select names it, `f50e8cf` the Phase 3 re-audit). Mode 4
+> **Status:** done 2026-07-30 — all three phases landed (`ddcd253` observe every comparison,
+> `469137b` report one-sided unless a select names it, `1762a8c` the Phase 3 re-audit). Mode 4
 > review passed with no blockers: the Outcome section's numbers were re-measured independently
 > (14 `GATE` + 2 `COMP` = 16, every one `tempo > N`, 0 genuinely dead), both negative results
 > confirmed (the two `min()` band halves and all seven bare comparisons score clean), and the
@@ -169,7 +169,7 @@ pub enum NodeObservation {
 ## What this plan does NOT do
 
 - **It does not gate CI.** Deferred to a decision taken on Phase 3's evidence.
-- **It does not edit preset content.** Nine dead gates were already fixed on 2026-07-29 (`e9a1c3c`);
+- **It does not edit preset content.** Nine dead gates were already fixed on 2026-07-29 (`ab382f2`);
   whatever Phase 3 surfaces is a separate `preset-author` pass.
 - **It does not touch the stimulus levels.** `FULL_LEVELS` and `LOW_LEVELS` are unchanged, so every
   historical reactivity number keeps its meaning (ADR-0042).
@@ -179,7 +179,7 @@ pub enum NodeObservation {
 ## Outcome — Phase 3 re-audit (2026-07-29)
 
 Measured with `cargo run -p standalone --example shot -- --presets presets --report` over the 36
-shipped presets, at HEAD `e7a40b7` (Phases 1–2 landed).
+shipped presets, at HEAD `469137b` (Phases 1–2 landed).
 
 **The library is clean. Every one of the 16 gate flags is the standing `tempo` false positive, and
 none is a genuinely dead gate.**
@@ -218,7 +218,7 @@ The two negative results are the deliverable, and neither was obtainable before 
    `_lorenz`, `_thomas`) and `rose_web.mirror_reflect = "onset > 0.007"` — produced **zero** flags.
    These are the shape that was invisible to the old check, and against which ADR-0043 recorded that
    the attractor presets "shipped without ever reseeding". They are now visible and they score
-   clean, which is direct confirmation that the 2026-07-29 content re-gain (`e9a1c3c`) actually
+   clean, which is direct confirmation that the 2026-07-29 content re-gain (`ab382f2`) actually
    took. Without Phase 1 this could only have been asserted, not measured.
 
 ### The count rose, as predicted — but by +2, not by 14

@@ -1,9 +1,9 @@
 # 0056 — Clamp occupancy: the instrument that would have caught a saturated library, plus the axis anchor
 
 > **Status:** **done** — closed 2026-08-03. All five `dev` phases landed on the
-> `plan-0056-clamp-occupancy` worktree branch: `a704d30` occupancy on the walk, `f607915` the `occ`
-> column and `SAT` lines, `3430cdc` the HARD gate with its measured threshold, `d389c96` the axis
-> anchor, `9b07ede` the tonal-flatness statistic in `sanity`. Mode 4 review: **no blockers, no
+> `plan-0056-clamp-occupancy` worktree branch: `3fb0039` occupancy on the walk, `640574c` the `occ`
+> column and `SAT` lines, `fff03b6` the HARD gate with its measured threshold, `b20cbdd` the axis
+> anchor, `06e212b` the tonal-flatness statistic in `sanity`. Mode 4 review: **no blockers, no
 > majors**; three minors, all fixed in the close commit.
 > [ADR-0062](../../adrs/0062-clamp-occupancy-is-the-saturation-instrument.md) is **accepted with an
 > Outcome section** (implemented in full);
@@ -143,7 +143,7 @@ flowchart LR
   the phase commit, exactly as Phase 3 does for occupancy. A deliberately flattened fixture — the
   cheapest being a preset driven above the tonemap knee — is reported as flat, and the shipped
   library's own values are what set the threshold. **State explicitly which of the four presets
-  `00d99d0` repaired this gate would have caught**, given that `sanity` renders at `Floor` and at
+  `095af15` repaired this gate would have caught**, given that `sanity` renders at `Floor` and at
   silence while the reported saturation was at `Rich`: if the honest answer is *none of them*, that
   is a finding worth surfacing, the statistic still belongs in the gate for the cases it does
   reach, and it says something about where the next instrument goes.

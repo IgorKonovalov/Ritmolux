@@ -567,17 +567,17 @@ reproducible from what ran rather than from a name whose meaning may since have 
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the spike renders | dev | done | `3c15e79` (no repository files; artifacts under untracked `spike/`) |
-| 2 — the look gate | human | done | `dc78cdd` |
-| 2b — the aspect measurement | dev | done | `3376bbd`, closed `aa5cb52` |
-| 3 — the pass-through stub | dev | done | `b87d823` |
-| 4 — the filter does the work | dev | done | `92aedf7` |
-| 5 — one command, and the documentation | dev | done | `4f683bf` |
-| 6 — a real track | human | done | `79ca9bc` |
-| 7a—7c — the suite runs everywhere, the seam is pinned | dev | done | `d597594` |
-| 7e — one page, and a gate that keeps it there | dev | done | `1aa2f2a` |
-| 7d — the instrument | dev | done | `e1a0e98` |
-| 7d — the corrected figures | dev | done | `b1647a6` |
+| 1 — the spike renders | dev | done | `7ee8168` (no repository files; artifacts under untracked `spike/`) |
+| 2 — the look gate | human | done | `1f4533c` |
+| 2b — the aspect measurement | dev | done | `8537f04`, closed `ae2dd22` |
+| 3 — the pass-through stub | dev | done | `7fd91db` |
+| 4 — the filter does the work | dev | done | `51836e1` |
+| 5 — one command, and the documentation | dev | done | `839e9cd` |
+| 6 — a real track | human | done | `36bd199` |
+| 7a—7c — the suite runs everywhere, the seam is pinned | dev | done | `bc254d7` |
+| 7e — one page, and a gate that keeps it there | dev | done | `11395b9` |
+| 7d — the instrument | dev | done | `2c8272f` |
+| 7d — the corrected figures | dev | done | `d5d20e5` |
 
 > **The per-phase sections below predate the implementation-log convention** (Plan 0112) and are
 > prose rather than observations. They are left as written because they carry the spike's, the
@@ -588,7 +588,7 @@ reproducible from what ran rather than from a name whose meaning may since have 
 ### Phase 1 — the spike ran, 2026-08-20
 
 By `dev`, in the lane `WORK/lmv-plan-0106` on branch `plan-0106-diffusion-filter`, branched from
-`5cf592d` at v0.75.0. **No repository file changed** except this log and the `Status` line, as the
+`ac4f955` at v0.75.0. **No repository file changed** except this log and the `Status` line, as the
 phase specifies; every artifact lives under an untracked `spike/`.
 
 **The subject material.** Caribou — *Odessa* (Swim, 2010), 4 s from 0:45, 48 kHz 16-bit PCM. Three
@@ -1120,12 +1120,12 @@ render wants sleep disabled; a partial output wants `ffprobe` read as "still wri
 
 Deviations, findings and measurements only.
 
-**Deviation, 7b (`d597594`).** The phase asks for two saturated RGB values whose chroma terms land
+**Deviation, 7b (`bc254d7`).** The phase asks for two saturated RGB values whose chroma terms land
 outside `0..=255`. Across the whole 8-bit cube the forward chroma terms reach exactly ±0.5 past
 each end and no further — pure red's Cr is 255.5, pure cyan's is 0.5 — so the frozen table
 carries **both directions**, and five of its seven inverse rows are where the clamp is exercised.
 
-**Deviation, 7c (`d597594`).** CI installs `numpy` in the `links` job. The colour table pins array
+**Deviation, 7c (`bc254d7`).** CI installs `numpy` in the `links` job. The colour table pins array
 functions, so without it that group would skip on the one runner that cannot skip anything else.
 
 **Finding, 7b.** The table's first bite attempt passed — a —0.0002 edit to the green luma weight
@@ -1172,7 +1172,7 @@ annotator runs against 1024 rather than 576 while a 768x768 frame pays nothing e
 the square arm structurally cheaper at equal pixel count. Nothing here measures it.
 
 **Finding, ADR number collision.** `main` carries
-`docs/adrs/0120-the-close-brief-is-a-section-of-the-plan.md` (commit `8b68cea`); this branch carries
+`docs/adrs/0120-the-close-brief-is-a-section-of-the-plan.md` (commit `151ebda`); this branch carries
 `docs/adrs/0120-a-sidecar-tool-documents-itself-in-one-place.md`. Both `proposed`, different
 filenames, so a merge takes both silently. 13 files on this branch cite the number.
 
@@ -1189,12 +1189,12 @@ collision above is unresolved. Phases 1—6's prose sections still predate the l
 
 **Deviations**
 
-- 7b (`d597594`): the frozen table carries **both** directions rather than the forward one the phase
+- 7b (`bc254d7`): the frozen table carries **both** directions rather than the forward one the phase
   names — across the whole 8-bit cube the forward chroma terms leave `0..=255` by exactly ±0.5
   and no further, so five of the seven inverse rows are where the clamp is exercised.
-- 7c (`d597594`): the CI `links` job installs `numpy`, which the phase does not mention. The colour
+- 7c (`bc254d7`): the CI `links` job installs `numpy`, which the phase does not mention. The colour
   table pins array functions and would otherwise skip on the one runner that cannot skip.
-- 7a (`d597594`): the no-`spike/` property was verified on a clean tree built outside the repo rather
+- 7a (`bc254d7`): the no-`spike/` property was verified on a clean tree built outside the repo rather
   than by renaming this lane's `spike/`, which was locked by the still-running Phase 6 render.
 
 **Done-when criteria not satisfied as stated**
@@ -1217,7 +1217,7 @@ collision above is unresolved. Phases 1—6's prose sections still predate the l
   600 lines against `## Implementation phases`' 374.
 - `docs/adrs/0120` is claimed twice: this branch's
   `0120-a-sidecar-tool-documents-itself-in-one-place.md` and `main`'s
-  `0120-the-close-brief-is-a-section-of-the-plan.md` (`8b68cea`), both `proposed`. Different
+  `0120-the-close-brief-is-a-section-of-the-plan.md` (`151ebda`), both `proposed`. Different
   filenames, so a merge takes both. 13 files on this branch cite the number.
 
 ### Close triggers
@@ -1234,7 +1234,7 @@ collision above is unresolved. Phases 1—6's prose sections still predate the l
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — 63 reductions across 38
   live entries, 4 unprobeable, no entry named. The plan **added** two live entries, 0125 and 0126,
   from Phase 6's two wants.
-- **Outstanding `human` phases:** none. Phase 2 (`dc78cdd`) and Phase 6 (`79ca9bc`) are both done.
+- **Outstanding `human` phases:** none. Phase 2 (`1f4533c`) and Phase 6 (`36bd199`) are both done.
 - **Not run on this branch:** `main`'s 8 commits are not merged, so `fmt`/`clippy`/`nextest` have
   never run on the combination.
 

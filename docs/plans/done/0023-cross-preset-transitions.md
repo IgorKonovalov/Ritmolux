@@ -7,12 +7,12 @@
 
 ## Close (2026-07-26)
 
-Landed in five `dev` commits — `2a40f83` (Phase 1: ink leaves the `PostChain` as a terminal engine
-post-pass), `4fefce3` (Phase 2: the walking skeleton — `Transition` controller + frozen crossfade on
-the cycle path, plus ink's param crossfade), `918ae89` (Phase 3: the blend library — crossfade,
-add/burn, luma-dissolve, wipe, behind one shader and a deterministic kind rotation), `5ab441a`
+Landed in five `dev` commits — `c99d748` (Phase 1: ink leaves the `PostChain` as a terminal engine
+post-pass), `f89abe2` (Phase 2: the walking skeleton — `Transition` controller + frozen crossfade on
+the cycle path, plus ink's param crossfade), `b3b2b2f` (Phase 3: the blend library — crossfade,
+add/burn, luma-dissolve, wipe, behind one shader and a deterministic kind rotation), `7c898d6`
 (Phase 4: adaptive dual-live + the budget governor, `CompositeSide`, `scenes::shares_resources`),
-`9c0d468` (Phase 5: every switch path dissolves, re-entrancy, `select_preset_now`, the doc sweep).
+`a93e94a` (Phase 5: every switch path dissolves, re-entrancy, `select_preset_now`, the doc sweep).
 
 **Mode 4 review: no blockers, no majors, five minors and one nit.** Verified cold: 137/137
 `cargo nextest run -p lmv-core` green (including the hardware-only dual-live trail check, which ran

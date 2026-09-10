@@ -1,8 +1,8 @@
 # 0039 — Line joins: the stroke stops coming apart at every vertex
 
-> **Status:** done 2026-07-28 — phases 1-4 landed in four commits (`5dfc81c` the per-endpoint flag
-> and the shader extension, `b184021` the spectrum polyline plus `core/tests/line_joints.rs`,
-> `12e6ab2` the rose / L-system / star, `f78ff2f` the doc sweep) and passed the Mode 4 review:
+> **Status:** done 2026-07-28 — phases 1-4 landed in four commits (`2418b91` the per-endpoint flag
+> and the shader extension, `c9ceab4` the spectrum polyline plus `core/tests/line_joints.rs`,
+> `3845438` the rose / L-system / star, `2f571ca` the doc sweep) and passed the Mode 4 review:
 > **no blockers**, one major, three minors, two nits. Verified rather than trusted: the Phase 1
 > byte-identical claim (no line-scene baseline moved), the fail-first evidence for the new pixel
 > test (re-run at close — joint `0.6431`/`0.6440` against interiors `0.4885`/`0.4588`), every

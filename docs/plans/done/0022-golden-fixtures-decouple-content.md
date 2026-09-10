@@ -1,7 +1,7 @@
 # 0022 — Decouple the golden drift guard from shipped presets (per-system frozen fixtures)
 
 > **Status:** done — closed 2026-07-23, passed Mode 4 review (no blockers, no majors; one minor,
-> one nit). Two `dev` phase commits (`def9b24` per-system fixtures + repointed golden; `19e7123`
+> one nit). Two `dev` phase commits (`480a8a7` per-system fixtures + repointed golden; `ee1a6be`
 > engine-vs-content doc split). Golden now guards **engine rendering determinism** via six frozen
 > per-system fixture TOMLs under `core/tests/fixtures/` (one per `SystemKind`, keyed by an exhaustive
 > `match` so a new scene fails to compile until its fixture exists), never shipped content — closing
@@ -9,7 +9,7 @@
 > `star_pattern`). The three shipped baselines (`aurora`/`warp`/`drift`.png) are deleted; no test
 > pins a shipped preset by name, and the shipped roster keeps its behavioral floors (`sanity`/
 > `reactivity`/`animation`, all iterating `default_presets()`). Landing this **greens `main`** from
-> the `76a2fb4` drift. Verified: `cargo test -p lmv-core --test golden` green on WARP with a real
+> the `8f86d9a` drift. Verified: `cargo test -p lmv-core --test golden` green on WARP with a real
 > comparison (not a skip); all six variants have exactly one fixture + baseline; no shipped-name pin
 > remains. **Minor:** the `SYSTEMS` iteration list is hand-maintained separately from the exhaustive
 > `fixture()` match, so a new variant is forced to add a fixture *arm* but not forced into `SYSTEMS`
@@ -28,7 +28,7 @@
 
 `core/tests/golden.rs` pins its drift baselines to three **shipped, curated presets** (`Aurora`,
 `Warp Drive`, `Drift`). Those are exactly what the `preset-author` lane tunes, so every intentional
-content change trips the engine-drift alarm and reds CI (it did — commit `76a2fb4` moved all three
+content change trips the engine-drift alarm and reds CI (it did — commit `8f86d9a` moved all three
 baselines to mean 0.15–0.25 vs a 0.02 tolerance). Repoint golden at **test-only frozen fixtures,
 one per `SystemKind`**, authored as TOML under `core/tests/fixtures/` and keyed by an exhaustive
 match so a new system must add a fixture. Drop all golden pixel-pinning of shipped presets (they
@@ -156,7 +156,7 @@ fn fixture_toml(system: SystemKind) -> &'static str {
   This is the exhaustive-match property working as intended (no scene ships unguarded), not a defect.
 - **Bless is WARP-tied and manual.** Baselines must be generated on Windows WARP or they drift
   (macOS skips per ADR-0016). Unchanged from today; the doc-comment in Phase 2 records it.
-- **Interim red `main`.** Until this plan lands, `main` stays red from the `76a2fb4` shipped-baseline
+- **Interim red `main`.** Until this plan lands, `main` stays red from the `8f86d9a` shipped-baseline
   drift. This plan *resolves that durably* (the tuned shipped presets are no longer pinned). If
   `main` must be green sooner, a stopgap `LMV_BLESS=1` re-bless of `aurora`/`warp`/`drift` on WARP
   greens it in the interim — but those baselines are then deleted by Phase 1, so the stopgap is
@@ -170,7 +170,7 @@ fn fixture_toml(system: SystemKind) -> &'static str {
 - **Does not touch `ci.yml`** — golden stays in the default `nextest` set, WARP-only per ADR-0016.
 - **Does not add pixel-pinning back onto shipped presets** at any tolerance (ADR-0023 Alternative B,
   rejected) — shipped presets are guarded only behaviorally.
-- **Does not re-bless or redesign the shipped presets themselves** — the `76a2fb4` field/flock look
+- **Does not re-bless or redesign the shipped presets themselves** — the `8f86d9a` field/flock look
   is the `preset-author`/`dev` owner's call; this plan only stops golden from pinning it.
 - **Does not implement `ReactionDiffusion`** (Plan 0014); it only notes the fixture-coordination
   point.

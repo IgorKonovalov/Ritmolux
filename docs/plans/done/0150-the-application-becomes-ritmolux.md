@@ -1,14 +1,14 @@
 # 0150 — The application becomes Ritmolux
 
 > **Status:** done - closed 2026-09-02. All nine phases landed: 2-8 by `dev` on `main`
-> (`c093dc7`..`688ae88`), and Phase 9's repository half was verified done at the close - `origin`
+> (`3c42f78`..`7fa3f66`), and Phase 9's repository half was verified done at the close - `origin`
 > is `IgorKonovalov/Ritmolux.git`, the checkout is `WORK/Ritmolux`, `foo_ritmolux.dll` is installed
 > and no `foo_lmv` remains. **Two Phase 9 items are the user's and outstanding:** restarting
 > foobar2000 so it rescans `user-components-x64` (the component was copied in while it was running),
 > and re-pointing every Spout receiver at the `Ritmolux` sender.
 > Mode 4 review: **no blockers, four majors, two minors.** The full suite was re-run against the
 > finished tree - **1518 passed, 5 skipped, 0 failed, 419.5 s** - and every golden is byte-identical
-> to the pre-rename baseline `47432ca`, so the plan's central safety property holds as claimed. All
+> to the pre-rename baseline `4755144`, so the plan's central safety property holds as claimed. All
 > four majors were doc-integrity defects from the sweep and were repaired in the close commit: four
 > `WORK/` pointers renamed to directories that do not exist, this plan's own index row inverted to
 > say the record keeps `ritmolux`, three dated observations falsified, and a closed plan retitled
@@ -370,20 +370,20 @@ flowchart TB
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — the name is cleared and the tree is frozen | human | done | no files touched |
-| 2 — the crates take the prefix | dev | done | c093dc7 |
-| 3 — the C ABI takes the prefix | dev | done | 55fa009 |
-| 4 — the shipped artifacts take the name | dev | done | 3d0b223 |
-| 5 — the environment takes the prefix | dev | done | 1198b53 |
-| 6 — the user's machine is migrated | dev | done | d9e234a |
-| 7 — the strings a user reads | dev | done | 15cc07a |
-| 8 — the live documentation, and the gates that name paths | dev | done | 688ae88 |
+| 2 — the crates take the prefix | dev | done | 3c42f78 |
+| 3 — the C ABI takes the prefix | dev | done | e418944 |
+| 4 — the shipped artifacts take the name | dev | done | 5435ab0 |
+| 5 — the environment takes the prefix | dev | done | e54fa2e |
+| 6 — the user's machine is migrated | dev | done | 3c4682e |
+| 7 — the strings a user reads | dev | done | 307630d |
+| 8 — the live documentation, and the gates that name paths | dev | done | 7fa3f66 |
 | 9 — the repository takes the name | human | **owed — `dev` stops here** | |
 
 ### Notes
 
 **Phase 1's freeze half was verified, not assumed.** `git worktree list` printed one line,
 `git status --porcelain` was empty, and Plan 0148 was closed and released at 0.102.0. A baseline
-`cargo nextest run --workspace` was taken on 47432ca **before any edit** — 1513 passed, 5 skipped,
+`cargo nextest run --workspace` was taken on 4755144 **before any edit** — 1513 passed, 5 skipped,
 0 failed, 407.3 s — so that "no golden moved" is measured against a known-green tree rather than
 asserted. Every phase below reports against that baseline.
 
@@ -668,10 +668,10 @@ body below it is byte-identical — the diff is 1 insertion, 1 deletion.
   probes** from Phase 4 until Phase 8 repaired them — all three named
   `plugin-foobar/foo_lmv.cpp`. All five gates exit 0 at the tip.
 - **Full suite:** `cargo nextest run --workspace` — **exit 0**, **1518 passed, 5 skipped, 0
-  failed**, 397 s. The pre-rename baseline on `47432ca` was **1513 passed, 5 skipped**; the five
+  failed**, 397 s. The pre-rename baseline on `4755144` was **1513 passed, 5 skipped**; the five
   added tests are the four directory-migration tests (Phase 6) and the sender-default guard
   (Phase 7). **No golden was re-blessed at any phase**, and the committed baselines are
-  byte-identical to `47432ca`.
+  byte-identical to `4755144`.
 - **Outstanding `human` phases:** **Phase 9, in full.** Rename the repository on GitHub, never
   recreate the old name, `git remote set-url`, rename the local checkout, install
   `foo_ritmolux.fb2k-component` and remove the old `foo_lmv` through Preferences, and re-point

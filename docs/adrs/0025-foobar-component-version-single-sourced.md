@@ -51,7 +51,7 @@ touch `LMV_ABI_VERSION`.
 
 ### Negative (the price we pay)
 - **The plugin loses its independent bump lever.** A plugin-only fix that lands *between* plan closes
-  (e.g. the mid-playback render fix, commit `88f9769`) does not move the number until the next
+  (e.g. the mid-playback render fix, commit `bff787a`) does not move the number until the next
   workspace bump. Accepted: under the current cadence the workspace version is the meaningful unit, and
   a plugin-only SemVer nobody maintained is worse than one that tracks the app.
 - **A compile outside `build.ps1` shows `0.0.0-dev`.** Correct-by-design (that path has no version

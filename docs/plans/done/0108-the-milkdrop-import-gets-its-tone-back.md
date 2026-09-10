@@ -1,7 +1,7 @@
 # 0108 — The MilkDrop import gets its tone back
 
 > **Status:** done — **closed 2026-08-17, all six phases run.** Phases 1/3/4/5 landed as code
-> (`b02cd45`, `60674da`, `6e92eb3`, `a07b0c6`) and were reviewed the same day; Phases 2 and 6 ran as
+> (`766a931`, `3249097`, `3a3533a`, `e664ee8`) and were reviewed the same day; Phases 2 and 6 ran as
 > one live look-gate session against `foo_vis_milk2` and are recorded below. The verdict on this
 > plan's own central question is **still merely different** — and the gate found four engine defects
 > this plan was never scoped to fix, which is worth more than the answer it went looking for. They
@@ -288,8 +288,8 @@ fn lmv_quantize(c: vec3<f32>, steps: f32) -> vec3<f32> {
 
 ## Implementation log
 
-**2026-08-17 — Phases 1, 3, 4 and 5 landed; Mode 4 review run the same day.** Commits `b02cd45`
-(Phase 1), `60674da` (Phase 3), `6e92eb3` (Phase 4), `a07b0c6` (Phase 5). Review verdict: **no
+**2026-08-17 — Phases 1, 3, 4 and 5 landed; Mode 4 review run the same day.** Commits `766a931`
+(Phase 1), `3249097` (Phase 3), `3a3533a` (Phase 4), `e664ee8` (Phase 5). Review verdict: **no
 blockers, two majors (both repaired at the review), three minors, one nit.** `fmt`, `clippy
 --workspace --all-targets -D warnings`, the three doc gates and the plan's own tests all green,
 including the full 32-baseline golden suite.

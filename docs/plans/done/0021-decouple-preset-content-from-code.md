@@ -7,8 +7,8 @@
 > **Related ADRs:** [0022](../../adrs/0022-build-time-preset-embedding.md) (accepted)
 >
 > **Close summary (Mode 4 review — no blockers, no majors, no minors, no nits):** Both phases
-> landed exactly as planned across three commits — `e1e4f1f` (Phase 1: `core/build.rs` generates
-> `EMBEDDED` from `presets/*.toml`), `11798c3` (rustfmt of `build.rs`), `0241b7d` (Phase 2:
+> landed exactly as planned across three commits — `982dddf` (Phase 1: `core/build.rs` generates
+> `EMBEDDED` from `presets/*.toml`), `53aec98` (rustfmt of `build.rs`), `704e94d` (Phase 2:
 > single-source `SystemKind` name↔kind mapping). Verified: the generated `EMBEDDED` reproduces
 > the prior embedded set **exactly** — 22 filename-sorted entries, byte-for-byte the same file set
 > as the old hand-written array (diff of old array names vs `presets/*.toml` = identical;

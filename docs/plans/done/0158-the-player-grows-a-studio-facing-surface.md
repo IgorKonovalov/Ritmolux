@@ -1,7 +1,7 @@
 # 0158 — The player grows a studio-facing surface
 
 > **Status:** done - closed 2026-09-10. Six `dev` phases on `plan-0158-studio-facing-surface`
-> (`ab0ec26` -> `715a777`). Mode 4 review: **no blockers, two majors, six minors.** Full
+> (`80123f0` -> `367c3a7`). Mode 4 review: **no blockers, two majors, six minors.** Full
 > suite re-run on the merged tip: 1672 passed, 6 skipped, 441 s; clippy and fmt clean; all
 > seven Node gates green. **Phase 7 stays open** and was extracted at the close to
 > [`docs/on-device-validation.md`](../../on-device-validation.md), which is where `human` work
@@ -296,12 +296,12 @@ to a layout.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — A parameter moves in place | dev | done | `ab0ec26` |
-| 2 — The player listens | dev | done | `b2d77ec` |
-| 3 — The player reports | dev | done | `fee2cfd` |
-| 4 — The engine states what a preset can contain | dev | done | `d7bdee8` |
-| 5 — The headless tap writes to a pipe | dev | done | `efb99f7` |
-| 6 — The windowed show gets a preview copy | dev | done | `715a777` |
+| 1 — A parameter moves in place | dev | done | `80123f0` |
+| 2 — The player listens | dev | done | `a7e8a24` |
+| 3 — The player reports | dev | done | `6d18fc6` |
+| 4 — The engine states what a preset can contain | dev | done | `f512a2c` |
+| 5 — The headless tap writes to a pipe | dev | done | `e9b27a2` |
+| 6 — The windowed show gets a preview copy | dev | done | `367c3a7` |
 | 7 — The on-device check | human | not started | |
 
 ### Notes

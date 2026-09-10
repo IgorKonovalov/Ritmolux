@@ -215,7 +215,7 @@ flowchart TB
     as such rather than as a failure to find a cause.
 
   Three method constraints Plan 0141's bisect learned and this one inherits:
-  - **Record the `rustc` version at every point.** Rebuilding `22bb460` in 2026-09 gave a number
+  - **Record the `rustc` version at every point.** Rebuilding `2c8f588` in 2026-09 gave a number
     **13,312 B** from the one measured at that commit in 2026-08 under the same build command, and
     nothing recorded at either date explains the gap. **That is the working noise floor for this
     column: any single step under ~13,312 B is uninterpretable.**
@@ -317,16 +317,16 @@ $ComponentWarnBytes = 11324620
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** `plan-0148-the-shipped-artifacts-carry-their-own-guarantees`, worktree `WORK/lmv-plan-0148`, forked from `main` at `fd54b43`.
+**Lane:** `plan-0148-the-shipped-artifacts-carry-their-own-guarantees`, worktree `WORK/lmv-plan-0148`, forked from `main` at `b950d98`.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `--render` is held to spending nothing | dev | done | d527820 |
-| 2 — `shot`'s help cannot fall behind its parser | dev | done | 277e372 |
-| 3 — What the container actually carries | dev | done | 393a332 |
-| 4 — The recipe reads its own output's length | dev | done | 690fb29 |
+| 1 — `--render` is held to spending nothing | dev | done | 5f41765 |
+| 2 — `shot`'s help cannot fall behind its parser | dev | done | 0ba7970 |
+| 3 — What the container actually carries | dev | done | 4a4004d |
+| 4 — The recipe reads its own output's length | dev | done | fba48d2 |
 | 5 — The second bisect | dev | done | committed with this row |
-| 6 — The repairs the close review found | dev | done | e3af0c3 |
+| 6 — The repairs the close review found | dev | done | 0d68655 |
 
 ### Notes
 
@@ -370,16 +370,16 @@ appears to have no effect. `cargo build -p standalone --example shot` first.
 shape Phase 3 did. All 34 points built, 33 steps, `rustc 1.97.1 (8bab26f4f 2026-07-14)` at every
 one, sole lane on the box before and after.
 
-- **Not a dominant step:** the largest single window is `7524b3f` at +122,368 B, which is 24.0 %
+- **Not a dominant step:** the largest single window is `5931128` at +122,368 B, which is 24.0 %
   of the +509,952 B — not the majority the done-when asks for.
 - **Not distributed either:** two steps clear the 66,560 B bar and twelve steps moved exactly 0 B,
   so the done-when's second finding is false as stated.
 - **The dominant thing is a cause, not a step.** `presets/*.toml` grew 185,563 B -> 525,603 B over
   the window, 40 presets to 81, and `build.rs` embeds each verbatim, so **340,040 B of the
-  509,952 B — 66.7 % — is preset text**. Both large steps are preset-adding closes, and `6969043`
+  509,952 B — 66.7 % — is preset text**. Both large steps are preset-adding closes, and `e729341`
   *shrinks* by 27,648 B where Plan 0125 shared the scenes' GPU boilerplate.
 
-Two cross-checks worth having: the baseline rebuild of `22bb460` gave 9,204,736 B, bit-identical to
+Two cross-checks worth having: the baseline rebuild of `2c8f588` gave 9,204,736 B, bit-identical to
 Plan 0141's 2026-09 rebuild of the same commit, so the two bisects share a measurement chain; and
 the cdylib's +509,952 B tracks the shipped component's +510,464 B, which is the first direct
 evidence that the proxy the method rests on is a good one.

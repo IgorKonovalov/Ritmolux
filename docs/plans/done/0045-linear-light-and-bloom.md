@@ -1,7 +1,7 @@
 # 0045 — Linear light: the HDR composite, the bloom stage, and the fold that had to be fixed first
 
-> **Status:** **done 2026-07-31** — every `dev` phase landed (`6f282e7`, `b67b9c2`, `c334b0e`,
-> `f7ab148`, `96780e1`, `23703dc`, merged to `main` at `2f4a804`), both Mode 4 reviews passed with
+> **Status:** **done 2026-07-31** — every `dev` phase landed (`7c1d9d3`, `d8ca422`, `1003df0`,
+> `1df0a16`, `c8234a4`, `2b4803d`, merged to `main` at `2df0f1a`), both Mode 4 reviews passed with
 > **no blockers**, and Phase 6 (`human`) reported. Gate on `main` at the close: `cargo nextest run
 > --release -p lmv-core` **316/316, 0 skipped**. (`cargo test` — not nextest — segfaults on the lib
 > binary from many GPU devices in one process; that is the documented crash mode, not a

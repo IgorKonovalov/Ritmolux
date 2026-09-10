@@ -1,7 +1,7 @@
 # 0051 — The scene seam emits premultiplied alpha: the swarm and the strokes stop punching holes in the backdrop
 
 > **Status:** **done** — closed 2026-08-01. All three phases landed on `main` in one session
-> (`708b80b` swarm seam + shared blend constant + guard, `63dd501` line seam + guard, `1828ac3`
+> (`4631bfd` swarm seam + shared blend constant + guard, `7fbc334` line seam + guard, `ca2f291`
 > docs). Mode 4 review: no blockers, one major (an operator-doc gap, fixed at close), four minor.
 > Verified at review rather than taken on report — the gate is green (fmt, clippy `-D warnings`,
 > 388/388), both guards were re-run (`|L - B|` 0.0002 swarm / 0.0000 lines), the line guard's

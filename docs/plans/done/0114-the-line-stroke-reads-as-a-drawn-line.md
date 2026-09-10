@@ -17,7 +17,7 @@
 > [ADR-0124](../../adrs/0124-the-line-stroke-carries-a-solid-core-and-a-pixel-wide-edge.md) is
 > accepted with a dated `Outcome`.
 > **Version: `0.81.0`** — one minor, taken here, for the whole plan. An earlier header note claimed
-> `v0.80.0` had been taken at a `dev`-arm close; it had not. That tag sits on `601293d`, Plan 0119's
+> `v0.80.0` had been taken at a `dev`-arm close; it had not. That tag sits on `696aae7`, Plan 0119's
 > release commit, and no part of this plan was on `main` until now. `dev`'s close block recorded the
 > discrepancy and correctly left it for this session.
 > **This merge also lands [Plan 0087](0087-the-line-renderer-draws-a-curve.md) Phases 1-4** — the
@@ -418,20 +418,20 @@ instruments, and neither one's verdict is evidence for the other's constant.
 > last one. **The phases above are the contract; everything here is what happened.**
 
 **Lane:** `WORK/lmv-plan-0114` on `plan-0114-line-stroke`, branched off `main` and merged forward
-at `b2fb13b`.
+at `447f65d`.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the profile lands | dev | done | `e2eb8fc` |
-| 2 — the arc fragment shares it | dev | done | `348cc01` |
-| 3 — the sample sheet | dev | done | `5592e40` |
+| 1 — the profile lands | dev | done | `5cb14b1` |
+| 2 — the arc fragment shares it | dev | done | `da560e0` |
+| 3 — the sample sheet | dev | done | `84861e3` |
 | 4 — pick the default | human | done | verdict below |
-| 5 — flip, re-bless, repair the docs | dev | done | `707bdb8` |
-| 6 — the library is retuned | human | done | `619fd68` |
-| 7 — the MilkDrop comparison set | dev | done | `4579dd8` |
+| 5 — flip, re-bless, repair the docs | dev | done | `1e094df` |
+| 6 — the library is retuned | human | done | `50f14a4` |
+| 7 — the MilkDrop comparison set | dev | done | `71bc1c3` |
 | 8 — judge against the reference | human | done | verdict below |
-| 9 — set the constant, add a baseline | dev | done | `60cf15e` |
-| 10 — the guard says so out loud | dev | done | `1d0185a` |
+| 9 — set the constant, add a baseline | dev | done | `74d104a` |
+| 10 — the guard says so out loud | dev | done | `471f11e` |
 
 ### Notes
 
@@ -459,7 +459,7 @@ and Phase 9's deliverable is its other half.
   of one: 34.3 / 7.9 on the software rasterizer and 34.3 / 7.9 on this machine's hardware adapter,
   measured by flipping `RenderContext::new_headless`'s `prefer_software` and restoring it.
 - **Phase 6's row was filled in here, by `dev`, and the phase was not `dev`'s.** It landed at
-  `619fd68` from the `preset-author` lane earlier the same day; leaving it reading `outstanding`
+  `50f14a4` from the `preset-author` lane earlier the same day; leaving it reading `outstanding`
   in the commit that writes this log would have recorded something known to be false.
 - **The plan doc carried an uncommitted edit from another session while this phase ran** — a
   header note on the version bump — and it is **not** in this commit. Only the two table rows and
@@ -579,7 +579,7 @@ and Phase 9's deliverable is its other half.
 - Byte-identity at Phase 1 was read bless-to-bless, not off a `git diff`:
   `LMV_BLESS=1 cargo nextest run -p lmv-core --test golden` moves `core/tests/golden/shape_collage.png`
   and nothing else. A control bless with the phase stashed moves the same one file, and so does a
-  bless in the `main` checkout at `0b9a486` with none of this branch's code — so that baseline
+  bless in the `main` checkout at `fd8645f` with none of this branch's code — so that baseline
   drifts locally on this machine independently of this plan. The other 34, the three `warp_mesh`
   ones included, are byte-identical.
 
@@ -588,19 +588,19 @@ and Phase 9's deliverable is its other half.
 - **`presets/` touched:** `presets/README.md` (the `softness` entry, the `glow` repair, the
   four-lever paragraph), and at Phase 6 **six `.toml` presets** — `curve_ionwake`,
   `curve_nightbloom`, `fragment_vitrail`, `lsystem_vellum`, `spectrum_halo`, `star_rosewindow`
-  (`619fd68`). Every one now binds `softness`; four also took a level or width trim.
+  (`50f14a4`). Every one now binds `softness`; four also took a level or width trim.
 - **Plan header `Closes:`** none — the header names no `design-backlog` entry.
 - **What shipped:** feature. A new authorable line parameter (`softness`), a changed default, one
   new golden fixture and baseline, two committed scripts, and the six-preset retune.
 - **Operator docs touched:** `presets/README.md`, `docs/presets.md`, `docs/capturing.md`.
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0. One entry was **raised**
   by this plan rather than convicted: **0132**, the level-statistic gap, filed from the Phase 6
-  sitting (`aedaabb`, renumbered `c6760f8`).
+  sitting (`b0db82d`, renumbered `b068a87`).
 - **Outstanding `human` phases:** none. Phases 4 and 8 returned verdicts, recorded above; Phase 6
-  landed at `619fd68`.
+  landed at `50f14a4`.
 - **Version, as facts rather than a recommendation:** this lane's `Cargo.toml` reads **`0.79.0`**
   and no `chore: Release` commit is on the branch. **`v0.80.0` is not this plan's** — the tag sits
-  on `601293d`, directly after `e1bd171 docs(plan-0119): close`, and is an ancestor of `main` but
+  on `696aae7`, directly after `a2ca5eb docs(plan-0119): close`, and is an ancestor of `main` but
   not of this branch. **No part of Plan 0114 is on `main`**: `softness` appears zero times in
   `main`'s `renderer.rs` and `main`'s roster row still reads `approved`. The header note above
   saying the bump was taken here states otherwise; it is not this section's to edit.

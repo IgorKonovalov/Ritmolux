@@ -1,8 +1,8 @@
 # 0075 — The content renaissance: the library is rebuilt as worlds, by replacement cohorts
 
 > **Status:** **done 2026-08-11** — all six phases landed on `plan-0075-content-renaissance`
-> (`873ca0a` Phase 1, `a6dcb51` Phase 2, `0d67416` Phase 3, `d4351ad` the brief, six cohort
-> series `4cb2776`..`9ab6c36`, `bdb61f3` Phase 6). Mode 4 review: **no blockers, no majors,
+> (`5f7a17d` Phase 1, `6242fc3` Phase 2, `8aff6a6` Phase 3, `53be190` the brief, six cohort
+> series `8d69f2a`..`5c1a519`, `55b6a36` Phase 6). Mode 4 review: **no blockers, no majors,
 > two minors, two nits** — 665/665 green after the merge with `main`, the 27-world set
 > verified against the brief's keep list and roster, the depth-cue no-op and structural-rescue
 > test bodies read against their done-whens. Close write-up in `docs/plans/README.md`.
@@ -219,7 +219,7 @@ flowchart TD
      space-filling) vigor above 1 overfills the region and dissolves the figure into dust —
      cohort 5 measured it on the loud frame and shipped the binding with the sign inverted.
      One-line caveat next to the row.
-  3. For history readers, a record rather than an edit: commit `444600d`'s title says
+  3. For history readers, a record rather than an edit: commit `217e2da`'s title says
      "firmament", but the world it ships is **Perseids** (the commit body is correct). History
      is never rewritten; this line is where the correction lives.
 - **Done when:** the docs describe the library that ships; no doc names a count that the next

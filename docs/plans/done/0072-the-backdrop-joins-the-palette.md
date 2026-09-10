@@ -1,9 +1,9 @@
 # Plan 0072 — The backdrop joins the palette
 
-> **Status:** **done 2026-08-09** — all three phases landed: Phase 1 `ff04fd4`
+> **Status:** **done 2026-08-09** — all three phases landed: Phase 1 `c7cae20`
 > (the pass samples the baked LUT pair, `saturation`/`palette_mix` fan out through
 > `ParamRoute::SceneAndBackdrop`, `core/tests/backdrop_palette.rs` carries the proof),
-> Phase 3 `7fe0a65` (the colour docs gain the backdrop), Phase 2 `ebe4170` (three of
+> Phase 3 `88a05b3` (the colour docs gain the backdrop), Phase 2 `e07f5b8` (three of
 > sixteen re-tuned). Mode 4 review 2026-08-09: **no blockers, no majors, four minors,
 > three nits**. Verified: `fmt` + `clippy --workspace --all-targets -D warnings` +
 > `nextest --workspace` (604/604) + `check-doc-links.mjs`, all green; the three new

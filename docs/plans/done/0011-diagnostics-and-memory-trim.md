@@ -8,23 +8,23 @@
 
 ## Close summary (2026-07-22)
 
-Seven phase commits landed (`7ad00df`, `166043f`, `5a9f67b`, `1ace817`, `82c7134`, `d266c08`,
-plus two post-review fixes `10a4796` + `894a2fc`). Phase 7 is a `human` carry-forward.
+Seven phase commits landed (`f52d264`, `3c6a264`, `88860b3`, `47dd250`, `0cd65f3`, `a214a91`,
+plus two post-review fixes `b1e5b38` + `4067410`). Phase 7 is a `human` carry-forward.
 
-- **Phase 1** (`7ad00df`): `core/src/diag/mod.rs` — pure `FrameStats` (fps / avg / p99 / total /
+- **Phase 1** (`f52d264`): `core/src/diag/mod.rs` — pure `FrameStats` (fps / avg / p99 / total /
   dropped from a fixed 240-sample ring, no clock, unit-tested) + `Diag` wrapping the single gated
   `Instant::now()` read (quarantined behind `collecting`, the only wall-clock read in `core` —
   verified). `Renderer::enable_diagnostics`/`metrics`; standalone title shows core-sourced fps + p99.
-- **Phase 2** (`166043f`): `render/overlay.rs` + `overlay_font.rs` — a skippable final pass drawing a
+- **Phase 2** (`3c6a264`): `render/overlay.rs` + `overlay_font.rs` — a skippable final pass drawing a
   frame-time sparkline, GPU bar, and a dependency-free 5x7 bitmap-digit readout as instanced quads.
-- **Phase 3** (`5a9f67b`): standalone F3 toggle, dependency-free per-OS RSS (`rss.rs`), and a 1 Hz
+- **Phase 3** (`88860b3`): standalone F3 toggle, dependency-free per-OS RSS (`rss.rs`), and a 1 Hz
   rotating `diagnostics.log` (`diaglog.rs`) on the render thread — no new crate, audio path untouched.
-- **Phase 4** (`1ace817`): C ABI **v3** — `lmv_set_debug` + `lmv_get_metrics` + `#[repr(C)] LmvMetrics`
+- **Phase 4** (`47dd250`): C ABI **v3** — `lmv_set_debug` + `lmv_get_metrics` + `#[repr(C)] LmvMetrics`
   (size-guarded, caller-allocated), `LMV_DEBUG_OVERLAY` env seed, header in lockstep with a
   `static_assert(sizeof == 56)`, and the first v3 FFI test (create → set_debug → get_metrics).
-- **Phase 5** (`82c7134`): foobar shim surfaces the overlay (env default + right-click toggle) and a
+- **Phase 5** (`0cd65f3`): foobar shim surfaces the overlay (env default + right-click toggle) and a
   1 Hz `plugin-diagnostics.log`; handshake relaxed to `core >= built` (v3 forward-compat).
-- **Phase 6** (`d266c08`): wgpu gated to the per-OS backend only (DX12 / Metal, default-features off)
+- **Phase 6** (`a214a91`): wgpu gated to the per-OS backend only (DX12 / Metal, default-features off)
   and an explicit `desired_maximum_frame_latency = 2` — the NFR §12 levers.
 
 **Verified at close:** `cargo test -p lmv-core` 21/21 green (incl. 4 diag + 4 FFI tests);

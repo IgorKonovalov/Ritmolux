@@ -1,7 +1,7 @@
 # 0130 — The audio input becomes an operator surface
 
-> **Status:** done — closed 2026-08-28. Phases 1-4b landed as `9005a8d`, `7eee5f0`,
-> `dd8fbf3`, `5e29453`, `85bd59b`; Phase 5 (`human`) ran bullets 1 and 2 only. Mode 4 review:
+> **Status:** done — closed 2026-08-28. Phases 1-4b landed as `43ff748`, `d3009ea`,
+> `07dc4f5`, `32c7c41`, `1bbe54e`; Phase 5 (`human`) ran bullets 1 and 2 only. Mode 4 review:
 > **no blockers, two majors, two minors, two nits.** Verified on the merged lane — `cargo fmt
 > --check` clean, `cargo clippy --workspace --all-targets` clean, `cargo nextest run --workspace`
 > 1100 passed / 5 skipped — and the five doc gates green. Both majors were about what the close
@@ -255,7 +255,7 @@ flowchart TB
     window is occluded or minimized is not seen until the window comes back. Comment only — the
     behavior is accepted.
   - `cargo nextest run --workspace`, `cargo clippy --workspace --all-targets` and `cargo fmt` stay
-    clean. The review ran all three on `72a96c5`: 1097 passed, 5 skipped, no warnings.
+    clean. The review ran all three on `bbec665`: 1097 passed, 5 skipped, no warnings.
 
 ### Phase 5 — On-device gate: swap it, unplug it, plug it back
 
@@ -366,11 +366,11 @@ struct CaptureHandle {
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — endpoint roster as a value, flags over config | dev | done | `9005a8d` |
-| 2 — the two rows in the pure state machine | dev | done | `7eee5f0` |
-| 3 — the shell swaps capture live | dev | done | `dd8fbf3` |
-| 4 — a dead input reports itself | dev | done | `5e29453` |
-| 4b — the review fixes | dev | done | `85bd59b` |
+| 1 — endpoint roster as a value, flags over config | dev | done | `43ff748` |
+| 2 — the two rows in the pure state machine | dev | done | `d3009ea` |
+| 3 — the shell swaps capture live | dev | done | `07dc4f5` |
+| 4 — a dead input reports itself | dev | done | `32c7c41` |
+| 4b — the review fixes | dev | done | `1bbe54e` |
 | 5 — on-device gate | human | partial — bullets 1 and 2 run 2026-08-28 | |
 
 ### Notes

@@ -1,7 +1,7 @@
 # 0068 — Why the downbeat rarely locks: an instrument, an ablation, and a verdict
 
-> **Status:** **done 2026-08-09** — all four phases landed as `be39985` (the probe) / `c6a7de3`
-> (the ladder) / `62ade74` (the verdict and the doc qualification), with **Phase 3 run by the user
+> **Status:** **done 2026-08-09** — all four phases landed as `7132fea` (the probe) / `f35b499`
+> (the ladder) / `1326d5b` (the verdict and the doc qualification), with **Phase 3 run by the user
 > on 2026-08-09** (98 minutes, two genres, results in place below). Mode 4 review at the close:
 > **no blockers, no majors, two minors, one nit.** Verified rather than taken on trust: nothing was
 > tuned — `CONFIDENCE_THRESHOLD` is still `0.25`, `BASS_WEIGHT` still `0.7`, and the 4/4 fold and

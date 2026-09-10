@@ -14,7 +14,7 @@ preset documents address a reader. The user's brief for the next step is broader
 let a reader *"understand ins and outs of the public API"*, be comprehensive, carry a few diagrams
 and solid examples, and serve users, embedders **and** contributors.
 
-Measured against that brief on the live site at `567380d`, four things are missing, and they are
+Measured against that brief on the live site at `3614c87`, four things are missing, and they are
 missing for structural reasons rather than for lack of prose.
 
 **The menu is organised by where a file came from, not by what a reader is trying to do.** The

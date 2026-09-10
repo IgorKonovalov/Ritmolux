@@ -1,9 +1,9 @@
 # 0025 — Full composite coverage: background + view transform for reaction-diffusion and attractor
 
 > **Status:** done — closed 2026-07-24, passed Mode 4 review (no blockers, no majors; one minor, one
-> nit). Five `dev` phase commits: `06b4007` (Phase 1, RD alpha-present over backdrop), `ae17d57`
-> (Phase 2, RD zoom/pan), `265045b` (Phase 3, attractor alpha-present), `566fcf8` (Phase 4, attractor
-> zoom/pan), `6c570ec` (Phase 5, `presets/README.md` note); plus `8d0e17a` (the pre-cleared
+> nit). Five `dev` phase commits: `3ea983f` (Phase 1, RD alpha-present over backdrop), `79975b3`
+> (Phase 2, RD zoom/pan), `5406539` (Phase 3, attractor alpha-present), `69fb2fc` (Phase 4, attractor
+> zoom/pan), `27667cd` (Phase 5, `presets/README.md` note); plus `d664422` (the pre-cleared
 > `Renderer::adapter_is_software()` accessor). Both fullscreen/accumulating presents switched from
 > opaque `REPLACE` to `PREMULTIPLIED_ALPHA_BLENDING` over the backdrop (RD alpha = the V-field
 > `structure` term; attractor alpha = accumulated luminance), and both now accept `zoom`/`pan_*` via

@@ -22,7 +22,7 @@ wants the `vX.Y.Z` tag on the commit that becomes `main`'s tip. That is a genuin
 merge-conflict inconvenience, and it is what makes the *direction* of the merge a decision.
 
 It is not hypothetical. Plan 0047's branch sat at `v0.23.0` while `main` had already reached `v0.24.0`
-(verified: `v0.24.0` is an ancestor of `24a8011` but not of `24a8011^1`). Had that close bumped from the
+(verified: `v0.24.0` is an ancestor of `29cd14d` but not of `29cd14d^1`). Had that close bumped from the
 branch's own base it would have re-issued `v0.24.0`; merging `main` in first made it the obvious
 `v0.24.0 -> v0.25.0`.
 

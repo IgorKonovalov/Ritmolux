@@ -157,7 +157,7 @@ should be read as buying coverage rather than speed.
 
 ## Notes
 
-The measurements above are Plan 0145's, taken 2026-08-31 on an idle box at `fd7f55b` (AMD Ryzen 9
+The measurements above are Plan 0145's, taken 2026-08-31 on an idle box at `694d37d` (AMD Ryzen 9
 5900HS, 16 logical CPUs, rustc 1.97.1, cargo-nextest 0.9.140). That plan's
 `### The measured baseline` carries the caveats, including a full-suite spread of 489–885 s across
 three readings within an hour — which is why this ADR argues from the **concurrency figure and the

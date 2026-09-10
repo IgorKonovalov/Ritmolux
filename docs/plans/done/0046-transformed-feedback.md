@@ -1,8 +1,8 @@
 # 0046 — Transformed feedback: the past learns to move
 
-> **Status:** **done 2026-08-09** — all five phases landed as `f2e6ed6` (the affine + the `dt` fix) /
-> `24f4bfc` (the `[feedback]` table) / `0816516` (the attractor joins) / `429396d` (the docs) /
-> `16802ae` (the Phase 5 verdict, **run by the user on 2026-08-09**). Mode 4 review at the close:
+> **Status:** **done 2026-08-09** — all five phases landed as `8564231` (the affine + the `dt` fix) /
+> `d1bc235` (the `[feedback]` table) / `f184466` (the attractor joins) / `93add38` (the docs) /
+> `d3afa9f` (the Phase 5 verdict, **run by the user on 2026-08-09**). Mode 4 review at the close:
 > **no blockers, no majors, four minors, two nits.** Verified rather than taken on trust: the
 > transform's aspect comes from the **render target** on both sinks (`trails.rs`'s `resolve` now
 > takes `surface`, which it had been ignoring; the attractor's is `Scene::render`'s `aspect`

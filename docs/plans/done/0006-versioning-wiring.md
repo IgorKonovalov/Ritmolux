@@ -6,8 +6,8 @@
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0005](../../adrs/0005-versioning-and-release-cadence.md) (accepted at this close)
 
-**Close summary (Mode 4, fresh session).** Phases 1-3 (`dev`) landed in commits ef5c4dd,
-1298e2b, 3616dfb; Phase 4 (`human`) confirmed at close — `cargo-release 1.1.3` is installed
+**Close summary (Mode 4, fresh session).** Phases 1-3 (`dev`) landed in commits f633c3e,
+9d32e0a, ee5cc12; Phase 4 (`human`) confirmed at close — `cargo-release 1.1.3` is installed
 and the dry-run works. Review verdict: **clean, no blockers, no majors.** Verified live: both
 crates resolve to `0.1.0` via workspace inheritance (`cargo metadata`); exactly one literal
 app-version string (root `Cargo.toml`); the standalone title embeds `env!("CARGO_PKG_VERSION")`

@@ -1,8 +1,8 @@
 # 0049 — The analysis diagnostics surface: making Plan 0048 Phase 6 measurable (and the kaleidoscope seam)
 
-> **Status:** done 2026-07-30 — all five phases landed in seven `dev` commits (`a335f35` the
-> integral fold order, `69761b9` `AnalysisMetrics` plumbed to the render seam, `a387909` the
-> overlay rows, `4dabb3f` the six log columns, then `38dc792` / `44c96a9` / `d5c9bd7` for Phase 5's
+> **Status:** done 2026-07-30 — all five phases landed in seven `dev` commits (`bd459a8` the
+> integral fold order, `682fa02` `AnalysisMetrics` plumbed to the render seam, `8d17ec8` the
+> overlay rows, `a26077f` the six log columns, then `748eac9` / `988254c` / `972d1ea` for Phase 5's
 > four items). Passed Mode 4 review: **no blockers, no majors**, four minors and a nit — three
 > minors and the nit fixed in the close commit. Verified at review rather than taken on trust:
 > `fmt --check` and `clippy --workspace --all-targets -D warnings` clean, `cargo nextest run

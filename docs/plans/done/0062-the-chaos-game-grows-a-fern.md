@@ -1,9 +1,9 @@
 # 0062 — The chaos game grows a fern: an IFS family that morphs between figures
 
-> **Status:** **done 2026-08-05** — all seven phases landed: `8c621fa` (Phase 1, the fern),
-> `7cdd34e` (Phase 2, the SVD roster), `18a088c` (Phase 3, the morph), `b4aa911` (Phase 4, the fit),
-> `daf59c6` (Phase 5, the four levers), `7cab347` (Phase 6, the golden fixture and the doc sweep),
-> `cf977f9` (Phase 7, the content pass and the two shipped presets). Mode 4 review: **no blockers,
+> **Status:** **done 2026-08-05** — all seven phases landed: `b6f449d` (Phase 1, the fern),
+> `86fcf54` (Phase 2, the SVD roster), `b31e287` (Phase 3, the morph), `808965c` (Phase 4, the fit),
+> `99ec2de` (Phase 5, the four levers), `e3787a8` (Phase 6, the golden fixture and the doc sweep),
+> `6957097` (Phase 7, the content pass and the two shipped presets). Mode 4 review: **no blockers,
 > one major, four minor**; 521/521 tests green, `fmt` and `clippy --all-targets -D warnings` clean,
 > **no existing golden baseline moved**, doc links resolve. Verified by reading each named test's
 > assertion body: the 25-ordered-pair × 33-position contractivity sweep asserts `max σ < 1`

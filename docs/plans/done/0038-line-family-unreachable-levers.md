@@ -1,9 +1,9 @@
 # 0038 — The line family's unreachable levers: `glow`, the readout's geometry, a level curve, and `log`
 
 > **Status:** done — **closed 2026-07-28** after a Mode 4 review in a fresh session.
-> All nine phases landed: `a1c67f4` (`glow`), `f3945be` (`span`/`baseline`), `c9121fd` (`curve`),
-> `e31ae88` (`log`), `a3f5d04` (the doc sweep), `9739232` (the settle gate), `4863bdd` (the marked
-> transient cell), `9a62754` (the non-finite guard), plus `8e84acf` + `ea781d0` (Phase 6, the
+> All nine phases landed: `32650b3` (`glow`), `c535f11` (`span`/`baseline`), `a2b70ee` (`curve`),
+> `b30da20` (`log`), `35fd0c3` (the doc sweep), `e14ded1` (the settle gate), `427c4a9` (the marked
+> transient cell), `401ecc8` (the non-finite guard), plus `52a15ea` + `3386211` (Phase 6, the
 > `preset-author` adoption pass). **Verdict: no blockers; one major, five minors, two nits** — the
 > major and three minors fixed in the close commit. Verified rather than taken on trust: `fmt
 > --check` + `clippy --workspace --all-targets -D warnings` clean, `nextest --workspace`
@@ -26,7 +26,7 @@
 > **Backlog entries closed:** [0016](../../design-backlog.md), [0017](../../design-backlog.md),
 > [0018](../../design-backlog.md), [0019](../../design-backlog.md)
 > **Amended 2026-07-27, after approval — [Plan 0037](0037-verifying-easing-transient-probe-and-dynamic-signal.md)
-> Phase 1 landed first (`ece3291`), which changes one done-when for the better.** This plan was
+> Phase 1 landed first (`84ea104`), which changes one done-when for the better.** This plan was
 > written assuming no transient probe existed, so Phase 3 could only pin ADR-0040's curve-vs-easing
 > ordering with a unit test on the pure per-element step. `capture_preset_over` and `step_response`
 > now exist, so **Phase 3 done-when 6** measures the ordering claim at the pixel level instead of
@@ -36,7 +36,7 @@
 > so **Phase 1's byte-identical-goldens claim now covers them too** — `glow` touches that scene.
 > **Amended again 2026-07-28, mid-plan, after Phase 3's done-when 6 measurement came back against
 > [ADR-0040](../../adrs/0040-spectrum-level-curve-applies-before-the-easing.md).** Phases 1–4 have
-> landed (`a1c67f4`, `f3945be`, `c9121fd`, `e31ae88`) and Phase 3 did what done-when 6 told it to:
+> landed (`32650b3`, `c535f11`, `a2b70ee`, `b30da20`) and Phase 3 did what done-when 6 told it to:
 > it measured, found the ADR's justification falsified, retuned nothing, and routed to `architect`.
 > The ruling is **[ADR-0040's Outcome](../../adrs/0040-spectrum-level-curve-applies-before-the-easing.md#outcome-2026-07-28-after-plan-0038-phase-3s-measurement)**:
 > **the shipped ordering stands and no scene code changes**, but its stated rationale ("a perceptually
@@ -233,7 +233,7 @@ table before and after its work.
      2026-07-27 — see the header note). Done-when 3 proves the ordering is *implemented as
      specified*; it cannot show the chosen order produces the motion ADR-0040 claims. Plan 0037
      Phase 1 has landed `Renderer::capture_preset_over(name, stimulus)` and
-     `metrics::step_response(rise, fall) -> StepResponse` (`ece3291`), so that claim is now directly
+     `metrics::step_response(rise, fall) -> StepResponse` (`84ea104`), so that claim is now directly
      measurable and should not ship on argument.
 
      Add a **spectrum** easing fixture — the two `easing_*` fixtures Plan 0037 added are
@@ -362,7 +362,7 @@ table before and after its work.
      configuration is exactly why the defect survived. Assert that a τ of, say, 2 s over the same 120
      frames is **reported as unsettled** rather than as a plausible frame count.
   3. **Phase 3's done-when 6 is re-measured under the fixed instrument and the corrected numbers are
-     recorded in the commit body**, replacing `c9121fd`'s. Either window is fine, with the arithmetic
+     recorded in the commit body**, replacing `a2b70ee`'s. Either window is fine, with the arithmetic
      stated: reaching 99 % of travel takes `4.6 · release / curve`, so at the fixture's
      `release = 0.5` and `curve = 0.5` the rejected arm needs **4.6 s ≈ 276 frames** of fall (and
      9.2 s ≈ 552 at `curve = 0.25`) against today's 96 — or drop the fixture's `release` to **0.15 s**,

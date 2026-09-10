@@ -1,14 +1,14 @@
 # 0110 — The shader surface stops being invisible
 
-> **Status:** done — **closed 2026-08-19, the five `dev` phases run** (`4595e14`, `c2b36cc`,
-> `916df90`, `e46232f`, `2b639fe`). Review: **no blockers, one major, three minors.** The major is
+> **Status:** done — **closed 2026-08-19, the five `dev` phases run** (`5e031b7`, `2fe26ab`,
+> `a1c8744`, `baaa351`, `82e10f7`). Review: **no blockers, one major, three minors.** The major is
 > that Phase 1's `#[path]`-declared test module is invisible to `hygiene.rs`'s skip rule, so it is
 > scanned as hot-path code and passes only because its `#![allow(...)]` block spells the sentinel
 > the guard greps for — the exact vacuous pass that guard's own header warns about, proven by probe
 > and carried to the followups below. **Phase 6 (`human`) ran 2026-08-20, and the plan is
 > complete.** The push landed as `v0.75.0`; CI run
 > [`32272926929`](https://github.com/IgorKonovalov/light-music-visualizer/actions/runs/32272926929)
-> on `main` (`7b9781d`) is green on all six jobs and puts `lmv-core` at **92.31 % lines** against
+> on `main` (`567bc28`) is green on all six jobs and puts `lmv-core` at **92.31 % lines** against
 > floor **91** — the review's `~92.3 %` projection, confirmed to two decimals. See
 > "Phase 6 — the CI reading" below.
 > **Created:** 2026-08-18
@@ -226,7 +226,7 @@ flowchart TB
 - **Files touched:** `core/src/milk/tests.rs`.
 - **Done when** these hold:
   - **A wave's per-point state carries to the next point within a wave, and does not leak into
-    the next wave.** This is the exact defect commit `a07b0c6` fixed; nothing currently pins it.
+    the next wave.** This is the exact defect commit `e664ee8` fixed; nothing currently pins it.
   - A shape instance's index reaches its program — instance `n` and instance `m` produce
     different `ShapeInstance` output when the program reads the instance variable.
   - `push_element` rejects an element whose register roster disagrees with the bundle's, with a
@@ -358,10 +358,10 @@ and 2 were already committed when it happened.
 
 | phase | state |
 |---|---|
-| 1 — the pure half gets unit tests | **done**, committed `4595e14` |
-| 2 — a shader-carrying fixture, and the guard | **done**, committed `c2b36cc` |
-| 3 — the branches where the surface is partly absent | **done**, committed `916df90` |
-| 4 — the element half of the runtime | **done**, committed `e46232f` |
+| 1 — the pure half gets unit tests | **done**, committed `5e031b7` |
+| 2 — a shader-carrying fixture, and the guard | **done**, committed `2fe26ab` |
+| 3 — the branches where the surface is partly absent | **done**, committed `a1c8744` |
+| 4 — the element half of the runtime | **done**, committed `baaa351` |
 | 5 — compare adapters, bless once, measure | **done**, committed with this log |
 | 6 — the CI reading | **human**, not started |
 
@@ -501,7 +501,7 @@ blesses "no bump" for a chore-only plan as a choice, and this is one.
 met and the shortfall branch of the done-when never fires.**
 
 Run [`32272926929`](https://github.com/IgorKonovalov/light-music-visualizer/actions/runs/32272926929),
-`main` at `7b9781d` (`v0.75.0`, pushed 2026-08-19 15:55Z). All six jobs green — `coverage`,
+`main` at `567bc28` (`v0.75.0`, pushed 2026-08-19 15:55Z). All six jobs green — `coverage`,
 `check` on both platforms, `deny`, `links`, `miri`. `rust-cache` reported a restore-key hit
 (`v0-rust-coverage-Windows_NT-x64-09dca0e9-810cc9d2`, full match false), so this is the cache-warm
 reading `ci.yml:33` has been waiting for since Plan

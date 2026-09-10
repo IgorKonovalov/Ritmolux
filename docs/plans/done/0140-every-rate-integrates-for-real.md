@@ -6,7 +6,7 @@
 > **Related ADRs:** [0152](../../adrs/0152-the-frame-delta-is-sanitized-at-the-scene-seam.md) (accepted),
 > [0153](../../adrs/0153-a-per-element-rate-integrates-per-element.md) (accepted)
 > **Closes:** design-backlog 0149, 0150. **0142 is carried, not closed** — see Phase 6.
-> **Closed:** 2026-09-08. Six phases, six commits (`d310598` through `2f4ca19`), full suite green on
+> **Closed:** 2026-09-08. Six phases, six commits (`5f7316e` through `402d8d2`), full suite green on
 > the merged tree — 1561 passed, 0 failed, 5 skipped — with no baseline blessed at any point and none
 > moved. Mode 4: **no blockers, two majors, three minors, one nit.** Both majors are about the seam's
 > *reach* rather than its correctness — `self.time += dt` reads the raw delta one call above it, and
@@ -292,16 +292,16 @@ flowchart TB
 > last one. **The phases above are the contract; everything here is what happened.**
 
 **Lane:** `WORK/rlx-0140-rates` on `plan-0140-every-rate-integrates-for-real`, branched from `main`
-at `775ef18`.
+at `634773b`.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The operator doc stops teaching the defect | dev | done | `d310598` |
-| 2 — The frame delta is sanitized at the seam | dev | done | `2a50d1a` |
-| 3 — The collage rates integrate per element | dev | done | `1209b76` |
-| 4 — Measure the emitter's third case | dev | done | `2373775` |
-| 5 — The three collage presets are retuned | dev | done, no preset edited | `36e52bb` |
-| 6 — The dissolve note | dev | done | `2f4ca19` |
+| 1 — The operator doc stops teaching the defect | dev | done | `5f7316e` |
+| 2 — The frame delta is sanitized at the seam | dev | done | `cf6c713` |
+| 3 — The collage rates integrate per element | dev | done | `4f484ce` |
+| 4 — Measure the emitter's third case | dev | done | `49bed04` |
+| 5 — The three collage presets are retuned | dev | done, no preset edited | `e05746f` |
+| 6 — The dissolve note | dev | done | `402d8d2` |
 
 ### Notes
 
@@ -350,7 +350,7 @@ at `775ef18`.
 - **A followup noticed and not acted on:** the first frame of every preset integrates at the scene's
   default rates rather than the preset's, for the six rates Plan 0122 converted as well as these two.
   It is bounded at one frame and no gate observes it. Not filed — the entry is architect's call.
-- **The `presets/README.md` row landed here** per the architect ruling in `d8b2c9f`, which also
+- **The `presets/README.md` row landed here** per the architect ruling in `7d7cb04`, which also
   amended this phase. The row states the integration, keeps Phase 1's frame-rate sentence and the
   wrap, and gives the reason a rate still wants a band envelope rather than an onset.
 
@@ -424,7 +424,7 @@ at `775ef18`.
 ### Close triggers
 
 - **`presets/` touched:** **no preset content changed.** `presets/README.md` moved in Phase 1
-  (`d310598`) and Phase 3 (`1209b76`) — the parameter reference, not a `.toml`. Phase 5 edited
+  (`5f7316e`) and Phase 3 (`4f484ce`) — the parameter reference, not a `.toml`. Phase 5 edited
   nothing.
 - **Plan header `Closes:`** — design-backlog **0149** and **0150**. Both are convicted by their own
   probes on delivery rather than by decay; the entries are untouched, as ADR-0108 directs.
@@ -442,6 +442,6 @@ at `775ef18`.
 - **`human` phases remaining:** **none.** All six phases carry `**Owner skill:** dev` and all six
   landed.
 - **Full suite:** `cargo nextest run --workspace` (not `-P fast`), run against the finished tree at
-  `2f4ca19`. **Exit 0 — 1561 passed, 0 failed, 5 skipped**, 457 s. The nine deferred GPU
+  `402d8d2`. **Exit 0 — 1561 passed, 0 failed, 5 skipped**, 457 s. The nine deferred GPU
   suites are inside that run; `--test golden` was additionally run alone after Phase 3 and after
   Phase 4, 3/3 both times. **No baseline was blessed at any point in this plan**, and none moved.

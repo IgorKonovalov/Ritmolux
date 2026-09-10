@@ -1,7 +1,7 @@
 # 0137 — The metrics measure light
 
-> **Status:** done — closed 2026-09-01. Six phases in eight commits (`efde516`,
-> `69da480`, `98977ff`, `2e1552a`, `4512095`, `5bf9dd6`, `32754b5`, plus the
+> **Status:** done — closed 2026-09-01. Six phases in eight commits (`4dc4343`,
+> `983902b`, `3d9b6a6`, `4680d4e`, `b740212`, `65b458f`, `e6b35ed`, plus the
 > close block). Mode 4 verdict: **no blockers, one major, four minors, one nit.** Verified
 > independently at the close: `cargo nextest run --workspace` **1499 passed, 5
 > skipped**, `fmt` and `clippy --workspace --all-targets -D warnings` clean, all
@@ -238,12 +238,12 @@ pub fn mean_lit_level(px: &[u8], w: u32, h: u32) -> f32;
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — One sRGB decode | dev | done | `efde516` |
-| 2 — A level statistic | dev | done | `69da480` |
-| 3 — A column for it | dev | done | `5bf9dd6`, `32754b5` |
-| 4 — `boundary_density` says what it is bound to | dev | done | `98977ff` |
-| 5 — The driven floor's second probe is actually pinned | dev | done | `2e1552a` |
-| 6 — Both floors name their population | dev | done | `4512095` |
+| 1 — One sRGB decode | dev | done | `4dc4343` |
+| 2 — A level statistic | dev | done | `983902b` |
+| 3 — A column for it | dev | done | `65b458f`, `e6b35ed` |
+| 4 — `boundary_density` says what it is bound to | dev | done | `3d9b6a6` |
+| 5 — The driven floor's second probe is actually pinned | dev | done | `4680d4e` |
+| 6 — Both floors name their population | dev | done | `b740212` |
 
 ### Notes
 
@@ -251,9 +251,9 @@ pub fn mean_lit_level(px: &[u8], w: u32, h: u32) -> f32;
   (a line family, so `geom` is present) at **107 columns** against the standing 100-column cap
   `no_report_table_line_wraps_at_a_hundred_columns` holds; the row was already at 99. Resolved by
   narrowing the eight 5-character numeric cells from 7 to 6 — `rate` keeps 7 because its cell can
-  carry a `+` — which lands the widest row at 99 with no test relaxed (`5bf9dd6`). The user chose
+  carry a `+` — which lands the widest row at 99 with no test relaxed (`65b458f`). The user chose
   that over raising the cap. ADR-0150 named the width a Negative but no measurement was taken.
-- **`32754b5` is a follow-on to Phase 3 and not in the plan.** The narrowing left the footprint and
+- **`e6b35ed` is a follow-on to Phase 3 and not in the plan.** The narrowing left the footprint and
   realistic-levels blocks at width 7, so their `bass`/`mid`/`treb`/`onset` columns stopped sitting
   under the main table's. Both blocks' own prose tells the reader to compare against the columns
   above, so both were narrowed to match.

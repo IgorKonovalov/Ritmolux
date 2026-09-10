@@ -186,15 +186,15 @@ eighty.
 |---|-------|---------|
 | 0009 | The `animation.rs` gate penalizes two legitimate designs | [ADR-0091](adrs/0091-the-animation-gate-scores-motion-against-the-figures-footprint.md) + [Plan 0077](plans/done/0077-the-quiet-sky.md) |
 | 0055 | The attractor's shape vocabulary is "breathe and bend" | [ADR-0093](adrs/0093-attractor-tuples-are-content-with-per-tuple-framing.md) + [Plan 0079](plans/done/0079-the-attractor-learns-new-figures.md). **Closed 2026-08-13** |
-| 0056 | A user-authored preset lived outside the repo for six weeks | [ADR-0081](adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md) + [Plan 0067](plans/done/0067-the-curation-route.md) (`3732fb4`) |
+| 0056 | A user-authored preset lived outside the repo for six weeks | [ADR-0081](adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md) + [Plan 0067](plans/done/0067-the-curation-route.md) (`ce5f064`) |
 | 0059 | The backdrop does not colour through the shared palette | [ADR-0086](adrs/0086-the-backdrop-colours-through-the-preset-palette.md) + [Plan 0072](plans/done/0072-the-backdrop-joins-the-palette.md) |
 | 0060 | An engine fix leaves its preset-side workarounds standing | [Plan 0067](plans/done/0067-the-curation-route.md) Phase 4 — the close-ceremony workaround grep is installed as step 3b and has run at every close since, reporting its result in the close notes even when it finds nothing |
 | 0061 | `perspective` moves the figure far more than it enlarges it | [Plan 0075](plans/done/0075-the-content-renaissance.md) Phase 3, as documentation — the ~0.9x translational law and the ~0.3 practical ceiling. The re-centring option (2) had no demonstrated want and is not carried forward |
 | 0062 | `depth_hue` is a lightness cue on a lightness ramp | [Plan 0075](plans/done/0075-the-content-renaissance.md); see 0075 |
 | 0063 | `spin`'s usable ceiling is set by `fade`, not by taste | [Plan 0075](plans/done/0075-the-content-renaissance.md) Phase 3, as documentation |
 | 0064 | An IFS preset switch shows a hard-edged rectangle of noise | [ADR-0087](adrs/0087-the-ifs-particle-carries-its-age-and-its-last-map.md) + [Plan 0073](plans/done/0073-the-fern-unfurls-and-colours-by-what-made-it.md) — the continuous respawn, so the population is never a uniform box at any instant |
-| 0065 | `morph` is a travel knob whose visible rate is steepest near zero | Documentation, `cf977f9`. Struck at the time; archived here |
-| 0066 | The IFS figures are STILL, so the drift-rate conventions are wrong for them | Documentation, `cf977f9`. **Its one undischarged half is now done**: `docs/capturing.md`'s gate table states that a passing `anim` is not evidence of a *watchable* preset on a still family |
+| 0065 | `morph` is a travel knob whose visible rate is steepest near zero | Documentation, `6957097`. Struck at the time; archived here |
+| 0066 | The IFS figures are STILL, so the drift-rate conventions are wrong for them | Documentation, `6957097`. **Its one undischarged half is now done**: `docs/capturing.md`'s gate table states that a passing `anim` is not evidence of a *watchable* preset on a still family |
 | 0067 | `depth_fade` is a uniform dimmer on every flat family | [Plan 0075](plans/done/0075-the-content-renaissance.md) Phase 2 — option 2, the true no-op, asserted by **byte equality** against a live Lorenz control so it cannot pass vacuously |
 | 0070 | The in-frame geometry fraction cannot gate new content | [Plan 0075](plans/done/0075-the-content-renaissance.md) Phase 2 — the `geom` column, where the over-scale defect is actually introduced. The `sanity.rs`-shaped distribution report stays a candidate second step, deliberately not taken |
 | 0072 | `sanity.rs`'s coverage floor forces thin-stroke line scenes into washed-out tuning | [Plan 0075](plans/done/0075-the-content-renaissance.md) |
@@ -822,7 +822,7 @@ lines".
 
 **These three were raised as `0070`-`0072` on the `plan-0065-mandala-interior` lane and renumbered
 here at its merge**, because `main` had independently minted a `0070` the same day at Plan 0069's
-close. Commit messages from that lane (`3c0e56a`, `a35485a`) and the plan's own Phase 3 verdict
+close. Commit messages from that lane (`1125690`, `4e0882d`) and the plan's own Phase 3 verdict
 still cite the old numbers; the mapping is `0070`→`0071`, `0071`→`0072`, `0072`→`0073`.
 
 **0071 and 0073 are CLOSED** (2026-08-27, Plan 0087) and their bodies are in
@@ -1406,7 +1406,7 @@ black and then come alive on a track boundary, with no user action — the repor
 ### Why it is filed rather than fixed
 
 [Plan 0097](plans/done/0097-the-track-announces-itself.md) fixed a *different* pre-existing defect in
-the same file under an explicitly approved scope expansion (the render timer, `1016777`). A second
+the same file under an explicitly approved scope expansion (the render timer, `6f2862c`). A second
 patch to the same window/ownership path in the same session would have been a third guess layered on
 two — this one wants a design pass over surface lifetime, not another edge case handled.
 
@@ -1414,7 +1414,7 @@ two — this one wants a design pass over surface lifetime, not another edge cas
 
 Whether the panel should **defer the attach** until it has a real client rect (claim without a
 surface, attach on first non-degenerate `WM_SIZE`), or whether `needs_reattach` should be re-checked
-from the same watchdog `1016777` added, which already re-derives visibility from the window every
+from the same watchdog `6f2862c` added, which already re-derives visibility from the window every
 500 ms and is the obvious place to also notice a surface that never became real.
 
 ### Reproduced independently 2026-08-16, on a second machine, with a worse symptom
@@ -3297,7 +3297,7 @@ user reads it — the window title, the settings surfaces, the packaging READMEs
 left lower-case.
 
 Plan 0150 could not see it because its greps matched the token, not its role, and the two roles sit
-four words apart on one line. Plan 0151's `11a320e` moved twelve prose sites and deliberately left
+four words apart on one line. Plan 0151's `f2b0048` moved twelve prose sites and deliberately left
 this one, because `standalone/src/main.rs` was live in another lane at the time; that lane has since
 closed and the banner moved to `cli.rs` in the split.
 

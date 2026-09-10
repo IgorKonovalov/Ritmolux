@@ -77,7 +77,7 @@ first because every later phase increases the number of people who meet the defe
 - **Notes for the implementer — read the backlog entries first; the 2026-08-16 evidence narrows
   the choice they leave open.** Entry 0102 offers two fixes: **defer the attach** until a
   non-degenerate `WM_SIZE`, or **re-check `needs_reattach` from the 500 ms watchdog** commit
-  `1016777` added. Plan 0102's Phase 5 run favours the first. The reported symptom there was not a
+  `6f2862c` added. Plan 0102's Phase 5 run favours the first. The reported symptom there was not a
   panel that never presented — it was a panel presenting a **correct picture at 154 ms per frame**,
   8.7x its steady state, with `draw_calls` and `gpu_bytes` byte-identical either side of the
   recovery. A watchdog looking for a surface that *never became real* would not have fired: this
@@ -183,7 +183,7 @@ first because every later phase increases the number of people who meet the defe
 - **This plan cannot promise adoption** and does not. Every done-when is an artifact. **Phase 1 is
   the one exception to that and is held to a measured property instead**, which is the right trade
   but a different kind of promise from the rest of the plan.
-- **Phase 1 is the third change to `foo_ritmolux.cpp`'s window/ownership path**, after `1016777`'s render
+- **Phase 1 is the third change to `foo_ritmolux.cpp`'s window/ownership path**, after `6f2862c`'s render
   timer and the surface work before it. [Backlog 0102](../design-backlog.md) says in as many words
   that it *"wants a design pass over surface lifetime, not another edge case handled"* — and that
   it was filed rather than fixed precisely to avoid *"a third guess layered on two"*. Treat a fix

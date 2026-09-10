@@ -1,8 +1,8 @@
 # 0109 — The MilkDrop import gets its geometry back
 
-> **Status:** done — closed 2026-08-19. Seven phases, six of them code: `b0f1223` (signed scale),
-> `0c87e36` (mode 6/7 angle), `c983002` (video echo), `e7dc9c5` (the field instrument, on its stop
-> branch), `b8108d1` (the pragma guard), `cfe15be` (close-review repairs), `39a8eb4` (the echo blend).
+> **Status:** done — closed 2026-08-19. Seven phases, six of them code: `3074791` (signed scale),
+> `79867b1` (mode 6/7 angle), `281a5d5` (video echo), `6ccb518` (the field instrument, on its stop
+> branch), `500bcfc` (the pragma guard), `15cd84f` (close-review repairs), `8887c40` (the echo blend).
 > Phase 5's look gate ran on 2026-08-19 against `foo_vis_milk2` 0.2.0.0; its verdicts are below.
 > **Review: no blockers, two majors, three minors** — both majors repaired before the close, and the
 > gate produced [ADR-0119](../../adrs/0119-the-video-echo-blends-toward-its-copy-rather-than-adding-it.md)
@@ -58,7 +58,7 @@ that should be black). Both are on backlog 0113.
 
 ## What the close review found
 
-**Two majors, both repaired in `cfe15be` before the close.** Six backlog citations written into the
+**Two majors, both repaired in `15cd84f` before the close.** Six backlog citations written into the
 source by Phases 1-3 were each off by one and two of them transposed, so a reader following the
 pointer landed on a real but wrong entry — and the close was about to freeze that by archiving those
 entries. And Phase 4's third dead hypothesis was not reproducible: `field_trace`'s `deposit_off_at`

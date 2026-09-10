@@ -1,7 +1,7 @@
 # 0050 — In-app settings, live quality, and a browse overlay that fits
 
-> **Status:** **done 2026-08-04.** All six phases complete. Phase 1 `14cd9e2`, Phase 2 `bed0274`,
-> Phase 3 `46b38f6`, Phase 4 `d81a24a`, Phase 5 `19096f1`, and Phase 6 (`human`) run on the machine
+> **Status:** **done 2026-08-04.** All six phases complete. Phase 1 `a8fdcde`, Phase 2 `e972c7f`,
+> Phase 3 `f69def6`, Phase 4 `d9ebcb5`, Phase 5 `c02abbf`, and Phase 6 (`human`) run on the machine
 > 2026-08-04 — results recorded under that phase below.
 > Mode 4 review: **no blockers, no majors**; one wrong design note in Phase 1, which `dev` flagged
 > rather than implemented, and one stale preset name in `docs/on-device-validation.md` that Phase 6
@@ -152,7 +152,7 @@ Each phase ships as its own commit. `dev` runs all phases in one session.
     freshly built scene has not been told how big the window is, and skipping this renders the new
     tier at the wrong resolution.
 
-    **That last clause is wrong, and `set_tier` correctly does not follow it** (`14cd9e2`, flagged
+    **That last clause is wrong, and `set_tier` correctly does not follow it** (`a8fdcde`, flagged
     by `dev` for this review rather than added as a no-op — the right call). There is nothing stale
     to re-apply: `core/src/render/mod.rs:543` calls `scene.set_target_size(...)` on the shared draw
     path **every frame**, and every `PostStage` takes `surface` as an argument to `begin`/`fold`

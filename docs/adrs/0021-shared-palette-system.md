@@ -11,7 +11,7 @@ Every built-in scene colors itself through the **same hardcoded iq cosine palett
 in two places: `fragment_field.rs` (in the WGSL `palette()` fn) and `swarm.rs` (a CPU `palette()`
 fn), both with `d = (0.10, 0.42, 0.62)`. A preset's only color lever is a scalar `hue` offset
 that rotates that one rainbow. This surfaced as concrete `preset-author`-lane friction (commit
-`76a2fb4`, while making the fragment and swarm presets distinct) in two ways that no preset can
+`8f86d9a`, while making the fragment and swarm presets distinct) in two ways that no preset can
 work around:
 
 - **Fragment fields cannot hold a cohesive mood.** Displayed color is `palette(field*0.6 + hue)`
@@ -135,7 +135,7 @@ interpolation later without changing the preset surface — noted as a followup,
 
 ## Notes
 
-Motivating friction: `preset-author` feedback note (2026-07-23), commit `76a2fb4`. The palette
+Motivating friction: `preset-author` feedback note (2026-07-23), commit `8f86d9a`. The palette
 duplication is at `core/src/render/scenes/fragment_field.rs` (`palette()` in the WGSL `SHADER`) and
 `core/src/render/scenes/swarm.rs:262`. This ADR fixes the color model only; it does not add color
 management (Alt E), does not touch the C ABI, and leaves preset **re-authoring** (exploiting the new

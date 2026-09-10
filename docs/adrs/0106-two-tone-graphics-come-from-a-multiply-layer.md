@@ -123,7 +123,7 @@ Low priority. The correction goes in the entry.
 
 ## Outcome (2026-08-16) — one Negative was falsified by measurement, and the open path came back negative
 
-Plan 0091 Phase 1 (`e2dd537`) put both of this ADR's unsettled claims on a rendered probe. Recorded
+Plan 0091 Phase 1 (`a6fd0c6`) put both of this ADR's unsettled claims on a rendered probe. Recorded
 here rather than in the body, which is append-only once accepted. Both probes live in
 `core/tests/layer.rs`, so neither number is recalled.
 

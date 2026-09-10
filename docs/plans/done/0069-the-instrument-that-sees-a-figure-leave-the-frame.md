@@ -1,7 +1,7 @@
 # 0069 — The instrument that sees a figure leave the frame
 
 > **Status:** **done 2026-08-06** — all four phases landed on `plan-0069-in-frame-geometry` as
-> `c3ce524` / `a359b67` / `9289a7c` / `1abf3a9`, one commit each. `main` was already an ancestor of
+> `2e047cc` / `337872a` / `56f5739` / `9e444ac`, one commit each. `main` was already an ancestor of
 > the branch, so no merge was needed; the full gate is green on the tip (`fmt`,
 > `clippy --all-targets -D warnings`, **546/546 nextest, 0 skipped**, doc links resolve) and **no
 > golden baseline moved or was added**, as promised. Mode 4 review: **no blockers, three minor, one
@@ -118,7 +118,7 @@ flowchart TD
 - **What:** a test over the shipped line-family presets asserting the fraction, plus the two frozen
   defective configurations as non-vacuity fixtures.
 - **Files touched:** `core/tests/geometry_extent.rs`, `core/tests/fixtures/` (the over-scaled comb,
-  restorable from `git show 2efb80e^:presets/spectrum_comb.toml`).
+  restorable from `git show aab1195^:presets/spectrum_comb.toml`).
 - **Done when:** the over-scaled comb and corona measure **below** their repaired counterparts, and
   the separation between defective and correct content is **at least an order of magnitude larger
   than the 0.055 pixel coverage achieved** between its lowest legitimate preset and a plausible

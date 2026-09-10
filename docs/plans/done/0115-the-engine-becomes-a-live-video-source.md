@@ -9,8 +9,8 @@
 > [0114](../../adrs/0114-the-engine-renders-video-offline-and-delegates-encoding.md),
 > [0001](../../adrs/0001-rust-core-wgpu-cabi-foobar-shim.md)
 >
-> **Closed 2026-08-30.** Eight phases including the added 3b, `b50592a`..`7e870aa` plus the close
-> block's `bbbb5eb` and the out-of-band auto-rotate fix `64758ad`. Mode 4 review: **no blockers,
+> **Closed 2026-08-30.** Eight phases including the added 3b, `ad348cd`..`d869655` plus the close
+> block's `2f8cc6c` and the out-of-band auto-rotate fix `ac311ac`. Mode 4 review: **no blockers,
 > two majors, three minors.** Verified at the close on the post-merge tree, not read off the log:
 > `cargo fmt --all --check`, `cargo clippy --workspace --all-targets` and `cargo nextest run
 > --workspace` all clean after `main` merged in, and the byte-identity and 300-frame residency
@@ -445,20 +445,20 @@ void      lmv_spout_destroy(LmvSpout *);
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** `plan-0115-live-video-source`, worktree `WORK/lmv-plan-0115`, branched from `main` at `5590a4f`.
+**Lane:** `plan-0115-live-video-source`, worktree `WORK/lmv-plan-0115`, branched from `main` at `bacd88c`.
 
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Stage the SDK, prove the receiving half | human | done — gate passed | |
-| 2 — The core grows a frame tap | dev | done | `b50592a` |
-| 3 — The Spout shim | dev | done | `ae436cf`, `2df3555` |
-| 3b — The GPU becomes nameable | dev | done | `b3925df`, `9347399` |
-| 4 — `lmv --stream` | dev | done | `3291b92` |
-| 5 — The stream survives a set | dev | done | `38800f3` |
+| 2 — The core grows a frame tap | dev | done | `ad348cd` |
+| 3 — The Spout shim | dev | done | `d47a22a`, `7faaaca` |
+| 3b — The GPU becomes nameable | dev | done | `22f01b0`, `b3dd292` |
+| 4 — `lmv --stream` | dev | done | `159f754` |
+| 5 — The stream survives a set | dev | done | `7289334` |
 | 6 — The gate in TouchDesigner | human | done — four of five answered | |
-| 7 — Packaging and docs | dev | done | `7e870aa` |
+| 7 — Packaging and docs | dev | done | `d869655` |
 
-Outside the phases, at the user's explicit instruction: **`64758ad`**, the auto-rotate fix Phase 5
+Outside the phases, at the user's explicit instruction: **`ac311ac`**, the auto-rotate fix Phase 5
 uncovered.
 
 ### Notes
@@ -581,8 +581,8 @@ against could not be known.
 
 - **AUTO-ROTATE HAD NOT ROTATED SINCE 2026-07-26, IN THE SHIPPED WINDOWED APP.** The shell's branch
   called `on_preset_switched()`, which is bookkeeping *about* a switch and performs none. `git log -L`
-  names `43e1278`, which correctly deferred the title and cap-overflow reads by one frame and took
-  `cycle_preset()` with them. Fixed at the user's instruction in `64758ad`: both rotation paths now
+  names `985a2fa`, which correctly deferred the title and cap-overflow reads by one frame and took
+  `cycle_preset()` with them. Fixed at the user's instruction in `ac311ac`: both rotation paths now
   go through one `rotate_to_next` helper pairing the change with its bookkeeping.
   **The new test covers the contract, not the call site** — `AppState` needs a real window and lives
   in the binary, so nothing here can assert what the event loop's branch calls, and **that absence is

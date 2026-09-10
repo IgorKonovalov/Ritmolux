@@ -1,7 +1,7 @@
 # 0080 — The sky gets a horizon: the backdrop paints a directional ramp
 
 > **Status:** done 2026-08-12 — all six `dev` phases landed as six commits
-> (`ac969a4..46a5f6c`). **Phase 7 is `human` and deliberately outstanding**, carried to the plans
+> (`597e93c..b4df88b`). **Phase 7 is `human` and deliberately outstanding**, carried to the plans
 > README's Standing section. Mode 4 review: **no blockers, no majors, three minors, one nit**
 > (minors: the `preset-author` lane's own `systems.md`/`craft.md` did not know the ramp exists —
 > the Plan 0078 `ink_gamma` minor repeated, and load-bearing because Phase 7's followup is that

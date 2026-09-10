@@ -1,8 +1,8 @@
 # 0143 — The documentation gets a front end
 
 > **Status:** done (2026-09-05)
-> **Closed 2026-09-05.** Phases 1, 2, 3, 5 and 6 as commits `41c77c5`, `44d1ec3`, `03a9588`,
-> `eeac887` and `cb3529c`; Phase 7 (`human`) on 2026-09-05 with no commit; Phase 4 (`human`)
+> **Closed 2026-09-05.** Phases 1, 2, 3, 5 and 6 as commits `c5bc794`, `77381c6`, `f2cf115`,
+> `c15dc6b` and `cd047f0`; Phase 7 (`human`) on 2026-09-05 with no commit; Phase 4 (`human`)
 > **permanently skipped** by the user, which Phase 6's CI made unnecessary. Mode 4 review:
 > **no blockers, no majors, four minors and three nits.** Verified independently of the log —
 > `cargo nextest run --workspace` green (1536 passed, 0 failed, 5 skipped), all six existing gates
@@ -294,12 +294,12 @@ other off-site target. `dev` should not re-raise this.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the site renders the published set from one source | dev | done | 41c77c5 |
-| 2 — links resolve across the publish boundary | dev | done | 44d1ec3 |
-| 3 — the home page routes, and does not pitch | dev | done | 03a9588 |
+| 1 — the site renders the published set from one source | dev | done | c5bc794 |
+| 2 — links resolve across the publish boundary | dev | done | 77381c6 |
+| 3 — the home page routes, and does not pitch | dev | done | f2cf115 |
 | 4 — the demo goes live on the personal site | human | not started — skipped by the user, this lane runs 1-3 and 5-6 | |
-| 5 — the gallery covers everything that ships | dev | done | eeac887 |
-| 6 — the permanent home builds itself | dev | done | cb3529c |
+| 5 — the gallery covers everything that ships | dev | done | c15dc6b |
+| 6 — the permanent home builds itself | dev | done | cd047f0 |
 | 7 — Pages is enabled and the demo is retired | human | done | no commit — see Notes |
 
 ### Notes
@@ -370,7 +370,7 @@ other off-site target. `dev` should not re-raise this.
 > skipped; Phase 7 completed on 2026-09-05 against the live site. Everything below is the state at
 > the end of the work.
 
-- **`presets/` touched:** no. `git diff --name-only 89c8c99..HEAD -- presets/` is empty.
+- **`presets/` touched:** no. `git diff --name-only f5dbbdb..HEAD -- presets/` is empty.
   `presets/README.md` is published by the site and is read, never written.
 - **Plan header `Closes:`** none
 - **What shipped:** feature. A documentation site under `site/`, a seventh Node gate

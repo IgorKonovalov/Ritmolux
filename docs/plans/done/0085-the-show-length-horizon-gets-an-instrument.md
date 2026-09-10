@@ -11,8 +11,8 @@
 
 ## Close (2026-08-15)
 
-Four `dev` phases, four commits: `3280136` (Phase 1, the horizon mode), `a1e62e5` (Phase 2, the
-first subjects), `97b7227` (Phase 3, the soak columns), `9514e2b` (Phase 4, the governor's
+Four `dev` phases, four commits: `21ef9db` (Phase 1, the horizon mode), `937daa5` (Phase 2, the
+first subjects), `a3173ed` (Phase 3, the soak columns), `33e6ebb` (Phase 4, the governor's
 qualification). **Phase 5 was `human` and outstanding at the moment of this close** — it needs the
 live app on a real machine for real minutes — **and was run a few hours later the same day**, so
 the plan is complete on all five phases. See the addendum at the end of this file; the paragraphs

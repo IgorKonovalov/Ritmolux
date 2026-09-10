@@ -1,9 +1,9 @@
 # 0063 — The attractor keeps its depth: perspective, haze, and a spin you can drive
 
-> **Status:** **done 2026-08-04** — all five phases landed. Phases 1-4 (`dev`): `1f0fc41` the depth
-> survives and pays for perspective, `6cd0d52` the two atmospheric cues, `c3c43d8` the integrated
-> `spin`, `6f27462` the `attractor_depth` golden fixture. Phase 5 (`human`, the `preset-author`
-> pass): `1855340` — both 3-D presets re-tuned, three findings routed to
+> **Status:** **done 2026-08-04** — all five phases landed. Phases 1-4 (`dev`): `e28b4c3` the depth
+> survives and pays for perspective, `ad09c55` the two atmospheric cues, `f340799` the integrated
+> `spin`, `f2857ec` the `attractor_depth` golden fixture. Phase 5 (`human`, the `preset-author`
+> pass): `d9243f6` — both 3-D presets re-tuned, three findings routed to
 > [design-backlog](../../design-backlog.md) 0061-0063. Mode 4 review: **no blockers, one major, two
 > minor.** Verified: every one of the fourteen pre-existing golden baselines is byte-identical and
 > the new one is the only addition; the mirror-identity property test is dimensionless algebra on

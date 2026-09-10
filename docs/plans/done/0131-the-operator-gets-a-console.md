@@ -6,9 +6,9 @@
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0143](../../adrs/0143-the-operator-console-is-a-second-surface-and-the-shell-owns-its-meaning.md) (accepted)
 
-> **Close (2026-08-30).** Five `dev` phases on `main`, no worktree: `9ab7726` (Phases 1 + 3),
-> `b9edb61` (the two machine-found defects), `f0760bb` (Phase 2), `03b4b01` (Phases 4 + 5) and
-> `eaba5b0` (the operator-feedback round). Phase 6 (`human`) is **part-run** and its remainder is
+> **Close (2026-08-30).** Five `dev` phases on `main`, no worktree: `982fac4` (Phases 1 + 3),
+> `d720bd3` (the two machine-found defects), `03ecde9` (Phase 2), `f65f48e` (Phases 4 + 5) and
+> `fc0fa72` (the operator-feedback round). Phase 6 (`human`) is **part-run** and its remainder is
 > carried by the checklist entry in
 > [`docs/on-device-validation.md`](../../on-device-validation.md), not by this plan.
 > Mode 4 review: **no blockers, two majors, five minors, two nits.** Re-verified at the close —
@@ -361,9 +361,9 @@ pub fn preview_slot(w: f32, h: f32, output_aspect: f32) -> PreviewSlot;
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The console window opens | dev | done | `9ab7726` |
-| 2 — The program preview | dev | done | `f0760bb` |
-| 3 — The modals move to the console | dev | done | `9ab7726` |
+| 1 — The console window opens | dev | done | `982fac4` |
+| 2 — The program preview | dev | done | `03ecde9` |
+| 3 — The modals move to the console | dev | done | `982fac4` |
 | 4 — Transport, staging and the mouse | dev | done | committed with this row, jointly with 5 |
 | 5 — Persistence, the flag, and the docs | dev | done | committed with this row, jointly with 4 |
 | 6 — The on-device gate | human | **part-run 2026-08-30** — one display; the rest deferred | |
@@ -421,7 +421,7 @@ predicts. `open_console` treats an `attach_aux` error as non-fatal — the windo
 reason goes to the diagnostic log, the show is untouched — and nothing on this machine or in CI can
 reach that branch. Phase 6 remains the only thing that would.
 
-**Two defects found by driving the console on the machine, both fixed in `b9edb61`.** Neither was
+**Two defects found by driving the console on the machine, both fixed in `d720bd3`.** Neither was
 reachable from the pure tests, and both are worth carrying into Phase 2 and Phase 4:
 
 - **The list was laid out against the output and drawn into the console.** `list_layout` read

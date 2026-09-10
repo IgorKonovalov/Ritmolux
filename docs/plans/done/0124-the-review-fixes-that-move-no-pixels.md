@@ -1,7 +1,7 @@
 # 0124 — The review fixes that move no pixels
 
-> **Status:** done — closed 2026-08-30. Phases 1, 2, 3, 5, 6 landed as `709544f`, `cf8c47a`,
-> `fdb0fed`, `7c87aad`, `4780f9e`; Phase 4 had landed out of band and was verified, not redone.
+> **Status:** done — closed 2026-08-30. Phases 1, 2, 3, 5, 6 landed as `fd856ee`, `e3e9b75`,
+> `0979eec`, `04e69f7`, `91003e1`; Phase 4 had landed out of band and was verified, not redone.
 > Mode 4 review: **no blockers, one major, five minors, two nits.** Verified on the lane after
 > `git merge main`: `fmt` clean, `clippy --workspace --all-targets -D warnings` clean,
 > `nextest --workspace` 1212 passed / 5 skipped, the golden suite green **unblessed**, all five
@@ -241,12 +241,12 @@ shorter than the placeholder above guessed).
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — One harness for forty test files | dev | done | 709544f |
-| 2 — Four strings, one attribute | dev | done | cf8c47a |
-| 3 — The gate learns the narration shape that survives | dev | done | fdb0fed |
+| 1 — One harness for forty test files | dev | done | fd856ee |
+| 2 — Four strings, one attribute | dev | done | e3e9b75 |
+| 3 — The gate learns the narration shape that survives | dev | done | 0979eec |
 | 4 — The maps name every crate | dev | landed out of band, verified | (none — see notes) |
-| 5 — The spec says what the shim does | dev | done | 7c87aad |
-| 6 — The unwired scripts get a line or get deleted | dev | done, with a deviation | 4780f9e |
+| 5 — The spec says what the shim does | dev | done | 04e69f7 |
+| 6 — The unwired scripts get a line or get deleted | dev | done, with a deviation | 91003e1 |
 
 ### Notes
 
@@ -334,7 +334,7 @@ verification on them.
 
 ### Close triggers
 
-- **`presets/` touched:** no — `git diff --name-only e6028bd..HEAD -- presets/` is empty. 74 files
+- **`presets/` touched:** no — `git diff --name-only 46edac8..HEAD -- presets/` is empty. 74 files
   in total.
 - **Plan header `Closes:`** none
 - **What shipped:** one user-facing **fix** (Phase 2 — six operator messages that reached the

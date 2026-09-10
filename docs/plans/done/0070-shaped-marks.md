@@ -1,8 +1,8 @@
 # 0070 — Shaped marks: the particle sprite stops being a circle
 
 > **Status:** **done 2026-08-05** — all six phases landed. Phases 1-5 on the
-> `plan-0070-shaped-marks` branch as `5d21e76` / `c15112a` / `564f3bd` / `d922ce1` / `a87e05b`,
-> fast-forwarded to `main`; the terminal `human` Phase 6 as `20657a8` at this close. Mode 4 review
+> `plan-0070-shaped-marks` branch as `6340a83` / `593a149` / `ebf3ef7` / `0f5298c` / `c41e387`,
+> fast-forwarded to `main`; the terminal `human` Phase 6 as `4c28e76` at this close. Mode 4 review
 > 2026-08-05: **no blockers**, one minor (the CPU mirror of the SDF chunk in `marks.rs`'s tests is
 > kept identical by inspection). **Verified:** every pre-existing golden baseline byte-identical
 > (`git diff --name-status` over the whole range adds `swarm_shaped.png` and modifies **zero**);

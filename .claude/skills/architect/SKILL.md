@@ -276,7 +276,7 @@ not one phase. This is architectural integrity, not line-by-line style. Run five
 
   **The three bolded rows are load-bearing for the `preset-author` lane.** That skill deliberately
   keeps *no* catalogue of its own — it points at these docs — precisely because its private copies
-  rotted while these stayed current (rewritten 2026-07-26, commit `1412a9b`). So when a plan adds a
+  rotted while these stayed current (rewritten 2026-07-26, commit `0e1e500`). So when a plan adds a
   scene param or a grammar function and these don't get swept, the content lane authors against a
   surface that doesn't exist and has no way to notice. Sweeping them *is* how that skill stays true.
 

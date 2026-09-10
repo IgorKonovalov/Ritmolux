@@ -562,7 +562,7 @@ the rows above.
 - **Five entries stay parked deliberately** — 0009 (informational), 0021 (the slew release, awaiting
   an author who wants it), 0032 (96 kHz, awaiting a report), 0038 and 0058 (content-lane retunes,
   routed not planned), and 0055 (attractor variety, which [0062] partly covers and whose own
-  re-check condition just landed). **0058 has since closed** by content on 2026-08-04 (`859ec66`),
+  re-check condition just landed). **0058 has since closed** by content on 2026-08-04 (`ca43dff`),
   so the parked content-lane retune is 0038 alone — worth knowing because two later documents kept
   pairing them.
 - **Two of the six plans ship no capability at all.** [0068] ships a diagnosis and explicitly no
@@ -680,7 +680,7 @@ by nobody yet; each is a family arm on a system 0163 or 0164 creates.
   linked artifact renamed to `rlx_core_c.lib`, and CI has no plugin job that would have caught a
   stale path. **Phase 9 needed a CI run rather than this machine, and got one:** run
   [`32272926929`](https://github.com/IgorKonovalov/Ritmolux/actions/runs/32272926929)
-  (`main` at `7b9781d`, `rust-cache` restore-key hit, all six jobs green), read at Plan
+  (`main` at `567bc28`, `rust-cache` restore-key hit, all six jobs green), read at Plan
   [0110](done/0110-the-shader-surface-stops-being-invisible.md)'s Phase 6 — that plan's own success
   criterion is the same job. Both halves answered:
   - **`COVERAGE_FLOOR` re-derives to 91**, the number it already carries. CI reads **92.31 % lines**

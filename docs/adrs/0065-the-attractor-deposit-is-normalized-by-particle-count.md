@@ -20,7 +20,7 @@ scene that claim is false: the same `fade` and the same `size` produce a differe
 different count, because capacity here **is** the picture. The claim holds for every other family
 and fails for this one.
 
-The price is on record. Commit `00d99d0` (2026-08-03) retuned four shipped attractor presets
+The price is on record. Commit `095af15` (2026-08-03) retuned four shipped attractor presets
 **downward** so they would survive `Rich` — Clifford furthest, `fade` 0.885 → 0.50, `size`
 0.62 → 0.28, `trails` 0.62 → 0.20 — with the measured share of the lit figure inside one narrow
 tone band falling from 49.8 % to 15.7 %. Those presets are now authored dim at the tier the
@@ -48,7 +48,7 @@ capacity-not-behavior claim becomes true for the last family that broke it.
   move; this moves it.
 
 ### Negative
-- **The four presets `00d99d0` brought down are now conservative at both tiers.** Their
+- **The four presets `095af15` brought down are now conservative at both tiers.** Their
   compensation was for a 3x that no longer exists, so they owe a re-raise. This is real content
   work and it is why the fix ships in a plan with a content phase rather than alone.
 - **A preset can no longer buy brightness by running at `Rich`.** That was never a documented
@@ -124,7 +124,7 @@ expectation with it instead of failing for the wrong reason.
 where it is *stated* — `core/src/render/tier.rs`'s module header and `presets/README.md` both now
 say the claim was false for this family, why (for an accumulating additive scene, capacity **is**
 the picture), and the general form: **a count feeding an accumulating pass is a look value until
-something normalizes it.** And the four presets `00d99d0` had brought down to survive the 3x owed a
-re-raise, which Phase 6 paid — halfway rather than fully, because `00d99d0` also added a bloom stage
+something normalizes it.** And the four presets `095af15` had brought down to survive the 3x owed a
+re-raise, which Phase 6 paid — halfway rather than fully, because `095af15` also added a bloom stage
 sized to the lowered figure. Rendered rather than reasoned: a full revert puts Clifford's interior
-back to a flat salmon mass, the exact failure `00d99d0` fixed arriving by another route.
+back to a flat salmon mass, the exact failure `095af15` fixed arriving by another route.

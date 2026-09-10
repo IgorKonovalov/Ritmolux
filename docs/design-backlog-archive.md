@@ -606,8 +606,8 @@ stimulus the item also asked for. What that measurement then revealed about the 
 
 ## Entries 0010-0014 — the 2026-07-26 `preset-author` API-feedback batch (second, post-Plan-0033)
 
-Raised from the lane's Phase 8 preset pass (`a070f5a`) and the live-tuning session that followed
-(`8b5b2e0`), on the user's 2048x1152 display. Two of these were filed by the lane as Plan 0033
+Raised from the lane's Phase 8 preset pass (`1778bc0`) and the live-tuning session that followed
+(`ddb5e08`), on the user's 2048x1152 display. Two of these were filed by the lane as Plan 0033
 regressions; **one of those was verified here and is not one** — see 0010.
 
 ---
@@ -650,7 +650,7 @@ folded direction** produces `s_uv` outside `[0,1]`, and the sampler is `ClampToE
 smears the border texel radially. Corners have the largest radius, so they are worst; a higher order
 rotates more of that out-of-range region into view.
 
-**It is NOT a Plan 0033 regression — this was tested, not assumed.** A worktree at `3f3b652~1` (the
+**It is NOT a Plan 0033 regression — this was tested, not assumed.** A worktree at `d00498c~1` (the
 commit before "the post stages follow the render target"), rendering the *same unmodified*
 `swarm_dense.toml` at the same size, produces **the same corner debris**. The arithmetic says why:
 the fold's aspect was a baked 1280/720 = 1.7778 before and is a live 1920/1080 = 1.7778 now, and the
@@ -785,7 +785,7 @@ and that the column names suspects rather than convicting them. Folded into
 [Plan 0037](plans/done/0037-verifying-easing-transient-probe-and-dynamic-signal.md)'s doc phase
 alongside 0014. No code change, no ADR.
 
-**~~CLOSED 2026-07-27~~** — `bca1457` added
+**~~CLOSED 2026-07-27~~** — `7eb6b13` added
 [the "A low `cover` is not a defect" section](capturing.md#a-low-cover-is-not-a-defect), naming
 `reaction_coral_bloom` at 0.128 as the healthy worked example.
 
@@ -829,7 +829,7 @@ Two independent blockers, both measured:
 
 **Impact: the widest blast radius in the batch.** ADR-0035's asymmetric easing is a capability whose
 entire value lives in the transient, and the harness cannot see a transient. Every easing edit in
-`a070f5a` and `8b5b2e0` rests solely on the user watching the running app, and the same hole will
+`1778bc0` and `ddb5e08` rests solely on the user watching the running app, and the same hole will
 make the next easing feature unverifiable too.
 
 Cheapest credible fix is one short committed reference clip (`--audio` already exists and reads
@@ -866,7 +866,7 @@ the swatch table below is still owed for the other three.)
 a generated strip committed as an image) closes it. Bundle with any other doc sweep.
 
 - **PROMOTED 2026-07-26 → [Plan 0037](plans/done/0037-verifying-easing-transient-probe-and-dynamic-signal.md)
-  Phase 5. ~~CLOSED 2026-07-27~~** — the swatch table shipped in `bca1457`, with `presets/README.md`
+  Phase 5. ~~CLOSED 2026-07-27~~** — the swatch table shipped in `7eb6b13`, with `presets/README.md`
   pointing at it from both places that mention `hue`. Retained above only because the correction is
   worth remembering.
 
@@ -874,10 +874,10 @@ a generated strip committed as an image) closes it. Bundle with any other doc sw
 
 ## Entries 0015-0019 — the 2026-07-27 batch (third, post-Plan-0034)
 
-Surfaced by the Plan 0034 **close review** and by the lane's first adoption pass (`037825d`), which
+Surfaced by the Plan 0034 **close review** and by the lane's first adoption pass (`564ac3b`), which
 put `bin()` into five curated presets, then extended the same day by a second `preset-author` pass
-over the `spectrum` scene itself. Most of the review batch was fixed in the close (`ca99cb1` the
-`shot` report stimuli and the palette wrap seam, `4d41884` the band-axis documentation); these five
+over the `spectrum` scene itself. Most of the review batch was fixed in the close (`ff2c4d9` the
+`shot` report stimuli and the palette wrap seam, `8dec9ab` the band-axis documentation); these five
 are what survived as open design questions.
 
 **0016, 0017, 0018 and 0019 are one theme: the levers exist in the engine but not in the preset
@@ -908,7 +908,7 @@ separate: it is DSP, not the preset surface.
 - **Below the crossover the mapping moves with the sample rate.** The log half is stable; the linear
   half is not, so the same `bin(x)` means a different frequency at 44.1 kHz than at 48 kHz.
 
-**The documentation half is already closed** (`4d41884`: `docs/presets.md` and `presets/README.md`
+**The documentation half is already closed** (`8dec9ab`: `docs/presets.md` and `presets/README.md`
 carry a measured position table and both consequences). **What is open is whether the axis itself
 should change**, and it is a real decision with real alternatives:
 
@@ -920,7 +920,7 @@ should change**, and it is a real decision with real alternatives:
 - **Let the edges respect the bin floor** — allocate the 64 bands over a range the window can
   actually resolve logarithmically, e.g. starting nearer 250 Hz, rather than pretending below it.
   Changes what every existing `bin()` position means, so it is breaking for the five presets in
-  `037825d` and the three `spectrum_*` ones.
+  `564ac3b` and the three `spectrum_*` ones.
 
 **Impact:** currently documentation-only, but it is load-bearing for the lane's most common reach
 (bass-region probes) and it interacts with the deferred `bin_range(lo, hi)` followup — a range
@@ -940,7 +940,7 @@ alternatives above; the empirical half of its impact question is now answered.
 
 **Routed at Plan 0037's close (2026-07-27): this is the repo's next ADR-worthy design item**, ahead
 of the rest of the open backlog. Two things a design here inherits and must not rediscover. First,
-it is **breaking**: the eight presets that reach `bin()` (`037825d`'s five plus the three
+it is **breaking**: the eight presets that reach `bin()` (`564ac3b`'s five plus the three
 `spectrum_*`) encode positions against today's axis, and the third alternative — re-laying the edges
 over a range the window can actually resolve — moves every one of them. Second, the
 `bin_range(lo, hi)` followup deferred from [ADR-0036](adrs/0036-preset-reachable-spectrum.md) is
@@ -980,7 +980,7 @@ Not ADR-worthy on its own, but see **0018**: it and this are the two halves of "
 is pinned by constants", and they should be designed together.
 
 - **PROMOTED 2026-07-27 → [Plan 0038](plans/done/0038-line-family-unreachable-levers.md) Phase 2
-  (with 0018, as this entry asked). ~~CLOSED 2026-07-28~~** — `f3945be` made `span` a bound
+  (with 0018, as this entry asked). ~~CLOSED 2026-07-28~~** — `c535f11` made `span` a bound
   **world** half-width defaulting to exactly the old `SPAN_X = 1.0`, with a unit test asserting no
   aspect or target size is read anywhere in the scene. The binding constraint held: `span ≈ 1.78`
   fills a 16:9 frame and leaves an ultrawide short, and `presets/README.md` states that rather than
@@ -1018,8 +1018,8 @@ system, not just this one), but it does not fix the easing-bypass leg on its own
 
 - **PROMOTED 2026-07-27 → [ADR-0040](adrs/0040-spectrum-level-curve-applies-before-the-easing.md) +
   [Plan 0038](plans/done/0038-line-family-unreachable-levers.md) Phases 3 and 4 — both candidates,
-  as this entry asked. ~~CLOSED 2026-07-28~~** — `c9121fd` shipped `curve` as a bindable exponent
-  applied **before** the easing, and `e31ae88` shipped `log(x)`. The either/or this entry called
+  as this entry asked. ~~CLOSED 2026-07-28~~** — `a2b70ee` shipped `curve` as a bindable exponent
+  applied **before** the easing, and `b30da20` shipped `log(x)`. The either/or this entry called
   ADR-worthy was decided, then **measured and half-falsified**: the ordering stands, but not for the
   "perceptually even fall" reason — see the ADR's Outcome. Read the two consequences it left behind
   before quoting this entry's framing: an even fall is unreachable in any ordering
@@ -1050,7 +1050,7 @@ scene should be a param", both are one named param, and a fix touching `BASELINE
 about `SPAN_X` at the same time. Same ADR-0037 constraint applies: world quantities only.
 
 - **PROMOTED 2026-07-27 → [Plan 0038](plans/done/0038-line-family-unreachable-levers.md) Phase 2
-  (with 0016). ~~CLOSED 2026-07-28~~** — `f3945be` made `baseline` a bound world y, defaulting to
+  (with 0016). ~~CLOSED 2026-07-28~~** — `c535f11` made `baseline` a bound world y, defaulting to
   exactly the old `-0.85`, and **fixed this by moving the figure rather than by special-casing the
   mirror**: no new mirror semantics, the reflection is still across the x-axis on every line scene
   alike. `baseline = 0` is the centre-mirrored readout, pinned by a test that counts the distinct
@@ -1078,7 +1078,7 @@ per-segment falloff param and a screen-space bloom are different tools an author
 differently, and holding a one-line win behind an undesigned stage has no payoff.
 
 - **PROMOTED 2026-07-27 → [Plan 0038](plans/done/0038-line-family-unreachable-levers.md) Phase 1,
-  ahead of 0005 as recommended. ~~CLOSED 2026-07-28~~** — `a1c67f4` bound `glow` on all four line
+  ahead of 0005 as recommended. ~~CLOSED 2026-07-28~~** — `32650b3` bound `glow` on all four line
   scenes at a default of exactly `1.0`, goldens byte-identical. The range question the entry did not
   ask was answered by the non-vacuity measurement: **downward has more range than upward** (0.25 vs
   0.17 per lit pixel on the rose), because strokes blend additively into an 8-bit target so `glow`
@@ -1368,7 +1368,7 @@ chain exactly. This is an unfinished application of it. Small enough to ride alo
 that touches the line family, or with Plan 0039's open Phase 5.
 
 - **CLOSED 2026-07-28 by [Plan 0040](plans/done/0040-line-joins-finish-the-job.md) Phase 3**
-  (`0bc33a6`). Both segments at a contact point carry `JOINED_A | JOINED_B`, all `2n` vertices are
+  (`d1ca109`). Both segments at a contact point carry `JOINED_A | JOINED_B`, all `2n` vertices are
   flagged, the silent test was replaced with one that asserts the sharing *across* pairs, and
   `star_pattern.png` is the only baseline that moved. The "worth checking by eye first" caution was
   honoured and **came back the other way round**: the bead is more distinct at a *wide* turn than at
@@ -1616,7 +1616,7 @@ reading**, which is worse than no reading. It cost this lane a full manual sweep
 (`grep -rnoE '(bass|mid|treb|onset)[^"]*?[><]=? *[0-9.]+' presets/*.toml`, then every threshold
 checked by hand against `LOW_LEVELS`) *after* `--report` had said the library was healthy.
 
-Nine dead gates total were fixed in `e9a1c3c`; **five of the nine** were invisible to the check.
+Nine dead gates total were fixed in `ab382f2`; **five of the nine** were invisible to the check.
 
 ### What I am not deciding
 
@@ -1665,7 +1665,7 @@ cargo run -p standalone --example shot -- --preset-file presets/swarm_drift.toml
 
 By the last frames of that strip the bands are the brightest thing on screen, and the interior has
 visibly *drained* — the picture is dimmer and flatter than it started. Present on **every** swarm
-preset, and present before the 2026-07-29 retune (`714856a`), so it is not a content regression;
+preset, and present before the 2026-07-29 retune (`2bab73f`), so it is not a content regression;
 that commit's longer exposures and coarser sprites only made it more legible.
 
 ### Mechanism
@@ -1744,7 +1744,7 @@ Every system has at least one of the latter, and they were largely unused:
 
 ### The evidence
 
-Four presets authored on 2026-07-29 (`a51c431`) bind audio to the geometry column instead, and
+Four presets authored on 2026-07-29 (`1c57a00`) bind audio to the geometry column instead, and
 measure well outside the set they joined:
 
 | preset | system | driven by audio | `anim` | reactivity at realistic levels |
@@ -2619,9 +2619,9 @@ Two consequences for the plan:
   pass — it is useful even after the edge becomes selectable, because it explains what the
   treatments are treating.
 
-**4. A third shipped instance, 2026-08-04 (Plan 0059 Phase 4, `990fedc`) — and it is evidence for
+**4. A third shipped instance, 2026-08-04 (Plan 0059 Phase 4, `e360ac1`) — and it is evidence for
 how the content rule fails in practice.** `attractor_clifford` inherited `kaleido_order = 2` from
-`f09f1fe`, where the fold was added as a symmetry A/B **with the unfolded framing still under it**.
+`29adccd`, where the fold was added as a symmetry A/B **with the unfolded framing still under it**.
 The ribbon's tips therefore sat on the frame edge and smeared into a permanent starburst; pulling
 the zoom peak from `1.42` to `0.94` removed them, the same lever and the same direction as
 Leviathan's `1.12 → 0.72`. **Two data points now say the rays are avoidable from content.** But
@@ -2670,7 +2670,7 @@ inside the frame.
 **Why it is newly visible, which is the part worth knowing.** The reseed gates were **dead** for most
 of this project's life — every attractor shipped with `reseed` written against raw levels it could
 not reach ("never fired once", `attractor_clifford.toml`'s own header). Plan 0041's content re-gain
-(`e9a1c3c`, 2026-07-29) made them fire for the first time, and Plan 0048's retune rescaled them onto
+(`ab382f2`, 2026-07-29) made them fire for the first time, and Plan 0048's retune rescaled them onto
 the normalized axis. So the artifact is **as old as the scene and as new as the gate working**: the
 user's instinct that it is unrelated to recent work is right about the mechanism and wrong about the
 exposure. `Rich` then triples the particle count into the same rectangle, which is [0031](design-backlog.md).
@@ -2751,7 +2751,7 @@ three hollow rings is still three hollow rings.
   before [ADR-0049](adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) normalized the
   bands, so the contour sat ~3.3 world units up against a visible half-height of `1.0` and was off
   frame **entirely**. What the gate measured was the lit `bg_vignette` left behind. The preset was
-  repaired in `81190ac` (`3.20 -> 0.60`), `KNOWN_FLAT` emptied itself in `4d325fc` exactly as
+  repaired in `983d23e` (`3.20 -> 0.60`), `KNOWN_FLAT` emptied itself in `d4125d7` exactly as
   designed — a repaired preset fails its own exemption and tells you to delete the line — and
   [Plan 0058](plans/done/0058-the-gate-can-see-an-empty-frame.md) Phase 2 then re-measured it at
   **`0.1916`** once the backdrop stopped counting as a figure
@@ -2877,7 +2877,7 @@ eyeballed.
 
 ## Entry 0058 — from Plan 0055 Phase 4 (2026-08-04), the content half of a decision the engine has now made
 
-**CLOSED 2026-08-04**, by content: `859ec66` (the eleven choose a treatment) and the Clifford
+**CLOSED 2026-08-04**, by content: `ca43dff` (the eleven choose a treatment) and the Clifford
 reframing inside it. All thirteen fold-binding presets now name a `kaleido_edge` explicitly —
 `grep -l '^kaleido_edge' presets/*.toml` returns thirteen — and the verdicts are a genuine spread
 (`falloff` 2, `tile` 6, `squash` 5, counting the two Plan 0055 already judged), which is the
@@ -2998,7 +2998,7 @@ needs a new edge behaviour is engine work and routes back through `architect`.
   literal `1.0` and every baseline is byte-identical. The only looks that move are Lorenz and
   Thomas, which Phase 5 retunes because their headers document the retired model.
 - **Raised:** 2026-08-04, from `preset-author` (Plan [0059](plans/done/0059-lorenz-finds-its-plane.md)
-  Phase 4, `990fedc`). All three findings verified against code, with rendered evidence noted.
+  Phase 4, `e360ac1`). All three findings verified against code, with rendered evidence noted.
 - **One entry, not three.** These are one gap seen from three sides: there is no per-scene deposit
   or intensity param, so a figure's level is spent on `exposure` — the one lever that is
   engine-wide, interpolated across a dissolve, and measured *after* the stage that would want to
@@ -3201,7 +3201,7 @@ question, and no calibration of it will help.
   conviction and sharp as a confirmation — useful to a content pass verifying its own repair even
   though it can never fail the build.
 - **Non-vacuity is already available.** `core/tests/sanity.rs` carries `pre_repair_spectrum_ridge`
-  as a frozen fixture, and `git show 2efb80e^:presets/spectrum_comb.toml` is the partial case. Any
+  as a frozen fixture, and `git show aab1195^:presets/spectrum_comb.toml` is the partial case. Any
   instrument proposed here can be tested against both before it is trusted.
 
 ---
@@ -3283,7 +3283,7 @@ change to the gate.
 
 ### Update 2026-08-04 — the gate has now rejected a preset, and there is a number
 
-- **Raised by:** `preset-author`, landing `emitter_squall` (`f6c56dc`). The entry above was filed
+- **Raised by:** `preset-author`, landing `emitter_squall` (`4460788`). The entry above was filed
   explicitly *not* as an argument that the gate should change. This update does not make that
   argument either, but it does retire the phrase "informational": the gate is now shaping shipped
   content rather than only measuring it.
@@ -3342,7 +3342,7 @@ floor, so the headroom is not large enough to give away blind.
   [Plan 0077](plans/done/0077-the-quiet-sky.md) Phase 1** (queued after Plan 0076 + cohort 6).
   The rotational-symmetry case stays out of scope by arithmetic and remains this entry's
   documented authoring constraint — the promotion covers the sparse half only.
-- **DELIVERED 2026-08-12 (Plan 0077 Phase 1, `698b734`).** The gate scores
+- **DELIVERED 2026-08-12 (Plan 0077 Phase 1, `178fab1`).** The gate scores
   `metrics::footprint_diff` — motion over the union of lit pixels, backdrops stripped — and
   the entry's own casualty is the standing proof: the rejected fifth-density Squall draft
   **passes at 0.1049** (the whole-frame statistic read it 0.0057), the static control keeps
@@ -3467,7 +3467,7 @@ shape" stays rejected (ADR-0093 Alternative B), unmeasured and now unneeded.
 **What was found.** `%APPDATA%\light-music-visualizer\presets\chthonic_coral_oracle.toml` — "Chthonic
 Coral Oracle", a reaction-diffusion preset — has **never been tracked in git**. It survived the cache
 clear deliberately; the other 43 files were retired or stale shipped copies, all recoverable from
-`c11bbf9` / `de707cb`. It is the only non-shipped preset in the user's library.
+`0e481c1` / `d87da35`. It is the only non-shipped preset in the user's library.
 
 **It is not a stray.** This is the preset that raised [backlog 0001](design-backlog-archive.md)
 on 2026-07-24 — the entry that became [ADR-0026](adrs/0026-full-composite-coverage-fullscreen-scenes.md)
@@ -3932,7 +3932,7 @@ ADR-0066 replaced the mechanism.
 ## ~~0065 — `morph` is a travel knob whose visible rate is steepest near zero, and nothing says so~~
 
 > **Discharged 2026-08-05** (Plan 0062 close). The fix was documentation and landed in the same
-> commit that raised it, `cf977f9`: `presets/README.md`'s IFS section now carries the measured
+> commit that raised it, `6957097`: `presets/README.md`'s IFS section now carries the measured
 > table, "`morph` is a TRAVEL knob, not a little-life knob", and the spiral-as-poor-target finding.
 > Recorded in [ADR-0075](adrs/0075-ifs-family-morphs-in-singular-value-space.md)'s Outcome. **One
 > thing is still open and is a review minor, not a backlog entry:** the param table's own `morph`
@@ -3940,7 +3940,7 @@ ADR-0066 replaced the mechanism.
 > what an author scanning the table reads.
 
 - **RESOLVED 2026-08-05, by documentation** — `presets/README.md`'s IFS section now carries the
-  measured table, the travel-not-life sentence and the spiral-is-a-poor-target note (`cf977f9`). The
+  measured table, the travel-not-life sentence and the spiral-is-a-poor-target note (`6957097`). The
   `morph` row of the param table, which still read "every value between is a real figure" some
   thirty lines above its own correction, now points down to it (`Plan 0073` Phase 5 caught that
   inconsistency; it is done, so that item of its doc sweep is already satisfied). Kept here rather
@@ -3996,7 +3996,7 @@ authors the wrong way.
 ## ~~0066 — the IFS figures are STILL, so the library's conventions about drift rates are wrong for them~~
 
 > **Discharged 2026-08-05** (Plan 0062 close). Documentation, landed in the same commit that raised
-> it, `cf977f9`: `presets/README.md`'s IFS section now says the figure is static so the levers carry
+> it, `6957097`: `presets/README.md`'s IFS section now says the figure is static so the levers carry
 > all the motion and want ~30 s periods, and that `spin`'s default of a full revolution every ~35 s
 > is wrong for a figure with an intrinsic "up". **The one part not discharged is the last sentence of
 > its fix** — nothing yet notes, where the animation gate is described, that a passing `anim` is not
@@ -4005,7 +4005,7 @@ authors the wrong way.
 
 - **RESOLVED 2026-08-05, by documentation** — `presets/README.md`'s IFS section now says the figure
   is static so the levers carry all the motion and want ~30 s periods, and that `spin`'s default is
-  wrong for a figure with an orientation (`cf977f9`). The optional half — a note wherever the
+  wrong for a figure with an orientation (`6957097`). The optional half — a note wherever the
   animation gate is described, that a passing `anim` is not evidence of a *watchable* preset on this
   family — is **not** done and is the part still worth doing.
 - **Raised:** 2026-08-04, from `preset-author`, during the Plan 0062 Phase 7 content pass.
@@ -4152,7 +4152,7 @@ over-scaled comb (`0.3563`) and both are working exactly as authored. A length f
 "deliberately inside the figure" from "accidentally outside the frame"; they are the same picture.
 
 So the defect class Plan 0069 was built for **still ships undetected on new content**. Author a
-`spectrum` preset tomorrow with the same over-scale that shipped in `2efb80e^` and nothing fails:
+`spectrum` preset tomorrow with the same over-scale that shipped in `aab1195^` and nothing fails:
 `sanity.rs` sweeps the library against per-system coverage floors, but `geometry_extent.rs` asserts
 only on the two frozen pairs. The plan's own Followup — "if Phase 3 convicts a shipped preset, file
 it" — could not fire for the same structural reason, and should be read as answered rather than
@@ -4471,7 +4471,7 @@ is the ADR.
 - **PROMOTED 2026-08-11 → [Plan 0077](plans/done/0077-the-quiet-sky.md) Phase 3** — same day as
   filed, riding the swarm-individuation plan exactly as the verdict below proposed; ADR-0066
   disturbance semantics, and the horizon caveat is carried by that plan's Phase 5.
-- **DELIVERED 2026-08-12 (Plan 0077 Phase 3, `3bfc7c8`).** The swarm's `reseed` is the
+- **DELIVERED 2026-08-12 (Plan 0077 Phase 3, `5651f11`).** The swarm's `reseed` is the
   attractor's percussive accent with ADR-0066's semantics — a seeded ±6 % domain-relative kick
   on a rising edge past 0.5, never a box respawn — measured dispersing (frame-diff 0.153
   against control) and re-gathering (coverage gap 0.30 % three seconds on). The caveat this
@@ -4511,7 +4511,7 @@ swarm-individuation plan is small. Not worth a plan of its own.
 - **PROMOTED 2026-08-11 → [Plan 0077](plans/done/0077-the-quiet-sky.md) Phase 4** — same day as
   filed, riding the sparse-idiom plan as its small instrument phase; no ADR, per the verdict
   below.
-- **DELIVERED 2026-08-12 (Plan 0077 Phase 4, `b1ca4e9`).** The mean columns stay untouched —
+- **DELIVERED 2026-08-12 (Plan 0077 Phase 4, `8b186b7`).** The mean columns stay untouched —
   every historical `--report` number keeps meaning what it said — and a **footprint reading**
   lands beside them (`metrics::footprint_diff` over the same capture pairs; text gets its own
   labeled block, JSON gains `reactivity_footprint`). The bloom-only fixture reads bass 0.161
@@ -4622,7 +4622,7 @@ established: **read the floor and re-derive by its own recorded rule, do not low
   change restores a stated property and has no rejected alternative worth recording. **Re-verified
   against code 2026-08-13** — the regex at `scripts/check-doc-links.mjs:48` is unchanged and the
   script's own header still says *"not reference-style links"*.
-- **CLOSED 2026-08-13** (Plan 0084 Phases 1-2, `33436f0` + `83cfb67`). Two new break classes beside
+- **CLOSED 2026-08-13** (Plan 0084 Phases 1-2, `37dbf9c` + `a07160c`). Two new break classes beside
   the inline one — a use with no definition in its file, and a definition whose relative target does
   not resolve — reported through the same `file:line -> target` shape. **The narrowing that makes it
   usable was measured, not assumed:** a shortcut use is only reported when *some* file in the tree
@@ -4691,7 +4691,7 @@ close-ceremony `git mv` that Plan 0060 already proved nobody catches by eye.
   property that makes it safe: N warm-up hops **without** rendering must leave analyzer state whose
   next frame is **bit-for-bit** equal to N hops **with** rendering. `SIGNAL_HOPS` and `WARMUP_HOPS`
   do not move — the measured headroom is not being renegotiated, only the wasted work removed.
-- **CLOSED 2026-08-13** (Plan 0084 Phases 3-4, `0e5216a` + `79b9b9b`). `Renderer::capture_audio_after_warmup`
+- **CLOSED 2026-08-13** (Plan 0084 Phases 3-4, `c48488b` + `3225f38`). `Renderer::capture_audio_after_warmup`
   takes a count of leading hops to advance without drawing; `capture_audio` is that call with a
   warm-up of zero, unchanged. Measured on the Windows development box through the DX12 software
   adapter (ADR-0071 — a measurement, not a contract): **136.3 s -> 100.2 s over 36 presets**, two
@@ -4872,7 +4872,7 @@ inside this file.
 > > cut off at the frame edge, so a smoothed `kaleido_tile` can ease between cell counts instead of
 > > snapping — the one param on this stage where that is true.*
 >
-> That comment landed in `e648a02`, **Plan 0064 Phase 1** — five phases before this entry was filed
+> That comment landed in `265dfb9`, **Plan 0064 Phase 1** — five phases before this entry was filed
 > at Phase 6 of the same plan. So the entry's central claim, that `tile` is "the same kind of
 > quantity" as `kaleido_spiral` and `palette_steps`, is answered in place: those two are rounded
 > because a fractional value is *meaningless*, and a fractional cell count is not.
@@ -4957,7 +4957,7 @@ difference an author meets on their first attempt.
 > > *The rule that came out of the retune: pick `G = C / 0.85` for `bass`/`mid` and `C / 0.60` for
 > > `treb`/`onset`, which puts a typical passage near half the cap and a peak at it.*
 >
-> It landed in `fc698cd` on **2026-08-03** — six days before this entry was raised on 2026-08-09. So
+> It landed in `dd1d9d7` on **2026-08-03** — six days before this entry was raised on 2026-08-09. So
 > the rule is not folklore; it is documented, in the file the `preset-author` lane treats as the
 > authority, in the paragraph an author reads when composing a clamped band term.
 >
@@ -5118,7 +5118,7 @@ half discharged and a half-discharged entry does not move.
   written below. What it does is add a steady-state frame-time column beside `p99` and record the
   qualification where R0's designer will meet it before they meet the column, which is this entry's
   own "the cheapest time to know is before the governor exists".
-- **CLOSED 2026-08-15** (Plan 0085 Phases 3-4, `97b7227` + `9514e2b`). The qualification is
+- **CLOSED 2026-08-15** (Plan 0085 Phases 3-4, `a3173ed` + `33e6ebb`). The qualification is
   recorded in all three places a governor design starts from — `docs/nfr.md` §1 beside the frame
   budget, roadmap item 3 in the plans index, and R0's own entry in `docs/roadmap-visual-richness.md`
   — and **the three candidate responses below are named in each and deliberately not chosen**, which
@@ -5205,7 +5205,7 @@ diagnostic it is today. Whatever is chosen, this measurement is the test case.
   RSS growth comes from live GPU resource churn no headless loop reproduces — so they share a
   motivation and **not** an instrument, and one harness for both would be blind to two of the three.
   The 2026-08-11 park-with-a-trigger below is discharged by the trigger having fired.
-- **CLOSED 2026-08-15** (Plan 0085 Phases 1-2, `3280136` + `a1e62e5`). `shot --horizon <minutes>`
+- **CLOSED 2026-08-15** (Plan 0085 Phases 1-2, `21ef9db` + `937daa5`). `shot --horizon <minutes>`
   renders N **simulated** minutes at the fixed capture step and prints one row per interval —
   coverage, `peak/mean` concentration, footprint motion — plus a `delta`/`monotone` trend per
   statistic, no threshold anywhere, and a line in its own output saying it is not a gate. Built as
@@ -5461,7 +5461,7 @@ parameter surface, and the scene that most wants it cannot reach it.
   gate half is that plan's Phase 1 via
   [ADR-0091](adrs/0091-the-animation-gate-scores-motion-against-the-figures-footprint.md)).
   Option 2 — the emitter's movable source — stays open in this entry, unpromoted.
-- **DELIVERED 2026-08-12 (Plan 0077 Phase 2, `fae16e6`).** The swarm carries `twinkle` and
+- **DELIVERED 2026-08-12 (Plan 0077 Phase 2, `ec927c2`).** The swarm carries `twinkle` and
   `size_spread` with the emitter's names and semantics — **rate and phase both off the seed**,
   so the field shimmers while the whole-frame mean sits still, the exact property this entry
   measured the emitter for. Both default 0 and the goldens pass unblessed (byte-identity by
@@ -5541,7 +5541,7 @@ first, because the candidate cause is one line and the entry may be cheaper than
   corrected in place by `architect` at that plan's close.** The finding said *"Both shipped
   reaction-diffusion worlds (`reaction_mitosis`, `reaction_verdigris`)"*. **There are three:**
   `present: system = "reaction_diffusion" in: presets/reaction_etching.toml`. `reaction_etching`
-  landed in `6ebec33` on **2026-08-10**, five days before this entry was written, so this is a
+  landed in `9f2531a` on **2026-08-10**, five days before this entry was written, so this is a
   **birth defect** — the class
   [ADR-0108](adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md) exists for,
   found by the first pass that read the entry against the tree, by the instrument that pass was
@@ -5646,7 +5646,7 @@ for show-length behaviour, on the family that most needs it, and the truncation 
   in the encoded domain instead, per bundle and driven by a uniform. The entry stays **live** until
   that plan lands, and its re-test trigger is that plan's Phase 2.
 - **HALF DISCHARGED 2026-08-17 — the fix shipped, the verdict has not.** Plan 0108 Phase 1 landed
-  (`b02cd45`): the feedback field quantizes in the sRGB-encoded domain at 255 steps, on by default for
+  (`766a931`): the feedback field quantizes in the sRGB-encoded domain at 255 steps, on by default for
   any `[milk]` bundle and an exact identity otherwise, reaching **both** warp epilogues (an MD1-era
   bundle has no custom warp shader and washed out through the built-in one). The field now settles to
   exact zero and stays black at a hundred times the brightness that shows the unquantized control
@@ -5727,7 +5727,7 @@ plan's own motivating claim; this entry is the re-test trigger.
   out, and the plan continues). That shape was the user's call over committing to fix all three,
   which this entry's falsified suspect shows would have been dishonest.
 - **PART DISCHARGED 2026-08-17 — two of the six symptoms fixed, three reproduced-but-open, one not
-  reached.** Plan 0108 Phases 3-5 landed (`60674da`, `6e92eb3`, `a07b0c6`), and the entry stays
+  reached.** Plan 0108 Phases 3-5 landed (`3249097`, `3a3533a`, `e664ee8`), and the entry stays
   **live** on what is left. Item by item:
   - **Item 1, `wave_usedots` beads — FIXED.** A mark carried no cap flags, so it was a hard-edged
     `DOT_LENGTH x 2*width` rectangle, 3.3x wider than it was long, with its long axis under a pixel:
@@ -6273,7 +6273,7 @@ only lever a preset has over the two fold rates is `warp`, because they are scal
 asking for a calmer world and asking for a flatter one are the same request.
 
 - **Raised:** 2026-08-27, from the mono cohort (`fragment_drostemono`, `shape_contourmono`,
-  `fragment_driftmono`, committed `d6ffa54`), by `preset-author`.
+  `fragment_driftmono`, committed `21bbdb9`), by `preset-author`.
 - **The field rate is reachable, but only by accident.** `pan` is added into the same sum the
   field sine sees (`var p = uv * zoom + pan`, then `sin(p.x + p.y + t * 0.5)`), so a pan of
   `r * time` on **both** axes leaves a residual sweep of `0.5 + 2r`, and `r = -0.25` cancels the
@@ -7493,7 +7493,7 @@ half what it reads at 96x96. A solid disc of radius `r` px reads about `2/r`.
 
 Both shipped floors — `0.31` on the default arm, `0.13` on `ShapeCollage` — are measurements taken
 **only** at `SIZE = 96`. `boundary_floor`'s docstring names the date (2026-08-26) and the revision
-(`8389f2a`) the two anchors were read at, which is [ADR-0071](adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)'s
+(`e68e538`) the two anchors were read at, which is [ADR-0071](adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)'s
 ceremony done carefully — but not the capture size, which is the one part of the configuration the
 number is actually bound to. `metrics.rs`'s own convention is to say it: `radial_shell_occupancy`
 names "the sanity suite's 96x96 capture" three times in one doc comment, for a weaker coupling.
@@ -7747,7 +7747,7 @@ It becomes worth doing the moment a second parametric layer ships, or alongside 
   numbers**, since this entry's last bullet says the NFR line may be the thing that is wrong.
 
 - **CLOSED 2026-09-01** by [Plan 0149](plans/done/0149-the-line-corners-stop-being-blunt.md) Phase 4
-  (commit `8ed7f1d`), by a different mechanism than the plan named: load-time sizing is impossible
+  (commit `2dbfe20`), by a different mechanism than the plan named: load-time sizing is impossible
   here because `curves::maurer_rose_pieces` decides the fit from the walk in hand, not from anything
   the preset declares. The four buffers start at capacity zero and are `reserve_exact`-ed on the
   first frame that actually fits a curve. Measured at Rich `max_segments = 60_000`: **11,760,008 B
@@ -7796,7 +7796,7 @@ author an inward boundary does not spend the session the way `fragment_vitrail`'
   bulge. Both over-claiming comments are corrected with it.
 
 - **CLOSED 2026-09-01** by [Plan 0149](plans/done/0149-the-line-corners-stop-being-blunt.md) Phase 3
-  (commit `324d34c`), taking the **load-time refusal** rather than the inward lobe. `schema.rs`
+  (commit `2af2d6d`), taking the **load-time refusal** rather than the inward lobe. `schema.rs`
   refuses a `scallop` ring whose `scale` is negative, naming the ring and the constraint. Both
   over-claiming comments were corrected with it: the one citing `ring_scale` where the structural
   `scale` is meant, and the *"the sweep between them is under half a turn for any depth"* line.
@@ -7862,7 +7862,7 @@ has already spent a plan on an arm whose stated contract and actual behaviour di
   than changing the divisor, which is what this entry argues for.
 
 - **CLOSED 2026-09-01** by [Plan 0149](plans/done/0149-the-line-corners-stop-being-blunt.md) Phase 5
-  (commit `c0fd6bf`). All four repairs landed. Item 1 **qualified the prose, not the divisor**, as
+  (commit `6ec7116`). All four repairs landed. Item 1 **qualified the prose, not the divisor**, as
   this entry argued: `marks.rs`s header and the repaired-reference section now say the interior
   contract is exact for equal spikes and name the `0.076`-`0.085` the jittered arm reads at the
   centre, with the `max(0.0, .)` guard described as bounding that error rather than removing it.
@@ -8008,7 +8008,7 @@ says it is for — *"a hardcoded list of nine names would let a tenth system shi
 picture"* — and it caught precisely that. What failed is that the only thing which executes it is a
 human running it at a close, and ADR-0100 deliberately keeps it out of CI (renders are not
 byte-reproducible; a CI diff would be permanently red). So the guard fired into an empty room:
-`shape_field` entered `SystemKind` on **2026-08-15** (`78d1671`, Plan 0091 Phase 3), `warp_mesh` on
+`shape_field` entered `SystemKind` on **2026-08-15** (`1707664`, Plan 0091 Phase 3), `warp_mesh` on
 2026-08-16 and `shape_collage` on 2026-08-25, and no close in the eleven days since could have
 re-shot an image even if it had tried.
 
@@ -8585,7 +8585,7 @@ The same method, and it is written down now: build only `core-cabi` at each `cho
 in the window and read `lmv_core_c.dll`. Two things Plan 0141's bisect learned that this one should
 carry:
 
-- **Record the `rustc` version at every point.** Rebuilding `22bb460` in 2026-09 gave a number
+- **Record the `rustc` version at every point.** Rebuilding `2c8f588` in 2026-09 gave a number
   **13,312 B** from the one measured at that commit in 2026-08, under the same build command, and
   nothing recorded at either date can now explain the gap. That is the working noise floor for this
   column, and it makes any single step under ~13 KB uninterpretable.
@@ -8780,10 +8780,10 @@ contained its answer:
 
 - **0078** (`kaleido_tile` is not quantized) — `core/src/render/kaleidoscope.rs:458` carries an
   explicit *"Deliberately **not** rounded"* doc comment with its reasoning, and that comment landed
-  at **Plan 0064 Phase 1** (`e648a02`), five phases before the entry was filed at Phase 6 of the
+  at **Plan 0064 Phase 1** (`265dfb9`), five phases before the entry was filed at Phase 6 of the
   same plan.
 - **0081** (the house gain rule is written down nowhere) — `presets/README.md:203` has carried
-  `G = C / 0.85` and `C / 0.60` since **2026-08-03** (`fc698cd`), six days before the entry claimed
+  `G = C / 0.85` and `C / 0.60` since **2026-08-03** (`dd1d9d7`), six days before the entry claimed
   the rule did not exist.
 
 Both are corrected in place below rather than moved, because a live entry that is *wrong* is more

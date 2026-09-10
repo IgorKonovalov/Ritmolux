@@ -1,8 +1,8 @@
 # 0154 — The site becomes navigable
 
 > **Status:** done (2026-09-05)
-> **Closed 2026-09-05.** Phases 1-7 as commits `3e5f6d6`, `2a77539`, `f7b5676`, `f3c8bb2`,
-> `22a0371`, `96e5806` and `3924b60`, on `main` with no worktree; Phase 8 (`human`) on 2026-09-05
+> **Closed 2026-09-05.** Phases 1-7 as commits `db9d087`, `db6e934`, `5b0a521`, `4bb5b79`,
+> `5b4cc19`, `01f4466` and `ce173f5`, on `main` with no worktree; Phase 8 (`human`) on 2026-09-05
 > with no commit. Mode 4 review: **no blockers, two majors, six minors, two nits.** Verified
 > independently of the implementation log: `cargo nextest run --workspace` green (1536 passed, 5
 > skipped, exit 0), all six tree gates and `toc.mjs --check` green, a cold `npm run build` from a
@@ -47,7 +47,7 @@ The user asked to improve the site: *"make navigation better, make really good i
 make everything neat and stable"*, and separately that a reader *"should understand how the
 application works, but not why this or that decision were made."*
 
-Four problems, measured 2026-09-05 against the tree at `9dc2183`.
+Four problems, measured 2026-09-05 against the tree at `f92ffeb`.
 
 **One page is the navigation problem.** `presets/README.md` is 273,211 bytes on one route. A flat
 split at `##` does not fix it — three sections hold 219,863 bytes, 80.5 % of the document. The
@@ -290,19 +290,19 @@ flowchart TB
 > last one. **The phases above are the contract; everything here is what happened.**
 > **Observations, never conclusions:** this says where to look, architect decides how it went.
 
-**Lane:** `main` directly, no worktree. Plan 0152's lane fast-forwarded into `main` (`a573ada`)
+**Lane:** `main` directly, no worktree. Plan 0152's lane fast-forwarded into `main` (`4755045`)
 between Phase 1 being written and committed, adding one provenance heading to
 `docs/on-device-validation.md`; every count below is against the merged tree.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — no plan number reaches a reader's eye | dev | done | `3e5f6d6` |
-| 2 — the roster becomes 46 pages | dev | done | `2a77539` |
-| 3 — a wrong anchor fails the build | dev | done | `f7b5676` |
-| 4 — the rule generalises | dev | done | `f3c8bb2` |
-| 5 — a stranger can find out what this is and get it | dev | done | `22a0371` |
-| 6 — the drift classes get gates | dev | done | `96e5806` |
-| 7 — it looks like one thing | dev | done | `3924b60` |
+| 1 — no plan number reaches a reader's eye | dev | done | `db9d087` |
+| 2 — the roster becomes 46 pages | dev | done | `db6e934` |
+| 3 — a wrong anchor fails the build | dev | done | `5b0a521` |
+| 4 — the rule generalises | dev | done | `4bb5b79` |
+| 5 — a stranger can find out what this is and get it | dev | done | `5b4cc19` |
+| 6 — the drift classes get gates | dev | done | `01f4466` |
+| 7 — it looks like one thing | dev | done | `ce173f5` |
 | 8 — verified where it is served | human | not started | |
 
 ### Notes
@@ -313,7 +313,7 @@ between Phase 1 being written and committed, adding one provenance heading to
 `## Idiom A — line / point strips (have it: lines/, Plan 0010 closed)`. The plugin skips a trailing
 parenthetical holding a code span; the same document's `## Idiom D — full-screen fragment (have it:
 fragment_field.rs)` is that shape with no citation in it. Excluding those three is what made the
-count exactly the **31** the phase predicts, at `23e7c89`. Their heading ids still carry a plan
+count exactly the **31** the phase predicts, at `fced298`. Their heading ids still carry a plan
 number; the catalogue does not split, so those are anchors, never route names.
 
 **P1 — counts, one of them low.** 32 headings (31 pre-merge), 21 contents-block rows, **15** body
@@ -360,7 +360,7 @@ slug. Restored with `git checkout`.
 a remark-plugin change does not invalidate it; two verification passes read a stale `site/dist`.
 
 **P4 — the phase's arithmetic was wrong about one file.** `docs/on-device-validation.md` is **48,219**
-bytes, not the 37,241 the done-when and ADR-0166 both name — 45,417 at `9dc2183`, the commit the ADR
+bytes, not the 37,241 the done-when and ADR-0166 both name — 45,417 at `f92ffeb`, the commit the ADR
 says it measured, so the figure was wrong when written. 40 KB therefore selects **five** documents,
 and **`docs/nfr.md` at 33,295 is the real largest under the threshold**. Raised before P1, answered
 at P4: apply the rule. **Phase 4's done-when and ADR-0166's "Why these two numbers" are left
@@ -431,7 +431,7 @@ scheme gets its own three accent stops.
 - **Operator docs touched:** `CLAUDE.md` only — the `packaging/` line and the `scripts/` block.
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit **0**.
 - **Full suite:** `cargo nextest run --workspace` — exit **0**, **1536 passed, 5 skipped**, 9 slow,
-  407.7 s, run at `3924b60`.
+  407.7 s, run at `ce173f5`.
 - **All eight Node gates at the tip:** every one exit 0.
 - **Outstanding `human` phases:** **Phase 8**. Nothing here has been pushed, so the live site is
   still the pre-plan one.

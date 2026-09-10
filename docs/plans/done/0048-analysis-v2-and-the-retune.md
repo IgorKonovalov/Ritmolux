@@ -1,12 +1,12 @@
 # 0048 — Analysis v2: the dual-resolution axis, normalized bands, phrase time, and the one retune that pays for all of it
 
 > **Status:** done — closed 2026-08-03 after a Mode 4 review with **no blockers**. All seven
-> phases ran: `bfd892b` the dual-resolution axis (8192-sample long window, crossover derived at
-> band 20 / 246.2 Hz), `ef3b772` normalization with the `*_raw` escapes, `910a6d1` the shared
-> `Variables::from_frame`, `81b21d5` ADR-0050 Layer 1, `7a06676` the gated downbeat estimator,
-> `909ae4a` the harness/docs recalibration, `0fb26d4` Phase 6's verdicts (recorded below),
-> `80c5dff` Phase 7's library retune (368 gains, 36 thresholds, 7 `bin()` positions), `bea5c1e`
-> the lane's backlog notes, `fc698cd` the axis-block regeneration that finally met Phase 5's
+> phases ran: `65f762c` the dual-resolution axis (8192-sample long window, crossover derived at
+> band 20 / 246.2 Hz), `7b045ff` normalization with the `*_raw` escapes, `3f4cf29` the shared
+> `Variables::from_frame`, `029558c` ADR-0050 Layer 1, `b4062b9` the gated downbeat estimator,
+> `c5e00bf` the harness/docs recalibration, `f779452` Phase 6's verdicts (recorded below),
+> `6c7fa2c` Phase 7's library retune (368 gains, 36 thresholds, 7 `bin()` positions), `d02d96d`
+> the lane's backlog notes, `dd1d9d7` the axis-block regeneration that finally met Phase 5's
 > done-when. [ADR-0049](../../adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) and
 > [ADR-0050](../../adrs/0050-downbeat-and-phrase-tracking-with-confidence-fallback.md) are
 > **accepted, each with an Outcome section**. Gate at the close: `fmt --check` clean, `clippy
@@ -260,7 +260,7 @@ question showing itself unprompted.
 **Verdict: no blockers, no majors.** Every phase landed with its done-when met, both ADRs
 earned an Outcome section, and the two things the closing session was told to check — the
 version bump and Phase 5's unmet done-when — are handled here (the latter having already been
-repaired by `fc698cd`). Four minors, all doc bookkeeping, all fixed in the close commit.
+repaired by `dd1d9d7`). Four minors, all doc bookkeeping, all fixed in the close commit.
 
 **Verified at review rather than taken on trust.** `fmt --check` clean; `clippy --workspace
 --all-targets -D warnings` clean; `cargo nextest run --workspace` **388/388, 0 skipped**.
@@ -277,7 +277,7 @@ recursively, so `gain.rs` and `downbeat.rs` were covered by the panic-pragma gua
 
 **The tests were opened, not trusted.** Three properties are worth naming because they are the
 kind most closes skip. `raw_levels_are_bit_identical_to_the_pre_normalization_build` pins four
-literals **measured against `92579ef`**, the commit before the plan — a fact about the old code
+literals **measured against `b5fb9df`**, the commit before the plan — a fact about the old code
 this code must match, which is the only form of "unchanged" worth asserting.
 `analysis_is_deterministic` **destructures** `AnalysisFrame`, so adding a field stops the file
 compiling until it is covered — added precisely because the normalizers and the beat clock are

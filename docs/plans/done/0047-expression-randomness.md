@@ -1,7 +1,7 @@
 # 0047 — Expression randomness: `hash`, `noise`, and the seed that finally does something
 
 > **Status:** done 2026-07-30 — all three phases shipped on `plan-0047-expression-randomness`
-> (`96d39c1` the two salted functions, `d72a4cc` `seed = "random"` + the capture pin, `8f7fc13`
+> (`c617ffe` the two salted functions, `fd45d36` `seed = "random"` + the capture pin, `aeb4507`
 > the docs sweep), merged to `main`. Passed Mode 4 review: **no blockers, no majors**; three
 > minors (the pin is test-verified at one of five capture entry points; `docs/capturing.md` and
 > NFR §6 not swept) — the two doc minors fixed in this close commit, the test-coverage one left

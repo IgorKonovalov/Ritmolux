@@ -8,10 +8,10 @@
 
 ## Close summary (2026-07-23)
 
-Landed in two `dev` commits — `08df308` (Phase 1: `build.ps1` reads `[workspace.package].version`
+Landed in two `dev` commits — `4689c99` (Phase 1: `build.ps1` reads `[workspace.package].version`
 from root `Cargo.toml` and generates `build/foo_lmv_version.h`; `foo_lmv.cpp` includes it guarded
 with a `0.0.0-dev` fallback and feeds `FOO_LMV_VERSION` to `DECLARE_COMPONENT_VERSION`) and
-`a8effb9` (Phase 2: refreshed both stale scene-description strings). Passed Mode 4 review cold —
+`6a4396b` (Phase 2: refreshed both stale scene-description strings). Passed Mode 4 review cold —
 **no blockers, no majors, no minors** (one nit below). Verified: the `Cargo.toml` regex
 `\[workspace\.package\][^\[]*?\bversion\s*=\s*"([^"]+)"` is anchored to the `[workspace.package]`
 section (the `[^\[]` class can't cross a section header, so a member/profile `version` can never

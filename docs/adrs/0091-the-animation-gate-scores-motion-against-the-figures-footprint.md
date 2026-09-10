@@ -100,7 +100,7 @@ the flat ladder) and `core/tests/animation.rs`'s own `#[ignore]`d ladder measure
 
 ## Outcome — 2026-08-12, at Plan 0077's close
 
-Nothing in the body was falsified; the implementation (`698b734`) is recorded here for the
+Nothing in the body was falsified; the implementation (`178fab1`) is recorded here for the
 two things the Decision left open or did not anticipate.
 
 - **The masked form won**, over the `frame_diff / max(occupancy, eps)` quotient, and the

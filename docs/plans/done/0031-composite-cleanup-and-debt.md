@@ -3,9 +3,9 @@
 > **Status:** done
 > **Created:** 2026-07-25
 > **Approved:** 2026-07-25
-> **Closed:** 2026-07-26 — six `dev` phase commits (`5244fd2` `shot`'s helpers into the lib,
-> `83706a3` `from_context`, `6755014` load-time routes + tau, `64e7145` three per-frame stops,
-> `fb024fc` `render/gpu.rs` + the attractor split, `609b9c9` the accumulated debt). Passed Mode 4
+> **Closed:** 2026-07-26 — six `dev` phase commits (`0a4b308` `shot`'s helpers into the lib,
+> `708e979` `from_context`, `2d37879` load-time routes + tau, `8144b75` three per-frame stops,
+> `d8d23f9` `render/gpu.rs` + the attractor split, `98b057b` the accumulated debt). Passed Mode 4
 > review: **no blockers, no majors**; five minors, three nits. Version **patch 0.16.0 -> 0.16.1**.
 > See "Close" at the foot of this file.
 > **Owner skill(s):** dev
@@ -414,7 +414,7 @@ phase, every `**Owner skill:**` tag present and in-vocabulary.
 ### Verified at review, not taken on trust
 
 - **211/211** `cargo nextest run --workspace` green, all nine GPU suites included.
-- **`core/tests/` is byte-untouched across the whole range** (`git diff --stat ee2811c..HEAD --
+- **`core/tests/` is byte-untouched across the whole range** (`git diff --stat bfb58bd..HEAD --
   core/tests/` is empty), so "every golden baseline byte-identical, no re-bless" — this plan's central
   acceptance criterion, and the one Phase 5 could have silently broken — is true in fact, not by
   assertion.

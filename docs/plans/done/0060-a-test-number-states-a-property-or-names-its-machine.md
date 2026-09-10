@@ -1,10 +1,10 @@
 # 0060 — A test number states a property, or names its machine
 
 > **Status:** **done 2026-08-04** — all three phases landed and the Mode 4 review found **no
-> blockers**. Phase 1 `1d56600` (both gates state what they can prove) plus `31073f6` (the
+> blockers**. Phase 1 `f49ac14` (both gates state what they can prove) plus `10f84f4` (the
 > `.config/nextest.toml` `success-output` override, without which Phase 2 would have read nothing
 > off a green run); Phase 2 the `human` push, **CI green on all three jobs**, run **30903871856**;
-> Phase 3 `a324b21` (the three documentation items) and `ae4c215` (the magnitude claim, on
+> Phase 3 `3aae7e2` (the three documentation items) and `a45c6c0` (the magnitude claim, on
 > hardware). **CI has been green since Phase 1** after five consecutive red pushes.
 > **Phase 3 was re-scoped mid-plan by the architect**, by this phase's own route-back clause: the
 > CI ratio came back at `0.036654`, under the `0.05` fallback the plan named in advance, so
@@ -55,12 +55,12 @@ tests asserting a number that only exists on one machine — is done either way.
 ## Context & problem
 
 The user asked why CI was failing. Two tests fail, deterministically, on every run since
-`554c3aa` (macOS) and `31ea398e` (Windows). Everything else is healthy: `fmt`, `cargo test --doc`
-and `clippy -D warnings` are all clean at `4ab383c`, verified locally — they simply never ran in
+`e622a37` (macOS) and `7a4e1879` (Windows). Everything else is healthy: `fmt`, `cargo test --doc`
+and `clippy -D warnings` are all clean at `36e453e`, verified locally — they simply never ran in
 CI, because `nextest` aborts the step first.
 
 **`raw_levels_are_bit_identical_to_the_pre_normalization_build` (`core/tests/dsp.rs`).** Four
-`f32` levels are asserted to reproduce, bit for bit, literals measured against `92579ef` on an
+`f32` levels are asserted to reproduce, bit for bit, literals measured against `b5fb9df` on an
 x86_64 box. On `macos-26-arm64` `bass_raw` diverges by `8.4e-6` relative — about 71 ULP — and it
 cannot do otherwise. The fixture builds its own input with `f32::sin` (platform libm), and
 `rustfft` dispatches NEON on aarch64 where it dispatches AVX/SSE on x86_64: different rounding
@@ -140,7 +140,7 @@ flowchart TB
 - **Detail — DSP.** The four-literal comparison runs under `cfg(target_arch = "x86_64")` and keeps
   `assert_eq!` on the bits exactly as it is. On every other architecture it prints each observed
   value as hex bits, decimal, and relative error against the same literal, plus a one-line notice
-  naming where the reference came from (`92579ef`, x86_64) in the ADR-0016 shape. The existing
+  naming where the reference came from (`b5fb9df`, x86_64) in the ADR-0016 shape. The existing
   non-vacuity counter-assertion — `frame.bass != frame.bass_raw`, that normalization is not a
   no-op — needs no frozen number and **runs on every architecture**, so the test is not vacuous
   where it is pinned.
@@ -175,12 +175,12 @@ flowchart TB
 
 #### Phase 2 measurements
 
-Read out of the CI log through the `.config/nextest.toml` `success-output` override (`31073f6`) —
+Read out of the CI log through the `.config/nextest.toml` `success-output` override (`10f84f4`) —
 without it both tests would have printed nothing, being passing tests on exactly the green run that
 was supposed to produce their numbers.
 
 **arm64 raw levels** (`macos-latest`, `macos-26-arm64`), against the x86_64 literals frozen at
-`92579ef`:
+`b5fb9df`:
 
 | level | observed bits | observed value | relative error |
 |---|---|---|---|
@@ -242,7 +242,7 @@ from.
   plan's own Risks section says the allocation quirk lets a held outgoing side through, and that
   belongs in the test rather than only here. Record both readings and the 11.3x signal spread in
   the comment, and point at ADR-0074. Change no assertion **in the WARP test**.
-  **Landed as `a324b21`, with one thing now stale in it.** That commit sent the magnitude claim to
+  **Landed as `3aae7e2`, with one thing now stale in it.** That commit sent the magnitude claim to
   Plan [0053](../done/0053-the-suite-stops-blessing-what-warp-gets-wrong.md) Phase 3, which was this plan's
   instruction at the time and was superseded hours later when ADR-0074's premise was corrected. The
   pointer sits at `core/src/render/mod.rs:3223-3225` and is re-pointed by the hardware item below —
@@ -284,14 +284,14 @@ from.
   — with **no assertion added, removed or loosened**, and the printed statistic set left intact;
   the DSP test's doc comment carries the four arm64 values; the determinism spec states the scope
   of its bit-identity clause; `fmt`, `clippy -D warnings` and the full `nextest` run are clean
-  locally, and no golden baseline moves. **Landed `a324b21`.**
-- **Done when (the hardware item): landed `ae4c215`.** A second, hardware-only test
+  locally, and no golden baseline moves. **Landed `3aae7e2`.**
+- **Done when (the hardware item): landed `a45c6c0`.** A second, hardware-only test
   (`a_dual_live_dissolve_moves_the_picture_against_its_own_progression`) asserts a ratio floor of
   `0.018` — half the `0.036542` measured on a **non-software** adapter, rounded down; its doc
   comment names the adapter (`AMD Radeon(TM) Graphics`, integrated, `0x1002:0x1638`), driver
   `30.0.13002.1001`, DX12, in the ADR-0071 measurement shape, states that it skips on both CI
   runners so CI never enforces it, and tabulates the hardware reading against both WARP readings.
-  The WARP test is untouched apart from that citation, and `a324b21`'s pointer at Plan 0053 Phase 3
+  The WARP test is untouched apart from that citation, and `3aae7e2`'s pointer at Plan 0053 Phase 3
   is re-pointed at the new test. Verified non-vacuous by mutation (both sides frozen collapses the
   ratio to exactly `0.000000`), and reproduced at close under `--no-capture`.
 
@@ -397,14 +397,14 @@ narrower than they read. Carried in ADR-0074's **Outcome** section and in Follow
   the `architect` skill's lens 4, phrased as the two questions to ask of any numeric assertion in a
   diff.
 - ~~**The dual-live magnitude claim is owed on hardware**, at Plan 0053 Phase 3~~ — **paid here,
-  `ae4c215`.** The deferral rested on a premise that was false and cheap to check: the gate is
+  `a45c6c0`.** The deferral rested on a premise that was false and cheap to check: the gate is
   `Renderer::adapter_is_software()` (`device_type == Cpu`), not "a discrete GPU". Plan 0053 Phase 3
   no longer owes this, and ADR-0074 Alternative C (re-posing the control as the outgoing preset's
   own un-dissolved motion) is no longer a fallback against hardware never arriving — it is now only
   a *better-posed* successor if anyone wants the WARP test to carry a magnitude after all.
 - **Two WARP builds disagree 11.3x on the dual-live signal, and the hardware reading says which one
   is wrong.** This entry used to say nothing explained the spread beyond "the allocation quirk costs
-  more history on the newer build". `ae4c215` explains it the other way: hardware matches the
+  more history on the newer build". `a45c6c0` explains it the other way: hardware matches the
   **newer** WARP to five figures on the control, so **10.0.19041 — this box's build — is the
   outlier**, inflating the numerator. The consequence is larger than the original entry's, because
   the golden suite blesses on this box: a `frozen`-only sequence with no dual-live asymmetry in it

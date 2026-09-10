@@ -1,8 +1,8 @@
 # 0013 — Headless scene capture + differential visual QA (reactivity, distinctness, sanity, animation, beat) + golden images + shot CLI
 
-> **Status:** done — Phases 1-8 (dev) landed in eight commits (`ecc50e5`, `ba68026`,
-> `d11a7f0`, `889f4e3`, `26a3180`, `4b54d1e`, `8152943`, `4364464`) plus the
-> `assets/test` gitignore (`a16be92`); passed Mode 4 review 2026-07-22 (no blockers, no
+> **Status:** done — Phases 1-8 (dev) landed in eight commits (`bb625b9`, `117ff43`,
+> `9df27a8`, `b7f6ed0`, `f1ead97`, `1a7e581`, `30c7049`, `0cf3640`) plus the
+> `assets/test` gitignore (`05e915d`); passed Mode 4 review 2026-07-22 (no blockers, no
 > majors). Verified: full `cargo test -p lmv-core` green (18 lib unit + animation/beat/
 > distinctness/golden/reactivity/sanity/dsp/ffi/preset/hygiene binaries, all software-adapter
 > where GPU-bound); `cargo clippy -p lmv-core -p standalone --all-targets -D warnings` clean
@@ -300,7 +300,7 @@ flowchart LR
   `cargo run -p lmv-standalone --example shot -- --audio assets/test/<name>.wav --strip 8 --out
   strip.png` produces a filmstrip that visibly reacts to the music.
 - **Close-review note (2026-07-22):** dev implemented a **safer variant** of this — `assets/test/*`
-  is **gitignored** (only a tracked `assets/test/README.md`, commit `a16be92`), so the clip is
+  is **gitignored** (only a tracked `assets/test/README.md`, commit `05e915d`), so the clip is
   supplied and used **locally, never committed**. This resolves the plan's own licensing risk
   ("dev never commits sourced music") more cleanly and does not block anything (the `--signal`
   path validates the full audio pipeline with no asset). It does mean the literal "committed under

@@ -262,23 +262,23 @@ linker = "rust-lld.exe"   # Phase 2 confirms this form resolves; it is not on PA
 > last one. **The phases above are the contract; everything here is what happened.**
 
 **Lane:** `main` directly, worktree
-`C:/Users/Igor Konovalov/WORK/light-music-visualizer`, at `35fd027` (after Plan
+`C:/Users/Igor Konovalov/WORK/light-music-visualizer`, at `18df929` (after Plan
 0132's close).
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Take the baseline | dev | done | b17d8cc |
-| 2 — Point the MSVC target at `rust-lld` | dev | done | fbc065b |
-| 3 — One artifact store for every lane | dev | done | 3323a71 |
-| 4 — Prove nothing about the tests changed | dev | done | a50b193 |
-| 5 — Repair the one script the redirect breaks | dev | done | a29a23a |
-| 6 — Measure where the suite time actually goes | dev | done | a3d57c6 |
-| 7 — Write down what a machine has to do | dev | done | 952d5c3 |
+| 1 — Take the baseline | dev | done | 1476e9c |
+| 2 — Point the MSVC target at `rust-lld` | dev | done | 3bb29c1 |
+| 3 — One artifact store for every lane | dev | done | 7d96470 |
+| 4 — Prove nothing about the tests changed | dev | done | 82da138 |
+| 5 — Repair the one script the redirect breaks | dev | done | 9b55452 |
+| 6 — Measure where the suite time actually goes | dev | done | 844e632 |
+| 7 — Write down what a machine has to do | dev | done | a2654df |
 
 ### Notes
 
 **Machine** (ADR-0071): AMD Ryzen 9 5900HS, Windows 10 19045, rustc 1.97.1,
-cargo-nextest 0.9.140, on AC. Baseline `35fd027`.
+cargo-nextest 0.9.140, on AC. Baseline `18df929`.
 
 **Phase 1 — baseline.** Compile-and-link only, `--no-run` throughout, so no figure
 here covers suite run time.

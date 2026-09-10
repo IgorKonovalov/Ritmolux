@@ -103,7 +103,7 @@ wrong. That judgement belongs to the Mode 4 review, and this ADR gives it a rule
 ### Neutral
 
 - Comment volume becomes a measurable property of the repo — 0.52 comment lines per code line at
-  `e022a5d` — so the bet above can be settled with a number rather than an impression.
+  `ff556c3` — so the bet above can be settled with a number rather than an impression.
 
 ## Alternatives considered
 
@@ -155,7 +155,7 @@ blocks of 40 lines or fewer to the convention.
 ## Notes
 
 Measured 2026-08-25 over `core/src`, `standalone/src`, `lmv-ring/src`, `core-cabi/src`, `core/tests`
-and `standalone/tests`, at commit `e022a5d`. The 28,064 / 53,489 figures cover the four `src` roots;
+and `standalone/tests`, at commit `ff556c3`. The 28,064 / 53,489 figures cover the four `src` roots;
 the sweep totals (89 links, 3,850 lines inside 61 blocks of 40+, 252 narration lines, 106 files)
 include the two test roots, which is why they exceed the numbers quoted in Context. **Every block
 count in this ADR is over the sweep scope**; the 191/140/125/118/106-line headers named in Context

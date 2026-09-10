@@ -6,8 +6,8 @@
 > owes an ADR, so it becomes a successor plan rather than holding this one open — the plan's Risks
 > section anticipated exactly this ("Phase 4 may stop the plan. By construction, and it is why Lorenz
 > is last: Phases 1-3 and 6 are complete work without it").
-> Phase commits: `8c95cf2` the two instruments, `4d77bff` the deposit, `5bb36c2` the reseed,
-> `9d717fc` the Lorenz diagnosis, `b2be2d3` the one content pass.
+> Phase commits: `ae03b0d` the two instruments, `14a2b37` the deposit, `4e0f538` the reseed,
+> `6898bbe` the Lorenz diagnosis, `95b88ad` the one content pass.
 > Mode 4 review: **no blockers, no majors**; three minors, all doc/bookkeeping, fixed in the close
 > commit. Gate on `main` after both lanes met: fmt clean, clippy `-D warnings` clean, **427/427,
 > 0 skipped**, and **no golden baseline moved anywhere in the plan** — proved by re-running the suite
@@ -42,7 +42,7 @@ suite.
 The three ADRs carry the mechanisms. What justifies one plan rather than three is the coupling, and
 it is concrete rather than aesthetic:
 
-- **The retune is already half-spent in the wrong direction.** Commit `00d99d0` (2026-08-03)
+- **The retune is already half-spent in the wrong direction.** Commit `095af15` (2026-08-03)
   brought four attractor presets down — Clifford's `fade` 0.885 → 0.50, `size` 0.62 → 0.28 — to
   survive a 3x deposit at `Rich`. Phase 2 removes that 3x, so those four become conservative at
   *both* tiers and owe a re-raise. Done as three plans, that content pass runs once for the
@@ -250,14 +250,14 @@ so Phase 6's re-authoring of `attractor_lorenz` is load-bearing for this and sho
 - **Owner skill:** human
 - **What:** run the `preset-author` lane over all six attractor presets **once**, judging each at
   both tiers with `--tier`. Three things to settle in the same pass: re-raise the four presets
-  `00d99d0` brought down to survive a 3x that no longer exists; judge whether the disturbed reseed
+  `095af15` brought down to survive a 3x that no longer exists; judge whether the disturbed reseed
   reads as the percussive accent every header claims (the jitter magnitude is the lever, and
   ADR-0066 says returning to the box is not); and re-author `attractor_lorenz` against a figure
   that now has a shape, where before it was carried by colour.
 - **Files touched:** `presets/attractor_*.toml` (six).
 - **Done when:** each of the six is judged at both tiers and the commit states which levers moved
   per preset. The tonal-flatness statistic is recorded before and after for each — the same
-  measurement `00d99d0` used by hand, available in the harness once [0056] Phase 5 lands. **No
+  measurement `095af15` used by hand, available in the harness once [0056] Phase 5 lands. **No
   preset's identity changes**: no palette, family or coefficient moves. This is a re-gain, not a
   re-design.
 
@@ -286,7 +286,7 @@ let deposit_scale = FLOOR_PARTICLES as f32 / active_count as f32;
 - **The jitter magnitude is a look constant with no principled value.** Phase 3 picks a starting
   value from the family's own extent; Phase 6 is where it is judged, in motion, at both tiers.
 - **Phase 6 wants [0056]'s flatness statistic.** Soft — it can be measured ad hoc the way
-  `00d99d0` did, in a scratch directory — but measuring it by hand twice is the specific waste this
+  `095af15` did, in a scratch directory — but measuring it by hand twice is the specific waste this
   plan exists to avoid, so **sequence [0056] first**.
 - **Phase 2 changes what "authored at `Floor`" guarantees**, in the direction of making it true.
   Anyone comparing a pre-change `Rich` screenshot will find the new one dimmer; that is the fix,

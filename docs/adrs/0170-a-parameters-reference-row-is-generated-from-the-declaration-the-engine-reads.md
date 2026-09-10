@@ -21,7 +21,7 @@ own parameters appear once, as a single table row listing names and nothing else
 A reader who wants to know what `flash` does, what its default is and what range reads has to
 search the essays, and for a parameter with no essay — `flash`, `glow`, most of the palette block —
 the answer is in `core/src/render/scenes/fragment_field.rs` and nowhere else. Counted on the tree at
-`567380d`: 24 `PARAMS` declarations across the scenes and the engine stages, and 33 per-parameter
+`3614c87`: 24 `PARAMS` declarations across the scenes and the engine stages, and 33 per-parameter
 tables in the roster, of which 21 carry a default column. The coverage is real and it is partial by
 construction, because every row was written by hand in response to a question someone once had.
 
@@ -143,7 +143,7 @@ repair is `a_parameter_default_is_declared_once`, a source scan over `core/src/r
 side by side is the finding whether or not they agree today** — `DEFAULT_ROTATION` in the same file
 was the same shape, agreeing and therefore latent, and a value comparison could have stated neither.
 
-The counts the Context measured at `567380d` moved on delivery: 24 `PARAMS` declarations became
+The counts the Context measured at `3614c87` moved on delivery: 24 `PARAMS` declarations became
 **26 rosters**, and the 33 hand-written tables became **19 generated ones** — 341 rows, 180 distinct
 parameters — because the generator composes a system's table from its own specs plus the shared
 blocks rather than from one table per hand-written section. The Neutral bullet on

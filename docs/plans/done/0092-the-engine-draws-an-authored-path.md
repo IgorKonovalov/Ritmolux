@@ -1,7 +1,7 @@
 # 0092 — The engine draws an authored path
 
 > **Status:** done — closed 2026-09-09. Seven phases on `plan-0092-the-engine-draws-an-authored-path`
-> (`6cd20de` → `51831ab`). Mode 4 review: **no blockers, one major, three minors, one nit.** Full
+> (`c61fbf0` → `e4a92ef`). Mode 4 review: **no blockers, one major, three minors, one nit.** Full
 > suite re-run at the tip: 1596 passed, 6 skipped. Both authored-path worlds shipped at the close.
 > **Created:** 2026-08-13
 > **Approved:** 2026-08-13 (user)
@@ -325,13 +325,13 @@ stroke = "0.0"       # 0 = filled; > 0 strokes at abs(d) < w
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The parser, and what it refuses | dev | done | `6cd20de` |
-| 2 — The path becomes a field | dev | done | `bad073f` |
-| 3 — Two paths morph | dev | done | `987c758` |
-| 4 — Arcs, if Plan 0087 delivered them | dev | done | `85e41b7` |
-| 5 — The authoring surface is documented | dev | done | `d66c3c6` |
+| 1 — The parser, and what it refuses | dev | done | `c61fbf0` |
+| 2 — The path becomes a field | dev | done | `c8bdf32` |
+| 3 — Two paths morph | dev | done | `0dd0a3c` |
+| 4 — Arcs, if Plan 0087 delivered them | dev | done | `965831b` |
+| 5 — The authoring surface is documented | dev | done | `bd04d36` |
 | 6 — The look gate | human | done | — (2026-09-09, in the running app) |
-| 7 — The pasted path is the path the browser drew | dev | done | `51831ab` |
+| 7 — The pasted path is the path the browser drew | dev | done | `e4a92ef` |
 
 ### Notes
 

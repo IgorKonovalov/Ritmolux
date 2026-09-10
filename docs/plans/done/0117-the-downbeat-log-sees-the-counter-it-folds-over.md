@@ -1,6 +1,6 @@
 # 0117 — the downbeat log sees the counter it folds over
 
-> **Status:** done — closed 2026-08-25. Both phases landed (`fa5f040`, `28641ec`);
+> **Status:** done — closed 2026-08-25. Both phases landed (`639ff5d`, `aa1f704`);
 > `cargo nextest run --workspace` re-run at the close reads 962 passed / 0 failed / 3 skipped,
 > `fmt` and `clippy --workspace --all-targets` clean, all three doc gates exit 0. Mode 4 review:
 > **no blockers, one major** (relative links inside Rust doc comments are unguarded — eleven
@@ -23,7 +23,7 @@ Plan 0095 moved the fold onto the bar grid's beat count; the log still writes `b
 are indexed in grid space, `beat` is in transient space, and before Plan 0095 those were one number.
 `a_synthesized_4_4_favours_the_alignment_it_was_built_with` fails on exactly that: the accent is
 unambiguously on phase 0 by the `beat` column (mean bass **0.364** against 0.032 / 0.004 / 0.006)
-and the fold reports `best = 3`. **`main` is red and unpushed at `c0869e6`.**
+and the fold reports `best = 3`. **`main` is red and unpushed at `8cc0fb0`.**
 
 The repair is two appended columns carrying what the fold was actually handed, and a test that reads
 them. It is also the instrument ADR-0109's `Outcome` says does not exist — with these columns a
@@ -167,12 +167,12 @@ flowchart LR
 > last one. **The phases above are the contract; everything here is what happened.**
 
 **Lane:** `main` directly — the repair's whole subject is that `main` is red and unpushed at
-`c0869e6`, so there is no branch to merge back.
+`8cc0fb0`, so there is no branch to merge back.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the tracker reports what it was handed | dev | done | `fa5f040` |
-| 2 — the log carries them, and the test reads them | dev | done | `28641ec` |
+| 1 — the tracker reports what it was handed | dev | done | `639ff5d` |
+| 2 — the log carries them, and the test reads them | dev | done | `aa1f704` |
 
 ### Notes
 

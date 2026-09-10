@@ -178,7 +178,7 @@ is a live company.
 ## Outcome — 2026-09-02, at Plan 0150's close
 
 The rename landed as decided and the central safety property held: the full suite is green
-(1518 passed, 5 skipped) and every golden is byte-identical to the pre-rename baseline `47432ca`.
+(1518 passed, 5 skipped) and every golden is byte-identical to the pre-rename baseline `4755144`.
 Three claims in the body above were falsified by the implementation and are corrected here rather
 than edited there.
 

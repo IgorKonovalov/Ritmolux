@@ -2,13 +2,13 @@
 
 > **Status:** done
 > **Created:** 2026-09-04
-> **Closed:** 2026-09-07 — both phases landed (`96458c9`, `8503b25`). Mode 4 review: **no blockers, no majors,
+> **Closed:** 2026-09-07 — both phases landed (`6e18cc5`, `fe4412d`). Mode 4 review: **no blockers, no majors,
 > one minor.** Verified independently of the log: the `easing` `.pdb` at 15,073,280 B against six
 > pre-change generations spanning 40.46-40.62 MB (62.9 %), `librlx_core` at 53,324,328 B inside the
 > band, `cargo nextest run --workspace` green at 1556 passed / 5 skipped / 498.357 s, and all seven
 > repo gates plus `toc --check` exit 0. **The `"*"` glob-scope claim is confirmed by CI rather than
 > by the rlib proxy this plan asked for**: the `coverage` job ran the ADR-0033 ratchet under
-> `debug = 0` on `d19e3db` and passed. No version bump — chore-only, `[profile.release]` untouched.
+> `debug = 0` on `53d9d35` and passed. No version bump — chore-only, `[profile.release]` untouched.
 > **Owner skill(s):** dev
 > **Related ADRs:** [ADR-0165](../../adrs/0165-dependencies-compile-without-debug-info-and-one-line-buys-it-back.md)
 
@@ -170,8 +170,8 @@ one key in one TOML table.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The profile setting | dev | done | `96458c9` |
-| 2 — The escape hatch, written down where it is needed | dev | done | `8503b25` |
+| 1 — The profile setting | dev | done | `6e18cc5` |
+| 2 — The escape hatch, written down where it is needed | dev | done | `fe4412d` |
 
 ### Notes
 
@@ -199,7 +199,7 @@ operative half — bare number, no relative link.
 - **Backlog probes:** exit 0 — `106 stated reductions still hold across all 45 live entries
   (8 unprobeable)`; its advisory list, never part of the exit code, names 0185 and 0186 among 64
   moved paths.
-- **Full suite:** `cargo nextest run --workspace` at `8503b25`, exit 0 — 1556 passed (11 slow),
+- **Full suite:** `cargo nextest run --workspace` at `fe4412d`, exit 0 — 1556 passed (11 slow),
   5 skipped, 416.462 s. Phase 1's own done-when names the same command and it ran there too:
   1556 passed, 5 skipped, 444.233 s.
 - **Outstanding `human` phases:** none.

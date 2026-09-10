@@ -1,6 +1,6 @@
 # 0139 — The render path validates before it spends
 
-> **Status:** done — closed 2026-09-01. Phases 1-3 landed as `5cf50bc`, `fa211e0`, `4d8e4c8`.
+> **Status:** done — closed 2026-09-01. Phases 1-3 landed as `fdbbbba`, `6291822`, `fecdc7d`.
 > Mode 4 review: **no blockers, one major, four minors, three nits.** Verified on the lane with
 > `main` merged in: `cargo nextest run --workspace` **1496 passed, 5 skipped, 0 failed**; `fmt`,
 > `clippy --workspace --all-targets` and all five Node gates green. `resolve_preset` was read
@@ -165,17 +165,17 @@ flowchart TB
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Validate the preset name before spending anything | dev | done | `5cf50bc` |
-| 2 — A size lever on the convenience path | dev | done | `fa211e0` |
-| 3 — The capture doc says what the levers are | dev | done | `4d8e4c8` |
+| 1 — Validate the preset name before spending anything | dev | done | `fdbbbba` |
+| 2 — A size lever on the convenience path | dev | done | `6291822` |
+| 3 — The capture doc says what the levers are | dev | done | `fecdc7d` |
 
 ### Notes
 
 - Phase 1's assertions live in `standalone/src/shot/render/tests.rs`, which no phase's **Files
   touched** names; it is `render.rs`'s own `mod tests` and was read as part of it.
 - **Inherited red, not this plan's:** `node scripts/check-comment-hygiene.mjs` exits 1 on
-  `core/tests/preset.rs:2800` and `:2832` at this lane's base commit `af4d2b1`. Both lines come from
-  `4e596c0`, a Plan 0146 phase commit, and this lane does not touch that file. The gate runs at
+  `core/tests/preset.rs:2800` and `:2832` at this lane's base commit `79cbc44`. Both lines come from
+  `96a8a75`, a Plan 0146 phase commit, and this lane does not touch that file. The gate runs at
   pre-push and in the CI `links` job.
 - **Followup noticed, not acted on:** `ffprobe` reads the encoded file as `bt709/unknown/unknown` -
   `-color_trc bt709` and `-color_primaries bt709` are on the generated command line and do not

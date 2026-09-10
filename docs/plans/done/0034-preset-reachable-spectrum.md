@@ -294,9 +294,9 @@ pub enum SpectrumLayout { Bars, Polyline, RadialRing }
 ## Close — 2026-07-27
 
 **Done.** Passed the Mode 4 review with **no blockers**; two majors, four minors and two nits, **all
-fixed in `ca99cb1`** rather than carried. Five `dev` phase commits — `a379b28` (`bin(x)`), `2450c2a`
-(the `spectrum` system), `a553b2e` (the `[spectrum]` table), `6950c94` (per-element `index`),
-`fe11659` (the operator sweep) — plus `ca99cb1` (the review fixes) and `4d41884` (the band-axis
+fixed in `ff2c4d9`** rather than carried. Five `dev` phase commits — `4b0e262` (`bin(x)`), `72451f3`
+(the `spectrum` system), `ef8b1df` (the `[spectrum]` table), `2b3449b` (per-element `index`),
+`0100789` (the operator sweep) — plus `ff2c4d9` (the review fixes) and `8dec9ab` (the band-axis
 documentation correction).
 
 The plan's central scoping claim **held in fact**: no new DSP, no new render idiom, no `Scene`-trait
@@ -330,12 +330,12 @@ and `new()` floors every band at one FFT bin *after* computing the log edges —
 linear slices, not logarithmic**; band 0 spans 23–47 Hz, *a full octave in one number*; resolution
 peaks around 500–800 Hz (band 30 is 0.55 semitones) and settles at ~1.7 semitones above 1 kHz. The
 bottom is the array's **coarsest** region musically, which is the opposite of what was written, and
-below the crossover the mapping **moves with the sample rate**. `4d41884` replaces the guidance in
+below the crossover the mapping **moves with the sample rate**. `8dec9ab` replaces the guidance in
 `docs/presets.md` and `presets/README.md` with a measured position table and the instruction to read
 it rather than compute from a curve. [ADR-0036](../../adrs/0036-preset-reachable-spectrum.md) is
 **accepted with an Outcome section** recording the correction (the ADR-0034 precedent).
 
-That error propagated once before it was caught: the content lane's first adoption pass (`037825d`)
+That error propagated once before it was caught: the content lane's first adoption pass (`564ac3b`)
 annotated its probes from the log-edge curve `35 * 514.3^x`, which is accurate above the crossover
 and **up to 2.9x wrong below it** — it put `bin(0.14)` at 84 Hz where the real answer is ~246 Hz. The
 bindings were tuned by effect and are unchanged; only the comments were wrong, and they are corrected.
@@ -349,7 +349,7 @@ rather than integrating it: against a 6.5 kHz tone `bin(0.84)` reads 0.094 while
 hi)`, and it is why `docs/presets.md` now says "use `bin()` for selectivity, the band scalars for
 regions".
 
-**Minors, all fixed in `ca99cb1`:** the readout spans the frame **height** (~56 % of the width at
+**Minors, all fixed in `ff2c4d9`:** the readout spans the frame **height** (~56 % of the width at
 16:9) and `Spectrum Comb`'s note had claimed the whole width; that header also said 24 elements
 against its own `elements = 26`; `docs/presets.md` had replaced a re-drifting count with another one
 ("Seven systems" → "Eight systems"), now count-free; and a per-element binding cost **N + 1**

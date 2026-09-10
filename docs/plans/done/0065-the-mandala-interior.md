@@ -1,8 +1,8 @@
 # 0065 — The mandala interior: `star_pattern` stops being hollow
 
 > **Status:** **done 2026-08-06** — Phases 1, 2, 4, 5 and 7 landed on `plan-0065-mandala-interior`
-> as `33e5efc` / `1904469` / `419418f` / `a35485a` / `b026ff3`, with `3c0e56a` recording the Phase 3
-> human verdict and `d4030b2` merging `main`. The full gate is green on the merged tip (`fmt`,
+> as `682d073` / `bc0e587` / `6dca973` / `4e0882d` / `f622efb`, with `1125690` recording the Phase 3
+> human verdict and `428f7b2` merging `main`. The full gate is green on the merged tip (`fmt`,
 > `clippy --all-targets -D warnings`, **566/566 nextest, 0 skipped**, doc links resolve) and **no
 > golden baseline moved or was added** — `git diff main -- core/tests/golden/` is empty and
 > `LMV_BLESS` was never run, exactly as the plan promised. Mode 4 review: **no blockers**.

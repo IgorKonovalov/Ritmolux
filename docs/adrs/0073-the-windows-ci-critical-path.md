@@ -252,8 +252,8 @@ worth taking instead.
 
 ## Outcome (2026-08-08, at Plan 0061's close)
 
-Both halves landed — the scoping as `1c55476` (early and out of sequence, at the user's request) and
-the sweep's single ownership as `55388b2`. **The decision is accepted; the measurement that would
+Both halves landed — the scoping as `33f5705` (early and out of sequence, at the user's request) and
+the sweep's single ownership as `8d1ad8b`. **The decision is accepted; the measurement that would
 confirm it is not yet taken**, and that gap is the point of this section.
 
 **What is confirmed, locally.** Scoping `the_json_report_is_well_formed_and_carries_its_top_level_keys`

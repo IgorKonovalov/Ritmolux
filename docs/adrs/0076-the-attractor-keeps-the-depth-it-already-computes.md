@@ -260,7 +260,7 @@ name. Measured on `attractor_dissolve` before the fix: `perspective = 0.7` and `
 each moved 0 of 921 600 pixels; `depth_fade = 0.9` moved 184 989 (design-backlog 0067, raised by
 `preset-author` while hunting depth on the IFS family).
 
-Plan 0075 Phase 2 (`a6dcb51`) restored the stated invariant by construction: the fade term is
+Plan 0075 Phase 2 (`6242fc3`) restored the stated invariant by construction: the fade term is
 multiplied by the family's has-depth flag (`f32(draw.d.w != 0.0)` — one multiply, no branch, the
 same style as the zero-extent trick itself). All three cues are now identities together, asserted
 at the capture with **byte equality** (`core/tests/attractor.rs`,

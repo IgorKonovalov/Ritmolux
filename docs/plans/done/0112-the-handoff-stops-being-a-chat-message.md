@@ -1,7 +1,7 @@
 # 0112 — The handoff stops being a chat message
 
 > **Status:** done — closed 2026-08-25. All three phases landed on `main`
-> (`9d8b359`, `51053b0`, `1708b79`, close block `f4ee668`). Mode 4: **no blockers, no majors, two
+> (`b139ebc`, `5e9c792`, `e93a03a`, close block `61c2139`). Mode 4: **no blockers, no majors, two
 > minors.** Verified against the tree: the template skeleton carries all four blocks and the size
 > rule; `dev`'s Step 3 writes the row inside the phase commit and Step 4 commits the close block
 > before printing a three-line pointer; Mode 4 lens 1 opens on the log and states it is claims, not
@@ -89,7 +89,7 @@ fresh-session boundary, which is the point of the seam and is not being automate
 
 Every phase edits harness markdown only. No Rust, no `presets/`, no `scripts/`. All three are
 tagged `dev` on the [Plan 0067](0067-the-curation-route.md) Phase 4 precedent (`docs(skills):`,
-commit `be7204c`) — the owner vocabulary has no word for a harness-editing phase, which is a known
+commit `f5222bd`) — the owner vocabulary has no word for a harness-editing phase, which is a known
 wart already filed as a followup by [Plan 0104](0104-the-library-stops-being-lopsided.md).
 
 Each phase's done-when is a property of the resulting file, checkable by reading it. `node
@@ -294,14 +294,14 @@ as well as `docs/`, and these phases add relative links in both.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the plan template carries the log skeleton | dev | done | `9d8b359` |
-| 2 — `dev` writes the log as the phases land | dev | done | `51053b0` |
-| 3 — architect reads the log, and `CLAUDE.md` names the seam | dev | done | `1708b79` |
+| 1 — the plan template carries the log skeleton | dev | done | `b139ebc` |
+| 2 — `dev` writes the log as the phases land | dev | done | `5e9c792` |
+| 3 — architect reads the log, and `CLAUDE.md` names the seam | dev | done | `e93a03a` |
 
 ### Notes
 
 - Step 4 no longer prints the `git log --oneline` the old brief pasted; the pointer is the three
-  named lines and nothing else. Commit `51053b0`.
+  named lines and nothing else. Commit `5e9c792`.
 - The plan does not say how a row names the commit it rides in. Rows read `committed with this row`
   while in flight and are backfilled with the real SHA on the next commit — the Plan 0110 precedent
   (`committed with this log`). The last row is backfilled by this close-block commit.

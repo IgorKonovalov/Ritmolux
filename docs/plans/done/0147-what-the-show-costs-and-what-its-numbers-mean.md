@@ -1,8 +1,8 @@
 # 0147 — What the show costs, and what its numbers mean
 
-> **Status:** done — closed 2026-09-06. Eight phases in `plan-0147-show-costs`: `eacaf8c`
-> (1), `bdbba7f` (2), `9e7dee1` (3), `76e3452` (3b), `ada2b37` (3c), `8b7bf2d` (5), plus
-> Phases 4 and 6 as measurements recorded in the log (`cd7af11`, `7478fa2`). Mode 4 review
+> **Status:** done — closed 2026-09-06. Eight phases in `plan-0147-show-costs`: `a5f4130`
+> (1), `39ebe73` (2), `0330b01` (3), `f9b95c6` (3b), `c4b48f6` (3c), `5d72a72` (5), plus
+> Phases 4 and 6 as measurements recorded in the log (`32541dd`, `31b1957`). Mode 4 review
 > 2026-09-06: **no blockers, one major, four minors, one nit** — the full suite re-run at the
 > tip (1545 passed, 5 skipped), `fmt` + `clippy --workspace --all-targets` clean, and all four
 > falsified comment sites verified repaired. The major is that four new backlog probe bullets
@@ -375,13 +375,13 @@ pub struct ConsolePacing {
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `level/*` says what it is normalized against | dev | done | `eacaf8c` |
-| 2 — A failed activation and a dead endpoint stop reading alike | dev | done | `bdbba7f` |
-| 3 — Both console levers become reachable | dev | done | `9e7dee1` |
-| 3b — The console present becomes countable | dev | done | `76e3452` |
-| 3c — The give-up verdict is scoped to the incident the budget counts | dev | done | `ada2b37` |
+| 1 — `level/*` says what it is normalized against | dev | done | `a5f4130` |
+| 2 — A failed activation and a dead endpoint stop reading alike | dev | done | `39ebe73` |
+| 3 — Both console levers become reachable | dev | done | `0330b01` |
+| 3b — The console present becomes countable | dev | done | `f9b95c6` |
+| 3c — The give-up verdict is scoped to the incident the budget counts | dev | done | `c4b48f6` |
 | 4 — Human: four arms, one hands-off window | human | done — 5 arms + 2 extra regimes | (a measurement; rows below) |
-| 5 — The verdict becomes the default | dev | done | `8b7bf2d` |
+| 5 — The verdict becomes the default | dev | done | `5d72a72` |
 | 6 — Human: the first frame-time row that names the discrete GPU | human | done | (a measurement; rows below) |
 
 ### Notes
@@ -578,7 +578,7 @@ the console open on the integrated part, holds 165.0 fps median with the console
   falsified entry is an `architect` call, so **neither entry was touched**. 0164 is in this plan's
   `Closes:` list; closing it discharges both probes. **The lane is red on `pre-push` and CI's `links`
   job until that happens.** (The three probes the Phases 1-3 log recorded as broken were repaired
-  earlier, in the review commit `c2c18de`.)
+  earlier, in the review commit `6956fdb`.)
 - **Full suite:** `cargo nextest run --workspace`, exit **0** — **1545 passed, 5 skipped**, 402 s,
   run at the tip of Phase 5 before this block was written.
 - **Outstanding `human` phases:** **none.** Phases 4 and 6 both ran on 2026-09-06 and their results

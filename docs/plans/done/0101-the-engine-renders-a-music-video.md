@@ -220,7 +220,7 @@ flowchart LR
 
 ## Close (2026-08-17)
 
-Phases 1-4 landed in `39b36e6..0ab8400`; Phase 5 executed 2026-08-17 (see its own entry above).
+Phases 1-4 landed in `a3b2e3c..cc463fd`; Phase 5 executed 2026-08-17 (see its own entry above).
 Mode 4 review: **no blockers, no majors**, five minor/nit findings, two of them found by running
 the feature rather than by reading it.
 

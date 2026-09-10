@@ -43,7 +43,7 @@ plan moves to `plans/done/` (which is a routine step of every close), they are i
 at all. Eleven are broken on `main` right now, found at Plan 0117's close only because that plan's
 own new link had to be repointed by hand.
 
-**Measured at `e022a5d`**, over `core/src`, `standalone/src`, `lmv-ring/src`, `core-cabi/src`,
+**Measured at `ff556c3`**, over `core/src`, `standalone/src`, `lmv-ring/src`, `core-cabi/src`,
 `core/tests` and `standalone/tests`:
 
 | | total | outside contended trees | inside them |
@@ -248,13 +248,13 @@ flowchart TB
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the gate exists, and it only reports | dev | done | `37868d4` |
-| 2 — the rule lands where authors read it | dev | done | `6ae4245` |
-| 3 — the 89 links go | dev | done | `0003f42` |
-| 4 — the 252 narration lines go | dev | done | `add5710` |
-| 5 — the gate is armed | dev | done | `29a0a9d` |
-| 6 — the long blocks come down, outside the contended trees | dev | done | `52c3bcb` |
-| 7 — the long blocks come down, inside the contended trees | dev | done | `6e48021` |
+| 1 — the gate exists, and it only reports | dev | done | `57a2b9b` |
+| 2 — the rule lands where authors read it | dev | done | `b71b177` |
+| 3 — the 89 links go | dev | done | `d6a285a` |
+| 4 — the 252 narration lines go | dev | done | `424c8b2` |
+| 5 — the gate is armed | dev | done | `0e228ac` |
+| 6 — the long blocks come down, outside the contended trees | dev | done | `3f4e451` |
+| 7 — the long blocks come down, inside the contended trees | dev | done | `e98583f` |
 
 ### Notes
 
@@ -262,16 +262,16 @@ flowchart TB
 
 - The gate walks the **whole workspace**, not the plan's six measured roots, so Phases 3 and 4 also
   swept `core/build.rs`, `core-cabi/tests/ffi.rs`, `milkconv/**` and `standalone/examples/**` — 4
-  links and 17 narration lines outside the plan's file lists (`0003f42`, `add5710`).
+  links and 17 narration lines outside the plan's file lists (`d6a285a`, `424c8b2`).
 - Phase 5 also edited `README.md` and `docs/nfr.md`, which its file list does not name. Both
   document the pre-push / CI gate roster that phase changes, and both were already one gate stale —
-  they said *three* Node gates where `check-filter-figures.mjs` had made it four (`29a0a9d`).
+  they said *three* Node gates where `check-filter-figures.mjs` had made it four (`0e228ac`).
 - The vocabulary list was **narrowed rather than escaped**: `the plan` is exempt in front of a
-  number, since `the Plan 0045 Phase 4b defect` is the citation form ADR-0127 asks for (`add5710`).
+  number, since `the Plan 0045 Phase 4b defect` is the citation form ADR-0127 asks for (`424c8b2`).
   The plan asked for the escape count after Phase 4 — it is **0**.
-- Phase 1's gate took a follow-up fix (`b4d0cba`): it counted newlines as it walked, so 10 of 441
+- Phase 1's gate took a follow-up fix (`82db614`): it counted newlines as it walked, so 10 of 441
   findings named a line holding code. It now derives the line from an index.
-- Counts swept are the current tree's, not the plan's `e022a5d` snapshot: **131** links (plan: 89),
+- Counts swept are the current tree's, not the plan's `ff556c3` snapshot: **131** links (plan: 89),
   **309** narration lines (252), **70** blocks of 40+ lines over **4,621** (61 over 3,850).
 
 **Done-when criteria not satisfied as stated.**
@@ -297,9 +297,9 @@ flowchart TB
 **Three defects the sweep found rather than caused.**
 
 - `core/src/render/tier.rs`'s `mesh_grid` opened with a stray line describing the segment-count
-  ceiling — a copy-paste leftover from a different field. Removed (`52c3bcb`).
+  ceiling — a copy-paste leftover from a different field. Removed (`3f4e451`).
 - `core/src/render/ink.rs` described trails and kaleidoscope as running at "fixed 16:9 internal
-  resolution"; they have followed the render target since ADR-0034. Restated (`52c3bcb`).
+  resolution"; they have followed the render target since ADR-0034. Restated (`3f4e451`).
 - `cargo doc --workspace --no-deps` emitted **no** warning about any of the 131 relative links,
   before or after — the same 62 pre-existing "links to private item" both times, which answers
   ADR-0127's Risks: rustdoc emits those hrefs without complaint.
@@ -381,7 +381,7 @@ the plan called the heaviest in the sweep, went **565 -> 352** across 7 blocks -
 - **Held for a live lane** (2): `marks.rs:1`, `shape_field.rs:1`.
 
 `cargo doc --workspace --no-deps` emits the **same 48** "links to private item" warnings before and
-after, compared against a detached worktree at `8848a12` rather than by recollection.
+after, compared against a detached worktree at `8361ed3` rather than by recollection.
 
 ### Close triggers
 
@@ -398,11 +398,11 @@ after, compared against a detached worktree at `8848a12` rather than by recollec
 
 ### Close (2026-08-27)
 
-**Mode 4: no blockers, no majors, five minors, one nit.** Phases 1-7 landed at `37868d4`, `6ae4245`
-(+ `b4d0cba`), `0003f42`, `add5710`, `29a0a9d`, `52c3bcb`, `6e48021`, with the prior review's two
-majors repaired at `807b6ef`.
+**Mode 4: no blockers, no majors, five minors, one nit.** Phases 1-7 landed at `57a2b9b`, `b71b177`
+(+ `82db614`), `d6a285a`, `424c8b2`, `0e228ac`, `3f4e451`, `e98583f`, with the prior review's two
+majors repaired at `3a4b12f`.
 
-Verified at the close rather than taken from the log: the diff over `37868d4^..HEAD` contains **no
+Verified at the close rather than taken from the log: the diff over `57a2b9b^..HEAD` contains **no
 non-comment Rust line** outside the fixture, so "changes no behaviour" is mechanical rather than
 asserted; all **115 ADR** and **101 plan** bare numbers cited across the workspace's `.rs` files
 resolve to real documents, which is Phase 3's done-when and is gated by nothing; the fixture bite

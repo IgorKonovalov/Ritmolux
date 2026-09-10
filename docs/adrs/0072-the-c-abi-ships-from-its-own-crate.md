@@ -105,7 +105,7 @@ debug settings, not which crate types are emitted. It addresses none of the cost
 
 ## Outcome (2026-08-08, at Plan 0061's close)
 
-Landed as `d442f7a`. The decision holds unchanged — `lmv-core` is `crate-type = ["rlib"]`, a plain
+Landed as `5fb9be6`. The decision holds unchanged — `lmv-core` is `crate-type = ["rlib"]`, a plain
 `cargo build` emits no `lmv_core*.lib` and no `.dll`, and `cargo build -p lmv-core-cabi` emits both.
 `LMV_ABI_VERSION` is still `4` and the twelve-function surface is byte-for-byte what it was. Both
 Negatives this ADR named were closed rather than accepted-and-forgotten: `core/tests/hygiene.rs`

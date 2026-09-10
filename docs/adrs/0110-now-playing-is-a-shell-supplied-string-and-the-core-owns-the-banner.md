@@ -188,6 +188,6 @@ thread holding its own MTA. `RequestAsync().join()` and `GetCurrentSession()` bo
 was still unusable on first contact, because two **pre-existing** defects in the shim's window path
 sit between a working core and a visible banner — a panel that attaches its surface at 1x1
 ([backlog 0102](../design-backlog.md)) and a render timer that, once killed, had nothing able to
-re-arm it (fixed under an approved scope expansion, `1016777`). Neither is about metadata. The
+re-arm it (fixed under an approved scope expansion, `6f2862c`). Neither is about metadata. The
 lesson for a future ADR routing work through this shim is that "the core can draw it" and "the user
 can see it" are further apart in the plugin than in the standalone.

@@ -6,7 +6,7 @@
 > **Related ADRs:** [0015-gpu-compute-particle-idiom](../../adrs/0015-gpu-compute-particle-idiom.md); extends [0002-layered-preset-architecture](../../adrs/0002-layered-preset-architecture.md) layer 2; reuses [0012-stateful-feedback-render-system](../../adrs/0012-stateful-feedback-render-system.md)'s `PingPongField`
 
 > **Closed 2026-07-23** — passed Mode 4 review (no blockers, no majors; two minor, three
-> nits). Five `dev` phase commits (`79b6cf0`, `937fdfb`, `9acc415`, `7ec850a`, `aa34d25`)
+> nits). Five `dev` phase commits (`192f0cb`, `6912dd1`, `3a74adc`, `da9cd89`, `3e50498`)
 > landing the engine's **first GPU compute pipeline** (ADR-0015 idiom B, now **accepted**): a
 > 50k-particle storage buffer stepped through a strange-attractor map by a compute shader and
 > drawn as additive point-sprites with fading trails via Plan 0014's `PingPongField` (no second

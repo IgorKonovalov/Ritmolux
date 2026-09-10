@@ -1,7 +1,7 @@
 # 0090 — the emitter's source moves
 
-> **Status:** done (closed 2026-08-15 — Phases 1-4 landed as `a274a48`, `10072ed`, `1c87eb7`,
-> `669c6bd`; the `human` Phase 5 stands, see below)
+> **Status:** done (closed 2026-08-15 — Phases 1-4 landed as `3d4a86d`, `8f83c37`, `763f711`,
+> `62cd952`; the `human` Phase 5 stands, see below)
 > **Created:** 2026-08-13
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [ADR-0104](../../adrs/0104-the-emitters-source-is-authorable-geometry.md) (accepted, this plan)

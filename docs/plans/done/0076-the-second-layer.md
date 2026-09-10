@@ -1,8 +1,8 @@
 # 0076 — The second layer: a preset composes two scenes (R3)
 
 > **Status:** **done** (closed 2026-08-11) — all five phases landed as five commits
-> (`aa737ce` schema + under join, `ada9e98` per-preset instances, `720fed9` over join + blend,
-> `d6bc968` dissolve/tier/instrument seams, `26ee35a` verdicts + goldens + operator docs); the
+> (`d35c3a1` schema + under join, `aff35ed` per-preset instances, `219346e` over join + blend,
+> `cd50cea` dissolve/tier/instrument seams, `f593b84` verdicts + goldens + operator docs); the
 > user judged the Phase 5 sample set and accepted it as-is (verdicts recorded below). Mode 4
 > review in a fresh session: **no blockers, no majors** — the done-when tests are genuinely
 > differential (the reactivity probe, the routing enumeration over all eight flag combinations,

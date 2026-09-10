@@ -171,7 +171,7 @@ homeless instead of one.
 
 ## Outcome — 2026-08-12, at Plan 0081's close
 
-All five `dev` phases landed (`50cac56..e7960f5`); Phase 6 is `human` and outstanding on purpose.
+All five `dev` phases landed (`97265e6..464973c`); Phase 6 is `human` and outstanding on purpose.
 The decision shipped as written — seven params, the additive band, the shared palette, the widened
 build condition — and the identity discipline held: the baselines came back hash-identical under the
 bless-to-bless control **three times**, once per code phase. Two things this ADR and its plan said

@@ -1,8 +1,8 @@
 # 0017 — Green CI: reasoned ttf-parser advisory ignore + adapter-skip for headless GPU tests
 
-> **Status:** done — Phase 1 (advisory, `95bf510`) + Phase 2 (GPU-test skip, `134d4e3`),
+> **Status:** done — Phase 1 (advisory, `927f09f`) + Phase 2 (GPU-test skip, `0d1303f`),
 > both `dev`; passed Mode 4 review 2026-07-23 (no blockers, no majors, no minors; two
-> non-actionable nits). **Post-close correction 2026-07-23 (`4bcebba`) — see the section at the
+> non-actionable nits). **Post-close correction 2026-07-23 (`d73c956`) — see the section at the
 > foot of this plan:** Phase 2's adapter-skip was scoped to the three in-crate `render::tests`
 > only; six `core/tests/` integration files calling the same constructor were missed and kept
 > `macos-latest` red after close. Verified: `cargo deny check` exits 0 (`advisories ok, bans ok,
@@ -216,7 +216,7 @@ pub enum RenderError {
   isn't worth an unmaintained dep, that is a deliberate ADR superseding ADR-0009, not a silent
   drop. This followup is the standing owner of the ignore entry's lifespan.
 
-## Post-close correction (2026-07-23, commit `4bcebba`)
+## Post-close correction (2026-07-23, commit `d73c956`)
 
 **The Phase 2 adapter-skip was under-scoped, and CI stayed red on `macos-latest` after this
 plan closed.** Recorded here so the close is honest — the code fix is already applied, committed,
@@ -234,7 +234,7 @@ integration binaries still panicked on the adapterless macOS runner. `main` went
 the next push (run 29990934038 and successors); nextest's fail-fast surfaced only `animation`
 and `beat` before cancelling, but all six shared the defect.
 
-**The fix (`4bcebba`, a `dev`-lane change applied out-of-plan to unblock red CI).** Extended the
+**The fix (`d73c956`, a `dev`-lane change applied out-of-plan to unblock red CI).** Extended the
 identical ADR-0016 shape to all six files: a `headless() -> Option<Renderer>` helper (inline
 `match` in `beat.rs`) that returns the renderer on `Ok`, prints `skipped: no GPU adapter on this
 runner (ADR-0016)` and returns `None`/`return`s on `Err(RenderError::RequestAdapter(_))`, and

@@ -7,9 +7,9 @@
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0117](../../adrs/0117-c-abi-v6-the-host-reads-the-roster-and-selects-a-preset.md) (C ABI v6), [0006](../../adrs/0006-c-abi-v2-preset-loading.md) (the folder + seed-then-load this builds on)
 
-**Closed 2026-08-18.** Phases 1-4 landed as `1ea486b` (ABI v6), `bdadf47` (the menu),
-`2919b7b` (persistence), `4d1f450` (the doc sweep). Mode 4 review: **no blockers, two majors**,
-both doc-side and both repaired at the close in `cc1b7ef` — the Phase 4 sweep had written `B` for
+**Closed 2026-08-18.** Phases 1-4 landed as `59e353a` (ABI v6), `9113b5d` (the menu),
+`ec97261` (persistence), `6252e67` (the doc sweep). Mode 4 review: **no blockers, two majors**,
+both doc-side and both repaired at the close in `f8efbf7` — the Phase 4 sweep had written `B` for
 the standalone's browse overlay in `docs/presets.md` (the binding is `Tab`), and
 `docs/on-device-validation.md` was absent from Phase 4's holder list and kept describing the
 component as Space-only.
@@ -239,9 +239,9 @@ this file.**
 
 foobar2000 v2, Windows 10, the dev box. **The installed component was stale and had to be
 replaced first** — `%APPDATA%\foobar2000-v2\user-components-x64\foo_lmv\foo_lmv.dll` was dated
-2026-08-16 17:28, which predates both `bdadf47` (the menu) and `2919b7b` (persistence), landed
+2026-08-16 17:28, which predates both `9113b5d` (the menu) and `ec97261` (persistence), landed
 2026-08-17. A run against it would have exercised a component with no Preset submenu at all and
-read as a total failure of Phases 2-3. Rebuilt from `main` at `10b0701` via `build.ps1 -Install`,
+read as a total failure of Phases 2-3. Rebuilt from `main` at `9508178` via `build.ps1 -Install`,
 version 0.75.1. **Anyone running a carried-forward human phase should date the installed artifact
 before trusting what they click** — the gap between a plan closing and its on-device phase running
 is exactly long enough for the profile to hold a pre-plan build.

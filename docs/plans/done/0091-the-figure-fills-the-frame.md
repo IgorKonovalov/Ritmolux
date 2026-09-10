@@ -9,7 +9,7 @@
 
 ## Close (2026-08-16)
 
-**Phases 1-5 landed** — `e2dd537`, `7f93b3e`, `78d1671`, `080a7ef`, `82c7471`. Mode 4 review:
+**Phases 1-5 landed** — `a6fd0c6`, `595d15f`, `1707664`, `e4cd03e`, `e7e30f0`. Mode 4 review:
 **no blockers, no majors, three minors.** Verified at the close rather than taken on report:
 `fmt` + `clippy --workspace --all-targets -D warnings` clean, and the golden suite passes against
 the **committed** baselines (not merely re-blessed) — so the plan's own "the particle path moves

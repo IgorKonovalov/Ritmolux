@@ -1,7 +1,7 @@
 # 0136 — The gates can convict
 
-> **Status:** done — closed 2026-09-02. Ten phases in thirteen commits (`df9b7a1`..`93e40bb`), plus
-> `53e5aa1` for the one review blocker. Review: **one blocker, two majors, two minors, one nit.**
+> **Status:** done — closed 2026-09-02. Ten phases in thirteen commits (`129a35d`..`2eb9c19`), plus
+> `f8b92b2` for the one review blocker. Review: **one blocker, two majors, two minors, one nit.**
 > The blocker was `clippy -D warnings` failing on Phase 9's new test helper while the close block
 > reported it clean — the plan's own subject, caught by re-running the gate rather than reading it.
 > Every done-when was verified by execution: the backlog 0104 mutation now collapses `--self-test`
@@ -378,16 +378,16 @@ flowchart TB
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The row gate asserts its own counts | dev | done | `df9b7a1` |
-| 2 — A seeded tree the row gate rejects | dev | done | `f58fa1b` |
-| 3 — The row gate reads a row's shape | dev | done | `8986147` |
-| 4 — Backlog references stop using fragments | dev | done | `672bdf2` |
-| 5 — A probe path is checked against the repository | dev | done | `790e6f8` |
-| 6 — The figure gate stops convicting untracked files | dev | done | `6ee06ac` |
-| 7 — The gates judge the code this project wrote | dev | done | `0f1ac37` |
-| 8 — Two entries whose premise the store revocation falsified | dev | done | `b6c804b` |
-| 9 — The image sweep runs again | dev | done | `a87983a`, `7b9a1ae` |
-| 10 — What the pictures are of | human | done | `93e40bb` |
+| 1 — The row gate asserts its own counts | dev | done | `129a35d` |
+| 2 — A seeded tree the row gate rejects | dev | done | `ed43d9a` |
+| 3 — The row gate reads a row's shape | dev | done | `3ac8fe2` |
+| 4 — Backlog references stop using fragments | dev | done | `213428f` |
+| 5 — A probe path is checked against the repository | dev | done | `46d8494` |
+| 6 — The figure gate stops convicting untracked files | dev | done | `e0a80fc` |
+| 7 — The gates judge the code this project wrote | dev | done | `9eaa541` |
+| 8 — Two entries whose premise the store revocation falsified | dev | done | `4d4866e` |
+| 9 — The image sweep runs again | dev | done | `10556ae`, `7b650b5` |
+| 10 — What the pictures are of | human | done | `2eb9c19` |
 
 ### Notes
 
@@ -481,9 +481,9 @@ flowchart TB
 - **The close block's clippy claim below was false when it was written, and is repaired here.**
   `cargo clippy --workspace --all-targets -- -D warnings` exits 1 on `collapsible_if` at
   `core/tests/hygiene.rs:608`, the nested `if let` / `if` inside `system_names`. That function is
-  Phase 9's own (`a87983a`) and the shape is already present at `deca944`, the commit that recorded
+  Phase 9's own (`10556ae`) and the shape is already present at `b1778a8`, the commit that recorded
   the claim - so the claim did not go stale, it was never true. `main` has never carried the
-  function, so the merge at `332a99e` is not implicated and `main` is not red. Collapsed into an
+  function, so the merge at `cd3c0f8` is not implicated and `main` is not red. Collapsed into an
   edition-2024 let-chain, which is the lint's own suggestion and changes no behaviour; the four
   Node gates, `cargo fmt --all --check` and the full suite are green at the tip.
 

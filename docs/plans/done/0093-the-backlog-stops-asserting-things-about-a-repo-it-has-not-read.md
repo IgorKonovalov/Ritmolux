@@ -8,9 +8,9 @@
 
 ## Close summary (2026-08-15)
 
-Four phase commits, all four done-when sets met: `ee471fb` (the checker + the shared fixture tree),
-`7a975ad` (25 probes across the 14 live entries, 3 reasoned `unprobeable`), `0ab3331` (pre-push, the
-CI `links` job, close-ceremony step 1c), `9d8b1ff` (the staleness advisory + the backlog header's
+Four phase commits, all four done-when sets met: `a81a870` (the checker + the shared fixture tree),
+`7233c9d` (25 probes across the 14 live entries, 3 reasoned `unprobeable`), `c0bfc4f` (pre-push, the
+CI `links` job, close-ceremony step 1c), `a0e7f0b` (the staleness advisory + the backlog header's
 grammar section).
 
 **Mode 4 verdict: no blockers, two major findings, both in the machinery rather than the plan.**

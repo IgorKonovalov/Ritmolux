@@ -1,6 +1,6 @@
 # 0157 — The cost probes estimate a duration, and the route gate stops counting rustdoc
 
-> **Status:** done — closed 2026-09-07. Phase 1 `084686a`, Phase 2 `70ed4cc`.
+> **Status:** done — closed 2026-09-07. Phase 1 `1b30f92`, Phase 2 `283c9c4`.
 > Mode 4: **no blockers, no majors, two minors, one nit.** Verified independently of the
 > log: `cargo nextest run --workspace` green (1556 passed, 5 skipped), all four cost probes
 > re-run on a real adapter and reporting positive durations, and the route gate exercised
@@ -17,7 +17,7 @@
 ## TL;DR
 
 Two independent defects are keeping `main` red, both pre-existing and both exposed rather than
-caused by the rustdoc repair at `a8e3dc1`. The four GPU cost probes estimate per-frame cost as the
+caused by the rustdoc repair at `313e1b8`. The four GPU cost probes estimate per-frame cost as the
 **minimum of a difference**, which selects the noisiest sample instead of rejecting it and produced
 a negative duration on `check (macos-latest)`; they will minimize each duration separately and
 subtract once (ADR-0173). And `scripts/check-site-routes.mjs` walks `site/dist/api/`, counting
@@ -26,7 +26,7 @@ that tree exactly as it already skips `_astro` and `pagefind`.
 
 ## Context & problem
 
-`main` at `eefba02` fails two workflows. Neither failure is a regression from Plan 0153's close —
+`main` at `7ebf675` fails two workflows. Neither failure is a regression from Plan 0153's close —
 both were masked, and the masking is the through-line of this plan.
 
 **The cost-probe estimator.** `arc_cost.rs`, `collage_cost.rs`, `field_cost.rs` and `mark_cost.rs`
@@ -47,7 +47,7 @@ time, so it would have printed a negative figure and passed.
 
 **The route gate.** `scripts/check-site-routes.mjs` asserts that every route the built site serves
 is reachable from the Starlight menu. Plan 0156 landed two things that have never run together:
-`070c549` added a `rustdoc` job unpacking `cargo doc` output into `site/dist/api/`, and the same
+`4919fb3` added a `rustdoc` job unpacking `cargo doc` output into `site/dist/api/`, and the same
 workflow runs this gate afterward. Because `rustdoc` has failed since the day it was added, the
 `build` job that `needs:` it was skipped every time — so the gate has never once seen `dist/api/`.
 It now does, and reports 96 orphans, all of them rustdoc module pages.
@@ -204,8 +204,8 @@ name to an exclusion list. No types, no interfaces, no runtime behaviour.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The cost probes estimate a duration | dev | done | `084686a` |
-| 2 — The route gate stops walking rustdoc's tree | dev | done | `70ed4cc` |
+| 1 — The cost probes estimate a duration | dev | done | `1b30f92` |
+| 2 — The route gate stops walking rustdoc's tree | dev | done | `283c9c4` |
 
 ### Notes
 
@@ -226,8 +226,8 @@ name to an exclusion list. No types, no interfaces, no runtime behaviour.
   all 45 live entries (8 unprobeable)"*. No entry named as broken; its advisory section reports 65
   probed paths moved since last read, none of them touched by this plan.
 - **Full suite:** `cargo nextest run --workspace`, exit 0 —
-  `Summary [415.690s] 1556 tests run: 1556 passed (9 slow), 5 skipped`, run at `70ed4cc`. The same
-  command at `084686a` read `[423.967s] 1556 passed (9 slow), 5 skipped`. No ADR-0156 upward
+  `Summary [415.690s] 1556 tests run: 1556 passed (9 slow), 5 skipped`, run at `283c9c4`. The same
+  command at `1b30f92` read `[423.967s] 1556 passed (9 slow), 5 skipped`. No ADR-0156 upward
   override was invoked at either phase: the four probes sit outside the nine deferred suites and
   ran under both.
 - **Also run at the tip:** `cargo clippy --workspace --all-targets -- -D warnings` and

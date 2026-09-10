@@ -1,6 +1,6 @@
 # 0081 — The sky gets a galaxy: the backdrop paints a curved band
 
-> **Status:** done 2026-08-12 — all five `dev` phases landed (`50cac56..e7960f5`); **Phase 6 is
+> **Status:** done 2026-08-12 — all five `dev` phases landed (`97265e6..464973c`); **Phase 6 is
 > `human` and deliberately outstanding**. Mode 4 review: no blockers, no majors, two minors, two
 > nits. The band ships as decided — seven params, additive over the ground, its own segment of the
 > same `[palette]`, the widened build condition — with the baselines hash-identical under the

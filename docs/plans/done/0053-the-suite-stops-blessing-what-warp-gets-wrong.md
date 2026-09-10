@@ -1,7 +1,7 @@
 # 0053 — The suite stops blessing what WARP gets wrong, and two guards start biting
 
-> **Status:** **done 2026-08-09** — all four phases landed in `1b7fc71`, `8bdb156`, `7fd3992`,
-> `134f54c`. Mode 4 review: **no blockers, two majors, four minors.**
+> **Status:** **done 2026-08-09** — all four phases landed in `2d0f0a7`, `373373b`, `f52b636`,
+> `d62b10f`. Mode 4 review: **no blockers, two majors, four minors.**
 >
 > **Phase 3 was written to document that the collisions were benign, and instead found two live
 > WARP mis-renders and fixed them.** `background-bind-layout` collided with the fullscreen scenes'
@@ -38,7 +38,7 @@
 > **The dev box has a hardware adapter.** The gate every hardware-only check in this suite skips on
 > is `Renderer::adapter_is_software()` — `device_type == DeviceType::Cpu`
 > (`core/src/render/context.rs`) — **not** "discrete", and Plan 0060 Phase 3 took a real hardware
-> measurement here on 2026-08-04 (`ae4c215`) after verifying the hardware-only sibling runs and
+> measurement here on 2026-08-04 (`a45c6c0`) after verifying the hardware-only sibling runs and
 > passes on this box. Whether Phase 3's *specific* comparison is satisfiable on an integrated
 > adapter is a judgement for whoever takes it — but "wait for a machine we do not have" is not the
 > reason to defer it. Try it first.

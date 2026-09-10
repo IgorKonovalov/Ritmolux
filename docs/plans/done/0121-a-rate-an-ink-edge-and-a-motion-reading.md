@@ -12,7 +12,7 @@
 ## TL;DR
 
 The mono cohort (`fragment_drostemono`, `shape_contourmono`, `fragment_driftmono`, committed
-`d6ffa54`) hit three walls in one session and handed them back as API feedback. This plan takes down
+`21bbdb9`) hit three walls in one session and handed them back as API feedback. This plan takes down
 all three: `fragment_field` gains `field_speed` and `fold_speed` so a world's animation rate stops
 being welded to its flatness; `palette_contour` learns to read the LUT so it fires at ink changes
 rather than at every band edge, which is the difference between usable and unusable on a limited-ink
@@ -338,26 +338,26 @@ fn band_contour(
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `--report` gains `drive` and `rate` | dev | done | `63461ee` |
-| 2 — preset names stop colliding | dev | done | `0f8fa98` |
-| 3 — `field_speed` and `fold_speed` | dev | done | `73d084c` |
-| 4 — `warp_speed` integrates too | dev | done | `4014682` |
-| 5 — the contour reads the LUT | dev | done | `324a30d` |
-| 6 — the content pass | preset-author | done | `d74fa37` |
+| 1 — `--report` gains `drive` and `rate` | dev | done | `b5eea01` |
+| 2 — preset names stop colliding | dev | done | `02c2546` |
+| 3 — `field_speed` and `fold_speed` | dev | done | `e035b1d` |
+| 4 — `warp_speed` integrates too | dev | done | `636cb05` |
+| 5 — the contour reads the LUT | dev | done | `9df06f5` |
+| 6 — the content pass | preset-author | done | `61d5ed9` |
 
 ### Notes
 
 **Deviations from the plan.**
 
-- Phase 2 (`0f8fa98`) also touched `standalone/tests/shot_cli.rs`, which is not in its file list:
+- Phase 2 (`02c2546`) also touched `standalone/tests/shot_cli.rs`, which is not in its file list:
   that test located the easing fixture's report row by a name prefix the middle-elision shortens.
-- Phase 5 (`324a30d`) also touched `core/src/render/scenes/warp_mesh/mod.rs`. `band_contour` is
+- Phase 5 (`9df06f5`) also touched `core/src/render/scenes/warp_mesh/mod.rs`. `band_contour` is
   written **four** times, not the three the phase lists, and the fourth copy's text had already
   drifted (`dd` for `d`) — so `the_contour_reaches_the_fragment_sites_and_not_the_vertex_one` could
   not have caught it: it iterated three sites, and the one place drift had happened was not among
   them. The fourth copy is now canonical and the assertion covers it. `docs/preset-palettes.md`
   documents `palette_contour` as live on warp-mesh. Scope put to the user before taking it.
-- Phase 5 (`324a30d`) added `core/tests/palette_contour.rs`. Its done-when requires assertions on
+- Phase 5 (`9df06f5`) added `core/tests/palette_contour.rs`. Its done-when requires assertions on
   rendered output and names no test file.
 
 **Done-when criteria not satisfiable as stated.**
@@ -386,7 +386,7 @@ suite is green (`cargo nextest run -p lmv-core`, **802 passed / 5 skipped**), an
 turned out to rest on a premise the tree does not carry.
 
 *`fragment_driftmono` — the rates, and the pan binding that was already free.* **The
-`-0.25 * time` cancellation the phase asks to remove was never shipped.** `d6ffa54` binds
+`-0.25 * time` cancellation the phase asks to remove was never shipped.** `21bbdb9` binds
 `pan_x`/`pan_y` to `noise` plus the mid surge and nothing else; what the file carried was the
 *derivation* — a header block presenting a symmetric pan as the scene's rate knob, ending "there
 is deliberately NO linear pan term". So the accident lived in the advice, not in the preset, and
@@ -397,7 +397,7 @@ calm passes had spent, bought back, with the fold's own clock holding the churn 
 
 | | `drive` | `rate` | `cover` | `anim` |
 |---|---|---|---|---|
-| Drift Mono, `d6ffa54` | 0.455 | 0.0411 | 0.450 | 0.316 |
+| Drift Mono, `21bbdb9` | 0.455 | 0.0411 | 0.450 | 0.316 |
 | Drift Mono, **shipped** | **0.469** | **0.0370** | **0.659** | 0.264 |
 | Tiled Rosette Mono | 0.461 | 0.0392 | 0.576 | 0.523 |
 | Droste Mono | 0.393 | 0.0275 | 0.326 | 0.383 |

@@ -2,7 +2,7 @@
 
 > **Status:** done
 > **Created:** 2026-08-13
-> **Closed:** 2026-08-13 — all four `dev` phases (`645eda6`, `e20872f`, `141fd6c`). Mode 4 review:
+> **Closed:** 2026-08-13 — all four `dev` phases (`859f5c9`, `77b868f`, `4c0c177`). Mode 4 review:
 > **no blockers, no majors, one minor, two nits.** The verdict is a value built once at startup on
 > the render/UI thread and only borrowed thereafter, landing in both durable artifacts from the same
 > stored string — so a tester's screenshot and their `diagnostics.log` cannot disagree about one run.

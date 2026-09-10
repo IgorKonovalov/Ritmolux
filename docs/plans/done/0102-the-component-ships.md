@@ -9,7 +9,7 @@
 
 ## Close (2026-08-16)
 
-Phases 1-4 landed in three commits — `e5e03de` (the recipe), `07f1573` (the release job), `56c3edf`
+Phases 1-4 landed in three commits — `0ffe3df` (the recipe), `760c6c6` (the release job), `82aa077`
 (what a recipient reads). Phase 1's `human` answer was given in-session: the SDK licence is
 BSD-style, permits binary redistribution, and puts a notice obligation only on redistributed
 *source*, so Phase 3 took the **CI fetch** route. **Phase 5 is `human`, is the component's only

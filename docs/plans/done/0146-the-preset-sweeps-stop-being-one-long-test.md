@@ -24,7 +24,7 @@ abort the whole plan.
 The user's ask: *"maybe we also should minimize number of presets that are used in tests, lets say we
 have 2 per family."*
 
-Measured on an idle box at `fd7f55b`, the sweeps are not slow because there is much work — they are
+Measured on an idle box at `694d37d`, the sweeps are not slow because there is much work — they are
 slow because the work cannot be spread. Full run: **7,965 s of test-wall in 869 s elapsed, average
 concurrency 9.2 on 16 CPUs — 43 % of the machine idle.** The narrow run reaches 13.7 on the same box.
 The whole gap is the tail, where only these five processes remain:
@@ -132,7 +132,7 @@ flowchart TB
   per ADR-0071: the coverage distribution stays whole inside its family's test, and the loud/moderate
   ratio is printed per preset rather than as one sorted table, which is the one report this split
   does change and must be called out in the log.
-- **The claim, and it replaces the retired concurrency anchor:** the plan's `9.2 at fd7f55b` came
+- **The claim, and it replaces the retired concurrency anchor:** the plan's `9.2 at 694d37d` came
   from a superseded measurement arm, and `dev` re-derived **8.98** on this tree, so the number is
   reproduced but is not the right test either — average concurrency counts *processes*, and a single
   sweep test uses about four logical CPUs, so the figure understates the machine's real occupancy.
@@ -248,18 +248,18 @@ fn animation_attractor_leviathan() {
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Spike: split the worst sweep | dev | done | `c2fa99f` |
-| 2 — Split the remaining per-preset sweeps | dev | done | `e2f84cf` |
-| 3 — Split `distinctness` per family | dev | done | `1c52867` |
-| 4 — The `representative` key and its floor | dev | done | `5107d8e` |
-| 5 — Seed the representatives | dev | done | `4e596c0` |
-| 6 — Hang the sample on the per-phase tier | dev | done | `d3effa9` |
-| 7 — Measure, and state what it cost | dev | done | `a9df6bb` |
+| 1 — Spike: split the worst sweep | dev | done | `f466320` |
+| 2 — Split the remaining per-preset sweeps | dev | done | `1954397` |
+| 3 — Split `distinctness` per family | dev | done | `cb6e451` |
+| 4 — The `representative` key and its floor | dev | done | `748bfc5` |
+| 5 — Seed the representatives | dev | done | `96a8a75` |
+| 6 — Hang the sample on the per-phase tier | dev | done | `01288b8` |
+| 7 — Measure, and state what it cost | dev | done | `7ad155f` |
 
 ### Measurements
 
 **Machine** (ADR-0071): AMD Ryzen 9 5900HS, 16 logical CPUs, Windows 10 19045, rustc 1.97.1,
-cargo-nextest 0.9.140, on AC. **Tree:** `ee0792b`, Plan 0145's close. **Quiet precondition:**
+cargo-nextest 0.9.140, on AC. **Tree:** `d655dcb`, Plan 0145's close. **Quiet precondition:**
 `cargo` / `cargo-nextest` / `rustc` and test-binary processes enumerated before and after every run;
 none present at any boundary, 16:21-16:55 CEST 2026-08-31. Test binaries were pre-built, so no
 compile sits inside any figure; elapsed is nextest's own `Summary` wall and concurrency is summed
@@ -434,11 +434,11 @@ floor-slack gate are unchanged, because they were already per family: verified b
 
 ### What it cost (Phase 7)
 
-Same machine and preconditions as Phase 1, at `d3effa9`, quiet verified before and after each run.
+Same machine and preconditions as Phase 1, at `01288b8`, quiet verified before and after each run.
 The `-P fast` arm was taken twice because the first reading found one foreign process at the
 boundary; the tainted 212.6 s is discarded and the clean 205.8 s stands.
 
-| | before (`ee0792b`) | after (`d3effa9`) | |
+| | before (`d655dcb`) | after (`01288b8`) | |
 |---|---|---|---|
 | **full `--workspace`** elapsed | 464.2 s | **435.6 s** | **-28.6 s, -6.2 %** |
 | summed test-wall | 4,169.5 s | 6,594.7 s | +58 % |
@@ -473,7 +473,7 @@ count above is what a revisit would argue from.
 
 ### Close triggers
 
-- **`presets/` touched:** yes — 24 `.toml` gain `representative = true` (Phase 5, `4e596c0`), two per
+- **`presets/` touched:** yes — 24 `.toml` gain `representative = true` (Phase 5, `96a8a75`), two per
   family across all 12. No parameter, expression or palette changed in any of them; the flag is
   harness metadata. `presets/README.md` gained the section documenting it.
 - **Plan header `Closes:`** none.
@@ -488,7 +488,7 @@ count above is what a revisit would argue from.
   across all 63 live entries, 8 unprobeable, 3 advisory rows (0146, 0161, 0172) whose probed paths
   have moved. No entry was convicted.
 - **Outstanding `human` phases:** none — all seven phases are `dev`.
-- **Full suite:** `cargo nextest run --workspace` (not `-P fast`), at `d3effa9` on a verified-quiet
+- **Full suite:** `cargo nextest run --workspace` (not `-P fast`), at `01288b8` on a verified-quiet
   box: **exit 0, 1491 passed, 0 failed, 5 skipped, 435.562 s**.
 
 ## Followups (after this lands)

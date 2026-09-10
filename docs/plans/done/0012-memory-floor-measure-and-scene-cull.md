@@ -12,9 +12,9 @@
 >
 > **Closed 2026-07-22** (Mode 4, fresh session — code written in a prior session). The two `dev` phases
 > landed and produced the numbers the plan set out to get:
-> - **Phase 1** (`50a7ea0`): culled `spectrum`/`pulse`/`starfield`; measured delta **WS −3.3 MB / private
+> - **Phase 1** (`f217f56`): culled `spectrum`/`pulse`/`starfield`; measured delta **WS −3.3 MB / private
 >   −2.0 MB** (5→2 scenes) — pipeline count is a weak lever (~1 MB WS/pipeline), driver floor dominates.
-> - **Phase 2** (`3de5611`): bare-wgpu floor spike; **fixed floor ~327 MB private vs post-cull standalone
+> - **Phase 2** (`8ae22fa`): bare-wgpu floor spike; **fixed floor ~327 MB private vs post-cull standalone
 >   ~338 MB private → our whole visual system adds only ~11 MB (~3%).** The construct-only number is not
 >   implausibly low (only ~11 MB under the standalone), so the configure-boundary measurement is faithful
 >   — no re-think, no core-surface widening needed.

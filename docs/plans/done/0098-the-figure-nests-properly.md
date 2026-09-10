@@ -1,7 +1,7 @@
 # 0098 — The figure nests properly
 
 > **Status:** done — closed 2026-08-27. All eight phases landed on `plan-0098-nested-figure`
-> (`28336c3`..`7411663`); Mode 4 review: **no blockers, no majors**, five minors and two nits.
+> (`b0b8f28`..`89e8676`); Mode 4 review: **no blockers, no majors**, five minors and two nits.
 > Verified on the merged lane: `fmt`, `clippy --workspace --all-targets`, and
 > `cargo nextest run --workspace` at **1060 passed / 0 failed** (goldens byte-identical), plus
 > the three doc gates. Two claims were falsified in build and corrected rather than worked
@@ -288,14 +288,14 @@ flowchart TD
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The star's interior stops lying | dev | done | `28336c3` |
-| 2 — The coordinate exists, and a polygon proves it | dev | done | `a6bb867` |
-| 3 — The heart and the star take the coordinate | dev | done | `43b269a` |
-| 4 — `ring` gets an honest answer | dev | done | `4257596` |
-| 4b — The figure can turn | dev | done | `01f3775` |
-| 5 — What it costs at the floor tier | dev | done | `255f386` |
-| 6 — The docs learn both coordinates | dev | done | `de1df96` |
-| 7 — The look gate | human | done | `30b2bce` |
+| 1 — The star's interior stops lying | dev | done | `b0b8f28` |
+| 2 — The coordinate exists, and a polygon proves it | dev | done | `eb47502` |
+| 3 — The heart and the star take the coordinate | dev | done | `aa3d58b` |
+| 4 — `ring` gets an honest answer | dev | done | `c7ca990` |
+| 4b — The figure can turn | dev | done | `08b602b` |
+| 5 — What it costs at the floor tier | dev | done | `9ade178` |
+| 6 — The docs learn both coordinates | dev | done | `5579401` |
+| 7 — The look gate | human | done | `21600c9` |
 
 ### Notes
 
@@ -396,13 +396,13 @@ flowchart TD
   preset differing only in `coord_mode`, at 165 fps / p99 7.0 ms: (1) the reference reproduces —
   under `"1"` every ring keeps the notch where `"0"` rounds it into a blob by the third ring
   inward; (2) `shape_pulse` is **re-authored** rather than left. The engine phases were already
-  committed, so this landed after the close block as `30b2bce`.
+  committed, so this landed after the close block as `21600c9`.
 - The re-author is `coord_mode = "1"` and nothing else. `color_span` was deliberately held at
   `0.45`: both coordinates put the outline at exactly 1, so holding it holds the interior banding
   fixed at the same four boundaries. The alternative — raising it to `0.85` to restore the old
   corner density — was rendered and rejected as a busier figure (seven boundaries inside instead of
   four). The surround consequently carries ~20 rings to the corner where it carried ~41.
-- **`presets/shape_facet.toml` was re-scaled too** (`82a3211`), and it is the one shipped preset
+- **`presets/shape_facet.toml` was re-scaled too** (`f38f8c1`), and it is the one shipped preset
   Phase 1 changed without anyone touching it: it is the only world on the curved `star` arm. Its
   reference moved `0.16253` to `0.20000` (x1.2306), which dropped the frame corner from band `19.7`
   to `16.6` — the graded ground stopped reaching its dark end. `color_span` `0.04234` to `0.05210`
@@ -411,7 +411,7 @@ flowchart TD
   Measured head to head: `anim` `0.019` to `0.020`, `cover` `0.818` to `0.826`, bands and gates
   unchanged. Its header's notes 1-3 are corrected; note 3 had said a bound `gamma` is unsafe on a
   curved star "until Plan 0098 Phase 1 lands".
-- **`shape_facet` was then given reactivity (`7411663`), which this plan did not ask for.** Flagged
+- **`shape_facet` was then given reactivity (`89e8676`), which this plan did not ask for.** Flagged
   because it is content work beyond the plan's scope, done at the user's request and *enabled* by
   it: the preset measured `mid`, `treb` and `onset` at `0.000 / 0.009 / 0.000`, and its own note 5
   recorded that a slow drift was the only safe motion lever — true when written, because every
@@ -424,8 +424,8 @@ flowchart TD
 ### Close triggers
 
 - **`presets/` touched:** yes — `presets/README.md`; `presets/shape_pulse.toml` re-authored at
-  Phase 7 (`30b2bce`); `presets/shape_facet.toml` re-scaled onto Phase 1's repaired star reference
-  (`82a3211`) and then given reactivity (`7411663`). Nothing embedded or removed: the shipped set
+  Phase 7 (`21600c9`); `presets/shape_facet.toml` re-scaled onto Phase 1's repaired star reference
+  (`f38f8c1`) and then given reactivity (`89e8676`). Nothing embedded or removed: the shipped set
   is the same files.
 - **Merge state:** `main` moved **12 commits** ahead while this branch ran (Plan 0121 closed and
   released `0.83.0`; Plan 0122 approved). Three files overlap — `shape_field.rs`,

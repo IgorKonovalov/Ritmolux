@@ -6,8 +6,8 @@
 > **Owner skill(s):** dev
 > **Related ADRs:** [0116](../../adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md)
 
-> **Close (2026-08-16).** All six `dev` phases landed: `5791d25`, `0171fdf`, `f17be77`, `665eb0e`,
-> `34b72ea`, `7903351`. Mode 4 review: **no blockers, two majors, two minors, one nit.** The three
+> **Close (2026-08-16).** All six `dev` phases landed: `0d639d1`, `a2d6cb4`, `8857754`, `7143b75`,
+> `05ae80f`, `c208380`. Mode 4 review: **no blockers, two majors, two minors, one nit.** The three
 > rosters went 477,594 -> 220,626 bytes and `node scripts/check-index-rows.mjs` is green on the
 > tree, on the fixture, and at all three call sites; every one of the 116 ADR index titles was
 > re-derived and matches its body `H1` exactly (verified mechanically at close). **Three deviations,

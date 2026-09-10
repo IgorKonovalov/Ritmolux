@@ -1,7 +1,7 @@
 # 0043 — The swarm gets a depth axis and a domain that follows the target
 
-> **Status:** done 2026-07-30 — all four phases landed (`ae6f638` the target-sized domain,
-> `7f54e2a` `field_freq`, `7eaa848` the depth axis, `de707cb` the family cut to three and
+> **Status:** done 2026-07-30 — all four phases landed (`1c1e975` the target-sized domain,
+> `729e23d` `field_freq`, `4f0b4dc` the depth axis, `d87da35` the family cut to three and
 > re-authored). Mode 4 review passed with **no blockers**; two minors and one nit, both minors
 > fixed in the close commit. Re-verified independently at review time: the seven `swarm` unit tests
 > all carry a counter-assertion that makes them non-vacuous (the replaced constants genuinely

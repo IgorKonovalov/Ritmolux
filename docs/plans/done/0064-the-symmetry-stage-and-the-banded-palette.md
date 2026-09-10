@@ -1,7 +1,7 @@
 # 0064 — The symmetry stage and the banded palette: mandalas, Droste zooms, and hard colour
 
 > **Status:** **done** (closed 2026-08-09) — all six phases landed in the `plan-0064-symmetry-stage-banded-palette`
-> worktree, six commits `e648a02..325f2ac`, taken **after [Plan 0055](0055-the-fold-edge-becomes-a-choice.md)**
+> worktree, six commits `265dfb9..fe13f24`, taken **after [Plan 0055](0055-the-fold-edge-becomes-a-choice.md)**
 > as this header planned. Mode 4 review: **no blockers and no code findings**; the three items raised
 > were all stale text in this plan, corrected below. Verified rather than trusted: the composed map
 > takes its aspect from the **render target** (`kaleidoscope.rs:1116`, ADR-0037 clean — the bug this

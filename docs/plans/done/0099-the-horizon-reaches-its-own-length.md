@@ -6,8 +6,8 @@
 > **Related ADRs:** none — this is a defect repair, not a design choice
 > **Closes:** design-backlog 0093
 
-> **Close (2026-08-16).** All three `dev` phases landed in two commits: `b0a5ba0` (Phases 1-2),
-> `cb8a434` (Phase 3). Mode 4 review: **no blockers, no majors, four minors and a nit.** Phase 1's
+> **Close (2026-08-16).** All three `dev` phases landed in two commits: `caacf89` (Phases 1-2),
+> `6e512db` (Phase 3). Mode 4 review: **no blockers, no majors, four minors and a nit.** Phase 1's
 > discriminator came back with a **third** answer rather than either of the two this plan offered:
 > `reaction_etching` fails like its two siblings, so the family reading holds for all three RD
 > worlds — but the ceiling is **not a frame count**. All three clear 5,401 and fail at 7,201, one

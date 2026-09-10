@@ -1,7 +1,7 @@
 # 0116 — The sanity lens finds the ground
 
-> **Status:** done — closed 2026-08-26. Phases 1, 3, 4, 6, 7 and 8 landed as `8d4a9a9`, `debd803`,
-> `5d97abd`, `86106af`, `022e4c5` and `c2dc0dc`; Phases 2 and 5 are the `human` gates and both ran.
+> **Status:** done — closed 2026-08-26. Phases 1, 3, 4, 6, 7 and 8 landed as `9b5a945`, `11ffa21`,
+> `7927495`, `7c8fe30`, `590b822` and `9a0cfcb`; Phases 2 and 5 are the `human` gates and both ran.
 > **Phase 9 did not run** — Phase 8's mechanical stop condition fired, verified independently at the
 > close by re-running its harness (every number reproduces). Mode 4 verdict: **one blocker, two
 > majors, four minors**; the blocker was an ADR number collision with `main`'s own ADR-0127
@@ -352,18 +352,18 @@ allowed to mean*. Phase 1 measured that the first cannot do the second's job.
 
 ## Implementation log
 
-**Lane:** `WORK/lmv-plan-0116` on `plan-0116-sanity-ground`, branched from `main` at `e022a5d`.
+**Lane:** `WORK/lmv-plan-0116` on `plan-0116-sanity-ground`, branched from `main` at `ff556c3`.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — What each candidate ground would say | dev | done | `8d4a9a9` |
+| 1 — What each candidate ground would say | dev | done | `9b5a945` |
 | 2 — The stop gate | human | done | recorded in Phase 2's Outcome above |
-| 3 — The lens takes a ground | dev | done | `debd803` |
-| 4 — The floors are re-derived, not re-used | dev | done | `5d97abd` |
+| 3 — The lens takes a ground | dev | done | `11ffa21` |
+| 4 — The floors are re-derived, not re-used | dev | done | `7927495` |
 | 5 — Adjudicate what changed | human | done | confirmed empty, 2026-08-26 |
-| 6 — The emptying canvas is actually caught | dev | done | `86106af` |
-| 7 — Documentation | dev | done | `022e4c5` |
-| 8 — What separates a composition from a blot | dev | done | `c2dc0dc` |
+| 6 — The emptying canvas is actually caught | dev | done | `7c8fe30` |
+| 7 — Documentation | dev | done | `590b822` |
+| 8 — What separates a composition from a blot | dev | done | `9a0cfcb` |
 | 9 — The flatness ceiling gains a second condition | dev | **did not run** | Phase 8's stop condition fired |
 
 ### Notes

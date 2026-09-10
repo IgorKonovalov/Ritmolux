@@ -417,7 +417,7 @@ could not express (`references/api-feedback.md`).
   frame *scalars* and there is deliberately no key for the 64-band array, so **every `bin()` term
   reads `0`** in a `--set` still and a `spectrum` preset renders flat there (`spectrum_ridge` comes
   out as two straight lines — that is the stimulus, not the preset). `--report` and the contact
-  sheets are **fine** since `ca99cb1`: their frames now light the log-band slice each named band
+  sheets are **fine** since `ff2c4d9`: their frames now light the log-band slice each named band
   summarises, mirroring `reactivity.rs`. **Verify anything spectral with `--signal`.**
 - **The band scale inverted at ADR-0049.** Bands are now `0..1` with real-music means around
   `0.42 / 0.41 / 0.22 / 0.20`, so the old failure (a threshold above anything music produces, never

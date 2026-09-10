@@ -1,7 +1,7 @@
 # 0067 — The curation route: a gate worth trusting, and the preset that has been waiting six weeks
 
 > **Status:** **done** (closed 2026-08-09) — all six phases landed in the `plan-0067-curation-route`
-> worktree, eight commits `ee08964..be7204c`, plus a `main` merge taking [Plan 0064](0064-the-symmetry-stage-and-the-banded-palette.md)'s
+> worktree, eight commits `0072583..f5222bd`, plus a `main` merge taking [Plan 0064](0064-the-symmetry-stage-and-the-banded-palette.md)'s
 > symmetry stage. Mode 4 review: **no blockers and no code findings.** The one substantive item was a
 > **factual error in this plan** — the `bar` claim, struck and corrected in Context & problem and in
 > Phase 3 — which the implementation caught and correctly refused to act on. Verified rather than

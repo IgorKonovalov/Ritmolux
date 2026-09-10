@@ -1,7 +1,7 @@
 # 0037 — Verifying easing: a transient probe, a signal with dynamics, and the levels authors calibrate against
 
-> **Status:** done — 2026-07-27 (five phase commits `ece3291` / `29bc035` / `6de5ad0` / `bca1457` /
-> `b3f18a6`; passed Mode 4 review with **no blockers and no majors** — four minors, four nits. See
+> **Status:** done — 2026-07-27 (five phase commits `84ea104` / `5067647` / `09116fb` / `7eb6b13` /
+> `3feb1c0`; passed Mode 4 review with **no blockers and no majors** — four minors, four nits. See
 > **Close** at the bottom.)
 > **Created:** 2026-07-26
 > **Approved:** 2026-07-26 — ready for `dev` (a fresh session; the handoff is manual on purpose)
@@ -14,7 +14,7 @@
 > documentation
 > **Amended 2026-07-27, after approval and after Plan 0034 closed.** Two additions, neither changing
 > the decision, the phase order, or ADR-0039: **Phase 1 done-when 5** pins that the new time-varying
-> stimulus must preserve the `spectrum` lighting `ca99cb1` just added to the very functions this
+> stimulus must preserve the `spectrum` lighting `ff2c4d9` just added to the very functions this
 > phase rewrites, and **Phase 4 done-when 4** picks up the empirical half of
 > [backlog 0015](../../design-backlog.md) while the user is already measuring real audio. The plan's
 > premise was **re-verified** against the post-0034 tree: `capture_preset` still takes a single
@@ -33,8 +33,8 @@ numbers, rather than by committing a clip.
 
 ## Context & problem
 
-ADR-0035 shipped `{ attack, release }`; 20 presets adopted it in `a070f5a` and more easing changed in
-`8b5b2e0` and `66300d6`. **Not one of those edits was checked by anything automated.** Two mechanisms
+ADR-0035 shipped `{ attack, release }`; 20 presets adopted it in `1778bc0` and more easing changed in
+`ddb5e08` and `3657199`. **Not one of those edits was checked by anything automated.** Two mechanisms
 cause that, and they are independent — fixing either alone leaves the gap open.
 
 **1. The capture primitive holds one stimulus.** `Renderer::capture_preset(name, frame, frames)`
@@ -144,7 +144,7 @@ Each phase ships as its own commit. Phases 1-3 and 5 are `dev`; Phase 4 is the u
      numbers in the commit body** so the next change has a reference.
   4. Verified non-vacuous: with the two fixtures' `[smoothing]` tables swapped, the test fails.
   5. **Do not regress the spectrum stimuli** (added 2026-07-27, after this plan was approved). Plan
-     0034's close landed `ca99cb1`, which made `shot`'s stimulus frames light the log-band `spectrum`
+     0034's close landed `ff2c4d9`, which made `shot`'s stimulus frames light the log-band `spectrum`
      array — `band_stimuli()` lights the slice its named band summarises (mirroring
      `reactivity.rs`), and `loud_frame()` fills it. **Those are the exact functions this phase
      rewrites to vary over time**, so a regenerated stimulus path can silently drop the lighting and
@@ -154,7 +154,7 @@ Each phase ships as its own commit. Phases 1-3 and 5 are `dev`; Phase 4 is the u
      So: every frame the new time-varying path emits **carries a populated `spectrum` alongside the
      scalars**, on the same convention. Prove it behaviorally rather than by inspection — a
      `bin()`-driven or `spectrum`-system preset must still move under the new path. The cheapest
-     check is that `--report`'s existing columns for `Spectrum Comb` stay in the region `ca99cb1`
+     check is that `--report`'s existing columns for `Spectrum Comb` stay in the region `ff2c4d9`
      measured (bass 0.084, mid 0.091, treb 0.047, onset 0.119, coverage 0.913) rather than collapsing
      toward the pre-fix values (0.040 / 0.030 / 0.016 / 0.000 / 0.664).
 
@@ -317,8 +317,8 @@ pub struct StepResponse {
 ## Close (2026-07-27)
 
 Passed Mode 4 review: **no blockers, no majors**; four minors, four nits. Five phase commits —
-`ece3291` the time-varying stimulus + the step-response measure, `29bc035` the `--report` columns,
-`6de5ad0` `--signal dynamic`, `bca1457` the doc sweep, `b3f18a6` the `human` measurement phase.
+`84ea104` the time-varying stimulus + the step-response measure, `5067647` the `--report` columns,
+`09116fb` `--signal dynamic`, `7eb6b13` the doc sweep, `3feb1c0` the `human` measurement phase.
 `[smoothing]` is observable: `Renderer::capture_preset_over(name, stimulus)` renders one frame per
 `AnalysisFrame` and reads each back, and `metrics::step_response` turns a rise segment and a fall
 segment into frames-to-settle each way. The identity ADR-0039 opened with — "the report is the same
@@ -345,10 +345,10 @@ added; no preset `.toml` changed. **Non-vacuity reproduced independently**: swap
 fixtures' `[smoothing]` tables fails
 `a_scalar_smoothing_entry_measures_symmetric_and_an_asymmetric_one_does_not` at
 `core/tests/easing.rs:194` reporting *rise 3 fall 61 (ratio 20.33)* where it demands symmetry, and
-the asymmetric fixture then reads *34 / 35 / 1.03* — the same four numbers `ece3291` recorded, from a
+the asymmetric fixture then reads *34 / 35 / 1.03* — the same four numbers `84ea104` recorded, from a
 cold reviewer's tree. **Phase 2's statistic recomputed from the JSON report over `presets/`**:
 asymmetric n=24 median `fall/rise` **1.02**, `fall > rise` **12/24**; scalar-only n=14 median
-**0.61**, `fall > rise` **0/14** — matching `29bc035` to a rounding digit and one boundary preset,
+**0.61**, `fall > rise` **0/14** — matching `5067647` to a rounding digit and one boundary preset,
 and matching across a debug/release build change, so the probe is build-invariant too.
 
 **Phase 2 done-when 2 came back a partial negative, exactly as the plan allowed for, and it was

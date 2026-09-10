@@ -1,7 +1,7 @@
 # 0149 — The line corners stop being blunt
 
 > **Status:** done — closed 2026-09-02. Phases 1, 2a, 2, 3, 4 and 5 landed as
-> `7128ba6`, `c801f43`, `d0d596e`, `324d34c`, `8ed7f1d` and `c0fd6bf`; Phase 6 returned
+> `17d53d3`, `9542872`, `30b5f79`, `2af2d6d`, `2dbfe20` and `6ec7116`; Phase 6 returned
 > **no change** to `WIDTH_SCALE` and Phase 7 lands no commit behind it. Mode 4 review:
 > **no blockers, two majors** — [ADR-0158]'s Decision still stated the truncated-miter
 > clamp the implementation replaced with a bevel (corrected in that ADR before
@@ -650,12 +650,12 @@ and neither carries a commit.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The instance carries a length, and nothing moves | dev | done | 7128ba6 |
-| 2a — The stroke is measured where the screen is isotropic | dev | done | c801f43 |
-| 2 — The corner reaches its point | dev | done | d0d596e |
-| 3 — A `scallop` refuses a depth it cannot draw | dev | done | 324d34c |
-| 4 — `parametric_curve` reserves what a preset declared | dev | done | 8ed7f1d |
-| 5 — Four contracts that say more than they hold | dev | done | c0fd6bf |
+| 1 — The instance carries a length, and nothing moves | dev | done | 17d53d3 |
+| 2a — The stroke is measured where the screen is isotropic | dev | done | 9542872 |
+| 2 — The corner reaches its point | dev | done | 30b5f79 |
+| 3 — A `scallop` refuses a depth it cannot draw | dev | done | 2af2d6d |
+| 4 — `parametric_curve` reserves what a preset declared | dev | done | 2dbfe20 |
+| 5 — Four contracts that say more than they hold | dev | done | 6ec7116 |
 | 6 — Judge what the corrected stroke weighs | human | done — verdict: no change | no commit |
 | 7 — Apply the calibration verdict | dev | done — nothing to apply | no commit |
 
@@ -849,7 +849,7 @@ Readings taken, all on this fixture at three softness values:
 
 | tree | sampling phase | worst byte | lit pixels (poly / arc) |
 |---|---|---|---|
-| pre-2a (`ba887cc`, rebuilt) | 0 | **1** | 628 / 632 |
+| pre-2a (`67fcae5`, rebuilt) | 0 | **1** | 628 / 632 |
 | post-2a | 0 | **114** (4 px) | 540 / 540 |
 | post-2a | 0.25 | 38 | 536 / 540 |
 | post-2a | 0.37 | 2 | 540 / 540 |
@@ -860,7 +860,7 @@ become identical and 76,796 pixels sit within 1 byte — and the 48-byte bound w
 never slack absorbed by beads. The walk now starts at `ARC_SAMPLE_PHASE = 0.5`,
 which is the furthest every vertex can be from the lattice's symmetry axes; the
 constant's doc carries the mechanism and the sweep above. **No tolerance was
-moved.** The pre-2a row was measured by checking `ba887cc` out over
+moved.** The pre-2a row was measured by checking `67fcae5` out over
 `core/src/render/scenes/` and rebuilding, not by restoring files with preserved
 mtimes.
 
@@ -974,10 +974,10 @@ fixture table and `frame_diff`.
 
 | file | arm | size |
 |---|---|---|
-| `sheet_pre2a_1080.png` | before Phase 2a (`ba887cc`, rebuilt) | 1920x1080 |
-| `sheet_post2_1080.png` | after Phase 2 (`d0d596e`) | 1920x1080 |
-| `sheet_pre2a_1280.png` | before Phase 2a (`ba887cc`, rebuilt) | 1280x800 |
-| `sheet_post2_1280.png` | after Phase 2 (`d0d596e`) | 1280x800 |
+| `sheet_pre2a_1080.png` | before Phase 2a (`67fcae5`, rebuilt) | 1920x1080 |
+| `sheet_post2_1080.png` | after Phase 2 (`30b5f79`) | 1920x1080 |
+| `sheet_pre2a_1280.png` | before Phase 2a (`67fcae5`, rebuilt) | 1280x800 |
+| `sheet_post2_1280.png` | after Phase 2 (`30b5f79`) | 1280x800 |
 
 Each is the twenty-preset line roster in a 5x4 labelled grid, from
 `target/plan0149/roster/`. One command per file:
@@ -989,10 +989,10 @@ cargo run --release -p standalone --example shot -- \
 
 No `--set`, so both arms are captured under the same resting stimulus and the
 only difference between them is the tree. The **before** arm is a rebuild:
-`git checkout ba887cc -- core/src standalone/src`, render, then
+`git checkout 67fcae5 -- core/src standalone/src`, render, then
 `git checkout HEAD -- core/src standalone/src` — not a restored file, because
 `Copy-Item` preserves mtime and cargo would serve the reverted code as fresh.
-`ba887cc` carries Phases 1, 3, 4 and 5 and neither 2a nor 2, which is exactly
+`67fcae5` carries Phases 1, 3, 4 and 5 and neither 2a nor 2, which is exactly
 the arm Phase 6 asks for.
 
 The pre-existing `target/plan0149/sheet_{nomiter,clamp,bevel}_*` and `panel_*`
@@ -1010,7 +1010,7 @@ that is the accepted look rather than an unexamined consequence.
 
 - **`presets/` touched:** none. `git diff --name-only main...HEAD -- presets/` is empty.
 - **Plan header `Closes:`** design-backlog 0134, 0135, 0136, 0144. **0135, 0136 and 0144 are
-  discharged** (Phases 4, 3 and 5) and were moved to the archive at `5ba4f72`; 0135 by a different
+  discharged** (Phases 4, 3 and 5) and were moved to the archive at `9ff226a`; 0135 by a different
   mechanism than the phase named — see the Notes. **0134 is discharged by Phase 2** and is still
   live in `docs/design-backlog.md`: archiving it is the close ceremony's judgement, not `dev`'s.
 - **What shipped:** a **fix**. Phase 3 is a load-time refusal, Phase 4 an allocation reduction with
@@ -1029,9 +1029,9 @@ that is the accepted look rather than an unexamined consequence.
   and it is red-on-delivery rather than decayed — 0134's probe is
   `absent: MITER_LIMIT in: core/src/render/scenes/lines/renderer.rs` and the constant is now at
   `renderer.rs:32`, which is that phase's own evidence. The 0135 and 0144 breaks are gone with
-  those entries' move to the archive at `5ba4f72`. Left untouched: archiving is the close
+  those entries' move to the archive at `9ff226a`. Left untouched: archiving is the close
   ceremony's judgement, not `dev`'s.
-- **Full suite:** at **Phase 2's tip** (`d0d596e`, which is the last commit that changes code —
+- **Full suite:** at **Phase 2's tip** (`30b5f79`, which is the last commit that changes code —
   everything after it is this log), `cargo nextest run --workspace` — **1505 run, 1505 passed,
   5 skipped, exit 0**, 411.967 s, `LMV_BLESS` unset, every golden suite included and no baseline
   file modified by the run. `cargo fmt --all --check`,

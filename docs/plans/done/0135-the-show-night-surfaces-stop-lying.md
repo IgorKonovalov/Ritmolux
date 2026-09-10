@@ -1,7 +1,7 @@
 # 0135 — The show-night surfaces stop lying
 
-> **Status:** done — closed 2026-08-30 on Phases 1-4 (`915fc74`, `c937026`, `e0fd1a7`,
-> `6c717d5`). Mode 4 review: **no blockers, one major, five minors.** Verified at the close:
+> **Status:** done — closed 2026-08-30 on Phases 1-4 (`c8672d0`, `53f12a9`, `4bb47e4`,
+> `a20fd16`). Mode 4 review: **no blockers, one major, five minors.** Verified at the close:
 > `fmt` clean, `clippy --workspace --all-targets` clean, `nextest --workspace` **1211 passed /
 > 5 skipped**, and ADR-0148's drift gate **convicted under mutation** — dropping `--osc` from
 > the roster failed `every_scanner_flag_literal_is_rostered` by name, which is the check Phase 2's
@@ -239,15 +239,15 @@ impl RecoveryPolicy {
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The binary knows its own flags | dev | done | `915fc74` |
-| 2 — `--help` prints the roster and exits | dev | done | `c937026` |
-| 3 — An operator's choice is a new incident | dev | done | `e0fd1a7` |
-| 4 — The settle window is in seconds | dev | done | `6c717d5` |
+| 1 — The binary knows its own flags | dev | done | `c8672d0` |
+| 2 — `--help` prints the roster and exits | dev | done | `53f12a9` |
+| 3 — An operator's choice is a new incident | dev | done | `4bb47e4` |
+| 4 — The settle window is in seconds | dev | done | `a20fd16` |
 | 5 — The unplug gate (evidence only) | human | not started | |
 
 ### Notes
 
-- **One file beyond the plan's list**, in Phase 2 (`c937026`): `standalone/tests/help_cli.rs`.
+- **One file beyond the plan's list**, in Phase 2 (`53f12a9`): `standalone/tests/help_cli.rs`.
   The phase's done-when asks for the exit to be asserted rather than the output, and a window,
   a wgpu device or a capture client on that path is not observable from inside the process that
   would be creating them. `CARGO_BIN_EXE_lmv` resolves the binary in an integration test and not
@@ -265,7 +265,7 @@ impl RecoveryPolicy {
   `#![allow(clippy::disallowed_methods, reason = ...)]` for the one-second exit bound. The
   repo-wide ban is a determinism rule for analysis code; `core/tests/arc_cost.rs` and six
   siblings use the same escape for the same reason.
-- The two comment corrections named in Phase 3 both landed in `e0fd1a7`; the settle constant's
+- The two comment corrections named in Phase 3 both landed in `4bb47e4`; the settle constant's
   own comment was corrected there too, since resetting the policy changes what it documents.
 - Not acted on: `TITLE_UPDATE_FRAMES` in `standalone/src/main.rs` is still a frame count. It
   paces the window-title refresh and is not in the recovery path, so Phase 4's second done-when

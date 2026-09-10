@@ -1,8 +1,8 @@
 # 0058 — The gate can see an empty frame, and "loud" has to mean more picture
 
 > **Status:** **done 2026-08-03** — all four phases landed, including the `human` Phase 4.
-> Phase commits: `96a914f` coverage measures the scene, `a0ce1c9` the floors are re-measured,
-> `8e79aa3` the excitation ratio ships as a report, `2efb80e` the comb and the corona come back
+> Phase commits: `84a70e3` coverage measures the scene, `419247d` the floors are re-measured,
+> `7e51d6b` the excitation ratio ships as a report, `aab1195` the comb and the corona come back
 > inside the frame.
 > Mode 4 review: **no blockers, no majors**; the minors were shared with [0057] and fixed in the
 > close commit. Gate on `main`: fmt clean, clippy `-D warnings` clean, **427/427, 0 skipped**.
@@ -104,7 +104,7 @@ flowchart TB
   stop and surface it rather than growing the capture surface).
 - **Done when:**
   - A preset whose scene draws nothing scores coverage `0.0`, **proven against the real case**: the
-    pre-repair `spectrum_ridge` (`scale = 3.20`, see `git show 81190ac^:presets/spectrum_ridge.toml`)
+    pre-repair `spectrum_ridge` (`scale = 3.20`, see `git show 983d23e^:presets/spectrum_ridge.toml`)
     fails this gate. This is the non-vacuity check and it is the point of the phase — a gate that
     cannot fail the defect that motivated it has not been built.
   - Every other shipped preset still passes, or a preset that now fails is reported as a **finding**
@@ -159,7 +159,7 @@ flowchart TB
 - **Owner skill:** human
 - **What:** a `preset-author` pass re-scaling `spectrum_comb` and `spectrum_corona` onto the
   normalized band scale, verified with the instruments Phases 1–3 provide rather than by eye. The
-  reference is the `spectrum_ridge` repair in `81190ac`: `3.20 -> 0.60`, chosen so a fully-driven
+  reference is the `spectrum_ridge` repair in `983d23e`: `3.20 -> 0.60`, chosen so a fully-driven
   element lands just inside the frame.
 - **Files touched:** `presets/spectrum_comb.toml`, `presets/spectrum_corona.toml`.
 - **Done when:** both presets keep their whole figure in frame at full drive; both pass Phases 1–3;

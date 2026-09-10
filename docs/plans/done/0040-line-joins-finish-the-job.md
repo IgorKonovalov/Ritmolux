@@ -1,13 +1,13 @@
 # 0040 — Line joins, finished: the star's other half, and a pin under the reported defect
 
-> **Status:** done 2026-07-28 — all three phases landed in three commits (`4c68bbd` the pixel pin
-> under the polyline joint, `434ac1d` the join bits generated into the shader plus a swap test,
-> `0bc33a6` the star rosette's contact points) and passed the Mode 4 review: **no blockers, no
+> **Status:** done 2026-07-28 — all three phases landed in three commits (`b38df68` the pixel pin
+> under the polyline joint, `c78714c` the join bits generated into the shader plus a swap test,
+> `d1ca109` the star rosette's contact points) and passed the Mode 4 review: **no blockers, no
 > majors**, two minors, two nits. Verified rather than trusted: the new baseline reproduces
 > bit-exact (`mean 0.0000 / outlier 0`), `star_pattern.png` is the **only** baseline that moved,
 > `fmt --check` + `clippy --workspace --all-targets -D warnings` are clean, and
 > `cargo nextest run --workspace` is **280/280, 0 skipped** — which corrects `dev`'s close report:
-> the `--test transition` abort is real and pre-existing (reproduced at `3e4dec5` in a scratch
+> the `--test transition` abort is real and pre-existing (reproduced at `4b7d606` in a scratch
 > worktree) but it is the known in-process parallel-GPU-teardown fault, and all 12 of those tests
 > execute and pass under the project's canonical runner. `dev`'s correction to Phase 2 done-when 2's
 > premise is accepted: the old assertion does fire on a bit swap, at element 1 only and by `0.008`,

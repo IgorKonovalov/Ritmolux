@@ -15,7 +15,7 @@
 > [ADR-0071](0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
 > (why the constant below is a measurement and must say so)
 > **Raised from:** [Plan 0119](../plans/done/0119-the-flatness-gate-gets-its-second-term.md) Phase 1,
-> measured 2026-08-26 at `8389f2a`
+> measured 2026-08-26 at `e68e538`
 
 ## Context
 
@@ -310,7 +310,7 @@ defect to route rather than an entry to re-add.
 
 ## Notes
 
-Every number above comes from one run of the Plan 0119 Phase 1 instrument at `8389f2a`:
+Every number above comes from one run of the Plan 0119 Phase 1 instrument at `e68e538`:
 
 ```text
 cargo nextest run -p lmv-core --test sanity --run-ignored all \

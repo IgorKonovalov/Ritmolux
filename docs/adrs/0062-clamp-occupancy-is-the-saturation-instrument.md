@@ -132,7 +132,7 @@ measurement added:
 
 **The threshold is `0.9`, and it is measured on *both* libraries rather than defended on one.** The
 plan required the distribution instead of this ADR's suggested starting value taken on faith, and
-`dev` walked 339 clamped bindings twice — today's library, and the pre-retune library at `80c5dff^`
+`dev` walked 339 clamped bindings twice — today's library, and the pre-retune library at `6c7fa2c^`
 that Plan 0048 Phase 7 found saturated:
 
 ```text

@@ -7,8 +7,8 @@
 > **Related ADRs:** [0012](../../adrs/0012-stateful-feedback-render-system.md) (stateful feedback render system), [0013](../../adrs/0013-c-abi-v4-render-dt.md) (C ABI v4: lmv_render_dt), [0002](../../adrs/0002-layered-preset-architecture.md) (preset layers)
 >
 > **Close (2026-07-23, Mode 4 review — no blockers, no majors; 2 minor, 2 nits):**
-> Six `dev` phase commits (`345be23`, `13148b7`, `39b6091`, `cb71057`, `9fcfc95`,
-> `8a05cea`). Landed the engine's first **stateful feedback** scene — Gray-Scott
+> Six `dev` phase commits (`13d3fd0`, `2ea1a5d`, `0a187cb`, `cc6ac3d`, `95f72ad`,
+> `104814d`). Landed the engine's first **stateful feedback** scene — Gray-Scott
 > reaction-diffusion on a reusable `render::feedback::PingPongField` (two
 > `Rgba16Float` offscreen textures, fixed 256² grid) with an iso-contour + hatch +
 > cosine-palette present look, driven by named params (`feed`/`kill`/`flow`/`inject`
@@ -33,7 +33,7 @@
 > pin). **On-device carry-forwards** (like prior plans): Phase 2 same-speed eyeball,
 > Phase 4 "reads as the reference family" (dev verified via real-GPU PNGs), Phase 5
 > live-foobar plugin `dt` (C++ shim not compiled here). **Note:** `main` stays red on
-> `golden` (pre-existing from `76a2fb4`, blessed cross-GPU) — **Plan 0022 greens it**,
+> `golden` (pre-existing from `8f86d9a`, blessed cross-GPU) — **Plan 0022 greens it**,
 > not this close. Version **minor 0.4.0 → 0.5.0** at close.
 
 ## TL;DR

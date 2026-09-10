@@ -9,8 +9,8 @@
 > [0132](../../adrs/0132-a-rate-parameter-integrates-a-phase.md) (accepted, Outcome — the rule this finishes)
 > **Closes:** design-backlog 0141
 >
-> All five phases landed — `5c258d0`, `b250d0d`, `254762c`, `228418a`, `c2439b7` (+ `d22fff7`,
-> `e186bd2`, `7ac363f`). **Mode 4 review: no blockers, two majors both discharged before the close**
+> All five phases landed — `3c52739`, `573ce0c`, `45c6ea5`, `271d2a2`, `a1bc2b1` (+ `8b7cde0`,
+> `46f3069`, `bd57e07`). **Mode 4 review: no blockers, two majors both discharged before the close**
 > — ADR-0135's body was corrected while still `proposed` (six bindable rates counted, nine found),
 > and the three rates it leaves unfixed, all multiplying a per-element `age`, were filed as
 > design-backlog 0149. Verified at the close: the four rate helpers really do collapse to one
@@ -316,11 +316,11 @@ impl Phase {
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `scenes::Phase`, proven on the three sites that already work | dev | done | `5c258d0` |
-| 2 — the two rates nothing binds | dev | done | `b250d0d` |
-| 3 — `swarm`'s field clock | dev | done | `254762c` |
-| 4 — the guard | dev | done | `228418a` |
-| 5 — the swarm content pass | human | done | `c2439b7` |
+| 1 — `scenes::Phase`, proven on the three sites that already work | dev | done | `3c52739` |
+| 2 — the two rates nothing binds | dev | done | `573ce0c` |
+| 3 — `swarm`'s field clock | dev | done | `45c6ea5` |
+| 4 — the guard | dev | done | `271d2a2` |
+| 5 — the swarm content pass | human | done | `a1bc2b1` |
 
 ### Notes
 
@@ -351,8 +351,8 @@ impl Phase {
   `--report` holds one stimulus for every frame it renders, so `spin` is constant across each
   probe and the integrated and multiplied forms agree there by construction.
 - **Correction at the Phase 5 close (2026-08-27): three of those five rows are presets that do not
-  exist.** `Dense`, `Starfield` and `Storm` were retired 2026-08-11 by `9bf2b23`, an ancestor of
-  `5c258d0` — never in the tree this plan ran against. The reading used `shot --report family=swarm`
+  exist.** `Dense`, `Starfield` and `Storm` were retired 2026-08-11 by `6f4e9a7`, an ancestor of
+  `3c52739` — never in the tree this plan ran against. The reading used `shot --report family=swarm`
   with **no `--presets`**, which resolves to the seeded `%APPDATA%` copy, and seeding is
   write-if-absent and never deletes. `Shatter` and `Drift` survive (both byte-identical there and in
   the repo; Phase 5 reproduces 0.081 and 0.136 exactly), but *"read against their family
@@ -376,7 +376,7 @@ impl Phase {
 ### Phase 5 — the content pass and the verdict
 
 - **Verdict: the retuned variants win on both presets.** Judged in the running app against a build of
-  `b250d0d` (this branch before the swarm fix) on the same track, both engines on one
+  `573ce0c` (this branch before the swarm fix) on the same track, both engines on one
   `LMV_PRESET_DIR` library. The losers: on the **old** engine because the lurch
   is the defect this plan removed; on the **corrected** because both files were
   tuned against a clock that lurched, so neither range means what it meant.
@@ -386,7 +386,7 @@ impl Phase {
   field periodically ran **backwards**, unbounded. That rewind is part of what the file means by
   *"it evolves almost entirely on `time`"*. Corrected it never reverses and the cloud settles;
   the retune (`sin` amplitude 0.010 → 0.060) swings the **rate** through zero instead. Numbers and
-  the `--horizon` readings behind them are in `swarm_drift.toml`'s header and `c2439b7`.
+  the `--horizon` readings behind them are in `swarm_drift.toml`'s header and `a1bc2b1`.
 - **Shatter's difference is invisible to every headless instrument here**, confirmed rather than
   assumed: its `spin` has no `time` term, so the change needs a moving rate at large elapsed time,
   and `--report`/`--horizon` hold one stimulus (`--horizon` rejects `--signal`/`--audio` outright),
@@ -401,7 +401,7 @@ impl Phase {
   and it *moved*, 0.5553 → 0.6531, under the wider `spin`, convicting the old floor at 2.33x against
   that file's 2.2x `MAX_FLOOR_SLACK`. Half the new minimum, which is that arm's stated rule.
 - **One stale workaround outside the two subjects:** `curve_nightbloom.toml`'s header justified its
-  constant `spin` with a constraint **Phase 2 removed** (`d22fff7`, value unchanged). The close
+  constant `spin` with a constraint **Phase 2 removed** (`8b7cde0`, value unchanged). The close
   ceremony's stale-workaround grep could not have found it — it looks for `ADR-00NN` / `Plan 00NN` /
   `backlog NNNN` and this header cites no number at all.
 - **No engine gap came back** — nothing new for the backlog from the content lane. `fmt`, `clippy`
@@ -424,5 +424,5 @@ impl Phase {
   `self.spin_time = advance_spin(self.spin_time, self.spin, self.dt);`, anchored on the function
   Phase 1 deleted; 0142's subject (the double-`update` on a same-system dissolve) is untouched by
   this plan and the entry still stands.
-- **`human` phases remaining:** none. Phase 5 landed 2026-08-27 (`c2439b7`, `d22fff7`); the verdict
-  was taken in the running app against a `b250d0d` build.
+- **`human` phases remaining:** none. Phase 5 landed 2026-08-27 (`a1bc2b1`, `8b7cde0`); the verdict
+  was taken in the running app against a `573ce0c` build.

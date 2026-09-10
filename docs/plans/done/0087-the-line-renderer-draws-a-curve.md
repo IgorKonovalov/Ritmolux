@@ -1,10 +1,10 @@
 # 0087 — the line renderer draws a curve
 
 > **Status:** done (2026-08-27) — all seven phases landed. Phases 1, 1b, 2, 3, 5 and 6 are the
-> `dev` run (`3f9e828`, `b97ff64`, `509eaff`, `82c031f`, `af4f118`, `8179f25`); Phase 4's look gate
+> `dev` run (`1ca72ca`, `68b721f`, `1cf7294`, `7f270b4`, `c6b31eb`, `3c08a3a`); Phase 4's look gate
 > returned *"circles looks fine but blurred"* and green-lit Phase 5; Phase 7 judged the three retired
 > mandalas in the running app — *"looks much better"* — and returned `star_mandala` to the shipped
-> set as `presets/star_mandala_bordered.toml` (`a7d7cd0`), the first preset in the library to bind a
+> set as `presets/star_mandala_bordered.toml` (`3697f30`), the first preset in the library to bind a
 > `rings` roster. `star_mandala_six` and `star_weave` stay retired. **Mode 4 review: no blockers,
 > one major** (`docs/capturing.md` still described the in-frame geometry measure as segments-only
 > after Phase 2 widened it to arcs, and the close block reported that sweep as not owed), **five
@@ -329,30 +329,30 @@ meet, they meet tangentially and overlap by ADR-0041's half-width as any two str
 > last one. **The phases above are the contract; everything here is what happened.**
 
 **Lane:** phases 1-4 ran in `WORK/lmv-plan-0087` on `plan-0087-arc-primitive`, branched from `main`
-at `aa4bc5f`; that branch is gone and its commits reached `main` inside Plan 0114's close merge.
-Phases 5-7 run in `WORK/lmv-plan-0087-biarc` on `plan-0087-biarc`, branched from `main` at `e205f8e`.
+at `2cbfdd4`; that branch is gone and its commits reached `main` inside Plan 0114's close merge.
+Phases 5-7 run in `WORK/lmv-plan-0087-biarc` on `plan-0087-biarc`, branched from `main` at `7122358`.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the arc instance draws | dev | done | `3f9e828` |
-| 1b — a sub-floor `thickness` stops failing silently | dev | done | `b97ff64` |
-| 2 — the in-frame geometry instrument learns arcs | dev | done | `509eaff` |
-| 3 — the circular motifs become arcs | dev | done | `82c031f` |
+| 1 — the arc instance draws | dev | done | `1ca72ca` |
+| 1b — a sub-floor `thickness` stops failing silently | dev | done | `68b721f` |
+| 2 — the in-frame geometry instrument learns arcs | dev | done | `1cf7294` |
+| 3 — the circular motifs become arcs | dev | done | `7f270b4` |
 | 4 — does it read as a curve? | human | done | verdict in the notes |
-| 5 — the general curve: a biarc chain | dev | done | `af4f118` |
-| 6 — the scalloped boundary | dev | done | `8179f25` |
+| 5 — the general curve: a biarc chain | dev | done | `c6b31eb` |
+| 6 — the scalloped boundary | dev | done | `3c08a3a` |
 | 7 — the retired mandalas, re-judged | human | not started | |
 
 ### Notes
 
 - **Phase 4's verdict, in the user's own words: _"circles looks fine but blurred"_.** Judged
   2026-08-25 in the running app, on the arc build alone at 1186x958, `rich` tier, against the three
-  retired mandalas at their honest tunings recovered from `654304a^` (`star_mandala`,
+  retired mandalas at their honest tunings recovered from `91b37e3^` (`star_mandala`,
   `star_mandala_six`, `star_weave` — `glow = 1.0`, no trails, no bloom). Against the phase's two
   questions: the arc-drawn ring **reads as drawn curves**, and **no bead was reported on it**. By the
   phase's own routing that is the "yes" that green-lights Phase 5.
 - **The verdict was taken twice, and the first take judged the wrong build.** Both builds were
-  launched side by side — the arc one and a control built at `509eaff`, the tip before circles became
+  launched side by side — the arc one and a control built at `1cf7294`, the tip before circles became
   arcs — and the first screenshot returned was the control's: its circles carry the stippled,
   scalloped edge an arc cannot produce, since an arc has no vertices. The second take ran the arc
   build alone. **The lesson is cheap and worth keeping: a two-window A/B needs the windows
@@ -390,7 +390,7 @@ Phases 5-7 run in `WORK/lmv-plan-0087-biarc` on `plan-0087-biarc`, branched from
 - **Phase 4's control needs choosing, because the obvious one no longer exists.** The phase says to
   judge "an arc-drawn `circle` ring against the polyline version". After Phase 3 the engine cannot
   draw a `circle` ring as a polyline at all, so the comparison is either against a build from before
-  `82c031f` or against a `petal`/`teardrop` ring, which is a different figure. `arc_cost.rs` took the
+  `7f270b4` or against a `petal`/`teardrop` ring, which is a different figure. `arc_cost.rs` took the
   second route and says why it is a stand-in.
 - **Phase 1's ADR-0058 obligation is discharged by the second of its two arms: there is no new
   bind-group layout.** The arc pipeline reuses the segment pipelines' bind layout, bind group and
@@ -556,7 +556,7 @@ Phases 5-7 run in `WORK/lmv-plan-0087-biarc` on `plan-0087-biarc`, branched from
   judged — but a gross construction error would have shown here and did not.
 
 - **Phase 7 opened, and it landed a preset this plan said it would not.** The user judged the four
-  presets in the running app — the three retired mandalas recovered untouched from `654304a^` plus a
+  presets in the running app — the three retired mandalas recovered untouched from `91b37e3^` plus a
   scratch fifth carrying the new boundary — and the verdict was *"looks much better"*, with the
   instruction to **keep the bordered one**. So `presets/star_mandala_bordered.toml` ships: the
   retired `star_mandala` roster and tuning exactly as they were rejected, on the new primitive, plus
@@ -631,7 +631,7 @@ Phases 5-7 run in `WORK/lmv-plan-0087-biarc` on `plan-0087-biarc`, branched from
   phase's scope and the gate's own message says a falsified entry is architect's to correct, close or
   split. **It breaks `pre-push` and the CI `links` job until it is closed.** (The Phase 1b breakage
   this field recorded before — 0098's stale path — is gone: that entry was archived on `main` at
-  `6eff54e`.)
+  `d007b22`.)
 - **Outstanding `human` phases:** **Phase 7, partly run.** All three retired presets were judged in
   the running app and the verdict was *"looks much better"*; `star_mandala` returns as
   `star_mandala_bordered` (commit below). **`star_mandala_six` and `star_weave` have no per-preset
@@ -640,8 +640,8 @@ Phases 5-7 run in `WORK/lmv-plan-0087-biarc` on `plan-0087-biarc`, branched from
   drafted verbatim in the notes above, with its probe. Raised by Phase 7 in the running app, and it
   revises [ADR-0041](../../adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md).
 - **Outstanding `dev` phases:** **none.** 5 and 6 landed here.
-- **Lane state:** `plan-0087-biarc` is branched from `main` at `e205f8e` and carries four commits —
-  `af4f118` (Phase 5), `8179f25` (Phase 6), `7631423` (the close block) and `a7d7cd0` (the preset). **`main` has moved since** — a parallel session is committing to it — so
+- **Lane state:** `plan-0087-biarc` is branched from `main` at `7122358` and carries four commits —
+  `c6b31eb` (Phase 5), `3c08a3a` (Phase 6), `69da436` (the close block) and `3697f30` (the preset). **`main` has moved since** — a parallel session is committing to it — so
   a merge of `main` into this branch is owed before the close. **No golden baseline moved**: all 794
   `lmv-core` tests pass on the tip, including every `parametric_curve` capture, which is the property
   the chord-web gate exists to hold. `cargo fmt --all --check` and

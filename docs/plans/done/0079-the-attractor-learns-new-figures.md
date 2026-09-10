@@ -1,8 +1,8 @@
 # 0079 — The attractor learns new figures: the tuple roster with per-tuple framing, and measured morph paths
 
-> **Status:** done 2026-08-13 — all six phases landed (`aae4f13`, `8947a0c`, Phase 3's curation,
-> `01e4cfc`, `8b6d48c`, Phase 6's judgement), plus eleven presets committed alongside them
-> (`7157d6c`, `ed665e4`, `0927d75`). **Both `human` gates were run, and both produced a verdict
+> **Status:** done 2026-08-13 — all six phases landed (`35cd84b`, `16ab7fa`, Phase 3's curation,
+> `69cb4f1`, `4cbefd4`, Phase 6's judgement), plus eleven presets committed alongside them
+> (`a0b83c2`, `a6c16b9`, `23bdad0`). **Both `human` gates were run, and both produced a verdict
 > rather than a default**: the curation kept all 50 candidates after drafting and rejecting a
 > four-per-family shortlist, and the morph sweep shipped four measured paths where the plan
 > budgeted for possibly zero. Mode 4 review: **no blockers, no majors, four minors, two nits** —
@@ -33,9 +33,9 @@
   a preset landing legal without a plan at all — so this is a **deliberate widening**, not a
   violation. The bullet below is left as written, because what it recorded was the intent at
   approval.
-- **Phase 4's `presets/README.md` work landed at Phase 1** (`aae4f13`), not at Phase 4. Correct
+- **Phase 4's `presets/README.md` work landed at Phase 1** (`35cd84b`), not at Phase 4. Correct
   call and not a shortcut: the doc gate runs immediately, and leaving the param roster red across
-  a `human` curation gate of unknown duration was not acceptable. Phase 4's commit (`01e4cfc`)
+  a `human` curation gate of unknown duration was not acceptable. Phase 4's commit (`69cb4f1`)
   carries the roster *contents* and the walk section instead.
 
 ## TL;DR
@@ -165,7 +165,7 @@ entry in a debug build, an order less in release, once per preset switch and nev
 frame).
 
 **One thing this makes easier rather than harder:** the four gallery presets shipped at
-`7157d6c` already cycle their family's whole roster, so they need no modulus repair — the
+`a0b83c2` already cycle their family's whole roster, so they need no modulus repair — the
 Phase 2 caveat about them parking on the last entry after a trim is void.
 
 ### Phase 4 — the roster lands, with docs

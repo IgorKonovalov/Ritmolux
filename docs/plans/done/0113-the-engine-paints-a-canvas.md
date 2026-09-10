@@ -1,7 +1,7 @@
 # 0113 — The engine paints a canvas
 
-> **Status:** done — closed 2026-08-26. Ten phases, `046b9f3`..`02b6de9`, all on
-> `main` (Phases 1-8 on the `plan-0113-shape-collage` lane, merged `b20ba21`; 6b, 9
+> **Status:** done — closed 2026-08-26. Ten phases, `6987056`..`38ab987`, all on
+> `main` (Phases 1-8 on the `plan-0113-shape-collage` lane, merged `aacfafe`; 6b, 9
 > and 10 directly). Two Mode 4 reviews: the first found three `major`s (a false
 > colour promise at five sites, a forbidden sweep quoted, a per-frame heap
 > allocation in the render path) which became Phase 9; the second found **no
@@ -523,17 +523,17 @@ directly.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The painter draws a static canvas | dev | done | 046b9f3 |
-| 2 — What an element costs | dev | done | 6038d25 |
-| 3 — The stop gate | human | **continue** | de69a52 |
-| 4 — The layout generator and a sample sheet | dev | done | a008327 |
-| 5 — The composition call | human | **diagonal-axis + hierarchy spread** | 168e42a |
-| 6 — The music moves the canvas | dev | done | 47ef35d |
-| 6b — The canvas is measured against its own paper | dev | done | df6ed6e |
-| 7 — The Kandinsky vocabulary | dev | done | 35d2f9f |
-| 8 — Documentation and the shipped set | dev | done | b31a4e7 |
-| 9 — The Mode 4 repairs | dev | done | 015f8a3 |
-| 10 — The second-pass repairs | dev | done | 02b6de9 |
+| 1 — The painter draws a static canvas | dev | done | 6987056 |
+| 2 — What an element costs | dev | done | 2d8e0da |
+| 3 — The stop gate | human | **continue** | c369e5b |
+| 4 — The layout generator and a sample sheet | dev | done | 66e4fdf |
+| 5 — The composition call | human | **diagonal-axis + hierarchy spread** | b31eda2 |
+| 6 — The music moves the canvas | dev | done | 26264a5 |
+| 6b — The canvas is measured against its own paper | dev | done | b3ae6e5 |
+| 7 — The Kandinsky vocabulary | dev | done | cad4470 |
+| 8 — Documentation and the shipped set | dev | done | c96d2f7 |
+| 9 — The Mode 4 repairs | dev | done | 34ab6d7 |
+| 10 — The second-pass repairs | dev | done | 38ab987 |
 
 ### Notes
 
@@ -702,7 +702,7 @@ none is a pixel change. Two things worth naming:
   the old lens said.
 
 **Merged, and both semantic collisions the lane recorded are discharged.** The
-branch merged into `main` on 2026-08-26 (`b20ba21`); neither collision was a
+branch merged into `main` on 2026-08-26 (`aacfafe`); neither collision was a
 conflict git would have shown. Plan 0095's retracted beat multiplier is repaired
 in Phase 9 — both shipped presets and `presets/README.md` now match
 `docs/presets.md`. ADR-0126 / Plan 0116's rebuilt sanity lens is adopted in

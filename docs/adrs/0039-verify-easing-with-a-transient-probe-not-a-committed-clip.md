@@ -31,8 +31,8 @@ bass **0.011**, far below the range shipped presets are gained for.
 The cost is already concrete. The `preset-author` lane could not separate five different `thickness`
 values on `rose_trails` (1.10 through 2.30, including the untouched original) because that preset's
 1.25 spin against a max-decay feedback saturates any held stimulus regardless of the value; it
-shipped a mid-range guess rather than the value it wanted. Every easing edit in `a070f5a`, `8b5b2e0`
-and `66300d6` rests solely on a human watching the running app.
+shipped a mid-range guess rather than the value it wanted. Every easing edit in `1778bc0`, `ddb5e08`
+and `3657199` rests solely on a human watching the running app.
 
 Two different problems hide inside this, and conflating them is what kept it unsolved:
 

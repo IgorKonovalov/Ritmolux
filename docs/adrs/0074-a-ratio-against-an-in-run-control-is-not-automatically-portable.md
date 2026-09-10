@@ -184,9 +184,9 @@ proved, not whether.
 
 ## Notes
 
-Readings taken 2026-08-04. Local: commit `1d56600`, `Microsoft Basic Render Driver`, DX12, driver
+Readings taken 2026-08-04. Local: commit `f49ac14`, `Microsoft Basic Render Driver`, DX12, driver
 10.0.19041.5794, Windows 10 10.0.19045. CI: run **30903871856**, `windows-latest`, WARP
-10.0.26100, read through the `.config/nextest.toml` `success-output` override added in `31073f6`
+10.0.26100, read through the `.config/nextest.toml` `success-output` override added in `10f84f4`
 (without which both readings would have been invisible on exactly the green run that produced
 them).
 
@@ -197,7 +197,7 @@ since 2026-07-30 at **93.34 %** against `COVERAGE_FLOOR = 88`.
 
 ## Outcome (added at Plan 0060's close, 2026-08-04)
 
-The hardware reading this ADR called for was taken hours later, on the same day, in `ae4c215`
+The hardware reading this ADR called for was taken hours later, on the same day, in `a45c6c0`
 (`a_dual_live_dissolve_moves_the_picture_against_its_own_progression`, floor `0.018`). **The
 decision above stands and no assertion changes.** But the third reading is not the confirmation the
 ADR expected — it falsifies the mechanism recorded in Context, and the correction matters more than

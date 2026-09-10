@@ -221,11 +221,11 @@ impl PaletteParams { pub fn set(&mut self, name: &str, v: f32) -> bool; pub fn r
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `gpu::color_pass` and `gpu::uniform_buffer` | dev | done | 8d2d590 |
-| 2 — `palette::LutPair` | dev | done | 672cd85 |
-| 3 — `scenes::common::{PaletteParams, PanParams}` | dev | done | c7dab47 |
-| 4 — `gpu::FullscreenScene` | dev | done | 60f57a7 |
-| 5 — `marks::InstancedQuads` | dev | done | 1310de3 |
+| 1 — `gpu::color_pass` and `gpu::uniform_buffer` | dev | done | bbe7e10 |
+| 2 — `palette::LutPair` | dev | done | 90d4dc6 |
+| 3 — `scenes::common::{PaletteParams, PanParams}` | dev | done | 02b14ef |
+| 4 — `gpu::FullscreenScene` | dev | done | f18ece6 |
+| 5 — `marks::InstancedQuads` | dev | done | e9602f8 |
 
 ### Notes
 

@@ -21,7 +21,7 @@ But the baselines are pinned to three **shipped, curated presets** (`Aurora`, `W
 organic", "make field and flock distinct" is its *normal work*. So every intentional content tune
 trips an engine-drift alarm and reds CI until someone re-blesses. This is a coupling of two things
 with **opposite change cadences**: engine rendering (stable, should be pinned) and shipped content
-(churny, should not be). It surfaced concretely when commit `76a2fb4` ("make field and flock
+(churny, should not be). It surfaced concretely when commit `8f86d9a` ("make field and flock
 presets distinct") moved all three baselines far past tolerance (mean 0.15–0.25 vs 0.02).
 
 Worse, the coupling crosses lanes: a `preset-author` doing their job reds a `dev`-owned test they
@@ -65,7 +65,7 @@ Golden's WARP-only execution is unchanged (ADR-0016 owns that); fixtures are ble
   only two fragment_field presets and one swarm.
 - **Self-maintaining coverage.** The exhaustive `match SystemKind` forces every new scene to add a
   drift fixture in the same change that adds the variant — no scene ships unguarded.
-- **Landing this also greens `main`** from the `76a2fb4` drift, because the tuned shipped presets
+- **Landing this also greens `main`** from the `8f86d9a` drift, because the tuned shipped presets
   are no longer pinned; no separate re-bless of `aurora`/`warp`/`drift` is needed.
 
 ### Negative

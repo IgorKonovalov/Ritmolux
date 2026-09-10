@@ -1,7 +1,7 @@
 # 0104 — The library stops being lopsided
 
-> **Status:** done — closed 2026-08-29. Phases 1–6 landed in `7561492`, `b2866ec`, `87eafaa`,
-> `c1a6e09`, `476ee23`, `be385c9`. **Mode 4 review: one blocker and three majors, all repaired at the close.** Verified independently of the implementation log: 72 presets across the scene registry's
+> **Status:** done — closed 2026-08-29. Phases 1–6 landed in `4eb9cef`, `4962e69`, `7b0a824`,
+> `34951f2`, `7728cba`, `8799203`. **Mode 4 review: one blocker and three majors, all repaired at the close.** Verified independently of the implementation log: 72 presets across the scene registry's
 > twelve systems, every one at or above the floor of four, counted by top-level `system =`; 18 new
 > files and zero deletions; the four edited presets header-only; no engine Rust; every phase carrying
 > one in-vocabulary `Owner skill:`. The two majors were both in Phase 5's workaround sweep, which
@@ -382,15 +382,15 @@ zero-world system still at zero, which is the exact defect the plan was opened t
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** `WORK/lmv-plan-0104` on `plan-0104-library-lopsided`, branched from `main` at `5590a4f`.
+**Lane:** `WORK/lmv-plan-0104` on `plan-0104-library-lopsided`, branched from `main` at `bacd88c`.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — is the big family actually big | dev | done | `7561492` |
-| 2 — the singletons get a range | human (`preset-author`) | done | `b2866ec` |
-| 3 — the thin families fill out | human (`preset-author`) | done | `87eafaa` |
-| 4 — `star_pattern`, after the renderer settles | human (`preset-author`) | done | `c1a6e09` |
-| 4b — `warp_mesh` gets its first worlds | human (`preset-author`) | done | `c1a6e09` |
+| 1 — is the big family actually big | dev | done | `4eb9cef` |
+| 2 — the singletons get a range | human (`preset-author`) | done | `4962e69` |
+| 3 — the thin families fill out | human (`preset-author`) | done | `7b0a824` |
+| 4 — `star_pattern`, after the renderer settles | human (`preset-author`) | done | `34951f2` |
+| 4b — `warp_mesh` gets its first worlds | human (`preset-author`) | done | `34951f2` |
 | 5 — curate the set, not the presets | dev | done (by `preset-author`) | — |
 | 6 — does the set read as a library | human | done | — (verdict, no commit) |
 

@@ -1,6 +1,6 @@
 # 0145 — The per-phase gate stops paying for the preset library
 
-> **Status:** done — closed 2026-08-31. Six `dev` phases on `main`, `8b1d7b0`..`a1b9559`.
+> **Status:** done — closed 2026-08-31. Six `dev` phases on `main`, `cb9ce64`..`c1fccc5`.
 > Mode 4: **no blockers, no majors, three minors** (an oversized log, three docs the plan
 > falsified and did not sweep, a plans-index projection its own Phase 6 superseded — all
 > repaired in the close commit). Verified independently at the close: the full suite exits 0
@@ -40,7 +40,7 @@ full argument):
 |---|---|---|
 | tests in the workspace | **1212** | `cargo nextest list --workspace` |
 | tests in the nine GPU suites | **27** (2.2 %) | the same, minus the pre-push filter |
-| shipped presets at Plan 0129's close → today | **54 → 81** | `git ls-tree ed8a787` vs `presets/` |
+| shipped presets at Plan 0129's close → today | **54 → 81** | `git ls-tree 618e68a` vs `presets/` |
 | copies of the exclusion filter that `dev` can see | **0 of 2** | `.githooks/pre-push`, `ci.yml` |
 
 Four of the nine suites sweep the shipped preset set, so the gate's price is set by the
@@ -51,7 +51,7 @@ today, inconsistently, and no phase records what it ran.
 
 ### The measured baseline
 
-Taken 2026-08-31 at `fd7f55b` on an idle box — no other `cargo`/`cargo-nextest`/`rustc` process at
+Taken 2026-08-31 at `694d37d` on an idle box — no other `cargo`/`cargo-nextest`/`rustc` process at
 the start of the pair, verified before and after each run. Machine per ADR-0071: AMD Ryzen 9 5900HS,
 Windows 10 19045, rustc 1.97.1, cargo-nextest 0.9.140, on AC.
 
@@ -290,18 +290,18 @@ form and the `-E` form both enumerate **1185** tests, against **1212** unfiltere
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Take the baseline on a quiet box | dev | done | `8b1d7b0` |
-| 2 — Define the filter once, as a nextest profile | dev | done | `f5431dc` |
-| 3 — Point the hook and CI at the profile | dev | done | `975c31b` |
-| 4 — Give the per-phase loop its tier | dev | done | `b90e382` |
-| 5 — Make the full-suite run a recorded fact | dev | done | `05a6f5d` |
+| 1 — Take the baseline on a quiet box | dev | done | `cb9ce64` |
+| 2 — Define the filter once, as a nextest profile | dev | done | `3549e51` |
+| 3 — Point the hook and CI at the profile | dev | done | `6726c5b` |
+| 4 — Give the per-phase loop its tier | dev | done | `795947c` |
+| 5 — Make the full-suite run a recorded fact | dev | done | `cf7a0d0` |
 | 6 — Re-measure, and do the per-plan arithmetic | dev | done | committed with this row |
 
 ### Measurements
 
 **Machine** (ADR-0071): AMD Ryzen 9 5900HS, 16 logical CPUs, Windows 10 19045, rustc 1.97.1,
-cargo-nextest 0.9.140, on AC. **Trees:** Phase 1 at `d66e91d`, Phase 6 at `05a6f5d` — *not* the
-architect's `fd7f55b`, which predates the 0144 and 0125 merges (105 files, +4244/-2468), so 0144's
+cargo-nextest 0.9.140, on AC. **Trees:** Phase 1 at `c9e43cf`, Phase 6 at `cf7a0d0` — *not* the
+architect's `694d37d`, which predates the 0144 and 0125 merges (105 files, +4244/-2468), so 0144's
 shared harness is in every reading here and in none of the plan's. **Quiet precondition:**
 `cargo`/`cargo-nextest`/`rustc`/`rust-lld`/`link` enumerated before and after all twenty runs; none
 present at any of the forty boundaries. 14:14-14:44 and 15:07-15:39 CEST 2026-08-31, each window one
@@ -343,10 +343,10 @@ records that `dev` already narrowed silently, so what past plans actually paid i
 
 ### Notes
 
-- **Scope deviation, Phase 5 (`05a6f5d`):** `.claude/skills/dev/references/close-ceremony-prompt.md`
+- **Scope deviation, Phase 5 (`cf7a0d0`):** `.claude/skills/dev/references/close-ceremony-prompt.md`
   also gained the `**Full suite:**` bullet, though it is in no phase's "Files touched" — without it
   that field guide enumerates six bullets while the template holds seven. Raised first; user's call.
-- **Deviation, Phase 3 (`975c31b`):** beyond deleting the expression, the hook's `SKIPPED_SUITES`
+- **Deviation, Phase 3 (`6726c5b`):** beyond deleting the expression, the hook's `SKIPPED_SUITES`
   variable and the loop echoing it are gone too. It was a second copy of the same list and would
   have drifted against the profile; nextest names the skipped binaries itself.
 - **The tier was applied to this plan from Phase 2 on, before Phase 4 landed it.** Phases 2-5 were
@@ -366,8 +366,8 @@ records that `dev` already narrowed silently, so what past plans actually paid i
 - **Operator docs touched:** none
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, no entry falsified
 - **Full suite:** `cargo nextest run --workspace` (not `-P fast`) — **exit 0**, `1230 tests run:
-  1230 passed (11-12 slow), 5 skipped`, three times at `05a6f5d` (Phase 5's tip, so it covers every
-  non-log change in the plan) and three times at `d66e91d`. No upward override was needed at any
+  1230 passed (11-12 slow), 5 skipped`, three times at `cf7a0d0` (Phase 5's tip, so it covers every
+  non-log change in the plan) and three times at `c9e43cf`. No upward override was needed at any
   phase: no scene, composite, preset-engine or embedded-set file was touched.
 - **Outstanding `human` phases:** none
 

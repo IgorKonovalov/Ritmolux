@@ -159,9 +159,9 @@ built on it.
 
 ## Notes
 
-Measurements taken on `3b39004` (2026-08-16). The `+41,705 bytes in three days` figure comes from
+Measurements taken on `f2b7e8a` (2026-08-16). The `+41,705 bytes in three days` figure comes from
 `git cat-file -p <commit>:docs/adrs/README.md | wc -c` walked back over the last twenty commits
-that touched the file; the 7.1x plans-index figure compares `800f102` (the commit that created
+that touched the file; the 7.1x plans-index figure compares `84c7617` (the commit that created
 `README-archive.md`) against the same working tree.
 
 The row-width distributions in the Decision are **construction arithmetic from the real filenames

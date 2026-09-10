@@ -1,7 +1,7 @@
 # 0035 — The composite's aspect is the target's: the grid-shape stretch, one grid policy, and a pixel guard for the post stages
 
-> **Status:** done — 2026-07-26 (four `dev` phase commits `d4f98f8` / `687621b` / `bc11b23` /
-> `f9f9e79`; passed Mode 4 review with **no blockers and no majors** — four minors, one nit. See
+> **Status:** done — 2026-07-26 (four `dev` phase commits `ba14bad` / `b081c08` / `8183c6b` /
+> `cb082ba`; passed Mode 4 review with **no blockers and no majors** — four minors, one nit. See
 > **Close** at the bottom.)
 > **Created:** 2026-07-26
 > **Approved:** 2026-07-26 — ready for `dev` (a fresh session; the handoff is manual on purpose)
@@ -265,8 +265,8 @@ fn grid_size(surface: (u32, u32), cap: (u32, u32), step: u32) -> (u32, u32);
 ## Close (2026-07-26)
 
 Passed Mode 4 review: **no blockers, no majors**; four minors, one nit. Four `dev` phase commits —
-`d4f98f8` the aspect fix, `687621b` the two post-stage baselines, `bc11b23` one grid policy,
-`f9f9e79` the docs. Turning `trails` or `kaleido_*` on now changes the picture's **softness and
+`ba14bad` the aspect fix, `b081c08` the two post-stage baselines, `8183c6b` one grid policy,
+`cb082ba` the docs. Turning `trails` or `kaleido_*` on now changes the picture's **softness and
 nothing else**: `SceneTarget::aspect` comes from `surface`, the kaleidoscope folds about the render
 target's ratio, and `Scene::set_target_size` keeps the grid because that one genuinely is a texel
 count. Plan 0029 Phase 5's attractor fix stops being conditional on no stage being active, and
@@ -343,7 +343,7 @@ hand.
 still claims "Six is the highest that stays clean at 16:9", which is `preset-author` content already
 recorded in backlog 0010; and `cargo test -p lmv-core --lib render::post` crashing with
 `STATUS_ACCESS_VIOLATION` under in-process parallel GPU tests **predates this plan** (verified by
-`dev` against a stashed tree at `a1e3e26`) — `nextest` and `--test-threads=1` are both clean, so
+`dev` against a stashed tree at `8a1eb08`) — `nextest` and `--test-threads=1` are both clean, so
 nothing is masked.
 
 **⚠ On-device carry-forward, unchanged and now one item longer:** after Phase 1 the composite
