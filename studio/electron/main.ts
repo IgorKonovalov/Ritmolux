@@ -20,9 +20,11 @@ import { registerPlayerHandlers } from './ipc/playerHandlers'
 import { registerPresetHandlers, type PresetScope } from './ipc/presetHandlers'
 import { SchemaCache } from './player/schema'
 import { ControlSender } from './player/control'
-import { PlayerSupervisor } from './player/supervisor'
+import { playerArgs, PlayerSupervisor } from './player/supervisor'
 import { resolvePlayer, type ResolvedPlayer } from './player/resolve'
-import { readSettings, settingsFile } from './settings'
+import type { PlayerMode } from '@shared/player-mode'
+
+import { playerModeOf, readSettings, settingsFile, writeSettings } from './settings'
 import { createWindow, DEV_SERVER_ORIGIN, getRendererPaths, installCsp } from './window'
 import { captureRequest, runCapture } from './capture'
 
@@ -62,7 +64,13 @@ function send(window: BrowserWindow, event: PlayerEvent): void {
 }
 
 function start(): void {
-  const settings = readSettings(settingsFile(app.getPath('userData')))
+  const file = settingsFile(app.getPath('userData'))
+  const settings = readSettings(file)
+  // Read once, at spawn. A mode changed later is written to the file and picked
+  // up by the next launch: switching live would mean tearing down the player,
+  // the control socket and the frame port under whatever is unsaved (ADR-0186
+  // Alternative A).
+  const mode = playerModeOf(settings)
   resolved = resolvePlayer({
     resourcesPath: app.isPackaged ? process.resourcesPath : undefined,
     settingsPath: settings.playerPath,
@@ -74,9 +82,14 @@ function start(): void {
     studioVersion: app.getVersion(),
     playerPath: resolved?.path,
     playerSource: resolved?.source,
+    playerMode: mode,
   })
   const schema = new SchemaCache(resolved?.path)
-  registerAppHandlers(info, () => schema.get())
+  // Merged onto what was read, because `writeSettings` writes what it is handed
+  // and `playerPath` is the key nobody would notice losing until a relaunch.
+  const setPlayerMode = (next: PlayerMode): void =>
+    writeSettings(file, { ...settings, playerMode: next })
+  registerAppHandlers(info, () => schema.get(), setPlayerMode)
   registerPresetHandlers(() => scope)
   registerPlayerHandlers(
     () => control,
@@ -117,6 +130,7 @@ function start(): void {
 
   supervisor = new PlayerSupervisor({
     playerPath: resolved.path,
+    args: playerArgs(mode),
     onEvent: (event) => {
       // The sender is aimed from the player's own answer, which is `null` when
       // it opened no listener.

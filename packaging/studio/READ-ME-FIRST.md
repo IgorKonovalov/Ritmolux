@@ -44,6 +44,18 @@ TWO windows. The Studio, and the player's own full picture beside it. They are
 the same show: the Studio paints a copy of the player's frames, so a change you
 make appears in both.
 
+ON ONE SCREEN, that second window is in the way. Click "settings" in the top
+right of the Studio and choose "windowless". Close the Studio and open it again;
+this time the player opens no window of its own and the Studio's own picture is
+the whole of it. The Studio remembers the choice.
+
+That mode is for editing on a laptop. When you are actually showing something to
+people, put it back on "windowed" - only then is the picture in the Studio the
+same picture the room is looking at.
+
+The Studio's picture is a small, scaled copy either way, so it is not the place
+to judge a fine detail - the player's own window is.
+
 Start any music. The picture reacts to whatever is already playing, out of the
 default output device. There is no audio setup.
 
@@ -99,8 +111,9 @@ The Studio's own settings are a separate, smaller file:
     Windows   %APPDATA%\ritmolux-studio\settings.json
     macOS     ~/Library/Application Support/ritmolux-studio/settings.json
 
-You should not need to touch it. Its one useful key is "playerPath", which
-points the Studio at a different player than the bundled one.
+You should not need to touch it. It has two keys: "playerMode", which the
+settings panel writes for you, and "playerPath", which points the Studio at a
+different player than the bundled one.
 
 Deleting either folder resets that half; both are recreated on the next launch.
 
@@ -112,6 +125,7 @@ Six things, however roughly:
 
   - Did it open, and what did SmartScreen or macOS do?
   - Did you get two windows, and did the picture react to music?
+  - Did the colours look right, or did anything look oddly blue or orange?
   - Did you manage to move a slider and see the picture change?
   - Did a saved change survive - does the look come back when you switch away
     and back to it in the library tab?

@@ -21,35 +21,41 @@ import {
   type PlayerEvent,
 } from '@shared/protocol'
 
+import { DEFAULT_PLAYER_MODE, type PlayerMode } from '@shared/player-mode'
+
 import { EventReader } from './events'
 import { FramePump, FrameSplitter } from './frames'
 
 /**
- * The invocation the studio asks for.
+ * What the studio asks the player to be, in the mode this machine chose
+ * (ADR-0186).
  *
- * **One player, windowed, and the studio's picture is a copy of the show's**
- * (ADR-0181). `--preview stdout` mirrors the frames a window is already drawing
- * onto the same pipe format a headless run writes, so what the author edits is
- * by construction what the audience is watching: one capture, one adapter, one
- * preset directory, one rotation state. A second child rendering its own
- * preview is a preview that can differ from the show.
+ * **One player either way, and it runs the same show loop.** `windowed` opens
+ * the show window and mirrors its frames with `--preview stdout`, so what the
+ * author edits is by construction what the audience is watching: one capture,
+ * one adapter, one preset directory, one rotation state. `windowless` runs that
+ * same loop headless and writes the frames straight out with
+ * `--stream --sink stdout`, for the single-screen machine where the show window
+ * is a window in the way — and there the preview is the only picture there is,
+ * so it is no longer a feed of what anyone else can see.
+ *
+ * **Every flag the studio depends on is on both vectors.** A flag added to one
+ * and not the other is a mode-dependent bug of exactly the kind the show-loop
+ * extraction existed to end, which is why a test walks both.
  *
  * `--control` is requested rather than assumed: the player answers with the
  * address it actually bound in `hello.control`, or `null` when it opened no
  * listener, and the studio reads that answer instead of predicting it. Port `0`
  * asks for an ephemeral one, which is why the answer is the only source.
  *
- * No size and no rate are named here, and none may be: a windowed run is paced
- * by its swapchain and reads back at its surface's size, so the geometry is the
- * player's to report and the `stream` event is where it reports it.
+ * No size, no rate and no channel order are named on either vector, and none
+ * may be: the pipe's geometry and its channel order are the player's to report
+ * and the `stream` event is where it reports them.
  */
-export const DEFAULT_PLAYER_ARGS = [
-  '--preview',
-  'stdout',
-  '--events',
-  '--control',
-  '127.0.0.1:0',
-] as const
+export function playerArgs(mode: PlayerMode): readonly string[] {
+  const sink = mode === 'windowless' ? ['--stream', '--sink', 'stdout'] : ['--preview', 'stdout']
+  return [...sink, '--events', '--control', '127.0.0.1:0']
+}
 
 /**
  * The child, narrowed to the four things the supervisor uses.
@@ -117,7 +123,10 @@ export class PlayerSupervisor {
   start(): void {
     if (this.child !== undefined) throw new Error('the player is already running')
     const spawnFn = this.options.spawn ?? defaultSpawn
-    const child = spawnFn(this.options.playerPath, this.options.args ?? DEFAULT_PLAYER_ARGS)
+    const child = spawnFn(
+      this.options.playerPath,
+      this.options.args ?? playerArgs(DEFAULT_PLAYER_MODE),
+    )
     this.child = child
 
     child.stdout.on('data', (chunk: Buffer) => this.output(chunk))

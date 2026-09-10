@@ -8,9 +8,10 @@ import { PassThrough } from 'node:stream'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { FrameMessage } from '@shared/frames'
+import { PLAYER_MODES } from '@shared/player-mode'
 import { EXPECTED_PLAYER_VERSION, PIXEL_FORMATS, type PlayerEvent } from '@shared/protocol'
 
-import { PlayerSupervisor, DEFAULT_PLAYER_ARGS, type SpawnFn } from './supervisor'
+import { PlayerSupervisor, playerArgs, type SpawnFn } from './supervisor'
 import type { FramePort } from './frames'
 
 /** A child whose two pipes the test writes to by hand. */
@@ -52,13 +53,13 @@ const hello = (version: string): string =>
 const STREAM = '{"v":1,"ev":"stream","width":2,"height":1,"fps":30,"format":"rgba8"}\n'
 
 describe('PlayerSupervisor', () => {
-  it('asks one windowed player to mirror the show, report, and listen', () => {
+  it('asks a windowed player to mirror the show, report, and listen', () => {
     // `--preview stdout` rather than `--stream --sink stdout`: the studio drives
     // the show itself and paints a copy of its frames, so there is no second
     // player and no second capture (ADR-0181). Port 0 asks for an ephemeral
     // listener; `hello.control` is the only place the answer comes from, which
     // is why nothing here predicts it.
-    expect(DEFAULT_PLAYER_ARGS).toEqual([
+    expect(playerArgs('windowed')).toEqual([
       '--preview',
       'stdout',
       '--events',
@@ -67,16 +68,43 @@ describe('PlayerSupervisor', () => {
     ])
   })
 
-  it('names no geometry and no channel order, because the player reports both', () => {
+  it('asks a windowless player for the same show with no window', () => {
+    // The mode ADR-0183 rejected as a subset and ADR-0186 restored as a peer:
+    // the same show loop, no swapchain, and the frames written straight out.
+    expect(playerArgs('windowless')).toEqual([
+      '--stream',
+      '--sink',
+      'stdout',
+      '--events',
+      '--control',
+      '127.0.0.1:0',
+    ])
+  })
+
+  it('carries --events and --control on both modes', () => {
+    // A flag on one vector and not the other is a mode-dependent bug of exactly
+    // the kind the show-loop extraction existed to end, and it would show up as
+    // a studio that has a picture and nothing to edit with.
+    for (const mode of PLAYER_MODES) {
+      const args = playerArgs(mode)
+      expect(args, `${mode} must report`).toContain('--events')
+      expect(args, `${mode} must listen`).toContain('--control')
+      expect(args[args.indexOf('--control') + 1]).toBe('127.0.0.1:0')
+    }
+  })
+
+  it('names no geometry and no channel order on either mode, because the player reports both', () => {
     // A size or a rate here would be a guess at a windowed run's swapchain and
     // surface, and the frame splitter would then cut the pipe by the guess
     // rather than by what arrived. The `stream` event is the only source, and
     // since ADR-0187 that is true of the channel order as well.
-    for (const flag of ['--size', '--fps']) {
-      expect(DEFAULT_PLAYER_ARGS).not.toContain(flag)
-    }
-    for (const format of PIXEL_FORMATS) {
-      expect(DEFAULT_PLAYER_ARGS).not.toContain(format)
+    for (const mode of PLAYER_MODES) {
+      for (const flag of ['--size', '--fps']) {
+        expect(playerArgs(mode)).not.toContain(flag)
+      }
+      for (const format of PIXEL_FORMATS) {
+        expect(playerArgs(mode)).not.toContain(format)
+      }
     }
   })
 

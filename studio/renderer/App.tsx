@@ -6,12 +6,14 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 
+import { DEFAULT_PLAYER_MODE, type PlayerMode } from '@shared/player-mode'
 import { isKnownPlayerVersion, EXPECTED_PLAYER_VERSION } from '@shared/protocol'
 
 import { Banner } from './components/Banner'
 import { Editor } from './views/Editor'
 import { Footer } from './components/Footer'
 import { Preview, type PreviewStats } from './components/Preview'
+import { Settings } from './views/Settings'
 import { usePlayerEvents } from './hooks/usePlayerEvents'
 
 import styles from './App.module.css'
@@ -20,6 +22,7 @@ interface AppInfo {
   studioVersion: string
   playerPath: string | undefined
   playerSource: string | undefined
+  playerMode: PlayerMode
 }
 
 export function App(): JSX.Element {
@@ -28,6 +31,7 @@ export function App(): JSX.Element {
   const [info, setInfo] = useState<AppInfo>()
   /** The last save's refusal, if it had one; cleared by the next save. */
   const [saveProblem, setSaveProblem] = useState<string>()
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   useEffect(() => {
     void window.api.app.getInfo().then(setInfo)
@@ -44,6 +48,14 @@ export function App(): JSX.Element {
       <header className={styles.header}>
         <h1 className={styles.title}>Ritmolux Studio</h1>
         <span className={styles.preset}>{player.preset?.name ?? 'no preset yet'}</span>
+        <button
+          type="button"
+          className={styles.settings}
+          aria-expanded={settingsOpen}
+          onClick={() => setSettingsOpen((open) => !open)}
+        >
+          settings
+        </button>
       </header>
 
       <main className={styles.main}>
@@ -77,6 +89,18 @@ export function App(): JSX.Element {
         )}
         {saveProblem !== undefined && (
           <Banner kind="error" title="The preset was not written" detail={saveProblem} />
+        )}
+        {settingsOpen && (
+          // Above the workbench rather than over it: unmounting the preview to
+          // show a settings dialog would drop the frame port's listener and
+          // the picture with it.
+          <Settings
+            running={info?.playerMode ?? DEFAULT_PLAYER_MODE}
+            playerPath={info?.playerPath}
+            playerSource={info?.playerSource}
+            studioVersion={info?.studioVersion ?? '—'}
+            onClose={() => setSettingsOpen(false)}
+          />
         )}
         <div className={styles.workbench}>
           <Preview stream={player.stream} onStats={onStats} />

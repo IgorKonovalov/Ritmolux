@@ -1,0 +1,114 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  border-radius: 4px;
+}
+
+.bar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.heading {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.close {
+  background: none;
+  border: 1px solid var(--panel-edge);
+  border-radius: 3px;
+  color: var(--text-dim);
+  font-size: 11px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--panel-edge);
+  border-radius: 4px;
+}
+
+.legend {
+  padding: 0 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.choice {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas: 'radio name' 'radio doc';
+  gap: 2px 8px;
+  align-items: baseline;
+  cursor: pointer;
+}
+
+.choice input {
+  grid-area: radio;
+  align-self: start;
+  margin-top: 3px;
+}
+
+.choiceName {
+  grid-area: name;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.choiceDoc {
+  grid-area: doc;
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.note {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.problem {
+  margin: 0;
+  color: var(--warn);
+  font-size: 11px;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 11px;
+}
+
+.facts dt {
+  color: var(--text-dim);
+}
+
+.facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.facts code {
+  font-family: var(--mono);
+}
+
+.source {
+  color: var(--text-dim);
+}

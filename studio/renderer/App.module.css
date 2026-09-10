@@ -26,6 +26,24 @@
   font-size: 11px;
 }
 
+.settings {
+  /* Pushed to the far end, so the preset name stays beside the title. */
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--panel-edge);
+  border-radius: 3px;
+  color: var(--text-dim);
+  font-size: 11px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.settings:hover,
+.settings[aria-expanded='true'] {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
 .main {
   flex: 1;
   display: flex;

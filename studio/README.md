@@ -7,25 +7,44 @@ own** — every pixel here arrived over a pipe from a `ritmolux` child process
 
 Not shipped by the player's release zips, and nothing shipped depends on it.
 
-## One player, and it is the show
+## One player, in one of two modes
 
-The studio spawns **one** player, windowed, with `--preview stdout --events
---control 127.0.0.1:0`. That child is the show on the projector *and* the source
-of the picture in this window: `--preview stdout` mirrors the frames it is
-already drawing onto the same pipe format a headless run writes (ADR-0181).
+The studio spawns **one** player and drives it over `--control`. Which sink it
+asks for is a **per-machine setting** (ADR-0186), offered under _settings_ in the
+window's header and remembered in `settings.json` as `playerMode`:
 
-Two consequences worth knowing before the first launch:
+| `playerMode`           | Spawned with             | What you get                                                  |
+| ---------------------- | ------------------------ | ------------------------------------------------------------- |
+| `windowed` _(default)_ | `--preview stdout`       | The player opens the show window; the preview is a copy of it |
+| `windowless`           | `--stream --sink stdout` | No window; the preview is the only picture                    |
 
-- **A window opens.** On a single-screen laptop with no projector attached that
-  is a window in the way; it is also the thing a VJ is there to run.
-- **The preview's geometry is the show's**, not a preview default. Frames arrive
-  at the surface's readback size and the display's rate, and the studio learns
-  both from the `stream` event rather than asking for them — nothing under
-  `studio/` names a size or a frame rate.
+Both carry `--events --control 127.0.0.1:0`, both perform the whole event
+roster, and the studio's frame reader branches on neither — it takes the
+geometry and the channel order from the `stream` event in both modes.
 
-One player means one loopback capture, one adapter, one preset directory and one
-rotation state, so the picture being edited cannot drift from the picture being
-watched.
+**`windowed` is the default because the VJ with a projector is who the player is
+for.** That child is the show _and_ the source of the picture in this window, so
+what is edited is by construction what an audience is watching: one loopback
+capture, one adapter, one preset directory, one rotation state.
+
+`windowless` gives that guarantee up for the session, which is why the settings
+panel says so in a line. It exists for the single-screen laptop where the show
+window is a window in the way.
+
+The mode is read when the player is spawned, so changing it takes effect on the
+next launch rather than restarting a running show.
+
+Two more things worth knowing before the first launch:
+
+- **The preview has a fixed shape.** It is a scaled, letterboxed copy at 640x360
+  (ADR-0187), not the show's own resolution, so resizing or fullscreening the
+  show window does not move the pipe's geometry — and a studio pixel is not a
+  show pixel. Judging a one-texel seam needs the show window.
+- **The channel order is announced, not assumed.** `stream.format` is `rgba8` or
+  `bgra8`; the windowed mirror carries whatever the swapchain negotiated. The
+  studio swaps the two bytes when it is told to, and refuses an order it cannot
+  name rather than painting a guess. Nothing under `studio/` names a size, a
+  rate or a channel order.
 
 ## Which configuration covers which directory
 
@@ -61,7 +80,9 @@ In this order (ADR-0178), first hit wins:
 2. **Settings** — `"playerPath"` in `settings.json` in the per-user application
    directory (`%APPDATA%/ritmolux-studio` on Windows,
    `~/Library/Application Support/ritmolux-studio` on macOS). This is the
-   developer's route: point it at a `target/release/ritmolux` of your own.
+   developer's route: point it at a `target/release/ritmolux` of your own. The
+   same file carries `"playerMode"`; the settings panel writes it, and an unset
+   or unrecognised value reads as `windowed`.
 3. **`PATH`**.
 
 A player whose `hello` reports a version the studio does not know is **stopped**

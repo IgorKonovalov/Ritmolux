@@ -2,12 +2,14 @@
 import { ipcRenderer } from 'electron'
 
 import { IPC_CHANNELS } from '@shared/ipc-channels'
-import type { SchemaResult } from '../../ipc/appHandlers'
+import type { SchemaResult, SettingsResult } from '../../ipc/appHandlers'
+import type { PlayerMode } from '@shared/player-mode'
 
 export interface AppInfo {
   studioVersion: string
   playerPath: string | undefined
   playerSource: string | undefined
+  playerMode: PlayerMode
 }
 
 export const appApi = {
@@ -19,4 +21,11 @@ export const appApi = {
   /** The engine's parameter schema, or why it could not be read. */
   getSchema: (): Promise<SchemaResult> =>
     ipcRenderer.invoke(IPC_CHANNELS.APP_GET_SCHEMA) as Promise<SchemaResult>,
+
+  /**
+   * Remember which mode to spawn the player in. The mode is read at spawn, so
+   * this takes effect on the next launch and never restarts a running show.
+   */
+  setPlayerMode: (mode: PlayerMode): Promise<SettingsResult> =>
+    ipcRenderer.invoke(IPC_CHANNELS.APP_SET_PLAYER_MODE, mode) as Promise<SettingsResult>,
 }

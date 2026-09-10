@@ -20,8 +20,17 @@ export const IPC_CHANNELS = {
    */
   PLAYER_FRAME: 'player:frame',
 
-  /** The studio's own version and the player path it resolved. */
+  /** The studio's own version, the player path it resolved, and its settings. */
   APP_GET_INFO: 'app:get-info',
+  /**
+   * Write the player mode into the studio's settings file (ADR-0186).
+   *
+   * An OS channel and not a fourth domain one: it carries no message of the
+   * control protocol and never reaches the player. What it needs main for is a
+   * file in the per-user directory, which the sandboxed renderer cannot open.
+   * The mode is read at spawn, so the answer says a relaunch is what applies it.
+   */
+  APP_SET_PLAYER_MODE: 'app:set-player-mode',
   /**
    * The resolved player's `--schema` document, fetched once and cached.
    *
