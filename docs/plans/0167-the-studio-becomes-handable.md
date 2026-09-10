@@ -507,9 +507,10 @@ reverted.
   it); 0199's `absent: --stream in: studio/electron/player/supervisor.ts` was falsified by Phase 5,
   which is what putting it there means. 0201 is `unprobeable`. Repairing or closing them is the
   `architect` call the script's own summary names, at the close.
-- **Full suite:** **not run, and deliberately.** `C:` has **5.2 GB free of 954 GB (100 % used)**, and
-  `cargo nextest run --workspace` builds every test binary in debug — the disk-filling failure
-  ADR-0053's *"disk cost is severe and recurring"* describes, live on this machine. Phases 4–6
+- **Full suite:** **not run, and deliberately.** `C:` has **5.2 GB free of 954 GB (100 % used)** and
+  this worktree's `target/` is **62 GB**, while `cargo nextest run --workspace` builds every test
+  binary in debug — the disk-filling failure ADR-0053's *"disk cost is severe and recurring"*
+  describes, live on this machine. Reclaiming that 62 GB is what the suite needs before it can run. Phases 4–6
   touched **no Rust and no C++**, so the Rust suite's last meaningful reading is the one the `dev`
   lane took at Phase 3. The studio's own gate is green at `d033ce6`: `npm run typecheck` (four
   projects), `npm run lint`, and `npm test` — **24 files, 237 tests, all passing**, including the
