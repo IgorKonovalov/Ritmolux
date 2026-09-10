@@ -492,6 +492,7 @@ here is the **definition**, and the essay is the **discussion**.
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
+| `sym` | `5` | `1` – `24` | How many lobes the figure repeats around its centre, as a whole number. |
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
 | `mirror_order` | `1` | `1` – `12` | Repeats the geometry this many times around the centre; 1 draws it once. |
 
@@ -504,6 +505,8 @@ here is the **definition**, and the essay is the **discussion**.
 | `phase` | `0` | `0` – `1` | Rotates where the figure starts sampling, as a fraction of a turn. |
 | `radial_offset` | `0` | `-1` – `1` | Pushes every point out from the centre, opening the figure into a ring. |
 | `pen` | `1` | `0` – `2` | How far the tracing point sits from the rolling circle's centre, in rolling radii: 1 draws cusps, less rounds them off, more throws them into loops. |
+| `sharpness` | `1` | `0.1` – `20` | How pointed the lobes are: low draws a spiky star, high rounds the figure toward a circle. |
+| `lobe` | `1` | `0.1` – `10` | How the lobes swell between their tips: low pinches them thin, high fills them into a polygon. |
 | `samples` | `361` | `16` – `2048` | How many points the curve is drawn from; fewer reads as a polygon. Truncated, so a rise adds its next point on arrival. |
 | `thickness` | `2` | `0.5` – `12` | Stroke width in pixels at the render target, before softness widens the falloff. |
 | `hue` | `0.6` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. |

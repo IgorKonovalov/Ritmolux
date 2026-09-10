@@ -57,6 +57,9 @@ const DEFAULT_PHASE: f32 = default_of(PARAMS, "phase");
 const DEFAULT_RADIAL_OFFSET: f32 = default_of(PARAMS, "radial_offset");
 // The family levers: each is read by one family and inert on the rest.
 const DEFAULT_PEN: f32 = default_of(PARAMS, "pen");
+const DEFAULT_SYM: f32 = default_of(PARAMS, "sym");
+const DEFAULT_SHARPNESS: f32 = default_of(PARAMS, "sharpness");
+const DEFAULT_LOBE: f32 = default_of(PARAMS, "lobe");
 const DEFAULT_SAMPLES: f32 = default_of(PARAMS, "samples");
 const DEFAULT_THICKNESS: f32 = 2.0;
 const DEFAULT_HUE: f32 = 0.6;
@@ -136,6 +139,9 @@ pub struct ParametricCurveScene {
     phase: f32,
     radial_offset: f32,
     pen: f32,
+    sym: f32,
+    sharpness: f32,
+    lobe: f32,
     samples: f32,
     thickness: f32,
     /// The shared palette knobs (ADR-0021).
@@ -203,6 +209,9 @@ impl ParametricCurveScene {
             phase: DEFAULT_PHASE,
             radial_offset: DEFAULT_RADIAL_OFFSET,
             pen: DEFAULT_PEN,
+            sym: DEFAULT_SYM,
+            sharpness: DEFAULT_SHARPNESS,
+            lobe: DEFAULT_LOBE,
             samples: DEFAULT_SAMPLES,
             thickness: DEFAULT_THICKNESS,
             colour: common::PaletteParams::new(DEFAULT_HUE, DEFAULT_BRIGHTNESS),
@@ -388,6 +397,29 @@ pub const PARAMS: &[ParamSpec] = &[
         kind: ParamKind::Modal,
     },
     ParamSpec {
+        name: "sym",
+        default: 5.0,
+        range: Some([1.0, 24.0]),
+        doc: "How many lobes the figure repeats around its centre, as a whole number.",
+        kind: ParamKind::Structural,
+    },
+    ParamSpec {
+        name: "sharpness",
+        default: 1.0,
+        range: Some([0.1, 20.0]),
+        doc: "How pointed the lobes are: low draws a spiky star, high rounds the figure toward a \
+               circle.",
+        kind: ParamKind::Modal,
+    },
+    ParamSpec {
+        name: "lobe",
+        default: 1.0,
+        range: Some([0.1, 10.0]),
+        doc: "How the lobes swell between their tips: low pinches them thin, high fills them \
+               into a polygon.",
+        kind: ParamKind::Modal,
+    },
+    ParamSpec {
         name: "samples",
         default: 361.0,
         range: Some([16.0, 2048.0]),
@@ -439,6 +471,9 @@ impl Scene for ParametricCurveScene {
         self.phase = DEFAULT_PHASE;
         self.radial_offset = DEFAULT_RADIAL_OFFSET;
         self.pen = DEFAULT_PEN;
+        self.sym = DEFAULT_SYM;
+        self.sharpness = DEFAULT_SHARPNESS;
+        self.lobe = DEFAULT_LOBE;
         self.samples = DEFAULT_SAMPLES;
         self.thickness = DEFAULT_THICKNESS;
         self.colour.reset();
@@ -467,6 +502,9 @@ impl Scene for ParametricCurveScene {
             "phase" => self.phase = value,
             "radial_offset" => self.radial_offset = value,
             "pen" => self.pen = value,
+            "sym" => self.sym = value,
+            "sharpness" => self.sharpness = value,
+            "lobe" => self.lobe = value,
             "samples" => self.samples = value,
             "thickness" => self.thickness = value,
             "hue_spread" => self.hue_spread = value,
@@ -540,7 +578,12 @@ impl Scene for ParametricCurveScene {
             draw_progress: self.draw_progress,
             color,
             width,
-            levers: curves::Levers { pen: self.pen },
+            levers: curves::Levers {
+                pen: self.pen,
+                sym: self.sym,
+                sharpness: self.sharpness,
+                lobe: self.lobe,
+            },
         };
 
         // Sample the single curve, then replicate it under the geometry mirror.

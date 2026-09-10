@@ -2125,6 +2125,8 @@ const STRUCTURAL: &[(&str, &str)] = &[
     ("warp_mesh", "echo_orient"),
     // `MirrorSpec::from_params`: rounds then clamps, on every line scene.
     ("parametric_curve", "mirror_order"),
+    // `Gielis::of`: rounds then clamps the superformula's symmetry number.
+    ("parametric_curve", "sym"),
     ("lsystem", "mirror_order"),
     ("star_pattern", "mirror_order"),
     ("spectrum", "mirror_order"),

@@ -240,8 +240,8 @@ struct FamilySample {
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — the family seam takes a second arm | dev | done | 997f7c5 |
-| 2 — hypotrochoid and epicycloid | dev | done | committed with this row |
-| 3 — the superformula | dev | not started | |
+| 2 — hypotrochoid and epicycloid | dev | done | 1e23aef |
+| 3 — the superformula | dev | done | committed with this row |
 | 4 — the harmonograph | dev | not started | |
 | 5 — per-family ranges in the reference | dev | not started | |
 | 6 — the documentation sweep | dev | not started | |
@@ -271,6 +271,19 @@ struct FamilySample {
   still the phase that changes what the generator prints.
 - Phase 2 also fixes a Phase 1 doc comment on `CurveFamily`, which linked the crate-private
   `curves::arm` from public docs and failed `cargo doc` under `-D warnings`.
+- Phase 3 reads `d` on the superformula as the skew ratio `n3 / n2` (`n3 = lobe * d`), clamped to
+  `0..16`. `n`, `phase` and `radial_offset` are inert on this family. The scene default `d = 71` is the
+  rose's, so an unbound `d` here clamps to the maximum skew. A superformula preset binds `d`, which
+  every example in this plan does.
+- Phase 3 computes the superformula's radius as `ln r` and divides by the walk's peak radius by
+  subtracting logarithms, so every vertex is `exp(<= 0)` times `scale` - finite and inside `scale` by
+  construction. The peak is taken over the whole trace, not the revealed prefix.
+- Phase 3 touched `core/tests/preset.rs`, outside its file list: `("parametric_curve", "sym")` joins the
+  hand-kept `STRUCTURAL` roster, which the kinds guard in `declared_params_match_set_param` fails
+  without. `Gielis::of` rounds and clamps `sym` itself, per the audit rule that roster states.
+- Phase 3's `[hold]` done-when is tested without a GPU. The test loads a real preset, then runs its
+  binding through the render layer's `ParamHold`, the binding's `kind.quantize`, and the sampler, and
+  reads the lobe count off the walk. It does not go through `Renderer::evaluate`.
 
 ### Close triggers
 

@@ -585,7 +585,10 @@ fn spirograph(pen: f32) -> CurveParams {
         n: 5.0,
         d: 5.0,
         samples: 360,
-        levers: Levers { pen },
+        levers: Levers {
+            pen,
+            ..Levers::default()
+        },
         ..rose()
     }
 }
@@ -733,7 +736,10 @@ fn a_negative_n_rolls_outside_and_draws_the_epicycloid() {
             n,
             d: 4.0,
             samples: 400,
-            levers: Levers { pen: 1.0 },
+            levers: Levers {
+                pen: 1.0,
+                ..Levers::default()
+            },
             ..rose()
         };
         walk_of(CurveFamily::Hypotrochoid, p)
@@ -798,7 +804,10 @@ fn no_hypotrochoid_emits_a_non_finite_vertex() {
                     CurveParams {
                         n,
                         d,
-                        levers: Levers { pen },
+                        levers: Levers {
+                            pen,
+                            ..Levers::default()
+                        },
                         ..rose()
                     },
                 );
@@ -815,4 +824,232 @@ fn no_hypotrochoid_emits_a_non_finite_vertex() {
             }
         }
     }
+}
+
+/// A superformula at `sym`, `sharpness` and `lobe`, with `d = 1` — no skew, so
+/// `n2 = n3` and the figure has its full `sym`-fold symmetry.
+fn superformula(sym: f32, sharpness: f32, lobe: f32) -> CurveParams {
+    CurveParams {
+        d: 1.0,
+        samples: 400,
+        levers: Levers {
+            sym,
+            sharpness,
+            lobe,
+            ..Levers::default()
+        },
+        ..rose()
+    }
+}
+
+/// The local maxima of the distance from the centre around a **closed** walk —
+/// a figure's lobes, counted as a viewer counts them.
+fn lobes(points: &[[f32; 2]]) -> usize {
+    let n = points.len();
+    let r = |k: usize| dist(points[k % n]);
+    (0..n)
+        .filter(|&k| r(k) > r(k + n - 1) && r(k) >= r(k + 1))
+        .count()
+}
+
+/// Plan 0162 Phase 3's first done-when: `sym = 5` at a low `sharpness` draws a
+/// **five-lobed star**, and a high `sharpness` rounds the same figure toward a
+/// **circle**.
+///
+/// "Star" is three properties, each a count or a ratio rather than a look: five
+/// lobes, a deep waist between them (the innermost point well inside the
+/// outermost), and a pointed tip at each lobe that the fit keeps as a corner.
+/// "Toward a circle" is the waist closing: every point within a few percent of
+/// one radius.
+#[test]
+fn a_low_sharpness_draws_a_five_lobed_star_and_a_high_one_a_near_circle() {
+    let (fit, star, pieces) = walk_of(CurveFamily::Superformula, superformula(5.0, 0.3, 1.0));
+    assert!(fit.fitted && fit.closed, "a whole sym closes over one turn");
+    assert_eq!(lobes(&star), 5, "sym = 5 must draw five lobes");
+    let (inner, outer) = star
+        .iter()
+        .map(|p| dist(*p))
+        .fold((f32::MAX, 0.0f32), |(lo, hi), r| (lo.min(r), hi.max(r)));
+    assert!(
+        inner < 0.5 * outer,
+        "a star's waist must sit well inside its tips: {inner} against {outer}"
+    );
+    assert_eq!(
+        corners(&pieces, true),
+        5,
+        "each of the five tips is a point, which the fit keeps as a corner"
+    );
+
+    // Five-fold: a fifth of a turn maps the walk onto itself, sample for sample.
+    let (sin, cos) = (std::f32::consts::TAU / 5.0).sin_cos();
+    let fifth = star.len() / 5;
+    for (j, q) in star.iter().enumerate() {
+        let turned = [q[0] * cos - q[1] * sin, q[0] * sin + q[1] * cos];
+        assert!(
+            super::dist(turned, star[(j + fifth) % star.len()]) < 1e-4,
+            "sample {j} is not carried onto its fifth-turn image"
+        );
+    }
+
+    let (fit, round, pieces) = walk_of(CurveFamily::Superformula, superformula(5.0, 20.0, 1.0));
+    assert!(fit.fitted && fit.closed);
+    let (inner, outer) = round
+        .iter()
+        .map(|p| dist(*p))
+        .fold((f32::MAX, 0.0f32), |(lo, hi), r| (lo.min(r), hi.max(r)));
+    assert!(
+        inner > 0.97 * outer,
+        "a high sharpness must round the figure toward a circle: {inner} against {outer}"
+    );
+    assert_eq!(corners(&pieces, true), 0, "a near-circle has no tip left");
+}
+
+/// Plan 0162 Phase 3's second done-when, and its degenerate-figure risk stated
+/// as a property: **no parameter combination inside the declared ranges emits a
+/// non-finite vertex**, and every vertex lies inside the stated radius — the
+/// figure's `scale`. Swept past the ranges too, including the exponents' poles:
+/// `sharpness` at and below zero, which sends a naive `r` to infinity.
+#[test]
+fn no_superformula_emits_a_non_finite_vertex_or_leaves_its_radius() {
+    let mut walks = 0;
+    for sym in [0.0, 1.0, 2.0, 3.0, 5.0, 8.0, 13.0, 24.0, 7.4] {
+        for sharpness in [0.0, 0.01, 0.1, 0.5, 1.0, 5.0, 20.0, -1.0, f32::NAN] {
+            for lobe in [0.0, 0.1, 1.0, 5.0, 10.0, 40.0] {
+                for d in [0.0, 0.5, 1.0, 4.0, 71.0, f32::INFINITY] {
+                    let p = CurveParams {
+                        d,
+                        samples: 240,
+                        scale: 0.9,
+                        levers: Levers {
+                            sym,
+                            sharpness,
+                            lobe,
+                            ..Levers::default()
+                        },
+                        ..rose()
+                    };
+                    let (_, points, pieces) = walk_of(CurveFamily::Superformula, p);
+                    let label = format!("sym {sym}, sharpness {sharpness}, lobe {lobe}, d {d}");
+                    for q in &points {
+                        assert!(
+                            q[0].is_finite() && q[1].is_finite(),
+                            "{label}: non-finite vertex {q:?}"
+                        );
+                        assert!(
+                            dist(*q) <= p.scale * (1.0 + 1e-5),
+                            "{label}: vertex {q:?} lies outside the radius {}",
+                            p.scale
+                        );
+                    }
+                    assert!(
+                        pieces.iter().all(|piece| {
+                            let [a, b] = [piece.start_point(), piece.end_point()];
+                            a.iter().chain(&b).all(|c| c.is_finite())
+                        }),
+                        "{label}: the fit produced a non-finite piece"
+                    );
+                    walks += 1;
+                }
+            }
+        }
+    }
+    assert_eq!(walks, 9 * 9 * 6 * 6);
+}
+
+/// `d` skews the two exponents apart: at `d = 1` the lobes are symmetric about
+/// their tips, and away from it the figure changes shape. Pinned so the skew is
+/// a lever that reaches the sampler rather than a documented one that does not.
+#[test]
+fn d_skews_the_superformula_lobes_apart() {
+    let symmetric = walk_of(CurveFamily::Superformula, superformula(4.0, 1.0, 2.0)).1;
+    let skewed = walk_of(
+        CurveFamily::Superformula,
+        CurveParams {
+            d: 3.0,
+            ..superformula(4.0, 1.0, 2.0)
+        },
+    )
+    .1;
+    let moved = symmetric
+        .iter()
+        .zip(&skewed)
+        .map(|(a, b)| super::dist(*a, *b))
+        .fold(0.0f32, f32::max);
+    assert!(moved > 0.05, "a d of 3 moved no sample past {moved}");
+}
+
+/// Plan 0162 Phase 3's third done-when: `sym` bound under `[hold] sym = "bar"`
+/// **changes the figure's symmetry once a bar and holds it between**.
+///
+/// Composed from the real pieces rather than restated: the loader reads the
+/// preset and folds its `[hold]` table and `sym`'s `Structural` kind into the
+/// binding, the render layer's own hold decides which frame's value stands, the
+/// kind rounds it, and the sampler draws it — and the lobe count is read off
+/// the drawn walk. The binding moves **every frame**, so a hold that leaked
+/// would show more than one figure inside a bar.
+#[test]
+fn sym_held_on_the_bar_changes_the_figure_once_a_bar() {
+    use crate::dsp::AnalysisFrame;
+    use crate::preset::{HoldEdge, Preset, Variables};
+    use crate::render::roster::ParamHold;
+    use crate::render::scenes::ParamKind;
+
+    let preset = Preset::from_toml_str(
+        "system = \"parametric_curve\"\nname = \"held\"\n\
+         [curve]\nfamily = \"superformula\"\n\
+         [params]\nsym = \"3 + floor(time * 8)\"\nsharpness = \"0.3\"\nd = \"1\"\n\
+         [hold]\nsym = \"bar\"\n",
+    )
+    .expect("a held superformula loads");
+    let (index, binding) = preset
+        .params
+        .iter()
+        .enumerate()
+        .find(|(_, b)| b.name == "sym")
+        .expect("sym is bound");
+    assert_eq!(
+        binding.hold,
+        Some(HoldEdge::Bar),
+        "the hold reached the binding"
+    );
+    assert_eq!(binding.kind, ParamKind::Structural, "sym rounds as a count");
+
+    let mut hold = ParamHold::default();
+    let mut per_bar: Vec<Vec<usize>> = vec![Vec::new(); 3];
+    let mut raw_seen = Vec::new();
+    for frame in 0..12 {
+        let bar = frame / 4;
+        // An eighth of a second a frame, exact in binary, so the binding reads
+        // `3 + frame` with no rounding at the floor.
+        let time = frame as f32 / 8.0;
+        let raw = binding.expr.eval(&Variables::new(
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, time, 0.0, 0.0,
+        ));
+        raw_seen.push(raw);
+        let analysis = AnalysisFrame {
+            bar_index: bar as u32,
+            ..AnalysisFrame::default()
+        };
+        let sym = binding
+            .kind
+            .quantize(hold.hold(index, raw, binding.hold, &analysis, time));
+        let (_, points, _) = walk_of(CurveFamily::Superformula, superformula(sym, 0.3, 1.0));
+        per_bar[bar].push(lobes(&points));
+    }
+    assert!(
+        raw_seen.windows(2).all(|w| w[0] != w[1]),
+        "the binding must move every frame for the hold to have anything to hold: {raw_seen:?}"
+    );
+    for (bar, figures) in per_bar.iter().enumerate() {
+        assert!(
+            figures.iter().all(|&f| f == figures[0]),
+            "bar {bar} showed {figures:?} lobes, so the symmetry moved inside a bar"
+        );
+    }
+    let shown: Vec<usize> = per_bar.iter().map(|f| f[0]).collect();
+    assert_eq!(
+        shown,
+        vec![3, 7, 11],
+        "each bar must show the symmetry its own first frame evaluated to"
+    );
 }

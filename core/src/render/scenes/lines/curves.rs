@@ -102,6 +102,13 @@ pub struct Levers {
     /// rolling radii — `1` traces the cusped cycloid, below it the curtate
     /// form, above it the prolate form with loops.
     pub pen: f32,
+    /// Superformula: the symmetry number `m`, a whole count of lobes.
+    pub sym: f32,
+    /// Superformula: `n1`, the outer exponent — low draws a pointed star,
+    /// high rounds the figure toward a circle.
+    pub sharpness: f32,
+    /// Superformula: `n2`, and `n3` before `d` skews it — how the lobes swell.
+    pub lobe: f32,
 }
 
 impl Default for Levers {
@@ -111,6 +118,9 @@ impl Default for Levers {
         use crate::render::scenes::default_of;
         Self {
             pen: default_of(PARAMS, "pen"),
+            sym: default_of(PARAMS, "sym"),
+            sharpness: default_of(PARAMS, "sharpness"),
+            lobe: default_of(PARAMS, "lobe"),
         }
     }
 }
@@ -260,7 +270,9 @@ pub(crate) fn arm(family: CurveFamily) -> FamilyArm {
             polyline: |p, _, _, out| maurer_rose(*p, out),
         },
         CurveFamily::Lissajous => FamilyArm {
-            sample: |p, points| periodic_walk(p, std::f32::consts::TAU, lissajous_point, points),
+            sample: |p, points| {
+                periodic_walk(p, std::f32::consts::TAU, |t| lissajous_point(p, t), points)
+            },
             // A curve by construction: `sin` against `sin` is smooth everywhere
             // it is not stationary, and the fit keeps any genuine corner a
             // degenerate phase produces.
@@ -270,11 +282,22 @@ pub(crate) fn arm(family: CurveFamily) -> FamilyArm {
         CurveFamily::Hypotrochoid => FamilyArm {
             sample: |p, points| {
                 let roll = Roll::of(p);
-                periodic_walk(p, roll.period, hypotrochoid_point, points)
+                periodic_walk(p, roll.period, |t| roll.point(p, t), points)
             },
             // A curve at every `pen`: the cusps `pen = 1` traces are genuine
             // corners of the figure, and the fit breaks its chain at them
             // rather than being declined by them.
+            fits: |_, _| true,
+            polyline: polyline_of,
+        },
+        CurveFamily::Superformula => FamilyArm {
+            sample: |p, points| {
+                let shape = Gielis::of(p);
+                let peak = shape.peak(p.samples);
+                periodic_walk(p, std::f32::consts::TAU, |t| shape.point(t, peak), points)
+            },
+            // A curve with genuine corners — a star's tips at a low
+            // `sharpness` — which the fit breaks its chain at.
             fits: |_, _| true,
             polyline: polyline_of,
         },
@@ -378,11 +401,12 @@ fn rose_point(p: &CurveParams, k: usize, rot_sin: f32, rot_cos: f32) -> [f32; 2]
 /// free end.
 ///
 /// `point` returns the figure in its own unit frame; the rotation and `scale`
-/// are applied here, once, for every family.
+/// are applied here, once, for every family. It is a closure so a family can
+/// resolve its construction once per walk rather than once per sample.
 fn periodic_walk(
     p: &CurveParams,
     period: f32,
-    point: fn(&CurveParams, f32) -> [f32; 2],
+    point: impl Fn(f32) -> [f32; 2],
     points: &mut Vec<[f32; 2]>,
 ) -> bool {
     points.clear();
@@ -393,7 +417,7 @@ fn periodic_walk(
     let drawn = drawn(p);
     let step = period / p.samples as f32;
     for k in 0..=drawn {
-        let [x, y] = point(p, step * k as f32);
+        let [x, y] = point(step * k as f32);
         points.push([
             (x * rot_cos - y * rot_sin) * p.scale,
             (x * rot_sin + y * rot_cos) * p.scale,
@@ -473,33 +497,119 @@ impl Roll {
     }
 }
 
-/// The hypotrochoid (or, for a negative `n`, the epitrochoid) in the unit disc:
-/// the rolling circle's centre runs round a circle of radius `1 -+ r` while the
-/// pen turns about it `(1 -+ r) / r` times as fast. `phase`, a fraction of a
-/// turn, sets where on the rolling circle the pen starts.
+impl Roll {
+    /// The hypotrochoid (or, for a negative `n`, the epitrochoid) in the unit
+    /// disc: the rolling circle's centre runs round a circle of radius `1 -+ r`
+    /// while the pen turns about it `(1 -+ r) / r` times as fast. `phase`, a
+    /// fraction of a turn, sets where on the rolling circle the pen starts.
+    ///
+    /// At `t = 0` and `phase = 0` the pen sits on the positive x-axis, so with
+    /// `pen = 1` point `0` is a cusp: the outermost point of a hypocycloid and
+    /// the innermost of an epicycloid.
+    fn point(self, p: &CurveParams, t: f32) -> [f32; 2] {
+        let start = finite_or_zero(p.phase) * std::f32::consts::TAU;
+        let (x, y) = if self.outside {
+            let centre = 1.0 + self.rolling;
+            let spin = centre / self.rolling * t + start;
+            (
+                centre * t.cos() - self.pen * spin.cos(),
+                centre * t.sin() - self.pen * spin.sin(),
+            )
+        } else {
+            let centre = 1.0 - self.rolling;
+            let spin = centre / self.rolling * t + start;
+            (
+                centre * t.cos() + self.pen * spin.cos(),
+                centre * t.sin() - self.pen * spin.sin(),
+            )
+        };
+        [x / self.extent, y / self.extent]
+    }
+}
+
+/// Gielis' superformula, resolved once from the parameters:
+/// `r(theta) = (|cos(m theta / 4)|^n2 + |sin(m theta / 4)|^n3)^(-1 / n1)`, with
+/// `m = sym`, `n1 = sharpness`, `n2 = lobe` and `n3 = lobe * d`.
 ///
-/// At `t = 0` and `phase = 0` the pen sits on the positive x-axis, so with
-/// `pen = 1` point `0` is a cusp: the outermost point of a hypocycloid and the
-/// innermost of an epicycloid.
-fn hypotrochoid_point(p: &CurveParams, t: f32) -> [f32; 2] {
-    let roll = Roll::of(p);
-    let start = finite_or_zero(p.phase) * std::f32::consts::TAU;
-    let (x, y) = if roll.outside {
-        let centre = 1.0 + roll.rolling;
-        let spin = centre / roll.rolling * t + start;
-        (
-            centre * t.cos() - roll.pen * spin.cos(),
-            centre * t.sin() - roll.pen * spin.sin(),
-        )
-    } else {
-        let centre = 1.0 - roll.rolling;
-        let spin = centre / roll.rolling * t + start;
-        (
-            centre * t.cos() + roll.pen * spin.cos(),
-            centre * t.sin() - roll.pen * spin.sin(),
-        )
-    };
-    [x / roll.extent, y / roll.extent]
+/// # Why the radius is carried as a logarithm
+///
+/// `n1` near zero raises the sum to a huge negative power: at `sharpness =
+/// 0.05` a sum of `1e-3` is `r = 1e60`, past `f32`'s range, and the vertex is
+/// `inf`. So the sampler works in `ln r = -ln(sum) / n1`, which is bounded —
+/// the sum lies in `[f32::MIN_POSITIVE, 2]` and `n1` is floored — and divides
+/// the figure by its own largest radius by **subtracting** the peak logarithm
+/// before exponentiating. Every vertex is then `exp(<= 0)` from the centre:
+/// finite and inside the unit disc, at every parameter, as a property of the
+/// arithmetic rather than of a clamp on the output.
+#[derive(Clone, Copy)]
+struct Gielis {
+    /// `m / 4`, with `m` the whole symmetry number.
+    quarter_sym: f32,
+    /// `n1`, floored above zero.
+    sharpness: f32,
+    /// `n2` and `n3`, the two exponents `lobe` binds and `d` skews apart.
+    cos_power: f32,
+    sin_power: f32,
+}
+
+/// The largest symmetry number the superformula honours — the ceiling on a
+/// figure whose lobes a `samples`-point walk can still resolve.
+const MAX_SYM: f32 = 64.0;
+
+/// The smallest `sharpness` the superformula honours. The radius's logarithm
+/// is `-ln(sum) / n1`, so this floor is what bounds it: at `0.05` it is at most
+/// `1750` in magnitude, comfortably finite before the peak is subtracted.
+const MIN_SHARPNESS: f32 = 0.05;
+
+/// The largest exponent `lobe` (or `lobe * d`) reaches. Past it `|cos|^n` is
+/// a spike narrower than any walk samples, and `0.7^64` is already `1e-10`.
+const MAX_LOBE: f32 = 64.0;
+
+/// The largest `d` skew the superformula honours, as a ratio `n3 / n2`.
+const MAX_SKEW: f32 = 16.0;
+
+impl Gielis {
+    fn of(p: &CurveParams) -> Self {
+        let sym = finite_or_zero(p.levers.sym).round().clamp(0.0, MAX_SYM);
+        let sharpness = if p.levers.sharpness.is_finite() {
+            p.levers.sharpness.max(MIN_SHARPNESS)
+        } else {
+            1.0
+        };
+        let lobe = finite_or_zero(p.levers.lobe).clamp(0.0, MAX_LOBE);
+        let skew = finite_or_zero(p.d).clamp(0.0, MAX_SKEW);
+        Self {
+            quarter_sym: sym * 0.25,
+            sharpness,
+            cos_power: lobe,
+            sin_power: (lobe * skew).min(MAX_LOBE),
+        }
+    }
+
+    /// `ln r(theta)`, finite for every `theta` — see the type's docs.
+    fn ln_radius(self, theta: f32) -> f32 {
+        let (sin, cos) = (self.quarter_sym * theta).sin_cos();
+        let sum = cos.abs().powf(self.cos_power) + sin.abs().powf(self.sin_power);
+        -sum.max(f32::MIN_POSITIVE).ln() / self.sharpness
+    }
+
+    /// The largest `ln r` over the **whole** trace, so the figure's size is a
+    /// property of the figure: a `draw_progress` reveal draws part of it at the
+    /// size it will be, rather than rescaling each frame to what is drawn.
+    fn peak(self, samples: usize) -> f32 {
+        let step = std::f32::consts::TAU / samples.max(1) as f32;
+        (0..=samples)
+            .map(|k| self.ln_radius(step * k as f32))
+            .fold(f32::MIN, f32::max)
+    }
+
+    /// The point at `theta`, divided by the peak radius: `exp(ln r - peak)`,
+    /// which is at most `1`.
+    fn point(self, theta: f32, peak: f32) -> [f32; 2] {
+        let r = (self.ln_radius(theta) - peak).min(0.0).exp();
+        let (sin, cos) = theta.sin_cos();
+        [r * cos, r * sin]
+    }
 }
 
 /// The walk in hand as chained chords (ADR-0158): every interior vertex is a

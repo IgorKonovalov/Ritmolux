@@ -267,15 +267,19 @@ pub enum CurveFamily {
     /// its centre. The **sign of `n`** picks which — positive rolls inside —
     /// so one family name covers both.
     Hypotrochoid,
+    /// Gielis' superformula — starfish, flowers, polygons and rounded shells
+    /// from `sym`, `sharpness`, `lobe` and a `d` that skews the lobes.
+    Superformula,
 }
 
 impl CurveFamily {
     /// Every family, in roster order — the closed set, and the list the schema
     /// export renders rather than restating.
-    pub const ALL: [CurveFamily; 3] = [
+    pub const ALL: [CurveFamily; 4] = [
         CurveFamily::MaurerRose,
         CurveFamily::Lissajous,
         CurveFamily::Hypotrochoid,
+        CurveFamily::Superformula,
     ];
 
     /// Parse a `[curve] family` name, or `None` if unknown.
@@ -284,6 +288,7 @@ impl CurveFamily {
             "maurer_rose" => CurveFamily::MaurerRose,
             "lissajous" => CurveFamily::Lissajous,
             "hypotrochoid" => CurveFamily::Hypotrochoid,
+            "superformula" => CurveFamily::Superformula,
             _ => return None,
         })
     }
@@ -295,6 +300,7 @@ impl CurveFamily {
             CurveFamily::MaurerRose => "maurer_rose",
             CurveFamily::Lissajous => "lissajous",
             CurveFamily::Hypotrochoid => "hypotrochoid",
+            CurveFamily::Superformula => "superformula",
         }
     }
 }
