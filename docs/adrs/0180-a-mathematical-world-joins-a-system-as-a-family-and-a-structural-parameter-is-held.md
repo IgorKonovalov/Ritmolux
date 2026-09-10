@@ -1,8 +1,8 @@
 # 0180 — A mathematical world joins a system as a family, and a structural parameter is quantized and held
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-10 (Plan 0161 built rules 2 and 4; rules 1 and 3 await Plans 0162-0164) - carries an Outcome
 > **Date:** 2026-09-09
-> **Related plan(s):** [0161](../plans/0161-the-structural-parameter-is-held.md),
+> **Related plan(s):** [0161](../plans/done/0161-the-structural-parameter-is-held.md),
 > [0162](../plans/0162-the-curve-families.md),
 > [0163](../plans/0163-the-analytic-field.md),
 > [0164](../plans/0164-the-cellular-system.md)
@@ -220,3 +220,37 @@ not about feasibility.
 The catalogue's pick order ranked these candidates 1 (curve families), 2 (Chladni), 3 (fractal
 flames on the compute path) and 4 (Lenia). This wave takes 1 and 2, adds escape-time and discrete
 automata, and leaves 3 and 4 as placed-but-unbuilt families under rules 1 and 2.
+
+## Outcome (2026-09-10, Plan 0161's close)
+
+Rules 2 and 4 are built. Three things the implementation established that the Decision above does
+not say, recorded here rather than by editing it.
+
+**Rule 2's last sentence contradicts itself, and the implementation followed the posture over the
+severity.** It reads *"Naming a parameter the preset does not bind is a load error, in ADR-0020's
+posture."* ADR-0020's posture for a name the preset does not consume is a **warning that keeps the
+preset** - the opposite severity. Plan 0161 Phase 1 shipped the warning, in `[occupancy] exempt`'s
+exact shape, and said so in its log. That is the right reading: the clause names one authority and
+one severity, they disagree, and the authority is the half that carries a reason. **A `[hold]` entry
+naming an unbound parameter warns.** What *is* a load error is narrower and was decided by the plan
+rather than here: an unknown edge word, a non-positive or non-finite period, and an entry naming a
+per-element or per-vertex binding - the last because an easing constant degrades to instant and a
+hold has no degraded form.
+
+**Rule 4's second half had nothing to apply to.** It asks that a family-bearing system name the
+family each structural parameter reads on. No structural parameter in the engine is family-specific
+today - `attractor`'s only one is `tuple`, which every family answers - so the clause is built but
+unexercised. It bites when Plans 0162 through 0164 land.
+
+**The audit rule that decided rule 2's roster is narrower than rule 2's own wording, deliberately.**
+Rule 2 says `Structural` means "integer meaning". Plan 0161 Phase 3 marked `Structural` **only**
+where the scene already clamps and rounds the value itself, so the engine's rounding composes to the
+identity and no mark could move a pixel. That kept the phase safe - no golden moved across 27 rows -
+and it left two parameters with integer meaning declared `Modal` because nothing rounds them:
+`deposit_arms` (which tears along `atan2`'s branch cut at a fractional value; filed as design-backlog
+0198) and `n`, the ADR's own headline example, which `curves.rs` evaluates as a raw frequency where a
+fractional value is a well-defined open web rather than a broken rose. **The headline example still
+works**: `n = "3 + floor(bass * 5)"` carries the author's own `floor`.
+
+One consequence of that narrowness is that `ParamKind::quantize` is currently a no-op on every row
+it reaches, so no test can distinguish it working from it being absent - design-backlog 0197.

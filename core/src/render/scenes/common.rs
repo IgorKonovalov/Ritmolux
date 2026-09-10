@@ -39,7 +39,7 @@
 )]
 
 use crate::render::palette;
-use crate::render::scenes::ParamSpec;
+use crate::render::scenes::{ParamKind, ParamSpec};
 
 /// `saturation` at rest: fully saturated, the palette's own colour.
 pub(crate) const DEFAULT_SATURATION: f32 = 1.0;
@@ -70,6 +70,7 @@ pub(crate) const SATURATION: ParamSpec = ParamSpec {
     default: DEFAULT_SATURATION,
     range: Some([0.0, 1.0]),
     doc: "Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own.",
+    kind: ParamKind::Modal,
 };
 
 /// `palette_mix`, shared: the A/B palette crossfade position.
@@ -78,6 +79,7 @@ pub(crate) const PALETTE_MIX: ParamSpec = ParamSpec {
     default: DEFAULT_PALETTE_MIX,
     range: Some([0.0, 1.0]),
     doc: "Crossfades from the preset's palette to its second one; 0 is the first, 1 the second.",
+    kind: ParamKind::Modal,
 };
 
 /// `palette_steps`, shared: how many flat bands the palette is cut into.
@@ -86,6 +88,7 @@ pub(crate) const PALETTE_STEPS: ParamSpec = ParamSpec {
     default: palette::DEFAULT_PALETTE_STEPS,
     range: Some([0.0, 16.0]),
     doc: "Quantizes the palette into this many flat bands; 0 leaves it continuous.",
+    kind: ParamKind::Structural,
 };
 
 /// `palette_contour`, shared: the line drawn at each band edge.
@@ -94,6 +97,7 @@ pub(crate) const PALETTE_CONTOUR: ParamSpec = ParamSpec {
     default: palette::DEFAULT_PALETTE_CONTOUR,
     range: Some([0.0, 1.0]),
     doc: "Draws a line at each band edge when the palette is stepped; 0 draws none.",
+    kind: ParamKind::Modal,
 };
 
 /// `pan_x`, shared: the scene's horizontal offset.
@@ -102,6 +106,7 @@ pub(crate) const PAN_X: ParamSpec = ParamSpec {
     default: DEFAULT_PAN,
     range: None,
     doc: "Slides the whole scene sideways, in the scene's own units rather than pixels.",
+    kind: ParamKind::Modal,
 };
 
 /// `pan_y`, shared: the scene's vertical offset.
@@ -110,6 +115,7 @@ pub(crate) const PAN_Y: ParamSpec = ParamSpec {
     default: DEFAULT_PAN,
     range: None,
     doc: "Slides the whole scene vertically, in the scene's own units rather than pixels.",
+    kind: ParamKind::Modal,
 };
 
 /// `hue` at the scene's own resting coordinate. See the block docs above.
@@ -119,6 +125,7 @@ pub(crate) const fn hue(default: f32) -> ParamSpec {
         default,
         range: Some([0.0, 1.0]),
         doc: "Where this scene reads from the palette, as a coordinate along it rather than a colour.",
+        kind: ParamKind::Modal,
     }
 }
 
@@ -129,6 +136,7 @@ pub(crate) const fn brightness(default: f32) -> ParamSpec {
         default,
         range: Some([0.0, 2.0]),
         doc: "The scene's overall light level, multiplying what it draws before the composite.",
+        kind: ParamKind::Modal,
     }
 }
 
@@ -139,6 +147,7 @@ pub(crate) const fn zoom(default: f32) -> ParamSpec {
         default,
         range: Some([0.25, 4.0]),
         doc: "Scales the whole scene about its centre; above 1 fills more of the frame.",
+        kind: ParamKind::Modal,
     }
 }
 

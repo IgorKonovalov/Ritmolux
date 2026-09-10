@@ -70,6 +70,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0191 — `evaluate_preset` advances the scene before it applies the preset's bindings, so the first frame after every switch integrates at the scene's defaults](#0191--evaluate_preset-advances-the-scene-before-it-applies-the-presets-bindings-so-the-first-frame-after-every-switch-integrates-at-the-scenes-defaults)
 - [0192 - `--report` cannot see a `beat_index`-driven response, so a deliberately musical preset measures as inert](#0192-----report-cannot-see-a-beat_index-driven-response-so-a-deliberately-musical-preset-measures-as-inert)
 - [0196 — most `v*` tags produce no Release run at all, and the cause Plan 0165 named cannot explain nineteen of them](#0196--most-v-tags-produce-no-release-run-at-all-and-the-cause-plan-0165-named-cannot-explain-nineteen-of-them)
+- [0198 — `deposit_arms` tears along the branch cut at a fractional value, and nothing rounds it](#0198--deposit_arms-tears-along-the-branch-cut-at-a-fractional-value-and-nothing-rounds-it)
 - [0199 — the studio always spawns a windowed player, so a one-screen machine gets a show window in the way, and the windowless mode that would fix it already exists](#0199--the-studio-always-spawns-a-windowed-player-so-a-one-screen-machine-gets-a-show-window-in-the-way-and-the-windowless-mode-that-would-fix-it-already-exists)
 - [0200 — the `stream` event names a channel order the windowed preview does not use, so every studio frame is drawn with red and blue swapped](#0200--the-stream-event-names-a-channel-order-the-windowed-preview-does-not-use-so-every-studio-frame-is-drawn-with-red-and-blue-swapped)
 - [0201 — the studio's preview stops updating mid-session while the show keeps drawing, and the drop counter cannot see why](#0201--the-studios-preview-stops-updating-mid-session-while-the-show-keeps-drawing-and-the-drop-counter-cannot-see-why)
@@ -335,9 +336,10 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0180 | A doc comment states the ABI version is 4 and points at a test file that does not exist | [Plan 0156](plans/done/0156-the-site-becomes-the-reference.md) Phase 6: the path corrected and neither figure restated, because rustdoc made the comment public. **Closed 2026-09-06** |
 | 0149 | Three bindable rates multiply a per-element `age` instead of integrating, and ADR-0135's guard cannot see any of them | [ADR-0153](adrs/0153-a-per-element-rate-integrates-per-element.md) + [Plan 0140](plans/done/0140-every-rate-integrates-for-real.md) Phases 1, 3 and 4. **Closed 2026-09-08** |
 | 0150 | `Phase::step` accepts any `dt`, so the guard is four copies in the callers and the attractor has none | [ADR-0152](adrs/0152-the-frame-delta-is-sanitized-at-the-scene-seam.md) + [Plan 0140](plans/done/0140-every-rate-integrates-for-real.md) Phase 2; six copies, not four. See 0189, 0190. **Closed 2026-09-08** |
-| 0193 | The `spout` feature is compiled for the first time by the job that publishes it | [ADR-0181](adrs/0181-the-gate-compiles-every-feature-a-release-ships.md) + [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md) Phase 1. Cost two releases, not one. **Closed 2026-09-10** |
-| 0194 | `release.yml` promises a dry run it cannot provide, because the publish gate reads the ref and not the event | [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md) Phase 2. The hazard was already realized once; see 0196. **Closed 2026-09-10** |
-| 0195 | `check-index-rows.mjs` is the one gate that never adopted the tracked-set enumeration | [ADR-0182](adrs/0182-a-plan-lane-may-live-inside-the-repository.md) + [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md) Phase 0. Both probes still pass. **Closed 2026-09-10** |
+| 0193 | The `spout` feature is compiled for the first time by the job that publishes it | [ADR-0181](adrs/0181-the-gate-compiles-every-feature-a-release-ships.md) + [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md) Phase 1. Cost two releases, not one. **Closed 2026-09-10** |
+| 0194 | `release.yml` promises a dry run it cannot provide, because the publish gate reads the ref and not the event | [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md) Phase 2. The hazard was already realized once; see 0196. **Closed 2026-09-10** |
+| 0195 | `check-index-rows.mjs` is the one gate that never adopted the tracked-set enumeration | [ADR-0182](adrs/0182-a-plan-lane-may-live-inside-the-repository.md) + [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md) Phase 0. Both probes still pass. **Closed 2026-09-10** |
+| 0197 | `ParamKind::quantize` is the mechanism ADR-0180 rule 2 exists for, and nothing tests it | Two tests, verified by mutation. Filed and closed the same day, at [Plan 0161](plans/done/0161-the-structural-parameter-is-held.md)'s close. The wiring stays uncovered; see the body. **Closed 2026-09-10** |
 <!-- roster:end -->
 
 ## Open entries
@@ -3648,7 +3650,16 @@ gate fires; the instrument simply cannot express the question.
 - **Verified 2026-09-09** - the stimulus holds `beat` as a boolean event and says why:
   `present: beat: true, in: standalone/src/shot/report.rs`
 - **Verified 2026-09-09** - and no counter is set anywhere in the report's stimulus construction:
-  `absent: beat_index in: standalone/src/shot/report.rs`
+  `absent: beat_index: in: standalone/src/shot/report.rs`
+- **NARROWED 2026-09-10, at Plan 0161's close.** The probe above used to read
+  `absent: beat_index` - the bare identifier, matched over the whole file - so it convicted the
+  entry on any **prose** mention of the counter, not only on a stimulus field that sets it. Plan
+  0161 Phase 6 hit exactly that: a doc comment on the new holds block, pointing at this entry,
+  named `beat_index` while explaining what the report cannot see, and the gate went red on a
+  correct comment. That lane reworded the comment rather than the probe, which is the right call
+  for `dev` and the wrong end to fix it at - a gate that forbids a word from a file's prose is
+  shaping the code instead of checking it. The trailing colon narrows the match to the struct-field
+  form `beat_index:`, which is how the stimulus would actually set it, and leaves prose free.
 
 ### The finding
 
@@ -3677,7 +3688,7 @@ to the author who could tell the difference.
 
 ## 0196 — most `v*` tags produce no Release run at all, and the cause Plan 0165 named cannot explain nineteen of them
 
-[Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md) fixed two real holes in
+[Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md) fixed two real holes in
 the release path and deliberately declined to audit a third it had spotted — *"whether that whole
 gap shares Phase 3's cause is a separate question this plan deliberately does not open."* This entry
 opens it, because the review that closed 0165 measured the gap and found it is the **dominant**
@@ -3709,7 +3720,7 @@ the close ceremony batching several accumulated tags into one push (the same >3-
 arriving by a different route), or `git push --follow-tags` not emitting a per-tag event under some
 condition nobody has reduced. Neither is established.
 
-- **Raised:** 2026-09-10, at [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md)'s
+- **Raised:** 2026-09-10, at [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md)'s
   Mode 4 review, from counting what the plan's own Phase 3 premise implied.
   **Owner if taken:** `architect` for the diagnosis, then `dev` if the answer is mechanical.
 - **Verified 2026-09-10** — nothing in the repository reconciles tags against releases after the
@@ -3736,12 +3747,72 @@ run appears, the bulk-push inference holds for that one tag and this entry still
 eighteen. If no run appears, the inference is wrong outright and this entry is the whole finding.
 **Read Phase 3's outcome before designing anything here.**
 
+- **UPDATE 2026-09-10, hours after filing — Phase 3 ran, and it narrows this entry rather than
+  settling it.** The delete-and-re-push produced Release run `34468008655` where the original push
+  had produced none; all four jobs went green and `v0.113.0` is published with its three zips. So
+  the bulk-tag inference **holds for `v0.113.0`**, and the recovery in `docs/releasing.md` is known
+  to work. What is untouched is the **other eighteen**: they were pushed across three weeks of
+  ordinary closes, before the history rewrite, and nothing here explains them. The entry stands at
+  eighteen tags rather than nineteen, and its two candidate causes are unchanged — neither has been
+  reduced to a probe, which is why the third bullet above is an honest `unprobeable:`.
+
 ### Priority
 
 **Medium.** Nothing a user runs is wrong and no artifact is incorrect — what is broken is delivery,
 and the project has been shipping from a release page that stopped at `v0.103.0` while the version
 reached `v0.113.0`. It becomes **High** the moment anyone outside the project is asked to download
 a build.
+
+---
+
+## 0198 — `deposit_arms` tears along the branch cut at a fractional value, and nothing rounds it
+
+`core/src/render/scenes/warp_mesh/shaders.rs` binds `let arms = dp.b.z` straight off the packed
+uniform and computes `let phase = arms * (ang + dp.b.w * r) + dp.c.x` from it — `dp.b.w` being the
+twist, per that file's own packing comment. The value is used raw, with no rounding anywhere between
+`set_param` and the multiply. A fractional arm count therefore tears along `atan2`'s branch cut — the **exact**
+discontinuity `marks::mark_points` rounds to avoid, and whose own doc comment argues the case at
+length for the mark shapes.
+
+Plan 0161 Phase 3's audit found it and left it `Modal`, correctly: that phase's rule was *mark
+`Structural` only where the scene already rounds*, and nothing rounds this one, so marking it would
+have been a behaviour change the plan did not license. No picture is wrong today — every shipped
+preset binds `deposit_arms` to an integer constant, so the tear is unreachable from the library.
+
+What the finding costs is the surface: `deposit_arms` is exactly the parameter class ADR-0180 rule 2
+was written for, and an author who binds it — which the new `[hold]` table now makes attractive,
+since `[hold] deposit_arms = "bar"` is the obvious way to step an arm count on the music — gets a
+torn mesh rather than a stepped one.
+
+- **Raised:** 2026-09-10, at Plan 0161's Mode 4 close review, from that plan's own Phase 3 audit
+  notes. **Owner if taken:** `dev`, behind a one-line `architect` call on whether marking it
+  `Structural` is the fix or whether the shader should round.
+- **Verified 2026-09-10** — the deposit shader binds the arm count straight off the packed uniform,
+  which is the value the phase is computed from:
+  `present: let arms = dp in: core/src/render/scenes/warp_mesh/shaders.rs`
+- **Verified 2026-09-10** — `unprobeable: that the shader multiplies the raw value rather than a
+  rounded one is a claim about the arithmetic of one expression inside a WGSL string literal, and
+  every fragment of that expression which would distinguish rounded from raw is regex punctuation
+  the probe grammar reads as syntax rather than as text. It is one line; read it`
+
+### The finding
+
+**Its stated twin is not a twin.** Plan 0161's Phase 3 notes pair this with `kaleido_tile` — *"same
+shape as `deposit_arms`, same disposition"*. That is wrong, and the record already says so:
+[backlog 0078](design-backlog-archive.md) investigated `kaleido_tile` and closed **FALSIFIED**,
+finding that its non-quantization is deliberate and argued in a doc comment — a smoothed
+`kaleido_tile` easing between cell counts is a designed behaviour, not a defect. `deposit_arms` has
+no such argument anywhere. This entry is one parameter, not two.
+
+**Marking it `Structural` is the cheap fix and it is not free.** It would round the value before the
+scene sees it, which is a behaviour change on any preset binding it continuously — none ship today,
+so the change is currently invisible, which is also the argument for doing it *now* rather than
+after someone authors one.
+
+### Priority
+
+**Low.** Unreachable from the shipped library, and the fix is a one-line declaration whose cost only
+grows if a preset lands on the parameter first.
 
 ## 0199 — the studio always spawns a windowed player, so a one-screen machine gets a show window in the way, and the windowless mode that would fix it already exists
 

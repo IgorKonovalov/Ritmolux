@@ -16,6 +16,7 @@ use serde::Deserialize;
 use super::expr::{self, Expr, ExprError};
 use crate::render::feedback::{Deposit, FeedbackConfig, Warp};
 use crate::render::palette::{NamedPalette, PaletteConfig};
+use crate::render::scenes::ParamKind;
 use crate::render::scenes::lines::star::{DEFAULT_RING_SCALE, MAX_RING_COUNT, Motif, RingSpec};
 use crate::render::scenes::lines::{
     CurveFamily, GeneratorConfig, MAX_LSYSTEM_DEPTH, SpectrumLayout, hankin,
@@ -23,13 +24,15 @@ use crate::render::scenes::lines::{
 use crate::render::scenes::particles::AttractorFamily;
 use crate::render::scenes::particles::ifs::IfsFigure;
 
-// The five concerns this file holds apart. `system` is the roster of built-in
-// systems, `easing` the attack/release pair, `raw` the on-disk tables, `load`
-// the TOML-to-`Preset` path, `error` the failure enum. What stays here is the
-// compiled shape a preset becomes.
+// The six concerns this file holds apart. `system` is the roster of built-in
+// systems, `easing` the attack/release pair, `hold` the musical edge a binding
+// re-samples on, `raw` the on-disk tables, `load` the TOML-to-`Preset` path,
+// `error` the failure enum. What stays here is the compiled shape a preset
+// becomes.
 mod easing;
 mod error;
 pub mod export;
+mod hold;
 mod load;
 mod raw;
 mod system;
@@ -37,7 +40,8 @@ mod system;
 pub use easing::Easing;
 pub use error::PresetError;
 pub use export::{KeyDesc, KeyKind, Roster, TableDesc};
-pub use system::{GLOBAL_PARAMS, SystemKind, is_known_param};
+pub use hold::HoldEdge;
+pub use system::{GLOBAL_PARAMS, SystemKind, is_known_param, kind_of_param};
 
 use raw::*;
 
@@ -173,6 +177,24 @@ pub struct Binding {
     /// frame (Plan 0031 Phase 3); it is a fact about the preset, and the preset
     /// does not change while it renders.
     pub tau: Easing,
+    /// The musical edge this binding re-samples on (ADR-0180 rule 2), read out
+    /// of the preset's `[hold]` table **once, here at load**, for `tau`'s
+    /// reason and at `tau`'s boundary.
+    ///
+    /// `None` -- the default for an unlisted param, and what every binding in
+    /// the shipped set carried before holds existed -- means the scene sees
+    /// every frame's value. `Some` means it sees the value taken at the last
+    /// edge, and the render layer holds that value; nothing here does.
+    pub hold: Option<HoldEdge>,
+    /// What the parameter this binding drives is **for** (ADR-0180 rule 2),
+    /// read off its [`ParamSpec`](crate::render::scenes::ParamSpec) here at
+    /// load — `tau`'s boundary, for `tau`'s reason. A
+    /// [`Structural`](ParamKind::Structural) value is rounded once, after the
+    /// hold and after the smoother, before the scene sees it.
+    ///
+    /// Folded rather than searched per frame: which kind a name carries is a
+    /// fact about the *engine*, and the engine does not change while it runs.
+    pub kind: ParamKind,
 }
 
 /// One `[latch]` entry, compiled (ADR-0137): a gate armed on one condition and

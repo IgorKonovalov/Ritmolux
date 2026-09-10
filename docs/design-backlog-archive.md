@@ -205,6 +205,7 @@ accepted cost" are different documents and only one of them is honest.
 - [0193 — the `spout` feature is compiled for the first time by the job that publishes it, and that has already cost a release](#0193--the-spout-feature-is-compiled-for-the-first-time-by-the-job-that-publishes-it-and-that-has-already-cost-a-release)
 - [0194 — `release.yml` promises a dry run it cannot provide, because the publish gate reads the ref and not the event](#0194--releaseyml-promises-a-dry-run-it-cannot-provide-because-the-publish-gate-reads-the-ref-and-not-the-event)
 - [0195 — `check-index-rows.mjs` is the one gate that never adopted the tracked-set enumeration, so a lane opened inside the repository blocks every push](#0195--check-index-rowsmjs-is-the-one-gate-that-never-adopted-the-tracked-set-enumeration-so-a-lane-opened-inside-the-repository-blocks-every-push)
+- [0197 — `ParamKind::quantize` is the mechanism ADR-0180 rule 2 exists for, and nothing tests it](#0197--paramkindquantize-is-the-mechanism-adr-0180-rule-2-exists-for-and-nothing-tests-it)
 <!-- toc:end -->
 
 ## 0001 — reaction_diffusion reaches only 2 of the 5 Plan-0018 composite levers
@@ -9196,7 +9197,7 @@ gate caught it and nobody went looking.
   rewrite — the rewrite was exonerated and this was found beside it. **Owner if taken:** `dev`,
   behind an architect decision about what the per-push gate covers.
 - **PROMOTED 2026-09-10 → [ADR-0181](adrs/0181-the-gate-compiles-every-feature-a-release-ships.md) +
-  [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md) Phase 1**, which adds a
+  [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md) Phase 1**, which adds a
   `spout` job to the gate. The probe below goes red on the commit that discharges it.
 - **Verified 2026-09-10** — the per-push gate does not mention the feature:
   `absent: spout in: .github/workflows/ci.yml`
@@ -9220,7 +9221,7 @@ had been tagged, and nobody noticed, because absence is not a signal anyone watc
 is unfixed is the blindness: the next item that moves out from under that `#[cfg]` fails exactly the
 same way, at exactly the same moment — the push that was meant to ship.
 
-**CLOSED 2026-09-10** — [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md)
+**CLOSED 2026-09-10** — [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md)
 Phase 1 added the `spout` job to `ci.yml`. The probe went red on the discharging commit, which
 ADR-0181 predicted. The review found the break cost **two** releases rather than one — `v0.108.0`
 failed identically on 2026-09-05, run `33992293177` — and that correction is recorded in
@@ -9242,7 +9243,7 @@ dispatching on the tag, which is the one ref that publishes.
   intended command would have published instead. The rehearsal was launched on `main` (run
   `34450413424`) and the `release` job was correctly skipped there. **Owner if taken:** `dev` for
   the condition; the doc half is architect's and was corrected when this entry was filed.
-- **PROMOTED 2026-09-10 → [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md)
+- **PROMOTED 2026-09-10 → [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md)
   Phase 2**, which narrows the condition to `github.event_name == 'push'` as well as the ref, so the
   existing comment becomes true rather than merely rewritten.
 - **Verified 2026-09-10** — the publish gate reads only the ref:
@@ -9267,7 +9268,7 @@ the comment side by side with a specific question in mind.
 blast radius is a premature public prerelease rather than a broken build — recoverable, but
 outward-facing and not quietly so.
 
-**CLOSED 2026-09-10** — [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md)
+**CLOSED 2026-09-10** — [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md)
 Phase 2 narrowed the condition to `github.event_name == 'push'` as well as the ref, so a dispatch
 publishes on no ref at all. The review found the hazard was **already realized**, not latent: run
 `31955362251` published `v0.70.0` from a dispatch on that tag, apparently to recover a tag whose own
@@ -9317,7 +9318,7 @@ ordinary reason: it was the only one whose block had drifted.
   tracked half, so it can report a nested hit and not convict on one. **`check-index-rows.mjs` is
   the only gate that convicts**, because it is the only full-tree walker with no tracked-set filter.
   The entry stands because the blocked push is real; what it blamed was four times too wide.
-- **PROMOTED 2026-09-10 → [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md)
+- **PROMOTED 2026-09-10 → [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md)
   Phase 0** and [ADR-0182](adrs/0182-a-plan-lane-may-live-inside-the-repository.md), which accept the
   inside-the-repo lane as a supported shape and make the enumeration rule explicit:
   **`check-index-rows.mjs` adopts `git ls-files`**, like the three gates that already do. The
@@ -9354,10 +9355,86 @@ unavailable. A copied constant invited the inference that a copied consequence f
 **High**, for the blocked push alone — immediate, affecting every session in the main checkout while
 a nested lane exists. ~~Medium for the write hazard~~, which does not exist.
 
-**CLOSED 2026-09-10** — [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md)
+**CLOSED 2026-09-10** — [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md)
 Phase 0 and [ADR-0182](adrs/0182-a-plan-lane-may-live-inside-the-repository.md).
 `check-index-rows.mjs` now enumerates from `git ls-files`, so an untracked nested checkout is
 invisible to it, and `.claude/worktrees/` joined the committed `.gitignore`. **Both of this entry's
 probes still passed at close**, and that is not an oversight: they are `present:` claims about
 `SKIP_DIRS` and the root-anchored fixture skip, both of which Phase 0 deliberately kept as the
 fallback walk. The entry is discharged; its probes simply stopped being diagnostic of it.
+
+## 0197 — `ParamKind::quantize` is the mechanism ADR-0180 rule 2 exists for, and nothing tests it
+
+`ParamKind::Structural` promises one thing: the value is rounded once, CPU-side, before the scene
+sees it (`core/src/render/scenes/mod.rs`). Three call sites reach it, all in
+`core/src/render/evaluate.rs` — the top-level binding loop, the layer's, and the layer's bindable
+`mix`. **No test asserts that it rounds anything**, at either the unit or the render level.
+
+The suite cannot notice, and this is structural rather than an oversight. Plan 0161 Phase 3's audit
+rule was deliberately narrow: mark `Structural` **only** where the scene already clamps and rounds
+the value itself, so the engine's rounding composes to the identity by construction. That rule is
+what made the phase safe — no golden moved — and it is also what makes all 27 marked rows blind to
+the mechanism. `round()` becoming `trunc()`, or the `.quantize(` call being dropped from
+`evaluate_layer`, passes 1691 tests.
+
+`declared_params_match_set_param`'s `STRUCTURAL` roster in `core/tests/preset.rs` guards **which**
+parameters are marked. That is a different claim from **marking does something**, and it is the only
+enforcement the field has.
+
+- **Raised:** 2026-09-10, at Plan 0161's Mode 4 close review.
+  **Owner if taken:** `dev` — this is a test, not a design question.
+- **Verified 2026-09-10** — the mechanism exists and is reached from the binding loop:
+  `present: quantize in: core/src/render/evaluate.rs`
+- **Verified 2026-09-10** — and the render-layer test module, which covers the hold and the
+  smoother beside it, never names it:
+  `absent: quantize in: core/src/render/tests.rs`
+
+### The finding
+
+The cost is not today's picture — it is the next three plans. Plans 0162, 0163 and 0164 are the
+first consumers where quantization actually bites: a Chladni mode number, an automaton rule index
+and a curve-family arm are integers the scene does **not** already round, so they will be the first
+rows where `Structural` changes behaviour rather than confirming it. They will be built on a path no
+test has ever exercised, and the plan that added the path is the one that could most cheaply have
+covered it.
+
+Both reader documents already promise the behaviour in prose — `docs/presets.md` and
+`presets/README.md` each state that a smoothed structural parameter *"walks through the intervening
+integers"*. That sentence is currently unbacked.
+
+**What a fix looks like:** a unit test on `ParamKind::quantize` over the two variants, plus one
+render-layer test extending `smoothing_eases_toward_the_held_value_not_the_raw_one` in
+`core/src/render/tests.rs` with a `Structural` binding eased from 3 toward 9, asserting every
+emitted value equals its own `round()`. Neither needs a GPU.
+
+### Priority
+
+**Medium.** Nothing renders wrong today, precisely because the audit chose rows where rounding is a
+no-op. It becomes **High** the moment 0162, 0163 or 0164 marks its first row where it is not.
+
+- **CLOSED 2026-09-10**, hours after filing, by the two tests this entry specified.
+  `a_structural_kind_rounds_and_a_modal_one_hands_the_value_through` in
+  `core/src/render/scenes/mod.rs` pins the arithmetic - including that Rust rounds a half **away
+  from zero**, which a scene indexing a closed roster depends on - plus the property over a sweep
+  that lands on no integer, and the non-finite pass-through the type's own doc claims. The
+  render-layer half is `a_smoothed_structural_binding_steps_through_whole_numbers` in
+  `core/src/render/tests.rs`, which reads one eased travel from 3 to 9 through **both** kinds: the
+  `Structural` run must be whole at every frame, must show an intervening whole number rather than
+  snapping, and must arrive; the `Modal` run must produce a fractional value, which is what makes
+  the first three assertions evidence rather than coincidence.
+
+  **Both were verified by mutation, not by going green.** With
+  `ParamKind::Structural => value` (the quantizer removed) both fail; with `value.trunc()`
+  substituted for `value.round()` both fail again - the render test on its arrival assertion, since
+  a truncated 8.96 never reaches 9.
+
+  **One residual, narrower than this entry and deliberately not carried as an edit to it.** The two
+  tests cover the mechanism and its arithmetic; they do not cover the **wiring** - that all three
+  call sites in `core/src/render/evaluate.rs` still call it. Dropping `.quantize(` from
+  `evaluate_layer` would still pass both. No GPU-free path drives `evaluate_preset` (it wants a
+  live `Box<dyn Scene>`, a `CompositeSide` and a `Terminal`), so covering the wiring means a
+  headless render test in one of the nine deferred GPU suites, which is a different piece of work
+  from the one this entry asked for. Recorded here rather than filed: it becomes worth filing if
+  Plan 0162, 0163 or 0164 marks a row where quantization is not already a no-op.
+
+---

@@ -8,6 +8,7 @@
 
 mod feedback;
 mod generator;
+mod hold;
 mod mesh;
 mod milk;
 mod palette;
@@ -19,6 +20,7 @@ mod spectrum;
 
 pub(super) use feedback::*;
 pub(super) use generator::*;
+pub(super) use hold::*;
 pub(super) use mesh::*;
 pub(super) use milk::*;
 pub(super) use palette::*;

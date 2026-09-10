@@ -151,6 +151,11 @@ pub enum KeyKind {
     Easing,
     /// A salt: a number, or the string `"random"` (ADR-0051).
     Seed,
+    /// A hold edge: `"beat"`, `"bar"`, or a positive number of seconds
+    /// (ADR-0180 rule 2). Not a `Roster`, because the number is not one of a
+    /// closed set and an editor offering only the two words would reject a
+    /// legal entry.
+    Hold,
     /// A colour: `"#rrggbb"` or `[r, g, b]` in `0..=1`.
     Colour,
     /// A table of author-chosen names to values of this kind.
@@ -173,6 +178,7 @@ impl KeyKind {
             KeyKind::Roster(_) => "enum",
             KeyKind::Easing => "easing",
             KeyKind::Seed => "seed",
+            KeyKind::Hold => "hold",
             KeyKind::Colour => "colour",
             KeyKind::Map(_) => "map",
             KeyKind::List(_) => "list",
@@ -373,6 +379,13 @@ fn push_roster(out: &mut String, label: &str, specs: &[ParamSpec]) {
         }
         out.push_str(",\"doc\":");
         push_string(out, spec.doc);
+        // ADR-0180 rule 4's distinction, so a studio can group its panel the
+        // way the reference groups its tables. Additive: a consumer that does
+        // not know the field ignores it, which is why `SCHEMA_VERSION` does
+        // not move — the body hash does, and that is the staleness signal a
+        // studio already compares.
+        out.push_str(",\"kind\":");
+        push_string(out, spec.kind.as_str());
         out.push('}');
     }
     out.push_str("]}");

@@ -76,7 +76,7 @@ use super::{
 use crate::dsp::AnalysisFrame;
 use crate::preset::Easing;
 use crate::render::palette::{self, Palette, desaturate};
-use crate::render::scenes::{ParamSpec, default_of};
+use crate::render::scenes::{ParamKind, ParamSpec, default_of};
 
 /// Largest element count a `[spectrum]` table may ask for — the band count
 /// itself, because above it the 64 → N reduction stops being a partition of the
@@ -154,42 +154,49 @@ pub const PARAMS: &[ParamSpec] = &[
         default: 0.06,
         range: Some([0.0, 1.0]),
         doc: "Height the readout sits at when the band is silent.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "scale",
         default: 1.2,
         range: Some([0.0, 4.0]),
         doc: "How far a full band pushes the readout above its base.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "curve",
         default: 1.0,
         range: Some([CURVE_MIN, CURVE_MAX]),
         doc: "Exponent on each band's level: 1 is linear, below 1 lifts quiet detail, above 1 pushes it down.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "radius",
         default: 0.35,
         range: Some([0.0, 1.0]),
         doc: "Radius of the ring the readout is drawn around, in the radial layouts.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "span",
         default: 1.0,
         range: Some([0.0, 1.0]),
         doc: "How much of the frequency axis is shown; below 1 the top end is cut.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "baseline",
         default: -0.85,
         range: None,
         doc: "Where the flat layout's zero line sits vertically.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "rotation",
         default: 0.0,
         range: Some([0.0, 1.0]),
         doc: "Turns the readout, as a fraction of a full turn.",
+        kind: ParamKind::Modal,
     },
     crate::render::scenes::lines::thickness(DEFAULT_THICKNESS),
     crate::render::scenes::common::hue(DEFAULT_HUE),

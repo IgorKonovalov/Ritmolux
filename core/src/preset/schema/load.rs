@@ -80,6 +80,13 @@ impl Preset {
         // value is a surfaced load error, never a panic.
         fold_smoothing(&mut params, &raw.smoothing, Surface::Preset, &mut warnings)?;
 
+        // The `[hold]` table (ADR-0180 rule 2), folded at the same boundary and
+        // for the same reason: the edge is a fact about the preset, resolved
+        // once, and the preset does not change while it renders. After the
+        // easing fold, so a preset carrying a bad entry in each table reports
+        // the smoothing one first, as it did before holds existed.
+        fold_hold(params.iter_mut(), &raw.hold, Surface::Preset, &mut warnings)?;
+
         // A `thickness` resting inside the stroke floor's dead zone (Plan 0087
         // Phase 1b, design-backlog 0098). Every value below
         // `MIN_USEFUL_THICKNESS` clamps to the same half-width, so the whole
@@ -248,8 +255,9 @@ impl Preset {
             system,
             raw.per_vertex,
             &raw.smoothing,
+            &raw.hold,
             &latch_names,
-            "",
+            Surface::Preset,
             &mut warnings,
         )?;
         // A `[params]` binding reaching for a vertex variable reads a flat zero
@@ -380,9 +388,10 @@ pub(super) fn check_hold(name: &str, seconds: f32) -> Result<(), PresetError> {
 
 /// Compile a `[per_vertex]` table into bindings (Plan 0100 Phase 1).
 ///
-/// `label` prefixes the error and warning text (`""` at the top level,
-/// `"[layer] "` inside one), and `smoothing` is that surface's own easing table
-/// — consulted only to warn, since a per-vertex binding is never eased.
+/// `surface` prefixes the error and warning text and names the tables they
+/// cite, and `smoothing` / `hold` are that surface's own easing and hold
+/// tables — consulted only to reject or warn about an entry naming a
+/// per-vertex binding, which is never eased and never held.
 ///
 /// Unknown names warn and keep the binding, exactly like `[params]` (ADR-0020):
 /// one typo must not discard an otherwise-good mesh program. A binding here for
@@ -392,10 +401,12 @@ pub(super) fn build_per_vertex(
     system: SystemKind,
     raw: BTreeMap<String, String>,
     smoothing: &BTreeMap<String, RawSmoothing>,
+    hold: &BTreeMap<String, RawHold>,
     latch_names: &[String],
-    label: &str,
+    surface: Surface,
     warnings: &mut Vec<String>,
 ) -> Result<Vec<Binding>, PresetError> {
+    let label = surface.prefix();
     if raw.is_empty() {
         return Ok(Vec::new());
     }
@@ -433,11 +444,26 @@ pub(super) fn build_per_vertex(
                  value to ease"
             ));
         }
+        // A load error where the smoothing entry above is a warning: an easing
+        // constant has a degraded form to fall back to and a hold has none.
+        // See `fold_hold`.
+        if hold.contains_key(&param) {
+            return Err(PresetError::Config(format!(
+                "{} entry '{param}' names a {} binding, which is evaluated once per mesh \
+                 vertex and has no single value to hold",
+                surface.table("hold"),
+                surface.table("per_vertex"),
+            )));
+        }
         out.push(Binding {
+            // Never quantized either: a per-vertex name is drawn from the warp
+            // mesh's own roster, every entry of which is continuous.
+            kind: ParamKind::Modal,
             name: param,
             expr,
-            // Never eased — see `Preset::per_vertex`.
+            // Never eased and never held — see `Preset::per_vertex`.
             tau: Easing::INSTANT,
+            hold: None,
         });
     }
     Ok(out)
@@ -500,7 +526,7 @@ pub(super) fn build_layer(
     // The bindable mix (ADR-0090): compiled like any binding, eased through
     // `[layer.smoothing] mix`. Parsed now; the `over` blend consumes it in
     // Plan 0076 Phase 3.
-    let mix = raw
+    let mut mix = raw
         .mix
         .as_deref()
         .map(|source| {
@@ -517,9 +543,28 @@ pub(super) fn build_layer(
                     .smoothing
                     .get("mix")
                     .map_or(Easing::INSTANT, |entry| entry.to_easing()),
+                // Folded below with the layer's own params, which is what lets
+                // `[layer.hold] mix` reach the one layer binding that lives
+                // outside `params`.
+                hold: None,
+                // The junction amount is a fraction, and no scene roster
+                // declares it — it is the composite's, not a scene's.
+                kind: ParamKind::Modal,
             })
         })
         .transpose()?;
+
+    // `[layer.hold]`: the same vocabulary and validation as the top level
+    // (ADR-0180 rule 2), against the layer's own bindings — which are indexed
+    // within the layer, so a layer's hold state cannot collide with the main
+    // preset's. `mix` rides the same walk so an entry naming it is folded
+    // rather than reported inert.
+    fold_hold(
+        params.iter_mut().chain(mix.as_mut()),
+        &raw.hold,
+        Surface::Layer,
+        warnings,
+    )?;
 
     // `[layer.per_vertex]` — the same surface as the top level's, against the
     // layer's own system and its own smoothing table.
@@ -527,8 +572,9 @@ pub(super) fn build_layer(
         system,
         raw.per_vertex,
         &raw.smoothing,
+        &raw.hold,
         latch_names,
-        "[layer] ",
+        Surface::Layer,
         warnings,
     )?;
     warn_vertex_use(&params, Surface::Layer, warnings);
@@ -779,9 +825,15 @@ pub(super) fn compile_bindings(
             }
         }
         out.push(Binding {
+            // Read off the engine's declaration once, here, so nothing per
+            // frame searches a roster by name (ADR-0180 rule 2). At the layer
+            // surface the search still walks the global stages and finds
+            // nothing there, because `known` above already rejected them.
+            kind: kind_of_param(system, &param),
             name: param,
             expr,
             tau: Easing::INSTANT,
+            hold: None,
         });
     }
     Ok(out)
@@ -824,6 +876,66 @@ pub(super) fn fold_smoothing(
                 surface.table("spectrum"),
             ));
             binding.tau = Easing::INSTANT;
+        }
+    }
+    Ok(())
+}
+
+/// Validate the `[hold]` table, then fold it into the bindings' `hold`
+/// (ADR-0180 rule 2).
+///
+/// [`fold_smoothing`]'s shape and its boundary, with one deliberate difference:
+/// a `[hold]` entry naming a **per-element** binding is a load **error**, not a
+/// warning. `[smoothing]` can degrade to instant and still render the preset
+/// the author wrote; a hold cannot degrade to anything -- the binding it names
+/// keeps re-picking its figure every frame, which is the exact defect the table
+/// exists to remove, and a warning would leave that looking like the engine
+/// ignoring a table it accepted. A per-vertex binding is rejected by the same
+/// rule, from `build_per_vertex`, where the per-vertex table is in scope.
+///
+/// An entry naming a parameter this surface does not bind is a **warning**, in
+/// `[occupancy] exempt`'s shape and for its reason: it silences nothing and
+/// holds nothing, and a typo must not discard the rest of a good preset.
+/// `bindings` is every binding this table may reach: a surface's `[params]`,
+/// plus the layer's bindable `mix`, which is a binding living outside `params`
+/// and is eased through `[layer.smoothing] mix` by the same reasoning.
+pub(super) fn fold_hold<'b>(
+    bindings: impl Iterator<Item = &'b mut Binding>,
+    hold: &BTreeMap<String, RawHold>,
+    surface: Surface,
+    warnings: &mut Vec<String>,
+) -> Result<(), PresetError> {
+    if hold.is_empty() {
+        return Ok(());
+    }
+    let prefix = surface.prefix();
+    // Validated over the whole table first, so a preset with two bad entries
+    // reports the name-ordered first of them whatever its bindings look like.
+    let mut edges: BTreeMap<&str, HoldEdge> = BTreeMap::new();
+    for (param, entry) in hold {
+        edges.insert(param, entry.to_edge(&format!("{prefix}{param}"))?);
+    }
+    let mut folded: Vec<&str> = Vec::new();
+    for binding in bindings {
+        let Some((&param, &edge)) = edges.get_key_value(binding.name.as_str()) else {
+            continue;
+        };
+        if binding.expr.uses_index() {
+            return Err(PresetError::Config(format!(
+                "{} entry '{param}' names a binding that reads `index`, so it is evaluated \
+                 once per element and has no single value to hold",
+                surface.table("hold"),
+            )));
+        }
+        binding.hold = Some(edge);
+        folded.push(param);
+    }
+    for param in edges.keys() {
+        if !folded.contains(param) {
+            warnings.push(format!(
+                "{} entry '{param}' is inert: this preset binds no such parameter",
+                surface.table("hold"),
+            ));
         }
     }
     Ok(())

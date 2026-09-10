@@ -123,6 +123,7 @@ headroom as headroom.
 - [Eased parameters — the `[smoothing]` table](#eased-parameters--the-smoothing-table)
   - [Snap up, glide down — the `{ attack, release }` form](#snap-up-glide-down--the--attack-release--form)
 - [An event with a memory — the `[latch]` table](#an-event-with-a-memory--the-latch-table)
+- [A value with a memory — the `[hold]` table](#a-value-with-a-memory--the-hold-table)
 - [A clamp is a limit, not a gain — the `[occupancy]` table](#a-clamp-is-a-limit-not-a-gain--the-occupancy-table)
 - [A world-space param is not bounded by its clamp — the frame is the bound](#a-world-space-param-is-not-bounded-by-its-clamp--the-frame-is-the-bound)
 - [Structural config (line systems, the attractor, and the shape field)](#structural-config-line-systems-the-attractor-and-the-shape-field)
@@ -398,6 +399,19 @@ the engine’s own declarations** ([ADR-0170](../docs/adrs/0170-a-parameters-ref
 reset — so it cannot name a default the engine does not use, and a parameter
 cannot be missing from it.
 
+Each system's parameters are printed in **two groups**
+([ADR-0180](../docs/adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md) rule 4).
+**Structural** parameters say *what is drawn* — a count, a mode, a family — and
+the engine rounds one to a whole number before the scene sees it, so easing one
+walks it through the intervening integers. **Modal** parameters say *how it
+looks*, and every value in their range means something. The distinction is worth
+knowing before you bind: [backlog 0030](../docs/design-backlog.md) measured that
+presets binding audio to **geometry** score two to four times better on the
+animation metric than presets binding it to brightness, and these two groups are
+where that choice is visible. A parameter with an integer-sounding name printed
+under **Modal** is there because its scene reads the fraction; its own row says
+so.
+
 The essays below the block are hand-written and are where depth lives: a line
 here is the **definition**, and the essay is the **discussion**.
 
@@ -407,7 +421,17 @@ here is the **definition**, and the essay is the **discussion**.
        the_parameter_reference_block_is_current
      The declarations it is generated from live beside each scene's own `set_param`. -->
 
+**Structural** parameters say *what is drawn* — a count, a mode, a family — and the engine rounds one to a whole number before the scene sees it. **Modal** parameters say *how it looks*, and every value in their range means something. A parameter with an integer-sounding name in the Modal group is there because the scene reads the fraction; its own line says so.
+
 ### System: `fragment_field`
+
+**Structural**
+
+| Parameter | Default | Range | What it does |
+|---|---|---|---|
+| `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
+
+**Modal**
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
@@ -424,10 +448,19 @@ here is the **definition**, and the essay is the **discussion**.
 | `color_center` | `0` | `-1` – `1` | Shifts which part of the field's range lands in the middle of the palette. |
 | `saturation` | `1` | `0` – `1` | Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own. |
 | `palette_mix` | `0` | `0` – `1` | Crossfades from the preset's palette to its second one; 0 is the first, 1 the second. |
-| `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
 | `palette_contour` | `0` | `0` – `1` | Draws a line at each band edge when the palette is stepped; 0 draws none. |
 
 ### System: `swarm`
+
+**Structural**
+
+| Parameter | Default | Range | What it does |
+|---|---|---|---|
+| `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
+| `shape` | `0` | `0` – `4` | Which silhouette each mark is drawn as - a disc, a square, a star, and so on. |
+| `points` | `5` | `3` – `16` | How many points or sides the silhouette has, where the shape has a count at all. |
+
+**Modal**
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
@@ -445,32 +478,37 @@ here is the **definition**, and the essay is the **discussion**.
 | `hue_center` | `0.5` | `0` – `1` | Where that band sits along the palette. |
 | `saturation` | `1` | `0` – `1` | Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own. |
 | `palette_mix` | `0` | `0` – `1` | Crossfades from the preset's palette to its second one; 0 is the first, 1 the second. |
-| `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
 | `palette_contour` | `0` | `0` – `1` | Draws a line at each band edge when the palette is stepped; 0 draws none. |
 | `twinkle` | `0` | `0` – `1` | Per-particle brightness flicker, seeded so it is reproducible. |
 | `size_spread` | `0` | `0` – `1` | How much particle sizes vary about `size`; 0 makes them uniform. |
 | `reseed` | `0` | `0` – `1` | Crossing zero throws every particle back to a fresh start position. |
-| `shape` | `0` | `0` – `4` | Which silhouette each mark is drawn as - a disc, a square, a star, and so on. |
-| `points` | `5` | `3` – `16` | How many points or sides the silhouette has, where the shape has a count at all. |
 | `star_valley` | `0.45` | `0` – `1` | How deep the notches between a star's points cut; near 1 the star becomes a disc. |
 | `star_curve` | `0` | `-1` – `1` | Bows a star's edges inward or outward instead of leaving them straight. |
 | `star_jitter` | `0` | `0` – `1` | Randomises each point's length by a seeded amount, so the star reads as hand-drawn. |
 
 ### System: `parametric_curve`
 
+**Structural**
+
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
-| `n` | `6` | `1` – `24` | The rose's petal number - the first of the two integers that pick the figure. |
-| `d` | `71` | `1` – `360` | The step between sampled angles, which is what turns a rose into a Maurer figure. |
+| `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
+| `mirror_order` | `1` | `1` – `12` | Repeats the geometry this many times around the centre; 1 draws it once. |
+
+**Modal**
+
+| Parameter | Default | Range | What it does |
+|---|---|---|---|
+| `n` | `6` | `1` – `24` | The rose's petal number, read as a real frequency: a fraction between two counts draws an open web rather than a rose. |
+| `d` | `71` | `1` – `360` | The step between sampled angles in degrees, which is what turns a rose into a Maurer figure; any real step draws a figure. |
 | `phase` | `0` | `0` – `1` | Rotates where the figure starts sampling, as a fraction of a turn. |
 | `radial_offset` | `0` | `-1` – `1` | Pushes every point out from the centre, opening the figure into a ring. |
-| `samples` | `361` | `16` – `2048` | How many points the curve is drawn from; fewer reads as a polygon. |
+| `samples` | `361` | `16` – `2048` | How many points the curve is drawn from; fewer reads as a polygon. Truncated, so a rise adds its next point on arrival. |
 | `thickness` | `2` | `0.5` – `12` | Stroke width in pixels at the render target, before softness widens the falloff. |
 | `hue` | `0.6` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. |
 | `hue_spread` | `0` | `0` – `1` | How far along the palette the colour travels from one end of the figure to the other. |
 | `saturation` | `1` | `0` – `1` | Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own. |
 | `palette_mix` | `0` | `0` – `1` | Crossfades from the preset's palette to its second one; 0 is the first, 1 the second. |
-| `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
 | `palette_contour` | `0` | `0` – `1` | Draws a line at each band edge when the palette is stepped; 0 draws none. |
 | `spin` | `0.1` | `-2` – `2` | Turns per second the whole figure rotates by. |
 | `scale` | `0.9` | `0.1` – `2` | Size of the figure within the frame, before the shared zoom is applied. |
@@ -482,10 +520,18 @@ here is the **definition**, and the essay is the **discussion**.
 | `zoom` | `1` | `0.25` – `4` | Scales the whole scene about its centre; above 1 fills more of the frame. |
 | `pan_x` | `0` |  | Slides the whole scene sideways, in the scene's own units rather than pixels. |
 | `pan_y` | `0` |  | Slides the whole scene vertically, in the scene's own units rather than pixels. |
-| `mirror_order` | `1` | `1` – `12` | Repeats the geometry this many times around the centre; 1 draws it once. |
 | `mirror_reflect` | `0` | `0` – `1` | Alternates the repeats into mirror images rather than plain rotations. |
 
 ### System: `lsystem`
+
+**Structural**
+
+| Parameter | Default | Range | What it does |
+|---|---|---|---|
+| `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
+| `mirror_order` | `1` | `1` – `12` | Repeats the geometry this many times around the centre; 1 draws it once. |
+
+**Modal**
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
@@ -495,7 +541,6 @@ here is the **definition**, and the essay is the **discussion**.
 | `hue_spread` | `0` | `0` – `1` | How far along the palette the colour travels from one end of the figure to the other. |
 | `saturation` | `1` | `0` – `1` | Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own. |
 | `palette_mix` | `0` | `0` – `1` | Crossfades from the preset's palette to its second one; 0 is the first, 1 the second. |
-| `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
 | `palette_contour` | `0` | `0` – `1` | Draws a line at each band edge when the palette is stepped; 0 draws none. |
 | `draw_progress` | `1` | `0` – `1` | How much of the figure is drawn, from its start; below 1 the line is still arriving. |
 | `thickness` | `1.8` | `0.5` – `12` | Stroke width in pixels at the render target, before softness widens the falloff. |
@@ -507,20 +552,27 @@ here is the **definition**, and the essay is the **discussion**.
 | `pan_x` | `0` |  | Slides the whole scene sideways, in the scene's own units rather than pixels. |
 | `pan_y` | `0` |  | Slides the whole scene vertically, in the scene's own units rather than pixels. |
 | `stroke_blend` | `0` | `0` – `1` | Moves the stroke from additive light toward opaque paint, so crossings stop brightening. |
-| `mirror_order` | `1` | `1` – `12` | Repeats the geometry this many times around the centre; 1 draws it once. |
 | `mirror_reflect` | `0` | `0` – `1` | Alternates the repeats into mirror images rather than plain rotations. |
 
 ### System: `star_pattern`
 
+**Structural**
+
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
-| `variant` | `1` | `0` – `8` | Picks which of the built-in star constructions is drawn. |
+| `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
+| `mirror_order` | `1` | `1` – `12` | Repeats the geometry this many times around the centre; 1 draws it once. |
+
+**Modal**
+
+| Parameter | Default | Range | What it does |
+|---|---|---|---|
+| `variant` | `1` | `0` – `8` | Moves the construction's contact angle, continuously: this is an angle offset rather than an index into a list. |
 | `rotation` | `0` | `0` – `1` | Turns the whole pattern, as a fraction of a full turn. |
 | `hue` | `0.5` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. |
 | `hue_spread` | `0` | `0` – `1` | How far along the palette the colour travels from one end of the figure to the other. |
 | `saturation` | `1` | `0` – `1` | Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own. |
 | `palette_mix` | `0` | `0` – `1` | Crossfades from the preset's palette to its second one; 0 is the first, 1 the second. |
-| `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
 | `palette_contour` | `0` | `0` – `1` | Draws a line at each band edge when the palette is stepped; 0 draws none. |
 | `draw_progress` | `1` | `0` – `1` | How much of the figure is drawn, from its start; below 1 the line is still arriving. |
 | `thickness` | `2` | `0.5` – `12` | Stroke width in pixels at the render target, before softness widens the falloff. |
@@ -532,13 +584,20 @@ here is the **definition**, and the essay is the **discussion**.
 | `zoom` | `1` | `0.25` – `4` | Scales the whole scene about its centre; above 1 fills more of the frame. |
 | `pan_x` | `0` |  | Slides the whole scene sideways, in the scene's own units rather than pixels. |
 | `pan_y` | `0` |  | Slides the whole scene vertically, in the scene's own units rather than pixels. |
-| `mirror_order` | `1` | `1` – `12` | Repeats the geometry this many times around the centre; 1 draws it once. |
 | `mirror_reflect` | `0` | `0` – `1` | Alternates the repeats into mirror images rather than plain rotations. |
 | `ring_phase` | `0` | `0` – `1` | Rotates each concentric ring against its neighbour. |
 | `ring_spread` | `1` | `0` – `2` | How far apart the rings sit radially. |
 | `ring_scale` | `1` | `0.25` – `4` | How much each ring grows over the one inside it. |
 
 ### System: `reaction_diffusion`
+
+**Structural**
+
+| Parameter | Default | Range | What it does |
+|---|---|---|---|
+| `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
+
+**Modal**
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
@@ -547,14 +606,13 @@ here is the **definition**, and the essay is the **discussion**.
 | `flow` | `1` | `0` – `4` | How fast the simulation advances per second. |
 | `inject` | `0` | `0` – `1` | Drops fresh reagent into the field, which is how a beat seeds new growth. |
 | `hue` | `0` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. |
-| `contour` | `6` | `0` – `24` | How many bands the concentration is drawn as; 0 is a smooth gradient. |
+| `contour` | `6` | `0` – `24` | How many bands the concentration is drawn as, as a real density: a fraction slides the whole set of iso-lines. 0 is a smooth gradient. |
 | `hatch` | `5` | `0` – `24` | Density of the hatching drawn along the concentration gradient. |
 | `glow` | `1` | `0` – `2` | Overall light the field emits. |
 | `color_span` | `0.85` | `0` – `1` | How much of the palette the concentration range covers. |
 | `color_center` | `0` | `-1` – `1` | Shifts which concentration lands in the middle of the palette. |
 | `saturation` | `1` | `0` – `1` | Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own. |
 | `palette_mix` | `0` | `0` – `1` | Crossfades from the preset's palette to its second one; 0 is the first, 1 the second. |
-| `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
 | `palette_contour` | `0` | `0` – `1` | Draws a line at each band edge when the palette is stepped; 0 draws none. |
 | `zoom` | `1` | `0.25` – `4` | Scales the whole scene about its centre; above 1 fills more of the frame. |
 | `pan_x` | `0` |  | Slides the whole scene sideways, in the scene's own units rather than pixels. |
@@ -562,13 +620,21 @@ here is the **definition**, and the essay is the **discussion**.
 
 ### System: `attractor`
 
+**Structural**
+
+| Parameter | Default | Range | What it does |
+|---|---|---|---|
+| `tuple` | `0` |  | Picks a whole known-good figure - family, coefficients and framing together. |
+| `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
+
+**Modal**
+
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
 | `a` | `0` |  | First of the four family coefficients; what it means depends on the attractor family the tuple picked. |
 | `b` | `0` |  | Second family coefficient - see the roster's attractor essay for what each family does with it. |
 | `c` | `0` |  | Third family coefficient, and on the IFS figures it means nothing at all. |
 | `d` | `0` |  | Fourth family coefficient; like the other three it is inert on the IFS figures. |
-| `tuple` | `0` |  | Picks a whole known-good figure - family, coefficients and framing together. |
 | `size` | `1` | `0` – `4` | Size of each particle's deposit into the accumulation. |
 | `hue` | `0` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. |
 | `brightness` | `1` | `0` – `2` | The scene's overall light level, multiplying what it draws before the composite. |
@@ -577,7 +643,6 @@ here is the **definition**, and the essay is the **discussion**.
 | `hue_center` | `0.075` | `0` – `1` | Where that band sits along the palette. |
 | `saturation` | `1` | `0` – `1` | Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own. |
 | `palette_mix` | `0` | `0` – `1` | Crossfades from the preset's palette to its second one; 0 is the first, 1 the second. |
-| `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
 | `palette_contour` | `0` | `0` – `1` | Draws a line at each band edge when the palette is stepped; 0 draws none. |
 | `zoom` | `1` | `0.25` – `4` | Scales the whole scene about its centre; above 1 fills more of the frame. |
 | `pan_x` | `0` |  | Slides the whole scene sideways, in the scene's own units rather than pixels. |
@@ -607,6 +672,15 @@ here is the **definition**, and the essay is the **discussion**.
 
 ### System: `spectrum`
 
+**Structural**
+
+| Parameter | Default | Range | What it does |
+|---|---|---|---|
+| `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
+| `mirror_order` | `1` | `1` – `12` | Repeats the geometry this many times around the centre; 1 draws it once. |
+
+**Modal**
+
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
 | `base` | `0.06` | `0` – `1` | Height the readout sits at when the band is silent. |
@@ -621,7 +695,6 @@ here is the **definition**, and the essay is the **discussion**.
 | `hue_spread` | `0` | `0` – `1` | How far along the palette the colour travels from one end of the figure to the other. |
 | `saturation` | `1` | `0` – `1` | Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own. |
 | `palette_mix` | `0` | `0` – `1` | Crossfades from the preset's palette to its second one; 0 is the first, 1 the second. |
-| `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
 | `palette_contour` | `0` | `0` – `1` | Draws a line at each band edge when the palette is stepped; 0 draws none. |
 | `brightness` | `1` | `0` – `2` | The scene's overall light level, multiplying what it draws before the composite. |
 | `glow` | `1` | `0` – `4` | Brightness of the halo around each stroke, on top of the stroke itself. |
@@ -630,10 +703,19 @@ here is the **definition**, and the essay is the **discussion**.
 | `zoom` | `1` | `0.25` – `4` | Scales the whole scene about its centre; above 1 fills more of the frame. |
 | `pan_x` | `0` |  | Slides the whole scene sideways, in the scene's own units rather than pixels. |
 | `pan_y` | `0` |  | Slides the whole scene vertically, in the scene's own units rather than pixels. |
-| `mirror_order` | `1` | `1` – `12` | Repeats the geometry this many times around the centre; 1 draws it once. |
 | `mirror_reflect` | `0` | `0` – `1` | Alternates the repeats into mirror images rather than plain rotations. |
 
 ### System: `emitter`
+
+**Structural**
+
+| Parameter | Default | Range | What it does |
+|---|---|---|---|
+| `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
+| `shape` | `0` | `0` – `4` | Which silhouette each mark is drawn as - a disc, a square, a star, and so on. |
+| `points` | `5` | `3` – `16` | How many points or sides the silhouette has, where the shape has a count at all. |
+
+**Modal**
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
@@ -658,23 +740,29 @@ here is the **definition**, and the essay is the **discussion**.
 | `hue_center` | `0.5` | `0` – `1` | Where that band sits along the palette. |
 | `saturation` | `1` | `0` – `1` | Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own. |
 | `palette_mix` | `0` | `0` – `1` | Crossfades from the preset's palette to its second one; 0 is the first, 1 the second. |
-| `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
 | `palette_contour` | `0` | `0` – `1` | Draws a line at each band edge when the palette is stepped; 0 draws none. |
 | `zoom` | `1` | `0.25` – `4` | Scales the whole scene about its centre; above 1 fills more of the frame. |
 | `pan_x` | `0` |  | Slides the whole scene sideways, in the scene's own units rather than pixels. |
 | `pan_y` | `0` |  | Slides the whole scene vertically, in the scene's own units rather than pixels. |
-| `shape` | `0` | `0` – `4` | Which silhouette each mark is drawn as - a disc, a square, a star, and so on. |
-| `points` | `5` | `3` – `16` | How many points or sides the silhouette has, where the shape has a count at all. |
 | `star_valley` | `0.45` | `0` – `1` | How deep the notches between a star's points cut; near 1 the star becomes a disc. |
 | `star_curve` | `0` | `-1` – `1` | Bows a star's edges inward or outward instead of leaving them straight. |
 | `star_jitter` | `0` | `0` – `1` | Randomises each point's length by a seeded amount, so the star reads as hand-drawn. |
 
 ### System: `shape_field`
 
+**Structural**
+
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
 | `shape` | `0` | `0` – `4` | Which silhouette each mark is drawn as - a disc, a square, a star, and so on. |
 | `points` | `5` | `3` – `16` | How many points or sides the silhouette has, where the shape has a count at all. |
+| `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
+| `coord_mode` | `0` | `0` – `1` | Which coordinate frame the distance is measured in, which changes the shape's whole geometry. |
+
+**Modal**
+
+| Parameter | Default | Range | What it does |
+|---|---|---|---|
 | `star_valley` | `0.45` | `0` – `1` | How deep the notches between a star's points cut; near 1 the star becomes a disc. |
 | `star_curve` | `0` | `-1` – `1` | Bows a star's edges inward or outward instead of leaving them straight. |
 | `star_jitter` | `0` | `0` – `1` | Randomises each point's length by a seeded amount, so the star reads as hand-drawn. |
@@ -685,15 +773,22 @@ here is the **definition**, and the essay is the **discussion**.
 | `color_center` | `0` | `-1` – `1` | Shifts which part of that range lands in the middle of the palette. |
 | `saturation` | `1` | `0` – `1` | Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own. |
 | `palette_mix` | `0` | `0` – `1` | Crossfades from the preset's palette to its second one; 0 is the first, 1 the second. |
-| `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
 | `palette_contour` | `0` | `0` – `1` | Draws a line at each band edge when the palette is stepped; 0 draws none. |
 | `gamma` | `1` | `0.25` – `4` | Shapes the falloff from the shape's edge; below 1 it bites sooner. |
-| `coord_mode` | `0` | `0` – `1` | Which coordinate frame the distance is measured in, which changes the shape's whole geometry. |
 | `rotation` | `0` | `0` – `1` | Turns the shape, as a fraction of a full turn. |
 | `stroke` | `0` | `0` – `1` | Draws the outline instead of the filled figure, at this half-width; 0 fills. |
 | `morph` | `0` | `0` – `1` | Travels the authored path towards its morph_to silhouette; inert without one. |
 
 ### System: `warp_mesh`
+
+**Structural**
+
+| Parameter | Default | Range | What it does |
+|---|---|---|---|
+| `echo_orient` | `0` | `0` – `3` | Which way the echoed copy is flipped before it is blended. |
+| `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
+
+**Modal**
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
@@ -714,7 +809,7 @@ here is the **definition**, and the essay is the **discussion**.
 | `deposit_y` | `0.5` | `0` – `1` | Vertical position of the deposited figure, in uv. |
 | `deposit_radius` | `0.45` | `0` – `1` | Radius of the deposited ring. |
 | `deposit_width` | `0.11` | `0` – `0.5` | How thick that ring is; narrow reads as a wire, wide as a disc. |
-| `deposit_arms` | `0` | `0` – `16` | How many arms the ring is broken into; 0 leaves it whole. |
+| `deposit_arms` | `0` | `0` – `16` | How many arms the ring is broken into, as a real angular frequency; 0 leaves it whole. |
 | `deposit_twist` | `0` | `-2` – `2` | Sweeps the arms into a spiral rather than leaving them radial. |
 | `deposit_spin` | `0` | `-2` – `2` | Turns per second the deposited figure rotates by. |
 | `gamma` | `1` | `0.25` – `4` | Shapes the field's tone curve on its way out; below 1 lifts the mid tones. |
@@ -726,26 +821,31 @@ here is the **definition**, and the essay is the **discussion**.
 | `invert` | `0` | `0` – `1` | Inverts the whole field. |
 | `echo_alpha` | `0` | `0` – `1` | How strongly a second, scaled copy of the field is blended over the first. |
 | `echo_zoom` | `1` | `0.25` – `4` | How much larger or smaller that echoed copy is. |
-| `echo_orient` | `0` | `0` – `3` | Which way the echoed copy is flipped before it is blended. |
 | `hue` | `0` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. |
 | `color_span` | `1` | `0` – `1` | How much of the palette the field's range covers. |
 | `color_center` | `0` | `-1` – `1` | Shifts which part of that range lands in the middle of the palette. |
 | `saturation` | `1` | `0` – `1` | Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own. |
 | `palette_mix` | `0` | `0` – `1` | Crossfades from the preset's palette to its second one; 0 is the first, 1 the second. |
-| `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
 | `palette_contour` | `0` | `0` – `1` | Draws a line at each band edge when the palette is stepped; 0 draws none. |
 | `brightness` | `1` | `0` – `2` | The scene's overall light level, multiplying what it draws before the composite. |
 
 ### System: `shape_collage`
 
+**Structural**
+
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
-| `count` | `0` | `0` – `64` | How many elements are placed; 0 lets the layout decide. |
 | `layout` | `0` | `0` – `8` | Picks which arrangement the elements are placed by. |
-| `seed` | `0` |  | Chooses one arrangement out of the family; the same seed always composes the same way. |
+| `roster` | `0` | `0` – `8` | Picks which set of shapes the elements are drawn from. |
+
+**Modal**
+
+| Parameter | Default | Range | What it does |
+|---|---|---|---|
+| `count` | `0` | `0` – `64` | How many elements are placed; 0 lets the layout decide. Truncated, so a rise admits its next element on arrival. |
+| `seed` | `0` |  | Chooses one arrangement out of the family; the same seed always composes the same way. Truncated, like `count`. |
 | `size_hierarchy` | `0.5` | `0` – `1` | How much larger the leading elements are than the rest; 0 makes them equal. |
 | `angle_bias` | `-22` |  | Degrees the elements lean by, which is what gives the composition its tilt. |
-| `roster` | `0` | `0` – `8` | Picks which set of shapes the elements are drawn from. |
 | `density` | `1` | `0` – `2` | How much of the frame the arrangement fills. |
 | `drift` | `0` | `0` – `2` | How far the elements wander from their placed positions. |
 | `spin` | `0` | `-2` – `2` | Turns per second the elements rotate by. |
@@ -765,6 +865,8 @@ here is the **definition**, and the essay is the **discussion**.
 | `edge_softness` | `0` | `0` – `1` | How far each element's edge fades; 0 is a hard cut. |
 
 ### Engine stage: `background`
+
+**Modal**
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
@@ -786,6 +888,8 @@ here is the **definition**, and the essay is the **discussion**.
 
 ### Engine stage: `trails`
 
+**Modal**
+
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
 | `trails` | `0` | `0` – `1` | How much of the previous frame survives into this one; 0 is no trail, near 1 a long smear. |
@@ -799,13 +903,20 @@ here is the **definition**, and the essay is the **discussion**.
 
 ### Engine stage: `kaleidoscope`
 
+**Structural**
+
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
 | `kaleido_order` | `1` | `1` – `16` | How many mirrored wedges the frame is folded into; 1 is no fold at all. |
+| `kaleido_edge` | `1` | `0` – `1` | Softens the seam between mirrored wedges; 1 is a hard edge. |
+
+**Modal**
+
+| Parameter | Default | Range | What it does |
+|---|---|---|---|
 | `kaleido_angle` | `0` | `0` – `1` | Rotates the whole fold, as a fraction of a full turn. |
 | `kaleido_center_x` | `0.5` | `0` – `1` | The horizontal point the wedges radiate from, in uv. |
 | `kaleido_center_y` | `0.5` | `0` – `1` | The vertical point the wedges radiate from, in uv. |
-| `kaleido_edge` | `1` | `0` – `1` | Softens the seam between mirrored wedges; 1 is a hard edge. |
 | `kaleido_tile` | `1` | `1` – `8` | Repeats the source across the frame before it is folded, so one wedge shows several copies. |
 | `kaleido_radial` | `1` | `0.25` – `4` | Scales distance from the centre when sampling, pulling detail inward or pushing it out. |
 | `kaleido_spiral` | `0` | `-2` – `2` | Rotates the sample by an amount that grows with radius, turning the wedges into a spiral. |
@@ -813,6 +924,8 @@ here is the **definition**, and the essay is the **discussion**.
 | `kaleido_inner` | `0.06` | `0` – `0.5` | Radius of the untouched disc at the centre, which keeps the pivot from smearing. |
 
 ### Engine stage: `bloom`
+
+**Modal**
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
@@ -822,17 +935,23 @@ here is the **definition**, and the essay is the **discussion**.
 
 ### Engine stage: `composite`
 
+**Modal**
+
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
 | `occlude` | `1` | `0` – `1` | How much of the backdrop the scene's own coverage hides; 0 lets the sky through everywhere. |
 
 ### Engine stage: `tonemap`
 
+**Modal**
+
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
 | `exposure` | `1` | `0` – `4` | Linear gain applied to the whole frame before the tonemap; 1 leaves it as rendered. |
 
 ### Engine stage: `ink`
+
+**Modal**
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
@@ -3698,6 +3817,65 @@ rejected, and a latch's `arm`/`fire` may not name another latch.
 > **A latch nothing reads is a load warning**, in the shape an inert
 > `[occupancy] exempt` entry gets and for the same reason: you would otherwise
 > believe an event was wired up while nothing consumed it.
+
+## A value with a memory — the `[hold]` table
+
+An optional top-level `[hold]` table names bindings the engine **re-samples on a
+musical edge** and holds between edges
+([ADR-0180](../docs/adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md) rule 2).
+It sits beside `[smoothing]` and `[latch]` in every sense — same place in the
+file, same resolved-once-at-load treatment, same reset on a preset switch — and
+between the three of them the sentence is finished: `[smoothing]` shapes a value
+over time, `[latch]` holds an **event**, `[hold]` holds a **value**.
+
+```toml
+[params]
+n = "3 + floor(bass * 5)"   # a rose that would flicker between 3 and 8 petals
+
+[hold]
+n = "bar"                   # ...takes its petal count once a bar instead
+```
+
+The expression is still evaluated every frame; the entry decides which frame's
+result the scene is shown.
+
+| entry | when the value is re-taken |
+|---|---|
+| `"beat"` | every frame the beat detector fires — the same gate the `beat` variable reads. |
+| `"bar"` | every time the bar counter moves. |
+| a number | every `n` seconds of render time, `n > 0`, bare (`2.5`) or quoted. |
+
+Anything else is a load error. The first frame a held binding is seen **always**
+takes a value, so a preset never opens on a default it did not ask for.
+
+> **`bar` rides the downbeat estimator, and that estimator locks about 3 % of
+> audible time** ([backlog 0042](../docs/design-backlog.md)). The rest of the
+> time the bar counter is derived from the beat count rather than tracked — it
+> steps on something regular, not on a guaranteed downbeat. What the entry
+> reliably buys is *slow*. Where you want the change on a hit, `"beat"` says so.
+
+**With `[smoothing]`, the order is evaluate → hold → smooth → quantize.** The
+smoother eases toward the held value, so a parameter that is both held and eased
+travels to each new figure rather than stepping to it — and a **Structural**
+parameter walks through the whole numbers on the way. Leave it out of
+`[smoothing]` for a clean jump.
+
+**A binding that reads `index`, or lives in `[per_vertex]`, cannot be held**: it
+is evaluated many times per frame and has no single value to hold, so an entry
+naming one is a **load error** rather than the warning the equivalent
+`[smoothing]` entry gets. An easing constant degrades to instant and still
+renders what you wrote; a hold has no degraded form, and the binding would go on
+flickering while the table looked applied. An entry naming a parameter the preset
+does not bind is a warning, like an inert `[occupancy] exempt` entry.
+
+`[layer.hold]` reaches the layer's own bindings and its `mix`, exactly as
+`[layer.smoothing]` does.
+
+> **A hold makes a preset read as more reactive than it is.** The static
+> reachability walk sees a live expression naming `bass` and cannot see that the
+> engine took its value once this bar. `shot --report` prints a `HELD:` line per
+> held binding with its edge for that reason — read the reactivity columns
+> beside it as the response the hold allows.
 
 ## A clamp is a limit, not a gain — the `[occupancy]` table
 

@@ -50,6 +50,7 @@ fn preset_report(name: &str, gates: Vec<GateReport>) -> PresetReport {
             fall_settled: false,
         },
         gates,
+        holds: Vec::new(),
     }
 }
 
@@ -461,8 +462,8 @@ fn a_dead_gate_on_a_layer_binding_flags_in_the_reachability_walk() {
         })
         .collect();
 
-    let gates = probe_reachability(&preset, &frames);
-    let names: Vec<&str> = gates.iter().map(|g| g.param.as_str()).collect();
+    let found = probe_reachability(&preset, &frames);
+    let names: Vec<&str> = found.gates.iter().map(|g| g.param.as_str()).collect();
     assert!(
         names.contains(&"[layer] zoom"),
         "the dead layer-param gate must flag, labeled with its namespace: {names:?}"

@@ -1,10 +1,10 @@
-//! The loaded presets, the active index, and the per-binding smoother.
+//! The loaded presets, the active index, and the per-binding frame state.
 //!
 //! GPU-free on purpose: [`Roster`] is the addressing contract (names in roster
 //! order, in-range select, out-of-range no-op) as a pure type, so it is testable
 //! without a surface, and [`Renderer`]'s preset methods delegate to it 1:1.
-//! [`ParamSmoother`] sits here because it is keyed by the same binding index the
-//! roster's routes are.
+//! [`BindingState`] -- the easing envelope and the sample-and-hold -- sits here
+//! because both are keyed by the same binding index the roster's routes are.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2; render/ is scanned by the
 // hygiene guard).
@@ -354,6 +354,190 @@ impl ParamSmoother {
     }
 }
 
+/// One held binding's state between frames.
+#[derive(Clone, Copy, Default)]
+struct HoldSlot {
+    /// The value the scene is being shown. `None` is **never sampled**, which
+    /// is what the first frame under a preset sees and what a
+    /// [`remap`](ParamHold::remap) leaves in a slot whose parameter had no
+    /// counterpart in the outgoing preset.
+    held: Option<f32>,
+    /// What the last re-sample measured its interval in: the analysis frame's
+    /// bar counter for [`HoldEdge::Bar`], the elapsed clock for
+    /// [`HoldEdge::Period`]. Unused for [`HoldEdge::Beat`], whose edge is the
+    /// frame's own one-frame gate rather than an interval.
+    last: Option<f32>,
+}
+
+/// Render-layer sample-and-hold over evaluated parameter values (ADR-0180
+/// rule 2). A binding listed in the preset's `[hold]` table is still evaluated
+/// every frame — the evaluator stays a pure, stateless function of its
+/// [`Variables`] — and this decides which frame's value the scene is shown.
+///
+/// **Beside [`ParamSmoother`] and keyed the same way**, by binding index into
+/// the active preset's name-sorted `params`, because a hold that drifted out of
+/// step with the binding it holds would show one parameter another's held
+/// value. The two are carried together in [`BindingState`] so neither can be
+/// reset, remapped or handed to a dissolve without the other.
+///
+/// Applied **between** `expr.eval` and the smoother: `[smoothing]` then eases
+/// toward the held value exactly as it eases toward any other, so a parameter
+/// that is both held and smoothed travels to each new value rather than
+/// stepping to it.
+///
+/// A preset with no `[hold]` table never reaches the state below — every
+/// binding's edge is `None`, [`hold`](Self::hold) returns the raw value on a
+/// slice length check, and the `Vec` stays empty and unallocated.
+#[derive(Default)]
+pub(super) struct ParamHold {
+    /// Per binding index; grown lazily and only for a binding that declares an
+    /// edge. Cleared on reset.
+    slots: Vec<HoldSlot>,
+}
+
+impl ParamHold {
+    /// Forget every held value so the next frame re-samples.
+    pub(super) fn reset(&mut self) {
+        self.slots.clear();
+    }
+
+    /// Re-key the carried state from binding order `from` to binding order
+    /// `to`, **by name** — [`ParamSmoother::remap`]'s contract, for its reason
+    /// and at its cost. A name with no counterpart lands on a fresh slot and
+    /// so re-samples on its first frame, which is where a reset would have left
+    /// it.
+    pub(super) fn remap(&mut self, from: &[&str], to: &[&str]) {
+        let carried: Vec<HoldSlot> = to
+            .iter()
+            .map(|name| {
+                from.iter()
+                    .position(|prev| prev == name)
+                    .and_then(|index| self.slots.get(index).copied())
+                    .unwrap_or_default()
+            })
+            .collect();
+        self.slots = carried;
+    }
+
+    /// [`remap`](Self::remap) for a **layer's** hold, whose slots are the
+    /// layer's params followed by one more for the bindable `mix` — the same
+    /// shape, and the same hand-carried extra slot, as
+    /// [`ParamSmoother::remap_layer`].
+    pub(super) fn remap_layer(&mut self, from: &Layer, to: &Layer) {
+        let from_names: Vec<&str> = from.params.iter().map(|b| b.name.as_str()).collect();
+        let to_names: Vec<&str> = to.params.iter().map(|b| b.name.as_str()).collect();
+        let mix = self.slots.get(from_names.len()).copied();
+        self.remap(&from_names, &to_names);
+        if from.mix.is_some() && to.mix.is_some() {
+            self.slots.resize(to_names.len() + 1, HoldSlot::default());
+            if let (Some(slot), Some(mix)) = (self.slots.get_mut(to_names.len()), mix) {
+                *slot = mix;
+            }
+        }
+    }
+
+    /// The value carried in `index`'s slot, or `None` where nothing has been
+    /// held in it yet — [`ParamSmoother::carried`]'s counterpart, so a test can
+    /// assert the state rather than infer it from a rendered frame.
+    #[cfg(test)]
+    pub(super) fn carried(&self, index: usize) -> Option<f32> {
+        self.slots.get(index).and_then(|slot| slot.held)
+    }
+
+    /// The value binding `index` shows this frame: `raw` where the binding
+    /// declares no edge or `edge` fires, and the value taken at the last edge
+    /// otherwise.
+    ///
+    /// The **first frame a held binding is seen takes its value** whatever the
+    /// edge says, so a preset never opens on a default it did not ask for. That
+    /// is also what makes a `bar` hold correct on a silent stream, where the
+    /// counter never moves.
+    pub(super) fn hold(
+        &mut self,
+        index: usize,
+        raw: f32,
+        edge: Option<HoldEdge>,
+        frame: &AnalysisFrame,
+        time: f32,
+    ) -> f32 {
+        let Some(edge) = edge else {
+            return raw;
+        };
+        if self.slots.len() <= index {
+            self.slots.resize(index + 1, HoldSlot::default());
+        }
+        let Some(slot) = self.slots.get_mut(index) else {
+            return raw; // unreachable after the resize; never panics on the hot path
+        };
+        // What this edge measures its interval in. `beat` has none: the frame's
+        // gate is already one frame wide (`Analyzer::take_frame` makes a beat
+        // sticky between takes and clears it, so it cannot fire twice for one
+        // hop or fall between two frames).
+        let marker = match edge {
+            HoldEdge::Beat => None,
+            // Exact for every bar count a session can reach: an f32 carries
+            // integers to 2^24, which at four seconds a bar is two years of
+            // continuous play.
+            HoldEdge::Bar => Some(frame.bar_index as f32),
+            HoldEdge::Period(_) => Some(time),
+        };
+        let fired = match (slot.held, edge) {
+            (None, _) => true,
+            (Some(_), HoldEdge::Beat) => frame.beat,
+            // A change, not an increase: `bar_index` steps backward across a
+            // downbeat re-alignment, and a re-sample is the right answer there.
+            (Some(_), HoldEdge::Bar) => slot.last != marker,
+            (Some(_), HoldEdge::Period(seconds)) => {
+                slot.last.is_none_or(|last| time - last >= seconds)
+            }
+        };
+        if fired {
+            slot.held = Some(raw);
+            // The interval restarts from the frame it fired on rather than from
+            // the scheduled edge, so a long frame delays the next one instead of
+            // banking a burst of them.
+            slot.last = marker;
+        }
+        slot.held.unwrap_or(raw)
+    }
+}
+
+/// The per-binding frame state one surface of one preset carries: its easing
+/// envelope and its sample-and-hold.
+///
+/// A bundle rather than two fields wherever a smoother is held, because the two
+/// are keyed by the **same** binding index and every operation on one is an
+/// operation on the other — a reset, a rebind's remap, the hand-over to the
+/// outgoing side of a dissolve. Split across two fields, the way this goes
+/// wrong is that one of the three sites moves only one of them and a parameter
+/// starts reading its neighbour's held value.
+#[derive(Default)]
+pub(super) struct BindingState {
+    pub(super) smoother: ParamSmoother,
+    pub(super) hold: ParamHold,
+}
+
+impl BindingState {
+    /// Forget both halves, so the next frame snaps to the incoming values and
+    /// re-samples every hold.
+    pub(super) fn reset(&mut self) {
+        self.smoother.reset();
+        self.hold.reset();
+    }
+
+    /// Re-key both halves from binding order `from` to binding order `to`.
+    pub(super) fn remap(&mut self, from: &[&str], to: &[&str]) {
+        self.smoother.remap(from, to);
+        self.hold.remap(from, to);
+    }
+
+    /// Re-key both halves across a **layer** rebind.
+    pub(super) fn remap_layer(&mut self, from: &Layer, to: &Layer) {
+        self.smoother.remap_layer(from, to);
+        self.hold.remap_layer(from, to);
+    }
+}
+
 /// The roster-facing half of [`Renderer`]: replacing the preset set, moving the
 /// active index, and applying the incoming preset's structural config to its
 /// scene. An `impl Renderer` continuation for the same reason `tier_governor` is
@@ -409,8 +593,8 @@ impl Renderer {
         let active = self.roster.active;
         let Self {
             roster,
-            param_smoother,
-            layer_smoother,
+            param_state,
+            layer_state,
             latches,
             ..
         } = self;
@@ -424,12 +608,12 @@ impl Renderer {
         if let (Some(prev), Some(next)) = (roster.presets.get(active), presets.get(active)) {
             let from: Vec<&str> = prev.params.iter().map(|b| b.name.as_str()).collect();
             let to: Vec<&str> = next.params.iter().map(|b| b.name.as_str()).collect();
-            param_smoother.remap(&from, &to);
+            param_state.remap(&from, &to);
             latches.remap(&prev.latches, &next.latches);
             match (prev.layer.as_ref(), next.layer.as_ref()) {
-                (Some(from), Some(to)) => layer_smoother.remap_layer(from, to),
+                (Some(from), Some(to)) => layer_state.remap_layer(from, to),
                 // A layer that arrived or left has no state to carry either way.
-                _ => layer_smoother.reset(),
+                _ => layer_state.reset(),
             }
         }
         self.roster.set_presets(presets);
@@ -577,8 +761,8 @@ impl Renderer {
         // The latch bank resets on the same beat and for the same two reasons:
         // an armed window must not cross a preset switch, and a capture has to
         // stay a pure function of its inputs (NFR 6).
-        self.param_smoother.reset();
-        self.layer_smoother.reset();
+        self.param_state.reset();
+        self.layer_state.reset();
         self.latches.reset();
         // A switch also drops whatever a control surface was holding: an override
         // names a parameter on the preset it was set against, and the same name

@@ -1,7 +1,7 @@
 //! [`SystemKind`]: which built-in system a preset drives, and the one roster
 //! every other list of systems derives from.
 
-use crate::render::scenes::{ParamSpec, declares, spec_names};
+use crate::render::scenes::{ParamKind, ParamSpec, declares, kind_of, spec_names};
 
 /// The built-in system a preset drives. Extend as Plan 0003 (and later plans)
 /// add systems; unknown names are rejected at load.
@@ -241,4 +241,18 @@ pub const GLOBAL_PARAMS: [&[ParamSpec]; 7] = [
 /// the preset still loads and applies its good bindings (ADR-0020, NFR 10).
 pub fn is_known_param(system: SystemKind, name: &str) -> bool {
     declares(system.param_specs(), name) || GLOBAL_PARAMS.iter().any(|stage| declares(stage, name))
+}
+
+/// The [`ParamKind`] `name` is declared with, searching `system`'s own roster
+/// first and then the global compositing stages — the same rosters in the same
+/// order [`is_known_param`] tests, so a name that is known there has a kind
+/// here.
+///
+/// [`ParamKind::Modal`] for a name no roster declares, which is the ADR-0020
+/// warning case: the binding is kept, nothing reads it, and quantizing a value
+/// no scene receives would be a decision about nothing.
+pub fn kind_of_param(system: SystemKind, name: &str) -> ParamKind {
+    kind_of(system.param_specs(), name)
+        .or_else(|| GLOBAL_PARAMS.iter().find_map(|stage| kind_of(stage, name)))
+        .unwrap_or_default()
 }

@@ -1895,6 +1895,108 @@ fn the_json_report_is_well_formed_and_carries_its_top_level_keys() {
     }
 }
 
+/// A library whose two presets each hold a binding, one on each named edge and
+/// one on a period — the shipped set holds none, so the fixture has to carry
+/// the case or the claim tests nothing.
+fn held_report_library() -> PathBuf {
+    let dir = scratch("held-report-library");
+    for (file, toml) in [
+        (
+            "held.toml",
+            "system = \"parametric_curve\"\nname = \"HeldOne\"\n\
+             [curve]\nfamily = \"maurer_rose\"\n\
+             [params]\nn = \"3 + floor(bass * 5)\"\nd = \"71\"\nsamples = \"361\"\n\
+             scale = \"0.8\"\nhue = \"0.55\"\nthickness = \"2.0\"\nbrightness = \"0.9\"\n\
+             [hold]\nn = \"bar\"\n",
+        ),
+        (
+            "held_two.toml",
+            "system = \"parametric_curve\"\nname = \"HeldTwo\"\n\
+             [curve]\nfamily = \"maurer_rose\"\n\
+             [params]\nn = \"4\"\nd = \"71\"\nsamples = \"361\"\n\
+             scale = \"0.8\"\nhue = \"0.2\"\nthickness = \"2.0\"\n\
+             brightness = \"0.6 + treb * 0.3\"\n\
+             [hold]\nbrightness = \"beat\"\nd = 2.5\n",
+        ),
+    ] {
+        std::fs::write(dir.join(file), toml).expect("write held fixture");
+    }
+    dir
+}
+
+/// `--report` names every held binding and the edge it re-samples on
+/// (ADR-0180 rule 2), in both presentations.
+///
+/// The reading is what this covers: a held binding names an audio variable and
+/// is evaluated every frame, so a reader scanning the reactivity columns would
+/// credit it as a per-frame response. The report has to say otherwise.
+#[test]
+fn the_report_names_every_held_binding_and_its_edge() {
+    let dir = held_report_library();
+    let dir_arg = dir.to_string_lossy().into_owned();
+
+    let out = run(&["--report", "--presets", &dir_arg]);
+    if skipped_for_no_adapter(&out) {
+        return;
+    }
+    assert!(
+        out.status.success(),
+        "--report failed\nstderr: {}",
+        stderr(&out)
+    );
+    let text = stdout(&out);
+    for (preset, param, edge) in [
+        ("HeldOne", "n", "bar"),
+        ("HeldTwo", "brightness", "beat"),
+        ("HeldTwo", "d", "2.5 s"),
+    ] {
+        let line = format!("HELD: {preset} {param} on {edge}");
+        assert!(
+            text.contains(&line),
+            "the report does not name `{param}` as held on `{edge}`; expected a \
+             line reading `{line}`\n{text}"
+        );
+    }
+
+    let out = run(&["--report", "--json", "--presets", &dir_arg]);
+    if skipped_for_no_adapter(&out) {
+        return;
+    }
+    let json = stdout(&out);
+    assert!(
+        json_is_balanced(&json),
+        "the report is not well-formed JSON:\n{json}"
+    );
+    for fragment in [
+        "\"param\":\"n\",\"edge\":\"bar\"",
+        "\"param\":\"brightness\",\"edge\":\"beat\"",
+        "\"param\":\"d\",\"edge\":\"2.5 s\"",
+    ] {
+        assert!(
+            json.contains(fragment),
+            "the JSON report is missing `{fragment}`:\n{json}"
+        );
+    }
+}
+
+/// A preset that holds nothing prints no holds block and no `HELD:` line — the
+/// whole shipped library is in that case, and a line per family saying nothing
+/// happened is noise the ceilings block already had to be summarized to avoid.
+#[test]
+fn a_report_over_unheld_presets_says_nothing_about_holds() {
+    let dir = tiny_report_library();
+    let dir_arg = dir.to_string_lossy().into_owned();
+    let out = run(&["--report", "--presets", &dir_arg]);
+    if skipped_for_no_adapter(&out) {
+        return;
+    }
+    let text = stdout(&out);
+    assert!(
+        !text.contains("HELD:") && !text.contains("held bindings"),
+        "a library that holds nothing must not print a holds block:\n{text}"
+    );
+}
+
 /// The transient columns carry a real measurement all the way out of the CLI
 /// (Plan 0037 Phase 2), in both presentations.
 ///

@@ -21,7 +21,7 @@
     clippy::unreachable
 )]
 
-use crate::render::scenes::ParamSpec;
+use crate::render::scenes::{ParamKind, ParamSpec};
 
 pub mod biarc;
 pub mod curves;
@@ -124,6 +124,7 @@ pub const SOFTNESS: ParamSpec = ParamSpec {
     default: DEFAULT_SOFTNESS,
     range: Some([0.0, 1.0]),
     doc: "How far a stroke's edge fades out; 0 is a hard line, 1 a wide glow with no core.",
+    kind: ParamKind::Modal,
 };
 
 /// `stroke_blend`, shared: additive light at 0, opaque paint at 1.
@@ -132,6 +133,7 @@ pub const STROKE_BLEND: ParamSpec = ParamSpec {
     default: ADDITIVE_BLEND,
     range: Some([0.0, 1.0]),
     doc: "Moves the stroke from additive light toward opaque paint, so crossings stop brightening.",
+    kind: ParamKind::Modal,
 };
 
 /// `mirror_order`, shared: how many copies of the geometry ring the centre.
@@ -140,6 +142,7 @@ pub const MIRROR_ORDER: ParamSpec = ParamSpec {
     default: 1.0,
     range: Some([1.0, 12.0]),
     doc: "Repeats the geometry this many times around the centre; 1 draws it once.",
+    kind: ParamKind::Structural,
 };
 
 /// `mirror_reflect`, shared: whether those copies alternate as mirror images.
@@ -148,6 +151,7 @@ pub const MIRROR_REFLECT: ParamSpec = ParamSpec {
     default: 0.0,
     range: Some([0.0, 1.0]),
     doc: "Alternates the repeats into mirror images rather than plain rotations.",
+    kind: ParamKind::Modal,
 };
 
 /// `draw_progress`, shared: how much of the figure has been drawn.
@@ -156,6 +160,7 @@ pub const DRAW_PROGRESS: ParamSpec = ParamSpec {
     default: 1.0,
     range: Some([0.0, 1.0]),
     doc: "How much of the figure is drawn, from its start; below 1 the line is still arriving.",
+    kind: ParamKind::Modal,
 };
 
 /// `glow`, shared: the halo around a stroke, on top of the stroke itself.
@@ -164,6 +169,7 @@ pub const GLOW: ParamSpec = ParamSpec {
     default: 1.0,
     range: Some([0.0, 4.0]),
     doc: "Brightness of the halo around each stroke, on top of the stroke itself.",
+    kind: ParamKind::Modal,
 };
 
 /// `thickness` at the scene's own resting width, in pixels at the render target.
@@ -173,6 +179,7 @@ pub const fn thickness(default: f32) -> ParamSpec {
         default,
         range: Some([0.5, 12.0]),
         doc: "Stroke width in pixels at the render target, before softness widens the falloff.",
+        kind: ParamKind::Modal,
     }
 }
 
@@ -183,6 +190,7 @@ pub const fn scale(default: f32) -> ParamSpec {
         default,
         range: Some([0.1, 2.0]),
         doc: "Size of the figure within the frame, before the shared zoom is applied.",
+        kind: ParamKind::Modal,
     }
 }
 
@@ -193,6 +201,7 @@ pub const fn hue_spread(default: f32) -> ParamSpec {
         default,
         range: Some([0.0, 1.0]),
         doc: "How far along the palette the colour travels from one end of the figure to the other.",
+        kind: ParamKind::Modal,
     }
 }
 

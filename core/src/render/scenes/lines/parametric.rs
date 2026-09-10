@@ -45,7 +45,7 @@ use super::{
 };
 use crate::dsp::AnalysisFrame;
 use crate::render::palette::Palette;
-use crate::render::scenes::{ParamSpec, default_of};
+use crate::render::scenes::{ParamKind, ParamSpec, default_of};
 
 // Parameter defaults — a calm, whole, slowly turning rose when nothing is bound.
 const DEFAULT_N: f32 = default_of(PARAMS, "n");
@@ -341,31 +341,39 @@ pub const PARAMS: &[ParamSpec] = &[
         name: "n",
         default: 6.0,
         range: Some([1.0, 24.0]),
-        doc: "The rose's petal number - the first of the two integers that pick the figure.",
+        doc: "The rose's petal number, read as a real frequency: a fraction between two counts \
+               draws an open web rather than a rose.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "d",
         default: 71.0,
         range: Some([1.0, 360.0]),
-        doc: "The step between sampled angles, which is what turns a rose into a Maurer figure.",
+        doc: "The step between sampled angles in degrees, which is what turns a rose into a \
+               Maurer figure; any real step draws a figure.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "phase",
         default: 0.0,
         range: Some([0.0, 1.0]),
         doc: "Rotates where the figure starts sampling, as a fraction of a turn.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "radial_offset",
         default: 0.0,
         range: Some([-1.0, 1.0]),
         doc: "Pushes every point out from the centre, opening the figure into a ring.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "samples",
         default: 361.0,
         range: Some([16.0, 2048.0]),
-        doc: "How many points the curve is drawn from; fewer reads as a polygon.",
+        doc: "How many points the curve is drawn from; fewer reads as a polygon. Truncated, so \
+               a rise adds its next point on arrival.",
+        kind: ParamKind::Modal,
     },
     crate::render::scenes::lines::thickness(DEFAULT_THICKNESS),
     crate::render::scenes::common::hue(DEFAULT_HUE),
@@ -379,6 +387,7 @@ pub const PARAMS: &[ParamSpec] = &[
         default: 0.1,
         range: Some([-2.0, 2.0]),
         doc: "Turns per second the whole figure rotates by.",
+        kind: ParamKind::Modal,
     },
     crate::render::scenes::lines::scale(DEFAULT_SCALE),
     crate::render::scenes::common::brightness(DEFAULT_BRIGHTNESS),

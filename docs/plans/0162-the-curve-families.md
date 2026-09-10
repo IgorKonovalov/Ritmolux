@@ -10,7 +10,7 @@
 > premise this plan spends),
 > [0098](../adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md) (the arc fit every new family
 > inherits for free)
-> **Depends on:** [0161](0161-the-structural-parameter-is-held.md) — the integer levers below are
+> **Depends on:** [0161](done/0161-the-structural-parameter-is-held.md) — the integer levers below are
 > worth binding only once `[hold]` exists.
 
 ## TL;DR
@@ -157,7 +157,7 @@ flowchart TD
   claim nothing holds — which is the exact posture `ParamSpec`'s own doc comment takes about
   unbounded parameters. The generated reference (ADR-0170) prints a per-family range for a parameter
   whose meaning is family-specific, alongside the Structural/Modal grouping
-  [0161](0161-the-structural-parameter-is-held.md) Phase 4 adds.
+  [0161](done/0161-the-structural-parameter-is-held.md) Phase 4 adds.
 - **Files touched:** the reference generator, `core/src/render/scenes/mod.rs` (whatever carries the
   per-family range), `presets/README.md` (regenerated).
 - **Done when:** `presets/README.md`'s `parametric_curve` table states `n`'s range per family, no
@@ -227,7 +227,7 @@ struct FamilySample {
 - **It does not touch `lsystem` or `star_pattern`**, the other two generator scenes.
 - **It does not author presets.** Four new families deserve worlds built on them; that is
   `preset-author`'s lane and it is the natural follow-on once this lands.
-- **It does not add `[hold]`** — that is [0161](0161-the-structural-parameter-is-held.md), which
+- **It does not add `[hold]`** — that is [0161](done/0161-the-structural-parameter-is-held.md), which
   this plan depends on.
 
 ## Implementation log

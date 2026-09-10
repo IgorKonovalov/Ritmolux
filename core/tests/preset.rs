@@ -6,7 +6,8 @@
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 
-use rlx_core::preset::{Preset, SystemKind, Variables, compile};
+use rlx_core::preset::{HoldEdge, Preset, SystemKind, Variables, compile};
+use rlx_core::render::scenes::ParamKind;
 
 /// Global allocator that counts allocation calls **per thread**, so a test can
 /// assert that a region on the current thread performs no heap allocation,
@@ -1038,6 +1039,188 @@ fn smoothing_a_per_element_binding_warns_instead_of_doing_nothing() {
     assert_eq!(tau_of("thickness"), rlx_core::preset::Easing::INSTANT);
 }
 
+// ---------------------------------------------------------------------------
+// The `[hold]` table (ADR-0180 rule 2)
+// ---------------------------------------------------------------------------
+
+/// Load a curve preset with the given extra tables. `n` and `d` are the two
+/// structural integers ADR-0180 quotes.
+fn held_curve(extra: &str) -> Result<Preset, rlx_core::preset::PresetError> {
+    Preset::from_toml_str(&format!(
+        "system = \"parametric_curve\"\nname = \"t\"\n\
+         [params]\nn = \"3 + floor(bass * 5)\"\nbrightness = \"0.5 + bass\"\n{extra}"
+    ))
+}
+
+fn edge_of(preset: &Preset, name: &str) -> Option<HoldEdge> {
+    preset
+        .params
+        .iter()
+        .find(|b| b.name == name)
+        .unwrap_or_else(|| panic!("{name} is bound"))
+        .hold
+}
+
+/// The whole vocabulary, in both the spellings an author reaches for: the two
+/// words, a bare number of seconds, and a quoted one -- which is the form
+/// ADR-0180 itself illustrates.
+#[test]
+fn a_hold_entry_parses_every_spelling_of_the_vocabulary() {
+    let cases: [(&str, HoldEdge); 5] = [
+        ("\"beat\"", HoldEdge::Beat),
+        ("\"bar\"", HoldEdge::Bar),
+        ("2.0", HoldEdge::Period(2.0)),
+        ("2", HoldEdge::Period(2.0)),
+        ("\"2.0\"", HoldEdge::Period(2.0)),
+    ];
+    for (written, expected) in cases {
+        let preset =
+            held_curve(&format!("[hold]\nn = {written}\n")).expect("a legal hold entry loads");
+        assert_eq!(
+            edge_of(&preset, "n"),
+            Some(expected),
+            "[hold] n = {written} did not parse as {expected:?}"
+        );
+        // The entry reaches exactly the binding it names and no other.
+        assert_eq!(edge_of(&preset, "brightness"), None);
+    }
+}
+
+/// A preset that declares no `[hold]` table leaves every binding unheld, which
+/// is the shape the whole shipped library loads in.
+#[test]
+fn a_preset_with_no_hold_table_holds_nothing() {
+    let preset = held_curve("").expect("valid preset");
+    assert!(
+        preset.params.iter().all(|b| b.hold.is_none()),
+        "a preset with no [hold] table must carry no edges"
+    );
+}
+
+/// Any word that is not an edge is a **load error**, not a silent fallback: a
+/// hold that quietly did nothing is the flicker the table exists to remove, and
+/// the message has to name what was written and what was expected.
+#[test]
+fn an_unknown_hold_edge_is_a_load_error() {
+    let err = held_curve("[hold]\nn = \"phrase\"\n").expect_err("unknown edge");
+    let text = err.to_string();
+    assert!(
+        text.contains("phrase") && text.contains("beat") && text.contains("bar"),
+        "the error names the word written and the two expected: {text}"
+    );
+    // A period must be positive and finite: zero re-samples every frame, which
+    // is what an unheld binding already does.
+    for bad in ["0", "-1.5"] {
+        let err = held_curve(&format!("[hold]\nn = {bad}\n")).expect_err("bad period");
+        assert!(
+            err.to_string().contains("positive"),
+            "a {bad} second period must be rejected as a period: {err}"
+        );
+    }
+}
+
+/// A `[hold]` entry naming a **per-element** binding is a load error where the
+/// `[smoothing]` one is a warning: an easing constant degrades to instant and
+/// still renders what the author wrote, and a hold has no degraded form.
+#[test]
+fn holding_a_per_element_binding_is_a_load_error() {
+    let err = Preset::from_toml_str(
+        "system = \"spectrum\"\n[spectrum]\nelements = 8\n\
+         [params]\nthickness = \"2 + bin(index) * 8\"\n[hold]\nthickness = \"beat\"\n",
+    )
+    .expect_err("a held per-element binding");
+    let text = err.to_string();
+    assert!(
+        text.contains("thickness") && text.contains("index"),
+        "the error names the binding and why: {text}"
+    );
+}
+
+/// A `[hold]` entry naming a `[per_vertex]` binding is rejected for the same
+/// reason, and names both tables so the author can see which one it meant.
+#[test]
+fn holding_a_per_vertex_binding_is_a_load_error() {
+    let err = Preset::from_toml_str(
+        "system = \"warp_mesh\"\n[per_vertex]\nwarp_x = \"x * 0.1\"\n\
+         [hold]\nwarp_x = \"bar\"\n",
+    )
+    .expect_err("a held per-vertex binding");
+    let text = err.to_string();
+    assert!(
+        text.contains("warp_x") && text.contains("[per_vertex]"),
+        "the error names the binding and the table it lives in: {text}"
+    );
+}
+
+/// An entry naming a parameter the preset does not bind holds nothing, so it is
+/// surfaced as a warning -- `[occupancy] exempt`'s posture, for its reason: the
+/// author believes a binding is held while it goes on flickering.
+#[test]
+fn a_hold_entry_naming_an_unbound_parameter_warns() {
+    let preset = held_curve("[hold]\nd = \"bar\"\n").expect("valid preset");
+    assert_eq!(preset.warnings.len(), 1, "only the inert entry warns");
+    let warning = preset.warnings.first().expect("the warning");
+    assert!(
+        warning.contains("[hold]") && warning.contains("'d'") && warning.contains("inert"),
+        "the warning names the table, the entry and that it does nothing: {warning}"
+    );
+}
+
+/// `[layer.hold]` reaches the layer's own bindings, and its `mix` -- the one
+/// layer binding that lives outside `params`. Layer bindings are indexed within
+/// the layer, so a layer's hold state cannot collide with the main preset's.
+#[test]
+fn a_layer_holds_its_own_bindings_and_its_mix() {
+    let preset = Preset::from_toml_str(
+        "system = \"swarm\"\n[params]\nforce = \"bass\"\n\
+         [layer]\nsystem = \"parametric_curve\"\njoin = \"over\"\n\
+         mix = \"0.5 + bass * 0.5\"\n\
+         [layer.params]\nn = \"3 + floor(bass * 5)\"\n\
+         [layer.hold]\nn = \"bar\"\nmix = \"beat\"\n",
+    )
+    .expect("valid preset");
+    let layer = preset.layer.as_ref().expect("the layer");
+    assert_eq!(
+        layer
+            .params
+            .iter()
+            .find(|b| b.name == "n")
+            .and_then(|b| b.hold),
+        Some(HoldEdge::Bar),
+        "[layer.hold] must reach the layer's own params"
+    );
+    assert_eq!(
+        layer.mix.as_ref().and_then(|b| b.hold),
+        Some(HoldEdge::Beat),
+        "[layer.hold] mix must reach the bindable mix"
+    );
+    assert!(
+        preset.params.iter().all(|b| b.hold.is_none()),
+        "a layer's hold table must not reach the top level"
+    );
+    assert!(
+        !preset.warnings.iter().any(|w| w.contains("[layer.hold]")),
+        "neither entry is inert: {:?}",
+        preset.warnings
+    );
+}
+
+/// A bad `[layer.hold]` entry names its own table, not the top-level one --
+/// otherwise an author with both tables cannot tell which one failed.
+#[test]
+fn a_layer_hold_error_names_the_layer_table() {
+    let err = Preset::from_toml_str(
+        "system = \"swarm\"\n[params]\nforce = \"bass\"\n\
+         [layer]\nsystem = \"parametric_curve\"\n\
+         [layer.params]\nn = \"6\"\n[layer.hold]\nn = \"phrase\"\n",
+    )
+    .expect_err("unknown edge in a layer");
+    assert!(
+        err.to_string().contains("[layer] n"),
+        "the error names the layer surface: {err}"
+    );
+}
+
 #[test]
 fn malformed_expressions_fail_to_compile_without_panicking() {
     for bad in [
@@ -1588,13 +1771,19 @@ fn engine_stage_rosters() -> Vec<(&'static str, &'static [rlx_core::render::scen
     all.split_off(head)
 }
 
-/// The reference itself: one table per system, then one per engine stage.
+/// The reference itself: one section per system, then one per engine stage,
+/// each split into its **Structural** and **Modal** parameters (ADR-0180
+/// rule 4).
 ///
 /// Four columns, which are the four things a reader asks in order — what is it
 /// called, what does it do if I bind nothing, what range moves it, and what does
 /// it mean. The range is the range that READS, not a clamp: a blank cell is a
 /// parameter that is unbounded or world-space, where the frame is the bound and
 /// inventing a number would be a claim nothing holds.
+///
+/// A group with no parameters prints **nothing** — no heading and no empty
+/// table. Most engine stages carry no structural parameter at all, and a run of
+/// empty tables would read as a defect rather than as an absence.
 fn render_parameter_reference() -> String {
     let mut out = String::from("\n");
     out.push_str(
@@ -1604,6 +1793,15 @@ fn render_parameter_reference() -> String {
          The declarations it is generated from live beside each scene's own \
          `set_param`. -->\n",
     );
+    // Said once, here, rather than over every one of the two dozen sections
+    // below.
+    out.push_str(
+        "\n**Structural** parameters say *what is drawn* — a count, a mode, a family — and the \
+         engine rounds one to a whole number before the scene sees it. **Modal** parameters say \
+         *how it looks*, and every value in their range means something. A parameter with an \
+         integer-sounding name in the Modal group is there because the scene reads the fraction; \
+         its own line says so.\n",
+    );
 
     let systems: Vec<_> = reference_rosters();
     let stage_names: Vec<&str> = engine_stage_rosters().iter().map(|(n, _)| *n).collect();
@@ -1611,26 +1809,36 @@ fn render_parameter_reference() -> String {
     for (label, specs) in &systems {
         let engine_stage = stage_names.contains(label);
         out.push_str(&format!(
-            "\n### {} `{label}`\n\n",
+            "\n### {} `{label}`\n",
             if engine_stage {
                 "Engine stage:"
             } else {
                 "System:"
             }
         ));
-        out.push_str("| Parameter | Default | Range | What it does |\n");
-        out.push_str("|---|---|---|---|\n");
-        for spec in *specs {
-            let range = match spec.range {
-                Some([lo, hi]) => format!("`{}` – `{}`", number(lo), number(hi)),
-                None => String::new(),
-            };
-            out.push_str(&format!(
-                "| `{}` | `{}` | {range} | {} |\n",
-                spec.name,
-                number(spec.default),
-                spec.doc,
-            ));
+        for (group, kind) in [
+            ("Structural", ParamKind::Structural),
+            ("Modal", ParamKind::Modal),
+        ] {
+            let rows: Vec<_> = specs.iter().filter(|spec| spec.kind == kind).collect();
+            if rows.is_empty() {
+                continue;
+            }
+            out.push_str(&format!("\n**{group}**\n\n"));
+            out.push_str("| Parameter | Default | Range | What it does |\n");
+            out.push_str("|---|---|---|---|\n");
+            for spec in rows {
+                let range = match spec.range {
+                    Some([lo, hi]) => format!("`{}` – `{}`", number(lo), number(hi)),
+                    None => String::new(),
+                };
+                out.push_str(&format!(
+                    "| `{}` | `{}` | {range} | {} |\n",
+                    spec.name,
+                    number(spec.default),
+                    spec.doc,
+                ));
+            }
         }
     }
     out.push('\n');
@@ -1852,7 +2060,91 @@ fn declared_params_match_set_param() {
             file.display(),
         );
     }
+
+    // --- the kinds (ADR-0180 rule 2) ---
+    //
+    // The scan above compares NAMES, so a wrong `ParamKind` passes it in
+    // silence — and a wrong one is not a compile error, not a load error, and
+    // visible only as a scene that stopped interpolating. What holds it is
+    // `STRUCTURAL` below: a hand-kept roster of every parameter the engine
+    // rounds, asserted equal to what the engine declares. Marking one costs a
+    // deliberate edit in a second place, which is the whole enforcement.
+    let mut declared: Vec<(&str, &str)> = Vec::new();
+    for (label, specs) in rlx_core::preset::export::param_rosters() {
+        for spec in specs {
+            match spec.kind {
+                ParamKind::Structural => declared.push((label, spec.name)),
+                ParamKind::Modal => {}
+            }
+        }
+    }
+    declared.sort_unstable();
+    let mut expected: Vec<(&str, &str)> = STRUCTURAL.to_vec();
+    expected.sort_unstable();
+    assert_eq!(
+        declared, expected,
+        "the engine's `ParamKind::Structural` declarations and this test's \
+         roster have drifted. A parameter that begins rounding where it used to \
+         interpolate changes its scene's output, so adding one here is the \
+         deliberate half of that decision — not paperwork after it."
+    );
 }
+
+/// Every parameter the engine declares `ParamKind::Structural`, as
+/// `(roster label, parameter)` — the roster labels being the ones
+/// `export::param_rosters()` prints, so a system's own name or an engine
+/// stage's.
+///
+/// **A hand-kept second statement, on purpose.** It is what
+/// `declared_params_match_set_param` above compares the engine's declarations
+/// against, and a `ParamKind` has no other enforcement available to it: it
+/// states what a value *means*, which no scan of the source can infer.
+/// Each entry names a parameter whose scene **already** clamps and rounds it
+/// before use, so the engine's own quantization composes to the identity. That
+/// is the audit's rule: a parameter is `Structural` where rounding is provably
+/// a no-op today, and `Modal` wherever the scene reads the fraction — which is
+/// why `n`, `d`, `samples`, `contour`, `count`, `seed`, `variant` and
+/// `deposit_arms` are absent despite integer-sounding names.
+const STRUCTURAL: &[(&str, &str)] = &[
+    // `mark_shape` / `mark_points`: clamp then round, CPU-side, because a
+    // fractional point count tears the angle fold along `atan2`'s branch cut.
+    ("swarm", "shape"),
+    ("swarm", "points"),
+    ("emitter", "shape"),
+    ("emitter", "points"),
+    ("shape_field", "shape"),
+    ("shape_field", "points"),
+    // `applied_coord_mode`: a two-entry roster, clamped and rounded.
+    ("shape_field", "coord_mode"),
+    // `family::roster_index`: rounds into the tuple roster.
+    ("attractor", "tuple"),
+    // `Grammar::from_param` / `Roster::from_param`: round into a closed set.
+    ("shape_collage", "layout"),
+    ("shape_collage", "roster"),
+    // `echo_orientation`: rounds, then wraps modulo the four flips.
+    ("warp_mesh", "echo_orient"),
+    // `MirrorSpec::from_params`: rounds then clamps, on every line scene.
+    ("parametric_curve", "mirror_order"),
+    ("lsystem", "mirror_order"),
+    ("star_pattern", "mirror_order"),
+    ("spectrum", "mirror_order"),
+    // `palette::band_steps`: clamps and rounds at every LUT read, on every
+    // scene that carries the shared palette block.
+    ("fragment_field", "palette_steps"),
+    ("swarm", "palette_steps"),
+    ("parametric_curve", "palette_steps"),
+    ("lsystem", "palette_steps"),
+    ("star_pattern", "palette_steps"),
+    ("reaction_diffusion", "palette_steps"),
+    ("attractor", "palette_steps"),
+    ("spectrum", "palette_steps"),
+    ("emitter", "palette_steps"),
+    ("shape_field", "palette_steps"),
+    ("warp_mesh", "palette_steps"),
+    // `fold_order` / `fold_edge`: the kaleidoscope's two stepped params.
+    ("kaleidoscope", "kaleido_order"),
+    ("kaleidoscope", "kaleido_edge"),
+];
 
 /// **The three additive-particle scenes spell their level lever the same way**
 /// (Plan 0066 Phase 1 / ADR-0080).
@@ -3286,25 +3578,44 @@ fn every_family_carries_at_least_two_representatives() {
 /// discriminator between a parameter object and a structural key's is the
 /// `default` field's type — a parameter's is a JSON number, a key's is a string.
 fn schema_param_rows(doc: &str) -> Vec<(String, String, String)> {
-    let mut rows = Vec::new();
+    // Returned in **the reference's order**: per roster, the structural
+    // parameters and then the modal ones (ADR-0180 rule 4). The document itself
+    // stays in declaration order — a consumer groups it by the `kind` each row
+    // carries — so the reordering rule lives here, in the one place that
+    // compares the two renderings against each other.
+    let (mut rows, mut structural, mut modal) = (Vec::new(), Vec::new(), Vec::new());
     for chunk in doc.split("{\"name\":\"").skip(1) {
         let Some((name, rest)) = chunk.split_once("\",") else {
             continue;
         };
+        if rest.starts_with("\"params\":") {
+            // A roster header closes the group before it.
+            rows.append(&mut structural);
+            rows.append(&mut modal);
+            continue;
+        }
         let Some(rest) = rest.strip_prefix("\"default\":") else {
             continue;
         };
         if rest.starts_with('"') {
             continue; // a structural key, whose default is written as a string
         }
-        let Some((head, _)) = rest.split_once(",\"doc\":") else {
+        let Some((head, tail)) = rest.split_once(",\"doc\":") else {
             continue;
         };
         let Some((default, range)) = head.split_once(",\"range\":") else {
             continue;
         };
-        rows.push((name.to_owned(), default.to_owned(), range.to_owned()));
+        let row = (name.to_owned(), default.to_owned(), range.to_owned());
+        // The `}` is what stops a doc line containing the phrase from counting.
+        if tail.contains("\"kind\":\"structural\"}") {
+            structural.push(row);
+        } else {
+            modal.push(row);
+        }
     }
+    rows.append(&mut structural);
+    rows.append(&mut modal);
     rows
 }
 

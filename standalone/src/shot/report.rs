@@ -17,7 +17,8 @@ use std::fmt::Write as _;
 use rlx_core::audio::AudioFormat;
 use rlx_core::dsp::{AnalysisFrame, Analyzer, HOP_SIZE, SPECTRUM_BINS};
 use rlx_core::preset::{
-    GateFlag, GateKind, Observations, Preset, SATURATED_OCCUPANCY, SystemKind, Variables,
+    Binding, GateFlag, GateKind, HoldEdge, Observations, Preset, SATURATED_OCCUPANCY, SystemKind,
+    Variables,
 };
 use rlx_core::render::metrics::{
     StepResponse, coverage, footprint_diff, frame_diff, mean_lit_level, quadrant_spread,
@@ -180,6 +181,27 @@ struct PresetReport {
     /// Gates this preset's expressions never exercised under the realistic
     /// probe — suspects, not convictions (see [`probe_reachability`]).
     gates: Vec<GateReport>,
+    /// The bindings this preset **holds** (ADR-0180 rule 2), with the edge each
+    /// re-samples on.
+    ///
+    /// Read beside the reactivity columns rather than folded into them. A held
+    /// binding names an audio variable and is evaluated every frame, so every
+    /// static reading here credits it as if the scene saw each frame's value —
+    /// and the scene may see one value a bar. Naming the hold is the whole of
+    /// the containment: it does not correct a number, it says which numbers to
+    /// read differently. Empty for every preset that declares no `[hold]`
+    /// table.
+    holds: Vec<HoldReport>,
+}
+
+/// One held binding, as the report names it.
+#[derive(Clone)]
+struct HoldReport {
+    /// The parameter, `[layer] `-prefixed inside a layer exactly as a gate's is.
+    param: String,
+    /// The edge, spelled as an author would write it: `beat`, `bar`, or a
+    /// number of seconds.
+    edge: String,
 }
 
 /// One flagged gate, together with the binding it came from.
@@ -247,7 +269,7 @@ fn build_family_report(
     r: &mut Renderer,
     system: SystemKind,
     names: &[String],
-    gates: &[(String, Vec<GateReport>)],
+    structural: &[(String, Structural)],
 ) -> Result<FamilyReport, String> {
     let silent = AnalysisFrame::default();
     let loud = AnalysisFrame::fully_driven();
@@ -322,6 +344,13 @@ fn build_family_report(
         // a single-quadrant frame is suspicious even at decent coverage.
         let _spread = quadrant_spread(&fixed, bg, COVERAGE_EPS);
 
+        // Both halves off one lookup: the gates and the holds came out of one
+        // walk over one binding set and are read back the same way.
+        let found = structural
+            .iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, s)| s.clone())
+            .unwrap_or_default();
         presets.push(PresetReport {
             name: name.clone(),
             reactivity,
@@ -342,11 +371,8 @@ fn build_family_report(
                 rise_settled: false,
                 fall_settled: false,
             }),
-            gates: gates
-                .iter()
-                .find(|(n, _)| n == name)
-                .map(|(_, g)| g.clone())
-                .unwrap_or_default(),
+            gates: found.gates,
+            holds: found.holds,
         });
         fixed_caps.push(fixed);
     }
@@ -625,7 +651,7 @@ fn reachability_frames() -> Result<Vec<AnalysisFrame>, String> {
 /// loop over a longer list, and a layer gate that never fires flags exactly
 /// like a top-level one. Layer entries are labeled `[layer] <param>` so the
 /// report says which namespace a dead gate lives in.
-fn probe_reachability(preset: &Preset, frames: &[AnalysisFrame]) -> Vec<GateReport> {
+fn probe_reachability(preset: &Preset, frames: &[AnalysisFrame]) -> Structural {
     let hop_seconds = HOP_SIZE as f32 / REACH_FORMAT.sample_rate as f32;
     let layer_bindings = preset
         .layer
@@ -636,8 +662,23 @@ fn probe_reachability(preset: &Preset, frames: &[AnalysisFrame]) -> Vec<GateRepo
         .iter()
         .map(|binding| (binding, false))
         .chain(layer_bindings.map(|binding| (binding, true)));
-    let mut out = Vec::new();
+    let mut out = Structural::default();
     for (binding, in_layer) in bindings {
+        let name = |binding: &Binding| {
+            if in_layer {
+                format!("[layer] {}", binding.name)
+            } else {
+                binding.name.clone()
+            }
+        };
+        // Read off the binding rather than measured: the edge is a fact about
+        // the preset, folded at load, and no stimulus is needed to see it.
+        if let Some(edge) = binding.hold {
+            out.holds.push(HoldReport {
+                param: name(binding),
+                edge: hold_edge_name(edge),
+            });
+        }
         let mut obs = Observations::new();
         for (hop, frame) in frames.iter().enumerate() {
             // Through the engine's own frame binding, so the probe cannot read
@@ -663,12 +704,8 @@ fn probe_reachability(preset: &Preset, frames: &[AnalysisFrame]) -> Vec<GateRepo
             }
         }
         for flag in binding.expr.flag_gates(&obs) {
-            out.push(GateReport {
-                param: if in_layer {
-                    format!("[layer] {}", binding.name)
-                } else {
-                    binding.name.clone()
-                },
+            out.gates.push(GateReport {
+                param: name(binding),
                 flag,
             });
         }
@@ -676,10 +713,32 @@ fn probe_reachability(preset: &Preset, frames: &[AnalysisFrame]) -> Vec<GateRepo
     out
 }
 
+/// A hold edge as an author writes it: the two words, or the period's own
+/// number of seconds — `HoldEdge::as_str` spells a period `seconds`, which is
+/// the kind rather than the value and would leave two different holds reading
+/// alike.
+fn hold_edge_name(edge: HoldEdge) -> String {
+    match edge {
+        HoldEdge::Period(seconds) => format!("{seconds} s"),
+        named => named.as_str().to_owned(),
+    }
+}
+
+/// What the structural pass found in one preset's compiled expressions.
+///
+/// One struct rather than two parallel lists keyed by preset name: they are
+/// produced by one walk over one binding set, and a second list threaded
+/// alongside is a list that can lose step with the first.
+#[derive(Default, Clone)]
+struct Structural {
+    gates: Vec<GateReport>,
+    holds: Vec<HoldReport>,
+}
+
 /// `(preset name, flagged gates)` for the whole library. Run **before** the
 /// renderer takes ownership of the presets — it reads their compiled
 /// expressions, which is the one thing a capture cannot show.
-fn reachability_pass(presets: &[Preset]) -> Result<Vec<(String, Vec<GateReport>)>, String> {
+fn reachability_pass(presets: &[Preset]) -> Result<Vec<(String, Structural)>, String> {
     let frames = reachability_frames()?;
     Ok(presets
         .iter()
@@ -694,6 +753,41 @@ fn reachability_pass(presets: &[Preset]) -> Result<Vec<(String, Vec<GateReport>)
 /// actionable. The count is per preset in the table, the worst few are named
 /// here, and `--json` carries every one.
 const CEILINGS_NAMED: usize = 3;
+
+/// The per-family holds block: every binding the engine re-samples on an edge
+/// rather than every frame (ADR-0180 rule 2), named one per line with its edge.
+///
+/// **This corrects no number, and that is deliberate.** Every column in the
+/// table above is a rendered measurement of the preset as it actually runs, so
+/// a hold is already inside them. What is not inside them is the static
+/// reading a person does over the same table — a binding that names `bass` is
+/// read as responding to bass, and a held one responds to bass once a bar.
+/// Naming the hold says which rows to read that way. This is containment for
+/// `[hold]`; it is not a fix for the report's blindness to counter-driven
+/// response (design-backlog 0192), which is a different and larger hole.
+///
+/// Silent for a family with no held binding, which is the whole shipped
+/// library: a line per family saying nothing happened is the noise the
+/// ceilings block already had to be summarized to avoid.
+fn write_holds(out: &mut String, fam: &FamilyReport) {
+    let held: Vec<(&str, &HoldReport)> = fam
+        .presets
+        .iter()
+        .flat_map(|p| p.holds.iter().map(move |h| (p.name.as_str(), h)))
+        .collect();
+    if held.is_empty() {
+        return;
+    }
+    let _ = writeln!(
+        out,
+        "  held bindings: the scene sees the value the named edge last took, not this \
+         frame's — so read the columns above as the response the hold allows, not as \
+         the expression's own"
+    );
+    for (name, hold) in &held {
+        let _ = writeln!(out, "  HELD: {name} {} on {}", hold.param, hold.edge);
+    }
+}
 
 /// The per-family saturation block: every `clamp()` that spent the run pinned
 /// at its upper bound, named one per line.
@@ -1230,6 +1324,7 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
                 let _ = writeln!(out, "{}", gate_line(name, gate));
             }
         }
+        write_holds(&mut out, fam);
         write_saturation(&mut out, fam);
         write_ceiling_summary(&mut out, fam);
 
@@ -1375,10 +1470,23 @@ fn json_reachability(p: &PresetReport) -> String {
     out.push_str(&format!(
         "{{\"probe\":{{\"signal\":\"dynamic\",\"bpm\":{},\"seconds\":{}}},\
          \"dead_branches\":{dead},\"unapproached_ceilings\":{ceilings},\
-         \"saturated_clamps\":{saturated},\"gates\":[",
+         \"saturated_clamps\":{saturated},\"holds\":[",
         num(REACH_BPM),
         num(REACH_SECS),
     ));
+    // Read off the compiled bindings, not measured — so unlike everything else
+    // in this object it carries no probe provenance.
+    for (i, hold) in p.holds.iter().enumerate() {
+        if i > 0 {
+            out.push(',');
+        }
+        out.push_str(&format!(
+            "{{\"param\":{},\"edge\":{}}}",
+            json_string(&hold.param),
+            json_string(&hold.edge)
+        ));
+    }
+    out.push_str("],\"gates\":[");
     for (i, gate) in p.gates.iter().enumerate() {
         if i > 0 {
             out.push(',');

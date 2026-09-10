@@ -7,11 +7,11 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0185.** *(0120 was reserved for
+**Next free number: 0186.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
-sidecar ADR renumbered to 0122 at its close. **0160 was then claimed twice as well**, on 2026-09-01 by Plan 0149's lane and on 2026-09-02 by Plan 0150 in the main checkout; 0160 stayed with Plan 0149, whose number is cited from Rust doc comments, and the rename ADR took 0162 at Plan 0149's close. **0181 was then claimed twice**, on 2026-09-10 by Plan 0165 in the main checkout and by Plan 0159's lane; 0181 stayed with Plan 0165, whose number is cited by bare number from `.github/workflows/ci.yml` and from `docs/design-backlog-archive.md`, which is append-only and closed, and the studio ADR renumbered to 0183. The sequence is dense again and nothing is held.)*
+sidecar ADR renumbered to 0122 at its close. **0160 was then claimed twice as well**, on 2026-09-01 by Plan 0149's lane and on 2026-09-02 by Plan 0150 in the main checkout; 0160 stayed with Plan 0149, whose number is cited from Rust doc comments, and the rename ADR took 0162 at Plan 0149's close. **0181 was then claimed twice**, on 2026-09-10 by Plan 0165 in the main checkout and by Plan 0159's lane; 0181 stayed with Plan 0165, whose number is cited by bare number from `.github/workflows/ci.yml` and from `docs/design-backlog-archive.md`, which is append-only and closed, and the studio ADR renumbered to 0183. **0183 was then claimed twice in turn**, on 2026-09-10 by Plan 0159's lane and by Plan 0166 in the main checkout; 0183 stayed with Plan 0159, whose ADR was written first that morning and is cited from [spec 0003](../specs/0003-studio-control-protocol.md), from [`docs/capturing.md`](../capturing.md) and from a live backlog probe naming its filename, and Plan 0166's translation ADR renumbered to 0185 at Plan 0159's close. The sequence is dense again and nothing is held.)*
 
 An index row is a pointer, not an abstract: the link, the title as the ADR body's `H1` writes it,
 and the status. `scripts/check-index-rows.mjs` holds every row below to 320 bytes
@@ -201,9 +201,10 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0177](0177-a-fourth-skill-lane-builds-the-studio.md) | A fourth skill lane, `studio-builder`, builds the studio and never touches the engine | proposed 2026-09-09 (Plan 0159), extends 0017 |
 | [0178](0178-the-studio-shell-conventions.md) | The studio shell conventions: three processes, a mirrored protocol, and the same security defaults as the sibling repository | proposed 2026-09-09 (Plan 0159) |
 | [0179](0179-a-precondition-is-checked-at-load-or-it-is-written-down.md) | A precondition on a figure is checked at load, or it is written down | proposed 2026-09-09 (Plan 0160), extends 0107, 0111 |
-| [0180](0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md) | A mathematical world joins a system as a family, and a structural parameter is quantized and held | proposed 2026-09-09 (Plans 0161-0164), extends 0007, 0015 |
-| [0181](0181-the-gate-compiles-every-feature-a-release-ships.md) | The per-push gate compiles every feature a release ships | proposed 2026-09-10 (Plan 0165) |
-| [0182](0182-a-plan-lane-may-live-inside-the-repository.md) | A plan lane may live inside the repository, and a tool that enumerates from git already knows it | proposed 2026-09-10 (Plan 0165), supplements 0053 |
+| [0180](0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md) | A mathematical world joins a system as a family, and a structural parameter is quantized and held | accepted 2026-09-10 (Plans 0161-0164), extends 0007, 0015, Outcome |
+| [0181](0181-the-gate-compiles-every-feature-a-release-ships.md) | The per-push gate compiles every feature a release ships | accepted 2026-09-10 (Plan 0165); Outcome |
+| [0182](0182-a-plan-lane-may-live-inside-the-repository.md) | A plan lane may live inside the repository, and a tool that enumerates from git already knows it | accepted 2026-09-10 (Plan 0165), supplements 0053 |
 | [0183](0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md) | The studio drives one player, and the show loop is extracted so every mode runs it | proposed 2026-09-10 (Plan 0159), revises 0175 |
 | [0184](0184-the-player-reports-what-it-loaded-and-the-studio-re-derives-nothing.md) | The player reports what it loaded, and the studio re-derives nothing | proposed 2026-09-10 (Plan 0159), extends 0176 |
+| [0185](0185-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md) | The documentation translates a slice, and a stamp makes staleness visible | proposed 2026-09-10 (Plan 0166), extends 0154, 0167 |
 <!-- roster:end -->
