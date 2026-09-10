@@ -3438,3 +3438,123 @@ fn the_schema_hash_is_stable_and_moves_with_the_document() {
          tell a studio its panels are stale"
     );
 }
+
+// ---------------------------------------------------------------------------
+// The system keys the document labels its rosters with (ADR-0184)
+// ---------------------------------------------------------------------------
+
+/// The label of every `systems[]` roster in the exported document, in order.
+///
+/// A roster is written `{"name":<label>,"params":[`, and a parameter inside one
+/// is written `{"name":<n>,"default":`, so the `"params":[` suffix is what tells
+/// the two apart without a JSON dependency. Only the `systems` half is read: the
+/// engine stages after it are labelled the same way and are not systems.
+fn schema_system_labels(doc: &str) -> Vec<String> {
+    let systems = doc
+        .split_once("\"systems\":[")
+        .expect("the document declares a systems array")
+        .1;
+    let systems = systems
+        .split_once("],\"stages\":[")
+        .expect("the systems array ends where the stages begin")
+        .0;
+    systems
+        .split("\"name\":\"")
+        .skip(1)
+        .filter_map(|rest| {
+            let (label, after) = rest.split_once('"')?;
+            after.starts_with(",\"params\":[").then(|| label.to_owned())
+        })
+        .collect()
+}
+
+/// Every system's **canonical key** labels a roster in the schema document, and
+/// the document labels no roster that is not one.
+///
+/// This is the lookup a parent process performs: it is told which system the
+/// active preset drives and finds that system's parameters in this document by
+/// that string. The two halves are asserted separately because they fail for
+/// different reasons — a key with no roster is a system a panel cannot be built
+/// for, and a roster with no key is a label nothing will ever ask for.
+///
+/// Asserted over **every** variant rather than a sample, because
+/// `SystemKind::as_str` and the scene's display name coincide on the systems
+/// whose names are one word and differ on the rest: a check that named only
+/// `swarm` or `attractor` would hold for either string (ADR-0184).
+#[test]
+fn every_system_key_labels_a_roster_in_the_schema_document() {
+    let document = rlx_core::preset::export::document();
+    let labels = schema_system_labels(&document);
+
+    assert_eq!(
+        labels.len(),
+        SystemKind::VARIANT_COUNT,
+        "the document labels {} system rosters and the engine declares {} \
+         systems:\n{labels:?}",
+        labels.len(),
+        SystemKind::VARIANT_COUNT
+    );
+    for kind in SystemKind::ALL {
+        assert!(
+            labels.iter().any(|label| label == kind.as_str()),
+            "no roster in the schema document is labelled `{}`, so a parent \
+             told the active preset drives it can build no panel; the document \
+             labels {labels:?}",
+            kind.as_str()
+        );
+    }
+    for label in &labels {
+        assert!(
+            SystemKind::from_name(label).is_some(),
+            "the document labels a roster `{label}`, which is not a system key \
+             any preset can write and nothing will ever look up"
+        );
+    }
+}
+
+/// What a system needs beyond its key before it will load.
+///
+/// Empty for every system that accepts its family default. The L-system is the
+/// one whose grammar has nothing to fall back on — there is no default axiom or
+/// rule set — so a preset for it has to bring the productions with it.
+fn bare_preset_extras(kind: SystemKind) -> &'static str {
+    match kind {
+        SystemKind::StarPattern => {
+            "[generator]\ntiling = \"none\"\nrings = [ { motif = \"circle\", count = 6, radius = 0.4, scale = 0.2 } ]\n"
+        }
+        SystemKind::LSystem => {
+            "[generator]\naxiom = \"F\"\nrules = { F = \"F[+F]F\" }\nangle_deg = 22\nmax_depth = 3\n"
+        }
+        _ => "",
+    }
+}
+
+/// A `system = "<key>"` preset, plus whatever that system requires, compiles for
+/// every system.
+///
+/// Not a schema property — a fixture guarantee. The spawned-process test in
+/// `standalone/tests/stream_show.rs` walks the whole roster by writing exactly
+/// these, and a system that needed a structural table to load would silently
+/// drop out of that walk as a `preset_error` rather than fail it.
+#[test]
+fn a_bare_system_preset_compiles_for_every_system() {
+    for kind in SystemKind::ALL {
+        let src = format!(
+            "name = \"{0}\"\nsystem = \"{0}\"\n{1}",
+            kind.as_str(),
+            bare_preset_extras(kind)
+        );
+        let preset = Preset::from_toml_str(&src)
+            .unwrap_or_else(|err| panic!("`{}` needs more than its key: {err}", kind.as_str()));
+        assert_eq!(
+            preset.system,
+            kind,
+            "`{}` loaded as another system",
+            kind.as_str()
+        );
+        assert!(
+            preset.source.is_none(),
+            "a preset compiled from a string knows no file to have come from"
+        );
+    }
+}

@@ -9,6 +9,7 @@
 
 use std::collections::BTreeMap;
 use std::fmt;
+use std::path::PathBuf;
 
 use serde::Deserialize;
 
@@ -207,6 +208,16 @@ pub struct Preset {
     pub name: String,
     /// Which built-in system this preset drives.
     pub system: SystemKind,
+    /// The absolute path this preset was read from, when it came from a
+    /// directory. `None` for the embedded set, which has no file on disk, and
+    /// for anything compiled straight from a string.
+    ///
+    /// Set by [`crate::preset::load_dir`] rather than here: `from_toml_str` is
+    /// handed source text and has no way to know where it came from, and a
+    /// caller that does know is the one that can say. A consumer that offers to
+    /// edit a preset needs this to be able to distinguish "not editable" from
+    /// "the write failed" (ADR-0184).
+    pub source: Option<PathBuf>,
     /// Parameter bindings, sorted by name for deterministic iteration.
     pub params: Vec<Binding>,
     /// The `[per_vertex]` table's bindings (Plan 0100 Phase 1): the warp mesh's

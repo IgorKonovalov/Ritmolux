@@ -34,7 +34,8 @@ use std::process::{Child, Command, Stdio};
 use std::sync::mpsc::Receiver;
 use std::time::Duration;
 
-use standalone::osc::decode::{Action, Name};
+use rlx_core::preset::SystemKind;
+use standalone::osc::decode::{Action, Name, Transport};
 
 /// A preset that compiles, so the directory the run is pointed at yields a
 /// roster rather than falling back to the embedded set.
@@ -319,4 +320,327 @@ fn a_headless_run_with_no_per_user_directory_keeps_the_embedded_set() {
         !roster.is_empty() && !roster[0].contains("\"names\":[]"),
         "the embedded set should still be the roster in:\n{stderr}"
     );
+}
+
+// ---------------------------------------------------------------------------
+// What the run says about what it loaded (ADR-0184)
+// ---------------------------------------------------------------------------
+
+/// What a system needs beyond its key before it will load — the same two
+/// exceptions `core/tests/preset.rs` names, which is where the claim that these
+/// are the only two is asserted.
+fn extras(kind: SystemKind) -> &'static str {
+    match kind {
+        SystemKind::StarPattern => {
+            "[generator]\ntiling = \"none\"\nrings = [ { motif = \"circle\", count = 6, radius = 0.4, scale = 0.2 } ]\n"
+        }
+        SystemKind::LSystem => {
+            "[generator]\naxiom = \"F\"\nrules = { F = \"F[+F]F\" }\nangle_deg = 22\nmax_depth = 3\n"
+        }
+        _ => "",
+    }
+}
+
+/// A string field's value, unescaped, or `None` when the key is absent or
+/// holds `null`.
+///
+/// Parsed by hand for `hello_control`'s reason: these are single scalars in a
+/// line this repository writes, and a test crate is not the place to take a JSON
+/// dependency for them. The unescaping is not decoration — every path on a
+/// Windows run arrives with each separator doubled, so a comparison against a
+/// `Path` fails on nothing but the escaping without it.
+fn field(line: &str, key: &str) -> Option<String> {
+    let rest = line.split_once(&format!("\"{key}\":"))?.1;
+    let mut out = String::new();
+    let mut chars = rest.strip_prefix('"')?.chars();
+    while let Some(c) = chars.next() {
+        match c {
+            '"' => return Some(out),
+            '\\' => out.push(chars.next()?),
+            c => out.push(c),
+        }
+    }
+    None
+}
+
+/// Whether the named key is present and holds `null`.
+///
+/// Distinct from `field(..).is_none()`, which is also true for a key that is not
+/// there at all: `null` is a value this contract promises, and a field that
+/// vanished instead would be a different break.
+fn is_null(line: &str, key: &str) -> bool {
+    line.split_once(&format!("\"{key}\":"))
+        .is_some_and(|(_, rest)| rest.starts_with("null"))
+}
+
+/// The system keys the **built binary's own** `--schema` document labels its
+/// parameter rosters with.
+///
+/// Taken from the same executable under test rather than from `rlx_core` in this
+/// process, so what is compared is what a parent would actually receive.
+fn schema_system_keys() -> Vec<String> {
+    let out = Command::new(env!("CARGO_BIN_EXE_ritmolux"))
+        .arg("--schema")
+        .output()
+        .expect("run the binary with --schema");
+    assert!(out.status.success(), "--schema did not exit zero");
+    let doc = String::from_utf8(out.stdout).expect("the schema document is UTF-8");
+    let systems = doc
+        .split_once("\"systems\":[")
+        .expect("the document declares a systems array")
+        .1
+        .split_once("],\"stages\":[")
+        .expect("the systems array ends where the stages begin")
+        .0;
+    systems
+        .split("\"name\":\"")
+        .skip(1)
+        .filter_map(|rest| {
+            let (label, after) = rest.split_once('"')?;
+            after.starts_with(",\"params\":[").then(|| label.to_owned())
+        })
+        .collect()
+}
+
+/// Stop the child now and hand back its standard error, or `None` when the
+/// runner cannot run this mode.
+///
+/// The counterpart to `finish` for a test that has seen everything it came for:
+/// a walk over the whole system roster is done when the last preset is on
+/// screen, and sizing `--frames` to cover it would make the test pay for the
+/// slowest plausible runner on every run.
+fn stop(
+    mut child: Child,
+    drain: std::thread::JoinHandle<()>,
+    collector: std::thread::JoinHandle<String>,
+) -> Option<String> {
+    let _ = child.kill();
+    let _ = child.wait();
+    drain.join().expect("the drain thread did not panic");
+    let stderr = collector.join().expect("the collector did not panic");
+    if let Some(reason) = unrunnable(&stderr) {
+        eprintln!("skipped: {reason}");
+        return None;
+    }
+    Some(stderr)
+}
+
+/// The `preset` event names the system by the key the schema labels that
+/// system's parameter roster with — for **every** system, not for one.
+///
+/// The whole roster rather than a sample, because the canonical key and the
+/// scene's display name are the same string for the systems whose names are one
+/// word and different for the rest: a check that named only `swarm` or
+/// `attractor` would pass against either accessor, and the panel a parent builds
+/// from the display name would find no parameters for two systems in three.
+///
+/// One process walks the roster over the control channel: rotation is held
+/// first, so nothing but this test moves the show, and each step waits for the
+/// `preset` event that says the dissolve finished before asking for the next.
+#[test]
+fn every_system_is_reported_by_the_key_the_schema_labels_its_roster_with() {
+    let dir = scratch("system-keys");
+    for kind in SystemKind::ALL {
+        let key = kind.as_str();
+        std::fs::write(
+            dir.join(format!("{key}.toml")),
+            format!("name = \"{key}\"\nsystem = \"{key}\"\n{}", extras(kind)),
+        )
+        .expect("write one preset per system");
+    }
+
+    let (mut child, drain) = spawn(&dir, &["--frames", "9000", "--control", "127.0.0.1:0"]);
+    let (collector, rx) = watch(&mut child);
+
+    let mut seen: Vec<(String, String)> = Vec::new();
+    if let Some(target) = wait_for(&rx, hello_control) {
+        let socket = UdpSocket::bind("127.0.0.1:0").expect("bind the sender");
+        let mut buf = Vec::new();
+        // Rotation off first: the director would otherwise move the show
+        // underneath the walk and the events would not line up with the asks.
+        Action::Transport(Transport::Hold).encode(&mut buf);
+        socket
+            .send_to(&buf, target)
+            .expect("send ctl/transport hold");
+
+        for kind in SystemKind::ALL {
+            let key = kind.as_str();
+            Action::Preset {
+                name: Name::new(key).expect("a system key inside the inline cap"),
+            }
+            .encode(&mut buf);
+            socket.send_to(&buf, target).expect("send ctl/preset");
+            let line = wait_for(&rx, |line| {
+                (is_event(line, "preset") && field(line, "name").as_deref() == Some(key))
+                    .then(|| line.to_owned())
+            });
+            let Some(line) = line else { break };
+            seen.push((
+                key.to_owned(),
+                field(&line, "system").unwrap_or_else(|| panic!("no system field on: {line}")),
+            ));
+        }
+    }
+    let Some(stderr) = stop(child, drain, collector) else {
+        return;
+    };
+
+    let keys = schema_system_keys();
+    assert_eq!(
+        seen.len(),
+        SystemKind::VARIANT_COUNT,
+        "the walk reported {} of {} systems; it stops at the first preset that \
+         never reaches the screen:\n{stderr}",
+        seen.len(),
+        SystemKind::VARIANT_COUNT
+    );
+    for (asked, reported) in &seen {
+        assert_eq!(
+            reported, asked,
+            "the show was dissolved to the preset whose only system is \
+             `{asked}` and the event called it `{reported}` — the display name \
+             for that system, not the key"
+        );
+        assert!(
+            keys.iter().any(|key| key == reported),
+            "`{reported}` labels no roster in the schema document this binary \
+             prints, so a parent told it cannot find that system's parameters; \
+             the document labels {keys:?}"
+        );
+    }
+}
+
+/// The `roster` event names the directory the run loaded and watches, and the
+/// `preset` event names the file the preset on screen came from.
+///
+/// The directory is checked against the **human** line the same load prints, not
+/// only against what the test asked for: the two come from one value, and a
+/// structured field that agreed with the test's own input while disagreeing with
+/// the run's own diagnostic would be reporting the request rather than the fact.
+#[test]
+fn the_roster_names_the_directory_and_the_preset_names_its_file() {
+    let dir = scratch("directory");
+    std::fs::write(dir.join("probe.toml"), GOOD).expect("write the good preset");
+
+    let (mut child, drain) = spawn(&dir, &["--frames", "300"]);
+    let (collector, rx) = watch(&mut child);
+    let seen = wait_for(&rx, |line| {
+        (is_event(line, "preset") && field(line, "name").as_deref() == Some("Show Probe"))
+            .then(|| line.to_owned())
+    });
+    let Some(stderr) = stop(child, drain, collector) else {
+        return;
+    };
+    let preset = seen.expect("the run never reported a preset on screen");
+
+    let roster = events(&stderr, "roster");
+    let reported_dir = roster
+        .first()
+        .and_then(|line| field(line, "dir"))
+        .unwrap_or_else(|| panic!("the roster carried no directory in:\n{stderr}"));
+
+    let printed = stderr
+        .lines()
+        .find_map(|line| line.split_once("preset(s) from "))
+        .map(|(_, dir)| dir.to_owned())
+        .unwrap_or_else(|| panic!("the run printed no load line in:\n{stderr}"));
+    assert_eq!(
+        reported_dir, printed,
+        "the roster's directory and the line the same load printed disagree, so \
+         one of them is not the directory the watcher polls"
+    );
+
+    let expected = std::path::absolute(&dir).expect("absolute scratch path");
+    assert_eq!(
+        Path::new(&reported_dir),
+        expected.as_path(),
+        "the roster named a directory this test did not point the run at"
+    );
+
+    let file =
+        field(&preset, "file").unwrap_or_else(|| panic!("the preset carried no file: {preset}"));
+    assert_eq!(
+        Path::new(&file),
+        expected.join("probe.toml").as_path(),
+        "the preset named a file it was not read from"
+    );
+    assert!(
+        Path::new(&file).is_absolute() && Path::new(&reported_dir).is_absolute(),
+        "a relative path is unusable to a parent process, which does not share \
+         this run's working directory: {reported_dir} / {file}"
+    );
+}
+
+/// A run on the embedded set reports a `null` file and a `null` directory.
+///
+/// The arm a parent offering to edit the preset on screen branches on: the
+/// embedded set has no file on disk and there is nowhere the watcher is looking,
+/// and both have to be sayable. `0`-like stand-ins — an empty string, an omitted
+/// key — would each read as an editable path pointing at the wrong place.
+#[test]
+fn the_embedded_set_reports_no_file_and_no_directory() {
+    let (mut child, drain) = spawn(Path::new(""), &["--frames", "60"]);
+    let (collector, rx) = watch(&mut child);
+    let seen = wait_for(&rx, |line| {
+        is_event(line, "preset").then(|| line.to_owned())
+    });
+    let Some(stderr) = stop(child, drain, collector) else {
+        return;
+    };
+
+    let roster = events(&stderr, "roster");
+    let roster = roster
+        .first()
+        .unwrap_or_else(|| panic!("the run produced no roster in:\n{stderr}"));
+    assert!(
+        is_null(roster, "dir"),
+        "an unresolved directory should be reported as null, not omitted and \
+         not as a path: {roster}"
+    );
+    assert!(
+        !roster.contains("\"names\":[]"),
+        "the embedded set should still be the roster: {roster}"
+    );
+
+    let preset = seen.expect("the run never reported a preset on screen");
+    assert!(
+        is_null(&preset, "file"),
+        "an embedded preset has no file and should say so as null: {preset}"
+    );
+    assert!(
+        field(&preset, "system").is_some_and(|system| !system.is_empty()),
+        "the system is known whether or not the preset has a file: {preset}"
+    );
+}
+
+/// A headless run reports `null` preview counters.
+///
+/// There is no preview pipe on this path — the headless sink writes the frames
+/// itself and blocks rather than dropping — so there is no producer-side loss to
+/// report. `null` says that; `0` would claim a preview that lost nothing, which
+/// is the reading ADR-0184 exists to stop the studio from making.
+#[test]
+fn a_headless_run_reports_no_preview_counters() {
+    let dir = scratch("preview-counters");
+    std::fs::write(dir.join("probe.toml"), GOOD).expect("write the good preset");
+
+    // `health` is emitted once a second while frames are drawn, so the run has
+    // to outlive one interval: 90 frames at 30 fps is three.
+    let (mut child, drain) = spawn(&dir, &["--frames", "90"]);
+    let (collector, _rx) = watch(&mut child);
+    let Some(stderr) = finish(child, drain, collector) else {
+        return;
+    };
+
+    let health = events(&stderr, "health");
+    assert!(
+        !health.is_empty(),
+        "the run drew frames for three health intervals and reported none:\n{stderr}"
+    );
+    for line in &health {
+        assert!(
+            is_null(line, "preview_sent") && is_null(line, "preview_dropped"),
+            "a run with no preview pipe should report both counters as null: {line}"
+        );
+    }
 }

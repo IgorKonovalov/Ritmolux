@@ -191,7 +191,16 @@ impl Show {
             .preset_names()
             .position(|candidate| candidate == name)
             .unwrap_or(0);
-        events.emit(&Event::Preset { name, index });
+        events.emit(&Event::Preset {
+            name,
+            index,
+            // The schema's key, never the scene's display name: the two coincide
+            // on the four one-word systems and differ on every other, so a
+            // parent resolving a parameter roster from the display name finds
+            // nothing for most of them.
+            system: renderer.active_system_key(),
+            file: renderer.active_preset_source(),
+        });
         self.reported_preset = name.to_owned();
     }
 
@@ -201,7 +210,17 @@ impl Show {
     /// or hidden player goes quiet: a parent watching this stream reads silence
     /// as "no frames", which is the fact it wants and which a timer that kept
     /// ticking would hide.
-    pub(crate) fn report_health(&mut self, renderer: &Renderer, now: Instant) {
+    /// `preview` is the preview pipe's `(sent, dropped)` totals, or `None` when
+    /// no preview pipe is open. The caller supplies them because the pipe
+    /// belongs to whichever path opened it, and only the producer can say how
+    /// many frames it made: a reader downstream sees what arrived and cannot
+    /// see what was never sent.
+    pub(crate) fn report_health(
+        &mut self,
+        renderer: &Renderer,
+        now: Instant,
+        preview: Option<(u64, u64)>,
+    ) {
         let Some(events) = self.events.as_mut() else {
             return;
         };
@@ -221,6 +240,8 @@ impl Show {
             ctl_rejected: rejected,
             ctl_dropped: dropped,
             ctl_refused: refused,
+            preview_sent: preview.map(|(sent, _)| sent),
+            preview_dropped: preview.map(|(_, dropped)| dropped),
         });
     }
 

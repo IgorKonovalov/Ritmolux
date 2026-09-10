@@ -985,12 +985,47 @@ impl Renderer {
 
     /// Name of the built-in system the active preset drives (e.g. the frontend
     /// shows it next to the preset name).
+    ///
+    /// This is the scene's **display** string — `"fragment field"`, with a
+    /// space. It is not the key anything looks a system up by; see
+    /// [`Renderer::active_system_key`], which is a different string for every
+    /// system whose name is more than one word.
     pub fn active_system_name(&self) -> &'static str {
         self.roster
             .active_preset()
             .and_then(|p| scene_for(&self.scenes, p.system))
             .map(|scene| scene.name())
             .unwrap_or("")
+    }
+
+    /// The **canonical key** of the system the active preset drives —
+    /// `"fragment_field"`, the exact string a preset writes in its `system`
+    /// field and the schema export labels that system's parameter roster with.
+    ///
+    /// Distinct from [`Renderer::active_system_name`] and not interchangeable
+    /// with it: the two coincide on the four systems whose names are one word
+    /// (`swarm`, `spectrum`, `emitter`, `attractor`) and differ on every other,
+    /// so code that resolves a schema roster from the display name works for a
+    /// quarter of the systems and silently finds nothing for the rest. Anything
+    /// keyed by system takes this one (ADR-0184).
+    ///
+    /// `""` on an empty roster, matching its sibling.
+    pub fn active_system_key(&self) -> &'static str {
+        self.roster
+            .active_preset()
+            .map(|p| p.system.as_str())
+            .unwrap_or("")
+    }
+
+    /// The file the active preset was read from, or `None` when it came from
+    /// the embedded set and has no file on disk.
+    ///
+    /// Absolute, as [`crate::preset::load_dir`] recorded it, so a consumer in
+    /// another process can act on it.
+    pub fn active_preset_source(&self) -> Option<&std::path::Path> {
+        self.roster
+            .active_preset()
+            .and_then(|p| p.source.as_deref())
     }
 
     /// The segment-cap truncation from the active preset's last `configure`, if

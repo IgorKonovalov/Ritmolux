@@ -387,7 +387,7 @@ export type PlayerEvent =
 | 2 — The protocol is typed once | studio-builder | done | `d80b7a4` |
 | 3 — The show loop is extracted | dev | done | `163b330` |
 | 4 — The studio drives the one player | studio-builder | done | `97a6294` |
-| 5 — The player reports what it loaded | dev | not started | |
+| 5 — The player reports what it loaded | dev | done | committed with this row |
 | 6 — Parameters move | studio-builder | not started | |
 | 7 — Expressions and palettes | studio-builder | not started | |
 | 8 — Composition and the library | studio-builder | not started | |
@@ -404,11 +404,8 @@ Phase 5 renders "a panel for the active preset's system" and writes "the preset
 file atomically into the directory the player watches". The event roster carries
 neither:
 
-| Needed | What the roster gives |
-|---|---|
-| The active preset's **system**, to pick the `ParamSpec` rows | `preset` carries `name` and `index` only, and `--schema` is keyed by system |
-| The active preset's **file**, to edit it | no event carries one, except `preset_error` and `preset_warning`, which carry one only when a file failed |
-| The **preset directory** the player watches | nothing carries it; the player prints it as a human diagnostic and shows it in the settings menu |
+the system, the file and the directory. (The table that stood here is
+reproduced in ADR-0184's Context, which is now where it lives.)
 
 The spec's own invariants already name the missing concept — *"a parameter the
 active preset's system claims"* — so the contract knows about the system and the
@@ -441,6 +438,35 @@ see it.
 > ADR is now **0183**. Every phase from the parameter panel down is renumbered by
 > one, so **the numbers in the notes below are the ones the plan carried when each
 > note was written** — this note's Phase 5 is now Phase 6, the on-device check 11.
+
+**Phase 5 — three things outside what the phase names, and one done-when a
+test does not reach.**
+
+- `standalone/src/app_state.rs` is touched and the phase's file list does not
+  name it: the windowed path owns the `PreviewPipe`, so it is the caller that
+  can hand `report_health` the totals.
+- **`roster`'s `dir` is absolute, and making it so changed an operator-visible
+  line.** ADR-0184 says `preset.file` is absolute and says nothing about `dir`.
+  The override arm of `startup_preset_dir` now runs `std::path::absolute`
+  before it prints, so the `RLX_PRESET_DIR set: ...` notice, the settings row
+  and the event name one path; a relative override reached the event verbatim
+  before, unusable to a parent with its own working directory.
+- `studio/shared/protocol.ts` and its spec test are in the phase's file list
+  and were **not** touched, on the user's direction at the session's start:
+  they are `studio-builder`'s, and the Zod widening and the field-diff test
+  open Phase 6. Nothing goes red between — the existing spec-diff test compares
+  `ev` names, which did not move.
+- **The windowed half of the preview-counter done-when has no test.** A
+  `PreviewPipe` exists only on the windowed path, so a stalled reader raising
+  `preview_dropped` needs a window, which is Phase 11. Covered instead: the
+  `null` arm end to end in `a_headless_run_reports_no_preview_counters`, and
+  both arms of the rendering in the `events.rs` fixture.
+
+Two readings taken while verifying: swapping `active_system_key` for
+`active_system_name` fails the twelve-system walk on `fragment_field`
+(`left: "fragment field"`), so it discriminates the accessors rather than
+assuming them; and `star_pattern` and `lsystem` need more than their key to
+load, which `a_bare_system_preset_compiles_for_every_system` is what says.
 
 **Phase 4 — what the capture shows, and one done-when with no originator yet.**
 
@@ -542,13 +568,8 @@ What that leaves unmet is the half of each phase that needs the player to say or
 do anything. Phase numbers below are the ones this plan carried when the note was
 written; the renumber that followed makes them 5, 6 and 7:
 
-| Phase (then) | Done-when it cannot reach today |
-|---|---|
-| 3 → 5 | A drag moving the picture (no listener); a `preset_error` shown after a save (not emitted) |
-| 3 → 5 | Which system to render a panel for (the `preset` event is not emitted) |
-| 4 → 6 | Error markers placed from `preset_error` events (not emitted) |
-| 5 → 7 | The library view of the roster (the `roster` event is not emitted) |
-| 5 → 7 | A click dissolving the player to a preset (no listener) |
+(The table of unreachable done-whens that stood here is discharged: Phases 3,
+4 and 5 landed the listener, the watcher and the full roster.)
 
 The halves that do not depend on it are untouched and buildable: `--schema`
 works and exports 59 KB covering every system's params with defaults, ranges and

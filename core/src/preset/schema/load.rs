@@ -291,6 +291,9 @@ impl Preset {
         Ok(Preset {
             name,
             system,
+            // The text this was compiled from does not say where it came from;
+            // `load_dir` fills this in for the presets it read off disk.
+            source: None,
             params,
             per_vertex,
             latches,

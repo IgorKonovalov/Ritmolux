@@ -118,8 +118,18 @@ pub fn load_dir(dir: &Path) -> LoadReport {
     for path in paths {
         match std::fs::read_to_string(&path) {
             Ok(src) => match Preset::from_toml_str(&src) {
-                Ok(preset) => {
+                Ok(mut preset) => {
                     warnings.extend(preset.warnings.iter().map(|w| (path.clone(), w.clone())));
+                    // Absolute, because the consumers that want it — an editor
+                    // that writes the file back, a report that names it — do not
+                    // share this process's working directory. `absolute` is
+                    // lexical: it prepends the cwd and normalizes, touching no
+                    // filesystem and, unlike `canonicalize`, producing no `\?\`
+                    // prefix on Windows for a path that then has to be handed to
+                    // another program. A cwd that cannot be read leaves the path
+                    // as it was rather than dropping the preset (NFR 10).
+                    preset.source =
+                        Some(std::path::absolute(&path).unwrap_or_else(|_| path.clone()));
                     presets.push(preset);
                 }
                 Err(err) => errors.push((path, err)),

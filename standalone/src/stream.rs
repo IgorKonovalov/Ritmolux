@@ -864,7 +864,10 @@ pub fn run(
         // The structured stream, after the frame that produced the figures it
         // reports (ADR-0176). Both are no-ops without `--events`.
         show.report_active_preset(&renderer);
-        show.report_health(&renderer, done);
+        // No preview pipe on this path: the headless sink writes the frames
+        // itself and blocks rather than dropping, so there is no producer-side
+        // loss to report and `null` says so.
+        show.report_health(&renderer, done, None);
 
         if should_report(frames, REPORT_EVERY) {
             resident.sample();

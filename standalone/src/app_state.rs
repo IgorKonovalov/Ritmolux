@@ -1104,7 +1104,11 @@ impl AppState {
         // The structured stream, after the frame that produced the figures it
         // reports (ADR-0176). Both are no-ops without `--events`.
         self.show.report_active_preset(&self.renderer);
-        self.show.report_health(&self.renderer, now);
+        self.show.report_health(
+            &self.renderer,
+            now,
+            self.preview_pipe.as_ref().map(|pipe| pipe.totals()),
+        );
         // After the show's present, never before it and never inside it.
         //
         // The cadence is decided here rather than inside `present_console`,

@@ -68,11 +68,28 @@ pub enum Event<'a> {
         name: &'a str,
         /// Its absolute position in the roster.
         index: usize,
+        /// The **canonical key** of the system it drives — `fragment_field`,
+        /// the string the schema document labels that system's parameter roster
+        /// with, and not the scene's display name. A parent renders a panel by
+        /// looking this up (ADR-0184).
+        system: &'a str,
+        /// The file it was read from, absolute. `None` when it came from the
+        /// embedded set, which has no file on disk — and which is what a parent
+        /// offering to edit it has to be told, since "not editable" and "the
+        /// write failed" are different facts.
+        file: Option<&'a Path>,
     },
     /// The roster was replaced — on every reload, whatever changed.
     Roster {
         /// The preset names, in roster order.
         names: &'a [String],
+        /// The directory this reload read and the watcher polls. `None` when
+        /// none resolved and the embedded set is what is running.
+        ///
+        /// Carried here rather than on `hello` because `hello` is emitted before
+        /// the directory is resolved and must stay the first event; the catalog
+        /// event is the one that can say where the catalog came from.
+        dir: Option<&'a Path>,
     },
     /// A preset failed to load.
     PresetError {
@@ -110,6 +127,17 @@ pub enum Event<'a> {
         /// Parameter overrides the engine refused because nothing claims the
         /// name, since start.
         ctl_refused: u64,
+        /// Frames handed to the preview pipe's writer, since start. `None` when
+        /// no preview pipe is open.
+        ///
+        /// The producer's own count, which is the only honest one: a reader
+        /// downstream sees what arrived and has no way to see what was never
+        /// sent.
+        preview_sent: Option<u64>,
+        /// Frames the preview pipe dropped because its queue was full, since
+        /// start. `None` when no preview pipe is open — a different fact from
+        /// `0`, and reported differently for that reason.
+        preview_dropped: Option<u64>,
     },
     /// The geometry of the frame stream on standard output, sent once before the
     /// first frame.
@@ -173,12 +201,20 @@ impl Event<'_> {
                     None => out.push_str("null"),
                 }
             }
-            Event::Preset { name, index } => {
+            Event::Preset {
+                name,
+                index,
+                system,
+                file,
+            } => {
                 out.push_str(",\"name\":");
                 out.push_str(&json_string(name));
                 out.push_str(&format!(",\"index\":{index}"));
+                out.push_str(",\"system\":");
+                out.push_str(&json_string(system));
+                push_optional_path(&mut out, "file", *file);
             }
-            Event::Roster { names } => {
+            Event::Roster { names, dir } => {
                 out.push_str(",\"names\":[");
                 for (i, name) in names.iter().enumerate() {
                     if i > 0 {
@@ -187,6 +223,7 @@ impl Event<'_> {
                     out.push_str(&json_string(name));
                 }
                 out.push(']');
+                push_optional_path(&mut out, "dir", *dir);
             }
             Event::PresetError {
                 file,
@@ -220,6 +257,8 @@ impl Event<'_> {
                 ctl_rejected,
                 ctl_dropped,
                 ctl_refused,
+                preview_sent,
+                preview_dropped,
             } => {
                 out.push_str(&format!(
                     ",\"fps\":{},\"frame_ms_p50\":{},\"frame_ms_p99\":{},\
@@ -229,6 +268,8 @@ impl Event<'_> {
                     num(*frame_ms_p50),
                     num(*frame_ms_p99),
                 ));
+                push_optional_u64(&mut out, "preview_sent", *preview_sent);
+                push_optional_u64(&mut out, "preview_dropped", *preview_dropped);
             }
             Event::Stream {
                 width,
@@ -254,6 +295,29 @@ impl Event<'_> {
 /// `null` rather than omitting the key: a consumer reads a fixed shape, and
 /// "absent" and "the parser could not say" are the same fact here — where an
 /// omitted key would make it guess whether the field exists in this version.
+fn push_optional_path(out: &mut String, key: &str, value: Option<&Path>) {
+    out.push_str(",\"");
+    out.push_str(key);
+    out.push_str("\":");
+    match value {
+        Some(path) => out.push_str(&json_string(&path.display().to_string())),
+        None => out.push_str("null"),
+    }
+}
+
+/// A count that is a number when the thing counting it exists and `null` when it
+/// does not. "No preview pipe" and "a preview pipe that lost nothing" are
+/// different facts, and `0` would say the second for both.
+fn push_optional_u64(out: &mut String, key: &str, value: Option<u64>) {
+    out.push_str(",\"");
+    out.push_str(key);
+    out.push_str("\":");
+    match value {
+        Some(value) => out.push_str(&value.to_string()),
+        None => out.push_str("null"),
+    }
+}
+
 fn push_optional_u32(out: &mut String, key: &str, value: Option<u32>) {
     out.push_str(",\"");
     out.push_str(key);
@@ -357,6 +421,16 @@ mod tests {
             Event::Preset {
                 name: "aurora \"quoted\"",
                 index: 3,
+                system: "fragment_field",
+                file: Some(Path::new("C:\\presets\\aurora.toml")),
+            },
+            // The embedded set: a preset with no file, which is the arm a parent
+            // deciding whether to offer an edit branches on.
+            Event::Preset {
+                name: "Clifford",
+                index: 0,
+                system: "attractor",
+                file: None,
             },
             Event::PresetError {
                 file: Path::new("C:\\presets\\aurora.toml"),
@@ -383,6 +457,20 @@ mod tests {
                 ctl_rejected: 2,
                 ctl_dropped: 3,
                 ctl_refused: 4,
+                preview_sent: Some(631),
+                preview_dropped: Some(97),
+            },
+            // No preview pipe: the counters are `null` rather than `0`, which is
+            // a different claim.
+            Event::Health {
+                fps: 59.8,
+                frame_ms_p50: 4.1,
+                frame_ms_p99: 9.7,
+                ctl_rejected: 2,
+                ctl_dropped: 3,
+                ctl_refused: 4,
+                preview_sent: None,
+                preview_dropped: None,
             },
             Event::Stream {
                 width: 640,
@@ -506,6 +594,8 @@ mod tests {
         let event = Event::Preset {
             name: "a \"quoted\" \\ name",
             index: 0,
+            system: "swarm",
+            file: Some(Path::new("C:\\a \"quoted\" dir\\p.toml")),
         };
         let rendered = event.line();
         assert!(
@@ -516,6 +606,23 @@ mod tests {
             rendered.contains("\\\"quoted\\\""),
             "the quotes were not escaped: {rendered}"
         );
+
+        // The same escaping on the two path fields this event and `roster`
+        // gained: they go out through one helper, and a directory a user named
+        // is exactly as able to carry a quote as a preset is.
+        let names = ["one".to_owned()];
+        let roster = Event::Roster {
+            names: &names,
+            dir: Some(Path::new("C:\\a \"quoted\" dir")),
+        };
+        for event in [event, roster] {
+            let rendered = event.line();
+            assert!(
+                is_one_object(rendered.trim_end_matches('\n')),
+                "{}: an escaped path broke the object: {rendered}",
+                event.name()
+            );
+        }
     }
 
     /// A byte offset becomes the line and column an editor would put a cursor at.

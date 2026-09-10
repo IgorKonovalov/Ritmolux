@@ -46,11 +46,11 @@ Adding an event or a field is additive under the same `v`; changing or removing 
 | `ev` | Fields | When |
 |------|--------|------|
 | `hello` | `version`, `schema`, `control` | Once, before the first frame of any run |
-| `preset` | `name`, `index` | The preset **on screen** changed |
-| `roster` | `names` | Every preset reload |
+| `preset` | `name`, `index`, `system`, `file` | The preset **on screen** changed |
+| `roster` | `names`, `dir` | Every preset reload |
 | `preset_error` | `file`, `message`, `line`, `col`, `param` | A preset failed to load |
 | `preset_warning` | `file`, `message` | A preset loaded with a non-fatal problem |
-| `health` | `fps`, `frame_ms_p50`, `frame_ms_p99`, `ctl_rejected`, `ctl_dropped`, `ctl_refused` | Once a second while frames are drawn |
+| `health` | `fps`, `frame_ms_p50`, `frame_ms_p99`, `ctl_rejected`, `ctl_dropped`, `ctl_refused`, `preview_sent`, `preview_dropped` | Once a second while frames are drawn |
 | `stream` | `width`, `height`, `fps`, `format` | Once, before the first frame on a frame pipe |
 | `pong` | `nonce` | Answering a `ctl/ping` |
 
@@ -112,6 +112,26 @@ Adding an event or a field is additive under the same `v`; changing or removing 
 - `preset` MUST report the preset **on screen**, from one site, rather than from each of the six
   that can change it. A switch dissolves, so a site announcing its own would name the incoming
   preset a frame before it was drawn.
+- `preset`'s `system` MUST be the system's **canonical key** — the exact string a preset writes in
+  its own `system` field, and the string the schema document labels that system's parameter roster
+  with. It is not the scene's display name, which is a different string for every system whose name
+  is more than one word: a parent resolving a roster from the display name would find one for the
+  four one-word systems and none for the rest. ([ADR-0184](../adrs/0184-the-player-reports-what-it-loaded-and-the-studio-re-derives-nothing.md))
+- **Every fact about what the player loaded travels on this stream, and a parent re-derives none of
+  it.** `preset` carries the file, `roster` carries the directory, and both are **absolute**,
+  because the parent that acts on them does not share the run's working directory. A parent that
+  resolved the preset directory itself would hold a second copy of a rule that has an override, a
+  first-run seed and an unresolved case — and the failure mode is a studio editing files the player
+  is not watching, with both processes reporting success. (ADR-0184)
+- A path field MUST be `null` rather than an empty string when the thing it names does not exist:
+  `preset.file` for a preset from the embedded set, `roster.dir` for a run whose per-user directory
+  did not resolve. The two are different facts from any path, and a parent branches on them —
+  "there is nothing to edit" and "there is nowhere to save" are answers, not failures.
+- `health`'s `preview_sent` and `preview_dropped` MUST be the **producer's** running totals for the
+  preview pipe, and `null` when no pipe is open. A reader downstream sees what arrived and has no
+  way to see what was never sent, so a count taken there measures its own back-pressure and not
+  delivery. `null` rather than `0`: "no preview" and "a preview that lost nothing" are different
+  claims. (ADR-0184)
 - `preset_error` MUST carry the file and the message, and the line and column **whenever the TOML
   parser provides a span**. An expression error carries the parameter name instead: it is raised
   after the document was parsed into values that no longer carry a position, so it has no span, and
@@ -182,3 +202,11 @@ and it is here so a reader who wants the history has it in one place rather than
   needs to be able to state a position; and `hello` is the first *event* rather than the first
   *line*, because the port it reports cannot be known until the per-user directory has been
   migrated and the config read, and those steps have their own things to say.
+
+**Added 2026-09-10**, from one plan:
+
+- **[Plan 0159](../plans/0159-the-studio-opens.md) Phase 5** added the four fields the invariants
+  above govern, on ADR-0184's decision, after the studio stopped at a parameter panel it could not
+  render: the stream said which preset was on screen and neither which system it drove nor which
+  file it came from, and nothing said where the watcher was looking. Each field is read at a site
+  that already held the value, which is why none of them moved the version.

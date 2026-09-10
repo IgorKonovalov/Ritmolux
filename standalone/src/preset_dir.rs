@@ -29,6 +29,15 @@ pub(crate) const PRESET_POLL: Duration = Duration::from_millis(150);
 pub(crate) fn startup_preset_dir() -> PathBuf {
     match resolve_preset_dir() {
         PresetDir::Override(dir) => {
+            // Absolute before it is printed or reported, so the notice, the
+            // settings row and the `roster` event all name one path a reader
+            // can act on. An override may be given relative to the shell that
+            // launched the run, and a parent process editing presets does not
+            // share that working directory. `absolute` is lexical — no
+            // filesystem access, and none of `canonicalize`'s `\\?\` prefix,
+            // which is a path other programs handle badly. The default arm
+            // below comes from the OS data root and is absolute already.
+            let dir = std::path::absolute(&dir).unwrap_or(dir);
             eprintln!(
                 "{PRESET_DIR_ENV} set: reading presets from {}",
                 dir.display()
@@ -168,7 +177,14 @@ pub(crate) fn reload_presets(renderer: &mut Renderer, dir: &Path, events: Option
     // The roster on **every** reload, whatever changed: a studio's library view
     // is a list of names, and it has no other way to know one moved.
     let names: Vec<String> = renderer.preset_names().map(str::to_owned).collect();
-    events.emit(&Event::Roster { names: &names });
+    // The empty path is how an unresolved per-user directory travels through
+    // this module; on the wire it is `null`, because "the embedded set is what
+    // is running" and "the directory is the filesystem root" must not look alike
+    // to a parent deciding where to save a file.
+    events.emit(&Event::Roster {
+        names: &names,
+        dir: (!dir.as_os_str().is_empty()).then_some(dir),
+    });
     // No `preset` event here: the active preset is reported from what is
     // actually on screen, once per frame, rather than from each of the six sites
     // that can change it — see `AppState::report_active_preset`. A switch
