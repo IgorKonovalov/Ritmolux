@@ -989,13 +989,77 @@ impl SeededRng {
 
 #[cfg(test)]
 mod tests {
-    //! The scene-keying contract (Plan 0030 Phase 3). Test asserts panic freely;
-    //! this is not the render path.
+    //! The scene-keying contract (Plan 0030 Phase 3), and the parameter-kind
+    //! quantizer declared beside it. Test asserts panic freely; this is not the
+    //! render path.
     #![allow(clippy::panic)]
 
-    use super::create_all;
+    use super::{ParamKind, create_all};
     use crate::preset::SystemKind;
     use crate::render::context::{RenderContext, RenderError};
+
+    /// `Structural` rounds and `Modal` does not — the whole of what a kind
+    /// changes about a value.
+    ///
+    /// **Nothing else can see this work or fail.** The engine's `Structural`
+    /// roster is confined to parameters whose scene already clamps and rounds
+    /// the value itself, so `quantize` composes to the identity everywhere it
+    /// currently runs and no rendered assertion distinguishes it from being
+    /// absent (design-backlog 0197). This covers it directly instead.
+    #[test]
+    fn a_structural_kind_rounds_and_a_modal_one_hands_the_value_through() {
+        // Rust rounds a half AWAY FROM ZERO, and a scene indexing a closed
+        // roster with the result depends on which way 6.5 goes, so the
+        // direction is pinned here rather than assumed.
+        for (value, rounded) in [
+            (6.4_f32, 6.0_f32),
+            (6.5, 7.0),
+            (6.6, 7.0),
+            (-6.4, -6.0),
+            (-6.5, -7.0),
+            (3.0, 3.0),
+            (0.0, 0.0),
+        ] {
+            assert_eq!(
+                ParamKind::Structural.quantize(value),
+                rounded,
+                "Structural must round {value}"
+            );
+            assert_eq!(
+                ParamKind::Modal.quantize(value),
+                value,
+                "Modal must hand {value} through untouched"
+            );
+        }
+
+        // The property behind the table, over a sweep that lands on no integer
+        // by construction: a Structural value equals its own round, and
+        // quantizing it again moves nothing.
+        for i in -400..400 {
+            let value = i as f32 * 0.0137;
+            let q = ParamKind::Structural.quantize(value);
+            assert_eq!(q, q.round(), "Structural produced the non-integral {q}");
+            assert_eq!(
+                ParamKind::Structural.quantize(q),
+                q,
+                "quantizing an already-quantized {q} moved it"
+            );
+            assert_eq!(
+                ParamKind::Modal.quantize(value),
+                value,
+                "Modal moved {value}"
+            );
+        }
+
+        // A non-finite value survives, which is what the type's own doc claims:
+        // `f32::round` has no special case for one and neither does this.
+        assert!(ParamKind::Structural.quantize(f32::NAN).is_nan());
+        assert_eq!(ParamKind::Structural.quantize(f32::INFINITY), f32::INFINITY);
+        assert_eq!(
+            ParamKind::Structural.quantize(f32::NEG_INFINITY),
+            f32::NEG_INFINITY
+        );
+    }
 
     /// The scene each system is *supposed* to drive, written independently of the
     /// factory so the two can disagree. This is the mapping the old magic-index

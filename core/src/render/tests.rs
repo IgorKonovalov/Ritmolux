@@ -18,7 +18,7 @@ use crate::dsp::AnalysisFrame;
 use crate::preset::{Easing, HoldEdge, Latch, Preset, SystemKind, Variables, compile};
 use crate::render::metrics::frame_diff;
 use crate::render::post::{KALEIDOSCOPE, TRAILS};
-use crate::render::scenes::{declares, spec_names};
+use crate::render::scenes::{ParamKind, declares, spec_names};
 
 /// A minimal valid preset: a known system + explicit name, no params.
 fn preset(name: &str) -> Preset {
@@ -1297,6 +1297,60 @@ fn smoothing_eases_toward_the_held_value_not_the_raw_one() {
     assert!(
         first > 3.0 && first < 9.0,
         "the step to the newly held value must ease, got {first}"
+    );
+}
+
+/// A `Structural` parameter that is **also** smoothed reaches the scene as whole
+/// numbers, stepping through the intervening integers rather than landing
+/// fractionally (ADR-0180 rule 2).
+///
+/// That is the behaviour both `docs/presets.md` and `presets/README.md` promise
+/// an author, and it is the one thing a kind changes about a rendered value.
+///
+/// **The `Modal` run is the control, and it is what makes this a test rather
+/// than a coincidence.** The same easing, read through the other kind, has to
+/// produce a fractional value — without that, a smoother whose steps happened
+/// to land on integers would satisfy every assertion above it.
+#[test]
+fn a_smoothed_structural_binding_steps_through_whole_numbers() {
+    let dt = 1.0 / 60.0;
+    let tau = Easing::symmetric(0.2);
+    // Seed at 3 -- the first frame after a reset snaps -- then hold the target
+    // at 9 and read the travel through each kind in turn.
+    let travel = |kind: ParamKind| {
+        let mut smoother = ParamSmoother::default();
+        let seed = kind.quantize(smoother.smooth(0, 3.0, tau, dt));
+        let rest: Vec<f32> = (0..60)
+            .map(|_| kind.quantize(smoother.smooth(0, 9.0, tau, dt)))
+            .collect();
+        (seed, rest)
+    };
+
+    let (seed, structural) = travel(ParamKind::Structural);
+    assert_eq!(seed, 3.0, "the ease must start where it was seeded");
+    for value in &structural {
+        assert_eq!(
+            *value,
+            value.round(),
+            "a Structural parameter reached the scene as the fractional {value}"
+        );
+    }
+    assert_eq!(
+        structural.last().copied(),
+        Some(9.0),
+        "the ease must arrive at its target"
+    );
+    // It TRAVELS. A quantizer that snapped straight from 3 to 9 would satisfy
+    // every assertion above this one.
+    assert!(
+        structural.iter().any(|v| *v > 3.0 && *v < 9.0),
+        "the ease showed no intervening whole number: {structural:?}"
+    );
+
+    let (_, modal) = travel(ParamKind::Modal);
+    assert!(
+        modal.iter().any(|v| *v != v.round()),
+        "the control produced no fractional value, so this test proves nothing          about the quantizer"
     );
 }
 
