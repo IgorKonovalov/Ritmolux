@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0183.** *(0120 was reserved for
+**Next free number: 0184.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -204,4 +204,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0180](0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md) | A mathematical world joins a system as a family, and a structural parameter is quantized and held | accepted 2026-09-10 (Plans 0161-0164), extends 0007, 0015, Outcome |
 | [0181](0181-the-gate-compiles-every-feature-a-release-ships.md) | The per-push gate compiles every feature a release ships | accepted 2026-09-10 (Plan 0165); Outcome |
 | [0182](0182-a-plan-lane-may-live-inside-the-repository.md) | A plan lane may live inside the repository, and a tool that enumerates from git already knows it | accepted 2026-09-10 (Plan 0165), supplements 0053 |
+| [0183](0183-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md) | The documentation translates a slice, and a stamp makes staleness visible | proposed 2026-09-10 (Plan 0166), extends 0154, 0167 |
 <!-- roster:end -->
