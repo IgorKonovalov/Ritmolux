@@ -235,8 +235,8 @@ the smaller plan to resolve the larger one's workflow edits.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 0 — The index-rows gate enumerates from git | dev | done | committed with this row |
-| 1 — The gate compiles the `spout` feature | dev | not started | |
+| 0 — The index-rows gate enumerates from git | dev | done | `ea77920` |
+| 1 — The gate compiles the `spout` feature | dev | done | committed with this row |
 | 2 — A dispatch cannot publish | dev | not started | |
 | 3 — The missed version gets published | human | not started | |
 
