@@ -202,7 +202,7 @@ hand-edited.
 the one player), `bd037d4` (5, the player reports what it loaded), `ce70952` (6, parameters move),
 `658472f` (7, expressions and palettes), `6b85624` (8, composition and the library), `9a4410a`
 (9, the release job and the gate). Review: **no blockers, four majors, four minors.** Version:
-**0.114.0** (minor - a feature plan). ADR-0175 and 0176 were already accepted; 0177, 0178, 0183 and
+**0.115.0** (minor - a feature plan). ADR-0175 and 0176 were already accepted; 0177, 0178, 0183 and
 0184 accepted at this close.
 
 **Phases 10 and 11 did not run, and the plan closes owing them.** Both are `human` - the tester

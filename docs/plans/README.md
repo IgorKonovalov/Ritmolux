@@ -767,7 +767,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
-- [0159 — The studio opens](done/0159-the-studio-opens.md) — closed 2026-09-10. Review: **no blockers, four majors, four minors.** Version: **0.114.0**. ADR-0177 + 0178 + 0183 + 0184 accepted. **Phases 10-11 (`human`) unrun**, behind [backlog 0199-0201](../design-backlog.md). [Write-up](README-archive.md).
+- [0159 — The studio opens](done/0159-the-studio-opens.md) — closed 2026-09-10. Review: **no blockers, four majors, four minors.** Version: **0.115.0**. ADR-0177 + 0178 + 0183 + 0184 accepted. **Phases 10-11 (`human`) unrun**, behind [backlog 0199-0201](../design-backlog.md). [Write-up](README-archive.md).
 - [0161 — The structural parameter is held](done/0161-the-structural-parameter-is-held.md) — closed 2026-09-10. Review: **no blockers, one major, six minors.** Version: **0.114.0** (minor). ADR-0180 accepted with an Outcome. Filed [backlog 0197 + 0198](../design-backlog.md). [Write-up](README-archive.md).
 - [0165 — The release path stops being the first compile](done/0165-the-release-path-stops-being-the-first-compile.md) — closed 2026-09-10. Review: **no blockers, three majors, four minors.** Version: **none** (chore-only). ADR-0181 + ADR-0182 accepted. [Write-up](README-archive.md).
 - [0158 — The player grows a studio-facing surface](done/0158-the-player-grows-a-studio-facing-surface.md) — closed 2026-09-10. Review: **no blockers, two majors, six minors.** Version: **0.113.0**. ADR-0175 + 0176 accepted. Phase 7 open, on [on-device](../on-device-validation.md). [Write-up](README-archive.md).
