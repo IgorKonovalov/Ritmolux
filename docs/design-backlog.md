@@ -70,7 +70,6 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0191 — `evaluate_preset` advances the scene before it applies the preset's bindings, so the first frame after every switch integrates at the scene's defaults](#0191--evaluate_preset-advances-the-scene-before-it-applies-the-presets-bindings-so-the-first-frame-after-every-switch-integrates-at-the-scenes-defaults)
 - [0192 - `--report` cannot see a `beat_index`-driven response, so a deliberately musical preset measures as inert](#0192-----report-cannot-see-a-beat_index-driven-response-so-a-deliberately-musical-preset-measures-as-inert)
 - [0196 — most `v*` tags produce no Release run at all, and the cause Plan 0165 named cannot explain nineteen of them](#0196--most-v-tags-produce-no-release-run-at-all-and-the-cause-plan-0165-named-cannot-explain-nineteen-of-them)
-- [0197 — `ParamKind::quantize` is the mechanism ADR-0180 rule 2 exists for, and nothing tests it](#0197--paramkindquantize-is-the-mechanism-adr-0180-rule-2-exists-for-and-nothing-tests-it)
 - [0198 — `deposit_arms` tears along the branch cut at a fractional value, and nothing rounds it](#0198--deposit_arms-tears-along-the-branch-cut-at-a-fractional-value-and-nothing-rounds-it)
 <!-- toc:end -->
 
@@ -337,6 +336,7 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0193 | The `spout` feature is compiled for the first time by the job that publishes it | [ADR-0181](adrs/0181-the-gate-compiles-every-feature-a-release-ships.md) + [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md) Phase 1. Cost two releases, not one. **Closed 2026-09-10** |
 | 0194 | `release.yml` promises a dry run it cannot provide, because the publish gate reads the ref and not the event | [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md) Phase 2. The hazard was already realized once; see 0196. **Closed 2026-09-10** |
 | 0195 | `check-index-rows.mjs` is the one gate that never adopted the tracked-set enumeration | [ADR-0182](adrs/0182-a-plan-lane-may-live-inside-the-repository.md) + [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md) Phase 0. Both probes still pass. **Closed 2026-09-10** |
+| 0197 | `ParamKind::quantize` is the mechanism ADR-0180 rule 2 exists for, and nothing tests it | Two tests, verified by mutation. Filed and closed the same day, at [Plan 0161](plans/done/0161-the-structural-parameter-is-held.md)'s close. The wiring stays uncovered; see the body. **Closed 2026-09-10** |
 <!-- roster:end -->
 
 ## Open entries
@@ -3759,57 +3759,6 @@ eighteen. If no run appears, the inference is wrong outright and this entry is t
 and the project has been shipping from a release page that stopped at `v0.103.0` while the version
 reached `v0.113.0`. It becomes **High** the moment anyone outside the project is asked to download
 a build.
-
----
-
-## 0197 — `ParamKind::quantize` is the mechanism ADR-0180 rule 2 exists for, and nothing tests it
-
-`ParamKind::Structural` promises one thing: the value is rounded once, CPU-side, before the scene
-sees it (`core/src/render/scenes/mod.rs`). Three call sites reach it, all in
-`core/src/render/evaluate.rs` — the top-level binding loop, the layer's, and the layer's bindable
-`mix`. **No test asserts that it rounds anything**, at either the unit or the render level.
-
-The suite cannot notice, and this is structural rather than an oversight. Plan 0161 Phase 3's audit
-rule was deliberately narrow: mark `Structural` **only** where the scene already clamps and rounds
-the value itself, so the engine's rounding composes to the identity by construction. That rule is
-what made the phase safe — no golden moved — and it is also what makes all 27 marked rows blind to
-the mechanism. `round()` becoming `trunc()`, or the `.quantize(` call being dropped from
-`evaluate_layer`, passes 1691 tests.
-
-`declared_params_match_set_param`'s `STRUCTURAL` roster in `core/tests/preset.rs` guards **which**
-parameters are marked. That is a different claim from **marking does something**, and it is the only
-enforcement the field has.
-
-- **Raised:** 2026-09-10, at Plan 0161's Mode 4 close review.
-  **Owner if taken:** `dev` — this is a test, not a design question.
-- **Verified 2026-09-10** — the mechanism exists and is reached from the binding loop:
-  `present: quantize in: core/src/render/evaluate.rs`
-- **Verified 2026-09-10** — and the render-layer test module, which covers the hold and the
-  smoother beside it, never names it:
-  `absent: quantize in: core/src/render/tests.rs`
-
-### The finding
-
-The cost is not today's picture — it is the next three plans. Plans 0162, 0163 and 0164 are the
-first consumers where quantization actually bites: a Chladni mode number, an automaton rule index
-and a curve-family arm are integers the scene does **not** already round, so they will be the first
-rows where `Structural` changes behaviour rather than confirming it. They will be built on a path no
-test has ever exercised, and the plan that added the path is the one that could most cheaply have
-covered it.
-
-Both reader documents already promise the behaviour in prose — `docs/presets.md` and
-`presets/README.md` each state that a smoothed structural parameter *"walks through the intervening
-integers"*. That sentence is currently unbacked.
-
-**What a fix looks like:** a unit test on `ParamKind::quantize` over the two variants, plus one
-render-layer test extending `smoothing_eases_toward_the_held_value_not_the_raw_one` in
-`core/src/render/tests.rs` with a `Structural` binding eased from 3 toward 9, asserting every
-emitted value equals its own `round()`. Neither needs a GPU.
-
-### Priority
-
-**Medium.** Nothing renders wrong today, precisely because the audit chose rows where rounding is a
-no-op. It becomes **High** the moment 0162, 0163 or 0164 marks its first row where it is not.
 
 ---
 
