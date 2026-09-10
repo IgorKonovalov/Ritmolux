@@ -549,6 +549,35 @@ multiple of 4 bytes; and that `n` was equal across all fourteen, so no partial s
 reading is in the plan's `## Implementation log`. **It reaches everything on the app side of the
 socket and nothing on the binding side**, which is the half this item exists for.
 
+## Rig-gated - the studio-facing surface (Plan 0158 Phase 7)
+
+**Two things no gate in this repository can see: a real controller and a real show.** Extracted
+from Plan 0158 at that plan's close (2026-09-10) so the plan could close on its six completed
+`dev` phases without waiting on a projector session, exactly as every item above was.
+
+Nothing in CI sends a datagram from another *program* - the suite's loopback test is the player
+talking to itself - and nothing in CI watches a projector for ten minutes. The frame-time figures
+Plan 0158 Phase 6 recorded are a **debug build** on one machine over ~7 s, which is a shape rather
+than a reading; the number this item exists to produce is the release one, at the projector.
+
+- [ ] **Drive the player from a real OSC sender.** From TouchDesigner, or any sender on the same
+      machine, run `ritmolux --control 127.0.0.1:9000 --events` against a playing preset. Confirm
+      `ctl/param` moves a parameter and `ctl/preset` switches the preset, and that `health`'s
+      counters acknowledge it - `ctl_rejected` staying flat is the half that says the sender and
+      the decoder agree on the wire, not merely that something happened. The vocabulary is in
+      [the studio control protocol spec](specs/0003-studio-control-protocol.md); the flags are in
+      [Configuration](configuration.md).
+      _(Plan 0158 Phase 7, extracted at that plan's close 2026-09-10.)_
+- [ ] **Read the preview's real cost on the projector.** A windowed player on the projector with
+      `--preview stdout` piped to a file, playing a track for ten minutes. Confirm the preview
+      frames are visibly the show, then record the release-build `frame_ms` p50 and p99 from the
+      preview line **with the readback on and off** here. The debug-build pair to beat is
+      `p50 37.18 / p99 76.44` on and `p50 30.72 / p99 76.24` off - ~6.5 ms at the median and
+      nothing at the p99, on a build whose show already ran at 30 fps. **A run that delivers zero
+      frames is not a reading**: the frame count on the exit line is ADR-0172's witness that the
+      readback actually ran.
+      _(Plan 0158 Phase 7, extracted at that plan's close 2026-09-10.)_
+
 ## How to run
 
 From the repo root on the target box:

@@ -44,8 +44,7 @@ place. The plan file carries the real link.
 | [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | approved | dev, human | **A new Phase 1 fixes backlog 0102 + 0103 before anything advertises the component** — foobar's UI starves until playback starts. **Phases 4-6 unblocked, 0150 closed.** 0156 Phase 2 shortens the README first. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + **0174**: Art-Net to the fixtures, verified against `rlx-artnet-sim` because **the rig is unreachable**. Phases 1-8 need none; 9 is the rig session. Phase 8 hard-depends on 0115 Phase 2. |
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
-| [0158](0158-the-player-grows-a-studio-facing-surface.md) | The player grows a studio-facing surface | approved | dev, human | ADR-0175 + ADR-0176: override, OSC control-in, events, schema export, pipe sink, preview readback. **0159 needs Phases 1-5.** Touches `run.rs` beside 0133 and 0120: merge `main` first. |
-| [0159](0159-the-studio-opens.md) | The studio opens | approved | studio-builder, dev, human | ADR-0177 + ADR-0178: the Electron studio under `studio/`, first lane of its kind. **Hard dependency: 0158 Phases 1-5.** Two `human` gates at the end: a tester zip and the on-device check. |
+| [0159](0159-the-studio-opens.md) | The studio opens | approved | studio-builder, dev, human | ADR-0177 + ADR-0178: the Electron studio under `studio/`, first lane of its kind. **0158 closed 2026-09-10, so its dependency is met.** Two `human` gates at the end: a tester zip and the on-device check. |
 | [0160](0160-the-silhouettes-preconditions-stop-being-silent.md) | The silhouette's preconditions stop being silent | draft | dev, human | ADR-0179: four preconditions on `[path]` that fail silently. **0092 closed 2026-09-09**, so its Phase 7 axis fix is in. Phase 2 is prose in `presets/README.md`. |
 | [0161](0161-the-structural-parameter-is-held.md) | The structural parameter is held | draft | dev | ADR-0180 rules 2+4: a `[hold]` table and `ParamKind`. **The wave's prerequisite - 0162, 0163 and 0164 each want it.** Phase 3's audit can move a golden; that is a stop, not a re-bless. |
 | [0162](0162-the-curve-families.md) | The curve families | draft | dev | ADR-0180 rule 1: Lissajous, hypotrochoid, superformula and harmonograph as `CurveFamily` arms. The catalogue's #1 payoff-per-effort item since 2026-07-25. **Needs 0161.** |
@@ -53,16 +52,16 @@ place. The plan file carries the real link.
 | [0164](0164-the-cellular-system.md) | The cellular system | draft | dev | ADR-0180 rules 1+2: a 14th system on `PingPongField` - `life_like`, `larger_than_life`, `cyclic`, plus an age channel so the field paints history. Lenia placed, not built. **Needs 0161.** |
 <!-- roster:end -->
 
-**Added 2026-09-09 — [0158] and [0159] are drafted, and they are a program rather than a
-pair.** Four ADRs frame it: 0175 (the studio is a separate Electron application that never draws
-a frame), 0176 (the player is driven over OSC control-in and reports on its standard streams),
-0177 (a fourth lane, `studio-builder`, owns `studio/`), 0178 (the shell conventions, lifted from
-the sibling repository's ADR-0008 with the divergences named). The order is fixed by dependency:
-**0158 first, on the player**, then 0159 on the studio. Clip rendering, show projects and the
-diffusion pass from the studio are each a later plan with its own interview; ADR-0175 records the
-`render` subcommand decision that the first of those needs, and nothing has built it.
+~~**Added 2026-09-09 — [0158] and [0159] are drafted, and they are a program rather than a
+pair.**~~ — **half spent 2026-09-10**, when [0158] closed on its six `dev` phases and ADR-0175 and
+ADR-0176 were accepted. The dependency the note existed to fix is discharged: **[0159] is startable
+now**, and it is the studio's own lane rather than a plan waiting on the player. What is still live
+is the tail — clip rendering, show projects and the diffusion pass from the studio are each a later
+plan with its own interview, and ADR-0175's `render` subcommand decision is recorded with nothing
+built against it. The full note is in [README-archive.md](README-archive.md) under
+`## Prior sequencing notes (superseded)`.
 
-[0158]: 0158-the-player-grows-a-studio-facing-surface.md
+[0158]: done/0158-the-player-grows-a-studio-facing-surface.md
 [0159]: 0159-the-studio-opens.md
 [0161]: 0161-the-structural-parameter-is-held.md
 [0162]: 0162-the-curve-families.md
@@ -751,6 +750,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0158 — The player grows a studio-facing surface](done/0158-the-player-grows-a-studio-facing-surface.md) — closed 2026-09-10. Review: **no blockers, two majors, six minors.** Version: **0.113.0**. ADR-0175 + 0176 accepted. Phase 7 open, on [on-device](../on-device-validation.md). [Write-up](README-archive.md).
 - [0092 — The engine draws an authored path](done/0092-the-engine-draws-an-authored-path.md) — closed 2026-09-09. Review: **no blockers, one major, three minors, one nit.** Version: **0.112.0** (minor). ADR-0107 already accepted. `shape_maple` + `shape_lion` shipped. [Write-up](README-archive.md).
 - [0140 — Every rate integrates, for real](done/0140-every-rate-integrates-for-real.md) — closed 2026-09-08. Review: **no blockers, two majors, three minors, one nit.** Version: **0.111.1**. ADR-0152 + 0153 accepted. Archived [backlog 0149 + 0150](../design-backlog-archive.md). [Write-up](README-archive.md).
 - [0157 — The cost probes estimate a duration](done/0157-the-cost-probes-estimate-a-duration.md) — closed 2026-09-07. Review: **no blockers, no majors, two minors, one nit.** Version: **none** (no shipped artifact moved). ADR-0173 accepted. [Write-up](README-archive.md).

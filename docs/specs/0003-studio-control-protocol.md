@@ -163,7 +163,7 @@ and it is here so a reader who wants the history has it in one place rather than
 
 **Written 2026-09-09**, from one plan:
 
-- **[Plan 0158](../plans/0158-the-player-grows-a-studio-facing-surface.md)** built the listener,
+- **[Plan 0158](../plans/done/0158-the-player-grows-a-studio-facing-surface.md)** built the listener,
   the decoder and the bounded queue as its second phase, against ADR-0176's vocabulary table, and
   the event stream as its third. Two places the implementation is narrower than that ADR's prose,
   both on purpose and both recorded above as invariants: `auto`/`hold` are **positions** rather

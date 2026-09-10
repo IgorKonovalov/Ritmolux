@@ -1,14 +1,19 @@
 # 0158 — The player grows a studio-facing surface
 
-> **Status:** in-progress
+> **Status:** done - closed 2026-09-10. Six `dev` phases on `plan-0158-studio-facing-surface`
+> (`ab0ec26` -> `715a777`). Mode 4 review: **no blockers, two majors, six minors.** Full
+> suite re-run on the merged tip: 1672 passed, 6 skipped, 441 s; clippy and fmt clean; all
+> seven Node gates green. **Phase 7 stays open** and was extracted at the close to
+> [`docs/on-device-validation.md`](../../on-device-validation.md), which is where `human` work
+> that waits on hardware lives.
 > **Created:** 2026-09-09
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0175](../adrs/0175-the-studio-is-a-separate-application-that-never-draws-a-frame.md) (proposed),
-> [0176](../adrs/0176-the-player-is-driven-over-osc-control-in-and-reports-on-its-standard-streams.md) (proposed),
-> [0125](../adrs/0125-the-live-video-out-is-a-spout-sender-fed-by-a-frame-tap.md),
-> [0143](../adrs/0143-the-operator-console-is-a-second-surface-and-the-shell-owns-its-meaning.md),
-> [0164](../adrs/0164-the-osc-address-root-becomes-rlx-in-one-break.md),
-> [0170](../adrs/0170-a-parameters-reference-row-is-generated-from-the-declaration-the-engine-reads.md)
+> **Related ADRs:** [0175](../../adrs/0175-the-studio-is-a-separate-application-that-never-draws-a-frame.md) (accepted),
+> [0176](../../adrs/0176-the-player-is-driven-over-osc-control-in-and-reports-on-its-standard-streams.md) (accepted),
+> [0125](../../adrs/0125-the-live-video-out-is-a-spout-sender-fed-by-a-frame-tap.md),
+> [0143](../../adrs/0143-the-operator-console-is-a-second-surface-and-the-shell-owns-its-meaning.md),
+> [0164](../../adrs/0164-the-osc-address-root-becomes-rlx-in-one-break.md),
+> [0170](../../adrs/0170-a-parameters-reference-row-is-generated-from-the-declaration-the-engine-reads.md)
 
 ## TL;DR
 

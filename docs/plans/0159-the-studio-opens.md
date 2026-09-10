@@ -8,7 +8,7 @@
 > [0177](../adrs/0177-a-fourth-skill-lane-builds-the-studio.md) (proposed),
 > [0178](../adrs/0178-the-studio-shell-conventions.md) (proposed),
 > [0038](../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md)
-> **Depends on:** [0158](0158-the-player-grows-a-studio-facing-surface.md) Phases 1 to 5 landed
+> **Depends on:** [0158](done/0158-the-player-grows-a-studio-facing-surface.md) Phases 1 to 5 landed
 > (the override, the listener, the events, the schema, the pipe sink). Phase 6 of 0158 is not
 > required by anything here.
 

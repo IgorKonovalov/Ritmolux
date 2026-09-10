@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0158 - The player grows a studio-facing surface](#0158---the-player-grows-a-studio-facing-surface)
   - [0092 — The engine draws an authored path](#0092--the-engine-draws-an-authored-path)
   - [0140 — Every rate integrates, for real](#0140--every-rate-integrates-for-real)
   - [0157 — The cost probes estimate a duration](#0157--the-cost-probes-estimate-a-duration)
@@ -166,6 +167,7 @@ hand-edited.
   - [0002 — Rust enforcement tooling](#0002--rust-enforcement-tooling)
   - [0001 — Core + standalone MVP, then foobar parity](#0001--core--standalone-mvp-then-foobar-parity)
 - [Prior sequencing notes (superseded)](#prior-sequencing-notes-superseded)
+  - [Superseded 2026-09-10 by Plan 0158's close (was in `README.md`)](#superseded-2026-09-10-by-plan-0158s-close-was-in-readmemd)
   - [Moved 2026-09-09 from `README.md` — the 0087-stop-condition risk](#moved-2026-09-09-from-readmemd--the-0087-stop-condition-risk)
   - [Moved 2026-09-08 from `README.md` — the 0140/0125 contention note](#moved-2026-09-08-from-readmemd--the-01400125-contention-note)
   - [Moved 2026-09-07 from `README.md` - the 0157-is-drafted note](#moved-2026-09-07-from-readmemd---the-0157-is-drafted-note)
@@ -186,6 +188,81 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0158 - The player grows a studio-facing surface](done/0158-the-player-grows-a-studio-facing-surface.md)
+
+- closed 2026-09-10. Six `dev` phases in the `WORK/rlx-plan-0158` worktree on
+`plan-0158-studio-facing-surface`: `ab0ec26` (1, the in-place override and the rebinding reload),
+`b2d77ec` (2, the control-in socket), `fee2cfd` (3, the event stream), `d7bdee8` (4, the schema
+export), `efb99f7` (5, the pipe sink) and `715a777` (6, the preview readback). Review: **no
+blockers, two majors, six minors.** Version: **0.113.0** (minor). ADR-0175 and ADR-0176 accepted at
+this close; ADR-0177 and ADR-0178 stay `proposed`, paired with Plan 0159.
+
+**The gate was re-run on the merged tip rather than taken from the log, and it matched exactly**:
+1672 tests run, 1672 passed, 6 skipped in 441 s, with clippy `--workspace --all-targets -D warnings`
+and `fmt --check` clean and all seven Node gates green. Four of `dev`'s close-trigger claims were
+verified independently and all four held: the `core-cabi/` diff is empty, the `presets/` diff is
+empty, no platform or audio-source type entered `core/`, and no dependency was added anywhere - so
+Phase 4's *"no JSON crate"* is a property of the lockfile and not an assertion about intent.
+
+**The test work is the plan's real output, and two constructions are worth reusing.** Phase 1's
+override tests assert **pixels**: an override of `bg_bright = 0.8` is compared byte-for-byte against
+a control preset that *binds* 0.8, with a vacuity guard that fails if 0.2 and 0.8 render alike - so
+no accessor was invented and a green run cannot be a tautology. Phase 4's descriptor check reads its
+field roster off serde's own derived `deserialize_struct` through a `FieldProbe` deserializer, which
+makes *"a field added to a `Raw*` struct fails this test"* literally true rather than aspirational;
+its one hole - a table absent from `descriptor_pairs()` - is closed by a reachability walk asserting
+`reached.len() == descriptor_pairs().len()`. Nearly every grep-shaped scan in the plan carries an
+anti-vacuity assertion (`scanned > 20 && waits_seen > 0`, `total > 50`, `cases >= 32 * rows`) plus a
+bidirectional allowlist-staleness check, which is the direct answer to the *"a detector matching
+nothing exits 0"* failure this repository hit in `check-index-rows.mjs`.
+
+**One done-when could not discriminate, and the fault is the plan's.** Phase 1's second criterion
+asked for a test that the accumulated field survives a rebind. `reset_resources` is called only from
+`capture_api.rs:433` and `:505`; `set_presets` never cleared the field on either path, before this
+plan or after, so the test would have passed identically against the pre-plan engine. `dev`
+disclosed it and substituted the clause that *is* observable - the eased values, with a control arm
+(the same preset reloaded under a different name) and a `>10x` separation witness. That is the right
+repair, and the miss is an instance of the architect's own *do the arithmetic on every numeric
+done-when* rule going unapplied at authoring time.
+
+**The two majors were both outside the code.** `docs/on-device-validation.md` had not been swept,
+so Phase 7 - the only outstanding `human` gate - would have moved into `plans/done/` with no carrier;
+it was extracted at the close into a `## Rig-gated` section, carrying the debug-build pair
+(`p50 37.18 / p99 76.44` on, `p50 30.72 / p99 76.24` off) as the figure the release reading must
+beat, and ADR-0172's frame-count witness as the condition for a run to count as a reading at all.
+And `ab0ec26` carries `Co-Authored-By` and `Claude-Session` trailers that CLAUDE.md forbids; the
+other six phase commits are clean because `block-attribution-trailers.js` landed on `main`
+*mid-plan*. The user's call at the close was to accept it rather than rewrite history, since the
+no-rewrite rule wins and the hook now prevents recurrence - recorded here so the record shows it
+was caught rather than missed.
+
+**Two minors were fixed in the close commit rather than deferred.** The `wait_indefinitely` guard
+allowlisted by **file name**, and six `mod.rs` live under `core/src/render/`, so any of them could
+have grown a blocking wait in the display loop and passed; it now matches on the path relative to
+that root, and the tightening was proved non-vacuous by pointing one entry at the wrong path and
+watching it convict `scenes/particles/mod.rs`. Four assert messages carried raw newlines and
+ten-space runs where `
+\` continuations were intended, so they rendered mangled at exactly the
+moment someone reads them - `cargo fmt` never reformats literal contents, so nothing catches this
+class.
+
+**Three minors were left standing, deliberately.** Phase 5's stalled-reader done-when asked the run
+to resume at the correct frame index; the byte count is asserted exactly (30 frames, no drops - the
+substantive half), but the drift half rests on `elapsed < 20 s` against a nominal 1.5 s, ~13x
+headroom, which the test comment concedes is *"only sized to catch drift"*. Phase 2's fuzz criterion
+said *"each is counted as rejected"* and the test asserts a **majority** (`refused * 2 > cases`),
+correctly reasoning that a flipped byte inside a float yields a different *valid* message - right
+reasoning, but it belonged in the log's notes and was not there. And the implementation log runs 224
+lines against the plan's 152-line `## Implementation phases`, 1.47x: the report is not allowed to
+outweigh the contract.
+
+**One decision was routed to the architect and answered.** `docs/specs/0003-studio-control-protocol.md`
+is not in the site's `PUBLISHED` map while both its siblings are, so the published
+`docs/configuration.md` links out to a github blob URL for the protocol its own flags describe.
+`dev` correctly declined to decide it. It is worth publishing, but a new route must be reachable
+from the menu rather than only from search (`check-site-routes.mjs`), so it is a small follow-up
+with its own edit to `site/`, not a line added to a map.
 
 ### [0092 — The engine draws an authored path](done/0092-the-engine-draws-an-authored-path.md)
 
@@ -7553,6 +7630,20 @@ stays in `lmv-core`, and is out of the Miri job's scope, so the FFI pointer hand
 uncovered (its C side remains the Plan 0001 Phase-6 smoke program's job, per ADR-0003).
 
 ## Prior sequencing notes (superseded)
+
+### Superseded 2026-09-10 by Plan 0158's close (was in `README.md`)
+
+**Added 2026-09-09 — [0158] and [0159] are drafted, and they are a program rather than a
+pair.** Four ADRs frame it: 0175 (the studio is a separate Electron application that never draws
+a frame), 0176 (the player is driven over OSC control-in and reports on its standard streams),
+0177 (a fourth lane, `studio-builder`, owns `studio/`), 0178 (the shell conventions, lifted from
+the sibling repository's ADR-0008 with the divergences named). The order is fixed by dependency:
+**0158 first, on the player**, then 0159 on the studio. Clip rendering, show projects and the
+diffusion pass from the studio are each a later plan with its own interview; ADR-0175 records the
+`render` subcommand decision that the first of those needs, and nothing has built it.
+
+[0158]: done/0158-the-player-grows-a-studio-facing-surface.md
+[0159]: 0159-the-studio-opens.md
 
 ### Moved 2026-09-09 from `README.md` — the 0087-stop-condition risk
 
