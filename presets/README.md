@@ -507,6 +507,7 @@ here is the **definition**, and the essay is the **discussion**.
 | `pen` | `1` | `0` – `2` | How far the tracing point sits from the rolling circle's centre, in rolling radii: 1 draws cusps, less rounds them off, more throws them into loops. |
 | `sharpness` | `1` | `0.1` – `20` | How pointed the lobes are: low draws a spiky star, high rounds the figure toward a circle. |
 | `lobe` | `1` | `0.1` – `10` | How the lobes swell between their tips: low pinches them thin, high fills them into a polygon. |
+| `decay` | `0.1` | `0` – `0.5` | How fast the pendulums die away along the trace: 0 closes the figure, more spirals it inward. |
 | `samples` | `361` | `16` – `2048` | How many points the curve is drawn from; fewer reads as a polygon. Truncated, so a rise adds its next point on arrival. |
 | `thickness` | `2` | `0.5` – `12` | Stroke width in pixels at the render target, before softness widens the falloff. |
 | `hue` | `0.6` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. |

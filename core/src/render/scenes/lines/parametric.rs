@@ -60,6 +60,7 @@ const DEFAULT_PEN: f32 = default_of(PARAMS, "pen");
 const DEFAULT_SYM: f32 = default_of(PARAMS, "sym");
 const DEFAULT_SHARPNESS: f32 = default_of(PARAMS, "sharpness");
 const DEFAULT_LOBE: f32 = default_of(PARAMS, "lobe");
+const DEFAULT_DECAY: f32 = default_of(PARAMS, "decay");
 const DEFAULT_SAMPLES: f32 = default_of(PARAMS, "samples");
 const DEFAULT_THICKNESS: f32 = 2.0;
 const DEFAULT_HUE: f32 = 0.6;
@@ -142,6 +143,7 @@ pub struct ParametricCurveScene {
     sym: f32,
     sharpness: f32,
     lobe: f32,
+    decay: f32,
     samples: f32,
     thickness: f32,
     /// The shared palette knobs (ADR-0021).
@@ -212,6 +214,7 @@ impl ParametricCurveScene {
             sym: DEFAULT_SYM,
             sharpness: DEFAULT_SHARPNESS,
             lobe: DEFAULT_LOBE,
+            decay: DEFAULT_DECAY,
             samples: DEFAULT_SAMPLES,
             thickness: DEFAULT_THICKNESS,
             colour: common::PaletteParams::new(DEFAULT_HUE, DEFAULT_BRIGHTNESS),
@@ -420,6 +423,14 @@ pub const PARAMS: &[ParamSpec] = &[
         kind: ParamKind::Modal,
     },
     ParamSpec {
+        name: "decay",
+        default: 0.1,
+        range: Some([0.0, 0.5]),
+        doc: "How fast the pendulums die away along the trace: 0 closes the figure, more spirals \
+               it inward.",
+        kind: ParamKind::Modal,
+    },
+    ParamSpec {
         name: "samples",
         default: 361.0,
         range: Some([16.0, 2048.0]),
@@ -474,6 +485,7 @@ impl Scene for ParametricCurveScene {
         self.sym = DEFAULT_SYM;
         self.sharpness = DEFAULT_SHARPNESS;
         self.lobe = DEFAULT_LOBE;
+        self.decay = DEFAULT_DECAY;
         self.samples = DEFAULT_SAMPLES;
         self.thickness = DEFAULT_THICKNESS;
         self.colour.reset();
@@ -505,6 +517,7 @@ impl Scene for ParametricCurveScene {
             "sym" => self.sym = value,
             "sharpness" => self.sharpness = value,
             "lobe" => self.lobe = value,
+            "decay" => self.decay = value,
             "samples" => self.samples = value,
             "thickness" => self.thickness = value,
             "hue_spread" => self.hue_spread = value,
@@ -583,6 +596,7 @@ impl Scene for ParametricCurveScene {
                 sym: self.sym,
                 sharpness: self.sharpness,
                 lobe: self.lobe,
+                decay: self.decay,
             },
         };
 

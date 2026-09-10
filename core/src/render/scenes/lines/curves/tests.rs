@@ -1053,3 +1053,164 @@ fn sym_held_on_the_bar_changes_the_figure_once_a_bar() {
         "each bar must show the symmetry its own first frame evaluated to"
     );
 }
+
+/// A 3:2 harmonograph damped by `decay`, over 720 samples.
+fn harmonograph(decay: f32) -> CurveParams {
+    CurveParams {
+        n: 3.0,
+        d: 2.0,
+        samples: 720,
+        levers: Levers {
+            decay,
+            ..Levers::default()
+        },
+        ..rose()
+    }
+}
+
+/// Plan 0162 Phase 4's first done-when, both halves.
+///
+/// **`decay = 0` draws the closed Lissajous-like figure**: every sample is the
+/// undamped 3:2 figure's point at its `t`, and the walk closes into one G1
+/// chain. **A positive `decay` spirals it inward over the trace**: split the
+/// walk into its turns and each turn's outermost point sits strictly inside the
+/// one before, and the trace does not come back to its start.
+#[test]
+fn an_undamped_harmonograph_closes_and_a_damped_one_spirals_inward() {
+    let p = harmonograph(0.0);
+    let (fit, points, pieces) = walk_of(CurveFamily::Harmonograph, p);
+    assert!(fit.fitted && fit.closed, "an undamped 3:2 trace closes");
+    let step = std::f32::consts::TAU * HARMONOGRAPH_TURNS / p.samples as f32;
+    for (k, q) in points.iter().enumerate() {
+        let t = step * k as f32;
+        let want = [(3.0 * t).sin(), (2.0 * t).sin()];
+        assert!(
+            super::dist(*q, want) < 1e-4,
+            "sample {k} at {q:?} is off the undamped 3:2 figure's {want:?}"
+        );
+    }
+    assert_g1(&pieces, true, "undamped harmonograph");
+
+    let (fit, points, _) = walk_of(CurveFamily::Harmonograph, harmonograph(0.1));
+    assert!(fit.fitted, "a moderate decay still fits");
+    assert!(!fit.closed, "a damped trace never returns to its start");
+    let turn = points.len() / HARMONOGRAPH_TURNS as usize;
+    let reach: Vec<f32> = points
+        .chunks(turn)
+        .map(|chunk| chunk.iter().map(|q| dist(*q)).fold(0.0f32, f32::max))
+        .collect();
+    assert!(
+        reach.len() >= 4,
+        "the trace spans its four turns: {reach:?}"
+    );
+    for pair in reach.windows(2) {
+        assert!(
+            pair[1] < pair[0],
+            "each turn must reach less far than the one before: {reach:?}"
+        );
+    }
+    assert!(
+        reach[reach.len() - 1] < 0.5 * reach[0],
+        "decay 0.1 over four turns must pull the figure well inward: {reach:?}"
+    );
+}
+
+/// Plan 0162 Phase 4's second done-when: **the fitter is not handed a run of
+/// coincident points at a high `decay`.**
+///
+/// The verdict is read off the walk, so the property is stated over a sweep:
+/// whenever the arm takes the fit, the walk it hands over holds no chord
+/// shorter than `MIN_CHORD`. And the sweep is not vacuous at either end — a
+/// hard `decay` does collapse the trace and is declined, drawing the polyline
+/// over the same walk; a moderate one is fitted.
+#[test]
+fn a_hard_decay_declines_the_fit_rather_than_hand_it_coincident_points() {
+    let mut fitted = 0;
+    let mut declined = 0;
+    for step in 0..=20 {
+        let decay = step as f32 * 0.05;
+        let (fit, points, pieces) = walk_of(CurveFamily::Harmonograph, harmonograph(decay));
+        let shortest = shortest_chord(&points);
+        if fit.fitted {
+            fitted += 1;
+            assert!(
+                shortest >= MIN_CHORD,
+                "decay {decay}: the fit was handed a chord of {shortest}"
+            );
+            assert!(!pieces.is_empty());
+        } else {
+            declined += 1;
+            assert!(
+                pieces.is_empty(),
+                "decay {decay}: a declined fit left pieces"
+            );
+            let mut chords = Vec::new();
+            let p = harmonograph(decay);
+            (arm(CurveFamily::Harmonograph).polyline)(&p, &points, fit.closed, &mut chords);
+            assert!(!fit.closed, "decay {decay}: a damped trace never closes");
+            assert_eq!(
+                chords.len(),
+                points.len() - 1,
+                "decay {decay}: the declined walk draws as its chords"
+            );
+            assert!(
+                chords
+                    .iter()
+                    .all(|c| c.a.iter().chain(&c.b).all(|v| v.is_finite())),
+                "decay {decay}: a declined walk drew a non-finite chord"
+            );
+        }
+    }
+    let (hard, _, _) = walk_of(CurveFamily::Harmonograph, harmonograph(0.5));
+    assert!(
+        !hard.fitted,
+        "the top of decay's declared range collapses the trace and must decline"
+    );
+    assert!(
+        fitted > 0 && declined > 0,
+        "the sweep must cross the verdict: {fitted} fitted, {declined} declined"
+    );
+}
+
+/// Plan 0162 Phase 4's third done-when: **`draw_progress` sweeps the trace from
+/// start to end.** Each reveal is a prefix of the whole trace, it grows with
+/// the progress, and the drawing head moves inward along the spiral — the last
+/// point drawn at a later progress lies inside the damped envelope at that
+/// point of the trace.
+#[test]
+fn draw_progress_sweeps_the_harmonograph_from_start_to_end() {
+    let (_, whole, _) = walk_of(CurveFamily::Harmonograph, harmonograph(0.1));
+    let period = std::f32::consts::TAU * HARMONOGRAPH_TURNS;
+    let mut previous = 0;
+    for quarter in 1..=4 {
+        let progress = quarter as f32 * 0.25;
+        let (_, drawn, _) = walk_of(
+            CurveFamily::Harmonograph,
+            CurveParams {
+                draw_progress: progress,
+                ..harmonograph(0.1)
+            },
+        );
+        assert!(
+            drawn.len() > previous,
+            "progress {progress} drew no further"
+        );
+        previous = drawn.len();
+        for (k, q) in drawn.iter().enumerate() {
+            assert_eq!(
+                *q, whole[k],
+                "progress {progress}: sample {k} is not the whole trace's"
+            );
+        }
+        let head = dist(drawn[drawn.len() - 1]);
+        let envelope = (-0.1 * period * progress).exp() * std::f32::consts::SQRT_2;
+        assert!(
+            head <= envelope + 1e-5,
+            "progress {progress}: the head at radius {head} is outside the envelope {envelope}"
+        );
+    }
+    assert_eq!(
+        previous, 721,
+        "a full reveal of an open trace draws every sample and both ends"
+    );
+}

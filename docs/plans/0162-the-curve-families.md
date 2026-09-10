@@ -241,8 +241,8 @@ struct FamilySample {
 |---|---|---|---|
 | 1 — the family seam takes a second arm | dev | done | 997f7c5 |
 | 2 — hypotrochoid and epicycloid | dev | done | 1e23aef |
-| 3 — the superformula | dev | done | committed with this row |
-| 4 — the harmonograph | dev | not started | |
+| 3 — the superformula | dev | done | 792525a |
+| 4 — the harmonograph | dev | done | committed with this row |
 | 5 — per-family ranges in the reference | dev | not started | |
 | 6 — the documentation sweep | dev | not started | |
 
@@ -284,6 +284,17 @@ struct FamilySample {
 - Phase 3's `[hold]` done-when is tested without a GPU. The test loads a real preset, then runs its
   binding through the render layer's `ParamHold`, the binding's `kind.quantize`, and the sampler, and
   reads the lobe count off the walk. It does not go through `Renderer::evaluate`.
+- Phase 4 follows the plan's formula literally: `decay` damps per radian of `t`, `exp(-decay t)`. The
+  trace runs a fixed `HARMONOGRAPH_TURNS = 4` turns of `t` (a constant, not a parameter), so an
+  undamped closed figure is retraced four times. `decay` reads `0..0.5`; its default is `0.1`.
+- Phase 4's verdict declines the fit when the walk holds a chord shorter than `MIN_CHORD` (1/64 px at
+  1080p), or when more than `SMOOTH_CORNER_SHARE` of its vertices are corners. The declined walk draws
+  as chained chords. At 720 samples the verdict flips inside `decay`'s printed range, and the test
+  sweeps across that flip.
+- Phase 4 fixed a Phase 1 defect in `periodic_walk`: closure was tested on position alone, so any
+  trace that starts and ends at the origin was joined into a loop - which is every damped
+  harmonograph at `phase = 0`. Closure now also requires the point one step past the end to land on
+  sample 1, i.e. the trace is periodic.
 
 ### Close triggers
 

@@ -109,6 +109,9 @@ pub struct Levers {
     pub sharpness: f32,
     /// Superformula: `n2`, and `n3` before `d` skews it — how the lobes swell.
     pub lobe: f32,
+    /// Harmonograph: the pendulums' damping, per radian of `t` — the
+    /// amplitude at `t` is `exp(-decay * t)`.
+    pub decay: f32,
 }
 
 impl Default for Levers {
@@ -121,9 +124,32 @@ impl Default for Levers {
             sym: default_of(PARAMS, "sym"),
             sharpness: default_of(PARAMS, "sharpness"),
             lobe: default_of(PARAMS, "lobe"),
+            decay: default_of(PARAMS, "decay"),
         }
     }
 }
+
+/// How many turns of `t` a harmonograph trace runs — the length of the
+/// pendulums' swing the figure records.
+///
+/// A trace that closes (`decay = 0`, whole frequencies) retraces its one figure
+/// this many times; a damped one spends them spiralling inward. Four is enough
+/// turns for a moderate `decay` to shrink the figure to a fraction of its first
+/// swing without leaving a `samples`-point walk too coarse to fit.
+pub const HARMONOGRAPH_TURNS: f32 = 4.0;
+
+/// The largest `decay` the harmonograph honours. Past it the whole trace after
+/// its first few samples is inside a pixel of the centre.
+const MAX_DECAY: f32 = 16.0;
+
+/// The shortest chord a walk may hold and still be handed to the fit — a
+/// sixty-fourth of a pixel at 1080p.
+///
+/// Below it two samples are one point to anything that draws them, and the
+/// tangent the fit takes between them is `f32` rounding rather than the
+/// curve's. A damped harmonograph's inner turns shrink toward the centre until
+/// its samples land this close, which is where its verdict declines the fit.
+const MIN_CHORD: f32 = biarc::PIXEL_1080P / 64.0;
 
 /// The smallest radius ratio the hypotrochoid rolls at, whatever `n` asks for.
 ///
@@ -301,6 +327,22 @@ pub(crate) fn arm(family: CurveFamily) -> FamilyArm {
             fits: |_, _| true,
             polyline: polyline_of,
         },
+        CurveFamily::Harmonograph => FamilyArm {
+            sample: |p, points| {
+                let period = std::f32::consts::TAU * HARMONOGRAPH_TURNS;
+                periodic_walk(p, period, |t| harmonograph_point(p, t), points)
+            },
+            // **Read off the walk, not the family.** At `decay = 0` the trace
+            // is a Lissajous figure and a curve; at a hard `decay` its later
+            // turns collapse onto the centre faster than the samples follow
+            // them, and a walk holding two samples the fit cannot tell apart —
+            // or one that is mostly corners — is drawn as its chords instead.
+            fits: |_, points| {
+                shortest_chord(points) >= MIN_CHORD
+                    && biarc::corner_fraction(points, false) <= SMOOTH_CORNER_SHARE
+            },
+            polyline: polyline_of,
+        },
     }
 }
 
@@ -394,11 +436,18 @@ fn rose_point(p: &CurveParams, k: usize, rot_sin: f32, rot_cos: f32) -> [f32; 2]
 /// Walk a figure given as `point(p, t)` over `t` in `[0, period]`: `samples`
 /// equal steps, of which a `draw_progress` reveal takes the first `drawn`.
 ///
-/// **Closed exactly when the whole trace is drawn and it comes back to its
-/// start** — decided from the points, not from the family, because whether a
+/// **Closed exactly when the whole trace is drawn and it is periodic over
+/// `period`** — decided from the figure, not from the family, because whether a
 /// Lissajous closes depends on whether `n` and `d` are whole, and both are
 /// expressions. A partial reveal is always open, so its drawing head stays a
 /// free end.
+///
+/// Periodic means the trace **carries on the way it began**: its end is its
+/// start, *and* one step past the end is its second sample. The first alone is
+/// not enough, and not by accident — every Lissajous-type trace at `phase = 0`
+/// starts at the origin, and a damped harmonograph ends there too, arriving
+/// along a spiral a twelfth the size of the swing it left on. Joining those two
+/// ends would draw a closing joint the figure does not have.
 ///
 /// `point` returns the figure in its own unit frame; the rotation and `scale`
 /// are applied here, once, for every family. It is a closure so a family can
@@ -414,21 +463,26 @@ fn periodic_walk(
         return false;
     }
     let (rot_sin, rot_cos) = p.rotation.sin_cos();
+    let place = |t: f32| {
+        let [x, y] = point(t);
+        [
+            (x * rot_cos - y * rot_sin) * p.scale,
+            (x * rot_sin + y * rot_cos) * p.scale,
+        ]
+    };
     let drawn = drawn(p);
     let step = period / p.samples as f32;
     for k in 0..=drawn {
-        let [x, y] = point(step * k as f32);
-        points.push([
-            (x * rot_cos - y * rot_sin) * p.scale,
-            (x * rot_sin + y * rot_cos) * p.scale,
-        ]);
+        points.push(place(step * k as f32));
     }
+    let returns =
+        |a: Option<&[f32; 2]>, b: [f32; 2]| a.is_some_and(|&a| dist(a, b) <= CLOSE_TOLERANCE);
     let closes = drawn == p.samples
         && points.len() > 3
-        && match (points.first(), points.last()) {
-            (Some(&a), Some(&b)) => dist(a, b) <= CLOSE_TOLERANCE,
-            _ => false,
-        };
+        && points
+            .last()
+            .is_some_and(|&end| returns(points.first(), end))
+        && returns(points.get(1), place(step * (p.samples + 1) as f32));
     if closes {
         // The repeated start is the wrap itself; a closed fit supplies it.
         points.pop();
@@ -610,6 +664,29 @@ impl Gielis {
         let (sin, cos) = theta.sin_cos();
         [r * cos, r * sin]
     }
+}
+
+/// The harmonograph in its unit square: two damped pendulums,
+/// `x = exp(-decay t) sin(n t + phase)` and `y = exp(-decay t) sin(d t)`, over
+/// [`HARMONOGRAPH_TURNS`] turns of `t`. At `decay = 0` this is exactly
+/// [`lissajous_point`].
+fn harmonograph_point(p: &CurveParams, t: f32) -> [f32; 2] {
+    let decay = finite_or_zero(p.levers.decay).clamp(0.0, MAX_DECAY);
+    let amplitude = (-decay * t).exp();
+    let [x, y] = lissajous_point(p, t);
+    [amplitude * x, amplitude * y]
+}
+
+/// The shortest chord between consecutive points of `points`, or infinity for
+/// a walk with fewer than two.
+fn shortest_chord(points: &[[f32; 2]]) -> f32 {
+    points
+        .windows(2)
+        .map(|pair| match pair {
+            [a, b] => dist(*a, *b),
+            _ => f32::INFINITY,
+        })
+        .fold(f32::INFINITY, f32::min)
 }
 
 /// The walk in hand as chained chords (ADR-0158): every interior vertex is a

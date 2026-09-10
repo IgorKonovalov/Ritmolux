@@ -270,16 +270,21 @@ pub enum CurveFamily {
     /// Gielis' superformula — starfish, flowers, polygons and rounded shells
     /// from `sym`, `sharpness`, `lobe` and a `d` that skews the lobes.
     Superformula,
+    /// The damped two-pendulum harmonograph — a Lissajous figure whose
+    /// amplitude dies away by `decay` along the trace, so it spirals inward
+    /// rather than closing.
+    Harmonograph,
 }
 
 impl CurveFamily {
     /// Every family, in roster order — the closed set, and the list the schema
     /// export renders rather than restating.
-    pub const ALL: [CurveFamily; 4] = [
+    pub const ALL: [CurveFamily; 5] = [
         CurveFamily::MaurerRose,
         CurveFamily::Lissajous,
         CurveFamily::Hypotrochoid,
         CurveFamily::Superformula,
+        CurveFamily::Harmonograph,
     ];
 
     /// Parse a `[curve] family` name, or `None` if unknown.
@@ -289,6 +294,7 @@ impl CurveFamily {
             "lissajous" => CurveFamily::Lissajous,
             "hypotrochoid" => CurveFamily::Hypotrochoid,
             "superformula" => CurveFamily::Superformula,
+            "harmonograph" => CurveFamily::Harmonograph,
             _ => return None,
         })
     }
@@ -301,6 +307,7 @@ impl CurveFamily {
             CurveFamily::Lissajous => "lissajous",
             CurveFamily::Hypotrochoid => "hypotrochoid",
             CurveFamily::Superformula => "superformula",
+            CurveFamily::Harmonograph => "harmonograph",
         }
     }
 }
