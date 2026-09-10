@@ -154,12 +154,13 @@ fn nothing_writes_prose_to_standard_output_while_a_sink_could_be_open() {
     }
     assert!(
         findings.is_empty(),
-        "{} file(s) write to standard output and are not in STDOUT_WRITERS:
-{}
-         Standard output carries the frame pipe while --stream --sink stdout is          open, so prose on it corrupts the stream. Either move the line to          stderr, or add the file with the reason it can never be reached from a          running stream.",
+        "{} file(s) write to standard output and are not in STDOUT_WRITERS:\n{}\n\
+         Standard output carries the frame pipe while --stream --sink stdout is \
+         open, so prose on it corrupts the stream. Either move the line to \
+         stderr, or add the file with the reason it can never be reached from a \
+         running stream.",
         findings.len(),
-        findings.join("
-"),
+        findings.join("\n"),
     );
 
     // ...and the allowlist does not outlive what it describes.
@@ -178,7 +179,8 @@ fn nothing_writes_prose_to_standard_output_while_a_sink_could_be_open() {
     }
     assert!(
         unused.is_empty(),
-        "these files are allowlisted for standard output and no longer write to          it: {unused:?}"
+        "these files are allowlisted for standard output and no longer write \
+         to it: {unused:?}"
     );
 }
 

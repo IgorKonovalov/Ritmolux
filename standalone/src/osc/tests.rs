@@ -455,7 +455,8 @@ fn no_malformed_packet_panics_and_every_one_is_counted_as_rejected() {
     let rows = vocabulary().len();
     assert!(
         cases >= 32 * rows,
-        "the corpus is {cases} cases across {rows} vocabulary rows, which is          too thin to be evidence of anything"
+        "the corpus is {cases} cases across {rows} vocabulary rows, which is \
+         too thin to be evidence of anything"
     );
     // A flipped byte inside a float argument produces a different *valid*
     // message, so not every case is a rejection - the claim is that the great

@@ -239,7 +239,8 @@ fn a_preset_datagram_selects_by_name() {
     }
     assert!(
         landed,
-        "the dissolve never reached the preset ctl/preset named; the roster is          still on '{}'",
+        "the dissolve never reached the preset ctl/preset named; the roster is \
+         still on '{}'",
         renderer.preset_name()
     );
 

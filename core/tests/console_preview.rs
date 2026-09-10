@@ -378,6 +378,11 @@ fn a_readback_without_a_preview_is_refused() {
 #[test]
 fn no_indefinite_wait_lives_outside_the_places_that_may_hold_one() {
     /// Where an indefinite wait is correct, and why.
+    ///
+    /// Each entry is a path **relative to `core/src/render/`**, never a bare
+    /// file name: six `mod.rs` live under this root, so a bare name would
+    /// allowlist a wait in any of them — including one that ships — while
+    /// naming only the test instrument below.
     const ALLOWED: [(&str, &str); 3] = [
         (
             "capture.rs",
@@ -388,7 +393,7 @@ fn no_indefinite_wait_lives_outside_the_places_that_may_hold_one() {
             "the frame tap's retire, on the same path and for the same reason",
         ),
         (
-            "mod.rs",
+            "scenes/particles/mod.rs",
             "`read_particles`, a #[cfg(test)] instrument that no shipped build compiles",
         ),
     ];
@@ -405,7 +410,7 @@ fn no_indefinite_wait_lives_outside_the_places_that_may_hold_one() {
     let mut findings = Vec::new();
     let mut scanned = 0usize;
     let mut waits_seen = 0usize;
-    let mut walk = vec![render];
+    let mut walk = vec![render.clone()];
     while let Some(dir) = walk.pop() {
         let Ok(entries) = std::fs::read_dir(&dir) else {
             continue;
@@ -425,11 +430,12 @@ fn no_indefinite_wait_lives_outside_the_places_that_may_hold_one() {
             scanned += 1;
             let waits = source.matches("wait_indefinitely").count();
             waits_seen += waits;
-            let name = path
-                .file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_default();
-            if waits > 0 && !allowed.contains(&name.as_str()) {
+            let relative = path
+                .strip_prefix(&render)
+                .unwrap_or(&path)
+                .to_string_lossy()
+                .replace('\\', "/");
+            if waits > 0 && !allowed.contains(&relative.as_str()) {
                 findings.push(format!("  {}: {waits} indefinite wait(s)", path.display()));
             }
         }
