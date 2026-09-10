@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0161** (ADRs are a separate sequence — next free there is **0180**.)
+**Next free number: 0165** (ADRs are a separate sequence — next free there is **0181**.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -47,6 +47,10 @@ place. The plan file carries the real link.
 | [0158](0158-the-player-grows-a-studio-facing-surface.md) | The player grows a studio-facing surface | approved | dev, human | ADR-0175 + ADR-0176: override, OSC control-in, events, schema export, pipe sink, preview readback. **0159 needs Phases 1-5.** Touches `run.rs` beside 0133 and 0120: merge `main` first. |
 | [0159](0159-the-studio-opens.md) | The studio opens | approved | studio-builder, dev, human | ADR-0177 + ADR-0178: the Electron studio under `studio/`, first lane of its kind. **Hard dependency: 0158 Phases 1-5.** Two `human` gates at the end: a tester zip and the on-device check. |
 | [0160](0160-the-silhouettes-preconditions-stop-being-silent.md) | The silhouette's preconditions stop being silent | draft | dev, human | ADR-0179: four preconditions on `[path]` that fail silently. **0092 closed 2026-09-09**, so its Phase 7 axis fix is in. Phase 2 is prose in `presets/README.md`. |
+| [0161](0161-the-structural-parameter-is-held.md) | The structural parameter is held | draft | dev | ADR-0180 rules 2+4: a `[hold]` table and `ParamKind`. **The wave's prerequisite - 0162, 0163 and 0164 each want it.** Phase 3's audit can move a golden; that is a stop, not a re-bless. |
+| [0162](0162-the-curve-families.md) | The curve families | draft | dev | ADR-0180 rule 1: Lissajous, hypotrochoid, superformula and harmonograph as `CurveFamily` arms. The catalogue's #1 payoff-per-effort item since 2026-07-25. **Needs 0161.** |
+| [0163](0163-the-analytic-field.md) | The analytic field | draft | dev | ADR-0180 rules 1+3: a 13th system holding `chladni` and `escape_time`, with Voronoi, quasicrystal and hyperbolic placed. Fills the roadmap's fractal-spiral gap. **Needs 0161.** |
+| [0164](0164-the-cellular-system.md) | The cellular system | draft | dev | ADR-0180 rules 1+2: a 14th system on `PingPongField` - `life_like`, `larger_than_life`, `cyclic`, plus an age channel so the field paints history. Lenia placed, not built. **Needs 0161.** |
 <!-- roster:end -->
 
 **Added 2026-09-09 — [0158] and [0159] are drafted, and they are a program rather than a
@@ -60,6 +64,11 @@ diffusion pass from the studio are each a later plan with its own interview; ADR
 
 [0158]: 0158-the-player-grows-a-studio-facing-surface.md
 [0159]: 0159-the-studio-opens.md
+[0161]: 0161-the-structural-parameter-is-held.md
+[0162]: 0162-the-curve-families.md
+[0163]: 0163-the-analytic-field.md
+[0164]: 0164-the-cellular-system.md
+[0180]: ../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md
 
 ~~**Added 2026-09-07 - [0157] is drafted, and it is the only plan that unblocks `main`.**~~ - **closed 2026-09-07.** Both phases landed the same day the note was written; `main` is green and the route gate passes against a built site with `dist/api/` populated. The note is in [README-archive.md](README-archive.md) under `## Prior sequencing notes (superseded)`, which also records the one durable half: the cost probes still run in `-P fast` on every arm of every push.
 
@@ -575,6 +584,15 @@ the rows above.
   (`lsystem`, `parametric_curve`, `star_pattern`) drift from their committed bytes under `RLX_BLESS`
   on clean `main` too, and a naive diff would have convicted the change of moving them.
 
+
+**Added 2026-09-09 - [0161] through [0164] are the mathematics wave, and 0161 gates the other
+three.** One ADR frames them: [0180] - a new mathematical world joins an existing system as a named
+**family** rather than founding a `SystemKind` (which is why seven new worlds cost two roster
+entries), and a **structural** parameter is quantized and holdable, because this engine's integer
+levers are bindable today and effectively unbindable in practice. The order is fixed by dependency:
+**0161 first**, then 0162, 0163 and 0164 in any order - they touch three disjoint scene paths.
+Lenia, Voronoi, quasicrystal, hyperbolic tiling and fractal flames are **placed** by 0180 and built
+by nobody yet; each is a family arm on a system 0163 or 0164 creates.
 
 ## Standing (not a plan)
 

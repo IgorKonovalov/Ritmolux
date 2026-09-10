@@ -153,6 +153,14 @@ most, not a renderer).
 
 ## Suggested pick order (payoff ÷ engine work)
 
+> **2026-09-09:** items **1** (curve families) and **2** (Chladni) are designed and drafted, as are
+> escape-time fractals and discrete cellular automata, under
+> [ADR-0180](adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md)
+> and [Plans 0161-0164](plans/README.md). Item **3**'s fractal flames and item **4**'s Lenia are
+> **placed** by that ADR as family arms on systems those plans create, and are the two cheapest
+> unbuilt entries on this list once they land.
+
+
 Refreshed 2026-07-25 — the first entries of the original order (attractors, Gray-Scott) have
 shipped, so what remains is ranked against the idioms as they now stand:
 

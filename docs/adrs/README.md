@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0180.** *(0120 was reserved for
+**Next free number: 0181.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -201,4 +201,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0177](0177-a-fourth-skill-lane-builds-the-studio.md) | A fourth skill lane, `studio-builder`, builds the studio and never touches the engine | proposed 2026-09-09 (Plan 0159), extends 0017 |
 | [0178](0178-the-studio-shell-conventions.md) | The studio shell conventions: three processes, a mirrored protocol, and the same security defaults as the sibling repository | proposed 2026-09-09 (Plan 0159) |
 | [0179](0179-a-precondition-is-checked-at-load-or-it-is-written-down.md) | A precondition on a figure is checked at load, or it is written down | proposed 2026-09-09 (Plan 0160), extends 0107, 0111 |
+| [0180](0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md) | A mathematical world joins a system as a family, and a structural parameter is quantized and held | proposed 2026-09-09 (Plans 0161-0164), extends 0007, 0015 |
 <!-- roster:end -->
