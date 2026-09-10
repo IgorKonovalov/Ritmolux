@@ -71,6 +71,8 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0192 - `--report` cannot see a `beat_index`-driven response, so a deliberately musical preset measures as inert](#0192-----report-cannot-see-a-beat_index-driven-response-so-a-deliberately-musical-preset-measures-as-inert)
 - [0196 — most `v*` tags produce no Release run at all, and the cause Plan 0165 named cannot explain nineteen of them](#0196--most-v-tags-produce-no-release-run-at-all-and-the-cause-plan-0165-named-cannot-explain-nineteen-of-them)
 - [0199 — the studio always spawns a windowed player, so a one-screen machine gets a show window in the way, and the windowless mode that would fix it already exists](#0199--the-studio-always-spawns-a-windowed-player-so-a-one-screen-machine-gets-a-show-window-in-the-way-and-the-windowless-mode-that-would-fix-it-already-exists)
+- [0200 — the `stream` event names a channel order the windowed preview does not use, so every studio frame is drawn with red and blue swapped](#0200--the-stream-event-names-a-channel-order-the-windowed-preview-does-not-use-so-every-studio-frame-is-drawn-with-red-and-blue-swapped)
+- [0201 — the studio's preview stops updating mid-session while the show keeps drawing, and the drop counter cannot see why](#0201--the-studios-preview-stops-updating-mid-session-while-the-show-keeps-drawing-and-the-drop-counter-cannot-see-why)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -3797,3 +3799,98 @@ Two things to settle before anyone builds it, because they are the reason the AD
 **High, and asked for as such by the user on 2026-09-10** — "to be fixed asap". It is the first
 thing anyone opening the studio on one screen hits, it is in front of Plan 0159's Phase 10 tester
 handoff rather than behind it, and the repair is small and mostly already built.
+
+## 0200 — the `stream` event names a channel order the windowed preview does not use, so every studio frame is drawn with red and blue swapped
+
+`standalone/src/stream.rs` declares the wire format as a constant, and its own comment says what
+the constant is for:
+
+> The pixel format on the wire, named in the `stream` event so a reader is not guessing at the
+> channel order.
+
+The reader did not guess, and still got it wrong. `STREAM_FORMAT` is the fixed string `"rgba8"`,
+emitted by `show.rs` into every `stream` event on both run modes. But the **windowed** preview
+intermediate is built at `self.ctx.surface_format()` — the format the swapchain negotiated through
+`get_default_config`, not a format this project chose — so on a backend that negotiates
+`Bgra8UnormSrgb` the pipe carries BGRA under an `rgba8` label. The studio does the only correct
+thing with what it was told: `new ImageData(pixels, …)`, which is RGBA by definition.
+
+Observed on 2026-09-10 on the development machine (DX12): the studio's preview draws the Clifford
+attractor in blue where the player's own window draws it in orange. Orange is red-high, blue-low;
+swapping those two channels is exactly the blue observed, on the same frame of the same preset.
+
+**The two run modes disagree, which is what makes this a contract bug rather than a wrong
+constant.** The headless path renders into `HEADLESS_FORMAT`, which is `Rgba8UnormSrgb`, so
+`"rgba8"` is *truthful* there and false on the windowed path — the same declared format naming two
+different byte layouts depending on how the player was started. Spec 0003's `stream` row carries a
+`format` field precisely so a consumer does not have to know which one it got.
+
+The repair is a decision, not just a line: either the player converts to the declared order before
+writing (a cost on every preview frame), or it reports the format it actually has — which widens
+the field's value set and is therefore a spec change rather than a fix.
+
+- **Raised:** 2026-09-10, from running the Plan 0159 Phase 9 packaged artifact and comparing the two
+  windows side by side.
+  **Owner if taken:** `architect` to choose between converting and reporting, then `dev` — the
+  studio side is already correct against the stated contract and should not be the one to change.
+- **Verified 2026-09-10** — the declared format is a fixed string, unrelated to any surface:
+  `present: STREAM_FORMAT: &str = "rgba8" in: standalone/src/stream.rs`
+- **Verified 2026-09-10** — and it is what every `stream` event carries, on both run modes:
+  `present: format: crate::stream::STREAM_FORMAT in: standalone/src/show.rs`
+- **Verified 2026-09-10** — while the windowed preview intermediate takes the negotiated swapchain
+  format instead: `present: self\.ctx\.surface_format\(\), in: core/src/render/mod.rs`
+- **Verified 2026-09-10** — which is negotiated rather than chosen:
+  `present: get_default_config\(&adapter in: core/src/render/context.rs`
+- **Verified 2026-09-10** — and the headless path is the one where the label is true, which is the
+  disagreement:
+  `present: HEADLESS_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb in: core/src/render/context.rs`
+- **Verified 2026-09-10** — the studio consumes the bytes as RGBA, correctly, given what it was
+  told: `present: new ImageData\(pixels, stream\.width, stream\.height\) in: studio/renderer/components/Preview.tsx`
+
+### Priority
+
+**High.** Every frame the studio has ever painted from a windowed player is wrong, the whole point
+of the studio is judging colour and a preset author tuning a palette against it would be tuning
+against a lie, and it is in front of Plan 0159's Phase 10 tester handoff rather than behind it.
+
+## 0201 — the studio's preview stops updating mid-session while the show keeps drawing, and the drop counter cannot see why
+
+Observed on 2026-09-10, packaged studio, Plan 0159 Phase 9's artifact: the preview canvas froze on
+one frame and never updated again. Not a hang — both processes stayed `Responding`, the player kept
+drawing at ~49 fps and kept writing `diagnostics.log`, and the studio's UI stayed interactive. Only
+the picture stopped.
+
+**Undiagnosed.** What is known is where it is not: the player is fine, and the studio's window is
+fine, so the stall is in the pipe, in main's read of it, or in the pump-and-acknowledge handshake
+between main and the renderer.
+
+**The instrumentation that would answer it is the instrumentation Plan 0159 Phase 4 already
+recorded as blind.** `FramePump` counts a drop only when a frame arrives while one is
+unacknowledged, so loss upstream of it — in the OS pipe, or in main's read cadence — is invisible;
+that note records the counter reading 0 while frames were plainly being lost. A frozen preview with
+`0 dropped` is therefore consistent with several different faults and distinguishes none of them.
+
+Worth separating before anyone fixes it, because they need different repairs: an acknowledgement
+that never arrives (the pump stays `inFlight` forever and drops every subsequent frame silently), a
+`FrameSplitter` desynchronised by a mid-run geometry change (it slices at a fixed `frameBytes` and
+a resize changes it, after which no whole frame is ever completed), or the player's writer having
+stopped. The first two are studio-side and the third is not.
+
+- **Raised:** 2026-09-10, from running the Plan 0159 Phase 9 packaged artifact.
+  **Owner if taken:** `studio-builder`, unless the third candidate is the one — start by making the
+  accounting able to tell them apart, because none of the three is currently distinguishable.
+- **Verified 2026-09-10** — the drop counter is in-flight-based, so it reads 0 for loss that happens
+  before the pump: `present: private inFlight = false in: studio/electron/player/frames.ts`
+- **Verified 2026-09-10** — and the splitter's frame size is fixed at construction, which is the
+  desynchronisation candidate:
+  `present: private readonly frameBytes: number, in: studio/electron/player/frames.ts`
+- **Verified 2026-09-10** — the acknowledgement is the renderer's, one message per painted frame:
+  `present: p\.postMessage\(\{ ack: true \}\) in: studio/renderer/components/Preview.tsx`
+- **Verified 2026-09-10** — the freeze itself:
+  `unprobeable: a preview that stops updating after some minutes is a runtime observation of two live processes, which the probe grammar deliberately cannot reach - it greps tracked files and never shells out (ADR-0108 Notes). Reproduce by running the packaged studio and watching the canvas against the player's own window.`
+
+### Priority
+
+**High**, and ahead of a fix: a preview that silently stops is worse than one that is slow, because
+nothing on screen says the picture is stale — the footer's own dropped count reads 0 throughout.
+It sits in front of Plan 0159's Phase 10 tester handoff with 0200.
