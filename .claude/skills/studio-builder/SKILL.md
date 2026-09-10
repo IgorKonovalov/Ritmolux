@@ -80,9 +80,28 @@ process producing them. You paint what arrives on the pipe.
 - **`preset-author`** — authors preset content and will use what you build. What it cannot do in
   the studio is friction for `docs/design-backlog.md`, not a reason to special-case a preset.
 
-Handoffs are manual. A plan whose next phase belongs to `dev` or `human` stops at that phase:
-commit, verify `git status` is clean, and end with one line naming the plan, the phase and the
-owner. There is no automated skill-to-skill handoff in this repository (ADR-0177).
+**Handoffs to `architect` and to a `human` phase are manual.** Commit, verify `git status` is
+clean, and end with one line naming the plan, the phase and the owner. **Never auto-invoke
+`architect`** — the close review is worthless from inside the session that wrote the code.
+
+**`dev ↔ you` is the one automatic seam, in both directions**
+([ADR-0188](../../../docs/adrs/0188-the-two-implementer-lanes-hand-off-automatically.md), amending
+ADR-0177). Reaching a `dev`-owned phase you commit, verify the tree is clean, announce in one line,
+then invoke the sibling:
+
+```
+Skill(skill="dev", args="Plan NNNN — <title>. Pick up at Phase M; Phases A–B are committed
+(<sha> <sha>), tree clean. Read the plan and its ## Implementation log.")
+```
+
+Three lines and a pointer, nothing more — the plan is in the repo and its `## Implementation log`
+carries the phase-to-commit rows already. **Your session ends when that call returns**; never loop
+back for a later `studio-builder` phase, `dev` hands it to you the same way. If the user declined
+the auto-handoff or a `Skill` call is unavailable, name the plan, phase and owner and stop.
+
+**Arriving that way, you are entering a plan mid-stream.** Verify the named commits are in
+`git log --oneline` and the tree is clean, then run Mode 2 with a shorter restatement — only the
+phases left. **The "go" is not shortened**: automation removes the copy-paste, not the approval.
 
 ## The four modes
 
@@ -120,13 +139,14 @@ Same cadence `dev` uses, scoped to `studio/`:
 3. **Flip `Status: draft` to `in-progress`** only if you are the first lane to start it. That
    line and your rows of the `## Implementation log` are the only plan edits you make.
 4. **Phase by phase, strictly in scope.** Re-read the phase; check the owner tag — `studio-builder`
-   proceed, `human` surface and stop, `dev` commit and hand off. Files listed, no more. Validate
+   proceed, `human` surface and stop, `dev` commit and auto-hand-off per the seam above. Files listed, no more. Validate
    at boundaries, trust inside. Run the done-when before moving on; a failing check is an
    underlying issue to fix, never a check to disable. Commit per phase:
    `feat(studio): the param panel moves a constant (plan 0159 phase 3)`.
 5. **After your last phase**: if it is the plan's last, show `git log --oneline -n <N>` and ask
-   the user to open a fresh `/architect` session for the close; never review your own work. If a
-   sibling owns the rest, hand off as above.
+   the user to open a fresh `/architect` session for the close; never review your own work — that
+   boundary is manual and is never a `Skill` call. If `dev` owns the rest, auto-hand-off as above;
+   if a `human` phase does, surface it and stop.
 
 If a phase turns out wrong — ADR-0178 contradicts it, the player behaves differently than the
 plan assumes, a path does not exist — **stop and surface it** with the three options: change the

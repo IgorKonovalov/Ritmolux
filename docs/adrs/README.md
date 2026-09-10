@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0188.** *(0120 was reserved for
+**Next free number: 0189.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -198,7 +198,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0174](0174-the-art-net-path-is-verified-against-a-simulated-rig.md) | The Art-Net path is verified against a simulated rig | proposed 2026-09-08 (Plan 0133) |
 | [0175](0175-the-studio-is-a-separate-application-that-never-draws-a-frame.md) | The studio is a separate application that never draws a frame, and the player stays the only renderer | accepted 2026-09-10 (Plans 0158, 0159), extends 0143, Outcome, revised by 0183 |
 | [0176](0176-the-player-is-driven-over-osc-control-in-and-reports-on-its-standard-streams.md) | The player is driven over OSC control-in, and reports on its standard streams | accepted 2026-09-10 (Plan 0158), extends 0164 |
-| [0177](0177-a-fourth-skill-lane-builds-the-studio.md) | A fourth skill lane, `studio-builder`, builds the studio and never touches the engine | accepted 2026-09-10 (Plan 0159), extends 0017 |
+| [0177](0177-a-fourth-skill-lane-builds-the-studio.md) | A fourth skill lane, `studio-builder`, builds the studio and never touches the engine | accepted 2026-09-10 (Plan 0159), extends 0017; amended by 0188 |
 | [0178](0178-the-studio-shell-conventions.md) | The studio shell conventions: three processes, a mirrored protocol, and the same security defaults as the sibling repository | accepted 2026-09-10 (Plan 0159); Outcome |
 | [0179](0179-a-precondition-is-checked-at-load-or-it-is-written-down.md) | A precondition on a figure is checked at load, or it is written down | proposed 2026-09-09 (Plan 0160), extends 0107, 0111 |
 | [0180](0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md) | A mathematical world joins a system as a family, and a structural parameter is quantized and held | accepted 2026-09-10 (Plans 0161-0164), extends 0007, 0015, Outcome |
@@ -209,4 +209,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0185](0185-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md) | The documentation translates a slice, and a stamp makes staleness visible | proposed 2026-09-10 (Plan 0166), extends 0154, 0167 |
 | [0186](0186-the-studios-player-mode-is-a-per-machine-setting.md) | The studio's player mode is a per-machine setting, and the windowless path is a peer | proposed 2026-09-10 (Plan 0167), amends 0183 |
 | [0187](0187-the-preview-pipe-has-a-fixed-shape-and-names-its-true-format.md) | The preview pipe has a fixed shape and names the format it actually carries | proposed 2026-09-10 (Plan 0167), revises 0176 |
+| [0188](0188-the-two-implementer-lanes-hand-off-automatically.md) | The two implementer lanes hand off to each other automatically, and every other seam stays manual | accepted 2026-09-10 (no plan), amends 0177 |
 <!-- roster:end -->

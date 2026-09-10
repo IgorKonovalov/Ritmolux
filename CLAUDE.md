@@ -249,7 +249,7 @@ was added per [ADR-0017](docs/adrs/0017-preset-author-skill-lane.md)):
 | `architect`     | `docs/` — plans, ADRs, diagrams, reviews         | "how should we build X", "design the …", "should we A or B", "plan the …", "review plan N" |
 | `dev`           | all code — `core/`, `standalone/`, `plugin-foobar/` | "implement plan N", "do the DSP phase", "code up the …" |
 | `preset-author` | preset **content** — `.toml` presets, expression bindings, `[curve]`/`[generator]` config; never engine Rust | "make an aurora-style preset", "a look that pulses on the beat", "tune rose_star", "make it more organic", "design a preset for the drop" |
-| `studio-builder` | `studio/` — the Electron studio that drives the player (ADR-0177, proposed); never Rust or C++, never a protocol widening | "build the param panel", "the preview canvas stutters", "implement phase 3 of plan 0159", "add a palette editor" |
+| `studio-builder` | `studio/` — the Electron studio that drives the player (ADR-0177); never Rust or C++, never a protocol widening | "build the param panel", "the preview canvas stutters", "implement phase 3 of plan 0159", "add a palette editor" |
 
 **The hard split: `architect` designs, `dev` and `studio-builder` build, `preset-author` composes
 content — never invert.** The architect never writes production code; `dev` authors no ADRs and writes only two
@@ -260,8 +260,15 @@ embeds a preset into the shipped set). The handoffs are `architect → dev` (the
 `dev → architect` (the plan's own `## Implementation log`, which `dev` writes as the phases land,
 plus a three-line pointer at it — [ADR-0120](docs/adrs/0120-the-close-brief-is-a-section-of-the-plan.md);
 the review itself still happens in a fresh session), and `preset-author → architect`/`dev`
-(engine-gap feedback, and curation of a strong preset). All are manual on purpose — their value is
-the clean-context boundary.
+(engine-gap feedback, and curation of a strong preset). Every one of those is **manual on purpose**,
+and each for its own reason — the "go" is an approval, the close review is worthless from inside the
+session that wrote the code, and routing a feedback note is a judgement the content lane does not
+make. The **one automatic seam is `dev ↔ studio-builder`, in both directions**
+([ADR-0188](docs/adrs/0188-the-two-implementer-lanes-hand-off-automatically.md), amending
+ADR-0177): reaching a phase the sibling implementer owns, a lane commits, verifies `git status` is
+clean, and invokes the sibling through the Skill tool with three lines — plan, phase, commits
+landed. The receiver restates and **still waits for an explicit "go"**; automation removes the
+copy-paste, not the approval. Nothing else is ever auto-invoked, least of all `architect`.
 
 The loop:
 

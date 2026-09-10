@@ -61,10 +61,18 @@ the behavior to avoid.
   the questions they ask and means none of them would notice a preset that ignores the music.
   [`docs/testing.md`](../../../docs/testing.md) carries the table.
 
-That's the whole ecosystem: you design, `dev` builds, `preset-author` composes content. The handoffs
-are `architect → dev` (the user's "go"), `dev → architect` (the close ceremony), and
-`preset-author → you`/`dev` (engine-gap feedback + curation). All stay manual — their value is the
-fresh-context boundary.
+- **`studio-builder`** — the second implementing lane (added per
+  [ADR-0177](../../../docs/adrs/0177-a-fourth-skill-lane-builds-the-studio.md)). Owns `studio/`,
+  the Electron studio, and never Rust or C++. A protocol widening it needs is a feedback note to
+  you, never a shim on its side.
+
+That's the whole ecosystem: you design, `dev` and `studio-builder` build, `preset-author` composes
+content. Your own handoffs — `architect → dev`/`studio-builder` (the user's "go"),
+implementer `→ architect` (the close ceremony), and `preset-author → you`/`dev` (engine-gap
+feedback + curation) — **stay manual, and no lane may ever auto-invoke you**: the fresh-context
+boundary is the whole mechanism of the close review. The one automatic seam is between the two
+*implementers*, in both directions, per
+[ADR-0188](../../../docs/adrs/0188-the-two-implementer-lanes-hand-off-automatically.md).
 
 ## Project context
 
@@ -146,9 +154,12 @@ studio ([ADR-0177](../../../docs/adrs/0177-a-fourth-skill-lane-builds-the-studio
 marks a task only the user can do (obtain a signing cert, install BlackHole, make a product
 call). No missing tags, no inline-prose ownership — the tag is machine-readable and each
 implementing lane branches on it. A plan missing an owner tag on any phase fails Mode 4 as a
-blocker. Prefer a plan owned by one implementing lane plus `human` gates; a plan that has to
-alternate `dev` and `studio-builder` costs a session boundary per handoff and is usually two
-plans.
+blocker. A plan may alternate `dev` and `studio-builder` freely — since
+[ADR-0188](../../../docs/adrs/0188-the-two-implementer-lanes-hand-off-automatically.md) that seam
+hands off automatically, so the crossing costs a restatement rather than a session. **Order the
+phases so each lane's run is contiguous** — an alternation that could have been two runs still
+buys nothing. What is still worth avoiding is a crossing that is really a *protocol* question:
+that is an ADR before the plan, not a phase boundary.
 
 **Do the arithmetic on every numeric done-when before the plan ships.** A done-when is the contract
 `dev` is held to, so an unchecked number costs either a mid-phase stop to litigate it or — worse — an

@@ -50,11 +50,16 @@ Then wait. The reads below are task-grounded, not startup routines.
 
 You own all Rust and C++ (core, standalone, plugin). The one sibling *implementer* is
 `studio-builder`, and it owns only `studio/`. The handoffs are `architect → you` (the user's "go"
-at Step 2), `you → architect` (the close-ceremony prompt at Step 4), `preset-author → architect`
-(engine-gap feedback, which reaches you as a plan), and `you ↔ studio-builder` at a phase whose
-owner tag is the other lane (commit, verify `git status` is clean, and name the plan, phase and
-owner in your final line — the user opens the other lane). All are manual and their value is the
-fresh-context boundary — don't try to collapse them into one session.
+at Step 2), `you → architect` (the close-ceremony prompt at Step 4), and `preset-author → architect`
+(engine-gap feedback, which reaches you as a plan). Those three are **manual and stay manual** —
+the "go" is an approval and the close review is worthless from inside the session that wrote the
+code. **Never auto-invoke `architect`.**
+
+`you ↔ studio-builder` is the one exception, in both directions
+([ADR-0188](../../../docs/adrs/0188-the-two-implementer-lanes-hand-off-automatically.md), amending
+ADR-0177): the plan is already approved and you are both implementers, so you hand off through the
+Skill tool rather than through the user. The receiver still restates and waits for its own "go" —
+that removes the copy-paste, not the approval.
 
 ## How plans ship
 
@@ -72,6 +77,13 @@ wastes far more time than a 30-second confirmation.
 
 Trigger: the user names a plan ("implement plan 0001"), names a phase by content ("do the DSP
 phase" — locate which plan), or asks you to pick up where a session left off.
+
+**Or you were handed the plan by `studio-builder`** (ADR-0188) — the invocation names a plan, a
+phase to pick up at, and the commits that just landed. You are entering a plan mid-stream, not
+starting one: read the plan and its `## Implementation log` as below, **verify the named commits
+are actually in `git log --oneline` and the tree is clean**, then restate only what is left —
+the run of `dev`-owned phases from that phase on. The restatement is shorter; **Step 2's gate is
+not** — you still wait for an explicit "go" before writing anything.
 
 1. **List the plans** with `Glob docs/plans/*.md`. If the named plan isn't there, stop and ask.
 2. **Read the named plan in full** — TL;DR, Decision, all phases, Related ADRs, Risks, "What this
@@ -110,8 +122,21 @@ For **each phase in order**:
 1. **Re-anchor and check the owner tag.** Re-read the phase block — it lists files to touch and
    the done-when. Read `**Owner skill:**`:
    - `dev`: proceed (your phase).
-   - `studio-builder`: not yours — commit what is done, verify `git status` is clean, and **stop**,
-     naming the plan, the phase and the owner in your final line.
+   - `studio-builder`: not yours — **auto-handoff** (ADR-0188). Commit what is done, verify
+     `git status` is clean, announce in one line ("Phase N is `studio-builder`'s — handing off via
+     /studio-builder"), then invoke the sibling directly:
+
+     ```
+     Skill(skill="studio-builder", args="Plan NNNN — <title>. Pick up at Phase M; Phases A–B are
+     committed (<sha> <sha>), tree clean. Read the plan and its ## Implementation log.")
+     ```
+
+     Three lines and a pointer, nothing more — the plan is in the repo and its
+     `## Implementation log` already carries your phase-to-commit rows, so a fuller payload would
+     just be the copy that drifts. **Your session ends when that call returns** — never loop back
+     for a later `dev` phase; the sibling hands it to you the same way. If the user declined the
+     auto-handoff, or a `Skill` call is unavailable, fall back to naming the plan, phase and owner
+     in your final line and stop.
    - `human`: surface that this is a user task and **stop** — don't infer or "get it ready".
    - **Override:** if at Step 2 the user explicitly authorized doing a `human` phase's mechanical
      part, echo the override in one sentence and proceed. Otherwise stop.
