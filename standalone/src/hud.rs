@@ -262,7 +262,7 @@ impl AppState {
             let names: Vec<&str> = self.renderer.preset_names().collect();
             let staging = console::staging_line(
                 console::next_up(&names, self.renderer.active_index()),
-                self.director.auto_enabled(),
+                self.show.director.auto_enabled(),
                 (
                     self.config.rotate.min_dwell_secs,
                     self.config.rotate.max_dwell_secs,
@@ -270,7 +270,7 @@ impl AppState {
             );
             drop(names);
             let mut furniture = vec![console::header(self.renderer.preset_name())];
-            furniture.extend(console::transport_lines(self.director.auto_enabled()));
+            furniture.extend(console::transport_lines(self.show.director.auto_enabled()));
             furniture.push(staging);
             self.hud.frame_text.console.splice(0..0, furniture);
         }

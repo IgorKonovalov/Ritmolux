@@ -1441,6 +1441,20 @@ the frames that fell inside it and the run resumes at the frame index the wall
 clock has reached rather than drifting behind it. That is the right policy for a
 loop with no present deadline; a windowed preview has one and drops instead.
 
+**A headless run is a whole show, and it is drivable.** It resolves and seeds
+the same per-user preset directory a window does, watches it, and hot-reloads a
+file you save into it; and it reports the same events — `roster` on every reload,
+`preset` when the picture changes, `preset_error` and `preset_warning` with the
+file and the line, `health` once a second. `--control` binds a listener here
+exactly as it does for a window, and `hello` carries the port it actually got, so
+a parent can move a parameter on the next frame. The window and the sink are what
+differ between the two modes; nothing in this paragraph does
+([ADR-0181](adrs/0181-the-studio-drives-one-player-and-the-show-loop-is-extracted.md)).
+
+On a machine with no per-user data directory at all — a bare CI runner — the run
+says so in one line and carries on with the presets built into the binary, which
+is the same degrade every other reader of that directory performs.
+
 **Standard output carries nothing else** while this sink is open — every
 human-readable line goes to standard error, and a test holds the whole crate to
 that.

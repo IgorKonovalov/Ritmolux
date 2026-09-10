@@ -379,6 +379,18 @@ impl Control {
         }
         &self.scratch
     }
+
+    /// The buffer the last [`drain`](Self::drain) took, without taking another.
+    ///
+    /// Empty before the first drain, and it holds whatever that drain returned
+    /// until the next one. It exists so a caller applying a drained frame in the
+    /// fixed order - transport, then preset, then clears, then values, then
+    /// pings - can hand the earlier steps to code that borrows something else
+    /// and come back here for the rest. Calling `drain` a second time for that
+    /// would swap in an empty buffer and discard the frame.
+    pub fn last_drained(&self) -> &Drained {
+        &self.scratch
+    }
 }
 
 impl Drop for Control {

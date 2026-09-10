@@ -166,7 +166,7 @@ impl AppState {
             KeyCode::Space => {
                 // Manual next scene: reset the director's dwell so the auto
                 // timer restarts from this moment.
-                self.director.force_next();
+                self.show.director.force_next();
                 self.rotate_to_next();
             }
             KeyCode::KeyA => self.toggle_auto_rotate(),
@@ -273,7 +273,7 @@ impl AppState {
             // The director's own reset comes with it, so the dwell restarts from
             // this moment exactly as a hotkey rotation does.
             console::ConsoleAction::RotateNow => {
-                self.director.force_next();
+                self.show.director.force_next();
                 self.rotate_to_next();
             }
             console::ConsoleAction::Settings(action) => self.apply_settings_action(action),
@@ -285,59 +285,32 @@ impl AppState {
     /// A `None` listener costs a branch, which is the whole of what an
     /// unconfigured run pays for this feature existing.
     ///
-    /// **The listener is moved out of `self` for the duration** rather than
-    /// borrowed from it: the drained buffer borrows the listener, every applier
-    /// below takes `&mut self`, and copying the buffer out to satisfy the borrow
-    /// checker would put an allocation per name on the render thread — the cost
-    /// the inline `Name` exists to avoid on the other thread.
+    /// **The window's half is the transport verbs, and only those.** Everything
+    /// else in a drained frame is applied by the show, so the two run modes
+    /// cannot disagree about it. A verb is resolved here because it resolves the
+    /// operator console's own action against the live settings view — one
+    /// applier for a click and for the wire, which is what spec 0003 requires —
+    /// and a settings view needs a window.
     ///
-    /// The order is the one `standalone::control`'s module docs fix, and it is
-    /// load-bearing: a preset switch drops every override, so the switch has to
-    /// precede the values, and a wholesale clear has to precede the values that
-    /// survive it.
-    ///
-    /// A parameter name nothing claims is refused by the core and **counted**,
-    /// not printed: OSC has no reply channel, and a sender scrubbing a mistyped
-    /// name at slider rate would otherwise produce a line per frame.
+    /// The order the two halves run in is load-bearing: a preset switch drops
+    /// every override, so transport has to precede the values the show applies.
+    /// The verbs are moved out of `self` for the duration rather than borrowed
+    /// from it, because every applier below takes `&mut self`.
     pub(crate) fn apply_control(&mut self) {
-        let Some(mut control) = self.control.take() else {
-            return;
-        };
-        // Recorded inside the block and applied after it: the counter lives on the
-        // listener, and the drained buffer holds a borrow of it until here.
-        let refused;
-        {
-            let drained = control.drain();
-            if drained.is_empty() {
-                self.control = Some(control);
-                return;
-            }
-            for verb in drained.transport() {
+        let mut verbs = std::mem::take(&mut self.control_transports);
+        if self.show.take_control_transports(&mut verbs) {
+            for verb in &verbs {
                 let view = self.settings_view();
-                let auto = self.director.auto_enabled();
+                let auto = self.show.director.auto_enabled();
                 if let Some(action) = console::action_for_transport(*verb, auto, &view) {
                     self.apply_console_action(action);
                 }
             }
-            // The renderer-only half, through the same function the loopback
-            // test drives, so the shell is not a second copy of the order.
-            let applied = standalone::control::apply_to_renderer(drained, &mut self.renderer);
-            if applied.switched {
+            if self.show.apply_control_rest(&mut self.renderer) {
                 self.on_preset_switched();
             }
-            // The one message that is answered individually (ADR-0176): OSC
-            // carries no acknowledgement, so `ping` exists precisely so a studio
-            // can tell a dead player from a quiet one, and the answer goes back
-            // on the stream that cannot drop.
-            if let Some(events) = self.events.as_mut() {
-                for nonce in drained.pings() {
-                    events.emit(&standalone::events::Event::Pong { nonce: *nonce });
-                }
-            }
-            refused = applied.refused;
         }
-        control.note_refused(refused);
-        self.control = Some(control);
+        self.control_transports = verbs;
     }
 
     /// A left-button press: toggle fullscreen when it lands within

@@ -3,7 +3,8 @@
 //! Every part of the shell lives in its own module: [`cli`] judges the argument
 //! list before a window exists, [`run`] opens the window and drives the winit
 //! loop, [`app_state`] holds the running show, and [`hud`] and [`input`] carry
-//! the two halves of what the operator sees and presses.
+//! the two halves of what the operator sees and presses. [`show`] is what the
+//! windowed and headless paths manage identically around the renderer.
 
 mod app_state;
 #[cfg(target_os = "macos")]
@@ -28,6 +29,7 @@ mod overlay;
 mod preset_dir;
 mod run;
 mod settings;
+mod show;
 mod soak;
 mod stream;
 

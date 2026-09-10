@@ -344,7 +344,7 @@ export type PlayerEvent =
 |---|---|---|---|
 | 1 — The skeleton shows the picture | studio-builder | done | `f2be445` |
 | 2 — The protocol is typed once | studio-builder | done | `d80b7a4` |
-| 3 — The show loop is extracted | dev | not started | |
+| 3 — The show loop is extracted | dev | done | committed with this row |
 | 4 — The studio drives the one player | studio-builder | not started | |
 | 5 — Parameters move | studio-builder | not started | |
 | 6 — Expressions and palettes | studio-builder | not started | |
@@ -354,6 +354,42 @@ export type PlayerEvent =
 | 10 — The on-device check | human | not started | |
 
 ### Notes
+
+**Phase 3 — two things outside what the phase names.**
+
+- `standalone/src/control.rs` is touched, and the phase's file list does not name
+  it. `Control::last_drained` was added: the fixed order a drained frame is
+  applied in puts the transport verbs before the rest, the transport step needs
+  the caller's own state, and calling `drain` a second time to come back for the
+  rest would swap in an empty buffer and discard the frame.
+- **The verb-to-action mapping is shared; the applier is not.** Spec 0003
+  requires a `ctl/transport` verb to resolve the same action the console strip
+  resolves, and both paths go through `console::action_for_transport`. What the
+  windowed path does with the result needs a window — a title, a soak note, a
+  redraw — so the headless path carries the three reachable actions out itself,
+  in `stream::apply_transport`, against a `SettingsView` built from the values a
+  run with no window actually has. `every_transport_action_is_applied` walks the
+  mapping and fails if it ever resolves to an action that applier ignores.
+
+The halves the Phase 2 note below records as unreachable are reachable;
+`standalone/tests/stream_show.rs` drives them from a spawned process.
+
+**Phase 3 — the frame-time reading the phase asks for.**
+
+Windowed, release, `--preset Pulse`, 1920x1080, AMD Radeon integrated on DX12,
+rich tier, ~70 s per run, read from `diagnostics.log`'s one-second rows:
+
+| | before | after |
+|---|---|---|
+| rows | 67 | 66 |
+| fps, median | 165.000 | 165.000 |
+| `frame_ms_avg`, median | 6.062 | 6.061 |
+| `frame_ms_p99`, median | 6.736 | 6.607 |
+
+The two runs' standard error is byte-identical. A first attempt used
+`--preset Lorenz`, which is GPU-bound at 7.6 fps on this adapter; `Pulse` was
+chosen because its baseline spread is +/-0.5%, which is what makes a per-frame
+CPU cost visible at all.
 
 **The headless path the plan spawns emits two events and binds no listener.**
 Phase 1 spawns `--stream --sink stdout --events --control` as the plan's phase

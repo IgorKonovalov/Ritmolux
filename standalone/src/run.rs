@@ -482,22 +482,14 @@ pub fn run() {
                 .as_deref()
                 .map(Config::load)
                 .unwrap_or_default();
-            // The headless path greets too, and it greets **here**: a parent that
-            // spawned this to read the pipe needs the version and the schema hash
-            // before the geometry, and the geometry before the first frame. No
-            // control listener is opened on this path, so the port is `null`
-            // rather than a number nothing is bound to.
-            let mut events = parse_events_flag().then(Events::new);
-            if let Some(events) = events.as_mut() {
-                events.emit(&Event::Hello {
-                    version: env!("CARGO_PKG_VERSION"),
-                    schema: &rlx_core::preset::export::hash_hex(),
-                    control: None,
-                });
-            }
-            if let Err(message) =
-                stream::run(&request, &config.input, &config.rotate, events.as_mut())
-            {
+            // The listener before the greeting, because `hello` reports the port
+            // **actually bound**; the greeting before the run, because a parent
+            // that spawned this to read the pipe needs the version and the
+            // schema hash before the geometry, and the geometry before the first
+            // frame. Both are the same two calls the windowed path makes.
+            let control = bind_control(&config.control);
+            let events = greet(control.as_ref());
+            if let Err(message) = stream::run(&request, &config, events, control) {
                 eprintln!("{message}");
                 std::process::exit(1);
             }
@@ -606,37 +598,9 @@ pub fn run() {
         None => None,
     };
 
-    // The studio control-in listener (ADR-0176), flag over config, and bound
-    // here for the reason the telemetry sink above is. The same split on where
-    // the address came from: one typed for this run is a usage error, one left
-    // in `config.toml` degrades to no listener and says so (NFR 10). Loopback is
-    // the config default rather than a rule enforced here — an operator who
-    // names another host has said what they meant.
-    let control_flag = match parse_control_arg() {
-        Ok(listen) => listen,
-        Err(msg) => {
-            eprintln!("{msg}");
-            std::process::exit(1);
-        }
-    };
-    let control_from_flag = control_flag.is_some();
-    let control = match resolve_control(control_flag, &config.control) {
-        Some(listen) => match Control::bind(&listen) {
-            Ok(listener) => {
-                eprintln!("control in on {}", listener.local_addr());
-                Some(listener)
-            }
-            Err(msg) if control_from_flag => {
-                eprintln!("{msg}");
-                std::process::exit(1);
-            }
-            Err(msg) => {
-                eprintln!("{msg}; control in off");
-                None
-            }
-        },
-        None => None,
-    };
+    // The studio control-in listener, bound here for the reason the telemetry
+    // sink above is, and before `hello` because `hello` reports the port.
+    let control = bind_control(&config.control);
 
     // Resolved before the window exists, so an unknown sink is a usage error
     // rather than a window that opens and then reports one — the shape every
@@ -649,20 +613,12 @@ pub fn run() {
         }
     };
 
-    // `hello` is the **first** event line, and it is emitted here rather than in
-    // `resumed` because a studio spawns this process and waits for it: a hello
-    // that arrived after the window opened would leave the parent with no way to
-    // tell a slow start from a dead one. It carries the control port actually
-    // bound, which is why it sits after the block above rather than beside the
-    // flag parsing.
-    let mut events = parse_events_flag().then(Events::new);
-    if let Some(events) = events.as_mut() {
-        events.emit(&Event::Hello {
-            version: env!("CARGO_PKG_VERSION"),
-            schema: &rlx_core::preset::export::hash_hex(),
-            control: control.as_ref().map(Control::local_addr),
-        });
-    }
+    // `hello` is emitted here rather than in `resumed` because a studio spawns
+    // this process and waits for it: a hello that arrived after the window
+    // opened would leave the parent with no way to tell a slow start from a dead
+    // one. It carries the control port actually bound, which is why it sits
+    // after the block above rather than beside the flag parsing.
+    let events = greet(control.as_ref());
 
     // Resolved before the event loop exists, so a `--gpu` with no value is a
     // usage error rather than a window that opens and then reports one — the
@@ -719,4 +675,63 @@ pub fn run() {
         eprintln!("event loop error: {err}");
         std::process::exit(1);
     }
+}
+
+/// Bind the studio control-in listener (ADR-0176), flag over config.
+///
+/// Bound before a window or a stream exists, for the reason the telemetry sink
+/// is: an address that cannot be bound is a startup error rather than a run that
+/// starts and then reports one. The same split on where the address came from —
+/// one typed for this run is a usage error, one left in `config.toml` degrades
+/// to no listener and says so (NFR 10). Loopback is the config default rather
+/// than a rule enforced here: an operator who names another host has said what
+/// they meant.
+fn bind_control(config: &config::Control) -> Option<Control> {
+    let control_flag = match parse_control_arg() {
+        Ok(listen) => listen,
+        Err(msg) => {
+            eprintln!("{msg}");
+            std::process::exit(1);
+        }
+    };
+    let from_flag = control_flag.is_some();
+    match resolve_control(control_flag, config) {
+        Some(listen) => match Control::bind(&listen) {
+            Ok(listener) => {
+                eprintln!("control in on {}", listener.local_addr());
+                Some(listener)
+            }
+            Err(msg) if from_flag => {
+                eprintln!("{msg}");
+                std::process::exit(1);
+            }
+            Err(msg) => {
+                eprintln!("{msg}; control in off");
+                None
+            }
+        },
+        None => None,
+    }
+}
+
+/// Open the structured event stream if `--events` asked for one, and emit
+/// `hello` on it.
+///
+/// `hello` is the first **event**, carrying this build's version, the schema
+/// document's hash and the control port actually bound — which is not the port
+/// requested when the operator asked for an ephemeral one, and is why this takes
+/// the listener rather than the flag. It is not necessarily the first *line*:
+/// the port comes from the operator config, which cannot be read until the
+/// per-user directory has been resolved, and those steps have their own things
+/// to say (spec 0003).
+fn greet(control: Option<&Control>) -> Option<Events> {
+    let mut events = parse_events_flag().then(Events::new);
+    if let Some(events) = events.as_mut() {
+        events.emit(&Event::Hello {
+            version: env!("CARGO_PKG_VERSION"),
+            schema: &rlx_core::preset::export::hash_hex(),
+            control: control.map(Control::local_addr),
+        });
+    }
+    events
 }

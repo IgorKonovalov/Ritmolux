@@ -1,7 +1,7 @@
 //! The live show: everything the shell holds once a window exists.
 //!
-//! [`AppState`]'s fields are grouped by what owns them — [`Capture`],
-//! [`Presets`], [`Hud`] and [`Diagnostics`] — so the struct names four
+//! [`AppState`]'s fields are grouped by what owns them — [`Capture`], [`Hud`],
+//! [`Diagnostics`] and [`crate::show::Show`] — so the struct names four
 //! collaborators rather than a flat roster, and a field added to one of them
 //! does not widen the top-level shape.
 //!
@@ -16,7 +16,6 @@ use std::time::{Duration, Instant};
 use rlx_core::audio::{AudioFormat, SampleConsumer};
 use rlx_core::dsp::Analyzer;
 use rlx_core::render::{AdapterChoice, CapOverflow, Renderer, RendererOptions, Tier};
-use standalone::events::Event;
 use standalone::osc::{OscSink, Telemetry, rms_of};
 use standalone::rss;
 use winit::event_loop::ActiveEventLoop;
@@ -35,14 +34,13 @@ use crate::capture_win;
 use crate::cli::resolve_log_path;
 use crate::console;
 use crate::diaglog::DiagLog;
-use crate::director::Director;
 use crate::downbeatlog::DownbeatLog;
 #[cfg(windows)]
 use crate::nowplaying_win;
 use crate::overlay::{OverlayKey, OverlayState};
-use crate::preset_dir::{PRESET_POLL, dir_signature, reload_presets, startup_preset_dir};
 use crate::run::{App, resolve_display};
 use crate::settings::{SettingsAction, SettingsState, SettingsView, TierState};
+use crate::show::Show;
 use crate::soak::SoakLog;
 use standalone::config::{self, Config};
 
@@ -156,31 +154,6 @@ pub(crate) struct Capture {
     /// a frame. The cost of caching is that a device appearing or disappearing
     /// while the menu is open is not seen until it is reopened.
     pub(crate) input_roster: Vec<String>,
-}
-
-/// The preset directory and where the roster currently stands.
-///
-/// `sig` and `last_poll` are the hot-reload watch; `pending_switch_settle` is
-/// the one-frame delay a dissolve costs anything that describes the *active*
-/// preset (ADR-0007).
-pub(crate) struct Presets {
-    /// Preset directory watched for hot-reload, with its last-seen signature
-    /// and poll deadline.
-    pub(crate) preset_dir: PathBuf,
-
-    pub(crate) preset_sig: Option<(u128, usize)>,
-
-    pub(crate) last_preset_poll: Instant,
-
-    /// Set at a preset switch, consumed after the next rendered frame: a switch
-    /// now **dissolves** (Plan 0023), so the roster does not reach the incoming
-    /// preset until that frame's capture step has run. Everything that describes
-    /// the active preset therefore still answers with the *outgoing* one at the
-    /// switch site — the window title, and (the one that does not self-correct)
-    /// its segment-cap truncation, which does not even exist until the incoming
-    /// preset's structural config is applied at the flip. ADR-0007 says the cap is
-    /// never a silent cut, so the check waits for the frame that makes it real.
-    pub(crate) pending_switch_settle: bool,
 }
 
 /// The two modals, the operator console's window, and the retained scratch
@@ -356,9 +329,10 @@ pub(crate) struct AppState {
     /// selected — advanced by the `D` hotkey, used when going fullscreen.
     pub(crate) display_index: usize,
 
-    /// Hands-off scene rotation policy (auto-rotate + drop bias); driven each
-    /// visible frame with the injected `dt`.
-    pub(crate) director: Director,
+    /// Everything this run manages around the renderer — the preset directory
+    /// and its watcher, scene rotation, the event stream and the control-in
+    /// listener — performed by the same code the headless path runs (ADR-0181).
+    pub(crate) show: Show,
 
     /// Wall-clock time of the previous rendered frame, for measuring the `dt`
     /// fed to the director. Shell frame pacing only — core stays clock-free.
@@ -370,7 +344,16 @@ pub(crate) struct AppState {
 
     pub(crate) capture: Capture,
 
-    pub(crate) presets: Presets,
+    /// Set at a preset switch, consumed after the next rendered frame: a switch
+    /// **dissolves** (Plan 0023), so the roster does not reach the incoming
+    /// preset until that frame's capture step has run. Everything that describes
+    /// the active preset therefore still answers with the *outgoing* one at the
+    /// switch site — the window title, and (the one that does not self-correct)
+    /// its segment-cap truncation, which does not even exist until the incoming
+    /// preset's structural config is applied at the flip. ADR-0007 says the cap
+    /// is never a silent cut, so the check waits for the frame that makes it
+    /// real.
+    pub(crate) pending_switch_settle: bool,
 
     pub(crate) hud: Hud,
 
@@ -390,38 +373,18 @@ pub(crate) struct AppState {
     /// to start it.
     pub(crate) preview_pinned: bool,
 
-    /// The structured event stream (ADR-0176), present only when `--events`
-    /// turned it on. Absent otherwise, so the frame path is a `None` test and
-    /// standard error carries exactly what it always did.
-    pub(crate) events: Option<standalone::events::Events>,
-
-    /// The preset name last reported through the event stream, so `preset` is
-    /// emitted on a **change** rather than every frame. Empty until the first
-    /// frame reports one.
-    pub(crate) reported_preset: String,
-
-    /// When the next `health` event is due. The stream's own cadence, not the
-    /// diagnostics log's: that one writes a file an operator reads afterwards,
-    /// and this one feeds a parent watching now, so neither should be able to
-    /// silence the other by being configured off.
-    pub(crate) next_health: Instant,
-
-    /// The studio control-in listener (ADR-0176), present only when `--control`
-    /// or `[control] enabled` turned it on. Absent otherwise, so the frame path
-    /// is a `None` test and no socket is bound.
-    ///
-    /// Held here rather than in [`Diagnostics`] because that struct is what the
-    /// run *reports*, and this is what drives it.
-    pub(crate) control: Option<standalone::control::Control>,
+    /// Retained scratch for the transport verbs one drained control frame
+    /// carries, so applying them allocates nothing on the render thread. Cleared
+    /// and refilled every frame the listener has traffic; see
+    /// [`Show::take_control_transports`].
+    pub(crate) control_transports: Vec<standalone::osc::decode::Transport>,
 }
 
-/// How often a `health` event goes out while frames are being drawn.
-///
-/// One second, which is the cadence ADR-0176 names and the same one the
-/// diagnostics log samples at — a parent plotting frame time and an operator
-/// reading the file afterwards are looking at the same rate, so the two readings
-/// are comparable rather than merely similar.
-const HEALTH_INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
+/// Capacity reserved for [`AppState::control_transports`], matching the
+/// listener's own per-frame transport cap. A frame that somehow carried more
+/// would grow the vector once and keep the capacity; the number is here so the
+/// steady state never does.
+const TRANSPORT_SCRATCH: usize = 8;
 
 /// Whether the display loop spends a console present on frame `frame`, at
 /// cadence `every_n`.
@@ -501,14 +464,16 @@ impl AppState {
             renderer.set_display_hz(hz);
         }
 
-        // Resolve the preset directory, seed the curated set into it on first
-        // run (write-if-absent — but never into an RLX_PRESET_DIR override,
-        // which is the user's own folder), then load it over the renderer's
-        // embedded defaults and record the signature so later edits hot-reload.
-        // Any failure degrades to the embedded defaults (NFR 10).
-        let preset_dir = startup_preset_dir();
-        reload_presets(&mut renderer, &preset_dir, app.events.as_mut());
-        let preset_sig = dir_signature(&preset_dir);
+        // The show: the preset directory, its watcher, rotation, the event
+        // stream and the control listener, all performed by the code the
+        // headless path runs (ADR-0181). Built here rather than beside the other
+        // fields below because `--preset` is judged against the set it installs.
+        let show = Show::start(
+            &mut renderer,
+            &rotate_for(&config.rotate, held_preset.as_deref()),
+            app.events.take(),
+            app.control.take(),
+        );
 
         // `--preset` holds one scene for the run. The name was checked against
         // this same roster before the window was created, so a miss here means
@@ -553,7 +518,6 @@ impl AppState {
             renderer,
             occluded: false,
             tier_pinned: tier.is_some(),
-            director: Director::from_config(&rotate_for(&config.rotate, held_preset.as_deref())),
             last_frame: start,
             last_click: None,
             config,
@@ -575,12 +539,7 @@ impl AppState {
                 // it is behind a keypress.
                 input_roster: Vec::new(),
             },
-            presets: Presets {
-                preset_dir,
-                preset_sig,
-                last_preset_poll: start,
-                pending_switch_settle: false,
-            },
+            pending_switch_settle: false,
             hud: Hud {
                 #[cfg(windows)]
                 now_playing: nowplaying_win::NowPlayingSource::start(),
@@ -610,20 +569,12 @@ impl AppState {
                 reported_overflow: renderer_overflow,
                 reported_demotion: false,
             },
-            control: app.control.take(),
             preview_pipe: None,
             preview_pinned: app.preview_pipe,
-            events: app.events.take(),
-            reported_preset: String::new(),
-            // Due one interval from now, not immediately: the diagnostics
-            // window is empty before the first frame, so a reading taken at
-            // startup is a row of zeros — which a parent cannot tell from a
-            // player that has stalled.
-            #[allow(
-                clippy::disallowed_methods,
-                reason = "the health cadence is shell frame pacing; core analysis stays clock-free"
-            )]
-            next_health: Instant::now() + HEALTH_INTERVAL,
+            show,
+            // Sized once for the listener's transport cap, so a frame carrying
+            // verbs reuses this rather than growing it on the render thread.
+            control_transports: Vec::with_capacity(TRANSPORT_SCRATCH),
         };
         // **Which GPU is rendering the show**, once, at startup. Unflagged, the
         // window takes whatever wgpu returns for the surface, which on a hybrid
@@ -961,29 +912,17 @@ impl AppState {
         }
     }
 
-    /// Re-scan the preset directory if the poll interval has elapsed and its
-    /// signature changed, hot-reloading on any edit. Keeps the current set if
-    /// the reload yields nothing valid (degrade, never crash — NFR 10).
-    #[allow(
-        clippy::disallowed_methods,
-        reason = "preset-poll pacing reads the wall clock; core analysis stays clock-free"
-    )]
+    /// Poll the show's preset watcher, then re-settle what a changed roster
+    /// leaves stale in the window.
+    ///
+    /// The scan, the reload and its events are the show's; the two things below
+    /// exist only because there is a window, and they run only on the frames a
+    /// reload actually happened.
     pub(crate) fn poll_presets(&mut self) {
-        if self.presets.last_preset_poll.elapsed() < PRESET_POLL {
+        if !self.show.poll_presets(&mut self.renderer) {
             return;
         }
-        self.presets.last_preset_poll = Instant::now();
-        let sig = dir_signature(&self.presets.preset_dir);
-        if sig == self.presets.preset_sig {
-            return;
-        }
-        self.presets.preset_sig = sig;
-        reload_presets(
-            &mut self.renderer,
-            &self.presets.preset_dir,
-            self.events.as_mut(),
-        );
-        // `reload_presets` announced any truncation itself; re-baseline so the
+        // The reload announced any truncation itself; re-baseline so the
         // frame loop reports only what changes from here.
         self.diagnostics.reported_overflow = self.renderer.cap_overflow().copied();
         // Keep the browse overlay's highlight valid if the roster just changed
@@ -1024,14 +963,7 @@ impl AppState {
         // refreshes at. `0` where the platform will not say, which reads as
         // "unpaced" rather than as a rate nothing runs at.
         let fps = display_hz(&self.window).map_or(0, |hz| hz.round().max(0.0) as u32);
-        if let Some(events) = self.events.as_mut() {
-            events.emit(&Event::Stream {
-                width,
-                height,
-                fps,
-                format: crate::stream::STREAM_FORMAT,
-            });
-        }
+        self.show.emit_stream(width, height, fps);
         self.preview_pipe = Some(crate::stream::PreviewPipe::spawn(width, height));
     }
 
@@ -1047,64 +979,6 @@ impl AppState {
         if let Some(image) = self.renderer.take_preview_frame() {
             pipe.send(image);
         }
-    }
-
-    /// Emit a `preset` event when the preset **on screen** has changed.
-    ///
-    /// Reported from what was actually drawn rather than from each of the six
-    /// sites that can change it — the director's rotation, a hotkey, the browse
-    /// overlay, the console's strip, `--preset`, and `ctl/preset`. A switch
-    /// dissolves, so a site announcing its own would name the incoming preset a
-    /// frame before it was drawn, and six announcements would be six chances to
-    /// disagree about that.
-    pub(crate) fn report_active_preset(&mut self) {
-        let Some(events) = self.events.as_mut() else {
-            return;
-        };
-        let name = self.renderer.preset_name();
-        if name == self.reported_preset {
-            return;
-        }
-        let index = self
-            .renderer
-            .preset_names()
-            .position(|candidate| candidate == name)
-            .unwrap_or(0);
-        events.emit(&Event::Preset { name, index });
-        self.reported_preset = name.to_owned();
-    }
-
-    /// Emit a `health` event once a second while frames are being drawn.
-    ///
-    /// Tied to the drawn frame rather than to a timer of its own, so a stalled
-    /// or hidden player goes quiet: a parent watching this stream reads silence
-    /// as "no frames", which is the fact it wants and which a timer that kept
-    /// ticking would hide.
-    #[allow(
-        clippy::disallowed_methods,
-        reason = "the health cadence is shell frame pacing; core analysis stays clock-free"
-    )]
-    pub(crate) fn report_health(&mut self, now: Instant) {
-        let Some(events) = self.events.as_mut() else {
-            return;
-        };
-        if now < self.next_health {
-            return;
-        }
-        self.next_health = now + HEALTH_INTERVAL;
-        let metrics = self.renderer.metrics();
-        let (rejected, dropped, refused) = self
-            .control
-            .as_ref()
-            .map_or((0, 0, 0), |c| (c.rejected(), c.dropped(), c.refused()));
-        events.emit(&Event::Health {
-            fps: metrics.fps,
-            frame_ms_p50: self.renderer.frame_ms_p50(),
-            frame_ms_p99: metrics.frame_ms_p99,
-            ctl_rejected: rejected,
-            ctl_dropped: dropped,
-            ctl_refused: refused,
-        });
     }
 
     /// Drain whatever audio arrived since last frame into the analyzer.
@@ -1172,7 +1046,7 @@ impl AppState {
 
         // Hands-off scene rotation: the director decides from dt + this frame's
         // energy whether to advance the preset (manual Space/A override it).
-        if self.director.advance(dt, &frame).is_some() {
+        if self.show.director.advance(dt, &frame).is_some() {
             self.rotate_to_next();
         }
 
@@ -1229,8 +1103,8 @@ impl AppState {
         self.feed_preview_pipe();
         // The structured stream, after the frame that produced the figures it
         // reports (ADR-0176). Both are no-ops without `--events`.
-        self.report_active_preset();
-        self.report_health(now);
+        self.show.report_active_preset(&self.renderer);
+        self.show.report_health(&self.renderer, now);
         // After the show's present, never before it and never inside it.
         //
         // The cadence is decided here rather than inside `present_console`,
@@ -1265,7 +1139,7 @@ impl AppState {
         // preset and applied its structural config, so this is the first moment the
         // renderer describes it rather than the one it is leaving (see
         // `pending_switch_settle`).
-        if std::mem::take(&mut self.presets.pending_switch_settle) {
+        if std::mem::take(&mut self.pending_switch_settle) {
             warn_cap_overflow(&self.renderer);
             self.diagnostics.reported_overflow = self.renderer.cap_overflow().copied();
             self.update_title();
@@ -1306,9 +1180,9 @@ impl AppState {
     /// the roster does not reach the incoming preset until the dissolve's capture
     /// frame has rendered. Reading the title or the cap overflow here would describe
     /// the preset being left, so both wait one frame — see
-    /// [`pending_switch_settle`](Presets::pending_switch_settle).
+    /// [`pending_switch_settle`](AppState::pending_switch_settle).
     pub(crate) fn on_preset_switched(&mut self) {
-        self.presets.pending_switch_settle = true;
+        self.pending_switch_settle = true;
         self.note_soak_switch();
         self.window.request_redraw();
     }
@@ -1350,7 +1224,7 @@ impl AppState {
         let m = self.renderer.metrics();
         let preset = self.renderer.preset_name();
         let system = self.renderer.active_system_name();
-        let rotate = if self.director.auto_enabled() {
+        let rotate = if self.show.director.auto_enabled() {
             "auto"
         } else {
             "manual"
@@ -1629,7 +1503,7 @@ impl AppState {
     /// restart, and the config's value comes back. One path is what
     /// makes that impossible rather than merely fixed.
     pub(crate) fn toggle_auto_rotate(&mut self) {
-        let on = self.director.toggle_auto();
+        let on = self.show.director.toggle_auto();
         self.config.rotate.auto = on;
         self.save_config();
         eprintln!("auto-rotate {}", if on { "on" } else { "off" });
@@ -1670,7 +1544,7 @@ impl AppState {
             } else {
                 TierState::Auto
             },
-            auto_rotate: self.director.auto_enabled(),
+            auto_rotate: self.show.director.auto_enabled(),
             min_dwell_secs: self.config.rotate.min_dwell_secs,
             max_dwell_secs: self.config.rotate.max_dwell_secs,
             fullscreen: self.window.fullscreen().is_some(),
@@ -1694,7 +1568,7 @@ impl AppState {
             input_editable: cfg!(windows),
             preset_name: self.config.hud.preset_name,
             now_playing: self.config.hud.now_playing,
-            preset_dir: self.presets.preset_dir.display().to_string(),
+            preset_dir: self.show.preset_dir().display().to_string(),
         }
     }
 
@@ -1716,7 +1590,7 @@ impl AppState {
                 self.config.rotate.max_dwell_secs = max_secs;
                 // The live director, not a rebuilt one: a rebuild would reset the
                 // dwell clock under the operator's hand.
-                self.director.set_dwell_bounds(min_secs, max_secs);
+                self.show.director.set_dwell_bounds(min_secs, max_secs);
                 self.save_config();
             }
             // Deferred, not done here: creating a window needs an

@@ -30,7 +30,7 @@
 use std::io::Write;
 use std::time::Duration;
 
-use standalone::events::{Event, Events};
+use standalone::events::Events;
 
 /// The sender name a receiver lists, unless `--sender` overrides it. Not
 /// necessarily the name that gets registered: a stale registration from a
@@ -56,6 +56,12 @@ const PREVIEW_FPS: u32 = 30;
 /// The pixel format on the wire, named in the `stream` event so a reader is not
 /// guessing at the channel order.
 pub const STREAM_FORMAT: &str = "rgba8";
+
+/// Capacity reserved for the transport verbs one drained control frame carries,
+/// matching the listener's own per-frame cap. A frame that somehow carried more
+/// would grow the vector once and keep the capacity; the number is here so the
+/// steady state never does.
+const TRANSPORT_SCRATCH: usize = 8;
 
 /// Where `--stream` publishes its frames.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -672,9 +678,9 @@ fn open_sink(request: &StreamRequest, adapter: &str) -> Result<Box<dyn FrameSink
 /// Run the headless source until Ctrl-C or `--frames`.
 pub fn run(
     request: &StreamRequest,
-    input: &standalone::config::Input,
-    rotate: &standalone::config::Rotate,
-    mut events: Option<&mut Events>,
+    config: &standalone::config::Config,
+    events: Option<Events>,
+    control: Option<standalone::control::Control>,
 ) -> Result<(), String> {
     use std::sync::atomic::Ordering;
     use std::time::Instant;
@@ -704,7 +710,7 @@ pub fn run(
 
     let mut sink = open_sink(request, &adapter)?;
 
-    let capture = crate::capture_start::start_capture(input);
+    let capture = crate::capture_start::start_capture(&config.input);
     let Some(mut consumer) = capture.consumer else {
         return Err(
             "--stream: no audio capture device is available, so there is nothing to visualize"
@@ -721,40 +727,45 @@ pub fn run(
 
     install_stop_handler();
 
-    // A headless source has nobody to press Space, so rotation is ON here even
-    // though `[rotate] auto` defaults off for the window (ADR-0027): a source
-    // stuck on one preset for a four-hour set is not what this mode is for. The
-    // dwell bounds still come from the operator's config, and `--preset` opts
-    // out entirely.
-    let mut director = crate::director::Director::from_config(&standalone::config::Rotate {
-        auto: request.preset.is_none(),
-        ..rotate.clone()
-    });
+    // The show: the preset directory and its watcher, rotation, the event
+    // stream and the control listener, performed by the same code the window
+    // runs (ADR-0181). A headless source has nobody to press Space, so rotation
+    // is ON here even though `[rotate] auto` defaults off for the window
+    // (ADR-0027): a source stuck on one preset for a four-hour set is not what
+    // this mode is for. The dwell bounds still come from the operator's config,
+    // and `--preset` opts out entirely.
+    let mut show = crate::show::Show::start(
+        &mut renderer,
+        &standalone::config::Rotate {
+            auto: request.preset.is_none(),
+            ..config.rotate.clone()
+        },
+        events,
+        control,
+    );
+    // Judged against the set the show just installed, which is the per-user
+    // directory when one resolved and the embedded set otherwise.
     if let Some(name) = request.preset.as_deref() {
         if !renderer.select_preset_by_name(name) {
             return Err(format!(
-                "--stream: no preset named '{name}'; --list-presets is not a flag, but the embedded set is what the window browses"
+                "--stream: no preset named '{name}'; --list-presets is not a flag, but the preset directory is what the window browses"
             ));
         }
         eprintln!("preset   : '{name}', held for the run - rotation is off");
     } else {
         eprintln!(
             "rotation : on, dwell {}-{} s from the operator config",
-            rotate.min_dwell_secs, rotate.max_dwell_secs
+            config.rotate.min_dwell_secs, config.rotate.max_dwell_secs
         );
     }
 
     // **Before the first frame**, which is the contract: a parent reading the
     // pipe has to know the geometry before it has bytes to cut up, and a
     // `stream` that arrived after them would leave the first frame unreadable.
-    if let Some(events) = events.as_mut() {
-        events.emit(&Event::Stream {
-            width: request.width,
-            height: request.height,
-            fps: request.fps,
-            format: STREAM_FORMAT,
-        });
-    }
+    show.emit_stream(request.width, request.height, request.fps);
+    // Sized once for the listener's per-frame transport cap, so a frame carrying
+    // verbs reuses this rather than growing it.
+    let mut transports = Vec::with_capacity(TRANSPORT_SCRATCH);
 
     let period = request.period();
     let mut scratch = vec![0.0_f32; 32_768];
@@ -780,6 +791,22 @@ pub fn run(
             break;
         }
 
+        // Control input, drained between frames and applied before anything this
+        // frame reads a parameter (ADR-0176), in the fixed order spec 0003 sets:
+        // the transport verbs first, because a preset switch drops every
+        // override, then the rest.
+        if show.take_control_transports(&mut transports) {
+            for verb in &transports {
+                apply_transport(*verb, &mut show, &mut renderer, config);
+            }
+            show.apply_control_rest(&mut renderer);
+        }
+
+        // The preset directory, polled on the same watcher the window runs, so
+        // a file saved by an editor reaches this path within one poll interval
+        // and its `roster` / `preset_error` reach whoever spawned it.
+        show.poll_presets(&mut renderer);
+
         // Drain everything the capture callback has handed over since the last
         // frame. The callback never blocks; this side does all the work.
         loop {
@@ -804,7 +831,7 @@ pub fn run(
         // decision and the change are paired here for the same reason the
         // shell pairs them: a rotation that is announced and not carried out
         // leaves the source on one scene for the whole set.
-        if let Some(reason) = director.advance(dt, &frame) {
+        if let Some(reason) = show.director.advance(dt, &frame) {
             let incoming = renderer.cycle_preset().to_owned();
             eprintln!("rotate   : frame {frames}, {reason:?} -> '{incoming}'");
         }
@@ -833,6 +860,11 @@ pub fn run(
         costs.send += done.duration_since(sent);
         costs.frames += 1;
         frames += 1;
+
+        // The structured stream, after the frame that produced the figures it
+        // reports (ADR-0176). Both are no-ops without `--events`.
+        show.report_active_preset(&renderer);
+        show.report_health(&renderer, done);
 
         if should_report(frames, REPORT_EVERY) {
             resident.sample();
@@ -869,6 +901,97 @@ pub fn run(
     );
     eprintln!("{}", summary(frames, wall, scene, &adapter));
     Ok(())
+}
+
+/// Apply one `ctl/transport` verb to a run that has no window.
+///
+/// **The verb-to-action mapping is [`crate::console::action_for_transport`],
+/// the same function a click on the operator console's transport strip goes
+/// through** — spec 0003 requires one rule rather than two that agree today, and
+/// the mapping is where the rule lives. What differs here is only the applier:
+/// a headless run has no title to update, no soak log to note a switch in and no
+/// window to redraw, so the three actions a transport verb can resolve to are
+/// carried out directly on the renderer and the director.
+///
+/// `every_transport_action_is_applied` pins the `_` arm: an action a future verb
+/// could resolve to and this applier ignores fails that test rather than going
+/// silent here.
+fn apply_transport(
+    verb: standalone::osc::decode::Transport,
+    show: &mut crate::show::Show,
+    renderer: &mut rlx_core::render::Renderer,
+    config: &standalone::config::Config,
+) {
+    use crate::console::ConsoleAction;
+    use crate::settings::SettingsAction;
+
+    let auto = show.director.auto_enabled();
+    let view = headless_view(
+        auto,
+        renderer.tier(),
+        config,
+        &show.preset_dir().display().to_string(),
+    );
+    let Some(action) = crate::console::action_for_transport(verb, auto, &view) else {
+        return;
+    };
+    match action {
+        ConsoleAction::Next => {
+            renderer.cycle_preset();
+        }
+        ConsoleAction::Prev => {
+            let count = renderer.preset_names().count();
+            if let Some(index) = crate::console::previous_index(count, renderer.active_index()) {
+                renderer.select_preset(index);
+            }
+        }
+        ConsoleAction::Settings(SettingsAction::ToggleAuto) => {
+            show.director.toggle_auto();
+        }
+        _ => {}
+    }
+}
+
+/// The settings view a run with no window honestly has.
+///
+/// Every field is what is actually true of this run rather than a placeholder:
+/// there is no window, so it is not fullscreen and the display roster is empty;
+/// there is no console; the capture path takes no operator selection here. It
+/// exists because [`crate::console::action_for_transport`] resolves a verb
+/// against the live values the settings menu displays, and that function is the
+/// one mapping both run modes go through.
+///
+/// Takes the four live values rather than the run's objects, so the mapping can
+/// be walked in a test without a GPU.
+fn headless_view(
+    auto_rotate: bool,
+    tier: rlx_core::render::Tier,
+    config: &standalone::config::Config,
+    preset_dir: &str,
+) -> crate::settings::SettingsView {
+    crate::settings::SettingsView {
+        tier,
+        // Pinned by construction on this path: `run` asks for `Tier::Rich` and
+        // there is no frame-time governor here to demote it.
+        tier_state: crate::settings::TierState::Pinned,
+        auto_rotate,
+        min_dwell_secs: config.rotate.min_dwell_secs,
+        max_dwell_secs: config.rotate.max_dwell_secs,
+        fullscreen: false,
+        display_index: 0,
+        display_count: 0,
+        display_name: String::new(),
+        diagnostics: false,
+        input_mode: config.input.mode,
+        input_device_index: 0,
+        input_device_count: 0,
+        input_device_name: config.input.device.clone(),
+        input_editable: false,
+        preset_name: config.hud.preset_name,
+        now_playing: config.hud.now_playing,
+        console: false,
+        preset_dir: preset_dir.to_owned(),
+    }
 }
 
 #[cfg(test)]
@@ -1214,5 +1337,48 @@ mod sink_tests {
             sink.send(&right, 8, 1).is_err(),
             "a frame of another shape was accepted"
         );
+    }
+
+    /// Every action a transport verb can resolve to is one `apply_transport`
+    /// carries out.
+    ///
+    /// The applier's `_` arm is the risk this pins: a verb that started
+    /// resolving to `Random` or `RotateNow` would be accepted, counted as
+    /// applied and do nothing, which is the silent shape ADR-0181 exists to
+    /// stop. The mapping is walked rather than read, so widening it here fails
+    /// rather than diverging.
+    #[test]
+    fn every_transport_action_is_applied() {
+        use crate::console::ConsoleAction;
+        use crate::settings::SettingsAction;
+        use standalone::osc::decode::Transport;
+
+        let config = standalone::config::Config::default();
+        for verb in [
+            Transport::Next,
+            Transport::Prev,
+            Transport::Auto,
+            Transport::Hold,
+        ] {
+            for auto in [true, false] {
+                // The view the applier itself builds, so the test walks the
+                // mapping through the same values the run gives it.
+                let view = headless_view(auto, rlx_core::render::Tier::Rich, &config, "");
+                let Some(action) = crate::console::action_for_transport(verb, auto, &view) else {
+                    continue;
+                };
+                assert!(
+                    matches!(
+                        action,
+                        ConsoleAction::Next
+                            | ConsoleAction::Prev
+                            | ConsoleAction::Settings(SettingsAction::ToggleAuto)
+                    ),
+                    "`{}` with auto={auto} resolves to {action:?}, which \
+                     `apply_transport` ignores",
+                    verb.as_str()
+                );
+            }
+        }
     }
 }

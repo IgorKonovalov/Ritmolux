@@ -8,6 +8,8 @@ standard error. It states what must be true of the running system, not how it is
 > `standalone/src/osc/encode.rs` (the wire encoder both directions share),
 > `standalone/src/control.rs` (the listener, the bounded queue and the renderer-side applier),
 > `standalone/src/events.rs` (the event roster and its writer),
+> `standalone/src/show.rs` (the one owner of the listener and of every emission below,
+> called by the windowed and the headless paths alike),
 > `standalone/src/config.rs` (`[control]`) and `standalone/src/cli.rs` (`--control`,
 > `--events`).
 > **Governing ADRs:** [0176](../adrs/0176-the-player-is-driven-over-osc-control-in-and-reports-on-its-standard-streams.md)
@@ -17,7 +19,9 @@ standard error. It states what must be true of the running system, not how it is
 > [0164](../adrs/0164-the-osc-address-root-becomes-rlx-in-one-break.md) (the `/rlx/v1` root and
 > the additive-under-the-prefix rule) and
 > [0143](../adrs/0143-the-operator-console-is-a-second-surface-and-the-shell-owns-its-meaning.md)
-> (the transport strip whose actions the wire verbs resolve).
+> (the transport strip whose actions the wire verbs resolve) and
+> [0181](../adrs/0181-the-studio-drives-one-player-and-the-show-loop-is-extracted.md) (why neither
+> roster below is conditional on a run mode).
 > **How the contract got here** is at the end, under *Provenance*.
 
 ## The vocabulary
@@ -41,17 +45,23 @@ Adding an event or a field is additive under the same `v`; changing or removing 
 
 | `ev` | Fields | When |
 |------|--------|------|
-| `hello` | `version`, `schema`, `control` | Once, before the window exists |
+| `hello` | `version`, `schema`, `control` | Once, before the first frame of any run |
 | `preset` | `name`, `index` | The preset **on screen** changed |
 | `roster` | `names` | Every preset reload |
 | `preset_error` | `file`, `message`, `line`, `col`, `param` | A preset failed to load |
 | `preset_warning` | `file`, `message` | A preset loaded with a non-fatal problem |
 | `health` | `fps`, `frame_ms_p50`, `frame_ms_p99`, `ctl_rejected`, `ctl_dropped`, `ctl_refused` | Once a second while frames are drawn |
-| `stream` | `width`, `height`, `fps`, `format` | Once, before the first frame on standard output |
+| `stream` | `width`, `height`, `fps`, `format` | Once, before the first frame on a frame pipe |
 | `pong` | `nonce` | Answering a `ctl/ping` |
 
 ## Invariants
 
+- **Neither roster above is conditional on a run mode.** A run that holds a renderer, a preset
+  directory and a rotation policy performs both tables, whether it opens a window or writes frames
+  to a pipe; the two differ in the window and the sink and in nothing here. A mode that held that
+  state and reported none of it would be silent rather than broken, which is why this is an
+  invariant rather than a note.
+  ([ADR-0181](../adrs/0181-the-studio-drives-one-player-and-the-show-loop-is-extracted.md))
 - The listener MUST be **off unless asked for**. With neither `--control` nor
   `[control] enabled = true`, no socket is bound — not one that ignores traffic, none. (ADR-0176)
 - The listener MUST bind **loopback** unless the operator names another host. Anything that can
@@ -140,9 +150,10 @@ Adding an event or a field is additive under the same `v`; changing or removing 
 
 ## Known gaps
 
-- **`stream` is declared here and emitted by the sink that carries the frames.** Its row is in the
-  roster above because the geometry is part of this contract; the pipe that announces it is the
-  headless video-out's.
+- **`stream` is declared here and emitted by whichever sink carries the frames.** Its row is in
+  the roster above because the geometry is part of this contract, and the numbers in it are the
+  sink's: a requested size and rate from the headless video-out, the readback's size and the
+  display's rate from a windowed run's `--preview stdout`.
 - **Nothing asserts the whole ordering of a live run.** `hello` before the rest is asserted from a
   spawned process, and each event's own shape is asserted at the writer — but the sequence a
   ten-minute show produces is what the plan's on-device phase looks at instead.
