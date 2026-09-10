@@ -1,6 +1,6 @@
 # 0166 — The basics read in Russian
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-09-10
 > **Owner skill(s):** `dev`, `human`
 > **Related ADRs:** [0183](../adrs/0183-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md)
