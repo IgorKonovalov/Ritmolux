@@ -385,7 +385,7 @@ impl Drop for Control {
     /// Ask the listener to stop and wait for it.
     ///
     /// Joined rather than detached so a test can assert the socket is released;
-    /// the wait is bounded by [`POLL`], which is what the read timeout is for.
+    /// the wait is bounded by `POLL`, which is what the read timeout is for.
     fn drop(&mut self) {
         self.stop.store(true, Ordering::Relaxed);
         if let Some(thread) = self.thread.take() {

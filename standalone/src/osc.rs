@@ -8,7 +8,7 @@
 //!
 //! ## Two directions, two files
 //!
-//! [`encode`] writes the wire format and [`decode`] reads it. Telemetry leaves
+//! [`mod@encode`] writes the wire format and [`mod@decode`] reads it. Telemetry leaves
 //! through the first; the studio control vocabulary under `/rlx/v1/ctl/`
 //! (ADR-0176) arrives through the second. They are a pair on purpose — a decoder
 //! written beside its encoder is a mirror rather than a dependency, and the

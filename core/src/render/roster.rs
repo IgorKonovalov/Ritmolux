@@ -164,7 +164,7 @@ pub enum ParamError {
     NoActivePreset,
     /// No backdrop, post stage, terminal pass or scene on the active preset's
     /// system answers to this name — the same verdict
-    /// [`ParamRoute::Unclaimed`] records for a binding, taken at the moment the
+    /// `ParamRoute::Unclaimed` records for a binding, taken at the moment the
     /// override is set instead of silently at apply time.
     UnknownParam(String),
 }

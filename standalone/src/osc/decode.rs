@@ -1,7 +1,7 @@
 //! The OSC 1.0 wire decoder, and the studio control vocabulary it parses
 //! (ADR-0176).
 //!
-//! The mirror of [`super::encode`], written beside it so the padding rule has
+//! The mirror of [`mod@super::encode`], written beside it so the padding rule has
 //! one statement per direction. Everything here is a **pure function of a byte
 //! slice** — no socket, no state, no clock — which is what lets the whole
 //! vocabulary be round-tripped and fuzzed without opening a port.
