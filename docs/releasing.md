@@ -46,6 +46,18 @@ pushes — the architect never does.
 git push --follow-tags
 ```
 
+**Push one tag, not a backlog of them.** GitHub does not start workflows for tags pushed in bulk, so
+a `git push --tags` carrying more than three of them fires nothing at all — no Release run, no
+artifacts, and no error to read. That is how `v0.113.0` came to exist on `origin` with zero Release
+runs: the 2026-09-10 history rewrite force-pushed 131 tags in one command. The recovery is to delete
+the remote ref and push it again on its own, because re-pushing an unchanged ref emits no event
+either:
+
+```sh
+git push origin :refs/tags/vX.Y.Z
+git push origin vX.Y.Z
+```
+
 That fires [`.github/workflows/release.yml`](../.github/workflows/release.yml)
 ([ADR-0038](adrs/0038-tag-driven-release-unsigned-universal-mac-app.md),
 [ADR-0115](adrs/0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md)),
@@ -80,10 +92,16 @@ the fix:
 gh auth refresh -s workflow
 ```
 
-To rehearse the builds without publishing anything, run the workflow from the Actions tab
-(`workflow_dispatch`): it produces all three zips as **run artifacts** and creates no release.
-Note that a `workflow_dispatch` is only offered once the workflow file exists on the default
-branch.
+To rehearse the builds, run the workflow from the Actions tab (`workflow_dispatch`): it produces
+all three zips as **run artifacts**. Note that a `workflow_dispatch` is only offered once the
+workflow file exists on the default branch.
+
+**Rehearse on a branch, never on a tag.** The `release` job's condition reads the *ref* and not the
+event — `if: startsWith(github.ref, 'refs/tags/v')` — so a dispatch launched against a `v*` tag
+satisfies it and **publishes for real**. Dispatching on `main` is the genuine dry run: the job is
+skipped and no release is created. [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md)
+Phase 2 narrows that condition to the push event, after which any dispatch is safe on any ref; until
+it lands, the ref you pick is the whole difference between a rehearsal and a publish.
 
 The component job can also be rehearsed locally, and unlike the macOS bundle it runs on the
 box this project is developed on:
