@@ -9,13 +9,13 @@ Not shipped by the player's release zips, and nothing shipped depends on it.
 
 ## Which configuration covers which directory
 
-| Directory | Process | Bundler | TypeScript project |
-|---|---|---|---|
-| `electron/` (minus `preload/`) | main | esbuild → `dist/main/index.cjs` | `tsconfig.main.json` |
-| `electron/preload/` | preload | esbuild → `dist/preload/index.cjs` | `tsconfig.preload.json` |
-| `renderer/` | renderer | Vite → `dist/renderer/` | `tsconfig.renderer.json` |
-| `shared/` | all three | — | every project includes it |
-| `**/*.test.ts(x)` | — | Vitest | `tsconfig.test.json` |
+| Directory                      | Process   | Bundler                            | TypeScript project        |
+| ------------------------------ | --------- | ---------------------------------- | ------------------------- |
+| `electron/` (minus `preload/`) | main      | esbuild → `dist/main/index.cjs`    | `tsconfig.main.json`      |
+| `electron/preload/`            | preload   | esbuild → `dist/preload/index.cjs` | `tsconfig.preload.json`   |
+| `renderer/`                    | renderer  | Vite → `dist/renderer/`            | `tsconfig.renderer.json`  |
+| `shared/`                      | all three | —                                  | every project includes it |
+| `**/*.test.ts(x)`              | —         | Vitest                             | `tsconfig.test.json`      |
 
 `npm run typecheck` runs all four with `--noEmit`. A Node type error in a
 renderer file is the boundary catching a real bug: the renderer never imports
@@ -23,14 +23,14 @@ Node, and ESLint refuses the import as well.
 
 ## Commands
 
-| Command | What it does |
-|---|---|
-| `npm run dev` | Watches all three bundles and opens the window against the Vite dev server |
-| `npm run build` | Builds main, preload and the renderer once |
-| `npm start` | Opens the window against the built files |
-| `npm test` | Vitest |
-| `npm run lint` | ESLint |
-| `npm run typecheck` | All four projects |
+| Command             | What it does                                                               |
+| ------------------- | -------------------------------------------------------------------------- |
+| `npm run dev`       | Watches all three bundles and opens the window against the Vite dev server |
+| `npm run build`     | Builds main, preload and the renderer once                                 |
+| `npm start`         | Opens the window against the built files                                   |
+| `npm test`          | Vitest                                                                     |
+| `npm run lint`      | ESLint                                                                     |
+| `npm run typecheck` | All four projects                                                          |
 
 ## Finding the player
 

@@ -14,9 +14,19 @@
 import { ipcRenderer } from 'electron'
 
 import { IPC_CHANNELS } from '@shared/ipc-channels'
-import type { PlayerEvent } from '@shared/protocol'
+import type { CtlAction, PlayerEvent } from '@shared/protocol'
 
 export const playerApi = {
+  /**
+   * One action, on its way to the player.
+   *
+   * Fire and forget, because the wire is: OSC has no acknowledgement, so a
+   * promise here would resolve on nothing more than the datagram leaving.
+   */
+  send: (action: CtlAction): void => {
+    ipcRenderer.send(IPC_CHANNELS.PLAYER_CTL, action)
+  },
+
   onEvent: (listener: (event: PlayerEvent) => void): (() => void) => {
     const handler = (_e: unknown, event: PlayerEvent): void => listener(event)
     ipcRenderer.on(IPC_CHANNELS.PLAYER_EVENT, handler)

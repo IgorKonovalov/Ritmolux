@@ -273,8 +273,8 @@ export type PlayerEvent =
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The skeleton shows the picture | studio-builder | done | |
-| 2 — The protocol is typed once | studio-builder | not started | |
+| 1 — The skeleton shows the picture | studio-builder | done | `f2be445` |
+| 2 — The protocol is typed once | studio-builder | done | |
 | 3 — Parameters move | studio-builder | not started | |
 | 4 — Expressions and palettes | studio-builder | not started | |
 | 5 — Composition and the library | studio-builder | not started | |

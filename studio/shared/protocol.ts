@@ -137,3 +137,45 @@ export const PLAYER_EVENT_NAMES = [
 export function frameBytes(stream: Pick<StreamEvent, 'width' | 'height'>): number {
   return stream.width * stream.height * 4
 }
+
+// ---------------------------------------------------------------------------
+// The vocabulary: what the studio may send
+// ---------------------------------------------------------------------------
+
+/** The prefix every address carries, version included. */
+export const ADDRESS_PREFIX = '/rlx/v1'
+
+/** The transport verbs the spec's table names, and no others. */
+export const TRANSPORT_VERBS = ['next', 'prev', 'auto', 'hold'] as const
+export type TransportVerb = (typeof TRANSPORT_VERBS)[number]
+
+export const ctlActionSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('param'), name: z.string().min(1), value: z.number().finite() }),
+  z.object({ kind: z.literal('param_clear'), name: z.string().min(1) }),
+  z.object({ kind: z.literal('params_clear') }),
+  z.object({ kind: z.literal('preset'), name: z.string().min(1) }),
+  z.object({ kind: z.literal('transport'), verb: z.enum(TRANSPORT_VERBS) }),
+  z.object({ kind: z.literal('ping'), nonce: z.number().int() }),
+])
+
+export type CtlAction = z.infer<typeof ctlActionSchema>
+
+/**
+ * The address each action resolves to.
+ *
+ * One entry per row of the spec's vocabulary table, and the test that diffs the
+ * two ways round is what keeps it that way — an address added here without a
+ * row, or a row added without an address, fails before it can ship.
+ */
+export const CTL_ADDRESSES = {
+  param: `${ADDRESS_PREFIX}/ctl/param`,
+  param_clear: `${ADDRESS_PREFIX}/ctl/param/clear`,
+  params_clear: `${ADDRESS_PREFIX}/ctl/params/clear`,
+  preset: `${ADDRESS_PREFIX}/ctl/preset`,
+  transport: `${ADDRESS_PREFIX}/ctl/transport`,
+  ping: `${ADDRESS_PREFIX}/ctl/ping`,
+} as const satisfies Record<CtlAction['kind'], string>
+
+export function ctlAddress(action: CtlAction): string {
+  return CTL_ADDRESSES[action.kind]
+}

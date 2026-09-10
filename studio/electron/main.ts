@@ -16,6 +16,8 @@ import { IPC_CHANNELS } from '@shared/ipc-channels'
 import type { PlayerEvent } from '@shared/protocol'
 
 import { registerAppHandlers, type AppInfo } from './ipc/appHandlers'
+import { registerPlayerHandlers } from './ipc/playerHandlers'
+import { ControlSender } from './player/control'
 import { PlayerSupervisor } from './player/supervisor'
 import { resolvePlayer, type ResolvedPlayer } from './player/resolve'
 import { readSettings, settingsFile } from './settings'
@@ -25,6 +27,7 @@ import { captureRequest, runCapture } from './capture'
 const isDev = process.env.ELECTRON_RENDERER_URL !== undefined
 
 let supervisor: PlayerSupervisor | undefined
+const control = new ControlSender()
 let resolved: ResolvedPlayer | undefined
 /** Events seen before the renderer loaded, replayed to it in arrival order. */
 let replay: PlayerEvent[] = []
@@ -63,6 +66,10 @@ function start(): void {
     playerSource: resolved?.source,
   })
   registerAppHandlers(info)
+  registerPlayerHandlers(
+    () => control,
+    (reason) => console.warn(`[studio] refused an action from the renderer: ${reason}`),
+  )
 
   installCsp(isDev)
   const { rendererFile, preloadPath } = getRendererPaths()
@@ -98,7 +105,12 @@ function start(): void {
 
   supervisor = new PlayerSupervisor({
     playerPath: resolved.path,
-    onEvent: (event) => send(window, event),
+    onEvent: (event) => {
+      // The sender is aimed from the player's own answer, which is `null` when
+      // it opened no listener.
+      if (event.ev === 'hello') control.aim(event.control)
+      send(window, event)
+    },
     onDiagnostic: (line) => console.log(`[player] ${line}`),
     onMalformed: (line, reason) => console.warn(`[player] unreadable event (${reason}): ${line}`),
     onRefused: (reason) => console.error(`[player] refused: ${reason}`),
@@ -119,4 +131,7 @@ app.on('window-all-closed', () => app.quit())
 
 // The child holds a GPU adapter and an audio capture; leaving it behind would
 // keep both after the window is gone.
-app.on('will-quit', () => supervisor?.stop())
+app.on('will-quit', () => {
+  supervisor?.stop()
+  control.close()
+})
