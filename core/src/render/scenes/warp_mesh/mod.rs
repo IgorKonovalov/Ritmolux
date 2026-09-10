@@ -335,7 +335,7 @@ pub const COMPOSITE_PARAMS: &[ParamSpec] = &[
         default: 0.0,
         range: Some([0.0, 3.0]),
         doc: "Which way the echoed copy is flipped before it is blended.",
-        kind: ParamKind::Modal,
+        kind: ParamKind::Structural,
     },
 ];
 
@@ -513,7 +513,8 @@ pub const PARAMS: &[ParamSpec] = &[
         name: "deposit_arms",
         default: 0.0,
         range: Some([0.0, 16.0]),
-        doc: "How many arms the ring is broken into; 0 leaves it whole.",
+        doc: "How many arms the ring is broken into, as a real angular frequency; 0 leaves it \
+               whole.",
         kind: ParamKind::Modal,
     },
     ParamSpec {
@@ -598,7 +599,7 @@ pub const PARAMS: &[ParamSpec] = &[
         default: 0.0,
         range: Some([0.0, 3.0]),
         doc: "Which way the echoed copy is flipped before it is blended.",
-        kind: ParamKind::Modal,
+        kind: ParamKind::Structural,
     },
     crate::render::scenes::common::hue(DEFAULT_HUE),
     ParamSpec {

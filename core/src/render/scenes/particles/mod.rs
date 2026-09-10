@@ -1336,7 +1336,7 @@ pub const PARAMS: &[ParamSpec] = &[
         default: 0.0,
         range: None,
         doc: "Picks a whole known-good figure - family, coefficients and framing together.",
-        kind: ParamKind::Modal,
+        kind: ParamKind::Structural,
     },
     ParamSpec {
         name: "size",

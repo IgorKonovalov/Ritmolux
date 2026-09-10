@@ -142,7 +142,7 @@ pub const MIRROR_ORDER: ParamSpec = ParamSpec {
     default: 1.0,
     range: Some([1.0, 12.0]),
     doc: "Repeats the geometry this many times around the centre; 1 draws it once.",
-    kind: ParamKind::Modal,
+    kind: ParamKind::Structural,
 };
 
 /// `mirror_reflect`, shared: whether those copies alternate as mirror images.

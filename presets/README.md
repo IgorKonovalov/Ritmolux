@@ -460,11 +460,11 @@ here is the **definition**, and the essay is the **discussion**.
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
-| `n` | `6` | `1` – `24` | The rose's petal number - the first of the two integers that pick the figure. |
-| `d` | `71` | `1` – `360` | The step between sampled angles, which is what turns a rose into a Maurer figure. |
+| `n` | `6` | `1` – `24` | The rose's petal number, read as a real frequency: a fraction between two counts draws an open web rather than a rose. |
+| `d` | `71` | `1` – `360` | The step between sampled angles in degrees, which is what turns a rose into a Maurer figure; any real step draws a figure. |
 | `phase` | `0` | `0` – `1` | Rotates where the figure starts sampling, as a fraction of a turn. |
 | `radial_offset` | `0` | `-1` – `1` | Pushes every point out from the centre, opening the figure into a ring. |
-| `samples` | `361` | `16` – `2048` | How many points the curve is drawn from; fewer reads as a polygon. |
+| `samples` | `361` | `16` – `2048` | How many points the curve is drawn from; fewer reads as a polygon. Truncated, so a rise adds its next point on arrival. |
 | `thickness` | `2` | `0.5` – `12` | Stroke width in pixels at the render target, before softness widens the falloff. |
 | `hue` | `0.6` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. |
 | `hue_spread` | `0` | `0` – `1` | How far along the palette the colour travels from one end of the figure to the other. |
@@ -514,7 +514,7 @@ here is the **definition**, and the essay is the **discussion**.
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
-| `variant` | `1` | `0` – `8` | Picks which of the built-in star constructions is drawn. |
+| `variant` | `1` | `0` – `8` | Moves the construction's contact angle, continuously: this is an angle offset rather than an index into a list. |
 | `rotation` | `0` | `0` – `1` | Turns the whole pattern, as a fraction of a full turn. |
 | `hue` | `0.5` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. |
 | `hue_spread` | `0` | `0` – `1` | How far along the palette the colour travels from one end of the figure to the other. |
@@ -547,7 +547,7 @@ here is the **definition**, and the essay is the **discussion**.
 | `flow` | `1` | `0` – `4` | How fast the simulation advances per second. |
 | `inject` | `0` | `0` – `1` | Drops fresh reagent into the field, which is how a beat seeds new growth. |
 | `hue` | `0` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. |
-| `contour` | `6` | `0` – `24` | How many bands the concentration is drawn as; 0 is a smooth gradient. |
+| `contour` | `6` | `0` – `24` | How many bands the concentration is drawn as, as a real density: a fraction slides the whole set of iso-lines. 0 is a smooth gradient. |
 | `hatch` | `5` | `0` – `24` | Density of the hatching drawn along the concentration gradient. |
 | `glow` | `1` | `0` – `2` | Overall light the field emits. |
 | `color_span` | `0.85` | `0` – `1` | How much of the palette the concentration range covers. |
@@ -714,7 +714,7 @@ here is the **definition**, and the essay is the **discussion**.
 | `deposit_y` | `0.5` | `0` – `1` | Vertical position of the deposited figure, in uv. |
 | `deposit_radius` | `0.45` | `0` – `1` | Radius of the deposited ring. |
 | `deposit_width` | `0.11` | `0` – `0.5` | How thick that ring is; narrow reads as a wire, wide as a disc. |
-| `deposit_arms` | `0` | `0` – `16` | How many arms the ring is broken into; 0 leaves it whole. |
+| `deposit_arms` | `0` | `0` – `16` | How many arms the ring is broken into, as a real angular frequency; 0 leaves it whole. |
 | `deposit_twist` | `0` | `-2` – `2` | Sweeps the arms into a spiral rather than leaving them radial. |
 | `deposit_spin` | `0` | `-2` – `2` | Turns per second the deposited figure rotates by. |
 | `gamma` | `1` | `0.25` – `4` | Shapes the field's tone curve on its way out; below 1 lifts the mid tones. |
@@ -740,9 +740,9 @@ here is the **definition**, and the essay is the **discussion**.
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
-| `count` | `0` | `0` – `64` | How many elements are placed; 0 lets the layout decide. |
+| `count` | `0` | `0` – `64` | How many elements are placed; 0 lets the layout decide. Truncated, so a rise admits its next element on arrival. |
 | `layout` | `0` | `0` – `8` | Picks which arrangement the elements are placed by. |
-| `seed` | `0` |  | Chooses one arrangement out of the family; the same seed always composes the same way. |
+| `seed` | `0` |  | Chooses one arrangement out of the family; the same seed always composes the same way. Truncated, like `count`. |
 | `size_hierarchy` | `0.5` | `0` – `1` | How much larger the leading elements are than the rest; 0 makes them equal. |
 | `angle_bias` | `-22` |  | Degrees the elements lean by, which is what gives the composition its tilt. |
 | `roster` | `0` | `0` – `8` | Picks which set of shapes the elements are drawn from. |

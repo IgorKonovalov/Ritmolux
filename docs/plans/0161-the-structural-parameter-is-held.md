@@ -244,8 +244,8 @@ struct ParamHold {
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — the `[hold]` table | dev | done | dc9e970 |
-| 2 — `ParamKind` and quantization | dev | done | committed with this row |
-| 3 — the audit | dev | not started | |
+| 2 — `ParamKind` and quantization | dev | done | 4eeeba8 |
+| 3 — the audit | dev | done | committed with this row |
 | 4 — the reference prints the two surfaces | dev | not started | |
 | 5 — `--report` learns about holds | dev | not started | |
 | 6 — the documentation sweep | dev | not started | |
@@ -302,6 +302,62 @@ struct ParamHold {
 - **One flaky failure, not a finding.** `rlx-core::path_cost
   the_contour_arity_is_priced_against_the_floor_tier` failed once under a loaded parallel run and
   passed alone and on the next full run. It is a GPU wall-clock measurement.
+
+**Phase 3 — the audit.**
+
+**No golden moved.** `golden`, `attractor`, `reaction_diffusion`, `background_composite`, `ink`,
+`reactivity`, `animation`, `sanity` and `distinctness` all pass unchanged.
+
+The rule the audit ran on, narrower than the phase's wording and stated here because it decided
+every row: **`Structural` only where the scene already clamps and rounds the value itself**, so the
+engine's `round` composes to the identity and the mark cannot move a pixel by construction. Where a
+scene reads the fraction — or reduces it by `floor`/truncation rather than `round` — the parameter
+stayed `Modal`.
+
+Marked `Structural` — 27 rows, 11 declaration sites (the shared blocks in `scenes/common.rs`,
+`scenes/marks.rs` and `lines/mod.rs` carry one declaration each for several systems):
+
+| parameter | what already rounds it |
+|---|---|
+| `palette_steps` (11 systems) | `palette::band_steps` |
+| `shape`, `points` (3 systems) | `marks::mark_shape`, `marks::mark_points` |
+| `mirror_order` (4 line systems) | `MirrorSpec::from_params` |
+| `kaleido_order`, `kaleido_edge` | `fold_order`, `fold_edge` |
+| `coord_mode` (`shape_field`) | `applied_coord_mode` |
+| `tuple` (`attractor`) | `family::roster_index` |
+| `layout`, `roster` (`shape_collage`) | `Grammar::from_param`, `Roster::from_param` |
+| `echo_orient` (`warp_mesh`) | `echo_orientation` |
+
+Stayed `Modal`, each with the reason now in its own `doc` line:
+
+- **`n`** (`parametric_curve`) — **the plan's own headline parameter.** `curves.rs:196` evaluates
+  `sin(n * theta + phase)` on the raw `f32`; a fractional petal frequency is a well-defined open web,
+  not a broken rose. The headline behaviour is unaffected: ADR-0180's example is
+  `n = "3 + floor(bass * 5)"`, whose `floor` is the author's own.
+- **`d`** (`parametric_curve`) — `curves.rs:195` reads it as an angle in degrees. Three shipped
+  presets already drive it continuously (`"1.96 + cos(time * 0.0110) * 0.36 + ..."` and two more).
+- **`samples`** (`parametric_curve`) — truncated (`as usize`), not rounded. Marking it would move
+  the point at which a rising `samples` gains its next point by half a sample.
+- **`contour`** (`reaction_diffusion`) — the shader's `f = v * density` inside a `fract()`: a
+  fractional density slides the whole set of iso-lines. Two shipped presets bind it to
+  `"5 + clamp(bass * 3.5, 0, 3)"` and smooth it with an `{ attack, release }` pair.
+- **`count`, `seed`** (`shape_collage`) — `applied_count` **floors**, and `shape_collage.rs:1367`
+  argues for floor over round in its own words: *"a `count` easing from 14 toward 20 should admit
+  the fifteenth element when it has actually arrived."* Rounding first inverts that. `seed` floors
+  by the same rule.
+- **`variant`** (`star_pattern`) — a contact angle, not an index (ADR-0060), and its `doc` said the
+  opposite. Corrected.
+- **`deposit_arms`** (`warp_mesh`) — **a finding.** `shaders.rs:313` computes
+  `phase = arms * (ang + twist * r)` on the raw value, so a fractional arm count tears along
+  `atan2`'s branch cut — the exact discontinuity `mark_points` rounds to avoid, and its doc comment
+  argues at length. Nothing rounds it, so the audit's rule leaves it `Modal`; every shipped preset
+  binds it to an integer constant, so no picture is wrong today. Marking it `Structural` is the
+  fix, and it is a behaviour change this plan does not license.
+- **`kaleido_tile`** — `fold_tile` clamps but does not round, and the stage's own module docs say a
+  fractional winding draws a seam. Same shape as `deposit_arms`, same disposition.
+
+`presets/README.md` was regenerated (`RLX_UPDATE_PARAM_REFERENCE=1`) for the eight moved `doc`
+lines; nothing in it was hand-edited.
 
 ### Close triggers
 

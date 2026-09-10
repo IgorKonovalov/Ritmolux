@@ -922,7 +922,7 @@ pub const PARAMS: &[ParamSpec] = &[
         default: 1.0,
         range: Some([1.0, 16.0]),
         doc: "How many mirrored wedges the frame is folded into; 1 is no fold at all.",
-        kind: ParamKind::Modal,
+        kind: ParamKind::Structural,
     },
     ParamSpec {
         name: "kaleido_angle",
@@ -950,7 +950,7 @@ pub const PARAMS: &[ParamSpec] = &[
         default: 1.0,
         range: Some([0.0, 1.0]),
         doc: "Softens the seam between mirrored wedges; 1 is a hard edge.",
-        kind: ParamKind::Modal,
+        kind: ParamKind::Structural,
     },
     // ADR-0077's composed map, in the order it is applied
     // (destination-to-source): tile -> fold -> radial -> spiral, with `zoom` and

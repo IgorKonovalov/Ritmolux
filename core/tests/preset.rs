@@ -2074,7 +2074,52 @@ fn declared_params_match_set_param() {
 /// `declared_params_match_set_param` above compares the engine's declarations
 /// against, and a `ParamKind` has no other enforcement available to it: it
 /// states what a value *means*, which no scan of the source can infer.
-const STRUCTURAL: &[(&str, &str)] = &[];
+/// Each entry names a parameter whose scene **already** clamps and rounds it
+/// before use, so the engine's own quantization composes to the identity. That
+/// is the audit's rule: a parameter is `Structural` where rounding is provably
+/// a no-op today, and `Modal` wherever the scene reads the fraction — which is
+/// why `n`, `d`, `samples`, `contour`, `count`, `seed`, `variant` and
+/// `deposit_arms` are absent despite integer-sounding names.
+const STRUCTURAL: &[(&str, &str)] = &[
+    // `mark_shape` / `mark_points`: clamp then round, CPU-side, because a
+    // fractional point count tears the angle fold along `atan2`'s branch cut.
+    ("swarm", "shape"),
+    ("swarm", "points"),
+    ("emitter", "shape"),
+    ("emitter", "points"),
+    ("shape_field", "shape"),
+    ("shape_field", "points"),
+    // `applied_coord_mode`: a two-entry roster, clamped and rounded.
+    ("shape_field", "coord_mode"),
+    // `family::roster_index`: rounds into the tuple roster.
+    ("attractor", "tuple"),
+    // `Grammar::from_param` / `Roster::from_param`: round into a closed set.
+    ("shape_collage", "layout"),
+    ("shape_collage", "roster"),
+    // `echo_orientation`: rounds, then wraps modulo the four flips.
+    ("warp_mesh", "echo_orient"),
+    // `MirrorSpec::from_params`: rounds then clamps, on every line scene.
+    ("parametric_curve", "mirror_order"),
+    ("lsystem", "mirror_order"),
+    ("star_pattern", "mirror_order"),
+    ("spectrum", "mirror_order"),
+    // `palette::band_steps`: clamps and rounds at every LUT read, on every
+    // scene that carries the shared palette block.
+    ("fragment_field", "palette_steps"),
+    ("swarm", "palette_steps"),
+    ("parametric_curve", "palette_steps"),
+    ("lsystem", "palette_steps"),
+    ("star_pattern", "palette_steps"),
+    ("reaction_diffusion", "palette_steps"),
+    ("attractor", "palette_steps"),
+    ("spectrum", "palette_steps"),
+    ("emitter", "palette_steps"),
+    ("shape_field", "palette_steps"),
+    ("warp_mesh", "palette_steps"),
+    // `fold_order` / `fold_edge`: the kaleidoscope's two stepped params.
+    ("kaleidoscope", "kaleido_order"),
+    ("kaleidoscope", "kaleido_edge"),
+];
 
 /// **The three additive-particle scenes spell their level lever the same way**
 /// (Plan 0066 Phase 1 / ADR-0080).

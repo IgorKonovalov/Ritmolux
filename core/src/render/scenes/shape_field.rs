@@ -1154,7 +1154,7 @@ pub const PARAMS: &[ParamSpec] = &[
         // silently resolves to another one.
         range: Some([MIN_COORD_MODE, MAX_COORD_MODE]),
         doc: "Which coordinate frame the distance is measured in, which changes the shape's whole geometry.",
-        kind: ParamKind::Modal,
+        kind: ParamKind::Structural,
     },
     ParamSpec {
         name: "rotation",

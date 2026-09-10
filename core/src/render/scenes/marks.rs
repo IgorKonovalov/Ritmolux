@@ -455,7 +455,7 @@ pub(crate) const SHAPE: ParamSpec = ParamSpec {
     default: 0.0,
     range: Some([0.0, 4.0]),
     doc: "Which silhouette each mark is drawn as - a disc, a square, a star, and so on.",
-    kind: ParamKind::Modal,
+    kind: ParamKind::Structural,
 };
 
 /// `points`, shared by the three shaped-mark scenes: the silhouette's count.
@@ -464,7 +464,7 @@ pub(crate) const POINTS: ParamSpec = ParamSpec {
     default: 5.0,
     range: Some([3.0, 16.0]),
     doc: "How many points or sides the silhouette has, where the shape has a count at all.",
-    kind: ParamKind::Modal,
+    kind: ParamKind::Structural,
 };
 
 /// `star_valley`, shared: how deep a star's notches cut.

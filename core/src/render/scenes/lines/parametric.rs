@@ -341,14 +341,16 @@ pub const PARAMS: &[ParamSpec] = &[
         name: "n",
         default: 6.0,
         range: Some([1.0, 24.0]),
-        doc: "The rose's petal number - the first of the two integers that pick the figure.",
+        doc: "The rose's petal number, read as a real frequency: a fraction between two counts \
+               draws an open web rather than a rose.",
         kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "d",
         default: 71.0,
         range: Some([1.0, 360.0]),
-        doc: "The step between sampled angles, which is what turns a rose into a Maurer figure.",
+        doc: "The step between sampled angles in degrees, which is what turns a rose into a \
+               Maurer figure; any real step draws a figure.",
         kind: ParamKind::Modal,
     },
     ParamSpec {
@@ -369,7 +371,8 @@ pub const PARAMS: &[ParamSpec] = &[
         name: "samples",
         default: 361.0,
         range: Some([16.0, 2048.0]),
-        doc: "How many points the curve is drawn from; fewer reads as a polygon.",
+        doc: "How many points the curve is drawn from; fewer reads as a polygon. Truncated, so \
+               a rise adds its next point on arrival.",
         kind: ParamKind::Modal,
     },
     crate::render::scenes::lines::thickness(DEFAULT_THICKNESS),

@@ -1491,7 +1491,8 @@ pub const PARAMS: &[ParamSpec] = &[
         name: "count",
         default: 0.0,
         range: Some([0.0, 64.0]),
-        doc: "How many elements are placed; 0 lets the layout decide.",
+        doc: "How many elements are placed; 0 lets the layout decide. Truncated, so a rise \
+               admits its next element on arrival.",
         kind: ParamKind::Modal,
     },
     ParamSpec {
@@ -1499,13 +1500,14 @@ pub const PARAMS: &[ParamSpec] = &[
         default: 0.0,
         range: Some([0.0, 8.0]),
         doc: "Picks which arrangement the elements are placed by.",
-        kind: ParamKind::Modal,
+        kind: ParamKind::Structural,
     },
     ParamSpec {
         name: "seed",
         default: 0.0,
         range: None,
-        doc: "Chooses one arrangement out of the family; the same seed always composes the same way.",
+        doc: "Chooses one arrangement out of the family; the same seed always composes the \
+               same way. Truncated, like `count`.",
         kind: ParamKind::Modal,
     },
     ParamSpec {
@@ -1527,7 +1529,7 @@ pub const PARAMS: &[ParamSpec] = &[
         default: 0.0,
         range: Some([0.0, 8.0]),
         doc: "Picks which set of shapes the elements are drawn from.",
-        kind: ParamKind::Modal,
+        kind: ParamKind::Structural,
     },
     ParamSpec {
         name: "density",

@@ -88,7 +88,7 @@ pub(crate) const PALETTE_STEPS: ParamSpec = ParamSpec {
     default: palette::DEFAULT_PALETTE_STEPS,
     range: Some([0.0, 16.0]),
     doc: "Quantizes the palette into this many flat bands; 0 leaves it continuous.",
-    kind: ParamKind::Modal,
+    kind: ParamKind::Structural,
 };
 
 /// `palette_contour`, shared: the line drawn at each band edge.

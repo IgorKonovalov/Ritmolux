@@ -666,7 +666,8 @@ pub const PARAMS: &[ParamSpec] = &[
         name: "variant",
         default: 1.0,
         range: Some([0.0, 8.0]),
-        doc: "Picks which of the built-in star constructions is drawn.",
+        doc: "Moves the construction's contact angle, continuously: this is an angle offset \
+               rather than an index into a list.",
         kind: ParamKind::Modal,
     },
     ParamSpec {

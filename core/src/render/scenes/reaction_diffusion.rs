@@ -853,7 +853,8 @@ pub const PARAMS: &[ParamSpec] = &[
         name: "contour",
         default: 6.0,
         range: Some([0.0, 24.0]),
-        doc: "How many bands the concentration is drawn as; 0 is a smooth gradient.",
+        doc: "How many bands the concentration is drawn as, as a real density: a fraction \
+               slides the whole set of iso-lines. 0 is a smooth gradient.",
         kind: ParamKind::Modal,
     },
     ParamSpec {
