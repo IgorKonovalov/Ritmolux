@@ -5,10 +5,10 @@
 use super::*;
 
 /// The base rose these tests vary one field at a time from. Named-field
-/// construction is the point of [`RoseParams`]: a reader can see which lever
+/// construction is the point of [`CurveParams`]: a reader can see which lever
 /// each test pulls without counting argument positions.
-fn rose() -> RoseParams {
-    RoseParams {
+fn rose() -> CurveParams {
+    CurveParams {
         n: 6.0,
         d: 71.0,
         phase: 0.0,
@@ -43,7 +43,7 @@ fn draw_progress_reveals_a_prefix() {
     let mut half = Vec::with_capacity(400);
     maurer_rose(rose(), &mut full);
     maurer_rose(
-        RoseParams {
+        CurveParams {
             draw_progress: 0.5,
             ..rose()
         },
@@ -60,7 +60,7 @@ fn sampling_into_a_preallocated_buffer_does_not_grow_it() {
     let cap = out.capacity();
     for frame in 0..8 {
         maurer_rose(
-            RoseParams {
+            CurveParams {
                 n: 5.0,
                 d: 97.0,
                 samples: 361,
@@ -83,7 +83,7 @@ fn sampling_into_a_preallocated_buffer_does_not_grow_it() {
 /// pre-Plan-0028 sampler — the reason the golden fixture needs no re-bless.
 #[test]
 fn zero_phase_and_offset_reduce_to_the_plain_sine_rose() {
-    let p = RoseParams {
+    let p = CurveParams {
         samples: 4,
         ..rose()
     };
@@ -124,7 +124,7 @@ fn the_rose_extends_every_interior_vertex_of_its_chain() {
 
     let mut arc = Vec::with_capacity(8);
     maurer_rose(
-        RoseParams {
+        CurveParams {
             samples: 3,
             ..rose()
         },
@@ -171,7 +171,7 @@ fn the_rose_extends_every_interior_vertex_of_its_chain() {
     // being drawn.
     let mut half = Vec::with_capacity(16);
     maurer_rose(
-        RoseParams {
+        CurveParams {
             samples: 8,
             draw_progress: 0.5,
             ..rose()
@@ -188,7 +188,7 @@ fn the_rose_extends_every_interior_vertex_of_its_chain() {
     // One chord is all ends and no joint.
     let mut single = Vec::with_capacity(4);
     maurer_rose(
-        RoseParams {
+        CurveParams {
             samples: 1,
             ..rose()
         },
@@ -205,7 +205,7 @@ fn the_rose_extends_every_interior_vertex_of_its_chain() {
 #[test]
 fn radial_offset_shifts_the_radius_by_a_constant() {
     let offset = 0.5_f32;
-    let base_params = RoseParams {
+    let base_params = CurveParams {
         samples: 4,
         ..rose()
     };
@@ -213,7 +213,7 @@ fn radial_offset_shifts_the_radius_by_a_constant() {
     let mut shifted = Vec::with_capacity(8);
     maurer_rose(base_params, &mut base);
     maurer_rose(
-        RoseParams {
+        CurveParams {
             radial_offset: offset,
             ..base_params
         },
@@ -238,7 +238,7 @@ fn phase_changes_the_geometry() {
     let mut shifted = Vec::with_capacity(400);
     maurer_rose(rose(), &mut zero);
     maurer_rose(
-        RoseParams {
+        CurveParams {
             phase: 1.0,
             ..rose()
         },
@@ -256,7 +256,7 @@ fn phase_changes_the_geometry() {
 /// changes the radii themselves.
 #[test]
 fn rotation_preserves_radii_where_phase_does_not() {
-    let base_params = RoseParams {
+    let base_params = CurveParams {
         samples: 8,
         ..rose()
     };
@@ -265,14 +265,14 @@ fn rotation_preserves_radii_where_phase_does_not() {
     let mut phased = Vec::with_capacity(16);
     maurer_rose(base_params, &mut base);
     maurer_rose(
-        RoseParams {
+        CurveParams {
             rotation: 0.7,
             ..base_params
         },
         &mut rotated,
     );
     maurer_rose(
-        RoseParams {
+        CurveParams {
             phase: 0.7,
             ..base_params
         },
@@ -302,7 +302,7 @@ fn a_chord_web_declines_the_fit_and_a_rose_takes_it() {
     let walk = |n: f32, d: f32, samples: usize| {
         let (mut points, mut pieces, mut at) = (Vec::new(), Vec::new(), Vec::new());
         let fitted = maurer_rose_pieces(
-            RoseParams {
+            CurveParams {
                 n,
                 d,
                 phase: 0.0,
@@ -341,4 +341,237 @@ fn a_chord_web_declines_the_fit_and_a_rose_takes_it() {
         "a fit that costs more than the chords it replaces is not a fit: {}",
         pieces.len()
     );
+}
+
+// ---------------------------------------------------------------------------
+// The families beyond the rose
+// ---------------------------------------------------------------------------
+
+/// A walk of `family` through [`fit_walk`], with the three buffers it fills.
+fn walk_of(family: CurveFamily, p: CurveParams) -> (Fit, Vec<[f32; 2]>, Vec<Piece>) {
+    let (mut points, mut pieces, mut at) = (Vec::new(), Vec::new(), Vec::new());
+    let fit = fit_walk(family, p, &mut points, &mut pieces, &mut at);
+    (fit, points, pieces)
+}
+
+/// The signed angle from unit direction `a` to `b`, in `(-PI, PI]`.
+fn turn_between(a: [f32; 2], b: [f32; 2]) -> f32 {
+    (a[0] * b[1] - a[1] * b[0]).atan2(a[0] * b[0] + a[1] * b[1])
+}
+
+/// The radius past which the fit emits a straight `Line` in place of an arc —
+/// `biarc`'s own `MAX_RADIUS`, restated because it is private to that module.
+const FLAT_RADIUS: f32 = 64.0;
+
+/// Every joint of `pieces` — including the wrap from the last piece to the
+/// first when `closed` — shares its endpoint and its tangent: the chain is
+/// **G1 all the way round**, not merely along its runs. Returns the joint count
+/// so a caller can refuse a vacuous chain.
+///
+/// # The one bounded exception, and why it is not a tangent break
+///
+/// Where the outline is flatter than [`FLAT_RADIUS`] — an inflection, where the
+/// curvature passes through zero — the fit draws the span as a straight line,
+/// and a line's direction is its chord rather than the tangent the fit asked
+/// for. The two differ by at most `asin(L / 2R)` for a line of length `L`,
+/// which is the bound asserted at a joint touching a line. Arc to arc, the
+/// construction is exact and the bound is f32 rounding.
+fn assert_g1(pieces: &[Piece], closed: bool, label: &str) -> usize {
+    let joints = if closed {
+        pieces.len()
+    } else {
+        pieces.len() - 1
+    };
+    let flat = |piece: Piece| match piece {
+        Piece::Line { a, b } => (super::dist(a, b) / (2.0 * FLAT_RADIUS)).asin(),
+        Piece::Arc { .. } => 0.0,
+    };
+    for k in 0..joints {
+        let (here, next) = (pieces[k], pieces[(k + 1) % pieces.len()]);
+        let gap = super::dist(here.end_point(), next.start_point());
+        assert!(
+            gap < 1e-4,
+            "{label}: joint {k} opens a {gap} gap between one piece and the next"
+        );
+        let bend = turn_between(here.end_tangent(), next.start_tangent()).abs();
+        let allowed = 1e-3 + flat(here) + flat(next);
+        assert!(
+            bend < allowed,
+            "{label}: joint {k} breaks the tangent by {} degrees between {here:?} and {next:?}",
+            bend.to_degrees()
+        );
+    }
+    joints
+}
+
+/// The Lissajous base these tests vary from: the 3:2 figure of the done-when.
+fn lissajous() -> CurveParams {
+    CurveParams {
+        n: 3.0,
+        d: 2.0,
+        samples: 360,
+        scale: 0.9,
+        ..rose()
+    }
+}
+
+/// Plan 0162 Phase 1's done-when: `n = 3`, `d = 2` draws the 3:2 Lissajous
+/// figure as **one closed G1 arc chain with no tangent break** — the wrap
+/// included, which is the joint an open fit would have left as two free ends.
+///
+/// "The 3:2 figure" is asserted on the walk, point by point against the formula
+/// computed here, so a sampler that drew some other smooth closed curve fails.
+#[test]
+fn a_three_two_lissajous_is_one_closed_g1_chain() {
+    let p = lissajous();
+    let (fit, points, pieces) = walk_of(CurveFamily::Lissajous, p);
+    assert!(
+        fit.fitted,
+        "a Lissajous is a curve and always takes the fit"
+    );
+    assert!(fit.closed, "whole frequencies close over one turn");
+    assert_eq!(
+        points.len(),
+        p.samples,
+        "a closed walk leaves out the repeated start, which the wrap supplies"
+    );
+
+    let step = std::f32::consts::TAU / p.samples as f32;
+    for (k, point) in points.iter().enumerate() {
+        let t = step * k as f32;
+        let want = [(3.0 * t).sin() * p.scale, (2.0 * t).sin() * p.scale];
+        assert!(
+            super::dist(*point, want) < 1e-5,
+            "sample {k} sits at {point:?}, not on the 3:2 figure's {want:?}"
+        );
+    }
+
+    assert!(
+        pieces
+            .iter()
+            .any(|piece| matches!(piece, Piece::Arc { .. })),
+        "a fitted Lissajous comes back as arcs"
+    );
+    assert!(
+        pieces.len() < p.samples,
+        "the fit must cost fewer pieces than the {} chords it replaces, got {}",
+        p.samples,
+        pieces.len()
+    );
+    let joints = assert_g1(&pieces, true, "3:2 Lissajous");
+    assert_eq!(joints, pieces.len(), "the wrap is a joint like any other");
+}
+
+/// Closure is read off the walk, not assumed from the family: a fractional
+/// frequency never returns to its start, and a partial reveal is always open so
+/// its drawing head stays a free end.
+#[test]
+fn a_lissajous_closes_only_when_the_whole_trace_returns_to_its_start() {
+    let (fit, points, _) = walk_of(
+        CurveFamily::Lissajous,
+        CurveParams {
+            n: 3.4,
+            ..lissajous()
+        },
+    );
+    assert!(fit.fitted && !fit.closed, "a 3.4:2 trace does not close");
+    assert_eq!(points.len(), 361, "an open walk keeps both its ends");
+
+    let (fit, points, _) = walk_of(
+        CurveFamily::Lissajous,
+        CurveParams {
+            draw_progress: 0.5,
+            ..lissajous()
+        },
+    );
+    assert!(fit.fitted && !fit.closed, "half a 3:2 figure is open");
+    assert_eq!(points.len(), 181, "half of 360 chords, plus the start");
+}
+
+/// Adding the Lissajous arm left the rose exactly where it was: the walk the
+/// dispatch hands the fit is the walk [`maurer_rose`] draws, point for point,
+/// and the verdict is still the corner share — so every rose golden, web or
+/// fitted, sees the arithmetic it was blessed against.
+#[test]
+fn the_rose_arm_walks_exactly_the_points_its_polyline_draws() {
+    for (n, d) in [(6.0, 71.0), (5.0, 2.0)] {
+        let p = CurveParams {
+            n,
+            d,
+            samples: 240,
+            ..rose()
+        };
+        let mut chords = Vec::with_capacity(256);
+        maurer_rose(p, &mut chords);
+        let (fit, points, _) = walk_of(CurveFamily::MaurerRose, p);
+        assert!(!fit.closed, "a Maurer walk is never closed");
+        assert_eq!(points.len(), chords.len() + 1);
+        for (k, chord) in chords.iter().enumerate() {
+            assert_eq!(points[k], chord.a, "d = {d}: chord {k} starts off the walk");
+            assert_eq!(
+                points[k + 1],
+                chord.b,
+                "d = {d}: chord {k} ends off the walk"
+            );
+        }
+    }
+}
+
+/// Every family round-trips through the loader by its own name, and a name
+/// outside the roster is still a load error rather than a fallback to the rose.
+#[test]
+fn every_family_loads_by_name_and_an_unknown_one_is_rejected() {
+    use crate::preset::Preset;
+    use crate::render::scenes::GeneratorConfig;
+
+    let load = |family: &str| {
+        Preset::from_toml_str(&format!(
+            "system = \"parametric_curve\"\nname = \"f\"\n[curve]\nfamily = \"{family}\"\n"
+        ))
+    };
+    for family in CurveFamily::ALL {
+        let preset = load(family.as_str())
+            .unwrap_or_else(|e| panic!("`{}` must load: {e}", family.as_str()));
+        assert!(
+            matches!(
+                preset.config,
+                Some(GeneratorConfig::Curve { family: loaded }) if loaded == family
+            ),
+            "`{}` loaded as {:?}",
+            family.as_str(),
+            preset.config
+        );
+    }
+    for unknown in ["lissajou", "Lissajous", "spirograph", ""] {
+        assert!(
+            load(unknown).is_err(),
+            "the unknown family `{unknown}` must be rejected, not defaulted"
+        );
+    }
+}
+
+/// The polyline a declining family draws chains every vertex, and a closed
+/// walk's wrap is a joint too — no free end where it meets itself.
+#[test]
+fn a_closed_polyline_joins_its_wrap_and_an_open_one_leaves_its_ends_free() {
+    let square = [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]];
+    let p = CurveParams {
+        width: 0.01,
+        ..rose()
+    };
+    let mut out = Vec::new();
+    polyline_of(&p, &square, true, &mut out);
+    assert_eq!(out.len(), 4, "a closed walk of four points is four chords");
+    assert_eq!(out[3].b, out[0].a, "the last chord returns to the first");
+    for (k, seg) in out.iter().enumerate() {
+        assert!(
+            seg.ext_a > 0.0 && seg.ext_b > 0.0,
+            "chord {k}: every end of a closed polyline is a joint"
+        );
+    }
+
+    polyline_of(&p, &square, false, &mut out);
+    assert_eq!(out.len(), 3, "an open walk of four points is three chords");
+    assert_eq!(out[0].ext_a, 0.0, "the open walk's first end is free");
+    assert_eq!(out[2].ext_b, 0.0, "and so is its last");
 }

@@ -266,7 +266,14 @@ impl ParametricCurveScene {
     /// [`color_along_path`] gives: a chord's place on the curve belongs to the
     /// curve, so a `draw_progress` reveal draws the gradient on rather than
     /// re-tinting it.
-    fn split_pieces(&mut self, samples: usize, ramp: ColorRamp, color: [f32; 3], width: f32) {
+    fn split_pieces(
+        &mut self,
+        samples: usize,
+        ramp: ColorRamp,
+        color: [f32; 3],
+        width: f32,
+        closed: bool,
+    ) {
         self.single_buf.clear();
         self.single_arcs.clear();
         let span = samples.saturating_sub(1).max(1) as f32;
@@ -295,8 +302,9 @@ impl ParametricCurveScene {
                     // as along a curve — the extension is what covers the wedge
                     // between two strokes, and a corner is where there is one.
                     //
-                    // The walk is open, so its two outer ends are free.
-                    let (ext_a, ext_b) = Piece::chain_extensions(&self.pieces, k, width, false);
+                    // An open walk's two outer ends are free; a closed one
+                    // wraps, and its first piece continues its last.
+                    let (ext_a, ext_b) = Piece::chain_extensions(&self.pieces, k, width, closed);
                     self.single_buf.push(SegmentInstance {
                         a,
                         b,
@@ -507,7 +515,7 @@ impl Scene for ParametricCurveScene {
         let color = ramp.at(&self.palette, 0.0);
         let width = super::half_width(self.thickness);
 
-        let params = curves::RoseParams {
+        let params = curves::CurveParams {
             n: self.n,
             d: self.d,
             phase: self.phase,
@@ -520,31 +528,34 @@ impl Scene for ParametricCurveScene {
             width,
         };
 
-        // Sample the single curve, then replicate it under the geometry mirror
-        // (Phase 4). At the default identity spec this is a 1:1 copy, so an
-        // un-mirrored preset is unchanged.
+        // Sample the single curve, then replicate it under the geometry mirror.
+        // At the default identity spec this is a 1:1 copy, so an un-mirrored
+        // preset is unchanged.
         //
-        // **Two primitives, one walk** (Plan 0087 Phase 5). A *smooth* Maurer
-        // walk — a small angular step, where the successive points trace a rose
-        // rather than web it — is fitted to a G1 arc chain and drawn without a
-        // tangent break anywhere. A chord web declines the fit and takes the
-        // path below, which is untouched: the chords **are** that figure, and
-        // an arc through two of them would be drawing something else.
-        let fitted = match self.family {
-            CurveFamily::MaurerRose => curves::maurer_rose_pieces(
-                params,
-                &mut self.points,
-                &mut self.pieces,
-                &mut self.walk,
-            ),
-        };
-        if fitted {
+        // **Two primitives, one walk.** A walk the family's verdict calls a
+        // curve — every Lissajous, and a Maurer rose at a small angular step —
+        // is fitted to a G1 arc chain and drawn without a tangent break
+        // anywhere. A walk it declines — a Maurer chord web — takes the
+        // family's polyline instead: the chords **are** that figure, and an arc
+        // through two of them would be drawing something else. The family is
+        // named only inside `curves`, so a new one never edits this scene.
+        let fit = curves::fit_walk(
+            self.family,
+            params,
+            &mut self.points,
+            &mut self.pieces,
+            &mut self.walk,
+        );
+        if fit.fitted {
             self.reserve_fit_buffers();
-            self.split_pieces(samples, ramp, color, width);
+            self.split_pieces(samples, ramp, color, width, fit.closed);
         } else {
-            match self.family {
-                CurveFamily::MaurerRose => curves::maurer_rose(params, &mut self.single_buf),
-            }
+            (curves::arm(self.family).polyline)(
+                &params,
+                &self.points,
+                fit.closed,
+                &mut self.single_buf,
+            );
             self.single_arcs.clear();
             color_along_path(&mut self.single_buf, &self.palette, ramp, samples);
         }
@@ -654,7 +665,7 @@ mod tests {
     /// allocation-free.
     #[test]
     fn the_walk_writes_one_more_point_than_it_has_chords_and_a_web_fits_nothing() {
-        let web = curves::RoseParams {
+        let web = curves::CurveParams {
             n: 6.0,
             // A shipped-shape chord web: `maurer_rose_pieces` declines this.
             d: 71.0,
@@ -728,7 +739,7 @@ mod tests {
 
         const W: f32 = 0.01;
 
-        let rose = curves::RoseParams {
+        let rose = curves::CurveParams {
             n: 5.0,
             // `curve_ionwake`'s rose: a curve, so `maurer_rose_pieces` takes it.
             d: 2.0,
@@ -879,7 +890,7 @@ mod tests {
     fn curve(samples: usize, draw_progress: f32, hue_spread: f32) -> Vec<SegmentInstance> {
         let mut out = Vec::with_capacity(samples + 1);
         curves::maurer_rose(
-            curves::RoseParams {
+            curves::CurveParams {
                 n: DEFAULT_N,
                 d: DEFAULT_D,
                 phase: DEFAULT_PHASE,

@@ -1,6 +1,6 @@
 # 0162 — The curve families
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-09
 > **Owner skill(s):** dev
 > **Related ADRs:** [0180](../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md)
@@ -235,11 +235,11 @@ struct FamilySample {
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `batch/2026-09-11`, worktree `C:\Users\Igor Konovalov\WORK\rlx-batch` (unattended batch run)
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the family seam takes a second arm | dev | not started | |
+| 1 — the family seam takes a second arm | dev | done | committed with this row |
 | 2 — hypotrochoid and epicycloid | dev | not started | |
 | 3 — the superformula | dev | not started | |
 | 4 — the harmonograph | dev | not started | |
@@ -247,6 +247,20 @@ struct FamilySample {
 | 6 — the documentation sweep | dev | not started | |
 
 ### Notes
+
+- Phase 1: `RoseParams` is renamed `CurveParams`, since every family now reads it. `maurer_rose_pieces`
+  is `#[cfg(test)]` - the scene reaches the rose through `curves::fit_walk`, as it reaches every family.
+- Phase 1: a fitted Lissajous is G1 exactly at arc-to-arc joints. Where `biarc` emits a straight
+  `Line` through an inflection (the MAX_RADIUS fallback), the joint departs from the requested tangent
+  by up to `asin(L / 2R)` - measured at 0.06 degrees on the 3:2 figure. The test asserts that bound,
+  and restates `biarc`'s private `MAX_RADIUS` as `FLAT_RADIUS = 64` in `curves/tests.rs`.
+- Phase 1: byte identity of the rose goldens was checked by re-blessing `golden` on this machine.
+  `parametric_curve`, `line_joint_zigzag` and every `composite_*` baseline came back byte-identical
+  to the committed files. Nine unrelated baselines (`backdrop_*`, `shape_*`, `warp_mesh*`) differed,
+  already did before this plan, and were restored untouched.
+- Phase 1: a new family reads `phase` as a fraction of a turn (`phase * TAU`), which is what the
+  `ParamSpec` doc and its `0..1` range state. The rose adds `phase` inside its sine in radians, which
+  that doc does not say. Left as it was - an observation, not acted on.
 
 ### Close triggers
 

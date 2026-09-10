@@ -248,24 +248,32 @@ impl Default for ViewTransform {
     }
 }
 
-/// Which parametric curve family a `[curve]` preset draws. Extend as Plan 0010's
-/// follow-ups add curve families (epicycloids, Lissajous, ...); unknown names
-/// are rejected at load.
+/// Which parametric curve family a `[curve]` preset draws; unknown names are
+/// rejected at load.
+///
+/// A family is a **walk and a fit verdict**, not a scene: each variant answers
+/// [`curves::arm`], and `parametric_curve` draws whatever that returns without
+/// naming a family itself. `n`, `d` and `phase` are read with a family-specific
+/// meaning (the `attractor` precedent, where `a`..`d` mean different things per
+/// family).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CurveFamily {
     /// The Maurer rose — `sin(n * theta)` walked at a fixed angular step.
     MaurerRose,
+    /// The Lissajous figure — `x = sin(n t + phase)`, `y = sin(d t)`.
+    Lissajous,
 }
 
 impl CurveFamily {
     /// Every family, in roster order — the closed set, and the list the schema
     /// export renders rather than restating.
-    pub const ALL: [CurveFamily; 1] = [CurveFamily::MaurerRose];
+    pub const ALL: [CurveFamily; 2] = [CurveFamily::MaurerRose, CurveFamily::Lissajous];
 
     /// Parse a `[curve] family` name, or `None` if unknown.
     pub fn from_name(name: &str) -> Option<Self> {
         Some(match name {
             "maurer_rose" => CurveFamily::MaurerRose,
+            "lissajous" => CurveFamily::Lissajous,
             _ => return None,
         })
     }
@@ -275,6 +283,7 @@ impl CurveFamily {
     pub fn as_str(self) -> &'static str {
         match self {
             CurveFamily::MaurerRose => "maurer_rose",
+            CurveFamily::Lissajous => "lissajous",
         }
     }
 }

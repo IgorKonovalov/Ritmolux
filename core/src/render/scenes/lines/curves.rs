@@ -13,6 +13,7 @@
     clippy::unreachable
 )]
 
+use super::CurveFamily;
 use super::biarc::{self, Piece};
 use super::renderer::{SegmentInstance, miter_extension};
 
@@ -32,22 +33,35 @@ use super::renderer::{SegmentInstance, miter_extension};
 /// The decision has to be about the walk as a whole.
 pub const SMOOTH_CORNER_SHARE: f32 = 0.25;
 
-/// The lateral budget the rose is fitted to: **one pixel at 1080p**.
+/// The lateral budget every family is fitted to: **one pixel at 1080p**.
 ///
 /// Quoted directly in [`biarc::PIXEL_1080P`] and not divided by anything,
-/// because unlike a motif outline this walk is sampled in the frame it is drawn
-/// in — `scale` is applied inside [`maurer_rose`] itself.
-const ROSE_FIT_BUDGET: f32 = biarc::PIXEL_1080P;
+/// because unlike a motif outline a walk is sampled in the frame it is drawn
+/// in — `scale` is applied inside the sampler itself.
+const FIT_BUDGET: f32 = biarc::PIXEL_1080P;
 
-/// Everything [`maurer_rose`] needs, by name.
+/// How near a walk's last point must come to its first for the walk to be
+/// **closed** — drawn as one loop with a G1 joint where it meets itself, rather
+/// than as an open trace whose two free ends happen to touch.
+///
+/// About a twentieth of a pixel at 1080p. A figure that closes by construction
+/// (a Lissajous with whole frequencies) comes back to within f32 rounding of its
+/// start — a few `1e-6` — so this sits two orders above that and two below
+/// anything a viewer could read as a gap.
+const CLOSE_TOLERANCE: f32 = 1.0e-4;
+
+/// Everything a family's walk needs, by name.
 ///
 /// This was eleven positional `f32`s behind `#[allow(clippy::too_many_arguments)]`
 /// (Plan 0031 Phase 6). Four of them — `phase`, `scale`, `radial_offset`,
 /// `rotation` — are adjacent, same-typed, and easy to transpose: the call would
 /// still compile and would draw a different curve. Named fields make that a typo
 /// you can see. `Copy` and all-scalar, so it is free at runtime.
+///
+/// `n`, `d` and `phase` carry a **family-specific** meaning; the field docs
+/// give the rose's, and each family's sampler states its own.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct RoseParams {
+pub struct CurveParams {
     /// Petal frequency: the `n` in `sin(n * theta)`.
     pub n: f32,
     /// Angular step between successive sampled points, in **degrees** — the
@@ -77,8 +91,8 @@ pub struct RoseParams {
 
 /// Sample a Maurer rose into `out` (cleared first).
 ///
-/// A Maurer rose walks [`samples`](RoseParams::samples) points at a fixed angular
-/// step [`d`](RoseParams::d) degrees, with radius
+/// A Maurer rose walks [`samples`](CurveParams::samples) points at a fixed angular
+/// step [`d`](CurveParams::d) degrees, with radius
 /// `r = sin(n * theta + phase) + radial_offset`; connecting the successive chords
 /// is what draws the characteristic web. With `phase` and `radial_offset` both at
 /// `0.0` the formula reduces to the plain `sin(n * theta)` rose (a no-op — the
@@ -87,7 +101,7 @@ pub struct RoseParams {
 /// Allocation-free: the caller preallocates `out` with capacity `>= samples`,
 /// and this pushes at most `samples` segments (never exceeding that capacity),
 /// so no reallocation occurs on the hot path.
-pub fn maurer_rose(p: RoseParams, out: &mut Vec<SegmentInstance>) {
+pub fn maurer_rose(p: CurveParams, out: &mut Vec<SegmentInstance>) {
     out.clear();
     if p.samples == 0 {
         return;
@@ -158,40 +172,138 @@ pub fn maurer_rose(p: RoseParams, out: &mut Vec<SegmentInstance>) {
 ///
 /// Allocation-free into preallocated buffers, because this runs **every frame**
 /// (ADR-0007's parametric build model gives it no load moment to run at).
+///
+/// The scene reaches this through [`fit_walk`], which every family shares; this
+/// is the rose's arm of it by name, for the tests that pin the rose's verdict.
+#[cfg(test)]
 pub(crate) fn maurer_rose_pieces(
-    p: RoseParams,
+    p: CurveParams,
     points: &mut Vec<[f32; 2]>,
     pieces: &mut Vec<Piece>,
     at: &mut Vec<f32>,
 ) -> bool {
-    points.clear();
+    fit_walk(CurveFamily::MaurerRose, p, points, pieces, at).fitted
+}
+
+/// What one family contributes to `parametric_curve`: **a walk and a fit
+/// verdict**, plus the polyline drawn when the verdict declines.
+///
+/// The scene owns the buffers, the mirror stage and the colour ramp; a family
+/// owns only these three. Adding a family is a [`CurveFamily`] variant and an
+/// arm in [`arm`] — the scene never names one.
+#[derive(Clone, Copy)]
+pub(crate) struct FamilyArm {
+    /// Fill `points` (cleared first) with the walk, in the frame the scene draws
+    /// in, and say whether it **closes** — its last sample is its first again,
+    /// so the fit joins the two ends as an ordinary G1 joint. A closed walk
+    /// leaves that repeated sample out.
+    pub sample: fn(&CurveParams, &mut Vec<[f32; 2]>) -> bool,
+    /// Whether the walk in hand is a **curve** the arc fit should take, or a
+    /// figure whose chords are the figure.
+    pub fits: fn(&CurveParams, &[[f32; 2]]) -> bool,
+    /// The chords drawn when [`fits`](Self::fits) declines: the walk in hand,
+    /// whether it closes, and the output buffer (cleared first).
+    pub polyline: fn(&CurveParams, &[[f32; 2]], bool, &mut Vec<SegmentInstance>),
+}
+
+/// The arm `family` draws through.
+pub(crate) fn arm(family: CurveFamily) -> FamilyArm {
+    match family {
+        CurveFamily::MaurerRose => FamilyArm {
+            sample: rose_walk,
+            fits: |_, points| biarc::corner_fraction(points, false) <= SMOOTH_CORNER_SHARE,
+            // The rose's chord web resamples through `maurer_rose` rather than
+            // chaining the walk in hand: that sampler is the one every web
+            // golden was blessed against, joints and all.
+            polyline: |p, _, _, out| maurer_rose(*p, out),
+        },
+        CurveFamily::Lissajous => FamilyArm {
+            sample: |p, points| periodic_walk(p, std::f32::consts::TAU, lissajous_point, points),
+            // A curve by construction: `sin` against `sin` is smooth everywhere
+            // it is not stationary, and the fit keeps any genuine corner a
+            // degenerate phase produces.
+            fits: |_, _| true,
+            polyline: polyline_of,
+        },
+    }
+}
+
+/// A fitted walk's outcome: whether the arc chain was built, and whether the
+/// walk closes on itself.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct Fit {
+    /// `true`: `pieces` holds the G1 chain. `false`: the verdict declined and
+    /// the caller draws [`FamilyArm::polyline`] over the walk in `points`.
+    pub fitted: bool,
+    /// The walk comes back to its start, so the chain wraps and neither end is
+    /// free.
+    pub closed: bool,
+}
+
+/// Walk `family` into `points` and, when its verdict takes the walk, fit it to
+/// a **G1 arc chain** in `pieces` (with each piece's place along the walk in
+/// `at`).
+///
+/// An empty or one-point walk is reported as fitted with nothing in it — there
+/// is no chord for a polyline to draw either.
+///
+/// Allocation-free into preallocated buffers, because this runs every frame.
+pub(crate) fn fit_walk(
+    family: CurveFamily,
+    p: CurveParams,
+    points: &mut Vec<[f32; 2]>,
+    pieces: &mut Vec<Piece>,
+    at: &mut Vec<f32>,
+) -> Fit {
+    let arm = arm(family);
     pieces.clear();
     at.clear();
-    if p.samples == 0 {
-        return true;
-    }
-    let (rot_sin, rot_cos) = p.rotation.sin_cos();
-    let progress = p.draw_progress.clamp(0.0, 1.0);
-    let drawn = (((p.samples as f32) * progress).round() as usize).min(p.samples);
-    for k in 0..=drawn {
-        points.push(rose_point(&p, k, rot_sin, rot_cos));
-    }
+    let closed = (arm.sample)(&p, points);
     if points.len() < 2 {
-        return true;
+        return Fit {
+            fitted: true,
+            closed,
+        };
     }
-    if biarc::corner_fraction(points, false) > SMOOTH_CORNER_SHARE {
+    if !(arm.fits)(&p, points) {
+        return Fit {
+            fitted: false,
+            closed,
+        };
+    }
+    biarc::fit(points, closed, FIT_BUDGET, pieces, at);
+    Fit {
+        fitted: true,
+        closed,
+    }
+}
+
+/// How many of the `samples` chords a `draw_progress` reveal draws.
+fn drawn(p: &CurveParams) -> usize {
+    let progress = p.draw_progress.clamp(0.0, 1.0);
+    (((p.samples as f32) * progress).round() as usize).min(p.samples)
+}
+
+/// The Maurer walk: `drawn + 1` points at the rose's fixed angular step.
+///
+/// Open, never closed: a Maurer walk ends where it ends. Even the closed-up
+/// cases arrive back at their start as a matter of arithmetic rather than of
+/// construction, and telling the fit otherwise would have it join two ends that
+/// a `draw_progress` reveal has no reason to bring together.
+fn rose_walk(p: &CurveParams, points: &mut Vec<[f32; 2]>) -> bool {
+    points.clear();
+    if p.samples == 0 {
         return false;
     }
-    // Open, not closed: a Maurer walk ends where it ends. Even the closed-up
-    // cases arrive back at their start as a matter of arithmetic rather than
-    // of construction, and telling the fit otherwise would have it join two
-    // ends that a `draw_progress` reveal has no reason to bring together.
-    biarc::fit(points, false, ROSE_FIT_BUDGET, pieces, at);
-    true
+    let (rot_sin, rot_cos) = p.rotation.sin_cos();
+    for k in 0..=drawn(p) {
+        points.push(rose_point(p, k, rot_sin, rot_cos));
+    }
+    false
 }
 
 /// Point `k` of the walk, in the frame [`maurer_rose`] draws in.
-fn rose_point(p: &RoseParams, k: usize, rot_sin: f32, rot_cos: f32) -> [f32; 2] {
+fn rose_point(p: &CurveParams, k: usize, rot_sin: f32, rot_cos: f32) -> [f32; 2] {
     let theta = (k as f32 * p.d).to_radians();
     let r = (p.n * theta + p.phase).sin() + p.radial_offset;
     let (ts, tc) = theta.sin_cos();
@@ -201,6 +313,109 @@ fn rose_point(p: &RoseParams, k: usize, rot_sin: f32, rot_cos: f32) -> [f32; 2] 
         (x * rot_cos - y * rot_sin) * p.scale,
         (x * rot_sin + y * rot_cos) * p.scale,
     ]
+}
+
+/// Walk a figure given as `point(p, t)` over `t` in `[0, period]`: `samples`
+/// equal steps, of which a `draw_progress` reveal takes the first `drawn`.
+///
+/// **Closed exactly when the whole trace is drawn and it comes back to its
+/// start** — decided from the points, not from the family, because whether a
+/// Lissajous closes depends on whether `n` and `d` are whole, and both are
+/// expressions. A partial reveal is always open, so its drawing head stays a
+/// free end.
+///
+/// `point` returns the figure in its own unit frame; the rotation and `scale`
+/// are applied here, once, for every family.
+fn periodic_walk(
+    p: &CurveParams,
+    period: f32,
+    point: fn(&CurveParams, f32) -> [f32; 2],
+    points: &mut Vec<[f32; 2]>,
+) -> bool {
+    points.clear();
+    if p.samples == 0 {
+        return false;
+    }
+    let (rot_sin, rot_cos) = p.rotation.sin_cos();
+    let drawn = drawn(p);
+    let step = period / p.samples as f32;
+    for k in 0..=drawn {
+        let [x, y] = point(p, step * k as f32);
+        points.push([
+            (x * rot_cos - y * rot_sin) * p.scale,
+            (x * rot_sin + y * rot_cos) * p.scale,
+        ]);
+    }
+    let closes = drawn == p.samples
+        && points.len() > 3
+        && match (points.first(), points.last()) {
+            (Some(&a), Some(&b)) => dist(a, b) <= CLOSE_TOLERANCE,
+            _ => false,
+        };
+    if closes {
+        // The repeated start is the wrap itself; a closed fit supplies it.
+        points.pop();
+    }
+    closes
+}
+
+/// The Lissajous figure in its unit square: `x = sin(n t + phase)`,
+/// `y = sin(d t)`, so `n` and `d` are the two frequencies and `phase` — a
+/// fraction of a turn, as the parameter reference states it — the offset
+/// between them. Whole `n` and `d` close over one `TAU` of `t`.
+fn lissajous_point(p: &CurveParams, t: f32) -> [f32; 2] {
+    let phase = finite_or_zero(p.phase) * std::f32::consts::TAU;
+    [
+        (finite_or_zero(p.n) * t + phase).sin(),
+        (finite_or_zero(p.d) * t).sin(),
+    ]
+}
+
+/// The walk in hand as chained chords (ADR-0158): every interior vertex is a
+/// joint and so, for a closed walk, is the wrap. An open walk's two ends are
+/// free, which keeps a `draw_progress` head from pushing the stroke past the
+/// point it reached.
+fn polyline_of(p: &CurveParams, points: &[[f32; 2]], closed: bool, out: &mut Vec<SegmentInstance>) {
+    out.clear();
+    let n = points.len();
+    if n < 2 {
+        return;
+    }
+    let chords = if closed { n } else { n - 1 };
+    let at = |k: usize| points.get(k % n).copied().unwrap_or([0.0, 0.0]);
+    for k in 0..chords {
+        let (a, b) = (at(k), at(k + 1));
+        let ext_a = if closed || k > 0 {
+            miter_extension(p.width, at(k + n - 1), a, b)
+        } else {
+            0.0
+        };
+        let ext_b = if closed || k + 1 < chords {
+            miter_extension(p.width, a, b, at(k + 2))
+        } else {
+            0.0
+        };
+        out.push(SegmentInstance {
+            a,
+            b,
+            color: p.color,
+            width: p.width,
+            alpha: 1.0,
+            ext_a,
+            ext_b,
+        });
+    }
+}
+
+/// `v`, or `0` when an expression produced a non-finite value — so a `NaN`
+/// parameter draws a degenerate figure rather than a `NaN` vertex.
+fn finite_or_zero(v: f32) -> f32 {
+    if v.is_finite() { v } else { 0.0 }
+}
+
+fn dist(a: [f32; 2], b: [f32; 2]) -> f32 {
+    let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+    (dx * dx + dy * dy).sqrt()
 }
 
 #[cfg(test)]
