@@ -391,7 +391,7 @@ export type PlayerEvent =
 | 6 — Parameters move | studio-builder | done | `ce70952` |
 | 7 — Expressions and palettes | studio-builder | done | `658472f` |
 | 8 — Composition and the library | studio-builder | done | `6b85624` |
-| 9 — The release job and the gate | dev | done | committed with this row |
+| 9 — The release job and the gate | dev | done | `9a4410a` |
 | 10 — The tester handoff | human | not started | |
 | 11 — The on-device check | human | not started | |
 
