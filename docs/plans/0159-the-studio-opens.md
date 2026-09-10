@@ -345,7 +345,7 @@ export type PlayerEvent =
 | 1 — The skeleton shows the picture | studio-builder | done | `f2be445` |
 | 2 — The protocol is typed once | studio-builder | done | `d80b7a4` |
 | 3 — The show loop is extracted | dev | done | `163b330` |
-| 4 — The studio drives the one player | studio-builder | done | committed with this row |
+| 4 — The studio drives the one player | studio-builder | done | `97a6294` |
 | 5 — Parameters move | studio-builder | not started | |
 | 6 — Expressions and palettes | studio-builder | not started | |
 | 7 — Composition and the library | studio-builder | not started | |
@@ -354,6 +354,37 @@ export type PlayerEvent =
 | 10 — The on-device check | human | not started | |
 
 ### Notes
+
+**Phase 5 is blocked on two facts the protocol does not carry.** The lane
+stopped before writing any of it.
+
+Phase 5 renders "a panel for the active preset's system" and writes "the preset
+file atomically into the directory the player watches". The event roster carries
+neither:
+
+| Needed | What the roster gives |
+|---|---|
+| The active preset's **system**, to pick the `ParamSpec` rows | `preset` carries `name` and `index` only, and `--schema` is keyed by system |
+| The active preset's **file**, to edit it | no event carries one, except `preset_error` and `preset_warning`, which carry one only when a file failed |
+| The **preset directory** the player watches | nothing carries it; the player prints it as a human diagnostic and shows it in the settings menu |
+
+The spec's own invariants already name the missing concept — *"a parameter the
+active preset's system claims"* — so the contract knows about the system and the
+stream does not report it.
+
+The studio can resolve the directory itself, by applying `RLX_PRESET_DIR` else
+the OS data root plus `Ritmolux/presets`. That is a second copy of a resolution
+rule, and two copies that agree today are what
+[ADR-0181](../adrs/0181-the-studio-drives-one-player-and-the-show-loop-is-extracted.md)
+was written about; a studio that resolved differently would edit files the player
+is not watching. Reading the path out of the `loaded N preset(s) from ...`
+diagnostic is the same bet on prose the event stream exists to end.
+
+What is buildable without either fact: the schema fetch and its cache, the
+`ParamSpec`-driven panel given a system, and the round-tripping TOML writer with
+its byte-equality test over `presets/*.toml` in this checkout. What is not: the
+panel knowing which system to render, and the save landing where the player will
+see it.
 
 **Phase 4 — what the capture shows, and one done-when with no originator yet.**
 
