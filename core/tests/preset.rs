@@ -1802,6 +1802,11 @@ fn render_parameter_reference() -> String {
          integer-sounding name in the Modal group is there because the scene reads the fraction; \
          its own line says so.\n",
     );
+    out.push_str(
+        "\nA **Range** cell that names families belongs to a parameter whose meaning depends on \
+         the family the system draws: it reads over the range given beside each family named, \
+         and does nothing at all on a family the cell calls inert.\n",
+    );
 
     let systems: Vec<_> = reference_rosters();
     let stage_names: Vec<&str> = engine_stage_rosters().iter().map(|(n, _)| *n).collect();
@@ -1827,10 +1832,15 @@ fn render_parameter_reference() -> String {
             out.push_str(&format!("\n**{group}**\n\n"));
             out.push_str("| Parameter | Default | Range | What it does |\n");
             out.push_str("|---|---|---|---|\n");
+            let families = rlx_core::render::scenes::family_params(label);
             for spec in rows {
-                let range = match spec.range {
-                    Some([lo, hi]) => format!("`{}` – `{}`", number(lo), number(hi)),
-                    None => String::new(),
+                let range = match (
+                    families.iter().find(|row| row.name == spec.name),
+                    spec.range,
+                ) {
+                    (Some(row), _) => family_range_cell(row),
+                    (None, Some([lo, hi])) => format!("`{}` – `{}`", number(lo), number(hi)),
+                    (None, None) => String::new(),
                 };
                 out.push_str(&format!(
                     "| `{}` | `{}` | {range} | {} |\n",
@@ -1843,6 +1853,29 @@ fn render_parameter_reference() -> String {
     }
     out.push('\n');
     out
+}
+
+/// The Range cell of a family-dependent parameter (ADR-0180 rule 4): the range
+/// on each family that reads it, then the families it is inert on — so a
+/// parameter that does nothing for the chosen family says so in its own row.
+fn family_range_cell(row: &rlx_core::render::scenes::FamilyParam) -> String {
+    let mut reads = Vec::new();
+    let mut inert = Vec::new();
+    for cell in row.ranges {
+        match cell.range {
+            Some([lo, hi]) => reads.push(format!(
+                "`{}` `{}` – `{}`",
+                cell.family,
+                number(lo),
+                number(hi)
+            )),
+            None => inert.push(format!("`{}`", cell.family)),
+        }
+    }
+    if !inert.is_empty() {
+        reads.push(format!("inert on {}", inert.join(", ")));
+    }
+    reads.join("; ")
 }
 
 /// A default or a bound as the reference prints it: the shortest spelling that
@@ -3690,15 +3723,34 @@ fn the_published_reference_and_the_exported_schema_agree() {
                 .split(',')
                 .filter_map(|n| n.parse().ok())
                 .collect();
-            let published: Vec<f32> = pub_range
-                .split('–')
-                .filter_map(|n| n.trim().trim_matches('`').parse().ok())
+            let bounds = |segment: &str| -> Vec<f32> {
+                segment
+                    .split('–')
+                    .filter_map(|n| n.trim().rsplit('`').nth(1)?.parse().ok())
+                    .collect()
+            };
+            // A family-dependent parameter's cell is one `family` `lo` – `hi`
+            // per reading family (ADR-0180 rule 4). The schema keeps one pair,
+            // and it must be a range some family in the cell reads.
+            let per_family: Vec<Vec<f32>> = pub_range
+                .split("; ")
+                .filter(|segment| segment.contains('–') && segment.matches('`').count() == 6)
+                .map(bounds)
                 .collect();
-            assert_eq!(
-                numbers, published,
-                "`{ex_name}`: the schema says range {ex_range}, the reference \
-                 says {pub_range}"
-            );
+            if per_family.is_empty() {
+                assert_eq!(
+                    numbers,
+                    bounds(pub_range),
+                    "`{ex_name}`: the schema says range {ex_range}, the reference \
+                     says {pub_range}"
+                );
+            } else {
+                assert!(
+                    per_family.contains(&numbers),
+                    "`{ex_name}`: the schema's range {ex_range} is no family's range \
+                     in the reference cell {pub_range}"
+                );
+            }
         }
     }
     assert!(

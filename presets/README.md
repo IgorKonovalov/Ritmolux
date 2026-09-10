@@ -423,6 +423,8 @@ here is the **definition**, and the essay is the **discussion**.
 
 **Structural** parameters say *what is drawn* — a count, a mode, a family — and the engine rounds one to a whole number before the scene sees it. **Modal** parameters say *how it looks*, and every value in their range means something. A parameter with an integer-sounding name in the Modal group is there because the scene reads the fraction; its own line says so.
 
+A **Range** cell that names families belongs to a parameter whose meaning depends on the family the system draws: it reads over the range given beside each family named, and does nothing at all on a family the cell calls inert.
+
 ### System: `fragment_field`
 
 **Structural**
@@ -492,7 +494,7 @@ here is the **definition**, and the essay is the **discussion**.
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
-| `sym` | `5` | `1` – `24` | How many lobes the figure repeats around its centre, as a whole number. |
+| `sym` | `5` | `superformula` `1` – `24`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `harmonograph` | How many lobes the figure repeats around its centre, as a whole number. |
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
 | `mirror_order` | `1` | `1` – `12` | Repeats the geometry this many times around the centre; 1 draws it once. |
 
@@ -500,14 +502,14 @@ here is the **definition**, and the essay is the **discussion**.
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
-| `n` | `6` | `1` – `24` | The rose's petal number, read as a real frequency: a fraction between two counts draws an open web rather than a rose. |
-| `d` | `71` | `1` – `360` | The step between sampled angles in degrees, which is what turns a rose into a Maurer figure; any real step draws a figure. |
-| `phase` | `0` | `0` – `1` | Rotates where the figure starts sampling, as a fraction of a turn. |
-| `radial_offset` | `0` | `-1` – `1` | Pushes every point out from the centre, opening the figure into a ring. |
-| `pen` | `1` | `0` – `2` | How far the tracing point sits from the rolling circle's centre, in rolling radii: 1 draws cusps, less rounds them off, more throws them into loops. |
-| `sharpness` | `1` | `0.1` – `20` | How pointed the lobes are: low draws a spiky star, high rounds the figure toward a circle. |
-| `lobe` | `1` | `0.1` – `10` | How the lobes swell between their tips: low pinches them thin, high fills them into a polygon. |
-| `decay` | `0.1` | `0` – `0.5` | How fast the pendulums die away along the trace: 0 closes the figure, more spirals it inward. |
+| `n` | `6` | `maurer_rose` `1` – `24`; `lissajous` `1` – `12`; `hypotrochoid` `-8` – `8`; `harmonograph` `1` – `12`; inert on `superformula` | The figure's first number, read as a real value per family: the rose's petal number, the Lissajous and harmonograph x frequency, the hypotrochoid's signed radius ratio. |
+| `d` | `71` | `maurer_rose` `1` – `360`; `lissajous` `1` – `12`; `hypotrochoid` `1` – `24`; `superformula` `0.25` – `4`; `harmonograph` `1` – `12` | The figure's second number, per family: the rose's sampling step in degrees, the Lissajous and harmonograph y frequency, the hypotrochoid's cusp count, the superformula's lobe skew. |
+| `phase` | `0` | `maurer_rose` `0` – `1`; `lissajous` `0` – `1`; `hypotrochoid` `0` – `1`; `harmonograph` `0` – `1`; inert on `superformula` | Offsets where the figure starts: inside the rose's sine, between the Lissajous and harmonograph axes, and at the hypotrochoid's pen. |
+| `radial_offset` | `0` | `maurer_rose` `-1` – `1`; inert on `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` | Pushes every point out from the centre, opening the figure into a ring. |
+| `pen` | `1` | `hypotrochoid` `0` – `2`; inert on `maurer_rose`, `lissajous`, `superformula`, `harmonograph` | How far the tracing point sits from the rolling circle's centre, in rolling radii: 1 draws cusps, less rounds them off, more throws them into loops. |
+| `sharpness` | `1` | `superformula` `0.1` – `20`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `harmonograph` | How pointed the lobes are: low draws a spiky star, high rounds the figure toward a circle. |
+| `lobe` | `1` | `superformula` `0.1` – `10`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `harmonograph` | How the lobes swell between their tips: low pinches them thin, high fills them into a polygon. |
+| `decay` | `0.1` | `harmonograph` `0` – `0.5`; inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula` | How fast the pendulums die away along the trace: 0 closes the figure, more spirals it inward. |
 | `samples` | `361` | `16` – `2048` | How many points the curve is drawn from; fewer reads as a polygon. Truncated, so a rise adds its next point on arrival. |
 | `thickness` | `2` | `0.5` – `12` | Stroke width in pixels at the render target, before softness widens the falloff. |
 | `hue` | `0.6` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. |

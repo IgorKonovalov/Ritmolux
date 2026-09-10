@@ -45,7 +45,7 @@ use super::{
 };
 use crate::dsp::AnalysisFrame;
 use crate::render::palette::Palette;
-use crate::render::scenes::{ParamKind, ParamSpec, default_of};
+use crate::render::scenes::{FamilyParam, FamilyRange, ParamKind, ParamSpec, default_of};
 
 // Parameter defaults — a calm, whole, slowly turning rose when nothing is bound.
 const DEFAULT_N: f32 = default_of(PARAMS, "n");
@@ -84,8 +84,8 @@ const DEFAULT_ZOOM: f32 = 1.0;
 const DEFAULT_MIRROR_ORDER: f32 = 1.0;
 const DEFAULT_MIRROR_REFLECT: f32 = 0.0;
 
-/// A parametric line curve (the Maurer rose), sampled per frame and driven by
-/// named preset parameters over the audio analysis.
+/// A parametric line curve of any [`CurveFamily`], sampled per frame and driven
+/// by named preset parameters over the audio analysis.
 pub struct ParametricCurveScene {
     /// The single line renderer, shared with the other line scenes (ADR-0007:
     /// "one line renderer"). Only the active scene draws in a frame, so the
@@ -365,23 +365,26 @@ pub const PARAMS: &[ParamSpec] = &[
         name: "n",
         default: 6.0,
         range: Some([1.0, 24.0]),
-        doc: "The rose's petal number, read as a real frequency: a fraction between two counts \
-               draws an open web rather than a rose.",
+        doc: "The figure's first number, read as a real value per family: the rose's petal \
+               number, the Lissajous and harmonograph x frequency, the hypotrochoid's signed \
+               radius ratio.",
         kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "d",
         default: 71.0,
         range: Some([1.0, 360.0]),
-        doc: "The step between sampled angles in degrees, which is what turns a rose into a \
-               Maurer figure; any real step draws a figure.",
+        doc: "The figure's second number, per family: the rose's sampling step in degrees, the \
+               Lissajous and harmonograph y frequency, the hypotrochoid's cusp count, the \
+               superformula's lobe skew.",
         kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "phase",
         default: 0.0,
         range: Some([0.0, 1.0]),
-        doc: "Rotates where the figure starts sampling, as a fraction of a turn.",
+        doc: "Offsets where the figure starts: inside the rose's sine, between the Lissajous and \
+               harmonograph axes, and at the hypotrochoid's pen.",
         kind: ParamKind::Modal,
     },
     ParamSpec {
@@ -463,6 +466,62 @@ pub const PARAMS: &[ParamSpec] = &[
     crate::render::scenes::common::PAN_Y,
     crate::render::scenes::lines::MIRROR_ORDER,
     crate::render::scenes::lines::MIRROR_REFLECT,
+];
+
+/// One row of [`FAMILY_PARAMS`], its ranges in [`CurveFamily::ALL`]'s order:
+/// the rose, the Lissajous, the hypotrochoid, the superformula, the
+/// harmonograph. `None` is a family that does not read the parameter.
+macro_rules! per_family {
+    ($name:literal: $rose:expr, $lissajous:expr, $hypotrochoid:expr, $superformula:expr, $harmonograph:expr $(,)?) => {
+        FamilyParam {
+            name: $name,
+            ranges: &[
+                FamilyRange {
+                    family: "maurer_rose",
+                    range: $rose,
+                },
+                FamilyRange {
+                    family: "lissajous",
+                    range: $lissajous,
+                },
+                FamilyRange {
+                    family: "hypotrochoid",
+                    range: $hypotrochoid,
+                },
+                FamilyRange {
+                    family: "superformula",
+                    range: $superformula,
+                },
+                FamilyRange {
+                    family: "harmonograph",
+                    range: $harmonograph,
+                },
+            ],
+        }
+    };
+}
+
+/// Every parameter whose meaning depends on the curve family, with the range
+/// that reads on each (ADR-0180 rule 4) — what the generated reference prints in
+/// place of the one range [`PARAMS`] declares, and the list that makes an inert
+/// parameter visibly inert.
+///
+/// A parameter missing from here reads the same on every family. Each entry's
+/// [`ParamSpec::range`] is one of its families' ranges, and the families are
+/// [`CurveFamily::ALL`] by name and in order — both held by this module's tests.
+pub const FAMILY_PARAMS: &[FamilyParam] = &[
+    per_family!("n":
+        Some([1.0, 24.0]), Some([1.0, 12.0]), Some([-8.0, 8.0]), None, Some([1.0, 12.0])),
+    per_family!("d":
+        Some([1.0, 360.0]), Some([1.0, 12.0]), Some([1.0, 24.0]), Some([0.25, 4.0]), Some([1.0, 12.0])),
+    per_family!("phase":
+        Some([0.0, 1.0]), Some([0.0, 1.0]), Some([0.0, 1.0]), None, Some([0.0, 1.0])),
+    per_family!("radial_offset": Some([-1.0, 1.0]), None, None, None, None),
+    per_family!("pen": None, None, Some([0.0, 2.0]), None, None),
+    per_family!("sym": None, None, None, Some([1.0, 24.0]), None),
+    per_family!("sharpness": None, None, None, Some([0.1, 20.0]), None),
+    per_family!("lobe": None, None, None, Some([0.1, 10.0]), None),
+    per_family!("decay": None, None, None, None, Some([0.0, 0.5])),
 ];
 
 impl Scene for ParametricCurveScene {
@@ -894,6 +953,95 @@ mod tests {
              {cornered} corners — it must hold some of each, or one of the two \
              halves above was never exercised"
         );
+    }
+
+    /// [`FAMILY_PARAMS`] is a statement about the engine, so it is held to the
+    /// engine: each row names a declared parameter once, lists **every** curve
+    /// family by the name a preset uses and in roster order, and carries a
+    /// spec range that is one of its families' — so the one pair the exported
+    /// schema keeps is a range some family genuinely reads.
+    ///
+    /// And each lever that only one family reads is inert everywhere else,
+    /// which is what the rows for `pen`, `sym`, `sharpness`, `lobe` and `decay`
+    /// claim: asserted on the sampler, by moving the lever on every family that
+    /// the table calls inert and finding the walk unmoved.
+    #[test]
+    fn the_family_table_is_the_roster_and_its_inert_cells_are_inert() {
+        let families: Vec<&str> = CurveFamily::ALL.iter().map(|f| f.as_str()).collect();
+        let mut seen = Vec::new();
+        for row in FAMILY_PARAMS {
+            assert!(!seen.contains(&row.name), "`{}` has two rows", row.name);
+            seen.push(row.name);
+            let spec = PARAMS
+                .iter()
+                .find(|spec| spec.name == row.name)
+                .unwrap_or_else(|| panic!("`{}` is not a declared parameter", row.name));
+            let listed: Vec<&str> = row.ranges.iter().map(|r| r.family).collect();
+            assert_eq!(listed, families, "`{}` must list every family", row.name);
+            assert!(
+                row.ranges.iter().any(|r| r.range == spec.range),
+                "`{}`'s spec range {:?} is no family's range",
+                row.name,
+                spec.range
+            );
+        }
+
+        let levers = curves::Levers::default();
+        let moved = |name: &str| -> curves::Levers {
+            let mut l = levers;
+            match name {
+                "pen" => l.pen = 1.7,
+                "sym" => l.sym = 9.0,
+                "sharpness" => l.sharpness = 7.0,
+                "lobe" => l.lobe = 4.0,
+                "decay" => l.decay = 0.3,
+                other => panic!("no lever called `{other}`"),
+            }
+            l
+        };
+        let walk = |family: CurveFamily, levers: curves::Levers| {
+            let p = curves::CurveParams {
+                n: 3.0,
+                d: 2.0,
+                phase: 0.0,
+                radial_offset: 0.0,
+                samples: 200,
+                scale: 0.9,
+                rotation: 0.0,
+                draw_progress: 1.0,
+                color: [1.0; 3],
+                width: 0.01,
+                levers,
+            };
+            let (mut points, mut pieces, mut at) = (Vec::new(), Vec::new(), Vec::new());
+            curves::fit_walk(family, p, &mut points, &mut pieces, &mut at);
+            points
+        };
+        let mut inert_checked = 0;
+        for name in ["pen", "sym", "sharpness", "lobe", "decay"] {
+            let row = FAMILY_PARAMS
+                .iter()
+                .find(|row| row.name == name)
+                .unwrap_or_else(|| panic!("`{name}` has no family row"));
+            for (cell, family) in row.ranges.iter().zip(CurveFamily::ALL) {
+                let (before, after) = (walk(family, levers), walk(family, moved(name)));
+                if cell.range.is_none() {
+                    assert_eq!(
+                        before, after,
+                        "`{name}` moved the {} it is inert on",
+                        cell.family
+                    );
+                    inert_checked += 1;
+                } else {
+                    assert_ne!(
+                        before, after,
+                        "`{name}` did not move the {} it reads on",
+                        cell.family
+                    );
+                }
+            }
+        }
+        assert_eq!(inert_checked, 5 * 4, "each lever is inert on four families");
     }
 
     /// `spin` integrates rather than multiplying the clock (ADR-0135), and at a

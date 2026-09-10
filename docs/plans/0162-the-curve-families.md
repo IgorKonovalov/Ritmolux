@@ -242,8 +242,8 @@ struct FamilySample {
 | 1 — the family seam takes a second arm | dev | done | 997f7c5 |
 | 2 — hypotrochoid and epicycloid | dev | done | 1e23aef |
 | 3 — the superformula | dev | done | 792525a |
-| 4 — the harmonograph | dev | done | committed with this row |
-| 5 — per-family ranges in the reference | dev | not started | |
+| 4 — the harmonograph | dev | done | 6376e88 |
+| 5 — per-family ranges in the reference | dev | done | committed with this row |
 | 6 — the documentation sweep | dev | not started | |
 
 ### Notes
@@ -295,6 +295,18 @@ struct FamilySample {
   trace that starts and ends at the origin was joined into a loop - which is every damped
   harmonograph at `phase = 0`. Closure now also requires the point one step past the end to land on
   sample 1, i.e. the trace is periodic.
+- Phase 5: `scenes/mod.rs` carries the types (`FamilyRange`, `FamilyParam`) and a `family_params(label)`
+  lookup. The `parametric_curve` table itself, `FAMILY_PARAMS`, sits beside `PARAMS` in
+  `parametric.rs`, which is outside the phase's file list. Nine rows: `n`, `d`, `phase`,
+  `radial_offset` and the five levers. Each row lists every family, and `None` means inert on that
+  family.
+- Phase 5 keeps `ParamSpec.range` for those nine parameters as declared: each is one of its families'
+  ranges (the rose's for `n`, `d`, `phase`), and a test holds that. So the exported schema still
+  carries one pair per parameter, and the studio sees no change. Only the generated reference prints
+  the per-family cell. `the_published_reference_and_the_exported_schema_agree` now accepts a
+  per-family cell when the schema's pair is one of its ranges.
+- Phase 5 rewrote the `n`, `d` and `phase` doc lines in `parametric.rs` to name each family's reading.
+  They had described the rose alone.
 
 ### Close triggers
 

@@ -207,6 +207,44 @@ pub fn kind_of(specs: &[ParamSpec], name: &str) -> Option<ParamKind> {
         .map(|spec| spec.kind)
 }
 
+/// Where one family-dependent parameter reads, on one family of a
+/// family-bearing system (ADR-0180 rule 4).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FamilyRange {
+    /// The family, spelled as a preset names it (`[curve] family = "..."`).
+    pub family: &'static str,
+    /// The range that reads on this family, in [`ParamSpec::range`]'s sense.
+    /// `None` where the family **does not read the parameter at all** — the
+    /// reference prints it as inert there rather than leaving it to be found.
+    pub range: Option<[f32; 2]>,
+}
+
+/// A parameter whose meaning — and so whose reading range — depends on the
+/// family its system draws.
+///
+/// The generated reference prints [`ranges`](Self::ranges) in place of the
+/// single [`ParamSpec::range`], because one pair would be a claim nothing holds:
+/// `parametric_curve`'s `n` reads `1..24` on a rose and `-8..8` on a
+/// hypotrochoid. The spec's own range stays declared and is the one a family in
+/// this list reads — the exported schema still carries one pair per parameter.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FamilyParam {
+    /// The parameter, as its [`ParamSpec`] names it.
+    pub name: &'static str,
+    /// One entry per family of the system, in the system's roster order.
+    pub ranges: &'static [FamilyRange],
+}
+
+/// The family-dependent parameters of the roster `label` names — as
+/// `export::param_rosters` labels it — or nothing, for a system whose
+/// parameters read the same on every family it draws.
+pub fn family_params(label: &str) -> &'static [FamilyParam] {
+    match label {
+        "parametric_curve" => lines::parametric::FAMILY_PARAMS,
+        _ => &[],
+    }
+}
+
 /// One integrated animation phase — the only way a bindable rate advances
 /// anything in this engine (ADR-0135, finishing the rule ADR-0132 stated).
 ///
