@@ -99,7 +99,7 @@
 )]
 
 use super::gpu;
-use crate::render::scenes::{ParamSpec, default_of};
+use crate::render::scenes::{ParamKind, ParamSpec, default_of};
 
 /// `exposure` default — a plain 1.0 stop, so an unbound preset is scaled by
 /// nothing and only the curve applies.
@@ -425,6 +425,7 @@ pub const PARAMS: &[ParamSpec] = &[ParamSpec {
     default: 1.0,
     range: Some([0.0, 4.0]),
     doc: "Linear gain applied to the whole frame before the tonemap; 1 leaves it as rendered.",
+    kind: ParamKind::Modal,
 }];
 
 /// The engine-wide exposure + tonemap pass. Neither a

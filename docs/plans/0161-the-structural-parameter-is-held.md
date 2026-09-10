@@ -243,8 +243,8 @@ struct ParamHold {
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the `[hold]` table | dev | done | committed with this row |
-| 2 — `ParamKind` and quantization | dev | not started | |
+| 1 — the `[hold]` table | dev | done | dc9e970 |
+| 2 — `ParamKind` and quantization | dev | done | committed with this row |
 | 3 — the audit | dev | not started | |
 | 4 — the reference prints the two surfaces | dev | not started | |
 | 5 — `--report` learns about holds | dev | not started | |
@@ -276,6 +276,32 @@ struct ParamHold {
 - **One unrelated fix in a file this phase edits:** `Renderer::param_smoother`'s doc comment was
   orphaned above `series_scratch` and documented neither field. It now sits on the field it
   describes.
+
+**Phase 2 — deviations from the plan as written.**
+
+- **`ParamKind` reaches 241 `ParamSpec` literals across 22 files, not "every scene's `PARAMS`
+  block".** Seven of those files are engine stages rather than scenes (`background`, `trails`,
+  `kaleidoscope`, `bloom`, `post`, `tonemap`, `ink`); they declare `ParamSpec` too and had to carry
+  the field to compile. All 241 read `Modal`.
+- **The kind is folded onto the `Binding` at load**, beside `tau` and `hold`, by
+  `kind_of_param(system, name)` — the same rosters in the same order `is_known_param` searches. The
+  alternative was a per-binding per-frame roster search.
+- **What the guard grew.** `declared_params_match_set_param` compares names by scanning source
+  text, and a `ParamKind` states what a value *means*, which no scan can infer. What it gained is a
+  hand-kept `STRUCTURAL` roster of `(roster label, parameter)` pairs asserted equal to what the
+  engine declares — empty in this phase, filled in Phase 3. Marking a parameter now costs a
+  deliberate edit in a second place, which is the enforcement available to a field of this kind.
+- **The exported schema carries `kind`** (`export::document()`, `ritmolux --schema`), additively,
+  with `SCHEMA_VERSION` left at 1 — the body hash moves, and that is the staleness signal a studio
+  already compares. Decided with the user before Phase 1 opened. Phase 4 names only the reader-facing
+  reference; without this the studio cannot group its panel the way ADR-0180 rule 4 groups the
+  tables.
+- **Not covered: the live-override path.** `ParamOverrides` (ADR-0176) writes through
+  `apply_route`, which never sees a `Binding` and so never quantizes. Inert while everything is
+  `Modal`; re-checked in Phase 3 against whatever it marks.
+- **One flaky failure, not a finding.** `rlx-core::path_cost
+  the_contour_arity_is_priced_against_the_floor_tier` failed once under a loaded parallel run and
+  passed alone and on the next full run. It is a GPU wall-clock measurement.
 
 ### Close triggers
 

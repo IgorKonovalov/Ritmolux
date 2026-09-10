@@ -65,7 +65,7 @@ use super::marks;
 use super::{Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
 use crate::render::palette::{self, Palette};
-use crate::render::scenes::{ParamSpec, default_of};
+use crate::render::scenes::{ParamKind, ParamSpec, default_of};
 
 /// The scene's spawn seed — the only randomness it has, and it is explicit
 /// (NFR §6). The bytes are ASCII used as a number: re-spelling them to match
@@ -798,90 +798,105 @@ pub const PARAMS: &[ParamSpec] = &[
         default: 120.0,
         range: Some([0.0, 2000.0]),
         doc: "New objects launched per second.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "gravity",
         default: 1.5,
         range: Some([-4.0, 8.0]),
         doc: "Downward acceleration, in frame heights per second squared; negative floats them up.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "launch_speed",
         default: 1.75,
         range: Some([0.0, 6.0]),
         doc: "Speed each object leaves the source at.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "launch_angle",
         default: 0.0,
         range: Some([-1.0, 1.0]),
         doc: "Direction of launch, as a fraction of a turn from straight up.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "spread",
         default: 0.55,
         range: Some([0.0, 1.0]),
         doc: "How wide the launch directions fan out about that angle.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "lifetime",
         default: 3.0,
         range: Some([0.1, 20.0]),
         doc: "Seconds an object lives before it fades out.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "lifetime_spread",
         default: 0.45,
         range: Some([0.0, 1.0]),
         doc: "How much lifetimes vary between objects; 0 makes them all die together.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "source_y",
         default: -1.12,
         range: None,
         doc: "Height the source sits at, which is normally just below the frame.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "source_width",
         default: 1.0,
         range: Some([0.0, 4.0]),
         doc: "How wide a line the objects are launched from; 0 is a single point.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "spawn_fade",
         default: 0.0,
         range: Some([0.0, 1.0]),
         doc: "Fades each object in over the start of its life rather than popping it on.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "prewarm",
         default: 0.0,
         range: Some([0.0, 1.0]),
         doc: "Back-dates the population so the first frame is already the steady state.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "size",
         default: 1.0,
         range: Some([0.0, 4.0]),
         doc: "Size of each object's mark.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "size_spread",
         default: 0.6,
         range: Some([0.0, 1.0]),
         doc: "How much sizes vary between objects.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "spin",
         default: 0.0,
         range: Some([-4.0, 4.0]),
         doc: "Turns per second each object rotates by as it flies.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "twinkle",
         default: 0.0,
         range: Some([0.0, 1.0]),
         doc: "Per-object brightness flicker, seeded so it is reproducible.",
+        kind: ParamKind::Modal,
     },
     crate::render::scenes::common::brightness(DEFAULT_BRIGHTNESS),
     crate::render::scenes::common::hue(DEFAULT_HUE),
@@ -890,12 +905,14 @@ pub const PARAMS: &[ParamSpec] = &[
         default: 1.0,
         range: Some([0.0, 1.0]),
         doc: "How far across the palette the object colours reach.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "hue_center",
         default: 0.5,
         range: Some([0.0, 1.0]),
         doc: "Where that band sits along the palette.",
+        kind: ParamKind::Modal,
     },
     crate::render::scenes::common::SATURATION,
     crate::render::scenes::common::PALETTE_MIX,

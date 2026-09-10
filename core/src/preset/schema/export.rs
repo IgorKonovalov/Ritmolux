@@ -379,6 +379,13 @@ fn push_roster(out: &mut String, label: &str, specs: &[ParamSpec]) {
         }
         out.push_str(",\"doc\":");
         push_string(out, spec.doc);
+        // ADR-0180 rule 4's distinction, so a studio can group its panel the
+        // way the reference groups its tables. Additive: a consumer that does
+        // not know the field ignores it, which is why `SCHEMA_VERSION` does
+        // not move — the body hash does, and that is the staleness signal a
+        // studio already compares.
+        out.push_str(",\"kind\":");
+        push_string(out, spec.kind.as_str());
         out.push('}');
     }
     out.push_str("]}");

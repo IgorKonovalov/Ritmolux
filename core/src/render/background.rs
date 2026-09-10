@@ -148,7 +148,7 @@
 
 use crate::render::gpu;
 use crate::render::palette::{self, Palette};
-use crate::render::scenes::{ParamSpec, default_of};
+use crate::render::scenes::{ParamKind, ParamSpec, default_of};
 
 /// Parameter defaults — a black backdrop when nothing is bound, so the composite
 /// is byte-neutral against the pre-Phase-3 per-scene clears.
@@ -664,90 +664,105 @@ pub const PARAMS: &[ParamSpec] = &[
         default: 0.0,
         range: Some([0.0, 1.0]),
         doc: "Where the backdrop starts in the preset's palette, as a coordinate along it.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "bg_bright",
         default: 0.0,
         range: Some([0.0, 1.0]),
         doc: "How lit the backdrop is; 0 is black and the scene draws on nothing.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "bg_vignette",
         default: 0.0,
         range: Some([0.0, 1.0]),
         doc: "Darkens the backdrop toward the corners, pulling the eye to the middle.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "bg_angle",
         default: 0.0,
         range: Some([0.0, 1.0]),
         doc: "Direction the backdrop ramp runs in, as a fraction of a full turn.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "bg_hue_span",
         default: 0.0,
         range: Some([-0.5, 0.5]),
         doc: "How far along the palette the ramp travels from `bg_hue`; 0 is a flat colour.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "bg_shade",
         default: 0.72,
         range: Some([0.0, 1.0]),
         doc: "Brightness multiplier at the ramp's start, so a sky can be dark at one edge.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "bg_shade_end",
         default: 1.0,
         range: Some([0.0, 1.0]),
         doc: "Brightness multiplier at the ramp's far end.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "bg_ramp_gamma",
         default: 1.0,
         range: Some([0.25, 4.0]),
         doc: "Bends the ramp's progress: below 1 the far colour arrives early, above 1 it holds off.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "bg_band_amount",
         default: 0.0,
         range: Some([0.0, 1.0]),
         doc: "Strength of a second colour band laid across the ramp; 0 removes it.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "bg_band_angle",
         default: 0.0,
         range: Some([0.0, 1.0]),
         doc: "Direction the band runs in, independently of the ramp, as a fraction of a turn.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "bg_band_pos",
         default: 0.5,
         range: Some([0.0, 1.0]),
         doc: "Where across the frame the band sits.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "bg_band_width",
         default: 0.15,
         range: Some([0.02, 1.0]),
         doc: "How wide the band is; narrow reads as a horizon, wide as a wash.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "bg_band_curve",
         default: 0.0,
         range: Some([-1.0, 1.0]),
         doc: "Bows the band into an arc instead of a straight line.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "bg_band_hue",
         default: 0.0,
         range: Some([0.0, 1.0]),
         doc: "Where the band's own colour is picked from the palette.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "bg_band_hue_span",
         default: 0.0,
         range: Some([-0.5, 0.5]),
         doc: "How far the band's colour travels along the palette across its width.",
+        kind: ParamKind::Modal,
     },
 ];
 

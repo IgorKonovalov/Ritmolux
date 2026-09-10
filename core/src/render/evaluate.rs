@@ -448,7 +448,14 @@ pub(super) fn evaluate_preset(
         // a latch, whose history was folded into `vars` before this loop opened
         // (ADR-0137).
         let held = state.hold.hold(index, raw, binding.hold, frame, time);
-        let value = state.smoother.smooth(index, held, binding.tau, dt);
+        // Quantization is **last** (ADR-0180 rule 2), so a structural parameter
+        // that is also smoothed steps through the intervening integers rather
+        // than landing fractionally. That is the documented behaviour: an
+        // author who wants a clean jump leaves the parameter out of
+        // `[smoothing]`.
+        let value = binding
+            .kind
+            .quantize(state.smoother.smooth(index, held, binding.tau, dt));
         // Dispatch on the resolved destination — no map lookup, no walk over the
         // stages, no chained fallthrough. The owner was decided at load.
         apply_route(*route, &binding.name, value, scene, side, &mut terminal);
@@ -524,7 +531,9 @@ pub(super) fn evaluate_layer(
         }
         let raw = binding.expr.eval(vars);
         let held = state.hold.hold(index, raw, binding.hold, frame, time);
-        let value = state.smoother.smooth(index, held, binding.tau, dt);
+        let value = binding
+            .kind
+            .quantize(state.smoother.smooth(index, held, binding.tau, dt));
         scene.set_param(&binding.name, value);
     }
     if let Some(mut surface) = vertex {
@@ -537,7 +546,9 @@ pub(super) fn evaluate_layer(
         let raw = mix.expr.eval(vars);
         let slot = layer.params.len();
         let held = state.hold.hold(slot, raw, mix.hold, frame, time);
-        let value = state.smoother.smooth(slot, held, mix.tau, dt);
+        let value = mix
+            .kind
+            .quantize(state.smoother.smooth(slot, held, mix.tau, dt));
         chain.set_layer_mix(value);
     }
     scene.update(frame);

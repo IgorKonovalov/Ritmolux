@@ -15,6 +15,7 @@ use serde::Deserialize;
 use super::expr::{self, Expr, ExprError};
 use crate::render::feedback::{Deposit, FeedbackConfig, Warp};
 use crate::render::palette::{NamedPalette, PaletteConfig};
+use crate::render::scenes::ParamKind;
 use crate::render::scenes::lines::star::{DEFAULT_RING_SCALE, MAX_RING_COUNT, Motif, RingSpec};
 use crate::render::scenes::lines::{
     CurveFamily, GeneratorConfig, MAX_LSYSTEM_DEPTH, SpectrumLayout, hankin,
@@ -39,7 +40,7 @@ pub use easing::Easing;
 pub use error::PresetError;
 pub use export::{KeyDesc, KeyKind, Roster, TableDesc};
 pub use hold::HoldEdge;
-pub use system::{GLOBAL_PARAMS, SystemKind, is_known_param};
+pub use system::{GLOBAL_PARAMS, SystemKind, is_known_param, kind_of_param};
 
 use raw::*;
 
@@ -184,6 +185,15 @@ pub struct Binding {
     /// every frame's value. `Some` means it sees the value taken at the last
     /// edge, and the render layer holds that value; nothing here does.
     pub hold: Option<HoldEdge>,
+    /// What the parameter this binding drives is **for** (ADR-0180 rule 2),
+    /// read off its [`ParamSpec`](crate::render::scenes::ParamSpec) here at
+    /// load — `tau`'s boundary, for `tau`'s reason. A
+    /// [`Structural`](ParamKind::Structural) value is rounded once, after the
+    /// hold and after the smoother, before the scene sees it.
+    ///
+    /// Folded rather than searched per frame: which kind a name carries is a
+    /// fact about the *engine*, and the engine does not change while it runs.
+    pub kind: ParamKind,
 }
 
 /// One `[latch]` entry, compiled (ADR-0137): a gate armed on one condition and

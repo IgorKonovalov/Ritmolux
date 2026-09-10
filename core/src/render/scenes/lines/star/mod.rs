@@ -655,7 +655,7 @@ mod rings;
 pub use motif::{MIN_SCALLOP_LOBES, Motif};
 pub use rings::{DEFAULT_RING_SCALE, MAX_RING_COUNT, RingSpec};
 
-use crate::render::scenes::{ParamSpec, default_of};
+use crate::render::scenes::{ParamKind, ParamSpec, default_of};
 use motif::*;
 use rings::*;
 
@@ -667,12 +667,14 @@ pub const PARAMS: &[ParamSpec] = &[
         default: 1.0,
         range: Some([0.0, 8.0]),
         doc: "Picks which of the built-in star constructions is drawn.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "rotation",
         default: 0.0,
         range: Some([0.0, 1.0]),
         doc: "Turns the whole pattern, as a fraction of a full turn.",
+        kind: ParamKind::Modal,
     },
     crate::render::scenes::common::hue(DEFAULT_HUE),
     crate::render::scenes::lines::hue_spread(DEFAULT_HUE_SPREAD),
@@ -697,18 +699,21 @@ pub const PARAMS: &[ParamSpec] = &[
         default: 0.0,
         range: Some([0.0, 1.0]),
         doc: "Rotates each concentric ring against its neighbour.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "ring_spread",
         default: 1.0,
         range: Some([0.0, 2.0]),
         doc: "How far apart the rings sit radially.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "ring_scale",
         default: 1.0,
         range: Some([0.25, 4.0]),
         doc: "How much each ring grows over the one inside it.",
+        kind: ParamKind::Modal,
     },
 ];
 

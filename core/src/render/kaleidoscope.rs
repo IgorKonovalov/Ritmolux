@@ -187,7 +187,7 @@
 use crate::render::gpu;
 
 use super::post::{Fold, PostStage, internal_grid_size};
-use crate::render::scenes::{ParamSpec, default_of};
+use crate::render::scenes::{ParamKind, ParamSpec, default_of};
 
 /// `kaleido_order` default — 1 = identity, so an unbound preset is unaffected.
 const DEFAULT_ORDER: f32 = default_of(PARAMS, "kaleido_order");
@@ -922,30 +922,35 @@ pub const PARAMS: &[ParamSpec] = &[
         default: 1.0,
         range: Some([1.0, 16.0]),
         doc: "How many mirrored wedges the frame is folded into; 1 is no fold at all.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "kaleido_angle",
         default: 0.0,
         range: Some([0.0, 1.0]),
         doc: "Rotates the whole fold, as a fraction of a full turn.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "kaleido_center_x",
         default: 0.5,
         range: Some([0.0, 1.0]),
         doc: "The horizontal point the wedges radiate from, in uv.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "kaleido_center_y",
         default: 0.5,
         range: Some([0.0, 1.0]),
         doc: "The vertical point the wedges radiate from, in uv.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "kaleido_edge",
         default: 1.0,
         range: Some([0.0, 1.0]),
         doc: "Softens the seam between mirrored wedges; 1 is a hard edge.",
+        kind: ParamKind::Modal,
     },
     // ADR-0077's composed map, in the order it is applied
     // (destination-to-source): tile -> fold -> radial -> spiral, with `zoom` and
@@ -955,30 +960,35 @@ pub const PARAMS: &[ParamSpec] = &[
         default: 1.0,
         range: Some([1.0, 8.0]),
         doc: "Repeats the source across the frame before it is folded, so one wedge shows several copies.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "kaleido_radial",
         default: 1.0,
         range: Some([0.25, 4.0]),
         doc: "Scales distance from the centre when sampling, pulling detail inward or pushing it out.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "kaleido_spiral",
         default: 0.0,
         range: Some([-2.0, 2.0]),
         doc: "Rotates the sample by an amount that grows with radius, turning the wedges into a spiral.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "kaleido_zoom",
         default: 0.0,
         range: Some([-1.0, 1.0]),
         doc: "Shifts the sampled radius inward or outward, riding on the radial term.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "kaleido_inner",
         default: 0.06,
         range: Some([0.0, 0.5]),
         doc: "Radius of the untouched disc at the centre, which keeps the pivot from smearing.",
+        kind: ParamKind::Modal,
     },
 ];
 

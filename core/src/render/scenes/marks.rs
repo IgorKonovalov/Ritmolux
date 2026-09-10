@@ -119,7 +119,7 @@
 )]
 
 use crate::render::gpu;
-use crate::render::scenes::{ParamSpec, default_of};
+use crate::render::scenes::{ParamKind, ParamSpec, default_of};
 
 /// The `shape` roster, in the order the numeric parameter selects them.
 ///
@@ -455,6 +455,7 @@ pub(crate) const SHAPE: ParamSpec = ParamSpec {
     default: 0.0,
     range: Some([0.0, 4.0]),
     doc: "Which silhouette each mark is drawn as - a disc, a square, a star, and so on.",
+    kind: ParamKind::Modal,
 };
 
 /// `points`, shared by the three shaped-mark scenes: the silhouette's count.
@@ -463,6 +464,7 @@ pub(crate) const POINTS: ParamSpec = ParamSpec {
     default: 5.0,
     range: Some([3.0, 16.0]),
     doc: "How many points or sides the silhouette has, where the shape has a count at all.",
+    kind: ParamKind::Modal,
 };
 
 /// `star_valley`, shared: how deep a star's notches cut.
@@ -471,6 +473,7 @@ pub(crate) const STAR_VALLEY: ParamSpec = ParamSpec {
     default: 0.45,
     range: Some([0.0, 1.0]),
     doc: "How deep the notches between a star's points cut; near 1 the star becomes a disc.",
+    kind: ParamKind::Modal,
 };
 
 /// `star_curve`, shared: how far a star's edges bow.
@@ -479,6 +482,7 @@ pub(crate) const STAR_CURVE: ParamSpec = ParamSpec {
     default: 0.0,
     range: Some([-1.0, 1.0]),
     doc: "Bows a star's edges inward or outward instead of leaving them straight.",
+    kind: ParamKind::Modal,
 };
 
 /// `star_jitter`, shared: the seeded variation in point length.
@@ -487,6 +491,7 @@ pub(crate) const STAR_JITTER: ParamSpec = ParamSpec {
     default: 0.0,
     range: Some([0.0, 1.0]),
     doc: "Randomises each point's length by a seeded amount, so the star reads as hand-drawn.",
+    kind: ParamKind::Modal,
 };
 
 pub(crate) const PARAMS: &[ParamSpec] = &[SHAPE, POINTS, STAR_VALLEY, STAR_CURVE, STAR_JITTER];

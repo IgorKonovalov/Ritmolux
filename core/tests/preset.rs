@@ -7,6 +7,7 @@ use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 
 use rlx_core::preset::{HoldEdge, Preset, SystemKind, Variables, compile};
+use rlx_core::render::scenes::ParamKind;
 
 /// Global allocator that counts allocation calls **per thread**, so a test can
 /// assert that a region on the current thread performs no heap allocation,
@@ -2034,7 +2035,46 @@ fn declared_params_match_set_param() {
             file.display(),
         );
     }
+
+    // --- the kinds (ADR-0180 rule 2) ---
+    //
+    // The scan above compares NAMES, so a wrong `ParamKind` passes it in
+    // silence — and a wrong one is not a compile error, not a load error, and
+    // visible only as a scene that stopped interpolating. What holds it is
+    // `STRUCTURAL` below: a hand-kept roster of every parameter the engine
+    // rounds, asserted equal to what the engine declares. Marking one costs a
+    // deliberate edit in a second place, which is the whole enforcement.
+    let mut declared: Vec<(&str, &str)> = Vec::new();
+    for (label, specs) in rlx_core::preset::export::param_rosters() {
+        for spec in specs {
+            match spec.kind {
+                ParamKind::Structural => declared.push((label, spec.name)),
+                ParamKind::Modal => {}
+            }
+        }
+    }
+    declared.sort_unstable();
+    let mut expected: Vec<(&str, &str)> = STRUCTURAL.to_vec();
+    expected.sort_unstable();
+    assert_eq!(
+        declared, expected,
+        "the engine's `ParamKind::Structural` declarations and this test's \
+         roster have drifted. A parameter that begins rounding where it used to \
+         interpolate changes its scene's output, so adding one here is the \
+         deliberate half of that decision — not paperwork after it."
+    );
 }
+
+/// Every parameter the engine declares `ParamKind::Structural`, as
+/// `(roster label, parameter)` — the roster labels being the ones
+/// `export::param_rosters()` prints, so a system's own name or an engine
+/// stage's.
+///
+/// **A hand-kept second statement, on purpose.** It is what
+/// `declared_params_match_set_param` above compares the engine's declarations
+/// against, and a `ParamKind` has no other enforcement available to it: it
+/// states what a value *means*, which no scan of the source can infer.
+const STRUCTURAL: &[(&str, &str)] = &[];
 
 /// **The three additive-particle scenes spell their level lever the same way**
 /// (Plan 0066 Phase 1 / ADR-0080).

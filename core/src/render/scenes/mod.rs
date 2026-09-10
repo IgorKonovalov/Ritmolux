@@ -44,6 +44,57 @@ use crate::render::palette::Palette;
 /// function of its inputs.
 pub(crate) const FALLBACK_DT: f32 = 1.0 / 60.0;
 
+/// What a parameter is **for** (ADR-0180 rule 2): whether its value carries an
+/// integer meaning, which decides two things and nothing else — whether the
+/// engine quantizes it before the scene sees it, and which of the generated
+/// reference's two groups it prints under.
+///
+/// Orthogonal to `[hold]`: a hold reaches any bindable parameter whatever its
+/// kind, and a kind quantizes whether or not the binding is held.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ParamKind {
+    /// Continuous — every value in the range means something, and the scene
+    /// reads the fraction. The default, and what every parameter was before
+    /// kinds existed.
+    #[default]
+    Modal,
+    /// Integer meaning: a mode number, a rule index, a count, a family. The
+    /// engine rounds the post-smoothing value **once**, CPU-side, before
+    /// `set_param`, so the scene is never handed 6.4 petals.
+    Structural,
+}
+
+impl ParamKind {
+    /// The name the generated reference and the exported schema print. Two
+    /// readers, one spelling.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ParamKind::Modal => "modal",
+            ParamKind::Structural => "structural",
+        }
+    }
+
+    /// `value` as the scene should receive it: rounded for a
+    /// [`Structural`](Self::Structural) parameter, untouched for a
+    /// [`Modal`](Self::Modal) one.
+    ///
+    /// **The last step before `set_param`**, after the hold has chosen which
+    /// frame's value stands and the smoother has eased toward it — which is
+    /// why a structural parameter that is *also* smoothed steps through the
+    /// intervening integers rather than landing fractionally. An author who
+    /// wants a clean jump leaves it out of `[smoothing]`.
+    ///
+    /// A non-finite value is passed through rather than rounded: `f32::round`
+    /// leaves `NaN` alone anyway, and the scenes already guard their own
+    /// inputs.
+    pub fn quantize(self, value: f32) -> f32 {
+        match self {
+            ParamKind::Modal => value,
+            ParamKind::Structural => value.round(),
+        }
+    }
+}
+
 /// What one named parameter is, as the engine declares it (ADR-0170).
 ///
 /// A scene and an engine stage each declare their parameters as a `&[ParamSpec]`
@@ -73,6 +124,13 @@ pub struct ParamSpec {
     pub range: Option<[f32; 2]>,
     /// One sentence: what the parameter does.
     pub doc: &'static str,
+    /// Whether the value carries an integer meaning (ADR-0180 rule 2).
+    ///
+    /// Read back out with [`kind_of`], and enforced by
+    /// `declared_params_match_set_param` in `core/tests/preset.rs`, which
+    /// compares this against a hand-kept roster — a field nothing checks is a
+    /// field that drifts.
+    pub kind: ParamKind,
 }
 
 /// Byte-wise `str` equality, usable in a `const fn`.
@@ -133,6 +191,20 @@ pub fn spec_names(specs: &[ParamSpec]) -> Vec<&'static str> {
 /// Whether `name` is declared in `specs`. The load-time membership test.
 pub fn declares(specs: &[ParamSpec], name: &str) -> bool {
     specs.iter().any(|spec| spec.name == name)
+}
+
+/// The [`ParamKind`] `name` is declared with in `specs`, or `None` where no
+/// spec here declares it.
+///
+/// Load-time, like [`declares`]: the loader folds the answer onto the binding
+/// so nothing per frame searches a roster by name (`[smoothing]`'s rule, for
+/// its reason). A name no roster declares is already an ADR-0020 warning, and
+/// an unclaimed binding reaches no scene, so its kind never matters.
+pub fn kind_of(specs: &[ParamSpec], name: &str) -> Option<ParamKind> {
+    specs
+        .iter()
+        .find(|spec| spec.name == name)
+        .map(|spec| spec.kind)
 }
 
 /// One integrated animation phase — the only way a bindable rate advances

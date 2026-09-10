@@ -83,7 +83,7 @@ use super::Scene;
 use super::common;
 use crate::dsp::AnalysisFrame;
 use crate::render::palette::Palette;
-use crate::render::scenes::{ParamSpec, default_of};
+use crate::render::scenes::{ParamKind, ParamSpec, default_of};
 
 /// Element kind selectors, as they reach the shader's `shape.z`. Phase 7 of
 /// Plan 0113 extends this roster; these three are what a suprematist canvas is
@@ -1492,84 +1492,98 @@ pub const PARAMS: &[ParamSpec] = &[
         default: 0.0,
         range: Some([0.0, 64.0]),
         doc: "How many elements are placed; 0 lets the layout decide.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "layout",
         default: 0.0,
         range: Some([0.0, 8.0]),
         doc: "Picks which arrangement the elements are placed by.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "seed",
         default: 0.0,
         range: None,
         doc: "Chooses one arrangement out of the family; the same seed always composes the same way.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "size_hierarchy",
         default: 0.5,
         range: Some([0.0, 1.0]),
         doc: "How much larger the leading elements are than the rest; 0 makes them equal.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "angle_bias",
         default: -22.0,
         range: None,
         doc: "Degrees the elements lean by, which is what gives the composition its tilt.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "roster",
         default: 0.0,
         range: Some([0.0, 8.0]),
         doc: "Picks which set of shapes the elements are drawn from.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "density",
         default: 1.0,
         range: Some([0.0, 2.0]),
         doc: "How much of the frame the arrangement fills.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "drift",
         default: 0.0,
         range: Some([0.0, 2.0]),
         doc: "How far the elements wander from their placed positions.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "spin",
         default: 0.0,
         range: Some([-2.0, 2.0]),
         doc: "Turns per second the elements rotate by.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "recompose",
         default: 0.0,
         range: Some([0.0, 1.0]),
         doc: "Crossing zero lays the composition out again from a new arrangement.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "recompose_blend",
         default: 0.0,
         range: Some([0.0, 1.0]),
         doc: "How long the change between two arrangements takes, rather than cutting.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "pump_size",
         default: DEFAULT_PUMP,
         range: Some([0.0, 2.0]),
         doc: "Scales every element together, for a beat to make the whole composition breathe.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "pump_alpha",
         default: DEFAULT_PUMP,
         range: Some([0.0, 2.0]),
         doc: "Fades every element together, the opacity twin of `pump_size`.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "scale",
         default: 1.0,
         range: Some([0.1, 4.0]),
         doc: "Size of the whole composition within the frame.",
+        kind: ParamKind::Modal,
     },
     crate::render::scenes::common::PAN_X,
     crate::render::scenes::common::PAN_Y,
@@ -1578,18 +1592,21 @@ pub const PARAMS: &[ParamSpec] = &[
         default: 1.0,
         range: Some([0.0, 1.0]),
         doc: "How opaque the ground behind the elements is; 0 leaves the backdrop showing.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "color_span",
         default: 1.0,
         range: Some([0.0, 1.0]),
         doc: "How much of the palette the elements are coloured across.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "palette_shift",
         default: 0.0,
         range: Some([0.0, 1.0]),
         doc: "Rotates every element's colour along the palette together.",
+        kind: ParamKind::Modal,
     },
     crate::render::scenes::common::SATURATION,
     crate::render::scenes::common::PALETTE_MIX,
@@ -1598,12 +1615,14 @@ pub const PARAMS: &[ParamSpec] = &[
         default: 1.0,
         range: Some([0.0, 1.0]),
         doc: "How opaque each element is, so overlaps can show through.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "edge_softness",
         default: 0.0,
         range: Some([0.0, 1.0]),
         doc: "How far each element's edge fades; 0 is a hard cut.",
+        kind: ParamKind::Modal,
     },
 ];
 

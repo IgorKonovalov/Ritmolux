@@ -453,6 +453,9 @@ pub(super) fn build_per_vertex(
             )));
         }
         out.push(Binding {
+            // Never quantized either: a per-vertex name is drawn from the warp
+            // mesh's own roster, every entry of which is continuous.
+            kind: ParamKind::Modal,
             name: param,
             expr,
             // Never eased and never held — see `Preset::per_vertex`.
@@ -541,6 +544,9 @@ pub(super) fn build_layer(
                 // `[layer.hold] mix` reach the one layer binding that lives
                 // outside `params`.
                 hold: None,
+                // The junction amount is a fraction, and no scene roster
+                // declares it — it is the composite's, not a scene's.
+                kind: ParamKind::Modal,
             })
         })
         .transpose()?;
@@ -816,6 +822,11 @@ pub(super) fn compile_bindings(
             }
         }
         out.push(Binding {
+            // Read off the engine's declaration once, here, so nothing per
+            // frame searches a roster by name (ADR-0180 rule 2). At the layer
+            // surface the search still walks the global stages and finds
+            // nothing there, because `known` above already rejected them.
+            kind: kind_of_param(system, &param),
             name: param,
             expr,
             tau: Easing::INSTANT,

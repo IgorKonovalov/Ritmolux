@@ -91,7 +91,7 @@
 use super::feedback::{self, Deposit, FeedbackConfig, PingPongField, Transform};
 use super::gpu;
 use super::post::{Fold, PostStage, internal_grid_size};
-use crate::render::scenes::{ParamSpec, default_of};
+use crate::render::scenes::{ParamKind, ParamSpec, default_of};
 
 /// `trails` param default — off, so an unbound preset pays nothing.
 const DEFAULT_TRAILS: f32 = default_of(PARAMS, "trails");
@@ -453,48 +453,56 @@ pub const PARAMS: &[ParamSpec] = &[
         default: 0.0,
         range: Some([0.0, 1.0]),
         doc: "How much of the previous frame survives into this one; 0 is no trail, near 1 a long smear.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "fb_zoom",
         default: crate::render::feedback::DEFAULT_FB_ZOOM,
         range: Some([0.9, 1.1]),
         doc: "Scale the accumulation is grown by each second, so held above 1 the trail tunnels outward.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "fb_rotate",
         default: crate::render::feedback::DEFAULT_FB_RATE,
         range: Some([-1.0, 1.0]),
         doc: "Turns per second the accumulation is rotated by, about the feedback centre.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "fb_dx",
         default: crate::render::feedback::DEFAULT_FB_RATE,
         range: Some([-1.0, 1.0]),
         doc: "Sideways drift of the accumulation, in frame widths per second.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "fb_dy",
         default: crate::render::feedback::DEFAULT_FB_RATE,
         range: Some([-1.0, 1.0]),
         doc: "Vertical drift of the accumulation, in frame heights per second.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "fb_center_x",
         default: crate::render::feedback::DEFAULT_FB_CENTER,
         range: Some([0.0, 1.0]),
         doc: "The horizontal point the zoom and the rotation pivot about, in uv.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "fb_center_y",
         default: crate::render::feedback::DEFAULT_FB_CENTER,
         range: Some([0.0, 1.0]),
         doc: "The vertical point the zoom and the rotation pivot about, in uv.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "fb_warp",
         default: crate::render::feedback::DEFAULT_FB_RATE,
         range: Some([0.0, 0.5]),
         doc: "Amplitude of a swirl added to the feedback sample, so the trail curls rather than sliding.",
+        kind: ParamKind::Modal,
     },
 ];
 

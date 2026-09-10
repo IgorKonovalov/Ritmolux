@@ -63,7 +63,7 @@ use super::{
 };
 use crate::dsp::AnalysisFrame;
 use crate::render::palette::Palette;
-use crate::render::scenes::{ParamSpec, default_of};
+use crate::render::scenes::{ParamKind, ParamSpec, default_of};
 
 const DEFAULT_VISIBLE_DEPTH: f32 = default_of(PARAMS, "visible_depth");
 const DEFAULT_ROTATION: f32 = default_of(PARAMS, "rotation");
@@ -287,12 +287,14 @@ pub const PARAMS: &[ParamSpec] = &[
         default: 1.0,
         range: Some([0.0, 1.0]),
         doc: "How deep into the grammar's recursion is drawn; below 1 the fine branches are missing.",
+        kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "rotation",
         default: 0.0,
         range: Some([0.0, 1.0]),
         doc: "Turns the whole figure, as a fraction of a full turn.",
+        kind: ParamKind::Modal,
     },
     crate::render::scenes::common::hue(DEFAULT_HUE),
     crate::render::scenes::lines::hue_spread(DEFAULT_HUE_SPREAD),
