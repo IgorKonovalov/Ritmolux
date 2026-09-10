@@ -299,7 +299,7 @@ flowchart TB
 |---|---|---|---|
 | 1 — The preview pipe stops moving under the reader | dev | done | 80fc61c |
 | 2 — The `stream` event names the format it actually carries | dev | done | fbae516 |
-| 3 — `--schema` declares the grammar | dev | done | committed with this row |
+| 3 — `--schema` declares the grammar | dev | done | 2cd608a |
 | 4 — The studio paints what it was told | studio-builder | not started | |
 | 5 — The player mode is a per-machine setting | studio-builder | not started | |
 | 6 — The two debts, discharged | studio-builder | not started | |
