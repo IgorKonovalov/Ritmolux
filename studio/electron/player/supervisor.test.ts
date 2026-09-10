@@ -52,17 +52,28 @@ const hello = (version: string): string =>
 const STREAM = '{"v":1,"ev":"stream","width":2,"height":1,"fps":30,"format":"rgba8"}\n'
 
 describe('PlayerSupervisor', () => {
-  it('asks for the stream, the events and a control listener', () => {
-    // Port 0 asks for an ephemeral one; `hello.control` is the only place the
-    // answer comes from, which is why nothing here predicts it.
+  it('asks one windowed player to mirror the show, report, and listen', () => {
+    // `--preview stdout` rather than `--stream --sink stdout`: the studio drives
+    // the show itself and paints a copy of its frames, so there is no second
+    // player and no second capture (ADR-0181). Port 0 asks for an ephemeral
+    // listener; `hello.control` is the only place the answer comes from, which
+    // is why nothing here predicts it.
     expect(DEFAULT_PLAYER_ARGS).toEqual([
-      '--stream',
-      '--sink',
+      '--preview',
       'stdout',
       '--events',
       '--control',
       '127.0.0.1:0',
     ])
+  })
+
+  it('names no geometry, because the player reports it', () => {
+    // A size or a rate here would be a guess at a windowed run's swapchain and
+    // surface, and the frame splitter would then cut the pipe by the guess
+    // rather than by what arrived. The `stream` event is the only source.
+    for (const flag of ['--size', '--fps']) {
+      expect(DEFAULT_PLAYER_ARGS).not.toContain(flag)
+    }
   })
 
   it('reports the control address the player actually bound', () => {

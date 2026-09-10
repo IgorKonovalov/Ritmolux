@@ -345,7 +345,7 @@ export type PlayerEvent =
 | 1 — The skeleton shows the picture | studio-builder | done | `f2be445` |
 | 2 — The protocol is typed once | studio-builder | done | `d80b7a4` |
 | 3 — The show loop is extracted | dev | done | `163b330` |
-| 4 — The studio drives the one player | studio-builder | not started | |
+| 4 — The studio drives the one player | studio-builder | done | committed with this row |
 | 5 — Parameters move | studio-builder | not started | |
 | 6 — Expressions and palettes | studio-builder | not started | |
 | 7 — Composition and the library | studio-builder | not started | |
@@ -354,6 +354,45 @@ export type PlayerEvent =
 | 10 — The on-device check | human | not started | |
 
 ### Notes
+
+**Phase 4 — what the capture shows, and one done-when with no originator yet.**
+
+`target/studio-shots/` is not committed; the capture the phase was verified from
+reads, in the footer: `player 0.113.0`, `control 127.0.0.1:56511`,
+`stream 1920x1080 @ 165 rgba8`, `59 painted - 0 dropped`, with the show's picture
+in the canvas and `Clifford` in the title. The geometry is the show's rather than
+the headless preview default, which is the third done-when; `--size` and `--fps`
+appear nowhere under `studio/` and a test now says so.
+
+**The second done-when has no originator until Phase 5.** A `ctl/param` sent from
+the studio needs something in the renderer to send it, and the parameter panel is
+Phase 5. The path below it is whole and exercised — `window.api.player.send` to
+`player:ctl` to the validated forward to the UDP sender aimed at what
+`hello.control` reported — and the player's half is driven from a spawned process
+by `standalone/tests/stream_show.rs`. What no test yet covers is a datagram the
+**studio** composed being accepted by a real player; Phase 5's slider is where
+that becomes observable.
+
+**Phase 4 — the preview at the show's resolution, measured.**
+
+Two readings taken while verifying the phase, both on the reference machine with
+`--preset Clifford` at 1920x1080:
+
+- **The pipe carries 8.29 MB per frame.** Draining it with a fast reader for 20 s
+  took 3 060 633 600 bytes — 369 frames, about 153 MB/s, while the show itself
+  drew at ~42 fps. So the preview yields roughly 18 frames/s where the show draws
+  42.
+- **The show slows with the studio attached**: `health` reports ~42 fps draining
+  into a file and 35.4 fps with the studio painting. That is one machine and one
+  preset, and it is the comparison Phase 10 is there to take properly.
+
+**The dropped-frame counter reads 0 while frames are plainly being lost.** The
+studio painted 59 frames in ~15 s against a show drawing 42/s. `FramePump`
+counts a drop only when a frame arrives while one is in flight, so loss that
+happens upstream of it — in the OS pipe, or in main's read cadence — is invisible
+to the reading ADR-0178 relies on to make the preview's cost honest. Nothing here
+is a Phase 4 regression: the frame reader is untouched, which is what the phase
+asked for. Where the accounting belongs is a question for the review.
 
 **ADR number 0181 is claimed twice.** This lane's studio/show-loop decision and
 main's `0181-the-gate-compiles-every-feature-a-release-ships.md` (Plan 0165) were

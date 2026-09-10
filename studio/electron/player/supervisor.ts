@@ -22,14 +22,24 @@ import { FramePump, FrameSplitter } from './frames'
 /**
  * The invocation the studio asks for.
  *
+ * **One player, windowed, and the studio's picture is a copy of the show's**
+ * (ADR-0181). `--preview stdout` mirrors the frames a window is already drawing
+ * onto the same pipe format a headless run writes, so what the author edits is
+ * by construction what the audience is watching: one capture, one adapter, one
+ * preset directory, one rotation state. A second child rendering its own
+ * preview is a preview that can differ from the show.
+ *
  * `--control` is requested rather than assumed: the player answers with the
  * address it actually bound in `hello.control`, or `null` when it opened no
  * listener, and the studio reads that answer instead of predicting it. Port `0`
  * asks for an ephemeral one, which is why the answer is the only source.
+ *
+ * No size and no rate are named here, and none may be: a windowed run is paced
+ * by its swapchain and reads back at its surface's size, so the geometry is the
+ * player's to report and the `stream` event is where it reports it.
  */
 export const DEFAULT_PLAYER_ARGS = [
-  '--stream',
-  '--sink',
+  '--preview',
   'stdout',
   '--events',
   '--control',

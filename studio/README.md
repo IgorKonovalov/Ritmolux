@@ -7,6 +7,26 @@ own** — every pixel here arrived over a pipe from a `ritmolux` child process
 
 Not shipped by the player's release zips, and nothing shipped depends on it.
 
+## One player, and it is the show
+
+The studio spawns **one** player, windowed, with `--preview stdout --events
+--control 127.0.0.1:0`. That child is the show on the projector *and* the source
+of the picture in this window: `--preview stdout` mirrors the frames it is
+already drawing onto the same pipe format a headless run writes (ADR-0181).
+
+Two consequences worth knowing before the first launch:
+
+- **A window opens.** On a single-screen laptop with no projector attached that
+  is a window in the way; it is also the thing a VJ is there to run.
+- **The preview's geometry is the show's**, not a preview default. Frames arrive
+  at the surface's readback size and the display's rate, and the studio learns
+  both from the `stream` event rather than asking for them — nothing under
+  `studio/` names a size or a frame rate.
+
+One player means one loopback capture, one adapter, one preset directory and one
+rotation state, so the picture being edited cannot drift from the picture being
+watched.
+
 ## Which configuration covers which directory
 
 | Directory                      | Process   | Bundler                            | TypeScript project        |
