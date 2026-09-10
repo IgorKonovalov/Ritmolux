@@ -17,6 +17,8 @@ import type { PlayerEvent } from '@shared/protocol'
 
 import { registerAppHandlers, type AppInfo } from './ipc/appHandlers'
 import { registerPlayerHandlers } from './ipc/playerHandlers'
+import { registerPresetHandlers, type PresetScope } from './ipc/presetHandlers'
+import { SchemaCache } from './player/schema'
 import { ControlSender } from './player/control'
 import { PlayerSupervisor } from './player/supervisor'
 import { resolvePlayer, type ResolvedPlayer } from './player/resolve'
@@ -32,6 +34,14 @@ let resolved: ResolvedPlayer | undefined
 /** Events seen before the renderer loaded, replayed to it in arrival order. */
 let replay: PlayerEvent[] = []
 let rendererReady = false
+/**
+ * The paths the player has named, which are the only ones main will open.
+ *
+ * Kept from the events rather than resolved here: the player is the one that
+ * knows where it is reading presets from, and a second resolver in the studio
+ * is the thing ADR-0184 refuses.
+ */
+const scope: PresetScope = { file: undefined, dir: undefined }
 
 function isExecutableFile(candidate: string): boolean {
   try {
@@ -65,7 +75,9 @@ function start(): void {
     playerPath: resolved?.path,
     playerSource: resolved?.source,
   })
-  registerAppHandlers(info)
+  const schema = new SchemaCache(resolved?.path)
+  registerAppHandlers(info, () => schema.get())
+  registerPresetHandlers(() => scope)
   registerPlayerHandlers(
     () => control,
     (reason) => console.warn(`[studio] refused an action from the renderer: ${reason}`),
@@ -109,6 +121,8 @@ function start(): void {
       // The sender is aimed from the player's own answer, which is `null` when
       // it opened no listener.
       if (event.ev === 'hello') control.aim(event.control)
+      if (event.ev === 'preset') scope.file = event.file ?? undefined
+      if (event.ev === 'roster') scope.dir = event.dir ?? undefined
       send(window, event)
     },
     onDiagnostic: (line) => console.log(`[player] ${line}`),

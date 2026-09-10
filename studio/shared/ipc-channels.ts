@@ -22,6 +22,22 @@ export const IPC_CHANNELS = {
 
   /** The studio's own version and the player path it resolved. */
   APP_GET_INFO: 'app:get-info',
+  /**
+   * The resolved player's `--schema` document, fetched once and cached.
+   *
+   * An OS channel and not a fourth domain one: it carries no message of the
+   * control protocol. What it needs main for is a child process, which the
+   * sandboxed renderer cannot spawn.
+   */
+  APP_GET_SCHEMA: 'app:get-schema',
+
+  /**
+   * A preset file, read as text. The path comes from the player's own `preset`
+   * event; main opens it and never resolves one of its own (ADR-0184).
+   */
+  PRESET_READ: 'preset:read',
+  /** A preset file, written atomically. The renderer holds no file handle. */
+  PRESET_WRITE: 'preset:write',
   /** `shell.openExternal`, the only way a link leaves the window. */
   SHELL_OPEN_EXTERNAL: 'shell:open-external',
 } as const

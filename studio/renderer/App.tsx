@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { isKnownPlayerVersion, EXPECTED_PLAYER_VERSION } from '@shared/protocol'
 
 import { Banner } from './components/Banner'
+import { Editor } from './views/Editor'
 import { Footer } from './components/Footer'
 import { Preview, type PreviewStats } from './components/Preview'
 import { usePlayerEvents } from './hooks/usePlayerEvents'
@@ -25,6 +26,8 @@ export function App(): JSX.Element {
   const player = usePlayerEvents()
   const [stats, setStats] = useState<PreviewStats>({ dropped: 0, delivered: 0 })
   const [info, setInfo] = useState<AppInfo>()
+  /** The last save's refusal, if it had one; cleared by the next save. */
+  const [saveProblem, setSaveProblem] = useState<string>()
 
   useEffect(() => {
     void window.api.app.getInfo().then(setInfo)
@@ -72,7 +75,18 @@ export function App(): JSX.Element {
             detail={`${problem.file}${problem.line !== null ? `:${problem.line}` : ''} — ${problem.message}`}
           />
         )}
-        <Preview stream={player.stream} onStats={onStats} />
+        {saveProblem !== undefined && (
+          <Banner kind="error" title="The preset was not written" detail={saveProblem} />
+        )}
+        <div className={styles.workbench}>
+          <Preview stream={player.stream} onStats={onStats} />
+          <Editor
+            system={player.preset?.system}
+            file={player.preset?.file}
+            reloads={player.reloads}
+            onProblem={setSaveProblem}
+          />
+        </div>
       </main>
 
       <Footer

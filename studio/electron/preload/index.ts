@@ -9,11 +9,13 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import { FRAME_PORT_SENTINEL, IPC_CHANNELS } from '@shared/ipc-channels'
 
 import { appApi } from './api/app'
+import { presetApi } from './api/preset'
 import { playerApi } from './api/player'
 
 const api = {
   app: appApi,
   player: playerApi,
+  preset: presetApi,
 } as const
 
 contextBridge.exposeInMainWorld('api', api)

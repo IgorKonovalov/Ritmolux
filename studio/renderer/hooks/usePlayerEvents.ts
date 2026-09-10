@@ -21,13 +21,29 @@ export interface PlayerState {
   hello?: HelloEvent
   stream?: StreamEvent
   health?: HealthEvent
-  preset?: { name: string; index: number }
+  /**
+   * The preset on screen, with the two facts an editor needs: the system's
+   * canonical key, and the file it was read from — `null` for the embedded set,
+   * which has none (ADR-0184).
+   */
+  preset?: { name: string; index: number; system: string; file: string | null }
   roster: string[]
+  /** Where the watcher is looking, or `null` when nothing resolved. */
+  dir: string | null
+  /**
+   * How many rosters have arrived.
+   *
+   * The player emits one on **every** reload, so this rises each time the file
+   * on disk may have changed — which is the signal to re-read it. A counter
+   * rather than a flag because a view reacts to the change, and two reloads in
+   * a row must not look like one.
+   */
+  reloads: number
   /** Most recent first; the panel shows the head and the list keeps the rest. */
   problems: Problem[]
 }
 
-const EMPTY: PlayerState = { roster: [], problems: [] }
+const EMPTY: PlayerState = { roster: [], dir: null, reloads: 0, problems: [] }
 
 function reduce(state: PlayerState, event: PlayerEvent): PlayerState {
   switch (event.ev) {
@@ -38,9 +54,17 @@ function reduce(state: PlayerState, event: PlayerEvent): PlayerState {
     case 'health':
       return { ...state, health: event }
     case 'preset':
-      return { ...state, preset: { name: event.name, index: event.index } }
+      return {
+        ...state,
+        preset: {
+          name: event.name,
+          index: event.index,
+          system: event.system,
+          file: event.file,
+        },
+      }
     case 'roster':
-      return { ...state, roster: event.names }
+      return { ...state, roster: event.names, dir: event.dir, reloads: state.reloads + 1 }
     case 'preset_error':
       return {
         ...state,

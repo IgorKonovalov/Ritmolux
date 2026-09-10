@@ -1,0 +1,49 @@
+.row {
+  display: grid;
+  grid-template-columns: minmax(7rem, 11rem) 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.15rem 0;
+}
+
+.name {
+  color: var(--text);
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slider {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.slider:disabled {
+  opacity: 0.4;
+}
+
+.value {
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  min-width: 4rem;
+  text-align: right;
+}
+
+.expr {
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note {
+  color: var(--text-dim);
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}

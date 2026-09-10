@@ -388,7 +388,7 @@ export type PlayerEvent =
 | 3 — The show loop is extracted | dev | done | `163b330` |
 | 4 — The studio drives the one player | studio-builder | done | `97a6294` |
 | 5 — The player reports what it loaded | dev | done | `bd037d4` |
-| 6 — Parameters move | studio-builder | not started | |
+| 6 — Parameters move | studio-builder | done | committed with this row |
 | 7 — Expressions and palettes | studio-builder | not started | |
 | 8 — Composition and the library | studio-builder | not started | |
 | 9 — The release job and the gate | dev | not started | |

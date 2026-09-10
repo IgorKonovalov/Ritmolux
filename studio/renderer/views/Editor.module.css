@@ -1,0 +1,26 @@
+.editor {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.status,
+.note {
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  line-height: 1.4;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--panel-edge);
+}
+
+.note {
+  border-bottom: none;
+}
+
+.path {
+  color: var(--text);
+  font-family: var(--mono);
+  overflow-wrap: anywhere;
+}

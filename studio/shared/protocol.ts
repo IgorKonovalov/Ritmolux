@@ -47,12 +47,28 @@ export const presetSchema = z.object({
   ev: z.literal('preset'),
   name: z.string(),
   index: z.number().int(),
+  /**
+   * The system's canonical key — `fragment_field`, the string the schema
+   * document labels that system's parameter roster with. Never the scene's
+   * display name: the two are the same only for the systems whose names are
+   * one word, so a panel resolved from the display name finds nothing for most
+   * of the roster (ADR-0184).
+   */
+  system: z.string(),
+  /** Absolute, or `null` for a preset from the embedded set, which has none. */
+  file: z.string().nullable(),
 })
 
 export const rosterSchema = z.object({
   ...base,
   ev: z.literal('roster'),
   names: z.array(z.string()),
+  /**
+   * The directory this reload read and the watcher polls, absolute, or `null`
+   * when none resolved and the embedded set is what is running. Where a save
+   * has to land to be seen; the studio never resolves it for itself.
+   */
+  dir: z.string().nullable(),
 })
 
 export const presetErrorSchema = z.object({
@@ -82,6 +98,16 @@ export const healthSchema = z.object({
   ctl_rejected: z.number().int(),
   ctl_dropped: z.number().int(),
   ctl_refused: z.number().int(),
+  /**
+   * The preview pipe's own totals, or `null` when no pipe is open.
+   *
+   * The producer's count, and the only honest one: what the studio counts is
+   * its own back-pressure, and a frame lost in the OS pipe never reaches it to
+   * be counted. `null` rather than `0` — "no preview" and "a preview that lost
+   * nothing" are different claims (ADR-0184).
+   */
+  preview_sent: z.number().int().nullable(),
+  preview_dropped: z.number().int().nullable(),
 })
 
 export const streamSchema = z.object({
@@ -99,6 +125,22 @@ export const pongSchema = z.object({
   nonce: z.number().int(),
 })
 
+/**
+ * Every event, by name. **The one list**: the roster the spec is diffed
+ * against and the field sets that diff are both read off this, so a member
+ * added to the union without a row here cannot hide.
+ */
+export const PLAYER_EVENT_SCHEMAS = {
+  hello: helloSchema,
+  preset: presetSchema,
+  roster: rosterSchema,
+  preset_error: presetErrorSchema,
+  preset_warning: presetWarningSchema,
+  health: healthSchema,
+  stream: streamSchema,
+  pong: pongSchema,
+} as const
+
 export const playerEventSchema = z.discriminatedUnion('ev', [
   helloSchema,
   presetSchema,
@@ -115,18 +157,23 @@ export type HelloEvent = z.infer<typeof helloSchema>
 export type StreamEvent = z.infer<typeof streamSchema>
 export type HealthEvent = z.infer<typeof healthSchema>
 export type PresetErrorEvent = z.infer<typeof presetErrorSchema>
+export type PresetEvent = z.infer<typeof presetSchema>
+export type RosterEvent = z.infer<typeof rosterSchema>
 
-/** Every `ev` name the union carries, for the test that diffs it to the spec. */
-export const PLAYER_EVENT_NAMES = [
-  'hello',
-  'preset',
-  'roster',
-  'preset_error',
-  'preset_warning',
-  'health',
-  'stream',
-  'pong',
-] as const
+/** Every `ev` name, read off the one list rather than typed a second time. */
+export const PLAYER_EVENT_NAMES = Object.keys(PLAYER_EVENT_SCHEMAS) as PlayerEvent['ev'][]
+
+/**
+ * The fields one event carries, excluding the two that route it.
+ *
+ * `v` and `ev` are on every line and are not in the spec's `Fields` column, so
+ * they are dropped here rather than special-cased at the comparison.
+ */
+export function eventFields(ev: PlayerEvent['ev']): string[] {
+  return Object.keys(PLAYER_EVENT_SCHEMAS[ev].shape).filter(
+    (key) => key !== 'v' && key !== 'ev',
+  )
+}
 
 /**
  * Bytes one frame of the geometry a `stream` event declared occupies.

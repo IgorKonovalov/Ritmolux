@@ -34,3 +34,26 @@
   padding: 12px;
   min-height: 0;
 }
+
+/* The picture and the panel side by side, and stacked when the window is
+   narrow: at a phone-ish width a 320 px panel beside a 16:9 preview leaves
+   neither readable. */
+.workbench {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(20rem, 26rem);
+  gap: 10px;
+  min-height: 0;
+}
+
+.workbench > * {
+  min-height: 0;
+  min-width: 0;
+}
+
+@media (max-width: 60rem) {
+  .workbench {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+}
