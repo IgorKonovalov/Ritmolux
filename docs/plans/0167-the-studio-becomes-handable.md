@@ -524,17 +524,137 @@ two studio tests and the smoke run spawn the player out of it.
   projects), `npm run lint`, and `npm test` — **24 files, 237 tests, all passing**, including the
   two that spawn the real player.
 - **Outstanding `human` phases:** **both** — 7 (the tester handoff) and 8 (the on-device check).
-  Neither can be started from this lane. **One thing stands in front of Phase 7**, recorded in the
-  notes above: `EXPECTED_PLAYER_VERSION` (`0.113.0`) disagrees with `[workspace.package] version`
-  (`0.115.0`), so the studio refuses the player — including, as far as anything here can tell, the
-  one a packaged studio would carry.
+  Neither can be started from this lane. The version mismatch that stood in front of Phase 7 was
+  settled in `be9f2e7` and is no longer blocking; what the developer-machine smoke run **did** turn
+  up is in [What the developer-machine smoke run found](#what-the-developer-machine-smoke-run-found)
+  below, and **finding A should be read before anyone is handed a build** — the studio rewrites
+  whichever preset rotation last brought in, without asking.
+
+## What the developer-machine smoke run found
+
+> **Read this before closing.** A smoke run on 2026-09-10, after Phase 6, with the owner driving the
+> built studio against `target/release/ritmolux.exe`. It is **not** Phase 7 — that needs someone who
+> has never seen the repository, working from the zip and `packaging/studio/READ-ME-FIRST.md` alone.
+> The owner's verdict on the three phases was *"all looks good, somehow works"*. What follows is
+> everything else the session turned up. **None of it is fixed** and none of it is in scope for this
+> plan's phases; it is handed over for the architect to route.
+
+### A — The studio rewrites an existing preset with no confirmation, and rotation decides which one
+
+**The owner's decision, in their words:** *"we are changing preset when studio is opened. we should
+never do that. When there is change in palette we should prompt user to save it under another name,
+never save without ask to existing preset."*
+
+**The mechanism.** Every editing gesture writes straight to the path the player named in its `preset`
+event, with no prompt and no undo: a parameter slider's **release** (`ParamRow` → `onCommit` →
+`setConstant`), a palette **name**, a stop **drag** and a stop **recolour** (`PaletteEditor` →
+`edit`), any structure-tab key (`TableEditor` → `setKey`), any map row added, edited or removed
+(`MapEditor`, new in Phase 6), and `Ctrl+S` in the file tab. That is Plan 0159's model working as
+designed — *"the picture follows the finger and the disk sees one write per gesture"* — and it
+assumes the preset under the editor is the one the author meant to edit.
+
+**Rotation is what turns that assumption into damage, and this is the part nothing records.**
+Rotation is on by default with a 20–130 s dwell from the operator config, so **the preset under the
+editor changes by itself while the author works**. An edit therefore lands in whichever file rotation
+most recently brought in. The evidence is unambiguous: in six minutes, **three different presets**
+each received `system = "swarm"` from what the owner experienced as clicking the system picker —
+`attractor_cliffordgallery` at 20:37, `attractor_dejonggallery` at 20:38, `attractor_ink` at 20:39.
+One gesture per file, one file per dwell.
+
+**Blast radius, measured.** Exactly **four** files in the watched directory
+(`%APPDATA%\Ritmolux\presets`, 123 presets) were written during the session:
+
+| file | what the studio changed |
+|---|---|
+| `attractor_clifford.toml` | all five `[palette] stops` recoloured — 49 differing lines |
+| `attractor_cliffordgallery.toml` | `[palette] name` `ice`→`ember`, `system`→`swarm`, brightness bindings — 25 differing lines |
+| `attractor_dejonggallery.toml` | `system`→`swarm` |
+| `attractor_ink.toml` | `system`→`swarm`, plus an appended `[palette] name = "spectrum"` |
+
+**The repository's `presets/` was never at risk** — `git status presets/` stayed clean throughout.
+The damage is confined to the per-user seeded copy. All four were **restored** from the shipped set
+on the owner's instruction and verified byte-identical; the modified versions were backed up to the
+session scratchpad first, and that backup is not durable.
+
+A separate measurement worth having, because it will otherwise be mistaken for this: **70 further
+files in that directory differ from the shipped set and none of it is the studio's doing.** The
+per-user directory is seeded once and never re-seeded, so every preset the repository has edited
+since that seed differs by construction. Only the four above carry a modification time from the
+session.
+
+**What it contradicts.** Plan 0159 Phase 3 decided the release writes the file, and its
+byte-equality test — *the written file differs from the original only on the edited lines* — is the
+contract that model is held to. Reversing it to *"never write to an existing preset without asking"*
+is an ADR with the current behaviour as the named rejected alternative, not a plan phase.
+
+**The second-order question the architect should settle in the same breath.** A save-as prompt is
+**not sufficient on its own**: rotation can move the preset between the gesture and the author's
+answer, so the fork would be taken from, or written next to, the wrong preset. Whatever is decided
+has to answer whether the studio **pins the preset** for as long as it is attached — which is a
+`ctl/transport hold` the studio already has the vocabulary to send, so it may be a studio-only
+change rather than a protocol one. A related question with the same root: an edit to a preset that
+came from the **embedded** set has nowhere to land at all — `state.status === 'embedded'` already
+disables writes, and a fork-on-edit model would give that case an answer it currently does not have.
+
+### B — Only the first of several problems is ever shown
+
+**The owner's words:** *"there is warnings when I'm changing system, i guess it could be multiple -
+we should let user open modal window and give details about each warning."*
+
+`usePlayerEvents` keeps up to **32** problems, newest first. `App.tsx` renders `player.problems[0]`
+and nothing else, and no count says there are more. The full list does reach `PresetEditor`, which
+turns it into gutter markers in the **file** tab — so an **error** is recoverable if the author
+thinks to look there. A **warning** is not: spec 0003 gives `preset_warning` only `file` and
+`message`, with no line or column, so `markersFor` has nothing to anchor it to.
+
+Changing the system is the reliable way to produce several at once, and for a structural reason: the
+rewrite keeps the outgoing system's `[params]` bindings and structural tables, and each one the
+incoming system does not declare is its own warning. It is also, per finding A, the gesture most
+likely to have landed on a preset the author did not intend.
+
+**Cost, so the routing is informed.** The banner-with-a-count and the modal are buildable **entirely
+inside `studio/`** from state that already exists — no new event, no new field, no protocol
+widening, one phase. The span question is the only part that is not: giving `preset_warning` a line
+and column would move spec 0003 and need a `dev` phase, and it is what would let a warning be marked
+in the file tab like an error. Those are separable and the architect can take the first without the
+second.
+
+### C — Readings and observations, recorded rather than acted on
+
+- **The quit is clean, verified.** Closing the studio window took the `ritmolux` child with it — no
+  orphan process, launcher exit code 0. That is `will-quit` calling `supervisor.stop()`, exercised
+  through a real window close rather than a hard kill.
+- **The mode change works end to end, on the machine.** `windowed` was spawned with the player
+  holding window handle `10486594`; the panel wrote `windowless`, and after a relaunch the same
+  build spawned a player with handle **`0`** while the studio kept its picture. `playerPath` survived
+  the write. That is backlog 0199 demonstrated live rather than only in a test.
+- **The windowless frame rate drifts down, unexplained.** `diagnostics.log` over six consecutive
+  one-second rows: fps `52.4 → 50.6 → 48.7 → 46.8 → 45.0 → 44.3`, with `frame_ms_avg` climbing
+  `19.1 → 22.6 ms` and `frames_dropped` at `0` throughout. Windowless has no swapchain to pace it, so
+  it free-runs against the preview pipe rather than against a display. Six seconds is far too short
+  to call this a regression, and it is exactly what Phase 8's full-track reading would show if it is
+  one. **Recorded so Phase 8 has a prior to compare against, not as a claim.**
+- **The capture endpoint was the microphone, not loopback**: `live WASAPI 48000/4 Microphone Array
+  (Realtek(R) Audio)`. Not a defect and not this plan's business, but it is a strong candidate for
+  a Phase 7 tester reporting *"it does not react to my music"*, and
+  `packaging/studio/READ-ME-FIRST.md` currently promises *"there is no audio setup"*.
 
 ## Followups (after this lands)
+
+From the plan as written:
 
 - The preview's drop accounting, so a stalled preview is distinguishable from a slow one.
 - `packaging/studio/READ-ME-FIRST.md` as a published install page.
 - Clip rendering from the studio (needs the `render` subcommand).
 - Show projects (needs an interview and an ADR on the file's shape).
+
+From the smoke run, detailed in the section above — the first is the one that gates a handoff:
+
+- **A save is never silent, and rotation cannot move the preset under an editor** (finding A). An
+  ADR: it reverses Plan 0159 Phase 3's model, whose byte-equality test is the current contract.
+- **Every problem is reachable, not only the first** (finding B). A studio-only phase; the
+  separable half — giving `preset_warning` a span so a warning can be marked in the file tab —
+  moves spec 0003 and needs `dev`.
 
 [backlog 0199]: ../design-backlog.md
 [backlog 0200]: ../design-backlog.md
