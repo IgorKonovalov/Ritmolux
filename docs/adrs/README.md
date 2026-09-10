@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0186.** *(0120 was reserved for
+**Next free number: 0188.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -207,4 +207,6 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0183](0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md) | The studio drives one player, and the show loop is extracted so every mode runs it | accepted 2026-09-10 (Plan 0159), revises 0175; Outcome |
 | [0184](0184-the-player-reports-what-it-loaded-and-the-studio-re-derives-nothing.md) | The player reports what it loaded, and the studio re-derives nothing | accepted 2026-09-10 (Plan 0159), extends 0176 |
 | [0185](0185-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md) | The documentation translates a slice, and a stamp makes staleness visible | proposed 2026-09-10 (Plan 0166), extends 0154, 0167 |
+| [0186](0186-the-studios-player-mode-is-a-per-machine-setting.md) | The studio's player mode is a per-machine setting, and the windowless path is a peer | proposed 2026-09-10 (Plan 0167), amends 0183 |
+| [0187](0187-the-preview-pipe-has-a-fixed-shape-and-names-its-true-format.md) | The preview pipe has a fixed shape and names the format it actually carries | proposed 2026-09-10 (Plan 0167), revises 0176 |
 <!-- roster:end -->

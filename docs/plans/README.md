@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0167** (ADRs are a separate sequence — next free there is **0186**.)
+**Next free number: 0168** (ADRs are a separate sequence — next free there is **0188**.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -49,6 +49,7 @@ place. The plan file carries the real link.
 | [0163](0163-the-analytic-field.md) | The analytic field | approved | dev | ADR-0180 rules 1+3: a 13th system holding `chladni` and `escape_time`, with Voronoi, quasicrystal and hyperbolic placed. Fills the roadmap's fractal-spiral gap. **Needs 0161.** |
 | [0164](0164-the-cellular-system.md) | The cellular system | approved | dev | ADR-0180 rules 1+2: a 14th system on `PingPongField` - `life_like`, `larger_than_life`, `cyclic`, plus an age channel so the field paints history. Lenia placed, not built. **Needs 0161.** |
 | [0166](0166-the-basics-read-in-russian.md) | The basics read in Russian | approved | dev, human | ADR-0185: five docs gain a Russian sibling `.ru.md` stamped with the source sha. **Phase 3 is a `human` review that blocks publication.** Touches no Rust - orderable against any lane. |
+| [0167](0167-the-studio-becomes-handable.md) | The studio becomes handable | draft | dev, studio-builder, human | ADR-0186 + 0187: closes backlog 0199, 0200 and 0201, then runs **Plan 0159's two unrun `human` phases** as 7 and 8. One lane handoff: dev, then studio-builder, then human. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-09 — [0158] and [0159] are drafted, and they are a program rather than a
