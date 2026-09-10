@@ -503,6 +503,7 @@ here is the **definition**, and the essay is the **discussion**.
 | `d` | `71` | `1` – `360` | The step between sampled angles in degrees, which is what turns a rose into a Maurer figure; any real step draws a figure. |
 | `phase` | `0` | `0` – `1` | Rotates where the figure starts sampling, as a fraction of a turn. |
 | `radial_offset` | `0` | `-1` – `1` | Pushes every point out from the centre, opening the figure into a ring. |
+| `pen` | `1` | `0` – `2` | How far the tracing point sits from the rolling circle's centre, in rolling radii: 1 draws cusps, less rounds them off, more throws them into loops. |
 | `samples` | `361` | `16` – `2048` | How many points the curve is drawn from; fewer reads as a polygon. Truncated, so a rise adds its next point on arrival. |
 | `thickness` | `2` | `0.5` – `12` | Stroke width in pixels at the render target, before softness widens the falloff. |
 | `hue` | `0.6` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. |

@@ -87,7 +87,49 @@ pub struct CurveParams {
     pub color: [f32; 3],
     /// Per-segment line width.
     pub width: f32,
+    /// The levers beyond `n`, `d` and `phase` that only some families read.
+    pub levers: Levers,
 }
+
+/// The family-specific levers: each is read by one family and is **inert** on
+/// every other, so none of them can move a rose.
+///
+/// Grouped apart from [`CurveParams`]' shared fields so a caller that does not
+/// draw the family reading one can take [`Levers::default`] and say so.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Levers {
+    /// Hypotrochoid: the pen's distance from the rolling circle's centre, in
+    /// rolling radii — `1` traces the cusped cycloid, below it the curtate
+    /// form, above it the prolate form with loops.
+    pub pen: f32,
+}
+
+impl Default for Levers {
+    /// Each lever at the default its `ParamSpec` declares.
+    fn default() -> Self {
+        use super::parametric::PARAMS;
+        use crate::render::scenes::default_of;
+        Self {
+            pen: default_of(PARAMS, "pen"),
+        }
+    }
+}
+
+/// The smallest radius ratio the hypotrochoid rolls at, whatever `n` asks for.
+///
+/// The walk runs `d / |n|` turns of the fixed circle, so `|n|` near zero asks
+/// for an unbounded walk over a finite `samples`. A quarter keeps the longest
+/// walk at `4 d` turns.
+const MIN_RATIO: f32 = 0.25;
+
+/// The largest cusp count a hypotrochoid walks, whatever `d` asks for — a
+/// ceiling on the walk's length, not on the figure: past a few hundred the
+/// cusps are finer than any `samples` resolves.
+const MAX_CUSPS: f32 = 1024.0;
+
+/// The largest `pen` the sampler honours; past it the loops dwarf the rolling
+/// circle and the figure is a ring of near-circles.
+const MAX_PEN: f32 = 16.0;
 
 /// Sample a Maurer rose into `out` (cleared first).
 ///
@@ -222,6 +264,17 @@ pub(crate) fn arm(family: CurveFamily) -> FamilyArm {
             // A curve by construction: `sin` against `sin` is smooth everywhere
             // it is not stationary, and the fit keeps any genuine corner a
             // degenerate phase produces.
+            fits: |_, _| true,
+            polyline: polyline_of,
+        },
+        CurveFamily::Hypotrochoid => FamilyArm {
+            sample: |p, points| {
+                let roll = Roll::of(p);
+                periodic_walk(p, roll.period, hypotrochoid_point, points)
+            },
+            // A curve at every `pen`: the cusps `pen = 1` traces are genuine
+            // corners of the figure, and the fit breaks its chain at them
+            // rather than being declined by them.
             fits: |_, _| true,
             polyline: polyline_of,
         },
@@ -369,6 +422,84 @@ fn lissajous_point(p: &CurveParams, t: f32) -> [f32; 2] {
         (finite_or_zero(p.n) * t + phase).sin(),
         (finite_or_zero(p.d) * t).sin(),
     ]
+}
+
+/// The rolling construction a hypotrochoid walk is drawn from, resolved once
+/// from the parameters: a fixed circle of radius `1`, a rolling circle of
+/// radius `rolling`, and a pen `pen` from the rolling circle's centre.
+#[derive(Clone, Copy)]
+struct Roll {
+    /// The rolling circle's radius, `1 / |n|`.
+    rolling: f32,
+    /// `true` when the circle rolls **outside** the fixed one — a negative `n`.
+    outside: bool,
+    /// The pen's distance from the rolling circle's centre, in world units of
+    /// the construction (`pen` rolling radii).
+    pen: f32,
+    /// How far `t` runs: `d` cusps, one every `TAU / |n|` of the fixed circle.
+    period: f32,
+    /// The largest distance the pen can reach from the centre, `|1 -+ r| + pen`
+    /// — what the figure is divided by to land in the unit disc.
+    extent: f32,
+}
+
+impl Roll {
+    fn of(p: &CurveParams) -> Self {
+        let n = finite_or_zero(p.n);
+        let ratio = n.abs().max(MIN_RATIO);
+        let rolling = 1.0 / ratio;
+        let outside = n < 0.0;
+        let pen = if p.levers.pen.is_finite() {
+            p.levers.pen.clamp(0.0, MAX_PEN)
+        } else {
+            1.0
+        } * rolling;
+        let cusps = finite_or_zero(p.d).clamp(1.0, MAX_CUSPS);
+        let centre = if outside {
+            1.0 + rolling
+        } else {
+            1.0 - rolling
+        };
+        Self {
+            rolling,
+            outside,
+            pen,
+            period: std::f32::consts::TAU * cusps / ratio,
+            // A pen at the rolling circle's centre on a circle rolling its own
+            // radius inside is a figure of one point; the floor keeps that a
+            // point rather than a division by zero.
+            extent: (centre.abs() + pen).max(f32::EPSILON),
+        }
+    }
+}
+
+/// The hypotrochoid (or, for a negative `n`, the epitrochoid) in the unit disc:
+/// the rolling circle's centre runs round a circle of radius `1 -+ r` while the
+/// pen turns about it `(1 -+ r) / r` times as fast. `phase`, a fraction of a
+/// turn, sets where on the rolling circle the pen starts.
+///
+/// At `t = 0` and `phase = 0` the pen sits on the positive x-axis, so with
+/// `pen = 1` point `0` is a cusp: the outermost point of a hypocycloid and the
+/// innermost of an epicycloid.
+fn hypotrochoid_point(p: &CurveParams, t: f32) -> [f32; 2] {
+    let roll = Roll::of(p);
+    let start = finite_or_zero(p.phase) * std::f32::consts::TAU;
+    let (x, y) = if roll.outside {
+        let centre = 1.0 + roll.rolling;
+        let spin = centre / roll.rolling * t + start;
+        (
+            centre * t.cos() - roll.pen * spin.cos(),
+            centre * t.sin() - roll.pen * spin.sin(),
+        )
+    } else {
+        let centre = 1.0 - roll.rolling;
+        let spin = centre / roll.rolling * t + start;
+        (
+            centre * t.cos() + roll.pen * spin.cos(),
+            centre * t.sin() - roll.pen * spin.sin(),
+        )
+    };
+    [x / roll.extent, y / roll.extent]
 }
 
 /// The walk in hand as chained chords (ADR-0158): every interior vertex is a

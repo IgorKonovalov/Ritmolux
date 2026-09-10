@@ -239,8 +239,8 @@ struct FamilySample {
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the family seam takes a second arm | dev | done | committed with this row |
-| 2 — hypotrochoid and epicycloid | dev | not started | |
+| 1 — the family seam takes a second arm | dev | done | 997f7c5 |
+| 2 — hypotrochoid and epicycloid | dev | done | committed with this row |
 | 3 — the superformula | dev | not started | |
 | 4 — the harmonograph | dev | not started | |
 | 5 — per-family ranges in the reference | dev | not started | |
@@ -261,6 +261,16 @@ struct FamilySample {
 - Phase 1: a new family reads `phase` as a fraction of a turn (`phase * TAU`), which is what the
   `ParamSpec` doc and its `0..1` range state. The rose adds `phase` inside its sine in radians, which
   that doc does not say. Left as it was - an observation, not acted on.
+- Phase 2 reads `n` as the signed radius ratio `R / r` (positive rolls inside) and `d` as the number
+  of cusps walked, so the trace runs `d / |n|` turns of the fixed circle and closes when that is
+  whole. The phase text gives both meanings without saying how they combine; this is the reading
+  under which both hold at once. `|n|` is floored at `0.25`, `d` clamped to `1..1024` and `pen` to
+  `0..16` - sampler safety bounds, not the printed ranges. `phase` turns the pen's starting angle.
+- Phases 2-4 each regenerate `presets/README.md` (with `RLX_UPDATE_PARAM_REFERENCE=1`) when they
+  add a parameter, because `the_parameter_reference_block_is_current` fails otherwise. Phase 5 is
+  still the phase that changes what the generator prints.
+- Phase 2 also fixes a Phase 1 doc comment on `CurveFamily`, which linked the crate-private
+  `curves::arm` from public docs and failed `cargo doc` under `-D warnings`.
 
 ### Close triggers
 

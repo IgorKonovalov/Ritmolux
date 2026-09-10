@@ -19,6 +19,7 @@ fn rose() -> CurveParams {
         draw_progress: 1.0,
         color: [1.0, 1.0, 1.0],
         width: 0.01,
+        levers: Levers::default(),
     }
 }
 
@@ -313,6 +314,7 @@ fn a_chord_web_declines_the_fit_and_a_rose_takes_it() {
                 draw_progress: 1.0,
                 color: [0.0; 3],
                 width: 0.01,
+                levers: Levers::default(),
             },
             &mut points,
             &mut pieces,
@@ -574,4 +576,243 @@ fn a_closed_polyline_joins_its_wrap_and_an_open_one_leaves_its_ends_free() {
     assert_eq!(out.len(), 3, "an open walk of four points is three chords");
     assert_eq!(out[0].ext_a, 0.0, "the open walk's first end is free");
     assert_eq!(out[2].ext_b, 0.0, "and so is its last");
+}
+
+/// A spirograph: a circle one fifth the size rolling inside the fixed one, five
+/// cusps' worth of walk, the pen at `pen` rolling radii.
+fn spirograph(pen: f32) -> CurveParams {
+    CurveParams {
+        n: 5.0,
+        d: 5.0,
+        samples: 360,
+        levers: Levers { pen },
+        ..rose()
+    }
+}
+
+/// Joints of `pieces` (wrapping when `closed`) that turn by more than 30
+/// degrees — the corners the fit kept.
+fn corners(pieces: &[Piece], closed: bool) -> usize {
+    let joints = if closed {
+        pieces.len()
+    } else {
+        pieces.len() - 1
+    };
+    (0..joints)
+        .filter(|&k| {
+            let (a, b) = (pieces[k], pieces[(k + 1) % pieces.len()]);
+            turn_between(a.end_tangent(), b.start_tangent()).abs() > 30f32.to_radians()
+        })
+        .count()
+}
+
+/// Plan 0162 Phase 2's first done-when: the classic spirograph figure. A
+/// 5:1 roll with the pen inside the rolling circle closes after one turn of the
+/// fixed circle into a five-lobed figure that is exactly **five-fold
+/// symmetric** — a fifth of a turn maps the walk onto itself, sample for
+/// sample — and whose every point lies in the annulus the construction allows:
+/// `(1 - r) - pen` to `(1 - r) + pen` from the centre, over the extent.
+#[test]
+fn a_hypotrochoid_draws_the_classic_spirograph_figure() {
+    let p = spirograph(0.6);
+    let (fit, points, pieces) = walk_of(CurveFamily::Hypotrochoid, p);
+    assert!(
+        fit.fitted && fit.closed,
+        "a 5:1 roll over five cusps closes"
+    );
+    assert_eq!(points.len(), p.samples);
+
+    let (sin, cos) = (std::f32::consts::TAU / 5.0).sin_cos();
+    let fifth = p.samples / 5;
+    for (j, q) in points.iter().enumerate() {
+        let turned = [q[0] * cos - q[1] * sin, q[0] * sin + q[1] * cos];
+        let there = points[(j + fifth) % points.len()];
+        assert!(
+            super::dist(turned, there) < 1e-4,
+            "sample {j} turned a fifth of a turn lands at {turned:?}, not on sample \
+             {}'s {there:?}",
+            (j + fifth) % points.len()
+        );
+    }
+
+    let (rolling, pen) = (0.2f32, 0.6 * 0.2);
+    let extent = (1.0 - rolling) + pen;
+    let (inner, outer) = (((1.0 - rolling) - pen) / extent, 1.0);
+    for (j, q) in points.iter().enumerate() {
+        let r = dist(*q);
+        assert!(
+            r >= inner - 1e-4 && r <= outer + 1e-4,
+            "sample {j} sits at radius {r}, outside the construction's {inner}..{outer}"
+        );
+    }
+    assert!(
+        (dist(points[0]) - outer).abs() < 1e-5,
+        "the walk starts on a lobe's outermost point"
+    );
+
+    assert_g1(&pieces, true, "curtate spirograph");
+    assert_eq!(corners(&pieces, true), 0, "a curtate trace has no cusp");
+}
+
+/// Plan 0162 Phase 2's second done-when: `pen` sweeps continuously from the
+/// curtate form through the cusped one into the prolate one **without the
+/// sampler folding or the fitter breaking**.
+///
+/// "Not folding" is continuity: a small step in `pen` moves every sample a
+/// small distance, because the figure is divided by an extent that is itself
+/// continuous in `pen`. "Not breaking" is that every step still fits into one
+/// closed chain whose pieces meet end to end and that costs fewer pieces than
+/// the chords it replaces — and that the chain is G1 everywhere the figure has
+/// no cusp, while at `pen = 1` it keeps exactly the five cusps the figure has.
+#[test]
+fn pen_sweeps_from_curtate_through_prolate_without_folding_or_breaking_the_fit() {
+    let mut previous: Option<Vec<[f32; 2]>> = None;
+    let mut swept = 0;
+    for step in 4..=40 {
+        let pen = step as f32 * 0.05;
+        let label = format!("pen = {pen}");
+        let p = spirograph(pen);
+        let (fit, points, pieces) = walk_of(CurveFamily::Hypotrochoid, p);
+        assert!(
+            fit.fitted && fit.closed,
+            "{label}: the walk must fit and close"
+        );
+        for q in &points {
+            assert!(
+                q[0].is_finite() && q[1].is_finite() && dist(*q) <= 1.0 + 1e-4,
+                "{label}: the vertex {q:?} is not a finite point in the unit disc"
+            );
+        }
+        assert!(
+            pieces.len() < p.samples,
+            "{label}: the fit cost {} pieces for {} chords",
+            pieces.len(),
+            p.samples
+        );
+        for k in 0..pieces.len() {
+            let (a, b) = (pieces[k], pieces[(k + 1) % pieces.len()]);
+            assert!(
+                super::dist(a.end_point(), b.start_point()) < 1e-4,
+                "{label}: the chain opens a gap at joint {k}"
+            );
+        }
+        if (pen - 1.0).abs() < 1e-3 {
+            assert_eq!(
+                corners(&pieces, true),
+                5,
+                "{label}: the cycloid proper keeps its five cusps as corners"
+            );
+        } else if (pen - 1.0).abs() >= 0.4 {
+            assert_g1(&pieces, true, &label);
+        }
+        if let Some(before) = &previous {
+            let moved = before
+                .iter()
+                .zip(&points)
+                .map(|(a, b)| super::dist(*a, *b))
+                .fold(0.0f32, f32::max);
+            assert!(
+                moved < 0.05,
+                "{label}: a 0.05 step in pen moved a sample {moved}, so the figure folded"
+            );
+        }
+        previous = Some(points);
+        swept += 1;
+    }
+    assert_eq!(swept, 37, "the sweep must run curtate to prolate");
+}
+
+/// Plan 0162 Phase 2's third done-when: a **negative `n` rolls the circle
+/// outside** and draws the epicycloid. The two forms are told apart by where
+/// their cusps sit: a hypocycloid's point outward from a figure inside the
+/// fixed circle, an epicycloid's point inward from a figure wrapped round it.
+#[test]
+fn a_negative_n_rolls_outside_and_draws_the_epicycloid() {
+    let at = |n: f32| {
+        let p = CurveParams {
+            n,
+            d: 4.0,
+            samples: 400,
+            levers: Levers { pen: 1.0 },
+            ..rose()
+        };
+        walk_of(CurveFamily::Hypotrochoid, p)
+    };
+
+    let (fit, epi, pieces) = at(-4.0);
+    assert!(fit.fitted && fit.closed);
+    // Rolling radius a quarter, outside: the fixed circle sits at
+    // `1 / (1 + 2r)` of the extent, and the cusps touch it.
+    let fixed = 1.0 / (1.0 + 2.0 * 0.25);
+    let start = dist(epi[0]);
+    assert!(
+        (start - fixed).abs() < 1e-5,
+        "the epicycloid's first cusp must touch the fixed circle at {fixed}, got {start}"
+    );
+    for (j, q) in epi.iter().enumerate() {
+        assert!(
+            dist(*q) >= fixed - 1e-4,
+            "sample {j} of the epicycloid dips inside the fixed circle"
+        );
+    }
+    assert_eq!(corners(&pieces, true), 4, "four cusps, pointing inward");
+
+    let (fit, hypo, pieces) = at(4.0);
+    assert!(fit.fitted && fit.closed);
+    assert!(
+        (dist(hypo[0]) - 1.0).abs() < 1e-5,
+        "the hypocycloid's first cusp is its outermost point"
+    );
+    for (j, q) in hypo.iter().enumerate() {
+        assert!(
+            dist(*q) <= 1.0 + 1e-4,
+            "sample {j} of the hypocycloid leaves the fixed circle"
+        );
+    }
+    assert_eq!(corners(&pieces, true), 4, "four cusps, pointing outward");
+}
+
+/// No hypotrochoid inside the declared ranges — nor one fed a non-finite
+/// expression result — emits a non-finite vertex, including the degenerate
+/// rolls: `n = 0` (clamped to the smallest ratio) and `n = 1` rolling inside,
+/// whose pen never leaves one point.
+#[test]
+fn no_hypotrochoid_emits_a_non_finite_vertex() {
+    for n in [
+        -8.0,
+        -2.5,
+        -1.0,
+        -0.1,
+        0.0,
+        0.1,
+        1.0,
+        2.0,
+        2.5,
+        8.0,
+        f32::NAN,
+    ] {
+        for d in [1.0, 5.0, 24.0, f32::INFINITY] {
+            for pen in [0.0, 0.5, 1.0, 2.0, f32::NAN] {
+                let (_, points, pieces) = walk_of(
+                    CurveFamily::Hypotrochoid,
+                    CurveParams {
+                        n,
+                        d,
+                        levers: Levers { pen },
+                        ..rose()
+                    },
+                );
+                assert!(
+                    points.iter().flatten().all(|c| c.is_finite()),
+                    "n = {n}, d = {d}, pen = {pen} emitted a non-finite vertex"
+                );
+                assert!(
+                    pieces
+                        .iter()
+                        .all(|piece| piece.start_point().iter().all(|c| c.is_finite())),
+                    "n = {n}, d = {d}, pen = {pen} fitted a non-finite piece"
+                );
+            }
+        }
+    }
 }

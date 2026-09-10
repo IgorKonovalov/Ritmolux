@@ -55,6 +55,8 @@ const DEFAULT_D: f32 = default_of(PARAMS, "d");
 // adds to the radius.
 const DEFAULT_PHASE: f32 = default_of(PARAMS, "phase");
 const DEFAULT_RADIAL_OFFSET: f32 = default_of(PARAMS, "radial_offset");
+// The family levers: each is read by one family and inert on the rest.
+const DEFAULT_PEN: f32 = default_of(PARAMS, "pen");
 const DEFAULT_SAMPLES: f32 = default_of(PARAMS, "samples");
 const DEFAULT_THICKNESS: f32 = 2.0;
 const DEFAULT_HUE: f32 = 0.6;
@@ -133,6 +135,7 @@ pub struct ParametricCurveScene {
     d: f32,
     phase: f32,
     radial_offset: f32,
+    pen: f32,
     samples: f32,
     thickness: f32,
     /// The shared palette knobs (ADR-0021).
@@ -199,6 +202,7 @@ impl ParametricCurveScene {
             d: DEFAULT_D,
             phase: DEFAULT_PHASE,
             radial_offset: DEFAULT_RADIAL_OFFSET,
+            pen: DEFAULT_PEN,
             samples: DEFAULT_SAMPLES,
             thickness: DEFAULT_THICKNESS,
             colour: common::PaletteParams::new(DEFAULT_HUE, DEFAULT_BRIGHTNESS),
@@ -376,6 +380,14 @@ pub const PARAMS: &[ParamSpec] = &[
         kind: ParamKind::Modal,
     },
     ParamSpec {
+        name: "pen",
+        default: 1.0,
+        range: Some([0.0, 2.0]),
+        doc: "How far the tracing point sits from the rolling circle's centre, in rolling radii: \
+               1 draws cusps, less rounds them off, more throws them into loops.",
+        kind: ParamKind::Modal,
+    },
+    ParamSpec {
         name: "samples",
         default: 361.0,
         range: Some([16.0, 2048.0]),
@@ -426,6 +438,7 @@ impl Scene for ParametricCurveScene {
         self.d = DEFAULT_D;
         self.phase = DEFAULT_PHASE;
         self.radial_offset = DEFAULT_RADIAL_OFFSET;
+        self.pen = DEFAULT_PEN;
         self.samples = DEFAULT_SAMPLES;
         self.thickness = DEFAULT_THICKNESS;
         self.colour.reset();
@@ -453,6 +466,7 @@ impl Scene for ParametricCurveScene {
             "d" => self.d = value,
             "phase" => self.phase = value,
             "radial_offset" => self.radial_offset = value,
+            "pen" => self.pen = value,
             "samples" => self.samples = value,
             "thickness" => self.thickness = value,
             "hue_spread" => self.hue_spread = value,
@@ -526,6 +540,7 @@ impl Scene for ParametricCurveScene {
             draw_progress: self.draw_progress,
             color,
             width,
+            levers: curves::Levers { pen: self.pen },
         };
 
         // Sample the single curve, then replicate it under the geometry mirror.
@@ -677,6 +692,7 @@ mod tests {
             draw_progress: 1.0,
             color: [1.0, 1.0, 1.0],
             width: 0.01,
+            levers: curves::Levers::default(),
         };
 
         let mut points = Vec::with_capacity(SAMPLES + 1);
@@ -751,6 +767,7 @@ mod tests {
             draw_progress: 1.0,
             color: [1.0, 1.0, 1.0],
             width: W,
+            levers: curves::Levers::default(),
         };
         let (mut points, mut pieces, mut at) = (Vec::new(), Vec::new(), Vec::new());
         assert!(
@@ -901,6 +918,7 @@ mod tests {
                 draw_progress,
                 color: [0.0; 3],
                 width: 0.01,
+                levers: curves::Levers::default(),
             },
             &mut out,
         );

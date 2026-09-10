@@ -252,7 +252,7 @@ impl Default for ViewTransform {
 /// rejected at load.
 ///
 /// A family is a **walk and a fit verdict**, not a scene: each variant answers
-/// [`curves::arm`], and `parametric_curve` draws whatever that returns without
+/// `curves::arm`, and `parametric_curve` draws whatever that returns without
 /// naming a family itself. `n`, `d` and `phase` are read with a family-specific
 /// meaning (the `attractor` precedent, where `a`..`d` mean different things per
 /// family).
@@ -262,18 +262,28 @@ pub enum CurveFamily {
     MaurerRose,
     /// The Lissajous figure — `x = sin(n t + phase)`, `y = sin(d t)`.
     Lissajous,
+    /// The spirograph: a circle rolling inside (hypotrochoid) or outside
+    /// (epitrochoid) a fixed one, traced by a pen at `pen` rolling radii from
+    /// its centre. The **sign of `n`** picks which — positive rolls inside —
+    /// so one family name covers both.
+    Hypotrochoid,
 }
 
 impl CurveFamily {
     /// Every family, in roster order — the closed set, and the list the schema
     /// export renders rather than restating.
-    pub const ALL: [CurveFamily; 2] = [CurveFamily::MaurerRose, CurveFamily::Lissajous];
+    pub const ALL: [CurveFamily; 3] = [
+        CurveFamily::MaurerRose,
+        CurveFamily::Lissajous,
+        CurveFamily::Hypotrochoid,
+    ];
 
     /// Parse a `[curve] family` name, or `None` if unknown.
     pub fn from_name(name: &str) -> Option<Self> {
         Some(match name {
             "maurer_rose" => CurveFamily::MaurerRose,
             "lissajous" => CurveFamily::Lissajous,
+            "hypotrochoid" => CurveFamily::Hypotrochoid,
             _ => return None,
         })
     }
@@ -284,6 +294,7 @@ impl CurveFamily {
         match self {
             CurveFamily::MaurerRose => "maurer_rose",
             CurveFamily::Lissajous => "lissajous",
+            CurveFamily::Hypotrochoid => "hypotrochoid",
         }
     }
 }
