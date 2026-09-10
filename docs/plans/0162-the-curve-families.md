@@ -244,7 +244,7 @@ struct FamilySample {
 | 3 — the superformula | dev | done | 792525a |
 | 4 — the harmonograph | dev | done | 6376e88 |
 | 5 — per-family ranges in the reference | dev | done | caeb435 |
-| 6 — the documentation sweep | dev | done | committed with this row |
+| 6 — the documentation sweep | dev | done | e69efb2 |
 
 ### Notes
 
@@ -320,16 +320,28 @@ struct FamilySample {
 - Phase 6: `docs/presets.md` gains a `### The [curve] table` section - a five-row table with `n`,
   `d`, `phase` and each family's own levers - and its systems row for `parametric_curve` now names
   the five families.
+- Noticed, not acted on: `.claude/skills/preset-author/references/systems.md` and its `api-feedback.md`
+  still describe `parametric_curve` as the Maurer rose alone. Those files are the content lane's.
+- The full suite ran while `docs-shots.mjs` was rendering, over the final code tree. Phase 6 changed
+  no Rust, only docs, the manifest and the `docs/examples/curves/` files, which were on disk for
+  the run.
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** `presets/README.md` only - the generated parameter block, regenerated in
+  1e23aef, 792525a, 6376e88 and caeb435. No `presets/*.toml` was added or changed.
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** feature - four new `[curve] family` values (`lissajous`, `hypotrochoid`,
+  `superformula`, `harmonograph`), five new `parametric_curve` parameters (`pen`, `sym`,
+  `sharpness`, `lobe`, `decay`), and per-family ranges in the generated reference.
+- **Operator docs touched:** `docs/presets.md`, `docs/preset-guide.md`, `presets/README.md`
+  (generated block), `docs/images/curves/` (four new renders), `docs/examples/curves/` (four
+  teaching presets).
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 - 119 stated reductions hold
+  across 52 live entries (11 unprobeable).
+- **Full suite:** `cargo nextest run --workspace --no-fail-fast` - exit 0, 1734 passed (11 slow),
+  6 skipped, 463.8 s.
+- **Outstanding `human` phases:** none - the plan has no `human` phase.
 
 ## Followups (after this lands)
 
