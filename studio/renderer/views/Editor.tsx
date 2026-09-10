@@ -16,7 +16,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { mapElementEditor } from '@shared/fields'
 import { rostersFor, type SchemaDocument, type TableKey } from '@shared/schema'
-import { presetPath, structuralTables } from '@shared/templates'
+import { canTemplate, structuralTables, templateFor } from '@shared/templates'
 import {
   readKeys,
   removeKey,
@@ -27,6 +27,7 @@ import {
   type Stop,
 } from '@shared/toml'
 
+import { ForkPrompt } from '../components/ForkPrompt'
 import { MapEditor } from '../components/MapEditor'
 import { PaletteEditor } from '../components/PaletteEditor'
 import { ParamPanel } from '../components/ParamPanel'
@@ -90,11 +91,42 @@ export function Editor({
   const schema = useSchema()
   const actions = usePlayerActions()
   const library = useRoster(roster, active, actions.selectPreset)
-  const { file: state, commit, write } = useActivePreset(file, reloads)
+  /**
+   * What an embedded preset forks from.
+   *
+   * It is a template for the system on screen, not a copy of what is drawn: no
+   * event carries the embedded document's own text and the studio resolves
+   * nothing of its own (ADR-0184), so the honest first file is the schema's
+   * defaults for that system plus whatever the gesture changed.
+   */
+  const base = useMemo(
+    () =>
+      file === null &&
+      system !== undefined &&
+      schema.status === 'ready' &&
+      canTemplate(schema.document, system)
+        ? templateFor(schema.document, { name: active ?? system, system })
+        : undefined,
+    [file, system, schema, active],
+  )
+  const preset = useActivePreset(file, reloads, { dir, name: active, base })
+  const { file: state, text, commit, write } = preset
   const [tab, setTab] = useState<Tab>('parameters')
 
-  const text = state.status === 'ready' ? state.text : undefined
-  const palette = state.status === 'ready' ? state.palette : undefined
+  /**
+   * A fork the player has not seen yet.
+   *
+   * `ctl/preset` naming a preset the roster does not hold changes nothing
+   * (spec 0003), so the switch waits for the watcher's poll to bring the new
+   * file in rather than firing into the gap between the write and the reload.
+   */
+  const [awaiting, setAwaiting] = useState<string>()
+  const select = library.select
+  useEffect(() => {
+    if (awaiting === undefined || !roster.includes(awaiting)) return
+    select(awaiting)
+    setAwaiting(undefined)
+  }, [awaiting, roster, select])
 
   /**
    * The stops as the ramp shows them mid-drag.
@@ -108,11 +140,8 @@ export function Editor({
   useEffect(() => setDraft(undefined), [text])
 
   const shownPalette = useMemo(
-    () =>
-      palette === undefined
-        ? { name: undefined, stops: [] }
-        : { ...palette, stops: draft ?? palette.stops },
-    [palette, draft],
+    () => ({ ...preset.palette, stops: draft ?? preset.palette.stops }),
+    [preset.palette, draft],
   )
 
   const onDrag = useCallback(
@@ -181,7 +210,7 @@ export function Editor({
     )
   }
 
-  const writable = state.status === 'ready'
+  const writable = preset.writable
 
   return (
     <div className={styles.editor}>
@@ -200,19 +229,36 @@ export function Editor({
         ))}
       </div>
 
-      <p className={styles.status}>
-        {state.status === 'ready' && <span className={styles.path}>{state.path}</span>}
-        {state.status === 'loading' && 'opening the preset file…'}
-        {state.status === 'waiting' && 'waiting for the player to name a preset'}
-        {state.status === 'embedded' &&
-          'this preset is one of the built-in set and has no file — a drag moves the picture, and nothing can be written'}
-        {state.status === 'failed' && `could not open ${state.path}: ${state.reason}`}
-      </p>
+      {preset.fork === undefined ? (
+        <p className={styles.status}>
+          {state.status === 'ready' && <span className={styles.path}>{state.path}</span>}
+          {state.status === 'loading' && 'opening the preset file…'}
+          {state.status === 'waiting' && 'waiting for the player to name a preset'}
+          {state.status === 'embedded' &&
+            'this preset is one of the built-in set and has no file — an edit saves a copy, which becomes its first one'}
+          {state.status === 'failed' && `could not open ${state.path}: ${state.reason}`}
+        </p>
+      ) : (
+        <ForkPrompt
+          // Keyed by what is being forked, so a gesture against a different
+          // preset re-seeds the field rather than keeping the name typed for the
+          // previous one.
+          key={preset.fork.source}
+          request={preset.fork}
+          onSave={(chosen) =>
+            void preset.keep(chosen).then((reason) => {
+              onProblem(reason)
+              if (reason === undefined) setAwaiting(chosen)
+            })
+          }
+          onCancel={preset.discard}
+        />
+      )}
 
       {tab === 'parameters' && (
         <ParamPanel
           rosters={rostersFor(schema.document, system)}
-          bindings={state.status === 'ready' ? state.bindings : []}
+          bindings={preset.bindings}
           writable={writable}
           onDrag={onDrag}
           onCommit={onCommit}
@@ -271,12 +317,12 @@ export function Editor({
             dir={dir}
             system={system}
             onSelect={library.select}
-            onCreate={(fileName, document) => {
-              if (dir === null) return
-              void window.api.preset
-                .write(presetPath(dir, fileName), document)
-                .then((result) => onProblem(result.ok ? undefined : result.reason))
-            }}
+            // Through the same create the fork takes: it refuses a name that is
+            // already a preset, and it remembers the file as this session's own so
+            // editing what was just made does not ask for a name again.
+            onCreate={(fileName, document) =>
+              void preset.create(fileName, document).then(onProblem)
+            }
             onProblem={onProblem}
           />
         </div>

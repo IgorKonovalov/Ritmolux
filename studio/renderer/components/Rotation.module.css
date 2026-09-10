@@ -1,0 +1,30 @@
+.rotation {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 11px;
+}
+
+.state {
+  color: var(--text-dim);
+}
+
+.rotation[data-held='true'] .state {
+  color: var(--warn);
+}
+
+.resume {
+  background: none;
+  border: 1px solid var(--panel-edge);
+  border-radius: 3px;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 10px;
+  padding: 2px 8px;
+}
+
+.resume:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}

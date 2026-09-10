@@ -11,7 +11,7 @@
  * roster entry that appears and vanishes, and on the tick where it exists it is
  * either a parse error or a second copy of the preset under a different name.
  */
-import { rename, readFile, writeFile, unlink } from 'node:fs/promises'
+import { access, rename, readFile, writeFile, unlink } from 'node:fs/promises'
 import { dirname, join, basename } from 'node:path'
 
 /** The suffix that keeps a half-written file out of the watcher's glob. */
@@ -52,4 +52,27 @@ export async function writePresetAtomically(path: string, text: string): Promise
     await unlink(temp).catch(() => undefined)
     throw error
   }
+}
+
+/**
+ * Write `text` to `path`, refusing a name that is already taken.
+ *
+ * The refusal is the whole point of the call: a fork (ADR-0189) and a new
+ * preset both need a name nothing is using, and one that landed on an existing
+ * preset would be the silent overwrite the fork exists to remove.
+ *
+ * **The check is not atomic against another writer, and cannot portably be.**
+ * Node has no no-clobber rename, and `open` with `wx` would claim the name with
+ * an empty `.toml` the watcher's next poll reads as a broken preset. The other
+ * writer this races is the author's own editor, which is one gesture at a time;
+ * the hazard that is real — the watcher reading half a document — is what the
+ * temporary file below is for.
+ */
+export async function createPresetFile(path: string, text: string): Promise<void> {
+  const taken = await access(path).then(
+    () => true,
+    () => false,
+  )
+  if (taken) throw new Error(`${basename(path)} is already there — choose another name`)
+  await writePresetAtomically(path, text)
 }

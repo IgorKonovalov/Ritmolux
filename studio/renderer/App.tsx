@@ -13,7 +13,10 @@ import { Banner } from './components/Banner'
 import { Editor } from './views/Editor'
 import { Footer } from './components/Footer'
 import { Preview, type PreviewStats } from './components/Preview'
+import { Rotation } from './components/Rotation'
 import { Settings } from './views/Settings'
+import { useHeldRotation } from './hooks/useHeldRotation'
+import { usePlayerActions } from './hooks/usePlayer'
 import { usePlayerEvents } from './hooks/usePlayerEvents'
 
 import styles from './App.module.css'
@@ -27,6 +30,8 @@ interface AppInfo {
 
 export function App(): JSX.Element {
   const player = usePlayerEvents()
+  const actions = usePlayerActions()
+  const rotation = useHeldRotation(player.hello, actions.transport)
   const [stats, setStats] = useState<PreviewStats>({ dropped: 0, delivered: 0 })
   const [info, setInfo] = useState<AppInfo>()
   /** The last save's refusal, if it had one; cleared by the next save. */
@@ -48,6 +53,7 @@ export function App(): JSX.Element {
       <header className={styles.header}>
         <h1 className={styles.title}>Ritmolux Studio</h1>
         <span className={styles.preset}>{player.preset?.name ?? 'no preset yet'}</span>
+        <Rotation held={rotation.held} onResume={rotation.resume} />
         <button
           type="button"
           className={styles.settings}

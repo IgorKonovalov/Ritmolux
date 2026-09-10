@@ -21,4 +21,11 @@ export const presetApi = {
   /** One atomic write. The watcher's next poll is what makes it visible. */
   write: (path: string, text: string): Promise<PresetResult<null>> =>
     ipcRenderer.invoke(IPC_CHANNELS.PRESET_WRITE, path, text) as Promise<PresetResult<null>>,
+
+  /**
+   * The same write, refused when the name is already taken — what a fork and a
+   * new preset both go through (ADR-0189).
+   */
+  create: (path: string, text: string): Promise<PresetResult<null>> =>
+    ipcRenderer.invoke(IPC_CHANNELS.PRESET_CREATE, path, text) as Promise<PresetResult<null>>,
 }

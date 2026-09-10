@@ -74,8 +74,8 @@ than with your machine; that is worth sending back exactly as it appears.
 The right-hand panel has five tabs.
 
     parameters   Every number the current look declares, with a slider or a
-                 field. Drag one and the picture moves as you drag. Let go and
-                 the value is written into the preset file.
+                 field. Drag one and the picture moves as you drag. Let go
+                 and the value is saved.
 
     structure    The tables underneath a look - how many particles, which
                  generator, how the layers stack.
@@ -90,6 +90,20 @@ The right-hand panel has five tabs.
 
 Parameters are live; the other four go through the file on disk, so the picture
 follows about a fifth of a second later, when the player notices the change.
+
+THE FIRST CHANGE YOU MAKE TO A PRESET MAKES A COPY. The Studio never writes a
+preset it did not create. It asks what to call the copy, saves the whole thing
+under that name, and switches to it; everything you do afterwards goes to your
+copy without asking again. The preset you started from is left exactly as it
+was, and your copy sits beside it in the library tab.
+
+Closing the Studio forgets which copies are yours, so the first change after you
+open it again asks once more and makes another copy. That is the price of the
+Studio keeping no memory of its own - nothing you did is lost.
+
+WHILE THE STUDIO IS OPEN, the player stops moving through presets by itself.
+Otherwise the one under your hands would change mid-edit. The header says
+"rotation held", and the button beside it starts it moving again.
 
 If a preset does not load, a red bar appears at the top with the file and the
 line - and the file tab marks that line.

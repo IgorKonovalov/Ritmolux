@@ -47,6 +47,17 @@ export const IPC_CHANNELS = {
   PRESET_READ: 'preset:read',
   /** A preset file, written atomically. The renderer holds no file handle. */
   PRESET_WRITE: 'preset:write',
+  /**
+   * A preset file written to a name that does not exist yet, refused if it
+   * does.
+   *
+   * Separate from the write above because the refusal is the whole of it: a
+   * fork (ADR-0189) and a new preset both need a name nothing is using, and a
+   * write that silently landed on an existing preset is the damage the fork
+   * exists to remove. An OS channel like its two neighbours — it carries no
+   * message of the control protocol.
+   */
+  PRESET_CREATE: 'preset:create',
   /** `shell.openExternal`, the only way a link leaves the window. */
   SHELL_OPEN_EXTERNAL: 'shell:open-external',
 } as const

@@ -46,6 +46,31 @@ Two more things worth knowing before the first launch:
   name rather than painting a guess. Nothing under `studio/` names a size, a
   rate or a channel order.
 
+## An edit makes a copy, and rotation is held
+
+**The studio never writes a preset it did not create** (ADR-0189). The first
+gesture against one - a slider release, a palette edit, a structure or map key,
+`Ctrl+S` - is held: the strip above the panel asks what to call the copy, the
+whole document lands in the watched directory under that name, and the editor
+switches to it. Every gesture after that writes the copy silently, one write per
+gesture, which is the live loop the studio is for.
+
+**The session is the unit.** The studio has nowhere durable to remember what it
+authored, so reopening yesterday's copy asks once more and makes a second one.
+That is one extra file, and no edit is lost paying for it.
+
+A preset from the **embedded** set takes the same path. It has no file, so the
+copy is its first one - built from the engine's declarations for the system on
+screen plus the edit, because no event carries the embedded document's own text
+and the studio resolves nothing of its own (ADR-0184).
+
+**Rotation is held for as long as the studio is attached.** `ctl/transport hold`
+goes out on every attach and the header says so, with a control that gives
+rotation back. Without it the preset under the editor changes by itself at the
+dwell the operator config sets, and an edit lands in whatever arrived last.
+Repeating the hold is safe by contract: `auto` and `hold` are positions rather
+than presses (`docs/specs/0003-studio-control-protocol.md`).
+
 ## Which configuration covers which directory
 
 | Directory                      | Process   | Bundler                            | TypeScript project        |

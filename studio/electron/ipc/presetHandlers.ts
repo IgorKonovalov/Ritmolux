@@ -17,7 +17,7 @@ import { resolve, sep } from 'node:path'
 
 import { IPC_CHANNELS } from '@shared/ipc-channels'
 
-import { readPreset, writePresetAtomically } from '../preset/writer'
+import { createPresetFile, readPreset, writePresetAtomically } from '../preset/writer'
 
 export type PresetResult<T> = { ok: true; value: T } | { ok: false; reason: string }
 
@@ -60,17 +60,33 @@ export function registerPresetHandlers(scope: () => PresetScope): void {
 
   ipcMain.handle(
     IPC_CHANNELS.PRESET_WRITE,
-    async (_event, path: unknown, text: unknown): Promise<PresetResult<null>> => {
-      if (typeof path !== 'string' || !isInScope(path, scope())) {
-        return { ok: false, reason: 'that file is not one the player named' }
-      }
-      if (typeof text !== 'string') return { ok: false, reason: 'a preset is written as text' }
-      try {
-        await writePresetAtomically(path, text)
-        return { ok: true, value: null }
-      } catch (error) {
-        return { ok: false, reason: (error as Error).message }
-      }
-    },
+    async (_event, path: unknown, text: unknown): Promise<PresetResult<null>> =>
+      put(path, text, scope, writePresetAtomically),
   )
+
+  // The same guard and the same shape as the write above; only the refusal on
+  // an existing name differs, and it lives in the writer.
+  ipcMain.handle(
+    IPC_CHANNELS.PRESET_CREATE,
+    async (_event, path: unknown, text: unknown): Promise<PresetResult<null>> =>
+      put(path, text, scope, createPresetFile),
+  )
+}
+
+async function put(
+  path: unknown,
+  text: unknown,
+  scope: () => PresetScope,
+  writer: (path: string, text: string) => Promise<void>,
+): Promise<PresetResult<null>> {
+  if (typeof path !== 'string' || !isInScope(path, scope())) {
+    return { ok: false, reason: 'that file is not one the player named' }
+  }
+  if (typeof text !== 'string') return { ok: false, reason: 'a preset is written as text' }
+  try {
+    await writer(path, text)
+    return { ok: true, value: null }
+  } catch (error) {
+    return { ok: false, reason: (error as Error).message }
+  }
 }
