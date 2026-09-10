@@ -1,6 +1,6 @@
 # 0167 — The studio becomes handable
 
-> **Status:** draft
+> **Status:** in-progress
 > **Created:** 2026-09-10
 > **Owner skill(s):** dev, studio-builder, human
 > **Related ADRs:** [0186](../adrs/0186-the-studios-player-mode-is-a-per-machine-setting.md) (proposed),
@@ -293,12 +293,11 @@ flowchart TB
 > from the plan or an unmet done-when is always disclosed. Stays shorter than
 > `## Implementation phases` above.
 
-**Lane:** _(`main` directly, or the worktree path plus its branch — `WORK/rlx-plan-0167` on
-`plan-0167-<slug>`)_
+**Lane:** `main` directly.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The preview pipe stops moving under the reader | dev | not started | |
+| 1 — The preview pipe stops moving under the reader | dev | done | committed with this row |
 | 2 — The `stream` event names the format it actually carries | dev | not started | |
 | 3 — `--schema` declares the grammar | dev | not started | |
 | 4 — The studio paints what it was told | studio-builder | not started | |
@@ -308,6 +307,45 @@ flowchart TB
 | 8 — The on-device check | human | not started | |
 
 ### Notes
+
+**Phase 1 — the frame-time reading.** Windowed, release, `--preset Pulse`, 1920x1080, AMD Radeon
+integrated on DX12, rich tier, ~70 s per run, read from `diagnostics.log`'s one-second rows. "after"
+is `--preview stdout` at the new 640x360 default with the blit in the path:
+
+| | before (no `--preview`) | after (`--preview stdout`) |
+|---|---|---|
+| rows | 68 | 68 |
+| fps, median | 165.000 | 165.000 |
+| `frame_ms_avg`, median | 6.061 | 6.061 |
+| `frame_ms_p99`, median | 6.338 | 6.412 |
+| `frames_dropped`, max | 0 | 0 |
+
+A separate 12 s run with `--events` and standard output to a file: `stream` announced
+`640x360 @ 165`, the file took 1 374 105 600 B — 1 491 whole frames at 921 600 B — and `health`
+reported `preview_sent` climbing at ~165/s with `preview_dropped` 0 throughout. The display is
+vsync-capped at 165 Hz, so the fps column has headroom in it and `frame_ms_avg` is the column that
+carries the reading.
+
+**Phase 1 — deviations.**
+
+- **Two files outside the phase's list**: `standalone/src/run.rs` (its `App::preview_pipe` is what
+  carries the parsed size from `cli.rs` to `app_state.rs`, so it changes type with them) and
+  `standalone/tests/console_preview_memory.rs` (one `open_preview_readback` call site).
+- **`the_readback_yields_the_frame_before_and_nothing_on_the_first` no longer asserts byte
+  identity.** The readback reads a sampled tap rather than an exact copy, so the claim is now
+  nearest-of-two — the readback is closer to the previous frame than to the current one. The
+  byte-identity assertion on the **show's own** pixels
+  (`the_shows_pixels_are_unchanged_with_the_readback_open`) is untouched and still exact.
+- **`cargo test` on `core/tests/console_preview.rs` crashes with `STATUS_ACCESS_VIOLATION` when the
+  harness runs its tests in parallel.** Verified against the unmodified tree at this phase's parent
+  commit: it crashes there too, so it predates this work. `cargo nextest` gives each test its own
+  process and is green.
+
+**Phase 1 — noticed, not acted on.** The tap blit is a sampling pass with a format on both sides, so
+converting `bgra8` to `rgba8` there would cost the same as the format-preserving blit that shipped —
+which is not the per-frame CPU pass over 8 MB that ADR-0187 rejects under Alternative C. If that is
+right, `format` could stay a single value and Phases 2 and 4 would have nothing to do. Implemented as
+the ADR specifies; recording the observation rather than acting on it.
 
 ### Close triggers
 

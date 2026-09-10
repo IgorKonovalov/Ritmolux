@@ -240,13 +240,12 @@ fn the_shows_pixels_are_unchanged_with_the_readback_open() {
         };
         renderer.open_preview().expect("a preview opens");
         renderer
-            .open_preview_readback()
+            .open_preview_readback(SIZE, SIZE)
             .expect("a readback opens against an open preview");
         assert_eq!(
             renderer.preview_readback_size(),
             Some((SIZE, SIZE)),
-            "the readback follows the intermediate's size, which is the copy's \
-             own extent"
+            "the readback yields the size it was opened at"
         );
         renderer
             .capture_frame(&frame)
@@ -275,6 +274,13 @@ fn the_shows_pixels_are_unchanged_with_the_readback_open() {
 /// freedom from waiting: the copy rides frame N's submission and the map is
 /// taken on frame N+1, so the first frame has nothing to take and every frame
 /// after it takes its predecessor's.
+///
+/// **The comparison is nearest-of-two rather than byte identity**, because the
+/// readback is a copy of nothing exactly: it reads a fixed-size tap that a
+/// sampling blit fills (ADR-0187), so even at the same size and aspect the
+/// values round-trip through the sampler. Byte identity of the *show's* own
+/// pixels is asserted above and is unaffected — the tap is a second read of the
+/// intermediate, not a stage in the path to the destination.
 #[test]
 fn the_readback_yields_the_frame_before_and_nothing_on_the_first() {
     let frame = AnalysisFrame::default();
@@ -283,7 +289,7 @@ fn the_readback_yields_the_frame_before_and_nothing_on_the_first() {
     };
     renderer.open_preview().expect("a preview opens");
     renderer
-        .open_preview_readback()
+        .open_preview_readback(SIZE, SIZE)
         .expect("a readback opens against an open preview");
 
     let first = renderer
@@ -305,28 +311,46 @@ fn the_readback_yields_the_frame_before_and_nothing_on_the_first() {
     assert_eq!(
         (readback.width, readback.height),
         (SIZE, SIZE),
-        "the readback yields the intermediate's size"
+        "the readback yields the size it was opened at"
     );
     assert!(
         !is_flat(&first),
         "the frames are flat, so the comparison below would hold for a readback \
          that produced anything at all"
     );
-    if let Some(diff) = first_difference(&first, &readback) {
-        panic!(
-            "the readback did not yield the FIRST frame's pixels: {diff}. It is \
-             consumed one frame late by construction, so a match against the \
-             second frame instead would mean the copy is being waited on rather \
-             than polled"
-        );
-    }
     // ...and the clock moved between them, so "the frame before" is a real
-    // distinction rather than two identical pictures.
+    // distinction rather than two identical pictures. Asserted before the
+    // comparison it makes meaningful, since a zero denominator there would let
+    // the nearest-of-two claim pass on nothing.
     assert!(
         first_difference(&first, &second).is_some(),
         "two consecutive captures were identical, so this test cannot tell the \
          previous frame from the current one"
     );
+    let to_first = mean_difference(&readback, &first);
+    let to_second = mean_difference(&readback, &second);
+    assert!(
+        to_first < to_second,
+        "the readback is {to_first:.3} 8-bit levels from the FIRST frame and \
+         {to_second:.3} from the second, so it did not yield the first. It is \
+         consumed one frame late by construction, and landing on the second \
+         would mean the copy is being waited on rather than polled"
+    );
+}
+
+/// The mean absolute per-channel difference between two frames of one size, in
+/// 8-bit levels. `f64::MAX` for a size mismatch, which is not a distance.
+fn mean_difference(a: &CaptureImage, b: &CaptureImage) -> f64 {
+    if (a.width, a.height) != (b.width, b.height) || a.rgba.is_empty() {
+        return f64::MAX;
+    }
+    let total: u64 = a
+        .rgba
+        .iter()
+        .zip(&b.rgba)
+        .map(|(x, y)| u64::from(x.abs_diff(*y)))
+        .sum();
+    total as f64 / a.rgba.len() as f64
 }
 
 /// Closing the preview takes the readback with it.
@@ -336,7 +360,9 @@ fn closing_the_preview_closes_the_readback() {
         return;
     };
     renderer.open_preview().expect("a preview opens");
-    renderer.open_preview_readback().expect("a readback opens");
+    renderer
+        .open_preview_readback(SIZE, SIZE)
+        .expect("a readback opens");
     assert_eq!(renderer.preview_readback_size(), Some((SIZE, SIZE)));
 
     renderer.close_preview();
@@ -360,10 +386,130 @@ fn a_readback_without_a_preview_is_refused() {
         return;
     };
     assert!(
-        renderer.open_preview_readback().is_err(),
+        renderer.open_preview_readback(SIZE, SIZE).is_err(),
         "a readback opened with no intermediate to read"
     );
     assert_eq!(renderer.preview_readback_size(), None);
+}
+
+/// A preview size that is neither the surface's nor a divisor of it, so no
+/// assertion below can pass by accidentally agreeing with the window.
+const PREVIEW: (u32, u32) = (100, 60);
+
+/// **A resize does not stop the preview** (ADR-0187, backlog 0201).
+///
+/// This is the defect the fixed-size tap exists to remove, and it is
+/// undiagnosable from either end: a readback rebuilt at the new size on `resize`
+/// hands its writer a frame the sink refuses, the writer's loop breaks on that
+/// error and discards its message, and the result is standard output going quiet
+/// while the show keeps drawing and every counter reads zero. See
+/// `Plan 0167 Phase 1` and backlog 0201 for the diagnosis.
+///
+/// So the assertion is that frames **keep arriving at the announced geometry**
+/// across a sequence of resizes — a drag, a maximize and a fullscreen toggle,
+/// which reach the renderer as the same `WindowEvent::Resized` and are therefore
+/// one case here rather than three.
+#[test]
+fn a_resize_does_not_stop_the_preview() {
+    let frame = AnalysisFrame::default();
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
+        return;
+    };
+    renderer.open_preview().expect("a preview opens");
+    renderer
+        .open_preview_readback(PREVIEW.0, PREVIEW.1)
+        .expect("a readback opens against an open preview");
+
+    // Two frames: the readback is one frame late, so the second is the first
+    // that can yield anything.
+    let yielded = |renderer: &mut rlx_core::render::Renderer, label: &str| {
+        for _ in 0..2 {
+            renderer
+                .capture_frame(&frame)
+                .unwrap_or_else(|err| panic!("capture {label}: {err}"));
+        }
+        let image = renderer
+            .take_preview_frame()
+            .unwrap_or_else(|| panic!("the preview yielded no frame {label}"));
+        assert_eq!(
+            (image.width, image.height),
+            PREVIEW,
+            "the frame {label} is not the size the pipe announced, which is the \
+             disagreement that used to end the writer thread"
+        );
+        assert_eq!(
+            image.rgba.len(),
+            PREVIEW.0 as usize * PREVIEW.1 as usize * 4,
+            "the frame {label} carries no bytes at the announced size"
+        );
+        image
+    };
+
+    let before = yielded(&mut renderer, "before the resize");
+    assert!(
+        !is_flat(&before),
+        "the preview was flat before any resize, so 'the picture kept coming' \
+         below would hold for a tap wired to nothing"
+    );
+
+    // A drag to a taller shape, a maximize to a wider one, and a fullscreen
+    // toggle to a third — every one of them a `Resized` the renderer rebuilds
+    // the intermediate for.
+    for (label, (width, height)) in [
+        ("after a drag", (SIZE * 2, SIZE)),
+        ("after a maximize", (SIZE * 3, SIZE * 2)),
+        ("after a fullscreen toggle", (SIZE, SIZE * 2)),
+    ] {
+        renderer.resize(width, height);
+        assert_eq!(
+            renderer.preview_state().map(|(size, _)| size),
+            Some((width, height)),
+            "the intermediate did not follow the surface {label}, so this case \
+             is not exercising a resize at all"
+        );
+        assert_eq!(
+            renderer.preview_readback_size(),
+            Some(PREVIEW),
+            "the pipe's geometry moved {label}"
+        );
+        let after = yielded(&mut renderer, label);
+        assert!(
+            !is_flat(&after),
+            "the preview went flat {label} — the tap is being cleared and never \
+             drawn into"
+        );
+    }
+}
+
+/// **The preview's size is the caller's, not the surface's.**
+///
+/// The size half of the test above, asserted with no frames drawn so a failure
+/// names the geometry rather than the picture. [`PREVIEW`] is chosen to share no
+/// factor with the surface, because a readback that still followed the
+/// intermediate would agree with a size that happened to be half the window.
+#[test]
+fn the_previews_size_is_independent_of_the_surfaces() {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
+        return;
+    };
+    renderer.open_preview().expect("a preview opens");
+    renderer
+        .open_preview_readback(PREVIEW.0, PREVIEW.1)
+        .expect("a readback opens against an open preview");
+
+    assert_eq!(renderer.preview_readback_size(), Some(PREVIEW));
+    renderer.resize(SIZE * 2, SIZE * 2);
+    assert_eq!(
+        renderer.preview_readback_size(),
+        Some(PREVIEW),
+        "the preview followed the surface up"
+    );
+    renderer.resize(SIZE / 2, SIZE * 3);
+    assert_eq!(
+        renderer.preview_readback_size(),
+        Some(PREVIEW),
+        "the preview followed the surface down"
+    );
 }
 
 /// No blocking wait enters the display loop.

@@ -72,10 +72,11 @@ pub(crate) struct App {
     /// `--events` was not passed, and then standard error carries exactly the
     /// human diagnostics it always did (ADR-0176).
     pub(crate) events: Option<Events>,
-    /// `--preview stdout` was passed: the windowed show's frames are mirrored
-    /// to a parent process. Off by default, and a run without it draws exactly
-    /// what it drew before the flag existed (ADR-0176).
-    pub(crate) preview_pipe: bool,
+    /// `--preview stdout[@WxH]` was passed: the windowed show's frames are
+    /// mirrored to a parent process at this size, which is the mirror's and not
+    /// the show's. `None` by default, and a run without it draws exactly what it
+    /// drew before the flag existed (ADR-0176).
+    pub(crate) preview_pipe: Option<(u32, u32)>,
     /// `--console` was passed. Held beside `config` rather than written into it,
     /// so the flag opens the console for this launch without persisting itself
     /// — the same shape `--input` / `--device` / `--osc` follow (ADR-0142).

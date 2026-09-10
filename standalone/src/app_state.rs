@@ -365,13 +365,17 @@ pub(crate) struct AppState {
     /// draws exactly what it drew before the flag existed.
     pub(crate) preview_pipe: Option<crate::stream::PreviewPipe>,
 
-    /// Whether `--preview stdout` holds the intermediate open independently of
-    /// the console.
+    /// The mirror's size when `--preview stdout[@WxH]` holds the intermediate
+    /// open independently of the console, `None` when the flag is absent.
     ///
     /// The two consumers are separate: closing the console must not take a
     /// preview a parent process is reading, and opening one must not be needed
     /// to start it.
-    pub(crate) preview_pinned: bool,
+    ///
+    /// The size is the **mirror's** and is answered for the life of the run: the
+    /// readback's tap is built at it and a window resize moves nothing about it
+    /// (ADR-0187).
+    pub(crate) preview_pinned: Option<(u32, u32)>,
 
     /// Retained scratch for the transport verbs one drained control frame
     /// carries, so applying them allocates nothing on the render thread. Cleared
@@ -797,7 +801,7 @@ impl AppState {
             // Unless `--preview stdout` is holding it: the console and the pipe
             // are two consumers of one intermediate, and closing the window one
             // of them lives in must not take the other's picture away.
-            if !self.preview_pinned {
+            if self.preview_pinned.is_none() {
                 self.renderer.close_preview();
             }
         }
@@ -943,16 +947,16 @@ impl AppState {
     /// preview rests on, and then the show runs without a mirror rather than
     /// running through an inexact path — the same choice the console makes.
     pub(crate) fn open_preview_pipe(&mut self) {
-        if !self.preview_pinned {
+        let Some((want_w, want_h)) = self.preview_pinned else {
             return;
-        }
+        };
         if let Err(err) = self
             .renderer
             .open_preview()
-            .and_then(|()| self.renderer.open_preview_readback())
+            .and_then(|()| self.renderer.open_preview_readback(want_w, want_h))
         {
             eprintln!("--preview: unavailable on this surface, the show runs without it: {err}");
-            self.preview_pinned = false;
+            self.preview_pinned = None;
             return;
         }
         let Some((width, height)) = self.renderer.preview_readback_size() else {

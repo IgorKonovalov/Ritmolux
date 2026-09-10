@@ -229,12 +229,12 @@ fn one_preview_readback_carries_three_hundred_frames_without_growing() {
 
     renderer.open_preview().expect("a preview opens");
     renderer
-        .open_preview_readback()
+        .open_preview_readback(WIDTH, HEIGHT)
         .expect("a readback opens against an open preview");
     assert_eq!(
         renderer.preview_readback_size(),
         Some((WIDTH, HEIGHT)),
-        "the readback follows the intermediate's size"
+        "the readback yields the size it was opened at"
     );
 
     let mut resident = ResidentSet::default();

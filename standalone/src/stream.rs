@@ -53,6 +53,11 @@ const PREVIEW_WIDTH: u32 = 640;
 const PREVIEW_HEIGHT: u32 = 360;
 const PREVIEW_FPS: u32 = 30;
 
+/// The same default for the **windowed** mirror `--preview stdout` opens, which
+/// is the other producer of a preview-shaped pipe. One constant rather than two
+/// so the two paths cannot drift into different pictures of the same thing.
+pub(crate) const DEFAULT_PREVIEW_SIZE: (u32, u32) = (PREVIEW_WIDTH, PREVIEW_HEIGHT);
+
 /// The pixel format on the wire, named in the `stream` event so a reader is not
 /// guessing at the channel order.
 pub const STREAM_FORMAT: &str = "rgba8";
@@ -124,7 +129,7 @@ const MAX_FPS: u32 = 240;
 /// Upper bound on a requested dimension, matching the largest target this
 /// engine is exercised at with headroom. Rejects a transposed or mistyped size
 /// before a multi-gigabyte allocation is attempted.
-const MAX_DIMENSION: u32 = 7680;
+pub(crate) const MAX_DIMENSION: u32 = 7680;
 
 /// What `--stream` was asked for.
 #[derive(Debug, Clone, PartialEq, Eq)]

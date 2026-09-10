@@ -9,9 +9,9 @@
 //!
 //! Each cycle is three steps across two frames:
 //!
-//! 1. **Record** — frame *N*'s encoder gets a `copy_texture_to_buffer` from the
-//!    intermediate into this buffer, riding the submission the frame makes
-//!    anyway.
+//! 1. **Record** — frame *N*'s encoder gets a scaling blit from the intermediate
+//!    into the fixed-size tap and a `copy_texture_to_buffer` out of that tap into
+//!    this buffer, both riding the submission the frame makes anyway.
 //! 2. **Arm** — after that submission, `map_async` is asked for the buffer.
 //! 3. **Consume** — frame *N+1* polls **without waiting**
 //!    ([`wgpu::PollType::Poll`]) and takes the mapping if it has landed. If it
@@ -50,34 +50,44 @@ use super::*;
 
 use std::sync::mpsc::{Receiver, TryRecvError};
 
-/// The staging buffer and the state of the map in flight.
+/// The fixed-size tap, the staging buffer, and the state of the map in flight.
 pub(super) struct PreviewReadback {
+    /// The tap the buffer copies out of. Owned here rather than beside the
+    /// intermediate because its whole purpose is to give this readback one
+    /// geometry for the life of the run (ADR-0187).
+    tap: preview::PreviewTap,
     buffer: wgpu::Buffer,
     width: u32,
     height: u32,
     /// `width * 4` rounded up to wgpu's 256-byte row alignment. The mapped
     /// range carries this stride and the frame handed out does not.
     padded_bpr: u32,
-    /// The identity of the intermediate this was sized against. A resize builds
-    /// a new intermediate, and a readback sized for the old one would ask for a
-    /// copy of the wrong extent.
-    generation: u64,
     /// The armed map's result channel, `None` when the buffer is free to record
     /// into.
     armed: Option<Receiver<Result<(), wgpu::BufferAsyncError>>>,
 }
 
 impl PreviewReadback {
-    /// Build a readback for `preview`.
-    pub(super) fn new(device: &wgpu::Device, preview: &preview::PreviewTarget) -> Self {
-        let (width, height) = preview.size();
+    /// Build a readback that yields `width`x`height` frames at `format`.
+    ///
+    /// Neither follows the intermediate: the tap is built here and stays, so a
+    /// renderer resize changes what the blit reads and nothing about what this
+    /// hands out.
+    pub(super) fn new(
+        device: &wgpu::Device,
+        format: wgpu::TextureFormat,
+        width: u32,
+        height: u32,
+    ) -> Self {
+        let tap = preview::PreviewTap::new(device, format, width, height);
+        let (width, height) = tap.size();
         let (buffer, padded_bpr) = capture::create_readback(device, width, height);
         Self {
+            tap,
             buffer,
             width,
             height,
             padded_bpr,
-            generation: preview.generation(),
             armed: None,
         }
     }
@@ -85,12 +95,6 @@ impl PreviewReadback {
     /// The size of the frames this yields.
     pub(super) fn size(&self) -> (u32, u32) {
         (self.width, self.height)
-    }
-
-    /// Whether this was built against `preview` rather than an earlier
-    /// intermediate.
-    pub(super) fn matches(&self, preview: &preview::PreviewTarget) -> bool {
-        self.generation == preview.generation()
     }
 
     /// Take the frame the **previous** submission's map produced, if it has
@@ -130,21 +134,27 @@ impl PreviewReadback {
         image
     }
 
-    /// Record the copy from `preview` into this buffer, if the buffer is free.
+    /// Fill the tap from `preview` and record the copy out of it, if the buffer
+    /// is free.
+    ///
+    /// Two recorded steps rather than one: the blit scales and letterboxes the
+    /// show into the tap's fixed shape, and the copy that follows reads a
+    /// texture whose extent has not moved since this readback was opened.
     ///
     /// Returns whether it recorded, which the caller needs: [`arm`](Self::arm)
     /// must be called after the submission if and only if this did.
     pub(super) fn record(
         &mut self,
+        device: &wgpu::Device,
         encoder: &mut wgpu::CommandEncoder,
         preview: &preview::PreviewTarget,
     ) -> bool {
-        if self.armed.is_some() || !self.matches(preview) {
+        if self.armed.is_some() || !self.tap.record_fill_from(device, encoder, preview) {
             return false;
         }
         capture::record_copy(
             encoder,
-            &preview.texture,
+            self.tap.texture(),
             &self.buffer,
             self.padded_bpr,
             self.width,
@@ -171,17 +181,27 @@ impl PreviewReadback {
 /// The renderer-facing half: opening and closing the readback, and the two steps
 /// a frame drawn through the intermediate performs.
 impl Renderer {
-    /// Open a non-blocking readback of the preview intermediate.
+    /// Open a non-blocking readback of the preview, yielding `width`x`height`
+    /// frames.
     ///
-    /// Requires an open preview — the readback copies out of that intermediate
-    /// and has nothing to read without one. Idempotent in effect: an already-open
-    /// readback is rebuilt against the current intermediate, which is what a
-    /// resize needs.
-    pub fn open_preview_readback(&mut self) -> Result<(), RenderError> {
+    /// Requires an open preview — the blit that fills the readback's tap samples
+    /// that intermediate and has nothing to read without one. The **size is the
+    /// caller's** and is answered for the life of the readback: a renderer
+    /// resize rebuilds the intermediate under the blit and moves nothing here
+    /// (ADR-0187).
+    ///
+    /// Calling it again replaces the readback, which is how a caller changes the
+    /// size it asked for.
+    pub fn open_preview_readback(&mut self, width: u32, height: u32) -> Result<(), RenderError> {
         let Some(preview) = self.preview.as_ref() else {
             return Err(RenderError::CaptureReadback);
         };
-        self.preview_readback = Some(PreviewReadback::new(&self.ctx.device, preview));
+        self.preview_readback = Some(PreviewReadback::new(
+            &self.ctx.device,
+            preview.format(),
+            width,
+            height,
+        ));
         Ok(())
     }
 
@@ -193,8 +213,11 @@ impl Renderer {
 
     /// The size of the frames the readback yields, or `None` when it is closed.
     ///
-    /// The **intermediate's** size, which is the output's configured target: the
-    /// copy out of it is exact, and an exact copy has one size.
+    /// **The size the caller asked for, and not the output's.** The frames are a
+    /// scaled, letterboxed copy of the intermediate rather than an exact one, so
+    /// this is a fixed property of the open readback: it answers the same pair
+    /// across every resize, and a consumer told it once never has to be told
+    /// again.
     pub fn preview_readback_size(&self) -> Option<(u32, u32)> {
         self.preview_readback.as_ref().map(PreviewReadback::size)
     }
@@ -230,7 +253,7 @@ impl Renderer {
         if let Some(image) = readback.consume(&ctx.device) {
             *preview_frame = Some(image);
         }
-        readback.record(encoder, preview)
+        readback.record(&ctx.device, encoder, preview)
     }
 
     /// Ask for the mapping, after the submission that carried the copy.

@@ -37,6 +37,7 @@ analysis is deterministic too, so a render is reproducible and diff-able.
 - [The live video-out: `ritmolux --stream`](#the-live-video-out-ritmolux---stream)
   - [`--sink spout`: another application on the same machine](#--sink-spout-another-application-on-the-same-machine)
   - [`--sink stdout`: raw frames on a pipe](#--sink-stdout-raw-frames-on-a-pipe)
+  - [`--preview stdout`: the windowed show, mirrored](#--preview-stdout-the-windowed-show-mirrored)
   - [The TouchDesigner side](#the-touchdesigner-side)
   - [Which GPU, and why it is not a preference](#which-gpu-and-why-it-is-not-a-preference)
   - [Presets, and stopping](#presets-and-stopping)
@@ -1492,6 +1493,41 @@ is the same degrade every other reader of that directory performs.
 **Standard output carries nothing else** while this sink is open — every
 human-readable line goes to standard error, and a test holds the whole crate to
 that.
+
+### `--preview stdout`: the windowed show, mirrored
+
+The sink above is a headless run: no window, and the pipe is the only picture
+there is. `--preview stdout` is the other half — a **windowed** run keeps its
+show on the projector and sends a copy of it up the same kind of pipe, announced
+by the same `stream` event. It is how a studio watches the picture the audience
+is actually seeing.
+
+**The two pipes are not the same thing, and the difference is the point.**
+
+| | `--stream --sink stdout` | `--preview stdout` |
+|---|---|---|
+| the show | headless, no window | a window, unchanged |
+| the frames | **exact**, at `--size` | a **scaled, letterboxed copy** |
+| the geometry | the size you asked for | fixed at 640x360, or `@WIDTHxHEIGHT` |
+| a slow reader | blocks the run | drops frames, the show carries on |
+
+`--sink stdout` is an exact feed for `ffmpeg`, so its frames are the size named
+on the command line and nothing scales them. `--preview` is a mirror for a
+canvas, so it is fixed-size on purpose: the show's window may be dragged,
+maximized or thrown fullscreen mid-run, and **the mirror's geometry does not
+move with it**. A reader is told the size once, before the first byte, and never
+again — which is the only arrangement a headerless byte stream can survive,
+since bytes already in the pipe carry no mark saying where a new size began.
+
+The show's aspect is kept: a window of a shape the mirror is not gets bars
+rather than a squash. What that costs is pixel-scale judgement — a one-texel
+seam or the exact width of a contour is not a thing to read off a scaled copy.
+Look at the show window for those.
+
+```bash
+ritmolux --events --preview stdout            # 640x360
+ritmolux --events --preview stdout@960x540    # something else
+```
 
 ### The TouchDesigner side
 

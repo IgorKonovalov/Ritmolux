@@ -96,7 +96,7 @@ pub(crate) const FLAGS: &[FlagSpec] = &[
         name: "--preview",
         takes_value: true,
         requires: None,
-        help: "<stdout> mirror the windowed show's frames to a parent process",
+        help: "<stdout[@WxH]> mirror the windowed show as a fixed-size copy to a parent",
     },
     FlagSpec {
         name: "--events",
@@ -679,21 +679,60 @@ pub(crate) fn resolve_osc(flag: Option<String>, config: &config::Osc) -> Option<
     }
 }
 
-/// `--preview <sink>`, validated against the one sink a windowed run offers.
+/// `--preview <sink>[@WIDTHxHEIGHT]`, validated against the one sink a windowed
+/// run offers. `None` when the flag is absent.
 ///
 /// A value rather than a bare flag, because the sink is the thing that varies:
 /// `stdout` is what a parent process reads, and a future one would be a new
 /// spelling here rather than a second flag.
-pub(crate) fn parse_preview_arg() -> Result<bool, String> {
+pub(crate) fn parse_preview_arg() -> Result<Option<(u32, u32)>, String> {
     let Some(value) = windowed_flag("--preview")? else {
-        return Ok(false);
+        return Ok(None);
     };
-    if value == "stdout" {
-        return Ok(true);
+    parse_preview_value(&value).map(Some)
+}
+
+/// [`parse_preview_arg`]'s rule as a pure function of the flag's value.
+///
+/// The size is the **mirror's**, not the show's: the show keeps the window's own
+/// resolution and the mirror is a scaled, letterboxed copy of it, fixed for the
+/// life of the run so a reader cutting the pipe into frames is told the geometry
+/// once (ADR-0187). Omitted, it is [`crate::stream::DEFAULT_PREVIEW_SIZE`] — what a studio's
+/// canvas actually displays.
+pub(crate) fn parse_preview_value(value: &str) -> Result<(u32, u32), String> {
+    let (sink, size) = match value.split_once('@') {
+        Some((sink, size)) => (sink, Some(size)),
+        None => (value, None),
+    };
+    if sink != "stdout" {
+        return Err(format!(
+            "--preview: unknown sink '{sink}' (expected one of: stdout)"
+        ));
     }
-    Err(format!(
-        "--preview: unknown sink '{value}' (expected one of: stdout)"
-    ))
+    let Some(size) = size else {
+        return Ok(crate::stream::DEFAULT_PREVIEW_SIZE);
+    };
+    let (w, h) = size
+        .split_once(['x', 'X'])
+        .ok_or_else(|| format!("--preview: '{size}' is not WIDTHxHEIGHT"))?;
+    let width: u32 = w
+        .trim()
+        .parse()
+        .map_err(|_| format!("--preview: '{w}' is not a width"))?;
+    let height: u32 = h
+        .trim()
+        .parse()
+        .map_err(|_| format!("--preview: '{h}' is not a height"))?;
+    if width == 0 || height == 0 {
+        return Err(format!("--preview: {width}x{height} has no pixels"));
+    }
+    let max = crate::stream::MAX_DIMENSION;
+    if width > max || height > max {
+        return Err(format!(
+            "--preview: {width}x{height} exceeds the {max} px limit"
+        ));
+    }
+    Ok((width, height))
 }
 
 /// Whether `--events` was passed.

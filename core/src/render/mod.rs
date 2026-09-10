@@ -716,10 +716,12 @@ impl Renderer {
         // The intermediate's copy extent is fixed at construction, so a live
         // preview is rebuilt at the new size rather than left disagreeing with
         // the destination it copies into.
-        // A readback sized against the outgoing intermediate would ask for a copy
-        // of the wrong extent, so it is rebuilt with it — and only when one was
-        // open, so a resize on a run that never asked for one allocates nothing.
-        let readback_open = self.preview_readback.is_some();
+        //
+        // **An open readback is left alone.** It samples the intermediate
+        // through a blit into its own fixed-size tap, so the rebuild below
+        // changes what that blit reads and nothing about the geometry the
+        // readback hands out — which is what lets a consumer be told the size
+        // once, before the first frame, and never again (ADR-0187).
         if self.preview.is_some() {
             self.preview = Some(preview::PreviewTarget::new(
                 &self.ctx.device,
@@ -727,11 +729,6 @@ impl Renderer {
                 self.ctx.config.width,
                 self.ctx.config.height,
             ));
-            if readback_open {
-                // Failure here means the preview it was rebuilt for is gone,
-                // which the branch above just ruled out.
-                let _ = self.open_preview_readback();
-            }
         }
     }
 
@@ -1114,8 +1111,7 @@ impl Renderer {
         self.preview = preview;
         // The readback rides this frame's own submission and takes the previous
         // frame's map on the way past, without waiting for either. `false` when
-        // no readback is open, when the map has not landed, or when the
-        // intermediate has been rebuilt under it.
+        // no readback is open or when the map has not landed.
         let recorded = self.step_preview_readback(&mut encoder);
 
         self.ctx.queue.submit(std::iter::once(encoder.finish()));

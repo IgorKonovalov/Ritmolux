@@ -23,6 +23,7 @@
     clippy::unreachable
 )]
 
+use super::gpu;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Hands out an identity for each intermediate ever built, so a consumer that
@@ -46,6 +47,7 @@ pub struct PreviewTarget {
     pub(crate) view: wgpu::TextureView,
     width: u32,
     height: u32,
+    format: wgpu::TextureFormat,
     generation: u64,
 }
 
@@ -82,6 +84,7 @@ impl PreviewTarget {
             view,
             width,
             height,
+            format,
             generation: NEXT_GENERATION.fetch_add(1, Ordering::Relaxed),
         }
     }
@@ -89,6 +92,12 @@ impl PreviewTarget {
     /// The pixel size this intermediate was built against.
     pub fn size(&self) -> (u32, u32) {
         (self.width, self.height)
+    }
+
+    /// The texture format this intermediate was built at — the destination's,
+    /// since the copy out of it refuses a mismatch.
+    pub(crate) fn format(&self) -> wgpu::TextureFormat {
+        self.format
     }
 
     /// This intermediate's identity, unique across every one ever built in this
@@ -113,6 +122,204 @@ impl PreviewTarget {
             },
         );
     }
+}
+
+/// The **fixed-size** mirror the preview readback copies out of (ADR-0187).
+///
+/// [`PreviewTarget`] above is the show's own size and is rebuilt whenever the
+/// window is, so a readback taken straight off it changes size mid-run. The
+/// reader on the other end of a byte pipe cannot survive that: the frames carry
+/// no header, a raw frame can hold any byte pattern so no sentinel finds the
+/// boundary, and bytes already in the OS pipe are still the old geometry. This
+/// texture is built once, at the size the caller asked for, and a **sampling
+/// blit** fills it from the intermediate every frame — so the window may be
+/// resized, maximized or thrown fullscreen and the bytes leaving here keep one
+/// shape for the life of the run.
+///
+/// Built at the intermediate's own format, so the blit preserves the channel
+/// order rather than converting it — whoever announces the pipe can then name
+/// what it actually carries.
+///
+/// The show's aspect is **letterboxed** into that fixed shape rather than
+/// stretched to it (see [`fit_rect`]).
+pub(crate) struct PreviewTap {
+    texture: wgpu::Texture,
+    view: wgpu::TextureView,
+    width: u32,
+    height: u32,
+    pipeline: wgpu::RenderPipeline,
+    layout: wgpu::BindGroupLayout,
+    sampler: wgpu::Sampler,
+    /// The bind group for the intermediate, keyed on that intermediate's
+    /// [`generation`](PreviewTarget::generation): a renderer resize builds
+    /// another intermediate, and a group still bound to the old one samples a
+    /// texture nothing owns.
+    bound: Option<(u64, wgpu::BindGroup)>,
+}
+
+/// The blit's fragment stage. Alpha is forced to 1: the pipe's consumer reads
+/// four channels per pixel, and an intermediate carrying anything but opaque
+/// there would paint the preview translucent over whatever is behind it.
+const TAP_WGSL: &str = r#"
+@group(0) @binding(0) var src: texture_2d<f32>;
+@group(0) @binding(1) var samp: sampler;
+
+@fragment
+fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
+    return vec4<f32>(textureSample(src, samp, in.uv).rgb, 1.0);
+}
+"#;
+
+impl PreviewTap {
+    /// Build the tap at `format` — the intermediate's — and the requested size.
+    pub(crate) fn new(
+        device: &wgpu::Device,
+        format: wgpu::TextureFormat,
+        width: u32,
+        height: u32,
+    ) -> Self {
+        let (width, height) = (width.max(1), height.max(1));
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("rlx-preview-tap"),
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+            view_formats: &[],
+        });
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        // `[Texture, Sampler]` — a shape no other layout in `core/src` holds,
+        // which `no_two_layouts_share_a_shape_without_recorded_evidence`
+        // enforces (ADR-0058).
+        let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("rlx-preview-tap-layout"),
+            entries: &[gpu::texture(0, true), gpu::sampler(1)],
+        });
+        let shader = gpu::fullscreen_shader(
+            device,
+            "rlx-preview-tap",
+            gpu::FULLSCREEN_VS_UV_FLIPPED,
+            TAP_WGSL,
+        );
+        let pipeline = gpu::fullscreen_pipeline(
+            device,
+            &shader,
+            &[&layout],
+            format,
+            wgpu::BlendState::REPLACE,
+            "rlx-preview-tap",
+        );
+        Self {
+            texture,
+            view,
+            width,
+            height,
+            pipeline,
+            layout,
+            sampler: device.create_sampler(&wgpu::SamplerDescriptor {
+                label: Some("rlx-preview-tap-sampler"),
+                // Linear: the tap is a heavy minification of the show in every
+                // ordinary case, and a nearest sample of it aliases into noise
+                // a viewer reads as detail that is not in the picture.
+                mag_filter: wgpu::FilterMode::Linear,
+                min_filter: wgpu::FilterMode::Linear,
+                ..Default::default()
+            }),
+            bound: None,
+        }
+    }
+
+    /// The pixel size this was built at, and the size of every frame copied out
+    /// of it for as long as it lives.
+    pub(crate) fn size(&self) -> (u32, u32) {
+        (self.width, self.height)
+    }
+
+    /// The texture a readback copies out of.
+    pub(crate) fn texture(&self) -> &wgpu::Texture {
+        &self.texture
+    }
+
+    /// Record the scaling, letterboxing blit from `preview` into this target.
+    ///
+    /// Returns whether it recorded. A caller copies out of this texture only
+    /// when it did, so a frame with no bind group is skipped rather than
+    /// published as whatever the tap happened to hold before.
+    pub(crate) fn record_fill_from(
+        &mut self,
+        device: &wgpu::Device,
+        encoder: &mut wgpu::CommandEncoder,
+        preview: &PreviewTarget,
+    ) -> bool {
+        let generation = preview.generation();
+        if self.bound.as_ref().is_none_or(|(g, _)| *g != generation) {
+            self.bound = Some((
+                generation,
+                device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: Some("rlx-preview-tap-group"),
+                    layout: &self.layout,
+                    entries: &[
+                        wgpu::BindGroupEntry {
+                            binding: 0,
+                            resource: wgpu::BindingResource::TextureView(&preview.view),
+                        },
+                        wgpu::BindGroupEntry {
+                            binding: 1,
+                            resource: wgpu::BindingResource::Sampler(&self.sampler),
+                        },
+                    ],
+                }),
+            ));
+        }
+        let Some((_, group)) = self.bound.as_ref() else {
+            return false;
+        };
+        let (x, y, width, height) = fit_rect(preview.size(), (self.width, self.height));
+        // Cleared rather than loaded: the letterbox bars are the part of the
+        // target the blit never writes, and a loaded target would keep showing
+        // the previous frame's picture in them.
+        let mut pass = gpu::color_pass(
+            encoder,
+            "rlx-preview-tap-blit",
+            &self.view,
+            wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+        );
+        pass.set_viewport(x as f32, y as f32, width as f32, height as f32, 0.0, 1.0);
+        // The viewport transforms; it does not clip. Without the scissor the
+        // oversized fullscreen triangle rasterizes over the bars too, and the
+        // letterbox is a stretch again.
+        pass.set_scissor_rect(x, y, width, height);
+        pass.set_pipeline(&self.pipeline);
+        pass.set_bind_group(0, group, &[]);
+        pass.draw(0..3, 0..1);
+        true
+    }
+}
+
+/// The largest rectangle carrying `src`'s aspect that fits inside `dst`,
+/// centred — origin top-left, in `dst`'s own pixels.
+///
+/// The tap is a fixed **resolution** and the show's window is any shape, so the
+/// two aspects disagree the moment anyone drags a window edge. Fitting rather
+/// than stretching is ADR-0037's rule at the one place a scaled copy of the show
+/// leaves the engine: bars are honest about the shape, a squash is not.
+///
+/// Every returned dimension is at least 1 — a zero-extent viewport is a wgpu
+/// validation error, and a degenerate `src` is a window mid-minimize rather than
+/// a caller's mistake.
+pub(crate) fn fit_rect(src: (u32, u32), dst: (u32, u32)) -> (u32, u32, u32, u32) {
+    let (dst_w, dst_h) = (dst.0.max(1), dst.1.max(1));
+    let (src_w, src_h) = (f64::from(src.0.max(1)), f64::from(src.1.max(1)));
+    let scale = (f64::from(dst_w) / src_w).min(f64::from(dst_h) / src_h);
+    let width = ((src_w * scale).round() as u32).clamp(1, dst_w);
+    let height = ((src_h * scale).round() as u32).clamp(1, dst_h);
+    ((dst_w - width) / 2, (dst_h - height) / 2, width, height)
 }
 
 /// A rectangle in a console surface's device pixels, origin top-left.
@@ -267,6 +474,42 @@ mod tests {
                 "{rect:?} is not inset from the bottom edge of {console:?}"
             );
         }
+    }
+
+    #[test]
+    fn the_tap_keeps_the_shows_aspect_and_centres_the_bars() {
+        // 16:10 into 16:9: bars left and right, and the picture centred between
+        // them. The tap is a resolution and not a shape (ADR-0037), so the
+        // show's aspect survives and the tap's does not reach the picture.
+        assert_eq!(fit_rect((1280, 800), (640, 360)), (32, 0, 576, 360));
+        // The other way: 4:3 into 16:9 is the same rule, and 21:9 into 16:9 puts
+        // the bars above and below instead — the case a test written only at
+        // 16:9 cannot tell apart from a stretch.
+        assert_eq!(fit_rect((1024, 768), (640, 360)), (80, 0, 480, 360));
+        assert_eq!(fit_rect((2560, 1080), (640, 360)), (0, 45, 640, 270));
+    }
+
+    #[test]
+    fn a_matching_aspect_fills_the_tap_with_no_bars() {
+        // The control on the test above: where the two aspects agree there is
+        // nothing to letterbox, and a fit that still inset the picture would be
+        // shrinking the show for no reason.
+        assert_eq!(fit_rect((1920, 1080), (640, 360)), (0, 0, 640, 360));
+        assert_eq!(fit_rect((640, 360), (640, 360)), (0, 0, 640, 360));
+    }
+
+    #[test]
+    fn a_degenerate_size_still_produces_a_drawable_rectangle() {
+        // A window mid-minimize reports a zero dimension, and a zero-extent
+        // viewport is a wgpu validation error rather than an empty frame.
+        for (src, dst) in [((0, 0), (640, 360)), ((1920, 0), (640, 360))] {
+            let (_, _, width, height) = fit_rect(src, dst);
+            assert!(
+                width >= 1 && height >= 1,
+                "fit_rect({src:?}, {dst:?}) produced a {width}x{height} viewport"
+            );
+        }
+        assert_eq!(fit_rect((1920, 1080), (0, 0)), (0, 0, 1, 1));
     }
 
     #[test]
