@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0168** (ADRs are a separate sequence — next free there is **0188**.)
+**Next free number: 0169** (ADRs are a separate sequence — next free there is **0190**.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -49,7 +49,8 @@ place. The plan file carries the real link.
 | [0163](0163-the-analytic-field.md) | The analytic field | approved | dev | ADR-0180 rules 1+3: a 13th system holding `chladni` and `escape_time`, with Voronoi, quasicrystal and hyperbolic placed. Fills the roadmap's fractal-spiral gap. **Needs 0161.** |
 | [0164](0164-the-cellular-system.md) | The cellular system | approved | dev | ADR-0180 rules 1+2: a 14th system on `PingPongField` - `life_like`, `larger_than_life`, `cyclic`, plus an age channel so the field paints history. Lenia placed, not built. **Needs 0161.** |
 | [0166](0166-the-basics-read-in-russian.md) | The basics read in Russian | approved | dev, human | ADR-0185: five docs gain a Russian sibling `.ru.md` stamped with the source sha. **Phase 3 is a `human` review that blocks publication.** Touches no Rust - orderable against any lane. |
-| [0167](0167-the-studio-becomes-handable.md) | The studio becomes handable | draft | dev, studio-builder, human | ADR-0186 + 0187: closes backlog 0199, 0200 and 0201, then runs **Plan 0159's two unrun `human` phases** as 7 and 8. One lane handoff: dev, then studio-builder, then human. |
+| [0167](0167-the-studio-becomes-handable.md) | The studio becomes handable | in-progress | dev, studio-builder, human | Phases 1-6 landed 2026-09-10; backlog 0199, 0200, 0201 archived. **Phases 7 and 8 are `human` and unrun** - 7 is blocked on Plan 0168. Does not close until both run. |
+| [0168](0168-the-studio-stops-surprising-the-author.md) | The studio stops surprising the author | draft | studio-builder | ADR-0189: an edit forks the preset instead of overwriting it, rotation is held while attached, and every problem is reachable. **Blocks Plan 0167 Phase 7.** Studio-only, no Rust. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-09 — [0158] and [0159] are drafted, and they are a program rather than a
@@ -67,6 +68,8 @@ it. The note is [in the archive](README-archive.md#prior-sequencing-notes-supers
 [0163]: 0163-the-analytic-field.md
 [0164]: 0164-the-cellular-system.md
 [0165]: done/0165-the-release-path-stops-being-the-first-compile.md
+[0167]: 0167-the-studio-becomes-handable.md
+[0168]: 0168-the-studio-stops-surprising-the-author.md
 [0180]: ../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md
 
 ~~**Added 2026-09-07 - [0157] is drafted, and it is the only plan that unblocks `main`.**~~ - **closed 2026-09-07.** Both phases landed the same day the note was written; `main` is green and the route gate passes against a built site with `dist/api/` populated. The note is in [README-archive.md](README-archive.md) under `## Prior sequencing notes (superseded)`, which also records the one durable half: the cost probes still run in `-P fast` on every arm of every push.
@@ -603,6 +606,25 @@ every `ParamSpec` and two `[hold]` table descriptors in the exported document, a
 `SCHEMA_VERSION` deliberately still at 1 - the body hash is what moved, which is the staleness
 signal the studio already compares. So **a schema re-export and a `[hold]` editor are owed by the
 next `studio-builder` plan**, not by a rebase and not by anything now in flight.
+
+> **Discharged 2026-09-10 by [0167] Phase 6.** The re-export and the `[hold]` editor both landed —
+> and the phase found the gap was not a missing component but a missing **reach**: `hold` is
+> declared only as a map *element* kind, and [0159] Phase 8's walk read `key.kind` and stopped at
+> `map`. The debt above is spent; the rest of the note stands as the record.
+
+**Added 2026-09-10 — [0167] does not close, and [0168] is what unblocks it.** 0167's six
+implementing phases landed and backlog 0199, 0200 and 0201 are archived, but its two `human`
+phases are unrun for the second time and its own text forbids closing on that. **Phase 7 is
+blocked on [0168]**: a smoke run measured the studio rewriting three curated presets in six
+minutes, without asking, because rotation moves the preset under the editor while the author
+works, and handing a tester that build is how they lose work and blame themselves.
+[ADR-0189](../adrs/0189-an-edit-forks-the-preset-and-the-studio-holds-rotation.md) reverses
+[0159] Phase 6's write-through model — an edit forks, and the studio holds rotation while
+attached. **Phase 8 is not blocked and can run now**; it is the on-device check, it needs no
+editing gesture, and it has a prior worth comparing against (a windowless frame rate drifting
+`52.4 -> 44.3` fps over six seconds, recorded in 0167's smoke-run section as an observation, not
+a claim). Order: 0168 whole, then 0167 Phase 7, then close 0167. 0168 is studio-only, so it
+contends with nothing on this roster.
 
 **One ordering this still does not license.** 0162, 0163 and 0164 touch disjoint scene paths but
 each **blesses new baselines**, so they merge in series even if they are built in parallel: the

@@ -1,6 +1,8 @@
 # 0167 — The studio becomes handable
 
-> **Status:** in-progress
+> **Status:** in-progress — Phases 1-6 landed 2026-09-10. **Phase 7 is blocked on
+> [Plan 0168](0168-the-studio-stops-surprising-the-author.md); Phase 8 is not blocked and can
+> run now.** This plan does not close until both have run.
 > **Created:** 2026-09-10
 > **Owner skill(s):** dev, studio-builder, human
 > **Related ADRs:** [0186](../adrs/0186-the-studios-player-mode-is-a-per-machine-setting.md) (proposed),
@@ -638,6 +640,56 @@ second.
   (Realtek(R) Audio)`. Not a defect and not this plan's business, but it is a strong candidate for
   a Phase 7 tester reporting *"it does not react to my music"*, and
   `packaging/studio/READ-ME-FIRST.md` currently promises *"there is no audio setup"*.
+
+## Architect's routing of the smoke run — 2026-09-10
+
+> Written by `architect`, in a session that did not implement any phase. The three findings above
+> are the lane's observations; this is where they were sent, and it is the answer to "can this plan
+> close".
+
+**This plan does not close, and it is not closed owing its `human` phases a second time.** Its own
+Risks section made that rule and the rule is right: two `human` phases deferred twice means the
+studio is never validated by a person, and a third plan would inherit them with the pattern
+established. What changes instead is that the two phases stop being one item.
+
+- **Phase 7 is blocked, on finding A.** [Plan 0168](0168-the-studio-stops-surprising-the-author.md)
+  is what unblocks it. Handing a VJ a build that rewrites whichever preset rotation last brought in,
+  with no prompt and no undo, is how a tester loses work and blames themselves — and the report that
+  comes back describes the wrong defect. The blocker is not the tester's inconvenience; it is that
+  the handoff would produce bad evidence.
+- **Phase 8 is not blocked and should run now.** It is the on-device check: the studio beside a
+  fullscreen player on the projector for one full track, on both machines. It needs no editing
+  gesture, so finding A does not touch it, and it has a prior worth comparing against — finding C's
+  windowless drift, `52.4 -> 44.3` fps over six seconds, which is far too short to call and is
+  exactly what a full track would settle.
+
+### Where each finding went
+
+| finding | routed to | why |
+|---|---|---|
+| **A** — silent write, rotation picks the file | [ADR-0189](../adrs/0189-an-edit-forks-the-preset-and-the-studio-holds-rotation.md) + [Plan 0168](0168-the-studio-stops-surprising-the-author.md) Phase 1 | It reverses a decided model, so it needs a named rejected alternative. Both second-order questions are settled in the ADR: the studio **holds rotation** while attached (`ctl/transport hold`, already a spec-0003 verb and a position rather than a press, so studio-only), and an **embedded** preset takes the same fork path — its fork is its first file, and `status: 'embedded'` stops being a dead end. |
+| **B**, the modal | [Plan 0168](0168-the-studio-stops-surprising-the-author.md) Phase 2 | Studio-only, one phase, built from state that already exists. A plan of its own is overhead and a backlog entry defers work that is ready; it rides the `studio-builder` lane 0168 already opens. |
+| **B**, the span | backlog 0202 | It moves spec 0003 and needs a `dev` lane, and nothing is waiting on it. Filed with a correction the finding did not make: `preset_error` is anchored **two** ways, and the second is `param` rather than a position — so adding `param` to `preset_warning` may buy the marker with no new mechanism, which is cheaper than a span. |
+| **C**, the audio endpoint | [Plan 0168](0168-the-studio-stops-surprising-the-author.md) Phase 3 (the sentence) + backlog 0203 (the cause) | `READ-ME-FIRST.md` promises *"There is no audio setup"* and the smoke run captured from a microphone while `InputMode`'s default is `Loopback`. The doc repair is in front of Phase 7; the diagnosis is not, and may close in a minute by reading one `config.toml`. |
+| **C**, the clean quit, the live mode change, the windowless drift | nowhere — they stay here | Two are confirmations, and the third is a six-second reading that Phase 8 is the instrument for. |
+
+### The two close-brief items that were the architect's
+
+- **The three `Closes:` probes are repaired: `check-backlog-claims.mjs` is green.** Backlog 0199,
+  0200 and 0201 are **archived** — bodies moved verbatim to
+  [`design-backlog-archive.md`](../design-backlog-archive.md) with dated `CLOSED` markers, ledger
+  rows left behind. Done **now rather than at the close**, because that gate runs at pre-push and in
+  CI's `links` job, so three red probes were blocking every push in the repository and not only this
+  plan's. Their closure records three corrections the entries themselves got wrong: 0200's mapping
+  could not live where both the entry and the plan put it (`standalone` cannot name a
+  `TextureFormat`), its two run modes have one format source rather than two, and 0201's repair took
+  neither of the two options it named. **The ledger rows point at this plan at its active path** —
+  the `git mv` at the eventual close breaks them in both directions, which is close-ceremony step
+  1b's job and `check-doc-links.mjs` will name them.
+- **The full suite ran, on the finished tree, and is green: `cargo nextest run --workspace` —
+  1 717 passed, 6 skipped, 439.1 s.** The disk that blocked it was reclaimed in `be9f2e7`. This
+  discharges the `**Full suite:**` trigger's deferral, and it covers Phases 1-3, which are the
+  phases that touched Rust — the reading the close brief correctly said was owed.
 
 ## Followups (after this lands)
 

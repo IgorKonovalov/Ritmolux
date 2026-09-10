@@ -71,9 +71,8 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0192 - `--report` cannot see a `beat_index`-driven response, so a deliberately musical preset measures as inert](#0192-----report-cannot-see-a-beat_index-driven-response-so-a-deliberately-musical-preset-measures-as-inert)
 - [0196 — most `v*` tags produce no Release run at all, and the cause Plan 0165 named cannot explain nineteen of them](#0196--most-v-tags-produce-no-release-run-at-all-and-the-cause-plan-0165-named-cannot-explain-nineteen-of-them)
 - [0198 — `deposit_arms` tears along the branch cut at a fractional value, and nothing rounds it](#0198--deposit_arms-tears-along-the-branch-cut-at-a-fractional-value-and-nothing-rounds-it)
-- [0199 — the studio always spawns a windowed player, so a one-screen machine gets a show window in the way, and the windowless mode that would fix it already exists](#0199--the-studio-always-spawns-a-windowed-player-so-a-one-screen-machine-gets-a-show-window-in-the-way-and-the-windowless-mode-that-would-fix-it-already-exists)
-- [0200 — the `stream` event names a channel order the windowed preview does not use, so every studio frame is drawn with red and blue swapped](#0200--the-stream-event-names-a-channel-order-the-windowed-preview-does-not-use-so-every-studio-frame-is-drawn-with-red-and-blue-swapped)
-- [0201 — the studio's preview stops updating mid-session while the show keeps drawing, and the drop counter cannot see why](#0201--the-studios-preview-stops-updating-mid-session-while-the-show-keeps-drawing-and-the-drop-counter-cannot-see-why)
+- [0202 — `preset_warning` carries no position at all, so the one problem class an author cannot see in the file tab is the one the system picker produces by the dozen](#0202--preset_warning-carries-no-position-at-all-so-the-one-problem-class-an-author-cannot-see-in-the-file-tab-is-the-one-the-system-picker-produces-by-the-dozen)
+- [0203 — the smoke run captured from a microphone while the default is loopback, and the handoff note promises the case cannot arise](#0203--the-smoke-run-captured-from-a-microphone-while-the-default-is-loopback-and-the-handoff-note-promises-the-case-cannot-arise)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -340,6 +339,9 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0194 | `release.yml` promises a dry run it cannot provide, because the publish gate reads the ref and not the event | [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md) Phase 2. The hazard was already realized once; see 0196. **Closed 2026-09-10** |
 | 0195 | `check-index-rows.mjs` is the one gate that never adopted the tracked-set enumeration | [ADR-0182](adrs/0182-a-plan-lane-may-live-inside-the-repository.md) + [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md) Phase 0. Both probes still pass. **Closed 2026-09-10** |
 | 0197 | `ParamKind::quantize` is the mechanism ADR-0180 rule 2 exists for, and nothing tests it | Two tests, verified by mutation. Filed and closed the same day, at [Plan 0161](plans/done/0161-the-structural-parameter-is-held.md)'s close. The wiring stays uncovered; see the body. **Closed 2026-09-10** |
+| 0199 | The studio always spawns a windowed player, so a one-screen machine gets a show window in the way | [ADR-0186](adrs/0186-the-studios-player-mode-is-a-per-machine-setting.md) + [Plan 0167](plans/0167-the-studio-becomes-handable.md) Phase 5. Demonstrated live, not only tested. **Closed 2026-09-10** |
+| 0200 | The `stream` event names a channel order the windowed preview does not use | [ADR-0187](adrs/0187-the-preview-pipe-has-a-fixed-shape-and-names-its-true-format.md) + [Plan 0167](plans/0167-the-studio-becomes-handable.md) Phases 2 and 4. Report, not convert. **Closed 2026-09-10** |
+| 0201 | The preview stops updating mid-session while the show keeps drawing | [ADR-0187](adrs/0187-the-preview-pipe-has-a-fixed-shape-and-names-its-true-format.md) + [Plan 0167](plans/0167-the-studio-becomes-handable.md) Phase 1. The preview target stopped moving. **Closed 2026-09-10** |
 <!-- roster:end -->
 
 ## Open entries
@@ -3814,185 +3816,83 @@ after someone authors one.
 **Low.** Unreachable from the shipped library, and the fix is a one-line declaration whose cost only
 grows if a preset lands on the parameter first.
 
-## 0199 — the studio always spawns a windowed player, so a one-screen machine gets a show window in the way, and the windowless mode that would fix it already exists
+## 0202 — `preset_warning` carries no position at all, so the one problem class an author cannot see in the file tab is the one the system picker produces by the dozen
 
-[ADR-0183](adrs/0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md) decided the
-studio drives **one windowed player** that is both the show on the projector and the source of the
-preview frames, and named the cost in its own Negative:
+Spec 0003 gives `preset_error` five fields — `file`, `message`, `line`, `col`, `param` — and gives
+`preset_warning` two: `file` and `message`. `markersFor` places a marker only where an event put
+one, deliberately (the studio runs no parser of its own), so it can anchor an error two ways and a
+warning **no way at all**. A warning is therefore invisible in the file tab by construction, and the
+author is told a preset "loaded with a non-fatal problem" without being told where.
 
-> A user who only wants to edit still gets a player window. That window is the show, which is what
-> a VJ wants; on a single-screen laptop with no projector attached it is a window in the way.
+That would be a small gap if warnings were rare. They are not, and the reason is structural:
+changing a preset's system keeps the outgoing system's `[params]` bindings and structural tables,
+and **each one the incoming system does not declare is its own warning**. One click produces
+several, which is what
+[Plan 0167](plans/0167-the-studio-becomes-handable.md)'s smoke run observed. Plan 0168 Phase 2 puts
+every problem in a modal, which makes them *legible*; it cannot make them *locatable*, and the two
+are different things when the author's next question is "which line".
 
-Observed on 2026-09-10, running the packaged studio on the development machine: two windows, the
-show's overlapping the studio's, and no way to ask for one. `DEFAULT_PLAYER_ARGS` is a module
-constant, and `StudioSettings` carries exactly one key, `playerPath`.
+**The cheap repair may not be a span.** `preset_error` is already anchored two ways — a TOML syntax
+failure carries `line`/`col`, and an expression failure carries `param` instead, because it is
+raised after the document was parsed into values that no longer hold a position. A binding-dropped
+warning is exactly that second shape: it knows the parameter's name. Adding `param` to
+`preset_warning` would let `markersFor` find its line through the `[params]` table with **no new
+mechanism**, where adding `line`/`col` would need the warning raised somewhere that still holds a
+position. Settle which before building either.
 
-**What makes this cheap rather than an engine feature is Plan 0159's own Phase 3.** Before it, the
-windowless `--stream` path was a silent subset — no control listener, two of eight events, no
-preset directory and so no editing loop at all, which is the whole reason ADR-0183 chose the
-windowed player. After it, `stream.rs` builds the same `crate::show::Show` the windowed path
-builds, and `run.rs` binds the control listener on that branch before it greets. **The mode the
-studio would need already runs the full show loop.** What is missing is the studio asking for it,
-and an amendment to ADR-0183, whose Decision sentence is written as though the windowless path were
-still the subset it was when the ADR was drafted.
-
-Two things to settle before anyone builds it, because they are the reason the ADR chose as it did:
-
-- **What the preview is a copy of, when there is no show.** ADR-0183's stated benefit is that the
-  picture being edited *is* the picture the audience sees, by construction. A windowless mode gives
-  that up for the editing session and must get it back when a projector is attached — a toggle
-  mid-session, or a relaunch, and those are different products.
-- **Whether the setting is per-launch or per-machine.** A VJ with a projector wants windowed every
-  time; the same person on a train wants windowless every time. That is a settings key, not a menu
-  item, if the answer is "per-machine".
-
-- **Raised:** 2026-09-10, from running the Plan 0159 Phase 9 packaged artifact on a single-screen
-  machine, and named as a cost in ADR-0183 before that.
-  **Owner if taken:** `architect` to amend ADR-0183, then `studio-builder` — this is spawn
-  arguments and a settings key, not engine work, which the second and third probes are what
-  establish.
-- **Verified 2026-09-10** — the studio never asks for the windowless mode; the spawn arguments name
-  the windowed preview and there is no branch to the other:
-  `absent: --stream in: studio/electron/player/supervisor.ts`
-- **Verified 2026-09-10** — and the windowless path already runs the extracted show loop, so the
-  editing loop it lacked when ADR-0183 was written is there now:
-  `present: crate::show::Show::start in: standalone/src/stream.rs`
-- **Verified 2026-09-10** — and binds the control listener on that branch, which was the other half
-  of what it could not do:
-  `present: let control = bind_control in: standalone/src/run.rs`
-- **Verified 2026-09-10** — the ADR sentence an amendment would have to move:
-  `present: \*\*The studio drives one player\.\*\* in: docs/adrs/0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md`
-- **Verified 2026-09-10** — the studio's settings carry no way to choose, one key and it is the
-  player's path: `present: playerPath\?: string in: studio/electron/settings.ts`
+- **Raised:** 2026-09-10, from [Plan 0167](plans/0167-the-studio-becomes-handable.md)'s
+  developer-machine smoke run, finding B — the separable half the routing deliberately did not take.
+  **Owner if taken:** `architect` to choose between `param` and a true span (it moves spec 0003
+  either way), then `dev` for the player side and `studio-builder` for the marker.
+- **Verified 2026-09-10** — the spec gives the warning two fields and no position:
+  `present: preset_warning.*file.*message.*non-fatal in: docs/specs/0003-studio-control-protocol.md`
+- **Verified 2026-09-10** — and the studio's schema mirrors it, `file` and `message` and nothing
+  else: `present: ev: z\.literal\('preset_warning'\), in: studio/shared/protocol.ts`
+- **Verified 2026-09-10** — while the error it sits beside carries all five, which is the asymmetry:
+  `present: preset_error.*line.*col.*param in: docs/specs/0003-studio-control-protocol.md`
+- **Verified 2026-09-10** — and `param` is already a working anchor, so the cheap repair exists:
+  `present: carries the \*\*parameter's name\*\* instead in: studio/renderer/editor/diagnostics.ts`
 
 ### Priority
 
-**High, and asked for as such by the user on 2026-09-10** — "to be fixed asap". It is the first
-thing anyone opening the studio on one screen hits, it is in front of Plan 0159's Phase 10 tester
-handoff rather than behind it, and the repair is small and mostly already built.
+**Medium.** It is not in front of the tester handoff — Plan 0168 Phase 2's list makes a warning
+readable, which is enough to hand over — and it becomes worth taking the next time a `dev` lane is
+open on the player's event surface for another reason.
 
-## 0200 — the `stream` event names a channel order the windowed preview does not use, so every studio frame is drawn with red and blue swapped
+## 0203 — the smoke run captured from a microphone while the default is loopback, and the handoff note promises the case cannot arise
 
-`standalone/src/stream.rs` declares the wire format as a constant, and its own comment says what
-the constant is for:
+[Plan 0167](plans/0167-the-studio-becomes-handable.md)'s smoke run, 2026-09-10, reported its capture
+endpoint as `live WASAPI 48000/4 Microphone Array (Realtek(R) Audio)`. That is an `eCapture`
+endpoint — `CaptureMode::LineIn` — and `InputMode`'s `#[default]` is `Loopback`, which taps a render
+device. So either the machine's config selected `line-in`, or something chose it, and **nobody
+established which**.
 
-> The pixel format on the wire, named in the `stream` event so a reader is not guessing at the
-> channel order.
+Whichever it is, the visible consequence is the same and it lands on a tester:
+`packaging/studio/READ-ME-FIRST.md` says *"The picture reacts to whatever is already playing, out of
+the default output device. There is no audio setup."* A tester whose player behaves as this one did
+sees a picture that does not move with their music and has been told in writing that this cannot
+happen — so the report that comes back will describe the wrong defect, or none at all.
 
-The reader did not guess, and still got it wrong. `STREAM_FORMAT` is the fixed string `"rgba8"`,
-emitted by `show.rs` into every `stream` event on both run modes. But the **windowed** preview
-intermediate is built at `self.ctx.surface_format()` — the format the swapchain negotiated through
-`get_default_config`, not a format this project chose — so on a backend that negotiates
-`Bgra8UnormSrgb` the pipe carries BGRA under an `rgba8` label. The studio does the only correct
-thing with what it was told: `new ImageData(pixels, …)`, which is RGBA by definition.
+**Plan 0168 Phase 3 repairs only the sentence.** It gives the tester a symptom, something to check
+and something to send back. It does **not** answer why the endpoint was what it was, which is this
+entry: a config that was set and forgotten is a non-issue, and a silent fallback from a failed
+loopback start to an input device would be a real defect worth a plan.
 
-Observed on 2026-09-10 on the development machine (DX12): the studio's preview draws the Clifford
-attractor in blue where the player's own window draws it in orange. Orange is red-high, blue-low;
-swapping those two channels is exactly the blue observed, on the same frame of the same preset.
-
-**The two run modes disagree, which is what makes this a contract bug rather than a wrong
-constant.** The headless path renders into `HEADLESS_FORMAT`, which is `Rgba8UnormSrgb`, so
-`"rgba8"` is *truthful* there and false on the windowed path — the same declared format naming two
-different byte layouts depending on how the player was started. Spec 0003's `stream` row carries a
-`format` field precisely so a consumer does not have to know which one it got.
-
-The repair is a decision, not just a line: either the player converts to the declared order before
-writing (a cost on every preview frame), or it reports the format it actually has — which widens
-the field's value set and is therefore a spec change rather than a fix.
-
-- **Raised:** 2026-09-10, from running the Plan 0159 Phase 9 packaged artifact and comparing the two
-  windows side by side.
-  **Owner if taken:** `architect` to choose between converting and reporting, then `dev` — the
-  studio side is already correct against the stated contract and should not be the one to change.
-- **Verified 2026-09-10** — the declared format is a fixed string, unrelated to any surface:
-  `present: STREAM_FORMAT: &str = "rgba8" in: standalone/src/stream.rs`
-- **Verified 2026-09-10** — and it is what every `stream` event carries, on both run modes:
-  `present: format: crate::stream::STREAM_FORMAT in: standalone/src/show.rs`
-- **Verified 2026-09-10** — while the windowed preview intermediate takes the negotiated swapchain
-  format instead: `present: self\.ctx\.surface_format\(\), in: core/src/render/mod.rs`
-- **Verified 2026-09-10** — which is negotiated rather than chosen:
-  `present: get_default_config\(&adapter in: core/src/render/context.rs`
-- **Verified 2026-09-10** — and the headless path is the one where the label is true, which is the
-  disagreement:
-  `present: HEADLESS_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb in: core/src/render/context.rs`
-- **Verified 2026-09-10** — the studio consumes the bytes as RGBA, correctly, given what it was
-  told: `present: new ImageData\(pixels, stream\.width, stream\.height\) in: studio/renderer/components/Preview.tsx`
+- **Raised:** 2026-09-10, from [Plan 0167](plans/0167-the-studio-becomes-handable.md)'s smoke run,
+  finding C — recorded there as an observation, not acted on.
+  **Owner if taken:** `dev`. It is a `standalone/` question and needs the machine's own
+  `config.toml` read first, which costs nothing and may close the entry outright.
+- **Verified 2026-09-10** — loopback is the default mode, so a microphone endpoint is not what an
+  unconfigured run produces: `present: Loopback, in: standalone/src/config.rs`
+- **Verified 2026-09-10** — and the two modes read different endpoint dataflows, which is why the
+  device name is the tell: `present: CaptureMode::LineIn => eCapture in: standalone/src/capture_win.rs`
+- **Verified 2026-09-10** — the promise a tester is handed:
+  `present: There is no audio setup\. in: packaging/studio/READ-ME-FIRST.md`
+- **Verified 2026-09-10** — the cause itself:
+  `unprobeable: which of the two explanations holds depends on one machine's config.toml and on whether a loopback start failed at runtime, neither of which is a tracked file. Read the machine's config.toml first; if it names loopback, the fallback theory is the live one and needs a run with the render endpoint made unavailable.`
 
 ### Priority
 
-**High.** Every frame the studio has ever painted from a windowed player is wrong, the whole point
-of the studio is judging colour and a preset author tuning a palette against it would be tuning
-against a lie, and it is in front of Plan 0159's Phase 10 tester handoff rather than behind it.
-
-## 0201 — the studio's preview stops updating mid-session while the show keeps drawing, and the drop counter cannot see why
-
-Observed on 2026-09-10, packaged studio, Plan 0159 Phase 9's artifact: the preview canvas froze on
-one frame and never updated again. Not a hang — both processes stayed `Responding`, the player kept
-drawing at ~49 fps and kept writing `diagnostics.log`, and the studio's UI stayed interactive. Only
-the picture stopped.
-
-**Diagnosed 2026-09-10 at Plan 0159's close, and it is the third candidate: the player's writer
-thread exits on the first frame after any resize of the show window, and says nothing.** The chain
-is four links, each of them deliberate on its own:
-
-1. `open_preview_pipe` runs **once**, at window creation (`standalone/src/run.rs`), and spawns a
-   `PreviewPipe` for the readback's size at that moment. Nothing calls it again.
-2. `WindowEvent::Resized` calls `Renderer::resize`, which **rebuilds the preview target and reopens
-   the readback at the new size** (`core/src/render/mod.rs`). From that frame on the images
-   `take_preview_frame` yields are a different size than the pipe was spawned for.
-3. `StdoutSink::send` refuses a frame whose size is not the announced one — correctly, because a
-   reader cutting a fixed stride cannot be handed a different one silently.
-4. The writer thread's loop is `if sink.send(..).is_err() { break; }`. So the refusal **ends the
-   thread**, permanently, and the `Err`'s message — which names both sizes — is discarded rather
-   than printed.
-
-Every observed symptom follows: standard output goes quiet, so the canvas holds its last frame; the
-studio's `FramePump` never sees another frame, so its counter stays at `0`; the player is untouched
-and keeps drawing; and nothing reaches standard error. The trigger is **any** resize or fullscreen
-toggle of the show window, which is what a one-screen user does to the window backlog 0199 is about.
-
-**The repair is a choice, not a line.** Either the resize path re-emits `stream` and respawns the
-pipe at the new size — which makes `stream` a repeatable event and is therefore a spec 0003 change —
-or the show window is not resizable while a preview is open. Whichever is taken, the writer must not
-exit silently: a `break` that discards a named error is what turned a size disagreement into an
-undiagnosable freeze.
-
-**The instrumentation that would answer it is the instrumentation Plan 0159 Phase 4 already
-recorded as blind.** `FramePump` counts a drop only when a frame arrives while one is
-unacknowledged, so loss upstream of it — in the OS pipe, or in main's read cadence — is invisible;
-that note records the counter reading 0 while frames were plainly being lost. A frozen preview with
-`0 dropped` is therefore consistent with several different faults and distinguishes none of them.
-
-Worth separating before anyone fixes it, because they need different repairs: an acknowledgement
-that never arrives (the pump stays `inFlight` forever and drops every subsequent frame silently), a
-`FrameSplitter` desynchronised by a mid-run geometry change (it slices at a fixed `frameBytes` and
-a resize changes it, after which no whole frame is ever completed), or the player's writer having
-stopped. The first two are studio-side and the third is not.
-
-- **Raised:** 2026-09-10, from running the Plan 0159 Phase 9 packaged artifact.
-  **Owner if taken:** `dev`. The third candidate is the one, so the fault is in `standalone/`; the
-  studio side is correct and needs no change. Making the accounting able to tell the three apart is
-  still worth doing and is `studio-builder`'s, but it is no longer what blocks a fix.
-- **Verified 2026-09-10** — the drop counter is in-flight-based, so it reads 0 for loss that happens
-  before the pump: `present: private inFlight = false in: studio/electron/player/frames.ts`
-- **Verified 2026-09-10** — the pipe is spawned at window creation, and this is its only call site — nothing respawns it after a resize:
-  `present: state\.open_preview_pipe\(\); in: standalone/src/run.rs`
-- **Verified 2026-09-10** — while the resize path rebuilds the preview at the surface's new size:
-  `present: self\.preview = Some\(preview::PreviewTarget::new\( in: core/src/render/mod.rs`
-- **Verified 2026-09-10** — and the sink refuses a frame whose size is not the announced one:
-  `present: if \(width, height\) != \(self\.width, self\.height\) in: standalone/src/stream.rs`
-- **Verified 2026-09-10** — which ends the writer thread, discarding the message:
-  `present: if sink\.send\(&image\.rgba, image\.width, image\.height\)\.is_err\(\) in: standalone/src/stream.rs`
-- **Verified 2026-09-10** — and the splitter's frame size is fixed at construction, which is the
-  desynchronisation candidate:
-  `present: private readonly frameBytes: number, in: studio/electron/player/frames.ts`
-- **Verified 2026-09-10** — the acknowledgement is the renderer's, one message per painted frame:
-  `present: p\.postMessage\(\{ ack: true \}\) in: studio/renderer/components/Preview.tsx`
-- **Verified 2026-09-10** — the freeze itself:
-  `unprobeable: a preview that stops updating after some minutes is a runtime observation of two live processes, which the probe grammar deliberately cannot reach - it greps tracked files and never shells out (ADR-0108 Notes). Reproduce by running the packaged studio and watching the canvas against the player's own window.`
-
-### Priority
-
-**High**, and ahead of a fix: a preview that silently stops is worse than one that is slow, because
-nothing on screen says the picture is stale — the footer's own dropped count reads 0 throughout.
-It sits in front of Plan 0159's Phase 10 tester handoff with 0200.
+**Medium**, and asymmetric: reading one config file may close it in a minute, and the branch it
+cannot close — a silent fallback to the wrong endpoint — would be a defect every user hits without
+knowing.
