@@ -207,7 +207,7 @@ flowchart LR
 
 ## Running this beside the live lanes
 
-Safe to run in parallel with **[0161](../0161-the-structural-parameter-is-held.md)** (`core/src/**`,
+Safe to run in parallel with **[0161](0161-the-structural-parameter-is-held.md)** (`core/src/**`,
 `presets/README.md`, the `--report` path) and **[0159](../0159-the-studio-opens.md)** (`studio/**`):
 there is no file in common with either, and no ordering dependency in either direction.
 

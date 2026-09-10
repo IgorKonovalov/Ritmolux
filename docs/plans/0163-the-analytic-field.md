@@ -11,7 +11,7 @@
 > glow finally uses),
 > [0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) (aspect comes from the target),
 > [0085](../adrs/0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md) (`occlude`)
-> **Depends on:** [0161](0161-the-structural-parameter-is-held.md) — Chladni's mode numbers are
+> **Depends on:** [0161](done/0161-the-structural-parameter-is-held.md) — Chladni's mode numbers are
 > integers on a musical edge and are worth little without `[hold]`.
 
 ## TL;DR
@@ -230,7 +230,7 @@ documents), so this scene keeps its LUTs in their own bind group exactly as that
 - **It does not touch `fragment_field`.** Its thirteen presets are unaffected — see Decision.
 - **It does not author presets.** Two new families with no worlds built on them go to
   `preset-author`.
-- **It does not add `[hold]`** — that is [0161](0161-the-structural-parameter-is-held.md).
+- **It does not add `[hold]`** — that is [0161](done/0161-the-structural-parameter-is-held.md).
 
 ## Implementation log
 

@@ -70,6 +70,8 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0191 — `evaluate_preset` advances the scene before it applies the preset's bindings, so the first frame after every switch integrates at the scene's defaults](#0191--evaluate_preset-advances-the-scene-before-it-applies-the-presets-bindings-so-the-first-frame-after-every-switch-integrates-at-the-scenes-defaults)
 - [0192 - `--report` cannot see a `beat_index`-driven response, so a deliberately musical preset measures as inert](#0192-----report-cannot-see-a-beat_index-driven-response-so-a-deliberately-musical-preset-measures-as-inert)
 - [0196 — most `v*` tags produce no Release run at all, and the cause Plan 0165 named cannot explain nineteen of them](#0196--most-v-tags-produce-no-release-run-at-all-and-the-cause-plan-0165-named-cannot-explain-nineteen-of-them)
+- [0197 — `ParamKind::quantize` is the mechanism ADR-0180 rule 2 exists for, and nothing tests it](#0197--paramkindquantize-is-the-mechanism-adr-0180-rule-2-exists-for-and-nothing-tests-it)
+- [0198 — `deposit_arms` tears along the branch cut at a fractional value, and nothing rounds it](#0198--deposit_arms-tears-along-the-branch-cut-at-a-fractional-value-and-nothing-rounds-it)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -3645,7 +3647,16 @@ gate fires; the instrument simply cannot express the question.
 - **Verified 2026-09-09** - the stimulus holds `beat` as a boolean event and says why:
   `present: beat: true, in: standalone/src/shot/report.rs`
 - **Verified 2026-09-09** - and no counter is set anywhere in the report's stimulus construction:
-  `absent: beat_index in: standalone/src/shot/report.rs`
+  `absent: beat_index: in: standalone/src/shot/report.rs`
+- **NARROWED 2026-09-10, at Plan 0161's close.** The probe above used to read
+  `absent: beat_index` - the bare identifier, matched over the whole file - so it convicted the
+  entry on any **prose** mention of the counter, not only on a stimulus field that sets it. Plan
+  0161 Phase 6 hit exactly that: a doc comment on the new holds block, pointing at this entry,
+  named `beat_index` while explaining what the report cannot see, and the gate went red on a
+  correct comment. That lane reworded the comment rather than the probe, which is the right call
+  for `dev` and the wrong end to fix it at - a gate that forbids a word from a file's prose is
+  shaping the code instead of checking it. The trailing colon narrows the match to the struct-field
+  form `beat_index:`, which is how the stimulus would actually set it, and leaves prose free.
 
 ### The finding
 
@@ -3748,3 +3759,105 @@ eighteen. If no run appears, the inference is wrong outright and this entry is t
 and the project has been shipping from a release page that stopped at `v0.103.0` while the version
 reached `v0.113.0`. It becomes **High** the moment anyone outside the project is asked to download
 a build.
+
+---
+
+## 0197 — `ParamKind::quantize` is the mechanism ADR-0180 rule 2 exists for, and nothing tests it
+
+`ParamKind::Structural` promises one thing: the value is rounded once, CPU-side, before the scene
+sees it (`core/src/render/scenes/mod.rs`). Three call sites reach it, all in
+`core/src/render/evaluate.rs` — the top-level binding loop, the layer's, and the layer's bindable
+`mix`. **No test asserts that it rounds anything**, at either the unit or the render level.
+
+The suite cannot notice, and this is structural rather than an oversight. Plan 0161 Phase 3's audit
+rule was deliberately narrow: mark `Structural` **only** where the scene already clamps and rounds
+the value itself, so the engine's rounding composes to the identity by construction. That rule is
+what made the phase safe — no golden moved — and it is also what makes all 27 marked rows blind to
+the mechanism. `round()` becoming `trunc()`, or the `.quantize(` call being dropped from
+`evaluate_layer`, passes 1691 tests.
+
+`declared_params_match_set_param`'s `STRUCTURAL` roster in `core/tests/preset.rs` guards **which**
+parameters are marked. That is a different claim from **marking does something**, and it is the only
+enforcement the field has.
+
+- **Raised:** 2026-09-10, at Plan 0161's Mode 4 close review.
+  **Owner if taken:** `dev` — this is a test, not a design question.
+- **Verified 2026-09-10** — the mechanism exists and is reached from the binding loop:
+  `present: quantize in: core/src/render/evaluate.rs`
+- **Verified 2026-09-10** — and the render-layer test module, which covers the hold and the
+  smoother beside it, never names it:
+  `absent: quantize in: core/src/render/tests.rs`
+
+### The finding
+
+The cost is not today's picture — it is the next three plans. Plans 0162, 0163 and 0164 are the
+first consumers where quantization actually bites: a Chladni mode number, an automaton rule index
+and a curve-family arm are integers the scene does **not** already round, so they will be the first
+rows where `Structural` changes behaviour rather than confirming it. They will be built on a path no
+test has ever exercised, and the plan that added the path is the one that could most cheaply have
+covered it.
+
+Both reader documents already promise the behaviour in prose — `docs/presets.md` and
+`presets/README.md` each state that a smoothed structural parameter *"walks through the intervening
+integers"*. That sentence is currently unbacked.
+
+**What a fix looks like:** a unit test on `ParamKind::quantize` over the two variants, plus one
+render-layer test extending `smoothing_eases_toward_the_held_value_not_the_raw_one` in
+`core/src/render/tests.rs` with a `Structural` binding eased from 3 toward 9, asserting every
+emitted value equals its own `round()`. Neither needs a GPU.
+
+### Priority
+
+**Medium.** Nothing renders wrong today, precisely because the audit chose rows where rounding is a
+no-op. It becomes **High** the moment 0162, 0163 or 0164 marks its first row where it is not.
+
+---
+
+## 0198 — `deposit_arms` tears along the branch cut at a fractional value, and nothing rounds it
+
+`core/src/render/scenes/warp_mesh/shaders.rs` binds `let arms = dp.b.z` straight off the packed
+uniform and computes `let phase = arms * (ang + dp.b.w * r) + dp.c.x` from it — `dp.b.w` being the
+twist, per that file's own packing comment. The value is used raw, with no rounding anywhere between
+`set_param` and the multiply. A fractional arm count therefore tears along `atan2`'s branch cut — the **exact**
+discontinuity `marks::mark_points` rounds to avoid, and whose own doc comment argues the case at
+length for the mark shapes.
+
+Plan 0161 Phase 3's audit found it and left it `Modal`, correctly: that phase's rule was *mark
+`Structural` only where the scene already rounds*, and nothing rounds this one, so marking it would
+have been a behaviour change the plan did not license. No picture is wrong today — every shipped
+preset binds `deposit_arms` to an integer constant, so the tear is unreachable from the library.
+
+What the finding costs is the surface: `deposit_arms` is exactly the parameter class ADR-0180 rule 2
+was written for, and an author who binds it — which the new `[hold]` table now makes attractive,
+since `[hold] deposit_arms = "bar"` is the obvious way to step an arm count on the music — gets a
+torn mesh rather than a stepped one.
+
+- **Raised:** 2026-09-10, at Plan 0161's Mode 4 close review, from that plan's own Phase 3 audit
+  notes. **Owner if taken:** `dev`, behind a one-line `architect` call on whether marking it
+  `Structural` is the fix or whether the shader should round.
+- **Verified 2026-09-10** — the deposit shader binds the arm count straight off the packed uniform,
+  which is the value the phase is computed from:
+  `present: let arms = dp in: core/src/render/scenes/warp_mesh/shaders.rs`
+- **Verified 2026-09-10** — `unprobeable: that the shader multiplies the raw value rather than a
+  rounded one is a claim about the arithmetic of one expression inside a WGSL string literal, and
+  every fragment of that expression which would distinguish rounded from raw is regex punctuation
+  the probe grammar reads as syntax rather than as text. It is one line; read it`
+
+### The finding
+
+**Its stated twin is not a twin.** Plan 0161's Phase 3 notes pair this with `kaleido_tile` — *"same
+shape as `deposit_arms`, same disposition"*. That is wrong, and the record already says so:
+[backlog 0078](design-backlog-archive.md) investigated `kaleido_tile` and closed **FALSIFIED**,
+finding that its non-quantization is deliberate and argued in a doc comment — a smoothed
+`kaleido_tile` easing between cell counts is a designed behaviour, not a defect. `deposit_arms` has
+no such argument anywhere. This entry is one parameter, not two.
+
+**Marking it `Structural` is the cheap fix and it is not free.** It would round the value before the
+scene sees it, which is a behaviour change on any preset binding it continuously — none ship today,
+so the change is currently invisible, which is also the argument for doing it *now* rather than
+after someone authors one.
+
+### Priority
+
+**Low.** Unreachable from the shipped library, and the fix is a one-line declaration whose cost only
+grows if a preset lands on the parameter first.

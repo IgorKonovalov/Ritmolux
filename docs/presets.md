@@ -1213,6 +1213,12 @@ all — a latch is not a timer with a jitter, it is a permission that gets spent
 `hold` is a **duration**, measured on real elapsed time like `[smoothing]`, so it
 is the same length at any refresh rate.
 
+> **This `hold` is not the [`[hold]`](#the-hold-table--re-sample-on-a-musical-edge-hold-in-between)
+> table below**, and both take a bare number of seconds, so it is worth one line.
+> A latch's `hold` says **how long a fired event keeps reading `1.0`**. A `[hold]`
+> entry says **how often a binding re-takes its value**. One is the length of a
+> pulse, the other the interval between samples.
+
 **A preset may declare up to four latches.** Asking for more is a load error
 naming the cap; the storage is a fixed block resolved at load, so this is a wall
 rather than a slower path. A latch name may not be one the grammar already
@@ -1274,14 +1280,23 @@ What the hold decides is which frame's value the scene is shown.
 
 Anything else is a load error naming what was written and what was expected.
 
+A number here is an **interval between re-samples**, not the length of anything.
+It is unrelated to
+[`[latch]`'s own `hold`](#the-latch-table--arm-on-one-thing-fire-on-another),
+which is how long a fired latch keeps reading `1.0` — the two spell the same word
+and take the same bare seconds, and they are the two different things above.
+
 > **`bar` is only as good as the downbeat tracker, and the downbeat tracker
 > locks about 3 % of audible time** ([backlog 0042](design-backlog.md)). The rest
-> of the time the bar counter is **derived from the beat count** rather than
-> estimated — it steps on something regular and musical, but it is not a
-> promise that you are on the downbeat. What `[hold] n = "bar"` reliably buys is
-> *slow*: roughly one change every four detected beats instead of sixty a second.
-> Where you want the change on a hit rather than on a phrase, `"beat"` says what
-> it means.
+> of the time the bar counter is **derived from the tempo grid's beat count**
+> rather than estimated — it steps on something regular and musical, but it is
+> not a promise that you are on the downbeat. Note that this is the grid's beat,
+> not the detector's: `beat_index` counts onsets at the 1.2x-2.3x above, and
+> folding a bar over *those* is the error
+> [ADR-0109](adrs/0109-the-beat-clock-counts-onsets-not-beats.md) exists to
+> end. So what `[hold] n = "bar"` reliably buys is *slow*: roughly one change
+> every four musical beats instead of sixty a second. Where you want the change
+> on a hit rather than on a phrase, `"beat"` says what it means.
 
 **The first frame always takes a value.** A held binding samples on the frame the
 preset becomes active, before any edge has fired — a preset never opens on a

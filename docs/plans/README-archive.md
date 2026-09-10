@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0161 - The structural parameter is held](#0161---the-structural-parameter-is-held)
   - [0165 - The release path stops being the first compile](#0165---the-release-path-stops-being-the-first-compile)
   - [0158 - The player grows a studio-facing surface](#0158---the-player-grows-a-studio-facing-surface)
   - [0092 — The engine draws an authored path](#0092--the-engine-draws-an-authored-path)
@@ -190,6 +191,70 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0161 - The structural parameter is held](done/0161-the-structural-parameter-is-held.md)
+
+- closed 2026-09-10. Six `dev` phases in the nested lane
+`.claude/worktrees/plan-0161-structural-hold` (ADR-0182's first, and the lane Plan 0165 Phase 0
+needed live to be observable at all). `dc9e970` (1, the `[hold]` table), `4eeeba8` (2, `ParamKind`),
+`7c70cba` (3, the audit), `de9fb94` (4, the two-group reference), `7b53a13` (5, `--report`),
+`f14b019` (6, the docs). Review: **no blockers, one major, six minors.** Version: **0.114.0**
+(minor - a feature plan). ADR-0180 accepted at this close **with an Outcome**.
+
+**The gate was re-run at the close on the merged tree, not taken from the log.**
+`cargo nextest run --workspace` gave 1691 passed / 6 skipped in 501 s - matching `dev`'s claim
+exactly - alongside `clippy --workspace --all-targets`, `fmt` and all seven Node gates.
+
+**The one major is that the plan's central mechanism is untested, and the reason is structural
+rather than sloppy.** `ParamKind::quantize` has three call sites in `core/src/render/evaluate.rs`
+and no assertion anywhere. Phase 3's audit rule - mark `Structural` **only** where the scene already
+clamps and rounds the value itself - is what made that phase safe across 27 rows with no golden
+moved, and it is also what makes every marked row blind to the mechanism: the engine's `round`
+composes to the identity everywhere it currently runs, so `round()` becoming `trunc()`, or the
+`.quantize(` call vanishing from `evaluate_layer`, passes all 1691 tests. Both reader documents
+already promise the behaviour in prose. Filed as design-backlog 0197, which names the two cheap
+tests that would close it and why Plans 0162-0164 are where it starts to matter.
+
+**Phase 3 did the honest thing twice, and that is the plan's best property.** It left `n` - the
+ADR's own headline parameter - `Modal`, because `curves.rs` evaluates it as a raw frequency in
+`sin(n * theta + phase)` where a fractional value is a well-defined open web rather than a broken
+rose; the headline example survives because its `floor` is the author's own. And it reported
+`deposit_arms` as an engine defect rather than fixing it under a plan that did not license the
+behaviour change - the deposit shader multiplies the raw value, so a fractional arm count tears
+along `atan2`'s branch cut, which is the exact discontinuity `mark_points` rounds to avoid. Filed
+as design-backlog 0198, which also corrects the log's pairing of it with `kaleido_tile`: that one
+was investigated as backlog 0078 and closed **FALSIFIED**, its non-quantization being deliberate
+and argued in a doc comment. One parameter, not two.
+
+**ADR-0180 rule 2 contradicted itself and `dev` resolved it correctly.** The clause reads *"a load
+error, in ADR-0020's posture"*, and ADR-0020's posture is a **warning that keeps the preset** - the
+opposite severity. Phase 1 shipped the warning and said so. The ADR was accepted with an Outcome
+recording that reading, rather than by editing an accepted body, together with rule 4's second half
+having nothing to apply to yet (no structural parameter in the engine is family-specific; `tuple`
+is answered by every attractor family) and the audit rule being narrower than rule 2's own wording.
+
+**Three doc repairs the close owed.** `docs/presets.md` told authors a `bar` hold buys *"one change
+every four detected beats"* - but `bar_index` is `shifted / BEATS_PER_BAR` over the **tempo grid's**
+beat count (`dsp/downbeat.rs`), not over onsets, and folding a bar over `beat_index` is precisely
+the error ADR-0109 and Plan 0095 exist to end. The same paragraph's own `"beat"` row, saying the
+detector fires 1.2x-2.3x per musical beat, contradicted it three lines above; `presets/README.md`
+stated the same caveat correctly and made no such claim. Corrected, with ADR-0109 cited. Second:
+`[latch]`'s `hold` (seconds a fired event reads 1.0) and the new `[hold]` table (seconds between
+re-samples) are adjacent sections spelling one word two ways, both taking a bare number of seconds,
+and neither acknowledged the other - one cross-reference added in each direction.
+
+**A gate was shaping code instead of checking it.** design-backlog 0192's probe was
+`absent: beat_index in: standalone/src/shot/report.rs` - a whole-file text absence, so it convicted
+the entry on any **prose** mention. Phase 6 hit exactly that: a correct doc comment on the new holds
+block, pointing at 0192 while explaining what the report cannot see, turned the gate red, and the
+lane reworded the comment. That is the right call for `dev` and the wrong end to fix it at. The
+probe is narrowed to `beat_index:` - the struct-field form a stimulus would actually use - and the
+now-stale comment explaining the constraint was removed at this close.
+
+**What did not move.** No `.toml` preset changed, so the embedded set is byte-identical and the
+curation sweep had nothing to judge - `presets/README.md` was the only file under `presets/` to
+move, its generated block regenerated by the harness for eight reworded `doc` lines.
+
 
 ### [0165 - The release path stops being the first compile](done/0165-the-release-path-stops-being-the-first-compile.md)
 
@@ -7685,6 +7750,28 @@ uncovered (its C side remains the Plan 0001 Phase-6 smoke program's job, per ADR
 
 ## Prior sequencing notes (superseded)
 
+**Superseded 2026-09-10, when [0161] closed.** Kept as the record of how the two lanes were
+paired and what the schema coupling was understood to be at the time.
+
+**Added 2026-09-10 - [0160] through [0164] are approved, and the two lanes to open now are
+[0161] and [0159].** They are the only pair on this roster that shares no directory, no skill lane
+and no baseline: 0161 is `dev` inside `core/`, 0159 is five `studio-builder` phases inside
+`studio/` plus one `dev` phase on the release job, and 0159 renders nothing into
+`core/tests/golden/`, so 0161 Phase 3's possible bless cannot collide with it. **The one coupling
+to name is the schema**: 0161 Phase 2 adds `kind` to `ParamSpec` and Phase 1 adds a `[hold]` table,
+both of which widen the document 0159 Phase 2 types once and Phases 3 and 5 render from. The
+widening is additive, so whichever lane lands second owes a schema re-export and a `[hold]` editor
+- a follow-up, not a rebase.
+
+**Two orderings this does not license.** [0160] contends with [0161] on
+`core/src/preset/schema/` - both add load-time work to the same directory - so it runs **after**
+0161 rather than beside it, and it is three phases of which one is prose and one is `human`. And
+0162, 0163 and 0164 touch disjoint scene paths but each **blesses new baselines**, so they merge in
+series even if they are built in parallel: the rule at the head of `### The two lanes, now` is
+written for exactly this case, and this is the first wave since it was written that will actually
+meet it.
+
+
 ### Superseded 2026-09-10 by Plan 0158's close (was in `README.md`)
 
 **Added 2026-09-09 — [0158] and [0159] are drafted, and they are a program rather than a
@@ -7698,6 +7785,8 @@ diffusion pass from the studio are each a later plan with its own interview; ADR
 
 [0158]: done/0158-the-player-grows-a-studio-facing-surface.md
 [0159]: 0159-the-studio-opens.md
+[0160]: 0160-the-silhouettes-preconditions-stop-being-silent.md
+[0164]: 0164-the-cellular-system.md
 
 ### Moved 2026-09-09 from `README.md` — the 0087-stop-condition risk
 
@@ -8435,7 +8524,7 @@ session), then 0079** (largest, two `human` curation gates).
 argued is spent — but it was followed, and the contention with 0159 Phase 6 it describes is real
 history rather than a prediction.
 
-[0161]: 0161-the-structural-parameter-is-held.md
+[0161]: done/0161-the-structural-parameter-is-held.md
 [0165]: done/0165-the-release-path-stops-being-the-first-compile.md
 
 **Added 2026-09-10 — [0165] runs beside the two live lanes, and goes first.** Its surfaces

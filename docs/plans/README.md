@@ -46,7 +46,6 @@ place. The plan file carries the real link.
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
 | [0159](0159-the-studio-opens.md) | The studio opens | approved | studio-builder, dev, human | ADR-0177 + ADR-0178: the Electron studio under `studio/`, first lane of its kind. **0158 closed 2026-09-10, so its dependency is met.** Two `human` gates at the end: a tester zip and the on-device check. |
 | [0160](0160-the-silhouettes-preconditions-stop-being-silent.md) | The silhouette's preconditions stop being silent | approved | dev, human | ADR-0179: four preconditions on `[path]` that fail silently. **0092 closed 2026-09-09**, so its Phase 7 axis fix is in. Phase 2 is prose in `presets/README.md`. |
-| [0161](0161-the-structural-parameter-is-held.md) | The structural parameter is held | approved | dev | ADR-0180 rules 2+4: a `[hold]` table and `ParamKind`. **The wave's prerequisite - 0162, 0163 and 0164 each want it.** Phase 3's audit can move a golden; that is a stop, not a re-bless. |
 | [0162](0162-the-curve-families.md) | The curve families | approved | dev | ADR-0180 rule 1: Lissajous, hypotrochoid, superformula and harmonograph as `CurveFamily` arms. The catalogue's #1 payoff-per-effort item since 2026-07-25. **Needs 0161.** |
 | [0163](0163-the-analytic-field.md) | The analytic field | approved | dev | ADR-0180 rules 1+3: a 13th system holding `chladni` and `escape_time`, with Voronoi, quasicrystal and hyperbolic placed. Fills the roadmap's fractal-spiral gap. **Needs 0161.** |
 | [0164](0164-the-cellular-system.md) | The cellular system | approved | dev | ADR-0180 rules 1+2: a 14th system on `PingPongField` - `life_like`, `larger_than_life`, `cyclic`, plus an age channel so the field paints history. Lenia placed, not built. **Needs 0161.** |
@@ -64,7 +63,7 @@ built against it. The full note is in [README-archive.md](README-archive.md) und
 [0158]: done/0158-the-player-grows-a-studio-facing-surface.md
 [0159]: 0159-the-studio-opens.md
 [0160]: 0160-the-silhouettes-preconditions-stop-being-silent.md
-[0161]: 0161-the-structural-parameter-is-held.md
+[0161]: done/0161-the-structural-parameter-is-held.md
 [0162]: 0162-the-curve-families.md
 [0163]: 0163-the-analytic-field.md
 [0164]: 0164-the-cellular-system.md
@@ -593,27 +592,24 @@ three.** One ADR frames them: [0180] - a new mathematical world joins an existin
 **family** rather than founding a `SystemKind` (which is why seven new worlds cost two roster
 entries), and a **structural** parameter is quantized and holdable, because this engine's integer
 levers are bindable today and effectively unbindable in practice. The order is fixed by dependency:
-**0161 first**, then 0162, 0163 and 0164 in any order - they touch three disjoint scene paths.
+**0161 first** - closed 2026-09-10 - then 0162, 0163 and 0164 in any order: three disjoint scene paths.
 Lenia, Voronoi, quasicrystal, hyperbolic tiling and fractal flames are **placed** by 0180 and built
 by nobody yet; each is a family arm on a system 0163 or 0164 creates.
 
-**Added 2026-09-10 - [0160] through [0164] are approved, and the two lanes to open now are
-[0161] and [0159].** They are the only pair on this roster that shares no directory, no skill lane
-and no baseline: 0161 is `dev` inside `core/`, 0159 is five `studio-builder` phases inside
-`studio/` plus one `dev` phase on the release job, and 0159 renders nothing into
-`core/tests/golden/`, so 0161 Phase 3's possible bless cannot collide with it. **The one coupling
-to name is the schema**: 0161 Phase 2 adds `kind` to `ParamSpec` and Phase 1 adds a `[hold]` table,
-both of which widen the document 0159 Phase 2 types once and Phases 3 and 5 render from. The
-widening is additive, so whichever lane lands second owes a schema re-export and a `[hold]` editor
-- a follow-up, not a rebase.
+**Added 2026-09-10, spent 2026-09-10 when [0161] closed.** That note paired [0161] and [0159] as
+the two lanes to open, and named the schema as their one coupling. It is
+[in the archive](README-archive.md#prior-sequencing-notes-superseded); what survives it is a debt.
+**[0159] now owes a schema re-export and a `[hold]` editor**: 0161 landed `kind` on every
+`ParamSpec` and two `[hold]` table descriptors in the exported document, additively, with
+`SCHEMA_VERSION` deliberately still at 1 - the body hash is what moved, which is the staleness
+signal the studio already compares. A follow-up in the `studio-builder` lane, not a rebase.
 
-**Two orderings this does not license.** [0160] contends with [0161] on
-`core/src/preset/schema/` - both add load-time work to the same directory - so it runs **after**
-0161 rather than beside it, and it is three phases of which one is prose and one is `human`. And
-0162, 0163 and 0164 touch disjoint scene paths but each **blesses new baselines**, so they merge in
-series even if they are built in parallel: the rule at the head of `### The two lanes, now` is
-written for exactly this case, and this is the first wave since it was written that will actually
-meet it.
+**One ordering this still does not license.** 0162, 0163 and 0164 touch disjoint scene paths but
+each **blesses new baselines**, so they merge in series even if they are built in parallel: the
+rule at the head of `### The two lanes, now` is written for exactly this case, and this is the first
+wave since it was written that will actually meet it. ([0160]'s half of this note is spent - it had
+to run after [0161] because both add load-time work to `core/src/preset/schema/`, and [0161] has
+landed.)
 
 ## Standing (not a plan)
 
@@ -772,6 +768,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0161 — The structural parameter is held](done/0161-the-structural-parameter-is-held.md) — closed 2026-09-10. Review: **no blockers, one major, six minors.** Version: **0.114.0** (minor). ADR-0180 accepted with an Outcome. Filed [backlog 0197 + 0198](../design-backlog.md). [Write-up](README-archive.md).
 - [0165 — The release path stops being the first compile](done/0165-the-release-path-stops-being-the-first-compile.md) — closed 2026-09-10. Review: **no blockers, three majors, four minors.** Version: **none** (chore-only). ADR-0181 + ADR-0182 accepted. [Write-up](README-archive.md).
 - [0158 — The player grows a studio-facing surface](done/0158-the-player-grows-a-studio-facing-surface.md) — closed 2026-09-10. Review: **no blockers, two majors, six minors.** Version: **0.113.0**. ADR-0175 + 0176 accepted. Phase 7 open, on [on-device](../on-device-validation.md). [Write-up](README-archive.md).
 - [0092 — The engine draws an authored path](done/0092-the-engine-draws-an-authored-path.md) — closed 2026-09-09. Review: **no blockers, one major, three minors, one nit.** Version: **0.112.0** (minor). ADR-0107 already accepted. `shape_maple` + `shape_lion` shipped. [Write-up](README-archive.md).

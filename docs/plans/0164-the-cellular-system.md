@@ -11,7 +11,7 @@
 > [0021](../adrs/0021-shared-palette-system.md) (the colour surface),
 > [0045](../adrs/0045-quality-tiers-floor-and-rich.md) (the grid cap),
 > [0051](../adrs/0051-seeded-grammar-randomness-with-per-run-opt-in.md) (the seed a reseed draws from)
-> **Depends on:** [0161](0161-the-structural-parameter-is-held.md) — a rule index is a Structural
+> **Depends on:** [0161](done/0161-the-structural-parameter-is-held.md) — a rule index is a Structural
 > parameter and is unusable without `[hold]`.
 
 ## TL;DR

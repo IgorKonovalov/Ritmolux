@@ -766,10 +766,6 @@ const CEILINGS_NAMED: usize = 3;
 /// `[hold]`; it is not a fix for the report's blindness to counter-driven
 /// response (design-backlog 0192), which is a different and larger hole.
 ///
-/// The counter is deliberately not named here: 0192's own probe asserts that
-/// this file mentions it nowhere, and a regex cannot tell prose from a
-/// stimulus field.
-///
 /// Silent for a family with no held binding, which is the whole shipped
 /// library: a line per family saying nothing happened is the noise the
 /// ceilings block already had to be summarized to avoid.

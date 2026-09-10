@@ -1,9 +1,15 @@
 # 0161 — The structural parameter is held
 
-> **Status:** in-progress
+> **Status:** done - closed 2026-09-10. Phases 1-6 landed as `dc9e970`, `4eeeba8`, `7c70cba`,
+> `de9fb94`, `7b53a13`, `f14b019`. Mode 4 review: **no blockers, one major, six minors.** The
+> full suite was re-run at the close on the tree with `main` merged in - 1691 passed, 6 skipped -
+> together with `clippy --workspace --all-targets`, `fmt` and all seven Node gates. The major is
+> that `ParamKind::quantize` has no test: the audit marked `Structural` only where the scene
+> already rounds, so the engine's own rounding is a no-op on every marked row and no suite would
+> notice it breaking. Filed as design-backlog 0197, with the `deposit_arms` tear as 0198.
 > **Created:** 2026-09-09
 > **Owner skill(s):** dev
-> **Related ADRs:** [0180](../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md)
+> **Related ADRs:** [0180](../../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md)
 > (rules 2 and 4)
 
 ## TL;DR
@@ -137,7 +143,7 @@ flowchart LR
 - **Owner skill:** dev
 - **What:** `--report`'s reactivity reading credits a binding for naming an audio variable. A held
   binding names one and may take its value once a bar, so the reading would over-credit it — the
-  same class as [backlog 0192](../design-backlog.md), where `--report` cannot see a
+  same class as [backlog 0192](../../design-backlog.md), where `--report` cannot see a
   `beat_index`-driven response and scores a deliberately musical preset as inert. This phase does
   **not** fix 0192; it stops this plan from widening it. The reading reports a held binding as held,
   with its edge, rather than scoring it as if it were per-frame.
@@ -150,7 +156,7 @@ flowchart LR
 - **What:** `docs/presets.md` gains a `[hold]` section next to `[latch]`, opening from the same
   sentence that already frames the gap. It must state, at the table, that `bar` rides the
   confidence-gated downbeat estimator, which locks ~3 % of audible time
-  ([backlog 0042](../design-backlog.md)) and is otherwise counter-derived — an author reading "hold
+  ([backlog 0042](../../design-backlog.md)) and is otherwise counter-derived — an author reading "hold
   on the bar" will not guess that. `presets/README.md`'s hand-written structural tables gain the
   Structural/Modal vocabulary. `docs/configuration.md` is untouched: this adds no flag.
 - **Files touched:** `docs/presets.md`, `presets/README.md`.
@@ -202,7 +208,7 @@ struct ParamHold {
 ## Risks & open questions
 
 - **`bar` is unreliable on most material.** The downbeat estimator locks ~3 % of audible time
-  ([backlog 0042](../design-backlog.md)); the rest of the time `bar_index` is counter-derived. The
+  ([backlog 0042](../../design-backlog.md)); the rest of the time `bar_index` is counter-derived. The
   capability is still correct — it steps on *something* musical — but "hold on the bar" promises
   more than the tracker delivers. Mitigation is documentation (Phase 6), not code; fixing the
   tracker is not this plan.
@@ -226,9 +232,9 @@ struct ParamHold {
 - **It does not add a phrase counter.** The vocabulary is `beat`, `bar`, and a period in seconds.
   `phrase` would need a counter this engine does not have, and inventing one here would bundle a
   DSP decision into a preset-surface plan.
-- **It does not fix [backlog 0192](../design-backlog.md)** — `--report`'s blindness to
+- **It does not fix [backlog 0192](../../design-backlog.md)** — `--report`'s blindness to
   `beat_index`-driven response. Phase 5 keeps this plan from widening it.
-- **It does not fix the downbeat tracker** ([backlog 0042](../design-backlog.md)).
+- **It does not fix the downbeat tracker** ([backlog 0042](../../design-backlog.md)).
 - **It does not retune any shipped preset.** The two hand-rolled staircases in
   `curve_nightbloom.toml:49` and `fragment_supernova.toml:44` become one line each *once someone
   rewrites them*, and that is content work in the `preset-author` lane — see Followups.
@@ -406,12 +412,12 @@ lines; nothing in it was hand-edited.
   tables named every table but this one, and the paragraph declaring `[latch]` *"the one part of
   the preset surface whose value depends on the frames before this one"* had stopped being true.
   Both corrected.
-- **`presets/README.md`'s Structural/Modal paragraph cites [backlog 0030](../design-backlog.md)**,
+- **`presets/README.md`'s Structural/Modal paragraph cites [backlog 0030](../../design-backlog.md)**,
   which measured that presets binding audio to geometry score 2-4x better on the animation metric
   than presets binding it to brightness. ADR-0180's Consequences names that measurement as the
   thing rule 4's two groups make pointable-at, and the paragraph is where an author meets it.
 - **One comment reworded to keep another lane's gate honest.** `write_holds`'s doc named
-  `beat_index` while pointing at [backlog 0192](../design-backlog.md), and 0192's own executable
+  `beat_index` while pointing at [backlog 0192](../../design-backlog.md), and 0192's own executable
   probe is `absent: beat_index in: standalone/src/shot/report.rs`. `check-backlog-claims.mjs` broke
   on it. The comment now says *counter-driven* and states why it does not name the counter — a
   regex cannot tell prose from a stimulus field, and rewriting the entry's probe is
