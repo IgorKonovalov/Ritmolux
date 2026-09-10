@@ -1,6 +1,6 @@
 # 0162 — The curve families
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-09-09
 > **Owner skill(s):** dev
 > **Related ADRs:** [0180](../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md)
