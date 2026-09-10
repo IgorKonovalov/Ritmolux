@@ -390,7 +390,7 @@ export type PlayerEvent =
 | 5 — The player reports what it loaded | dev | done | `bd037d4` |
 | 6 — Parameters move | studio-builder | done | `ce70952` |
 | 7 — Expressions and palettes | studio-builder | done | `658472f` |
-| 8 — Composition and the library | studio-builder | done | committed with this row |
+| 8 — Composition and the library | studio-builder | done | `6b85624` |
 | 9 — The release job and the gate | dev | not started | |
 | 10 — The tester handoff | human | not started | |
 | 11 — The on-device check | human | not started | |
@@ -438,6 +438,48 @@ see it.
 > ADR is now **0183**. Every phase from the parameter panel down is renumbered by
 > one, so **the numbers in the notes below are the ones the plan carried when each
 > note was written** — this note's Phase 5 is now Phase 6, the on-device check 11.
+
+**Phases 6 to 8 — one unmet done-when, one missing player flag, and four
+files outside the lists.**
+
+- **Phase 7's second done-when is not met.** The language mode was to generate
+  its token list from *"the schema's function and variable roster"*; `--schema`
+  declares systems, stages and tables and carries no such roster, and the
+  engine's `VAR_NAMES` and `Func::from_name` are not exported. Rather than type
+  the list into the studio, `presetLanguage` takes a roster and colours exactly
+  what it is given — nothing today. Structure is coloured either way, and
+  `expr-language.test.ts` pins both arms, so passing a roster is the only change
+  needed. **Feedback for architect: the schema export needs a `grammar` section.**
+- **Phase 8's `ritmolux --check` does not exist.** The done-when names the
+  fallback and that is what runs: one spawned player over a directory of twelve
+  templates, asserting the roster names all of them and that no `preset_error`
+  or `preset_warning` arrives. 2.7 s, and it skips with a notice where there is
+  no built player, capture endpoint or adapter. The absent flag is the feedback
+  note the done-when itself calls for.
+- **Four files sit outside the phase lists**, each because a rule outranked the
+  list. `shared/toml.ts` and `shared/fields.ts` are pure string and schema work
+  the renderer needs, and ADR-0178 says main runs no editing logic — the plan put
+  both under `electron/`. `electron/ipc/presetHandlers.ts` and
+  `renderer/hooks/useActivePreset.ts` have no home in the lists at all. Three IPC
+  channels are new (`app:get-schema`, `preset:read`, `preset:write`), all **OS**
+  channels carrying no protocol message; the three domain channels are untouched.
+- **CodeMirror 6 and `@lezer/highlight`, pinned exact** (ADR-0178 chose it).
+  Every advisory `npm audit` reports is dev-only: `npm audit --omit=dev` finds
+  none.
+
+**Phases 6 to 8 — four things the real player and the real presets corrected.**
+
+- **A `[params]` value is always a quoted string.** The loader deserializes that
+  table into `BTreeMap<String, String>`, so a bare TOML number there is a load
+  error; a constant is a numeric *expression*. The first corpus run found zero
+  constants across the shipped set and said so.
+- **A regex `.` excludes the carriage return.** The obvious entry pattern matched
+  nothing in a CRLF preset, so every parameter read as unbound.
+- **A parameter's `range` can be `null`, and thirty-one are** — the pan offsets
+  and their siblings. Those get a number field; a slider would offer travel the
+  engine never promised.
+- **A table key's `of` is an object** carrying a kind and sometimes a table, not
+  a string.
 
 **Phase 5 — three things outside what the phase names, and one done-when a
 test does not reach.**
