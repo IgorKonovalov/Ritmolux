@@ -69,9 +69,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0190 — the `dt` seam's comment names three downstream sites as unguarded, and all three still carry a guard, on three different policies](#0190--the-dt-seams-comment-names-three-downstream-sites-as-unguarded-and-all-three-still-carry-a-guard-on-three-different-policies)
 - [0191 — `evaluate_preset` advances the scene before it applies the preset's bindings, so the first frame after every switch integrates at the scene's defaults](#0191--evaluate_preset-advances-the-scene-before-it-applies-the-presets-bindings-so-the-first-frame-after-every-switch-integrates-at-the-scenes-defaults)
 - [0192 - `--report` cannot see a `beat_index`-driven response, so a deliberately musical preset measures as inert](#0192-----report-cannot-see-a-beat_index-driven-response-so-a-deliberately-musical-preset-measures-as-inert)
-- [0193 — the `spout` feature is compiled for the first time by the job that publishes it, and that has already cost a release](#0193--the-spout-feature-is-compiled-for-the-first-time-by-the-job-that-publishes-it-and-that-has-already-cost-a-release)
-- [0194 — `release.yml` promises a dry run it cannot provide, because the publish gate reads the ref and not the event](#0194--releaseyml-promises-a-dry-run-it-cannot-provide-because-the-publish-gate-reads-the-ref-and-not-the-event)
-- [0195 — `check-index-rows.mjs` is the one gate that never adopted the tracked-set enumeration, so a lane opened inside the repository blocks every push](#0195--check-index-rowsmjs-is-the-one-gate-that-never-adopted-the-tracked-set-enumeration-so-a-lane-opened-inside-the-repository-blocks-every-push)
+- [0196 — most `v*` tags produce no Release run at all, and the cause Plan 0165 named cannot explain nineteen of them](#0196--most-v-tags-produce-no-release-run-at-all-and-the-cause-plan-0165-named-cannot-explain-nineteen-of-them)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -334,6 +332,9 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0180 | A doc comment states the ABI version is 4 and points at a test file that does not exist | [Plan 0156](plans/done/0156-the-site-becomes-the-reference.md) Phase 6: the path corrected and neither figure restated, because rustdoc made the comment public. **Closed 2026-09-06** |
 | 0149 | Three bindable rates multiply a per-element `age` instead of integrating, and ADR-0135's guard cannot see any of them | [ADR-0153](adrs/0153-a-per-element-rate-integrates-per-element.md) + [Plan 0140](plans/done/0140-every-rate-integrates-for-real.md) Phases 1, 3 and 4. **Closed 2026-09-08** |
 | 0150 | `Phase::step` accepts any `dt`, so the guard is four copies in the callers and the attractor has none | [ADR-0152](adrs/0152-the-frame-delta-is-sanitized-at-the-scene-seam.md) + [Plan 0140](plans/done/0140-every-rate-integrates-for-real.md) Phase 2; six copies, not four. See 0189, 0190. **Closed 2026-09-08** |
+| 0193 | The `spout` feature is compiled for the first time by the job that publishes it | [ADR-0181](adrs/0181-the-gate-compiles-every-feature-a-release-ships.md) + [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md) Phase 1. Cost two releases, not one. **Closed 2026-09-10** |
+| 0194 | `release.yml` promises a dry run it cannot provide, because the publish gate reads the ref and not the event | [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md) Phase 2. The hazard was already realized once; see 0196. **Closed 2026-09-10** |
+| 0195 | `check-index-rows.mjs` is the one gate that never adopted the tracked-set enumeration | [ADR-0182](adrs/0182-a-plan-lane-may-live-inside-the-repository.md) + [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md) Phase 0. Both probes still pass. **Closed 2026-09-10** |
 <!-- roster:end -->
 
 ## Open entries
@@ -3671,168 +3672,70 @@ it costs is judgement — a curator reading `onset 0.000` concludes a preset ign
 preset may be the most rhythmically driven thing in the set. That misreading has now happened once,
 to the author who could tell the difference.
 
-## 0193 — the `spout` feature is compiled for the first time by the job that publishes it, and that has already cost a release
+## 0196 — most `v*` tags produce no Release run at all, and the cause Plan 0165 named cannot explain nineteen of them
 
-`standalone`'s `spout` feature is off by default and **on** in the shipped Windows binary:
-`release.yml`'s `windows` job stages the pinned SDK ([ADR-0125](adrs/0125-the-live-video-out-is-a-spout-sender-fed-by-a-frame-tap.md))
-and builds `--features spout`, because that flag is what makes `ritmolux --stream` exist in the
-artifact a tester downloads. Nothing compiles it earlier. `ci.yml` does not mention the feature;
-neither does `.githooks/pre-push`. Code behind `#[cfg(feature = "spout")]` is not type-checked when
-the feature is off, so every `cargo build`, every `clippy --all-targets` and every `nextest` run in
-this repository is blind to it **by construction**, not by omission.
+[Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md) fixed two real holes in
+the release path and deliberately declined to audit a third it had spotted — *"whether that whole
+gap shares Phase 3's cause is a separate question this plan deliberately does not open."* This entry
+opens it, because the review that closed 0165 measured the gap and found it is the **dominant**
+failure mode rather than a tail.
 
-So the first compile of that path is the job that publishes it. `v0.112.0` is the worked example:
-`foobar` green, `macos` green, `windows` red with `cannot find function start_capture in the crate
-root` (`E0425`, `standalone/src/stream.rs:348`), the `release` job skipped by its
-`needs: [macos, windows, foobar]`, and therefore **no GitHub Release for that version at all**.
-`e9b27a2` repaired the call site seven commits later, incidentally, inside the Plan 0158 merge — a
-refactor moved the function into `capture_start` and updated the gated caller on its way past. No
-gate caught it and nobody went looking.
+Counted on 2026-09-10 from `git ls-remote --tags origin`, `gh run list --workflow=release.yml` and
+`gh release list`:
 
-- **Raised:** 2026-09-10, while diagnosing why CI went red after the trailer-stripping history
-  rewrite — the rewrite was exonerated and this was found beside it. **Owner if taken:** `dev`,
-  behind an architect decision about what the per-push gate covers.
-- **PROMOTED 2026-09-10 → [ADR-0181](adrs/0181-the-gate-compiles-every-feature-a-release-ships.md) +
-  [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md) Phase 1**, which adds a
-  `spout` job to the gate. The probe below goes red on the commit that discharges it.
-- **Verified 2026-09-10** — the per-push gate does not mention the feature:
-  `absent: spout in: .github/workflows/ci.yml`
-- **Verified 2026-09-10** — and neither does the pre-push hook:
-  `absent: spout in: .githooks/pre-push`
-- **Verified 2026-09-10** — while the release build turns it on:
-  `present: cargo build --release -p standalone --features spout in: .github/workflows/release.yml`
+| | |
+|---|---|
+| tags on `origin` | **132** |
+| published releases | **27** |
+| tags in the `v0.93.0` → `v0.113.0` window | **24** |
+| of those, published | **3** (`v0.100.0`, `v0.100.1`, `v0.103.0`) |
+| of the 21 that did not, produced a Release run at all | **2** — `v0.108.0` and `v0.112.0`, both red |
+| produced **no run whatsoever** | **19** |
 
-### The finding
+So the release path fails nineteen times silently for every twice it fails loudly, and Plan 0165
+addressed only the loud half plus one instance of the silent one.
 
-The class is *any* `#[cfg]`-gated code no job compiles, and `spout` is the only such feature today —
-which is what makes this cheap to close and easy to lose. The failure mode is the part worth
-remembering: because the publishing job is gated on `needs:`, a broken release does not appear as a
-red release. It appears as **nothing** — no release, no asset, no announcement. Between 2026-09-09
-and the day this was written, the newest published release was `v0.103.0` while three later versions
-had been tagged, and nobody noticed, because absence is not a signal anyone watches.
+**The cause 0165 named cannot carry the nineteen.** Phase 3 attributes `v0.113.0`'s missing run to
+GitHub suppressing workflow events for tags pushed in bulk — 131 tags force-pushed by the
+2026-09-10 history rewrite. That explains `v0.113.0` and nothing before it: the other eighteen were
+tagged and pushed across three weeks of ordinary closes, long before the rewrite. Something else is
+producing most of them, and it is not identified.
 
-### Priority
+Two candidates worth separating before anyone builds a fix, because they need different repairs:
+the close ceremony batching several accumulated tags into one push (the same >3-refs suppression,
+arriving by a different route), or `git push --follow-tags` not emitting a per-tag event under some
+condition nobody has reduced. Neither is established.
 
-**Medium.** Nothing a user runs is wrong, and the defect that proved the hole is already fixed. What
-is unfixed is the blindness: the next item that moves out from under that `#[cfg]` fails exactly the
-same way, at exactly the same moment — the push that was meant to ship.
-
-## 0194 — `release.yml` promises a dry run it cannot provide, because the publish gate reads the ref and not the event
-
-The `release` job's condition is `if: startsWith(github.ref, 'refs/tags/v')`, and the file contains
-no reference to `github.event_name` at all. A `workflow_dispatch` launched against a **tag** ref
-therefore satisfies that condition and publishes — while the workflow's own header comment says
-`workflow_dispatch` "builds the same artifacts without publishing anything, for dry runs", and
-`docs/releasing.md` told a reader the Actions-tab rehearsal "creates no release".
-
-Two documents described a safety property the code does not have, and the safe reading is the one a
-releaser would reach for under pressure: rehearse the exact thing you are about to ship, which means
-dispatching on the tag, which is the one ref that publishes.
-
-- **Raised:** 2026-09-10, when a no-publish rehearsal of the release path was wanted and the
-  intended command would have published instead. The rehearsal was launched on `main` (run
-  `34450413424`) and the `release` job was correctly skipped there. **Owner if taken:** `dev` for
-  the condition; the doc half is architect's and was corrected when this entry was filed.
-- **PROMOTED 2026-09-10 → [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md)
-  Phase 2**, which narrows the condition to `github.event_name == 'push'` as well as the ref, so the
-  existing comment becomes true rather than merely rewritten.
-- **Verified 2026-09-10** — the publish gate reads only the ref:
-  `present: startsWith\(github\.ref, 'refs/tags/v'\) in: .github/workflows/release.yml`
-- **Verified 2026-09-10** — and the event is nowhere in the file:
-  `absent: github\.event_name in: .github/workflows/release.yml`
-- **Verified 2026-09-10** — while the header promises the opposite:
-  `present: artifacts without publishing anything in: .github/workflows/release.yml`
+- **Raised:** 2026-09-10, at [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md)'s
+  Mode 4 review, from counting what the plan's own Phase 3 premise implied.
+  **Owner if taken:** `architect` for the diagnosis, then `dev` if the answer is mechanical.
+- **Verified 2026-09-10** — nothing in the repository reconciles tags against releases after the
+  fact, on a schedule or otherwise, so a tag that fires no run is detected by a human noticing an
+  absence: `absent: schedule: in: .github/workflows`
+- **Verified 2026-09-10** — and the publish path is the tag push alone, with no second route that
+  could catch a missed one now that Plan 0165 Phase 2 closed the dispatch path
+  ([ADR-0181](adrs/0181-the-gate-compiles-every-feature-a-release-ships.md) Outcome):
+  `present: github\.event_name == 'push' in: .github/workflows/release.yml`
+- **Verified 2026-09-10** — the counts above are GitHub-side state, not repository state:
+  `unprobeable: the tag-to-release ratio lives on origin and in the Actions history, which the probe grammar deliberately cannot reach - it greps tracked files and never shells out (ADR-0108 Notes). Re-derive with the three commands named at the head of this entry.`
 
 ### The finding
 
-A comment that overstates a guarantee is worse than no comment, because it is load-bearing in
-exactly the moment it is wrong. This one sits at the top of the file that publishes, and the
-repository has no mechanism that could have caught it: `scripts/check-comment-hygiene.mjs` reads
-`.rs`, `.cpp` and `.h`, so a workflow comment is outside every gate, and nothing at all
-cross-checks prose in `docs/` against a YAML condition. Finding it took reading the condition and
-the comment side by side with a specific question in mind.
+The failure announces itself as **nothing** — no red run, no release, no notification — which is
+the same property [backlog 0193](design-backlog-archive.md) identified one level down and for the
+same reason: the `release` job
+is gated on `needs:`, so a broken release is a *skipped* job. Here it is worse, because there is no
+run to skip. Absence is not a signal anyone watches, and 105 of 132 tags have gone unpublished
+without anyone reading it as a fault.
+
+Plan 0165 Phase 3 is, in effect, the experiment: it deletes and re-pushes `v0.113.0` alone. If a
+run appears, the bulk-push inference holds for that one tag and this entry still owns the other
+eighteen. If no run appears, the inference is wrong outright and this entry is the whole finding.
+**Read Phase 3's outcome before designing anything here.**
 
 ### Priority
 
-**Medium.** The hazard needs a human to act on a false promise before it costs anything, and the
-blast radius is a premature public prerelease rather than a broken build — recoverable, but
-outward-facing and not quietly so.
-
-## 0195 — `check-index-rows.mjs` is the one gate that never adopted the tracked-set enumeration, so a lane opened inside the repository blocks every push
-
-`check-doc-links.mjs`, `check-index-rows.mjs`, `check-comment-hygiene.mjs` and `toc.mjs` each walk
-the tree with the same exclusion — `SKIP_DIRS = new Set(["target", "node_modules", ".git"])` — and
-a lane opened **inside** the repository is none of those three. On 2026-09-10 a worktree for the
-Plan 0161 lane sat at `.claude/worktrees/plan-0161-structural-hold/`, a full second checkout,
-ignored by git via `.git/info/exclude` and invisible to `git status`. Every one of those four walks
-descended into it.
-
-Two consequences were claimed when this was filed. ~~The second is the dangerous one.~~ **Only the
-first is real** — see the correction bullet below.
-
-**The gate convicts on a fixture that is supposed to be convicted.** `check-index-rows.mjs` skips
-its own seeded trees by **absolute path**, anchored at the real repo root:
-`resolve(REPO_ROOT, "scripts", "fixtures", "index-rows-red")`. The nested checkout's copy of that
-fixture resolves to a different absolute path, so the skip misses it, the walk reads the
-deliberately over-cap row it contains, and the gate exits 1 — reporting
-`.claude/worktrees/…/scripts/fixtures/index-rows-red/roster.md:47`. Nothing in the main checkout is
-wrong. The gate runs at pre-push, so **every push from the main checkout fails while such a lane
-exists**, and CI stays green because a fresh checkout has no nested copy. That inverts the usual
-relationship: the local gate is red and the un-bypassable one is green.
-
-~~**`toc.mjs` does not only read.** It rewrites the contents block of any long document it finds, so
-a routine `node scripts/toc.mjs` in the main checkout can edit markdown **inside another lane's
-working tree**.~~ **False, corrected the same day.** `toc.mjs:119` enumerates from `git ls-files` and
-walks only when git cannot answer, so an untracked nested checkout is never in its list. The hazard
-exists only in that fallback, which announces itself. The 2026-09-10 run rewrote one file for the
-ordinary reason: it was the only one whose block had drifted.
-
-- **Raised:** 2026-09-10, when `check-index-rows.mjs` went red against a clean main checkout while
-  capturing two unrelated findings. **Owner if taken:** `dev`, on an architect call about which
-  exclusion is correct.
-- **CORRECTED 2026-09-10, hours after filing — two of this entry's claims were false, and they are
-  struck below rather than deleted.** The title said *four Node gates*; the body said `toc.mjs` can
-  write into a lane. Reading how those four enumerate their inputs shows `toc.mjs`,
-  `check-doc-links.mjs` and `check-comment-hygiene.mjs` all take their file list from
-  **`git ls-files`**, walking only when git cannot answer — so a nested lane, being untracked, is
-  already invisible to them, and `toc.mjs` cannot rewrite what it never lists.
-  `check-filter-figures.mjs` scans the working tree deliberately but leaves the exit code to the
-  tracked half, so it can report a nested hit and not convict on one. **`check-index-rows.mjs` is
-  the only gate that convicts**, because it is the only full-tree walker with no tracked-set filter.
-  The entry stands because the blocked push is real; what it blamed was four times too wide.
-- **PROMOTED 2026-09-10 → [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md)
-  Phase 0** and [ADR-0182](adrs/0182-a-plan-lane-may-live-inside-the-repository.md), which accept the
-  inside-the-repo lane as a supported shape and make the enumeration rule explicit:
-  **`check-index-rows.mjs` adopts `git ls-files`**, like the three gates that already do. The
-  `.git`-probe shape and the `.claude`-in-`SKIP_DIRS` shape are both recorded as rejected there — the
-  first solves a problem four of the five walkers do not have, the second silences
-  `check-doc-links.mjs` over `.claude/skills/**`, where it found five broken links on its first run.
-- **Verified 2026-09-10** — the exclusion set has no notion of a nested checkout:
-  `present: SKIP_DIRS = new Set\(\["target", "node_modules", "\.git"\]\) in: scripts/check-index-rows.mjs`
-- **Verified 2026-09-10** — and the fixture skip is anchored to one absolute root, which a second
-  checkout cannot match:
-  `present: resolve\(REPO_ROOT, "scripts", "fixtures", "index-rows-red"\) in: scripts/check-index-rows.mjs`
-- **Verified 2026-09-10** — the renderer that writes shares the same blindness:
-  `present: SKIP_DIRS = new Set\(\["target", "node_modules", "\.git"\]\) in: scripts/toc.mjs`
-- **Verified 2026-09-10** — and nothing in it knows what a worktree is:
-  `absent: worktree in: scripts/toc.mjs`
-
-### The finding
-
-[ADR-0053](adrs/0053-plan-lanes-run-in-git-worktrees.md) put plan lanes at `WORK/rlx-plan-NNNN` —
-**siblings of the repository, outside it** — and every gate was written against that shape, where a
-tree walk from the repo root cannot reach another lane by construction. A worktree created *under*
-the repository breaks that assumption silently, and the two lanes live on 2026-09-10 were split
-across both shapes: `WORK/rlx-plan-0159` and `WORK/rlx-plan-0161` outside, and
-`.claude/worktrees/plan-0161-structural-hold` inside.
-
-The repair is one script adopting a convention three of its siblings already follow, and ADR-0182
-records why the three wider shapes lost. What makes this entry worth keeping after its correction is
-the shape of the mistake: the four scripts **share the `SKIP_DIRS` constant by copy**, which reads
-like shared behaviour and is not — three of them never reach that constant unless git is
-unavailable. A copied constant invited the inference that a copied consequence followed.
-
-### Priority
-
-**High**, for the blocked push alone — immediate, affecting every session in the main checkout while
-a nested lane exists. ~~Medium for the write hazard~~, which does not exist.
+**Medium.** Nothing a user runs is wrong and no artifact is incorrect — what is broken is delivery,
+and the project has been shipping from a release page that stopped at `v0.103.0` while the version
+reached `v0.113.0`. It becomes **High** the moment anyone outside the project is asked to download
+a build.
