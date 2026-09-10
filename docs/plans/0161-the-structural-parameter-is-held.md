@@ -246,8 +246,8 @@ struct ParamHold {
 | 1 — the `[hold]` table | dev | done | dc9e970 |
 | 2 — `ParamKind` and quantization | dev | done | 4eeeba8 |
 | 3 — the audit | dev | done | 7c70cba |
-| 4 — the reference prints the two surfaces | dev | done | committed with this row |
-| 5 — `--report` learns about holds | dev | not started | |
+| 4 — the reference prints the two surfaces | dev | done | de9fb94 |
+| 5 — `--report` learns about holds | dev | done | committed with this row |
 | 6 — the documentation sweep | dev | not started | |
 
 ### Notes
@@ -374,6 +374,28 @@ lines; nothing in it was hand-edited.
   name the family each structural parameter reads on. No structural parameter in the engine is
   family-specific today: `attractor`'s only one is `tuple`, which every family answers. The
   families that make the clause bite arrive with Plans 0162 through 0164.
+
+**Phase 5 — `--report` learns that a binding can be held.**
+
+- **The phase's premise needed narrowing before it could be built.** It says `--report`'s
+  reactivity reading *"credits a binding for naming an audio variable"*. It does not: all four
+  reactivity columns, `drive`, `anim` and `rate` are **rendered** measurements — the report drives
+  one band at a time and differences the frames — so a hold is already inside every number. What
+  credits a binding for naming an audio variable is the **reader**, scanning the table. So the
+  block names the held bindings and corrects no figure, which is also what makes the second
+  done-when true by construction: an unheld preset's numbers cannot have moved, because no number
+  changed for anyone.
+- **The block is silent for a family that holds nothing** — the whole shipped library. A line per
+  family saying nothing happened is the noise the ceilings block already had to be summarized to
+  avoid.
+- **A period prints its own number** (`2.5 s`) rather than `HoldEdge::as_str`'s `seconds`, which
+  names the kind and would leave two different holds reading alike.
+- **`probe_reachability` now returns a `Structural { gates, holds }`** rather than a bare
+  `Vec<GateReport>`. Both come out of one walk over one binding set, and a second list threaded
+  alongside keyed by preset name is a list that can lose step with the first.
+- **`docs/capturing.md` is the `--report` reference and now describes a block and a JSON key it did
+  not carry.** Updated in Phase 6, which is the documentation sweep; Phase 6's file list names only
+  `docs/presets.md` and `presets/README.md`.
 
 ### Close triggers
 
