@@ -72,6 +72,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0193 — the `spout` feature is compiled for the first time by the job that publishes it, and that has already cost a release](#0193--the-spout-feature-is-compiled-for-the-first-time-by-the-job-that-publishes-it-and-that-has-already-cost-a-release)
 - [0194 — `release.yml` promises a dry run it cannot provide, because the publish gate reads the ref and not the event](#0194--releaseyml-promises-a-dry-run-it-cannot-provide-because-the-publish-gate-reads-the-ref-and-not-the-event)
 - [0195 — `check-index-rows.mjs` is the one gate that never adopted the tracked-set enumeration, so a lane opened inside the repository blocks every push](#0195--check-index-rowsmjs-is-the-one-gate-that-never-adopted-the-tracked-set-enumeration-so-a-lane-opened-inside-the-repository-blocks-every-push)
+- [0196 — most `v*` tags produce no Release run at all, and the cause Plan 0165 named cannot explain nineteen of them](#0196--most-v-tags-produce-no-release-run-at-all-and-the-cause-plan-0165-named-cannot-explain-nineteen-of-them)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -3836,3 +3837,70 @@ unavailable. A copied constant invited the inference that a copied consequence f
 
 **High**, for the blocked push alone — immediate, affecting every session in the main checkout while
 a nested lane exists. ~~Medium for the write hazard~~, which does not exist.
+
+## 0196 — most `v*` tags produce no Release run at all, and the cause Plan 0165 named cannot explain nineteen of them
+
+[Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md) fixed two real holes in
+the release path and deliberately declined to audit a third it had spotted — *"whether that whole
+gap shares Phase 3's cause is a separate question this plan deliberately does not open."* This entry
+opens it, because the review that closed 0165 measured the gap and found it is the **dominant**
+failure mode rather than a tail.
+
+Counted on 2026-09-10 from `git ls-remote --tags origin`, `gh run list --workflow=release.yml` and
+`gh release list`:
+
+| | |
+|---|---|
+| tags on `origin` | **132** |
+| published releases | **27** |
+| tags in the `v0.93.0` → `v0.113.0` window | **24** |
+| of those, published | **3** (`v0.100.0`, `v0.100.1`, `v0.103.0`) |
+| of the 21 that did not, produced a Release run at all | **2** — `v0.108.0` and `v0.112.0`, both red |
+| produced **no run whatsoever** | **19** |
+
+So the release path fails nineteen times silently for every twice it fails loudly, and Plan 0165
+addressed only the loud half plus one instance of the silent one.
+
+**The cause 0165 named cannot carry the nineteen.** Phase 3 attributes `v0.113.0`'s missing run to
+GitHub suppressing workflow events for tags pushed in bulk — 131 tags force-pushed by the
+2026-09-10 history rewrite. That explains `v0.113.0` and nothing before it: the other eighteen were
+tagged and pushed across three weeks of ordinary closes, long before the rewrite. Something else is
+producing most of them, and it is not identified.
+
+Two candidates worth separating before anyone builds a fix, because they need different repairs:
+the close ceremony batching several accumulated tags into one push (the same >3-refs suppression,
+arriving by a different route), or `git push --follow-tags` not emitting a per-tag event under some
+condition nobody has reduced. Neither is established.
+
+- **Raised:** 2026-09-10, at [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md)'s
+  Mode 4 review, from counting what the plan's own Phase 3 premise implied.
+  **Owner if taken:** `architect` for the diagnosis, then `dev` if the answer is mechanical.
+- **Verified 2026-09-10** — nothing in the repository reconciles tags against releases after the
+  fact, on a schedule or otherwise, so a tag that fires no run is detected by a human noticing an
+  absence: `absent: schedule: in: .github/workflows`
+- **Verified 2026-09-10** — and the publish path is the tag push alone, with no second route that
+  could catch a missed one now that Plan 0165 Phase 2 closed the dispatch path
+  ([ADR-0181](adrs/0181-the-gate-compiles-every-feature-a-release-ships.md) Outcome):
+  `present: github\.event_name == 'push' in: .github/workflows/release.yml`
+- **Verified 2026-09-10** — the counts above are GitHub-side state, not repository state:
+  `unprobeable: the tag-to-release ratio lives on origin and in the Actions history, which the probe grammar deliberately cannot reach - it greps tracked files and never shells out (ADR-0108 Notes). Re-derive with the three commands named at the head of this entry.`
+
+### The finding
+
+The failure announces itself as **nothing** — no red run, no release, no notification — which is
+the same property backlog 0193 identified one level down and for the same reason: the `release` job
+is gated on `needs:`, so a broken release is a *skipped* job. Here it is worse, because there is no
+run to skip. Absence is not a signal anyone watches, and 105 of 132 tags have gone unpublished
+without anyone reading it as a fault.
+
+Plan 0165 Phase 3 is, in effect, the experiment: it deletes and re-pushes `v0.113.0` alone. If a
+run appears, the bulk-push inference holds for that one tag and this entry still owns the other
+eighteen. If no run appears, the inference is wrong outright and this entry is the whole finding.
+**Read Phase 3's outcome before designing anything here.**
+
+### Priority
+
+**Medium.** Nothing a user runs is wrong and no artifact is incorrect — what is broken is delivery,
+and the project has been shipping from a release page that stopped at `v0.103.0` while the version
+reached `v0.113.0`. It becomes **High** the moment anyone outside the project is asked to download
+a build.
