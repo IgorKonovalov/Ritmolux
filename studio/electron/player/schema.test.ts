@@ -52,12 +52,22 @@ describe('parsing a document', () => {
     expect(() => parseSchemaDocument('loaded 41 preset(s) from ...')).toThrow(/not JSON/)
   })
 
-  it('refuses a roster whose parameter has no range, rather than defaulting one', () => {
+  it('reads a null range, which is what an unbounded parameter carries', () => {
+    // Thirty-one of the engine's parameters declare no bounds — the pan
+    // offsets and their siblings. Refusing the document over one would leave
+    // the panel empty for every system that has one.
+    const unbounded = JSON.parse(MINIMAL) as Record<string, unknown>
+    const systems = unbounded.systems as { params: Record<string, unknown>[] }[]
+    systems[0].params[0].range = null
+    expect(parseSchemaDocument(JSON.stringify(unbounded)).systems[0].params[0].range).toBeNull()
+  })
+
+  it('refuses a roster whose parameter has no range key at all', () => {
     const broken = JSON.parse(MINIMAL) as Record<string, unknown>
     const systems = broken.systems as { params: Record<string, unknown>[] }[]
     delete systems[0].params[0].range
-    // A slider needs ends. Inventing them would put a control on screen whose
-    // travel has nothing to do with what the engine accepts.
+    // Absent is not the same as declared-unbounded, and a document missing the
+    // key is one this studio was not written against.
     expect(() => parseSchemaDocument(JSON.stringify(broken))).toThrow(SchemaError)
   })
 })

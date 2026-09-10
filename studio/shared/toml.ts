@@ -91,11 +91,19 @@ interface Entry {
   trailer: string
 }
 
+/**
+ * The keys of one table, and where that table's block begins and ends.
+ *
+ * `wanted` is `''` for the **root** — the keys before the first header, which
+ * is where `name` and `system` live. The schema calls that table `preset`; in
+ * the file it has no header line at all, which is why `start` stays `-1` for it
+ * and the caller inserts relative to the last root key instead.
+ */
 function scan(
   lines: string[],
   wanted: string,
 ): { entries: Entry[]; paramsStart: number; paramsEnd: number } {
-  let table: string | undefined
+  let table = ''
   let paramsStart = -1
   let paramsEnd = -1
   const entries: Entry[] = []
@@ -120,7 +128,7 @@ function scan(
       trailer,
     })
   }
-  if (paramsStart !== -1 && paramsEnd === -1) paramsEnd = lines.length
+  if (paramsEnd === -1 && (paramsStart !== -1 || wanted === '')) paramsEnd = lines.length
   return { entries, paramsStart, paramsEnd }
 }
 
@@ -166,6 +174,66 @@ export function formatValue(value: number): string {
 /** What the dominant line ending of this file is, so an inserted line matches. */
 function lineEnding(lines: string[]): string {
   return lines.some((line) => line.endsWith('\r')) ? '\r' : ''
+}
+
+/** One key of one table, as it stands in the file. */
+export interface Key {
+  name: string
+  /** The literal as written, quotes included. */
+  literal: string
+  line: number
+}
+
+/** Every key `table` declares, in file order. */
+export function readKeys(text: string, table: string): Key[] {
+  return scan(text.split('\n'), table).entries.map((entry) => ({
+    name: entry.name,
+    literal: entry.value,
+    line: entry.line,
+  }))
+}
+
+/**
+ * `text` with `table`'s `key` set to `literal`, and nothing else changed.
+ *
+ * `literal` is written **as given**, so the caller decides quoting: a float is
+ * `1.5`, an enum is `"ember"`, a boolean is `true`. That is the whole of the
+ * type knowledge, and it lives with the schema kind that produced it rather
+ * than being guessed from the value's JavaScript type here.
+ *
+ * Three cases in order, the same three a parameter takes: the key has a line
+ * and its value cell is replaced with the indent, the `=` column and any
+ * trailing comment kept; the table exists without the key, so a line is
+ * appended to it; or the table does not exist and is appended to the file.
+ */
+export function setKey(text: string, table: string, key: string, literal: string): string {
+  const lines = text.split('\n')
+  const { entries, paramsStart, paramsEnd } = scan(lines, table)
+  const eol = lineEnding(lines)
+
+  const existing = entries.find((entry) => entry.name === key)
+  if (existing !== undefined) {
+    lines[existing.line] = `${existing.indent}${key}${existing.equals}${literal}${existing.trailer}`
+    return lines.join('\n')
+  }
+
+  const fresh = `${key} = ${literal}${eol}`
+  if (table === '') {
+    // The root has no header to insert after: a new key joins the last one
+    // there, or opens the file when there is none.
+    const at = entries.length > 0 ? entries[entries.length - 1].line + 1 : 0
+    lines.splice(at, 0, fresh)
+    return lines.join('\n')
+  }
+  if (paramsStart === -1) {
+    const tail = lines.length > 0 && lines[lines.length - 1] === '' ? lines.length - 1 : lines.length
+    lines.splice(tail, 0, `${eol}`, `[${table}]${eol}`, fresh)
+    return lines.join('\n')
+  }
+  const inTable = entries.filter((entry) => entry.line > paramsStart && entry.line < paramsEnd)
+  const at = inTable.length > 0 ? inTable[inTable.length - 1].line + 1 : paramsStart + 1
+  lines.splice(at, 0, fresh)
+  return lines.join('\n')
 }
 
 /**

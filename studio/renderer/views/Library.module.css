@@ -1,0 +1,99 @@
+.library {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 0;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  max-height: 22rem;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.entry,
+.entryOn {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--text);
+  cursor: pointer;
+  display: block;
+  font-family: inherit;
+  font-size: 0.8rem;
+  padding: 0.25rem 0.4rem;
+  text-align: left;
+  width: 100%;
+}
+
+.entry:hover {
+  background: var(--panel);
+}
+
+.entryOn {
+  background: var(--panel);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.empty,
+.note {
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  line-height: 1.4;
+  padding: 0.25rem 0.4rem;
+}
+
+.new {
+  border: 1px solid var(--panel-edge);
+  border-radius: 4px;
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.5rem 0.75rem 0.7rem;
+}
+
+.heading {
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  margin: 0 0 0.2rem;
+  text-transform: uppercase;
+}
+
+.name,
+.system {
+  background: var(--bg);
+  border: 1px solid var(--panel-edge);
+  border-radius: 3px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.78rem;
+  padding: 0.2rem 0.3rem;
+  width: 100%;
+}
+
+.create {
+  background: none;
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  color: var(--accent);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.75rem;
+  overflow: hidden;
+  padding: 0.25rem 0.5rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.create:disabled {
+  border-color: var(--panel-edge);
+  color: var(--text-dim);
+  cursor: default;
+}

@@ -19,8 +19,16 @@ export const SCHEMA_VERSION = 1
 export const paramSpecSchema = z.object({
   name: z.string().min(1),
   default: z.number(),
-  /** `[lo, hi]` — the slider's ends, and what the engine clamps to. */
-  range: z.tuple([z.number(), z.number()]),
+  /**
+   * `[lo, hi]` — the slider's ends, and what the engine clamps to — or `null`
+   * for a parameter the engine declares no bounds for.
+   *
+   * `null` is common rather than exotic: the pan offsets and their siblings
+   * are unbounded by design. A control with invented ends would be a lie about
+   * what the engine accepts, so an unbounded parameter gets a field and not a
+   * slider.
+   */
+  range: z.tuple([z.number(), z.number()]).nullable(),
   doc: z.string(),
 })
 export type ParamSpec = z.infer<typeof paramSpecSchema>
@@ -40,8 +48,17 @@ export const tableKeySchema = z.object({
   kind: z.string().min(1),
   /** Present for `enum`: the values the key accepts, and no others. */
   values: z.array(z.string()).optional(),
-  /** Present for `list`: what one element is. */
-  of: z.string().optional(),
+  /**
+   * Present for `list` and `map`: what one element is, as a kind of its own
+   * and, when that kind is `table`, which table.
+   *
+   * An object rather than a string: an element can itself be a table, and
+   * `{ kind: "table", table: "stop" }` says which one. Read from the document
+   * the engine prints rather than assumed.
+   */
+  of: z
+    .object({ kind: z.string().min(1), table: z.string().optional() })
+    .optional(),
   /** Present for `table` and `map`: which table one value is. */
   table: z.string().optional(),
 })

@@ -47,3 +47,15 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+
+/* An unbounded parameter: a field, not a slider. */
+.field {
+  background: var(--bg);
+  border: 1px solid var(--panel-edge);
+  border-radius: 3px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  padding: 0.15rem 0.3rem;
+  width: 100%;
+}

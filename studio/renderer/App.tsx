@@ -85,6 +85,9 @@ export function App(): JSX.Element {
             file={player.preset?.file}
             reloads={player.reloads}
             problems={player.problems}
+            roster={player.roster}
+            active={player.preset?.name}
+            dir={player.dir}
             onProblem={setSaveProblem}
           />
         </div>

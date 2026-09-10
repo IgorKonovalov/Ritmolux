@@ -15,11 +15,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { rostersFor } from '@shared/schema'
-import { setPaletteName, setStop, type Stop } from '@shared/toml'
+import { presetPath, structuralTables } from '@shared/templates'
+import { readKeys, setKey, setPaletteName, setStop, type Stop } from '@shared/toml'
 
 import { PaletteEditor } from '../components/PaletteEditor'
 import { ParamPanel } from '../components/ParamPanel'
 import { PresetEditor } from '../components/PresetEditor'
+import { SystemPicker } from '../components/SystemPicker'
+import { TableEditor } from '../components/TableEditor'
+import { Library } from './Library'
+import { useRoster } from '../hooks/useRoster'
 import { useActivePreset } from '../hooks/useActivePreset'
 import { usePlayerActions } from '../hooks/usePlayer'
 import { useSchema } from '../hooks/useSchema'
@@ -34,10 +39,16 @@ export interface EditorProps {
   /** Rises on every reload, so the file is re-read after a save. */
   reloads: number
   problems: Problem[]
+  /** The preset names the player last reported, in roster order. */
+  roster: string[]
+  /** The name on screen, so the library can mark it. */
+  active: string | undefined
+  /** Where the watcher is looking, or `null` when nothing resolved. */
+  dir: string | null
   onProblem: (reason: string | undefined) => void
 }
 
-const TABS = ['parameters', 'palette', 'file'] as const
+const TABS = ['parameters', 'structure', 'palette', 'file', 'library'] as const
 type Tab = (typeof TABS)[number]
 
 export function Editor({
@@ -45,10 +56,14 @@ export function Editor({
   file,
   reloads,
   problems,
+  roster,
+  active,
+  dir,
   onProblem,
 }: EditorProps): JSX.Element {
   const schema = useSchema()
   const actions = usePlayerActions()
+  const library = useRoster(roster, active, actions.selectPreset)
   const { file: state, commit, write } = useActivePreset(file, reloads)
   const [tab, setTab] = useState<Tab>('parameters')
 
@@ -147,6 +162,50 @@ export function Editor({
           onDrag={onDrag}
           onCommit={onCommit}
         />
+      )}
+
+      {tab === 'structure' && schema.status === 'ready' && (
+        <div className={styles.pane}>
+          <SystemPicker
+            document={schema.document}
+            current={system}
+            writable={writable}
+            // The root, not a `[preset]` table: the schema calls the document's own
+            // keys `preset`, and in the file they sit before the first header.
+            onChange={(next) => edit((current) => setKey(current, '', 'system', `"${next}"`))}
+          />
+          {structuralTables(schema.document).map((table) => (
+            <TableEditor
+              key={table.name}
+              table={table}
+              keys={text === undefined ? [] : readKeys(text, table.name)}
+              writable={writable}
+              onSet={(name, key, literal) =>
+                edit((current) => setKey(current, name, key, literal))
+              }
+            />
+          ))}
+        </div>
+      )}
+
+      {tab === 'library' && (
+        <div className={styles.pane}>
+          <Library
+            document={schema.document}
+            roster={library.names}
+            active={library.pending ?? library.active}
+            dir={dir}
+            system={system}
+            onSelect={library.select}
+            onCreate={(fileName, document) => {
+              if (dir === null) return
+              void window.api.preset
+                .write(presetPath(dir, fileName), document)
+                .then((result) => onProblem(result.ok ? undefined : result.reason))
+            }}
+            onProblem={onProblem}
+          />
+        </div>
       )}
 
       {tab === 'palette' && (

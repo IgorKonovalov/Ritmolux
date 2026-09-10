@@ -76,39 +76,45 @@ export function ParamRow({
     )
   }
 
-  const [lo, hi] = spec.range
-  const step = (hi - lo) / STEPS
   const commit = (): void => {
     if (writable) onCommit(spec.name, value)
   }
+  const move = (next: number): void => {
+    if (!Number.isFinite(next)) return
+    setValue(next)
+    onDrag(spec.name, next)
+  }
+  const id = `param-${spec.name}`
+
+  // No declared bounds, so no slider: a range control needs two ends, and
+  // inventing them would offer travel the engine never promised. Thirty-one
+  // parameters are in this arm, the pan offsets among them.
+  const unbounded = spec.range === null
+  const [lo, hi] = spec.range ?? [0, 1]
 
   return (
     <div className={styles.row} title={spec.doc}>
-      <label className={styles.name} htmlFor={`param-${spec.name}`}>
+      <label className={styles.name} htmlFor={id}>
         {spec.name}
       </label>
       <input
-        id={`param-${spec.name}`}
-        className={styles.slider}
-        type="range"
-        min={lo}
-        max={hi}
-        step={step}
+        id={id}
+        className={unbounded ? styles.field : styles.slider}
+        type={unbounded ? 'number' : 'range'}
+        {...(unbounded ? { step: 'any' } : { min: lo, max: hi, step: (hi - lo) / STEPS })}
         value={value}
-        onChange={(event) => {
-          const next = event.currentTarget.valueAsNumber
-          setValue(next)
-          onDrag(spec.name, next)
-        }}
+        onChange={(event) => move(event.currentTarget.valueAsNumber)}
         // A gesture ends with a pointer release, a key release or the control
         // losing focus; each is one write and none of them fires per step.
         onPointerUp={commit}
         onKeyUp={commit}
         onBlur={commit}
       />
-      <output className={styles.value} htmlFor={`param-${spec.name}`}>
-        {value.toFixed(3)}
-      </output>
+      {!unbounded && (
+        <output className={styles.value} htmlFor={id}>
+          {value.toFixed(3)}
+        </output>
+      )}
       {binding === undefined && <span className={styles.note}>default</span>}
     </div>
   )
