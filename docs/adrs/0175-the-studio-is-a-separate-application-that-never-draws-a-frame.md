@@ -150,6 +150,25 @@ Rejected because a slider, a text field with a cursor, and a scrolling code edit
 widget toolkit's worth of work in that idiom, and the console already showed where the idiom's
 ceiling is.
 
+## Outcome (2026-09-10, Plan 0159 Phases 1 to 2)
+
+**The preview leg named in the Decision is inverted, on a ground this ADR's own Context states
+without following through.** The Decision reads *"the live preview is the player itself, run
+headless with its frame tap writing raw frames to the studio over a pipe, and later the windowed
+player with a preview copy of its output"*. The headless run is the wrong half of that pair to
+start from: the Context lists `standalone/src/preset_dir.rs` as one of the four mechanisms that
+make the studio "mostly a client", and that module is imported by `app_state.rs` alone — so the
+**headless path never resolves, seeds, watches or reloads the preset directory**. The editing
+loop the studio exists to close does not run there. That path also binds no control listener
+(`run.rs` returns before `resolve_control`) and emits two of the eight events.
+
+Nothing about *"the studio never draws a frame"* is affected — that half stands, and is what
+Phases 1 and 2 built against.
+[ADR-0181](0181-the-studio-drives-one-player-and-the-show-loop-is-extracted.md) changes which
+player produces the pixels: the studio drives **one windowed player** that is both the show and
+the preview source, and the show loop is extracted so the headless path stops being a silent
+subset of it.
+
 ## Notes
 
 The two facts this ADR rests on were read from the tree rather than remembered: the frame tap and

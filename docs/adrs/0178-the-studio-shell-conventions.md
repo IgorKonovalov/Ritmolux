@@ -95,11 +95,16 @@ picker, and the external-URL opener. Channel names are constants in
 ### The preview path
 
 Frames are read from the child's standard output in the main process, split at the byte
-length the `stream` event declared, and posted to the renderer over a `MessagePort` as
-transferable buffers, so the copy across processes is one move rather than a structured
-clone. The renderer paints with `putImageData` on a canvas sized to the stream, and upgrades
-to a WebGL texture upload only if a measurement says the 2D path cannot hold the default
-640x360 at 30 fps. **Backpressure is dropped frames, never a stalled read:** if the renderer
+length the `stream` event declared, and posted to the renderer over a `MessagePort` handed
+across once at start. **The frame is copied exactly once, and no transfer list is involved:**
+`MessagePortMain.postMessage(message, transfer)` accepts only `MessagePortMain` objects in
+`transfer`, and main and the renderer are separate OS processes, so the bytes are serialized by
+the boundary whatever is asked for. What the design buys is the absence of a *second* copy — the
+frame is cut once out of the pipe's chunks into a buffer that owns its memory, and the renderer
+views that buffer in place rather than re-copying it. The renderer paints with `putImageData` on
+a canvas sized to the stream, and upgrades to a WebGL texture upload only if a measurement says
+the 2D path cannot hold the stream's declared geometry at its declared rate.
+**Backpressure is dropped frames, never a stalled read:** if the renderer
 has not consumed the last frame, main drops the new one and counts it, and the count is shown.
 The main process never blocks on the child's pipe.
 
@@ -153,8 +158,11 @@ second editor is an ADR each.
 
 ### Negative
 
-- **Everything crosses IPC**, including thirty frames a second. The `MessagePort` path is the
-  mitigation and it is measured in Plan 0159, not assumed.
+- **Everything crosses IPC**, including every preview frame — at the show's own rate, since
+  [ADR-0181](0181-the-studio-drives-one-player-and-the-show-loop-is-extracted.md) makes the
+  preview a copy of the windowed player's output rather than a headless run at a rate of its own.
+  The `MessagePort` path and the single copy are the mitigation, and both are measured in
+  Plan 0159, not assumed.
 - **Dropped preview frames are a normal reading**, not a defect, and the studio must say so on
   screen or a user will chase them.
 - **A third release artifact** with the player inside it means the release job builds the
