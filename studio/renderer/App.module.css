@@ -75,3 +75,20 @@
     grid-template-rows: auto minmax(0, 1fr);
   }
 }
+
+/* The way into the whole list, sitting on the banner that shows its head. */
+.problems {
+  background: none;
+  border: 1px solid var(--panel-edge);
+  border-radius: 3px;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  padding: 2px 8px;
+}
+
+.problems:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}

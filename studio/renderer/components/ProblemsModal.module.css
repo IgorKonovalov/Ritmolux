@@ -1,0 +1,98 @@
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  background: rgb(0 0 0 / 55%);
+}
+
+.sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: min(48rem, 100%);
+  max-height: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--panel-edge);
+  border-radius: 4px;
+  background: var(--panel);
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.heading {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.close {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--panel-edge);
+  border-radius: 3px;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  padding: 3px 10px;
+}
+
+.close:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+}
+
+.item {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  gap: 0.15rem 0.6rem;
+  padding: 0.4rem 0;
+  border-top: 1px solid var(--panel-edge);
+  font-size: 11px;
+}
+
+.kind {
+  grid-row: span 2;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.item[data-kind='error'] .kind {
+  color: var(--error);
+}
+
+.item[data-kind='warning'] .kind {
+  color: var(--warn);
+}
+
+.file {
+  color: var(--text-dim);
+  font-family: var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.message {
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.empty {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 11px;
+}

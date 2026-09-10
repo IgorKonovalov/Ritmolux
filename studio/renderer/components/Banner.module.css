@@ -16,6 +16,12 @@
   border-color: var(--warn);
 }
 
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
 .title {
   font-size: 12px;
 }

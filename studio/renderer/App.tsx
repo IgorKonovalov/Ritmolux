@@ -13,6 +13,7 @@ import { Banner } from './components/Banner'
 import { Editor } from './views/Editor'
 import { Footer } from './components/Footer'
 import { Preview, type PreviewStats } from './components/Preview'
+import { ProblemsModal } from './components/ProblemsModal'
 import { Rotation } from './components/Rotation'
 import { Settings } from './views/Settings'
 import { useHeldRotation } from './hooks/useHeldRotation'
@@ -37,6 +38,7 @@ export function App(): JSX.Element {
   /** The last save's refusal, if it had one; cleared by the next save. */
   const [saveProblem, setSaveProblem] = useState<string>()
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [problemsOpen, setProblemsOpen] = useState(false)
 
   useEffect(() => {
     void window.api.app.getInfo().then(setInfo)
@@ -47,6 +49,9 @@ export function App(): JSX.Element {
   const unknownVersion = player.hello !== undefined && !isKnownPlayerVersion(player.hello.version)
   const missingPlayer = info !== undefined && info.playerPath === undefined
   const problem = player.problems[0]
+  // The count is the reducer's, not a number this view keeps: how many problems
+  // are held, and how many are dropped past the bound, is settled in one place.
+  const more = player.problems.length > 1
 
   return (
     <div className={styles.app}>
@@ -91,7 +96,21 @@ export function App(): JSX.Element {
                 : 'A preset loaded with a problem'
             }
             detail={`${problem.file}${problem.line !== null ? `:${problem.line}` : ''} — ${problem.message}`}
+            action={
+              more && (
+                <button
+                  type="button"
+                  className={styles.problems}
+                  onClick={() => setProblemsOpen(true)}
+                >
+                  {player.problems.length} problems
+                </button>
+              )
+            }
           />
+        )}
+        {problemsOpen && (
+          <ProblemsModal problems={player.problems} onClose={() => setProblemsOpen(false)} />
         )}
         {saveProblem !== undefined && (
           <Banner kind="error" title="The preset was not written" detail={saveProblem} />
