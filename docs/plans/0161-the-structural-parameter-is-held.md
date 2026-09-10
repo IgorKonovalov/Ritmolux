@@ -1,6 +1,6 @@
 # 0161 — The structural parameter is held
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-09
 > **Owner skill(s):** dev
 > **Related ADRs:** [0180](../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md)
@@ -239,11 +239,11 @@ struct ParamHold {
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `worktree-plan-0161-structural-hold` in `.claude/worktrees/plan-0161-structural-hold`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the `[hold]` table | dev | not started | |
+| 1 — the `[hold]` table | dev | done | committed with this row |
 | 2 — `ParamKind` and quantization | dev | not started | |
 | 3 — the audit | dev | not started | |
 | 4 — the reference prints the two surfaces | dev | not started | |
@@ -251,6 +251,31 @@ struct ParamHold {
 | 6 — the documentation sweep | dev | not started | |
 
 ### Notes
+
+**Phase 1 — deviations from the plan as written.**
+
+- **The edge lives on `Binding`, not in `ParamHold`.** The plan's illustrative `ParamHold` carries
+  an `edge` field; the shipped one carries only `held` and `last`, and `Binding.hold:
+  Option<HoldEdge>` sits beside `Binding.tau` — folded at load, in `[smoothing]`'s position and by
+  its reasoning. The state would otherwise hold a second copy of a fact about the preset.
+- **`ParamSmoother` and `ParamHold` are owned together as `BindingState`.** Four `Renderer` fields
+  (`param_smoother`, `layer_smoother`, `outgoing_smoother`, `outgoing_layer_smoother`) became four
+  `BindingState` fields rather than eight parallel ones, and `evaluate_preset` takes the bundle in
+  the one argument the smoother used to take — that function is already at the argument-count lint
+  (`VertexSurface`'s doc says so). This put the phase into three files the phase's list does not
+  name: `core/src/render/mod.rs`, `core/src/render/composite.rs`, `core/src/render/transition.rs`.
+- **ADR-0180 rule 2 and ADR-0020 disagree about an entry naming an unbound parameter.** Rule 2 says
+  *"a load error, in ADR-0020's posture"*; ADR-0020's posture for a name the preset does not consume
+  is a **warning** that keeps the preset. Shipped as a warning, in `[occupancy] exempt`'s exact
+  shape. Plan 0161 Phase 1 itself specifies only the edge vocabulary as a load error, which this
+  keeps.
+- **`[hold]` on a per-vertex binding is a load error, on a per-element binding likewise** — the
+  plan's Risks section asks for both, and the second is where `[smoothing]` warns instead.
+- **`[layer.hold]` landed with Phase 1**, covering the plan's second Followup, including
+  `[layer.hold] mix`. Tested in `core/tests/preset.rs`.
+- **One unrelated fix in a file this phase edits:** `Renderer::param_smoother`'s doc comment was
+  orphaned above `series_scratch` and documented neither field. It now sits on the field it
+  describes.
 
 ### Close triggers
 

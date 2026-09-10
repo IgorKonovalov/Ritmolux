@@ -200,8 +200,8 @@ pub(super) struct Outgoing<'a> {
     pub(super) blend: &'a mut Blend,
     pub(super) scenes: &'a mut SceneRoster,
     pub(super) side: &'a mut CompositeSide,
-    pub(super) smoother: &'a mut ParamSmoother,
-    pub(super) layer_smoother: &'a mut ParamSmoother,
+    pub(super) state: &'a mut BindingState,
+    pub(super) layer_state: &'a mut BindingState,
     pub(super) latches: &'a mut LatchBank,
 }
 
@@ -220,8 +220,8 @@ pub(super) fn encode_outgoing_side(
         blend,
         scenes,
         side,
-        smoother,
-        layer_smoother,
+        state,
+        layer_state,
         latches,
     } = out;
     // The outgoing preset and the routes resolved for it come from the same
@@ -253,8 +253,8 @@ pub(super) fn encode_outgoing_side(
             scene: out_scene,
             composite: side,
             terminal: None,
-            smoother,
-            layer_smoother,
+            state,
+            layer_state,
             latches,
         },
         shared,
@@ -298,8 +298,8 @@ pub(super) struct ActiveSide<'a> {
     pub(super) active: Active<'a>,
     pub(super) scene: &'a mut Box<dyn Scene>,
     pub(super) composite: &'a mut CompositeSide,
-    pub(super) smoother: &'a mut ParamSmoother,
-    pub(super) layer_smoother: &'a mut ParamSmoother,
+    pub(super) state: &'a mut BindingState,
+    pub(super) layer_state: &'a mut BindingState,
     pub(super) latches: &'a mut LatchBank,
 }
 
@@ -319,8 +319,8 @@ pub(super) fn encode_active_side(
         active,
         scene,
         composite: live_side,
-        smoother,
-        layer_smoother,
+        state,
+        layer_state,
         latches,
     } = side;
     let DisplayTail {
@@ -345,8 +345,8 @@ pub(super) fn encode_active_side(
                 tonemap: &mut *tonemap,
                 ink: &mut *ink,
             }),
-            smoother,
-            layer_smoother,
+            state,
+            layer_state,
             latches,
         },
         shared,

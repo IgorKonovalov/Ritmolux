@@ -6,7 +6,7 @@
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 
-use rlx_core::preset::{Preset, SystemKind, Variables, compile};
+use rlx_core::preset::{HoldEdge, Preset, SystemKind, Variables, compile};
 
 /// Global allocator that counts allocation calls **per thread**, so a test can
 /// assert that a region on the current thread performs no heap allocation,
@@ -1036,6 +1036,188 @@ fn smoothing_a_per_element_binding_warns_instead_of_doing_nothing() {
         rlx_core::preset::Easing::symmetric(0.3)
     );
     assert_eq!(tau_of("thickness"), rlx_core::preset::Easing::INSTANT);
+}
+
+// ---------------------------------------------------------------------------
+// The `[hold]` table (ADR-0180 rule 2)
+// ---------------------------------------------------------------------------
+
+/// Load a curve preset with the given extra tables. `n` and `d` are the two
+/// structural integers ADR-0180 quotes.
+fn held_curve(extra: &str) -> Result<Preset, rlx_core::preset::PresetError> {
+    Preset::from_toml_str(&format!(
+        "system = \"parametric_curve\"\nname = \"t\"\n\
+         [params]\nn = \"3 + floor(bass * 5)\"\nbrightness = \"0.5 + bass\"\n{extra}"
+    ))
+}
+
+fn edge_of(preset: &Preset, name: &str) -> Option<HoldEdge> {
+    preset
+        .params
+        .iter()
+        .find(|b| b.name == name)
+        .unwrap_or_else(|| panic!("{name} is bound"))
+        .hold
+}
+
+/// The whole vocabulary, in both the spellings an author reaches for: the two
+/// words, a bare number of seconds, and a quoted one -- which is the form
+/// ADR-0180 itself illustrates.
+#[test]
+fn a_hold_entry_parses_every_spelling_of_the_vocabulary() {
+    let cases: [(&str, HoldEdge); 5] = [
+        ("\"beat\"", HoldEdge::Beat),
+        ("\"bar\"", HoldEdge::Bar),
+        ("2.0", HoldEdge::Period(2.0)),
+        ("2", HoldEdge::Period(2.0)),
+        ("\"2.0\"", HoldEdge::Period(2.0)),
+    ];
+    for (written, expected) in cases {
+        let preset =
+            held_curve(&format!("[hold]\nn = {written}\n")).expect("a legal hold entry loads");
+        assert_eq!(
+            edge_of(&preset, "n"),
+            Some(expected),
+            "[hold] n = {written} did not parse as {expected:?}"
+        );
+        // The entry reaches exactly the binding it names and no other.
+        assert_eq!(edge_of(&preset, "brightness"), None);
+    }
+}
+
+/// A preset that declares no `[hold]` table leaves every binding unheld, which
+/// is the shape the whole shipped library loads in.
+#[test]
+fn a_preset_with_no_hold_table_holds_nothing() {
+    let preset = held_curve("").expect("valid preset");
+    assert!(
+        preset.params.iter().all(|b| b.hold.is_none()),
+        "a preset with no [hold] table must carry no edges"
+    );
+}
+
+/// Any word that is not an edge is a **load error**, not a silent fallback: a
+/// hold that quietly did nothing is the flicker the table exists to remove, and
+/// the message has to name what was written and what was expected.
+#[test]
+fn an_unknown_hold_edge_is_a_load_error() {
+    let err = held_curve("[hold]\nn = \"phrase\"\n").expect_err("unknown edge");
+    let text = err.to_string();
+    assert!(
+        text.contains("phrase") && text.contains("beat") && text.contains("bar"),
+        "the error names the word written and the two expected: {text}"
+    );
+    // A period must be positive and finite: zero re-samples every frame, which
+    // is what an unheld binding already does.
+    for bad in ["0", "-1.5"] {
+        let err = held_curve(&format!("[hold]\nn = {bad}\n")).expect_err("bad period");
+        assert!(
+            err.to_string().contains("positive"),
+            "a {bad} second period must be rejected as a period: {err}"
+        );
+    }
+}
+
+/// A `[hold]` entry naming a **per-element** binding is a load error where the
+/// `[smoothing]` one is a warning: an easing constant degrades to instant and
+/// still renders what the author wrote, and a hold has no degraded form.
+#[test]
+fn holding_a_per_element_binding_is_a_load_error() {
+    let err = Preset::from_toml_str(
+        "system = \"spectrum\"\n[spectrum]\nelements = 8\n\
+         [params]\nthickness = \"2 + bin(index) * 8\"\n[hold]\nthickness = \"beat\"\n",
+    )
+    .expect_err("a held per-element binding");
+    let text = err.to_string();
+    assert!(
+        text.contains("thickness") && text.contains("index"),
+        "the error names the binding and why: {text}"
+    );
+}
+
+/// A `[hold]` entry naming a `[per_vertex]` binding is rejected for the same
+/// reason, and names both tables so the author can see which one it meant.
+#[test]
+fn holding_a_per_vertex_binding_is_a_load_error() {
+    let err = Preset::from_toml_str(
+        "system = \"warp_mesh\"\n[per_vertex]\nwarp_x = \"x * 0.1\"\n\
+         [hold]\nwarp_x = \"bar\"\n",
+    )
+    .expect_err("a held per-vertex binding");
+    let text = err.to_string();
+    assert!(
+        text.contains("warp_x") && text.contains("[per_vertex]"),
+        "the error names the binding and the table it lives in: {text}"
+    );
+}
+
+/// An entry naming a parameter the preset does not bind holds nothing, so it is
+/// surfaced as a warning -- `[occupancy] exempt`'s posture, for its reason: the
+/// author believes a binding is held while it goes on flickering.
+#[test]
+fn a_hold_entry_naming_an_unbound_parameter_warns() {
+    let preset = held_curve("[hold]\nd = \"bar\"\n").expect("valid preset");
+    assert_eq!(preset.warnings.len(), 1, "only the inert entry warns");
+    let warning = preset.warnings.first().expect("the warning");
+    assert!(
+        warning.contains("[hold]") && warning.contains("'d'") && warning.contains("inert"),
+        "the warning names the table, the entry and that it does nothing: {warning}"
+    );
+}
+
+/// `[layer.hold]` reaches the layer's own bindings, and its `mix` -- the one
+/// layer binding that lives outside `params`. Layer bindings are indexed within
+/// the layer, so a layer's hold state cannot collide with the main preset's.
+#[test]
+fn a_layer_holds_its_own_bindings_and_its_mix() {
+    let preset = Preset::from_toml_str(
+        "system = \"swarm\"\n[params]\nforce = \"bass\"\n\
+         [layer]\nsystem = \"parametric_curve\"\njoin = \"over\"\n\
+         mix = \"0.5 + bass * 0.5\"\n\
+         [layer.params]\nn = \"3 + floor(bass * 5)\"\n\
+         [layer.hold]\nn = \"bar\"\nmix = \"beat\"\n",
+    )
+    .expect("valid preset");
+    let layer = preset.layer.as_ref().expect("the layer");
+    assert_eq!(
+        layer
+            .params
+            .iter()
+            .find(|b| b.name == "n")
+            .and_then(|b| b.hold),
+        Some(HoldEdge::Bar),
+        "[layer.hold] must reach the layer's own params"
+    );
+    assert_eq!(
+        layer.mix.as_ref().and_then(|b| b.hold),
+        Some(HoldEdge::Beat),
+        "[layer.hold] mix must reach the bindable mix"
+    );
+    assert!(
+        preset.params.iter().all(|b| b.hold.is_none()),
+        "a layer's hold table must not reach the top level"
+    );
+    assert!(
+        !preset.warnings.iter().any(|w| w.contains("[layer.hold]")),
+        "neither entry is inert: {:?}",
+        preset.warnings
+    );
+}
+
+/// A bad `[layer.hold]` entry names its own table, not the top-level one --
+/// otherwise an author with both tables cannot tell which one failed.
+#[test]
+fn a_layer_hold_error_names_the_layer_table() {
+    let err = Preset::from_toml_str(
+        "system = \"swarm\"\n[params]\nforce = \"bass\"\n\
+         [layer]\nsystem = \"parametric_curve\"\n\
+         [layer.params]\nn = \"6\"\n[layer.hold]\nn = \"phrase\"\n",
+    )
+    .expect_err("unknown edge in a layer");
+    assert!(
+        err.to_string().contains("[layer] n"),
+        "the error names the layer surface: {err}"
+    );
 }
 
 #[test]

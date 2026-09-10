@@ -7,15 +7,15 @@
 #![allow(clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
 
 use super::{
-    AdapterChoice, AnalysisMetrics, CaptureImage, HeadlessOptions, LatchBank, ParamOverrides,
-    ParamRoute, ParamSmoother, RenderError, Renderer, RendererOptions, Roster, SampleBudget, Tier,
-    element_prefix, evaluate_series, resolve_route,
+    AdapterChoice, AnalysisMetrics, BindingState, CaptureImage, HeadlessOptions, LatchBank,
+    ParamHold, ParamOverrides, ParamRoute, ParamSmoother, RenderError, Renderer, RendererOptions,
+    Roster, SampleBudget, Tier, element_prefix, evaluate_series, resolve_route,
 };
 // `Mode` is named from its own module now: `render/mod.rs` stopped importing it
 // when `dissolve_mode` moved next to the transition code (Plan 0061 Phase 3).
 use super::transition::Mode;
 use crate::dsp::AnalysisFrame;
-use crate::preset::{Easing, Latch, Preset, SystemKind, Variables, compile};
+use crate::preset::{Easing, HoldEdge, Latch, Preset, SystemKind, Variables, compile};
 use crate::render::metrics::frame_diff;
 use crate::render::post::{KALEIDOSCOPE, TRAILS};
 use crate::render::scenes::{declares, spec_names};
@@ -1074,6 +1074,229 @@ fn reset_snaps_to_the_next_value() {
         s.smooth(0, 5.0, tau, dt),
         5.0,
         "after a reset the next value seeds fresh — a snap, no stale bleed"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// `[hold]` -- the per-binding sample-and-hold (ADR-0180 rule 2)
+// ---------------------------------------------------------------------------
+
+/// An analysis frame carrying just the two counters a hold edge reads.
+fn beat_bar(beat: bool, bar_index: u32) -> AnalysisFrame {
+    AnalysisFrame {
+        beat,
+        bar_index,
+        ..AnalysisFrame::default()
+    }
+}
+
+/// The whole point of a `bar` hold, as arithmetic: a value that varies every
+/// frame is **constant inside a bar** and **differs across bars**.
+///
+/// The raw series stands in for `3 + floor(bass * 5)` on a bass that ramps,
+/// which is the binding ADR-0180 quotes as the one an author writes and the
+/// engine then flickers.
+#[test]
+fn a_bar_hold_is_constant_within_a_bar_and_moves_across_them() {
+    let mut hold = ParamHold::default();
+    // Twelve frames, four to a bar, with the raw value moving every frame.
+    let raw = |i: usize| 3.0 + (i as f32 * 5.0 / 12.0).floor();
+    let mut per_bar: Vec<Vec<f32>> = vec![Vec::new(); 3];
+    for i in 0..12 {
+        let bar = i / 4;
+        let frame = beat_bar(false, bar as u32);
+        let held = hold.hold(0, raw(i), Some(HoldEdge::Bar), &frame, i as f32 / 60.0);
+        per_bar[bar].push(held);
+    }
+    for (bar, values) in per_bar.iter().enumerate() {
+        let Some(&first) = values.first() else {
+            panic!("each bar produced frames");
+        };
+        assert!(
+            values.iter().all(|&v| v == first),
+            "bar {bar} showed {values:?}, so the hold released inside a bar"
+        );
+    }
+    let taken: Vec<f32> = per_bar
+        .iter()
+        .filter_map(|values| values.first().copied())
+        .collect();
+    assert_eq!(
+        taken,
+        vec![raw(0), raw(4), raw(8)],
+        "each bar must show the value of its OWN first frame"
+    );
+    assert!(
+        taken.iter().any(|&v| v != raw(0)),
+        "the three bars all showed {taken:?}, so nothing re-sampled across a bar"
+    );
+}
+
+/// The default path: a binding the preset's `[hold]` table does not name passes
+/// its raw value through untouched, frame after frame, and allocates no slot.
+///
+/// This is the claim that no shipped preset moved -- every binding in the whole
+/// library loads with no edge.
+#[test]
+fn an_unheld_binding_passes_every_frame_through_unchanged() {
+    let mut hold = ParamHold::default();
+    let frame = beat_bar(true, 7);
+    for i in 0..32 {
+        let raw = (i as f32) * 0.37 - 4.0;
+        assert_eq!(
+            hold.hold(3, raw, None, &frame, i as f32),
+            raw,
+            "an unheld binding must show exactly what it evaluated to"
+        );
+    }
+    assert_eq!(
+        hold.carried(3),
+        None,
+        "an unheld binding must not allocate a hold slot"
+    );
+}
+
+/// The first frame a held binding is seen takes its value whatever the edge
+/// says -- a preset must never open on a default it never asked for.
+///
+/// Checked on the two edges that could plausibly withhold it: `beat`, whose gate
+/// has not fired, and `bar`, on a silent stream where the counter never moves.
+#[test]
+fn a_held_binding_takes_its_value_on_the_first_frame() {
+    for edge in [HoldEdge::Beat, HoldEdge::Bar, HoldEdge::Period(10.0)] {
+        let mut hold = ParamHold::default();
+        let frame = beat_bar(false, 0);
+        assert_eq!(
+            hold.hold(0, 42.0, Some(edge), &frame, 0.0),
+            42.0,
+            "{edge:?} withheld the opening value"
+        );
+        assert_eq!(
+            hold.hold(0, 99.0, Some(edge), &frame, 1.0 / 60.0),
+            42.0,
+            "{edge:?} released on a frame with no edge"
+        );
+    }
+}
+
+/// `beat` re-samples on the frame the analysis frame's gate fires, and on no
+/// other. `Analyzer::take_frame` makes that gate exactly one render frame wide,
+/// which is what lets this read the flag rather than track an edge.
+#[test]
+fn a_beat_hold_re_samples_only_on_a_gate_frame() {
+    let mut hold = ParamHold::default();
+    let edge = Some(HoldEdge::Beat);
+    let quiet = beat_bar(false, 0);
+    let beat = beat_bar(true, 0);
+    assert_eq!(hold.hold(0, 1.0, edge, &quiet, 0.0), 1.0);
+    assert_eq!(hold.hold(0, 2.0, edge, &quiet, 0.1), 1.0);
+    assert_eq!(hold.hold(0, 3.0, edge, &beat, 0.2), 3.0);
+    assert_eq!(hold.hold(0, 4.0, edge, &quiet, 0.3), 3.0);
+    assert_eq!(hold.hold(0, 5.0, edge, &beat, 0.4), 5.0);
+}
+
+/// A period re-samples once the interval has elapsed and restarts from the frame
+/// it fired on, so a long frame delays the next edge rather than banking a burst
+/// of them.
+#[test]
+fn a_period_hold_re_samples_on_the_clock() {
+    let mut hold = ParamHold::default();
+    let edge = Some(HoldEdge::Period(0.5));
+    let frame = beat_bar(false, 0);
+    assert_eq!(hold.hold(0, 1.0, edge, &frame, 0.0), 1.0);
+    assert_eq!(hold.hold(0, 2.0, edge, &frame, 0.4), 1.0);
+    assert_eq!(
+        hold.hold(0, 3.0, edge, &frame, 0.5),
+        3.0,
+        "the interval elapsed and nothing re-sampled"
+    );
+    assert_eq!(hold.hold(0, 4.0, edge, &frame, 0.9), 3.0);
+    // A long gap fires once, not four times: the next edge is measured from
+    // 2.9, the frame this one fired on, not from 0.5.
+    assert_eq!(hold.hold(0, 5.0, edge, &frame, 2.9), 5.0);
+    assert_eq!(hold.hold(0, 6.0, edge, &frame, 3.2), 5.0);
+}
+
+/// `bar_index` steps **backward** across a downbeat re-alignment, and a change
+/// in either direction is a re-sample: the alternative strands a held binding on
+/// a stale value until the counter climbs back past where it was.
+#[test]
+fn a_bar_hold_re_samples_when_the_counter_moves_backward() {
+    let mut hold = ParamHold::default();
+    let edge = Some(HoldEdge::Bar);
+    assert_eq!(hold.hold(0, 1.0, edge, &beat_bar(false, 9), 0.0), 1.0);
+    assert_eq!(hold.hold(0, 2.0, edge, &beat_bar(false, 9), 0.1), 1.0);
+    assert_eq!(
+        hold.hold(0, 3.0, edge, &beat_bar(false, 8), 0.2),
+        3.0,
+        "an alignment change moved the counter back and nothing re-sampled"
+    );
+}
+
+/// Held state is keyed by binding index and carried across a rebind **by name**,
+/// exactly as the eased value is -- a hold that moved while its smoother stayed
+/// would hand a parameter its neighbour's held value.
+#[test]
+fn a_rebind_carries_a_held_value_by_name() {
+    let mut hold = ParamHold::default();
+    let frame = beat_bar(false, 0);
+    hold.hold(0, 10.0, Some(HoldEdge::Bar), &frame, 0.0);
+    hold.hold(1, 20.0, Some(HoldEdge::Bar), &frame, 0.0);
+    // `d` was at slot 0 and `n` at slot 1; a binding inserted above both moves
+    // each one slot along.
+    hold.remap(&["d", "n"], &["angle", "d", "n"]);
+    assert_eq!(hold.carried(1), Some(10.0), "`d` followed its name");
+    assert_eq!(hold.carried(2), Some(20.0), "`n` followed its name");
+    assert_eq!(
+        hold.carried(0),
+        None,
+        "a binding with no counterpart re-samples on its first frame"
+    );
+}
+
+/// A reset forgets every held value, so a preset switch cannot show the outgoing
+/// preset's held figure.
+#[test]
+fn a_reset_forgets_every_held_value() {
+    let mut hold = ParamHold::default();
+    let frame = beat_bar(false, 0);
+    hold.hold(0, 10.0, Some(HoldEdge::Bar), &frame, 0.0);
+    hold.reset();
+    assert_eq!(
+        hold.hold(0, 77.0, Some(HoldEdge::Bar), &frame, 0.1),
+        77.0,
+        "after a reset the next frame re-samples"
+    );
+}
+
+/// The order ADR-0180 rule 2 fixes: evaluate, hold, then smooth. The smoother
+/// eases toward the **held** value, so a parameter that is both held and eased
+/// travels to each new figure instead of stepping to it.
+#[test]
+fn smoothing_eases_toward_the_held_value_not_the_raw_one() {
+    let mut state = BindingState::default();
+    let dt = 1.0 / 60.0;
+    let tau = Easing::symmetric(0.2);
+    let edge = Some(HoldEdge::Bar);
+    let step = |state: &mut BindingState, raw: f32, bar: u32, t: f32| {
+        let held = state.hold.hold(0, raw, edge, &beat_bar(false, bar), t);
+        state.smoother.smooth(0, held, tau, dt)
+    };
+    // Bar 0 opens at 3 and the raw value climbs; the smoother has nowhere to
+    // travel, because the held value never moves.
+    assert_eq!(step(&mut state, 3.0, 0, 0.0), 3.0);
+    for i in 1..10 {
+        assert_eq!(
+            step(&mut state, 3.0 + i as f32, 0, i as f32 * dt),
+            3.0,
+            "the smoother chased the raw value instead of the held one"
+        );
+    }
+    // Bar 1 re-samples to 9 and the smoother now travels toward it.
+    let first = step(&mut state, 9.0, 1, 10.0 * dt);
+    assert!(
+        first > 3.0 && first < 9.0,
+        "the step to the newly held value must ease, got {first}"
     );
 }
 

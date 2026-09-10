@@ -933,8 +933,8 @@ impl Renderer {
             // before `configure_active_scene` resets the active one, so a
             // heavily-smoothed preset keeps easing through a dual-live dissolve
             // instead of snapping to raw values the frame it stops being active.
-            self.outgoing_smoother = std::mem::take(&mut self.param_smoother);
-            self.outgoing_layer_smoother = std::mem::take(&mut self.layer_smoother);
+            self.outgoing_state = std::mem::take(&mut self.param_state);
+            self.outgoing_layer_state = std::mem::take(&mut self.layer_state);
             self.outgoing_latches = std::mem::take(&mut self.latches);
             self.roster.select(index);
             self.configure_active_scene();

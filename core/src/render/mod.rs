@@ -78,7 +78,7 @@ use crate::audio::AudioFormat;
 use crate::diag::{AnalysisMetrics, Diag, Metrics};
 use crate::dsp::AnalysisFrame;
 use crate::preset::{
-    Easing, Expr, LATCH_CAP, Latch, Layer, LayerJoin, Preset, SystemKind, Variables,
+    Easing, Expr, HoldEdge, LATCH_CAP, Latch, Layer, LayerJoin, Preset, SystemKind, Variables,
 };
 #[cfg(feature = "text")]
 use aux_target::AuxTarget;
@@ -159,7 +159,7 @@ const DUAL_LIVE_BUDGET_MS: f32 = 18.0;
 
 // The five concerns this file keeps out of the `Renderer` (Plan 0126 Phase 2).
 // `routing` answers where a name goes and which scene a system has, `roster` the
-// loaded presets and their smoothers, `evaluate` one frame's bindings,
+// loaded presets and their per-binding frame state, `evaluate` one frame's bindings,
 // `composite` one side's encode, `tier_governor` the demotion path as an
 // `impl Renderer` continuation. What stays here is the `Renderer` itself.
 mod composite;
@@ -357,8 +357,6 @@ pub struct Renderer {
     /// (ADR-0007: the cap is never a silent cut). Refreshed whenever the active
     /// preset changes; the frontend surfaces it. `None` when geometry fit.
     cap_overflow: Option<CapOverflow>,
-    /// Per-parameter easing state (ADR-0019 / Phase 5), reset on every
-    /// active-preset change and capture rebuild.
     /// Scratch for per-element binding evaluation (Plan 0034 Phase 4). Sized
     /// **once, here at construction**, to the largest element count the loader
     /// admits — so the per-frame path slices it and never allocates. A frame uses
@@ -371,7 +369,11 @@ pub struct Renderer {
     /// it and never allocates. Every system but the warp mesh uses an empty
     /// prefix.
     vertex_scratch: Vec<f32>,
-    param_smoother: ParamSmoother,
+    /// The active preset's per-binding frame state: its easing envelopes
+    /// (ADR-0019) and its sample-and-holds (ADR-0180 rule 2). Reset on every
+    /// active-preset change and capture rebuild, and handed to
+    /// [`outgoing_state`](Self::outgoing_state) at a dissolve's roster flip.
+    param_state: BindingState,
     /// Live per-name parameter overrides on the active preset (ADR-0176) — what a
     /// control surface holds while a slider is being dragged, shadowing the
     /// preset's own binding until it is cleared.
@@ -381,25 +383,25 @@ pub struct Renderer {
     /// `set_presets`, so an override can never outlive the preset it named.
     overrides: ParamOverrides,
     /// The active preset's `[latch]` state (ADR-0137). Reset wherever
-    /// [`param_smoother`](Self::param_smoother) is, and handed to the outgoing
+    /// [`param_state`](Self::param_state) is, and handed to the outgoing
     /// bank at the same roster flip — a latch mid-hold keeps reading through a
     /// dual-live dissolve exactly as an eased param keeps easing.
     ///
     /// One bank per preset, not per surface: a latch is preset-level state and
     /// its `[layer]` bindings read the same event the main scene does, so unlike
-    /// [`layer_smoother`](Self::layer_smoother) there is no second one.
+    /// [`layer_state`](Self::layer_state) there is no second one.
     latches: LatchBank,
     /// The outgoing preset's `[latch]` state during a dual-live dissolve.
     outgoing_latches: LatchBank,
-    /// The active preset's **layer** easing state (Plan 0076 Phase 1) — its own
-    /// smoother because layer bindings are indexed within the layer's `params`,
-    /// which would collide with the main preset's indices in
-    /// [`param_smoother`](Self::param_smoother). Reset wherever that one is.
-    layer_smoother: ParamSmoother,
-    /// The outgoing preset's layer easing state during a dual-live dissolve —
-    /// the layer counterpart of [`outgoing_smoother`](Self::outgoing_smoother),
+    /// The active preset's **layer** frame state (Plan 0076 Phase 1) — its own,
+    /// because layer bindings are indexed within the layer's `params` and would
+    /// collide with the main preset's indices in
+    /// [`param_state`](Self::param_state). Reset wherever that one is.
+    layer_state: BindingState,
+    /// The outgoing preset's layer frame state during a dual-live dissolve —
+    /// the layer counterpart of [`outgoing_state`](Self::outgoing_state),
     /// handed over at the same roster flip.
-    outgoing_layer_smoother: ParamSmoother,
+    outgoing_layer_state: BindingState,
     /// The active quality tier's capacity values, resolved **once** here at
     /// construction (ADR-0045). Read at construction and reconfigure time only —
     /// never branched on per frame.
@@ -424,11 +426,13 @@ pub struct Renderer {
     /// from the platform here — a refresh rate is a shell concern, and `core`
     /// stays source- and platform-agnostic.
     frame_budget_secs: f32,
-    /// The **outgoing** preset's easing state during a dual-live dissolve. Moved
-    /// out of [`param_smoother`](Self::param_smoother) when the roster flips, so a
+    /// The **outgoing** preset's frame state during a dual-live dissolve. Moved
+    /// out of [`param_state`](Self::param_state) when the roster flips, so a
     /// heavily-smoothed preset keeps easing through the dissolve instead of
-    /// snapping to raw values the moment it stops being active.
-    outgoing_smoother: ParamSmoother,
+    /// snapping to raw values the moment it stops being active, and a held
+    /// binding keeps showing what it held rather than re-picking a figure on
+    /// the way out.
+    outgoing_state: BindingState,
 }
 
 impl Renderer {
@@ -482,17 +486,17 @@ impl Renderer {
             cap_overflow: None,
             series_scratch: vec![0.0; scenes::lines::spectrum::MAX_ELEMENTS],
             vertex_scratch: vec![0.0; scenes::warp_mesh::vertex_count(scenes::warp_mesh::MAX_MESH)],
-            param_smoother: ParamSmoother::default(),
+            param_state: BindingState::default(),
             overrides: ParamOverrides::default(),
             latches: LatchBank::default(),
             outgoing_latches: LatchBank::default(),
-            layer_smoother: ParamSmoother::default(),
-            outgoing_layer_smoother: ParamSmoother::default(),
+            layer_state: BindingState::default(),
+            outgoing_layer_state: BindingState::default(),
             tier,
             tier_pinned: opts.tier.is_some(),
             tier_demoted: false,
             frame_budget_secs: tier::budget_secs(tier::DEFAULT_DISPLAY_HZ),
-            outgoing_smoother: ParamSmoother::default(),
+            outgoing_state: BindingState::default(),
         };
         // Apply the initial preset's structural config (ADR-0007) so a line
         // scene at roster index 0 renders with its geometry built.
@@ -1175,11 +1179,11 @@ impl Renderer {
             preview: _,
             series_scratch,
             vertex_scratch,
-            param_smoother,
+            param_state,
             overrides,
-            layer_smoother,
-            outgoing_smoother,
-            outgoing_layer_smoother,
+            layer_state,
+            outgoing_state,
+            outgoing_layer_state,
             latches,
             outgoing_latches,
             // Resolved once at construction; the overlay names it (ADR-0045). The
@@ -1271,8 +1275,8 @@ impl Renderer {
                     blend,
                     scenes,
                     side,
-                    smoother: outgoing_smoother,
-                    layer_smoother: outgoing_layer_smoother,
+                    state: outgoing_state,
+                    layer_state: outgoing_layer_state,
                     latches: outgoing_latches,
                 },
                 &mut shared,
@@ -1309,8 +1313,8 @@ impl Renderer {
                 },
                 scene,
                 composite: live_side,
-                smoother: param_smoother,
-                layer_smoother,
+                state: param_state,
+                layer_state,
                 latches,
             },
             DisplayTail {

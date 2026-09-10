@@ -374,7 +374,7 @@ pub(super) fn evaluate_preset(
     scene: &mut Box<dyn Scene>,
     side: &mut CompositeSide,
     terminal: Option<Terminal<'_>>,
-    smoother: &mut ParamSmoother,
+    state: &mut BindingState,
     inputs: &FrameInputs<'_>,
     scratch: Scratch<'_>,
 ) {
@@ -435,13 +435,20 @@ pub(super) fn evaluate_preset(
             continue;
         }
         let raw = binding.expr.eval(vars);
-        // Ease the evaluated value on the injected real `dt` before applying it
-        // (ADR-0019). `tau` came off the preset's `[smoothing]` table at load;
-        // `0` (the default for an unlisted param) passes through instantly. The
-        // evaluation above is a pure function of `vars` and allocates nothing —
-        // including a latch, whose history was folded into `vars` before this
-        // loop opened (ADR-0137).
-        let value = smoother.smooth(index, raw, binding.tau, dt);
+        // Evaluate, hold, then ease — the order ADR-0180 rule 2 fixes. The
+        // hold decides WHICH frame's value stands (`None`, for a binding the
+        // preset's `[hold]` table does not name, is every frame and touches no
+        // state); the smoother then eases toward whatever stands, so a
+        // parameter that is both held and eased travels to each new value
+        // instead of stepping to it.
+        //
+        // `tau` and `hold` both came off the preset at load; `0` and `None`
+        // (the defaults for an unlisted param) pass through. The evaluation
+        // above is a pure function of `vars` and allocates nothing — including
+        // a latch, whose history was folded into `vars` before this loop opened
+        // (ADR-0137).
+        let held = state.hold.hold(index, raw, binding.hold, frame, time);
+        let value = state.smoother.smooth(index, held, binding.tau, dt);
         // Dispatch on the resolved destination — no map lookup, no walk over the
         // stages, no chained fallthrough. The owner was decided at load.
         apply_route(*route, &binding.name, value, scene, side, &mut terminal);
@@ -495,7 +502,7 @@ pub(super) fn evaluate_layer(
     layer: &Layer,
     scene: &mut Box<dyn Scene>,
     chain: &mut PostChain,
-    smoother: &mut ParamSmoother,
+    state: &mut BindingState,
     inputs: &FrameInputs<'_>,
     scratch: Scratch<'_>,
 ) {
@@ -516,7 +523,8 @@ pub(super) fn evaluate_layer(
             continue;
         }
         let raw = binding.expr.eval(vars);
-        let value = smoother.smooth(index, raw, binding.tau, dt);
+        let held = state.hold.hold(index, raw, binding.hold, frame, time);
+        let value = state.smoother.smooth(index, held, binding.tau, dt);
         scene.set_param(&binding.name, value);
     }
     if let Some(mut surface) = vertex {
@@ -527,7 +535,9 @@ pub(super) fn evaluate_layer(
     }
     if let Some(mix) = layer.mix.as_ref() {
         let raw = mix.expr.eval(vars);
-        let value = smoother.smooth(layer.params.len(), raw, mix.tau, dt);
+        let slot = layer.params.len();
+        let held = state.hold.hold(slot, raw, mix.hold, frame, time);
+        let value = state.smoother.smooth(slot, held, mix.tau, dt);
         chain.set_layer_mix(value);
     }
     scene.update(frame);
@@ -582,8 +592,8 @@ pub(super) struct Side<'a> {
     /// outgoing side's `exposure`/`ink_*` were held at the capture frame and are
     /// crossfaded by the single engine-wide pass of each (ADR-0080).
     pub(super) terminal: Option<Terminal<'a>>,
-    pub(super) smoother: &'a mut ParamSmoother,
-    pub(super) layer_smoother: &'a mut ParamSmoother,
+    pub(super) state: &'a mut BindingState,
+    pub(super) layer_state: &'a mut BindingState,
     pub(super) latches: &'a mut LatchBank,
 }
 
@@ -636,8 +646,8 @@ pub(super) fn evaluate_side(side: Side<'_>, shared: &mut SideInputs<'_>) {
         scene,
         composite,
         terminal,
-        smoother,
-        layer_smoother,
+        state,
+        layer_state,
         latches,
     } = side;
     let vars = latches.advance(
@@ -663,7 +673,7 @@ pub(super) fn evaluate_side(side: Side<'_>, shared: &mut SideInputs<'_>) {
         scene,
         &mut *composite,
         terminal,
-        smoother,
+        state,
         &inputs,
         Scratch {
             series: shared.series.get_mut(..elements).unwrap_or(&mut []),
@@ -689,7 +699,7 @@ pub(super) fn evaluate_side(side: Side<'_>, shared: &mut SideInputs<'_>) {
         layer,
         layer_scene,
         &mut composite.chain,
-        layer_smoother,
+        layer_state,
         &inputs,
         Scratch {
             series: shared.series.get_mut(..count).unwrap_or(&mut []),

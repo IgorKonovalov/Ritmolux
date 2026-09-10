@@ -64,6 +64,11 @@ pub(in crate::preset::schema) struct RawPreset {
     /// `{ attack, release }` pair. Absent means every param is applied instantly.
     #[serde(default)]
     pub(in crate::preset::schema) smoothing: BTreeMap<String, RawSmoothing>,
+    /// The optional `[hold]` table (ADR-0180 rule 2): the musical edge each
+    /// listed binding re-samples on, each `"beat"`, `"bar"` or a period in
+    /// seconds. Absent means every binding is read every frame.
+    #[serde(default)]
+    pub(in crate::preset::schema) hold: BTreeMap<String, RawHold>,
     /// The optional `[latch]` table (ADR-0137): named armed-and-fired events,
     /// each an `arm`/`fire` pair plus a `hold` in seconds. Absent means the
     /// preset holds no state between frames in its expression layer.
@@ -115,6 +120,11 @@ pub(in crate::preset::schema) struct RawLayer {
     /// the same vocabulary as the top-level table (ADR-0019 / ADR-0035).
     #[serde(default)]
     pub(in crate::preset::schema) smoothing: BTreeMap<String, RawSmoothing>,
+    /// Per-parameter sample-and-hold for the layer's bindings —
+    /// `[layer.hold]`, the same vocabulary as the top-level table (ADR-0180
+    /// rule 2), against the layer's own bindings.
+    #[serde(default)]
+    pub(in crate::preset::schema) hold: BTreeMap<String, RawHold>,
     /// The layer's structural tables, per system (ADR-0007) — the same shapes
     /// as the top level's.
     #[serde(default)]
@@ -267,6 +277,12 @@ pub(in crate::preset::schema) const PRESET: TableDesc = TableDesc {
             doc: "Per-parameter easing in seconds; an unlisted parameter is applied instantly.",
         },
         KeyDesc {
+            name: "hold",
+            kind: KeyKind::Map(&KeyKind::Hold),
+            default: "",
+            doc: "Per-parameter sample-and-hold; an unlisted parameter is read every frame.",
+        },
+        KeyDesc {
             name: "latch",
             kind: KeyKind::Map(&KeyKind::Table("latch")),
             default: "",
@@ -396,6 +412,12 @@ pub(in crate::preset::schema) const LAYER: TableDesc = TableDesc {
             kind: KeyKind::Map(&KeyKind::Easing),
             default: "",
             doc: "Per-parameter easing for the layer's bindings.",
+        },
+        KeyDesc {
+            name: "hold",
+            kind: KeyKind::Map(&KeyKind::Hold),
+            default: "",
+            doc: "Per-parameter sample-and-hold for the layer's bindings.",
         },
         KeyDesc {
             name: "curve",

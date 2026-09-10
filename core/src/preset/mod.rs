@@ -29,8 +29,8 @@ pub use expr::{
 };
 pub use schema::export;
 pub use schema::{
-    Binding, Easing, GLOBAL_PARAMS, KeyDesc, KeyKind, Latch, Layer, LayerBlend, LayerJoin, Preset,
-    PresetError, Roster, SystemKind, TableDesc, is_known_param,
+    Binding, Easing, GLOBAL_PARAMS, HoldEdge, KeyDesc, KeyKind, Latch, Layer, LayerBlend,
+    LayerJoin, Preset, PresetError, Roster, SystemKind, TableDesc, is_known_param,
 };
 
 // The shipped example presets, embedded at compile time so the C-ABI/foobar
