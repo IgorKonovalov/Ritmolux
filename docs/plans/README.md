@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0165** (ADRs are a separate sequence — next free there is **0181**.)
+**Next free number: 0166** (ADRs are a separate sequence — next free there is **0183**.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -68,6 +68,7 @@ built against it. The full note is in [README-archive.md](README-archive.md) und
 [0162]: 0162-the-curve-families.md
 [0163]: 0163-the-analytic-field.md
 [0164]: 0164-the-cellular-system.md
+[0165]: done/0165-the-release-path-stops-being-the-first-compile.md
 [0180]: ../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md
 
 ~~**Added 2026-09-07 - [0157] is drafted, and it is the only plan that unblocks `main`.**~~ - **closed 2026-09-07.** Both phases landed the same day the note was written; `main` is green and the route gate passes against a built site with `dist/api/` populated. The note is in [README-archive.md](README-archive.md) under `## Prior sequencing notes (superseded)`, which also records the one durable half: the cost probes still run in `-P fast` on every arm of every push.
@@ -372,6 +373,8 @@ build is no longer a reason to keep a finished worktree around.
 - **The `opt-level` question is closed, not deferred.** Phase 6 measured our unoptimized code at
   **19.1 %** of the `reactivity` suite — the minority arm, so ADR-0033's ratchet derivation is not
   reopened and no ADR is owed.
+
+~~**Added 2026-09-10 — [0165] runs beside the two live lanes, and goes first.**~~ — **closed 2026-09-10.** 0165 landed first as planned and is closed, so the ordering it argued is spent; 0159 Phase 6 now merges `main` onto the settled workflows. The note is in [README-archive.md](README-archive.md) under `## Prior sequencing notes (superseded)`.
 
 ### The two lanes, now
 
@@ -769,6 +772,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0165 — The release path stops being the first compile](done/0165-the-release-path-stops-being-the-first-compile.md) — closed 2026-09-10. Review: **no blockers, three majors, four minors.** Version: **none** (chore-only). ADR-0181 + ADR-0182 accepted. [Write-up](README-archive.md).
 - [0158 — The player grows a studio-facing surface](done/0158-the-player-grows-a-studio-facing-surface.md) — closed 2026-09-10. Review: **no blockers, two majors, six minors.** Version: **0.113.0**. ADR-0175 + 0176 accepted. Phase 7 open, on [on-device](../on-device-validation.md). [Write-up](README-archive.md).
 - [0092 — The engine draws an authored path](done/0092-the-engine-draws-an-authored-path.md) — closed 2026-09-09. Review: **no blockers, one major, three minors, one nit.** Version: **0.112.0** (minor). ADR-0107 already accepted. `shape_maple` + `shape_lion` shipped. [Write-up](README-archive.md).
 - [0140 — Every rate integrates, for real](done/0140-every-rate-integrates-for-real.md) — closed 2026-09-08. Review: **no blockers, two majors, three minors, one nit.** Version: **0.111.1**. ADR-0152 + 0153 accepted. Archived [backlog 0149 + 0150](../design-backlog-archive.md). [Write-up](README-archive.md).

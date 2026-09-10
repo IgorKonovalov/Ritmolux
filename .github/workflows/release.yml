@@ -8,7 +8,15 @@
 #
 # Trigger: a pushed v* tag, which is what the close ceremony's `cargo release`
 # already writes (docs/releasing.md). workflow_dispatch builds the same
-# artifacts without publishing anything, for dry runs.
+# artifacts and publishes nothing, for dry runs - on EVERY ref it can be
+# launched against, a v* tag included, because the release job below tests the
+# event as well as the ref.
+#
+# It tests the event because for a while it did not, and this comment claimed
+# the property anyway (backlog 0194). `startsWith(github.ref, 'refs/tags/v')`
+# alone is satisfied by a dispatch launched on a tag, which is exactly the ref a
+# releaser reaches for when rehearsing the thing they are about to ship - so the
+# safest-looking rehearsal was the one that published.
 #
 # NOTE: pushing changes to this file needs the `workflow` OAuth scope on the git
 # credential - `gh auth refresh -s workflow` if the push is rejected.
@@ -189,15 +197,19 @@ jobs:
 
   # Publish. Gated on ALL THREE builds by `needs:`, so a failure on any platform
   # leaves no Release at all rather than a half-published one - the release job
-  # is skipped, not merely red. Gated on the ref being a tag, so the
-  # workflow_dispatch dry-run path produces run artifacts and publishes nothing.
+  # is skipped, not merely red.
+  #
+  # Gated on the EVENT and the ref, not the ref alone. A tag push publishes; a
+  # workflow_dispatch never does, whatever ref it names, so the dry-run path
+  # produces run artifacts and nothing else. The ref half alone left "dispatch
+  # is a rehearsal" true only for the refs nobody rehearses on (backlog 0194).
   #
   # Runs on ubuntu-latest: it only moves zips around, and `gh` is preinstalled
   # on every runner image, so no pinned third-party release action is needed
   # (NFR section 4 - every dependency is a cost to justify).
   release:
     needs: [macos, windows, foobar]
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write

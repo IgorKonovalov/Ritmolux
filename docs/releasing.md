@@ -46,6 +46,18 @@ pushes — the architect never does.
 git push --follow-tags
 ```
 
+**Push one tag, not a backlog of them.** GitHub does not start workflows for tags pushed in bulk, so
+a `git push --tags` carrying more than three of them fires nothing at all — no Release run, no
+artifacts, and no error to read. That is how `v0.113.0` came to exist on `origin` with zero Release
+runs: the 2026-09-10 history rewrite force-pushed 131 tags in one command. The recovery is to delete
+the remote ref and push it again on its own, because re-pushing an unchanged ref emits no event
+either:
+
+```sh
+git push origin :refs/tags/vX.Y.Z
+git push origin vX.Y.Z
+```
+
 That fires [`.github/workflows/release.yml`](../.github/workflows/release.yml)
 ([ADR-0038](adrs/0038-tag-driven-release-unsigned-universal-mac-app.md),
 [ADR-0115](adrs/0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md)),
@@ -80,10 +92,20 @@ the fix:
 gh auth refresh -s workflow
 ```
 
-To rehearse the builds without publishing anything, run the workflow from the Actions tab
-(`workflow_dispatch`): it produces all three zips as **run artifacts** and creates no release.
-Note that a `workflow_dispatch` is only offered once the workflow file exists on the default
-branch.
+To rehearse the builds, run the workflow from the Actions tab (`workflow_dispatch`): it produces
+all three zips as **run artifacts**. Note that a `workflow_dispatch` is only offered once the
+workflow file exists on the default branch.
+
+**A dispatch never publishes, on any ref — a tag included.** The `release` job's condition names
+the event as well as the ref, `if: github.event_name == 'push' && startsWith(github.ref,
+'refs/tags/v')`, so the rehearsal is safe wherever you launch it and you do not have to pick the
+ref carefully to stay out of trouble. Plan 0165 Phase 2 made that true; before it, the condition
+read the ref alone, a dispatch on a `v*` tag satisfied it, and **the safest-looking rehearsal was
+the one that published** — which is not hypothetical here: run `31955362251` published `v0.70.0`
+from a dispatch on that tag.
+
+**The consequence: a dispatch is no longer a way to publish a tag whose push produced no run.**
+That recovery is the delete-and-re-push above, and it is now the only one.
 
 The component job can also be rehearsed locally, and unlike the macOS bundle it runs on the
 box this project is developed on:

@@ -69,6 +69,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0190 — the `dt` seam's comment names three downstream sites as unguarded, and all three still carry a guard, on three different policies](#0190--the-dt-seams-comment-names-three-downstream-sites-as-unguarded-and-all-three-still-carry-a-guard-on-three-different-policies)
 - [0191 — `evaluate_preset` advances the scene before it applies the preset's bindings, so the first frame after every switch integrates at the scene's defaults](#0191--evaluate_preset-advances-the-scene-before-it-applies-the-presets-bindings-so-the-first-frame-after-every-switch-integrates-at-the-scenes-defaults)
 - [0192 - `--report` cannot see a `beat_index`-driven response, so a deliberately musical preset measures as inert](#0192-----report-cannot-see-a-beat_index-driven-response-so-a-deliberately-musical-preset-measures-as-inert)
+- [0196 — most `v*` tags produce no Release run at all, and the cause Plan 0165 named cannot explain nineteen of them](#0196--most-v-tags-produce-no-release-run-at-all-and-the-cause-plan-0165-named-cannot-explain-nineteen-of-them)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -331,6 +332,9 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0180 | A doc comment states the ABI version is 4 and points at a test file that does not exist | [Plan 0156](plans/done/0156-the-site-becomes-the-reference.md) Phase 6: the path corrected and neither figure restated, because rustdoc made the comment public. **Closed 2026-09-06** |
 | 0149 | Three bindable rates multiply a per-element `age` instead of integrating, and ADR-0135's guard cannot see any of them | [ADR-0153](adrs/0153-a-per-element-rate-integrates-per-element.md) + [Plan 0140](plans/done/0140-every-rate-integrates-for-real.md) Phases 1, 3 and 4. **Closed 2026-09-08** |
 | 0150 | `Phase::step` accepts any `dt`, so the guard is four copies in the callers and the attractor has none | [ADR-0152](adrs/0152-the-frame-delta-is-sanitized-at-the-scene-seam.md) + [Plan 0140](plans/done/0140-every-rate-integrates-for-real.md) Phase 2; six copies, not four. See 0189, 0190. **Closed 2026-09-08** |
+| 0193 | The `spout` feature is compiled for the first time by the job that publishes it | [ADR-0181](adrs/0181-the-gate-compiles-every-feature-a-release-ships.md) + [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md) Phase 1. Cost two releases, not one. **Closed 2026-09-10** |
+| 0194 | `release.yml` promises a dry run it cannot provide, because the publish gate reads the ref and not the event | [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md) Phase 2. The hazard was already realized once; see 0196. **Closed 2026-09-10** |
+| 0195 | `check-index-rows.mjs` is the one gate that never adopted the tracked-set enumeration | [ADR-0182](adrs/0182-a-plan-lane-may-live-inside-the-repository.md) + [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md) Phase 0. Both probes still pass. **Closed 2026-09-10** |
 <!-- roster:end -->
 
 ## Open entries
@@ -3667,3 +3671,80 @@ interview this entry is asking for.
 it costs is judgement — a curator reading `onset 0.000` concludes a preset ignores the music, when the
 preset may be the most rhythmically driven thing in the set. That misreading has now happened once,
 to the author who could tell the difference.
+
+## 0196 — most `v*` tags produce no Release run at all, and the cause Plan 0165 named cannot explain nineteen of them
+
+[Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md) fixed two real holes in
+the release path and deliberately declined to audit a third it had spotted — *"whether that whole
+gap shares Phase 3's cause is a separate question this plan deliberately does not open."* This entry
+opens it, because the review that closed 0165 measured the gap and found it is the **dominant**
+failure mode rather than a tail.
+
+Counted on 2026-09-10 from `git ls-remote --tags origin`, `gh run list --workflow=release.yml` and
+`gh release list`:
+
+| | |
+|---|---|
+| tags on `origin` | **132** |
+| published releases | **27** |
+| tags in the `v0.93.0` → `v0.113.0` window | **24** |
+| of those, published | **3** (`v0.100.0`, `v0.100.1`, `v0.103.0`) |
+| of the 21 that did not, produced a Release run at all | **2** — `v0.108.0` and `v0.112.0`, both red |
+| produced **no run whatsoever** | **19** |
+
+So the release path fails nineteen times silently for every twice it fails loudly, and Plan 0165
+addressed only the loud half plus one instance of the silent one.
+
+**The cause 0165 named cannot carry the nineteen.** Phase 3 attributes `v0.113.0`'s missing run to
+GitHub suppressing workflow events for tags pushed in bulk — 131 tags force-pushed by the
+2026-09-10 history rewrite. That explains `v0.113.0` and nothing before it: the other eighteen were
+tagged and pushed across three weeks of ordinary closes, long before the rewrite. Something else is
+producing most of them, and it is not identified.
+
+Two candidates worth separating before anyone builds a fix, because they need different repairs:
+the close ceremony batching several accumulated tags into one push (the same >3-refs suppression,
+arriving by a different route), or `git push --follow-tags` not emitting a per-tag event under some
+condition nobody has reduced. Neither is established.
+
+- **Raised:** 2026-09-10, at [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md)'s
+  Mode 4 review, from counting what the plan's own Phase 3 premise implied.
+  **Owner if taken:** `architect` for the diagnosis, then `dev` if the answer is mechanical.
+- **Verified 2026-09-10** — nothing in the repository reconciles tags against releases after the
+  fact, on a schedule or otherwise, so a tag that fires no run is detected by a human noticing an
+  absence: `absent: schedule: in: .github/workflows`
+- **Verified 2026-09-10** — and the publish path is the tag push alone, with no second route that
+  could catch a missed one now that Plan 0165 Phase 2 closed the dispatch path
+  ([ADR-0181](adrs/0181-the-gate-compiles-every-feature-a-release-ships.md) Outcome):
+  `present: github\.event_name == 'push' in: .github/workflows/release.yml`
+- **Verified 2026-09-10** — the counts above are GitHub-side state, not repository state:
+  `unprobeable: the tag-to-release ratio lives on origin and in the Actions history, which the probe grammar deliberately cannot reach - it greps tracked files and never shells out (ADR-0108 Notes). Re-derive with the three commands named at the head of this entry.`
+
+### The finding
+
+The failure announces itself as **nothing** — no red run, no release, no notification — which is
+the same property [backlog 0193](design-backlog-archive.md) identified one level down and for the
+same reason: the `release` job
+is gated on `needs:`, so a broken release is a *skipped* job. Here it is worse, because there is no
+run to skip. Absence is not a signal anyone watches, and 105 of 132 tags have gone unpublished
+without anyone reading it as a fault.
+
+Plan 0165 Phase 3 is, in effect, the experiment: it deletes and re-pushes `v0.113.0` alone. If a
+run appears, the bulk-push inference holds for that one tag and this entry still owns the other
+eighteen. If no run appears, the inference is wrong outright and this entry is the whole finding.
+**Read Phase 3's outcome before designing anything here.**
+
+- **UPDATE 2026-09-10, hours after filing — Phase 3 ran, and it narrows this entry rather than
+  settling it.** The delete-and-re-push produced Release run `34468008655` where the original push
+  had produced none; all four jobs went green and `v0.113.0` is published with its three zips. So
+  the bulk-tag inference **holds for `v0.113.0`**, and the recovery in `docs/releasing.md` is known
+  to work. What is untouched is the **other eighteen**: they were pushed across three weeks of
+  ordinary closes, before the history rewrite, and nothing here explains them. The entry stands at
+  eighteen tags rather than nineteen, and its two candidate causes are unchanged — neither has been
+  reduced to a probe, which is why the third bullet above is an honest `unprobeable:`.
+
+### Priority
+
+**Medium.** Nothing a user runs is wrong and no artifact is incorrect — what is broken is delivery,
+and the project has been shipping from a release page that stopped at `v0.103.0` while the version
+reached `v0.113.0`. It becomes **High** the moment anyone outside the project is asked to download
+a build.

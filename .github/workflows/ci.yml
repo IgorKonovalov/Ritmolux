@@ -1,5 +1,6 @@
 # NFR section 7: build, test, doctests, clippy, fmt on Windows + macOS for every
-# push, plus three single-runner gates - cargo-deny (supply chain), the rlx-core
+# push, plus five single-runner gates - the `spout` feature compile (ADR-0181),
+# the doc-link and roster checks, cargo-deny (supply chain), the rlx-core
 # coverage ratchet (ADR-0033), and Miri over rlx-ring's unsafe.
 #
 # Live audio is out of CI scope. GPU rendering partly is not: on Windows the DX12
@@ -118,6 +119,57 @@ jobs:
       - run: cargo doc --workspace --no-deps
         env:
           RUSTDOCFLAGS: -D warnings
+
+  # The one off-by-default feature the shipped Windows binary turns on
+  # (ADR-0181). `release.yml`'s `windows` job builds `--features spout`, because
+  # that flag is what makes `ritmolux --stream` exist in the artifact a tester
+  # downloads - and nothing compiled that code path any earlier. Code behind
+  # `#[cfg(feature = "spout")]` is NOT type-checked when the feature is off, so
+  # `check` above, the whole `nextest` run and `clippy --all-targets` are blind
+  # to it by construction rather than by omission. This job is the only thing
+  # that compiles it before a tag is pushed.
+  #
+  # What it guards is an item moving out from under a gated call site: the most
+  # ordinary refactor there is, invisible to every other job, and already the
+  # cause of a release that does not exist. `v0.112.0` died here with `cannot
+  # find function start_capture in the crate root`, the `release` job was
+  # skipped by its `needs:`, and the failure announced itself only as an absent
+  # artifact.
+  #
+  # Its own job rather than a step on `check (windows-latest)`: that job is the
+  # gate's longest at 19m41s, and a step there would serialize the SDK fetch
+  # into the critical path and name `check` as the subject when this breaks.
+  # Concurrent, the wall clock does not move (ADR-0181 Alternative A).
+  #
+  # `cargo check` in the dev profile, not the release build: it type-checks and
+  # does not link, so a link-only or LTO-only break still surfaces first at the
+  # tag push. That is the accepted limit, not an oversight (ADR-0181 Alternative
+  # C) - a release-profile `lto = "fat"` build is minutes of gate time answering
+  # the packaging question ADR-0038 keeps in release.yml.
+  #
+  # The SDK fetch is a network call, so a third-party outage can red a push.
+  # ADR-0181 accepts that and names an `actions/cache` on the pinned hash as the
+  # mitigation IF evidence arrives; do not add one speculatively.
+  #
+  # Windows-only because Spout is a DirectX facility - there is no macOS or
+  # Linux arm to add.
+  spout:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      # No toolchain action, matching `check` and `coverage`: rustup on the
+      # runner auto-installs whatever rust-toolchain.toml pins on the first
+      # cargo invocation. A `dtolnay/rust-toolchain@stable` step here was inert
+      # - the pin wins inside the directory either way - but it installed a
+      # second toolchain and read as if this job ran on stable.
+      - uses: Swatinem/rust-cache@v2
+      # Mirrors release.yml's `windows` job exactly; standalone/build.rs
+      # consumes whatever is staged at standalone/spout-sdk/ and does not care
+      # which route it came by.
+      - name: Stage the pinned Spout SDK
+        shell: pwsh
+        run: ./packaging/spout/fetch-sdk.ps1
+      - run: cargo check -p standalone --features spout
 
   # Doc-link gate (Plan 0061 Phase 2c). Every relative markdown link in the repo
   # must resolve - across docs/, README.md and .claude/skills/**.
