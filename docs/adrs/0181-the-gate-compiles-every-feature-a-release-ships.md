@@ -122,7 +122,8 @@ unrelated refactor repaired it, and the Context's "worked example" framing reads
 incident. This strengthens the decision rather than qualifying it: the window between a gated call
 site breaking and anyone noticing was weeks, not days.
 
-**The sibling finding's hazard was already realized.** ADR-0181's Notes and backlog 0194 describe
+**The sibling finding's hazard was already realized.** ADR-0181's Notes and
+[backlog 0194](../design-backlog-archive.md) describe
 a `workflow_dispatch` on a tag ref as a latent publish path. It is not latent — run `31955362251`
 **published `v0.70.0`** from a dispatch on that tag, `release` job green in 7 s. It appears to have
 been used deliberately, to recover a tag whose own push produced no Release run.
