@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0168 - The studio stops surprising the author](#0168---the-studio-stops-surprising-the-author)
   - [0159 - The studio opens](#0159---the-studio-opens)
   - [0161 - The structural parameter is held](#0161---the-structural-parameter-is-held)
   - [0165 - The release path stops being the first compile](#0165---the-release-path-stops-being-the-first-compile)
@@ -193,6 +194,71 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0168 - The studio stops surprising the author](done/0168-the-studio-stops-surprising-the-author.md)
+
+- closed 2026-09-10. Three phases on `main` directly, no worktree lane: `4221c6a` (1, an edit forks
+the preset and rotation is held), `231424d` (2, every problem is reachable), `dadce82` (3, the
+handoff note stops promising an audio setup). Review: **no blockers, one major, three minors, one
+nit.** Version: **0.116.0** (minor - a feature plan). ADR-0189 accepted at this close.
+
+**The plan reverses a shipped model and the tests are the proof, so they were read rather than
+counted.** `Editor.test.tsx` drives all five gesture classes through the real components against a
+fake filesystem and asserts **zero** writes before the name is answered and exactly one afterwards,
+to the new path; the source document is asserted **byte-identical** after a full session against the
+fork, not line-counted; and the race the prompt opens is closed by a test that changes the active
+preset between the gesture and the answer and asserts neither the outgoing nor the incoming file is
+written. `grep` over the renderer finds exactly one call to `preset.write` and it is inside the
+gate, so no path around it was left open.
+
+**The full workspace suite was re-run at the close, because the log never claimed it.**
+`cargo nextest run --workspace` gave **1717 passed / 6 skipped in 701.2 s**, exit 0. The plan
+touched no Rust at all - the diff is 24 files, every one under `studio/`, `packaging/studio/` or
+`docs/` - so the nine GPU suites were never at risk; that they were never at risk is what the run
+establishes rather than assumes. The studio's own gate is green: typecheck, lint and **263 Vitest
+tests across 29 files**. `shared/toml.test.ts` and `renderer/editor/diagnostics.test.ts` are
+unedited, which is the plan's own done-when that the TOML editor did not move, and
+`shared/protocol.ts` and `docs/specs/` are untouched by the whole plan.
+
+**The `### Close triggers` block is missing from the log, and one of its bullets would have
+mattered.** The log carries `**Lane:**`, the phase table and good notes, but none of the four
+close-trigger bullets ADR-0120 asks for. The consequence was not hypothetical: Phase 3 removed the
+sentence *"There is no audio setup"* from `packaging/studio/READ-ME-FIRST.md`, which is the exact
+string backlog **0203**'s third probe pinned, so `check-backlog-claims.mjs` went red **on delivery**
+and the log said nothing about it. It is the class ADR-0108 anticipates - a probe written to break
+when its claim is discharged - and the repair is architect work, done at this close: 0203's heading
+dropped its discharged half, the body carries a dated note naming which half landed, and the probe
+now pins the symptom sentence that replaced the promise. **The entry stays live**, because the cause
+- why the smoke run's endpoint was `Microphone Array` while `InputMode`'s default is `Loopback` -
+is still unestablished, and that is the half nobody has touched.
+
+**Two calls the plan explicitly delegated were made and recorded.** The prompt is an inline name
+field in the editor's status strip rather than a modal, so a slider release does not put an overlay
+over the preview at the instant the finger left it; and fork identity is **session-scoped**, a
+`Set` of paths in the hook, so a relaunch asks again and makes a second copy. Both are in the log,
+in `studio/README.md` and in the tester's note, which is the standard ADR-0189's Negative section
+asked to be held to.
+
+**The embedded fork is not a copy of what is on screen, and the log says so plainly.** No event
+carries an embedded preset's own text and ADR-0184 forbids the studio resolving one, so the fork is
+`templateFor` on the system the `preset` event named plus the gesture's edit - the embedded
+preset's own bindings are not in it. That is the honest answer available and it is disclosed in the
+right three places; it is worth knowing that a tester who forks a shipped preset gets the system's
+defaults, not the look they were auditioning.
+
+**The findings.** One **major**: the missing `### Close triggers` block above. Three **minors**:
+`useHeldRotation`'s load-bearing invariant - that `hello` is referentially stable, so a resume is
+not silently undone by the next render - is undefended, because the test rerenders with a *fresh*
+`hello()` each time and therefore asserts the re-fire rather than the identity (it holds today
+because `reducePlayerEvent` carries the same object forward and `usePlayerActions` memoizes on
+`[]`, both one edit from being false); the embedded fork's lossiness has no test asserting what is
+*absent* from the written document, only what is present; and `packaging/studio/READ-ME-FIRST.md`
+gained a Phase 3 line beyond its phase's list (a "six things" count corrected to "a few"), disclosed
+but the kind of drift a count invites. One **nit**: a second held gesture relabels the fork prompt
+with the *current* preset's name while still carrying the first gesture's document, so a library
+click mid-prompt can make the prompt name a preset it is not about - a mislabel, never a miswrite,
+and narrow now that rotation is held.
+
 
 ### [0159 - The studio opens](done/0159-the-studio-opens.md)
 

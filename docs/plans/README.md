@@ -49,8 +49,7 @@ place. The plan file carries the real link.
 | [0163](0163-the-analytic-field.md) | The analytic field | approved | dev | ADR-0180 rules 1+3: a 13th system holding `chladni` and `escape_time`, with Voronoi, quasicrystal and hyperbolic placed. Fills the roadmap's fractal-spiral gap. **Needs 0161.** |
 | [0164](0164-the-cellular-system.md) | The cellular system | approved | dev | ADR-0180 rules 1+2: a 14th system on `PingPongField` - `life_like`, `larger_than_life`, `cyclic`, plus an age channel so the field paints history. Lenia placed, not built. **Needs 0161.** |
 | [0166](0166-the-basics-read-in-russian.md) | The basics read in Russian | approved | dev, human | ADR-0185: five docs gain a Russian sibling `.ru.md` stamped with the source sha. **Phase 3 is a `human` review that blocks publication.** Touches no Rust - orderable against any lane. |
-| [0167](0167-the-studio-becomes-handable.md) | The studio becomes handable | in-progress | dev, studio-builder, human | Phases 1-6 landed 2026-09-10; backlog 0199, 0200, 0201 archived. **Phases 7 and 8 are `human` and unrun** - 7 is blocked on Plan 0168. Does not close until both run. |
-| [0168](0168-the-studio-stops-surprising-the-author.md) | The studio stops surprising the author | draft | studio-builder | ADR-0189: an edit forks the preset instead of overwriting it, rotation is held while attached, and every problem is reachable. **Blocks Plan 0167 Phase 7.** Studio-only, no Rust. |
+| [0167](0167-the-studio-becomes-handable.md) | The studio becomes handable | in-progress | dev, studio-builder, human | Phases 1-6 landed 2026-09-10; backlog 0199, 0200, 0201 archived. **Phases 7 and 8 are `human` and unrun**; 7 is unblocked now that 0168 has closed. Does not close until both run. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-09 — [0158] and [0159] are drafted, and they are a program rather than a
@@ -69,7 +68,7 @@ it. The note is [in the archive](README-archive.md#prior-sequencing-notes-supers
 [0164]: 0164-the-cellular-system.md
 [0165]: done/0165-the-release-path-stops-being-the-first-compile.md
 [0167]: 0167-the-studio-becomes-handable.md
-[0168]: 0168-the-studio-stops-surprising-the-author.md
+[0168]: done/0168-the-studio-stops-surprising-the-author.md
 [0180]: ../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md
 
 ~~**Added 2026-09-07 - [0157] is drafted, and it is the only plan that unblocks `main`.**~~ - **closed 2026-09-07.** Both phases landed the same day the note was written; `main` is green and the route gate passes against a built site with `dist/api/` populated. The note is in [README-archive.md](README-archive.md) under `## Prior sequencing notes (superseded)`, which also records the one durable half: the cost probes still run in `-P fast` on every arm of every push.
@@ -626,6 +625,11 @@ editing gesture, and it has a prior worth comparing against (a windowless frame 
 a claim). Order: 0168 whole, then 0167 Phase 7, then close 0167. 0168 is studio-only, so it
 contends with nothing on this roster.
 
+> **Half discharged 2026-09-10 by [0168], closed.** The fork, the held rotation and the problems
+> list all landed, so [0167] Phase 7 is unblocked and the ordering above is spent. What stands is
+> the rest: **both of [0167]'s `human` phases are still unrun**, Phase 8 still has the
+> `52.4 -> 44.3` fps prior worth comparing against, and 0167 still does not close until they run.
+
 **One ordering this still does not license.** 0162, 0163 and 0164 touch disjoint scene paths but
 each **blesses new baselines**, so they merge in series even if they are built in parallel: the
 rule at the head of `### The two lanes, now` is written for exactly this case, and this is the first
@@ -790,6 +794,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0168 — The studio stops surprising the author](done/0168-the-studio-stops-surprising-the-author.md) — closed 2026-09-10. Review: **no blockers, one major, three minors, one nit.** Version: **0.116.0** (minor). ADR-0189 accepted. Half-discharged [backlog 0203](../design-backlog.md). [Write-up](README-archive.md).
 - [0159 — The studio opens](done/0159-the-studio-opens.md) — closed 2026-09-10. Review: **no blockers, four majors, four minors.** Version: **0.115.0**. ADR-0177 + 0178 + 0183 + 0184 accepted. **Phases 10-11 (`human`) unrun**, behind [backlog 0199-0201](../design-backlog.md). [Write-up](README-archive.md).
 - [0161 — The structural parameter is held](done/0161-the-structural-parameter-is-held.md) — closed 2026-09-10. Review: **no blockers, one major, six minors.** Version: **0.114.0** (minor). ADR-0180 accepted with an Outcome. Filed [backlog 0197 + 0198](../design-backlog.md). [Write-up](README-archive.md).
 - [0165 — The release path stops being the first compile](done/0165-the-release-path-stops-being-the-first-compile.md) — closed 2026-09-10. Review: **no blockers, three majors, four minors.** Version: **none** (chore-only). ADR-0181 + ADR-0182 accepted. [Write-up](README-archive.md).

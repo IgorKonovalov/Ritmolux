@@ -72,7 +72,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0196 — most `v*` tags produce no Release run at all, and the cause Plan 0165 named cannot explain nineteen of them](#0196--most-v-tags-produce-no-release-run-at-all-and-the-cause-plan-0165-named-cannot-explain-nineteen-of-them)
 - [0198 — `deposit_arms` tears along the branch cut at a fractional value, and nothing rounds it](#0198--deposit_arms-tears-along-the-branch-cut-at-a-fractional-value-and-nothing-rounds-it)
 - [0202 — `preset_warning` carries no position at all, so the one problem class an author cannot see in the file tab is the one the system picker produces by the dozen](#0202--preset_warning-carries-no-position-at-all-so-the-one-problem-class-an-author-cannot-see-in-the-file-tab-is-the-one-the-system-picker-produces-by-the-dozen)
-- [0203 — the smoke run captured from a microphone while the default is loopback, and the handoff note promises the case cannot arise](#0203--the-smoke-run-captured-from-a-microphone-while-the-default-is-loopback-and-the-handoff-note-promises-the-case-cannot-arise)
+- [0203 — the smoke run captured from a microphone while the default is loopback, and nobody established why](#0203--the-smoke-run-captured-from-a-microphone-while-the-default-is-loopback-and-nobody-established-why)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -3859,7 +3859,7 @@ position. Settle which before building either.
 readable, which is enough to hand over — and it becomes worth taking the next time a `dev` lane is
 open on the player's event surface for another reason.
 
-## 0203 — the smoke run captured from a microphone while the default is loopback, and the handoff note promises the case cannot arise
+## 0203 — the smoke run captured from a microphone while the default is loopback, and nobody established why
 
 [Plan 0167](plans/0167-the-studio-becomes-handable.md)'s smoke run, 2026-09-10, reported its capture
 endpoint as `live WASAPI 48000/4 Microphone Array (Realtek(R) Audio)`. That is an `eCapture`
@@ -3867,16 +3867,19 @@ endpoint — `CaptureMode::LineIn` — and `InputMode`'s `#[default]` is `Loopba
 device. So either the machine's config selected `line-in`, or something chose it, and **nobody
 established which**.
 
-Whichever it is, the visible consequence is the same and it lands on a tester:
-`packaging/studio/READ-ME-FIRST.md` says *"The picture reacts to whatever is already playing, out of
-the default output device. There is no audio setup."* A tester whose player behaves as this one did
-sees a picture that does not move with their music and has been told in writing that this cannot
-happen — so the report that comes back will describe the wrong defect, or none at all.
+Whichever it is, the visible consequence lands on a tester, who sees a picture that does not move
+with their music.
 
-**Plan 0168 Phase 3 repairs only the sentence.** It gives the tester a symptom, something to check
-and something to send back. It does **not** answer why the endpoint was what it was, which is this
-entry: a config that was set and forgotten is a non-issue, and a silent fallback from a failed
-loopback start to an input device would be a real defect worth a plan.
+**Half of this entry was discharged by [Plan 0168](plans/done/0168-the-studio-stops-surprising-the-author.md)
+Phase 3, 2026-09-10.** `packaging/studio/READ-ME-FIRST.md` used to say *"There is no audio setup"*,
+so a tester whose player behaved as this one did had been told in writing that it could not happen,
+and the report coming back would have described the wrong defect or none at all. That sentence is
+gone: the note now names the symptom, points at `diagnostics.log`'s endpoint column, and asks for
+that line back.
+
+**The open half is the cause, which is what this entry now is.** A config that was set and forgotten
+is a non-issue; a silent fallback from a failed loopback start to an input device would be a real
+defect worth a plan. Nothing has established which.
 
 - **Raised:** 2026-09-10, from [Plan 0167](plans/0167-the-studio-becomes-handable.md)'s smoke run,
   finding C — recorded there as an observation, not acted on.
@@ -3886,8 +3889,9 @@ loopback start to an input device would be a real defect worth a plan.
   unconfigured run produces: `present: Loopback, in: standalone/src/config.rs`
 - **Verified 2026-09-10** — and the two modes read different endpoint dataflows, which is why the
   device name is the tell: `present: CaptureMode::LineIn => eCapture in: standalone/src/capture_win.rs`
-- **Verified 2026-09-10** — the promise a tester is handed:
-  `present: There is no audio setup\. in: packaging/studio/READ-ME-FIRST.md`
+- **Verified 2026-09-10, restamped at Plan 0168's close** — the promise is gone and what replaced
+  it is the symptom, so the note a tester is handed no longer contradicts this entry:
+  `present: listening to the wrong thing in: packaging/studio/READ-ME-FIRST.md`
 - **Verified 2026-09-10** — the cause itself:
   `unprobeable: which of the two explanations holds depends on one machine's config.toml and on whether a loopback start failed at runtime, neither of which is a tracked file. Read the machine's config.toml first; if it names loopback, the fallback theory is the live one and needs a run with the render endpoint made unavailable.`
 
