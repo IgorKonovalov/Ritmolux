@@ -110,6 +110,13 @@ under that name, and switches to it; everything you do afterwards goes to your
 copy without asking again. The preset you started from is left exactly as it
 was, and your copy sits beside it in the library tab.
 
+ONE EXCEPTION, and it is worth knowing before it surprises you. A few looks are
+built into the player rather than kept as files, and the Studio cannot read one
+of those. Copying it gives you the plain starting point for that kind of look
+plus the change you just made - not the look you were watching. If your copy
+comes out looking nothing like what was on screen, that is why, and it is
+expected rather than a fault.
+
 Closing the Studio forgets which copies are yours, so the first change after you
 open it again asks once more and makes another copy. That is the price of the
 Studio keeping no memory of its own - nothing you did is lost.

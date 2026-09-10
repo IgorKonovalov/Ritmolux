@@ -210,5 +210,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0186](0186-the-studios-player-mode-is-a-per-machine-setting.md) | The studio's player mode is a per-machine setting, and the windowless path is a peer | proposed 2026-09-10 (Plan 0167), amends 0183 |
 | [0187](0187-the-preview-pipe-has-a-fixed-shape-and-names-its-true-format.md) | The preview pipe has a fixed shape and names the format it actually carries | proposed 2026-09-10 (Plan 0167), revises 0176 |
 | [0188](0188-the-two-implementer-lanes-hand-off-automatically.md) | The two implementer lanes hand off to each other automatically, and every other seam stays manual | accepted 2026-09-10 (no plan), amends 0177 |
-| [0189](0189-an-edit-forks-the-preset-and-the-studio-holds-rotation.md) | An edit forks the preset on first touch, and the studio holds rotation while attached | proposed 2026-09-10 (Plan 0168), revises 0184 |
+| [0189](0189-an-edit-forks-the-preset-and-the-studio-holds-rotation.md) | An edit forks the preset on first touch, and the studio holds rotation while attached | accepted 2026-09-10 (Plan 0168), revises 0184 |
 <!-- roster:end -->

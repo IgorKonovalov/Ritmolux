@@ -1,14 +1,18 @@
 # 0168 — The studio stops surprising the author
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-10. Phases 1-3 landed as 4221c6a, 231424d, dadce82.
+> Mode 4 review: **no blockers, one major, three minors, one nit.** The full workspace suite was
+> re-run against the finished tree (1717 passed, 6 skipped) and the studio's own gate is green
+> (29 files, 263 tests); the fork gate, the byte-equality of the source document, the gesture-time
+> capture and the problems list were each read as assertions rather than taken from the log.
 > **Created:** 2026-09-10
 > **Owner skill(s):** studio-builder
-> **Related ADRs:** [0189](../adrs/0189-an-edit-forks-the-preset-and-the-studio-holds-rotation.md) (proposed —
-> this plan is what accepts it), [0184](../adrs/0184-the-player-reports-what-it-loaded-and-the-studio-re-derives-nothing.md)
+> **Related ADRs:** [0189](../../adrs/0189-an-edit-forks-the-preset-and-the-studio-holds-rotation.md) (proposed —
+> this plan is what accepts it), [0184](../../adrs/0184-the-player-reports-what-it-loaded-and-the-studio-re-derives-nothing.md)
 > (the file under the editor stays the player's own, and this plan does not reopen it),
-> [0183](../adrs/0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md),
-> [0178](../adrs/0178-the-studio-shell-conventions.md)
-> **Blocks:** [0167](0167-the-studio-becomes-handable.md) Phase 7 — the tester handoff does not run
+> [0183](../../adrs/0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md),
+> [0178](../../adrs/0178-the-studio-shell-conventions.md)
+> **Blocks:** [0167](../0167-the-studio-becomes-handable.md) Phase 7 — the tester handoff does not run
 > until Phase 1 below has landed.
 
 ## TL;DR
@@ -32,7 +36,7 @@ undo. Rotation is on by default with a 20–130 s dwell, so the preset under the
 itself while the author works. In six minutes, three different presets each took `system = "swarm"`
 from what the owner experienced as clicking the system picker once; a fourth had all five `[palette]
 stops` recoloured, 49 differing lines. Four files modified, no prompt, no record, recovery by hand
-from the shipped set. [ADR-0189](../adrs/0189-an-edit-forks-the-preset-and-the-studio-holds-rotation.md)
+from the shipped set. [ADR-0189](../../adrs/0189-an-edit-forks-the-preset-and-the-studio-holds-rotation.md)
 settles what replaces it, and names the current behaviour as its rejected Alternative A.
 
 **Finding B — only the first of several problems is ever shown.** `usePlayerEvents` keeps up to 32
@@ -96,7 +100,7 @@ flowchart TB
 
 ### Phase 1 — An edit forks the preset, and rotation is held while the studio is attached
 - **Owner skill:** studio-builder
-- **What:** [ADR-0189](../adrs/0189-an-edit-forks-the-preset-and-the-studio-holds-rotation.md), all
+- **What:** [ADR-0189](../../adrs/0189-an-edit-forks-the-preset-and-the-studio-holds-rotation.md), all
   three parts. A gesture against a preset this session has not already forked prompts for a name,
   writes the whole document there, and switches the editor to it; later gestures against that fork
   write silently at today's cadence. The fork's source is the `path` + `text` pair `useActivePreset`
@@ -268,5 +272,5 @@ edited. `shared/protocol.ts` and `docs/specs/` are untouched by the whole plan.
 done-when here is a test; what a person would see — the prompt mid-drag, the held-rotation line on a
 projector — is Plan 0167's Phase 7 and Phase 8.
 
-[backlog 0202]: ../design-backlog.md
-[backlog 0203]: ../design-backlog.md
+[backlog 0202]: ../../design-backlog.md
+[backlog 0203]: ../../design-backlog.md

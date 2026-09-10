@@ -1,8 +1,8 @@
 # ADR-0189 — An edit forks the preset on first touch, and the studio holds rotation while attached
 
-> **Status:** proposed
+> **Status:** accepted
 > **Date:** 2026-09-10
-> **Related plan(s):** [0168 — The studio stops surprising the author](../plans/0168-the-studio-stops-surprising-the-author.md),
+> **Related plan(s):** [0168 — The studio stops surprising the author](../plans/done/0168-the-studio-stops-surprising-the-author.md),
 > [0167 — The studio becomes handable](../plans/0167-the-studio-becomes-handable.md) (its smoke run
 > is this ADR's evidence, and its Phase 7 is blocked on this)
 > **Related:** [ADR-0184](0184-the-player-reports-what-it-loaded-and-the-studio-re-derives-nothing.md)

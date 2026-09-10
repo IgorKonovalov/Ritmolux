@@ -1,7 +1,7 @@
 # 0167 — The studio becomes handable
 
 > **Status:** in-progress — Phases 1-6 landed 2026-09-10. **Phase 7 is blocked on
-> [Plan 0168](0168-the-studio-stops-surprising-the-author.md); Phase 8 is not blocked and can
+> [Plan 0168](done/0168-the-studio-stops-surprising-the-author.md); Phase 8 is not blocked and can
 > run now.** This plan does not close until both have run.
 > **Created:** 2026-09-10
 > **Owner skill(s):** dev, studio-builder, human
@@ -652,7 +652,7 @@ Risks section made that rule and the rule is right: two `human` phases deferred 
 studio is never validated by a person, and a third plan would inherit them with the pattern
 established. What changes instead is that the two phases stop being one item.
 
-- **Phase 7 is blocked, on finding A.** [Plan 0168](0168-the-studio-stops-surprising-the-author.md)
+- **Phase 7 is blocked, on finding A.** [Plan 0168](done/0168-the-studio-stops-surprising-the-author.md)
   is what unblocks it. Handing a VJ a build that rewrites whichever preset rotation last brought in,
   with no prompt and no undo, is how a tester loses work and blames themselves — and the report that
   comes back describes the wrong defect. The blocker is not the tester's inconvenience; it is that
@@ -667,10 +667,10 @@ established. What changes instead is that the two phases stop being one item.
 
 | finding | routed to | why |
 |---|---|---|
-| **A** — silent write, rotation picks the file | [ADR-0189](../adrs/0189-an-edit-forks-the-preset-and-the-studio-holds-rotation.md) + [Plan 0168](0168-the-studio-stops-surprising-the-author.md) Phase 1 | It reverses a decided model, so it needs a named rejected alternative. Both second-order questions are settled in the ADR: the studio **holds rotation** while attached (`ctl/transport hold`, already a spec-0003 verb and a position rather than a press, so studio-only), and an **embedded** preset takes the same fork path — its fork is its first file, and `status: 'embedded'` stops being a dead end. |
-| **B**, the modal | [Plan 0168](0168-the-studio-stops-surprising-the-author.md) Phase 2 | Studio-only, one phase, built from state that already exists. A plan of its own is overhead and a backlog entry defers work that is ready; it rides the `studio-builder` lane 0168 already opens. |
+| **A** — silent write, rotation picks the file | [ADR-0189](../adrs/0189-an-edit-forks-the-preset-and-the-studio-holds-rotation.md) + [Plan 0168](done/0168-the-studio-stops-surprising-the-author.md) Phase 1 | It reverses a decided model, so it needs a named rejected alternative. Both second-order questions are settled in the ADR: the studio **holds rotation** while attached (`ctl/transport hold`, already a spec-0003 verb and a position rather than a press, so studio-only), and an **embedded** preset takes the same fork path — its fork is its first file, and `status: 'embedded'` stops being a dead end. |
+| **B**, the modal | [Plan 0168](done/0168-the-studio-stops-surprising-the-author.md) Phase 2 | Studio-only, one phase, built from state that already exists. A plan of its own is overhead and a backlog entry defers work that is ready; it rides the `studio-builder` lane 0168 already opens. |
 | **B**, the span | backlog 0202 | It moves spec 0003 and needs a `dev` lane, and nothing is waiting on it. Filed with a correction the finding did not make: `preset_error` is anchored **two** ways, and the second is `param` rather than a position — so adding `param` to `preset_warning` may buy the marker with no new mechanism, which is cheaper than a span. |
-| **C**, the audio endpoint | [Plan 0168](0168-the-studio-stops-surprising-the-author.md) Phase 3 (the sentence) + backlog 0203 (the cause) | `READ-ME-FIRST.md` promises *"There is no audio setup"* and the smoke run captured from a microphone while `InputMode`'s default is `Loopback`. The doc repair is in front of Phase 7; the diagnosis is not, and may close in a minute by reading one `config.toml`. |
+| **C**, the audio endpoint | [Plan 0168](done/0168-the-studio-stops-surprising-the-author.md) Phase 3 (the sentence) + backlog 0203 (the cause) | `READ-ME-FIRST.md` promises *"There is no audio setup"* and the smoke run captured from a microphone while `InputMode`'s default is `Loopback`. The doc repair is in front of Phase 7; the diagnosis is not, and may close in a minute by reading one `config.toml`. |
 | **C**, the clean quit, the live mode change, the windowless drift | nowhere — they stay here | Two are confirmations, and the third is a six-second reading that Phase 8 is the instrument for. |
 
 ### The two close-brief items that were the architect's
