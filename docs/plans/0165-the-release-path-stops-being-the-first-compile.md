@@ -4,7 +4,7 @@
 > **Created:** 2026-09-10
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0181-the-gate-compiles-every-feature-a-release-ships](../adrs/0181-the-gate-compiles-every-feature-a-release-ships.md)
-> **Closes:** design-backlog 0193, design-backlog 0194
+> **Closes:** design-backlog 0193, design-backlog 0194, design-backlog 0195
 
 ## TL;DR
 
@@ -13,10 +13,14 @@ that publishes it, and that has already eaten one release — `v0.112.0` died at
 `#[cfg(feature = "spout")]` call site and no GitHub Release was ever created. This plan adds a
 `spout` compile job to the per-push gate, makes `release.yml`'s dry-run promise true instead of
 merely written, and then publishes the `v0.113.0` that is tagged on `origin` but was never built.
+Phase 0 comes first and is unrelated to the release path: four Node gates walk a worktree opened
+inside the repository, which fails every push from the main checkout and is what would stop this
+plan's own phases from landing.
 
 ## Context & problem
 
-Three findings from unbreaking CI on 2026-09-10, all in the release path, none in the engine.
+Four findings from unbreaking CI on 2026-09-10. Three are in the release path; the fourth is in
+the gates themselves and blocks the other three from being pushed at all.
 
 **1. Nothing compiles `--features spout` before a tag is pushed.** `ci.yml` contains no occurrence
 of the string `spout`; `.githooks/pre-push` neither. Code behind `#[cfg(feature = "spout")]` is not
@@ -40,6 +44,17 @@ workflows for tags pushed in bulk — more than three at once — and today's tr
 rewrite force-pushed 131 of them. So the tag exists at `c5a08f1`, has zero Release runs, and the
 newest published release remains `v0.103.0`. The trap is now written into `docs/releasing.md`;
 publishing the missed version is Phase 3.
+
+**4. Four Node gates walk a worktree opened inside the repository.** `check-doc-links.mjs`,
+`check-index-rows.mjs`, `check-comment-hygiene.mjs` and `toc.mjs` share one exclusion by copy —
+`SKIP_DIRS = new Set(["target", "node_modules", ".git"])` — and a lane at
+`.claude/worktrees/plan-NNNN-*/` is a full second checkout that is none of those. `check-index-rows`
+then reads the seeded **red** fixture inside that copy, whose skip is anchored to the real repo
+root's absolute path, and convicts; the gate runs at `.githooks/pre-push:147`, so **every push from
+the main checkout fails** while such a lane exists, with nothing wrong in the pushed tree. Worse,
+`toc.mjs` rewrites what it walks, so it can edit markdown inside a live lane's working tree. Backlog
+0195 carries the probes; Phase 0 repairs it, and goes first because nothing else here can be pushed
+until it does.
 
 ## Decision
 
@@ -73,6 +88,30 @@ flowchart LR
 ```
 
 ## Implementation phases
+
+### Phase 0 — The gates stop walking into another lane's checkout
+- **Owner skill:** `dev`
+- **What:** Teach the four tree walks to skip any subdirectory that **contains a `.git` entry**,
+  which states the real rule — never walk into another checkout — and covers a lane opened anywhere
+  rather than only under `.claude`. The entry must be accepted as either a directory *or a file*: a
+  linked worktree's `.git` is a gitlink **file**, which is exactly the case that bit us. Apply the
+  same change to all four, because they carry the exclusion by copy: `scripts/check-doc-links.mjs`,
+  `scripts/check-index-rows.mjs`, `scripts/check-comment-hygiene.mjs`, `scripts/toc.mjs`. Leave the
+  existing `SKIP_DIRS` and both fixture-tree skips alone — a fixture tree holds no `.git`, so it is
+  unaffected, and each must still be scanned when it **is** the root, which is how its bite checks
+  work.
+- **Files touched:** `scripts/check-doc-links.mjs`, `scripts/check-index-rows.mjs`,
+  `scripts/check-comment-hygiene.mjs`, `scripts/toc.mjs`
+- **Done when:** `node scripts/check-index-rows.mjs` exits 0 in a main checkout that has a worktree
+  under `.claude/worktrees/` — the exact condition that reds it today, and the one to reproduce
+  before changing anything, because a fix verified only against a tree without a nested lane has
+  tested nothing. Both `--self-test` runs the hook invokes (`check-index-rows.mjs --self-test` and
+  `toc.mjs --self-test`) still pass, so the seeded fixtures are still reachable as roots. And
+  `node scripts/toc.mjs` rewrites nothing outside the checkout it was run from.
+- **Trap — do not reach for the one-token fix.** Adding `.claude` to `SKIP_DIRS` is smaller and
+  wrong: `check-doc-links.mjs` deliberately covers `.claude/skills/**`, where it found five broken
+  links the first time it ran, and a name-based skip silences that check forever. The rejected
+  alternatives are recorded in backlog 0195.
 
 ### Phase 1 — The gate compiles the `spout` feature
 - **Owner skill:** `dev`
@@ -138,6 +177,13 @@ flowchart LR
   Release runs for `v0.113.0` — but it was not verified against a documented limit in this session.
   If the re-push also produces no run, that inference is wrong and the cause is elsewhere; say so
   rather than re-pushing a third time.
+- **A `.git` probe costs one filesystem stat per directory, on four walks.** Unmeasured here, and
+  expected to disappear next to reading every `.md` in the tree — but it is a cost, and if it shows
+  up in the hook's ~28 s budget the measurement belongs in the commit message.
+- **`check-comment-hygiene.mjs` has the same blindness and has not yet convicted.** It scans `.rs`,
+  `.cpp` and `.h`, so it reads another lane's in-progress Rust today and stays green only because
+  that lane's comments happen to comply. Phase 0 fixes it in the same edit rather than waiting for
+  it to fire.
 - **`v0.112.0` can never be built from its own tree.** Its run is pinned to `f207c46`, a
   pre-rewrite SHA that no longer exists on `origin`, so `actions/checkout` cannot fetch it. The
   version is skipped, permanently. That is a consequence of the history rewrite and is recorded
@@ -164,6 +210,7 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
+| 0 — The gates stop walking into another lane's checkout | dev | not started | |
 | 1 — The gate compiles the `spout` feature | dev | not started | |
 | 2 — A dispatch cannot publish | dev | not started | |
 | 3 — The missed version gets published | human | not started | |

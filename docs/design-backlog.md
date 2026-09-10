@@ -3788,6 +3788,11 @@ copy's blocks happened to be current. Nothing prevented the other outcome.
 - **Raised:** 2026-09-10, when `check-index-rows.mjs` went red against a clean main checkout while
   capturing two unrelated findings. **Owner if taken:** `dev`, on an architect call about which
   exclusion is correct.
+- **PROMOTED 2026-09-10 → [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md)
+  Phase 0**, which takes the **skip any directory holding a `.git` entry** shape — the rule the
+  gates actually mean — and goes first in that plan, because the blocked push blocks the plan's own
+  phases. The `.claude`-in-`SKIP_DIRS` shape was rejected: `check-doc-links.mjs` covers
+  `.claude/skills/**` and found five broken links there on its first run.
 - **Verified 2026-09-10** — the exclusion set has no notion of a nested checkout:
   `present: SKIP_DIRS = new Set\(\["target", "node_modules", "\.git"\]\) in: scripts/check-index-rows.mjs`
 - **Verified 2026-09-10** — and the fixture skip is anchored to one absolute root, which a second
