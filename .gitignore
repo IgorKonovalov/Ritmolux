@@ -84,3 +84,12 @@ site/.astro/
 # tool drops beside whatever it was pointed at while a change is checked in a
 # real browser. Per-session scratch, never evidence for anything committed.
 .playwright-mcp/
+
+# The studio (Plan 0159). `studio/` is the repository's second npm project; it
+# is never shipped by the player's zips and nothing shipped depends on it. Its
+# dependency tree and its three build outputs are derived - the lockfile IS
+# committed, for the reason ADR-0154 gives for the site's: a shell that builds
+# differently on CI than on a laptop is the failure the pins exist to stop.
+studio/node_modules/
+studio/dist/
+studio/release/

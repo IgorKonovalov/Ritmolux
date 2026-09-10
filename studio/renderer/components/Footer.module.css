@@ -1,0 +1,22 @@
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--panel-edge);
+  background: var(--panel);
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  flex-wrap: wrap;
+}
+
+.cell strong,
+.cell code {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.spacer {
+  flex: 1;
+}

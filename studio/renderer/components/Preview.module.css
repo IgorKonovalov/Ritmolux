@@ -1,0 +1,28 @@
+.frame {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  background: #000;
+  border: 1px solid var(--panel-edge);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.canvas {
+  /* The element fills the box and `contain` letterboxes inside it, so the
+     stream's own aspect survives a window of any shape. Sizing by `max-*`
+     instead would pin a 640x360 stream to 640x360 CSS pixels in the middle of
+     a much larger pane. */
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.waiting {
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 12px;
+}

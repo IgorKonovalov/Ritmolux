@@ -1,6 +1,6 @@
 # 0159 — The studio opens
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-09
 > **Owner skill(s):** studio-builder, dev, human
 > **Related ADRs:** [0175](../adrs/0175-the-studio-is-a-separate-application-that-never-draws-a-frame.md) (proposed),
@@ -269,12 +269,11 @@ export type PlayerEvent =
 > from the plan or an unmet done-when is always disclosed. Stays shorter than
 > `## Implementation phases` above.
 
-**Lane:** _(`main` directly, or the worktree path plus its branch — `WORK/rlx-plan-0159` on
-`plan-0159-<slug>`)_
+**Lane:** `WORK/rlx-plan-0159` on `plan-0159-the-studio-opens`.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The skeleton shows the picture | studio-builder | not started | |
+| 1 — The skeleton shows the picture | studio-builder | done | |
 | 2 — The protocol is typed once | studio-builder | not started | |
 | 3 — Parameters move | studio-builder | not started | |
 | 4 — Expressions and palettes | studio-builder | not started | |

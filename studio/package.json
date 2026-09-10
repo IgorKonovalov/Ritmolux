@@ -1,0 +1,52 @@
+{
+  "name": "ritmolux-studio",
+  "version": "0.113.0",
+  "private": true,
+  "description": "The Ritmolux studio: an Electron shell that edits a preset by driving the player.",
+  "main": "dist/main/index.cjs",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently --names \"main,preload,vite,electron\" -c \"yellow,magenta,cyan,green\" \"node scripts/build-main.mjs --watch\" \"node scripts/build-preload.mjs --watch\" \"vite\" \"wait-on http://localhost:5273 file:dist/main/index.cjs file:dist/preload/index.cjs && cross-env ELECTRON_RENDERER_URL=http://localhost:5273 electron .\"",
+    "build:main": "node scripts/build-main.mjs",
+    "build:preload": "node scripts/build-preload.mjs",
+    "build:renderer": "vite build",
+    "build": "npm run build:main && npm run build:preload && npm run build:renderer",
+    "start": "electron .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint \"electron/**/*.ts\" \"renderer/**/*.{ts,tsx}\" \"shared/**/*.ts\"",
+    "lint:fix": "npm run lint -- --fix",
+    "format": "prettier --write \"**/*.{ts,tsx,json,css,md}\"",
+    "typecheck": "tsc --noEmit --project tsconfig.main.json && tsc --noEmit --project tsconfig.preload.json && tsc --noEmit --project tsconfig.renderer.json && tsc --noEmit --project tsconfig.test.json"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "zod": "3.23.8"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.11.1",
+    "@testing-library/jest-dom": "6.5.0",
+    "@testing-library/react": "16.0.1",
+    "@types/node": "22.7.4",
+    "@types/react": "18.3.11",
+    "@types/react-dom": "18.3.0",
+    "@typescript-eslint/eslint-plugin": "8.8.0",
+    "@typescript-eslint/parser": "8.8.0",
+    "@vitejs/plugin-react": "4.3.2",
+    "concurrently": "9.0.1",
+    "cross-env": "7.0.3",
+    "electron": "32.1.2",
+    "esbuild": "0.24.0",
+    "eslint": "9.11.1",
+    "eslint-config-prettier": "9.1.0",
+    "eslint-plugin-react": "7.37.1",
+    "eslint-plugin-react-hooks": "5.0.0",
+    "jsdom": "25.0.1",
+    "prettier": "3.3.3",
+    "typescript": "5.6.2",
+    "vite": "5.4.8",
+    "vitest": "2.1.8",
+    "wait-on": "8.0.1"
+  }
+}

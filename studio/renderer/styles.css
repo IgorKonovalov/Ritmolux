@@ -1,0 +1,33 @@
+/* The studio's tokens. One dark surface: the thing being judged is a picture,
+   and a bright chrome around it changes how its colour reads. */
+:root {
+  --bg: #101014;
+  --panel: #17171d;
+  --panel-edge: #26262f;
+  --text: #e6e6ea;
+  --text-dim: #8b8b98;
+  --accent: #6ee7d0;
+  --warn: #f0b429;
+  --error: #f2686c;
+  --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: ui-monospace, 'Cascadia Mono', 'SF Mono', Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}

@@ -1,0 +1,28 @@
+.banner {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 4px;
+  border: 1px solid var(--panel-edge);
+  background: var(--panel);
+}
+
+.banner[data-kind='error'] {
+  border-color: var(--error);
+}
+
+.banner[data-kind='warning'] {
+  border-color: var(--warn);
+}
+
+.title {
+  font-size: 12px;
+}
+
+.detail {
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
+}

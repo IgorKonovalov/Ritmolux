@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "types": ["vite/client"]
+  },
+  "include": ["renderer/**/*", "shared/**/*"],
+  "exclude": ["node_modules", "dist", "release", "electron/**/*", "**/*.test.ts", "**/*.test.tsx"]
+}
