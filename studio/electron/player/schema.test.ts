@@ -18,6 +18,7 @@ const MINIMAL = JSON.stringify({
   ],
   stages: [{ name: 'bloom', params: [] }],
   tables: [{ name: 'preset', doc: 'The document.', keys: [] }],
+  grammar: { variables: ['bass'], functions: ['sin'], constants: ['pi'] },
 })
 
 describe('parsing a document', () => {
@@ -29,7 +30,11 @@ describe('parsing a document', () => {
       default: 0.4,
       range: [0, 1.5],
       doc: 'A fold.',
+      // A document from before the engine declared kinds still reads, and its
+      // parameters read as continuous — the answer every parameter had then.
+      kind: 'modal',
     })
+    expect(doc.grammar.functions).toEqual(['sin'])
   })
 
   it('keeps the rows it understands when a newer engine adds a field it does not', () => {

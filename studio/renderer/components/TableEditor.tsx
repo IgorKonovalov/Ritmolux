@@ -7,14 +7,21 @@
  * through `editorForKind` and is caught by the test that walks every kind the
  * document declares.
  *
- * The three composite kinds — a list, a map, a nested table — are shown and not
- * edited. A line editor rewrites the line a key sits on, and those three do not
- * sit on one line; a control that pretended otherwise would silently reformat
- * an author's array. That is a real limit and it is on screen, not hidden.
+ * A list and a nested table are shown and not edited. A line editor rewrites the
+ * line a key sits on, and neither of those sits on one line; a control that
+ * pretended otherwise would silently reformat an author's array. That is a real
+ * limit and it is on screen, not hidden.
+ *
+ * A **map** is the exception, and the schema is what makes it one: its entries
+ * are author-named but each entry's kind is declared, so a map whose element
+ * has a control gets rows through `MapEditor`. Which maps those are is
+ * `mapElementEditor`'s answer, not a list here.
  */
-import { editorForKind, literalFor } from '@shared/fields'
+import { editorForKind, literalFor, mapElementEditor } from '@shared/fields'
 import type { TableKey, TableSpec } from '@shared/schema'
 import type { Key } from '@shared/toml'
+
+import { MapEditor } from './MapEditor'
 
 import styles from './TableEditor.module.css'
 
@@ -29,11 +36,24 @@ export interface TableEditorProps {
   table: TableSpec
   /** The keys this preset's copy of the table declares. */
   keys: Key[]
+  /** The entries of one nested section, for a map key written as `[a.b]`. */
+  readSection: (section: string) => Key[]
+  /** Names offered on a map's add row; not a closed set. */
+  suggestions: string[]
   writable: boolean
   onSet: (table: string, key: string, literal: string) => void
+  onRemove: (table: string, key: string) => void
 }
 
-export function TableEditor({ table, keys, writable, onSet }: TableEditorProps): JSX.Element {
+export function TableEditor({
+  table,
+  keys,
+  readSection,
+  suggestions,
+  writable,
+  onSet,
+  onRemove,
+}: TableEditorProps): JSX.Element {
   const held = new Map(keys.map((key) => [key.name, key]))
 
   return (
@@ -41,15 +61,36 @@ export function TableEditor({ table, keys, writable, onSet }: TableEditorProps):
       <h3 className={styles.heading} title={table.doc}>
         {table.name}
       </h3>
-      {table.keys.map((key) => (
-        <Row
-          key={key.name}
-          spec={key}
-          literal={held.get(key.name)?.literal}
-          writable={writable}
-          onSet={(literal) => onSet(table.name, key.name, literal)}
-        />
-      ))}
+      {table.keys.map((key) => {
+        const control = mapElementEditor(key)
+        if (control !== undefined) {
+          // A map of this table is its own TOML section: `[layer.hold]`, not a
+          // value on the `[layer]` line.
+          const section = `${table.name}.${key.name}`
+          return (
+            <MapEditor
+              key={key.name}
+              section={section}
+              spec={key}
+              control={control}
+              entries={readSection(section)}
+              suggestions={suggestions}
+              writable={writable}
+              onSet={onSet}
+              onRemove={onRemove}
+            />
+          )
+        }
+        return (
+          <Row
+            key={key.name}
+            spec={key}
+            literal={held.get(key.name)?.literal}
+            writable={writable}
+            onSet={(literal) => onSet(table.name, key.name, literal)}
+          />
+        )
+      })}
     </section>
   )
 }

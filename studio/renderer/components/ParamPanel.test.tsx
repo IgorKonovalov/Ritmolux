@@ -22,8 +22,15 @@ const ROSTERS: ParamRoster[] = [
   {
     name: 'fragment_field',
     params: [
-      { name: 'warp', default: 0.4, range: [0, 1.5], doc: 'Amplitude of the fold.' },
-      { name: 'drift', default: 1, range: [0, 4], doc: 'How fast it turns.' },
+      { name: 'warp', default: 0.4, range: [0, 1.5], doc: 'Amplitude of the fold.', kind: 'modal' },
+      { name: 'drift', default: 1, range: [0, 4], doc: 'How fast it turns.', kind: 'modal' },
+      {
+        name: 'mirror_order',
+        default: 6,
+        range: [0, 12],
+        doc: 'How many mirrors.',
+        kind: 'structural',
+      },
     ],
   },
 ]
@@ -112,10 +119,59 @@ describe('what each binding renders as', () => {
 
   it('builds every row from the schema and none from a list of its own', () => {
     panel({
-      rosters: [{ name: 'invented', params: [{ name: 'x', default: 0, range: [0, 1], doc: '' }] }],
+      rosters: [
+        {
+          name: 'invented',
+          params: [{ name: 'x', default: 0, range: [0, 1], doc: '', kind: 'modal' }],
+        },
+      ],
       bindings: [],
     })
     expect(screen.getByLabelText('x')).toBeDefined()
     expect(screen.queryByLabelText('warp')).toBeNull()
+  })
+})
+
+/**
+ * A parameter the engine rounds is not offered a continuous control
+ * (Plan 0167 Phase 6).
+ *
+ * `kind` is the whole of the rule: `structural` means the engine quantizes the
+ * value once before the scene sees it (ADR-0180 rule 2), so a slider offering
+ * three quarters of a step offers travel that draws the same picture — and a
+ * value sent unrounded would have the studio reporting 6.4 mirrors while the
+ * player drew 6.
+ */
+describe('what the kind decides', () => {
+  it('gives a structural parameter whole steps', () => {
+    panel()
+    expect(screen.getByLabelText('mirror_order')).toHaveProperty('step', '1')
+  })
+
+  it('leaves a modal parameter a step fine enough to read as continuous', () => {
+    panel()
+    const slider = screen.getByLabelText('warp') as HTMLInputElement
+    expect(Number(slider.step)).toBeLessThan(0.01)
+  })
+
+  it('sends the value the engine would have rounded to, not the one dragged', () => {
+    const { onDrag, onCommit } = panel({ bindings: [] })
+    const slider = screen.getByLabelText('mirror_order')
+    fireEvent.change(slider, { target: { value: '6.4' } })
+    expect(onDrag).toHaveBeenCalledWith('mirror_order', 6)
+    fireEvent.pointerUp(slider)
+    expect(onCommit).toHaveBeenCalledWith('mirror_order', 6)
+  })
+
+  it('reads out a whole number rather than three decimals of one', () => {
+    panel({ bindings: [] })
+    expect(screen.getByText('6')).toBeDefined()
+  })
+
+  it('rounds a fractional value the file holds, because the engine will', () => {
+    panel({
+      bindings: [{ kind: 'const', name: 'mirror_order', value: 5.7, line: 7, quote: '"' }],
+    })
+    expect(screen.getByLabelText('mirror_order')).toHaveProperty('value', '6')
   })
 })

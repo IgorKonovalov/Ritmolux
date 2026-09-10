@@ -226,13 +226,36 @@ export function setKey(text: string, table: string, key: string, literal: string
     return lines.join('\n')
   }
   if (paramsStart === -1) {
-    const tail = lines.length > 0 && lines[lines.length - 1] === '' ? lines.length - 1 : lines.length
+    const tail =
+      lines.length > 0 && lines[lines.length - 1] === '' ? lines.length - 1 : lines.length
     lines.splice(tail, 0, `${eol}`, `[${table}]${eol}`, fresh)
     return lines.join('\n')
   }
   const inTable = entries.filter((entry) => entry.line > paramsStart && entry.line < paramsEnd)
   const at = inTable.length > 0 ? inTable[inTable.length - 1].line + 1 : paramsStart + 1
   lines.splice(at, 0, fresh)
+  return lines.join('\n')
+}
+
+/**
+ * `text` with `table`'s `key` removed, and nothing else changed.
+ *
+ * The whole line goes, comment and indent with it, because the line belongs to
+ * the key: an author-named entry of a map — `[hold] petals` — has no meaning
+ * left once the name is gone. A key the file does not hold is not an error; the
+ * document comes back untouched, so a removal is idempotent and a stale click
+ * cannot corrupt anything.
+ *
+ * The table header is **left standing** when the last key goes. An empty
+ * `[hold]` is legal and means the same as no `[hold]` at all, and removing it
+ * would take a blank line and any comment above it with it.
+ */
+export function removeKey(text: string, table: string, key: string): string {
+  const lines = text.split('\n')
+  const { entries } = scan(lines, table)
+  const existing = entries.find((entry) => entry.name === key)
+  if (existing === undefined) return text
+  lines.splice(existing.line, 1)
   return lines.join('\n')
 }
 
@@ -272,7 +295,8 @@ export function setConstant(text: string, name: string, value: number): string {
   if (paramsStart === -1) {
     // No table: append one. A trailing blank line is how these files end, so
     // the header goes after it rather than making a second one.
-    const tail = lines.length > 0 && lines[lines.length - 1] === '' ? lines.length - 1 : lines.length
+    const tail =
+      lines.length > 0 && lines[lines.length - 1] === '' ? lines.length - 1 : lines.length
     lines.splice(tail, 0, `${eol}`, `[params]${eol}`, fresh)
     return lines.join('\n')
   }
@@ -359,7 +383,8 @@ export function setPaletteName(text: string, name: string): string {
   const eol = lineEnding(lines)
   const fresh = `name = "${name}"${eol}`
   if (paramsStart === -1) {
-    const tail = lines.length > 0 && lines[lines.length - 1] === '' ? lines.length - 1 : lines.length
+    const tail =
+      lines.length > 0 && lines[lines.length - 1] === '' ? lines.length - 1 : lines.length
     lines.splice(tail, 0, `${eol}`, `[palette]${eol}`, fresh)
     return lines.join('\n')
   }

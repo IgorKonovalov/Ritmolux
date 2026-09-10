@@ -2,16 +2,15 @@
  * The highlighter colours structure, and colours a name only when something
  * told it what that name is (Plan 0159 Phase 7).
  *
- * The plan asks for a token list **generated from the schema's function and
- * variable roster**. That roster does not exist: `--schema` declares systems,
- * stages and tables, and the engine's own `VAR_NAMES` and function match are
- * not exported. So the list is not generated here and it is not typed here
- * either — `presetLanguage` takes a roster and colours exactly what it is
- * given. These assertions pin that: with no roster, no identifier is a
- * function or a variable; with one, every name in it is and nothing else is.
+ * `presetLanguage` takes a roster and colours exactly what it is given: with no
+ * roster, no identifier is a function, a variable or a constant; with one,
+ * every name in it is and nothing else is. The roster the studio actually hands
+ * it is the schema document's `grammar`, generated from the engine's own
+ * declarations, so a name added to the grammar is coloured with no edit here
+ * (ADR-0170).
  *
- * The day the schema carries the roster, the wiring is one argument and this
- * file becomes the test the plan asked for.
+ * The last block walks the **live** roster, so this file states no vocabulary
+ * of its own beyond the two-name fixture the arms are pinned with.
  */
 import { StreamLanguage } from '@codemirror/language'
 import { EditorState } from '@codemirror/state'
@@ -42,6 +41,7 @@ function tokens(line: string, grammar?: Grammar): string[] {
 const GRAMMAR: Grammar = {
   functions: ['sin', 'clamp'],
   variables: ['bass', 'time'],
+  constants: ['pi', 'tau'],
 }
 
 describe('with no roster, which is what the studio has today', () => {
@@ -52,20 +52,22 @@ describe('with no roster, which is what the studio has today', () => {
     )
   })
 
-  it('colours no identifier inside an expression as a function or a variable', () => {
-    const inside = tokens('warp = "sin(bass) + clamp(time, 0, 1)"')
+  it('colours no identifier inside an expression as a name of any kind', () => {
+    const inside = tokens('warp = "sin(bass) + clamp(time, 0, 1) * pi"')
     // Not "some names known and others not" — that is the state that tells an
     // author a real function is a typo.
     expect(inside).not.toContain('grammarFunction')
     expect(inside).not.toContain('grammarVariable')
+    expect(inside).not.toContain('grammarConstant')
   })
 })
 
-describe('with a roster, which is what it takes when the engine exports one', () => {
+describe('with a roster, which is what the schema now carries', () => {
   it('colours every name the roster carries', () => {
-    const inside = tokens('warp = "sin(bass)"', GRAMMAR)
+    const inside = tokens('warp = "sin(bass) * tau"', GRAMMAR)
     expect(inside).toContain('grammarFunction')
     expect(inside).toContain('grammarVariable')
+    expect(inside).toContain('grammarConstant')
   })
 
   it('colours no name the roster does not carry', () => {
@@ -74,6 +76,7 @@ describe('with a roster, which is what it takes when the engine exports one', ()
     const inside = tokens('warp = "wobble(2)"', GRAMMAR)
     expect(inside).not.toContain('grammarFunction')
     expect(inside).not.toContain('grammarVariable')
+    expect(inside).not.toContain('grammarConstant')
   })
 
   it('still colours the numbers and the operators, which need no roster at all', () => {

@@ -1,0 +1,73 @@
+.map {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--panel-edge);
+  border-radius: 4px;
+}
+
+.heading {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.doc {
+  margin: 0 0 4px;
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.empty {
+  margin: 0 0 4px;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.row,
+.add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.add {
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--panel-edge);
+}
+
+.name {
+  font-family: var(--mono);
+  font-size: 11px;
+  min-width: 0;
+}
+
+.control {
+  font-family: var(--mono);
+  font-size: 11px;
+  min-width: 0;
+}
+
+.remove,
+.addButton {
+  background: none;
+  border: 1px solid var(--panel-edge);
+  border-radius: 3px;
+  color: var(--text-dim);
+  font-size: 11px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.remove:hover:enabled,
+.addButton:hover:enabled {
+  color: var(--text);
+  border-color: var(--accent);
+}

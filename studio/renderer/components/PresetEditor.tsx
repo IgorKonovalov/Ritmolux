@@ -15,7 +15,7 @@ import { EditorView, keymap, lineNumbers } from '@codemirror/view'
 import { useEffect, useRef, useState } from 'react'
 
 import { markersFor, type PlayerProblem } from '../editor/diagnostics'
-import { presetLanguage } from '../editor/expr-language'
+import { presetLanguage, type Grammar } from '../editor/expr-language'
 
 import styles from './PresetEditor.module.css'
 
@@ -23,24 +23,34 @@ export interface PresetEditorProps {
   path: string | undefined
   /** The file as the player last loaded it. */
   text: string | undefined
+  /** The engine's identifier rosters, off the schema document it printed. */
+  grammar: Grammar
   problems: PlayerProblem[]
   onSave: (text: string) => void
 }
 
-const BASE: Extension[] = [
-  lineNumbers(),
-  history(),
-  lintGutter(),
-  syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-  presetLanguage(),
-  EditorView.lineWrapping,
-  EditorView.theme({
-    '&': { height: '100%', fontSize: '12px' },
-    '.cm-scroller': { fontFamily: 'var(--mono)' },
-  }),
-]
+function base(grammar: Grammar): Extension[] {
+  return [
+    lineNumbers(),
+    history(),
+    lintGutter(),
+    syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+    presetLanguage(grammar),
+    EditorView.lineWrapping,
+    EditorView.theme({
+      '&': { height: '100%', fontSize: '12px' },
+      '.cm-scroller': { fontFamily: 'var(--mono)' },
+    }),
+  ]
+}
 
-export function PresetEditor({ path, text, problems, onSave }: PresetEditorProps): JSX.Element {
+export function PresetEditor({
+  path,
+  text,
+  grammar,
+  problems,
+  onSave,
+}: PresetEditorProps): JSX.Element {
   const host = useRef<HTMLDivElement>(null)
   const view = useRef<EditorView>()
   const [dirty, setDirty] = useState(false)
@@ -64,7 +74,7 @@ export function PresetEditor({ path, text, problems, onSave }: PresetEditorProps
         // into this view rather than two that have to agree.
         doc: '',
         extensions: [
-          ...BASE,
+          ...base(grammar),
           keymap.of([
             {
               key: 'Mod-s',
@@ -91,8 +101,11 @@ export function PresetEditor({ path, text, problems, onSave }: PresetEditorProps
       editor.destroy()
       view.current = undefined
     }
-    // Built once. The document and the markers are pushed in below.
-  }, [])
+    // Built once. `grammar` is in the deps because the mode is built from it,
+    // and it is one object for the life of the window — the schema is a property
+    // of the binary and is fetched once — so this does not rebuild the view and
+    // does not drop the undo history.
+  }, [grammar])
 
   // A different file, or the same one reloaded. The author's unsaved edit wins
   // over a reload of the same file; a genuinely different file always replaces.

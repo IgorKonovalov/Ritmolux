@@ -14,9 +14,12 @@ import { describe, expect, it } from 'vitest'
 
 import {
   formatValue,
+  readKeys,
   readPalette,
   readParams,
+  removeKey,
   setConstant,
+  setKey,
   setPaletteName,
   setStop,
 } from './toml'
@@ -126,9 +129,7 @@ describe('reading a binding', () => {
     // is a load error and not a shorter constant. Rewriting one in place would
     // preserve a file that does not load.
     const bare = '[params]\nwarp = 0.4\n'
-    expect(readParams(bare)).toEqual([
-      { kind: 'opaque', name: 'warp', text: '0.4', line: 1 },
-    ])
+    expect(readParams(bare)).toEqual([{ kind: 'opaque', name: 'warp', text: '0.4', line: 1 }])
   })
 
   it('reads only the params table, not every key in the file', () => {
@@ -225,9 +226,7 @@ describe('the palette table', () => {
 
   it('moves one stop and keeps the comment that names its colour', () => {
     const moved = setStop(custom, 0, { at: 0.25 })
-    expect(moved.split('\n')[2]).toBe(
-      '  { at = 0.25, color = "#475a93" },  # lapis - the trunks',
-    )
+    expect(moved.split('\n')[2]).toBe('  { at = 0.25, color = "#475a93" },  # lapis - the trunks')
     expect(moved.split('\n')[3]).toBe(custom.split('\n')[3])
   })
 
@@ -250,7 +249,9 @@ describe('the palette table', () => {
   })
 
   it('adds the table when the preset has no palette at all', () => {
-    expect(setPaletteName('name = "Probe"\n', 'ice')).toBe('name = "Probe"\n\n[palette]\nname = "ice"\n')
+    expect(setPaletteName('name = "Probe"\n', 'ice')).toBe(
+      'name = "Probe"\n\n[palette]\nname = "ice"\n',
+    )
   })
 
   it('refuses to name a built-in over a preset that authored its own stops', () => {
@@ -271,5 +272,66 @@ describe('the palette table', () => {
       expect(readPalette(setStop(text, 0, { at: 0.11 })).stops[0].at).toBe(0.11)
     }
     expect(checked).toBeGreaterThan(5)
+  })
+})
+
+/**
+ * An author-named map's entries are added, edited and removed one line at a
+ * time (Plan 0167 Phase 6).
+ *
+ * `[hold]` is the case this exists for: its keys are parameter names the author
+ * chose, so an editor can only work line by line, and the file around them is
+ * the project's own record.
+ */
+const HELD = [
+  '# A preset with a hold table.',
+  'name   = "Probe"',
+  'system = "spectrum"',
+  '',
+  '[hold]',
+  'petals = "beat"   # on the downbeat',
+  'warp   = 0.5',
+  '',
+  '[feedback]',
+  'warp = "zoom"',
+].join('\n')
+
+describe('an author-named map table', () => {
+  it('reads the entries the file holds, in file order', () => {
+    expect(readKeys(HELD, 'hold').map((key) => key.name)).toEqual(['petals', 'warp'])
+    expect(readKeys(HELD, 'hold')[0].literal).toBe('"beat"')
+  })
+
+  it('removes exactly the line the entry sits on', () => {
+    const after = removeKey(HELD, 'hold', 'petals')
+    expect(readKeys(after, 'hold').map((key) => key.name)).toEqual(['warp'])
+    expect(after.split('\n').length).toBe(HELD.split('\n').length - 1)
+    // The neighbours are untouched, comment column and all.
+    expect(after).toContain('warp   = 0.5')
+    expect(after).toContain('[feedback]')
+  })
+
+  it('leaves the header standing when the last entry goes', () => {
+    let after = removeKey(HELD, 'hold', 'petals')
+    after = removeKey(after, 'hold', 'warp')
+    // An empty `[hold]` means what no `[hold]` means, and taking the header out
+    // would take the blank line and any comment above it too.
+    expect(after).toContain('[hold]')
+    expect(readKeys(after, 'hold')).toEqual([])
+  })
+
+  it('is a no-op for an entry the file does not hold', () => {
+    expect(removeKey(HELD, 'hold', 'drift')).toBe(HELD)
+  })
+
+  it('adds an entry into the table that is already there', () => {
+    const after = setKey(HELD, 'hold', 'drift', '"bar"')
+    expect(readKeys(after, 'hold').map((key) => key.name)).toEqual(['petals', 'warp', 'drift'])
+    expect(after).toContain('[feedback]')
+  })
+
+  it('keeps an author comment column when it rewrites an entry', () => {
+    const after = setKey(HELD, 'hold', 'petals', '"bar"')
+    expect(after).toContain('petals = "bar"   # on the downbeat')
   })
 })

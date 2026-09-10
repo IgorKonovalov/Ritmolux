@@ -14,10 +14,20 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import { rostersFor } from '@shared/schema'
+import { mapElementEditor } from '@shared/fields'
+import { rostersFor, type SchemaDocument, type TableKey } from '@shared/schema'
 import { presetPath, structuralTables } from '@shared/templates'
-import { readKeys, setKey, setPaletteName, setStop, type Stop } from '@shared/toml'
+import {
+  readKeys,
+  removeKey,
+  setKey,
+  setPaletteName,
+  setStop,
+  type Key,
+  type Stop,
+} from '@shared/toml'
 
+import { MapEditor } from '../components/MapEditor'
 import { PaletteEditor } from '../components/PaletteEditor'
 import { ParamPanel } from '../components/ParamPanel'
 import { PresetEditor } from '../components/PresetEditor'
@@ -50,6 +60,22 @@ export interface EditorProps {
 
 const TABS = ['parameters', 'structure', 'palette', 'file', 'library'] as const
 type Tab = (typeof TABS)[number]
+
+/**
+ * The document root's own map keys — `[hold]`, `[smoothing]` — which have no
+ * `TableSpec` of their own because in the file they are sections at the top
+ * level rather than tables a preset writes under a header of the schema's
+ * naming.
+ *
+ * `structuralTables` drops the root for a good reason: its `system` has the
+ * picker, its `params` has the parameter panel, and its table-valued keys are
+ * each rendered as their own section. What is left over is exactly the maps,
+ * and until this they had nowhere to be.
+ */
+function rootMaps(document: SchemaDocument): TableKey[] {
+  const root = document.tables.find((table) => table.name === 'preset')
+  return (root?.keys ?? []).filter((key) => mapElementEditor(key) !== undefined)
+}
 
 export function Editor({
   system,
@@ -114,6 +140,35 @@ export function Editor({
     [text, write, onProblem],
   )
 
+  const readSection = useCallback(
+    (section: string): Key[] => (text === undefined ? [] : readKeys(text, section)),
+    [text],
+  )
+  const onSetKey = useCallback(
+    (section: string, key: string, literal: string) =>
+      edit((current) => setKey(current, section, key, literal)),
+    [edit],
+  )
+  const onRemoveKey = useCallback(
+    (section: string, key: string) => edit((current) => removeKey(current, section, key)),
+    [edit],
+  )
+
+  /**
+   * Every parameter the active preset may bind, offered as the names a map's
+   * add row suggests. The same roster the parameter panel is built from, so a
+   * `[hold]` entry is offered exactly the names a hold can reach.
+   */
+  const bindable = useMemo(
+    () =>
+      schema.status === 'ready'
+        ? rostersFor(schema.document, system).flatMap((roster) =>
+            roster.params.map((spec) => spec.name),
+          )
+        : [],
+    [schema, system],
+  )
+
   if (schema.status === 'loading') {
     return <p className={styles.note}>Reading the engine&apos;s parameter schema…</p>
   }
@@ -174,15 +229,34 @@ export function Editor({
             // keys `preset`, and in the file they sit before the first header.
             onChange={(next) => edit((current) => setKey(current, '', 'system', `"${next}"`))}
           />
+          {rootMaps(schema.document).map((key) => {
+            const control = mapElementEditor(key)
+            if (control === undefined) return null
+            return (
+              <MapEditor
+                key={key.name}
+                // A root map is a top-level section: `[hold]`, not `[preset.hold]`.
+                section={key.name}
+                spec={key}
+                control={control}
+                entries={readSection(key.name)}
+                suggestions={bindable}
+                writable={writable}
+                onSet={onSetKey}
+                onRemove={onRemoveKey}
+              />
+            )
+          })}
           {structuralTables(schema.document).map((table) => (
             <TableEditor
               key={table.name}
               table={table}
-              keys={text === undefined ? [] : readKeys(text, table.name)}
+              keys={readSection(table.name)}
+              readSection={readSection}
+              suggestions={bindable}
               writable={writable}
-              onSet={(name, key, literal) =>
-                edit((current) => setKey(current, name, key, literal))
-              }
+              onSet={onSetKey}
+              onRemove={onRemoveKey}
             />
           ))}
         </div>
@@ -233,6 +307,7 @@ export function Editor({
           <PresetEditor
             path={state.status === 'ready' ? state.path : undefined}
             text={text}
+            grammar={schema.document.grammar}
             problems={problems}
             onSave={(next) => edit(() => next)}
           />

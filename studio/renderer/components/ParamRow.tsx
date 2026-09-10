@@ -12,6 +12,14 @@
  * `ctl/param`, which the player applies on its next frame and holds; only the
  * release writes the file. So the picture follows the finger and the disk sees
  * one write per gesture.
+ *
+ * **What the value means decides the control.** The engine rounds a
+ * `structural` parameter once before the scene sees it (ADR-0180 rule 2), so
+ * offering it a continuous slider would show travel that changes nothing: three
+ * quarters of a step draws the same picture as the step. Those get whole steps,
+ * and the value they send is the value the engine would have rounded to — a
+ * slider that reported 6.4 petals while the scene drew 6 would be the studio
+ * disagreeing with the player about what it just did.
  */
 import { useEffect, useState } from 'react'
 
@@ -42,6 +50,15 @@ export interface ParamRowProps {
  */
 const STEPS = 200
 
+/**
+ * `value` as the engine will receive it: rounded for a parameter whose value
+ * carries an integer meaning, untouched otherwise. The same rule
+ * `ParamKind::quantize` applies on the other side of the socket.
+ */
+function quantize(spec: ParamSpec, value: number): number {
+  return spec.kind === 'structural' ? Math.round(value) : value
+}
+
 export function ParamRow({
   spec,
   binding,
@@ -49,7 +66,7 @@ export function ParamRow({
   onDrag,
   onCommit,
 }: ParamRowProps): JSX.Element {
-  const bound = binding?.kind === 'const' ? binding.value : spec.default
+  const bound = quantize(spec, binding?.kind === 'const' ? binding.value : spec.default)
   const [value, setValue] = useState(bound)
 
   // The file is the durable channel: when a reload brings a different value in,
@@ -79,8 +96,9 @@ export function ParamRow({
   const commit = (): void => {
     if (writable) onCommit(spec.name, value)
   }
-  const move = (next: number): void => {
-    if (!Number.isFinite(next)) return
+  const move = (raw: number): void => {
+    if (!Number.isFinite(raw)) return
+    const next = quantize(spec, raw)
     setValue(next)
     onDrag(spec.name, next)
   }
@@ -91,6 +109,10 @@ export function ParamRow({
   // parameters are in this arm, the pan offsets among them.
   const unbounded = spec.range === null
   const [lo, hi] = spec.range ?? [0, 1]
+  // A whole step for a structural parameter, and a two-hundredth of the range
+  // for a modal one — fine enough to read as continuous, coarse enough that one
+  // gesture is tens of datagrams rather than hundreds.
+  const step = spec.kind === 'structural' ? 1 : (hi - lo) / STEPS
 
   return (
     <div className={styles.row} title={spec.doc}>
@@ -101,7 +123,9 @@ export function ParamRow({
         id={id}
         className={unbounded ? styles.field : styles.slider}
         type={unbounded ? 'number' : 'range'}
-        {...(unbounded ? { step: 'any' } : { min: lo, max: hi, step: (hi - lo) / STEPS })}
+        {...(unbounded
+          ? { step: spec.kind === 'structural' ? 1 : 'any' }
+          : { min: lo, max: hi, step })}
         value={value}
         onChange={(event) => move(event.currentTarget.valueAsNumber)}
         // A gesture ends with a pointer release, a key release or the control
@@ -112,7 +136,7 @@ export function ParamRow({
       />
       {!unbounded && (
         <output className={styles.value} htmlFor={id}>
-          {value.toFixed(3)}
+          {spec.kind === 'structural' ? value.toFixed(0) : value.toFixed(3)}
         </output>
       )}
       {binding === undefined && <span className={styles.note}>default</span>}
