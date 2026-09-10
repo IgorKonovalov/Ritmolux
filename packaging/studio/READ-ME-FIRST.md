@@ -57,7 +57,20 @@ The Studio's picture is a small, scaled copy either way, so it is not the place
 to judge a fine detail - the player's own window is.
 
 Start any music. The picture reacts to whatever is already playing, out of the
-default output device. There is no audio setup.
+device your computer is playing it through. Nothing needs setting up first.
+
+IF THE PICTURE DOES NOT REACT to music you can plainly hear, the player is
+listening to the wrong thing - which does happen, and is worth reporting rather
+than working around. Open diagnostics.log in the folder named in section 4 and
+look at the last column of any row. It names the device the player opened:
+
+    live WASAPI 48000/2 Speakers (Realtek(R) Audio)
+
+If that names a microphone or a headset input instead of the speakers or
+headphones you are actually listening to, that is the fault, and that line is
+the single most useful thing to send back. Setting your default playback device
+in the system sound settings and starting the Studio again is worth one try; if
+it changes nothing, say so - that is a finding, not something you did wrong.
 
 Along the bottom of the Studio is a strip of readings: the player's version, the
 address it is listening on, the size and rate of the picture, and how many
@@ -135,7 +148,7 @@ Deleting either folder resets that half; both are recreated on the next launch.
 5. What to send back
 --------------------
 
-Six things, however roughly:
+A few things, however roughly:
 
   - Did it open, and what did SmartScreen or macOS do?
   - Did you get two windows, and did the picture react to music?
