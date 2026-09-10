@@ -1,0 +1,68 @@
+# attractor_emberdrift - a Clifford figure turning slowly inside its own smoke.
+#
+# THE LOOK: a woven disc of ember-coloured particles, held long enough by `fade`
+# that the figure sits inside a soft ghost of where it just was. The accumulation
+# is drifted upward and grown slightly by the attractor's own feedback transform,
+# so the smoke leaves the figure rather than blurring it in place.
+#
+# WHAT DRIVES IT: `tuple` is pinned - the figure never cuts. Motion comes from
+# `zoom` breathing on bass and `size` (the deposit footprint) on mid, both eased,
+# plus a `reseed` gated well above the onset mean so the cloud is shaken a few
+# times a passage rather than every hit. Brightness is a constant: this preset
+# spends its energy on geometry.
+#
+# WHAT TO LOOK AT WHEN JUDGING: the smoke. It should read as a drift with a
+# direction, not as a symmetric blur. Second: the reseed - watch whether the
+# shake reads as the figure being disturbed and recovering, or as a glitch.
+
+system = "attractor"
+name = "Ember Drift"
+
+[particles]
+family = "clifford"
+density = 1.0
+
+[palette]
+name = "ember"
+
+[generator]
+seed = 11
+
+[smoothing]
+zoom = 0.35
+size = 0.25
+brightness = 0.5
+
+[params]
+tuple = "4"
+
+# Breathing, not pumping: 0.95 base, bass tops out 0.34 above it.
+zoom = "0.90 + clamp(bass * 0.35, 0, 0.30)"
+size = "0.34 + clamp(mid * 0.21, 0, 0.18)"
+brightness = "0.22"
+
+# The trail, and the transform that gives it a direction.
+fade = "0.90"
+fb_zoom = "1.012"
+fb_dy = "-0.035"
+fb_rotate = "0.02"
+fb_warp = "0.06"
+
+# Colour: a narrow ember band, drifting along the palette over about a minute.
+hue = "0"
+hue_spread = "0.34"
+hue_center = "0.42 + sin(time * 0.09) * 0.16"
+saturation = "1.0"
+
+# A shake, not a wipe. onset mean is 0.15, so 0.62 fires on the strong hits only.
+reseed = "onset > 0.62"
+
+bg_hue = "0.02"
+bg_bright = "0.07"
+bg_vignette = "0.7"
+occlude = "0.6"
+
+bloom_amount = "0.15"
+bloom_threshold = "1.3"
+bloom_radius = "1.8"
+exposure = "0.95"

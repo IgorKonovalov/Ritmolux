@@ -1,0 +1,69 @@
+# reaction_tidepool - Gray-Scott coral read as a shallow rock pool.
+#
+# THE LOOK: pale coral fingers growing through cold green water, drawn as iso-bands
+# rather than as a smooth gradient so the field reads as a chart of a pool floor.
+# Slow and ambient: nothing here strobes.
+#
+# WHAT DRIVES IT: `flow` (simulation speed) carries the music, so loud passages
+# grow the coral faster instead of making it brighter - the energy is spent on
+# structure. `inject` drops fresh reagent on a beat, which is the only sharp event
+# in the file. `feed`/`kill` sit inside the live band with a deliberately TINY
+# reactive span: this parameter pair has a failure state at both ends (the field
+# fills solid and there is no contour left to draw), so a house-rule gain here
+# would render flat mustard. See the "cap is a failure state" note in the roster.
+#
+# WHAT TO LOOK AT WHEN JUDGING: the contour bands. They should stay legible while
+# the pattern moves; if the field goes to a single flat colour the regime has
+# drifted out of the live band. Second: whether the beat injections read as new
+# growth appearing rather than as a flash.
+
+system = "reaction_diffusion"
+name = "Tidepool"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#0a333e" },
+  { at = 0.30, color = "#136059" },
+  { at = 0.58, color = "#33987e" },
+  { at = 0.80, color = "#a6dfb8" },
+  { at = 1.00, color = "#f7ecd0" },
+]
+
+[generator]
+seed = 3
+
+[smoothing]
+flow = 0.45
+inject = { attack = 0.02, release = 0.55 }
+contour = 0.6
+
+[params]
+# The regime. Base inside the coral band; the reactive span is +/- 0.0018 on feed
+# and +/- 0.0009 on kill, which travels between two living states and never leaves
+# the band. The clamps bound the BAND, not the term.
+feed = "0.0546 + noise(time * 0.045) * 0.0016 + clamp(bass * 1.18, 0, 1) * 0.0018"
+kill = "0.0621 + noise(time * 0.038 + 90) * 0.0007 - clamp(mid * 1.18, 0, 1) * 0.0009"
+
+# Where the music actually goes: how fast the reaction advances.
+flow = "0.55 + clamp(bass * 1.35, 0, 1.15) + clamp(mid * 0.53, 0, 0.45)"
+inject = "clamp(onset * 0.83, 0, 0.5) * beat"
+
+# Drawing: iso-bands over the concentration, plus a light hatch along the gradient.
+contour = "5 + clamp(treb * 5.0, 0, 3)"
+hatch = "3.5"
+glow = "1.05"
+
+hue = "0.0"
+color_span = "0.90"
+color_center = "0.46"
+saturation = "0.95"
+zoom = "1.25"
+
+bg_hue = "0.08"
+bg_bright = "0.18"
+bg_vignette = "0.55"
+occlude = "0.9"
+
+bloom_amount = "0.18"
+bloom_threshold = "1.25"
+exposure = "1.0"

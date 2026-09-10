@@ -1,0 +1,70 @@
+# fragment_etchingplate - the same field engine as an intaglio print.
+#
+# THE LOOK: no colour at all. A heavily folded domain-warp field, quantized into
+# seven flat bands with a hairline contour at every band edge, then run through the
+# terminal ink remap at FULL strength - dark indigo ink on warm cream paper. The
+# result should read as a printed plate rather than as a lit screen.
+#
+# WHAT DRIVES IT: `warp` (the fold amplitude) on bass and `fold_speed` on mid, so
+# the plate's engraving reorganizes with the music while the ink and paper never
+# move. `palette_contour` takes a treble term, which thickens the hairlines - the
+# only place in this file where a band adds ink rather than moving it.
+#
+# `ink_amount` is pinned at 1 and not bound. A PARTIAL ink amount is a transition,
+# not a resting value: it blends toward a near-black source and greys the paper,
+# so an eased one spends most of its life in the muddy middle. Pick 0 or 1.
+#
+# WHAT TO LOOK AT WHEN JUDGING: the paper. It must stay clean cream in the empty
+# regions - any grey cast means something is lifting the floor (bloom, bg_bright,
+# exposure) and the print reading is gone. Second: whether the seven bands still
+# read as separate at speed, or whether the fold outruns them.
+
+system = "fragment_field"
+name = "Etching Plate"
+
+[palette]
+name = "mono"
+
+[generator]
+seed = 37
+
+[smoothing]
+warp = 0.4
+fold_speed = 0.55
+palette_contour = { attack = 0.03, release = 0.45 }
+
+[params]
+warp = "0.72 + clamp(bass * 0.66, 0, 0.56)"
+field_speed = "0.5"
+fold_speed = "0.35 + clamp(mid * 0.53, 0, 0.45)"
+zoom = "2.2"
+
+# The plate: hard bands with a drawn edge, not a gradient.
+palette_steps = "7"
+palette_contour = "0.35 + clamp(treb * 0.42, 0, 0.25)"
+
+hue = "0"
+color_span = "0.95"
+color_center = "0.0"
+saturation = "0"
+# High enough that the field actually REACHES the ink pole. Below about 1.1 the
+# darkest region lands mid-ramp and the plate prints as grey on grey.
+glow = "1.35"
+flash = "0"
+
+# Bloom off: the bright pass blurs exactly the hard edges this look is made of,
+# and there is no highlight to find under an ink remap anyway.
+bloom_amount = "0"
+bg_bright = "0"
+occlude = "1.0"
+exposure = "1.0"
+
+# The remap. Pinned at 1 - see the header.
+ink_amount = "1"
+paper_hue = "0.11"
+paper_sat = "0.16"
+paper_bright = "0.95"
+ink_hue = "0.66"
+ink_sat = "0.55"
+ink_bright = "0.10"
+ink_gamma = "0.62"

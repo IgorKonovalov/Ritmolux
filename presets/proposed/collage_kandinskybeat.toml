@@ -1,0 +1,88 @@
+# collage_kandinskybeat - flat opaque graphic shapes, recomposed on the hit.
+#
+# THE LOOK: the one system in the engine where one object is in FRONT of another.
+# Bars, rings, sectors and checkers laid along a dominant diagonal on off-white
+# paper - hard edges, no glow, no bloom. The reference is Kandinsky's Bauhaus
+# period rather than anything luminous.
+#
+# WHAT DRIVES IT: `recompose` is edge-triggered, so the whole canvas is thrown away
+# and laid out again when the gate rises past 0.5 - here on a strong onset, with a
+# 0.22 s blend so it dissolves rather than cuts. Between recompositions `pump_size`
+# and `pump_alpha` breathe the elements (phase-offset per element, so the canvas
+# never flashes as one sheet), `density` admits and retires elements on the mids,
+# and `angle_bias` drifts the whole composition's lean.
+#
+# THE PALETTE IS THE OTHER HALF OF THE DESIGN and is authored as eight PLATEAUS,
+# not as a gradient: pairs of stops a ten-thousandth apart, at the eight band
+# centres a layout grammar draws its colours from (k/8 + 1/16). Every colour is
+# below sRGB byte 0xcb, which is where the tonemap is exactly the identity - so
+# the fills survive the post chain unshaded and the edges stay hard with no halo.
+#
+# WHAT TO LOOK AT WHEN JUDGING: the edges and the fills. A halo or a shaded fill
+# means a colour went over the knee. Second: whether a recomposition reads as a new
+# picture or as the same picture shuffled - if it is the latter, `seed` is not
+# advancing and `size_hierarchy` is too low to make a subject.
+
+system = "shape_collage"
+name = "Kandinsky Beat"
+
+[palette]
+stops = [
+  { at = 0.0000, color = "#c0472c" },
+  { at = 0.1249, color = "#c0472c" },
+  { at = 0.1250, color = "#1f4e79" },
+  { at = 0.2499, color = "#1f4e79" },
+  { at = 0.2500, color = "#c9a227" },
+  { at = 0.3749, color = "#c9a227" },
+  { at = 0.3750, color = "#2f6b4f" },
+  { at = 0.4999, color = "#2f6b4f" },
+  { at = 0.5000, color = "#6d3a8a" },
+  { at = 0.6249, color = "#6d3a8a" },
+  { at = 0.6250, color = "#2b2b2b" },
+  { at = 0.7499, color = "#2b2b2b" },
+  { at = 0.7500, color = "#9aa3ab" },
+  { at = 0.8749, color = "#9aa3ab" },
+  { at = 0.8750, color = "#c8c2b4" },
+  { at = 1.0000, color = "#c8c2b4" },
+]
+
+[generator]
+seed = 17
+
+[smoothing]
+density = 0.5
+pump_size = { attack = 0.03, release = 0.5 }
+pump_alpha = { attack = 0.03, release = 0.6 }
+angle_bias = 1.2
+
+[params]
+layout = "2"
+roster = "1"
+count = "26"
+size_hierarchy = "0.72"
+# hash(beat_index) re-rolls the arrangement on ACTIVITY. beat_index counts onset
+# detections, not beats, so this claims no period - which is exactly what it is for.
+seed = "floor(hash(beat_index) * 4096)"
+
+# Edge-triggered: rises past 0.5 on a strong hit and recomposes once.
+recompose = "onset > 0.66"
+recompose_blend = "0.22"
+
+density = "0.62 + clamp(mid * 0.45, 0, 0.38)"
+angle_bias = "-26 + sin(time * 0.05) * 14"
+drift = "1.25"
+spin = "0.35"
+
+# Phase-offset per element, so the canvas breathes instead of flashing.
+pump_size = "clamp(bass * 0.35, 0, 0.30)"
+pump_alpha = "clamp(onset * 0.33, 0, 0.20)"
+
+scale = "1.05"
+paper = "0.9375"
+opacity = "1.0"
+edge_softness = "0"
+color_span = "1.0"
+palette_shift = "mod(time * 0.008, 1)"
+saturation = "1.0"
+
+exposure = "1.0"

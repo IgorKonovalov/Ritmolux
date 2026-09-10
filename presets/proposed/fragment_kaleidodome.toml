@@ -1,0 +1,84 @@
+# fragment_kaleidodome - the composite's symmetry stage as the subject.
+#
+# THE LOOK: a domed rose window. The field underneath is deliberately plain -
+# low warp, wide colour span, slow drift - because the picture is made by the
+# SCREEN-SPACE KALEIDOSCOPE that runs after it: eight mirrored wedges radiating
+# from one centre, with a spiral term that rotates the sample by an amount growing
+# with radius so the wedges wind rather than radiate straight. `kaleido_tile` is
+# pinned at 1 on purpose - above 1 the source repeats before the fold and the
+# result is wallpaper, which is a good look and a different one.
+#
+# This is the only preset in the batch whose mechanism lives in the composite
+# rather than in the scene, which is what it is here to be judged as.
+#
+# WHAT DRIVES IT: `kaleido_spiral` on bass - the wedges winding tighter as the
+# music comes up - and `kaleido_radial` on mid, which pulls detail inward or pushes
+# it out. `kaleido_order` is PINNED: it is a structural param that rounds to a
+# whole number, so an eased binding walks it through the intervening wedge counts
+# and reads as a stutter rather than as a change. `kaleido_inner` keeps a small
+# untouched disc at the pivot so the centre does not smear.
+#
+# WHAT TO LOOK AT WHEN JUDGING: the seams. `kaleido_edge` is at 1 (hard), so the
+# wedge boundaries should be visible lines - if they read as a soft blur, something
+# downstream is filling them. Second: whether the spiral change is legible as
+# WINDING, or whether it just looks like a different picture each time.
+
+system = "fragment_field"
+name = "Kaleido Dome"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#0a0418" },
+  { at = 0.20, color = "#3d1060" },
+  { at = 0.42, color = "#8c1c58" },
+  { at = 0.62, color = "#d64c2e" },
+  { at = 0.78, color = "#e8a52c" },
+  { at = 0.90, color = "#5fb8a0" },
+  { at = 1.00, color = "#dff3e8" },
+]
+
+[generator]
+seed = 59
+
+[smoothing]
+kaleido_spiral = 0.45
+kaleido_radial = 0.55
+kaleido_angle = 1.0
+warp = 0.6
+
+[params]
+# The field: plain on purpose. It is the material the fold works on.
+warp = "0.30 + clamp(bass * 0.24, 0, 0.20)"
+field_speed = "0.35"
+fold_speed = "0.22"
+zoom = "1.6"
+hue = "0"
+color_span = "0.92"
+color_center = "0.10 + noise(time * 0.04) * 0.18"
+saturation = "1.0"
+glow = "0.80"
+flash = "0"
+
+# THE MECHANISM. Order is pinned - it rounds to a whole number and an eased one
+# stutters through the intervening wedge counts.
+kaleido_order = "8"
+kaleido_edge = "1"
+kaleido_tile = "1"
+kaleido_inner = "0.09"
+kaleido_center_x = "0.5"
+kaleido_center_y = "0.5"
+kaleido_angle = "mod(time * 0.02, 1)"
+# The wedges winding, and the detail travelling in and out.
+kaleido_spiral = "0.25 + clamp(bass * 0.71, 0, 0.60)"
+kaleido_radial = "0.95 + clamp(mid * 0.53, 0, 0.45)"
+kaleido_zoom = "sin(time * 0.05) * 0.10"
+
+bg_hue = "0.02"
+bg_bright = "0.08"
+bg_vignette = "0.6"
+occlude = "0.9"
+
+bloom_amount = "0.26"
+bloom_threshold = "1.2"
+bloom_radius = "1.5"
+exposure = "1.0"

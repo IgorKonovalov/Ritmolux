@@ -1,0 +1,74 @@
+# spectrum_radialbloom - the frequency axis as a corona.
+#
+# THE LOOK: 48 elements laid around a ring, each one a spoke whose length is its
+# own band. It is an honest readout - you can point at a frequency - but drawn as
+# an object rather than as a meter: the ring itself breathes on bass and turns
+# slowly, so the figure reads as a corona around a dark centre.
+#
+# WHAT DRIVES IT: the band array, through the per-element `index` bindings.
+# `thickness` and `hue` both vary per element off `bin(index)`, so a spoke that is
+# loud is also fatter and further along the palette than its silent neighbours -
+# three cues for one signal, which is what stops a radial readout reading flat.
+# `radius` pumps on bass; per-element easing (fast attack, slow release) is what
+# makes the spokes fall like a meter instead of strobing on every analysis hop.
+#
+# WHAT TO LOOK AT WHEN JUDGING: the spokes at rest. They must not all be the same
+# length - if they are, the stimulus has no spectrum (verify this one with
+# --signal, never with --set, which cannot drive the band array). Second: whether
+# the ring reads as one object or as 48 unrelated sticks.
+
+system = "spectrum"
+name = "Radial Bloom"
+
+[spectrum]
+elements = 48
+layout = "radial_ring"
+smoothing = { attack = 0.02, release = 0.30 }
+
+[palette]
+stops = [
+  { at = 0.00, color = "#12043a" },
+  { at = 0.30, color = "#5b1e9c" },
+  { at = 0.58, color = "#c9308a" },
+  { at = 0.80, color = "#ff7a4d" },
+  { at = 1.00, color = "#ffe9a8" },
+]
+
+[generator]
+seed = 2
+
+[smoothing]
+radius = 0.18
+rotation = 0.5
+
+[params]
+# The ring: a dark centre that opens on bass. 0.24 base, +0.14 at peak.
+radius = "0.24 + clamp(bass * 0.165, 0, 0.14)"
+base = "0.035"
+scale = "1.5"
+curve = "0.72"
+span = "1.0"
+rotation = "time * 0.012 + sin(time * 0.07) * 0.02"
+
+# Per-element: a loud spoke is fatter and further along the palette.
+# bin() typical value is 0.089, an order of magnitude under the band scalars, so
+# these gains are much larger than a `bass` term of the same cap would carry.
+thickness = "2.2 + clamp(bin(index) * 34, 0, 5.5)"
+hue = "0.10 + index * 0.62 + clamp(bin(index) * 2.6, 0, 0.22)"
+hue_spread = "0"
+
+brightness = "0.78"
+glow = "1.15"
+softness = "0.35"
+stroke_blend = "0.15"
+saturation = "1.0"
+
+bg_hue = "0.02"
+bg_bright = "0.09"
+bg_vignette = "0.75"
+occlude = "0.45"
+
+bloom_amount = "0.42"
+bloom_threshold = "1.0"
+bloom_radius = "1.6"
+exposure = "1.0"

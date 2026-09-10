@@ -1,0 +1,88 @@
+# emitter_ashfall - warm ash falling through a dark room. The slow one.
+#
+# THE LOOK: the emitter turned upside down. The source sits ABOVE the frame
+# (`source_y` is positive) and `launch_angle` is half a turn, so the objects are
+# thrown downward and gravity only makes them fall faster. A wide `source_width`
+# and a long `lifetime` mean the population is always mid-fall - there is no
+# visible spawn edge and no visible death.
+#
+# WHAT DRIVES IT: this is the ambient end of the batch and almost nothing is
+# allowed to snap. `spawn_rate` takes a heavily-released bass term, so the density
+# builds over a passage rather than on a hit. `gravity` takes a slow drift so the
+# fall rate itself wanders. `twinkle` is the only fast thing in the file, and it is
+# per-object and seeded, so it reads as embers catching rather than as flicker.
+#
+# WHAT TO LOOK AT WHEN JUDGING: whether the fall reads as CONTINUOUS. Any visible
+# horizontal line where objects appear or vanish is a failure of lifetime against
+# gravity. Second: whether the density change over a passage is legible at all -
+# this preset deliberately has no event in it, and that is the risk it takes.
+
+system = "emitter"
+name = "Ashfall"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#1a0f08" },
+  { at = 0.30, color = "#6b3a18" },
+  { at = 0.58, color = "#c4692a" },
+  { at = 0.80, color = "#e8a860" },
+  { at = 1.00, color = "#f6e0bc" },
+]
+
+[generator]
+seed = 31
+
+[smoothing]
+spawn_rate = { attack = 0.35, release = 1.4 }
+gravity = 1.4
+size = 0.8
+hue_center = 1.6
+
+[params]
+# Above the frame, thrown downward. This is the whole inversion.
+source_y = "1.18"
+source_width = "2.6"
+launch_angle = "0.5"
+launch_speed = "0.22"
+spread = "0.22"
+gravity = "0.42 + noise(time * 0.05) * 0.18 + clamp(bass * 0.24, 0, 0.20)"
+
+# Slow builds only: attack 0.35 s, release 1.4 s. Nothing here lands on a beat.
+spawn_rate = "150 + clamp(bass * 530, 0, 450)"
+
+lifetime = "9.5"
+lifetime_spread = "0.5"
+spawn_fade = "0.35"
+prewarm = "1"
+
+shape = "0"
+size = "0.95 + clamp(mid * 0.53, 0, 0.45)"
+size_spread = "0.85"
+spin = "0.15"
+twinkle = "0.72"
+
+brightness = "1.9"
+hue = "0"
+hue_spread = "0.62"
+# The ash goes from grey-warm to lit-ember as the passage builds. A colour travel
+# is the second reactive cue in a preset with no event in it.
+hue_center = "0.50 + clamp(bass * 0.33, 0, 0.28)"
+saturation = "0.95"
+zoom = "1.0"
+
+# A slow drift on the accumulation, which is what turns falling dots into streaks.
+trails = "0.45"
+fb_dy = "-0.012"
+
+bg_hue = "0.08"
+bg_bright = "0.15"
+bg_hue_span = "0.10"
+bg_angle = "0.0"
+bg_shade = "0.3"
+bg_vignette = "0.72"
+occlude = "0.35"
+
+bloom_amount = "0.38"
+bloom_threshold = "1.05"
+bloom_radius = "1.9"
+exposure = "1.0"

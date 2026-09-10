@@ -1,0 +1,83 @@
+# swarm_emberstorm - the same ten thousand particles, hit hard.
+#
+# THE LOOK: the aggressive counterpart to a drifting swarm. A tight, fast, hot
+# cloud that is thrown outward from the centre on every strong onset and is dragged
+# back in by a high-frequency flow field before the next one. Short trails, small
+# marks, and a hard rim - it should feel like sparks off a grinder, not like smoke.
+#
+# WHAT DRIVES IT: `burst`, the outward impulse, is the mechanism, and it carries a
+# two-constant smoothing entry - attack 0.02 s, release 0.55 s - so it SNAPS out
+# and glides back. That pair is a rectifier rather than a low-pass and will ride
+# above its input's mean under sustained material, which is exactly the envelope
+# behaviour a percussive accent wants and the reason it is not used on anything
+# continuous in this file. `reseed` is gated at 0.7, well above the 0.153 onset
+# mean, so the cloud is genuinely disturbed a few times a passage.
+#
+# WHAT TO LOOK AT WHEN JUDGING: whether the burst reads as a THROW and not as a
+# zoom. If the whole cloud simply scales, `force` is too low to pull it back in
+# before the next hit. Second: whether the peak washes out - this is the preset in
+# the batch closest to the additive ceiling, and the check is that a hit has MORE
+# legible structure than the rest between hits, not less.
+
+system = "swarm"
+name = "Ember Storm"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#12040a" },
+  { at = 0.28, color = "#7a1418" },
+  { at = 0.56, color = "#d94f16" },
+  { at = 0.78, color = "#f79a2e" },
+  { at = 1.00, color = "#ffe6a8" },
+]
+
+[generator]
+seed = 47
+
+[smoothing]
+burst = { attack = 0.02, release = 0.55 }
+force = 0.25
+spin = 0.4
+size = 0.15
+
+[params]
+# The throw. onset mean 0.153, peak 1.0 - gain 2.0 with cap 1.2 caps at 0.60.
+burst = "clamp(onset * 2.0, 0, 1.2)"
+# ...and what drags it back in before the next hit.
+force = "0.85 + clamp(bass * 0.53, 0, 0.45)"
+field_freq = "2.9 + noise(time * 0.09) * 1.1"
+spin = "0.75 + clamp(mid * 0.71, 0, 0.60)"
+
+shape = "3"
+points = "4"
+star_valley = "0.24"
+star_curve = "0.35"
+star_jitter = "0.45"
+size = "1.75 + clamp(treb * 0.83, 0, 0.50)"
+size_spread = "0.65"
+twinkle = "0.5"
+
+# Shaken a few times a passage, not on every hit.
+reseed = "onset > 0.70"
+
+brightness = "2.0"
+hue = "0"
+hue_spread = "0.48"
+hue_center = "0.70"
+saturation = "1.0"
+zoom = "0.95"
+
+# Medium: enough that a spark leaves a streak, short enough that it never smears
+# into the smoke a longer trail would make.
+trails = "0.68"
+fb_zoom = "1.006"
+
+bg_hue = "0.05"
+bg_bright = "0.08"
+bg_vignette = "0.8"
+occlude = "0.6"
+
+bloom_amount = "0.40"
+bloom_threshold = "1.15"
+bloom_radius = "1.4"
+exposure = "0.95"

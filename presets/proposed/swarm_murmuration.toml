@@ -1,0 +1,78 @@
+# swarm_murmuration - a flock, not a particle system.
+#
+# THE LOOK: ten thousand small cold marks pulled through a curling flow field,
+# smeared by a medium trail so the swarm draws its own recent path. The reference
+# is a starling murmuration at dusk: a shape that is legible for a second, then is
+# a different shape.
+#
+# WHAT DRIVES IT: `spin` is the lever. Bass adds rotational bias to the flow, so
+# a loud passage curls the flock into vortices and a quiet one lets it stream.
+# `field_freq` takes a slow noise wander so the eddy scale changes over a minute
+# without ever being driven by the music. `burst` is the only beat event and it is
+# small on purpose - a big one flings the flock off screen, which reads as nothing.
+# Brightness is fixed; the trail already carries the accumulated light.
+#
+# WHAT TO LOOK AT WHEN JUDGING: coherence. The marks should read as one body with
+# internal structure, not as noise. Second: the trail length - judge it a few beats
+# in, since `trails` restarts empty at a preset switch.
+
+system = "swarm"
+name = "Murmuration"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#0a1230" },
+  { at = 0.35, color = "#26467e" },
+  { at = 0.65, color = "#5f8fc4" },
+  { at = 0.88, color = "#b8d4e8" },
+  { at = 1.00, color = "#efe2c4" },
+]
+
+[generator]
+seed = 19
+
+[smoothing]
+spin = 0.55
+force = 0.4
+burst = { attack = 0.03, release = 0.6 }
+field_freq = 0.9
+
+[params]
+# The curl. Base 0.22, bass adds up to 0.72 - the flock's whole character.
+spin = "0.55 + clamp(bass * 0.85, 0, 0.72)"
+force = "2.10 + clamp(mid * 0.94, 0, 0.80)"
+field_freq = "0.95 + noise(time * 0.06) * 0.55"
+
+# Small, so the flock reads as a body rather than as blobs.
+size = "0.70 + clamp(treb * 0.50, 0, 0.30)"
+size_spread = "0.45"
+shape = "0"
+twinkle = "0.30"
+
+# A nudge on the hit, not a shove.
+burst = "clamp(onset * 0.50, 0, 0.30)"
+
+brightness = "1.85"
+hue = "0"
+hue_spread = "0.45"
+hue_center = "0.82"
+saturation = "0.9"
+zoom = "0.78"
+
+# The smear that makes it a murmuration instead of a dot field.
+trails = "0.86"
+fb_zoom = "1.004"
+fb_warp = "0.05"
+
+bg_hue = "0.06"
+bg_bright = "0.20"
+bg_hue_span = "0.10"
+bg_angle = "0.75"
+bg_shade = "0.4"
+bg_vignette = "0.5"
+occlude = "0.55"
+
+bloom_amount = "0.30"
+bloom_threshold = "1.15"
+bloom_radius = "1.4"
+exposure = "1.0"

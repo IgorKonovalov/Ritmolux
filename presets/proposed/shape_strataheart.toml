@@ -1,0 +1,75 @@
+# shape_strataheart - one silhouette, drawn entirely as palette.
+#
+# THE LOOK: a heart rendered as a topographic map of itself. There is no stroke and
+# no glow here: the picture is `palette_steps` quantizing the distance field into
+# flat bands, and `palette_contour` drawing a hairline where two bands meet. In
+# `coord_mode = 1` the bands are SCALED COPIES of the outline rather than offset
+# curves, so the figure nests inside itself all the way to the centre.
+#
+# This is the palette-first preset of the batch's pair. Every design decision is a
+# stop position; swap the gradient and it is a different piece.
+#
+# WHAT DRIVES IT: `palette_steps` itself is bound - it steps between 6 and 11
+# bands with the mids, which adds and removes whole contour rings. `gamma` (where
+# the bands crowd) rides bass, so a loud passage pushes the rings out toward the
+# rim and a quiet one packs them at the centre. `scale` pumps a little on the beat.
+# Note `palette_steps` snaps at each half-integer, so an eased binding walks it
+# through the intervening counts rather than crawling.
+#
+# WHAT TO LOOK AT WHEN JUDGING: the band edges. They must stay HARD - if they are
+# haloed, bloom is fighting the banding and one of the two has to go. Second:
+# whether the ring count visibly changes with the music, or whether it sits.
+
+system = "shape_field"
+name = "Strata Heart"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#1b0b2e" },
+  { at = 0.18, color = "#5c1246" },
+  { at = 0.36, color = "#a01f4a" },
+  { at = 0.54, color = "#e04a3c" },
+  { at = 0.70, color = "#f5893f" },
+  { at = 0.85, color = "#f8c96a" },
+  { at = 1.00, color = "#fdf0c4" },
+]
+
+[generator]
+seed = 6
+
+[smoothing]
+palette_steps = 0.30
+gamma = 0.40
+scale = { attack = 0.03, release = 0.45 }
+rotation = 0.8
+
+[params]
+shape = "4"
+coord_mode = "1"
+
+# The bands themselves. 6 at rest, 11 at a mid peak - whole rings arriving.
+palette_steps = "6 + clamp(mid * 5.9, 0, 5)"
+palette_contour = "0.55"
+
+# Where the rings crowd. Below 1 they bite sooner (packed at the centre).
+gamma = "0.70 + clamp(bass * 0.94, 0, 0.80)"
+
+scale = "0.52 + clamp(onset * 0.20, 0, 0.12)"
+rotation = "sin(time * 0.13) * 0.10"
+pan_y = "0.0"
+stroke = "0"
+
+color_span = "0.72"
+color_center = "0.10 + noise(time * 0.16) * 0.16"
+saturation = "1.0"
+
+bg_hue = "0.02"
+bg_bright = "0.10"
+bg_vignette = "0.7"
+occlude = "1.0"
+
+# Banding fights bloom - the bright pass blurs exactly the hard edges this look is
+# made of, so it is kept low and above the knee rather than off and rather than up.
+bloom_amount = "0.08"
+bloom_threshold = "1.6"
+exposure = "1.0"

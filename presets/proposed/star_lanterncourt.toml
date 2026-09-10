@@ -1,0 +1,85 @@
+# star_lanterncourt - a twelve-fold Hankin interlace with a lantern hung inside it.
+#
+# THE LOOK: an architectural rosette. The dodecagonal interlace is the frame; four
+# concentric rings of ornament sit inside it, closed by a deep scalloped boundary
+# at the rim. Slow, warm, and symmetrical - the closest thing in this batch to a
+# still object.
+#
+# WHAT DRIVES IT: the two RADIAL ring levers, deliberately, and not `ring_phase`.
+# A 12/18/24-fold figure turned by any angle lands almost on top of itself, so a
+# spin moves few pixels however fast it runs and both the eye and the animation
+# metric read it as frozen. `ring_spread` (the figure opening) rides bass and
+# `ring_scale` (the motifs growing in place) rides mid, so the mandala breathes
+# radially. `ring_phase` carries only a slow counter-rotation gesture on top.
+#
+# WHAT TO LOOK AT WHEN JUDGING: whether it reads as ONE figure. The interlace and
+# the rings have to look designed together, not layered. Second: the rim - the
+# scallop's depth is `ring_scale`, so on a loud passage the boundary should visibly
+# deepen from a near-plain circle into a scallop.
+
+system = "star_pattern"
+name = "Lantern Court"
+
+[generator]
+tiling = "12"
+contact_angle_deg = 21
+seed = 4
+rings = [
+  { motif = "trefoil", count = 1,  radius = 0.00, scale = 0.34 },
+  { motif = "diamond", count = 12, radius = 0.29, scale = 0.17 },
+  { motif = "petal",   count = 18, radius = 0.50, scale = 0.24, phase = 0.09 },
+  { motif = "circle",  count = 24, radius = 0.66, scale = 0.10 },
+  # scallop reads its keys differently: count is LOBES, scale is the bulge DEPTH.
+  { motif = "scallop", count = 36, radius = 0.84, scale = 0.04 },
+]
+
+[palette]
+stops = [
+  { at = 0.00, color = "#2a1006" },
+  { at = 0.30, color = "#8a4a12" },
+  { at = 0.58, color = "#d8952f" },
+  { at = 0.82, color = "#f5d98a" },
+  { at = 1.00, color = "#fff4d6" },
+]
+
+[smoothing]
+ring_spread = 0.30
+ring_scale = 0.22
+thickness = { attack = 0.03, release = 0.5 }
+
+[params]
+# The figure opening and closing. 0.88 base, +0.20 at a bass peak.
+ring_spread = "0.88 + clamp(bass * 0.235, 0, 0.20)"
+# The motifs growing in place - and the rim scallop deepening with them.
+ring_scale = "0.85 + clamp(mid * 0.53, 0, 0.45)"
+# The gesture: a slow counter-rotation, not the animation.
+ring_phase = "mod(time * 0.035, 1)"
+
+variant = "1.4"
+rotation = "mod(time * 0.008, 1)"
+scale = "0.82"
+zoom = "1.0"
+
+thickness = "1.9 + clamp(treb * 2.0, 0, 1.2)"
+softness = "0.30"
+stroke_blend = "0.22"
+draw_progress = "1"
+
+hue = "0.30"
+hue_spread = "0.55"
+saturation = "0.95"
+brightness = "0.85"
+glow = "0.95"
+
+bg_hue = "0.04"
+bg_bright = "0.14"
+bg_hue_span = "0.10"
+bg_angle = "0.5"
+bg_shade = "0.45"
+bg_vignette = "0.7"
+occlude = "0.35"
+
+bloom_amount = "0.30"
+bloom_threshold = "1.15"
+bloom_radius = "1.5"
+exposure = "1.0"

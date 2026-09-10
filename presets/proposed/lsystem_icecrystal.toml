@@ -1,0 +1,82 @@
+# lsystem_icecrystal - a branching grammar folded six ways into an ice crystal.
+#
+# THE LOOK: a pale blue snowflake against a dark window. The grammar is an ordinary
+# dense bush; the six-fold mirror is what turns it into a crystal, and the long
+# straight runs the grammar produces are what give the figure its spicules. Slow
+# and cold - the whole gesture is the figure ARRIVING and retreating.
+#
+# WHAT DRIVES IT: `draw_progress` is the mechanism. It rides a slow sine so the
+# crystal draws itself in over about twenty-six seconds, holds, and retreats - and
+# bass adds to it, so a loud passage pushes the growth further out along the
+# branch than a quiet one reaches. `visible_depth` takes the mid band, which adds
+# and removes the fine tips: the figure gets more DETAILED when the music does,
+# not brighter. Brightness and glow are constants.
+#
+# WHAT TO LOOK AT WHEN JUDGING: the tips. `visible_depth` below 1 should be
+# visibly missing the finest branches, and they should come back on. Second:
+# whether the six-fold mirror reads as frost or as a kaleidoscope cliche - if it
+# is the latter, drop mirror_order to 2 and judge again. Third: the pair of long
+# verticals through the centre are the grammar's trunk repeated by the mirror;
+# they are load-bearing to the crystal reading, but they are also the first thing
+# that will look like a mistake.
+
+system = "lsystem"
+name = "Ice Crystal"
+
+[generator]
+# A dense bush grammar: each F becomes eight, so depth 4 is ~4k segments - well
+# under the 20 000 ceiling, and depth 5 would be 32k and truncate silently.
+axiom = "F"
+rules = { F = "FF-[-F+F+F]+[+F-F-F]" }
+angle_deg = 22
+max_depth = 4
+seed = 8
+
+[palette]
+name = "ice"
+
+[smoothing]
+visible_depth = 0.45
+draw_progress = 0.35
+hue = 0.6
+
+[params]
+# The arrival. A ~26 s round trip on its own, plus up to 0.28 more from bass.
+draw_progress = "clamp(0.82 + 0.16 * sin(time * 0.24) + clamp(bass * 0.24, 0, 0.20), 0, 1)"
+# The fine tips, added and removed by the mids. Both ends of this range are alive:
+# 0.72 is a bare armature, 1.0 the whole grammar.
+visible_depth = "0.72 + clamp(mid * 0.33, 0, 0.28)"
+
+# A slow continuous turn. Without it the figure is genuinely FROZEN in silence -
+# every other binding here is gated on a band, and `--report`'s anim column reads
+# a still frame as still.
+rotation = "mod(time * 0.018, 1)"
+scale = "0.95"
+zoom = "1.0"
+pan_y = "-0.05"
+
+mirror_order = "6"
+mirror_reflect = "1"
+
+thickness = "2.1 + clamp(treb * 2.5, 0, 1.5)"
+softness = "0.42"
+stroke_blend = "0.1"
+
+hue = "0.34 + noise(time * 0.05) * 0.22"
+hue_spread = "0.55"
+saturation = "0.9"
+brightness = "0.95"
+glow = "1.3"
+
+bg_hue = "0.05"
+bg_bright = "0.13"
+bg_hue_span = "0.12"
+bg_angle = "0.25"
+bg_shade = "0.35"
+bg_vignette = "0.65"
+occlude = "0.4"
+
+bloom_amount = "0.36"
+bloom_threshold = "1.05"
+bloom_radius = "1.7"
+exposure = "1.0"
