@@ -88,8 +88,14 @@ does. See [Capturing](capturing.md).
 **`--schema`** answers the other question a program asks before it starts driving the player: what
 a preset may contain. It prints one JSON object on stdout — every system and engine stage with its
 parameters (name, default, range, and the line that says what each does), every structural table
-with its keys and the closed rosters they draw from, and a `hash` of all of it. Like `--help` it
-creates nothing and exits, and it moves no files on the way.
+with its keys and the closed rosters they draw from, the expression grammar's identifier rosters,
+and a `hash` of all of it. Like `--help` it creates nothing and exits, and it moves no files on
+the way.
+
+The `grammar` object carries three arrays — `variables`, `functions` and `constants` — which is
+what an expression editor colours from. `variables` is what the parser's identifier lookup
+accepts, so the reserved `[latch]` placeholders are absent: an author reaches a latch through the
+name they declared for it, and a preset's own latch names are in the preset rather than here.
 
 The parameter half is rendered from the same declarations the reference table in
 [the preset library's README](../presets/README.md) is, so the two cannot disagree. The `hash`

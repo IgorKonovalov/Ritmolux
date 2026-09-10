@@ -298,8 +298,8 @@ flowchart TB
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The preview pipe stops moving under the reader | dev | done | 80fc61c |
-| 2 — The `stream` event names the format it actually carries | dev | done | committed with this row |
-| 3 — `--schema` declares the grammar | dev | not started | |
+| 2 — The `stream` event names the format it actually carries | dev | done | fbae516 |
+| 3 — `--schema` declares the grammar | dev | done | committed with this row |
 | 4 — The studio paints what it was told | studio-builder | not started | |
 | 5 — The player mode is a per-machine setting | studio-builder | not started | |
 | 6 — The two debts, discharged | studio-builder | not started | |
@@ -368,6 +368,28 @@ and the swizzle Phase 4 adds will be exercised by its own test rather than by a 
 **Phase 2 — files outside the list**: `standalone/tests/stream_pipe.rs` (a comment on why `rgba8` is
 this sink's answer), `core/src/render/context.rs` (the new `RenderError` variant),
 `core/src/render/preview_readback.rs` and `core/src/render/tests.rs` (the refusal and the tests).
+
+**Phase 3 — a third roster, and why.** The plan names two, `VAR_NAMES` and `Func`. The exported
+`grammar` carries three: `variables`, `functions` and **`constants`**. `is_reserved_ident` — the
+engine's own answer to "is this name taken" — has three arms, and exporting two of them would leave
+`pi` and `tau` uncoloured in the editor Phase 6 builds, which is the gap this phase closes. Two
+strings, and the test diffs each roster against its own source.
+
+**Phase 3 — `variables` is not `VAR_NAMES`.** The four reserved `[latch]` placeholders are in
+`VAR_NAMES` as storage and are filtered out of the parser's identifier lookup, so a roster published
+straight from `VAR_NAMES` would offer an editor four spellings that do not compile. The filter is now
+one predicate (`is_bindable_slot`) that the parser and the export both read, and
+`the_published_variable_roster_is_what_the_parser_accepts` asks `compile` rather than a second list.
+
+**Phase 3 — `Func::from_name`'s match became a table.** `FUNCS` is `[(&str, Func); 17]`;
+`from_name`, `name` and `function_names` all resolve through it, which is what makes "in both
+directions" true by construction rather than by a test comparing two hand-written lists. `constant`
+got the same treatment (`CONSTANTS`). A variant added to `Func` without a `FUNCS` entry is
+constructed by nothing, so `dead_code` fails the build — which is why no test hand-lists the
+variants.
+
+**Phase 3 — files outside the list**: `docs/configuration.md` (the `--schema` paragraph names the
+new object).
 
 ### Close triggers
 

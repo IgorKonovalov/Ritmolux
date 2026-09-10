@@ -119,6 +119,44 @@ pub const VAR_NAMES: [&str; 27] = [
 /// Number of expression variables.
 pub const VAR_COUNT: usize = VAR_NAMES.len();
 
+/// Whether the variable in `slot` is one an author can reach **by its name in
+/// [`VAR_NAMES`]**.
+///
+/// The reserved `[latch]` placeholders are storage, not grammar: they sit in
+/// `VAR_NAMES` so the positional assertions can see them, and an author reaches
+/// a latch only through the name they declared for it (ADR-0137). The parser's
+/// identifier lookup and the exported roster read this one predicate, so a
+/// consumer is never offered a name the parser would refuse.
+fn is_bindable_slot(slot: usize) -> bool {
+    !(LATCH_SLOT_BASE..LATCH_SLOT_BASE + LATCH_CAP).contains(&slot)
+}
+
+/// Every variable name an expression may **write**, in [`VAR_NAMES`] order.
+///
+/// [`VAR_NAMES`] itself is the storage layout and includes the four reserved
+/// latch placeholders; this is the grammar. A consumer building an editor wants
+/// this one.
+pub fn variable_names() -> impl Iterator<Item = &'static str> {
+    VAR_NAMES
+        .iter()
+        .enumerate()
+        .filter(|(slot, _)| is_bindable_slot(*slot))
+        .map(|(_, name)| *name)
+}
+
+/// Every bare identifier that resolves to a literal, in declaration order.
+///
+/// Resolved before the variable lookup, so a consumer highlighting these is
+/// naming something no future variable can shadow.
+pub fn constant_names() -> impl Iterator<Item = &'static str> {
+    CONSTANTS.iter().map(|(name, _)| *name)
+}
+
+/// Every built-in function name, in declaration order.
+pub fn function_names() -> impl Iterator<Item = &'static str> {
+    FUNCS.iter().map(|(name, _)| *name)
+}
+
 /// Slot of the implicit per-element `index` variable — kept last, so it stays
 /// derivable from the count however many analysis variables precede it.
 const INDEX_SLOT: usize = VAR_COUNT - 1;
@@ -492,52 +530,52 @@ enum Func {
     Noise,
 }
 
+/// **The single roster of built-in functions**, spelling first.
+///
+/// [`Func::from_name`] resolves through it, [`Func::name`] inverts it, and
+/// [`function_names`] publishes it — so a function added here is spellable,
+/// printable and declared to a studio in one edit, and there is no second list
+/// for any of the three to fall out of step with (ADR-0170's discipline, applied
+/// to the grammar rather than to the parameters).
+const FUNCS: [(&str, Func); 17] = [
+    ("sin", Func::Sin),
+    ("cos", Func::Cos),
+    ("abs", Func::Abs),
+    ("floor", Func::Floor),
+    ("sqrt", Func::Sqrt),
+    ("log", Func::Log),
+    ("min", Func::Min),
+    ("max", Func::Max),
+    ("pow", Func::Pow),
+    ("mod", Func::Mod),
+    ("clamp", Func::Clamp),
+    ("lerp", Func::Lerp),
+    ("smoothstep", Func::Smoothstep),
+    ("select", Func::Select),
+    ("bin", Func::Bin),
+    ("hash", Func::Hash),
+    ("noise", Func::Noise),
+];
+
 impl Func {
     fn from_name(name: &str) -> Option<Self> {
-        Some(match name {
-            "sin" => Func::Sin,
-            "cos" => Func::Cos,
-            "abs" => Func::Abs,
-            "floor" => Func::Floor,
-            "sqrt" => Func::Sqrt,
-            "log" => Func::Log,
-            "min" => Func::Min,
-            "max" => Func::Max,
-            "pow" => Func::Pow,
-            "mod" => Func::Mod,
-            "clamp" => Func::Clamp,
-            "lerp" => Func::Lerp,
-            "smoothstep" => Func::Smoothstep,
-            "select" => Func::Select,
-            "bin" => Func::Bin,
-            "hash" => Func::Hash,
-            "noise" => Func::Noise,
-            _ => return None,
-        })
+        FUNCS
+            .iter()
+            .find(|(spelling, _)| *spelling == name)
+            .map(|(_, func)| *func)
     }
 
     /// The source name — the inverse of [`Func::from_name`], for
     /// [`Node::write_source`].
+    ///
+    /// `"?"` is unreachable while [`FUNCS`] holds every variant, which
+    /// `every_function_variant_is_in_the_roster` asserts; this file denies
+    /// panics, so it degrades rather than proving the point with a crash.
     fn name(self) -> &'static str {
-        match self {
-            Func::Sin => "sin",
-            Func::Cos => "cos",
-            Func::Abs => "abs",
-            Func::Floor => "floor",
-            Func::Sqrt => "sqrt",
-            Func::Log => "log",
-            Func::Min => "min",
-            Func::Max => "max",
-            Func::Pow => "pow",
-            Func::Mod => "mod",
-            Func::Clamp => "clamp",
-            Func::Lerp => "lerp",
-            Func::Smoothstep => "smoothstep",
-            Func::Select => "select",
-            Func::Bin => "bin",
-            Func::Hash => "hash",
-            Func::Noise => "noise",
-        }
+        FUNCS
+            .iter()
+            .find(|(_, func)| *func == self)
+            .map_or("?", |(spelling, _)| *spelling)
     }
 
     fn arity(self) -> usize {
@@ -649,12 +687,16 @@ pub fn is_identifier(name: &str) -> bool {
         && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
+/// **The single roster of named constants.** [`constant`] resolves through it
+/// and [`constant_names`] publishes it, so a constant added here is spellable
+/// and declared in one edit.
+const CONSTANTS: [(&str, f32); 2] = [("pi", std::f32::consts::PI), ("tau", std::f32::consts::TAU)];
+
 fn constant(name: &str) -> Option<f32> {
-    Some(match name {
-        "pi" => std::f32::consts::PI,
-        "tau" => std::f32::consts::TAU,
-        _ => return None,
-    })
+    CONSTANTS
+        .iter()
+        .find(|(spelling, _)| *spelling == name)
+        .map(|(_, value)| *value)
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1812,8 +1854,10 @@ impl Parser<'_> {
                     // they are in `VAR_NAMES` so the positional assertion can
                     // see them, and held out here so an author reaches a latch
                     // only through the name they declared for it (ADR-0137
-                    // Alternative B is the readability this protects).
-                    .filter(|slot| !(LATCH_SLOT_BASE..LATCH_SLOT_BASE + LATCH_CAP).contains(slot))
+                    // Alternative B is the readability this protects). The same
+                    // predicate narrows the exported roster, so a consumer is
+                    // never offered a name this lookup refuses.
+                    .filter(|slot| is_bindable_slot(*slot))
                 {
                     Ok(Node::Var(slot))
                 } else if let Some(slot) = self
@@ -2118,5 +2162,97 @@ mod tests {
             e.flag_gates(&obs).is_empty(),
             "half-occupancy is a live binding, not a saturated one"
         );
+    }
+
+    /// **The published variable roster is exactly what the parser accepts**, in
+    /// both directions, asked of the parser rather than of a second list.
+    ///
+    /// The trap this guards is the reserved `[latch]` block: those four names
+    /// are in [`VAR_NAMES`] as storage and are held out of the identifier
+    /// lookup, so a roster published straight from `VAR_NAMES` would offer an
+    /// editor four spellings that do not compile.
+    #[test]
+    fn the_published_variable_roster_is_what_the_parser_accepts() {
+        let published: Vec<&str> = variable_names().collect();
+        for name in VAR_NAMES {
+            let compiles = compile(name).is_ok();
+            assert_eq!(
+                published.contains(&name),
+                compiles,
+                "`{name}` is {} the published roster and {} as an expression",
+                if published.contains(&name) {
+                    "in"
+                } else {
+                    "absent from"
+                },
+                if compiles {
+                    "compiles"
+                } else {
+                    "does not compile"
+                }
+            );
+        }
+        assert_eq!(
+            published.len(),
+            VAR_COUNT - LATCH_CAP,
+            "the roster is VAR_NAMES without the reserved latch block"
+        );
+    }
+
+    /// **The function roster is the only source**: `from_name` resolves through
+    /// it, `name` inverts it, and the published roster is it.
+    ///
+    /// A variant added to [`Func`] without an entry in [`FUNCS`] is constructed
+    /// by nothing, so `dead_code` fails the build before this test runs — which
+    /// is why nothing here hand-lists the variants.
+    #[test]
+    fn every_function_variant_is_in_the_roster() {
+        for (spelling, func) in FUNCS {
+            assert_eq!(
+                Func::from_name(spelling),
+                Some(func),
+                "`{spelling}` is published and the parser does not resolve it"
+            );
+            assert_eq!(
+                func.name(),
+                spelling,
+                "`{spelling}` does not print as the name it parses from, so a \
+                 round-tripped expression would change spelling"
+            );
+        }
+        let published: Vec<&str> = function_names().collect();
+        assert_eq!(published.len(), FUNCS.len());
+        // Plausible names that are NOT functions here, so "the roster is what
+        // the engine knows" is a claim with a failing case rather than a set
+        // that happens to contain everything asked of it.
+        for absent in ["tan", "log10", "atan2", "fract", "random", "step"] {
+            assert_eq!(Func::from_name(absent), None, "`{absent}` resolved");
+            assert!(
+                !published.contains(&absent),
+                "`{absent}` is published and the parser refuses it"
+            );
+        }
+    }
+
+    /// The constant roster is likewise one table, and resolves before the
+    /// variable lookup so nothing can shadow it.
+    #[test]
+    fn every_constant_resolves_by_its_published_name() {
+        for name in constant_names() {
+            let value = constant(name).unwrap_or_else(|| panic!("`{name}` resolves"));
+            assert!(value.is_finite(), "`{name}` is {value}");
+            assert!(
+                compile(name).is_ok(),
+                "`{name}` is published and does not compile"
+            );
+            assert!(
+                !VAR_NAMES.contains(&name),
+                "`{name}` is both a constant and a variable, and the constant \
+                 wins — so the variable is unreachable"
+            );
+        }
+        for absent in ["e", "phi", "inf"] {
+            assert_eq!(constant(absent), None, "`{absent}` resolved");
+        }
     }
 }

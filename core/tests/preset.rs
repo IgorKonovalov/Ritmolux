@@ -3869,3 +3869,144 @@ fn a_bare_system_preset_compiles_for_every_system() {
         );
     }
 }
+
+// ---------------------------------------------------------------------------
+// The grammar the document declares (Plan 0167 Phase 3, ADR-0170)
+// ---------------------------------------------------------------------------
+
+/// The strings in one array of the document's `grammar` object.
+///
+/// The arrays hold nothing but plain names — `[A-Za-z_][A-Za-z0-9_]*`, which is
+/// what the tokenizer accepts — so splitting on the quotes needs no JSON
+/// dependency and no escape handling.
+fn schema_grammar(doc: &str, key: &str) -> Vec<String> {
+    let grammar = doc
+        .split_once("\"grammar\":{")
+        .expect("the document declares a grammar object")
+        .1;
+    let array = grammar
+        .split_once(&format!("\"{key}\":["))
+        .unwrap_or_else(|| panic!("the grammar declares a `{key}` array"))
+        .1;
+    let array = array.split_once(']').expect("the array is closed").0;
+    array
+        .split(',')
+        .map(|name| name.trim().trim_matches('"').to_owned())
+        .filter(|name| !name.is_empty())
+        .collect()
+}
+
+/// **Every name the engine knows appears in the document, and no other** — in
+/// both directions, against the engine's own declarations.
+///
+/// This is what an expression editor colours from. A name the engine accepts and
+/// the document omits reads as an author's typo; a name the document carries and
+/// the engine refuses is worse, because the editor says the expression is fine
+/// and the player rejects the preset.
+#[test]
+fn the_schema_declares_every_grammar_name_the_engine_knows_and_no_other() {
+    use rlx_core::preset::expr;
+
+    let document = rlx_core::preset::export::document();
+
+    for (key, engine) in [
+        ("variables", expr::variable_names().collect::<Vec<_>>()),
+        ("functions", expr::function_names().collect::<Vec<_>>()),
+        ("constants", expr::constant_names().collect::<Vec<_>>()),
+    ] {
+        let declared = schema_grammar(&document, key);
+        assert!(
+            !declared.is_empty(),
+            "the document's `{key}` array is empty, so every claim below about \
+             it is vacuous"
+        );
+        assert_eq!(
+            declared, engine,
+            "the document's `{key}` roster is not the engine's, in order"
+        );
+        // Both directions against the engine's own answer to "is this name
+        // taken", which is the question the loader asks before it will accept a
+        // `[latch]` of that name.
+        for name in &declared {
+            assert!(
+                expr::is_reserved_ident(name),
+                "the document declares `{name}` as a {key} entry and the engine \
+                 does not know that name at all"
+            );
+        }
+    }
+
+    // A name in none of the three rosters is in none of the arrays either. The
+    // failing case the assertions above need: without it they would hold for a
+    // document that declared every identifier anyone could type.
+    let all: Vec<String> = ["variables", "functions", "constants"]
+        .iter()
+        .flat_map(|key| schema_grammar(&document, key))
+        .collect();
+    for absent in [
+        // The reserved `[latch]` placeholders: storage the parser refuses by
+        // name, so an editor offering them would be offering four spellings
+        // that do not compile.
+        "_latch0",
+        "_latch3",
+        // The downbeat gate's own confidence, deliberately out of the grammar.
+        "downbeat_confidence",
+        "downbeat_locked",
+        // Plausible neighbours of names that are in it.
+        "tan",
+        "log10",
+        "e",
+        "treble",
+    ] {
+        assert!(
+            !all.contains(&absent.to_owned()),
+            "the document declares `{absent}`, which is not a name the grammar \
+             resolves"
+        );
+    }
+}
+
+/// The grammar is inside what the hash covers, and adding it did **not** move
+/// `SCHEMA_VERSION`.
+///
+/// The version says the document's *shape* changed in a way a consumer could
+/// choke on; an added field is additive and a consumer that does not know it
+/// ignores it. What tells a studio its panels are stale is the body hash, so the
+/// grammar has to be inside it.
+#[test]
+fn the_grammar_is_hashed_and_the_schema_version_did_not_move() {
+    use rlx_core::preset::export;
+
+    let document = export::document();
+    assert!(
+        document.starts_with(&format!("{{\"v\":{},", export::SCHEMA_VERSION)),
+        "the document does not open with the schema version it declares"
+    );
+    assert_eq!(
+        export::SCHEMA_VERSION,
+        1,
+        "the grammar is an added field, which is additive — a consumer that does \
+         not know it ignores it, so the version must not move for it"
+    );
+
+    let body = document
+        .split_once(",\"systems\":")
+        .map(|(_, rest)| format!("\"systems\":{rest}"))
+        .expect("the document opens with its version and hash, then the systems");
+    assert!(
+        body.contains("\"grammar\":{\"variables\":["),
+        "the grammar is outside the body, so the hash cannot see it"
+    );
+    let moved = body.replacen(
+        "\"grammar\":{\"variables\":[\"",
+        "\"grammar\":{\"variables\":[\"x",
+        1,
+    );
+    assert_ne!(moved, body, "the perturbation changed nothing");
+    assert_ne!(
+        export::hash_str(&moved),
+        export::hash(),
+        "a document with a grammar name changed hashed the same, so the hash \
+         cannot tell a studio its expression editor is stale"
+    );
+}
