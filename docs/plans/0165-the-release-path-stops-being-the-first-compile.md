@@ -231,26 +231,78 @@ the smaller plan to resolve the larger one's workflow edits.
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** `main`, in the main checkout at `WORK/Ritmolux` — no worktree. Phase 0's done-when needs a nested lane present to be observable, and `.claude/worktrees/plan-0161-structural-hold` was live and `locked` throughout.
+**Lane:** `main`, in the main checkout at `WORK/Ritmolux` — no worktree of its own. Phase 0's
+done-when needs a nested lane present to be observable at all, and
+`.claude/worktrees/plan-0161-structural-hold` was live and `locked` throughout.
 
 | phase | owner | state | commit |
 |---|---|---|---|
 | 0 — The index-rows gate enumerates from git | dev | done | `ea77920` |
 | 1 — The gate compiles the `spout` feature | dev | done | `7807900` |
-| 2 — A dispatch cannot publish | dev | done | committed with this row |
+| 2 — A dispatch cannot publish | dev | done | `a9fc91b` |
 | 3 — The missed version gets published | human | not started | |
 
 ### Notes
 
+- **Phase 1's teeth check could not be run as worded, and a different mutation was used.** The
+  done-when says to re-introduce `crate::start_capture` in place of
+  `crate::capture_start::start_capture` and watch `E0425` reproduce. That call site — now
+  `standalone/src/stream.rs:707` — is **not** behind `#[cfg(feature = "spout")]`: `mod stream` is
+  declared unconditionally in `main.rs` and only the Spout *sink* inside it is gated, so the
+  mutation reds the ordinary `cargo check -p standalone` as well and demonstrates nothing about the
+  new job. The mutation actually used was a genuinely gated one, inside the
+  `#[cfg(all(feature = "spout", windows))]` arm of `open_sink`: `let roster = adapters();` ->
+  `let roster = standalone::adapters();`. Result — `cargo check -p standalone` **green**,
+  `cargo check -p standalone --features spout` **red** with
+  `error[E0425]: cannot find function 'adapters' in crate 'standalone'` at `stream.rs:626`.
+  Reverted, not committed; `git status` was clean before the Phase 1 commit.
+- **Phase 1's done-when is only half-verified in this session.** The local half is done (SDK staged
+  via `packaging/spout/fetch-sdk.ps1`, `cargo check -p standalone --features spout` finished in
+  13.11 s, and the mutation above). The other half — *the job appears in a CI run on `main`
+  alongside `check`, `links`, `deny`, `coverage` and `miri`, and is green* — needs the push,
+  which is not `dev`'s. Unverified until then.
+- **The pre-push hook is red at this tip, by design, and closing the entries is what clears it.**
+  Three probes are falsified by these commits, and `.githooks/pre-push:149` runs
+  `check-backlog-claims.mjs`: 0193 `absent: spout in: .github/workflows/ci.yml` (now matches at
+  `ci.yml:123`), 0194 `absent: github\.event_name in: .github/workflows/release.yml` (matches at
+  `release.yml:212`), and 0194 `present: artifacts without publishing anything in:
+  .github/workflows/release.yml` (the header comment was rewritten, so the phrase is gone).
+  ADR-0181 predicts the first — *"it goes red on the commit that discharges it, which is the
+  intended signal"*. Repairing a falsified entry is an `architect` call, so nothing here touched
+  them.
+- **0195's two probes still pass, and that is not an oversight.** Both are `present:` claims about
+  `SKIP_DIRS` and the absolute-path fixture skip, and Phase 0 kept both by instruction — the walk
+  they describe survives as the fallback.
+- **Followup noticed, not acted on:** the `spout` job uses `dtolnay/rust-toolchain@stable`, as the
+  phase specifies, while `check` and `coverage` install nothing and let rustup resolve
+  `rust-toolchain.toml` on first invocation. The pin still wins inside the job, so this is a
+  difference in shape rather than in toolchain — but it is the only job in `ci.yml` that names a
+  toolchain action.
+- The Spout SDK is now staged at `standalone/spout-sdk/` in this checkout. It is gitignored and
+  untracked; nothing was committed from it.
+
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`**
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** no. No file under `presets/` was read or written; the three commits touch
+  `scripts/`, `.gitignore` and `.github/workflows/` only.
+- **Plan header `Closes:`** design-backlog 0193, design-backlog 0194, design-backlog 0195 — all
+  three are discharged by the code that landed (0195 by Phase 0, 0193 by Phase 1, 0194 by Phase 2),
+  and all three are still **live entries** in `docs/design-backlog.md`; see the probe note above.
+- **What shipped:** fix-only, and none of it in a shipped artifact. Two gate changes and one
+  workflow condition; no Rust, no C++, no preset, so `ritmolux.exe`, the `.app` and the foobar
+  component are byte-identical to what the previous tag would have produced.
+- **Operator docs touched:** none in this session. `docs/releasing.md`'s half of finding 2 and the
+  bulk-tag-push trap were written before it, in the commit that landed the plan.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** **exit 1**, `backlog claims: 3
+  broken` — the three listed in the Notes above. The advisory half reports 65 moved paths and is
+  never part of the exit code.
+- **Full suite:** `cargo nextest run --workspace` (not `-P fast`), run at the tip of `a9fc91b`.
+  **Exit 0** — `Summary [565.841s] 1672 tests run: 1672 passed (17 slow), 6 skipped`.
+- **Outstanding `human` phases:** **Phase 3** — delete and re-push the `v0.113.0` tag
+  (`git push origin :refs/tags/v0.113.0` then `git push origin v0.113.0`) so the Release workflow
+  fires for it. Not started, and it needs these three commits pushed first, which the phase's own
+  ordering requires. The plan's risk section covers the case where the re-push still produces no
+  run: the bulk-tag inference is then wrong, and it says not to push a third time.
 
 ## Followups (after this lands)
 
