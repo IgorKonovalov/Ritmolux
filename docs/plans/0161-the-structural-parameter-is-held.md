@@ -245,8 +245,8 @@ struct ParamHold {
 |---|---|---|---|
 | 1 — the `[hold]` table | dev | done | dc9e970 |
 | 2 — `ParamKind` and quantization | dev | done | 4eeeba8 |
-| 3 — the audit | dev | done | committed with this row |
-| 4 — the reference prints the two surfaces | dev | not started | |
+| 3 — the audit | dev | done | 7c70cba |
+| 4 — the reference prints the two surfaces | dev | done | committed with this row |
 | 5 — `--report` learns about holds | dev | not started | |
 | 6 — the documentation sweep | dev | not started | |
 
@@ -358,6 +358,22 @@ Stayed `Modal`, each with the reason now in its own `doc` line:
 
 `presets/README.md` was regenerated (`RLX_UPDATE_PARAM_REFERENCE=1`) for the eight moved `doc`
 lines; nothing in it was hand-edited.
+
+**Phase 4 — the reference prints the two surfaces.**
+
+- **A group with no rows prints nothing** — no heading, no empty table. Most engine stages carry no
+  structural parameter, and a run of empty tables reads as a defect rather than as an absence. The
+  phase does not say which way to go on this.
+- **The sentence that says what the two words mean is printed once**, at the head of the generated
+  block, rather than over each of the two dozen sections.
+- **`schema_param_rows` in the agreement test now reorders the schema's rows** the way the
+  reference groups them, so the two renderings are still compared **in order** rather than as sets.
+  The exported document itself stays in declaration order — a consumer groups it by the `kind` each
+  row now carries — so the reordering rule lives in exactly one place.
+- **Rule 4's second half has nothing to apply to yet.** It also asks that a family-bearing system
+  name the family each structural parameter reads on. No structural parameter in the engine is
+  family-specific today: `attractor`'s only one is `tuple`, which every family answers. The
+  families that make the clause bite arrive with Plans 0162 through 0164.
 
 ### Close triggers
 

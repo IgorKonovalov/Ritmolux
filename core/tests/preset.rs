@@ -1771,13 +1771,19 @@ fn engine_stage_rosters() -> Vec<(&'static str, &'static [rlx_core::render::scen
     all.split_off(head)
 }
 
-/// The reference itself: one table per system, then one per engine stage.
+/// The reference itself: one section per system, then one per engine stage,
+/// each split into its **Structural** and **Modal** parameters (ADR-0180
+/// rule 4).
 ///
 /// Four columns, which are the four things a reader asks in order — what is it
 /// called, what does it do if I bind nothing, what range moves it, and what does
 /// it mean. The range is the range that READS, not a clamp: a blank cell is a
 /// parameter that is unbounded or world-space, where the frame is the bound and
 /// inventing a number would be a claim nothing holds.
+///
+/// A group with no parameters prints **nothing** — no heading and no empty
+/// table. Most engine stages carry no structural parameter at all, and a run of
+/// empty tables would read as a defect rather than as an absence.
 fn render_parameter_reference() -> String {
     let mut out = String::from("\n");
     out.push_str(
@@ -1787,6 +1793,15 @@ fn render_parameter_reference() -> String {
          The declarations it is generated from live beside each scene's own \
          `set_param`. -->\n",
     );
+    // Said once, here, rather than over every one of the two dozen sections
+    // below.
+    out.push_str(
+        "\n**Structural** parameters say *what is drawn* — a count, a mode, a family — and the \
+         engine rounds one to a whole number before the scene sees it. **Modal** parameters say \
+         *how it looks*, and every value in their range means something. A parameter with an \
+         integer-sounding name in the Modal group is there because the scene reads the fraction; \
+         its own line says so.\n",
+    );
 
     let systems: Vec<_> = reference_rosters();
     let stage_names: Vec<&str> = engine_stage_rosters().iter().map(|(n, _)| *n).collect();
@@ -1794,26 +1809,36 @@ fn render_parameter_reference() -> String {
     for (label, specs) in &systems {
         let engine_stage = stage_names.contains(label);
         out.push_str(&format!(
-            "\n### {} `{label}`\n\n",
+            "\n### {} `{label}`\n",
             if engine_stage {
                 "Engine stage:"
             } else {
                 "System:"
             }
         ));
-        out.push_str("| Parameter | Default | Range | What it does |\n");
-        out.push_str("|---|---|---|---|\n");
-        for spec in *specs {
-            let range = match spec.range {
-                Some([lo, hi]) => format!("`{}` – `{}`", number(lo), number(hi)),
-                None => String::new(),
-            };
-            out.push_str(&format!(
-                "| `{}` | `{}` | {range} | {} |\n",
-                spec.name,
-                number(spec.default),
-                spec.doc,
-            ));
+        for (group, kind) in [
+            ("Structural", ParamKind::Structural),
+            ("Modal", ParamKind::Modal),
+        ] {
+            let rows: Vec<_> = specs.iter().filter(|spec| spec.kind == kind).collect();
+            if rows.is_empty() {
+                continue;
+            }
+            out.push_str(&format!("\n**{group}**\n\n"));
+            out.push_str("| Parameter | Default | Range | What it does |\n");
+            out.push_str("|---|---|---|---|\n");
+            for spec in rows {
+                let range = match spec.range {
+                    Some([lo, hi]) => format!("`{}` – `{}`", number(lo), number(hi)),
+                    None => String::new(),
+                };
+                out.push_str(&format!(
+                    "| `{}` | `{}` | {range} | {} |\n",
+                    spec.name,
+                    number(spec.default),
+                    spec.doc,
+                ));
+            }
         }
     }
     out.push('\n');
@@ -3553,25 +3578,44 @@ fn every_family_carries_at_least_two_representatives() {
 /// discriminator between a parameter object and a structural key's is the
 /// `default` field's type — a parameter's is a JSON number, a key's is a string.
 fn schema_param_rows(doc: &str) -> Vec<(String, String, String)> {
-    let mut rows = Vec::new();
+    // Returned in **the reference's order**: per roster, the structural
+    // parameters and then the modal ones (ADR-0180 rule 4). The document itself
+    // stays in declaration order — a consumer groups it by the `kind` each row
+    // carries — so the reordering rule lives here, in the one place that
+    // compares the two renderings against each other.
+    let (mut rows, mut structural, mut modal) = (Vec::new(), Vec::new(), Vec::new());
     for chunk in doc.split("{\"name\":\"").skip(1) {
         let Some((name, rest)) = chunk.split_once("\",") else {
             continue;
         };
+        if rest.starts_with("\"params\":") {
+            // A roster header closes the group before it.
+            rows.append(&mut structural);
+            rows.append(&mut modal);
+            continue;
+        }
         let Some(rest) = rest.strip_prefix("\"default\":") else {
             continue;
         };
         if rest.starts_with('"') {
             continue; // a structural key, whose default is written as a string
         }
-        let Some((head, _)) = rest.split_once(",\"doc\":") else {
+        let Some((head, tail)) = rest.split_once(",\"doc\":") else {
             continue;
         };
         let Some((default, range)) = head.split_once(",\"range\":") else {
             continue;
         };
-        rows.push((name.to_owned(), default.to_owned(), range.to_owned()));
+        let row = (name.to_owned(), default.to_owned(), range.to_owned());
+        // The `}` is what stops a doc line containing the phrase from counting.
+        if tail.contains("\"kind\":\"structural\"}") {
+            structural.push(row);
+        } else {
+            modal.push(row);
+        }
     }
+    rows.append(&mut structural);
+    rows.append(&mut modal);
     rows
 }
 
