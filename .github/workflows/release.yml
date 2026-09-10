@@ -195,7 +195,70 @@ jobs:
           path: target/dist/*.zip
           if-no-files-found: error
 
-  # Publish. Gated on ALL THREE builds by `needs:`, so a failure on any platform
+  # The studio, macOS (Plan 0159, ADR-0178). A thin caller, like the macos job
+  # above: the build, the universal lipo of BOTH the player and the Electron
+  # shell, the ad-hoc signing, the zipping and the verification all live in
+  # packaging/studio/bundle-studio.sh, so a developer running it on a Mac is
+  # held to this job's bar rather than to a looser one.
+  #
+  # It builds the player itself rather than reusing the macos job's artifact:
+  # that job uploads a zip, not a binary, and unpacking a signed bundle to reach
+  # the executable inside it would make this job depend on the other's layout.
+  # The cost is one duplicated `lto = "fat"` build; the saving is that either
+  # job can be re-run alone.
+  studio-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: studio/package-lock.json
+      - name: Install both Apple targets
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      # Invoked through `bash` for the reason the macos job gives: this repo is
+      # developed on Windows with core.filemode=false, where the executable bit
+      # is easy to drop on a later edit.
+      - name: Build, bundle, sign, zip and verify
+        run: bash packaging/studio/bundle-studio.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: studio-macos-universal
+          path: target/dist/*.zip
+          if-no-files-found: error
+
+  # The studio, Windows (Plan 0159, ADR-0178). The same thin caller on the other
+  # platform.
+  #
+  # It stages the Spout SDK because the player it carries is built
+  # `--features spout`, exactly as the standalone zip's is: the studio ships the
+  # player a tester would otherwise download, and a player without the feature
+  # fails `--stream` with a named error instead of having it.
+  studio-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: studio/package-lock.json
+      - name: Stage the pinned Spout SDK
+        shell: pwsh
+        run: ./packaging/spout/fetch-sdk.ps1
+      - name: Build, stage, zip and verify
+        shell: pwsh
+        run: ./packaging/studio/build-studio.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: studio-windows-x64
+          path: target/dist/*.zip
+          if-no-files-found: error
+
+  # Publish. Gated on ALL FIVE builds by `needs:`, so a failure on any platform
   # leaves no Release at all rather than a half-published one - the release job
   # is skipped, not merely red.
   #
@@ -208,7 +271,7 @@ jobs:
   # on every runner image, so no pinned third-party release action is needed
   # (NFR section 4 - every dependency is a cost to justify).
   release:
-    needs: [macos, windows, foobar]
+    needs: [macos, windows, foobar, studio-macos, studio-windows]
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -226,20 +289,22 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Three since Plan 0102: the two standalone zips and the foobar2000
-          # component. The recipe either produces all three or the tag is
-          # incomplete (ADR-0115, Negative), and an exact count is what makes a
-          # silently-skipped job fail here rather than ship a short release.
+          # Five since Plan 0159: the two standalone zips, the foobar2000
+          # component, and the two studio zips. The recipe either produces all
+          # five or the tag is incomplete (ADR-0115, Negative), and an exact
+          # count is what makes a silently-skipped job fail here rather than
+          # ship a short release.
           count=$(ls -1 assets/*.zip | wc -l)
-          if [ "$count" -ne 3 ]; then
-              echo "expected exactly 3 zips, found $count:" >&2
+          if [ "$count" -ne 5 ]; then
+              echo "expected exactly 5 zips, found $count:" >&2
               ls -1 assets/ >&2
               exit 1
           fi
           ls -1 assets/*.zip
 
           notes="Builds of the ${TAG} tag: the standalone app for macOS and
-          Windows, and the foobar2000 component.
+          Windows, the foobar2000 component, and the studio for macOS and
+          Windows.
 
           - **macOS** (universal, arm64 + Intel, requires macOS 13+): unsigned and
             ad-hoc signed only, so macOS quarantines it - right-click the app and
@@ -252,11 +317,15 @@ jobs:
             install foo_ritmolux.fb2k-component from File - Preferences - Components.
             It reads what foobar2000 is already decoding, so unlike the
             standalone app there is no audio capture to permit.
+          - **Studio** (macOS universal / Windows x64): the editor. It carries
+            its own copy of the player inside it, so it is the only download you
+            need - take this INSTEAD of the standalone zip above, not beside it.
+            Same signing story as the standalone app on each platform.
 
           Each zip carries a READ-ME-FIRST.txt with the full steps. The two
           standalone zips also carry a reference copy of the presets; the
-          component shares the standalone app's preset folder if both are
-          installed. This is a prerelease while the app is 0.x."
+          component and the studio share the standalone app's preset folder if
+          both are installed. This is a prerelease while the app is 0.x."
 
           # Re-running a workflow on an existing tag must not hard-fail:
           # `gh release create` errors when the release already exists, so

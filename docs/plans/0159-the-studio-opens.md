@@ -391,11 +391,57 @@ export type PlayerEvent =
 | 6 — Parameters move | studio-builder | done | `ce70952` |
 | 7 — Expressions and palettes | studio-builder | done | `658472f` |
 | 8 — Composition and the library | studio-builder | done | `6b85624` |
-| 9 — The release job and the gate | dev | not started | |
+| 9 — The release job and the gate | dev | done | committed with this row |
 | 10 — The tester handoff | human | not started | |
 | 11 — The on-device check | human | not started | |
 
 ### Notes
+
+**Phase 9 — one done-when written before Plan 0102, and four files outside the
+lists.**
+
+- **"A tag push produces three zips" counts the release as it was before the
+  foobar2000 component.** It already produced three, so the studio's two make
+  **five**: `release.yml`'s publish gate is `-ne 5`, its `needs:` names five
+  jobs, and `docs/releasing.md` says five.
+- **`studio/electron-builder.yml` and two `studio/package.json` edits are
+  `studio-builder`'s lane, not this phase's list.** Written here on the user's
+  direction at the session's start, because nothing outside `studio/` can
+  produce the zip the done-when measures. `electron-builder` 25.1.8 pinned
+  exact, two `package:*` scripts, an `author` field; `npm audit --omit=dev`
+  finds nothing.
+- **`.gitignore` gains `studio/staging/`**, where each packaging script drops
+  the platform's player for a fixed `extraResources` path to read.
+- **`docs/nfr.md` section 7's gate count moved nine to ten** for the new `studio`
+  CI job, beyond the size row the phase names for that file. While there: the
+  same sentence says "the six Node doc gates" and the hook runs seven —
+  `check-reader-prose.mjs` is absent from it. Not touched.
+
+**Phase 9 — what was measured, and what has run nowhere.**
+
+- **118,073,278 B**, the Windows zip, from the first one `build-studio.ps1`
+  produced against a `--features spout` player. Unpacked 291,321,974 B:
+  277,424,419 B prebuilt Electron, 10,701,824 B player, **3,195,731 B `app.asar`
+  — everything this project wrote**. The NFR row records rather than caps.
+- **The bundled-player done-when is verified from the extracted archive.**
+  Unpacked to a scratch directory, no settings file, `Ritmolux Studio.exe`
+  launched: it spawned `...esources\playeritmolux.exe --preview stdout
+  --events --control 127.0.0.1:0`.
+- **Nothing macOS was executed.** `bundle-studio.sh` is `bash -n` clean and
+  carries `packaging/macos/bundle.sh`'s assertions plus two — the bundled
+  player's own `lipo -archs`, and `--strict --deep` — but the ad-hoc signature,
+  the universal Electron lipo and the plist check run first on the
+  `studio-macos` job of a tag push.
+- **Both arms of the hook's guard were exercised** against the real lines, the
+  absent arm with `studio/node_modules` moved aside. 15.2 s warm: typecheck
+  7.7 s, lint 2.6 s, tests 4.6 s.
+- **`-P fast` is the tier run** (1459 passed, 230 skipped). The full suite is not
+  run here — no Rust, shader or preset is touched — and is owed at the close,
+  which is not this session's: Phases 10 and 11 are `human` and unstarted.
+- **Two things a tester sees that no done-when names:** electron-builder reports
+  `default Electron icon is used`, and `packaging/studio/READ-ME-FIRST.md` is not
+  in `site/`'s `PUBLISHED` map, so unlike the other three it publishes as no
+  install page.
 
 **Phase 5 is blocked on two facts the protocol does not carry.** The lane
 stopped before writing any of it.

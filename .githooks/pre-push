@@ -61,7 +61,7 @@ run_step() {
     "$@" || fail "$label"
 }
 
-echo "pre-push: running the fast subset (doc links, backlog claims, comment hygiene, reader prose, sd-filter, fmt, clippy, tests)"
+echo "pre-push: running the fast subset (doc links, backlog claims, comment hygiene, reader prose, sd-filter, studio, fmt, clippy, tests)"
 
 # Cheapest check first, so the cheapest failure is the fastest one. ~50 ms, which
 # is why it fits a gate ADR-0033 Alternative F otherwise keeps to the fast subset:
@@ -172,6 +172,33 @@ if command -v python3 >/dev/null 2>&1; then
     run_step "python3 tools/sd-filter/test_sd_filter.py" python3 tools/sd-filter/test_sd_filter.py
 else
     echo "pre-push: skipping the diffusion-filter suite (no python3 on PATH)"
+fi
+
+# The studio's gate (Plan 0159, ADR-0178): typecheck, lint and the Vitest suite
+# for studio/, which is TypeScript and touches no cargo target at all.
+#
+# It rides a guard on studio/node_modules rather than on a command, unlike the
+# node and python3 guards above: `npm` being on PATH says nothing about whether
+# THIS clone has installed the studio's dependency tree, and `npm ci` from a
+# hook is not a thing a gate may do - it is a minutes-long network install.
+# So an uninstalled clone SKIPS with a notice, in ADR-0016's shape, and the CI
+# `studio` job is the backstop that cannot skip, exactly as the `links` job is
+# for the seven checks above.
+#
+# It costs 15.2 s warm on the development machine - typecheck 7.7 s, lint 2.6 s,
+# tests 4.6 s - against the ~27 s the rest of this hook took before ADR-0157's
+# preset sample. That is the largest single addition this gate has taken, and it
+# is bought coverage rather than lost speed: nothing else here reads studio/ at
+# all, and a red typecheck there is invisible to every cargo step below.
+#
+# `npm --prefix` rather than a `cd`: this hook runs from the repository root and
+# a step that changes directory would leak into the cargo steps beneath it.
+if [ -d studio/node_modules ]; then
+    run_step "npm --prefix studio run typecheck" npm --prefix studio run typecheck
+    run_step "npm --prefix studio run lint" npm --prefix studio run lint
+    run_step "npm --prefix studio test" npm --prefix studio test
+else
+    echo "pre-push: skipping the studio's typecheck, lint and tests (no studio/node_modules; run: npm --prefix studio ci)"
 fi
 
 run_step "cargo fmt --all --check" cargo fmt --all --check

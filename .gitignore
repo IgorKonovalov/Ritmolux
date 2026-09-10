@@ -103,3 +103,6 @@ site/.astro/
 studio/node_modules/
 studio/dist/
 studio/release/
+# Where packaging/studio/ drops the player binary for electron-builder's
+# `extraResources` to pick up. A copy of an artifact target/ already holds.
+studio/staging/

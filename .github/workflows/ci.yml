@@ -275,6 +275,37 @@ jobs:
       - run: python -m pip install --quiet numpy
       - run: python tools/sd-filter/test_sd_filter.py
 
+  # The studio's own gate (Plan 0159, ADR-0178). Typecheck, lint and the Vitest
+  # suite for `studio/`, which is TypeScript and touches no cargo target at all.
+  #
+  # Its own job on ubuntu-latest rather than a step in `check`: the studio's
+  # tests need no GPU, no audio device and no Windows, so putting them on the
+  # Windows critical path ADR-0073 is fighting would cost the gate minutes for
+  # nothing. Nothing shipped depends on `studio/`, so this job failing never
+  # means a broken player - but it is the ONLY automated reading of the studio,
+  # because the pre-push hook's studio step skips itself on a clone with no
+  # studio/node_modules.
+  #
+  # npm ci rather than npm install: it installs the committed lockfile exactly
+  # and fails if package.json and the lockfile disagree, which is the only
+  # reason the lockfile is committed at all.
+  studio:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: studio
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: studio/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+
   # Supply-chain gate (deny.toml): advisories, licenses, bans, sources.
   # Platform-independent (reads Cargo.lock + the [graph] targets in deny.toml),
   # so it runs once on the cheapest runner.

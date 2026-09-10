@@ -1,0 +1,52 @@
+# What a `v*` tag ships for the studio (ADR-0178, ADR-0038).
+#
+# This file describes ONE thing: how to turn `dist/` plus a staged player into
+# an unpacked application directory. It does not describe the archive. The two
+# scripts in packaging/studio/ do the staging, the ad-hoc signing, the zipping
+# and the verification, exactly as packaging/macos/bundle.sh and
+# packaging/foobar/build-component.ps1 do for the artifacts beside this one - so
+# a local run is held to the same bar as the release job, and all five zips in a
+# release share one naming and one layout.
+#
+# Hence `--dir` at every call site and no `target:` key here: electron-builder's
+# own zip target would name the archive its way and would zip the macOS bundle
+# BEFORE the ad-hoc signature goes on it.
+appId: dev.ritmolux.studio
+productName: Ritmolux Studio
+copyright: Igor Konovalov
+
+directories:
+  # Gitignored, and NOT target/: this is electron-builder's scratch, while the
+  # zip the scripts assemble from it lands in target/dist beside the other four.
+  output: release
+
+# The three bundles and the manifest, and deliberately nothing else. esbuild
+# bundles the main and preload entry points and Vite bundles the renderer, each
+# with every dependency inlined - zod, React and CodeMirror included - so a
+# second copy of them under node_modules would ship megabytes the app never
+# resolves. electron-builder adds production `dependencies` unless told not to,
+# which is what the exclusion below is for.
+files:
+  - dist/**/*
+  - package.json
+  - '!node_modules/**/*'
+
+# The player, staged here by the packaging script: the Windows .exe, or the
+# lipo'd universal binary on macOS. It lands at `resources/player/`, which is
+# the first candidate studio/electron/player/resolve.ts looks at, so a tester
+# who unzips and double-clicks configures nothing.
+extraResources:
+  - from: staging/player
+    to: player
+
+mac:
+  category: public.app-category.music
+  # No Apple account, so no real identity (ADR-0038). null disables
+  # electron-builder's signing entirely rather than letting it search the
+  # keychain and fail; packaging/studio/bundle-studio.sh applies the ad-hoc
+  # signature afterwards and verifies it, which is what gives TCC a stable code
+  # identity to bind the Screen Recording grant to.
+  identity: null
+  # macOS 13+, matching the player's own floor: the studio spawns it, so a Mac
+  # that cannot run the player has no use for the studio.
+  minimumSystemVersion: '13.0'

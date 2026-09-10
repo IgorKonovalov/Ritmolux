@@ -168,6 +168,17 @@ the decision that moved it is linked.
   every build and **warns** above 11,324,620 B (90 % of the cap). It never fails a release over a
   size: these caps are soft, while the seven fatal checks beside the measurement are properties of
   a correct artifact.
+- **Recorded, not capped: 118,073,278 B** for the Windows studio zip, `ritmolux-studio-v0.113.0-windows-x64.zip`,
+  measured from the first zip `packaging/studio/build-studio.ps1` produced
+  ([ADR-0178](adrs/0178-the-studio-shell-conventions.md) asks for the figure in bytes; the macOS
+  universal zip carries two Electron architectures and will be larger, and its figure joins this
+  row when the first release measures it). It decomposes, from the unpacked 291,321,974 B:
+  **277,424,419 B of prebuilt Electron runtime**, 10,701,824 B of player, and **3,195,731 B of
+  `app.asar` — everything this project wrote**. That ratio is why the row records rather than
+  caps: 95 % of the artifact is a dependency whose size no edit here moves, so a cap would
+  measure Electron's release cadence rather than our restraint, and the two soft caps above
+  exist to be readings on the latter. What *would* move it is dropping a bundle, not trimming
+  one; the studio is never shipped inside the player, and nothing shipped depends on it.
 - wgpu is the accepted fixed cost; little else is.
 - Release profile: LTO on, symbols stripped, exact-version pins for direct deps.
 - Gate: any new crate pulling > ~20 transitive deps needs a stated justification (comment in
@@ -199,9 +210,11 @@ the decision that moved it is linked.
   **All of those carry `--workspace` since [ADR-0072](adrs/0072-the-c-abi-ships-from-its-own-crate.md)**,
   and it is load-bearing rather than stylistic: `rlx-core-cabi` is deliberately outside the workspace
   `default-members`, so the bare forms would silently stop testing and linting the C ABI entirely.
-- Plus **nine** single-runner gates: `cargo deny check` (supply chain), Miri over `rlx-ring`'s
-  `unsafe` (UB), the coverage ratchet below, and the six Node doc gates that share the `links`
-  job — `check-doc-links.mjs` (every relative markdown link resolves — [Plan 0061](plans/done/0061-the-build-stops-paying-for-what-it-is-not-building.md) Phase 2c),
+- Plus **ten** single-runner gates: `cargo deny check` (supply chain), Miri over `rlx-ring`'s
+  `unsafe` (UB), the coverage ratchet below, the `studio` job (the studio's typecheck, lint and
+  Vitest suite — the only automated reading of `studio/`, since the pre-push hook's studio step
+  skips itself on a clone with no `studio/node_modules`), and the six Node doc gates that share
+  the `links` job — `check-doc-links.mjs` (every relative markdown link resolves — [Plan 0061](plans/done/0061-the-build-stops-paying-for-what-it-is-not-building.md) Phase 2c),
   `check-index-rows.mjs` (every row inside a marked roster region stays a pointer under 320 bytes —
   [ADR-0116](adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md)),
   `check-backlog-claims.mjs` (every live backlog entry's probe still holds —

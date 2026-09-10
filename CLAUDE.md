@@ -57,6 +57,14 @@ core-cabi/           # The C ABI, and nothing else (ADR-0072) — the only crate
 rlx-ring/            # The lock-free SPSC ring, extracted zero-dependency so Miri gates it in CI.
 standalone/          # Rust binary + lib — winit window, wgpu surface, loopback capture, `shot`.
 plugin-foobar/       # C++ shim: foobar2000 SDK integration, links core's C ABI. Windows-first.
+studio/              # The Electron studio (ADR-0175, ADR-0178): a THIRD application that edits a
+                     #   preset by driving the player, and NEVER draws a frame itself - it spawns
+                     #   one windowed player, paints a copy of its frames, and reaches it over the
+                     #   control protocol (ADR-0176, docs/specs/0003). Lane `studio-builder`;
+                     #   TypeScript only, no Rust and no C++. Nothing shipped depends on it, and it
+                     #   is not built by any cargo command - but it IS a release artifact of its
+                     #   own, carrying a player inside it at `resources/player/`, which is what
+                     #   makes packaging/studio/ and the two `studio-*` release jobs exist.
 milkconv/            # The MilkDrop `.milk` -> preset converter (ADR-0113). A full workspace member
                      #   that NEVER ships and that no shipped artifact depends on, so it is OUTSIDE
                      #   `default-members` like core-cabi: `--workspace`, `-p milkconv`, or its own
@@ -75,19 +83,23 @@ tools/
                      #   page (docs/diffusion-filter.md) and check-filter-figures.mjs holds them there.
 site/                # The documentation front end (ADR-0154): an
                      #   Astro Starlight site publishing the READER-FACING subset of docs/ with real
-                     #   search, live at igorkonovalov.github.io/Ritmolux/. The repository's only npm
-                     #   project; never shipped, nothing shipped depends on it. `docs/` stays the
+                     #   search, live at igorkonovalov.github.io/Ritmolux/. One of the repository's
+                     #   two npm projects (studio/ is the other); never shipped, nothing shipped
+                     #   depends on it. `docs/` stays the
                      #   SINGLE SOURCE - the content loader reads docs/, docs/specs/ and
                      #   presets/README.md IN PLACE, there is no staged copy, and no markdown file
                      #   outside site/ may be edited to serve it. The publish boundary is the
                      #   PUBLISHED map in src/plugins/rewrite-links.mjs, which also rewrites every
                      #   relative link at build time: inside the set to a site route, outside it to
                      #   a github.com blob URL. A new doc does not join the site by existing.
-packaging/           # What a `v*` tag ships (ADR-0038). macos/ holds bundle.sh — build both
-                     #   Apple targets, lipo, substitute the plist version, ad-hoc sign, zip AND
-                     #   verify — so packaging runs the same on a Mac as in CI, not CI-only magic.
-                     #   Plus the three READ-ME-FIRST.md a tester finds in the zip,
-                     #   which the site publishes as its install pages (ADR-0167).
+packaging/           # What a `v*` tag ships (ADR-0038) — FIVE zips since Plan 0159. macos/ holds
+                     #   bundle.sh — build both Apple targets, lipo, substitute the plist version,
+                     #   ad-hoc sign, zip AND verify — so packaging runs the same on a Mac as in CI,
+                     #   not CI-only magic. studio/ holds the same recipe for the studio, once per
+                     #   platform, each carrying a player into resources/player/. Plus the four
+                     #   READ-ME-FIRST.md a tester finds in the zips; the site publishes THREE of
+                     #   them as its install pages (ADR-0167) — the studio's is not in the
+                     #   PUBLISHED map, and a new one does not join by existing.
 docs/                # Full one-line-per-doc map: README.md "Repository layout". The load-bearing set:
 ├── nfr.md           # Quantified v1 non-functional requirements — the numbers behind every
 │                    #   "lightweight" / "real-time" / "stable frame rate" in the plans.
@@ -129,9 +141,11 @@ docs/                # Full one-line-per-doc map: README.md "Repository layout".
 └── hooks/           # block-broad-git-add.js — enforces explicit-path staging;
                      #   block-attribution-trailers.js — denies agent attribution in a
                      #   commit or PR message. Both are DENY hooks, not advice.
-.githooks/           # Checked-in git hooks. pre-push runs the fast subset (doc links + fmt +
-                     #   clippy + a narrowed nextest, ~28 s). OPT-IN PER CLONE — nothing runs
-                     #   until `git config core.hooksPath .githooks`. See README + ADR-0033.
+.githooks/           # Checked-in git hooks. pre-push runs the fast subset (doc links + the studio's
+                     #   typecheck/lint/tests + fmt + clippy + a narrowed nextest). OPT-IN PER
+                     #   CLONE — nothing runs until `git config core.hooksPath .githooks`, and the
+                     #   studio step skips itself again on a clone with no studio/node_modules.
+                     #   See README + ADR-0033.
 scripts/             # Repo maintenance. Nine Node gates. SEVEN run by pre-push and by the CI
                      #   `links` job; the other TWO run in neither, because they need a BUILT site -
                      #   they live in .github/workflows/pages.yml. check-site-links.mjs asserts that
