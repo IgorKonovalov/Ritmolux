@@ -20,7 +20,7 @@ standard error. It states what must be true of the running system, not how it is
 > the additive-under-the-prefix rule) and
 > [0143](../adrs/0143-the-operator-console-is-a-second-surface-and-the-shell-owns-its-meaning.md)
 > (the transport strip whose actions the wire verbs resolve) and
-> [0181](../adrs/0181-the-studio-drives-one-player-and-the-show-loop-is-extracted.md) (why neither
+> [0183](../adrs/0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md) (why neither
 > roster below is conditional on a run mode).
 > **How the contract got here** is at the end, under *Provenance*.
 
@@ -61,7 +61,7 @@ Adding an event or a field is additive under the same `v`; changing or removing 
   to a pipe; the two differ in the window and the sink and in nothing here. A mode that held that
   state and reported none of it would be silent rather than broken, which is why this is an
   invariant rather than a note.
-  ([ADR-0181](../adrs/0181-the-studio-drives-one-player-and-the-show-loop-is-extracted.md))
+  ([ADR-0183](../adrs/0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md))
 - The listener MUST be **off unless asked for**. With neither `--control` nor
   `[control] enabled = true`, no socket is bound — not one that ignores traffic, none. (ADR-0176)
 - The listener MUST bind **loopback** unless the operator names another host. Anything that can

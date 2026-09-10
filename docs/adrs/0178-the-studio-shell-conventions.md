@@ -159,7 +159,7 @@ second editor is an ADR each.
 ### Negative
 
 - **Everything crosses IPC**, including every preview frame — at the show's own rate, since
-  [ADR-0181](0181-the-studio-drives-one-player-and-the-show-loop-is-extracted.md) makes the
+  [ADR-0183](0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md) makes the
   preview a copy of the windowed player's output rather than a headless run at a rate of its own.
   The `MessagePort` path and the single copy are the mitigation, and both are measured in
   Plan 0159, not assumed.

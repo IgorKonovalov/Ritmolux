@@ -8,11 +8,12 @@
 > [0176](../adrs/0176-the-player-is-driven-over-osc-control-in-and-reports-on-its-standard-streams.md) (accepted),
 > [0177](../adrs/0177-a-fourth-skill-lane-builds-the-studio.md) (proposed),
 > [0178](../adrs/0178-the-studio-shell-conventions.md) (proposed),
-> [0181](../adrs/0181-the-studio-drives-one-player-and-the-show-loop-is-extracted.md) (proposed),
+> [0183](../adrs/0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md) (proposed),
+> [0184](../adrs/0184-the-player-reports-what-it-loaded-and-the-studio-re-derives-nothing.md) (proposed),
 > [0038](../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md)
 > **Depends on:** [0158](done/0158-the-player-grows-a-studio-facing-surface.md) Phases 1 to 5 landed
 > (the override, the listener, the events, the schema, the pipe sink). **Phase 6 of 0158 — the
-> windowed preview copy — is now required**: ADR-0181 makes it the mechanism the studio's preview
+> windowed preview copy — is now required**: ADR-0183 makes it the mechanism the studio's preview
 > uses, and it shipped.
 
 ## TL;DR
@@ -35,7 +36,7 @@ ADR-0175's Decision said. That path binds no control listener, emits two of the 
 and — decisively — never resolves, seeds, watches or reloads the preset directory, because
 `standalone/src/preset_dir.rs` is imported by `app_state.rs` alone. The editing loop this plan
 exists to close does not run there.
-[ADR-0181](../adrs/0181-the-studio-drives-one-player-and-the-show-loop-is-extracted.md) settles
+[ADR-0183](../adrs/0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md) settles
 it: the studio drives **one windowed player** that is both the show and the preview source, and
 the show loop is extracted so the headless path stops being a silent subset of it. Two phases
 below are new because of it, and the phases after them are renumbered.
@@ -49,7 +50,7 @@ next frame, and a pipe carries the picture. The studio is those four things in o
 ## Decision
 
 We build the studio in `studio/` as ADR-0178 lays it out, lane `studio-builder` for the studio
-itself, with `dev` owning what lies outside it — the show-loop extraction ADR-0181 calls for,
+itself, with `dev` owning what lies outside it — the show-loop extraction ADR-0183 calls for,
 the release workflow and the pre-push hook — and `human` owning the two things only the user can
 do (the tester handoff and the on-device check). The first phase is a walking skeleton that
 already shows the player's picture; nothing in the plan is plumbing that shows nothing.
@@ -135,7 +136,7 @@ flowchart LR
 
 ### Phase 3 — The show loop is extracted, and every mode runs it
 - **Owner skill:** dev
-- **What:** ADR-0181's second half. Preset-directory resolution and seeding, the watcher and its
+- **What:** ADR-0183's second half. Preset-directory resolution and seeding, the watcher and its
   reload, the `Director`, the event emissions and the control drain move out of
   `standalone/src/app_state.rs` into one place both the windowed and the headless paths call.
   What stays different between the two is the window and which sink the frames go to. The
@@ -167,7 +168,7 @@ flowchart LR
 
 ### Phase 4 — The studio drives the one player
 - **Owner skill:** studio-builder
-- **What:** ADR-0181's first half, which is a small change to the supervisor: spawn
+- **What:** ADR-0183's first half, which is a small change to the supervisor: spawn
   `--preview stdout --events --control 127.0.0.1:0` rather than the headless set, and take the
   geometry from the `stream` event exactly as now. The picture in the studio becomes a copy of
   the show's own output.
@@ -180,7 +181,47 @@ flowchart LR
   - The frame reader is untouched: the geometry still comes from the `stream` event and no size
     or rate is hard-coded anywhere in `studio/`.
 
-### Phase 5 — Parameters move
+### Phase 5 — The player reports what it loaded
+- **Owner skill:** dev
+- **What:** [ADR-0184](../adrs/0184-the-player-reports-what-it-loaded-and-the-studio-re-derives-nothing.md).
+  Four additive fields under the same `v`, each read at the site that already holds the value:
+  `preset` gains `system` (the schema's own key, `SystemKind::as_str()`, not the `Scene::name()`
+  display string) and `file`; `roster` gains `dir`; `health` gains `preview_sent` and
+  `preview_dropped` from the counters `PreviewPipe` already keeps and writes only to
+  `diagnostics.log`. `Preset` gains `source: Option<PathBuf>`, set by `load_dir` and `None` for the
+  embedded set, and the renderer gains the accessors the emission site needs. Spec 0003's two
+  tables move with it, and the studio's spec-diff test grows to cover the `Fields` column.
+- **Files touched:** `core/src/preset/schema/mod.rs` (`Preset.source`),
+  `core/src/preset/mod.rs` (`load_dir` sets it), `core/src/render/mod.rs` (the two accessors),
+  `standalone/src/events.rs` (the four fields and their rendering),
+  `standalone/src/show.rs` (`report_active_preset`, `report_health`),
+  `standalone/src/preset_dir.rs` (`roster`'s `dir`), `standalone/src/stream.rs` (reading the
+  totals out), `docs/specs/0003-studio-control-protocol.md`,
+  `studio/shared/protocol.ts` and `studio/shared/protocol.spec.test.ts`.
+- **Done when:**
+  - A spawned run reports, for a preset loaded from a directory, a `preset` line whose `system`
+    is a key the `--schema` document's `systems[]` contains: a test asserts membership against
+    the document the same binary printed, over **every** system, not one — the display name and
+    the schema key coincide on the four single-word systems and differ on the rest, so a test
+    that names only `swarm` or `attractor` cannot tell which accessor the code used.
+  - The same run's `preset` line carries the absolute path the preset was read from, and a run
+    against an unresolvable directory carries `"file":null` with a `roster` carrying `"dir":null`
+    — both from the same spawned-process test, so the embedded-set path is exercised rather than
+    assumed. `PresetDir::Unresolved` still runs the show.
+  - `roster`'s `dir` is the path the watcher polls, taken from `Show`'s own field rather than
+    re-resolved: a test asserts the emitted value equals what `Show::preset_dir` returns after a
+    reload, under `RLX_PRESET_DIR` as well as under the default.
+  - `health` carries the preview counters, and a windowed `--preview stdout` run whose reader
+    stalls reports a **rising** `preview_dropped` while the show keeps drawing. With no preview
+    pipe open both fields are `null`, not `0` — "no preview" and "a preview that lost nothing"
+    are different facts.
+  - The spec-diff test compares the `Fields` column against each union member's own keys, both
+    ways, and fails when a field is added on one side alone. Adding one of this phase's own
+    fields to only the spec, or only the union, is what the test is demonstrated against.
+  - The human diagnostics are unchanged: `--events` stays purely additive (spec 0003), and
+    `diagnostics.log`'s preview cost line still says what it said.
+
+### Phase 6 — Parameters move
 - **Owner skill:** studio-builder
 - **What:** The renderer asks main for the schema (main runs `ritmolux --schema` once at start
   and caches it), renders a panel for the active preset's system from the `ParamSpec` rows,
@@ -203,7 +244,7 @@ flowchart LR
     and is not draggable; the slider is offered only for a constant binding.
   - A `preset_error` after a save is shown against the file and line it names.
 
-### Phase 6 — Expressions and palettes
+### Phase 7 — Expressions and palettes
 - **Owner skill:** studio-builder
 - **What:** A CodeMirror 6 editor for the preset file with a small language mode for the
   expression grammar, error markers placed from `preset_error` events, and a palette editor with
@@ -216,10 +257,10 @@ flowchart LR
     one save cycle, and clears when fixed; a test drives the diagnostics from a recorded event.
   - The language mode's token list is generated from the schema's function and variable
     roster, not hand-typed: a test asserts every name in the schema is highlighted and no other.
-  - Moving a palette stop writes the `[palette]` table in the same round-tripping form Phase 5
+  - Moving a palette stop writes the `[palette]` table in the same round-tripping form Phase 6
     established, and the picture follows on the next reload.
 
-### Phase 7 — Composition and the library
+### Phase 8 — Composition and the library
 - **Owner skill:** studio-builder
 - **What:** The system picker, the structural tables (`[particles]`, `[generator]`, `[curve]`,
   `[mesh]`, `[spectrum]`, `[per_vertex]`, `[feedback]`, `[layer]`, `[latch]`, `[smoothing]`)
@@ -239,7 +280,7 @@ flowchart LR
   - Clicking a library entry dissolves the player to it, and the panel re-renders for the new
     system.
 
-### Phase 8 — The release job and the gate
+### Phase 9 — The release job and the gate
 - **Owner skill:** dev
 - **What:** The `v*` tag builds the studio zip for Windows and macOS with the player inside,
   beside the two existing zips; `.githooks/pre-push` runs the studio's typecheck, lint and tests
@@ -256,14 +297,14 @@ flowchart LR
   - The size row exists and names the bytes; the pre-push hook's studio step is skipped, with
     a printed notice in ADR-0016's shape, on a clone with no `studio/node_modules`.
 
-### Phase 9 — The tester handoff
+### Phase 10 — The tester handoff
 - **Owner skill:** human
 - **What:** Hand the studio zip to one VJ who has never seen the repository.
 - **Done when:** They open it, see the picture, move a slider, save, and the player picks up the
   saved file, without any instruction beyond `packaging/studio/READ-ME-FIRST.md`. What they
   could not do is written into `docs/design-backlog.md` as entries with probes.
 
-### Phase 10 — The on-device check
+### Phase 11 — The on-device check
 - **Owner skill:** human
 - **What:** The studio beside a fullscreen player on the projector, driven over `--control`, for
   one full track, on the development machine and on the macOS arm.
@@ -295,7 +336,7 @@ export type PlayerEvent =
 - **Frame transfer cost in Electron.** The `MessagePort` path is the design; if the renderer
   cannot paint the stream's declared geometry at its declared rate with `putImageData`, the phase
   upgrades to a WebGL texture upload before it lowers anything. **The rate is now the show's**,
-  since ADR-0181 makes the preview a copy of the windowed player's output rather than a headless
+  since ADR-0183 makes the preview a copy of the windowed player's output rather than a headless
   run pinned at 640x360 and 30 fps — so this risk grew, and the dropped-frame counter is what
   makes either reading honest.
 - **The extraction is the phase with the most to break and least to show.** Phase 3 touches
@@ -304,13 +345,13 @@ export type PlayerEvent =
   test, and a frame-time line reported before and after rather than assumed.
 - **Round-tripping TOML with comments.** Shipped presets carry long header comments that are
   the project's own record; a writer that loses them is a regression the byte-equality test in
-  Phase 5 exists to catch. If no library round-trips faithfully, the writer edits the file as
+  Phase 6 exists to catch. If no library round-trips faithfully, the writer edits the file as
   text by line, which is enough for a constant on its own line and is what the test measures.
 - **One capture, and one window that is now part of the editing workflow.** The two-capture risk
-  is gone with the second player (ADR-0181). What replaces it: a user editing on a single screen
+  is gone with the second player (ADR-0183). What replaces it: a user editing on a single screen
   with no projector attached has the player's window in the way, and macOS still has no loopback
   without a virtual device. The on-device check reads both.
-- **The schema's structural half may not be enough to render an editor.** Phase 7's walk over
+- **The schema's structural half may not be enough to render an editor.** Phase 8's walk over
   the schema is where a missing enumeration or a missing default surfaces; each is a feedback
   note to `architect` for Plan 0158's Phase 4, not a hand-typed fallback in the studio.
 - **The `render` subcommand and projects are not here.** A tester will ask for both; the plan
@@ -323,7 +364,7 @@ export type PlayerEvent =
 - **No project or show file.** Its format is an interview and an ADR first, because a cue list
   and a timeline are different products.
 - **No second player.** Revised 2026-09-10: the studio drives **one** windowed player that is
-  both the show and the preview source (ADR-0181), through Plan 0158 Phase 6's `--preview
+  both the show and the preview source (ADR-0183), through Plan 0158 Phase 6's `--preview
   stdout`. There is no headless editing child, and the two-capture risk below is discharged
   rather than carried.
 - **No remote control, no phone page.** ADR-0175 Alternative E.
@@ -346,12 +387,13 @@ export type PlayerEvent =
 | 2 — The protocol is typed once | studio-builder | done | `d80b7a4` |
 | 3 — The show loop is extracted | dev | done | `163b330` |
 | 4 — The studio drives the one player | studio-builder | done | `97a6294` |
-| 5 — Parameters move | studio-builder | not started | |
-| 6 — Expressions and palettes | studio-builder | not started | |
-| 7 — Composition and the library | studio-builder | not started | |
-| 8 — The release job and the gate | dev | not started | |
-| 9 — The tester handoff | human | not started | |
-| 10 — The on-device check | human | not started | |
+| 5 — The player reports what it loaded | dev | not started | |
+| 6 — Parameters move | studio-builder | not started | |
+| 7 — Expressions and palettes | studio-builder | not started | |
+| 8 — Composition and the library | studio-builder | not started | |
+| 9 — The release job and the gate | dev | not started | |
+| 10 — The tester handoff | human | not started | |
+| 11 — The on-device check | human | not started | |
 
 ### Notes
 
@@ -375,7 +417,7 @@ stream does not report it.
 The studio can resolve the directory itself, by applying `RLX_PRESET_DIR` else
 the OS data root plus `Ritmolux/presets`. That is a second copy of a resolution
 rule, and two copies that agree today are what
-[ADR-0181](../adrs/0181-the-studio-drives-one-player-and-the-show-loop-is-extracted.md)
+[ADR-0183](../adrs/0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md)
 was written about; a studio that resolved differently would edit files the player
 is not watching. Reading the path out of the `loaded N preset(s) from ...`
 diagnostic is the same bet on prose the event stream exists to end.
@@ -385,6 +427,20 @@ What is buildable without either fact: the schema fetch and its cache, the
 its byte-equality test over `presets/*.toml` in this checkout. What is not: the
 panel knowing which system to render, and the save landing where the player will
 see it.
+
+> **Architect, 2026-09-10.** Answered, and the answer is a phase: the three facts
+> travel on the event stream from the sites that already hold them
+> ([ADR-0184](../adrs/0184-the-player-reports-what-it-loaded-and-the-studio-re-derives-nothing.md)),
+> carried by the new **Phase 5** above, owned by `dev`. The refusal of a second
+> resolver stands; what the note does not reach is that the system has two names
+> here, and Phase 5's first done-when is written against it. The **preview
+> accounting** the Phase 4 note routes here is in the same phase — the producer
+> already counts it. The **ADR-0181 collision** is decided in `docs/adrs/README.md`
+> beside 0120's and 0160's: 0181 stays with Plan 0165, whose number is cited bare
+> from `ci.yml` and from the append-only backlog archive, and this lane's studio
+> ADR is now **0183**. Every phase from the parameter panel down is renumbered by
+> one, so **the numbers in the notes below are the ones the plan carried when each
+> note was written** — this note's Phase 5 is now Phase 6, the on-device check 11.
 
 **Phase 4 — what the capture shows, and one done-when with no originator yet.**
 
@@ -504,7 +560,7 @@ reports nothing.
 > **Architect, 2026-09-10.** The interim decision recorded here — keep the studio
 > headless and bind the listener on that path — was superseded the same day, once
 > the missing watcher was found alongside the missing listener. See
-> [ADR-0181](../adrs/0181-the-studio-drives-one-player-and-the-show-loop-is-extracted.md)
+> [ADR-0183](../adrs/0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md)
 > and Phases 3 and 4 above.
 
 **Two places the implementation differs from what a phase or an ADR says.**

@@ -1449,7 +1449,7 @@ file and the line, `health` once a second. `--control` binds a listener here
 exactly as it does for a window, and `hello` carries the port it actually got, so
 a parent can move a parameter on the next frame. The window and the sink are what
 differ between the two modes; nothing in this paragraph does
-([ADR-0181](adrs/0181-the-studio-drives-one-player-and-the-show-loop-is-extracted.md)).
+([ADR-0183](adrs/0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md)).
 
 On a machine with no per-user data directory at all — a bare CI runner — the run
 says so in one line and carries on with the presets built into the binary, which

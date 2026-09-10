@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0166** (ADRs are a separate sequence — next free there is **0183**.)
+**Next free number: 0166** (ADRs are a separate sequence — next free there is **0185**.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -44,7 +44,7 @@ place. The plan file carries the real link.
 | [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | approved | dev, human | **A new Phase 1 fixes backlog 0102 + 0103 before anything advertises the component** — foobar's UI starves until playback starts. **Phases 4-6 unblocked, 0150 closed.** 0156 Phase 2 shortens the README first. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + **0174**: Art-Net to the fixtures, verified against `rlx-artnet-sim` because **the rig is unreachable**. Phases 1-8 need none; 9 is the rig session. Phase 8 hard-depends on 0115 Phase 2. |
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
-| [0159](0159-the-studio-opens.md) | The studio opens | in-progress | studio-builder, dev, human | ADR-0177 + ADR-0178: the Electron studio under `studio/`. Phases 1-2 landed 2026-09-10; ADR-0181 then added two phases and renumbered the rest to 10. |
+| [0159](0159-the-studio-opens.md) | The studio opens | in-progress | studio-builder, dev, human | ADR-0177 + ADR-0178: the Electron studio under `studio/`. Phases 1-4 landed 2026-09-10; ADR-0184 then added Phase 5 and renumbered the rest to 11. |
 | [0160](0160-the-silhouettes-preconditions-stop-being-silent.md) | The silhouette's preconditions stop being silent | approved | dev, human | ADR-0179: four preconditions on `[path]` that fail silently. **0092 closed 2026-09-09**, so its Phase 7 axis fix is in. Phase 2 is prose in `presets/README.md`. |
 | [0161](0161-the-structural-parameter-is-held.md) | The structural parameter is held | approved | dev | ADR-0180 rules 2+4: a `[hold]` table and `ParamKind`. **The wave's prerequisite - 0162, 0163 and 0164 each want it.** Phase 3's audit can move a golden; that is a stop, not a re-bless. |
 | [0162](0162-the-curve-families.md) | The curve families | approved | dev | ADR-0180 rule 1: Lissajous, hypotrochoid, superformula and harmonograph as `CurveFamily` arms. The catalogue's #1 payoff-per-effort item since 2026-07-25. **Needs 0161.** |

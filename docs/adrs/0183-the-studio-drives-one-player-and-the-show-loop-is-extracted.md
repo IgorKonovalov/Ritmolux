@@ -1,4 +1,4 @@
-# ADR-0181 — The studio drives one player, and the show loop is extracted so every mode runs it
+# ADR-0183 — The studio drives one player, and the show loop is extracted so every mode runs it
 
 > **Status:** proposed
 > **Date:** 2026-09-10

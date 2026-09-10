@@ -164,7 +164,7 @@ loop the studio exists to close does not run there. That path also binds no cont
 
 Nothing about *"the studio never draws a frame"* is affected — that half stands, and is what
 Phases 1 and 2 built against.
-[ADR-0181](0181-the-studio-drives-one-player-and-the-show-loop-is-extracted.md) changes which
+[ADR-0183](0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md) changes which
 player produces the pixels: the studio drives **one windowed player** that is both the show and
 the preview source, and the show loop is extracted so the headless path stops being a silent
 subset of it.
