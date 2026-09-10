@@ -69,6 +69,7 @@
 // cap and still wrong, so the shape check sits BESIDE the length one rather than
 // replacing it.
 
+import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { join, dirname, resolve, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -81,6 +82,8 @@ const ROOT_ARG = argv.find((a) => !a.startsWith("--"));
 const REPO = resolve(ROOT_ARG ?? REPO_ROOT);
 
 // Build output, vendored deps, and VCS internals hold markdown we do not own.
+// Consulted by the FALLBACK walk alone: the tracked set never lists any of
+// them, so the git enumeration below needs no name-based skip.
 const SKIP_DIRS = new Set(["target", "node_modules", ".git"]);
 
 // The fixture trees carry this checker's own bite checks and are skipped on a
@@ -109,21 +112,67 @@ const DELIMITER = /^ {0,3}\|[\s:|-]*-[\s:|-]*$/;
 const TABLE_ROW = /^ {0,3}\|/;
 const BULLET = /^ {0,3}[-*+]\s/;
 
+/** Whether an absolute path sits inside a seeded tree that is NOT the scan root. */
+function inSeededTree(abs, root) {
+  for (const tree of SEEDED_TREES) {
+    if (root === tree || root.startsWith(tree + sep)) continue; // the root is that tree
+    if (abs === tree || abs.startsWith(tree + sep)) return true;
+  }
+  return false;
+}
+
 /**
- * Every `.md` file under the scan root, as paths relative to it.
+ * Every `.md` file the REPOSITORY holds under the scan root, relative to it.
  *
  * The root is a parameter rather than the module-level `REPO` because
  * `--self-test` measures TWO trees in one process — the fixture and the
- * repository — and a walk closed over one global can only ever answer for the
- * tree the command line named.
+ * repository — and an enumeration closed over one global can only ever answer
+ * for the tree the command line named.
+ *
+ * Enumerated from git for the reason toc.mjs, check-doc-links.mjs and
+ * check-comment-hygiene.mjs are, and for one more this gate learned the hard
+ * way. The shared reason is CI parity: a filesystem walk cannot tell documents
+ * we own from a gitignored file sitting in the working tree, which is present
+ * locally and absent from CI's fresh clone. The extra one is a SECOND CHECKOUT
+ * under the root — a plan lane at `.claude/worktrees/<name>/` (ADR-0182). Such a
+ * tree is untracked by definition, so the tracked set excludes it for free,
+ * where the walk read its seeded RED fixture and convicted a clean main
+ * checkout at `.githooks/pre-push`, with CI green.
+ *
+ * `git ls-files` prints paths relative to the CWD it runs in, not to the
+ * repository root, so running it in `root` yields exactly the relative paths
+ * `scan()` joins back onto `root` — the trap check-backlog-claims.mjs documents
+ * at `trackedPaths`. Falls back to the walk when git cannot answer, and says so
+ * rather than reporting a set it did not measure (ADR-0016).
  */
-function markdownFiles(root, dir = root, found = []) {
+function markdownFiles(root) {
+  try {
+    const out = execFileSync("git", ["ls-files", "-z"], {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    const found = [];
+    for (const path of out.split("\0")) {
+      if (!path || !path.endsWith(".md")) continue;
+      if (inSeededTree(resolve(root, path), root)) continue;
+      found.push(path);
+    }
+    return { files: found, source: "git" };
+  } catch {
+    return { files: walk(root), source: "filesystem" };
+  }
+}
+
+/** The pre-git enumeration, kept as the fallback for a tree git cannot answer for. */
+function walk(root, dir = root, found = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
       if (SKIP_DIRS.has(entry.name)) continue;
       if (SEEDED_TREES.has(full)) continue;
-      markdownFiles(root, full, found);
+      walk(root, full, found);
     } else if (entry.name.endsWith(".md")) {
       found.push(relative(root, full));
     }
@@ -269,7 +318,8 @@ function measure(root) {
   let regionTotal = 0;
   let rowTotal = 0;
 
-  for (const file of markdownFiles(root).sort()) {
+  const { files, source } = markdownFiles(root);
+  for (const file of files.sort()) {
     const show = file.split(sep).join("/");
     const { regions, rows, errors: fileErrors, shapes } = scan(root, file);
     errors.push(...fileErrors.map((e) => e.split(sep).join("/")));
@@ -300,6 +350,7 @@ function measure(root) {
     misshaped,
     summary,
     perFile,
+    source,
     regions: regionTotal,
     rows: rowTotal,
   };
@@ -419,10 +470,19 @@ function selfTest() {
 
 if (SELF_TEST) selfTest();
 
-const { violations, errors, misshaped, summary } = measure(REPO);
+const { violations, errors, misshaped, summary, source: enumeration } = measure(REPO);
 
 console.log("index rows: regions found");
 for (const s of summary) console.log(s);
+
+if (enumeration !== "git") {
+  console.log(
+    "note: git could not list this tree, so the file set came from a filesystem\n" +
+      "      walk. That set includes anything gitignored sitting in the working\n" +
+      "      tree — a vendored README, another checkout opened under this root —\n" +
+      "      whose rosters are not ours to measure and which no clone contains.",
+  );
+}
 
 if (errors.length > 0) {
   console.error(`\nindex rows: ${errors.length} malformed marker(s)`);

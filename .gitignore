@@ -42,6 +42,16 @@ Thumbs.db
 # Claude Code local overrides
 .claude/settings.local.json
 
+# Plan lanes the harness opens INSIDE the repository (ADR-0182). ADR-0053 put a
+# lane at WORK/rlx-plan-NNNN, a sibling of this checkout; the harness creates one
+# here instead, and both shapes are supported. It is a second checkout, so its
+# ~8 GB of target/ and its copy of every tracked file live under this root - and
+# a lane's seeded RED fixture, read as if it were ours, convicted a clean main
+# checkout at pre-push. The gates answer that by enumerating from `git ls-files`,
+# which cannot see an untracked tree; this line is what makes the shape visible
+# to every clone rather than to a machine-local .git/info/exclude.
+.claude/worktrees/
+
 # Python bytecode from the tools/ stages (Plan 0106). The stages themselves
 # are committed; their caches are not.
 __pycache__/
