@@ -110,6 +110,13 @@ flowchart LR
   has tested nothing. `node scripts/check-index-rows.mjs --self-test` still asserts the fixtures'
   exact counts, both roots still separable. The gate still convicts a genuinely over-cap row in
   `docs/`: add one, watch it fail, remove it.
+- **Run this phase in the main checkout, not a sibling lane.** The done-when above requires a
+  nested worktree to be present, and a lane at `WORK/rlx-plan-0165` has none inside it — the
+  conviction is unreproducible there, so a fix written in a sibling lane cannot be verified by the
+  criterion it has to meet. Either run the plan in the main checkout while a `.claude/worktrees/`
+  lane is live, or create a throwaway one inside the lane and say so in the implementation log.
+  ADR-0182 accepts both lane shapes; this phase is the one place where which one you are in changes
+  what you can observe.
 - **Do not take the three shapes ADR-0182 rejected** — a `.git`-entry probe on every walk, `.claude`
   in `SKIP_DIRS`, or a relative fixture skip alone. The reasons are recorded there, and the first
   two were the chosen shape until the evidence arrived.
@@ -189,6 +196,23 @@ flowchart LR
   pre-rewrite SHA that no longer exists on `origin`, so `actions/checkout` cannot fetch it. The
   version is skipped, permanently. That is a consequence of the history rewrite and is recorded
   here so nobody later reads the gap as a lost artifact.
+
+## Running this beside the live lanes
+
+Safe to run in parallel with **[0161](0161-the-structural-parameter-is-held.md)** (`core/src/**`,
+`presets/README.md`, the `--report` path) and **[0159](0159-the-studio-opens.md)** (`studio/**`):
+there is no file in common with either, and no ordering dependency in either direction.
+
+**The one contention is 0159's Phase 6**, *The release job and the gate*, which touches
+`.github/workflows/` for a `studio` CI job and the release workflow, `.githooks/pre-push`,
+`.gitignore` and `docs/releasing.md` — every file this plan shares with anything live sits in that
+single phase. It also moves the release's asset count from three zips to four, in the same publish
+step Phase 2 here edits.
+
+**So land this plan first.** It is three small phases against 0159's eight, Phase 0 unblocks pushing
+for every session in the main checkout, and then 0159's Phase 6 merges `main` and writes its studio
+job beside a `spout` job and a hardened publish condition that already exist. The reverse order asks
+the smaller plan to resolve the larger one's workflow edits.
 
 ## What this plan does NOT do
 
