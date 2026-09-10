@@ -70,6 +70,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0191 — `evaluate_preset` advances the scene before it applies the preset's bindings, so the first frame after every switch integrates at the scene's defaults](#0191--evaluate_preset-advances-the-scene-before-it-applies-the-presets-bindings-so-the-first-frame-after-every-switch-integrates-at-the-scenes-defaults)
 - [0192 - `--report` cannot see a `beat_index`-driven response, so a deliberately musical preset measures as inert](#0192-----report-cannot-see-a-beat_index-driven-response-so-a-deliberately-musical-preset-measures-as-inert)
 - [0196 — most `v*` tags produce no Release run at all, and the cause Plan 0165 named cannot explain nineteen of them](#0196--most-v-tags-produce-no-release-run-at-all-and-the-cause-plan-0165-named-cannot-explain-nineteen-of-them)
+- [0199 — the studio always spawns a windowed player, so a one-screen machine gets a show window in the way, and the windowless mode that would fix it already exists](#0199--the-studio-always-spawns-a-windowed-player-so-a-one-screen-machine-gets-a-show-window-in-the-way-and-the-windowless-mode-that-would-fix-it-already-exists)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -3739,3 +3740,60 @@ eighteen. If no run appears, the inference is wrong outright and this entry is t
 and the project has been shipping from a release page that stopped at `v0.103.0` while the version
 reached `v0.113.0`. It becomes **High** the moment anyone outside the project is asked to download
 a build.
+
+## 0199 — the studio always spawns a windowed player, so a one-screen machine gets a show window in the way, and the windowless mode that would fix it already exists
+
+[ADR-0183](adrs/0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md) decided the
+studio drives **one windowed player** that is both the show on the projector and the source of the
+preview frames, and named the cost in its own Negative:
+
+> A user who only wants to edit still gets a player window. That window is the show, which is what
+> a VJ wants; on a single-screen laptop with no projector attached it is a window in the way.
+
+Observed on 2026-09-10, running the packaged studio on the development machine: two windows, the
+show's overlapping the studio's, and no way to ask for one. `DEFAULT_PLAYER_ARGS` is a module
+constant, and `StudioSettings` carries exactly one key, `playerPath`.
+
+**What makes this cheap rather than an engine feature is Plan 0159's own Phase 3.** Before it, the
+windowless `--stream` path was a silent subset — no control listener, two of eight events, no
+preset directory and so no editing loop at all, which is the whole reason ADR-0183 chose the
+windowed player. After it, `stream.rs` builds the same `crate::show::Show` the windowed path
+builds, and `run.rs` binds the control listener on that branch before it greets. **The mode the
+studio would need already runs the full show loop.** What is missing is the studio asking for it,
+and an amendment to ADR-0183, whose Decision sentence is written as though the windowless path were
+still the subset it was when the ADR was drafted.
+
+Two things to settle before anyone builds it, because they are the reason the ADR chose as it did:
+
+- **What the preview is a copy of, when there is no show.** ADR-0183's stated benefit is that the
+  picture being edited *is* the picture the audience sees, by construction. A windowless mode gives
+  that up for the editing session and must get it back when a projector is attached — a toggle
+  mid-session, or a relaunch, and those are different products.
+- **Whether the setting is per-launch or per-machine.** A VJ with a projector wants windowed every
+  time; the same person on a train wants windowless every time. That is a settings key, not a menu
+  item, if the answer is "per-machine".
+
+- **Raised:** 2026-09-10, from running the Plan 0159 Phase 9 packaged artifact on a single-screen
+  machine, and named as a cost in ADR-0183 before that.
+  **Owner if taken:** `architect` to amend ADR-0183, then `studio-builder` — this is spawn
+  arguments and a settings key, not engine work, which the second and third probes are what
+  establish.
+- **Verified 2026-09-10** — the studio never asks for the windowless mode; the spawn arguments name
+  the windowed preview and there is no branch to the other:
+  `absent: --stream in: studio/electron/player/supervisor.ts`
+- **Verified 2026-09-10** — and the windowless path already runs the extracted show loop, so the
+  editing loop it lacked when ADR-0183 was written is there now:
+  `present: crate::show::Show::start in: standalone/src/stream.rs`
+- **Verified 2026-09-10** — and binds the control listener on that branch, which was the other half
+  of what it could not do:
+  `present: let control = bind_control in: standalone/src/run.rs`
+- **Verified 2026-09-10** — the ADR sentence an amendment would have to move:
+  `present: \*\*The studio drives one player\.\*\* in: docs/adrs/0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md`
+- **Verified 2026-09-10** — the studio's settings carry no way to choose, one key and it is the
+  player's path: `present: playerPath\?: string in: studio/electron/settings.ts`
+
+### Priority
+
+**High, and asked for as such by the user on 2026-09-10** — "to be fixed asap". It is the first
+thing anyone opening the studio on one screen hits, it is in front of Plan 0159's Phase 10 tester
+handoff rather than behind it, and the repair is small and mostly already built.
