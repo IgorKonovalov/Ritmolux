@@ -25,7 +25,20 @@ beforeEach(() => {
 afterEach(cleanup)
 
 function panel(running: 'windowed' | 'windowless' = 'windowed') {
-  render(
+  return render(
+    <Settings
+      running={running}
+      playerPath="/opt/ritmolux"
+      playerSource="bundled"
+      studioVersion="0.113.0"
+      onClose={vi.fn()}
+    />,
+  )
+}
+
+/** The same panel, re-rendered with a different running mode. */
+function again(view: ReturnType<typeof panel>, running: 'windowed' | 'windowless'): void {
+  view.rerender(
     <Settings
       running={running}
       playerPath="/opt/ritmolux"
@@ -61,6 +74,31 @@ describe('the player mode', () => {
       fireEvent.click(screen.getByLabelText(/windowless/))
     })
     expect(screen.getByRole('alert').textContent).toContain('disk is full')
+  })
+
+  it('follows the running mode when the app info arrives after the first render', () => {
+    // `running` is one IPC round trip behind the mount. A panel that seeded its
+    // state from the first value would show `windowed` on a machine set to
+    // `windowless`, and claim a choice nobody made.
+    const view = panel('windowed')
+    again(view, 'windowless')
+    expect((screen.getByLabelText(/windowless/) as HTMLInputElement).checked).toBe(true)
+    expect(screen.getByText('The player is running in windowless.')).toBeDefined()
+  })
+
+  it('keeps a choice the user made when the info catches up behind it', async () => {
+    const view = panel('windowed')
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText(/windowless/))
+    })
+    again(view, 'windowed')
+    expect((screen.getByLabelText(/windowless/) as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('says nothing about saving until something was saved', () => {
+    panel('windowed')
+    expect(screen.getByText('The player is running in windowed.')).toBeDefined()
+    expect(screen.queryByText(/Saved\./)).toBeNull()
   })
 
   it('does not describe the windowless preview as a show feed', () => {

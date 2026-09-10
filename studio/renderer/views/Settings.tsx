@@ -40,11 +40,20 @@ export function Settings({
   studioVersion,
   onClose,
 }: SettingsProps): JSX.Element {
-  const [chosen, setChosen] = useState<PlayerMode>(running)
+  /**
+   * The mode the user picked in this window, or `undefined` while they have
+   * picked none.
+   *
+   * Not seeded from `running`: `running` arrives with the app info, one IPC
+   * round trip after the first render, and a `useState(running)` would keep
+   * whatever the default was at mount and then report a choice nobody made.
+   */
+  const [picked, setPicked] = useState<PlayerMode>()
   const [problem, setProblem] = useState<string>()
+  const chosen = picked ?? running
 
   const choose = (mode: PlayerMode): void => {
-    setChosen(mode)
+    setPicked(mode)
     void window.api.app.setPlayerMode(mode).then((result) => {
       // The choice is kept on screen either way; what changes is whether the
       // file took it, which is the only thing the next launch reads.
@@ -77,9 +86,9 @@ export function Settings({
           </label>
         ))}
         <p className={styles.note}>
-          {chosen === running
+          {picked === undefined || picked === running
             ? `The player is running in ${running}.`
-            : `Saved. The player is still running in ${running} — reopen the studio to start it in ${chosen}.`}
+            : `Saved. The player is still running in ${running} — reopen the studio to start it in ${picked}.`}
         </p>
         {problem !== undefined && (
           <p className={styles.problem} role="alert">
