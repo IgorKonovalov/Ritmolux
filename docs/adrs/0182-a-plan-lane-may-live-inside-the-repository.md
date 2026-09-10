@@ -1,8 +1,8 @@
 # ADR-0182 — A plan lane may live inside the repository, and a tool that enumerates from git already knows it
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-10
 > **Date:** 2026-09-10
-> **Related plan(s):** [0165-the-release-path-stops-being-the-first-compile](../plans/0165-the-release-path-stops-being-the-first-compile.md) Phase 0
+> **Related plan(s):** [0165-the-release-path-stops-being-the-first-compile](../plans/done/0165-the-release-path-stops-being-the-first-compile.md) Phase 0
 > **Supplements:** [ADR-0053](0053-plan-lanes-run-in-git-worktrees.md)
 
 ## Context

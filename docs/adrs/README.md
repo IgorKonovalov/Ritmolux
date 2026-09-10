@@ -202,6 +202,6 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0178](0178-the-studio-shell-conventions.md) | The studio shell conventions: three processes, a mirrored protocol, and the same security defaults as the sibling repository | proposed 2026-09-09 (Plan 0159) |
 | [0179](0179-a-precondition-is-checked-at-load-or-it-is-written-down.md) | A precondition on a figure is checked at load, or it is written down | proposed 2026-09-09 (Plan 0160), extends 0107, 0111 |
 | [0180](0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md) | A mathematical world joins a system as a family, and a structural parameter is quantized and held | proposed 2026-09-09 (Plans 0161-0164), extends 0007, 0015 |
-| [0181](0181-the-gate-compiles-every-feature-a-release-ships.md) | The per-push gate compiles every feature a release ships | proposed 2026-09-10 (Plan 0165) |
-| [0182](0182-a-plan-lane-may-live-inside-the-repository.md) | A plan lane may live inside the repository, and a tool that enumerates from git already knows it | proposed 2026-09-10 (Plan 0165), supplements 0053 |
+| [0181](0181-the-gate-compiles-every-feature-a-release-ships.md) | The per-push gate compiles every feature a release ships | accepted 2026-09-10 (Plan 0165); Outcome |
+| [0182](0182-a-plan-lane-may-live-inside-the-repository.md) | A plan lane may live inside the repository, and a tool that enumerates from git already knows it | accepted 2026-09-10 (Plan 0165), supplements 0053 |
 <!-- roster:end -->

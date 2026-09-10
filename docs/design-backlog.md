@@ -332,9 +332,9 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0180 | A doc comment states the ABI version is 4 and points at a test file that does not exist | [Plan 0156](plans/done/0156-the-site-becomes-the-reference.md) Phase 6: the path corrected and neither figure restated, because rustdoc made the comment public. **Closed 2026-09-06** |
 | 0149 | Three bindable rates multiply a per-element `age` instead of integrating, and ADR-0135's guard cannot see any of them | [ADR-0153](adrs/0153-a-per-element-rate-integrates-per-element.md) + [Plan 0140](plans/done/0140-every-rate-integrates-for-real.md) Phases 1, 3 and 4. **Closed 2026-09-08** |
 | 0150 | `Phase::step` accepts any `dt`, so the guard is four copies in the callers and the attractor has none | [ADR-0152](adrs/0152-the-frame-delta-is-sanitized-at-the-scene-seam.md) + [Plan 0140](plans/done/0140-every-rate-integrates-for-real.md) Phase 2; six copies, not four. See 0189, 0190. **Closed 2026-09-08** |
-| 0193 | The `spout` feature is compiled for the first time by the job that publishes it | [ADR-0181](adrs/0181-the-gate-compiles-every-feature-a-release-ships.md) + [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md) Phase 1. Cost two releases, not one. **Closed 2026-09-10** |
-| 0194 | `release.yml` promises a dry run it cannot provide, because the publish gate reads the ref and not the event | [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md) Phase 2. The hazard was already realized once; see 0196. **Closed 2026-09-10** |
-| 0195 | `check-index-rows.mjs` is the one gate that never adopted the tracked-set enumeration | [ADR-0182](adrs/0182-a-plan-lane-may-live-inside-the-repository.md) + [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md) Phase 0. Both probes still pass. **Closed 2026-09-10** |
+| 0193 | The `spout` feature is compiled for the first time by the job that publishes it | [ADR-0181](adrs/0181-the-gate-compiles-every-feature-a-release-ships.md) + [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md) Phase 1. Cost two releases, not one. **Closed 2026-09-10** |
+| 0194 | `release.yml` promises a dry run it cannot provide, because the publish gate reads the ref and not the event | [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md) Phase 2. The hazard was already realized once; see 0196. **Closed 2026-09-10** |
+| 0195 | `check-index-rows.mjs` is the one gate that never adopted the tracked-set enumeration | [ADR-0182](adrs/0182-a-plan-lane-may-live-inside-the-repository.md) + [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md) Phase 0. Both probes still pass. **Closed 2026-09-10** |
 <!-- roster:end -->
 
 ## Open entries
@@ -3674,7 +3674,7 @@ to the author who could tell the difference.
 
 ## 0196 — most `v*` tags produce no Release run at all, and the cause Plan 0165 named cannot explain nineteen of them
 
-[Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md) fixed two real holes in
+[Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md) fixed two real holes in
 the release path and deliberately declined to audit a third it had spotted — *"whether that whole
 gap shares Phase 3's cause is a separate question this plan deliberately does not open."* This entry
 opens it, because the review that closed 0165 measured the gap and found it is the **dominant**
@@ -3706,7 +3706,7 @@ the close ceremony batching several accumulated tags into one push (the same >3-
 arriving by a different route), or `git push --follow-tags` not emitting a per-tag event under some
 condition nobody has reduced. Neither is established.
 
-- **Raised:** 2026-09-10, at [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md)'s
+- **Raised:** 2026-09-10, at [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md)'s
   Mode 4 review, from counting what the plan's own Phase 3 premise implied.
   **Owner if taken:** `architect` for the diagnosis, then `dev` if the answer is mechanical.
 - **Verified 2026-09-10** — nothing in the repository reconciles tags against releases after the
@@ -3732,6 +3732,15 @@ Plan 0165 Phase 3 is, in effect, the experiment: it deletes and re-pushes `v0.11
 run appears, the bulk-push inference holds for that one tag and this entry still owns the other
 eighteen. If no run appears, the inference is wrong outright and this entry is the whole finding.
 **Read Phase 3's outcome before designing anything here.**
+
+- **UPDATE 2026-09-10, hours after filing — Phase 3 ran, and it narrows this entry rather than
+  settling it.** The delete-and-re-push produced Release run `34468008655` where the original push
+  had produced none; all four jobs went green and `v0.113.0` is published with its three zips. So
+  the bulk-tag inference **holds for `v0.113.0`**, and the recovery in `docs/releasing.md` is known
+  to work. What is untouched is the **other eighteen**: they were pushed across three weeks of
+  ordinary closes, before the history rewrite, and nothing here explains them. The entry stands at
+  eighteen tags rather than nineteen, and its two candidate causes are unchanged — neither has been
+  reduced to a probe, which is why the third bullet above is an honest `unprobeable:`.
 
 ### Priority
 

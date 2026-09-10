@@ -1,8 +1,8 @@
 # ADR-0181 — The per-push gate compiles every feature a release ships
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-10
 > **Date:** 2026-09-10
-> **Related plan(s):** [0165-the-release-path-stops-being-the-first-compile](../plans/0165-the-release-path-stops-being-the-first-compile.md)
+> **Related plan(s):** [0165-the-release-path-stops-being-the-first-compile](../plans/done/0165-the-release-path-stops-being-the-first-compile.md)
 
 ## Context
 
@@ -110,9 +110,17 @@ and the tag push remains the full-fidelity build by design.
 
 ## Outcome — 2026-09-10, at Plan 0165's close review
 
-Two facts found while reviewing the implementation, both of which the Context above understates.
-Recorded here rather than edited into the body, so what was known when the decision was taken stays
-readable.
+Three findings from reviewing the implementation. The first is the decision working; the other two
+are facts the Context above understates, recorded here rather than edited into the body so that what
+was known when the decision was taken stays readable.
+
+**The gate and the real build agree, which had never been tested.** The `spout` job went green on CI
+run `34467912506` in **3m30s**, against `check (windows-latest)`'s 25m on the same run — so the
+"wall clock does not move" claim in Positive holds with room. Release run `34468008655` then built
+the same feature at release profile and `lto = "fat"`, and its `windows` job — the one that killed
+both `v0.108.0` and `v0.112.0` — succeeded and packaged. That is the first occasion the dev-profile
+check and the full build have both run on this feature, and the Negative section's accepted gap
+(a check does not link) went untested rather than unfound.
 
 **The `E0425` cost two releases, not one.** `v0.108.0` failed on 2026-09-05 with the identical
 `cannot find function start_capture in the crate root` — run `33992293177`, `windows` red at the

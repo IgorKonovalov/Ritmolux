@@ -1,10 +1,18 @@
 # 0165 — The release path stops being the first compile
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-10. Phases 0-2 landed as `ea77920`, `7807900` and `a9fc91b`;
+> Phase 3 published `v0.113.0` (release run `34468008655`, all three zips, the first release since
+> `v0.103.0`). Mode 4 review: **no blockers, three majors, four minors, two nits** — every major in
+> the close rather than in the phases. Verified independently of the log: the Phase 0 conviction
+> reproduced and cleared with a nested lane live, the over-cap bite check convicts, `--self-test`
+> 10/10, `cargo nextest run --workspace` 1671/1672 with one isolated-green flake, `clippy
+> --workspace --all-targets` clean, and the `spout` job green on CI run `34467912506`.
+> **Version: none** — deliberate, not a miss: the diff is CI, one script and docs, so every shipped
+> artifact is byte-identical.
 > **Created:** 2026-09-10
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0181-the-gate-compiles-every-feature-a-release-ships](../adrs/0181-the-gate-compiles-every-feature-a-release-ships.md),
-> [0182-a-plan-lane-may-live-inside-the-repository](../adrs/0182-a-plan-lane-may-live-inside-the-repository.md)
+> **Related ADRs:** [0181-the-gate-compiles-every-feature-a-release-ships](../../adrs/0181-the-gate-compiles-every-feature-a-release-ships.md),
+> [0182-a-plan-lane-may-live-inside-the-repository](../../adrs/0182-a-plan-lane-may-live-inside-the-repository.md)
 > **Closes:** design-backlog 0193, design-backlog 0194, design-backlog 0195
 
 ## TL;DR
@@ -199,8 +207,8 @@ flowchart LR
 
 ## Running this beside the live lanes
 
-Safe to run in parallel with **[0161](0161-the-structural-parameter-is-held.md)** (`core/src/**`,
-`presets/README.md`, the `--report` path) and **[0159](0159-the-studio-opens.md)** (`studio/**`):
+Safe to run in parallel with **[0161](../0161-the-structural-parameter-is-held.md)** (`core/src/**`,
+`presets/README.md`, the `--report` path) and **[0159](../0159-the-studio-opens.md)** (`studio/**`):
 there is no file in common with either, and no ordering dependency in either direction.
 
 **The one contention is 0159's Phase 6**, *The release job and the gate*, which touches
@@ -240,7 +248,7 @@ done-when needs a nested lane present to be observable at all, and
 | 0 — The index-rows gate enumerates from git | dev | done | `ea77920` |
 | 1 — The gate compiles the `spout` feature | dev | done | `7807900` |
 | 2 — A dispatch cannot publish | dev | done | `a9fc91b` |
-| 3 — The missed version gets published | human | not started | |
+| 3 — The missed version gets published | human | done | run `34468008655` |
 
 ### Notes
 
@@ -303,6 +311,34 @@ done-when needs a nested lane present to be observable at all, and
   fires for it. Not started, and it needs these three commits pushed first, which the phase's own
   ordering requires. The plan's risk section covers the case where the re-push still produces no
   run: the bulk-tag inference is then wrong, and it says not to push a third time.
+
+### Close addendum — written by `architect` at the Mode 4 review, 2026-09-10
+
+**Phase 3 ran, and it is also the experiment the risk section describes.** The delete-and-re-push
+produced run `34468008655` where the original push had produced none, and all four jobs went green:
+`foobar`, `windows`, `macos`, then `release`. `v0.113.0` is published as a prerelease carrying
+`ritmolux-v0.113.0-{windows-x64,macos-universal,foobar2000-component}.zip`. The tag still
+dereferences to `c5a08f1`, so this is a build of the intended tree.
+
+**The `windows` job is the result worth keeping.** It is the job that killed `v0.108.0` and
+`v0.112.0`, and it is the only one that compiles `--features spout` at release profile. The gate's
+`cargo check` predicted green and the `lto = "fat"` build agreed — the first time the gate and the
+real build have both run on this feature.
+
+**What the experiment does NOT settle.** The re-push explains `v0.113.0` and nothing before it.
+Nineteen tags in the `v0.93.0`-`v0.113.0` window produced no Release run at all, eighteen of them
+pushed before the history rewrite, and that remains unexplained. It is backlog 0196, filed at this
+review because the plan deferred the question without leaving an entry or a probe behind.
+
+**Two record corrections the review measured**, both in
+[ADR-0181](../../adrs/0181-the-gate-compiles-every-feature-a-release-ships.md)'s `Outcome`: the `E0425`
+cost **two** releases (`v0.108.0`, run `33992293177`, 2026-09-05), and the dispatch-on-tag publish
+was **already realized** (run `31955362251` published `v0.70.0`), which means Phase 2 removes a
+recovery path rather than purely tightening one.
+
+**Phase 1's second half is verified.** The `spout` job is green on CI run `34467912506`, alongside
+`check`, `links`, `deny`, `coverage` and `miri`, at 3m30s against `check (windows-latest)`'s 25m —
+ADR-0181's "wall clock does not move" holds with room.
 
 ## Followups (after this lands)
 

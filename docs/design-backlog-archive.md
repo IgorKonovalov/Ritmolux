@@ -9196,7 +9196,7 @@ gate caught it and nobody went looking.
   rewrite — the rewrite was exonerated and this was found beside it. **Owner if taken:** `dev`,
   behind an architect decision about what the per-push gate covers.
 - **PROMOTED 2026-09-10 → [ADR-0181](adrs/0181-the-gate-compiles-every-feature-a-release-ships.md) +
-  [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md) Phase 1**, which adds a
+  [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md) Phase 1**, which adds a
   `spout` job to the gate. The probe below goes red on the commit that discharges it.
 - **Verified 2026-09-10** — the per-push gate does not mention the feature:
   `absent: spout in: .github/workflows/ci.yml`
@@ -9220,7 +9220,7 @@ had been tagged, and nobody noticed, because absence is not a signal anyone watc
 is unfixed is the blindness: the next item that moves out from under that `#[cfg]` fails exactly the
 same way, at exactly the same moment — the push that was meant to ship.
 
-**CLOSED 2026-09-10** — [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md)
+**CLOSED 2026-09-10** — [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md)
 Phase 1 added the `spout` job to `ci.yml`. The probe went red on the discharging commit, which
 ADR-0181 predicted. The review found the break cost **two** releases rather than one — `v0.108.0`
 failed identically on 2026-09-05, run `33992293177` — and that correction is recorded in
@@ -9242,7 +9242,7 @@ dispatching on the tag, which is the one ref that publishes.
   intended command would have published instead. The rehearsal was launched on `main` (run
   `34450413424`) and the `release` job was correctly skipped there. **Owner if taken:** `dev` for
   the condition; the doc half is architect's and was corrected when this entry was filed.
-- **PROMOTED 2026-09-10 → [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md)
+- **PROMOTED 2026-09-10 → [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md)
   Phase 2**, which narrows the condition to `github.event_name == 'push'` as well as the ref, so the
   existing comment becomes true rather than merely rewritten.
 - **Verified 2026-09-10** — the publish gate reads only the ref:
@@ -9267,7 +9267,7 @@ the comment side by side with a specific question in mind.
 blast radius is a premature public prerelease rather than a broken build — recoverable, but
 outward-facing and not quietly so.
 
-**CLOSED 2026-09-10** — [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md)
+**CLOSED 2026-09-10** — [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md)
 Phase 2 narrowed the condition to `github.event_name == 'push'` as well as the ref, so a dispatch
 publishes on no ref at all. The review found the hazard was **already realized**, not latent: run
 `31955362251` published `v0.70.0` from a dispatch on that tag, apparently to recover a tag whose own
@@ -9317,7 +9317,7 @@ ordinary reason: it was the only one whose block had drifted.
   tracked half, so it can report a nested hit and not convict on one. **`check-index-rows.mjs` is
   the only gate that convicts**, because it is the only full-tree walker with no tracked-set filter.
   The entry stands because the blocked push is real; what it blamed was four times too wide.
-- **PROMOTED 2026-09-10 → [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md)
+- **PROMOTED 2026-09-10 → [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md)
   Phase 0** and [ADR-0182](adrs/0182-a-plan-lane-may-live-inside-the-repository.md), which accept the
   inside-the-repo lane as a supported shape and make the enumeration rule explicit:
   **`check-index-rows.mjs` adopts `git ls-files`**, like the three gates that already do. The
@@ -9354,7 +9354,7 @@ unavailable. A copied constant invited the inference that a copied consequence f
 **High**, for the blocked push alone — immediate, affecting every session in the main checkout while
 a nested lane exists. ~~Medium for the write hazard~~, which does not exist.
 
-**CLOSED 2026-09-10** — [Plan 0165](plans/0165-the-release-path-stops-being-the-first-compile.md)
+**CLOSED 2026-09-10** — [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md)
 Phase 0 and [ADR-0182](adrs/0182-a-plan-lane-may-live-inside-the-repository.md).
 `check-index-rows.mjs` now enumerates from `git ls-files`, so an untracked nested checkout is
 invisible to it, and `.claude/worktrees/` joined the committed `.gitignore`. **Both of this entry's

@@ -50,7 +50,6 @@ place. The plan file carries the real link.
 | [0162](0162-the-curve-families.md) | The curve families | approved | dev | ADR-0180 rule 1: Lissajous, hypotrochoid, superformula and harmonograph as `CurveFamily` arms. The catalogue's #1 payoff-per-effort item since 2026-07-25. **Needs 0161.** |
 | [0163](0163-the-analytic-field.md) | The analytic field | approved | dev | ADR-0180 rules 1+3: a 13th system holding `chladni` and `escape_time`, with Voronoi, quasicrystal and hyperbolic placed. Fills the roadmap's fractal-spiral gap. **Needs 0161.** |
 | [0164](0164-the-cellular-system.md) | The cellular system | approved | dev | ADR-0180 rules 1+2: a 14th system on `PingPongField` - `life_like`, `larger_than_life`, `cyclic`, plus an age channel so the field paints history. Lenia placed, not built. **Needs 0161.** |
-| [0165](0165-the-release-path-stops-being-the-first-compile.md) | The release path stops being the first compile | approved | dev, human | ADR-0181: the gate compiles `--features spout`, and a dispatch stops publishing. **Phase 0 unblocks every push - backlog 0195.** Phase 3 ships the unbuilt `v0.113.0`. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-09 — [0158] and [0159] are drafted, and they are a program rather than a
@@ -69,7 +68,7 @@ built against it. The full note is in [README-archive.md](README-archive.md) und
 [0162]: 0162-the-curve-families.md
 [0163]: 0163-the-analytic-field.md
 [0164]: 0164-the-cellular-system.md
-[0165]: 0165-the-release-path-stops-being-the-first-compile.md
+[0165]: done/0165-the-release-path-stops-being-the-first-compile.md
 [0180]: ../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md
 
 ~~**Added 2026-09-07 - [0157] is drafted, and it is the only plan that unblocks `main`.**~~ - **closed 2026-09-07.** Both phases landed the same day the note was written; `main` is green and the route gate passes against a built site with `dist/api/` populated. The note is in [README-archive.md](README-archive.md) under `## Prior sequencing notes (superseded)`, which also records the one durable half: the cost probes still run in `-P fast` on every arm of every push.
@@ -375,14 +374,7 @@ build is no longer a reason to keep a finished worktree around.
   **19.1 %** of the `reactivity` suite — the minority arm, so ADR-0033's ratchet derivation is not
   reopened and no ADR is owed.
 
-**Added 2026-09-10 — [0165] runs beside the two live lanes, and goes first.** Its surfaces
-(`scripts/check-index-rows.mjs`, `ci.yml`, `release.yml`, `.gitignore`) meet nothing in
-[0161]'s `core/src/**` or [0159]'s `studio/**`. The single contention is **0159 Phase 6**, which
-adds a `studio` CI job, edits the release workflow and moves the asset count to four zips — the same
-publish step 0165 Phase 2 narrows. 0165 is three phases and its Phase 0 unblocks pushing from the
-main checkout, so it lands first and 0159 Phase 6 merges `main` onto a settled pair of workflows.
-**0165 Phase 0 must run in the main checkout** — a sibling lane holds no nested worktree, so the
-conviction it repairs cannot be reproduced there.
+~~**Added 2026-09-10 — [0165] runs beside the two live lanes, and goes first.**~~ — **closed 2026-09-10.** 0165 landed first as planned and is closed, so the ordering it argued is spent; 0159 Phase 6 now merges `main` onto the settled workflows. The note is in [README-archive.md](README-archive.md) under `## Prior sequencing notes (superseded)`.
 
 ### The two lanes, now
 
@@ -780,6 +772,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0165 — The release path stops being the first compile](done/0165-the-release-path-stops-being-the-first-compile.md) — closed 2026-09-10. Review: **no blockers, three majors, four minors.** Version: **none** (chore-only). ADR-0181 + ADR-0182 accepted. [Write-up](README-archive.md).
 - [0158 — The player grows a studio-facing surface](done/0158-the-player-grows-a-studio-facing-surface.md) — closed 2026-09-10. Review: **no blockers, two majors, six minors.** Version: **0.113.0**. ADR-0175 + 0176 accepted. Phase 7 open, on [on-device](../on-device-validation.md). [Write-up](README-archive.md).
 - [0092 — The engine draws an authored path](done/0092-the-engine-draws-an-authored-path.md) — closed 2026-09-09. Review: **no blockers, one major, three minors, one nit.** Version: **0.112.0** (minor). ADR-0107 already accepted. `shape_maple` + `shape_lion` shipped. [Write-up](README-archive.md).
 - [0140 — Every rate integrates, for real](done/0140-every-rate-integrates-for-real.md) — closed 2026-09-08. Review: **no blockers, two majors, three minors, one nit.** Version: **0.111.1**. ADR-0152 + 0153 accepted. Archived [backlog 0149 + 0150](../design-backlog-archive.md). [Write-up](README-archive.md).
