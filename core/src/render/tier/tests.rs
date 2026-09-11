@@ -84,6 +84,12 @@ fn rich_is_never_below_the_floor() {
     assert!(rich.cellular_radius >= floor.cellular_radius);
     let top = crate::render::scenes::cellular::MAX_RADIUS as u32;
     assert!(floor.cellular_radius >= 1 && rich.cellular_radius <= top);
+    // The grid cap sits inside what the loader accepts, and the default grid
+    // runs at its own size on every tier.
+    use crate::render::scenes::cellular::{DEFAULT_GRID, MAX_GRID};
+    assert!(rich.cellular_grid >= floor.cellular_grid);
+    assert!(floor.cellular_grid >= DEFAULT_GRID);
+    assert!(rich.cellular_grid <= MAX_GRID);
 }
 
 /// The floor is the pre-tier engine. These are the literals the constants

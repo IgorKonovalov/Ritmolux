@@ -480,6 +480,30 @@ pub struct TierConfig {
     /// a constant to measure**, at the tier's own grid cap and 60 generations a
     /// second.
     pub cellular_radius: u32,
+
+    /// The largest `[cellular] grid` a preset may run on, in cells a side
+    /// (ADR-0045).
+    ///
+    /// **A cap on content, like [`cellular_radius`](Self::cellular_radius),
+    /// and it is clamped and announced rather than silently reduced**: a
+    /// pattern is a fixed number of cells, so a grid clamped from 1024 to 512
+    /// draws every glider twice as large. A preset asking within the `Floor`
+    /// value runs identically on both tiers; one asking past it runs on the cap
+    /// and says so at load, through the cap overflow the standalone prints
+    /// ([`OverflowContext::Grid`](super::scenes::OverflowContext::Grid)).
+    ///
+    /// # Where the numbers come from
+    ///
+    /// **Arithmetic, not a measurement**, from the same read count
+    /// [`cellular_radius`](Self::cellular_radius) states. `Floor`'s 512 is the
+    /// grid that figure is quoted at — 262 144 cells, 425 M texel reads a
+    /// second at `Floor`'s radius and 60 generations a second — and its state
+    /// textures are 4 MB of the ping-pong pair and the row counts. `Rich` takes
+    /// the loader's own ceiling, 1024: four times the cells, 16 MB.
+    ///
+    /// **When the floor tier is next exercised on real target hardware this is
+    /// a constant to measure**, with `cellular_radius`, on one frame.
+    pub cellular_grid: u32,
 }
 
 impl TierConfig {
@@ -499,6 +523,7 @@ impl TierConfig {
         collage_elements: 40,
         field_iterations: 64,
         cellular_radius: 6,
+        cellular_grid: 512,
     };
 
     /// The midrange-discrete tier.
@@ -524,6 +549,7 @@ impl TierConfig {
         collage_elements: 96,
         field_iterations: 512,
         cellular_radius: 10,
+        cellular_grid: 1024,
     };
 
     /// The config for `tier`.

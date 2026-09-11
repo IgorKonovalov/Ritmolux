@@ -26,6 +26,12 @@
 //! `[cellular] grid` is how many cells a side holds, and a pattern is a fixed
 //! number of cells — a glider is five — so the grid decides how large every
 //! pattern looks. It is declared by the preset and never follows the window.
+//! The tier caps it ([`TierConfig::cellular_grid`](crate::render::TierConfig::cellular_grid)),
+//! and because the cap changes content rather than density, a grid clamped to
+//! it is announced — returned from `configure` as a
+//! [`CapOverflow`](super::CapOverflow) — never silently reduced. A bound
+//! `radius` past the tier's cap is announced the same way, per frame, through
+//! [`Scene::mirror_overflow`].
 //! The present is a plain normalized stretch of the grid over the target and
 //! computes no screen-destined geometry, so there is no aspect for it to take
 //! from the wrong place (ADR-0037).
@@ -322,6 +328,50 @@ pub(crate) fn applied_radius(value: f32, cap: f32) -> u32 {
         DEFAULT_RADIUS
     };
     v.clamp(1.0, cap).round() as u32
+}
+
+/// The clamp to report for a bound radius of `value` under `cap`, or `None`
+/// when the preset asked within it — or runs a family that reads no radius,
+/// where there is nothing to clamp. `value` is compared as the shader would
+/// take it before the cap, so a bound 6.4 under a cap of 6 is not a clamp.
+pub(crate) fn radius_clamp(
+    family: CellularFamily,
+    value: f32,
+    cap: f32,
+) -> Option<super::CapOverflow> {
+    if family != CellularFamily::LargerThanLife {
+        return None;
+    }
+    let asked = applied_radius(value, MAX_RADIUS);
+    let applied = applied_radius(value, cap);
+    (asked > applied).then_some(super::CapOverflow {
+        dropped: (asked - applied) as usize,
+        context: super::OverflowContext::Radius(asked),
+        cap: applied as usize,
+    })
+}
+
+/// `config` with its grid held to `cap`, and the clamp to report if that moved
+/// it. A grid is structural, so this runs once, at `configure`.
+pub(crate) fn grid_clamp(
+    config: CellularConfig,
+    cap: u32,
+) -> (CellularConfig, Option<super::CapOverflow>) {
+    if config.grid <= cap {
+        return (config, None);
+    }
+    let overflow = super::CapOverflow {
+        dropped: (config.grid - cap) as usize,
+        context: super::OverflowContext::Grid(config.grid),
+        cap: cap as usize,
+    };
+    (
+        CellularConfig {
+            grid: cap,
+            ..config
+        },
+        Some(overflow),
+    )
 }
 
 /// A bound `states` as the step and present passes read it: clamped into
@@ -1052,6 +1102,14 @@ pub struct CellularScene {
     /// The tier's [`cellular_radius`](crate::render::TierConfig::cellular_radius):
     /// the widest neighbourhood a bound `radius` reaches the shader with.
     radius_cap: f32,
+    /// The tier's [`cellular_grid`](crate::render::TierConfig::cellular_grid):
+    /// the largest grid a preset runs on.
+    grid_cap: u32,
+    /// This frame's clamp of a bound `radius` to [`radius_cap`](Self::radius_cap),
+    /// or `None` when the preset asked within it — read back through
+    /// [`Scene::mirror_overflow`] so the frontend announces it. A `Copy` value
+    /// rewritten each frame, so reporting it allocates nothing.
+    clamp: Option<super::CapOverflow>,
     birth: f32,
     survive: f32,
     radius: f32,
@@ -1080,13 +1138,15 @@ pub struct CellularScene {
 
 impl CellularScene {
     /// The CPU-side state, holding a bound `larger_than_life` radius to
-    /// `radius_cap` — the tier's
-    /// [`cellular_radius`](crate::render::TierConfig::cellular_radius). GPU
+    /// `radius_cap` and a preset's grid to `grid_cap` — the tier's
+    /// [`cellular_radius`](crate::render::TierConfig::cellular_radius) and
+    /// [`cellular_grid`](crate::render::TierConfig::cellular_grid). GPU
     /// resources are deferred to the first render (module docs).
     pub fn new(
         device: &wgpu::Device,
         surface_format: wgpu::TextureFormat,
         radius_cap: u32,
+        grid_cap: u32,
     ) -> Self {
         let config = CellularConfig::default();
         Self {
@@ -1102,6 +1162,8 @@ impl CellularScene {
             pending_stamp: None,
             prev_reseed: 0.0,
             radius_cap: (radius_cap as f32).clamp(1.0, MAX_RADIUS),
+            grid_cap: grid_cap.clamp(MIN_GRID, MAX_GRID),
+            clamp: None,
             birth: DEFAULT_BIRTH,
             survive: DEFAULT_SURVIVE,
             radius: DEFAULT_RADIUS,
@@ -1190,19 +1252,28 @@ impl Scene for CellularScene {
     }
 
     fn configure(&mut self, cfg: &GeneratorConfig) -> Option<super::CapOverflow> {
-        if let GeneratorConfig::Cellular(config) = cfg {
-            // A switch starts the incoming preset from its own seed: its family
-            // may read the state channel differently, and its discs are its
-            // own stream.
-            self.config = *config;
-            self.needs_seed = true;
-            self.clock = GenerationClock::default();
-            self.pending_generations = 0;
-            self.stamp_rng = stamp_rng(config.salt);
-            self.pending_stamp = None;
-            self.prev_reseed = 0.0;
-        }
-        None
+        let GeneratorConfig::Cellular(config) = cfg else {
+            return None;
+        };
+        // A switch starts the incoming preset from its own seed: its family
+        // may read the state channel differently, and its discs are its own
+        // stream. The grid is held to the tier here, once, and the clamp is
+        // returned for the renderer to announce with the preset.
+        let (config, overflow) = grid_clamp(*config, self.grid_cap);
+        self.config = config;
+        self.needs_seed = true;
+        self.clock = GenerationClock::default();
+        self.pending_generations = 0;
+        self.stamp_rng = stamp_rng(config.salt);
+        self.pending_stamp = None;
+        self.prev_reseed = 0.0;
+        // The outgoing preset's radius clamp is not this one's to report.
+        self.clamp = None;
+        overflow
+    }
+
+    fn mirror_overflow(&self) -> Option<&super::CapOverflow> {
+        self.clamp.as_ref()
     }
 
     fn reset_params(&mut self) {
@@ -1285,6 +1356,7 @@ impl Scene for CellularScene {
         let stamp = self.pending_stamp.take();
         let generations = std::mem::take(&mut self.pending_generations);
         let step = self.step_params(stamp);
+        self.clamp = radius_clamp(self.config.family, self.radius, self.radius_cap);
         let present = PresentParams {
             a: [
                 self.colour.hue,

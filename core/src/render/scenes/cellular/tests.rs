@@ -44,6 +44,7 @@ fn scene_with(ctx: &RenderContext, config: CellularConfig) -> CellularScene {
         &ctx.device,
         crate::render::COMPOSITE_FORMAT,
         MAX_RADIUS as u32,
+        MAX_GRID,
     );
     scene.configure(&GeneratorConfig::Cellular(config));
     scene
@@ -1054,6 +1055,7 @@ fn the_tier_caps_the_radius_the_shader_is_given() {
             &ctx.device,
             crate::render::COMPOSITE_FORMAT,
             tier.cellular_radius,
+            tier.cellular_grid,
         );
         scene.configure(&GeneratorConfig::Cellular(ltl(64, true, 1)));
         scene.reset_params();
@@ -1562,4 +1564,53 @@ fn states_and_threshold_are_structural_and_hold_cleanly() {
         "a cell was left outside the 3-colour cycle"
     );
     assert_same_field(&after, &cpu, "the generation after states stepped 7 -> 3");
+}
+
+// ---------------------------------------------------------------------------
+// The determinism proof, in the field's own units
+// ---------------------------------------------------------------------------
+
+/// **Identical seed and identical frames yield an identical field after 1,000
+/// generations**, for every family — state and age, every texel, read off the
+/// field rather than off a picture of it, with reseeds on a beat pattern and a
+/// generation rate that moves. The integration twin in `core/tests/cellular.rs`
+/// makes the same claim through the whole renderer.
+#[test]
+fn the_field_is_identical_after_a_thousand_generations_for_every_family() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    let mut driver = Driver::new(&ctx);
+    for family in CellularFamily::ALL {
+        let mut run = |salt: u32| -> (u32, Vec<f32>) {
+            let config = CellularConfig {
+                family,
+                grid: 64,
+                wrap: true,
+                salt,
+            };
+            let mut scene = scene_with(&ctx, config);
+            let mut generations = 0;
+            for i in 0..300u32 {
+                let rate = 200.0 + 40.0 * ((i * 37) % 100) as f32 / 100.0;
+                let reseed = if i % 23 == 0 { 1.0 } else { 0.0 };
+                generations += driver.frame(
+                    &mut scene,
+                    1.0 / 60.0,
+                    &[("step_rate", rate), ("reseed", reseed), ("radius", 3.0)],
+                );
+            }
+            (generations, read_texels(&ctx, &scene))
+        };
+        let (g1, one) = run(3);
+        let (g2, two) = run(3);
+        assert_eq!(g1, g2);
+        assert!(g1 >= 1000, "{family:?} ran only {g1} generations");
+        assert!(one == two, "{family:?}: two runs from one seed diverged");
+        let (_, other) = run(4);
+        assert!(
+            one != other,
+            "{family:?}: a different seed reached the same field"
+        );
+    }
 }

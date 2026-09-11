@@ -255,8 +255,8 @@ pub struct CellularConfig {
 | 1 — the system, grid, clock, `life_like` | dev | done | f93f3e2 |
 | 2 — the age channel | dev | done | 677ab2b |
 | 3 — `larger_than_life` | dev | done | 4fcb75b, 1d74d0b |
-| 4 — `cyclic` | dev | done | committed with this row |
-| 5 — tier cap, golden, determinism | dev | not started | |
+| 4 — `cyclic` | dev | done | 8aed06f |
+| 5 — tier cap, golden, determinism | dev | done | committed with this row |
 | 6 — documentation and the reference | dev | not started | |
 
 ### Notes
@@ -340,6 +340,25 @@ pub struct CellularConfig {
   each generation. A fourth `EXTRA_FIXTURES` golden, `cellular_cyclic`, was added; outside the
   phase's file list, as were `core/tests/preset.rs` (`states`, `threshold` join `STRUCTURAL`) and
   the regenerated `presets/README.md`.
+- Phase 5, `TierConfig::cellular_grid` is Floor 512 / Rich 1024 (the loader's ceiling), from the
+  read-count arithmetic in its doc, not a measurement. A grid past it is clamped at `configure` and
+  returned from it as a new `OverflowContext::Grid`; a bound `radius` past `cellular_radius` is
+  reported per frame through `Scene::mirror_overflow` as a new `OverflowContext::Radius`, both with
+  `CapOverflow` `Display` arms. That widens the context enum and touched
+  `core/src/render/scenes/mod.rs` and `core/src/render/scenes/cellular/` - outside the phase's
+  file list, and the same authorization 0163 Phase 4's review accepted for `Iterations`. The
+  standalone recovery line 0163's review flags as misnaming a clamp as geometry applies to these
+  two as well; not changed here.
+- Phase 5, "the golden pins a fixed seed, a fixed generation count and a Floor-legal grid": the
+  four cellular fixtures (Phases 1-4) each pin `[generator] seed`, a `step_rate` over the suite's
+  fixed 60 frames, and `grid = 64`; `the_cellular_goldens_hold_across_a_rerun` captures each on two
+  renderers built in turn and asserts byte equality and the grid.
+- Phase 5, the determinism property is asserted twice: through the renderer
+  (`core/tests/cellular.rs`, every one of 300 frames byte-identical across two renderers, at least
+  1,000 generations, every family, a beat-driven reseed and a bass-driven rate, with a moved beat
+  and another seed as controls) and on the field's own texels
+  (`the_field_is_identical_after_a_thousand_generations_for_every_family`, in
+  `core/src/render/scenes/cellular/tests.rs`, outside the phase's file list).
 
 ### Close triggers
 

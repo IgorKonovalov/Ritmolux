@@ -518,6 +518,17 @@ pub enum OverflowContext {
     /// the one case where the tier changes a preset's picture rather than its
     /// density (ADR-0045) — which is exactly why it must not be silent.
     Iterations(u32),
+    /// A cellular `[cellular] grid` asked for past the tier's
+    /// [`cellular_grid`](crate::render::TierConfig::cellular_grid) — once, at
+    /// preset load, since the grid is structural. Carries what was asked.
+    ///
+    /// A clamp of content, like [`Iterations`](Self::Iterations): a pattern is
+    /// a fixed number of cells, so a smaller grid draws every pattern larger.
+    Grid(u32),
+    /// A `larger_than_life` `radius` asked for past the tier's
+    /// [`cellular_radius`](crate::render::TierConfig::cellular_radius) — per
+    /// frame, since the radius is bindable. Carries what was asked.
+    Radius(u32),
 }
 
 impl std::fmt::Display for OverflowContext {
@@ -529,6 +540,8 @@ impl std::fmt::Display for OverflowContext {
             OverflowContext::Mirror(order) => write!(f, "mirror x{order}"),
             OverflowContext::Depth(depth) => write!(f, "depth {depth}"),
             OverflowContext::Iterations(asked) => write!(f, "iterations {asked}"),
+            OverflowContext::Grid(asked) => write!(f, "grid {asked}"),
+            OverflowContext::Radius(asked) => write!(f, "radius {asked}"),
         }
     }
 }
@@ -560,6 +573,20 @@ impl std::fmt::Display for CapOverflow {
                 f,
                 "{} is past this quality tier's cap of {}; drawn at {} instead, so the \
                  set's boundary resolves less detail than the preset asked for \
+                 (ask for {} or fewer, or pin --tier rich)",
+                self.context, self.cap, self.cap, self.cap
+            ),
+            OverflowContext::Grid(_) => write!(
+                f,
+                "{} is past this quality tier's cap of {}; the automaton runs on a {}-cell \
+                 grid instead, so every pattern draws larger than the preset asked \
+                 (ask for {} or fewer, or pin --tier rich)",
+                self.context, self.cap, self.cap, self.cap
+            ),
+            OverflowContext::Radius(_) => write!(
+                f,
+                "{} is past this quality tier's cap of {}; the neighbourhood is drawn at {} \
+                 instead, which runs a different rule than the preset asked \
                  (ask for {} or fewer, or pin --tier rich)",
                 self.context, self.cap, self.cap, self.cap
             ),
@@ -772,10 +799,11 @@ pub(crate) trait Scene {
 
     /// The per-frame cap overflow, if this frame hit one: the line scenes'
     /// geometry mirror (Plan 0018 Phase 4) when its N-fold replication exceeded
-    /// the segment cap and truncated, or the analytic field's escape-time
-    /// budget when a bound `iterations` passed the tier's cap and was clamped.
-    /// Reuses the ADR-0007 [`CapOverflow`](lines::CapOverflow) so the frontend
-    /// surfaces either — a cap is never silent. Default `None`.
+    /// the segment cap and truncated, the analytic field's escape-time budget
+    /// when a bound `iterations` passed the tier's cap and was clamped, or the
+    /// cellular system's `radius` likewise. Reuses the ADR-0007
+    /// [`CapOverflow`](lines::CapOverflow) so the frontend surfaces any of them
+    /// — a cap is never silent. Default `None`.
     fn mirror_overflow(&self) -> Option<&lines::CapOverflow> {
         None
     }
@@ -1043,6 +1071,7 @@ fn create(
             device,
             surface_format,
             tier.cellular_radius,
+            tier.cellular_grid,
         )),
     }
 }
