@@ -25,7 +25,14 @@ name = "Lorenz Knot"
 
 [particles]
 family = "lorenz"
-density = 1.0
+# Sparse on purpose, like every shipped 3-D flow (0.006-0.02). At 1.0 the full
+# particle count is integrated every frame and the running app fell to ~20 fps;
+# the deposit is normalized by count (ADR-0065), so thinning it costs no total
+# light - but each surviving particle then carries more of it, and at the old
+# size/brightness/bloom the strand swelled into a soft halo. Hence the smaller
+# `size`, `brightness` 0.34 -> 0.18 and `bloom_amount` 0.26 -> 0.10 below.
+# Measured headless at 1280x720 Rich: 360 frames in 3.1 s against 13.6 s.
+density = 0.02
 
 [palette]
 stops = [
@@ -55,8 +62,8 @@ perspective = "0.42 + clamp(bass * 0.33, 0, 0.28)"
 depth_fade = "0.38 + clamp(mid * 0.24, 0, 0.20)"
 depth_hue = "0.30"
 
-size = "0.68 + clamp(treb * 0.42, 0, 0.25)"
-brightness = "0.34"
+size = "0.36 + clamp(treb * 0.25, 0, 0.15)"
+brightness = "0.18"
 fade = "0.88"
 
 zoom = "1.05"
@@ -72,7 +79,7 @@ bg_bright = "0.08"
 bg_vignette = "0.72"
 occlude = "0.5"
 
-bloom_amount = "0.26"
+bloom_amount = "0.10"
 bloom_threshold = "1.2"
 bloom_radius = "1.7"
 exposure = "1.0"

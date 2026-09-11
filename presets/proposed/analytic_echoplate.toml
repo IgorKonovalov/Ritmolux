@@ -1,28 +1,30 @@
 # Echo Plate - the Chladni plate as a source for the feedback trail. The plate
 # holds a LOW-mode figure (mode_n 1..3, mode_m 4..7) and changes it on the
-# beat; the previous figures do not vanish but tunnel outward and turn, so a
-# bar of music leaves a nested stack of the patterns it played.
+# bar; the previous figures do not vanish but tunnel outward and turn, so the
+# music leaves a nested stack of the patterns it played.
 #
 # What drives it: bass picks mode_m, mids pick mode_n, both re-taken on the
-# beat. trails 0.86 with fb_zoom > 1 and a slow fb_rotate pushes each old
-# figure out past the frame edge; the onset nudges fb_zoom so a hit throws the
-# echoes faster. Luminance is held low (brightness 0.55) because the trail
-# stacks light additively - see the additive ceiling in the preset-author craft.
+# bar. trails 0.955 with fb_zoom > 1 and a slow fb_rotate pushes each old
+# figure out past the frame edge; the onset nudges fb_zoom, eased over 0.8 s,
+# so a busy passage throws the echoes a little faster without a jolt.
 #
 # The trail is a per-frame max-decay, so at 0.955 an echo lives well under a
-# second: in a still the echoes read as zoom STREAKS radiating off the current
-# figure (warp-speed plate) rather than as a nested stack. The stack shows only
-# in the frames right after a beat changes the figure. The first cut at
-# trails 0.86 / fb_zoom 1.04 read as a dim ribbed plate with no echo at all.
+# second: in a still the echoes read as zoom STREAKS off the current figure
+# rather than as a nested stack. The stack shows in the frames right after the
+# figure changes. The first cut at trails 0.86 / fb_zoom 1.04 read as a dim
+# ribbed plate with no echo at all; the second, re-taking the figure on every
+# beat under fb_zoom 1.07, read as too chaotic to the owner - hence the bar
+# hold and the halved zoom and rotation.
 #
 # Judge: can you still pick out the CURRENT figure from its echoes, or is the
 # whole thing a lit fog? The present figure should be the brightest layer.
 #
 # Horizon (5 simulated min, 96x96, --set bass=0.6,mid=0.45, against a static
 # star_pattern control reading delta 0.0000 / monotone 0.00 throughout):
-# coverage 0.948 -> 0.954 (monotone 0.50), peak/mean 1.19 -> 1.45 (0.50),
-# footprint 0.139 -> 0.004 (0.56). Settles in the first interval and then
-# breathes; nothing piles up. Coverage sits near 0.95 at 96 px because the
+# coverage 0.948 -> 0.975 (monotone 0.50), peak/mean 1.19 -> 1.34 (0.50),
+# footprint 0.098 -> 0.003 (0.56). Re-run on the calmer bar-held cut; the
+# same shape as the first: settles in the first interval and then breathes,
+# nothing piles up. Coverage sits near 0.95 at 96 px because the
 # streaks fill a thumbnail - read that as the smear, not as a wash.
 system = "analytic_field"
 name = "Echo Plate"
@@ -46,14 +48,14 @@ plate_mix  = "0"
 brightness = "1.0"
 hue        = "0.02 * sin(time * 0.2)"
 trails     = "0.955"
-fb_zoom    = "1.07 + clamp(onset * 0.05, 0, 0.03)"
-fb_rotate  = "0.04"
+fb_zoom    = "1.04 + clamp(onset * 0.025, 0, 0.015)"
+fb_rotate  = "0.02"
 bloom_amount    = "0.3"
 bloom_threshold = "0.7"
 
 [hold]
-mode_n = "beat"
-mode_m = "beat"
+mode_n = "bar"
+mode_m = "bar"
 
 [smoothing]
-fb_zoom = 0.3
+fb_zoom = 0.8

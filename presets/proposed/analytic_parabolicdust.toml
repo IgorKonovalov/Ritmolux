@@ -1,16 +1,22 @@
 # Parabolic Dust - a Julia set just past the Mandelbrot cusp (c ~ 0.26-0.33),
 # where the set has shattered into dust but orbits still linger near the
 # parabolic point, so the dust arranges itself into spirals of fine sparks.
-# The camera sits ~3.7x in on ONE of those spirals (pan -0.47, 0.29), so the
+# The camera sits ~3.7x in on ONE of those spirals (pan -0.56, 0.25), so the
 # frame is a single nautilus arm curling into a bright eye - a close-up, not
 # the whole set. (The whole set at zoom 1 is one stop on Julia Circuit's tour;
 # this is what makes the two different candidates.)
 #
-# What drives it: the bass pushes c_re outward from 0.262 (barely past the
-# cusp: fat arm, many sparks) toward 0.33 (thin, sparse dust) - so the loud
+# What drives it: the bass pushes c_re outward from 0.274 (just past the
+# cusp: fat arm, many sparks) toward 0.314 (thin, sparse dust) - so the loud
 # frame THINS the spiral and the quiet one fills it in, the inverse of a
 # brightness binding. c_im drifts on a slow noise so the arm turns; the mids
 # push the camera in slightly. 64 iterations, exactly the Floor cap.
+#
+# THE TRAP: near the cusp the spiral's SIZE is extremely sensitive to c_re, so
+# a c_re swing reads as a zoom. The first cut ran 0.262..0.33 over 0.2 s and
+# the arm ballooned to ~3x and back on every kick - what the owner called
+# chaotic zoom. The range is now 0.04 wide over 0.8 s; the `zoom` binding
+# itself was never the culprit, but it is halved and eased too.
 #
 # Judge: does the arm read as a spiral of sparks (a nautilus, a galaxy) or as
 # a smear? And does the bass thinning read as BREATHING or as dimming? The
@@ -34,18 +40,19 @@ stops = [
 ]
 
 [params]
-c_re          = "0.262 + clamp(bass * 0.08, 0, 0.068)"
+c_re          = "0.274 + clamp(bass * 0.047, 0, 0.04)"
 c_im          = "0.012 + 0.03 * (noise(time * 0.04) - 0.5)"
 iterations    = "64"
 escape_radius = "48"
 interior      = "0"
-zoom          = "3.6 + clamp(mid * 0.5, 0, 0.4)"
-pan_x         = "-0.47"
-pan_y         = "0.29"
+zoom          = "3.6 + clamp(mid * 0.24, 0, 0.2)"
+pan_x         = "-0.56"
+pan_y         = "0.25"
 color_span    = "0.5"
 brightness    = "1.25"
 bloom_amount    = "0.35"
 bloom_threshold = "0.8"
 
 [smoothing]
-c_re = 0.2
+c_re = 0.8
+zoom = 1.2

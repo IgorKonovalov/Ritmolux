@@ -5,13 +5,17 @@
 # set rather than a Julia set, and far outside the reference's zoom range of
 # 0.25-4 (the scene does not clamp zoom; f32 holds cleanly at this depth).
 #
-# What drives it: the BASS drives the iteration budget, 40..400. That is the
+# What drives it: the BASS drives the iteration budget, 40..160. That is the
 # structural lever on this map - more iterations resolve the filaments and
 # carve the black set back, fewer let the black bloat over them - so the kick
 # visibly sharpens the spirals and the quiet swallows them. Checked with a
 # --set pair: at bass 0.1 the upper-right quarter is black; at bass 1 it is
 # lace. The zoom breathes on a slow noise; color_center creeps with time so
 # the palette flows down the spiral arms.
+#
+# COST: every pixel pays the iteration count, so the budget IS the frame rate.
+# The first cut ran 40..400 and the running app fell to ~15 fps on a loud
+# passage; 160 is the ceiling that keeps the carve-back visible.
 #
 # TIER NOTE: this preset asks for more than the Floor cap of 64 iterations, so
 # on Floor it is clamped (and the frontend announces it) - Floor draws a
@@ -39,7 +43,7 @@ stops = [
 ]
 
 [params]
-iterations    = "40 + clamp(bass * 420, 0, 360)"
+iterations    = "40 + clamp(bass * 141, 0, 120)"
 escape_radius = "64"
 zoom          = "220 * pow(2.2, noise(time * 0.05) - 0.5)"
 pan_x         = "-0.743644"

@@ -4,16 +4,29 @@
 # `draw_progress` rides the bar phase, so each bar the hypotrochoid is traced
 # from its first point to its last and then begins again. Every bar the
 # machine is re-geared: `n` (the radius ratio of the rolling circle) is
-# re-rolled from four ratios, each paired with the cusp count `d` that closes
-# it (d / n whole), so what gets drawn is always a complete figure:
-#     11/5 = 2.2  -> d 11 (five turns)
-#      5/2 = 2.5  -> d  5 (two turns)
-#     12/5 = 2.4  -> d 12 (five turns)
-#      9/4 = 2.25 -> d  9 (four turns)
+# re-rolled from eight ratios, each paired with the cusp count `d` that closes
+# it (d / |n| whole), so what gets drawn is always a complete figure, and no
+# two neighbours in the table share a fold count:
+#        3   -> d  3  three-fold, one turn     (deltoid family)
+#        4   -> d  4  four-fold, one turn      (astroid family)
+#      5/2   -> d  5  five-pointed star, two turns
+#      7/3   -> d  7  seven-pointed star, three turns
+#     11/5   -> d 11  eleven-fold rosette, five turns
+#      8/3   -> d  8  eight-fold, three turns
+#     -5/2   -> d  5  EPIcycloid: five loops rolled outside, two turns
+#     -7/2   -> d  7  EPIcycloid: seven outward loops, two turns
+# The `n` and `d` selects index the SAME `floor(hash(bar_index) * 8)`, so the
+# pairing holds only as long as the two chains stay in the same order.
 #
-# What drives it: the bar phase (the reveal), the bar counter (the gear),
-# bass on `pen` (loud rolls it toward the rim and the loops open), and the
-# ink pass for the blue paper.
+# The pen is re-rolled per bar too, off a decorrelated hash, across
+# 0.45..1.35 rolling radii: under 1 the gear draws rounded petals, at 1 sharp
+# cusps, over 1 looped knots - so the same gear comes back as a different
+# drawing. Eight gears by three pen regimes is what the owner asked for when
+# they said "draw different figures".
+#
+# What drives it: the bar phase (the reveal), the bar counter (the gear and
+# the pen), bass on top of `pen` (loud opens the loops), and the ink pass for
+# the blue paper.
 #
 # The reveal never starts from nothing: `draw_progress` floors at 0.12, so a
 # frame at bar phase 0 (every `--report` probe frame, and all of silence)
@@ -31,9 +44,9 @@ name = "Blueprint"
 family = "hypotrochoid"
 
 [params]
-n          = "select(hash(bar_index) < 0.25, 2.2, select(hash(bar_index) < 0.5, 2.5, select(hash(bar_index) < 0.75, 2.4, 2.25)))"
-d          = "select(hash(bar_index) < 0.25, 11, select(hash(bar_index) < 0.5, 5, select(hash(bar_index) < 0.75, 12, 9)))"
-pen        = "0.75 + clamp(bass * 0.35, 0, 0.3)"
+n          = "select(floor(hash(bar_index) * 8) < 1, 3, select(floor(hash(bar_index) * 8) < 2, 4, select(floor(hash(bar_index) * 8) < 3, 2.5, select(floor(hash(bar_index) * 8) < 4, 7 / 3, select(floor(hash(bar_index) * 8) < 5, 2.2, select(floor(hash(bar_index) * 8) < 6, 8 / 3, select(floor(hash(bar_index) * 8) < 7, -2.5, -3.5)))))))"
+d          = "select(floor(hash(bar_index) * 8) < 1, 3, select(floor(hash(bar_index) * 8) < 2, 4, select(floor(hash(bar_index) * 8) < 3, 5, select(floor(hash(bar_index) * 8) < 4, 7, select(floor(hash(bar_index) * 8) < 5, 11, select(floor(hash(bar_index) * 8) < 6, 8, select(floor(hash(bar_index) * 8) < 7, 5, 7)))))))"
+pen        = "0.45 + hash(bar_index + 31) * 0.9 + clamp(bass * 0.29, 0, 0.25)"
 draw_progress = "0.12 + 0.88 * smoothstep(0.0, 0.85, bar_phase)"
 samples    = "1800"
 scale      = "0.84"

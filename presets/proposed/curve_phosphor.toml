@@ -11,13 +11,15 @@
 #     The offset NUDGES the figure on a busy passage; it cannot make it turn
 #     faster, because the grammar has no accumulator to integrate a rate
 #     (see ROSTER.md, engine gaps).
-#   - `n` (the x frequency) is held on the bar and eased, so every few beats
-#     the figure travels from 3:4 to 5:4 (or back) THROUGH the open,
-#     non-closing ratios in between - the only moment the trace comes apart.
+#   - `n` (the x frequency) is held on the bar and SNAPS between 3:4 and 5:4.
+#     It is deliberately not eased: a Lissajous closes only at whole `n`, and
+#     an exponential ease never lands exactly on one, so an eased `n` leaves a
+#     visible gap where the trace fails to meet its own start - for the whole
+#     bar, not only mid-change.
 #   - bass widens the figure a little; `trails` is the phosphor persistence.
 #
-# Judge: does the phase sweep read as a figure turning in 3D, and does the
-# ratio change read as a deliberate re-tuning rather than a glitch? The
+# Judge: does the phase sweep read as a figure turning in 3D, and is the trace
+# one unbroken loop at every moment? The
 # phosphor smear should be a short tail behind the moving trace, not a fog.
 #
 # Horizon, 2026-09-11: 5 simulated minutes at 96x96, --set bass=0.6,mid=0.45,
@@ -61,5 +63,4 @@ bg_vignette = "0.7"
 n = "bar"
 
 [smoothing]
-n = 0.8
 scale = 0.2
