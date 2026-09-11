@@ -434,3 +434,26 @@ order.
   `trails` 0.86 with a slow `fb_zoom`, drew each nodal line as a ribbed band of
   near-coincident copies instead of an echo. That is the trail behaving as documented,
   but together with a thin analytic line it looks like a sampling fault.
+
+## Engine gaps the second-look pass hit (2026-09-11)
+
+Routed feedback for `architect`, from rendering option sheets for the eight presets the owner
+sent back for tuning.
+
+### 1. `visible_depth` declares `0 - 1` and is read as a generation count
+
+`lsystem.rs` declares `ParamSpec { name: "visible_depth", range: Some([0.0, 1.0]) }`, so the
+generated `presets/README.md` row says `0 - 1`. The scene reads it as
+`self.visible_depth.max(1.0) as usize`, a whole generation index, and the shipped L-systems bind
+it 3-7. `lsystem_icecrystal` was authored against the reference at `0.72 - 1.0` and sat at
+generation 1 forever, which is why the owner found it bare. The declaration is wrong, not the
+scene, and every future author reading the generated table will make the same binding. A `dev`
+fix to the `ParamSpec` range regenerates the row.
+
+### 2. `shot --all` with `--signal` writes no contact sheet
+
+With a directory `--out`, `--all --signal dynamic:110 --frame-at 300` fails with *image format
+could not be determined*, and with a file `--out` it writes one frame (gap 5 of the first pass).
+The command in this folder's own README is that combination. All four option passes fell back to
+`--set` stills for the sheets and `--signal` strips per variant, which is two commands where the
+README promises one.
