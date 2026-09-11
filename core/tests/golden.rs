@@ -130,13 +130,16 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
 /// - `cellular_ltl` — both cellular fixtures above run `life_like`, so the row
 ///   pass never runs and the family index never reaches the box sum. The only
 ///   baseline that runs `larger_than_life`.
+/// - `cellular_cyclic` — every other cellular fixture holds a binary state, so
+///   the colour seed, the cycle's advance and the state-index palette
+///   coordinate are unreached. The only baseline that runs `cyclic`.
 ///
 /// **Captured after the roster loop, and appended rather than inserted.** Every
 /// pre-existing baseline is therefore rendered from the device state it always
 /// was, so adding an entry here moves none of them — which matters on WARP,
 /// where building GPU resources mid-run is documented to change what a later
 /// capture resolves to. For the same reason a new entry goes at the **end**.
-const EXTRA_FIXTURES: [(&str, &str); 13] = [
+const EXTRA_FIXTURES: [(&str, &str); 14] = [
     (
         "attractor_depth",
         include_str!("fixtures/attractor_depth.toml"),
@@ -171,6 +174,10 @@ const EXTRA_FIXTURES: [(&str, &str); 13] = [
         include_str!("fixtures/cellular_trail.toml"),
     ),
     ("cellular_ltl", include_str!("fixtures/cellular_ltl.toml")),
+    (
+        "cellular_cyclic",
+        include_str!("fixtures/cellular_cyclic.toml"),
+    ),
 ];
 
 /// The stroke fixture's text, named once so the roster entry above and the guard

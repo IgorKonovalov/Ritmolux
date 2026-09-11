@@ -2,8 +2,9 @@
 //! each family's rule, written out independently so a GPU field can be held to
 //! it cell for cell. Test-only.
 //!
-//! Every cell is `0` or `1` here, which is exactly what the shader writes into
-//! the state channel, so the comparison is equality rather than a tolerance.
+//! Every cell is a whole number here — `0` or `1`, or a `cyclic` colour index —
+//! which is exactly what the shader writes into the state channel, so the
+//! comparison is equality rather than a tolerance.
 #![allow(clippy::indexing_slicing)]
 
 use super::Stamp;
@@ -99,6 +100,76 @@ pub(super) fn ltl_step(
             u8::from(count >= lo && count <= hi)
         })
         .collect()
+}
+
+/// A `cyclic` seed: every cell one of `states` colours, from the same hash.
+pub(super) fn seed_colours(n: u32, seed: u32, states: u32) -> Vec<u8> {
+    (0..n * n)
+        .map(|i| {
+            let h = mix32((i % n) ^ mix32((i / n) ^ mix32(seed)));
+            ((h >> 8) % states) as u8
+        })
+        .collect()
+}
+
+/// One `cyclic` generation: a cell advances to the next colour round the cycle
+/// when at least `threshold` of its eight neighbours hold it. A neighbour past a
+/// dead border counts for nothing.
+pub(super) fn cyclic_step(
+    cells: &[u8],
+    n: u32,
+    wrap: bool,
+    states: u32,
+    threshold: u32,
+) -> Vec<u8> {
+    let ni = i64::from(n);
+    (0..n * n)
+        .map(|i| {
+            let (x, y) = (i64::from(i % n), i64::from(i / n));
+            let s = u32::from(cells[i as usize]) % states;
+            let next = (s + 1) % states;
+            let mut count = 0;
+            for dy in -1..=1i64 {
+                for dx in -1..=1i64 {
+                    if dx == 0 && dy == 0 {
+                        continue;
+                    }
+                    let (px, py) = (x + dx, y + dy);
+                    if !wrap && (px < 0 || py < 0 || px >= ni || py >= ni) {
+                        continue;
+                    }
+                    let j = py.rem_euclid(ni) * ni + px.rem_euclid(ni);
+                    if u32::from(cells[j as usize]) % states == next {
+                        count += 1;
+                    }
+                }
+            }
+            (if count >= threshold { next } else { s }) as u8
+        })
+        .collect()
+}
+
+/// The topological defects of a `cyclic` field on a torus: every 2x2 plaquette
+/// whose colour steps, taken the short way round the cycle, wind a full turn.
+/// A spiral's core is one; noise is full of them. Meaningful for an odd
+/// `states`, where the short way round is never a tie.
+pub(super) fn defects(cells: &[u8], n: u32, states: u32) -> Vec<(u32, u32)> {
+    let s = states as i32;
+    let step = |a: u8, b: u8| -> i32 {
+        let d = (i32::from(b) - i32::from(a)).rem_euclid(s);
+        if d > s / 2 { d - s } else { d }
+    };
+    let at = |x: u32, y: u32| cells[((y % n) * n + (x % n)) as usize];
+    let mut out = Vec::new();
+    for y in 0..n {
+        for x in 0..n {
+            let (a, b, c, d) = (at(x, y), at(x + 1, y), at(x + 1, y + 1), at(x, y + 1));
+            if step(a, b) + step(b, c) + step(c, d) + step(d, a) != 0 {
+                out.push((x, y));
+            }
+        }
+    }
+    out
 }
 
 /// A field with its age channel: per cell, the state and the generations since

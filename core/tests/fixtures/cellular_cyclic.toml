@@ -1,0 +1,26 @@
+# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+#
+# The `cellular` scene's `cyclic` family: seeded noise over 3 colours at
+# threshold 3, run a fixed 120 generations - 120 a second over the suite's 60
+# frames - which is past where the noise has organized into spiral cores on
+# a 64-cell torus.
+#
+#  - `states`/`threshold` bound explicitly, so a change of default cannot move
+#    this baseline.
+#  - `hue = "0"`, so the palette coordinate is the state index and nothing
+#    else, which is the family's own claim.
+system = "cellular"
+name   = "fixture_cellular_cyclic"
+
+[cellular]
+family = "cyclic"
+grid   = 64
+
+[generator]
+seed = 7
+
+[params]
+states    = "3"
+threshold = "3"
+step_rate = "120"
+hue       = "0"

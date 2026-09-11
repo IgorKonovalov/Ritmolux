@@ -16,6 +16,11 @@
 //! `radius` is capped by the tier on top of that
 //! ([`TierConfig::cellular_radius`](crate::render::TierConfig::cellular_radius)).
 //!
+//! `cyclic` is the cyclic automaton: a cell holds one of `states` colours and
+//! advances to the next round the cycle when at least `threshold` of its eight
+//! neighbours already hold it. There is no dead state, so every cell is lit and
+//! its palette coordinate is its state index over `states`, with no remap.
+//!
 //! # The grid is content, not a resolution
 //!
 //! `[cellular] grid` is how many cells a side holds, and a pattern is a fixed
@@ -88,12 +93,20 @@ pub enum CellularFamily {
     /// side `2 * radius + 1` — Evans's Larger than Life, whose rules carry
     /// travelling bugs and blobs where a radius-1 rule settles.
     LargerThanLife,
+    /// The cyclic automaton: `states` colours in a cycle, a cell advancing to
+    /// the next when at least `threshold` of its eight neighbours hold it.
+    /// From noise it organizes into interlocking rotating spirals.
+    Cyclic,
 }
 
 impl CellularFamily {
     /// Every family, in the order the step shader's family index numbers them
     /// and the generated reference lists them.
-    pub const ALL: [CellularFamily; 2] = [CellularFamily::LifeLike, CellularFamily::LargerThanLife];
+    pub const ALL: [CellularFamily; 3] = [
+        CellularFamily::LifeLike,
+        CellularFamily::LargerThanLife,
+        CellularFamily::Cyclic,
+    ];
 
     /// Parse the canonical `[cellular] family = "..."` value, or `None`.
     pub fn from_name(name: &str) -> Option<Self> {
@@ -105,6 +118,7 @@ impl CellularFamily {
         match self {
             CellularFamily::LifeLike => "life_like",
             CellularFamily::LargerThanLife => "larger_than_life",
+            CellularFamily::Cyclic => "cyclic",
         }
     }
 
@@ -114,14 +128,16 @@ impl CellularFamily {
         match self {
             CellularFamily::LifeLike => 0,
             CellularFamily::LargerThanLife => 1,
+            CellularFamily::Cyclic => 2,
         }
     }
 
     /// The fraction of cells a seed makes live. A sparse soup dies out under a
-    /// larger neighbourhood's thresholds, so that family seeds denser.
+    /// larger neighbourhood's thresholds, so that family seeds denser. Unread
+    /// for `cyclic`, whose seed is uniform over its colours.
     fn density(self) -> f32 {
         match self {
-            CellularFamily::LifeLike => LIFE_DENSITY,
+            CellularFamily::LifeLike | CellularFamily::Cyclic => LIFE_DENSITY,
             CellularFamily::LargerThanLife => LTL_DENSITY,
         }
     }
@@ -129,7 +145,7 @@ impl CellularFamily {
     /// Whether a generation needs the row pass first.
     fn sums_rows(self) -> bool {
         match self {
-            CellularFamily::LifeLike => false,
+            CellularFamily::LifeLike | CellularFamily::Cyclic => false,
             CellularFamily::LargerThanLife => true,
         }
     }
@@ -209,6 +225,13 @@ const LTL_DENSITY: f32 = 0.5;
 /// to.
 pub const MAX_RADIUS: f32 = 10.0;
 
+/// The most colours a `cyclic` cycle may hold. A half float holds every state
+/// index exactly far past this; the bound is where a cycle stops reading as a
+/// cycle across a 256-texel palette.
+pub const MAX_STATES: f32 = 24.0;
+/// The most neighbours a `cyclic` threshold can ask for: all eight.
+pub const MAX_THRESHOLD: f32 = 8.0;
+
 /// How much slack an interval bound gets when it is turned into a whole count,
 /// so a bound written as an exact fraction — `3/8` at radius 1 — keeps the
 /// count it names on both ends despite `f32` rounding.
@@ -240,6 +263,8 @@ const DEFAULT_BIRTH_LO: f32 = default_of(PARAMS, "birth_lo");
 const DEFAULT_BIRTH_HI: f32 = default_of(PARAMS, "birth_hi");
 const DEFAULT_SURVIVE_LO: f32 = default_of(PARAMS, "survive_lo");
 const DEFAULT_SURVIVE_HI: f32 = default_of(PARAMS, "survive_hi");
+const DEFAULT_STATES: f32 = default_of(PARAMS, "states");
+const DEFAULT_THRESHOLD: f32 = default_of(PARAMS, "threshold");
 const DEFAULT_AGE_TINT: f32 = default_of(PARAMS, "age_tint");
 const DEFAULT_HUE: f32 = 0.0;
 const DEFAULT_ZOOM: f32 = 1.0;
@@ -297,6 +322,31 @@ pub(crate) fn applied_radius(value: f32, cap: f32) -> u32 {
         DEFAULT_RADIUS
     };
     v.clamp(1.0, cap).round() as u32
+}
+
+/// A bound `states` as the step and present passes read it: clamped into
+/// `2..=`[`MAX_STATES`] and rounded — a cycle of one colour never advances,
+/// and a fractional count names no cycle. A non-finite value falls back to the
+/// declared default.
+pub(crate) fn applied_states(value: f32) -> u32 {
+    let v = if value.is_finite() {
+        value
+    } else {
+        DEFAULT_STATES
+    };
+    v.clamp(2.0, MAX_STATES).round() as u32
+}
+
+/// A bound `threshold` as the step pass reads it: clamped into
+/// `1..=`[`MAX_THRESHOLD`] and rounded. A non-finite value falls back to the
+/// declared default.
+pub(crate) fn applied_threshold(value: f32) -> u32 {
+    let v = if value.is_finite() {
+        value
+    } else {
+        DEFAULT_THRESHOLD
+    };
+    v.clamp(1.0, MAX_THRESHOLD).round() as u32
 }
 
 /// How many cells the box of `radius` holds besides its centre: the
@@ -443,6 +493,21 @@ pub const PARAMS: &[ParamSpec] = &[
         kind: ParamKind::Modal,
     },
     ParamSpec {
+        name: "states",
+        default: 3.0,
+        range: Some([2.0, MAX_STATES]),
+        doc: "How many colours the cycle holds; each cell advances to the next one round it.",
+        kind: ParamKind::Structural,
+    },
+    ParamSpec {
+        name: "threshold",
+        default: 3.0,
+        range: Some([1.0, MAX_THRESHOLD]),
+        doc: "How many of its eight neighbours must already hold the next colour before a cell \
+              advances to it.",
+        kind: ParamKind::Structural,
+    },
+    ParamSpec {
         name: "step_rate",
         default: 10.0,
         range: Some([0.0, 60.0]),
@@ -488,7 +553,7 @@ pub const PARAMS: &[ParamSpec] = &[
 /// One row of [`FAMILY_PARAMS`], its ranges in [`CellularFamily::ALL`]'s
 /// order. `None` is a family that does not read the parameter.
 macro_rules! per_family {
-    ($name:literal: $life_like:expr, $larger_than_life:expr $(,)?) => {
+    ($name:literal: $life_like:expr, $larger_than_life:expr, $cyclic:expr $(,)?) => {
         FamilyParam {
             name: $name,
             ranges: &[
@@ -500,6 +565,10 @@ macro_rules! per_family {
                     family: "larger_than_life",
                     range: $larger_than_life,
                 },
+                FamilyRange {
+                    family: "cyclic",
+                    range: $cyclic,
+                },
             ],
         }
     };
@@ -510,13 +579,19 @@ macro_rules! per_family {
 /// `life_like`'s and inert elsewhere. A parameter missing from here reads the
 /// same on every family.
 pub const FAMILY_PARAMS: &[FamilyParam] = &[
-    per_family!("birth": Some([0.0, MAX_RULE]), None),
-    per_family!("survive": Some([0.0, MAX_RULE]), None),
-    per_family!("radius": None, Some([1.0, MAX_RADIUS])),
-    per_family!("birth_lo": None, Some([0.0, 1.0])),
-    per_family!("birth_hi": None, Some([0.0, 1.0])),
-    per_family!("survive_lo": None, Some([0.0, 1.0])),
-    per_family!("survive_hi": None, Some([0.0, 1.0])),
+    per_family!("birth": Some([0.0, MAX_RULE]), None, None),
+    per_family!("survive": Some([0.0, MAX_RULE]), None, None),
+    per_family!("radius": None, Some([1.0, MAX_RADIUS]), None),
+    per_family!("birth_lo": None, Some([0.0, 1.0]), None),
+    per_family!("birth_hi": None, Some([0.0, 1.0]), None),
+    per_family!("survive_lo": None, Some([0.0, 1.0]), None),
+    per_family!("survive_hi": None, Some([0.0, 1.0]), None),
+    per_family!("states": None, None, Some([2.0, MAX_STATES])),
+    per_family!("threshold": None, None, Some([1.0, MAX_THRESHOLD])),
+    // Every cyclic cell is lit and coloured by its state, so the wake reads
+    // nothing there.
+    per_family!("trail": Some([0.0, 64.0]), Some([0.0, 64.0]), None),
+    per_family!("age_tint": Some([0.0, 1.0]), Some([0.0, 1.0]), None),
 ];
 
 /// The one uniform every step-shader pass reads, written once a frame.
@@ -534,12 +609,12 @@ struct StepParams {
     /// x: family index, y: wrap (1 torus), z: grid (cells per side), w: live
     /// threshold against the hash's top 24 bits.
     a: [u32; 4],
-    /// x: birth mask, y: survive mask, z: radius (cells), w: unused.
+    /// x: birth mask, y: survive mask, z: radius (cells), w: cyclic's states.
     b: [u32; 4],
     /// x: the field's seed, y: the stamp's seed, z: stamp radius squared
     /// (cells²), w: unused.
     c: [u32; 4],
-    /// xy: stamp centre (cells), zw: unused.
+    /// xy: stamp centre (cells), z: cyclic's threshold, w: unused.
     d: [u32; 4],
     /// `larger_than_life`'s two intervals as whole neighbour counts,
     /// inclusive: xy births a dead cell, zw keeps a live one.
@@ -555,7 +630,7 @@ struct PresentParams {
     b: [f32; 4],
     /// x: zoom, yz: pan, w: wrap (1 torus).
     c: [f32; 4],
-    /// x: trail (generations), y: age_tint, zw: unused.
+    /// x: trail (generations), y: age_tint, z: 1 for `cyclic`, w: its states.
     d: [f32; 4],
 }
 
@@ -984,6 +1059,8 @@ pub struct CellularScene {
     birth_hi: f32,
     survive_lo: f32,
     survive_hi: f32,
+    states: f32,
+    threshold: f32,
     step_rate: f32,
     reseed: f32,
     trail: f32,
@@ -1032,6 +1109,8 @@ impl CellularScene {
             birth_hi: DEFAULT_BIRTH_HI,
             survive_lo: DEFAULT_SURVIVE_LO,
             survive_hi: DEFAULT_SURVIVE_HI,
+            states: DEFAULT_STATES,
+            threshold: DEFAULT_THRESHOLD,
             step_rate: DEFAULT_STEP_RATE,
             reseed: 0.0,
             trail: DEFAULT_TRAIL,
@@ -1076,10 +1155,15 @@ impl CellularScene {
                 applied_rule(self.birth, DEFAULT_BIRTH),
                 applied_rule(self.survive, DEFAULT_SURVIVE),
                 radius,
-                0,
+                applied_states(self.states),
             ],
             c: [field_seed(self.config.salt), stamp.seed, stamp.radius_sq, 0],
-            d: [stamp.centre[0], stamp.centre[1], 0, 0],
+            d: [
+                stamp.centre[0],
+                stamp.centre[1],
+                applied_threshold(self.threshold),
+                0,
+            ],
             e: [birth[0], birth[1], survive[0], survive[1]],
         }
     }
@@ -1129,6 +1213,8 @@ impl Scene for CellularScene {
         self.birth_hi = DEFAULT_BIRTH_HI;
         self.survive_lo = DEFAULT_SURVIVE_LO;
         self.survive_hi = DEFAULT_SURVIVE_HI;
+        self.states = DEFAULT_STATES;
+        self.threshold = DEFAULT_THRESHOLD;
         self.step_rate = DEFAULT_STEP_RATE;
         self.reseed = 0.0;
         self.trail = DEFAULT_TRAIL;
@@ -1152,6 +1238,8 @@ impl Scene for CellularScene {
             "birth_hi" => self.birth_hi = value,
             "survive_lo" => self.survive_lo = value,
             "survive_hi" => self.survive_hi = value,
+            "states" => self.states = value,
+            "threshold" => self.threshold = value,
             "step_rate" => self.step_rate = value,
             "reseed" => self.reseed = value,
             "trail" => self.trail = value,
@@ -1235,8 +1323,12 @@ impl Scene for CellularScene {
                 } else {
                     DEFAULT_AGE_TINT
                 },
-                0.0,
-                0.0,
+                if self.config.family == CellularFamily::Cyclic {
+                    1.0
+                } else {
+                    0.0
+                },
+                applied_states(self.states) as f32,
             ],
         };
 

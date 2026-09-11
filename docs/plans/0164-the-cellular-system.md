@@ -254,8 +254,8 @@ pub struct CellularConfig {
 |---|---|---|---|
 | 1 — the system, grid, clock, `life_like` | dev | done | f93f3e2 |
 | 2 — the age channel | dev | done | 677ab2b |
-| 3 — `larger_than_life` | dev | done | committed with this row |
-| 4 — `cyclic` | dev | not started | |
+| 3 — `larger_than_life` | dev | done | 4fcb75b, 1d74d0b |
+| 4 — `cyclic` | dev | done | committed with this row |
 | 5 — tier cap, golden, determinism | dev | not started | |
 | 6 — documentation and the reference | dev | not started | |
 
@@ -320,6 +320,26 @@ pub struct CellularConfig {
   `STRUCTURAL`), `core/src/render/scenes/mod.rs` (`family_params("cellular")`, the tier argument
   to the factory), `core/src/render/tier/tests.rs` and the regenerated `presets/README.md` were
   also touched.
+- Phase 3, `1d74d0b` is a one-line follow-up to `4fcb75b`: a test comment that
+  `check-comment-hygiene.mjs` flags as plan-relative narration was committed in `4fcb75b` because
+  the gate and the commit were chained in one command. History was not rewritten.
+- Phase 4, the neighbourhood is the eight-cell Moore one (the plan does not name it), a neighbour
+  past a dead border counts for nothing, and the seed is uniform over the colours. Defaults
+  `states = 3`, `threshold = 3` (the classic 313 rule), chosen from a probe of five pairs by how
+  fast noise organizes: 4,818 winding defects in the seed, 30 at generation 296.
+- Phase 4, "the palette coordinate is the state index directly": `state / states`, plus `hue` as
+  on every scene, and every cyclic cell is lit - so `trail` and `age_tint` are inert on the family
+  and are listed so in `FAMILY_PARAMS` (and so in the generated reference).
+- Phase 4, "hold cleanly under `[hold]`": a state left over from a larger `states` is read modulo
+  the new count and written back inside the cycle on the next generation, so a held step down
+  strands no cell. The test is `states_and_threshold_are_structural_and_hold_cleanly`.
+- Phase 4, "visible rotating spirals" is asserted topologically
+  (`noise_organizes_into_rotating_spirals`): few winding defects remain, most within **three**
+  cells of a core 64 generations earlier - a core drifts a cell or two as its arms turn, so one
+  cell (16 of 24 at three, 10 of 24 at one) was too tight - and a tenth of the field still turns
+  each generation. A fourth `EXTRA_FIXTURES` golden, `cellular_cyclic`, was added; outside the
+  phase's file list, as were `core/tests/preset.rs` (`states`, `threshold` join `STRUCTURAL`) and
+  the regenerated `presets/README.md`.
 
 ### Close triggers
 

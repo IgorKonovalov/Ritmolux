@@ -1269,3 +1269,297 @@ fn larger_than_life_is_still_moving_after_two_thousand_generations() {
         "the control moved {moved} cells, so the measurement cannot tell settled from moving"
     );
 }
+
+// ---------------------------------------------------------------------------
+// cyclic
+// ---------------------------------------------------------------------------
+
+fn cyclic(grid: u32, wrap: bool, salt: u32) -> CellularConfig {
+    CellularConfig {
+        family: CellularFamily::Cyclic,
+        grid,
+        wrap,
+        salt,
+    }
+}
+
+/// The state channel as colour indices.
+fn colours(ctx: &RenderContext, scene: &CellularScene) -> Vec<u8> {
+    read_texels(ctx, scene)
+        .chunks_exact(4)
+        .map(|t| (t[0] + 0.5) as u8)
+        .collect()
+}
+
+/// The cyclic field matches the rule written out on the CPU, generation by
+/// generation, from its seeded noise — on a torus and inside a dead border, at
+/// two cycles.
+#[test]
+fn cyclic_matches_the_cpu_rule() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    const N: u32 = 40;
+    let mut driver = Driver::new(&ctx);
+    for (states, threshold, wrap) in [(3u32, 3u32, true), (5, 2, false), (7, 1, true)] {
+        let rule = [
+            ("step_rate", ONE_GEN.1),
+            ("states", states as f32),
+            ("threshold", threshold as f32),
+        ];
+        let mut scene = scene_with(&ctx, cyclic(N, wrap, 2));
+        driver.frame(
+            &mut scene,
+            ONE_GEN.0,
+            &[("step_rate", 0.0), ("states", states as f32)],
+        );
+        let mut cpu = mirror::seed_colours(N, field_seed(2), states);
+        assert_same_field(&colours(&ctx, &scene), &cpu, "the cyclic seed");
+        for generation in 1..=24 {
+            driver.frame(&mut scene, ONE_GEN.0, &rule);
+            cpu = mirror::cyclic_step(&cpu, N, wrap, states, threshold);
+            if generation % 6 == 0 {
+                assert_same_field(
+                    &colours(&ctx, &scene),
+                    &cpu,
+                    &format!("{states}/{threshold}, wrap {wrap}, generation {generation}"),
+                );
+            }
+        }
+        drop(scene);
+    }
+}
+
+/// **A seeded noise field organizes into rotating spirals within a bounded
+/// number of generations**, measured by topology rather than by eye: noise is
+/// full of plaquettes whose colours wind a full turn round the cycle, a spiral
+/// is exactly one such plaquette at its core, and a field of spirals has few of
+/// them, holds them still while its arms turn, and never stops turning.
+///
+/// At the declared default — 3 colours, threshold 3 — by generation 296: the
+/// defects fall to under a twentieth of the noise's, some remain (the cores),
+/// most of them at 360 sit within three cells of where one was 64 generations
+/// earlier, and a tenth of the field is still changing every generation.
+#[test]
+fn noise_organizes_into_rotating_spirals() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    const N: u32 = 128;
+    let states = DEFAULT_STATES as u32;
+    let mut driver = Driver::new(&ctx);
+    let mut scene = scene_with(&ctx, cyclic(N, true, 3));
+    let fast = [("step_rate", 240.0)];
+    driver.frame(&mut scene, 0.1, &[("step_rate", 0.0)]);
+    let noise = mirror::defects(&colours(&ctx, &scene), N, states).len();
+    let mut generation = 0;
+    let mut run_to = |scene: &mut CellularScene, driver: &mut Driver<'_>, stop: u32| {
+        while generation < stop {
+            generation += driver.frame(scene, 1.0 / 30.0, &fast);
+        }
+        assert_eq!(generation, stop);
+    };
+    // Checkpoints on multiples of the eight generations one frame runs.
+    run_to(&mut scene, &mut driver, 296);
+    let at_300 = colours(&ctx, &scene);
+    let cores_300 = mirror::defects(&at_300, N, states);
+    run_to(&mut scene, &mut driver, 360);
+    let at_360 = colours(&ctx, &scene);
+    let cores_360 = mirror::defects(&at_360, N, states);
+    // One more generation, for how much of the field is turning.
+    driver.frame(&mut scene, 1.0 / 240.0, &fast);
+    let turning = at_360
+        .iter()
+        .zip(&colours(&ctx, &scene))
+        .filter(|(a, b)| a != b)
+        .count();
+    let within = |reach: u32| {
+        let near = |p: &(u32, u32), q: &(u32, u32)| {
+            let d = |a: u32, b: u32| a.abs_diff(b).min(N - a.abs_diff(b));
+            d(p.0, q.0) <= reach && d(p.1, q.1) <= reach
+        };
+        cores_360
+            .iter()
+            .filter(|p| cores_300.iter().any(|q| near(p, q)))
+            .count()
+    };
+    println!(
+        "cores held within 1/2/3/5 cells: {}/{}/{}/{}",
+        within(1),
+        within(2),
+        within(3),
+        within(5)
+    );
+    // A core in this rule drifts a cell or two as its arms turn rather than
+    // sitting on one plaquette, so "held still" is within three cells.
+    let still = within(3);
+    println!(
+        "defects: {noise} in the noise, {} at 296, {} at 360 ({still} within three cells of a \
+         296 core); {turning} of {} cells turning at 360",
+        cores_300.len(),
+        cores_360.len(),
+        N * N
+    );
+    assert!(noise > 1000, "the seeded noise has only {noise} defects");
+    assert!(
+        cores_300.len() * 20 < noise,
+        "{} defects at 296 of the noise's {noise}: the field has not organized",
+        cores_300.len()
+    );
+    assert!(!cores_360.is_empty(), "no spiral cores remain");
+    assert!(
+        still * 2 >= cores_360.len(),
+        "only {still} of {} cores held still for 64 generations",
+        cores_360.len()
+    );
+    assert!(
+        turning * 10 >= (N * N) as usize,
+        "only {turning} cells are turning: the spirals have stopped"
+    );
+}
+
+/// **The palette coordinate is the state index directly, with no remap**: at
+/// `hue = 0` every pixel is the palette at `state / states`, whatever `trail`
+/// and `age_tint` ask — they are inert on this family — and every cell is lit.
+#[test]
+fn a_cyclic_cell_is_the_palette_at_its_state_index() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    let states = 5u32;
+    let mut driver = Driver::new(&ctx);
+    let mut scene = scene_with(&ctx, cyclic(TARGET, true, 4));
+    for _ in 0..6 {
+        driver.frame(
+            &mut scene,
+            ONE_GEN.0,
+            &[
+                ("step_rate", ONE_GEN.1),
+                ("states", states as f32),
+                ("threshold", 2.0),
+            ],
+        );
+    }
+    driver.frame(
+        &mut scene,
+        ONE_GEN.0,
+        &[
+            ("step_rate", 0.0),
+            ("states", states as f32),
+            ("trail", 3.0),
+            ("age_tint", 0.9),
+        ],
+    );
+    let field = colours(&ctx, &scene);
+    let image = driver.read_target();
+    let spectrum = Palette::default_spectrum();
+    let mut worst = 0.0_f32;
+    for (pixel, state) in image.iter().zip(&field) {
+        let rgb = spectrum.sample(f32::from(*state) / states as f32, 0.0);
+        for c in 0..3 {
+            worst = worst.max((pixel[c] - rgb[c]).abs());
+        }
+    }
+    let used: std::collections::BTreeSet<u8> = field.iter().copied().collect();
+    println!("worst channel error {worst:.4}; states in use {used:?}");
+    assert_eq!(
+        used.len(),
+        states as usize,
+        "not every colour is on the field"
+    );
+    assert!(
+        worst < 0.01,
+        "a pixel is {worst} off the palette at its state index"
+    );
+}
+
+/// **`states` and `threshold` are Structural and hold cleanly under
+/// `[hold]`**: both round before the scene sees them, a preset may hold both on
+/// a musical edge, and a held step of `states` downward leaves no cell outside
+/// the new cycle — the field is read modulo the new count and written back
+/// inside it on the very next generation, which the CPU statement predicts cell
+/// for cell.
+#[test]
+fn states_and_threshold_are_structural_and_hold_cleanly() {
+    use crate::preset::{HoldEdge, Preset};
+    for name in ["states", "threshold"] {
+        let spec = PARAMS.iter().find(|s| s.name == name).expect("declared");
+        assert_eq!(spec.kind, ParamKind::Structural, "{name}");
+    }
+    for i in -10..300 {
+        let v = i as f32 * 0.13;
+        assert_eq!(
+            applied_states(ParamKind::Structural.quantize(v)),
+            applied_states(v)
+        );
+        assert_eq!(
+            applied_threshold(ParamKind::Structural.quantize(v)),
+            applied_threshold(v)
+        );
+    }
+    assert_eq!(applied_states(1.0), 2, "a cycle of one never turns");
+    assert_eq!(applied_states(99.0), MAX_STATES as u32);
+    assert_eq!(applied_threshold(0.0), 1);
+    assert_eq!(applied_threshold(12.0), 8);
+
+    let preset = Preset::from_toml_str(
+        "system = \"cellular\"\n[cellular]\nfamily = \"cyclic\"\n\
+         [params]\nstates = \"3 + floor(bass * 5)\"\nthreshold = \"1 + floor(mid * 3)\"\n\
+         [hold]\nstates = \"bar\"\nthreshold = \"beat\"\n",
+    )
+    .expect("a held cyclic preset loads");
+    assert!(preset.warnings.is_empty(), "{:?}", preset.warnings);
+    for (name, edge) in [("states", HoldEdge::Bar), ("threshold", HoldEdge::Beat)] {
+        let binding = preset
+            .params
+            .iter()
+            .find(|b| b.name == name)
+            .expect("bound");
+        assert_eq!(binding.kind, ParamKind::Structural, "{name}");
+        assert_eq!(binding.hold, Some(edge), "{name}");
+    }
+
+    let Some(ctx) = context() else {
+        return;
+    };
+    const N: u32 = 32;
+    let mut driver = Driver::new(&ctx);
+    let mut scene = scene_with(&ctx, cyclic(N, true, 5));
+    let seven = [
+        ("step_rate", ONE_GEN.1),
+        ("states", 7.0),
+        ("threshold", 1.0),
+    ];
+    driver.frame(
+        &mut scene,
+        ONE_GEN.0,
+        &[("step_rate", 0.0), ("states", 7.0)],
+    );
+    let mut cpu = mirror::seed_colours(N, field_seed(5), 7);
+    for _ in 0..5 {
+        driver.frame(&mut scene, ONE_GEN.0, &seven);
+        cpu = mirror::cyclic_step(&cpu, N, true, 7, 1);
+    }
+    let before = colours(&ctx, &scene);
+    assert!(
+        before.iter().any(|s| *s >= 3),
+        "no cell sits past the smaller cycle, so the step down tests nothing"
+    );
+    // The held step: 7 colours to 3.
+    driver.frame(
+        &mut scene,
+        ONE_GEN.0,
+        &[
+            ("step_rate", ONE_GEN.1),
+            ("states", 3.0),
+            ("threshold", 1.0),
+        ],
+    );
+    cpu = mirror::cyclic_step(&cpu, N, true, 3, 1);
+    let after = colours(&ctx, &scene);
+    assert!(
+        after.iter().all(|s| *s < 3),
+        "a cell was left outside the 3-colour cycle"
+    );
+    assert_same_field(&after, &cpu, "the generation after states stepped 7 -> 3");
+}

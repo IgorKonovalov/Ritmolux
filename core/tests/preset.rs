@@ -2200,6 +2200,11 @@ const STRUCTURAL: &[(&str, &str)] = &[
     // `cellular::applied_radius`: clamps into the tier's cap and rounds,
     // because the radius is a loop bound over whole cells.
     ("cellular", "radius"),
+    // `cellular::applied_states` / `applied_threshold`: clamp and round, because
+    // a cycle is a whole number of colours and a threshold a whole number of
+    // neighbours.
+    ("cellular", "states"),
+    ("cellular", "threshold"),
     // `fold_order` / `fold_edge`: the kaleidoscope's two stepped params.
     ("kaleidoscope", "kaleido_order"),
     ("kaleidoscope", "kaleido_edge"),

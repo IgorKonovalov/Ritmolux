@@ -20,16 +20,17 @@
 /// A `const MAX_RADIUS: i32` is prepended with it at construction.
 pub(super) const STEP_COMMON: &str = r#"
 struct Step {
-    // x: family (0 life_like, 1 larger_than_life), y: wrap (1 torus),
+    // x: family (0 life_like, 1 larger_than_life, 2 cyclic), y: wrap (1 torus),
     // z: grid (cells per side), w: live threshold against the hash's top 24 bits
     a: vec4<u32>,
     // x: birth mask, y: survive mask (bit k: k live neighbours),
-    // z: radius (cells, 1..=MAX_RADIUS, capped CPU-side), w: unused
+    // z: radius (cells, 1..=MAX_RADIUS, capped CPU-side),
+    // w: cyclic's states (>= 2, clamped CPU-side)
     b: vec4<u32>,
     // x: the field's seed, y: the stamp's seed, z: stamp radius squared
     // (cells^2), w: unused
     c: vec4<u32>,
-    // xy: stamp centre (cells), zw: unused
+    // xy: stamp centre (cells), z: cyclic's threshold (1..=8), w: unused
     d: vec4<u32>,
     // larger_than_life's intervals as whole neighbour counts, inclusive:
     // x..y births a dead cell, z..w keeps a live one
@@ -85,9 +86,9 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 /// grid itself, so a fragment's position is its cell.
 ///
 /// Everything here is integer arithmetic over texel values that are whole
-/// numbers a half float holds exactly — a state of 0 or 1, an age up to
-/// `AGE_CAP`, a row count up to `2 * MAX_RADIUS + 1` — so a generation is the
-/// same on every adapter.
+/// numbers a half float holds exactly — a state of 0 or 1 or a colour index
+/// below `MAX_STATES`, an age up to `AGE_CAP`, a row count up to
+/// `2 * MAX_RADIUS + 1` — so a generation is the same on every adapter.
 pub(super) const STEP_SHADER: &str = r#"
 @group(0) @binding(0) var field: texture_2d<f32>;
 // The row pass's counts; read by `larger_than_life` only, bound for every
@@ -98,12 +99,42 @@ pub(super) const STEP_SHADER: &str = r#"
 // The field's uniform is shared by all three passes; which pass this is lives
 // in `MODE` alone. See `StepParams` for why that split is load-bearing.
 
-// A seeded cell: live when the hash of its coordinates, under `seed`, falls
-// below the threshold. Every input is a u32, so the field is the same bit for
+// A seeded cell, from the hash of its coordinates under `seed`: live when the
+// hash falls below the threshold, or — for `cyclic` — one of its `states`
+// colours, uniformly. Every input is a u32, so the field is the same bit for
 // bit on every adapter.
 fn seeded(c: vec2<i32>, seed: u32) -> f32 {
     let h = mix32(u32(c.x) ^ mix32(u32(c.y) ^ mix32(seed)));
-    return select(0.0, 1.0, (h >> 8u) < params.a.w);
+    let binary = select(0.0, 1.0, (h >> 8u) < params.a.w);
+    let colour = f32((h >> 8u) % max(params.b.w, 1u));
+    return select(binary, colour, params.a.x == 2u);
+}
+
+// The state of the cell at `c` as a colour index in `0..states`, and whether
+// it counts: off the grid it is the wrapped cell on a torus and counts for
+// nothing otherwise. A state left over from a larger `states` is read modulo
+// the current one, so a held change of `states` never strands a cell outside
+// the cycle.
+fn colour_at(c: vec2<i32>, n: i32, wrap: bool, states: u32) -> vec2<u32> {
+    let size = vec2<i32>(n);
+    let w = ((c % size) + size) % size;
+    let inside = all(c >= vec2<i32>(0)) && all(c < size);
+    let s = u32(textureLoad(field, w, 0).x + 0.5) % states;
+    return vec2<u32>(s, select(0u, 1u, wrap || inside));
+}
+
+// How many of `c`'s eight neighbours hold the colour `next`.
+fn cyclic_count(c: vec2<i32>, n: i32, wrap: bool, states: u32, next: u32) -> u32 {
+    var count = 0u;
+    for (var dy = -1; dy <= 1; dy = dy + 1) {
+        for (var dx = -1; dx <= 1; dx = dx + 1) {
+            if (dx != 0 || dy != 0) {
+                let v = colour_at(c + vec2<i32>(dx, dy), n, wrap, states);
+                count = count + select(0u, 1u, v.y == 1u && v.x == next);
+            }
+        }
+    }
+    return count;
 }
 
 // The live cells in the box of side `2r + 1` about `c`, `c` itself excluded:
@@ -174,6 +205,17 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
         default: {
             let alive = state > 0.5;
             switch params.a.x {
+                case 2u: {
+                    // cyclic: a cell advances to the next colour round the
+                    // cycle when at least `threshold` of its eight neighbours
+                    // already hold it, and is written back inside the cycle
+                    // either way.
+                    let states = max(params.b.w, 1u);
+                    let s = u32(state + 0.5) % states;
+                    let next = (s + 1u) % states;
+                    let advance = cyclic_count(c, n, wrap, states, next) >= params.d.z;
+                    state = f32(select(s, next, advance));
+                }
                 case 1u: {
                     // larger_than_life: an inclusive interval of whole counts
                     // over the box, one for a dead cell and one for a live one.
@@ -206,7 +248,8 @@ struct Present {
     b: vec4<f32>,
     // x: zoom, yz: pan (grid-space view transform, ADR-0018), w: wrap (1 torus)
     c: vec4<f32>,
-    // x: trail (generations, >= 0, clamped CPU-side), y: age_tint, zw: unused
+    // x: trail (generations, >= 0, clamped CPU-side), y: age_tint,
+    // z: 1 for the cyclic family, w: cyclic's states (>= 2)
     d: vec4<f32>,
 }
 @group(0) @binding(0) var field: texture_2d<f32>;
@@ -279,6 +322,11 @@ struct Paint {
 // binary field exactly. As it fades it slides `age_tint` of the way along the
 // palette, so history reads as colour as well as light. A live cell's
 // coordinate never moves with `age_tint`.
+//
+// A `cyclic` cell has no dead state: every colour is lit, and its coordinate is
+// its state index over `states` with no remap — the cycle is laid round the
+// palette once, so a spiral's arms are the palette in order. `trail` and
+// `age_tint` are inert there.
 fn paint(texel: vec4<f32>) -> Paint {
     let trail = pp.d.x;
     let fade = clamp(1.0 - (texel.y + 1.0) / (trail + 1.0), 0.0, 1.0);
@@ -286,6 +334,11 @@ fn paint(texel: vec4<f32>) -> Paint {
     var p: Paint;
     p.coord = select(pp.d.y * (1.0 - fade), 0.0, live);
     p.light = select(fade, 1.0, live);
+    if (pp.d.z > 0.5) {
+        let states = max(pp.d.w, 1.0);
+        p.coord = (floor(texel.x + 0.5) % states) / states;
+        p.light = 1.0;
+    }
     return p;
 }
 
