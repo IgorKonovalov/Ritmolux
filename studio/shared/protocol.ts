@@ -25,7 +25,7 @@ export const EVENT_VERSION = 1
  * rule and a mismatch means the bundle was assembled wrong or a path in
  * settings points at a stale build.
  */
-export const EXPECTED_PLAYER_VERSION = '0.121.0'
+export const EXPECTED_PLAYER_VERSION = '0.121.1'
 
 export function isKnownPlayerVersion(version: string): boolean {
   return version === EXPECTED_PLAYER_VERSION
