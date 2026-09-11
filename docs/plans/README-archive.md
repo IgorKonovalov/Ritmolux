@@ -18,6 +18,8 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0164 - The cellular system](#0164---the-cellular-system)
+  - [0163 - The analytic field](#0163---the-analytic-field)
   - [0162 - The curve families](#0162---the-curve-families)
   - [0168 - The studio stops surprising the author](#0168---the-studio-stops-surprising-the-author)
   - [0159 - The studio opens](#0159---the-studio-opens)
@@ -173,6 +175,7 @@ hand-edited.
   - [0001 — Core + standalone MVP, then foobar parity](#0001--core--standalone-mvp-then-foobar-parity)
 - [Prior sequencing notes (superseded)](#prior-sequencing-notes-superseded)
   - [Moved 2026-09-10 from `README.md` — the 0158/0159 program note, spent](#moved-2026-09-10-from-readmemd--the-01580159-program-note-spent)
+  - [Superseded 2026-09-11 by the joint close of Plans 0163 and 0164 (was in `README.md`)](#superseded-2026-09-11-by-the-joint-close-of-plans-0163-and-0164-was-in-readmemd)
   - [Superseded 2026-09-10 by Plan 0158's close (was in `README.md`)](#superseded-2026-09-10-by-plan-0158s-close-was-in-readmemd)
   - [Moved 2026-09-09 from `README.md` — the 0087-stop-condition risk](#moved-2026-09-09-from-readmemd--the-0087-stop-condition-risk)
   - [Moved 2026-09-08 from `README.md` — the 0140/0125 contention note](#moved-2026-09-08-from-readmemd--the-01400125-contention-note)
@@ -195,6 +198,84 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0164 - The cellular system](done/0164-the-cellular-system.md)
+
+- closed 2026-09-11, jointly with 0163, in an unattended batch run on `batch/2026-09-11`. Six `dev`
+phases: `f93f3e2` (1, the system, grid, clock and `life_like`), `677ab2b` (2, the age channel),
+`4fcb75b` + `1d74d0b` (3, `larger_than_life`), `8aed06f` (4, `cyclic`), `1dd4b0f` (5, the tier caps,
+goldens and determinism), `a6a1392` (6, documentation and the reference). Review: **no blockers, no
+majors, two minors, two nits.** Version: **0.119.0** (minor - a feature plan). No ADR was paired;
+ADR-0180 rules 1, 2 and 4 were already accepted.
+
+**The full suite was re-run at the close and matched the log exactly**: `cargo nextest run
+--workspace` on `67b7308`, 1795 run, 1795 passed (15 slow), 6 skipped, 522.2 s, exit 0. All seven
+Node gates green.
+
+**Every done-when was read against its test, not against a green run, and the tests hold.** Conway
+is proved by a planted glider tracked for ten periods with a `B3/S2` control that must fail to carry
+it; the whole field is held to a CPU statement of the rule generation by generation, on a torus and
+inside a dead border, for two rule pairs, with a non-degeneracy guard on the live count. Determinism
+is asserted twice - through the renderer over 300 frames and at least 1,000 generations with a moved
+beat and a second salt as controls, and on the field's own texels for every family. The two tier
+clamps each assert the notice *and* that the clamp changed the picture, so neither can pass
+vacuously. The `cyclic` spiral claim is topological rather than visual: defect count against the
+seed's, core persistence across 64 generations, and a tenth of the field still turning.
+
+**Two deviations were ruled authorised and one correction stands.** The `OverflowContext` widening
+(`Grid`, `Radius`) is the same architect decision 0163's close accepted for `Iterations`. The
+`larger_than_life` default is deliberately **not** Bosco's rule - Bosco's froze into 36 still cells
+by generation 2,000 on the lane's own probe - and the shipped rule was chosen from a six-variant
+sweep over three seeds, which the log states and the test's control convicts. `TierConfig`'s two new
+caps are **arithmetic, not measurement**, and both docs say so; `docs/on-device-validation.md`
+carries them as items for real hardware.
+
+**What outlived the plan.** No shipped preset draws the system, so the guide's three pictures come
+from teaching presets under `docs/examples/cellular/`. The cap-recovery line in
+`standalone/src/app_state.rs` still announces every context as a geometry recovery, which this plan
+widened from one wrong context to three - now [backlog 0207](../design-backlog.md). Stale
+written-out system counts in `core/src/render/scenes/common.rs` are
+[backlog 0208](../design-backlog.md). The plan's own followup was discharged at the close:
+[backlog 0142](../design-backlog.md) gained a dated note naming `cellular` as its sharpest instance
+- a shared ping-pong field double-steps the *rule* rather than offsetting a phase - and recording
+that the `[layer]` path is unaffected, because a layer scene is constructed per preset rather than
+resolved from the one-instance-per-system roster. The mechanism is read from the code; no test
+reaches the dual-live path, which is 0142's standing `unprobeable:`.
+
+### [0163 - The analytic field](done/0163-the-analytic-field.md)
+
+- closed 2026-09-11, jointly with 0164, after a **held** review on the same day. Five `dev` phases
+in the `batch/2026-09-11` lane: `65d57d4` (1, the system and `chladni`), `232afb3` (2,
+`escape_time`), `9ae4650` (3, orbit traps), `cf11972` (4, the tier cap and the golden regime),
+`27f2a63` (5, documentation and the reference). Review: **no blockers, no majors** on the re-close,
+four minors and three nits. Version: **0.118.0** (minor - a feature plan). No ADR was paired.
+
+**This is the plan that proves the close-triggers bullet is worth being a blocker.** The first
+review held the plan on a single finding: the `### Close triggers` block was empty, every bullet
+including `Full suite:`. Under ADR-0156 the nine GPU suites run once per plan, so that bullet is the
+only record they ever met the finished tree - a missing one means nothing is known about the drift
+guards. The lane filled it in `f10bd6b` and did the honest thing with the one bullet it could not
+claim: the session had ended mid-run, so `Full suite:` names **the reviewer's** run rather than
+inventing its own, and says so. The re-close re-ran the suite against the merged tree anyway.
+
+**The engine work was sound on the first read and nothing changed it.** The 3,5 Chladni plate is
+held to an independent CPU formula at >0.99 pixel agreement with a 2,4 control that must disagree;
+squareness is checked at 1280x800 - the configuration where an internal grid's aspect and the
+target's disagree, which is the one ADR-0037 exists for. `escape_time` corrected the plan's own
+smooth-count formula, which does not reduce to the textbook form at `power = 2`; the shipped
+`nu = n + 1 - log_p(ln|z_n| / ln R)` is continuous across every integer step and a test asserts it
+with a control. `cpow` carries one exit and a constant loop bound because an early `return` out of
+the whole-power branch validated in naga, built its pipeline, and then lost the device at the first
+draw on both adapters - on frames that never took the branch.
+
+**What outlived the plan.** `fragment_field`'s REPLACE blend overwrites the backdrop with no post
+stage active, so `occlude = 0` lets nothing through against its own shader comment; the new system
+mirrors it deliberately and a parity test pins both, wrong path included. That is now
+[backlog 0206](../design-backlog.md) - it had no carrier outside the plan's log, which is exactly
+how a finding is lost. The CPU mirror's fidelity is proved against the GPU on one branch only
+(`power = 2`, `map = julia`, `trap = none`) while the 441,000-sample finiteness sweep leans on it
+for fractional powers, the Mandelbrot map and all four traps. Sixteen unjudged `analytic_field`
+candidates sit in `presets/proposed/`, outside this plan.
 
 ### [0162 - The curve families](done/0162-the-curve-families.md)
 
@@ -7990,6 +8071,35 @@ written for exactly this case, and this is the first wave since it was written t
 meet it.
 
 
+### Superseded 2026-09-11 by the joint close of Plans 0163 and 0164 (was in `README.md`)
+
+**Fully spent when the last two of the four closed.** Kept as the record of how the mathematics
+wave was sequenced, and of the merge-in-series rule it was the first wave to actually meet.
+
+**Added 2026-09-09 - [0161] through [0164] are the mathematics wave, and 0161 gates the other
+three.** One ADR frames them: [0180] - a new mathematical world joins an existing system as a named
+**family** rather than founding a `SystemKind` (which is why seven new worlds cost two roster
+entries), and a **structural** parameter is quantized and holdable, because this engine's integer
+levers are bindable today and effectively unbindable in practice. The order is fixed by dependency:
+**0161 first** - closed 2026-09-10 - then 0162, 0163 and 0164 in any order: three disjoint scene paths.
+**[0162] closed 2026-09-11**, so 0163 and 0164 are what remains of the wave.
+Lenia, Voronoi, quasicrystal, hyperbolic tiling and fractal flames are **placed** by 0180 and built
+by nobody yet; each is a family arm on a system 0163 or 0164 creates.
+
+**One ordering this still does not license.** 0162, 0163 and 0164 touch disjoint scene paths but
+each **blesses new baselines**, so they merge in series even if they are built in parallel: the
+rule at the head of `### The two lanes, now` is written for exactly this case, and this is the first
+wave since it was written that will actually meet it. ([0160]'s half of this note is spent - it had
+to run after [0161] because both add load-time work to `core/src/preset/schema/`, and [0161] has
+landed.)
+
+[0160]: 0160-the-silhouettes-preconditions-stop-being-silent.md
+[0161]: done/0161-the-structural-parameter-is-held.md
+[0162]: done/0162-the-curve-families.md
+[0163]: done/0163-the-analytic-field.md
+[0164]: done/0164-the-cellular-system.md
+[0180]: ../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md
+
 ### Superseded 2026-09-10 by Plan 0158's close (was in `README.md`)
 
 **Added 2026-09-09 — [0158] and [0159] are drafted, and they are a program rather than a
@@ -8004,7 +8114,7 @@ diffusion pass from the studio are each a later plan with its own interview; ADR
 [0158]: done/0158-the-player-grows-a-studio-facing-surface.md
 [0159]: done/0159-the-studio-opens.md
 [0160]: 0160-the-silhouettes-preconditions-stop-being-silent.md
-[0164]: 0164-the-cellular-system.md
+[0164]: done/0164-the-cellular-system.md
 
 ### Moved 2026-09-09 from `README.md` — the 0087-stop-condition risk
 

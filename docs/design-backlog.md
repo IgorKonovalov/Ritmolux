@@ -75,6 +75,9 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0203 — the smoke run captured from a microphone while the default is loopback, and nobody established why](#0203--the-smoke-run-captured-from-a-microphone-while-the-default-is-loopback-and-nobody-established-why)
 - [0204 — the studio's sliders read one range per parameter, so a curve family's own range is unreachable from them](#0204--the-studios-sliders-read-one-range-per-parameter-so-a-curve-familys-own-range-is-unreachable-from-them)
 - [0205 — a windowless player reports `0.0 fps` and writes no diagnostics rows, while rendering normally](#0205--a-windowless-player-reports-00-fps-and-writes-no-diagnostics-rows-while-rendering-normally)
+- [0206 — with no post stage active a fullscreen field's REPLACE blend overwrites the backdrop, so `occlude = 0` lets nothing through](#0206--with-no-post-stage-active-a-fullscreen-fields-replace-blend-overwrites-the-backdrop-so-occlude--0-lets-nothing-through)
+- [0207 — the cap-recovery line says "geometry is back within the segment cap" for every context, and three of the five are not geometry](#0207--the-cap-recovery-line-says-geometry-is-back-within-the-segment-cap-for-every-context-and-three-of-the-five-are-not-geometry)
+- [0208 — a system count written into prose goes stale on the next system, and fourteen places have now carried one](#0208--a-system-count-written-into-prose-goes-stale-on-the-next-system-and-fourteen-places-have-now-carried-one)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -2496,6 +2499,28 @@ advances twice.
   sprite rotation is measured against. A scene affected only through `update` is now affected
   through both.
 
+- **Updated 2026-09-11** — [Plan 0164](plans/done/0164-the-cellular-system.md) adds `cellular`, and
+  it is the sharpest instance this entry has collected. Every other affected scene carries a
+  **phase**: a rotation, a noise coordinate, a particle field's clock, where a double-step is an
+  offset and the picture recovers its look if not its position. `cellular` carries a **ping-pong
+  field of cells**, and its `update` integrates the frame's `dt` into a generation counter, so a
+  same-system dissolve does not offset the automaton — it runs the rule an extra generation per
+  frame on the state both sides are reading. For `larger_than_life` and `cyclic`, whose whole
+  interest is travelling structure at a chosen rate, that is a different world rather than the same
+  one early. The reseed edge is the one part that does **not** double: `update` records the level
+  on the first call, so the second sees no rising edge.
+
+  **The layer path is not affected, and knowing which half is which matters for any fix.** A
+  `[layer]` scene is constructed for the preset rather than resolved from the roster
+  (`core/src/render/roster.rs`, `build_layer`), so two dissolving sides' layers share nothing. It is
+  only the base scene — the `Vec<(SystemKind, Box<dyn Scene>)>` with one instance per system — that
+  both sides reach. So the affected population is every stateful base scene and no layer.
+
+  **Still unobserved, for the reason this entry already names.** Plan 0164's own risk item asked its
+  lane to confirm the symptom on `cellular` and it could not: no test reaches the dual-live render
+  path, which is this entry's standing `unprobeable:`. The mechanism above is read from the code,
+  not from a capture.
+
 ### The finding
 
 It is **pre-existing and it predates the rates.** `particles::spin_time` has integrated in `update`
@@ -3981,3 +4006,114 @@ no number rather than a zero.
 **Medium.** It misleads exactly the two audiences the studio was built for — an operator editing on
 a laptop, which is what windowless mode is *for*, and a first tester following the handoff note.
 Nothing is wrong with the picture, so it costs no show; it costs trust in the readings.
+
+---
+
+## 0206 — with no post stage active a fullscreen field's REPLACE blend overwrites the backdrop, so `occlude = 0` lets nothing through
+
+`fragment_field`'s shader comment promises that *"at 0 the sky adds through an opaque field"*, and
+on the path an author is most likely to try first — a preset with no `[post]` stage — it does not.
+The field draws with a REPLACE blend straight onto the composite, so whatever the backdrop wrote is
+gone before `occlude` is read; the parameter reaches the alpha channel and the alpha channel reaches
+nothing. With a stage active the promise holds, which is why this survived: every test and every
+shipped preset that exercises `occlude` has a stage in the chain.
+
+`analytic_field` mirrors the behaviour exactly, and deliberately —
+`occlude_behaves_as_it_does_on_fragment_field` pins the two together on both paths so that a repair
+of one cannot silently diverge from the other. That test is the carrier for the parity, not for the
+correctness: it asserts the two agree, including where they are both wrong.
+
+The size is an authoring dead end rather than a wrong picture. An author reading
+[`docs/presets.md`](presets.md) sets `occlude = 0` to let a `bg_*` sky through, sees no change, and
+has no way to learn that a `[post]` stage is the undeclared precondition. The fix is a decision
+about what a fullscreen scene's blend should be when nothing downstream will composite it, which is
+a chain question rather than a scene one — and it must move both systems at once, or the parity test
+is the thing that goes red.
+
+- **Raised:** 2026-09-11, at [Plan 0163](plans/done/0163-the-analytic-field.md)'s close review; the
+  finding is the implementing lane's, from its Phase 1 notes. **Owner if taken:** `architect` for
+  where the blend is decided, then `dev`.
+- **Verified 2026-09-11** — the parameter exists and is read on both systems:
+  `present: occlude in: core/src/render/scenes/fragment_field.rs`
+- **Verified 2026-09-11** — and the two are pinned to each other, wrong path included:
+  `present: occlude_behaves_as_it_does_on_fragment_field in: core/tests/analytic_field.rs`
+
+### Priority
+
+**Low.** Two workarounds exist and both are one line — add any `[post]` stage, or paint the ground
+from the chain rather than from `bg_*`, which 0069 already recommends for a different reason. What
+it costs is a parameter that reads as broken on the simplest preset an author can write.
+
+---
+
+## 0207 — the cap-recovery line says "geometry is back within the segment cap" for every context, and three of the five are not geometry
+
+`poll_cap_overflow` is edge-triggered on *presence*, so it prints one line when a cap starts biting
+and one when it stops. The onset line renders the `CapOverflow`, which speaks for each context in
+its own words. The recovery line is a hardcoded string about segments.
+
+That was correct while `OverflowContext` held only `Mirror` and `Depth`. It now holds five variants:
+[Plan 0163](plans/done/0163-the-analytic-field.md) Phase 4 added `Iterations`, and
+[Plan 0164](plans/done/0164-the-cellular-system.md) Phase 5 added `Grid` and `Radius`. So an
+escape-time budget that comes back under the tier's iteration cap, or a `larger_than_life`
+neighbourhood that does, is announced to the operator as a *geometry* recovery — about a cap that
+was never involved. Three of five contexts now print a sentence that names the wrong mechanism.
+
+The repair is the one the onset path already takes: match on `OverflowContext` and let each arm say
+what came back, exactly as `CapOverflow`'s own `Display` does. `OverflowContext`'s own `Display` carries a comment declaring these
+strings user-visible text the shell prints verbatim, so the wrong one is a wrong statement rather
+than a rough edge.
+
+- **Raised:** 2026-09-11, at [Plan 0163](plans/done/0163-the-analytic-field.md)'s close review as a
+  `minor`, and carried forward at [Plan 0164](plans/done/0164-the-cellular-system.md)'s close, which
+  widened it from one wrong context to three. **Owner if taken:** `dev`.
+- **Verified 2026-09-11** — the recovery line is one hardcoded string with no match on the context:
+  `present: geometry is back within the segment cap in: standalone/src/app_state.rs`
+- **Verified 2026-09-11** — while the onset path renders the context it was given:
+  `present: preset '\{\}': \{overflow\} in: standalone/src/app_state.rs`
+
+### Priority
+
+**Low.** It is one console line, seen only by an operator already reading `stderr`, and only on the
+frame a clamp releases. It is on this list because it is the second half of a pair whose first half
+is correct, which is how it stayed wrong across two plans that each looked straight at it.
+
+---
+
+## 0208 — a system count written into prose goes stale on the next system, and fourteen places have now carried one
+
+Two systems landed in three days — `analytic_field`
+([Plan 0163](plans/done/0163-the-analytic-field.md)) and `cellular`
+([Plan 0164](plans/done/0164-the-cellular-system.md)) — and each close found the same class of
+staleness waiting: a sentence that had written the count down. `docs/capturing.md` listed *"all
+twelve"* and enumerated twelve names for `--report family=`; `docs/presets.md` promised *"one or
+more presets for every built-in system"*, which two systems shipping no preset made false;
+`docs/preset-guide.md` said *"All twelve systems have one"* and called `shape_collage` *"The newest
+system"*. All four were repaired by hand, at two different closes, by someone who happened to grep.
+
+`core/src/render/scenes/common.rs` still carries five, one of them inside an assertion message that
+reports a count it no longer knows: *"only {seen} shared-name declarations found across twelve
+systems"*.
+
+[CLAUDE.md](../CLAUDE.md) already states the rule — *"Prefer count-free phrasing ('the whole
+embedded set') over hard numbers that re-drift"* — and the rule has no carrier. Nothing greps for a
+number-word beside the word `system`, so every instance is found by eye, one close late, by whoever
+is closing the plan that falsified it. The generated parameter reference is the shape that works:
+`presets/README.md`'s roster cannot go stale because it is emitted from the declarations
+([ADR-0170](adrs/0170-a-parameters-reference-row-is-generated-from-the-declaration-the-engine-reads.md)).
+Prose cannot be generated, so the reachable fix is a gate rather than a generator — a Node check in
+`scripts/`, beside the seven that already run at pre-push, that rejects a written-out count adjacent
+to `system` in the reader documents and in `.rs` comments.
+
+- **Raised:** 2026-09-11, at the joint close of Plans 0163 and 0164. **Owner if taken:** `architect`
+  for whether the gate's grammar is worth its false positives, then `dev`.
+- **Verified 2026-09-11** — the stale count is still in the tree, in the place a doc sweep does not
+  reach: `present: twelve systems in: core/src/render/scenes/common.rs`
+- **Verified 2026-09-11** — and nothing in `scripts/` looks for one:
+  `absent: twelve in: scripts/check-reader-prose.mjs`
+
+### Priority
+
+**Low.** Every instance so far has been cosmetic and every one was caught, so the cost to date is
+reviewer attention rather than a wrong build. It is worth an entry because the catching is the
+expensive part and it recurs on a fixed schedule: once per new system, forever.

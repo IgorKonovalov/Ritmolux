@@ -1,11 +1,11 @@
 # 0180 — A mathematical world joins a system as a family, and a structural parameter is quantized and held
 
-> **Status:** accepted 2026-09-10 (Plan 0161 built rules 2 and 4; Plan 0162 built rule 1 for the curves; rule 1's two new systems and rule 3 await Plans 0163-0164) - carries an Outcome
+> **Status:** accepted 2026-09-10, fully built 2026-09-11 (Plan 0161 rules 2 and 4; Plan 0162 rule 1 for the curves; Plans 0163 and 0164 rule 1's two new systems and rule 3) - carries an Outcome with two addenda
 > **Date:** 2026-09-09
 > **Related plan(s):** [0161](../plans/done/0161-the-structural-parameter-is-held.md),
 > [0162](../plans/done/0162-the-curve-families.md),
-> [0163](../plans/0163-the-analytic-field.md),
-> [0164](../plans/0164-the-cellular-system.md)
+> [0163](../plans/done/0163-the-analytic-field.md),
+> [0164](../plans/done/0164-the-cellular-system.md)
 > **Builds on:** [ADR-0007](0007-line-geometry-generators.md) (the `CurveFamily` seam),
 > [ADR-0012](0012-stateful-feedback-render-system.md) (`PingPongField`, the automata's host),
 > [ADR-0015](0015-gpu-compute-particle-idiom.md) (the four render idioms this wave is placed against),
@@ -268,3 +268,32 @@ for the eight Modal parameters (`n`, `d`, `phase`, `radial_offset`, `pen`, `shar
 every row whose meaning moves with the family), because a Modal `n` that reads `1..24` on one family
 and `-8..8` on another is the same legibility problem. The exported schema was deliberately left at
 one range per parameter, so the studio does not yet see the per-family range - design-backlog 0204.
+
+### Addendum (2026-09-11, the joint close of Plans 0163 and 0164)
+
+**Rule 1's two new systems are built, and the arithmetic held.** `analytic_field`
+([Plan 0163](../plans/done/0163-the-analytic-field.md)) carries `chladni` and `escape_time` with
+Voronoi, quasicrystal and hyperbolic tiling placed; `cellular`
+([Plan 0164](../plans/done/0164-the-cellular-system.md)) carries `life_like`, `larger_than_life` and
+`cyclic` with Lenia placed. Seven worlds cost two `SystemKind` entries, which is what the rule
+promised, and the five still unbuilt are each a family arm on a system that now exists rather than a
+roster entry waiting to be argued for.
+
+**Rule 4's second half now has something to apply to, and the Outcome's *"built but unexercised"*
+is spent.** `cellular` is the first system with family-specific structural parameters: `birth` and
+`survive` read only on `life_like`, `radius` and the four interval bounds only on
+`larger_than_life`, `states` and `threshold` only on `cyclic`, and `trail`/`age_tint` are inert on
+`cyclic` alone. `FAMILY_PARAMS` declares each with the range that reads there, the generated
+reference prints it, and `the_family_table_is_the_roster` holds the declaration to the engine's own
+family roster. `analytic_field` exercises the same clause one step less finely: `trap` is a load
+error on `chladni`, as `map` is.
+
+**Rule 3 was built and one thing it does not cover was found.** Both systems baseline inside a
+stable regime and assert the rest structurally: `analytic_field`'s escape-time golden pins a `c`
+where no pixel escapes in the second half of the budget, against a control just past the cardioid's
+cusp where 0.23 of the frame does; `cellular`'s four goldens pin a seed, a generation count and a
+Floor-legal grid, and the determinism property is asserted on 1,000+ generations rather than on
+pixels. What rule 3 says nothing about is a **CPU mirror's** coverage: `analytic_field`'s mirror is
+held to the GPU on one branch and then relied on for every other, which the close recorded as a
+minor. A mirror is an instrument, and rule 3 governs baselines rather than instruments — noted
+here rather than widened, because widening it is a decision and not a correction.

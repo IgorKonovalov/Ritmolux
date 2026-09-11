@@ -1,17 +1,20 @@
 # 0163 — The analytic field
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-11. Five `dev` phases landed (`65d57d4`, `232afb3`,
+> `9ae4650`, `cf11972`, `27f2a63`); the 2026-09-11 HELD review's one blocker — an empty
+> `### Close triggers` block — was discharged in `f10bd6b`. Re-reviewed on the finished tree:
+> **no blockers, no majors**, four minors and three nits carried to backlog 0206, 0207 and 0208.
 > **Created:** 2026-09-09
 > **Owner skill(s):** dev
-> **Related ADRs:** [0180](../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md)
+> **Related ADRs:** [0180](../../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md)
 > (rules 1, 3 and 4),
-> [0021](../adrs/0021-shared-palette-system.md) (the palette LUT the field colours through),
-> [0045](../adrs/0045-quality-tiers-floor-and-rich.md) (where the iteration cap lives),
-> [0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md) (the HDR pipeline an escape-time
+> [0021](../../adrs/0021-shared-palette-system.md) (the palette LUT the field colours through),
+> [0045](../../adrs/0045-quality-tiers-floor-and-rich.md) (where the iteration cap lives),
+> [0046](../../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md) (the HDR pipeline an escape-time
 > glow finally uses),
-> [0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) (aspect comes from the target),
-> [0085](../adrs/0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md) (`occlude`)
-> **Depends on:** [0161](done/0161-the-structural-parameter-is-held.md) — Chladni's mode numbers are
+> [0037](../../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) (aspect comes from the target),
+> [0085](../../adrs/0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md) (`occlude`)
+> **Depends on:** [0161](0161-the-structural-parameter-is-held.md) — Chladni's mode numbers are
 > integers on a musical edge and are worth little without `[hold]`.
 
 ## TL;DR
@@ -25,19 +28,19 @@ without another `SystemKind`.
 
 ## Context & problem
 
-The engine has no escape-time fractal. [`roadmap-visual-richness.md`](../roadmap-visual-richness.md)'s
+The engine has no escape-time fractal. [`roadmap-visual-richness.md`](../../roadmap-visual-richness.md)'s
 reference table names the gap — *"Fractal glowing spiral | needs escape-time/IFS or feedback spiral,
 HDR glow | have today: neither"* — and the pipeline that row was waiting on has existed since
 ADR-0046. Nothing was ever built to use it.
 
 It has no cymatics either, and that absence is the odder one:
-[`generative-techniques-catalogue.md`](../generative-techniques-catalogue.md) rates Chladni
+[`generative-techniques-catalogue.md`](../../generative-techniques-catalogue.md) rates Chladni
 *"cheapest of all — no state, pure per-pixel eval"* and *"thematically perfect for a music viz"*, and
 ranks it second on its pick order. A Chladni plate's figure is decided by two integers; a music
 visualizer has a dominant frequency to hand them.
 
 The obvious home would be `fragment_field`, and it is the wrong one.
-[ADR-0180](../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md)
+[ADR-0180](../../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md)
 Alternative B records why: that scene's parameter surface **is** the sine fold's own — `warp`,
 `fold_speed`, and an integrated fold phase in its uniform (ADR-0132) — and its shader is a fixed
 five-iteration fold with no family switch anywhere in it. Making it polymorphic risks the table and
@@ -149,7 +152,7 @@ flowchart TD
   iterations, shallow zoom, and `c` away from the set boundary where one float of divergence flips a
   pixel from interior to exterior. Anything that cannot hold at the `0.02` mean-channel-difference
   floor `golden.rs` already declares is asserted as a structural statistic instead
-  ([ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)).
+  ([ADR-0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)).
 - **Files touched:** `core/src/render/tier.rs`, `core/tests/` (the golden + its preset).
 - **Done when:** the same preset renders identically on `Floor` and `Rich` when it asks within the
   `Floor` bound; a preset over the bound is clamped with a notice, not silently; and the golden holds
@@ -216,7 +219,7 @@ documents), so this scene keeps its LUTs in their own bind group exactly as that
   contained by rule 4. It gets worse with each placed family that later lands; if the table becomes
   unreadable, the answer is per-family sub-tables in the generator, not a second system.
 - **`power` as a Modal parameter means non-integer exponents**, which need a complex `pow` in the
-  shader and can produce a branch cut. [backlog 0119](../design-backlog.md) records exactly this
+  shader and can produce a branch cut. [backlog 0119](../../design-backlog.md) records exactly this
   class of defect for `ang`'s branch cut on the +x axis in the per-vertex program. Check the seam
   before shipping a fractional default.
 
@@ -224,13 +227,13 @@ documents), so this scene keeps its LUTs in their own bind group exactly as that
 
 - **It does not build quasicrystal, Voronoi or hyperbolic tiling.** ADR-0180 rule 1 places them in
   this system; each is a later family arm, and the Voronoi one is
-  [`roadmap-visual-richness.md`](../roadmap-visual-richness.md)'s R4 item 2.
+  [`roadmap-visual-richness.md`](../../roadmap-visual-richness.md)'s R4 item 2.
 - **It does not add a raymarched SDF or anything 3D.** The catalogue lists SDF raymarching under the
   same idiom; it is a different cost class and deserves its own interview.
 - **It does not touch `fragment_field`.** Its thirteen presets are unaffected — see Decision.
 - **It does not author presets.** Two new families with no worlds built on them go to
   `preset-author`.
-- **It does not add `[hold]`** — that is [0161](done/0161-the-structural-parameter-is-held.md).
+- **It does not add `[hold]`** — that is [0161](0161-the-structural-parameter-is-held.md).
 
 ## Implementation log
 
@@ -354,7 +357,22 @@ documents), so this scene keeps its LUTs in their own bind group exactly as that
   than the reviewer's should say so; nothing else in this block depends on it.
 - **Outstanding `human` phases:** none - all five phases are `dev` and all five landed.
 
-## Close review (architect, Mode 4) - 2026-09-11 - HELD
+## Close review (architect, Mode 4) - 2026-09-11 - HELD, then CLOSED
+
+> **Re-close, 2026-09-11.** The blocker below was discharged in `f10bd6b`: the `### Close triggers`
+> block is written, all six bullets, and the Phase 5 row names `27f2a63`. The lane declares the
+> **Full suite** bullet as the reviewer's run rather than its own and says so explicitly, which is
+> the honest form. Re-verified against the finished tree at the joint close of this plan and
+> [0164](0164-the-cellular-system.md): `cargo nextest run --workspace` green, the seven Node
+> gates green. **No blockers, no majors.** The minors below were not code-fixed and did not need to
+> be: the two that are documentation were swept in the close commit
+> (`docs/capturing.md`'s family list, and `docs/presets.md`'s false *"one or more presets for every
+> built-in system"*), and the two that are code now carry backlog entries rather than living only
+> in this file — the `fragment_field` `occlude` defect as
+> [0206](../../design-backlog.md), the recovery line as [0207](../../design-backlog.md). The third nit,
+> the stale *"Twelve systems"* prose, became [0208](../../design-backlog.md) as a class rather than an
+> instance. The section below is left exactly as it was written, as the record.
+
 
 > Written by `architect` in a fresh session, unattended batch run. **The plan is not closed.** Its
 > `Status:` line is left as `dev` set it. This section is the review; the implementing lane owns the
@@ -463,7 +481,7 @@ log names pass on the finished tree.
 - Route to `preset-author`: `chladni` and `escape_time` with orbit traps, and specifically the
   question of whether a Julia `c` driven by two different bands reads as musical or as noise.
 - The three placed-but-unbuilt families. Voronoi with edge emphasis discharges
-  [`roadmap-visual-richness.md`](../roadmap-visual-richness.md) R4 item 2 and is the cheapest of the
+  [`roadmap-visual-richness.md`](../../roadmap-visual-richness.md) R4 item 2 and is the cheapest of the
   three.
 - Fractal flames (catalogue pick-order item 3) are the compute-path sibling of this plan and now the
   cheapest unbuilt entry on that list — they reuse the attractor's IFS and this plan's HDR posture.

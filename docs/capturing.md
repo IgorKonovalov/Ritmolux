@@ -128,7 +128,7 @@ Flags:
 | `--size <WxH>` | render size (default 1280x720) |
 | `--out <path>` | output PNG (single shot) or dir/file (`--all`) |
 | `--all` | contact sheet of every preset, labeled (needs `--out`) |
-| `--report [family=<sys>]` | per-family metrics table — reactivity, animation, coverage and the [transient probe](#the-transient-columns); `family=` takes any `system` name — all twelve the scene registry carries: `attractor`, `emitter`, `fragment_field`, `lsystem`, `parametric_curve`, `reaction_diffusion`, `shape_collage`, `shape_field`, `spectrum`, `star_pattern`, `swarm`, `warp_mesh` |
+| `--report [family=<sys>]` | per-family metrics table — reactivity, animation, coverage and the [transient probe](#the-transient-columns); `family=` takes any `system` name — every one the scene registry carries: `analytic_field`, `attractor`, `cellular`, `emitter`, `fragment_field`, `lsystem`, `parametric_curve`, `reaction_diffusion`, `shape_collage`, `shape_field`, `spectrum`, `star_pattern`, `swarm`, `warp_mesh` |
 | `--json` | emit the report as JSON instead of a text table |
 | `--signal <kind:param>` | synth-audio filmstrip (see below) |
 | `--audio <clip.wav>` | filmstrip from a 16-bit PCM WAV |

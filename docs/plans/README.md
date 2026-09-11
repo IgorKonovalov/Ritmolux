@@ -45,10 +45,8 @@ place. The plan file carries the real link.
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + **0174**: Art-Net to the fixtures, verified against `rlx-artnet-sim` because **the rig is unreachable**. Phases 1-8 need none; 9 is the rig session. Phase 8 hard-depends on 0115 Phase 2. |
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
 | [0160](0160-the-silhouettes-preconditions-stop-being-silent.md) | The silhouette's preconditions stop being silent | approved | dev, human | ADR-0179: four preconditions on `[path]` that fail silently. **0092 closed 2026-09-09**, so its Phase 7 axis fix is in. Phase 2 is prose in `presets/README.md`. |
-| [0163](0163-the-analytic-field.md) | The analytic field | approved | dev | ADR-0180 rules 1+3: a 13th system holding `chladni` and `escape_time`, with Voronoi, quasicrystal and hyperbolic placed. Fills the roadmap's fractal-spiral gap. **Needs 0161.** |
-| [0164](0164-the-cellular-system.md) | The cellular system | approved | dev | ADR-0180 rules 1+2: a 14th system on `PingPongField` - `life_like`, `larger_than_life`, `cyclic`, plus an age channel so the field paints history. Lenia placed, not built. **Needs 0161.** |
 | [0166](0166-the-basics-read-in-russian.md) | The basics read in Russian | approved | dev, human | ADR-0185: five docs gain a Russian sibling `.ru.md` stamped with the source sha. **Phase 3 is a `human` review that blocks publication.** Touches no Rust - orderable against any lane. |
-| [0167](0167-the-studio-becomes-handable.md) | The studio becomes handable | in-progress | dev, studio-builder, human | Phases 1-6 landed 2026-09-10; backlog 0199, 0200, 0201 archived. **Phases 7 and 8 are `human` and unrun**; 7 is unblocked now that 0168 has closed. Does not close until both run. |
+| [0167](0167-the-studio-becomes-handable.md) | The studio becomes handable | in-progress | dev, studio-builder, human | Phases 1-6 landed 2026-09-10. **Phase 7 (`human`) unrun; Phase 8 has its Windows readings 2026-09-11 and still owes the macOS arm.** Filed backlog 0205. Does not close until both finish. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-09 — [0158] and [0159] are drafted, and they are a program rather than a
@@ -63,8 +61,8 @@ it. The note is [in the archive](README-archive.md#prior-sequencing-notes-supers
 [0160]: 0160-the-silhouettes-preconditions-stop-being-silent.md
 [0161]: done/0161-the-structural-parameter-is-held.md
 [0162]: done/0162-the-curve-families.md
-[0163]: 0163-the-analytic-field.md
-[0164]: 0164-the-cellular-system.md
+[0163]: done/0163-the-analytic-field.md
+[0164]: done/0164-the-cellular-system.md
 [0165]: done/0165-the-release-path-stops-being-the-first-compile.md
 [0167]: 0167-the-studio-becomes-handable.md
 [0168]: done/0168-the-studio-stops-surprising-the-author.md
@@ -587,15 +585,15 @@ the rows above.
   on clean `main` too, and a naive diff would have convicted the change of moving them.
 
 
-**Added 2026-09-09 - [0161] through [0164] are the mathematics wave, and 0161 gates the other
-three.** One ADR frames them: [0180] - a new mathematical world joins an existing system as a named
-**family** rather than founding a `SystemKind` (which is why seven new worlds cost two roster
-entries), and a **structural** parameter is quantized and holdable, because this engine's integer
-levers are bindable today and effectively unbindable in practice. The order is fixed by dependency:
-**0161 first** - closed 2026-09-10 - then 0162, 0163 and 0164 in any order: three disjoint scene paths.
-**[0162] closed 2026-09-11**, so 0163 and 0164 are what remains of the wave.
-Lenia, Voronoi, quasicrystal, hyperbolic tiling and fractal flames are **placed** by 0180 and built
-by nobody yet; each is a family arm on a system 0163 or 0164 creates.
+~~**Added 2026-09-09 - [0161] through [0164] are the mathematics wave.**~~ — **fully spent
+2026-09-11**, when [0163] and [0164] closed together behind [0161] and [0162]. All four landed, in
+the dependency order the note fixed, and [0180] framed every one of them. The note and the
+merge-in-series ordering it carried are
+[in the archive](README-archive.md#prior-sequencing-notes-superseded). **What survives it is the
+tail the note always named:** Lenia, Voronoi, quasicrystal, hyperbolic tiling and fractal flames are
+**placed** by [0180] and built by nobody — each is now a family arm on a system that exists, which
+is the whole point of the wave. Fractal flames are the cheapest of the five: they reuse the
+attractor's IFS and [0163]'s HDR posture.
 
 **Added 2026-09-10, spent 2026-09-10 when [0161] closed.** That note paired [0161] and [0159] as
 the two lanes to open, and named the schema as their one coupling. It is
@@ -629,13 +627,14 @@ contends with nothing on this roster.
 > list all landed, so [0167] Phase 7 is unblocked and the ordering above is spent. What stands is
 > the rest: **both of [0167]'s `human` phases are still unrun**, Phase 8 still has the
 > `52.4 -> 44.3` fps prior worth comparing against, and 0167 still does not close until they run.
-
-**One ordering this still does not license.** 0162, 0163 and 0164 touch disjoint scene paths but
-each **blesses new baselines**, so they merge in series even if they are built in parallel: the
-rule at the head of `### The two lanes, now` is written for exactly this case, and this is the first
-wave since it was written that will actually meet it. ([0160]'s half of this note is spent - it had
-to run after [0161] because both add load-time work to `core/src/preset/schema/`, and [0161] has
-landed.)
+>
+> **Updated 2026-09-11 — Phase 8 ran on Windows and is still open.** The studio-attached pair
+> measured like-for-like on one held preset reads `140.1 -> 125.8` fps, **-10.2 %** against
+> [0159] Phase 4's -15.7 %, with zero player frames dropped of 17,077; fullscreen survived three
+> toggles and `bgra8` was negotiated windowed, which retires the plan's own risk that the swizzle
+> stayed synthetic-only. **The macOS arm is still owed**, and the run filed
+> [backlog 0205](../design-backlog.md) — a windowless player reports `0.0 fps` and writes no
+> diagnostics rows while rendering normally. **Phase 7 has not been attempted.**
 
 ## Standing (not a plan)
 
@@ -794,6 +793,8 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0164 — The cellular system](done/0164-the-cellular-system.md) — closed 2026-09-11. Review: **no blockers, no majors, two minors, two nits.** Version: **0.119.0** (minor). No ADR paired. Filed [backlog 0207 + 0208](../design-backlog.md). [Write-up](README-archive.md).
+- [0163 — The analytic field](done/0163-the-analytic-field.md) — closed 2026-09-11 after a held review the same day. Review: **no blockers, no majors, four minors, three nits.** Version: **0.118.0** (minor). Filed [backlog 0206](../design-backlog.md). [Write-up](README-archive.md).
 - [0162 — The curve families](done/0162-the-curve-families.md) — closed 2026-09-11. Review: **no blockers, no majors, four minors, two nits.** Version: **0.117.0** (minor). ADR-0180 Outcome addendum. Filed [backlog 0204](../design-backlog.md). [Write-up](README-archive.md).
 - [0168 — The studio stops surprising the author](done/0168-the-studio-stops-surprising-the-author.md) — closed 2026-09-10. Review: **no blockers, one major, three minors, one nit.** Version: **0.116.0** (minor). ADR-0189 accepted. Half-discharged [backlog 0203](../design-backlog.md). [Write-up](README-archive.md).
 - [0159 — The studio opens](done/0159-the-studio-opens.md) — closed 2026-09-10. Review: **no blockers, four majors, four minors.** Version: **0.115.0**. ADR-0177 + 0178 + 0183 + 0184 accepted. **Phases 10-11 (`human`) unrun**, behind [backlog 0199-0201](../design-backlog.md). [Write-up](README-archive.md).

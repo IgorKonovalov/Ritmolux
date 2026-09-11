@@ -231,8 +231,8 @@ preset uses two layers — rich-tier, governed.*
 
 > **Designed 2026-09-09:** [ADR-0180](adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md)
 > plus [Plan 0161](plans/done/0161-the-structural-parameter-is-held.md),
-> [0162](plans/done/0162-the-curve-families.md), [0163](plans/0163-the-analytic-field.md) and
-> [0164](plans/0164-the-cellular-system.md) take items **1** (curve families) and **2** (cellular),
+> [0162](plans/done/0162-the-curve-families.md), [0163](plans/done/0163-the-analytic-field.md) and
+> [0164](plans/done/0164-the-cellular-system.md) take items **1** (curve families) and **2** (cellular),
 > add escape-time fractals and Chladni, and **place** Voronoi, quasicrystal, hyperbolic tiling and
 > Lenia as family arms on the two systems 0163 and 0164 create. Item **3**'s fractal flames and item
 > **4**'s waveform tap are untouched; item **5**'s lit relief is still deliberately last. The ADR's

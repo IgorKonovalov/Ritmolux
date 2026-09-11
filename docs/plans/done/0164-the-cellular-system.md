@@ -1,17 +1,25 @@
 # 0164 — The cellular system
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-11. Six `dev` phases landed (`f93f3e2`, `677ab2b`,
+> `4fcb75b`+`1d74d0b`, `8aed06f`, `1dd4b0f`, `a6a1392`). Mode 4 review on the finished tree:
+> **no blockers, no majors**, two minors and two nits. `cargo nextest run --workspace` green
+> at `67b7308` — 1795 run, 1795 passed, 6 skipped, 522.2 s — and the seven Node gates green.
+> The two minors are code and carry backlog entries rather than living in this file:
+> [0207](../../design-backlog.md) (the recovery line names geometry for three contexts that are
+> not) and [0208](../../design-backlog.md) (a system count written into prose). Plan 0164's own
+> followup discharged: backlog 0142 carries a dated note naming `cellular` as its sharpest
+> instance, and why the layer path is not affected.
 > **Created:** 2026-09-09
 > **Owner skill(s):** dev
-> **Related ADRs:** [0180](../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md)
+> **Related ADRs:** [0180](../../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md)
 > (rules 1, 2 and 4),
-> [0012](../adrs/0012-stateful-feedback-render-system.md) (`PingPongField`, the host),
-> [0034](../adrs/0034-internal-resolution-follows-the-target.md) (the rule this scene is a
+> [0012](../../adrs/0012-stateful-feedback-render-system.md) (`PingPongField`, the host),
+> [0034](../../adrs/0034-internal-resolution-follows-the-target.md) (the rule this scene is a
 > deliberate exception to — see Decision),
-> [0021](../adrs/0021-shared-palette-system.md) (the colour surface),
-> [0045](../adrs/0045-quality-tiers-floor-and-rich.md) (the grid cap),
-> [0051](../adrs/0051-seeded-grammar-randomness-with-per-run-opt-in.md) (the seed a reseed draws from)
-> **Depends on:** [0161](done/0161-the-structural-parameter-is-held.md) — a rule index is a Structural
+> [0021](../../adrs/0021-shared-palette-system.md) (the colour surface),
+> [0045](../../adrs/0045-quality-tiers-floor-and-rich.md) (the grid cap),
+> [0051](../../adrs/0051-seeded-grammar-randomness-with-per-run-opt-in.md) (the seed a reseed draws from)
+> **Depends on:** [0161](0161-the-structural-parameter-is-held.md) — a rule index is a Structural
 > parameter and is unusable without `[hold]`.
 
 ## TL;DR
@@ -27,7 +35,7 @@ region, band energy drives the generation rate, and the rule itself can step on 
 
 The engine has one automaton — Gray-Scott, a continuous two-species reaction-diffusion PDE — and
 nothing discrete.
-[`generative-techniques-catalogue.md`](../generative-techniques-catalogue.md) lists
+[`generative-techniques-catalogue.md`](../../generative-techniques-catalogue.md) lists
 *"Conway / generalised grid rules"* as Cheap and has never had a plan; the Nature of Code mapping
 ranks cellular automata fourth and calls the ping-pong texture an ideal fit. The infrastructure is
 in-tree and proven: `PingPongField`, a fixed-timestep accumulator, and a 256² Gray-Scott field that
@@ -53,14 +61,14 @@ channel; the palette coordinate is a function of both, so a dead cell fades alon
 instead of vanishing.
 
 **The grid is a content parameter, not a target-following resolution, and that is a deliberate
-exception to [ADR-0034](../adrs/0034-internal-resolution-follows-the-target.md).** The precedent is
+exception to [ADR-0034](../../adrs/0034-internal-resolution-follows-the-target.md).** The precedent is
 explicit: `reaction_diffusion`'s grid stayed 256² through the tier split because *pattern scale
 moves with resolution*, which makes the grid content-changing rather than a quality knob
-([`roadmap-visual-richness.md`](../roadmap-visual-richness.md)'s R0 note). A Life grid is the same —
+([`roadmap-visual-richness.md`](../../roadmap-visual-richness.md)'s R0 note). A Life grid is the same —
 a glider is a fixed number of cells, so doubling the grid halves its apparent size. So `[cellular]`
 declares the grid, `TierConfig` caps it, and it does not follow the window. The present is a plain
 normalized stretch and the scene computes no screen-destined geometry, so
-[ADR-0037](../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) is satisfied by having no
+[ADR-0037](../../adrs/0037-internal-grid-is-a-resolution-not-a-shape.md) is satisfied by having no
 aspect to get wrong.
 
 We rejected folding this into `reaction_diffusion` (its `feed`/`kill`/`diffusion` parameters are
@@ -106,7 +114,7 @@ flowchart TD
 - **`step_rate`** (generations per second) and **`reseed`** (an edge parameter — a rising value
   reseeds the field, so it composes with `[latch]`) round out the audio surface.
 - **Determinism:** the reseed draws from the preset's seed
-  ([ADR-0051](../adrs/0051-seeded-grammar-randomness-with-per-run-opt-in.md)), never from a clock. NFR §6.
+  ([ADR-0051](../../adrs/0051-seeded-grammar-randomness-with-per-run-opt-in.md)), never from a clock. NFR §6.
 - **Files touched:** `core/src/preset/schema/system.rs`, `core/src/render/scenes/cellular/` (new),
   `core/src/render/scenes/mod.rs`, `core/src/preset/schema/`, `core/src/render/mod.rs`.
 - **Done when:** `birth = 8`, `survive = 12` from a seeded field reproduces Conway — a glider
@@ -224,7 +232,7 @@ pub struct CellularConfig {
   wanted, but it means `--report`'s repeated-run comparisons must fix `step_rate` or they compare
   two different histories.
 - **A same-system dissolve runs `Scene::update` twice in one frame** — [backlog
-  0142](../design-backlog.md), which names every stateful scene as advancing at 2x for the
+  0142](../../design-backlog.md), which names every stateful scene as advancing at 2x for the
   dissolve's duration. This scene is stateful, so it inherits that defect on day one. This plan does
   not fix it; the implementation log should confirm the symptom is the known one and not a new one.
 - **The determinism property is the thing most likely to be quietly false.** A GPU reduction with
@@ -236,7 +244,7 @@ pub struct CellularConfig {
 - **It does not build Lenia.** ADR-0180 rule 1 places it as a fourth family on this system; the
   user's call was discrete first, and the continuous kernel is a different cost class.
 - **It does not touch `reaction_diffusion`** or its pinned 256² grid.
-- **It does not fix [backlog 0142](../design-backlog.md)** — the double-`update` on a same-system
+- **It does not fix [backlog 0142](../../design-backlog.md)** — the double-`update` on a same-system
   dissolve — which this scene inherits.
 - **It does not add DLA, sandpile or percolation.** Those are growth processes rather than automata
   and would want their own interview.
@@ -403,5 +411,5 @@ pub struct CellularConfig {
   `reseed` reads as musical or as a hard cut. The `[latch]` composition is the interesting part.
 - Lenia as a fourth family — the catalogue's pick-order item 4, and the one that most rewards the
   age channel Phase 2 builds.
-- [backlog 0142](../design-backlog.md) gains a second stateful scene as evidence; worth a dated note
+- [backlog 0142](../../design-backlog.md) gains a second stateful scene as evidence; worth a dated note
   on the entry at this plan's close rather than a new entry.

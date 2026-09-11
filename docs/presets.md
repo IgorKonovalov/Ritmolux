@@ -26,9 +26,11 @@ the one place it is maintained; this document does not duplicate it.
 > the guide's opening on purpose; where they disagree, the guide is the newer one
 > ([ADR-0101](adrs/0101-the-preset-docs-gain-a-tutorial-layer-rather-than-a-merge.md)).
 
-> **Accurate as of 2026-08-13**, against the curated set in
-> [`presets/`](../presets/) — one or more presets for every built-in system — and
-> the v2 expression grammar. The number of presets is deliberately not written
+> **Accurate as of 2026-09-11**, against the curated set in
+> [`presets/`](../presets/) and the v2 expression grammar. Most built-in systems ship
+> at least one preset; `analytic_field` and `cellular` are the newest and ship none
+> yet, so their pictures come from the teaching presets under
+> [`docs/examples/`](examples/). The number of presets is deliberately not written
 > down here: it moves constantly, and a count in this line is a line that goes
 > stale without anything noticing.
 
