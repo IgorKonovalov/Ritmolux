@@ -237,6 +237,7 @@ fn system_name(system: SystemKind) -> &'static str {
         SystemKind::WarpMesh => "warp_mesh",
         SystemKind::ShapeCollage => "shape_collage",
         SystemKind::AnalyticField => "analytic_field",
+        SystemKind::Cellular => "cellular",
     }
 }
 

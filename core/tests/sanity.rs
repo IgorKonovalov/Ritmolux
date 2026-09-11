@@ -496,6 +496,13 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // distribution when the first preset ships**, at half the family
         // minimum like every floor above.
         SystemKind::AnalyticField => 0.08,
+        // **Not derived from a distribution either**: the system ships no
+        // preset content. `reaction_diffusion`'s number, because both paint a
+        // stateful grid whose live share is what the frame shows — a borrowed
+        // number, not a measurement. **Re-derive it from this test's printed
+        // distribution when the first preset ships**, at half the family
+        // minimum like every floor above.
+        SystemKind::Cellular => 0.09,
     }
 }
 
@@ -613,6 +620,7 @@ fn system_name(system: SystemKind) -> &'static str {
         SystemKind::WarpMesh => "warp_mesh",
         SystemKind::ShapeCollage => "shape_collage",
         SystemKind::AnalyticField => "analytic_field",
+        SystemKind::Cellular => "cellular",
     }
 }
 

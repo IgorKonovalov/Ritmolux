@@ -85,6 +85,7 @@ headroom as headroom.
   - [System: `warp_mesh`](#system-warp_mesh)
   - [System: `shape_collage`](#system-shape_collage)
   - [System: `analytic_field`](#system-analytic_field)
+  - [System: `cellular`](#system-cellular)
   - [Engine stage: `background`](#engine-stage-background)
   - [Engine stage: `trails`](#engine-stage-trails)
   - [Engine stage: `kaleidoscope`](#engine-stage-kaleidoscope)
@@ -898,6 +899,31 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | `trap_rotate` | `0` | `escape_time` `0` – `1`; inert on `chladni` | Turns the orbit trap about the origin, in whole turns. Inert on a `circle` and with no `trap`. |
 | `color_span` | `1` | `0` – `4` | How much of the palette the field's level covers; 0 is one flat colour. |
 | `color_center` | `0` | `-1` – `1` | Shifts which part of the palette the field's level starts from. |
+| `brightness` | `1` | `0` – `2` | The scene's overall light level, multiplying what it draws before the composite. |
+| `hue` | `0` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. |
+| `zoom` | `1` | `0.25` – `4` | Scales the whole scene about its centre; above 1 fills more of the frame. |
+| `pan_x` | `0` |  | Slides the whole scene sideways, in the scene's own units rather than pixels. |
+| `pan_y` | `0` |  | Slides the whole scene vertically, in the scene's own units rather than pixels. |
+| `saturation` | `1` | `0` – `1` | Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own. |
+| `palette_mix` | `0` | `0` – `1` | Crossfades from the preset's palette to its second one; 0 is the first, 1 the second. |
+| `palette_contour` | `0` | `0` – `1` | Draws a line at each band edge when the palette is stepped; 0 draws none. |
+
+### System: `cellular`
+
+**Structural**
+
+| Parameter | Default | Range | What it does |
+|---|---|---|---|
+| `birth` | `8` | `0` – `511` | Which live-neighbour counts bring a dead cell to life, as a bitmask over the counts 0-8: bit k set means k neighbours give birth. 8 (bit 3) is Conway's. |
+| `survive` | `12` | `0` – `511` | Which live-neighbour counts keep a live cell alive, as a bitmask over the counts 0-8. 12 (bits 2 and 3) is Conway's. |
+| `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
+
+**Modal**
+
+| Parameter | Default | Range | What it does |
+|---|---|---|---|
+| `step_rate` | `10` | `0` – `60` | How many generations the automaton runs per second, whatever the frame rate; 0 freezes it. |
+| `reseed` | `0` | `0` – `1` | A rise past 0.5 refills one disc of the grid with fresh seeded cells, once per rise; bind a beat or a latch to it. |
 | `brightness` | `1` | `0` – `2` | The scene's overall light level, multiplying what it draws before the composite. |
 | `hue` | `0` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. |
 | `zoom` | `1` | `0.25` – `4` | Scales the whole scene about its centre; above 1 fills more of the frame. |

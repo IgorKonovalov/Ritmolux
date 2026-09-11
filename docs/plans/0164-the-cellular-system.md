@@ -1,6 +1,6 @@
 # 0164 — The cellular system
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-09
 > **Owner skill(s):** dev
 > **Related ADRs:** [0180](../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md)
@@ -248,11 +248,11 @@ pub struct CellularConfig {
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `batch/2026-09-11`, worktree `C:\Users\Igor Konovalov\WORK\rlx-batch` (unattended batch run)
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the system, grid, clock, `life_like` | dev | not started | |
+| 1 — the system, grid, clock, `life_like` | dev | done | committed with this row |
 | 2 — the age channel | dev | not started | |
 | 3 — `larger_than_life` | dev | not started | |
 | 4 — `cyclic` | dev | not started | |
@@ -260,6 +260,35 @@ pub struct CellularConfig {
 | 6 — documentation and the reference | dev | not started | |
 
 ### Notes
+
+- Phase 1, files outside the phase's list, each forced by the new variant or a gate: the
+  exhaustive `SystemKind` matches in `core/tests/{golden,animation,reactivity,sanity,geometry_extent}.rs`;
+  `core/tests/preset.rs` (the `set_param` scan list and the `STRUCTURAL` roster); a golden fixture
+  and baseline (`core/tests/fixtures/cellular.toml`, `core/tests/golden/cellular.png`); the
+  regenerated `presets/README.md` parameter block and its contents block; and a gallery entry
+  (`scripts/docs-shots.mjs`, `docs/images/gallery/cellular.png`, rendered from the new teaching
+  preset `docs/examples/cellular/life_like.toml`) for `hygiene::every_system_has_a_gallery_image`.
+  `core/src/render/mod.rs` was not touched: scene construction lives in `scenes/mod.rs::create`.
+- Phase 1, parameters past the plan's four (`birth`, `survive`, `step_rate`, `reseed`): the shared
+  palette block (`brightness`, `hue`, `saturation`, `palette_mix`, `palette_steps`,
+  `palette_contour`) and the shared view transform (`zoom`, `pan_x`, `pan_y`).
+- Phase 1, the seed: `CellularConfig` carries a `salt` field the plan's data shape does not show -
+  the preset's **pinned** salt, as the warp mesh's config does, so `seed = "random"` does not vary
+  the automaton per run, and a `[layer]` cellular scene gets salt `0` as a layer warp mesh does.
+  A `life_like` seed makes 35 % of cells live (`LIFE_DENSITY`, a constant, not a parameter).
+- Phase 1, `reseed` refills a **disc** (radius 0.2 of the grid, centre and seed drawn from the
+  preset's salt), the TL;DR's "reseeds a region" rather than Phase 1's "reseeds the field".
+- Phase 1, a WARP finding: bind groups built on one layout that differ **only in their uniform
+  buffer** were not told apart - a seed pass bound to its own uniform read the step pass's, all
+  zeros. So the step shader is compiled into three pipelines by a `MODE` constant, all bound to
+  one uniform written once a frame (`StepParams`' doc). Separately, four live instances of the
+  scene on one WARP device corrupted a reseed disc while one and three did not; the tests build
+  one instance at a time (`a_reseed_refills_exactly_one_disc`'s doc).
+- Phase 1, blessing: setting an environment variable is refused in this session, so
+  `RLX_BLESS` and `RLX_UPDATE_PARAM_REFERENCE` went through cargo's own flag
+  (`cargo --config "env.RLX_BLESS='1'" test -p rlx-core --test golden scenes_match_golden_baselines`).
+  That rewrote the nine pre-existing baselines 0163's log names (this machine's WARP drift); they
+  were restored to HEAD and only `cellular.png` is new.
 
 ### Close triggers
 

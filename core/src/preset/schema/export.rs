@@ -95,6 +95,8 @@ pub enum Roster {
     EscapeMap,
     /// `[field] trap`.
     TrapShape,
+    /// `[cellular] family`.
+    CellularFamily,
 }
 
 impl Roster {
@@ -126,6 +128,7 @@ impl Roster {
             Roster::FieldFamily => FieldFamily::ALL.iter().map(|f| f.as_str()).collect(),
             Roster::EscapeMap => EscapeMap::ALL.iter().map(|m| m.as_str()).collect(),
             Roster::TrapShape => TrapShape::ALL.iter().map(|t| t.as_str()).collect(),
+            Roster::CellularFamily => CellularFamily::ALL.iter().map(|f| f.as_str()).collect(),
         }
     }
 
@@ -241,6 +244,7 @@ pub const TABLES: &[&TableDesc] = &[
     &super::raw::SPECTRUM,
     &super::raw::MESH,
     &super::raw::FIELD,
+    &super::raw::CELLULAR,
     &super::raw::MILK,
     &super::raw::MILK_ELEMENT,
     &super::raw::FEEDBACK,

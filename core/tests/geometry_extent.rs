@@ -195,7 +195,10 @@ fn draws_segments(system: SystemKind) -> bool {
         | SystemKind::ShapeCollage
         // The analytic field evaluates a closed form per pixel; there is no
         // geometry at all, let alone a segment list.
-        | SystemKind::AnalyticField => false,
+        | SystemKind::AnalyticField
+        // The cellular system paints a grid of cells per pixel; its present has
+        // no segment list either.
+        | SystemKind::Cellular => false,
     }
 }
 

@@ -6,6 +6,7 @@
 //! validates it into the real thing -- so an invalid document is rejected at
 //! exactly one place per table.
 
+mod cellular;
 mod feedback;
 mod field;
 mod generator;
@@ -19,6 +20,7 @@ mod preset;
 mod smoothing;
 mod spectrum;
 
+pub(super) use cellular::*;
 pub(super) use feedback::*;
 pub(super) use field::*;
 pub(super) use generator::*;

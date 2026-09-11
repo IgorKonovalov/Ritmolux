@@ -46,6 +46,10 @@ pub enum SystemKind {
     /// (ADR-0180 rule 1): the Chladni plate, and every later stateless
     /// per-pixel world, as a `[field] family` rather than a system each.
     AnalyticField,
+    /// A discrete cellular automaton on a ping-pong grid (ADR-0180 rule 1,
+    /// ADR-0012): every grid rule — birth/survival, larger neighbourhoods, the
+    /// cyclic automaton — as a `[cellular] family` rather than a system each.
+    Cellular,
 }
 
 /// **The** roster of built-in systems: every variant, its canonical name, and
@@ -119,6 +123,7 @@ const TABLE: [(SystemKind, &str, &[ParamSpec]); SystemKind::VARIANT_COUNT] = {
             "analytic_field",
             scenes::analytic_field::PARAMS,
         ),
+        (SystemKind::Cellular, "cellular", scenes::cellular::PARAMS),
     ]
 };
 
@@ -142,7 +147,7 @@ impl SystemKind {
     /// typed off this count, so bumping the count without adding a row does not
     /// compile either. Both are module-private, so this names them rather than
     /// linking them.
-    pub const VARIANT_COUNT: usize = 13;
+    pub const VARIANT_COUNT: usize = 14;
 
     /// This variant's index into [`TABLE`].
     ///
@@ -165,6 +170,7 @@ impl SystemKind {
             SystemKind::WarpMesh => 10,
             SystemKind::ShapeCollage => 11,
             SystemKind::AnalyticField => 12,
+            SystemKind::Cellular => 13,
         }
     }
 

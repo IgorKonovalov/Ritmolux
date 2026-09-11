@@ -65,6 +65,7 @@ impl Preset {
             raw.spectrum,
             raw.mesh,
             raw.field,
+            raw.cellular,
             raw.milk,
             pinned_salt,
         )?;
@@ -592,6 +593,7 @@ pub(super) fn build_layer(
         raw.spectrum,
         raw.mesh,
         raw.field,
+        raw.cellular,
         // A `[layer]` carries no `[milk]` table: a converted preset is a whole
         // preset, and layering one under another is a composition nothing in the
         // corpus asks for. A layer warp mesh drives its mesh from `[layer.params]`
@@ -648,6 +650,7 @@ pub(super) fn build_config(
     spectrum: Option<RawSpectrum>,
     mesh: Option<RawMesh>,
     field: Option<RawField>,
+    cellular: Option<RawCellular>,
     milk: Option<RawMilk>,
     salt: u32,
 ) -> Result<Option<GeneratorConfig>, PresetError> {
@@ -735,6 +738,15 @@ pub(super) fn build_config(
             Some(f) => f.into_config()?,
             None => FieldConfig::default(),
         }))),
+        // The automaton's family, grid and edge rule are structural: the family
+        // selects a rule, and the grid sizes the state textures, which an eased
+        // value would rebuild mid-frame. Config is always `Some` so `configure`
+        // runs on every preset switch and reseeds the field — never stale. The
+        // salt is the pinned one, as the warp mesh's is: the automaton is a pure
+        // function of the preset in the live app as well as in a capture.
+        SystemKind::Cellular => Ok(Some(GeneratorConfig::Cellular(
+            cellular.unwrap_or_default().into_config(salt)?,
+        ))),
         // Reaction-diffusion drives its regime through named params (feed/kill/
         // flow), not a declarative structural table. `shape_collage`'s structure
         // is an authored element list compiled into the scene, and its seeded

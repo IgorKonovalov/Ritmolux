@@ -16,6 +16,7 @@
 )]
 
 pub mod analytic_field;
+pub mod cellular;
 pub(crate) mod common;
 pub mod emitter;
 pub mod fragment_field;
@@ -462,6 +463,11 @@ pub enum GeneratorConfig {
     /// on every preset switch and the outgoing preset's family never survives
     /// into the incoming one.
     Field(analytic_field::FieldConfig),
+    /// The cellular system's `[cellular]` table (ADR-0180 rule 1): which
+    /// automaton runs, on how large a grid, and the salt its seeding draws from.
+    /// Always `Some` for that system, so `configure` runs on every preset switch
+    /// and the incoming preset starts from its own seed.
+    Cellular(cellular::CellularConfig),
 }
 
 impl GeneratorConfig {
@@ -481,7 +487,8 @@ impl GeneratorConfig {
             | GeneratorConfig::Particles { .. }
             | GeneratorConfig::WarpMesh { .. }
             | GeneratorConfig::Path { .. }
-            | GeneratorConfig::Field(_) => 0,
+            | GeneratorConfig::Field(_)
+            | GeneratorConfig::Cellular(_) => 0,
         }
     }
 }
@@ -945,7 +952,8 @@ fn draws_through_shared_line_renderer(kind: SystemKind) -> bool {
         | SystemKind::ShapeField
         | SystemKind::WarpMesh
         | SystemKind::ShapeCollage
-        | SystemKind::AnalyticField => false,
+        | SystemKind::AnalyticField
+        | SystemKind::Cellular => false,
     }
 }
 
@@ -1030,6 +1038,7 @@ fn create(
             surface_format,
             tier.field_iterations,
         )),
+        SystemKind::Cellular => Box::new(cellular::CellularScene::new(device, surface_format)),
     }
 }
 
@@ -1154,6 +1163,7 @@ mod tests {
             SystemKind::WarpMesh => "warp mesh",
             SystemKind::ShapeCollage => "shape collage",
             SystemKind::AnalyticField => "analytic field",
+            SystemKind::Cellular => "cellular",
         }
     }
 
@@ -1325,6 +1335,7 @@ mod tests {
             SystemKind::WarpMesh,
             SystemKind::ShapeCollage,
             SystemKind::AnalyticField,
+            SystemKind::Cellular,
         ];
         for (i, a) in independent.iter().enumerate() {
             for b in independent.iter().skip(i + 1).chain(lines.iter()) {

@@ -1,0 +1,28 @@
+# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+#
+# The `cellular` scene's drift baseline: Conway's Life on a 64-cell torus,
+# seeded from a fixed salt and run a fixed 20 generations - 20 a second over
+# the suite's 60 frames at 1/60 s.
+#
+#  - `[generator] seed` pinned, so the seeded field is this file's own and not
+#    the default salt's: an automaton is a chaotic integrator, and a baseline
+#    of one is only a baseline from a fixed seed and a fixed generation count.
+#  - `birth`/`survive` bound at Conway although they equal the defaults, so a
+#    change of default cannot move this baseline.
+#  - `grid = 64` puts each cell on two pixels of the 128 capture, so a field
+#    one generation off moves whole pixels rather than a blur of them.
+system = "cellular"
+name   = "fixture_cellular"
+
+[cellular]
+family = "life_like"
+grid   = 64
+
+[generator]
+seed = 7
+
+[params]
+birth     = "8"
+survive   = "12"
+step_rate = "20"
+hue       = "0.1"

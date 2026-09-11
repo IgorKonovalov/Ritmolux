@@ -51,6 +51,10 @@ pub(in crate::preset::schema) struct RawPreset {
     /// closed-form family the analytic field draws.
     #[serde(default)]
     pub(in crate::preset::schema) field: Option<RawField>,
+    /// The optional `[cellular]` structural-config table (ADR-0180 rule 1):
+    /// which automaton the cellular system runs, and on how large a grid.
+    #[serde(default)]
+    pub(in crate::preset::schema) cellular: Option<RawCellular>,
     /// The optional `[per_vertex]` table (Plan 0100): bindings evaluated once
     /// per mesh vertex, with `x`/`y`/`rad`/`ang` in scope.
     #[serde(default)]
@@ -145,6 +149,8 @@ pub(in crate::preset::schema) struct RawLayer {
     pub(in crate::preset::schema) mesh: Option<RawMesh>,
     #[serde(default)]
     pub(in crate::preset::schema) field: Option<RawField>,
+    #[serde(default)]
+    pub(in crate::preset::schema) cellular: Option<RawCellular>,
     /// `[layer.per_vertex]` — the same per-vertex surface as the top level, for
     /// a layer whose system is the warp mesh (Plan 0100 Phase 1).
     #[serde(default)]
@@ -337,6 +343,12 @@ pub(in crate::preset::schema) const PRESET: TableDesc = TableDesc {
             doc: "Which closed-form world the analytic field draws.",
         },
         KeyDesc {
+            name: "cellular",
+            kind: KeyKind::Table("cellular"),
+            default: "",
+            doc: "Which automaton the cellular system runs, and on how large a grid.",
+        },
+        KeyDesc {
             name: "milk",
             kind: KeyKind::Table("milk"),
             default: "",
@@ -472,6 +484,12 @@ pub(in crate::preset::schema) const LAYER: TableDesc = TableDesc {
             kind: KeyKind::Table("field"),
             default: "",
             doc: "The layer's analytic-field family.",
+        },
+        KeyDesc {
+            name: "cellular",
+            kind: KeyKind::Table("cellular"),
+            default: "",
+            doc: "The layer's automaton family and grid.",
         },
     ],
 };

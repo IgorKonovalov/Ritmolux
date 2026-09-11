@@ -476,6 +476,18 @@ const IMAGES = [
     size: "1280x720",
     tier: "rich",
   },
+  {
+    // cellular — UNJUDGED, and not a choice: the system ships no preset yet,
+    // so its slot renders the teaching preset the guide prints for the
+    // life_like family, the system's first. Swap it for a shipped world when
+    // the content lane lands one.
+    out: "docs/images/gallery/cellular.png",
+    presetFile: "docs/examples/cellular/life_like.toml",
+    signal: "dynamic:110",
+    hop: 300,
+    size: "1280x720",
+    tier: "rich",
+  },
 
   // --- the gallery: one card per shipped preset ---------------------------
   ...CARDS.map((preset) => ({

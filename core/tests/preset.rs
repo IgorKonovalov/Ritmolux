@@ -1960,6 +1960,10 @@ fn declared_params_match_set_param() {
             src.join("render/scenes/analytic_field/mod.rs"),
             SystemKind::AnalyticField.param_names(),
         ),
+        (
+            src.join("render/scenes/cellular/mod.rs"),
+            SystemKind::Cellular.param_names(),
+        ),
         // The global compositing stages, declared the same way.
         (
             src.join("render/background.rs"),
@@ -2188,6 +2192,11 @@ const STRUCTURAL: &[(&str, &str)] = &[
     // `analytic_field::applied_iterations`: clamps into the tier's cap and
     // rounds, because the budget is a loop bound.
     ("analytic_field", "iterations"),
+    ("cellular", "palette_steps"),
+    // `cellular::applied_rule`: clamps into the nine-bit range and rounds,
+    // because a rule is a bitmask and a fractional one names no neighbour count.
+    ("cellular", "birth"),
+    ("cellular", "survive"),
     // `fold_order` / `fold_edge`: the kaleidoscope's two stepped params.
     ("kaleidoscope", "kaleido_order"),
     ("kaleidoscope", "kaleido_edge"),
