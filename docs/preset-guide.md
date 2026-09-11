@@ -75,10 +75,10 @@ the params then animate it.
 ## 2. The systems
 
 One image each, captured under the same stimulus at the same moment in the clip, so they are
-comparable. Each is a real shipped preset — the file name is under the picture — except where a
-system or a family has none yet, and there the picture renders a teaching preset instead:
-`parametric_curve` adds four more, one per curve family beyond the rose, and `analytic_field` and
-`cellular` ship no preset at all, so all five of their pictures are teaching presets. The
+comparable. Each is a real preset, and the file name is under the picture: a `presets/` name is a
+shipped preset, while a `docs/examples/` name is a teaching preset, written to show one family
+plainly and never shipped. The families of `parametric_curve`, `analytic_field` and `cellular` are
+pictured that way, one teaching preset each, so each picture shows its family and nothing else. The
 **parameter reference** — every parameter of every
 system, with its default, the range that reads and what it does — is
 [`../presets/README.md`](../presets/README.md).

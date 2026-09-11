@@ -79,6 +79,8 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0207 — the cap-recovery line says "geometry is back within the segment cap" for every context, and three of the five are not geometry](#0207--the-cap-recovery-line-says-geometry-is-back-within-the-segment-cap-for-every-context-and-three-of-the-five-are-not-geometry)
 - [0208 — a system count written into prose goes stale on the next system, and fourteen places have now carried one](#0208--a-system-count-written-into-prose-goes-stale-on-the-next-system-and-fourteen-places-have-now-carried-one)
 - [0209 — the studio's schema walks pass in CI by walking nothing, because the CI job builds no player](#0209--the-studios-schema-walks-pass-in-ci-by-walking-nothing-because-the-ci-job-builds-no-player)
+- [0210 — `--horizon` takes its ground from frame 0's corner pixel, and on a seeded cellular field that pixel can be a live cell, so a dead field reads as fully covered](#0210----horizon-takes-its-ground-from-frame-0s-corner-pixel-and-on-a-seeded-cellular-field-that-pixel-can-be-a-live-cell-so-a-dead-field-reads-as-fully-covered)
+- [0211 — the `larger_than_life` default rule stops moving within a minute on the shipped preset's grid, while the test that chose it runs a grid half that size](#0211--the-larger_than_life-default-rule-stops-moving-within-a-minute-on-the-shipped-presets-grid-while-the-test-that-chose-it-runs-a-grid-half-that-size)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -4149,3 +4151,98 @@ parameter reference.
 **Medium.** Nothing is broken today — the walks pass on the development machine. But the next
 engine change that adds a structural kind the studio cannot edit will reach `main` green, and the
 first person to notice will be an author in the editor.
+
+## 0210 — `--horizon` takes its ground from frame 0's corner pixel, and on a seeded cellular field that pixel can be a live cell, so a dead field reads as fully covered
+
+`measure` in `standalone/src/shot/horizon.rs` samples the background once, from the top-left pixel
+of the first captured image, and holds it for every row. That is deliberate, and its comment says
+why: re-sampling per row would let the mask move under the statistics. The first image is frame 0
+(`sample_frames` starts there). For every other system frame 0's corner is ground. A cellular world
+is the exception: frame 0 is the seed soup, and at `larger_than_life`'s 50 % density the corner is a
+live cell about half the time.
+
+When it is, the ruler is inverted. Measured 2026-09-11 on `cellular_tide_bugs` with
+`reseed = "0"`, `trail = "0"` and `step_rate = "12"`, run as `--horizon 3 --interval 30 --size 96x96`.
+The frame-0 corner is `(169, 188, 186)`, a live cell. By 60 s the field has frozen into about thirty
+small rings on black, and the horizon prints coverage **0.9818** for every row from 60 s on.
+Re-measuring that 60 s frame against its own black corner, at the same `eps = 10`, gives **0.0182**.
+The two numbers are complements: the table counted the black as figure and the rings as ground.
+
+Coverage is not the only statistic that reads through this ground. `footprint_diff` and
+`peak_to_mean` take the same `bg`, so the footprint mask was about 98 % of the frame rather than
+about 2 %, and any motion inside it would be averaged over roughly fifty times the pixels it should
+be. That half was not measured: this run's field froze, so its footprint reads zero under either
+mask.
+
+It matters because cellular is the kind of world
+[ADR-0099](adrs/0099-the-show-length-horizon-is-a-spot-check-and-it-splits-in-two.md) names as the
+horizon's trigger: a population that can pile up or die out. The one horizon verdict recorded so far,
+in `presets/cellular_tide_bugs.toml`'s header (*"motion 0.000 from 60 s on"*), stands, because a
+frozen field is zero under any mask. But a coverage trend read on a cellular world today depends on
+which colour the seed happened to put at one pixel, and nothing in the table says which.
+
+Per-row re-sampling is rejected in the code for a good reason, so it is not the fix. The candidates:
+
+- take the ground from something known to be ground, such as the scene's clear colour, which widens
+  what the shell asks of the core;
+- take frame 0's modal colour rather than its corner, which a soup at or above 50 % breaks again;
+- keep the ruler, and have the horizon warn when frame 0's corner is not frame 0's modal colour.
+
+`--report` uses the same corner convention (`standalone/src/shot/report.rs`) but samples the frame it
+scores, a late one, so it is exposed only when that frame's own corner is lit. Its exposure on the
+cellular presets was not checked.
+
+- **Raised:** 2026-09-11, in the triage after the first cellular presets landed (`10c0d2a`).
+  **Owner if taken:** `architect` for the ground source, then `dev`.
+- **Verified 2026-09-11** — the ground is still sampled once, from frame 0's corner:
+  `present: images\.first\(\)\.map_or\(\[0, 0, 0, 255\], corner\) in: standalone/src/shot/horizon.rs`
+- **Verified 2026-09-11** — the misreading itself needs a GPU render:
+  `unprobeable: the 0.9818-against-0.0182 split is a rendered measurement, reproduced by the command above`
+
+### Priority
+
+**Medium.** No recorded verdict is wrong today. But the instrument this project names for exactly
+this kind of world gives an inverted coverage reading on about half the seeds, and the table does not
+say which half a run landed in.
+
+## 0211 — the `larger_than_life` default rule stops moving within a minute on the shipped preset's grid, while the test that chose it runs a grid half that size
+
+[Plan 0164](plans/done/0164-the-cellular-system.md) Phase 3 chose the default rule (radius 5,
+`birth_lo = 0.28`, `birth_hi = 0.385`, `survive_lo = 0.26`, `survive_hi = 0.47`) from a sweep,
+because Bosco's rule froze. The property it was chosen for is held by
+`larger_than_life_is_still_moving_after_two_thousand_generations` in
+`core/src/render/scenes/cellular/tests.rs`: on a 128-cell torus, from salts 12 and 13, more than 50
+cells differ between generation 2,000 and generation 2,060. The plan's log records 134 to 149 cells,
+which is under 1 % of the 16,384.
+
+On the one shipped `larger_than_life` world it does not hold. Measured 2026-09-11 in the same run as
+0210: `cellular_tide_bugs`'s own field (grid 256, generator seed 23) with reseed and trail off, at 12
+generations a second. Footprint reads 0.3603 at 30 s, 0.0015 at 60 s, and 0.0000 at every row from
+90 s to 180 s. At 60 s, about 720 generations in, the frame is about thirty small rings on black.
+Rows are 360 generations apart, so a zero allows still lifes or oscillators whose period divides
+360; nothing travels either way. The preset's own header measured the same over ten minutes, and it
+reseeds at least every 5 s to work around it.
+
+So the test shows one grid and seed where the rule sustains, and the shipped preset shows one where it
+does not. Neither says which is typical, and the two readings want different fixes:
+
+- **The default should sustain** on any grid and seed a preset is likely to use. Then the sweep is
+  redone at 256 over more seeds, and the test runs at the grid presets ship on.
+- **Sustaining is not something a default owes.** Then the rule stays, the test's name and doc stop
+  claiming the property for the family, and the parameter reference says a `larger_than_life` world
+  with no reseed settles. An author then reaches for `reseed` on purpose rather than finding out over
+  a ten-minute horizon, which is how Tide Bugs found out.
+
+- **Raised:** 2026-09-11, in the triage after the first cellular presets landed (`10c0d2a`).
+  **Owner if taken:** `architect` for which reading, then `dev`.
+- **Verified 2026-09-11** — the default is still the rule that froze:
+  `present: default: 0\.385, in: core/src/render/scenes/cellular/mod.rs`
+- **Verified 2026-09-11** — and the test still claims the property for the family:
+  `present: fn larger_than_life_is_still_moving_after_two_thousand_generations in: core/src/render/scenes/cellular/tests.rs`
+- **Verified 2026-09-11** — the freeze itself needs a GPU render:
+  `unprobeable: the footprint series is a rendered measurement, reproduced by the command in 0210`
+
+### Priority
+
+**Low.** The one shipped world already works around it, and its look is sound. The cost is the next
+author's ten minutes, and a test whose name promises more than it measures.
