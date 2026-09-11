@@ -257,7 +257,7 @@ pub struct CellularConfig {
 | 3 — `larger_than_life` | dev | done | 4fcb75b, 1d74d0b |
 | 4 — `cyclic` | dev | done | 8aed06f |
 | 5 — tier cap, golden, determinism | dev | done | 1dd4b0f |
-| 6 — documentation and the reference | dev | done | committed with this row |
+| 6 — documentation and the reference | dev | done | a6a1392 |
 
 ### Notes
 
@@ -375,16 +375,27 @@ pub struct CellularConfig {
   family=` (0163's review flagged the same line for `analytic_field`); `docs/presets.md`'s
   "one or more presets for every built-in system" line is false for `analytic_field` and
   `cellular`; `core/src/render/scenes/common.rs` still says "Twelve systems".
+- Risks' backlog 0142 item ("confirm the symptom is the known one"): **not confirmed in this
+  lane** - no test drives a same-system dissolve of this scene. By construction `update`
+  integrates the frame's stored `dt` into the generation clock, so a second `update` in one frame
+  would run the frame's generations twice; the reseed edge would not fire twice, since the first
+  call records the level. Carried as the on-device look item above.
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** yes - `presets/README.md` only (the generated parameter block and its
+  contents block, regenerated in Phases 1-4). No preset `.toml` was added or changed.
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** feature - a new system, `cellular`, with three families (`life_like`,
+  `larger_than_life`, `cyclic`), the age channel, and two new `TierConfig` caps.
+- **Operator docs touched:** `docs/presets.md`, `docs/preset-guide.md`,
+  `docs/on-device-validation.md`, `presets/README.md` (generated). Not touched: `docs/capturing.md`
+  (see Notes).
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 - 122 stated reductions hold
+  across 53 live entries, 11 unprobeable.
+- **Full suite:** `cargo nextest run --workspace` on `a6a1392`, this machine's DX12 WARP adapter -
+  exit 0, 1795 tests run, 1795 passed (13 slow), 6 skipped, 492.2 s.
+- **Outstanding `human` phases:** none.
 
 ## Followups (after this lands)
 
