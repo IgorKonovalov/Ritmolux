@@ -173,6 +173,21 @@ footprint so the vendor spread is on record.
       constant moved there in Plan 0044) — and per Plan 0043's own risk bullet that is a **look
       decision that routes back to `architect`**, not a constant to quietly lower. _(Plan 0043
       Phase 3's done-when, extracted at that plan's close.)_
+- [ ] **The analytic field's escape-time budget, on the low-end box, 1080p.** Plan 0163 added
+      `analytic_field`, a fullscreen per-pixel loop whose cost is `iterations` per pixel on every
+      pixel of the set's interior, and capped it per tier with `TierConfig::FLOOR.field_iterations`
+      = **64** — a number taken from **arithmetic, not a measurement** (the field's doc comment in
+      `core/src/render/tier.rs` carries it). No shipped preset draws the system yet, so point
+      `RLX_PRESET_DIR` at `docs/examples/field/` and load **`escape_time.toml`**; then write the
+      heaviest frame the cap allows beside it — the same file with `zoom = "3"`, `pan_x = "-0.2"`,
+      so the set's interior fills the window and every pixel runs all 64 steps. Overlay on (`F3`),
+      report **(a)** whether fps holds ≥ 60 @ 1080p on both, and **(b)** the p99. Load
+      **`chladni.toml`** too: it is a closed form with no loop and should be the cheapest system in
+      the engine, which is worth one line confirming. **If the heavy frame misses, the lever is
+      `TierConfig::FLOOR.field_iterations`** — and lowering it changes what an escape-time preset
+      *looks like* on this tier, not just how dense it is, so it routes to `architect` with the
+      number rather than being quietly lowered. _(Plan 0163 Phase 4 set the cap without target
+      hardware; this is where the measurement comes from.)_
 - [ ] **Frame-time p99 with the debug overlay on, any box.** Plan 0030 put the three post stages
       behind a `PostStage` trait, so a rendered frame now costs ~4 vtable calls plus ~4 `TextureView`
       Arc bumps it did not before. Expected to be unmeasurable against a render pass, but it was
@@ -357,6 +372,17 @@ not run at the plan's close, so the rich tier currently ships numbers nobody has
       `[quality] tier`, so remember to set it back (or pass `--tier`, which still wins at launch)
       before running anything that assumes the default. Plan 0050's own Phase 6 item 3 asks for
       exactly this measurement; whichever runs first satisfies both.
+- [ ] **The analytic field at `Rich`'s iteration cap, on the discrete GPU, native fullscreen.**
+      `TierConfig::RICH.field_iterations` = **512**, the top of `iterations`' declared range,
+      provisional like every field above. Load the heavy escape-time frame from the low-end item
+      above with `iterations = "512"` and `--tier rich`, and report **(a)** whether it holds the
+      display's refresh rate and **(b)** the p99. Then let it run **unpinned** (`(auto)` in the
+      `S` menu) on a frame that misses: the governor demotes on a sustained miss, and on this one
+      system a demotion is **visible as content** — the set's boundary loses detail when the budget
+      drops to 64, where every other system only loses density. The standalone prints both the
+      demotion and the clamp that follows it; say whether that change reads as a defect on screen.
+      **If it does, that is an `architect` call**, not a constant to lower. _(Plan 0163's own risk
+      register names this as worth watching on the on-device pass.)_
 
 ## Runnable now — the foobar2000 component's clean-profile install (Plan 0102 Phase 5)
 

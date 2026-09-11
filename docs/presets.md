@@ -121,6 +121,8 @@ Beyond `[params]`, a preset may carry optional tables — `[curve]` / `[generato
 sample density),
 `[path]` (an authored silhouette for the shape field, as inline SVG path data —
 summarised [below](#the-path-table)),
+`[field]` (which closed-form world the analytic field draws, and for escape time
+its map and orbit trap — [below](#the-field-table)),
 `[spectrum]` (the readout's element count, layout and per-element easing —
 summarised [below](#the-spectrum-table)), `[feedback]` (how an accumulation reads
 its own past — [below](#the-feedback-table)), `[smoothing]` (per-parameter
@@ -172,6 +174,7 @@ that table is maintained alongside the presets and is the authoritative list.
 | `shape_field` | One mark silhouette drawn at frame scale as a signed-distance field, so banding the palette draws concentric offset contours. |
 | `warp_mesh` | The previous frame, resampled through a grid with **one transform per vertex** — the only system that draws nothing of its own. |
 | `shape_collage` | Flat opaque elements on their own off-white paper, composited in painter order — the only system in which one object is genuinely *in front of* another, and the only one that draws a graphic rather than light. |
+| `analytic_field` | A fullscreen closed-form function of position from one of two families — the Chladni plate's nodal lines, or an escape-time Julia or Mandelbrot set with optional orbit traps ([below](#the-field-table)). |
 
 **There is deliberately no per-system preset count here.** A count re-drifts every time
 a preset is added and nothing fails when it does. `presets/` is the list; `ls presets/*.toml`
@@ -287,6 +290,73 @@ Three things about the table are worth saying out loud:
 The range that reads for each of these parameters **on each family** is printed in the
 `parametric_curve` table of [`presets/README.md`](../presets/README.md), which also marks every
 family a parameter is inert on.
+
+### The `[field]` table
+
+An `analytic_field` preset draws one closed-form function of position across the whole frame —
+no state between frames, nothing accumulated, the picture a pure function of this frame's
+bindings. `[field]` picks which function:
+
+```toml
+system = "analytic_field"
+
+[field]
+family = "escape_time"   # "chladni" or "escape_time"; any other name is a load error
+map    = "julia"         # escape_time only: "julia" (the default) or "mandelbrot"
+trap   = "cross"         # escape_time only: "none" (the default), "point", "line", "cross", "circle"
+```
+
+All three keys are read once, at load, and are **not bindable**. A preset with no `[field]` table
+draws the Chladni plate. `map` or `trap` on the `chladni` family is a load error rather than a
+silent no-op — the plate has no orbit for either to act on.
+
+The two families share one parameter surface, following
+[ADR-0180](adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md):
+every parameter below is read by **one family only** and does nothing on the other. The colour and
+framing parameters — `color_span`, `color_center`, `brightness`, `hue`, `zoom`, `pan_*` and the
+shared palette block — read the same on both.
+
+| `family` | The figure | Structural | Modal |
+|---|---|---|---|
+| `chladni` | The nodal lines of a square plate: the zero set of `cos(n π x) cos(m π y) − cos(m π x) cos(n π y)` | `mode_n`, `mode_m` | `line_width`, `plate_mix` |
+| `escape_time` | `z → z^power + c` iterated to an escape radius, coloured by the smooth iteration count | `iterations` | `c_re`, `c_im`, `escape_radius`, `power`, `interior`, `trap_radius`, `trap_rotate` |
+
+What each family does with them:
+
+- **`chladni` — the figure is two whole numbers.** `mode_n` and `mode_m` are rounded before the
+  plate sees them, because a fractional mode is not a standing wave of the plate at all. **Equal
+  modes cancel** and the plate goes blank. The plate spans the frame's short axis at `zoom = 1`
+  and stays square at any window shape. `line_width` is the band's width in plate units, the same
+  number of pixels wherever the lines run; `plate_mix` blends from the lines alone toward the whole
+  signed wave. A mode bound to audio re-picks the figure on every frame — bind it through
+  [`[hold]`](#the-hold-table--re-sample-on-a-musical-edge-hold-in-between) so it changes on the
+  beat or the bar instead.
+- **`escape_time` — `c` is the lever.** On the `julia` map, `c_re` and `c_im` are the constant, and
+  moving `c` from inside the Mandelbrot set to outside it takes the figure from one connected piece
+  to scattered dust — a bass-driven `c_re` does exactly that on the music. On the `mandelbrot` map
+  the pixel is `c` and both are inert. `power` above `2` adds lobes; a **fractional** power tears
+  the figure along the negative real axis, so reach for whole numbers unless the seam is the look.
+  `interior` is the light of the set itself (`0` is the textbook black).
+- **`escape_time` colours continuously.** The palette follows the *smooth* iteration count, so the
+  boundary reads as a glow rather than as contour steps, and one iteration spans a fixed 1/32 of
+  the palette at `color_span = 1` — raising `iterations` never recolours a pixel that escaped
+  early. Band it deliberately with `palette_steps`, as on any other system.
+- **A `trap` recolours by nearness.** With a trap, a pixel takes the palette at the **smallest
+  distance its orbit came to the trap shape** instead of at its escape count — which is what draws
+  filaments, rings and stained-glass cells. Every shape sits `trap_radius` from the origin
+  (the circle's radius, the line's offset, the point's and the cross's distance) and turns by
+  `trap_rotate` in whole turns, which is inert on a `circle`. `trap = "none"` draws exactly the
+  untrapped picture.
+
+**`iterations` is capped by the quality tier.** A tier that chose the count would make one preset
+two different pictures, so the preset asks and the tier bounds: the Floor tier allows 64, the Rich
+tier 512. A preset asking within 64 renders identically on both. One asking for more is drawn at
+the cap and **says so** — the standalone prints which preset asked for how many and what it was
+drawn at, the same way it reports a segment cap or a tier demotion. Author against 64 unless the deep look is
+the point.
+
+The range that reads for each parameter, and the family it is inert on, is printed in the
+`analytic_field` table of [`presets/README.md`](../presets/README.md).
 
 ### The `[path]` table
 
@@ -1405,8 +1475,9 @@ that merely waste a line. Neither ever crashes a running visual (NFR 10).
 - An expression that fails to compile — an unknown identifier, a bad number, a
   wrong argument count, an unbalanced parenthesis, a stray character.
 - An invalid structural table (`[curve]`, `[generator]`, `[particles]`, `[path]`,
-  `[spectrum]`, `[palette]`, `[smoothing]`, `[latch]`) - including a `[path] d`
-  the parser refuses, which names the character offset it stopped at.
+  `[spectrum]`, `[field]`, `[palette]`, `[smoothing]`, `[latch]`) - including a `[path] d`
+  the parser refuses, which names the character offset it stopped at, and a `[field] map` or
+  `trap` on a family that has no orbit.
 
 **Warnings — the preset still loads and renders:**
 

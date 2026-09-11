@@ -244,8 +244,8 @@ documents), so this scene keeps its LUTs in their own bind group exactly as that
 | 1 — the system, and Chladni through it | dev | done | 65d57d4 |
 | 2 — the escape-time family | dev | done | 232afb3 |
 | 3 — orbit traps | dev | done | 9ae4650 |
-| 4 — the tier cap and the golden regime | dev | done | committed with this row |
-| 5 — documentation and the reference | dev | not started | |
+| 4 — the tier cap and the golden regime | dev | done | cf11972 |
+| 5 — documentation and the reference | dev | done | committed with this row |
 
 ### Notes
 
@@ -317,6 +317,16 @@ documents), so this scene keeps its LUTs in their own bind group exactly as that
   fixture byte-identically, and the stable regime is asserted as a structural statistic (ADR-0071)
   - no pixel escapes in the second half of the 48-step budget, against 0.23 of the frame at a
   control `c` just past the cardioid's cusp.
+- Phase 5, `presets/README.md`'s contents block was stale from Phase 1 through Phase 4: each of
+  those commits regenerated the parameter block (adding a `### System: analytic_field` heading)
+  without running `node scripts/toc.mjs`, so `toc.mjs --check` would have failed on 65d57d4,
+  232afb3, 9ae4650 and cf11972. Regenerated in this phase's commit.
+- Phase 5, the guide's two pictures are `docs/images/gallery/analytic_field.png` (the `chladni`
+  family, from Phase 1) and a new `docs/images/field/escape_time.png`, both rendered from teaching
+  presets under `docs/examples/field/` because no shipped preset draws the system; rendered one at
+  a time with the manifest entry's exact `shot` line, not by re-running the whole
+  `scripts/docs-shots.mjs` sweep. `docs/preset-guide.md` also lost two statements the new system
+  made false ("All twelve systems have one", `shape_collage` as "The newest system").
 
 ### Close triggers
 

@@ -84,6 +84,7 @@ headroom as headroom.
   - [System: `shape_field`](#system-shape_field)
   - [System: `warp_mesh`](#system-warp_mesh)
   - [System: `shape_collage`](#system-shape_collage)
+  - [System: `analytic_field`](#system-analytic_field)
   - [Engine stage: `background`](#engine-stage-background)
   - [Engine stage: `trails`](#engine-stage-trails)
   - [Engine stage: `kaleidoscope`](#engine-stage-kaleidoscope)

@@ -65,7 +65,8 @@ Four things are worth naming, because they are the whole model:
   dead, and step 3 of the [walkthrough](preset-tuning-walkthrough.md) is about exactly that.
 
 Some systems also take a **structural table** — `[curve]` here, `[generator]` for the two generator
-systems, `[particles]` for the attractor, `[spectrum]` for the readout. Those are declarative
+systems, `[particles]` for the attractor, `[spectrum]` for the readout, `[field]` for the analytic
+field. Those are declarative
 configuration read once when the preset loads, **not** expressions: they choose *which figure*, and
 the params then animate it.
 
@@ -74,9 +75,10 @@ the params then animate it.
 ## 2. The systems
 
 One image each, captured under the same stimulus at the same moment in the clip, so they are
-comparable. Each is a real shipped preset — the file name is under the picture. All twelve systems
-have one, and `parametric_curve` adds four more, one per curve family no shipped preset draws yet,
-rendered from teaching presets instead. The **parameter reference** — every parameter of every
+comparable. Each is a real shipped preset — the file name is under the picture — except where a
+system or a family has none yet, and there the picture renders a teaching preset instead:
+`parametric_curve` adds four more, one per curve family beyond the rose, and `analytic_field` ships
+no preset at all, so both of its pictures are teaching presets. The **parameter reference** — every parameter of every
 system, with its default, the range that reads and what it does — is
 [`../presets/README.md`](../presets/README.md).
 
@@ -292,7 +294,7 @@ tilted and overlapping on a warm off-white ground](images/gallery/shape_collage.
 
 *`presets/collage_suprematist.toml`*
 
-The newest system. It is the engine's only **graphic** world rather than a luminous one.
+It is the engine's only **graphic** world rather than a luminous one.
 Every other system emits additive light, which has no notion of one object being in front of
 another — a black bar over a red one simply adds. This one *paints*: each pixel starts at the
 **paper** colour and walks an array of flat elements in array order, compositing each with `over`,
@@ -303,6 +305,38 @@ vocabulary rather than an omission.
 and constructivist canvases, poster shapes, anything where solid opaque forms overlap. The one
 authoring fact is that the palette stays under linear `0.6` — see
 [`preset-palettes.md`](preset-palettes.md#flat-colour-on-shape_collage--stay-under-the-knee).
+
+### `analytic_field`
+
+![A Chladni plate: pale blue lines on dark navy forming diagonal crosses through a central wheel,
+with a rounded triangle loop sitting in every cell between them](images/gallery/analytic_field.png)
+
+*`family = "chladni"` — [`docs/examples/field/chladni.toml`](examples/field/chladni.toml)*
+
+One fullscreen pass that computes a **closed-form function of position** — no state, no geometry,
+nothing accumulated, so every frame is exactly what this frame's bindings say. A `[field] family`
+line picks which function, and each family is a whole mathematical world with its own parameters.
+
+The picture above is the **Chladni plate**: the lines where sand settles on a vibrating square
+plate, for two whole mode numbers. Change a mode and the whole figure re-forms, so the family most
+rewards a `[hold]` on the bar — the example holds its second mode that way, stepping it with the
+bass.
+
+![A Julia set glowing cream and amber against a dark umber ground: a chain of spiralling lobes
+stretched across the frame, each ringed by fine filigree, with two dark eyes where the set's
+interior shows](images/field/escape_time.png)
+
+*`family = "escape_time"` — [`docs/examples/field/escape_time.toml`](examples/field/escape_time.toml)*
+
+**Escape time**: the Julia and Mandelbrot sets, coloured by a smooth count so the boundary glows
+rather than bands. On a Julia set the constant `c` is the lever — the bass here nudges it — and
+carrying it outside the Mandelbrot set breaks the figure into dust. An orbit `trap` recolours the
+set by how near each point's orbit passed a point, line, cross or circle, which is where filaments
+and stained-glass cells come from.
+
+**Reach for this when** the look is mathematics you can name: cymatic figures, fractal boundaries,
+orbit-trap filigree. Which parameter belongs to which family, and what the quality tier does to
+`iterations`, is the [`[field]` table](presets.md#the-field-table) in the grammar reference.
 
 ---
 

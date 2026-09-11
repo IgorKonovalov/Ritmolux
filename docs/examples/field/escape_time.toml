@@ -1,0 +1,24 @@
+# The `escape_time` family of the analytic field, for the illustrated guide's
+# picture of it. Teaching material, not a shipped preset: a Julia set whose
+# constant the bass nudges along the real axis, inside the Floor tier's
+# iteration budget, coloured by the smooth count so the boundary glows.
+system = "analytic_field"
+name = "Julia -0.8 + 0.156i"
+
+[field]
+family = "escape_time"
+map    = "julia"
+
+[palette]
+name = "ember"
+
+[params]
+c_re          = "-0.8 + clamp(bass * 0.04, 0, 0.04)"
+c_im          = "0.156"
+iterations    = "64"
+escape_radius = "32"
+interior      = "0.08"
+zoom          = "0.72"
+color_span    = "1.1"
+color_center  = "-0.06"
+brightness    = "1.3"

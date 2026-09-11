@@ -299,6 +299,20 @@ const IMAGES = [
     tier: "rich",
   })),
 
+  // --- the analytic field's families beyond the plate ----------------------
+  //
+  // The gallery entry below pictures `chladni`; this pictures `escape_time`,
+  // from a teaching preset for the curves' reason - no shipped preset draws
+  // it yet. Filed OUTSIDE docs/images/gallery/ for the same reason too.
+  {
+    out: "docs/images/field/escape_time.png",
+    presetFile: "docs/examples/field/escape_time.toml",
+    signal: "dynamic:110",
+    hop: 300,
+    size: "1280x720",
+    tier: "rich",
+  },
+
   // --- the gallery: one per SystemKind ------------------------------------
 
   {
