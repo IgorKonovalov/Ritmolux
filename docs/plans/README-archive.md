@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0162 - The curve families](#0162---the-curve-families)
   - [0168 - The studio stops surprising the author](#0168---the-studio-stops-surprising-the-author)
   - [0159 - The studio opens](#0159---the-studio-opens)
   - [0161 - The structural parameter is held](#0161---the-structural-parameter-is-held)
@@ -194,6 +195,32 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0162 - The curve families](done/0162-the-curve-families.md)
+
+- closed 2026-09-11, in an unattended batch run on `batch/2026-09-11`. Six `dev` phases:
+`997f7c5` (1, the family seam and Lissajous), `1e23aef` (2, hypotrochoid and epicycloid), `792525a`
+(3, the superformula), `6376e88` (4, the harmonograph), `caeb435` (5, per-family ranges in the
+generated reference), `e69efb2` (6, the documentation sweep). Review: **no blockers, no majors, four
+minors, two nits.** Version: **0.117.0** (minor - a feature plan). ADR-0180 took a dated addendum
+to its Outcome.
+
+**The full suite was re-run at the close and matched the log**: `cargo nextest run --workspace`,
+1734 passed, 6 skipped, 445.2 s, exit 0. Clippy, fmt and `cargo doc` clean.
+
+**The seam is the plan's real deliverable.** `parametric_curve` no longer names a family: each is a
+`FamilyArm` in `curves.rs` - a walk, a fit verdict and a polyline - so the next curve family is a
+variant and an arm. The superformula's finiteness holds by construction rather than by a clamp on
+the output (the radius is a logarithm divided by its peak), and the test sweeps the exponents' poles.
+Phase 4 found and fixed a Phase 1 closure defect: a trace starting and ending at the origin - every
+damped harmonograph at `phase = 0` - was being joined into a loop, so closure now also asks that the
+trace carry on the way it began.
+
+**What outlived the plan.** The studio's sliders still read one range per parameter, so a
+hypotrochoid's negative `n` is unreachable by gesture - backlog 0204, a schema question. The
+`preset-author` skill's references still say the rose is the only family; the batch session could not
+write `.claude/`, so that sweep is owed. No shipped preset draws the four new families; thirteen
+unjudged candidates sit in `presets/proposed/`, outside this plan.
 
 ### [0168 - The studio stops surprising the author](done/0168-the-studio-stops-surprising-the-author.md)
 

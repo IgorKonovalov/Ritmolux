@@ -1,9 +1,9 @@
 # 0180 — A mathematical world joins a system as a family, and a structural parameter is quantized and held
 
-> **Status:** accepted 2026-09-10 (Plan 0161 built rules 2 and 4; rules 1 and 3 await Plans 0162-0164) - carries an Outcome
+> **Status:** accepted 2026-09-10 (Plan 0161 built rules 2 and 4; Plan 0162 built rule 1 for the curves; rule 1's two new systems and rule 3 await Plans 0163-0164) - carries an Outcome
 > **Date:** 2026-09-09
 > **Related plan(s):** [0161](../plans/done/0161-the-structural-parameter-is-held.md),
-> [0162](../plans/0162-the-curve-families.md),
+> [0162](../plans/done/0162-the-curve-families.md),
 > [0163](../plans/0163-the-analytic-field.md),
 > [0164](../plans/0164-the-cellular-system.md)
 > **Builds on:** [ADR-0007](0007-line-geometry-generators.md) (the `CurveFamily` seam),
@@ -254,3 +254,17 @@ works**: `n = "3 + floor(bass * 5)"` carries the author's own `floor`.
 
 One consequence of that narrowness is that `ParamKind::quantize` is currently a no-op on every row
 it reaches, so no test can distinguish it working from it being absent - design-backlog 0197.
+
+### Addendum (2026-09-11, Plan 0162's close)
+
+**Rule 1 is built for the curves.** Lissajous, hypotrochoid, superformula and harmonograph are
+`CurveFamily` arms on `parametric_curve`, and none of them edited the scene: a family is a walk and a
+fit verdict inside `curves.rs`. The two new systems rule 1 places are still Plans 0163 and 0164.
+
+**Rule 4's family clause now has something to apply to, and was built wider than it asks.** The rule
+names the family each *structural* parameter reads on; `sym` is the first such parameter, and the
+generated reference names it. The implementation also prints per-family ranges and inert families
+for the eight Modal parameters (`n`, `d`, `phase`, `radial_offset`, `pen`, `sharpness`, `lobe`, `decay` -
+every row whose meaning moves with the family), because a Modal `n` that reads `1..24` on one family
+and `-8..8` on another is the same legibility problem. The exported schema was deliberately left at
+one range per parameter, so the studio does not yet see the per-family range - design-backlog 0204.

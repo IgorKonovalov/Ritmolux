@@ -73,6 +73,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0198 — `deposit_arms` tears along the branch cut at a fractional value, and nothing rounds it](#0198--deposit_arms-tears-along-the-branch-cut-at-a-fractional-value-and-nothing-rounds-it)
 - [0202 — `preset_warning` carries no position at all, so the one problem class an author cannot see in the file tab is the one the system picker produces by the dozen](#0202--preset_warning-carries-no-position-at-all-so-the-one-problem-class-an-author-cannot-see-in-the-file-tab-is-the-one-the-system-picker-produces-by-the-dozen)
 - [0203 — the smoke run captured from a microphone while the default is loopback, and nobody established why](#0203--the-smoke-run-captured-from-a-microphone-while-the-default-is-loopback-and-nobody-established-why)
+- [0204 — the studio's sliders read one range per parameter, so a curve family's own range is unreachable from them](#0204--the-studios-sliders-read-one-range-per-parameter-so-a-curve-familys-own-range-is-unreachable-from-them)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -3900,3 +3901,37 @@ defect worth a plan. Nothing has established which.
 **Medium**, and asymmetric: reading one config file may close it in a minute, and the branch it
 cannot close — a silent fallback to the wrong endpoint — would be a defect every user hits without
 knowing.
+
+## 0204 — the studio's sliders read one range per parameter, so a curve family's own range is unreachable from them
+
+[Plan 0162](plans/done/0162-the-curve-families.md) gave `parametric_curve` five families that read
+`n`, `d` and `phase` differently, and printed each family's range in the generated reference through
+a `FAMILY_PARAMS` table. It deliberately left the **exported schema** alone: each of those nine
+parameters still carries one `range` pair, the rose's where the rose reads it. `ParamRow.tsx` builds
+its slider from exactly that pair.
+
+So in the studio, on a curve preset: `d` on a Lissajous is a `1`–`360` slider whose useful travel is
+`1`–`12`, three percent of it; `n` on a hypotrochoid is a `1`–`24` slider that **cannot reach a
+negative value**, so the epicycloid — half of that family — is unreachable by gesture; and all five
+single-family levers (`pen`, `sym`, `sharpness`, `lobe`, `decay`) show on every family, including
+the four each is inert on. Nothing is wrong in the player, and the reference is truthful; the gap is
+that the studio cannot see what the reference says.
+
+The shape of a fix is a protocol question, not a studio shim: either the schema grows a per-family
+range (a `SCHEMA_VERSION` question under spec 0003) or the studio learns the family and asks for it.
+The `attractor`'s `a`..`d` are the same class and were never family-ranged either, so a fix should
+cover both.
+
+- **Raised:** 2026-09-11, at Plan 0162's Mode 4 close review. **Owner if taken:** `architect` for
+  the schema shape, then `dev` for the export and `studio-builder` for the slider.
+- **Verified 2026-09-11** — the per-family table exists in the engine:
+  `present: pub const FAMILY_PARAMS in: core/src/render/scenes/lines/parametric.rs`
+- **Verified 2026-09-11** — and the schema export does not read it:
+  `absent: family_params in: core/src/preset/schema/export.rs`
+- **Verified 2026-09-11** — while the studio's slider takes its two ends from the one pair:
+  `present: const \[lo, hi\] = spec\.range in: studio/renderer/components/ParamRow.tsx`
+
+### Priority
+
+**Low.** No curve preset on the new families ships yet, and the studio edits the file as text as
+well as by slider; it becomes worth taking when the first such preset is curated into the set.

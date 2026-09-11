@@ -1,16 +1,19 @@
 # 0162 — The curve families
 
-> **Status:** in-progress
+> **Status:** done 2026-09-11 — six `dev` phases, `997f7c5` `1e23aef` `792525a` `6376e88`
+> `caeb435` `e69efb2`. Mode 4: **no blockers, no majors, four minors, two nits** (see
+> `## Close review`). Full `cargo nextest run --workspace` re-run at the close: 1734 passed,
+> 6 skipped, exit 0.
 > **Created:** 2026-09-09
 > **Owner skill(s):** dev
-> **Related ADRs:** [0180](../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md)
+> **Related ADRs:** [0180](../../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md)
 > (rule 1 — a new world joins a system as a family),
-> [0007](../adrs/0007-line-geometry-generators.md) (the `CurveFamily` seam this widens),
-> [0029](../adrs/0029-parametric-curve-shape-params.md) (which rejected the superformula on a
+> [0007](../../adrs/0007-line-geometry-generators.md) (the `CurveFamily` seam this widens),
+> [0029](../../adrs/0029-parametric-curve-shape-params.md) (which rejected the superformula on a
 > premise this plan spends),
-> [0098](../adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md) (the arc fit every new family
+> [0098](../../adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md) (the arc fit every new family
 > inherits for free)
-> **Depends on:** [0161](done/0161-the-structural-parameter-is-held.md) — the integer levers below are
+> **Depends on:** [0161](0161-the-structural-parameter-is-held.md) — the integer levers below are
 > worth binding only once `[hold]` exists.
 
 ## TL;DR
@@ -20,7 +23,7 @@
 existing `parametric_curve` scene, drawn through the same `LineRenderer`, coloured through the same
 palette, and — unlike the Maurer chord web — fitted to G1 arc chains by the biarc fitter that
 already exists, so they arrive smooth rather than faceted. This is
-[`generative-techniques-catalogue.md`](../generative-techniques-catalogue.md)'s number-one
+[`generative-techniques-catalogue.md`](../../generative-techniques-catalogue.md)'s number-one
 payoff-per-effort item, unbuilt since 2026-07-25.
 
 ## Context & problem
@@ -43,12 +46,12 @@ five draw the same figure with different numbers, which is a concrete instance o
 The seam to widen is already the right shape. `parametric.rs:525` and `:537` are two `match
 self.family` arms — one choosing the arc-fitted path, one the polyline fallback — so a family is a
 sampler plus a fit decision, not a new scene. And the arc fitter is generic over a sampled outline
-([ADR-0098](../adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md)); `biarc.rs:13` already
+([ADR-0098](../../adrs/0098-the-line-renderer-draws-arcs-as-per-pixel-distance-fields.md)); `biarc.rs:13` already
 breaks the chain at genuine corners, so a superformula's cusps survive it.
 
 The one thing that made this unattractive before is gone. ADR-0029 rejected the superformula as
-"more than the routed need" — [`roadmap-visual-richness.md`](../roadmap-visual-richness.md) replaced
-that premise, and [ADR-0180](../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md)
+"more than the routed need" — [`roadmap-visual-richness.md`](../../roadmap-visual-richness.md) replaced
+that premise, and [ADR-0180](../../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md)
 records the replacement as a decision.
 
 ## Decision
@@ -62,7 +65,7 @@ Parameter surface: `n`, `d` and `phase` are **reused** with family-specific mean
 `attractor` precedent where `a`..`d` mean different things per family
 (`particles/family.rs:84`), and four genuinely new levers join for the shapes that need them —
 `sym`, `sharpness`, `lobe`, `pen`, `decay`. Per
-[ADR-0180](../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md)
+[ADR-0180](../../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md)
 rule 4 the generated reference names the family each one reads on, so an inert parameter is visibly
 inert.
 
@@ -157,7 +160,7 @@ flowchart TD
   claim nothing holds — which is the exact posture `ParamSpec`'s own doc comment takes about
   unbounded parameters. The generated reference (ADR-0170) prints a per-family range for a parameter
   whose meaning is family-specific, alongside the Structural/Modal grouping
-  [0161](done/0161-the-structural-parameter-is-held.md) Phase 4 adds.
+  [0161](0161-the-structural-parameter-is-held.md) Phase 4 adds.
 - **Files touched:** the reference generator, `core/src/render/scenes/mod.rs` (whatever carries the
   per-family range), `presets/README.md` (regenerated).
 - **Done when:** `presets/README.md`'s `parametric_curve` table states `n`'s range per family, no
@@ -227,7 +230,7 @@ struct FamilySample {
 - **It does not touch `lsystem` or `star_pattern`**, the other two generator scenes.
 - **It does not author presets.** Four new families deserve worlds built on them; that is
   `preset-author`'s lane and it is the natural follow-on once this lands.
-- **It does not add `[hold]`** — that is [0161](done/0161-the-structural-parameter-is-held.md), which
+- **It does not add `[hold]`** — that is [0161](0161-the-structural-parameter-is-held.md), which
   this plan depends on.
 
 ## Implementation log
@@ -342,6 +345,81 @@ struct FamilySample {
 - **Full suite:** `cargo nextest run --workspace --no-fail-fast` - exit 0, 1734 passed (11 slow),
   6 skipped, 463.8 s.
 - **Outstanding `human` phases:** none - the plan has no `human` phase.
+
+## Close review
+
+> Mode 4, 2026-09-11, a fresh session, in an unattended batch run. **No blockers, no majors, four
+> minors, two nits.** Closed.
+
+**What was verified rather than read off the log.** The full suite was re-run over the finished tree:
+`cargo nextest run --workspace --no-fail-fast` gave **1734 passed, 6 skipped, 445.2 s, exit 0**,
+matching the log's bullet. `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt
+--check` and `cargo doc --workspace --no-deps` are clean; every Node gate passes. Every phase carries
+one in-vocabulary `**Owner skill:** dev` tag and there is no `human` phase. The commits between the
+phases touching only `presets/proposed/` (`74539d9`, `bedeefb`) are an overnight staging area outside
+this plan and were not reviewed as part of it.
+
+**The tests were read, and they state properties.** The 3:2 Lissajous is checked point by point
+against the formula and as one closed G1 chain, wrap included, with the inflection-line exception
+bounded by `asin(L / 2R)` rather than waved through. The spirograph is checked by exact five-fold
+symmetry and the construction's annulus; the `pen` sweep by continuity between steps and by exactly
+five kept corners at `pen = 1`; the epicycloid by where its cusps touch the fixed circle. The
+superformula's no-non-finite-vertex claim is a sweep that includes the exponents' poles, `NaN` and
+`inf`, and it holds by construction — the radius is carried as a logarithm and divided by its peak.
+The `[hold] sym = "bar"` test runs a real preset's binding through `ParamHold`, the kind's quantize
+and the sampler, with a binding that moves every frame. The harmonograph's decline is asserted from
+both sides of the flip. The rose is pinned walk-for-chord to `maurer_rose`, and `FAMILY_PARAMS`'
+inert cells are asserted inert on the sampler, not only listed.
+
+**Layering holds.** No platform type, no C ABI change, no scene-trait change: a family is a
+`FamilyArm` inside `curves.rs`, the scene names none, and the hot-path pragma already covers the
+module. No aspect is derived from a grid. The new families route through the existing
+`mirror_overflow` path, which answers the plan's `max_segments` risk.
+
+### Minors
+
+1. **The log is longer than the contract.** `## Implementation log` runs ~110 lines against the
+   phases section's ~80. Its notes are good and several were load-bearing for this review (the
+   `periodic_walk` closure fix, the `d = 71` clamp, the files outside the phase lists), but the rule
+   is that the report may not outweigh the contract.
+2. **The studio cannot reach a family's own range.** Phase 5 kept one `range` pair per parameter in
+   the exported schema, deliberately and logged, and the studio's slider is built from that pair
+   (`studio/renderer/components/ParamRow.tsx:111`): `n` on a hypotrochoid cannot go negative, so the
+   epicycloid is unreachable by gesture, and `d` on a Lissajous is a `1`–`360` slider. Filed as
+   backlog 0204 rather than fixed — its shape is a schema question.
+3. **The content lane's own references still say the rose is the only family** —
+   `.claude/skills/preset-author/SKILL.md:79`, `references/systems.md:63-64`,
+   `references/grammar.md:81`, `references/api-feedback.md:58`. The log noticed it and correctly
+   left it. This close tried to sweep it and **could not**: the batch session was denied write
+   access to `.claude/`. It is owed by the next session with that access; each line should point at
+   the `[curve]` table in `docs/presets.md` rather than restate it.
+4. **A constant `true` verdict arc-fits an undersampled walk.** Lissajous, hypotrochoid and
+   superformula take the fit unconditionally, as the plan decided. At the scene defaults an unbound
+   Lissajous is a 6:71 figure over 361 samples — about five samples per `y` cycle — so the fit draws
+   arcs through a walk that is not resolving a curve, which is exactly the case the rose's
+   `corner_fraction` verdict declines. `docs/presets.md` tells authors to bind `n` and `d`, so no
+   look is wrong today; if one ever is, the harmonograph's walk-read verdict is the tool already in
+   the file.
+
+### Nits
+
+1. `parametric.rs:182`, `:194` and `:245` still name `maurer_rose_pieces` as the scene's path. It is
+   now a `#[cfg(test)]` wrapper over `curves::fit_walk`, which is what the scene calls.
+2. The rose reads `phase` in radians while its spec prints `0`–`1` as for a fraction of a turn —
+   older than this plan and noticed in its log. The per-family cell now prints `maurer_rose 0 – 1`
+   beside three families that do read turns; `docs/presets.md`'s table states both units correctly.
+
+### Bookkeeping at the close
+
+- **Curation (step 3b):** `presets/` was touched only by the regenerated parameter block; no preset
+  was added or changed, and nothing in `presets/proposed/` is embedded. **No change to the set.** The
+  plan fixed no defect in shipped code, so there is no workaround to hunt; the grep for `Plan 0162`
+  across `presets/*.toml` is empty.
+- **Backlog:** probes green before and after; nothing live was falsified. 0204 filed.
+- **ADR-0180:** rule 1 is now built for the curves and rule 4's family clause is exercised for the
+  first time (`sym` is a Structural parameter read on one family). Status line and a dated Outcome
+  addendum record it.
+- **Version:** minor, `0.117.0` — a feature plan.
 
 ## Followups (after this lands)
 

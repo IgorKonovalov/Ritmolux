@@ -159,6 +159,10 @@ most, not a renderer).
 > and [Plans 0161-0164](plans/README.md). Item **3**'s fractal flames and item **4**'s Lenia are
 > **placed** by that ADR as family arms on systems those plans create, and are the two cheapest
 > unbuilt entries on this list once they land.
+>
+> **2026-09-11:** item **1** is built. [Plan 0162](plans/done/0162-the-curve-families.md) added
+> Lissajous, hypotrochoid/epicycloid, superformula and harmonograph as `CurveFamily` arms, so the
+> "still the only family" note under item 1 below is the 2026-07-25 reading, kept as the record.
 
 
 Refreshed 2026-07-25 — the first entries of the original order (attractors, Gray-Scott) have
