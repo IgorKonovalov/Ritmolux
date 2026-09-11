@@ -1,24 +1,20 @@
-# Ink Pendulum — a real harmonograph drawing, ink on paper.
+# Ink Pendulum - the machine drawing live. An ink-on-paper plate that shows the
+# PEN: `draw_progress` rides the bar phase, so each bar the harmonograph is
+# drawn from its first swing inward to the knot, then a fresh sheet. Every bar
+# the machine is re-set to a new ratio (2:3, 3:4, 1:2, 3:5, each detuned a
+# hair so the loops drift) and a new starting phase - a different drawing per
+# bar. Bass still opens the swing (inverted decay).
 #
-# The look: the thing a Victorian drawing machine made. Two pendulums a hair
-# off 2:3 swing a pen across cream paper and die away, so the figure spirals
-# inward in overlapping loops that crowd into a dark knot at the centre. The
-# slight detune (`d = 3.012`) makes consecutive loops drift, which is what
-# gives a harmonograph its woven moire.
+# draw_progress floors at 0.12 so a bar-phase-0 frame (all of silence, every
+# --report probe) still shows the first swing.
 #
-# What drives it:
-#   - `decay` is the structural lever, and it runs INVERTED on loudness:
-#     quiet passages damp the pendulums hard, so the drawing collapses into
-#     a small tight spiral; loud ones let them swing, so the figure opens out
-#     to the full sheet with sparse outer loops.
-#   - `phase` (the offset between the two pendulums) drifts on noise, which
-#     turns the whole figure's handedness slowly.
-#   - no spin: a pen on paper does not rotate.
+# The `n` and `d` selects index the same `hash(bar_index)` thresholds, so each
+# ratio stays paired only while the two chains keep the same order. The line
+# reads pencil-grey rather than ink-black - the ink pass cannot darken a thin
+# stroke (ROSTER.md, curve-families gap 5).
 #
-# Judge: the density gradient is the point - sparse loops outside, a dense
-# knot inside. At rest the knot should be small and legible; at peak the
-# figure should fill the sheet. If the knot is a solid ink blob, `decay` is
-# collapsing the inner turns below the fit (the family falls back to chords).
+# Chosen by the owner from three second-look directions (over a heavy
+# multiply-ink knot and two coloured pens on black lacquer).
 system = "parametric_curve"
 name = "Ink Pendulum"
 
@@ -26,10 +22,11 @@ name = "Ink Pendulum"
 family = "harmonograph"
 
 [params]
-n          = "2"
-d          = "3.012"
-phase      = "0.2 + noise(time * 0.05) * 0.4"
-decay      = "0.22 - clamp((bass + mid) * 0.11, 0, 0.16)"
+n          = "select(hash(bar_index) < 0.25, 2, select(hash(bar_index) < 0.5, 3, select(hash(bar_index) < 0.75, 1, 3)))"
+d          = "select(hash(bar_index) < 0.25, 3.012, select(hash(bar_index) < 0.5, 4.01, select(hash(bar_index) < 0.75, 2.006, 5.01)))"
+phase      = "hash(bar_index + 7)"
+decay      = "0.20 - clamp((bass + mid) * 0.09, 0, 0.13)"
+draw_progress = "0.12 + 0.88 * smoothstep(0.0, 0.9, bar_phase)"
 samples    = "2048"
 scale      = "0.95"
 spin       = "0"

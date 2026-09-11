@@ -3,13 +3,23 @@
 # reading as a textile: a fine white lace over midnight, the plate zoomed out
 # so it repeats as a wallpaper.
 #
+# Shaded silk: `plate_mix` 0.55 lets the signed wave show UNDER the thread, so
+# the cloth has a sheen between the stitches rather than flat black, and the
+# colour alternates each bar between two palettes - silver on midnight
+# ([palette]) and gold on umber ([palette_b]) - through `palette_mix` on
+# `bar_index`, eased over 0.6 s so the change is a dye, not a cut.
+#
 # What drives it: the modes are re-taken on the beat from bass and treble, so
 # the weave changes stitch on the hit. The treble thins and thickens the thread
 # (line_width 0.004..0.016 in plate units - a hairline at 640x360), and bloom
 # finds the crossings, where two lines overlap and the light doubles.
 # A slow drift of pan_x/pan_y keeps the cloth sliding when the music is quiet.
 #
-# Judge: is the lace ordered (a repeating stitch you can follow) or moire noise?
+# Chosen by the owner from three second-look directions (over a round
+# kaleidoscope doily and a bass-breathing stitch scale).
+#
+# Judge: does the gold bar read as a new cloth rather than a colour flip, and
+# is the lace ordered (a repeating stitch you can follow) or moire noise?
 # At 640x360 the high modes are close to the pixel pitch, so judge this one at
 # 1280x720 too - aliasing at thumbnail size is a real risk of the top range.
 system = "analytic_field"
@@ -26,12 +36,21 @@ stops = [
   { at = 1.0,  color = "#f4f7ff" },
 ]
 
+[palette_b]
+stops = [
+  { at = 0.0,  color = "#0a0503" },
+  { at = 0.40, color = "#3a1d0a" },
+  { at = 0.75, color = "#d8a24f" },
+  { at = 1.0,  color = "#fff4d6" },
+]
+
 [params]
+palette_mix = "select(mod(bar_index, 2) > 0.5, 1, 0)"
 mode_n     = "12 + floor(clamp(treb * 1.7, 0, 1.99))"
 mode_m     = "14 + floor(clamp(bass, 0, 0.99) * 3)"
 line_width = "0.004 + clamp(treb * 0.02, 0, 0.012)"
-plate_mix  = "0.10"
-zoom       = "0.62"
+plate_mix  = "0.55"
+zoom       = "0.9"
 pan_x      = "0.35 * sin(time * 0.05)"
 pan_y      = "0.25 * sin(time * 0.037 + 1.3)"
 brightness = "1.25"
@@ -44,4 +63,5 @@ mode_n = "beat"
 mode_m = "beat"
 
 [smoothing]
+palette_mix = 0.6
 line_width = 0.08

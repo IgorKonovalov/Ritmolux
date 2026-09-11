@@ -1,22 +1,19 @@
-# Cogwheel — an epicycloid whose cusps swell into loops on the bass.
+# Cogwheel - a saw blade. The seven-lobed epicycloid (n = -3.5, d = 7) in
+# steel, and the music spins it: the bass throws `spin` up (fast attack, 0.8 s
+# release) and a 0.8 trail smears the knots into arcs, so a loud passage is a
+# blade at speed with motion-blurred teeth and a quiet one is the gear standing
+# still enough to count. Bass also drives `pen` 0.55 -> 1.55, so the scallops
+# become cusps become loops on the kick.
 #
-# The look: a brass seven-lobed flower, the curve a circle traces rolling
-# OUTSIDE a fixed one (`n` negative: the epicycloid half of the family).
-# `n = -3.5` with `d = 7` walks seven cusps over two turns of the fixed
-# circle, so the figure closes into one unbroken loop.
+# Chosen by the owner from three second-look directions (over a counter-turning
+# gear train and a beat-ticked escapement).
 #
-# What drives it:
-#   - `pen` is the structural lever and the whole reactive idea. At rest it
-#     sits near 0.55, well inside the rolling circle, and the cusps are rounded
-#     into soft scallops. Bass pushes it past 1, where each cusp becomes a
-#     small loop - a hit visibly grows seven knots on the rim.
-#   - `spin` turns the gear slowly; the treble rides the stroke colour.
-#   - `phase` walks the pen's starting angle on a slow noise, so even at
-#     rest the loops creep round the rim.
-#
-# Judge: watch the cusps across a kick. Scallop -> point -> loop should read
-# as one mechanism tightening, not as a flicker. If the loops never appear,
-# `pen` is not crossing 1 and the preset is a static flower.
+# Horizon (10 simulated min, 96x96, --set bass=0.6,mid=0.45, against a static
+# star_pattern control reading delta 0.0000 / monotone 0.00): coverage
+# 0.057 -> 0.171 at monotone 0.40, peak/mean 42.8 -> 19.5 (0.55), footprint
+# 0.225 -> 0.212 (0.53). The coverage rise is the trail filling the blade's
+# sweep, not a pile-up: under half the steps went that way, and the footprint
+# is flat.
 system = "parametric_curve"
 name = "Cogwheel"
 
@@ -25,32 +22,33 @@ family = "hypotrochoid"
 
 [palette]
 stops = [
-  { at = 0.0, color = "#1a0d02" },
-  { at = 0.4, color = "#8a5314" },
-  { at = 0.75, color = "#e8b04a" },
-  { at = 1.0, color = "#fff1c8" },
+  { at = 0.0, color = "#03060c" },
+  { at = 0.4, color = "#2a4a6e" },
+  { at = 0.75, color = "#9cc8ee" },
+  { at = 1.0, color = "#f4faff" },
 ]
 
 [params]
 n          = "-3.5"
 d          = "7"
 pen        = "0.55 + clamp(bass * 1.15, 0, 1.0)"
-phase      = "noise(time * 0.1) * 0.3"
 samples    = "1200"
 scale      = "0.8"
-spin       = "0.05"
-thickness  = "2.6"
+spin       = "0.08 + clamp(bass * 0.94, 0, 0.8)"
+thickness  = "2.4"
 softness   = "0.3"
-glow       = "0.7"
-brightness = "0.85"
-hue        = "0.7 + clamp(treb * 0.25, 0, 0.15)"
-hue_spread = "0.2"
-bloom_amount    = "0.3"
-bloom_threshold = "0.7"
-bg_bright  = "0.14"
+glow       = "0.6"
+brightness = "0.7"
+hue        = "0.72 + clamp(treb * 0.25, 0, 0.15)"
+hue_spread = "0.25"
+trails     = "0.8"
+bloom_amount    = "0.25"
+bloom_threshold = "0.8"
+bg_bright  = "0.06"
 bg_hue     = "0.1"
-bg_vignette = "0.8"
+bg_vignette = "0.85"
 
 [smoothing]
 pen = { attack = 0.04, release = 0.35 }
+spin = { attack = 0.1, release = 0.8 }
 hue = 0.3

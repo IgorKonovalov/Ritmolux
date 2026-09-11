@@ -1,30 +1,32 @@
-# Multibrot - the Mandelbrot map with the exponent as the structural lever:
-# z -> z^power + c for a WHOLE power from 3 to 7, re-rolled once a bar. Each
-# power is a different body - power d has d-1 fold symmetry, so the figure
-# steps between a 2-lobed, 3-lobed ... 6-lobed crown - and all of them sit
-# centred on the origin (power 2 is left out because its set sits off-centre
-# at -0.5 and would jump sideways on the change).
+# Multibrot - a multi-power JULIA crown: z -> z^power + c for a WHOLE power
+# from 3 to 7, re-rolled once a bar. Power p has p-fold symmetry, so each bar
+# the crown re-forms with a different number of arms, and because it is the
+# Julia map every power opens into lit filaments rather than sitting as the
+# solid black body the Mandelbrot map drew.
 #
-# What drives it: power re-rolls on the bar from hash(bar_index), so the change
-# is an EVENT once a bar and never a wobble. The bass lights the set from
-# inside (interior 0 -> 0.5), so a kick fills the black crown with its own
-# palette; the mids breathe the zoom slightly. Smooth-count colouring on a
-# cyclic palette, so the halo is a set of soft nested rings around the crown.
+# What drives it: `power` is held on the bar and picked by
+# `floor(hash(bar_index * 7.31) * 4.99)`. `c` orbits the origin slowly on
+# `time`, and its radius is sized from THE SAME hash (0.53 + 0.085 per power
+# step), because the radius at which a Julia set holds together grows with the
+# power - one radius for every power left the high powers as dust and the low
+# ones as blobs. Keep the two hash expressions identical: the grammar cannot
+# read a held value back, so the pairing is by construction only. The bass
+# pushes the radius outward (thinner, more filament); the mids breathe the zoom.
 #
-# An 8-frame --strip on dynamic:110 showed the re-roll working: a two-lobed,
-# a five-fold and a six-fold crown across eight frames. --report cannot see
-# this (the probe holds the bar still), so its Multibrot row is the weakest in
-# the pass (drive 0.058) for the preset whose change is the most discrete.
+# Known flaw: now and then the orbit crosses into the region where the set
+# fills in, and a frame reads as a solid blob before `c` moves on.
 #
-# Judge: does the step between powers read as the SAME object gaining or
-# losing a lobe, or as a cut to an unrelated picture? And is the interior light
-# a nice fill or a wash that hides the silhouette?
+# Chosen by the owner from three second-look directions (over a trail of echo
+# crowns and a stepped enamel palette on the Mandelbrot map).
+#
+# Judge: does the per-bar re-form read as the SAME object gaining an arm, and
+# how often does the blob frame land?
 system = "analytic_field"
 name = "Multibrot"
 
 [field]
 family = "escape_time"
-map    = "mandelbrot"
+map    = "julia"
 
 [palette]
 stops = [
@@ -39,17 +41,21 @@ stops = [
 
 [params]
 power         = "3 + floor(hash(bar_index * 7.31) * 4.99)"
+c_re          = "(0.53 + floor(hash(bar_index * 7.31) * 4.99) * 0.085 + clamp(bass * 0.12, 0, 0.1)) * cos(time * 0.11)"
+c_im          = "(0.53 + floor(hash(bar_index * 7.31) * 4.99) * 0.085 + clamp(bass * 0.12, 0, 0.1)) * sin(time * 0.11)"
 iterations    = "48"
 escape_radius = "24"
-interior      = "clamp(bass * 0.6, 0, 0.5)"
+interior      = "0.15"
 zoom          = "0.74 + 0.06 * noise(time * 0.15) + clamp(mid * 0.08, 0, 0.07)"
-color_span    = "0.9"
+color_span    = "1.6"
 color_center  = "0.05 * sin(time * 0.2)"
-brightness    = "1.15"
+brightness    = "1.4"
 
 [hold]
 power = "bar"
 
 [smoothing]
+c_re = 0.3
+c_im = 0.3
 interior = 0.12
 zoom     = 0.3

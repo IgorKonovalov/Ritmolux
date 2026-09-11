@@ -1,25 +1,16 @@
-# Turnabout — a spirograph that flips between rolling inside and outside.
+# Turnabout - a pen that races in. The hypotrochoid flips between n = +3 and
+# n = -3 on the beat (deltoid <-> its outward-rolled partner, the same figure
+# inside out; d / |n| = 1, so both close), and every beat also REDRAWS it:
+# `draw_progress` restarts from the onset and races round the trace in
+# ~0.33 s, so each hit is a pen stroke. A 0.93 trail keeps the previous figure
+# fading underneath - the inside-out partner as an afterimage, not a layer.
+# `time_since_beat` counts onset detections, so busy music redraws more often.
+# `n` is never eased: an eased `n` leaves the trace open.
 #
-# The look: the hypotrochoid family's sign is the whole idea. `n = 3` rolls a
-# circle a third the size INSIDE the fixed one (three inward cusps, a
-# curved triangle); `n = -3` rolls it OUTSIDE (the epicycloid: three outward
-# lobes, a trefoil). The same three-fold figure turned inside out. A beat
-# re-rolls the sign, with NO easing on purpose: easing would walk `n` through
-# zero, where the ratio floors and the trace blows up into a scribble.
+# Chosen by the owner from three second-look directions (over a colour-coded
+# flip ladder and a mirrored hexagram).
 #
-# What drives it:
-#   - `n`'s sign, held on the beat (a hit may or may not turn the figure
-#     inside out - `hash` decides).
-#   - `pen` wanders 0.6..1.6 on noise pushed by the mids, so the cusps round
-#     off or throw loops, on both the inner and outer figure.
-#   - bass swells the figure (`scale`) - added after `--report` read the pen
-#     alone as almost no whole-frame change.
-#   - `spin` is steady; a layer of the opposite sign sits UNDER at low
-#     brightness, so the figure you are not seeing is always ghosted.
-#
-# Judge: does the flip read as the same object turning inside out, or just
-# as two different shapes alternating? The ghost layer is there to make it
-# the former; if it muddies the frame, it is the first thing to cut.
+# Horizon (3 simulated min, fork pass): breathes, no pile-up.
 system = "parametric_curve"
 name = "Turnabout"
 
@@ -39,16 +30,20 @@ n          = "select(hash(beat_index * 11) > 0.5, 3, -3)"
 d          = "3"
 pen        = "0.6 + noise(time * 0.12) * 0.6 + clamp(mid * 0.45, 0, 0.38)"
 samples    = "900"
+draw_progress = "clamp(0.08 + time_since_beat * 2.8, 0, 1)"
 scale      = "0.74 + clamp(bass * 0.14, 0, 0.12)"
 spin       = "0.05"
 thickness  = "3.0"
 softness   = "0.3"
-glow       = "0.8"
-brightness = "0.85"
-hue        = "0.62"
+glow       = "0.6"
+brightness = "0.6"
+hue        = "0.62 + clamp(onset * 0.25, 0, 0.15)"
 hue_spread = "0.25"
-bloom_amount    = "0.3"
-bloom_threshold = "0.7"
+trails     = "0.93"
+fb_zoom    = "1.0"
+fb_rotate  = "0"
+bloom_amount    = "0.25"
+bloom_threshold = "0.8"
 bg_bright  = "0.04"
 bg_vignette = "0.85"
 
@@ -58,31 +53,4 @@ n = "beat"
 [smoothing]
 pen = 0.25
 scale = { attack = 0.04, release = 0.3 }
-
-[layer]
-system = "parametric_curve"
-join = "under"
-
-[layer.curve]
-family = "hypotrochoid"
-
-[layer.params]
-n          = "select(hash(beat_index * 11) > 0.5, -3, 3)"
-d          = "3"
-pen        = "0.6 + noise(time * 0.12) * 0.6 + clamp(mid * 0.45, 0, 0.38)"
-samples    = "900"
-scale      = "0.74 + clamp(bass * 0.14, 0, 0.12)"
-spin       = "0.05"
-thickness  = "1.4"
-softness   = "0.4"
-glow       = "0.3"
-brightness = "0.4"
-hue        = "0.3"
-hue_spread = "0.1"
-
-[layer.hold]
-n = "beat"
-
-[layer.smoothing]
-pen = 0.25
-scale = { attack = 0.04, release = 0.3 }
+hue = 0.3
