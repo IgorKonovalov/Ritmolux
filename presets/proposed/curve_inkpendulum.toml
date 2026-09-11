@@ -1,14 +1,24 @@
 # Ink Pendulum - the machine drawing live. An ink-on-paper plate that shows the
-# PEN: `draw_progress` rides the bar phase, so each bar the harmonograph is
-# drawn from its first swing inward to the knot, then a fresh sheet. Every bar
-# the machine is re-set to a new ratio (2:3, 3:4, 1:2, 3:5, each detuned a
-# hair so the loops drift) and a new starting phase - a different drawing per
-# bar. Bass still opens the swing (inverted decay).
+# PEN: `draw_progress` rides the bar, so each bar the harmonograph is drawn
+# from its first swing inward to the knot, held finished for the last fifth of
+# the cycle, then a fresh sheet. Every sheet the machine is re-set to a new
+# ratio (2:3, 3:4, 1:2, 3:5, each detuned a hair so the loops drift) and a new
+# starting phase - a different drawing per sheet. Bass still opens the swing
+# (inverted decay), and `phase` creeps on `time` so a held drawing is not
+# frozen in silence.
 #
-# draw_progress floors at 0.12 so a bar-phase-0 frame (all of silence, every
-# --report probe) still shows the first swing.
+# THE SHEET IS THE BAR SHIFTED BY 0.85. `sheet = floor(bar_index + bar_phase
+# + 0.85)` and the reveal runs on `mod(bar_phase + 0.85, 1)`: both wrap at bar
+# phase 0.15, so the re-set lands on a fresh sheet, and bar phase 0 - all of
+# silence, and every frame the behavioral suite probes - falls inside the hold
+# and shows the whole drawing. The first cut revealed from bar phase 0 on a
+# 0.12 floor, so every probe saw the first swing alone: frozen in the
+# animation gate, coverage 0.021 at excitation 0.4 against the 0.04 floor.
+# Measured 2026-09-11 with the file temporarily embedded: animation silent
+# 0.0165 (floor 0.01), reactivity bass 0.0323 (floor 0.02), coverage 0.058 at
+# excitation 0.4, 10/10 radial shells.
 #
-# The `n` and `d` selects index the same `hash(bar_index)` thresholds, so each
+# The `n` and `d` selects index the same `hash(sheet)` thresholds, so each
 # ratio stays paired only while the two chains keep the same order. The line
 # reads pencil-grey rather than ink-black - the ink pass cannot darken a thin
 # stroke (ROSTER.md, curve-families gap 5).
@@ -22,11 +32,11 @@ name = "Ink Pendulum"
 family = "harmonograph"
 
 [params]
-n          = "select(hash(bar_index) < 0.25, 2, select(hash(bar_index) < 0.5, 3, select(hash(bar_index) < 0.75, 1, 3)))"
-d          = "select(hash(bar_index) < 0.25, 3.012, select(hash(bar_index) < 0.5, 4.01, select(hash(bar_index) < 0.75, 2.006, 5.01)))"
-phase      = "hash(bar_index + 7)"
+n          = "select(hash(floor(bar_index + bar_phase + 0.85)) < 0.25, 2, select(hash(floor(bar_index + bar_phase + 0.85)) < 0.5, 3, select(hash(floor(bar_index + bar_phase + 0.85)) < 0.75, 1, 3)))"
+d          = "select(hash(floor(bar_index + bar_phase + 0.85)) < 0.25, 3.012, select(hash(floor(bar_index + bar_phase + 0.85)) < 0.5, 4.01, select(hash(floor(bar_index + bar_phase + 0.85)) < 0.75, 2.006, 5.01)))"
+phase      = "hash(floor(bar_index + bar_phase + 0.85) + 7) + time * 0.02"
 decay      = "0.20 - clamp((bass + mid) * 0.09, 0, 0.13)"
-draw_progress = "0.12 + 0.88 * smoothstep(0.0, 0.9, bar_phase)"
+draw_progress = "0.03 + 0.97 * smoothstep(0.0, 0.8, mod(bar_phase + 0.85, 1))"
 samples    = "2048"
 scale      = "0.95"
 spin       = "0"

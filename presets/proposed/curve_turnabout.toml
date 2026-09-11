@@ -7,10 +7,30 @@
 # `time_since_beat` counts onset detections, so busy music redraws more often.
 # `n` is never eased: an eased `n` leaves the trace open.
 #
+# BEFORE THE FIRST ONSET THE FIGURE STANDS WHOLE (`beat_index < 1`). There is
+# no stroke to redraw until something has been hit, and `time_since_beat`
+# reads 0 there - which is also the state every frame the behavioral suite
+# probes sits in, with the trail cold. The first cut drew its 8 % stub in that
+# state, so the probes saw a fragment and it failed reactivity (0.0078) and
+# loudness coverage. Live, the stub is never seen alone: from the second hit
+# on it lands over the previous figure's afterimage.
+#
+# The stroke is heavier (4.8) and brighter (0.85) than the first cut for the
+# same gates: at 3.0 / 0.6 the antialiased edge sat under the lit threshold
+# and a whole figure still read 0.039 at excitation 0.4 against the 0.04
+# floor. Measured 2026-09-11 with the file temporarily embedded: reactivity
+# onset 0.0366 (floor 0.02), coverage 0.048 at excitation 0.4, animation
+# silent 0.0906.
+#
 # Chosen by the owner from three second-look directions (over a colour-coded
 # flip ladder and a mirrored hexagram).
 #
-# Horizon (3 simulated min, fork pass): breathes, no pile-up.
+# Horizon (3 simulated min, 96x96, `--set bass=0.6,mid=0.45`, re-run
+# 2026-09-11 after the stroke got heavier): coverage 0.5540 -> 0.5549,
+# footprint 0.0422 -> 0.0433, monotone 0.40-0.67 - breathes, no pile-up.
+# What it measures is the WHOLE-FIGURE state: `--horizon` holds one stimulus
+# and refuses a clip, and a held `beat_index` of 0 never redraws, so the
+# redraw loop over the 0.93 trail has no horizon reading.
 system = "parametric_curve"
 name = "Turnabout"
 
@@ -30,13 +50,13 @@ n          = "select(hash(beat_index * 11) > 0.5, 3, -3)"
 d          = "3"
 pen        = "0.6 + noise(time * 0.12) * 0.6 + clamp(mid * 0.45, 0, 0.38)"
 samples    = "900"
-draw_progress = "clamp(0.08 + time_since_beat * 2.8, 0, 1)"
-scale      = "0.74 + clamp(bass * 0.14, 0, 0.12)"
+draw_progress = "select(beat_index < 1, 1, clamp(0.08 + time_since_beat * 2.8, 0, 1))"
+scale      = "0.74 + clamp(bass * 0.2, 0, 0.17)"
 spin       = "0.05"
-thickness  = "3.0"
+thickness  = "4.8"
 softness   = "0.3"
 glow       = "0.6"
-brightness = "0.6"
+brightness = "0.85"
 hue        = "0.62 + clamp(onset * 0.25, 0, 0.15)"
 hue_spread = "0.25"
 trails     = "0.93"

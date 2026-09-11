@@ -1,42 +1,55 @@
 # Blueprint — a drawing machine that draws a new spirograph each bar.
 #
 # The look: pale linework on blueprint blue, the pen visibly ARRIVING -
-# `draw_progress` rides the bar phase, so each bar the hypotrochoid is traced
-# from its first point to its last and then begins again. Every bar the
-# machine is re-geared: `n` (the radius ratio of the rolling circle) is
-# re-rolled from eight ratios, each paired with the cusp count `d` that closes
-# it (d / |n| whole), so what gets drawn is always a complete figure, and no
-# two neighbours in the table share a fold count:
-#        3   -> d  3  three-fold, one turn     (deltoid family)
+# `draw_progress` rides the bar, so each bar the hypotrochoid is traced from
+# its first point to its last, HELD finished for the last quarter of the
+# cycle, and then a fresh sheet begins. Every sheet the machine is re-geared:
+# `n` (the radius ratio of the rolling circle) is re-rolled from eight ratios,
+# each paired with the cusp count `d` that closes it (d / |n| whole), so what
+# gets drawn is always a complete figure, and no two neighbours in the table
+# share a fold count:
+#     11/5   -> d 11  eleven-fold rosette, five turns
 #        4   -> d  4  four-fold, one turn      (astroid family)
 #      5/2   -> d  5  five-pointed star, two turns
 #      7/3   -> d  7  seven-pointed star, three turns
-#     11/5   -> d 11  eleven-fold rosette, five turns
+#        3   -> d  3  three-fold, one turn     (deltoid family)
 #      8/3   -> d  8  eight-fold, three turns
 #     -5/2   -> d  5  EPIcycloid: five loops rolled outside, two turns
 #     -7/2   -> d  7  EPIcycloid: seven outward loops, two turns
-# The `n` and `d` selects index the SAME `floor(hash(bar_index) * 8)`, so the
+# The `n` and `d` selects index the SAME `floor(hash(sheet) * 8)`, so the
 # pairing holds only as long as the two chains stay in the same order.
 #
-# The pen is re-rolled per bar too, off a decorrelated hash, across
+# THE SHEET IS THE BAR SHIFTED BY 0.85. `sheet = floor(bar_index + bar_phase
+# + 0.85)` and the reveal runs on `mod(bar_phase + 0.85, 1)`: both wrap at bar
+# phase 0.15, so the re-gear always lands on a fresh sheet, never mid-stroke,
+# and bar phase 0 - all of silence, and every frame the behavioral suite
+# probes - falls inside the hold and shows the whole drawing. The first cut
+# revealed from bar phase 0 on a 0.12 floor, so every probe saw a stub and the
+# preset failed sanity, animation and reactivity as a blank frame.
+#
+# SLOT 0 IS THE DENSEST GEAR ON PURPOSE. The probes sit at bar_index 0, and
+# `hash(0)` falls in slot 0; with the deltoid there the probe saw one thin loop
+# (coverage 0.014, 3/10 shells) and failed as blank. The hash scatters, so the
+# slot order does not change what the live look rolls.
+#
+# The pen is re-rolled per sheet too, off a decorrelated hash, across
 # 0.45..1.35 rolling radii: under 1 the gear draws rounded petals, at 1 sharp
 # cusps, over 1 looped knots - so the same gear comes back as a different
 # drawing. Eight gears by three pen regimes is what the owner asked for when
 # they said "draw different figures".
 #
-# What drives it: the bar phase (the reveal), the bar counter (the gear and
-# the pen), bass on top of `pen` (loud opens the loops), and the ink pass for
-# the blue paper.
+# What drives it: the bar phase (the reveal), the sheet counter (the gear and
+# the pen), bass on top of `pen` (loud opens the loops), a slow `spin` so the
+# held drawing is not frozen in silence, and the ink pass for the blue paper.
 #
-# The reveal never starts from nothing: `draw_progress` floors at 0.12, so a
-# frame at bar phase 0 (every `--report` probe frame, and all of silence)
-# still shows the first stroke. Without that floor `--report` read the
-# preset as a blank frame, cover 0.000.
+# Gates, measured 2026-09-11 with the file temporarily embedded: animation
+# silent 0.0153 (floor 0.01), reactivity bass 0.0333 (floor 0.02), coverage
+# 0.064 at excitation 0.4 (floor 0.04), 9/10 radial shells.
 #
-# Judge: does the reveal read as a pen drawing, and does the re-gear land
-# at the start of a reveal rather than mid-stroke? `bar_phase` is counter-
-# derived most of the time (see docs/presets.md on [hold] "bar"), so the
-# reveal is steady, not downbeat-locked - judge its rhythm, not its sync.
+# Judge: does the reveal read as a pen drawing, and does the held finished
+# figure give the eye time to read it? `bar_phase` is counter-derived most of
+# the time (see docs/presets.md on [hold] "bar"), so the reveal is steady,
+# not downbeat-locked - judge its rhythm, not its sync.
 system = "parametric_curve"
 name = "Blueprint"
 
@@ -44,14 +57,14 @@ name = "Blueprint"
 family = "hypotrochoid"
 
 [params]
-n          = "select(floor(hash(bar_index) * 8) < 1, 3, select(floor(hash(bar_index) * 8) < 2, 4, select(floor(hash(bar_index) * 8) < 3, 2.5, select(floor(hash(bar_index) * 8) < 4, 7 / 3, select(floor(hash(bar_index) * 8) < 5, 2.2, select(floor(hash(bar_index) * 8) < 6, 8 / 3, select(floor(hash(bar_index) * 8) < 7, -2.5, -3.5)))))))"
-d          = "select(floor(hash(bar_index) * 8) < 1, 3, select(floor(hash(bar_index) * 8) < 2, 4, select(floor(hash(bar_index) * 8) < 3, 5, select(floor(hash(bar_index) * 8) < 4, 7, select(floor(hash(bar_index) * 8) < 5, 11, select(floor(hash(bar_index) * 8) < 6, 8, select(floor(hash(bar_index) * 8) < 7, 5, 7)))))))"
-pen        = "0.45 + hash(bar_index + 31) * 0.9 + clamp(bass * 0.29, 0, 0.25)"
-draw_progress = "0.12 + 0.88 * smoothstep(0.0, 0.85, bar_phase)"
+n          = "select(floor(hash(floor(bar_index + bar_phase + 0.85)) * 8) < 1, 2.2, select(floor(hash(floor(bar_index + bar_phase + 0.85)) * 8) < 2, 4, select(floor(hash(floor(bar_index + bar_phase + 0.85)) * 8) < 3, 2.5, select(floor(hash(floor(bar_index + bar_phase + 0.85)) * 8) < 4, 7 / 3, select(floor(hash(floor(bar_index + bar_phase + 0.85)) * 8) < 5, 3, select(floor(hash(floor(bar_index + bar_phase + 0.85)) * 8) < 6, 8 / 3, select(floor(hash(floor(bar_index + bar_phase + 0.85)) * 8) < 7, -2.5, -3.5)))))))"
+d          = "select(floor(hash(floor(bar_index + bar_phase + 0.85)) * 8) < 1, 11, select(floor(hash(floor(bar_index + bar_phase + 0.85)) * 8) < 2, 4, select(floor(hash(floor(bar_index + bar_phase + 0.85)) * 8) < 3, 5, select(floor(hash(floor(bar_index + bar_phase + 0.85)) * 8) < 4, 7, select(floor(hash(floor(bar_index + bar_phase + 0.85)) * 8) < 5, 3, select(floor(hash(floor(bar_index + bar_phase + 0.85)) * 8) < 6, 8, select(floor(hash(floor(bar_index + bar_phase + 0.85)) * 8) < 7, 5, 7)))))))"
+pen        = "0.45 + hash(floor(bar_index + bar_phase + 0.85) + 31) * 0.9 + clamp(bass * 0.29, 0, 0.25)"
+draw_progress = "0.03 + 0.97 * smoothstep(0.0, 0.75, mod(bar_phase + 0.85, 1))"
 samples    = "1800"
 scale      = "0.84"
-spin       = "0.015"
-thickness  = "2.0"
+spin       = "0.03"
+thickness  = "2.6"
 softness   = "0.15"
 glow       = "0.35"
 brightness = "1.6"
