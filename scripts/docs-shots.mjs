@@ -450,6 +450,18 @@ const IMAGES = [
     size: "1280x720",
     tier: "rich",
   },
+  {
+    // analytic_field — UNJUDGED, and not a choice: the system ships no preset
+    // yet, so its slot renders the teaching preset the guide prints for the
+    // Chladni family, the system's first. Swap it for a shipped world when
+    // the content lane lands one.
+    out: "docs/images/gallery/analytic_field.png",
+    presetFile: "docs/examples/field/chladni.toml",
+    signal: "dynamic:110",
+    hop: 300,
+    size: "1280x720",
+    tier: "rich",
+  },
 
   // --- the gallery: one card per shipped preset ---------------------------
   ...CARDS.map((preset) => ({

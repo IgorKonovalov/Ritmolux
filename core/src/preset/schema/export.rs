@@ -89,6 +89,8 @@ pub enum Roster {
     Motif,
     /// `[generator] tiling`.
     Tiling,
+    /// `[field] family`.
+    FieldFamily,
 }
 
 impl Roster {
@@ -117,6 +119,7 @@ impl Roster {
             Roster::LayerBlend => LayerBlend::ALL.iter().map(|b| b.as_str()).collect(),
             Roster::Motif => Motif::ALL.iter().map(|m| m.name()).collect(),
             Roster::Tiling => crate::render::scenes::lines::hankin::TILINGS.to_vec(),
+            Roster::FieldFamily => FieldFamily::ALL.iter().map(|f| f.as_str()).collect(),
         }
     }
 
@@ -231,6 +234,7 @@ pub const TABLES: &[&TableDesc] = &[
     &super::raw::PATH,
     &super::raw::SPECTRUM,
     &super::raw::MESH,
+    &super::raw::FIELD,
     &super::raw::MILK,
     &super::raw::MILK_ELEMENT,
     &super::raw::FEEDBACK,

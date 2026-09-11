@@ -64,6 +64,7 @@ impl Preset {
             raw.path,
             raw.spectrum,
             raw.mesh,
+            raw.field,
             raw.milk,
             pinned_salt,
         )?;
@@ -590,6 +591,7 @@ pub(super) fn build_layer(
         raw.path,
         raw.spectrum,
         raw.mesh,
+        raw.field,
         // A `[layer]` carries no `[milk]` table: a converted preset is a whole
         // preset, and layering one under another is a composition nothing in the
         // corpus asks for. A layer warp mesh drives its mesh from `[layer.params]`
@@ -645,6 +647,7 @@ pub(super) fn build_config(
     path: Option<RawPath>,
     spectrum: Option<RawSpectrum>,
     mesh: Option<RawMesh>,
+    field: Option<RawField>,
     milk: Option<RawMilk>,
     salt: u32,
 ) -> Result<Option<GeneratorConfig>, PresetError> {
@@ -724,6 +727,14 @@ pub(super) fn build_config(
                 morph_to: parsed.and_then(|p| p.morph_to),
             }))
         }
+        // The analytic field's family is structural for `[curve] family`'s
+        // reason — it selects a code path — and an absent table is the default
+        // family. Config is always `Some` so `configure` runs on every preset
+        // switch (resetting the family — never stale).
+        SystemKind::AnalyticField => Ok(Some(GeneratorConfig::Field(match field {
+            Some(f) => f.into_config()?,
+            None => FieldConfig::default(),
+        }))),
         // Reaction-diffusion drives its regime through named params (feed/kill/
         // flow), not a declarative structural table. `shape_collage`'s structure
         // is an authored element list compiled into the scene, and its seeded

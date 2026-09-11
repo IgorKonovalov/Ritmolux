@@ -7,6 +7,7 @@
 //! exactly one place per table.
 
 mod feedback;
+mod field;
 mod generator;
 mod hold;
 mod mesh;
@@ -19,6 +20,7 @@ mod smoothing;
 mod spectrum;
 
 pub(super) use feedback::*;
+pub(super) use field::*;
 pub(super) use generator::*;
 pub(super) use hold::*;
 pub(super) use mesh::*;

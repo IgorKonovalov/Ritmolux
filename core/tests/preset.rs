@@ -1956,6 +1956,10 @@ fn declared_params_match_set_param() {
             src.join("render/scenes/emitter.rs"),
             SystemKind::Emitter.param_names(),
         ),
+        (
+            src.join("render/scenes/analytic_field/mod.rs"),
+            SystemKind::AnalyticField.param_names(),
+        ),
         // The global compositing stages, declared the same way.
         (
             src.join("render/background.rs"),
@@ -2176,6 +2180,11 @@ const STRUCTURAL: &[(&str, &str)] = &[
     ("emitter", "palette_steps"),
     ("shape_field", "palette_steps"),
     ("warp_mesh", "palette_steps"),
+    ("analytic_field", "palette_steps"),
+    // `analytic_field::applied_mode`: clamps into the plate's range and rounds,
+    // because a fractional mode is not a standing wave of the plate at all.
+    ("analytic_field", "mode_n"),
+    ("analytic_field", "mode_m"),
     // `fold_order` / `fold_edge`: the kaleidoscope's two stepped params.
     ("kaleidoscope", "kaleido_order"),
     ("kaleidoscope", "kaleido_edge"),

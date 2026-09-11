@@ -871,6 +871,33 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | `opacity` | `1` | `0` – `1` | How opaque each element is, so overlaps can show through. |
 | `edge_softness` | `0` | `0` – `1` | How far each element's edge fades; 0 is a hard cut. |
 
+### System: `analytic_field`
+
+**Structural**
+
+| Parameter | Default | Range | What it does |
+|---|---|---|---|
+| `mode_n` | `3` | `chladni` `1` – `16` | The plate's first mode number: how many nodal lines cross one axis. Equal to `mode_m`, the two waves cancel and the plate is blank. |
+| `mode_m` | `5` | `chladni` `1` – `16` | The plate's second mode number: how many nodal lines cross the other axis. |
+| `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
+
+**Modal**
+
+| Parameter | Default | Range | What it does |
+|---|---|---|---|
+| `line_width` | `0.04` | `chladni` `0` – `0.3` | How wide a band around the nodal lines lights, in plate units (the plate is 2 across); 0 is a one-pixel line. |
+| `plate_mix` | `0` | `chladni` `0` – `1` | Blends from the nodal lines alone toward the whole signed wave, which reads as a standing wave rather than as sand. |
+| `color_span` | `1` | `0` – `4` | How much of the palette the field's level covers; 0 is one flat colour. |
+| `color_center` | `0` | `-1` – `1` | Shifts which part of the palette the field's level starts from. |
+| `brightness` | `1` | `0` – `2` | The scene's overall light level, multiplying what it draws before the composite. |
+| `hue` | `0` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. |
+| `zoom` | `1` | `0.25` – `4` | Scales the whole scene about its centre; above 1 fills more of the frame. |
+| `pan_x` | `0` |  | Slides the whole scene sideways, in the scene's own units rather than pixels. |
+| `pan_y` | `0` |  | Slides the whole scene vertically, in the scene's own units rather than pixels. |
+| `saturation` | `1` | `0` – `1` | Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own. |
+| `palette_mix` | `0` | `0` – `1` | Crossfades from the preset's palette to its second one; 0 is the first, 1 the second. |
+| `palette_contour` | `0` | `0` – `1` | Draws a line at each band edge when the palette is stepped; 0 draws none. |
+
 ### Engine stage: `background`
 
 **Modal**

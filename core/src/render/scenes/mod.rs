@@ -15,6 +15,7 @@
     clippy::unreachable
 )]
 
+pub mod analytic_field;
 pub(crate) mod common;
 pub mod emitter;
 pub mod fragment_field;
@@ -241,6 +242,7 @@ pub struct FamilyParam {
 pub fn family_params(label: &str) -> &'static [FamilyParam] {
     match label {
         "parametric_curve" => lines::parametric::FAMILY_PARAMS,
+        "analytic_field" => analytic_field::FAMILY_PARAMS,
         _ => &[],
     }
 }
@@ -455,6 +457,11 @@ pub enum GeneratorConfig {
         /// that, which is what keeps an `O(N^2)` search off the frame.
         morph_to: Option<crate::preset::path::PathShape>,
     },
+    /// The analytic field's `[field]` table (ADR-0180 rule 1): which closed-form
+    /// family the pass draws. Always `Some` for that system, so `configure` runs
+    /// on every preset switch and the outgoing preset's family never survives
+    /// into the incoming one.
+    Field(analytic_field::FieldConfig),
 }
 
 impl GeneratorConfig {
@@ -473,7 +480,8 @@ impl GeneratorConfig {
             | GeneratorConfig::Star { .. }
             | GeneratorConfig::Particles { .. }
             | GeneratorConfig::WarpMesh { .. }
-            | GeneratorConfig::Path { .. } => 0,
+            | GeneratorConfig::Path { .. }
+            | GeneratorConfig::Field(_) => 0,
         }
     }
 }
@@ -914,7 +922,8 @@ fn draws_through_shared_line_renderer(kind: SystemKind) -> bool {
         | SystemKind::Emitter
         | SystemKind::ShapeField
         | SystemKind::WarpMesh
-        | SystemKind::ShapeCollage => false,
+        | SystemKind::ShapeCollage
+        | SystemKind::AnalyticField => false,
     }
 }
 
@@ -993,6 +1002,10 @@ fn create(
             device,
             surface_format,
             tier.collage_elements,
+        )),
+        SystemKind::AnalyticField => Box::new(analytic_field::AnalyticFieldScene::new(
+            device,
+            surface_format,
         )),
     }
 }
@@ -1117,6 +1130,7 @@ mod tests {
             SystemKind::Emitter => "emitter",
             SystemKind::WarpMesh => "warp mesh",
             SystemKind::ShapeCollage => "shape collage",
+            SystemKind::AnalyticField => "analytic field",
         }
     }
 
@@ -1287,6 +1301,7 @@ mod tests {
             SystemKind::ShapeField,
             SystemKind::WarpMesh,
             SystemKind::ShapeCollage,
+            SystemKind::AnalyticField,
         ];
         for (i, a) in independent.iter().enumerate() {
             for b in independent.iter().skip(i + 1).chain(lines.iter()) {

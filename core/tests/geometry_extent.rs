@@ -192,7 +192,10 @@ fn draws_segments(system: SystemKind) -> bool {
         // `shape_collage` is `shape_field`'s case exactly: its elements are
         // signed distances evaluated per pixel against a CPU-side element array,
         // and there is no segment list for this instrument to measure.
-        | SystemKind::ShapeCollage => false,
+        | SystemKind::ShapeCollage
+        // The analytic field evaluates a closed form per pixel; there is no
+        // geometry at all, let alone a segment list.
+        | SystemKind::AnalyticField => false,
     }
 }
 

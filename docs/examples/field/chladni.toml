@@ -1,0 +1,24 @@
+# The `chladni` family of the analytic field, for the illustrated guide's
+# picture of it. Teaching material, not a shipped preset: the plate's first
+# mode is pinned, the second steps with the bass and is held on the bar, so
+# the figure changes on a musical edge and at no other time.
+system = "analytic_field"
+name = "Chladni 3:5"
+
+[field]
+family = "chladni"
+
+[palette]
+name = "ice"
+
+[params]
+mode_n     = "3"
+mode_m     = "5 + floor(clamp(bass, 0, 0.99) * 3)"
+line_width = "0.035 + clamp(bass * 0.02, 0, 0.02)"
+plate_mix  = "0.15"
+color_span = "0.6"
+hue        = "0.2"
+brightness = "1.2"
+
+[hold]
+mode_m = "bar"

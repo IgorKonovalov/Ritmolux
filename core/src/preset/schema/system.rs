@@ -42,6 +42,10 @@ pub enum SystemKind {
     /// first **graphic** world rather than a luminous one: the only system in
     /// which one object is genuinely in front of another.
     ShapeCollage,
+    /// One fullscreen pass whose output is a closed-form function of position
+    /// (ADR-0180 rule 1): the Chladni plate, and every later stateless
+    /// per-pixel world, as a `[field] family` rather than a system each.
+    AnalyticField,
 }
 
 /// **The** roster of built-in systems: every variant, its canonical name, and
@@ -110,6 +114,11 @@ const TABLE: [(SystemKind, &str, &[ParamSpec]); SystemKind::VARIANT_COUNT] = {
             "shape_collage",
             scenes::shape_collage::PARAMS,
         ),
+        (
+            SystemKind::AnalyticField,
+            "analytic_field",
+            scenes::analytic_field::PARAMS,
+        ),
     ]
 };
 
@@ -133,7 +142,7 @@ impl SystemKind {
     /// typed off this count, so bumping the count without adding a row does not
     /// compile either. Both are module-private, so this names them rather than
     /// linking them.
-    pub const VARIANT_COUNT: usize = 12;
+    pub const VARIANT_COUNT: usize = 13;
 
     /// This variant's index into [`TABLE`].
     ///
@@ -155,6 +164,7 @@ impl SystemKind {
             SystemKind::ShapeField => 9,
             SystemKind::WarpMesh => 10,
             SystemKind::ShapeCollage => 11,
+            SystemKind::AnalyticField => 12,
         }
     }
 

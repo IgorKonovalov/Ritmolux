@@ -487,6 +487,15 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // emptied canvas, at the quiet excitation where emptying happens —
         // [`a_canvas_the_music_empties_is_convicted_and_black_calls_it_full`].
         SystemKind::ShapeCollage => 0.13,
+        // **Not derived from a distribution**: the system ships with no preset
+        // content, as `shape_field` and `warp_mesh` once did, so this floor has
+        // never gated anything. It takes `FragmentField`'s number because both
+        // are fullscreen `occlude` fields, which is a borrowed number and not a
+        // measurement — a Chladni plate lights only its nodal lines, far less
+        // of the frame than a fold does. **Re-derive it from this test's printed
+        // distribution when the first preset ships**, at half the family
+        // minimum like every floor above.
+        SystemKind::AnalyticField => 0.08,
     }
 }
 
@@ -603,6 +612,7 @@ fn system_name(system: SystemKind) -> &'static str {
         SystemKind::ShapeField => "shape_field",
         SystemKind::WarpMesh => "warp_mesh",
         SystemKind::ShapeCollage => "shape_collage",
+        SystemKind::AnalyticField => "analytic_field",
     }
 }
 

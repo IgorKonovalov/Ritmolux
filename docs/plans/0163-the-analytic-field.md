@@ -1,6 +1,6 @@
 # 0163 — The analytic field
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-09
 > **Owner skill(s):** dev
 > **Related ADRs:** [0180](../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md)
@@ -237,17 +237,44 @@ documents), so this scene keeps its LUTs in their own bind group exactly as that
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `batch/2026-09-11`, worktree `C:\Users\Igor Konovalov\WORK\rlx-batch` (unattended batch run)
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the system, and Chladni through it | dev | not started | |
+| 1 — the system, and Chladni through it | dev | done | committed with this row |
 | 2 — the escape-time family | dev | not started | |
 | 3 — orbit traps | dev | not started | |
 | 4 — the tier cap and the golden regime | dev | not started | |
 | 5 — documentation and the reference | dev | not started | |
 
 ### Notes
+
+- Phase 1, files outside the phase's list, each forced by the new variant or by a gate: the
+  exhaustive `SystemKind` matches in `core/tests/{golden,animation,reactivity,sanity,geometry_extent}.rs`;
+  `core/tests/preset.rs` (`STRUCTURAL` roster + the `set_param` scan list); a golden fixture and
+  baseline (`core/tests/fixtures/analytic_field.toml`, `core/tests/golden/analytic_field.png`); the
+  regenerated `presets/README.md` block (a Phase 5 file - `the_parameter_reference_block_is_current`
+  fails on any new parameter); and a gallery entry (`scripts/docs-shots.mjs`,
+  `docs/images/gallery/analytic_field.png`, rendering the new teaching preset
+  `docs/examples/field/chladni.toml`) - Phase 5 material pulled forward because
+  `hygiene::every_system_has_a_gallery_image` fails without it. `core/src/render/mod.rs` was not
+  touched: scene construction lives in `scenes/mod.rs::create`.
+- Phase 1, bind-group layout: one group `[Texture, Texture, Sampler, Uniform]`, not the plan's
+  "LUTs in their own group as `fragment_field` does". Every single-uniform group shape is already
+  taken in `core/src` (`no_two_layouts_share_a_shape_without_recorded_evidence` prints them), so the
+  two-group split would have needed a new ADR-0058 allowlist entry with hardware-vs-WARP evidence.
+- Phase 1, `occlude`: with no post stage active, `fragment_field` itself does not let the backdrop
+  through at `occlude = 0` - its REPLACE blend overwrites the backdrop, so its own shader comment
+  ("at 0 the sky adds through an opaque field") holds only with a stage active. The analytic field
+  mirrors it exactly on both paths, and `occlude_behaves_as_it_does_on_fragment_field` asserts parity
+  on both plus the working stage-active path. Not fixed here (the plan does not touch
+  `fragment_field`).
+- Phase 1, golden: nine pre-existing baselines (`shape_field`, `warp_mesh*`, `shape_collage*`,
+  `backdrop_*`) read mean <= 0.0013 / outlier <= 2 on this machine's WARP, identically on the
+  unmodified tree, so adding the scene moved none of them; they were not re-blessed.
+- Phase 1, `-P fast`: two runs each had one standalone process test fail under load and pass alone -
+  `stream_show every_system_is_reported_by_the_key...` then `control_loopback
+  a_preset_datagram_selects_by_name`, both recorded as load flakes in `docs/plans/README-archive.md`.
 
 ### Close triggers
 

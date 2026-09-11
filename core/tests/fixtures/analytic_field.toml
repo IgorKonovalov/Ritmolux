@@ -1,0 +1,27 @@
+# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+#
+# The `analytic_field` scene's drift baseline: the Chladni plate at modes 3 and
+# 5, its nodal lines lit over a dark plate, with a little of the signed wave
+# mixed in so the baseline also sees the second half of the colour path.
+#
+#  - `mode_n`/`mode_m` bound although they equal the defaults, so a change of
+#    default cannot move this baseline; and unequal, because at equal modes
+#    the two waves cancel and the plate is blank - a flat frame no regression
+#    could move.
+#  - `plate_mix = "0.25"` keeps the lines dominant and still reaches the signed
+#    field's coordinate, so a change to either term moves this frame.
+#  - `zoom` off 1 so the plate does not fill the frame edge to edge, which would
+#    hide a regression that took the plate's extent from the wrong axis.
+system = "analytic_field"
+name   = "fixture_analytic_field"
+
+[field]
+family = "chladni"
+
+[params]
+mode_n     = "3"
+mode_m     = "5"
+line_width = "0.05"
+plate_mix  = "0.25"
+zoom       = "0.85"
+hue        = "0.1"

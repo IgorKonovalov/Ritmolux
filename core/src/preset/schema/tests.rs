@@ -588,6 +588,7 @@ fn descriptor_pairs() -> Vec<DescriptorPair> {
         (&raw::PATH, serde_fields::<raw::RawPath>()),
         (&raw::SPECTRUM, serde_fields::<raw::RawSpectrum>()),
         (&raw::MESH, serde_fields::<raw::RawMesh>()),
+        (&raw::FIELD, serde_fields::<raw::RawField>()),
         (&raw::MILK, serde_fields::<raw::RawMilk>()),
         (&raw::MILK_ELEMENT, serde_fields::<raw::RawMilkElement>()),
         (&raw::FEEDBACK, serde_fields::<raw::RawFeedback>()),
@@ -699,7 +700,7 @@ fn every_roster_value_parses_through_its_owners_parser() {
     /// A roster beside the parser that owns it.
     type RosterCheck = (Roster, fn(&str) -> bool);
 
-    let checks: [RosterCheck; 12] = [
+    let checks: [RosterCheck; 13] = [
         (Roster::System, |n| SystemKind::from_name(n).is_some()),
         (Roster::CurveFamily, |n| CurveFamily::from_name(n).is_some()),
         (Roster::AttractorFamily, |n| {
@@ -721,6 +722,7 @@ fn every_roster_value_parses_through_its_owners_parser() {
         (Roster::Tiling, |n| {
             n == "none" || hankin::tiling_order(n).is_some()
         }),
+        (Roster::FieldFamily, |n| FieldFamily::from_name(n).is_some()),
     ];
 
     for (roster, parses) in checks {
