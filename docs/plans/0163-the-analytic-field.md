@@ -241,8 +241,8 @@ documents), so this scene keeps its LUTs in their own bind group exactly as that
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the system, and Chladni through it | dev | done | committed with this row |
-| 2 — the escape-time family | dev | not started | |
+| 1 — the system, and Chladni through it | dev | done | 65d57d4 |
+| 2 — the escape-time family | dev | done | committed with this row |
 | 3 — orbit traps | dev | not started | |
 | 4 — the tier cap and the golden regime | dev | not started | |
 | 5 — documentation and the reference | dev | not started | |
@@ -275,6 +275,26 @@ documents), so this scene keeps its LUTs in their own bind group exactly as that
 - Phase 1, `-P fast`: two runs each had one standalone process test fail under load and pass alone -
   `stream_show every_system_is_reported_by_the_key...` then `control_loopback
   a_preset_datagram_selects_by_name`, both recorded as load flakes in `docs/plans/README-archive.md`.
+- Phase 2, the smooth count is `nu = n + 1 - log_p(ln|z_n| / ln R)`, not the plan's
+  `n + 1 - log2(log|z|)/log(power)`: the plan's expression does not reduce to the textbook
+  `n + 1 - log2(ln|z|)` at `power = 2`. The one used is continuous across every integer step for
+  any radius, and differs from the textbook form by a per-radius constant.
+- Phase 2, the palette coordinate is `nu / 32` (a fixed `ITERATIONS_PER_PALETTE`), not
+  `nu / iterations`, so a pixel's colour does not change with the budget - the tier cap in Phase 4
+  then recolours only pixels escaping past it. `map` on the `chladni` family is a load error.
+- Phase 2, "no pixel emits a non-finite value" is asserted on a CPU port of the shader's escape arm
+  (`analytic_field/mirror.rs`, 441 000 samples across every range's ends and past them), because an
+  8-bit capture cannot show a NaN; `the_gpu_draws_the_set_the_mirror_computes` holds the port to
+  the GPU's escape mask. The scene clamps `c`, `power`, `escape_radius`, `iterations` and a
+  non-finite pan CPU-side, and the shader's argument rests on those clamps.
+- Phase 2, `cpow` has one exit and a constant loop bound: an early `return` out of the whole-power
+  branch validated in naga, built its pipeline cleanly, and then lost the device at the first draw
+  on both WARP and the hardware adapter - on frames that never took that branch.
+  `the_shader_is_valid_wgsl` and `the_pipeline_builds_on_the_adapter` were added while finding
+  it; neither caught that failure, the captures did.
+- Phase 2, a second golden (`analytic_field_escape`, an EXTRA fixture in `core/tests/golden.rs`)
+  was added here rather than in Phase 4, so Phase 3's `trap = "none"` has a Phase 2 baseline to be
+  compared with.
 
 ### Close triggers
 

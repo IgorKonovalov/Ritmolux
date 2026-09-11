@@ -877,16 +877,22 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
-| `mode_n` | `3` | `chladni` `1` – `16` | The plate's first mode number: how many nodal lines cross one axis. Equal to `mode_m`, the two waves cancel and the plate is blank. |
-| `mode_m` | `5` | `chladni` `1` – `16` | The plate's second mode number: how many nodal lines cross the other axis. |
+| `mode_n` | `3` | `chladni` `1` – `16`; inert on `escape_time` | The plate's first mode number: how many nodal lines cross one axis. Equal to `mode_m`, the two waves cancel and the plate is blank. |
+| `mode_m` | `5` | `chladni` `1` – `16`; inert on `escape_time` | The plate's second mode number: how many nodal lines cross the other axis. |
+| `iterations` | `64` | `escape_time` `1` – `512`; inert on `chladni` | How many steps an orbit is followed before it is called part of the set; more resolves finer boundary detail. Capped by the quality tier. |
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
 
 **Modal**
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
-| `line_width` | `0.04` | `chladni` `0` – `0.3` | How wide a band around the nodal lines lights, in plate units (the plate is 2 across); 0 is a one-pixel line. |
-| `plate_mix` | `0` | `chladni` `0` – `1` | Blends from the nodal lines alone toward the whole signed wave, which reads as a standing wave rather than as sand. |
+| `line_width` | `0.04` | `chladni` `0` – `0.3`; inert on `escape_time` | How wide a band around the nodal lines lights, in plate units (the plate is 2 across); 0 is a one-pixel line. |
+| `plate_mix` | `0` | `chladni` `0` – `1`; inert on `escape_time` | Blends from the nodal lines alone toward the whole signed wave, which reads as a standing wave rather than as sand. |
+| `c_re` | `-0.8` | `escape_time` `-1.5` – `0.5`; inert on `chladni` | The real part of the Julia constant: the lever that reshapes the set, from one connected piece to dust. Inert on the `mandelbrot` map. |
+| `c_im` | `0.156` | `escape_time` `-1` – `1`; inert on `chladni` | The imaginary part of the Julia constant. Inert on the `mandelbrot` map. |
+| `escape_radius` | `16` | `escape_time` `2` – `256`; inert on `chladni` | How far an orbit must travel to count as escaped; larger smooths the colour bands' spacing. |
+| `power` | `2` | `escape_time` `1.5` – `8`; inert on `chladni` | The exponent in z -> z^power + c: 2 is the classic set, higher whole powers add lobes, and a fractional power tears along the negative real axis. |
+| `interior` | `0` | `escape_time` `0` – `1`; inert on `chladni` | How much light the set itself emits; 0 is the textbook black interior. |
 | `color_span` | `1` | `0` – `4` | How much of the palette the field's level covers; 0 is one flat colour. |
 | `color_center` | `0` | `-1` – `1` | Shifts which part of the palette the field's level starts from. |
 | `brightness` | `1` | `0` – `2` | The scene's overall light level, multiplying what it draws before the composite. |

@@ -119,13 +119,17 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
 ///   no line of `sd_bar`, `sd_ring`, `sd_segment`, `sd_arc` or `sd_checker`
 ///   executes. Also the only baseline where two elements composite `over` each
 ///   other rather than one hiding the other.
+/// - `analytic_field_escape` — the rostered `analytic_field.toml` draws the
+///   Chladni plate, so the family index never reaches the escape-time arm and
+///   not one orbit is iterated. The only baseline that runs `cpow`, the escape
+///   loop or the smooth count.
 ///
 /// **Captured after the roster loop, and appended rather than inserted.** Every
 /// pre-existing baseline is therefore rendered from the device state it always
 /// was, so adding an entry here moves none of them — which matters on WARP,
 /// where building GPU resources mid-run is documented to change what a later
 /// capture resolves to. For the same reason a new entry goes at the **end**.
-const EXTRA_FIXTURES: [(&str, &str); 10] = [
+const EXTRA_FIXTURES: [(&str, &str); 11] = [
     (
         "attractor_depth",
         include_str!("fixtures/attractor_depth.toml"),
@@ -150,6 +154,10 @@ const EXTRA_FIXTURES: [(&str, &str); 10] = [
     (
         "shape_field_path",
         include_str!("fixtures/shape_field_path.toml"),
+    ),
+    (
+        "analytic_field_escape",
+        include_str!("fixtures/analytic_field_escape.toml"),
     ),
 ];
 

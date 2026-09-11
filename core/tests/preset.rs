@@ -2185,6 +2185,9 @@ const STRUCTURAL: &[(&str, &str)] = &[
     // because a fractional mode is not a standing wave of the plate at all.
     ("analytic_field", "mode_n"),
     ("analytic_field", "mode_m"),
+    // `analytic_field::applied_iterations`: clamps into the tier's cap and
+    // rounds, because the budget is a loop bound.
+    ("analytic_field", "iterations"),
     // `fold_order` / `fold_edge`: the kaleidoscope's two stepped params.
     ("kaleidoscope", "kaleido_order"),
     ("kaleidoscope", "kaleido_edge"),

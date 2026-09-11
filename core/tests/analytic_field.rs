@@ -367,3 +367,347 @@ fn an_unknown_family_is_a_load_error() {
     let named = Preset::from_toml_str(&plate(3.0, 5.0, "")).expect("the plate loads");
     assert!(named.warnings.is_empty(), "{:?}", named.warnings);
 }
+
+// ---------------------------------------------------------------------------
+// Escape time
+// ---------------------------------------------------------------------------
+
+/// A Julia constant inside the Mandelbrot set: the main cardioid's
+/// `mu / 2 - mu^2 / 4` at `mu = 0.7 e^(2i)`, well inside `|mu| < 1`, so its
+/// filled Julia set is one quasi-disk with no pinch point a grid could split.
+const C_INSIDE: (f32, f32) = (-0.066, 0.411);
+
+/// A constant outside it: its own orbit leaves `|z| = 2` by the fourth step,
+/// so its Julia set is a Cantor dust of measure zero.
+const C_OUTSIDE: (f32, f32) = (0.534, 0.411);
+
+/// The escape-time view every test here shares: the plane `[-1.67, 1.67]^2`,
+/// wide enough to hold either set whole.
+const ESCAPE_ZOOM: f32 = 0.6;
+
+/// An escape-time preset over `palette`, the set's interior black.
+fn julia(c_re: &str, c_im: &str, palette: &str, extra: &str) -> String {
+    format!(
+        "system = \"analytic_field\"\nname = \"julia\"\n{palette}\
+         [field]\nfamily = \"escape_time\"\nmap = \"julia\"\n\
+         [params]\nc_re = \"{c_re}\"\nc_im = \"{c_im}\"\niterations = \"64\"\n\
+         escape_radius = \"16\"\ninterior = \"0\"\nzoom = \"{ESCAPE_ZOOM}\"\n{extra}"
+    )
+}
+
+/// The integer step at which `z -> z^2 + c` from `p` passes radius 16, or
+/// `None` within 64 steps — the textbook iteration, written independently of
+/// the shader.
+fn escape_step(p: (f32, f32), c: (f32, f32)) -> Option<u32> {
+    let (mut x, mut y) = p;
+    for n in 1..=64 {
+        (x, y) = (x * x - y * y + c.0, 2.0 * x * y + c.1);
+        if x * x + y * y > 256.0 {
+            return Some(n);
+        }
+    }
+    None
+}
+
+/// The dark pixels of `img` — the set's interior — as a mask.
+fn interior_mask(img: &CaptureImage) -> Vec<bool> {
+    (0..img.height)
+        .flat_map(|y| (0..img.width).map(move |x| (x, y)))
+        .map(|(x, y)| luma(img, x, y) < 64.0)
+        .collect()
+}
+
+/// The sizes of `mask`'s 4-connected components, largest first.
+fn components(mask: &[bool], width: usize) -> Vec<usize> {
+    let mut seen = vec![false; mask.len()];
+    let mut sizes = Vec::new();
+    for start in 0..mask.len() {
+        if !mask[start] || seen[start] {
+            continue;
+        }
+        let (mut size, mut stack) = (0usize, vec![start]);
+        seen[start] = true;
+        while let Some(i) = stack.pop() {
+            size += 1;
+            let (x, y) = (i % width, i / width);
+            let mut visit = |j: usize| {
+                if mask[j] && !seen[j] {
+                    seen[j] = true;
+                    stack.push(j);
+                }
+            };
+            if x > 0 {
+                visit(i - 1);
+            }
+            if x + 1 < width {
+                visit(i + 1);
+            }
+            if y > 0 {
+                visit(i - width);
+            }
+            if i + width < mask.len() {
+                visit(i + width);
+            }
+        }
+        sizes.push(size);
+    }
+    sizes.sort_unstable_by(|a, b| b.cmp(a));
+    sizes
+}
+
+/// The interior's share of the frame, and the share of the interior its
+/// largest connected piece holds.
+fn topology(img: &CaptureImage) -> (f32, f32) {
+    let mask = interior_mask(img);
+    let sizes = components(&mask, img.width as usize);
+    let interior: usize = sizes.iter().sum();
+    let largest = sizes.first().copied().unwrap_or(0);
+    (
+        interior as f32 / mask.len() as f32,
+        largest as f32 / interior.max(1) as f32,
+    )
+}
+
+/// **A Julia preset renders a connected filled set for `c` inside the
+/// Mandelbrot set and a dust for `c` outside it** — and the set drawn is the
+/// textbook one, held to an independent iteration pixel by pixel.
+#[test]
+fn a_julia_set_is_connected_for_c_inside_the_mandelbrot_set_and_dust_outside() {
+    const SIZE: u32 = 128;
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
+        return;
+    };
+    let inside = capture(
+        &mut renderer,
+        &julia(&C_INSIDE.0.to_string(), &C_INSIDE.1.to_string(), WHITE, ""),
+    );
+    let outside = capture(
+        &mut renderer,
+        &julia(
+            &C_OUTSIDE.0.to_string(),
+            &C_OUTSIDE.1.to_string(),
+            WHITE,
+            "",
+        ),
+    );
+    let (inside_share, inside_largest) = topology(&inside);
+    let (outside_share, _) = topology(&outside);
+    println!(
+        "c inside: interior {inside_share:.4} of the frame, its largest piece {inside_largest:.4}; \
+         c outside: interior {outside_share:.5}"
+    );
+    assert!(
+        inside_share > 0.05,
+        "c inside the Mandelbrot set filled only {inside_share:.4} of the frame"
+    );
+    assert!(
+        inside_largest > 0.99,
+        "c inside the Mandelbrot set drew a set in pieces: the largest holds only \
+         {inside_largest:.4} of the interior"
+    );
+    assert!(
+        outside_share < 0.002,
+        "c outside the Mandelbrot set left {outside_share:.5} of the frame interior — \
+         its Julia set is dust and should be almost nowhere"
+    );
+
+    // The set drawn is the set the textbook iteration defines.
+    let (mut agree, mut decided) = (0usize, 0usize);
+    for y in 0..SIZE {
+        for x in 0..SIZE {
+            let p = field_at(x, y, SIZE, SIZE, ESCAPE_ZOOM);
+            let step = escape_step(p, C_INSIDE);
+            // Orbits that escape on the last couple of steps sit on the
+            // boundary, where the last rounding decides; leave them out.
+            if step.is_some_and(|n| n > 62) {
+                continue;
+            }
+            decided += 1;
+            if (luma(&inside, x, y) < 64.0) == step.is_none() {
+                agree += 1;
+            }
+        }
+    }
+    let agreement = agree as f32 / decided as f32;
+    println!("the drawn set against the textbook iteration: {agreement:.4}");
+    assert!(
+        agreement > 0.99,
+        "only {agreement:.4} of the frame matches the textbook Julia set for c inside"
+    );
+}
+
+/// A grey ramp: palette coordinate `t` is grey level `t`, so a capture's
+/// brightness reads the palette coordinate back through the tonemap.
+const GREY: &str = "[palette]\nstops = [\
+    { at = 0.0, color = \"#000000\" }, \
+    { at = 1.0, color = \"#ffffff\" }]\n";
+
+/// **The palette across the escape boundary is free of integer banding at
+/// `palette_steps = 0`.**
+///
+/// `color_span = 4` makes one iteration an eighth of the palette — about thirty
+/// grey levels — so an integer count would print a hard edge wherever the
+/// escape step changes. Those places are found independently (the textbook
+/// iteration), and at each the capture's step across the pair is compared with
+/// its steps across the pairs either side: a smooth count moves across an
+/// integer step no faster than the slope around it.
+///
+/// **The control is a banded picture by construction.** The smooth count is a
+/// whole number exactly where the escape step changes (`|z_n| = R`), so at
+/// `color_span = 4` a `palette_steps = 8` cuts the palette at every one of
+/// those places — the integer count's picture, drawn through the same pass.
+/// The same statistic must convict it, or it could not convict banding.
+#[test]
+fn the_escape_boundary_is_free_of_integer_banding() {
+    const SIZE: u32 = 256;
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
+        return;
+    };
+    let smooth = capture(
+        &mut renderer,
+        &julia(
+            &C_INSIDE.0.to_string(),
+            &C_INSIDE.1.to_string(),
+            GREY,
+            "color_span = \"4\"\npalette_steps = \"0\"\n",
+        ),
+    );
+    let banded = capture(
+        &mut renderer,
+        &julia(
+            &C_INSIDE.0.to_string(),
+            &C_INSIDE.1.to_string(),
+            GREY,
+            "color_span = \"4\"\npalette_steps = \"8\"\n",
+        ),
+    );
+    let (judged, worst_excess, span) = worst_step_excess(&smooth);
+    let (_, banded_excess, _) = worst_step_excess(&banded);
+    println!(
+        "{judged} integer steps judged; the smooth palette exceeds its local slope by at \
+         most {worst_excess:.2} grey levels over a span {:.0}..{:.0}; the banded control by \
+         {banded_excess:.2}",
+        span.0, span.1
+    );
+    assert!(
+        judged >= 20,
+        "only {judged} integer steps were judged, too few to show banding"
+    );
+    assert!(
+        span.1 - span.0 > 40.0,
+        "the judged pixels span only {:.0} grey levels, so a band edge could hide in them",
+        span.1 - span.0
+    );
+    assert!(
+        banded_excess > 16.0,
+        "the banded control exceeds its slope by only {banded_excess:.2}, so this \
+         statistic cannot see an integer band edge"
+    );
+    assert!(
+        worst_excess < 8.0,
+        "across an integer escape step the palette jumps {worst_excess:.2} grey levels past \
+         its local slope — the boundary is banded"
+    );
+}
+
+/// Over every place the escape step changes by one between two exterior
+/// neighbours, how far the capture's jump across the pair exceeds its jumps
+/// across the pairs either side: `(places judged, worst excess, luma span)`.
+fn worst_step_excess(img: &CaptureImage) -> (usize, f32, (f32, f32)) {
+    let size = img.width;
+    let (mut judged, mut worst_excess, mut span) = (0usize, 0.0f32, (255.0f32, 0.0f32));
+    for y in 0..size {
+        let row: Vec<Option<u32>> = (0..size)
+            .map(|x| escape_step(field_at(x, y, size, size, ESCAPE_ZOOM), C_INSIDE))
+            .collect();
+        for x in 2..size - 1 {
+            let (a, b) = (row[(x - 1) as usize], row[x as usize]);
+            // Exterior on both sides, one integer step apart, and early
+            // enough that 4 * nu / 32 has not wrapped the repeat-addressed
+            // palette.
+            let (Some(a), Some(b)) = (a, b) else { continue };
+            if a == b || a.max(b) > 6 {
+                continue;
+            }
+            // The two neighbouring pairs must each sit inside one step.
+            if row[(x - 2) as usize] != Some(a) || row[(x + 1) as usize] != Some(b) {
+                continue;
+            }
+            let l = |i: u32| luma(img, i, y);
+            let jump = (l(x) - l(x - 1)).abs();
+            let slope = (l(x - 1) - l(x - 2)).abs().max((l(x + 1) - l(x)).abs());
+            judged += 1;
+            worst_excess = worst_excess.max(jump - slope);
+            span = (span.0.min(l(x)), span.1.max(l(x)));
+        }
+    }
+    (judged, worst_excess, span)
+}
+
+/// **A bass-driven `c_re` visibly morphs the set's topology**: silence holds
+/// `c` inside the Mandelbrot set and the set is one piece; full bass carries it
+/// outside and the set falls to dust. The same preset, two analysis frames.
+#[test]
+fn a_bass_driven_c_re_morphs_the_topology() {
+    const SIZE: u32 = 128;
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
+        return;
+    };
+    let c_re = format!("{} + {} * bass", C_INSIDE.0, C_OUTSIDE.0 - C_INSIDE.0);
+    let toml = julia(&c_re, &C_INSIDE.1.to_string(), WHITE, "");
+    let preset = Preset::from_toml_str(&toml).expect("the bass-driven Julia loads");
+    renderer.set_presets(vec![preset]);
+    let at = |renderer: &mut Renderer, bass: f32| {
+        let frame = AnalysisFrame {
+            bass,
+            ..Default::default()
+        };
+        renderer
+            .capture_preset("julia", &frame, FRAMES)
+            .expect("capture the bass-driven Julia")
+    };
+    let quiet = topology(&at(&mut renderer, 0.0));
+    let loud = topology(&at(&mut renderer, 1.0));
+    println!(
+        "bass 0: interior {:.4}, largest piece {:.4}; bass 1: interior {:.5}",
+        quiet.0, quiet.1, loud.0
+    );
+    assert!(
+        quiet.0 > 0.05 && quiet.1 > 0.99,
+        "at silence the set should be one filled piece: {quiet:?}"
+    );
+    assert!(
+        loud.0 < 0.002,
+        "at full bass the set should be dust: interior {:.5}",
+        loud.0
+    );
+}
+
+/// `[field] map` is escape time's alone, and names its roster when it is
+/// misspelled — both load errors, never a silent default.
+#[test]
+fn the_escape_map_is_validated_at_load() {
+    let on_plate = Preset::from_toml_str(
+        "system = \"analytic_field\"\n[field]\nfamily = \"chladni\"\nmap = \"julia\"\n",
+    )
+    .expect_err("a map on the plate must not load");
+    assert!(
+        on_plate.to_string().contains("escape_time"),
+        "the error must say which family a map belongs to: {on_plate}"
+    );
+    let unknown = Preset::from_toml_str(
+        "system = \"analytic_field\"\n[field]\nfamily = \"escape_time\"\nmap = \"fatou\"\n",
+    )
+    .expect_err("an unknown map must not load");
+    let message = unknown.to_string();
+    assert!(
+        message.contains("fatou") && message.contains("mandelbrot"),
+        "the error must name the bad value and the roster: {message}"
+    );
+    for map in ["julia", "mandelbrot"] {
+        Preset::from_toml_str(&format!(
+            "system = \"analytic_field\"\n[field]\nfamily = \"escape_time\"\nmap = \"{map}\"\n"
+        ))
+        .unwrap_or_else(|e| panic!("map = {map} must load: {e}"));
+    }
+}

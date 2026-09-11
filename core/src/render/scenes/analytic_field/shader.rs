@@ -30,6 +30,12 @@ struct Params {
     // x: line_width (plate units), y: plate_mix, z: one pixel of the target in
     // field units, w: unused
     e: vec4<f32>,
+    // x, y: c (the Julia constant), z: iterations (whole, >= 1, capped
+    // CPU-side), w: escape_radius (clamped CPU-side into [2, 256])
+    f: vec4<f32>,
+    // x: power (clamped CPU-side into [1.1, 8]), y: interior light,
+    // z: map (0 julia, 1 mandelbrot), w: unused
+    g: vec4<f32>,
 }
 
 // One group, the LUTs before the uniform. The order is what keeps this layout a
@@ -142,6 +148,97 @@ fn chladni(p: vec2<f32>) -> Sample {
     return s;
 }
 
+// How many iterations of smooth count one traversal of the palette spans at
+// `color_span = 1`. A FIXED scale, not `iterations`: a pixel that escapes at
+// step 7 keeps its colour whatever the budget is, so raising or capping the
+// budget changes only the pixels that escape past it. The LUT is
+// repeat-addressed, so deeper counts cycle the palette.
+const ITERATIONS_PER_PALETTE: f32 = 32.0;
+
+// z^power. A whole power multiplies exactly, which keeps z^2 + c the textbook
+// map to the last bit; a fractional one goes through the polar form, whose
+// angle `atan2` cuts along the negative real axis — the seam a fractional
+// power shows. The origin is its own image, and is selected over whatever
+// `atan2(0, 0)` makes of it.
+//
+// ONE EXIT, AND A CONSTANT LOOP BOUND. An early `return` out of the whole-power
+// branch, or a trip count read from `power`, compiles and validates and then
+// loses the device at the first draw on the DX12 software adapter — even on a
+// frame whose family never calls this. The multiply loop runs to the largest
+// power `MAX_POWER` allows and skips the steps past `power`.
+fn cpow(z: vec2<f32>, power: f32) -> vec2<f32> {
+    var out = z;
+    if (fract(power) == 0.0) {
+        for (var i = 2.0; i <= 8.0; i = i + 1.0) {
+            if (i <= power) {
+                out = vec2<f32>(out.x * z.x - out.y * z.y, out.x * z.y + out.y * z.x);
+            }
+        }
+    } else {
+        let r2 = dot(z, z);
+        let theta = atan2(z.y, z.x);
+        let rp = exp(0.5 * power * log(max(r2, 1e-30)));
+        let polar = rp * vec2<f32>(cos(power * theta), sin(power * theta));
+        out = select(polar, vec2<f32>(0.0), r2 < 1e-30);
+    }
+    return out;
+}
+
+// Escape time: z -> z^power + c, iterated until |z| passes the escape radius
+// or the budget runs out. `map` chooses whether c is the constant (Julia, the
+// orbit starting at the pixel) or the pixel (Mandelbrot, the orbit starting at
+// zero).
+//
+// The palette coordinate is the SMOOTH count
+//     nu = n + 1 - log_p( ln|z_n| / ln R )
+// which runs continuously across the step where the integer count n jumps:
+// |z_n| just past R gives n + 1, and |z_n| near R^p gives n — the value the
+// neighbour that escaped one step earlier reached. The integer count bands the
+// palette into contour steps; this is what makes the boundary read as a glow.
+//
+// Every term is kept finite by construction: the pixel is clamped before it
+// seeds the orbit, the radius and power are clamped CPU-side, `|z|^2` is
+// clamped below f32's ceiling before its log, and an escaped |z| exceeds R so
+// the inner log's argument is at least 1.
+fn escape_time(p: vec2<f32>) -> Sample {
+    let iterations = u32(params.f.z);
+    let radius = params.f.w;
+    let power = params.g.x;
+    let mandelbrot = params.g.z > 0.5;
+    let q = clamp(p, vec2<f32>(-64.0), vec2<f32>(64.0));
+    var z = select(q, vec2<f32>(0.0), mandelbrot);
+    let c = select(params.f.xy, q, mandelbrot);
+    let r2 = radius * radius;
+
+    var n = 0u;
+    var escaped = false;
+    loop {
+        if (n >= iterations) {
+            break;
+        }
+        z = cpow(z, power) + c;
+        n = n + 1u;
+        if (dot(z, z) > r2) {
+            escaped = true;
+            break;
+        }
+    }
+
+    var s: Sample;
+    if (escaped) {
+        let log_mod = 0.5 * log(min(dot(z, z), 1e37));
+        let nu = f32(n) + 1.0 - log(max(log_mod / log(radius), 1.0)) / log(power);
+        s.coord = max(nu, 0.0) / ITERATIONS_PER_PALETTE;
+        s.light = 1.0;
+    } else {
+        // The set itself: coloured by how far out its orbit ended, which is
+        // bounded for a point that never escaped.
+        s.coord = 0.25 * min(length(z), 2.0);
+        s.light = clamp(params.g.y, 0.0, 1.0);
+    }
+    return s;
+}
+
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let aspect = params.a.x;
@@ -158,6 +255,9 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let family = u32(params.d.y + 0.5);
     var s: Sample;
     switch family {
+        case 1u: {
+            s = escape_time(p);
+        }
         default: {
             s = chladni(p);
         }

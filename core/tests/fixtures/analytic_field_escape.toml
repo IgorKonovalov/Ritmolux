@@ -1,0 +1,33 @@
+# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+#
+# The analytic field's escape-time arm, authored inside its STABLE REGIME
+# (ADR-0180 rule 3), so one float of divergence between adapters cannot flip a
+# pixel between the set and its outside:
+#
+#  - `c` deep inside the Mandelbrot set's main cardioid (mu = 0.7 e^(2i)), far
+#    from the boundary where the set's topology changes. Its Julia set is one
+#    quasi-disk whose interior orbits fall onto an attracting fixed point.
+#  - `iterations = 48`, inside the Floor tier's cap, so the same picture is what
+#    every tier draws.
+#  - `zoom = 0.6`, shallow: the whole set in frame, nothing magnified.
+#  - `interior = 0.3` so the baseline also sees the set's own colour path, and
+#    `color_span` off 1 so a change to the smooth count's scale moves it.
+#
+# No `trap` key: this is the plain escape-time picture a `trap = "none"` must
+# reproduce byte for byte.
+system = "analytic_field"
+name   = "fixture_analytic_field_escape"
+
+[field]
+family = "escape_time"
+map    = "julia"
+
+[params]
+c_re          = "-0.066"
+c_im          = "0.411"
+iterations    = "48"
+escape_radius = "16"
+interior      = "0.3"
+zoom          = "0.6"
+color_span    = "1.5"
+hue           = "0.55"

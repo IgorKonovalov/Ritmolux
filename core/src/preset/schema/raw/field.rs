@@ -9,8 +9,12 @@ use super::super::*;
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(in crate::preset::schema) struct RawField {
-    /// Family name (`"chladni"`); validated at load.
+    /// Family name (`"chladni"` / `"escape_time"`); validated at load.
     pub(in crate::preset::schema) family: String,
+    /// `"julia"` / `"mandelbrot"`: whether `c` is a parameter or the pixel.
+    /// Escape time only; absent means `julia`.
+    #[serde(default)]
+    pub(in crate::preset::schema) map: Option<String>,
 }
 
 impl RawField {
@@ -29,7 +33,30 @@ impl RawField {
                     .join(", ")
             ))
         })?;
-        Ok(FieldConfig { family })
+        // A map on a family that has no orbit is refused rather than ignored:
+        // the author asked for something the engine cannot do, and a silent
+        // no-op would leave them looking for the Mandelbrot set on a plate.
+        let map = match self.map {
+            None => EscapeMap::default(),
+            Some(name) if family != FieldFamily::EscapeTime => {
+                return Err(PresetError::Config(format!(
+                    "[field] map = '{name}' is escape_time only; the '{}' family has no \
+                     orbit for it to seed",
+                    family.as_str()
+                )));
+            }
+            Some(name) => EscapeMap::from_name(&name).ok_or_else(|| {
+                PresetError::Config(format!(
+                    "unknown [field] map '{name}' (expected one of: {})",
+                    EscapeMap::ALL
+                        .iter()
+                        .map(|m| m.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ))
+            })?,
+        };
+        Ok(FieldConfig { family, map })
     }
 }
 
@@ -46,10 +73,19 @@ impl RawField {
 pub(in crate::preset::schema) const FIELD: TableDesc = TableDesc {
     name: "field",
     doc: "Which closed-form world the analytic field draws.",
-    keys: &[KeyDesc {
-        name: "family",
-        kind: KeyKind::Roster(Roster::FieldFamily),
-        default: "",
-        doc: "The field family. Required inside the table; an absent table is chladni.",
-    }],
+    keys: &[
+        KeyDesc {
+            name: "family",
+            kind: KeyKind::Roster(Roster::FieldFamily),
+            default: "",
+            doc: "The field family. Required inside the table; an absent table is chladni.",
+        },
+        KeyDesc {
+            name: "map",
+            kind: KeyKind::Roster(Roster::EscapeMap),
+            default: "julia",
+            doc: "Escape time only: julia iterates from the pixel with c the constant, \
+                  mandelbrot makes the pixel c.",
+        },
+    ],
 };

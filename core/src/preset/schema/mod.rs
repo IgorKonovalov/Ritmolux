@@ -17,7 +17,7 @@ use super::expr::{self, Expr, ExprError};
 use crate::render::feedback::{Deposit, FeedbackConfig, Warp};
 use crate::render::palette::{NamedPalette, PaletteConfig};
 use crate::render::scenes::ParamKind;
-use crate::render::scenes::analytic_field::{FieldConfig, FieldFamily};
+use crate::render::scenes::analytic_field::{EscapeMap, FieldConfig, FieldFamily};
 use crate::render::scenes::lines::star::{DEFAULT_RING_SCALE, MAX_RING_COUNT, Motif, RingSpec};
 use crate::render::scenes::lines::{
     CurveFamily, GeneratorConfig, MAX_LSYSTEM_DEPTH, SpectrumLayout, hankin,

@@ -2,8 +2,9 @@
 //! function of position, coloured through the shared palette LUT (ADR-0021).
 //!
 //! Every stateless per-pixel mathematical world lives here as a named
-//! **family** (ADR-0180 rule 1), selected by `[field] family`. The first family
-//! is the Chladni plate, whose two integer mode numbers are the whole figure.
+//! **family** (ADR-0180 rule 1), selected by `[field] family`: the Chladni
+//! plate, whose two integer mode numbers are the whole figure, and escape time
+//! — the Julia and Mandelbrot sets — coloured by the smooth iteration count.
 //!
 //! # No state between frames
 //!
@@ -51,12 +52,15 @@ pub enum FieldFamily {
     /// numbers are `mode_n` and `mode_m`.
     #[default]
     Chladni,
+    /// Escape time: `z -> z^power + c` iterated to an escape radius, coloured
+    /// by the smooth iteration count — the Julia and Mandelbrot sets.
+    EscapeTime,
 }
 
 impl FieldFamily {
     /// Every family, in the order the shader's family index numbers them and
     /// the generated reference lists them.
-    pub const ALL: [FieldFamily; 1] = [FieldFamily::Chladni];
+    pub const ALL: [FieldFamily; 2] = [FieldFamily::Chladni, FieldFamily::EscapeTime];
 
     /// Parse the canonical `[field] family = "..."` value, or `None`.
     pub fn from_name(name: &str) -> Option<Self> {
@@ -67,6 +71,7 @@ impl FieldFamily {
     pub fn as_str(self) -> &'static str {
         match self {
             FieldFamily::Chladni => "chladni",
+            FieldFamily::EscapeTime => "escape_time",
         }
     }
 
@@ -75,6 +80,38 @@ impl FieldFamily {
     fn index(self) -> u32 {
         match self {
             FieldFamily::Chladni => 0,
+            FieldFamily::EscapeTime => 1,
+        }
+    }
+}
+
+/// Escape time only: what the pixel is (ADR-0180's `[field] map`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum EscapeMap {
+    /// The pixel seeds the orbit and `c` is the `c_re`/`c_im` constant — one
+    /// Julia set, which the constant reshapes.
+    #[default]
+    Julia,
+    /// The pixel is `c` and every orbit starts at zero — the Mandelbrot set,
+    /// the map of which constants give a connected Julia set. `c_re`/`c_im` are
+    /// inert.
+    Mandelbrot,
+}
+
+impl EscapeMap {
+    /// Both maps, for the load error and the schema export.
+    pub const ALL: [EscapeMap; 2] = [EscapeMap::Julia, EscapeMap::Mandelbrot];
+
+    /// Parse the canonical `[field] map = "..."` value, or `None`.
+    pub fn from_name(name: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|map| map.as_str() == name)
+    }
+
+    /// The canonical name — [`from_name`](Self::from_name)'s inverse.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            EscapeMap::Julia => "julia",
+            EscapeMap::Mandelbrot => "mandelbrot",
         }
     }
 }
@@ -86,6 +123,9 @@ impl FieldFamily {
 pub struct FieldConfig {
     /// Which world is drawn.
     pub family: FieldFamily,
+    /// Escape time only: whether `c` is a parameter or the pixel. The loader
+    /// refuses a `map` on any other family.
+    pub map: EscapeMap,
 }
 
 /// The largest mode number either axis of the plate accepts. Past it the nodal
@@ -105,6 +145,49 @@ pub(crate) fn applied_mode(value: f32, default: f32) -> f32 {
     }
 }
 
+/// The most iterations any tier lets an escape-time preset ask for — the top of
+/// `iterations`' declared range, and the loop bound the shader is handed.
+pub const MAX_ITERATIONS: f32 = 512.0;
+
+/// A bound iteration budget as the shader reads it: clamped into
+/// `1..=cap` and rounded, so the loop bound is a whole number the tier allows.
+/// A non-finite value falls back to the declared default, itself capped.
+pub(crate) fn applied_iterations(value: f32, cap: f32) -> f32 {
+    let cap = cap.clamp(1.0, MAX_ITERATIONS);
+    if value.is_finite() {
+        value.clamp(1.0, cap).round()
+    } else {
+        DEFAULT_ITERATIONS.min(cap)
+    }
+}
+
+/// `value` clamped into `[lo, hi]`, or `fallback` when it is not finite. The
+/// escape-time parameters are clamped CPU-side because the shader's finiteness
+/// argument rests on their bounds (see its `escape_time` comment): a power at 1
+/// divides by `ln 1`, a radius under 2 lets bounded orbits "escape", and an
+/// unbounded `c` can overflow f32 in one step.
+fn bounded(value: f32, lo: f32, hi: f32, fallback: f32) -> f32 {
+    if value.is_finite() {
+        value.clamp(lo, hi)
+    } else {
+        fallback
+    }
+}
+
+/// The smallest `power` the shader is handed: the smooth count divides by
+/// `ln power`, which vanishes at 1.
+pub const MIN_POWER: f32 = 1.1;
+/// The largest `power`, which with the largest radius keeps `|z|^power` inside
+/// f32 for one step past escape.
+pub const MAX_POWER: f32 = 8.0;
+/// The escape radius's clamp. Below 2 an orbit that stays bounded can still
+/// cross it; above 256 one step past it can overflow at the largest power.
+pub const ESCAPE_RADIUS_RANGE: [f32; 2] = [2.0, 256.0];
+/// How far `c` may sit from the origin on either axis. Every constant with a
+/// connected Julia set lies inside `|c| <= 2`; this leaves room for a binding
+/// to overshoot into dust without letting it reach f32's ceiling.
+pub const C_LIMIT: f32 = 4.0;
+
 const DEFAULT_HUE: f32 = 0.0;
 const DEFAULT_ZOOM: f32 = 1.0;
 const DEFAULT_COLOR_SPAN: f32 = default_of(PARAMS, "color_span");
@@ -113,6 +196,12 @@ const DEFAULT_MODE_N: f32 = default_of(PARAMS, "mode_n");
 const DEFAULT_MODE_M: f32 = default_of(PARAMS, "mode_m");
 const DEFAULT_LINE_WIDTH: f32 = default_of(PARAMS, "line_width");
 const DEFAULT_PLATE_MIX: f32 = default_of(PARAMS, "plate_mix");
+const DEFAULT_C_RE: f32 = default_of(PARAMS, "c_re");
+const DEFAULT_C_IM: f32 = default_of(PARAMS, "c_im");
+const DEFAULT_ITERATIONS: f32 = default_of(PARAMS, "iterations");
+const DEFAULT_ESCAPE_RADIUS: f32 = default_of(PARAMS, "escape_radius");
+const DEFAULT_POWER: f32 = default_of(PARAMS, "power");
+const DEFAULT_INTERIOR: f32 = default_of(PARAMS, "interior");
 
 /// The parameter names this scene consumes — the vocabulary a preset binding is
 /// checked against at load (ADR-0020). **Keep in sync with `set_param` below**;
@@ -151,6 +240,52 @@ pub const PARAMS: &[ParamSpec] = &[
         kind: ParamKind::Modal,
     },
     ParamSpec {
+        name: "iterations",
+        default: 64.0,
+        range: Some([1.0, MAX_ITERATIONS]),
+        doc: "How many steps an orbit is followed before it is called part of the set; more \
+              resolves finer boundary detail. Capped by the quality tier.",
+        kind: ParamKind::Structural,
+    },
+    ParamSpec {
+        name: "c_re",
+        default: -0.8,
+        range: Some([-1.5, 0.5]),
+        doc: "The real part of the Julia constant: the lever that reshapes the set, from one \
+              connected piece to dust. Inert on the `mandelbrot` map.",
+        kind: ParamKind::Modal,
+    },
+    ParamSpec {
+        name: "c_im",
+        default: 0.156,
+        range: Some([-1.0, 1.0]),
+        doc: "The imaginary part of the Julia constant. Inert on the `mandelbrot` map.",
+        kind: ParamKind::Modal,
+    },
+    ParamSpec {
+        name: "escape_radius",
+        default: 16.0,
+        range: Some([2.0, 256.0]),
+        doc: "How far an orbit must travel to count as escaped; larger smooths the colour \
+              bands' spacing.",
+        kind: ParamKind::Modal,
+    },
+    ParamSpec {
+        name: "power",
+        default: 2.0,
+        range: Some([1.5, MAX_POWER]),
+        doc: "The exponent in z -> z^power + c: 2 is the classic set, higher whole powers add \
+              lobes, and a fractional power tears along the negative real axis.",
+        kind: ParamKind::Modal,
+    },
+    ParamSpec {
+        name: "interior",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "How much light the set itself emits; 0 is the textbook black interior.",
+        kind: ParamKind::Modal,
+    },
+    ParamSpec {
         name: "color_span",
         default: 1.0,
         range: Some([0.0, 4.0]),
@@ -178,13 +313,19 @@ pub const PARAMS: &[ParamSpec] = &[
 /// One row of [`FAMILY_PARAMS`], its ranges in [`FieldFamily::ALL`]'s order.
 /// `None` is a family that does not read the parameter.
 macro_rules! per_family {
-    ($name:literal: $chladni:expr $(,)?) => {
+    ($name:literal: $chladni:expr, $escape_time:expr $(,)?) => {
         FamilyParam {
             name: $name,
-            ranges: &[FamilyRange {
-                family: "chladni",
-                range: $chladni,
-            }],
+            ranges: &[
+                FamilyRange {
+                    family: "chladni",
+                    range: $chladni,
+                },
+                FamilyRange {
+                    family: "escape_time",
+                    range: $escape_time,
+                },
+            ],
         }
     };
 }
@@ -196,10 +337,16 @@ macro_rules! per_family {
 /// held by this module's tests. A parameter missing from here reads the same on
 /// every family.
 pub const FAMILY_PARAMS: &[FamilyParam] = &[
-    per_family!("mode_n": Some([1.0, MAX_MODE])),
-    per_family!("mode_m": Some([1.0, MAX_MODE])),
-    per_family!("line_width": Some([0.0, 0.3])),
-    per_family!("plate_mix": Some([0.0, 1.0])),
+    per_family!("mode_n": Some([1.0, MAX_MODE]), None),
+    per_family!("mode_m": Some([1.0, MAX_MODE]), None),
+    per_family!("line_width": Some([0.0, 0.3]), None),
+    per_family!("plate_mix": Some([0.0, 1.0]), None),
+    per_family!("iterations": None, Some([1.0, MAX_ITERATIONS])),
+    per_family!("c_re": None, Some([-1.5, 0.5])),
+    per_family!("c_im": None, Some([-1.0, 1.0])),
+    per_family!("escape_radius": None, Some([2.0, 256.0])),
+    per_family!("power": None, Some([1.5, MAX_POWER])),
+    per_family!("interior": None, Some([0.0, 1.0])),
 ];
 
 #[repr(C)]
@@ -210,6 +357,8 @@ struct Params {
     c: [f32; 4],
     d: [f32; 4],
     e: [f32; 4],
+    f: [f32; 4],
+    g: [f32; 4],
 }
 
 /// The fullscreen analytic field, driven by named preset parameters and one
@@ -232,6 +381,12 @@ pub struct AnalyticFieldScene {
     mode_m: f32,
     line_width: f32,
     plate_mix: f32,
+    c_re: f32,
+    c_im: f32,
+    iterations: f32,
+    escape_radius: f32,
+    power: f32,
+    interior: f32,
     /// How much of this field's coverage the backdrop resolves against
     /// (ADR-0085). Set by the renderer every frame through
     /// [`Scene::set_occlude`] — **not** a named param, so `reset_params` leaves
@@ -299,6 +454,12 @@ impl AnalyticFieldScene {
             mode_m: DEFAULT_MODE_M,
             line_width: DEFAULT_LINE_WIDTH,
             plate_mix: DEFAULT_PLATE_MIX,
+            c_re: DEFAULT_C_RE,
+            c_im: DEFAULT_C_IM,
+            iterations: DEFAULT_ITERATIONS,
+            escape_radius: DEFAULT_ESCAPE_RADIUS,
+            power: DEFAULT_POWER,
+            interior: DEFAULT_INTERIOR,
             occlude: crate::render::post::DEFAULT_OCCLUDE,
         }
     }
@@ -339,6 +500,12 @@ impl Scene for AnalyticFieldScene {
         self.mode_m = DEFAULT_MODE_M;
         self.line_width = DEFAULT_LINE_WIDTH;
         self.plate_mix = DEFAULT_PLATE_MIX;
+        self.c_re = DEFAULT_C_RE;
+        self.c_im = DEFAULT_C_IM;
+        self.iterations = DEFAULT_ITERATIONS;
+        self.escape_radius = DEFAULT_ESCAPE_RADIUS;
+        self.power = DEFAULT_POWER;
+        self.interior = DEFAULT_INTERIOR;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
@@ -355,6 +522,12 @@ impl Scene for AnalyticFieldScene {
             "mode_m" => self.mode_m = value,
             "line_width" => self.line_width = value,
             "plate_mix" => self.plate_mix = value,
+            "c_re" => self.c_re = value,
+            "c_im" => self.c_im = value,
+            "iterations" => self.iterations = value,
+            "escape_radius" => self.escape_radius = value,
+            "power" => self.power = value,
+            "interior" => self.interior = value,
             _ => {}
         }
     }
@@ -379,8 +552,11 @@ impl Scene for AnalyticFieldScene {
         };
         // One pixel of the target, in field units: the short axis spans 2 / zoom.
         let pixel = 2.0 / (zoom * self.target_height as f32);
+        // A pan is unbounded but must be a number: the escape arm clamps the
+        // point it seeds an orbit with, and a clamp cannot rescue a NaN.
+        let pan = |v: f32| if v.is_finite() { v } else { 0.0 };
         let params = Params {
-            a: [aspect.max(0.1), zoom, self.pan.x, self.pan.y],
+            a: [aspect.max(0.1), zoom, pan(self.pan.x), pan(self.pan.y)],
             b: [
                 self.colour.hue,
                 self.color_span,
@@ -400,6 +576,26 @@ impl Scene for AnalyticFieldScene {
                 applied_mode(self.mode_m, DEFAULT_MODE_M),
             ],
             e: [self.line_width, self.plate_mix, pixel, 0.0],
+            f: [
+                bounded(self.c_re, -C_LIMIT, C_LIMIT, DEFAULT_C_RE),
+                bounded(self.c_im, -C_LIMIT, C_LIMIT, DEFAULT_C_IM),
+                applied_iterations(self.iterations, MAX_ITERATIONS),
+                bounded(
+                    self.escape_radius,
+                    ESCAPE_RADIUS_RANGE[0],
+                    ESCAPE_RADIUS_RANGE[1],
+                    DEFAULT_ESCAPE_RADIUS,
+                ),
+            ],
+            g: [
+                bounded(self.power, MIN_POWER, MAX_POWER, DEFAULT_POWER),
+                bounded(self.interior, 0.0, 1.0, DEFAULT_INTERIOR),
+                match self.config.map {
+                    EscapeMap::Julia => 0.0,
+                    EscapeMap::Mandelbrot => 1.0,
+                },
+                0.0,
+            ],
         };
         self.gpu.write_uniform(queue, &params);
 
@@ -410,5 +606,7 @@ impl Scene for AnalyticFieldScene {
     }
 }
 
+#[cfg(test)]
+mod mirror;
 #[cfg(test)]
 mod tests;
