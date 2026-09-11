@@ -67,6 +67,48 @@ pub(super) fn life_step(cells: &[u8], n: u32, wrap: bool, birth: u32, survive: u
         .collect()
 }
 
+/// A field with its age channel: per cell, the state and the generations since
+/// it last changed, saturating at [`AGE_CAP`](super::AGE_CAP).
+#[derive(Clone, Debug, PartialEq)]
+pub(super) struct Aged {
+    pub(super) state: Vec<u8>,
+    pub(super) age: Vec<f32>,
+}
+
+impl Aged {
+    /// A seeded field: live cells at age 0, dead ones at the cap — a seed has
+    /// no history, so nothing starts with a wake.
+    pub(super) fn seeded(state: Vec<u8>) -> Self {
+        let age = state
+            .iter()
+            .map(|s| if *s == 1 { 0.0 } else { super::AGE_CAP })
+            .collect();
+        Self { state, age }
+    }
+
+    /// Advance to `next`: a cell that changed restarts at 0, one that did not
+    /// counts on to the cap. `aged` is false for a disc, which is not a
+    /// generation and leaves an unchanged cell's age where it was.
+    pub(super) fn then(&self, next: Vec<u8>, aged: bool) -> Self {
+        let age = self
+            .state
+            .iter()
+            .zip(&next)
+            .zip(&self.age)
+            .map(|((was, now), age)| {
+                if was != now {
+                    0.0
+                } else if aged {
+                    (age + 1.0).min(super::AGE_CAP)
+                } else {
+                    *age
+                }
+            })
+            .collect();
+        Self { state: next, age }
+    }
+}
+
 /// The field after one reseed disc: every cell within the disc — measured
 /// across the seam on a torus — reseeded under the stamp's own seed.
 pub(super) fn stamp(cells: &[u8], n: u32, wrap: bool, s: Stamp, threshold: u32) -> Vec<u8> {

@@ -252,8 +252,8 @@ pub struct CellularConfig {
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the system, grid, clock, `life_like` | dev | done | committed with this row |
-| 2 — the age channel | dev | not started | |
+| 1 — the system, grid, clock, `life_like` | dev | done | f93f3e2 |
+| 2 — the age channel | dev | done | committed with this row |
 | 3 — `larger_than_life` | dev | not started | |
 | 4 — `cyclic` | dev | not started | |
 | 5 — tier cap, golden, determinism | dev | not started | |
@@ -289,6 +289,14 @@ pub struct CellularConfig {
   (`cargo --config "env.RLX_BLESS='1'" test -p rlx-core --test golden scenes_match_golden_baselines`).
   That rewrote the nine pre-existing baselines 0163's log names (this machine's WARP drift); they
   were restored to HEAD and only `cellular.png` is new.
+- Phase 2, the age channel is a count, not a decaying value: generations since the cell last
+  changed, saturating at 1023. The decay the plan names is in the present, which fades a dead cell
+  as `1 - (age + 1) / (trail + 1)` and slides it `age_tint` along the palette; live cells never
+  move with `age_tint`. Defaults `trail = 12`, `age_tint = 0.35`.
+- Phase 2, "`trail = 0` reproduces Phase 1's binary output exactly": the rostered golden fixture
+  now binds `trail = "0"`, and its baseline, blessed at Phase 1 and re-encoded by this phase's
+  bless run, came out byte-identical. A second fixture, `cellular_trail` (an `EXTRA_FIXTURES`
+  entry in `core/tests/golden.rs`), baselines the wake; outside the phase's file list.
 
 ### Close triggers
 

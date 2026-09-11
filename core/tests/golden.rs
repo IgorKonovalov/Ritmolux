@@ -124,13 +124,16 @@ fn fixture(system: SystemKind) -> (&'static str, &'static str) {
 ///   Chladni plate, so the family index never reaches the escape-time arm and
 ///   not one orbit is iterated. The only baseline that runs `cpow`, the escape
 ///   loop or the smooth count.
+/// - `cellular_trail` — the rostered `cellular.toml` binds `trail = 0`, so every
+///   dead cell's fade is zero and neither the age channel nor the palette
+///   coordinate it drives reaches a pixel. The only baseline that paints a wake.
 ///
 /// **Captured after the roster loop, and appended rather than inserted.** Every
 /// pre-existing baseline is therefore rendered from the device state it always
 /// was, so adding an entry here moves none of them — which matters on WARP,
 /// where building GPU resources mid-run is documented to change what a later
 /// capture resolves to. For the same reason a new entry goes at the **end**.
-const EXTRA_FIXTURES: [(&str, &str); 11] = [
+const EXTRA_FIXTURES: [(&str, &str); 12] = [
     (
         "attractor_depth",
         include_str!("fixtures/attractor_depth.toml"),
@@ -159,6 +162,10 @@ const EXTRA_FIXTURES: [(&str, &str); 11] = [
     (
         "analytic_field_escape",
         include_str!("fixtures/analytic_field_escape.toml"),
+    ),
+    (
+        "cellular_trail",
+        include_str!("fixtures/cellular_trail.toml"),
     ),
 ];
 

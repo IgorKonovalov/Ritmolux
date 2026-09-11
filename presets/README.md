@@ -924,6 +924,8 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 |---|---|---|---|
 | `step_rate` | `10` | `0` – `60` | How many generations the automaton runs per second, whatever the frame rate; 0 freezes it. |
 | `reseed` | `0` | `0` – `1` | A rise past 0.5 refills one disc of the grid with fresh seeded cells, once per rise; bind a beat or a latch to it. |
+| `trail` | `12` | `0` – `64` | How many generations a dead cell keeps glowing, fading as it goes; 0 draws only the live cells. |
+| `age_tint` | `0.35` | `0` – `1` | How far along the palette a dead cell's glow travels as it fades; 0 keeps the wake the live cells' colour. |
 | `brightness` | `1` | `0` – `2` | The scene's overall light level, multiplying what it draws before the composite. |
 | `hue` | `0` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. |
 | `zoom` | `1` | `0.25` – `4` | Scales the whole scene about its centre; above 1 fills more of the frame. |

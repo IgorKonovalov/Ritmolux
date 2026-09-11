@@ -1,0 +1,28 @@
+# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+#
+# The `cellular` scene's age channel: the rostered fixture's field - the same
+# seed, grid, rule and 20 generations - painted with a wake, so the second
+# channel and the palette coordinate it drives are baselined.
+#
+#  - `trail = "8"` is long enough that most dead cells near the live ones glow
+#    and short enough that the seed's first deaths have faded, so both ends of
+#    the fade are in the frame.
+#  - `age_tint = "0.6"` spans most of the palette, so a change to the
+#    coordinate the age drives moves colour and not only light.
+system = "cellular"
+name   = "fixture_cellular_trail"
+
+[cellular]
+family = "life_like"
+grid   = 64
+
+[generator]
+seed = 7
+
+[params]
+birth     = "8"
+survive   = "12"
+step_rate = "20"
+trail     = "8"
+age_tint  = "0.6"
+hue       = "0.1"

@@ -57,7 +57,7 @@ fn life(grid: u32, wrap: bool, salt: u32) -> CellularConfig {
 /// offscreen target.
 struct Driver<'a> {
     ctx: &'a RenderContext,
-    _target: wgpu::Texture,
+    target: wgpu::Texture,
     view: wgpu::TextureView,
     time: f32,
 }
@@ -70,10 +70,36 @@ impl<'a> Driver<'a> {
             capture::create_target(&ctx.device, crate::render::COMPOSITE_FORMAT, TARGET, TARGET);
         Self {
             ctx,
-            _target: target,
+            target,
             view,
             time: 0.0,
         }
+    }
+
+    /// The last frame's present, `TARGET` pixels a side, as linear RGBA.
+    fn read_target(&self) -> Vec<[f32; 4]> {
+        let (buffer, padded_bpr) =
+            capture::create_linear_readback(&self.ctx.device, TARGET, TARGET);
+        let mut encoder = self
+            .ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("cellular-target-readback"),
+            });
+        capture::record_copy(
+            &mut encoder,
+            &self.target,
+            &buffer,
+            padded_bpr,
+            TARGET,
+            TARGET,
+        );
+        self.ctx.queue.submit(std::iter::once(encoder.finish()));
+        capture::read_back_linear(&self.ctx.device, &buffer, TARGET, TARGET, padded_bpr)
+            .expect("the target reads back")
+            .chunks_exact(4)
+            .map(|p| [p[0], p[1], p[2], p[3]])
+            .collect()
     }
 
     /// One frame of `dt` seconds with `params` bound; returns how many
@@ -168,7 +194,8 @@ fn live_cells(cells: &[u8], n: u32) -> Vec<(u32, u32)> {
     out
 }
 
-/// Overwrite the field with exactly `cells` live and every other cell dead.
+/// Overwrite the field with exactly `cells` live and every other cell dead —
+/// at age 0 and at the age cap respectively, as a seed leaves them.
 ///
 /// A test-only pass with **no bind group at all** — the cells are constants in
 /// its source — so it adds no layout for ADR-0058's guard to weigh against the
@@ -184,7 +211,7 @@ fn plant(ctx: &RenderContext, scene: &mut CellularScene, cells: &[(u32, u32)]) {
         .collect();
     let body = format!(
         "@fragment\nfn fs_main(in: VsOut) -> @location(0) vec4<f32> {{\n    \
-         let c = vec2<u32>(in.pos.xy);\n    var v = vec4<f32>(0.0, 0.0, 0.0, 1.0);\n{tests}    \
+         let c = vec2<u32>(in.pos.xy);\n    var v = vec4<f32>(0.0, {AGE_CAP:?}, 0.0, 1.0);\n{tests}    \
          return v;\n}}\n"
     );
     let shader = gpu::fullscreen_shader(
@@ -233,13 +260,7 @@ const ONE_GEN: (f32, f32) = (0.25, 4.0);
 #[test]
 fn the_shaders_are_valid_wgsl() {
     for pass in [StepPass::Seed, StepPass::Stamp, StepPass::Step] {
-        let step = format!(
-            "{}const MODE: u32 = {}u;\n{}{}",
-            gpu::FULLSCREEN_VS_UV_FLIPPED,
-            pass.mode(),
-            gpu::HASH_WGSL,
-            shader::STEP_SHADER
-        );
+        let step = format!("{}{}", gpu::FULLSCREEN_VS_UV_FLIPPED, pass.source());
         if let Err(e) = crate::milk::shader::validate_wgsl(&step) {
             panic!("the {} shader does not validate:\n{e}", pass.label());
         }
@@ -651,4 +672,290 @@ fn thirty_and_one_hundred_forty_four_fps_reach_the_same_field() {
     let (g_half, f_half) = run(&mut driver, 60, 30);
     assert_eq!(g_half, 6);
     assert_ne!(f_half, f30, "half the wall time reached the same field");
+}
+
+// ---------------------------------------------------------------------------
+// The age channel
+// ---------------------------------------------------------------------------
+
+/// The field read as the mirror's [`mirror::Aged`]: state and age per cell.
+fn aged(ctx: &RenderContext, scene: &CellularScene) -> mirror::Aged {
+    let texels = read_texels(ctx, scene);
+    mirror::Aged {
+        state: texels
+            .chunks_exact(4)
+            .map(|t| u8::from(t[0] > 0.5))
+            .collect(),
+        age: texels.chunks_exact(4).map(|t| t[1]).collect(),
+    }
+}
+
+/// **The age channel is generations since each cell last changed**, cell for
+/// cell what the CPU statement predicts: through a seed, forty generations, a
+/// reseed disc that is not a generation, and past it.
+#[test]
+fn the_age_channel_counts_generations_since_each_cell_changed() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    const N: u32 = 48;
+    let threshold = live_threshold(LIFE_DENSITY);
+    let mut driver = Driver::new(&ctx);
+    let mut scene = scene_with(&ctx, life(N, true, 4));
+    driver.frame(&mut scene, ONE_GEN.0, &[("step_rate", 0.0)]);
+    let mut cpu = mirror::Aged::seeded(mirror::seed_field(N, field_seed(4), threshold));
+    assert!(aged(&ctx, &scene) == cpu, "the seeded field's ages");
+
+    let conway = [("step_rate", ONE_GEN.1)];
+    for generation in 1..=40 {
+        driver.frame(&mut scene, ONE_GEN.0, &conway);
+        cpu = cpu.then(mirror::life_step(&cpu.state, N, true, 8, 12), true);
+        if generation % 10 == 0 {
+            let gpu = aged(&ctx, &scene);
+            let differing = gpu.age.iter().zip(&cpu.age).filter(|(a, b)| a != b).count();
+            assert_same_field(&gpu.state, &cpu.state, &format!("generation {generation}"));
+            assert_eq!(
+                differing, 0,
+                "generation {generation}: {differing} ages differ"
+            );
+        }
+    }
+    let young = cpu.age.iter().filter(|a| **a > 0.0 && **a < 40.0).count();
+    assert!(
+        young > 100,
+        "only {young} cells carry a history to have tested"
+    );
+
+    // A disc on a frozen frame: its changed cells restart, the rest keep their
+    // age exactly — a disc is not a generation.
+    driver.frame(
+        &mut scene,
+        ONE_GEN.0,
+        &[("step_rate", 0.0), ("reseed", 1.0)],
+    );
+    let disc = next_stamp(&mut stamp_rng(4), N);
+    cpu = cpu.then(mirror::stamp(&cpu.state, N, true, disc, threshold), false);
+    assert!(aged(&ctx, &scene) == cpu, "the ages after a reseed disc");
+    driver.frame(&mut scene, ONE_GEN.0, &conway);
+    cpu = cpu.then(mirror::life_step(&cpu.state, N, true, 8, 12), true);
+    assert!(aged(&ctx, &scene) == cpu, "the generation after the disc");
+}
+
+/// Rec. 709 luminance of a linear pixel.
+fn luminance(p: [f32; 4]) -> f32 {
+    0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2]
+}
+
+/// **A moving glider leaves a fading wake whose length is `trail`**: behind it,
+/// exactly the dead cells younger than `trail` light, each dimmer the older it
+/// is, and a longer trail lights strictly more of them. `trail = 0` lights
+/// none. The grid is drawn one cell to a pixel, so a pixel is a cell.
+#[test]
+fn a_moving_glider_leaves_a_wake_as_long_as_trail() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    const SHAPE: [(u32, u32); 5] = [(1, 0), (2, 1), (0, 2), (1, 2), (2, 2)];
+    let mut driver = Driver::new(&ctx);
+    let mut scene = scene_with(&ctx, life(TARGET, true, 1));
+    driver.frame(&mut scene, ONE_GEN.0, &[("step_rate", 0.0)]);
+    let glider: Vec<(u32, u32)> = SHAPE.iter().map(|(x, y)| (x + 4, y + 4)).collect();
+    plant(&ctx, &mut scene, &glider);
+    for _ in 0..40 {
+        driver.frame(&mut scene, ONE_GEN.0, &[("step_rate", ONE_GEN.1)]);
+    }
+    let field = aged(&ctx, &scene);
+
+    let mut wakes = Vec::new();
+    for trail in [0.0_f32, 3.0, 8.0, 20.0] {
+        driver.frame(
+            &mut scene,
+            ONE_GEN.0,
+            &[("step_rate", 0.0), ("trail", trail), ("age_tint", 0.0)],
+        );
+        let image = driver.read_target();
+        let mut wake: Vec<(f32, f32)> = Vec::new();
+        for (i, pixel) in image.iter().enumerate() {
+            let lit = luminance(*pixel) > 1e-4;
+            if field.state[i] == 1 {
+                assert!(lit, "trail {trail}: a live cell is dark");
+                continue;
+            }
+            let age = field.age[i];
+            assert_eq!(
+                lit,
+                age < trail,
+                "trail {trail}: a dead cell of age {age} is {}",
+                if lit { "lit" } else { "dark" }
+            );
+            if lit {
+                wake.push((age, luminance(*pixel)));
+            }
+        }
+        // Dimmer with age: any two wake cells of different ages are ordered.
+        for (a, la) in &wake {
+            for (b, lb) in &wake {
+                if a < b {
+                    assert!(
+                        la > lb,
+                        "trail {trail}: age {a} at {la} is not brighter than age {b} at {lb}"
+                    );
+                }
+            }
+        }
+        println!("trail {trail}: {} wake cells", wake.len());
+        wakes.push(wake.len());
+    }
+    assert_eq!(wakes[0], 0, "trail 0 drew a wake");
+    assert!(
+        wakes[1] > 0 && wakes[1] < wakes[2] && wakes[2] < wakes[3],
+        "the wake does not lengthen with trail: {wakes:?}"
+    );
+}
+
+/// **`trail = 0` is the binary field exactly**: every pixel is either the live
+/// colour or untouched — no light and no coverage — whatever `age_tint` asks.
+/// The rostered golden fixture binds `trail = 0` and its baseline predates the
+/// age channel, which holds the same claim against the whole present.
+#[test]
+fn trail_zero_draws_the_binary_field() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    let mut driver = Driver::new(&ctx);
+    let mut scene = scene_with(&ctx, life(TARGET, true, 2));
+    for _ in 0..12 {
+        driver.frame(
+            &mut scene,
+            ONE_GEN.0,
+            &[("step_rate", ONE_GEN.1), ("trail", 0.0)],
+        );
+    }
+    driver.frame(
+        &mut scene,
+        ONE_GEN.0,
+        &[("step_rate", 0.0), ("trail", 0.0), ("age_tint", 0.8)],
+    );
+    let field = aged(&ctx, &scene);
+    let image = driver.read_target();
+    let live_colour = image
+        .iter()
+        .zip(&field.state)
+        .find(|(_, s)| **s == 1)
+        .map(|(p, _)| *p)
+        .expect("some cell is live");
+    let recent = field.age.iter().filter(|a| **a < 4.0).count();
+    assert!(
+        recent > 20,
+        "only {recent} cells died recently enough to tempt a wake"
+    );
+    for (pixel, state) in image.iter().zip(&field.state) {
+        if *state == 1 {
+            assert_eq!(*pixel, live_colour, "a live cell is not the live colour");
+        } else {
+            // The driver clears to opaque black, and a premultiplied draw of no
+            // light and no coverage leaves that exactly as it was.
+            assert_eq!(
+                *pixel,
+                [0.0, 0.0, 0.0, 1.0],
+                "a dead cell drew something at trail 0"
+            );
+        }
+    }
+}
+
+/// **The palette's A/B crossfade and `palette_steps` act on this coordinate as
+/// they do on every other scene's**: every pixel is the palette pair sampled
+/// at its cell's coordinate — `hue`, plus `age_tint` times how far its wake has
+/// faded — banded by `palette::band_coord` and crossfaded by `palette_mix`,
+/// the CPU statements the shared WGSL mirrors, times its light.
+#[test]
+fn every_pixel_is_the_palette_at_its_age_coordinate() {
+    use crate::render::palette::{NamedPalette, PaletteConfig};
+    let Some(ctx) = context() else {
+        return;
+    };
+    let pair = Palette::bake_pair(
+        &PaletteConfig::default_spectrum(),
+        &PaletteConfig::Named(NamedPalette::from_name("ice").expect("ice is a palette")),
+    );
+    let mut driver = Driver::new(&ctx);
+    let mut scene = scene_with(&ctx, life(TARGET, true, 6));
+    scene.set_palette(&pair);
+    for _ in 0..16 {
+        driver.frame(&mut scene, ONE_GEN.0, &[("step_rate", ONE_GEN.1)]);
+    }
+    let field = aged(&ctx, &scene);
+    let (trail, tint, hue) = (10.0_f32, 0.6_f32, 0.15_f32);
+
+    let mut worst = 0.0_f32;
+    let mut banded_colours = std::collections::BTreeSet::new();
+    let mut smooth_colours = std::collections::BTreeSet::new();
+    for (mix, steps) in [
+        (0.0_f32, 0.0_f32),
+        (1.0, 0.0),
+        (0.4, 0.0),
+        (0.0, 4.0),
+        (0.7, 4.0),
+    ] {
+        driver.frame(
+            &mut scene,
+            ONE_GEN.0,
+            &[
+                ("step_rate", 0.0),
+                ("trail", trail),
+                ("age_tint", tint),
+                ("hue", hue),
+                ("palette_mix", mix),
+                ("palette_steps", steps),
+            ],
+        );
+        let image = driver.read_target();
+        for (i, pixel) in image.iter().enumerate() {
+            let (coord, light) = if field.state[i] == 1 {
+                (0.0, 1.0)
+            } else {
+                let fade = (1.0 - (field.age[i] + 1.0) / (trail + 1.0)).clamp(0.0, 1.0);
+                (tint * (1.0 - fade), fade)
+            };
+            let t = palette::band_coord(coord + hue, palette::band_steps(steps));
+            let rgb = pair.sample(t, mix);
+            for c in 0..3 {
+                worst = worst.max((pixel[c] - rgb[c] * light).abs());
+            }
+            if light > 0.0 && mix == 0.0 {
+                let key = [
+                    (pixel[0] / light * 64.0).round() as i32,
+                    (pixel[1] / light * 64.0).round() as i32,
+                    (pixel[2] / light * 64.0).round() as i32,
+                ];
+                if steps > 0.0 {
+                    banded_colours.insert(key);
+                } else {
+                    smooth_colours.insert(key);
+                }
+            }
+        }
+    }
+    println!(
+        "worst channel error {worst:.4}; {} colours smooth, {} banded",
+        smooth_colours.len(),
+        banded_colours.len()
+    );
+    assert!(
+        worst < 0.02,
+        "a pixel is {worst} off the palette at its coordinate"
+    );
+    // Non-vacuity: the wake spans many colours when smooth and at most the
+    // four bands (plus the live colour's own band) when stepped.
+    assert!(
+        smooth_colours.len() > 6,
+        "the wake spans only {} colours",
+        smooth_colours.len()
+    );
+    assert!(
+        banded_colours.len() <= 4,
+        "four bands drew {} colours",
+        banded_colours.len()
+    );
 }

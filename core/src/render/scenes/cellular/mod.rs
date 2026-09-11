@@ -33,6 +33,14 @@
 //! texel values, so a field is a pure function of its config and the sequence
 //! of bound values and `dt`s it was driven with.
 //!
+//! # The age channel
+//!
+//! A binary field reads as noise; what reads as structure is its history. So
+//! the state texture's second channel counts the generations since each cell
+//! last changed state, and the present paints a dead cell by it: it fades out
+//! over `trail` generations while sliding `age_tint` of the way along the
+//! palette. `trail = 0` is the binary field exactly.
+//!
 //! **GPU resources are built lazily, on first render**, as the
 //! reaction-diffusion scene's are and for its reason: a capture that never
 //! activates this scene never builds them, so the WARP software adapter the
@@ -161,6 +169,15 @@ const RESEED_RADIUS: f32 = 0.2;
 /// The fraction of cells a `life_like` seed makes live.
 const LIFE_DENSITY: f32 = 0.35;
 
+/// Where the age channel stops counting: generations since a cell last
+/// changed, saturating here. A half float holds every whole number to 2048
+/// exactly, so the count stays exact below this, and it is past any `trail`
+/// the scene reads, so a saturated cell is simply "long ago".
+pub(crate) const AGE_CAP: f32 = 1023.0;
+/// The longest `trail` the present reads, in generations: the age channel's
+/// own ceiling, since a wake cannot outlast the count it is read from.
+pub const MAX_TRAIL: f32 = AGE_CAP;
+
 /// Mixed into the preset's salt before it seeds the field, so a salt of `0`
 /// still hashes to a field rather than to the hash's fixed point. The ASCII
 /// bytes of "CELL"; opaque, since changing it moves every seeded field.
@@ -172,6 +189,8 @@ const STAMP_SEED_MIX: u64 = 0x5253_4545_4443_4C31;
 const DEFAULT_BIRTH: f32 = default_of(PARAMS, "birth");
 const DEFAULT_SURVIVE: f32 = default_of(PARAMS, "survive");
 const DEFAULT_STEP_RATE: f32 = default_of(PARAMS, "step_rate");
+const DEFAULT_TRAIL: f32 = default_of(PARAMS, "trail");
+const DEFAULT_AGE_TINT: f32 = default_of(PARAMS, "age_tint");
 const DEFAULT_HUE: f32 = 0.0;
 const DEFAULT_ZOOM: f32 = 1.0;
 
@@ -201,6 +220,17 @@ pub(crate) fn applied_step_rate(value: f32) -> f32 {
         value.clamp(0.0, MAX_STEP_RATE)
     } else {
         DEFAULT_STEP_RATE
+    }
+}
+
+/// A bound `trail` as the present reads it: clamped into `0..=`[`MAX_TRAIL`],
+/// the declared default where it is not finite. The shader divides by
+/// `trail + 1`, which this keeps at least 1.
+pub(crate) fn applied_trail(value: f32) -> f32 {
+    if value.is_finite() {
+        value.clamp(0.0, MAX_TRAIL)
+    } else {
+        DEFAULT_TRAIL
     }
 }
 
@@ -301,6 +331,22 @@ pub const PARAMS: &[ParamSpec] = &[
               rise; bind a beat or a latch to it.",
         kind: ParamKind::Modal,
     },
+    ParamSpec {
+        name: "trail",
+        default: 12.0,
+        range: Some([0.0, 64.0]),
+        doc: "How many generations a dead cell keeps glowing, fading as it goes; 0 draws only \
+              the live cells.",
+        kind: ParamKind::Modal,
+    },
+    ParamSpec {
+        name: "age_tint",
+        default: 0.35,
+        range: Some([0.0, 1.0]),
+        doc: "How far along the palette a dead cell's glow travels as it fades; 0 keeps the \
+              wake the live cells' colour.",
+        kind: ParamKind::Modal,
+    },
     common::brightness(common::DEFAULT_BRIGHTNESS),
     common::hue(DEFAULT_HUE),
     common::zoom(DEFAULT_ZOOM),
@@ -345,6 +391,8 @@ struct PresentParams {
     b: [f32; 4],
     /// x: zoom, yz: pan, w: wrap (1 torus).
     c: [f32; 4],
+    /// x: trail (generations), y: age_tint, zw: unused.
+    d: [f32; 4],
 }
 
 /// The two bind groups of one pass over the ping-pong pair — reading texture A
@@ -424,12 +472,7 @@ impl Resources {
                 device,
                 label,
                 gpu::FULLSCREEN_VS_UV_FLIPPED,
-                &format!(
-                    "const MODE: u32 = {}u;\n{}{}",
-                    pass.mode(),
-                    gpu::HASH_WGSL,
-                    shader::STEP_SHADER
-                ),
+                &pass.source(),
             );
             gpu::fullscreen_pipeline(
                 device,
@@ -553,6 +596,18 @@ impl StepPass {
             StepPass::Step => "cellular-step",
         }
     }
+
+    /// This pass's step shader after the vertex prelude: its two constants,
+    /// the hash, and the body. Built at construction only.
+    fn source(self) -> String {
+        format!(
+            "const MODE: u32 = {}u;\nconst AGE_CAP: f32 = {:?};\n{}{}",
+            self.mode(),
+            AGE_CAP,
+            gpu::HASH_WGSL,
+            shader::STEP_SHADER
+        )
+    }
 }
 
 fn step_bind_group(
@@ -633,6 +688,8 @@ pub struct CellularScene {
     survive: f32,
     step_rate: f32,
     reseed: f32,
+    trail: f32,
+    age_tint: f32,
     colour: common::PaletteParams,
     pan: common::PanParams,
     zoom: f32,
@@ -667,6 +724,8 @@ impl CellularScene {
             survive: DEFAULT_SURVIVE,
             step_rate: DEFAULT_STEP_RATE,
             reseed: 0.0,
+            trail: DEFAULT_TRAIL,
+            age_tint: DEFAULT_AGE_TINT,
             colour: common::PaletteParams::new(DEFAULT_HUE, common::DEFAULT_BRIGHTNESS),
             pan: common::PanParams::default(),
             zoom: DEFAULT_ZOOM,
@@ -743,6 +802,8 @@ impl Scene for CellularScene {
         self.survive = DEFAULT_SURVIVE;
         self.step_rate = DEFAULT_STEP_RATE;
         self.reseed = 0.0;
+        self.trail = DEFAULT_TRAIL;
+        self.age_tint = DEFAULT_AGE_TINT;
         self.colour.reset();
         self.pan.reset();
         self.zoom = DEFAULT_ZOOM;
@@ -759,6 +820,8 @@ impl Scene for CellularScene {
             "survive" => self.survive = value,
             "step_rate" => self.step_rate = value,
             "reseed" => self.reseed = value,
+            "trail" => self.trail = value,
+            "age_tint" => self.age_tint = value,
             "zoom" => self.zoom = value,
             _ => {}
         }
@@ -830,6 +893,16 @@ impl Scene for CellularScene {
                     0.0
                 },
                 if self.config.wrap { 1.0 } else { 0.0 },
+            ],
+            d: [
+                applied_trail(self.trail),
+                if self.age_tint.is_finite() {
+                    self.age_tint
+                } else {
+                    DEFAULT_AGE_TINT
+                },
+                0.0,
+                0.0,
             ],
         };
 

@@ -11,6 +11,10 @@
 #    change of default cannot move this baseline.
 #  - `grid = 64` puts each cell on two pixels of the 128 capture, so a field
 #    one generation off moves whole pixels rather than a blur of them.
+#  - `trail = "0"`: the binary field, which is what this baseline was blessed
+#    on before the age channel existed - so it holding unmoved is the claim
+#    that `trail = 0` is the binary field exactly. `cellular_trail.toml`
+#    baselines the wake.
 system = "cellular"
 name   = "fixture_cellular"
 
@@ -25,4 +29,5 @@ seed = 7
 birth     = "8"
 survive   = "12"
 step_rate = "20"
+trail     = "0"
 hue       = "0.1"
