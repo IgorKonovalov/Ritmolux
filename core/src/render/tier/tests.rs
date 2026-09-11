@@ -76,6 +76,11 @@ fn rich_is_never_below_the_floor() {
     assert!(rich.swarm_particles >= floor.swarm_particles);
     assert!(rich.emitter_objects >= floor.emitter_objects);
     assert!(rich.max_segments >= floor.max_segments);
+    assert!(rich.field_iterations >= floor.field_iterations);
+    // Both caps sit inside what a preset can ask for at all, so the tier is
+    // the only thing that ever clamps below the declared range's top.
+    let top = crate::render::scenes::analytic_field::MAX_ITERATIONS as u32;
+    assert!(floor.field_iterations >= 1 && rich.field_iterations <= top);
 }
 
 /// The floor is the pre-tier engine. These are the literals the constants

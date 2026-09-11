@@ -243,8 +243,8 @@ documents), so this scene keeps its LUTs in their own bind group exactly as that
 |---|---|---|---|
 | 1 — the system, and Chladni through it | dev | done | 65d57d4 |
 | 2 — the escape-time family | dev | done | 232afb3 |
-| 3 — orbit traps | dev | done | committed with this row |
-| 4 — the tier cap and the golden regime | dev | not started | |
+| 3 — orbit traps | dev | done | 9ae4650 |
+| 4 — the tier cap and the golden regime | dev | done | committed with this row |
 | 5 — documentation and the reference | dev | not started | |
 
 ### Notes
@@ -303,6 +303,20 @@ documents), so this scene keeps its LUTs in their own bind group exactly as that
 - Phase 3, "`trap = "none"` is byte-identical to Phase 2's output": the `analytic_field_escape`
   golden, blessed at Phase 2 and not re-blessed, reads mean 0.0000 / max outlier 0 after this
   phase on this machine's WARP; `trap_none_is_byte_identical_to_no_trap` holds the in-run half.
+- Phase 4, `TierConfig::field_iterations` is Floor 64 / Rich 512 from arithmetic stated in its doc
+  (1080p x 64 steps x ~12 flops against a ~2015 iGPU's peak), not a measurement - no target
+  hardware is reachable from this lane. The doc names it as a constant to measure.
+- Phase 4, the announce channel: the clamp is a new `OverflowContext::Iterations` reported through
+  `Scene::mirror_overflow` -> `Renderer::cap_overflow()`, which the standalone already polls per
+  frame and prints on the transition, as it does a tier demotion. That widens a context enum
+  `tier.rs` (on `collage_elements`) calls an architect decision to widen, and it touched
+  `core/src/render/scenes/mod.rs` (the enum, its `Display`, the trait method's doc) and a doc
+  comment in `core/src/render/mod.rs` - outside the phase's file list. No standalone change was
+  needed.
+- Phase 4, "the golden holds across a re-run": two renderers built in turn capture the escape
+  fixture byte-identically, and the stable regime is asserted as a structural statistic (ADR-0071)
+  - no pixel escapes in the second half of the 48-step budget, against 0.23 of the frame at a
+  control `c` just past the cardioid's cusp.
 
 ### Close triggers
 

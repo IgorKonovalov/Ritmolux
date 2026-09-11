@@ -46,7 +46,11 @@ fn the_pipeline_builds_on_the_adapter() {
         Err(e) => panic!("headless context build failed: {e}"),
     };
     let scope = ctx.device.push_error_scope(wgpu::ErrorFilter::Validation);
-    let scene = AnalyticFieldScene::new(&ctx.device, crate::render::COMPOSITE_FORMAT);
+    let scene = AnalyticFieldScene::new(
+        &ctx.device,
+        crate::render::COMPOSITE_FORMAT,
+        crate::render::TierConfig::FLOOR.field_iterations,
+    );
     if let Some(error) = pollster::block_on(scope.pop()) {
         panic!("building the analytic field raised: {error}");
     }
@@ -157,6 +161,55 @@ fn a_bound_iteration_budget_is_clamped_to_its_cap_and_rounded() {
             "rounding upstream moved the budget at {value}"
         );
     }
+}
+
+/// **A budget past the tier's cap is reported, and one within it is not** —
+/// nor is any budget on a family that iterates nothing. The report names what
+/// was asked and the cap it was drawn at, and its message names the lever.
+#[test]
+fn a_budget_past_the_tier_cap_is_reported_and_one_within_it_is_not() {
+    let floor = crate::render::TierConfig::FLOOR.field_iterations as f32;
+    assert_eq!(
+        iteration_clamp(FieldFamily::EscapeTime, 48.0, floor),
+        None,
+        "48 is inside the Floor cap"
+    );
+    assert_eq!(
+        iteration_clamp(FieldFamily::EscapeTime, floor + 0.4, floor),
+        None,
+        "a fraction over the cap rounds onto it and is not a clamp"
+    );
+    assert_eq!(
+        iteration_clamp(FieldFamily::Chladni, 500.0, floor),
+        None,
+        "the plate reads no budget, so nothing is clamped"
+    );
+    let clamp =
+        iteration_clamp(FieldFamily::EscapeTime, 200.0, floor).expect("200 is past the Floor cap");
+    assert_eq!(
+        clamp.context,
+        super::super::OverflowContext::Iterations(200)
+    );
+    assert_eq!(clamp.cap, floor as usize);
+    assert_eq!(clamp.dropped, 200 - floor as usize);
+    let message = clamp.to_string();
+    for needle in [
+        "iterations 200",
+        &format!("cap of {}", floor as u32),
+        "--tier rich",
+    ] {
+        assert!(
+            message.contains(needle),
+            "`{message}` does not say `{needle}`"
+        );
+    }
+    // Past the declared range's top, what was asked is reported as the top:
+    // the loop bound can never exceed it on any tier.
+    let absurd = iteration_clamp(FieldFamily::EscapeTime, 1e9, floor).expect("clamped");
+    assert_eq!(
+        absurd.context,
+        super::super::OverflowContext::Iterations(MAX_ITERATIONS as u32)
+    );
 }
 
 /// The Julia constant that the tests call *inside* the Mandelbrot set: the

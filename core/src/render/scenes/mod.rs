@@ -501,16 +501,26 @@ pub enum OverflowContext {
     Mirror(u32),
     /// An L-system depth expanded past the cap — once, at preset load.
     Depth(u32),
+    /// An escape-time `iterations` budget asked for past the tier's
+    /// [`field_iterations`](crate::render::TierConfig::field_iterations) —
+    /// per frame, since the budget is bindable. Carries what was asked; the
+    /// [`CapOverflow`] carries the cap it was clamped to.
+    ///
+    /// Not a truncation of geometry but a clamp of a structural parameter, and
+    /// the one case where the tier changes a preset's picture rather than its
+    /// density (ADR-0045) — which is exactly why it must not be silent.
+    Iterations(u32),
 }
 
 impl std::fmt::Display for OverflowContext {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // These two renderings are the user-visible text ADR-0007 requires stay
+        // These renderings are the user-visible text ADR-0007 requires stay
         // informative; the shell prints them verbatim. Do not reword them
         // without meaning to change what an operator sees.
         match self {
             OverflowContext::Mirror(order) => write!(f, "mirror x{order}"),
             OverflowContext::Depth(depth) => write!(f, "depth {depth}"),
+            OverflowContext::Iterations(asked) => write!(f, "iterations {asked}"),
         }
     }
 }
@@ -535,12 +545,23 @@ pub struct CapOverflow {
 
 impl std::fmt::Display for CapOverflow {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "geometry exceeded the {}-segment cap at {} (dropped {} segment(s)); \
-             reduce the structure or its depth",
-            self.cap, self.context, self.dropped
-        )
+        match self.context {
+            // A clamp, not a cut: nothing is dropped, the picture is drawn at
+            // the cap, and the operator is told which lever gets it back.
+            OverflowContext::Iterations(_) => write!(
+                f,
+                "{} is past this quality tier's cap of {}; drawn at {} instead, so the \
+                 set's boundary resolves less detail than the preset asked for \
+                 (ask for {} or fewer, or pin --tier rich)",
+                self.context, self.cap, self.cap, self.cap
+            ),
+            OverflowContext::Mirror(_) | OverflowContext::Depth(_) => write!(
+                f,
+                "geometry exceeded the {}-segment cap at {} (dropped {} segment(s)); \
+                 reduce the structure or its depth",
+                self.cap, self.context, self.dropped
+            ),
+        }
     }
 }
 
@@ -741,11 +762,12 @@ pub(crate) trait Scene {
     /// and one shared WGSL snippet, not two implementations that must agree.
     fn set_feedback(&mut self, _cfg: crate::render::feedback::FeedbackConfig) {}
 
-    /// The per-frame geometry-mirror cap overflow (Plan 0018 Phase 4), if this
-    /// frame's N-fold replication exceeded the segment cap and truncated. Reuses
-    /// the ADR-0007 [`CapOverflow`](lines::CapOverflow) so the frontend surfaces
-    /// it — the cap is never a silent cut. Default `None`: only the line scenes
-    /// mirror, and only when `mirror_order` pushes past the cap.
+    /// The per-frame cap overflow, if this frame hit one: the line scenes'
+    /// geometry mirror (Plan 0018 Phase 4) when its N-fold replication exceeded
+    /// the segment cap and truncated, or the analytic field's escape-time
+    /// budget when a bound `iterations` passed the tier's cap and was clamped.
+    /// Reuses the ADR-0007 [`CapOverflow`](lines::CapOverflow) so the frontend
+    /// surfaces either — a cap is never silent. Default `None`.
     fn mirror_overflow(&self) -> Option<&lines::CapOverflow> {
         None
     }
@@ -1006,6 +1028,7 @@ fn create(
         SystemKind::AnalyticField => Box::new(analytic_field::AnalyticFieldScene::new(
             device,
             surface_format,
+            tier.field_iterations,
         )),
     }
 }

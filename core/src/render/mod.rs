@@ -1099,9 +1099,10 @@ impl Renderer {
     /// fit — which is every shipped preset.
     pub fn cap_overflow(&self) -> Option<&CapOverflow> {
         // The configure-time overflow (an oversized L-system depth) takes
-        // precedence; otherwise the active scene's per-frame geometry-mirror
-        // overflow (Plan 0018 Phase 4), set once a frame has replicated. Both
-        // reuse the same `CapOverflow` type so the frontend surfaces either.
+        // precedence; otherwise the active scene's per-frame overflow, set once
+        // a frame has rendered — a line scene's geometry mirror (Plan 0018
+        // Phase 4) or the analytic field's iteration clamp to the tier. All
+        // reuse the same `CapOverflow` type so the frontend surfaces any.
         if let Some(overflow) = self.cap_overflow.as_ref() {
             return Some(overflow);
         }

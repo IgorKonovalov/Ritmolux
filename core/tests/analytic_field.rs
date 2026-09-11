@@ -20,7 +20,7 @@ mod common;
 
 use rlx_core::dsp::AnalysisFrame;
 use rlx_core::preset::{Preset, PresetError, SystemKind};
-use rlx_core::render::{CaptureImage, Renderer};
+use rlx_core::render::{CaptureImage, Renderer, Tier, TierConfig};
 
 /// Frames per capture. The field holds no state, so one frame is the whole
 /// picture; two keeps the clock off zero.
@@ -831,6 +831,183 @@ fn trap_none_is_byte_identical_to_no_trap() {
     assert_eq!(
         untrapped.rgba, with_levers.rgba,
         "`trap_radius` / `trap_rotate` moved a picture with no trap"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// The tier cap and the golden regime
+// ---------------------------------------------------------------------------
+
+/// The escape-time golden fixture, authored inside the stable regime.
+const ESCAPE_FIXTURE: &str = include_str!("fixtures/analytic_field_escape.toml");
+
+/// One capture of `toml` on a fresh software renderer pinned to `tier`, which
+/// is dropped before the next is built (a second live device in one binary is
+/// what the software adapter falls over on). Also hands back what the renderer
+/// reported as a cap overflow.
+fn capture_on(tier: Tier, size: u32, toml: &str) -> Option<(CaptureImage, Option<String>)> {
+    let mut renderer = common::headless_tiered(size, size, tier)?;
+    let img = capture(&mut renderer, toml);
+    let notice = renderer.cap_overflow().map(|o| o.to_string());
+    Some((img, notice))
+}
+
+/// The fixture with its `iterations` line replaced, and its `c` moved to the
+/// scene's default `-0.8 + 0.156i` — close to the Mandelbrot set's boundary,
+/// where orbits linger and a deeper budget resolves pixels the fixture's own
+/// stable `c` settles long before the cap.
+fn deep_with_iterations(n: u32) -> String {
+    let edited = ESCAPE_FIXTURE
+        .replace(
+            "iterations    = \"48\"",
+            &format!("iterations    = \"{n}\""),
+        )
+        .replace("c_re          = \"-0.066\"", "c_re          = \"-0.8\"")
+        .replace("c_im          = \"0.411\"", "c_im          = \"0.156\"");
+    assert_eq!(
+        edited.matches("-0.8").count() + edited.matches("0.156").count(),
+        2,
+        "the fixture's c lines moved, so the replacements changed nothing"
+    );
+    assert!(
+        edited.contains(&format!("\"{n}\"")),
+        "the iterations line moved"
+    );
+    edited
+}
+
+/// **The same preset renders identically on `Floor` and `Rich` when it asks
+/// within the `Floor` bound** — byte for byte, and with no notice on either.
+#[test]
+fn a_preset_within_the_floor_bound_renders_identically_on_both_tiers() {
+    // The fixture asks for 48 (checked against the file in the regime test).
+    const _: () = assert!(
+        48 <= TierConfig::FLOOR.field_iterations,
+        "the fixture no longer asks within the Floor bound"
+    );
+    let Some((floor, floor_notice)) = capture_on(Tier::Floor, 96, ESCAPE_FIXTURE) else {
+        return;
+    };
+    let Some((rich, rich_notice)) = capture_on(Tier::Rich, 96, ESCAPE_FIXTURE) else {
+        return;
+    };
+    assert_eq!(floor_notice, None, "a budget inside the cap was reported");
+    assert_eq!(rich_notice, None);
+    assert!(
+        floor.rgba == rich.rgba,
+        "a preset asking within the Floor bound drew a different picture on Rich"
+    );
+}
+
+/// **A preset over the bound is clamped with a notice, not silently.** On
+/// `Floor` it draws exactly the picture of a preset asking for the cap, and the
+/// renderer reports the clamp through the channel the standalone announces cap
+/// overflows and tier demotions through; `Rich`, whose cap it is inside, draws
+/// the deeper picture and reports nothing.
+#[test]
+fn a_preset_over_the_floor_bound_is_clamped_with_a_notice() {
+    let cap = TierConfig::FLOOR.field_iterations;
+    let asked = 3 * cap;
+    const _: () = assert!(
+        3 * TierConfig::FLOOR.field_iterations <= TierConfig::RICH.field_iterations,
+        "Rich must allow what this test asks Floor for"
+    );
+    let over = deep_with_iterations(asked);
+    let Some((floor, notice)) = capture_on(Tier::Floor, 96, &over) else {
+        return;
+    };
+    let Some((at_cap, cap_notice)) = capture_on(Tier::Floor, 96, &deep_with_iterations(cap)) else {
+        return;
+    };
+    let Some((rich, rich_notice)) = capture_on(Tier::Rich, 96, &over) else {
+        return;
+    };
+    println!("Floor's notice: {notice:?}");
+    let notice = notice.expect("a clamped budget must be announced, not silent");
+    assert!(
+        notice.contains(&format!("iterations {asked}")) && notice.contains(&cap.to_string()),
+        "the notice must say what was asked and what it was drawn at: {notice}"
+    );
+    assert_eq!(
+        cap_notice, None,
+        "asking for exactly the cap is not a clamp"
+    );
+    assert_eq!(
+        rich_notice, None,
+        "Rich allows {asked}, so it reports nothing"
+    );
+    assert!(
+        floor.rgba == at_cap.rgba,
+        "the clamped preset is not the picture of the cap"
+    );
+    let moved = rich
+        .rgba
+        .chunks_exact(4)
+        .zip(floor.rgba.chunks_exact(4))
+        .filter(|(a, b)| a != b)
+        .count();
+    println!("Rich's deeper budget moved {moved} pixels");
+    assert!(
+        moved > 0,
+        "the deeper budget changed nothing, so this preset cannot show the clamp"
+    );
+}
+
+/// **The golden holds across a re-run on the software adapter**, and it is
+/// authored inside the stable regime ADR-0180 rule 3 asks for.
+///
+/// The re-run is literal: two renderers, built and dropped in turn, capture the
+/// fixture byte for byte alike. The regime is asserted as a structural
+/// statistic (ADR-0071) rather than taken on trust: almost no pixel's orbit
+/// escapes in the last steps of the budget, which is where one float of
+/// divergence between adapters decides between the set and its outside.
+#[test]
+fn the_escape_golden_holds_across_a_rerun_inside_its_stable_regime() {
+    const SIZE: u32 = 128;
+    let Some((first, _)) = capture_on(Tier::Floor, SIZE, ESCAPE_FIXTURE) else {
+        return;
+    };
+    let Some((second, _)) = capture_on(Tier::Floor, SIZE, ESCAPE_FIXTURE) else {
+        return;
+    };
+    assert!(
+        first.rgba == second.rgba,
+        "the escape-time golden drew two different frames on two runs"
+    );
+
+    // The fixture's own numbers, so the statistic follows the file.
+    let budget = 48u32;
+    assert!(ESCAPE_FIXTURE.contains("iterations    = \"48\""));
+    // Pixels whose orbit escapes in the second half of the budget: the ones a
+    // change of budget - or one float of divergence - could still move.
+    let late_share = |c: (f32, f32)| {
+        let late = (0..SIZE)
+            .flat_map(|y| (0..SIZE).map(move |x| (x, y)))
+            .filter(|&(x, y)| {
+                escape_step(field_at(x, y, SIZE, SIZE, ESCAPE_ZOOM), c)
+                    .is_some_and(|n| n > budget / 2 && n <= budget)
+            })
+            .count();
+        late as f32 / (SIZE * SIZE) as f32
+    };
+    let share = late_share(C_INSIDE);
+    // The control: a `c` just past the main cardioid's cusp at 1/4, where
+    // every orbit squeezes slowly through the gap the cusp leaves, must read as
+    // outside the regime, or the statistic sees nothing.
+    let unstable = late_share((0.26, 0.0));
+    println!(
+        "{share:.4} of the golden's pixels escape in the second half of its budget; \
+         {unstable:.4} at a near-boundary c"
+    );
+    assert!(
+        unstable > 0.01,
+        "a near-boundary c reads {unstable:.4}, so this statistic cannot tell a stable \
+         fixture from an unstable one"
+    );
+    assert!(
+        share < 0.01,
+        "{share:.4} of the golden's pixels escape in the last steps of its budget - the \
+         fixture has left the stable regime its baseline depends on"
     );
 }
 

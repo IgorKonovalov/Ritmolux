@@ -418,6 +418,38 @@ pub struct TierConfig {
     /// whose context enum is shared with the line scenes, so widening it is an
     /// architect call.
     pub collage_elements: usize,
+
+    /// The most iterations an `analytic_field` escape-time preset may follow an
+    /// orbit for (ADR-0045, ADR-0180 rule 3).
+    ///
+    /// **The one value here that can change a preset's picture**, which is
+    /// why it is a *cap on what the preset asks for* rather than a count the
+    /// tier chooses. An escape-time boundary at 48 iterations and at 512 is not
+    /// the same image, where a particle cloud at two densities is. So a preset
+    /// asks for `iterations`, this bounds it, and a preset asking within the
+    /// `Floor` value renders identically on both tiers. One that asks for more
+    /// is clamped and **says so**, through the same per-frame overflow the
+    /// segment cap surfaces through
+    /// ([`OverflowContext::Iterations`](super::scenes::OverflowContext::Iterations)),
+    /// which the standalone reports on the transition exactly as it reports a
+    /// tier demotion.
+    ///
+    /// # Where the numbers come from
+    ///
+    /// **Arithmetic, not a measurement.** It is a fullscreen per-pixel loop, so
+    /// the worst frame is one whose every pixel runs the whole budget: 1080p is
+    /// 2.07 M pixels, and one step of `z^2 + c` plus its escape test is about a
+    /// dozen floating-point operations, so 64 iterations is ~1.6 GFLOP a frame.
+    /// A ~2015 integrated GPU — the baseline NFR §1's floor is about — peaks at a
+    /// few hundred GFLOPS, which puts that frame at single-digit milliseconds at
+    /// peak and roughly two to three times that in practice: inside the 16.67 ms
+    /// budget with the composite still to pay for. 128 would sit on the budget.
+    /// `Rich` takes the top of `iterations`' own declared range.
+    ///
+    /// **When the floor tier is next exercised on real target hardware this is
+    /// a constant to measure**, on the heaviest escape-time frame: a zoom whose
+    /// whole view is the set's interior.
+    pub field_iterations: u32,
 }
 
 impl TierConfig {
@@ -435,6 +467,7 @@ impl TierConfig {
         mesh_grid: (64, 48),
         max_segments: 20_000,
         collage_elements: 40,
+        field_iterations: 64,
     };
 
     /// The midrange-discrete tier.
@@ -458,6 +491,7 @@ impl TierConfig {
         mesh_grid: (88, 66),
         max_segments: 60_000,
         collage_elements: 96,
+        field_iterations: 512,
     };
 
     /// The config for `tier`.

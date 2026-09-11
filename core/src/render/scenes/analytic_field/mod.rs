@@ -226,6 +226,27 @@ pub(crate) fn applied_iterations(value: f32, cap: f32) -> f32 {
     }
 }
 
+/// The clamp to report for a bound budget of `value` under `cap`, or `None`
+/// when the preset asked within it — or drew a family that reads no budget,
+/// where there is nothing to clamp. `value` is compared as the shader would
+/// take it before the cap, so a bound 64.4 under a cap of 64 is not a clamp.
+pub(crate) fn iteration_clamp(
+    family: FieldFamily,
+    value: f32,
+    cap: f32,
+) -> Option<super::CapOverflow> {
+    if family != FieldFamily::EscapeTime {
+        return None;
+    }
+    let asked = applied_iterations(value, MAX_ITERATIONS);
+    let applied = applied_iterations(value, cap);
+    (asked > applied).then_some(super::CapOverflow {
+        dropped: (asked - applied) as usize,
+        context: super::OverflowContext::Iterations(asked as u32),
+        cap: applied as usize,
+    })
+}
+
 /// `value` clamped into `[lo, hi]`, or `fallback` when it is not finite. The
 /// escape-time parameters are clamped CPU-side because the shader's finiteness
 /// argument rests on their bounds (see its `escape_time` comment): a power at 1
@@ -462,6 +483,14 @@ pub struct AnalyticFieldScene {
     /// Height of the target this scene renders into this frame, in pixels —
     /// what turns "one pixel" into field units for the line's antialiasing.
     target_height: u32,
+    /// The tier's [`field_iterations`](crate::render::TierConfig::field_iterations):
+    /// the most iterations a bound budget reaches the shader with.
+    iteration_cap: f32,
+    /// This frame's clamp of the budget to [`iteration_cap`](Self::iteration_cap),
+    /// or `None` when the preset asked within it — read back through
+    /// [`Scene::mirror_overflow`] so the frontend announces the clamp. A `Copy`
+    /// value rewritten each frame, so reporting it allocates nothing.
+    clamp: Option<super::CapOverflow>,
     colour: common::PaletteParams,
     pan: common::PanParams,
     zoom: f32,
@@ -487,8 +516,14 @@ pub struct AnalyticFieldScene {
 }
 
 impl AnalyticFieldScene {
-    /// Build the scene's pipeline and uniform buffer on `device`.
-    pub fn new(device: &wgpu::Device, surface_format: wgpu::TextureFormat) -> Self {
+    /// Build the scene's pipeline and uniform buffer on `device`, holding a
+    /// bound escape-time budget to `iteration_cap` — the tier's
+    /// [`field_iterations`](crate::render::TierConfig::field_iterations).
+    pub fn new(
+        device: &wgpu::Device,
+        surface_format: wgpu::TextureFormat,
+        iteration_cap: u32,
+    ) -> Self {
         let shader = gpu::fullscreen_shader(
             device,
             "analytic-field-shader",
@@ -537,6 +572,8 @@ impl AnalyticFieldScene {
             ),
             config: FieldConfig::default(),
             target_height: 1,
+            iteration_cap: (iteration_cap as f32).clamp(1.0, MAX_ITERATIONS),
+            clamp: None,
             colour: common::PaletteParams::new(DEFAULT_HUE, common::DEFAULT_BRIGHTNESS),
             pan: common::PanParams::default(),
             zoom: DEFAULT_ZOOM,
@@ -580,8 +617,14 @@ impl Scene for AnalyticFieldScene {
     fn configure(&mut self, cfg: &GeneratorConfig) -> Option<super::CapOverflow> {
         if let GeneratorConfig::Field(config) = cfg {
             self.config = *config;
+            // The outgoing preset's clamp is not this one's to report.
+            self.clamp = None;
         }
         None
+    }
+
+    fn mirror_overflow(&self) -> Option<&super::CapOverflow> {
+        self.clamp.as_ref()
     }
 
     fn reset_params(&mut self) {
@@ -653,6 +696,7 @@ impl Scene for AnalyticFieldScene {
         // A pan is unbounded but must be a number: the escape arm clamps the
         // point it seeds an orbit with, and a clamp cannot rescue a NaN.
         let pan = |v: f32| if v.is_finite() { v } else { 0.0 };
+        self.clamp = iteration_clamp(self.config.family, self.iterations, self.iteration_cap);
         let params = Params {
             a: [aspect.max(0.1), zoom, pan(self.pan.x), pan(self.pan.y)],
             b: [
@@ -677,7 +721,7 @@ impl Scene for AnalyticFieldScene {
             f: [
                 bounded(self.c_re, -C_LIMIT, C_LIMIT, DEFAULT_C_RE),
                 bounded(self.c_im, -C_LIMIT, C_LIMIT, DEFAULT_C_IM),
-                applied_iterations(self.iterations, MAX_ITERATIONS),
+                applied_iterations(self.iterations, self.iteration_cap),
                 bounded(
                     self.escape_radius,
                     ESCAPE_RADIUS_RANGE[0],
