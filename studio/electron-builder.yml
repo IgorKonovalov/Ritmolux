@@ -50,3 +50,9 @@ mac:
   # macOS 13+, matching the player's own floor: the studio spawns it, so a Mac
   # that cannot run the player has no use for the studio.
   minimumSystemVersion: '13.0'
+  # The bundled player is lipo'd universal BEFORE electron-builder runs, so
+  # `--universal` finds the same Mach-O in its x64 and arm64 halves and refuses
+  # to merge it unless the path is named here. Named, the merge keeps one copy,
+  # and the copy is already both architectures - bundle-studio.sh's lipo -archs
+  # check on the bundled player is what proves it.
+  x64ArchFiles: 'Contents/Resources/player/*'
