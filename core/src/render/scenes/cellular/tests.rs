@@ -1203,8 +1203,8 @@ fn radius_one_with_whole_thresholds_is_life_like() {
     );
 }
 
-/// **A radius above 1 is still moving after 2,000 generations**, the property
-/// the plan asks of the family: the declared default rule (radius 5, births at
+/// **A radius above 1 is still moving after 2,000 generations** — the property
+/// the family exists for (Plan 0164 Phase 3): the declared default rule (radius 5, births at
 /// 34..=46 of 120 neighbours, survival at 32..=56) from two seeded soups,
 /// compared at generation 2,000 with itself 60 generations on — a span every
 /// oscillator of period 1 to 6, 10, 12, 15, 20 and 30 returns to itself
