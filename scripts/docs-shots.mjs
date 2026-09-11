@@ -124,7 +124,7 @@ import { relative, resolve, sep } from "node:path";
 // the phrase's quiet bar where the flock settles onto its flow field.
 //
 // 640x360 rather than the 1280x720 above. A card is displayed at roughly a
-// third of a page column, and 82 of them at full size would put tens of
+// third of a page column, and over a hundred of them at full size would put tens of
 // megabytes of derived PNG into the repository for detail no reader can see.
 const CARD_SIZE = "640x360";
 const CARD_HOP_OVERRIDES = { swarm_braid: 374, swarm_drift: 374, swarm_shatter: 374, swarm_stipple: 374 };
@@ -133,7 +133,20 @@ const CARD_HOP_OVERRIDES = { swarm_braid: 374, swarm_drift: 374, swarm_shatter: 
 /// each group is a count, so a family that gains a preset and not a card is
 /// visible here as well as in the test.
 const CARDS = [
-  // attractor (19)
+  // analytic_field (12)
+  "analytic_echoplate",
+  "analytic_juliacircuit",
+  "analytic_lacegrid",
+  "analytic_multibrot",
+  "analytic_parabolicdust",
+  "analytic_pearlstring",
+  "analytic_ringorbit",
+  "analytic_seahorse",
+  "analytic_searchlight",
+  "analytic_stainedglass",
+  "analytic_standingwave",
+  "analytic_twobandjulia",
+  // attractor (20)
   "attractor_clifford",
   "attractor_cliffordgallery",
   "attractor_dejonggallery",
@@ -143,6 +156,7 @@ const CARDS = [
   "attractor_ink",
   "attractor_leviathan",
   "attractor_lorenzgallery",
+  "attractor_lorenzknot",
   "attractor_thomas",
   "attractor_thomasgallery",
   "attractor_thomasred",
@@ -159,9 +173,10 @@ const CARDS = [
   "emitter_heartfall",
   "emitter_perseids",
   "emitter_petalfall",
-  // fragment_field (13)
+  // fragment_field (14)
   "fragment_driftmono",
   "fragment_drostemono",
+  "fragment_etchingplate",
   "fragment_interferencemono",
   "fragment_mandala",
   "fragment_nebula",
@@ -173,17 +188,23 @@ const CARDS = [
   "fragment_tunnel",
   "fragment_vitrail",
   "fragment_whorl",
-  // lsystem (5)
+  // lsystem (6)
   "lsystem_bower",
   "lsystem_coral",
+  "lsystem_icecrystal",
   "lsystem_rime",
   "lsystem_sumimono",
   "lsystem_vellum",
-  // parametric_curve (5)
+  // parametric_curve (10)
   "curve_broadside",
+  "curve_cogwheel",
+  "curve_gyre",
   "curve_ionwake",
+  "curve_lacework",
   "curve_loom",
   "curve_nightbloom",
+  "curve_phosphor",
+  "curve_prismscope",
   "curve_rosemono",
   // reaction_diffusion (7)
   "reaction_etching",
@@ -198,7 +219,7 @@ const CARDS = [
   "collage_nocturne",
   "collage_onwhite",
   "collage_suprematist",
-  // shape_field (8)
+  // shape_field (9)
   "shape_aperture",
   "shape_contourmono",
   "shape_facet",
@@ -207,10 +228,11 @@ const CARDS = [
   "shape_maple",
   "shape_pulse",
   "shape_ringmono",
+  "shape_strataheart",
   // spectrum (5)
   "spectrum_anemone",
-  "spectrum_halo",
   "spectrum_metermono",
+  "spectrum_radialbloom",
   "spectrum_ridge",
   "spectrum_skyline",
   // star_pattern (4)
@@ -218,9 +240,10 @@ const CARDS = [
   "star_mandala_bordered",
   "star_rosewindow",
   "star_zellij",
-  // swarm (4)
+  // swarm (5)
   "swarm_braid",
   "swarm_drift",
+  "swarm_murmuration",
   "swarm_shatter",
   "swarm_stipple",
   // warp_mesh (5)
@@ -413,10 +436,11 @@ const IMAGES = [
     tier: "rich",
   },
   {
-    // spectrum — UNJUDGED. Chosen when this family shipped one preset; 5 ship
-    // now and none has been compared against halo.
+    // spectrum — UNJUDGED. `spectrum_radialbloom` took this slot when the owner
+    // retired `spectrum_halo` in its favour, so it inherits the slot rather than
+    // winning it; the other four spectrum worlds have not been compared at it.
     out: "docs/images/gallery/spectrum.png",
-    presetFile: "presets/spectrum_halo.toml",
+    presetFile: "presets/spectrum_radialbloom.toml",
     signal: "dynamic:110",
     hop: 300,
     size: "1280x720",
@@ -487,12 +511,12 @@ const IMAGES = [
     tier: "rich",
   },
   {
-    // analytic_field — UNJUDGED, and not a choice: the system ships no preset
-    // yet, so its slot renders the teaching preset the guide prints for the
-    // Chladni family, the system's first. Swap it for a shipped world when
-    // the content lane lands one.
+    // analytic_field — UNJUDGED. `analytic_standingwave` was the owner's pick
+    // when the system's first shipped worlds landed: the Chladni family, which
+    // is what the slot's teaching preset showed before it. The escape-time
+    // worlds have not been compared at it.
     out: "docs/images/gallery/analytic_field.png",
-    presetFile: "docs/examples/field/chladni.toml",
+    presetFile: "presets/analytic_standingwave.toml",
     signal: "dynamic:110",
     hop: 300,
     size: "1280x720",

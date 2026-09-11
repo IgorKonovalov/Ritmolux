@@ -633,7 +633,7 @@ analyzer over real samples and therefore populate the array:
 
 ```bash
 # The band array through the real FFT - the readout actually moves
-cargo run -p standalone --example shot -- --preset "Halo" \
+cargo run -p standalone --example shot -- --preset "Radial Bloom" \
   --signal chord --strip 3 --out comb.png
 ```
 

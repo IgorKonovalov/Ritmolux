@@ -487,15 +487,13 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // emptied canvas, at the quiet excitation where emptying happens —
         // [`a_canvas_the_music_empties_is_convicted_and_black_calls_it_full`].
         SystemKind::ShapeCollage => 0.13,
-        // **Not derived from a distribution**: the system ships with no preset
-        // content, as `shape_field` and `warp_mesh` once did, so this floor has
-        // never gated anything. It takes `FragmentField`'s number because both
-        // are fullscreen `occlude` fields, which is a borrowed number and not a
-        // measurement — a Chladni plate lights only its nodal lines, far less
-        // of the frame than a fold does. **Re-derive it from this test's printed
-        // distribution when the first preset ships**, at half the family
-        // minimum like every floor above.
-        SystemKind::AnalyticField => 0.08,
+        // **Derived from the distribution on 2026-09-11**, when the family's
+        // first twelve worlds shipped, from a `0.08` borrowed off
+        // `FragmentField`. The lowest shipped member is `Echo Plate` at 0.3253 —
+        // a Chladni plate lights only its nodal lines plus the trail behind
+        // them — and the borrowed floor sat 4.07x under it, past the 2.2x slack
+        // this file allows. Half that minimum, like every floor above.
+        SystemKind::AnalyticField => 0.16,
         // **Not derived from a distribution either**: the system ships no
         // preset content. `reaction_diffusion`'s number, because both paint a
         // stateful grid whose live share is what the frame shows — a borrowed

@@ -220,10 +220,11 @@ figures. It has by far the largest parameter surface, and much of it is family-s
 
 ### `spectrum`
 
-![A radial spectrum readout: a ring of coloured spokes radiating outward, cyan at the top through
-violet and pink to gold, over a dark blue-violet vignette](images/gallery/spectrum.png)
+![A radial spectrum readout: a ring of spokes around an empty centre on black, each spoke's length
+and thickness its own band, long magenta spokes to the upper left, short violet ones to the right
+and warm orange ones below](images/gallery/spectrum.png)
 
-*`presets/spectrum_halo.toml`*
+*`presets/spectrum_radialbloom.toml`*
 
 A direct readout of the analysis frame's 64-band log-spaced spectrum, drawn as bars, a polyline or a
 radial ring of spokes. It is the one system where the audio is literally legible in the picture.
@@ -309,10 +310,11 @@ authoring fact is that the palette stays under linear `0.6` — see
 
 ### `analytic_field`
 
-![A Chladni plate: pale blue lines on dark navy forming diagonal crosses through a central wheel,
-with a rounded triangle loop sitting in every cell between them](images/gallery/analytic_field.png)
+![A Chladni plate's whole signed wave: a diamond lattice of hot orange and cold blue cells, each
+stepped into flat nested terraces, with black nodal seams between them](images/gallery/analytic_field.png)
 
-*`family = "chladni"` — [`docs/examples/field/chladni.toml`](examples/field/chladni.toml)*
+*`family = "chladni"` — `presets/analytic_standingwave.toml`; the teaching preset is
+[`docs/examples/field/chladni.toml`](examples/field/chladni.toml)*
 
 One fullscreen pass that computes a **closed-form function of position** — no state, no geometry,
 nothing accumulated, so every frame is exactly what this frame's bindings say. A `[field] family`
