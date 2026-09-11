@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0170** (ADRs are a separate sequence — next free there is **0191**.)
+**Next free number: 0174** (ADRs are a separate sequence — next free there is **0193**.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -47,6 +47,10 @@ place. The plan file carries the real link.
 | [0160](0160-the-silhouettes-preconditions-stop-being-silent.md) | The silhouette's preconditions stop being silent | approved | dev, human | ADR-0179: four preconditions on `[path]` that fail silently. **0092 closed 2026-09-09**, so its Phase 7 axis fix is in. Phase 2 is prose in `presets/README.md`. |
 | [0166](0166-the-basics-read-in-russian.md) | The basics read in Russian | approved | dev, human | ADR-0185: five docs gain a Russian sibling `.ru.md` stamped with the source sha. **Phase 3 is a `human` review that blocks publication.** Touches no Rust - orderable against any lane. |
 | [0169](0169-a-preset-is-checked-before-it-is-rendered.md) | A preset is checked before it is rendered | draft | dev, human | ADR-0190 (proposed): `--check` reuses the loader, a JSON Schema feeds the editor, **nothing formats a preset**. Phase 2 stops if `proposed/` or `docs/examples/` already warn. |
+| [0170](0170-the-horizon-reads-the-frames-own-ground.md) | The horizon reads the frame's own ground | draft | dev | Backlog 0210 + 0211: `--horizon` and `--report` take ADR-0126's modal ground; the Larger than Life default is documented as settling, not changed. No new ADR. |
+| [0171](0171-one-stall-policy-and-a-guarded-clock.md) | One stall policy, and a guarded clock | draft | dev | ADR-0191 (proposed), backlog 0188-0190: every frame entry replaces a bad `dt` before the clock moves; three downstream guards go, a hygiene test holds it at one. |
+| [0172](0172-the-studios-readings-become-true.md) | The studio's readings become true | draft | dev, studio-builder | ADR-0192 (proposed), backlog 0202, 0205, 0209: windowless fps, a committed schema snapshot, `param` on warnings. Overlaps 0169 twice. |
+| [0173](0173-the-milkdrop-geometry-reads-the-source.md) | The MilkDrop geometry reads the source | draft | dev | Backlog 0119 + 0120 from MilkDrop 2's released source: `atan2` handedness, waveform base amplitude. No rig; each phase has a stop branch. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-09 — [0158] and [0159] are drafted, and they are a program rather than a

@@ -55,6 +55,16 @@ and an interview rather than a phase"*, and its four routes differ on a provenan
 Phase 8 deferred — *decide later, nothing third-party in the repository or a release* — which is the
 same decision seen from two sides, since a texture is third-party content exactly as a preset is.
 
+**Revised 2026-09-11: Phase 2 reads the source before it infers.** MilkDrop 2's source was released
+under BSD-3-Clause on 2013-05-13 and is public, with the feedback loop in `vis_milk2/milkdropfs.cpp`.
+Every earlier attempt on 0113 inferred the reference's behaviour from pictures, because no source was
+reachable. Phase 2 now derives the equilibrium the reference's own warp, decay, echo and gamma path
+implies for a preset with no warp shader (all five washed presets are that kind), and compares it with
+our measured field — *Fog Tunnel*'s background reads 0.298 linear at the field. It repairs only a
+divergence that arithmetic names, and stops as written if there is none. Plan 0173 reads the same file
+for the mesh and the waveform; whichever runs first names the commit and the other reuses it.
+Nothing from the source is copied into the repository.
+
 ## Architecture diagram
 
 ```mermaid
@@ -101,6 +111,12 @@ flowchart LR
 - **What:** Identify what sets the equilibrium, or state precisely that the instrument cannot see it.
 - **Files touched:** `docs/design-backlog.md` (a dated update on 0113).
 - **Notes for the implementer:**
+  - **Start from the reference's source** (revised 2026-09-11, see Decision). Write down its per-frame
+    arithmetic for the built-in warp path — decay, echo, gamma, the order they apply in and the domain
+    each multiplies in (8-bit encoded or linear) — and the equilibrium it implies for *Fog Tunnel*'s
+    bundle. Compare that with Phase 1's settled level. A divergence the arithmetic names is Phase 3's
+    target; no divergence is the honest stop this phase already allows. Cite file, function, line and
+    commit, and copy nothing.
   - The known fact is that only a per-frame decay and a ceiling clamp exist — **nothing bounds the
     equilibrium level**. A decay plus a source term has an equilibrium at `source / (1 - decay)`, so
     the candidates are the decay's units, the source's scale, or the clamp interacting with both.
