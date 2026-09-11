@@ -1,0 +1,55 @@
+# Sand Plate - the cymatics demonstration itself: pale sand gathered on the nodal
+# lines of a dark brass plate. The figure is the Chladni zero set, and the two
+# mode numbers are the only structure there is.
+#
+# What drives it: the bass picks mode_m out of 5..9 and the beat re-takes it,
+# so a kick is a NEW FIGURE rather than a brighter one; the mids pick mode_n out
+# of 1..4, re-taken only on the bar, so the plate's family (how many lines
+# cross the short axis) changes slowly while its detail changes on the hit.
+# The two ranges never meet, because mode_n == mode_m blanks the plate.
+# Onsets thicken the sand a little. The ground is the engine backdrop (occlude
+# 0, a vignetted brass ramp), with plate_mix wandering 0.05..0.13 on a slow
+# noise and a small pan drift - both there so the plate is not frozen in
+# silence, since the field itself has no state.
+#
+# Judge: does each beat read as the sand JUMPING to a new pattern, like the
+# bowed-plate film, or as a flicker? The figure should always be symmetric and
+# legible; the whole look is lost if the lines smear into a lit field.
+system = "analytic_field"
+name = "Sand Plate"
+
+[field]
+family = "chladni"
+
+[palette]
+stops = [
+  { at = 0.0,  color = "#07060a" },
+  { at = 0.30, color = "#231a14" },
+  { at = 0.62, color = "#7a5a36" },
+  { at = 0.86, color = "#e2c796" },
+  { at = 1.0,  color = "#fff6e4" },
+]
+
+[params]
+mode_n     = "1 + floor(clamp(mid, 0, 0.99) * 4)"
+mode_m     = "5 + floor(clamp(bass, 0, 0.99) * 5)"
+line_width = "0.022 + clamp(onset * 0.035, 0, 0.021)"
+plate_mix  = "0.05 + 0.08 * noise(time * 0.35)"
+pan_x      = "0.05 * sin(time * 0.07)"
+color_span = "1"
+brightness = "1.15"
+bloom_amount    = "0.25"
+bloom_threshold = "0.8"
+occlude      = "0"
+bg_bright    = "0.30"
+bg_hue       = "0.55"
+bg_hue_span  = "-0.25"
+bg_vignette  = "0.85"
+bg_angle     = "0.25"
+
+[hold]
+mode_n = "bar"
+mode_m = "beat"
+
+[smoothing]
+line_width = 0.10

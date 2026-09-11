@@ -1,0 +1,55 @@
+# Multibrot - the Mandelbrot map with the exponent as the structural lever:
+# z -> z^power + c for a WHOLE power from 3 to 7, re-rolled once a bar. Each
+# power is a different body - power d has d-1 fold symmetry, so the figure
+# steps between a 2-lobed, 3-lobed ... 6-lobed crown - and all of them sit
+# centred on the origin (power 2 is left out because its set sits off-centre
+# at -0.5 and would jump sideways on the change).
+#
+# What drives it: power re-rolls on the bar from hash(bar_index), so the change
+# is an EVENT once a bar and never a wobble. The bass lights the set from
+# inside (interior 0 -> 0.5), so a kick fills the black crown with its own
+# palette; the mids breathe the zoom slightly. Smooth-count colouring on a
+# cyclic palette, so the halo is a set of soft nested rings around the crown.
+#
+# An 8-frame --strip on dynamic:110 showed the re-roll working: a two-lobed,
+# a five-fold and a six-fold crown across eight frames. --report cannot see
+# this (the probe holds the bar still), so its Multibrot row is the weakest in
+# the pass (drive 0.058) for the preset whose change is the most discrete.
+#
+# Judge: does the step between powers read as the SAME object gaining or
+# losing a lobe, or as a cut to an unrelated picture? And is the interior light
+# a nice fill or a wash that hides the silhouette?
+system = "analytic_field"
+name = "Multibrot"
+
+[field]
+family = "escape_time"
+map    = "mandelbrot"
+
+[palette]
+stops = [
+  { at = 0.0,  color = "#04060e" },
+  { at = 0.10, color = "#070f1e" },
+  { at = 0.25, color = "#133a5c" },
+  { at = 0.45, color = "#3fb0a8" },
+  { at = 0.62, color = "#f2e6b8" },
+  { at = 0.80, color = "#c8506a" },
+  { at = 1.0,  color = "#04060e" },
+]
+
+[params]
+power         = "3 + floor(hash(bar_index * 7.31) * 4.99)"
+iterations    = "48"
+escape_radius = "24"
+interior      = "clamp(bass * 0.6, 0, 0.5)"
+zoom          = "0.74 + 0.06 * noise(time * 0.15) + clamp(mid * 0.08, 0, 0.07)"
+color_span    = "0.9"
+color_center  = "0.05 * sin(time * 0.2)"
+brightness    = "1.15"
+
+[hold]
+power = "bar"
+
+[smoothing]
+interior = 0.12
+zoom     = 0.3

@@ -1,0 +1,57 @@
+# Round Plate - real cymatics photographs are round (a circular plate, or water
+# in a dish), but the Chladni family draws a square plate. This preset folds
+# the square plate through the engine's kaleidoscope into a six-fold rosette,
+# with the plate zoomed out (0.75) so its inner rings become the mandala's
+# rings of petals and the frame's corners fall to black like the rim of a dish.
+#
+# What drives it: the plate's mode pair re-takes on the bar (mode_n 2..4 on
+# mids, mode_m 5..8 on bass), so the mandala changes design slowly. The
+# kaleidoscope's spiral leans with the bass (0 -> 0.1) and its angle turns
+# slowly with time; plate_mix 0.25 lays a soft wave under the lines so the
+# petals have a body. Gold on deep violet.
+#
+# The first cut used order 8, zoom 1.2 and a spiral up to 0.45, and came back
+# as eight chevron SPOKES - the square plate's diagonals, bent - with no ring
+# anywhere. Spiral is the dangerous lever here; keep it small.
+#
+# Judge: does it read as a ROUND vibrating plate, or as a kaleidoscope trick
+# over a square one? Watch the rim: four stubby gold bars sit at the edge of
+# the fold where the plate's straight lines are cut by a wedge boundary. They
+# are the fold's seam showing, and the first thing to tune if this is kept.
+system = "analytic_field"
+name = "Round Plate"
+
+[field]
+family = "chladni"
+
+[palette]
+stops = [
+  { at = 0.0,  color = "#07030e" },
+  { at = 0.35, color = "#2a1240" },
+  { at = 0.65, color = "#8a4a2a" },
+  { at = 0.88, color = "#f2c46a" },
+  { at = 1.0,  color = "#fff4d6" },
+]
+
+[params]
+mode_n     = "2 + floor(clamp(mid, 0, 0.99) * 3)"
+mode_m     = "5 + floor(clamp(bass, 0, 0.99) * 4)"
+line_width = "0.03"
+plate_mix  = "0.25"
+zoom       = "0.75"
+brightness = "1.15"
+kaleido_order  = "6"
+kaleido_edge   = "0.4"
+kaleido_angle  = "time * 0.01"
+kaleido_spiral = "clamp(bass * 0.12, 0, 0.1)"
+kaleido_radial = "1"
+kaleido_inner  = "0.02"
+bloom_amount    = "0.25"
+bloom_threshold = "0.85"
+
+[hold]
+mode_n = "bar"
+mode_m = "bar"
+
+[smoothing]
+kaleido_spiral = 0.3

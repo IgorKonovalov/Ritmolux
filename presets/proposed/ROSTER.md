@@ -40,6 +40,22 @@ going for, so a verdict is a comparison rather than a general impression.
 | `curve_inkpendulum` | parametric_curve / harmonograph | 2026-09-11 curve families | Victorian harmonograph, 2:3.012, ink on paper. `decay` INVERTED on loudness: quiet collapses to a tight knot, loud opens to the sheet. Watch the knot at rest — it is the quiet state's picture. |
 | `curve_gyre` | parametric_curve / harmonograph | 2026-09-11 curve families | Near-unison damped circle, three-fold rotational mirror = three-armed galaxy; bass lowers `decay` and the arms unwind. Strongest quiet-vs-loud contrast of the four harmonographs. |
 | `curve_tidechart` | parametric_curve / harmonograph | 2026-09-11 curve families | 4:3.006 opaque ribbon, palette stepped along the trace so the damping lands as nested colour shells — a bathymetric chart. Do the bands read as depth or as candy stripe? |
+| `analytic_sandplate` | analytic_field / chladni | 2026-09-11 analytic field | The cymatics demo: pale sand on a vignetted brass plate, modes 1..4 × 5..9, `mode_m` held on the BEAT. Does a kick read as the sand jumping to a new figure, or as a flicker? |
+| `analytic_standingwave` | analytic_field / chladni (`plate_mix` 1) | 2026-09-11 analytic field | The whole signed wave, hot crests and cold troughs, stepped into 6-11 terraces with black nodal seams. Top-middle mode range (7..10 × 11..15). Relief, or quilt? |
+| `analytic_lacegrid` | analytic_field / chladni | 2026-09-11 analytic field | Modes 12..13 × 14..16, the top of the range: hairline white lace, zoomed out to a wallpaper. Check it at 1280x720 too — aliasing near the pixel pitch is the risk. |
+| `analytic_echoplate` | analytic_field / chladni + trails | 2026-09-11 analytic field | Low modes into a zooming max-decay trail. Stills show zoom STREAKS off the current figure, not a stack of old ones. Is the current figure still the brightest layer? Horizon clean. |
+| `analytic_engraving` | analytic_field / chladni + ink | 2026-09-11 analytic field | Slate-indigo ink on cream paper, wide lines, a faint aquatint wash of the wave. Held on the bar: the calm one. Is the ink dark enough to read as print? |
+| `analytic_modesweep` | analytic_field / chladni (unheld) | 2026-09-11 analytic field | No hold: eased bass sweeps `mode_m` 2..16 through every integer. A strip showed 7 distinct figures in 8 frames. Does a crescendo read as the plate CLIMBING, or as a strobe? |
+| `analytic_roundplate` | analytic_field / chladni + kaleidoscope | 2026-09-11 analytic field | The square plate folded six ways into a round cymatic mandala. Round plate, or a kaleidoscope trick? Four gold stubs at the rim are the fold's seam showing. |
+| `analytic_juliacircuit` | analytic_field / escape_time (julia) | 2026-09-11 analytic field | c tours the main cardioid's edge; the bass pushes it OUTSIDE, so quiet = black connected set and loud = the set cracks open pink with gold spiral eyes. Morph, or black/pink flicker? |
+| `analytic_twobandjulia` | analytic_field / escape_time (julia) | 2026-09-11 analytic field | Plan 0163's own question: c_re on bass, c_im on treble, in the valley between cardioid and bulb. No time term, so every change is the music. Musical, or noise? |
+| `analytic_parabolicdust` | analytic_field / escape_time (julia) | 2026-09-11 analytic field | A 3.7x close-up on ONE spiral arm of the dust past the cusp: a nautilus of sparks. The bass THINS it. Watch whether the arm stays in frame across a minute. |
+| `analytic_seahorse` | analytic_field / escape_time (mandelbrot) | 2026-09-11 analytic field | ~220x into Seahorse Valley; bass drives `iterations` 40..400, so quiet lets the black swallow the filaments and loud carves them back (checked with a --set pair). Rich only: Floor clamps it. |
+| `analytic_multibrot` | analytic_field / escape_time (mandelbrot, `power`) | 2026-09-11 analytic field | Whole `power` 3..7 re-rolled on the bar: the crown steps between 2-, 3-...6-fold. The same object gaining a lobe, or a cut? `--report` cannot see the re-roll; the strip can. |
+| `analytic_stainedglass` | analytic_field / escape_time + `cross` trap | 2026-09-11 analytic field | Cross trap, stepped jewel palette, contour leading. The bass slides the trap and re-cuts every pane. Flat glass with lead, or a psychedelic poster? The corners show striped exterior. |
+| `analytic_ringorbit` | analytic_field / escape_time + `circle` trap (`power` 3) | 2026-09-11 analytic field | Cubic Julia, circle trap: blue ring filaments nested round a three-fold set. The bass swells the trap circle, so the rings pulse outward. Filaments, or flat glow? |
+| `analytic_pearlstring` | analytic_field / escape_time + `point` trap | 2026-09-11 analytic field | The dendrite c = -0.8+0.156i strung with lavender beads where orbits pass one point. The point orbits with time; the bass re-strings it. Beads on a thread, or spray? |
+| `analytic_searchlight` | analytic_field / escape_time + `line` trap | 2026-09-11 analytic field | A line trap turning like a lighthouse beam through a fixed dendrite (-0.1+0.95i), in acid green. Most animated row in the pass (anim 0.241). A beam through a structure, or churn? |
 
 ## Notes on this pass
 
@@ -268,3 +284,153 @@ pass's gap 4 (the order the report prints its tables in).
   same `hash(bar_index)`, one for `n` and one for its matching `d` (Blueprint), and the
   pairing is kept consistent by hand. A `pick(i, a, b, c, …)` function would make the
   intent one line per parameter.
+
+## Notes on the analytic-field pass (2026-09-11)
+
+**Sixteen presets on `analytic_field`, the system Plan 0163 landed:** seven on `chladni`
+and nine on `escape_time`. The Implementation log confirms both families, both `map`s and
+all four trap shapes, and all of them are covered. Every file was rendered at
+`--tier rich --signal dynamic:110 --frame-at 300 --size 640x360` after its last edit and
+looked at.
+
+**Filenames use `analytic_`**, the way `fragment_field` ships as `fragment_*`. No shipped
+preset draws this system yet, so there is no precedent to follow. If the owner wants
+`field_` instead, rename them all together.
+
+**How the structural levers are spread:**
+
+- **Chladni modes:** low (Echo Plate 1..3 × 4..7, Sand Plate 1..4 × 5..9), middle
+  (Engraving 3..6 × 7..10, Round Plate 2..4 × 5..8), high (Standing Wave 7..10 × 11..15),
+  the top (Lace Grid 12..13 × 14..16), and the whole range unheld (Mode Sweep 2..16).
+  `plate_mix` runs from 0 through 0.25 to 1. Holds use `beat`, `bar` and none.
+- **Escape time:** Julia and Mandelbrot. `power` runs 2, 3, and whole 3..7 on the bar.
+  Iterations run from 20 (Stained Glass, deliberately low) to 40..400 on the bass
+  (Seahorse). Zoom runs from 0.72 to ~330. `c` is placed inside the cardioid, on its
+  edge, just outside it, in Seahorse Valley and past the cusp. Each trap shape is used
+  once.
+
+**Binned: `analytic_tornjulia`** (a fractional `power` wandering from 2.3 to 3.6, meant
+to show the tear as a look). Two cuts at two different `c` values both came back with
+the branch cut as a **dead-straight horizontal seam with a rectangular step**, cutting
+through a black blob. It reads as a render defect, not a fracture. That answers the
+risk Plan 0163 raised about the fractional seam. See gap 3.
+
+**Re-cut after the first render:**
+
+- Julia Circuit first toured the `|c| = 0.7885` circle and came back as dim dust. It
+  moved to the cardioid edge, where the bass pulled `c` inside and the loud frame was a
+  featureless black blob. The direction was then flipped: loud pushes `c` outside.
+- Stained Glass took four cuts. The first three were a rainbow poster and then cream
+  crackle glaze, because with 48 iterations every interior orbit grazes the cross (gap
+  1). It needed `c` inside the cardioid, 20 iterations, and `color_span` at its maximum.
+- Seahorse started 40x in, which was too shallow. Its first iteration range (140..380)
+  showed no quiet/loud difference.
+- Parabolic Dust was, at first, exactly one stop on Julia Circuit's tour in a different
+  palette. It was re-framed as a close-up so that it is a separate candidate.
+- Round Plate's first fold made chevron spokes instead of rings.
+- Echo Plate's first trail was too short to read as echoes at all.
+
+**`--report` (tier floor, `family=analytic_field`):** every preset reacts to at least
+one band. There are no near-duplicates and no clamp over 90 % occupancy. It found one
+real problem: **`anim` read 0.000 on eight presets.** The field is stateless, so with
+no audio and no `time` term the picture is frozen. The shipped `animation` gate would
+reject all eight. Five of them (Sand Plate, Standing Wave, Engraving, Mode Sweep,
+Multibrot) now carry a slow pan, zoom or wash drift and read 0.004-0.009. Three still
+read 0.000:
+
+- **Two-Band Julia**, deliberately: every change on it is the music.
+- **Julia Circuit** and **Ring Orbit**: they do drift on `time`, but too slowly for the
+  probe's window.
+
+A keeper among those three needs a faster drift before `dev` embeds it. Multibrot's row
+(drive 0.058) is the weakest. Its main change is the bar re-roll, which the probe holds
+still; an 8-frame strip confirms the re-roll works.
+
+**Horizon:** only Echo Plate accumulates, since it is the only one with `trails`. I ran
+five simulated minutes at 96x96 against a static `star_pattern` control, which read
+`delta 0.0000 / monotone 0.00`. Echo Plate settles in the first interval and then
+breathes (monotone 0.50-0.56). The verdict is in its header.
+
+**Tier:** everything except Seahorse asks for at most 64 iterations (the Floor cap), so
+it draws the same picture on both tiers. Seahorse asks for up to 400, and on Floor it is
+clamped with an announcement.
+
+**The best four, if the morning is short:** Standing Wave, Seahorse, Pearl String and
+Searchlight. Two-Band Julia is the one to watch with real music, because it is the
+plan's open question.
+
+## Engine gaps this pass hit — analytic field
+
+Routed feedback for `architect`, ordered by how much authoring time each one cost.
+
+### 1. A trapped field cannot send its exterior to one colour
+
+With a `trap`, a pixel's palette coordinate is the orbit's nearest approach. That value
+is unbounded, it is largest out in the exterior, and **the LUT repeats past 1**. So
+there is no palette that is bright near the trap and dark everywhere far from it: the
+far field wraps back around through every stop. It shows in three presets:
+
+- the striped fringes in Stained Glass's corners;
+- the concentric rings round Pearl String;
+- the chevrons behind Searchlight.
+
+On Pearl String and Searchlight they happen to read as a design. On Stained Glass they
+are the flaw. It also cost the most renders of anything in the pass. Stained Glass had
+to be framed so that the exterior barely shows, and that constrains `c` and `zoom` for
+a reason that has nothing to do with the look. On top of that, **an escaped pixel's
+light is fixed at 1**, and `interior` has no exterior twin. So the exterior can only be
+darkened through the palette, which is the wrapping coordinate itself.
+
+**What would close it:** a clamp-addressed palette mode (for example a per-palette
+`repeat = false`), or an `exterior` light parameter beside `interior`. Either one alone
+would have saved Stained Glass two cuts.
+
+### 2. The analytic field has no rotation
+
+The scene has `zoom`, `pan_x` and `pan_y`, and nothing that turns it. A Julia or
+Multibrot crown that slowly turns is the obvious ambient motion, and the one thing a
+stateless field needs most (see the `anim` note above). The only rotation available is
+the kaleidoscope's `kaleido_angle`, which brings a fold with it. Every drift in this
+pass is therefore a pan or a zoom breath. **What would close it:** a `rotate` in turns,
+like `trap_rotate` but applied to the field's coordinates.
+
+### 3. The fractional-power seam reads as a bug (the plan's risk, answered)
+
+Plan 0163's risks section asked to "check the seam before shipping a fractional
+default". Checked: the `atan2` cut along the negative real axis draws a
+**straight horizontal line with a rectangular step** where the two sides of the set
+fail to meet. At `power` 2.3-3.6, with two different `c` values, it never read as a
+fracture. It read as a tile that failed to render. Torn Julia was binned because of it.
+`power` is safe as a whole number held on an edge, as Multibrot uses it. A fractional
+`power` is not yet a look. The reference's line *"a fractional power tears along the
+negative real axis"* is accurate, but it reads as an invitation, and it should read as a
+warning.
+
+### 4. The Chladni plate is square, and real cymatics is round
+
+The `chladni` family is the square-plate formula. The imagery people know (a round
+plate, water in a dish) is Bessel modes on a disc. Round Plate fakes the disc with a
+six-fold kaleidoscope. It mostly works, but it leaves four stub artifacts at the rim,
+and it needed three cuts to stop turning into chevron spokes. **What would close it:** a
+`[field] plate = "square" | "circle"` choice, or a disc family placed beside the three
+ADR-0180 already names. `mode_n` would become the angular order and `mode_m` the radial
+order.
+
+### 5. Smaller
+
+- **`mode_n == mode_m` blanks the plate.** Every Chladni preset here keeps its two
+  ranges disjoint by hand. Mode Sweep deliberately lets them cross, and gets a blank
+  frame for it. The reference says so, but nothing warns at load when two bound ranges
+  overlap.
+- **The reference gives `zoom` as 0.25-4, but the scene does not clamp it.** Seahorse
+  runs at ~150-330x and f32 holds cleanly there. For the Mandelbrot map the stated range
+  undersells the system by two orders of magnitude, and an author reading the table
+  would never try a deep zoom. That is a doc sentence, not an engine change.
+- **The stateless field and the `animation` gate** (the eight `anim 0.000` rows above).
+  This is not a defect, but every future `analytic_field` preset will hit it. A
+  sentence in the reference ("the field has no state: without a `time` term it is
+  frozen in silence") would save the next author a report run.
+- **Short max-decay trails over a field read as ribbing.** Echo Plate's first cut, at
+  `trails` 0.86 with a slow `fb_zoom`, drew each nodal line as a ribbed band of
+  near-coincident copies instead of an echo. That is the trail behaving as documented,
+  but together with a thin analytic line it looks like a sampling fault.

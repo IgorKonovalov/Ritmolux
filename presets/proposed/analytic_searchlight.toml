@@ -1,0 +1,48 @@
+# Searchlight - a LINE orbit trap swept round like a lighthouse beam. Each
+# pixel is lit by how close its orbit came to one straight line through the
+# plane; as the line turns, the lit filaments sweep across the Julia set in
+# waves, and because the set folds that line through itself the sweep is never
+# a plain rotation - bundles of light gather and part as it goes.
+#
+# What drives it: trap_rotate walks steadily with time (one full turn every
+# ~25 s: the sweep), and the bass slides the line off-centre (trap_radius
+# 0 -> 0.45), which re-routes every filament at once. c is a fixed dendrite
+# (-0.1 + 0.95i, the thin branching set) so the structure the beam reveals is
+# always the same tree - the light is what moves.
+#
+# Judge: is the sweep legible as a BEAM moving through a fixed structure, or
+# does the whole frame just churn? The line trap is the least intuitive of the
+# four trap shapes; this is its test.
+system = "analytic_field"
+name = "Searchlight"
+
+[field]
+family = "escape_time"
+map    = "julia"
+trap   = "line"
+
+[palette]
+stops = [
+  { at = 0.0,  color = "#fbffe8" },
+  { at = 0.04, color = "#d8ff7a" },
+  { at = 0.12, color = "#2fa84a" },
+  { at = 0.28, color = "#0a2a1a" },
+  { at = 0.50, color = "#030805" },
+  { at = 1.0,  color = "#030805" },
+]
+
+[params]
+c_re         = "-0.1"
+c_im         = "0.95"
+iterations   = "48"
+interior     = "1"
+trap_radius  = "clamp(bass * 0.53, 0, 0.45)"
+trap_rotate  = "time * 0.04"
+zoom         = "0.8"
+color_span   = "1.6"
+brightness   = "1.25"
+bloom_amount    = "0.35"
+bloom_threshold = "0.85"
+
+[smoothing]
+trap_radius = 0.15

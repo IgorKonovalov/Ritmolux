@@ -1,0 +1,51 @@
+# Parabolic Dust - a Julia set just past the Mandelbrot cusp (c ~ 0.26-0.33),
+# where the set has shattered into dust but orbits still linger near the
+# parabolic point, so the dust arranges itself into spirals of fine sparks.
+# The camera sits ~3.7x in on ONE of those spirals (pan -0.47, 0.29), so the
+# frame is a single nautilus arm curling into a bright eye - a close-up, not
+# the whole set. (The whole set at zoom 1 is one stop on Julia Circuit's tour;
+# this is what makes the two different candidates.)
+#
+# What drives it: the bass pushes c_re outward from 0.262 (barely past the
+# cusp: fat arm, many sparks) toward 0.33 (thin, sparse dust) - so the loud
+# frame THINS the spiral and the quiet one fills it in, the inverse of a
+# brightness binding. c_im drifts on a slow noise so the arm turns; the mids
+# push the camera in slightly. 64 iterations, exactly the Floor cap.
+#
+# Judge: does the arm read as a spiral of sparks (a nautilus, a galaxy) or as
+# a smear? And does the bass thinning read as BREATHING or as dimming? The
+# spiral may drift partly out of frame as c moves - watch whether it stays
+# composed across a minute.
+system = "analytic_field"
+name = "Parabolic Dust"
+
+[field]
+family = "escape_time"
+map    = "julia"
+
+[palette]
+stops = [
+  { at = 0.0,  color = "#010207" },
+  { at = 0.12, color = "#081230" },
+  { at = 0.35, color = "#1a2c6a" },
+  { at = 0.62, color = "#9ac4ff" },
+  { at = 0.85, color = "#fff3e0" },
+  { at = 1.0,  color = "#ffffff" },
+]
+
+[params]
+c_re          = "0.262 + clamp(bass * 0.08, 0, 0.068)"
+c_im          = "0.012 + 0.03 * (noise(time * 0.04) - 0.5)"
+iterations    = "64"
+escape_radius = "48"
+interior      = "0"
+zoom          = "3.6 + clamp(mid * 0.5, 0, 0.4)"
+pan_x         = "-0.47"
+pan_y         = "0.29"
+color_span    = "0.5"
+brightness    = "1.25"
+bloom_amount    = "0.35"
+bloom_threshold = "0.8"
+
+[smoothing]
+c_re = 0.2

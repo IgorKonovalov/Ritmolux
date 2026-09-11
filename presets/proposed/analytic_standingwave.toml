@@ -1,0 +1,50 @@
+# Standing Wave - the same plate with the sand swept off: plate_mix = 1 shows
+# the whole signed wave, crests hot and troughs cold, and the nodal lines are
+# the black seams where the two meet. palette_steps cuts the wave into flat
+# terraces with a hairline at each edge, so it reads as a contour map of the
+# vibration rather than as a gradient.
+#
+# What drives it: HIGH modes (mode_n 7..10, mode_m 11..15), re-taken on the bar
+# from mid and bass respectively, so the map is dense and changes slowly.
+# palette_steps rides the mids between 6 and 11 terraces - a structural change
+# in how finely the wave is sliced. The bass breathes zoom 1.00 -> 1.12.
+#
+# Judge: do the terraces read as relief (a landscape of peaks and basins) or as
+# candy stripes? The black nodal seams should stay the strongest line in the
+# frame. This is the dense end of the mode range; compare with Sand Plate for
+# the sparse end.
+system = "analytic_field"
+name = "Standing Wave"
+
+[field]
+family = "chladni"
+
+[palette]
+stops = [
+  { at = 0.0,  color = "#8fd0ff" },
+  { at = 0.22, color = "#1d4f9a" },
+  { at = 0.44, color = "#0a1330" },
+  { at = 0.50, color = "#020204" },
+  { at = 0.56, color = "#34100a" },
+  { at = 0.78, color = "#c2461a" },
+  { at = 1.0,  color = "#ffd28a" },
+]
+
+[params]
+mode_n          = "7 + floor(clamp(mid, 0, 0.99) * 4)"
+mode_m          = "11 + floor(clamp(bass, 0, 0.99) * 5)"
+plate_mix       = "1"
+line_width      = "0.02"
+palette_steps   = "6 + floor(clamp(mid * 6.5, 0, 5.99))"
+palette_contour = "0.55"
+zoom            = "1 + clamp(bass * 0.14, 0, 0.12)"
+brightness      = "1.0"
+pan_x           = "0.12 * sin(time * 0.05)"
+pan_y           = "0.09 * sin(time * 0.041 + 1.7)"
+
+[hold]
+mode_n = "bar"
+mode_m = "bar"
+
+[smoothing]
+zoom = 0.25

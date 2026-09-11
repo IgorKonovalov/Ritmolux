@@ -1,0 +1,64 @@
+# Stained Glass - a Julia set coloured by a CROSS orbit trap instead of by its
+# escape time: each pixel takes the colour of the nearest its orbit came to a
+# pair of crossed lines, which breaks the plane into curved panes. The palette
+# is stepped into flat jewel tones with a dark contour at every step, so the
+# panes read as glass and the contours as the lead between them. interior = 1
+# lights the set itself, so the whole frame is glass - no black hole.
+#
+# What drives it: the bass slides the trap out from the origin (trap_radius
+# 0.05..0.45), which re-cuts every pane at once - a structural change, not a
+# brightness one. The cross turns slowly with time and a quarter-turn nudge on
+# the mids; c wanders slowly round -0.30 + 0.45i, INSIDE the main cardioid, so
+# every orbit converges on one fixed point and the panes are the trap's
+# preimages rather than noise. Two settings are load-bearing and look wrong:
+# iterations is only 20 (with more, every orbit eventually grazes the cross and
+# the whole set reads distance ~0 - one cream pane), and color_span sits at its
+# top (4) because the distances that matter are all under ~0.1.
+#
+# Judge: do the panes read as FLAT colour with dark leading (a window), or as a
+# noisy psychedelic field? The leading lines are the whole look. The corners
+# still show the exterior as striped fringes - the palette repeats past 1, so
+# the exterior's large distances cannot be sent to one dark colour (see the
+# engine gaps in ROSTER.md).
+system = "analytic_field"
+name = "Stained Glass"
+
+[field]
+family = "escape_time"
+map    = "julia"
+trap   = "cross"
+
+[palette]
+stops = [
+  { at = 0.0,   color = "#ffe7a8" },
+  { at = 0.08,  color = "#ffe7a8" },
+  { at = 0.09,  color = "#e89a1a" },
+  { at = 0.17,  color = "#e89a1a" },
+  { at = 0.18,  color = "#b3241a" },
+  { at = 0.26,  color = "#b3241a" },
+  { at = 0.27,  color = "#5e1048" },
+  { at = 0.35,  color = "#5e1048" },
+  { at = 0.36,  color = "#1b2c86" },
+  { at = 0.44,  color = "#1b2c86" },
+  { at = 0.45,  color = "#11706e" },
+  { at = 0.53,  color = "#11706e" },
+  { at = 0.54,  color = "#0c1410" },
+  { at = 1.0,   color = "#050608" },
+]
+
+[params]
+c_re            = "-0.30 + 0.05 * sin(time * 0.07)"
+c_im            = "0.45 + 0.04 * (noise(time * 0.05) - 0.5)"
+iterations      = "20"
+interior        = "1"
+trap_radius     = "0.05 + clamp(bass * 0.47, 0, 0.40)"
+trap_rotate     = "time * 0.01 + clamp(mid * 0.3, 0, 0.25)"
+zoom            = "1.85"
+color_span      = "4"
+palette_steps   = "11"
+palette_contour = "1"
+brightness      = "1.0"
+
+[smoothing]
+trap_radius = 0.2
+trap_rotate = 0.35

@@ -1,0 +1,49 @@
+# Two-Band Julia - the experiment Plan 0163 routed to this lane by name: a
+# Julia constant driven by TWO DIFFERENT BANDS, c_re by the bass and c_im by
+# the treble, so the set is steered across a 2-D neighbourhood of Seahorse
+# Valley (-0.75 + 0.11i) by the mix, not along one line by the loudness.
+# Seahorse Valley because it is the region where a small move in c changes the
+# most: the Julia set there is a chain of double spirals whose winding changes
+# with every step.
+#
+# What drives it: c_re = -0.77 + bass * 0.05 (a kick pulls the spirals tighter
+# toward the period-2 bulb); c_im = 0.07 + treb * 0.09 (hats and air unwind
+# them). Both eased by 0.12 s so the set travels rather than snaps. Nothing
+# else moves - no time drift at all - so every change on screen is the music.
+# 64 iterations, the Floor cap; a teal-to-coral palette on near-black.
+#
+# Judge: THE question - does a two-band c read as musical (a kick and a hat
+# visibly doing different things to one object) or as noise? If it reads as
+# noise, that is a finding worth routing back, and the one-band presets in this
+# pass (Julia Circuit, Parabolic Dust) are the control.
+system = "analytic_field"
+name = "Two-Band Julia"
+
+[field]
+family = "escape_time"
+map    = "julia"
+
+[palette]
+stops = [
+  { at = 0.0,  color = "#020406" },
+  { at = 0.10, color = "#06222a" },
+  { at = 0.30, color = "#0f6f78" },
+  { at = 0.52, color = "#9fe8d8" },
+  { at = 0.70, color = "#ff8a6a" },
+  { at = 0.88, color = "#5a1030" },
+  { at = 1.0,  color = "#020406" },
+]
+
+[params]
+c_re          = "-0.762 + clamp(bass * 0.0155, 0, 0.013)"
+c_im          = "0.085 + clamp(treb * 0.1, 0, 0.06)"
+iterations    = "64"
+escape_radius = "32"
+interior      = "0"
+zoom          = "0.8"
+color_span    = "0.55"
+brightness    = "1.2"
+
+[smoothing]
+c_re = 0.12
+c_im = 0.12

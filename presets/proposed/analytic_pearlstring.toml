@@ -1,0 +1,48 @@
+# Pearl String - the classic dendritic Julia set (c = -0.8 + 0.156i) coloured
+# by a POINT orbit trap: a pixel glows only where its orbit passed close to one
+# point, so the set's filaments are strung with small bright beads - the pearls
+# are every place in the plane whose orbit visits the trap.
+#
+# What drives it: the trap point orbits the origin (trap_rotate walks with
+# time), so the pearls slide along the filaments continuously. The bass pushes
+# the point outward (trap_radius 0.15 -> 0.55), which re-strings every pearl
+# at once; the mids nudge c_im a touch so the dendrite flexes. Everything but
+# the pearls is near-black: the palette is bright only in its first tenth.
+#
+# Judge: do the pearls read as discrete beads on a thread, or as a spray? And
+# does the bass re-stringing read as the necklace re-forming, or as a cut?
+system = "analytic_field"
+name = "Pearl String"
+
+[field]
+family = "escape_time"
+map    = "julia"
+trap   = "point"
+
+[palette]
+stops = [
+  { at = 0.0,  color = "#ffffff" },
+  { at = 0.03, color = "#f3e4ff" },
+  { at = 0.09, color = "#b08ad8" },
+  { at = 0.20, color = "#2a1848" },
+  { at = 0.40, color = "#07040e" },
+  { at = 1.0,  color = "#07040e" },
+]
+
+[params]
+c_re         = "-0.8"
+c_im         = "0.156 + clamp(mid * 0.012, 0, 0.01)"
+iterations   = "56"
+interior     = "1"
+trap_radius  = "0.15 + clamp(bass * 0.47, 0, 0.40)"
+trap_rotate  = "time * 0.05"
+zoom         = "0.78"
+color_span   = "1.8"
+brightness   = "1.3"
+bloom_amount    = "0.4"
+bloom_threshold = "0.85"
+bloom_radius    = "0.7"
+
+[smoothing]
+trap_radius = 0.15
+c_im        = 0.2

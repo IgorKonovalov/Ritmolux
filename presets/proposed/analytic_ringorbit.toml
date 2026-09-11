@@ -1,0 +1,47 @@
+# Ring Orbit - a CUBIC Julia set (power 3, so three-fold rather than two-fold
+# symmetry) coloured by a CIRCLE orbit trap: each pixel glows by how close its
+# orbit came to a ring of radius trap_radius. That draws concentric filaments -
+# rings nested inside rings, bent through the set's own geometry.
+#
+# What drives it: the bass expands the trap circle (0.25..1.05), and because
+# every pixel is measured against it the whole field of rings swells outward on
+# the kick - the rings are the beat's shockwave, but made of the fractal. c
+# wanders on a slow noise near 0.54i, where the cubic set is a connected
+# three-armed spiral. Luminance is flat; the palette is dark except in a narrow
+# bright band near distance zero, so only the rings light.
+#
+# Judge: do the rings read as FILAMENTS (thin, bright, following the fractal)
+# or as a flat glow? And does the swell on the bass read as a pulse outward?
+system = "analytic_field"
+name = "Ring Orbit"
+
+[field]
+family = "escape_time"
+map    = "julia"
+trap   = "circle"
+
+[palette]
+stops = [
+  { at = 0.0,  color = "#f6fbff" },
+  { at = 0.05, color = "#79d6ff" },
+  { at = 0.16, color = "#1e4dba" },
+  { at = 0.34, color = "#120a36" },
+  { at = 0.60, color = "#030208" },
+  { at = 1.0,  color = "#030208" },
+]
+
+[params]
+power        = "3"
+c_re         = "0.02 + 0.06 * (noise(time * 0.04) - 0.5)"
+c_im         = "0.54 + 0.05 * (noise(time * 0.04 + 40) - 0.5)"
+iterations   = "40"
+interior     = "1"
+trap_radius  = "0.25 + clamp(bass * 0.94, 0, 0.8)"
+zoom         = "0.9"
+color_span   = "0.9"
+brightness   = "1.3"
+bloom_amount    = "0.35"
+bloom_threshold = "0.8"
+
+[smoothing]
+trap_radius = 0.12
