@@ -10,7 +10,7 @@
 //! `2 * radius + 1` and replaces the masks with two intervals over the box's
 //! filled fraction: a dead cell is born inside `birth_lo..=birth_hi`, a live one
 //! survives inside `survive_lo..=survive_hi`. The fractions are turned into
-//! whole counts on the CPU ([`interval_counts`]), so the shader compares
+//! whole counts on the CPU (`interval_counts`), so the shader compares
 //! integers. The box is summed **separated** — a row pass, then a column sum in
 //! the step pass — at `2 * (2r + 1)` reads a cell rather than `(2r + 1)^2`, and
 //! `radius` is capped by the tier on top of that
@@ -31,14 +31,14 @@
 //! it is announced — returned from `configure` as a
 //! [`CapOverflow`](super::CapOverflow) — never silently reduced. A bound
 //! `radius` past the tier's cap is announced the same way, per frame, through
-//! [`Scene::mirror_overflow`].
+//! `Scene::mirror_overflow`.
 //! The present is a plain normalized stretch of the grid over the target and
 //! computes no screen-destined geometry, so there is no aspect for it to take
 //! from the wrong place (ADR-0037).
 //!
 //! # Generations, not frames
 //!
-//! `step_rate` is in generations per second. [`GenerationClock`] integrates it
+//! `step_rate` is in generations per second. `GenerationClock` integrates it
 //! over the injected `dt` and hands `render` a whole number of generations to
 //! run, so the automaton advances by the same count in the same wall time at
 //! any refresh rate. Because an automaton is path-dependent, two runs at

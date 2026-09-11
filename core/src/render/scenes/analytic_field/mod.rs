@@ -18,7 +18,7 @@
 //!
 //! ADR-0037's rule, restated because a fullscreen field computing a radius is
 //! exactly the shape that gets it wrong: the field's x axis is scaled by the
-//! `aspect` [`Scene::render`] is handed, which is the target's, so one field
+//! `aspect` `Scene::render` is handed, which is the target's, so one field
 //! unit is the same number of pixels on both axes and a square plate stays
 //! square at 1280x800.
 
