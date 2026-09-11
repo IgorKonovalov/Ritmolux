@@ -450,6 +450,36 @@ pub struct TierConfig {
     /// a constant to measure**, on the heaviest escape-time frame: a zoom whose
     /// whole view is the set's interior.
     pub field_iterations: u32,
+
+    /// The widest neighbourhood a `cellular` `larger_than_life` preset may ask
+    /// for, as a `radius` in cells (ADR-0045, ADR-0180).
+    ///
+    /// Like [`field_iterations`](Self::field_iterations) this is a **cap on what
+    /// the preset asks for**, because a radius is content: the same rule at two
+    /// radii grows two different worlds, where a particle count at two densities
+    /// is one. A preset asking within the `Floor` value runs identically on both
+    /// tiers.
+    ///
+    /// # Where the numbers come from
+    ///
+    /// **Arithmetic, not a measurement.** The neighbourhood sum is separated — a
+    /// row pass and a column sum — so one generation costs `2 * (2r + 1) + 1`
+    /// texel reads a cell rather than `(2r + 1)^2`. At `Floor`'s 6 that is 27
+    /// reads; on a 512-cell grid at 60 generations a second, 425 M reads a
+    /// second, a few percent of what a ~2015 integrated GPU — the baseline NFR
+    /// §1's floor is about — fetches, and the grid and rate both have to sit at
+    /// their tops to reach it. `Rich` takes the top of `radius`' declared range,
+    /// 10: 43 reads, 2.7 G a second at a 1024 grid and the same rate. Unseparated,
+    /// radius 10 would be 441 reads a cell — ten times that.
+    ///
+    /// `Floor` is 6 rather than the whole range because the default rule (at
+    /// radius 5) fits under it with one to spare, and a floor
+    /// machine pays for every step past it at every generation.
+    ///
+    /// **When the floor tier is next exercised on real target hardware this is
+    /// a constant to measure**, at the tier's own grid cap and 60 generations a
+    /// second.
+    pub cellular_radius: u32,
 }
 
 impl TierConfig {
@@ -468,6 +498,7 @@ impl TierConfig {
         max_segments: 20_000,
         collage_elements: 40,
         field_iterations: 64,
+        cellular_radius: 6,
     };
 
     /// The midrange-discrete tier.
@@ -492,6 +523,7 @@ impl TierConfig {
         max_segments: 60_000,
         collage_elements: 96,
         field_iterations: 512,
+        cellular_radius: 10,
     };
 
     /// The config for `tier`.

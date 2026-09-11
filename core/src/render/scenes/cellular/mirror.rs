@@ -67,6 +67,40 @@ pub(super) fn life_step(cells: &[u8], n: u32, wrap: bool, birth: u32, survive: u
         .collect()
 }
 
+/// One `larger_than_life` generation, summed the unseparated way on purpose —
+/// every cell of the box read directly — so the GPU's row-and-column sum is held
+/// to an independent statement of it. `birth` and `survive` are the inclusive
+/// whole-count intervals the shader receives.
+pub(super) fn ltl_step(
+    cells: &[u8],
+    n: u32,
+    wrap: bool,
+    radius: u32,
+    birth: [u32; 2],
+    survive: [u32; 2],
+) -> Vec<u8> {
+    let r = i64::from(radius);
+    (0..n * n)
+        .map(|i| {
+            let (x, y) = (i64::from(i % n), i64::from(i / n));
+            let mut count = 0u32;
+            for dy in -r..=r {
+                for dx in -r..=r {
+                    if dx != 0 || dy != 0 {
+                        count += u32::from(at(cells, n, wrap, x + dx, y + dy));
+                    }
+                }
+            }
+            let [lo, hi] = if cells[i as usize] == 1 {
+                survive
+            } else {
+                birth
+            };
+            u8::from(count >= lo && count <= hi)
+        })
+        .collect()
+}
+
 /// A field with its age channel: per cell, the state and the generations since
 /// it last changed, saturating at [`AGE_CAP`](super::AGE_CAP).
 #[derive(Clone, Debug, PartialEq)]

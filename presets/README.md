@@ -914,14 +914,19 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
-| `birth` | `8` | `0` – `511` | Which live-neighbour counts bring a dead cell to life, as a bitmask over the counts 0-8: bit k set means k neighbours give birth. 8 (bit 3) is Conway's. |
-| `survive` | `12` | `0` – `511` | Which live-neighbour counts keep a live cell alive, as a bitmask over the counts 0-8. 12 (bits 2 and 3) is Conway's. |
+| `birth` | `8` | `life_like` `0` – `511`; inert on `larger_than_life` | Which live-neighbour counts bring a dead cell to life, as a bitmask over the counts 0-8: bit k set means k neighbours give birth. 8 (bit 3) is Conway's. |
+| `survive` | `12` | `life_like` `0` – `511`; inert on `larger_than_life` | Which live-neighbour counts keep a live cell alive, as a bitmask over the counts 0-8. 12 (bits 2 and 3) is Conway's. |
+| `radius` | `5` | `larger_than_life` `1` – `10`; inert on `life_like` | How far the neighbourhood reaches, in cells: a square of side 2 x radius + 1 about each cell. Capped by the quality tier. |
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
 
 **Modal**
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
+| `birth_lo` | `0.28` | `larger_than_life` `0` – `1`; inert on `life_like` | The least filled fraction of its neighbourhood at which a dead cell is born. |
+| `birth_hi` | `0.385` | `larger_than_life` `0` – `1`; inert on `life_like` | The most filled fraction of its neighbourhood at which a dead cell is born. |
+| `survive_lo` | `0.26` | `larger_than_life` `0` – `1`; inert on `life_like` | The least filled fraction of its neighbourhood at which a live cell survives. |
+| `survive_hi` | `0.47` | `larger_than_life` `0` – `1`; inert on `life_like` | The most filled fraction of its neighbourhood at which a live cell survives. |
 | `step_rate` | `10` | `0` – `60` | How many generations the automaton runs per second, whatever the frame rate; 0 freezes it. |
 | `reseed` | `0` | `0` – `1` | A rise past 0.5 refills one disc of the grid with fresh seeded cells, once per rise; bind a beat or a latch to it. |
 | `trail` | `12` | `0` – `64` | How many generations a dead cell keeps glowing, fading as it goes; 0 draws only the live cells. |

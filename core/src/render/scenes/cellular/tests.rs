@@ -38,9 +38,24 @@ fn context() -> Option<RenderContext> {
 fn scene_with(ctx: &RenderContext, config: CellularConfig) -> CellularScene {
     // `COMPOSITE_FORMAT`, not the surface format: a scene draws into the
     // composite chain's linear target (`scenes::create_all`).
-    let mut scene = CellularScene::new(&ctx.device, crate::render::COMPOSITE_FORMAT);
+    // Every radius the family declares, so a probe's radius is its own and
+    // never the tier's; the tier's cap has its own test.
+    let mut scene = CellularScene::new(
+        &ctx.device,
+        crate::render::COMPOSITE_FORMAT,
+        MAX_RADIUS as u32,
+    );
     scene.configure(&GeneratorConfig::Cellular(config));
     scene
+}
+
+fn ltl(grid: u32, wrap: bool, salt: u32) -> CellularConfig {
+    CellularConfig {
+        family: CellularFamily::LargerThanLife,
+        grid,
+        wrap,
+        salt,
+    }
 }
 
 fn life(grid: u32, wrap: bool, salt: u32) -> CellularConfig {
@@ -957,5 +972,300 @@ fn every_pixel_is_the_palette_at_its_age_coordinate() {
         banded_colours.len() <= 4,
         "four bands drew {} colours",
         banded_colours.len()
+    );
+}
+
+// ---------------------------------------------------------------------------
+// larger_than_life
+// ---------------------------------------------------------------------------
+
+/// [`FAMILY_PARAMS`] is a statement about the engine, so it is held to it: each
+/// row names a declared parameter once, lists every family by the name a preset
+/// uses and in roster order, and carries a spec range some family reads.
+#[test]
+fn the_family_table_is_the_roster() {
+    let families: Vec<&str> = CellularFamily::ALL.iter().map(|f| f.as_str()).collect();
+    let mut seen = Vec::new();
+    for row in FAMILY_PARAMS {
+        assert!(!seen.contains(&row.name), "`{}` has two rows", row.name);
+        seen.push(row.name);
+        let spec = PARAMS
+            .iter()
+            .find(|spec| spec.name == row.name)
+            .unwrap_or_else(|| panic!("`{}` is not a declared parameter", row.name));
+        let listed: Vec<&str> = row.ranges.iter().map(|r| r.family).collect();
+        assert_eq!(listed, families, "`{}` must list every family", row.name);
+        assert!(
+            row.ranges.iter().any(|r| r.range == spec.range),
+            "`{}`'s spec range {:?} is no family's range",
+            row.name,
+            spec.range
+        );
+    }
+    assert_eq!(
+        crate::render::scenes::family_params("cellular"),
+        FAMILY_PARAMS,
+        "the reference must reach this table under the system's own label"
+    );
+}
+
+/// A bound radius reaches the shader whole, inside `1..=cap`, and never past
+/// the family's own top; the Structural quantizer composes with it.
+#[test]
+fn a_bound_radius_is_clamped_to_the_cap_and_rounded() {
+    for (value, cap, applied) in [
+        (5.0, 10.0, 5),
+        (5.4, 10.0, 5),
+        (5.6, 10.0, 6),
+        (0.0, 10.0, 1),
+        (-3.0, 10.0, 1),
+        (9.0, 6.0, 6),
+        (40.0, 99.0, MAX_RADIUS as u32),
+    ] {
+        assert_eq!(applied_radius(value, cap), applied, "{value} under {cap}");
+    }
+    assert_eq!(applied_radius(f32::NAN, 10.0), DEFAULT_RADIUS as u32);
+    assert_eq!(
+        applied_radius(f32::NAN, 3.0),
+        3,
+        "the fallback is capped too"
+    );
+    for i in -20..200 {
+        let v = i as f32 * 0.11;
+        assert_eq!(
+            applied_radius(ParamKind::Structural.quantize(v), 10.0),
+            applied_radius(v, 10.0)
+        );
+    }
+}
+
+/// **The tier's radius cap reaches the shader**: a scene built at `Floor`
+/// hands a bound radius of 10 to the step pass as `Floor`'s cap, and one built
+/// at `Rich` hands it through — read off the uniform the pass is given, not
+/// recomputed from the law. No frame is rendered.
+#[test]
+fn the_tier_caps_the_radius_the_shader_is_given() {
+    use crate::render::TierConfig;
+    let Some(ctx) = context() else {
+        return;
+    };
+    for tier in [TierConfig::FLOOR, TierConfig::RICH] {
+        let mut scene = CellularScene::new(
+            &ctx.device,
+            crate::render::COMPOSITE_FORMAT,
+            tier.cellular_radius,
+        );
+        scene.configure(&GeneratorConfig::Cellular(ltl(64, true, 1)));
+        scene.reset_params();
+        scene.set_param("radius", 10.0);
+        assert_eq!(
+            scene.step_params(None).b[2],
+            tier.cellular_radius.min(10),
+            "{:?}",
+            tier.tier
+        );
+        scene.set_param("radius", 3.0);
+        assert_eq!(scene.step_params(None).b[2], 3, "a radius inside the cap");
+    }
+    const {
+        assert!(
+            TierConfig::FLOOR.cellular_radius < 10,
+            "the Floor cap binds at 10"
+        );
+        assert!(
+            DEFAULT_RADIUS as u32 <= TierConfig::FLOOR.cellular_radius,
+            "the default rule runs at its own radius on every tier"
+        );
+    }
+}
+
+/// An interval of fractions becomes the whole counts it admits, inclusive at
+/// both ends — so an exact fraction keeps its count — and an interval holding no
+/// whole count admits nothing. The defaults land on the counts they are
+/// declared for at radius 5.
+#[test]
+fn an_interval_becomes_the_whole_counts_it_admits() {
+    assert_eq!(neighbourhood(1), 8);
+    assert_eq!(neighbourhood(5), 120);
+    let none = [8.0, 8.0];
+    // Conway at radius 1: B3, S23.
+    assert_eq!(interval_counts(3.0 / 8.0, 3.0 / 8.0, 1, none), [3, 3]);
+    assert_eq!(interval_counts(2.0 / 8.0, 3.0 / 8.0, 1, none), [2, 3]);
+    // The declared defaults: births at 34..=46 — Bosco's B34..45 widened by one
+    // count — and Bosco's S33..57 with the centre excluded, 32..=56.
+    let birth = interval_counts(DEFAULT_BIRTH_LO, DEFAULT_BIRTH_HI, 5, none);
+    let survive = interval_counts(DEFAULT_SURVIVE_LO, DEFAULT_SURVIVE_HI, 5, none);
+    assert_eq!((birth, survive), ([34, 46], [32, 56]));
+    // Empty, reversed, and past the ends.
+    let [first, last] = interval_counts(0.30, 0.31, 1, none);
+    assert!(first > last, "0.30..0.31 of 8 holds no whole count");
+    let [first, last] = interval_counts(0.6, 0.4, 5, none);
+    assert!(first > last, "a reversed interval admits nothing");
+    assert_eq!(interval_counts(-1.0, 2.0, 2, none), [0, 24]);
+    assert_eq!(interval_counts(f32::NAN, 0.5, 1, [0.25, 0.9]), [2, 4]);
+}
+
+/// **The separated sum is the box**: a `larger_than_life` field matches the
+/// rule summed cell by cell on the CPU, generation by generation, at three
+/// radii, on a torus and inside a dead border.
+#[test]
+fn larger_than_life_matches_the_cpu_rule() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    const N: u32 = 40;
+    let mut driver = Driver::new(&ctx);
+    for (radius, wrap) in [(2u32, true), (3, false), (5, true)] {
+        let bounds = (0.28_f32, 0.385_f32, 0.26_f32, 0.47_f32);
+        let birth = interval_counts(bounds.0, bounds.1, radius, [0.0; 2]);
+        let survive = interval_counts(bounds.2, bounds.3, radius, [0.0; 2]);
+        let params = [
+            ("step_rate", ONE_GEN.1),
+            ("radius", radius as f32),
+            ("birth_lo", bounds.0),
+            ("birth_hi", bounds.1),
+            ("survive_lo", bounds.2),
+            ("survive_hi", bounds.3),
+        ];
+        let mut scene = scene_with(&ctx, ltl(N, wrap, 8));
+        driver.frame(&mut scene, ONE_GEN.0, &[("step_rate", 0.0)]);
+        let mut cpu = mirror::seed_field(N, field_seed(8), live_threshold(LTL_DENSITY));
+        assert_same_field(&states(&ctx, &scene), &cpu, "the larger_than_life seed");
+        for generation in 1..=20 {
+            driver.frame(&mut scene, ONE_GEN.0, &params);
+            cpu = mirror::ltl_step(&cpu, N, wrap, radius, birth, survive);
+            if generation % 5 == 0 {
+                assert_same_field(
+                    &states(&ctx, &scene),
+                    &cpu,
+                    &format!("radius {radius}, wrap {wrap}, generation {generation}"),
+                );
+            }
+        }
+        let live = cpu.iter().filter(|c| **c == 1).count();
+        assert!(
+            live > 20 && live < (N * N) as usize * 3 / 4,
+            "radius {radius}: {live} live cells is too degenerate a field to have tested on"
+        );
+        drop(scene);
+    }
+}
+
+/// **At radius 1 with whole-count thresholds `larger_than_life` is
+/// `life_like`**: Conway written as intervals (`B3/8..3/8`, `S2/8..3/8`) and as
+/// masks (`birth = 8`, `survive = 12`) grow the same field from the same
+/// planted soup, generation by generation.
+#[test]
+fn radius_one_with_whole_thresholds_is_life_like() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    const N: u32 = 24;
+    let soup: Vec<(u32, u32)> = mirror::seed_field(N, 99, live_threshold(0.4))
+        .iter()
+        .enumerate()
+        .filter(|(_, c)| **c == 1)
+        .map(|(i, _)| (i as u32 % N, i as u32 / N))
+        .collect();
+    let mut driver = Driver::new(&ctx);
+    let mut run = |config: CellularConfig, rule: &[(&str, f32)]| -> Vec<Vec<u8>> {
+        let mut scene = scene_with(&ctx, config);
+        driver.frame(&mut scene, ONE_GEN.0, &[("step_rate", 0.0)]);
+        plant(&ctx, &mut scene, &soup);
+        (0..24)
+            .map(|_| {
+                driver.frame(&mut scene, ONE_GEN.0, rule);
+                states(&ctx, &scene)
+            })
+            .collect()
+    };
+    let masks = run(
+        life(N, true, 1),
+        &[("step_rate", ONE_GEN.1), ("birth", 8.0), ("survive", 12.0)],
+    );
+    let intervals = run(
+        ltl(N, true, 1),
+        &[
+            ("step_rate", ONE_GEN.1),
+            ("radius", 1.0),
+            ("birth_lo", 3.0 / 8.0),
+            ("birth_hi", 3.0 / 8.0),
+            ("survive_lo", 2.0 / 8.0),
+            ("survive_hi", 3.0 / 8.0),
+        ],
+    );
+    for (generation, (a, b)) in masks.iter().zip(&intervals).enumerate() {
+        assert_same_field(b, a, &format!("generation {}", generation + 1));
+    }
+    assert!(
+        masks[0] != masks[23],
+        "the soup froze at once, so the comparison tested nothing"
+    );
+}
+
+/// **A radius above 1 is still moving after 2,000 generations**, the property
+/// the plan asks of the family: the declared default rule (radius 5, births at
+/// 34..=46 of 120 neighbours, survival at 32..=56) from two seeded soups,
+/// compared at generation 2,000 with itself 60 generations on — a span every
+/// oscillator of period 1 to 6, 10, 12, 15, 20 and 30 returns to itself
+/// across, so a field that had settled into still lifes and those oscillators
+/// would compare equal.
+///
+/// The control is a radius-4 rule (births at 26..=34 of 80 neighbours,
+/// survival at 24..=42) that from the same soup does settle, into a few hundred
+/// still cells: without it, "moving" could be a property of the measurement
+/// rather than of the rule.
+#[test]
+fn larger_than_life_is_still_moving_after_two_thousand_generations() {
+    let Some(ctx) = context() else {
+        return;
+    };
+    const N: u32 = 128;
+    let mut driver = Driver::new(&ctx);
+    // Eight generations a frame, the most one frame encodes.
+    let mut run = |salt: u32, rule: &[(&str, f32)]| -> (usize, usize) {
+        let dt = 1.0 / 30.0;
+        let mut scene = scene_with(&ctx, ltl(N, true, salt));
+        let mut generations = 0;
+        while generations < 2000 {
+            generations += driver.frame(&mut scene, dt, rule);
+        }
+        assert_eq!(generations, 2000);
+        let at_2000 = states(&ctx, &scene);
+        let mut later = 0;
+        while later < 60 {
+            later += driver.frame(&mut scene, dt, rule);
+        }
+        let at_2060 = states(&ctx, &scene);
+        let live = at_2000.iter().filter(|c| **c == 1).count();
+        let moved = at_2000.iter().zip(&at_2060).filter(|(a, b)| a != b).count();
+        (live, moved)
+    };
+    for salt in [12, 13] {
+        let (live, moved) = run(salt, &[("step_rate", 240.0)]);
+        println!("default rule, salt {salt}: {live} live at 2000, {moved} differ at 2060");
+        assert!(live > 50, "salt {salt}: the soup died out ({live} live)");
+        assert!(
+            moved > 50,
+            "salt {salt}: only {moved} cells differ across 60 generations — it settled"
+        );
+    }
+    let control = [
+        ("step_rate", 240.0),
+        ("radius", 4.0),
+        ("birth_lo", 26.0 / 80.0),
+        ("birth_hi", 34.0 / 80.0),
+        ("survive_lo", 24.0 / 80.0),
+        ("survive_hi", 42.0 / 80.0),
+    ];
+    let (live, moved) = run(12, &control);
+    println!("radius-4 control, salt 12: {live} live at 2000, {moved} differ at 2060");
+    assert!(
+        live > 50,
+        "the control died out rather than settling ({live} live)"
+    );
+    assert_eq!(
+        moved, 0,
+        "the control moved {moved} cells, so the measurement cannot tell settled from moving"
     );
 }

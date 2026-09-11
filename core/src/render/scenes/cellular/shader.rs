@@ -1,6 +1,7 @@
-//! The cellular system's two fragment stages: the step pass, which seeds,
-//! stamps and advances the field one generation per draw, and the present pass,
-//! which paints it through the palette.
+//! The cellular system's fragment stages: the step pass, which seeds, stamps
+//! and advances the field one generation per draw; the row pass, the first half
+//! of a `larger_than_life` neighbourhood sum; and the present pass, which paints
+//! the field through the palette.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2; render/ is scanned by the
 // hygiene guard). Only constants live here, compiled once at construction.
@@ -12,31 +13,87 @@
     clippy::unreachable
 )]
 
-/// The step pass. [`gpu::FULLSCREEN_VS_UV_FLIPPED`](crate::render::gpu::FULLSCREEN_VS_UV_FLIPPED),
-/// a `const MODE: u32` naming the pass (0 step, 1 seed, 2 stamp), `const
-/// AGE_CAP: f32` and [`gpu::HASH_WGSL`](crate::render::gpu::HASH_WGSL) are
-/// prepended at construction, which is where `VsOut`, `MODE`, `AGE_CAP` and
-/// `mix32` come from. The render target is the grid itself, so a fragment's
-/// position is its cell.
+/// What the step and row passes share: the uniform's shape and the helpers that
+/// read the field. Both passes declare their own bindings named `field` and
+/// `params`, which WGSL resolves wherever they are declared in the module.
 ///
-/// Everything here is integer arithmetic over texel values that are whole
-/// numbers a half float holds exactly — a state of 0 or 1, an age up to
-/// `AGE_CAP` — so a generation is the same on every adapter.
-pub(super) const STEP_SHADER: &str = r#"
+/// A `const MAX_RADIUS: i32` is prepended with it at construction.
+pub(super) const STEP_COMMON: &str = r#"
 struct Step {
-    // x: family (0 life_like), y: wrap (1 torus), z: grid (cells per side),
-    // w: live threshold against the hash's top 24 bits
+    // x: family (0 life_like, 1 larger_than_life), y: wrap (1 torus),
+    // z: grid (cells per side), w: live threshold against the hash's top 24 bits
     a: vec4<u32>,
-    // x: birth mask, y: survive mask (bit k: k live neighbours), zw: unused
+    // x: birth mask, y: survive mask (bit k: k live neighbours),
+    // z: radius (cells, 1..=MAX_RADIUS, capped CPU-side), w: unused
     b: vec4<u32>,
     // x: the field's seed, y: the stamp's seed, z: stamp radius squared
     // (cells^2), w: unused
     c: vec4<u32>,
     // xy: stamp centre (cells), zw: unused
     d: vec4<u32>,
+    // larger_than_life's intervals as whole neighbour counts, inclusive:
+    // x..y births a dead cell, z..w keeps a live one
+    e: vec4<u32>,
 }
+
+// 1 when the cell at `c` is live. Off the grid it is the wrapped cell on a
+// torus and dead otherwise. Always loads an in-range texel and selects, so the
+// function has one exit and no branch.
+fn live(c: vec2<i32>, n: i32, wrap: bool) -> u32 {
+    let size = vec2<i32>(n);
+    let w = ((c % size) + size) % size;
+    let inside = all(c >= vec2<i32>(0)) && all(c < size);
+    let v = textureLoad(field, w, 0).x;
+    return select(0u, 1u, v > 0.5 && (wrap || inside));
+}
+"#;
+
+/// The row pass of `larger_than_life`: each cell's live count along its own
+/// row, `radius` either side and itself included, written into the row
+/// texture the step pass sums down its column. [`STEP_COMMON`] and the vertex
+/// prelude are prepended.
+///
+/// **This is the separation**: a box of side `2r + 1` costs `2r + 1` reads
+/// here and `2r + 1` there, where summing it in one pass costs `(2r + 1)^2` —
+/// 42 reads a cell against 441 at radius 10. The loop runs to the constant
+/// `MAX_RADIUS` and skips the steps past `radius`, since a trip count read from
+/// a uniform is what lost the device on WARP for the analytic field.
+pub(super) const ROWS_SHADER: &str = r#"
 @group(0) @binding(0) var field: texture_2d<f32>;
 @group(0) @binding(1) var<uniform> params: Step;
+
+@fragment
+fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
+    let n = i32(params.a.z);
+    let wrap = params.a.y != 0u;
+    let r = i32(params.b.z);
+    let c = vec2<i32>(in.pos.xy);
+    var sum = 0u;
+    for (var dx = -MAX_RADIUS; dx <= MAX_RADIUS; dx = dx + 1) {
+        if (abs(dx) <= r) {
+            sum = sum + live(c + vec2<i32>(dx, 0), n, wrap);
+        }
+    }
+    return vec4<f32>(f32(sum), 0.0, 0.0, 1.0);
+}
+"#;
+
+/// The step pass. [`gpu::FULLSCREEN_VS_UV_FLIPPED`](crate::render::gpu::FULLSCREEN_VS_UV_FLIPPED),
+/// a `const MODE: u32` naming the pass (0 step, 1 seed, 2 stamp), `const
+/// AGE_CAP: f32`, `const MAX_RADIUS: i32`, [`gpu::HASH_WGSL`](crate::render::gpu::HASH_WGSL)
+/// and [`STEP_COMMON`] are prepended at construction. The render target is the
+/// grid itself, so a fragment's position is its cell.
+///
+/// Everything here is integer arithmetic over texel values that are whole
+/// numbers a half float holds exactly — a state of 0 or 1, an age up to
+/// `AGE_CAP`, a row count up to `2 * MAX_RADIUS + 1` — so a generation is the
+/// same on every adapter.
+pub(super) const STEP_SHADER: &str = r#"
+@group(0) @binding(0) var field: texture_2d<f32>;
+// The row pass's counts; read by `larger_than_life` only, bound for every
+// family so the three passes share one layout.
+@group(0) @binding(1) var rows: texture_2d<f32>;
+@group(0) @binding(2) var<uniform> params: Step;
 
 // The field's uniform is shared by all three passes; which pass this is lives
 // in `MODE` alone. See `StepParams` for why that split is load-bearing.
@@ -49,15 +106,21 @@ fn seeded(c: vec2<i32>, seed: u32) -> f32 {
     return select(0.0, 1.0, (h >> 8u) < params.a.w);
 }
 
-// 1 when the cell at `c` is live. Off the grid it is the wrapped cell on a
-// torus and dead otherwise. Always loads an in-range texel and selects, so the
-// function has one exit and no branch.
-fn live(c: vec2<i32>, n: i32, wrap: bool) -> u32 {
+// The live cells in the box of side `2r + 1` about `c`, `c` itself excluded:
+// the row pass's counts summed down the column. A row past a dead border
+// contributes nothing; on a torus it is the wrapped row, whose count the row
+// pass already wrapped.
+fn box_count(c: vec2<i32>, n: i32, wrap: bool, r: i32, self_live: u32) -> u32 {
     let size = vec2<i32>(n);
-    let w = ((c % size) + size) % size;
-    let inside = all(c >= vec2<i32>(0)) && all(c < size);
-    let v = textureLoad(field, w, 0).x;
-    return select(0u, 1u, v > 0.5 && (wrap || inside));
+    var sum = 0u;
+    for (var dy = -MAX_RADIUS; dy <= MAX_RADIUS; dy = dy + 1) {
+        let p = c + vec2<i32>(0, dy);
+        let w = ((p % size) + size) % size;
+        let inside = p.y >= 0 && p.y < n;
+        let row = u32(textureLoad(rows, w, 0).x + 0.5);
+        sum = sum + select(0u, row, abs(dy) <= r && (wrap || inside));
+    }
+    return sum - self_live;
 }
 
 // The live neighbours of `c` among its eight.
@@ -109,9 +172,22 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             age = select(age, 0.0, state != here.x);
         }
         default: {
-            let count = moore_count(c, n, wrap);
-            let mask = select(params.b.x, params.b.y, state > 0.5);
-            state = f32((mask >> count) & 1u);
+            let alive = state > 0.5;
+            switch params.a.x {
+                case 1u: {
+                    // larger_than_life: an inclusive interval of whole counts
+                    // over the box, one for a dead cell and one for a live one.
+                    let count = box_count(c, n, wrap, i32(params.b.z), select(0u, 1u, alive));
+                    let lo = select(params.e.x, params.e.z, alive);
+                    let hi = select(params.e.y, params.e.w, alive);
+                    state = select(0.0, 1.0, count >= lo && count <= hi);
+                }
+                default: {
+                    let count = moore_count(c, n, wrap);
+                    let mask = select(params.b.x, params.b.y, alive);
+                    state = f32((mask >> count) & 1u);
+                }
+            }
             age = select(age, 0.0, state != here.x);
         }
     }

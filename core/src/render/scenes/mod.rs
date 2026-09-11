@@ -244,6 +244,7 @@ pub fn family_params(label: &str) -> &'static [FamilyParam] {
     match label {
         "parametric_curve" => lines::parametric::FAMILY_PARAMS,
         "analytic_field" => analytic_field::FAMILY_PARAMS,
+        "cellular" => cellular::FAMILY_PARAMS,
         _ => &[],
     }
 }
@@ -1038,7 +1039,11 @@ fn create(
             surface_format,
             tier.field_iterations,
         )),
-        SystemKind::Cellular => Box::new(cellular::CellularScene::new(device, surface_format)),
+        SystemKind::Cellular => Box::new(cellular::CellularScene::new(
+            device,
+            surface_format,
+            tier.cellular_radius,
+        )),
     }
 }
 

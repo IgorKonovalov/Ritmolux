@@ -253,8 +253,8 @@ pub struct CellularConfig {
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — the system, grid, clock, `life_like` | dev | done | f93f3e2 |
-| 2 — the age channel | dev | done | committed with this row |
-| 3 — `larger_than_life` | dev | not started | |
+| 2 — the age channel | dev | done | 677ab2b |
+| 3 — `larger_than_life` | dev | done | committed with this row |
 | 4 — `cyclic` | dev | not started | |
 | 5 — tier cap, golden, determinism | dev | not started | |
 | 6 — documentation and the reference | dev | not started | |
@@ -297,6 +297,29 @@ pub struct CellularConfig {
   now binds `trail = "0"`, and its baseline, blessed at Phase 1 and re-encoded by this phase's
   bless run, came out byte-identical. A second fixture, `cellular_trail` (an `EXTRA_FIXTURES`
   entry in `core/tests/golden.rs`), baselines the wake; outside the phase's file list.
+- Phase 3 took **both** of the plan's cost levers: the box is summed separated (a row pass into a
+  `rows` texture, then a column sum in the step pass - `2(2r+1)+1` reads a cell) **and**
+  `radius` is capped by a new `TierConfig::cellular_radius`, Floor 6 / Rich 10, the declared
+  range's top being 10. The cap clamps silently in this phase; the announce is Phase 5's.
+- Phase 3, the neighbourhood is the square box (Chebyshev radius) with the centre excluded, and
+  the fractional intervals are converted CPU-side to inclusive whole counts over `(2r+1)^2 - 1`
+  (`interval_counts`). A `larger_than_life` seed makes 50 % of cells live (`LTL_DENSITY`).
+- Phase 3, the default rule is **not Bosco's**: Bosco's rule (B34..45, S33..57 with the centre
+  counted) from a 50 % soup froze into 36 still cells by generation 2,000 on a 96-cell torus, and
+  kept only ~85 cells moving on a 128-cell one. The shipped default widens the birth interval by
+  one count (births 34..=46 of 120, survival 32..=56: `birth_hi = 0.385`), chosen from a sweep of
+  six radius-5 variants over three seeds; it keeps 134-149 cells moving across a 60-generation
+  lag after 2,000 generations on both seeds the test runs. The test's control is a radius-4 rule
+  that settles to exactly zero motion.
+- Phase 3, "the per-generation cost at the tier's maximum radius holds the frame budget" is
+  **argued, not measured**: `TierConfig::cellular_radius`'s doc carries the read-count
+  arithmetic against the ~2015 iGPU baseline; no target hardware is reachable from this lane, and
+  WARP timings are not a stand-in. The doc names it as a constant to measure.
+- Phase 3, a third `EXTRA_FIXTURES` golden, `cellular_ltl` (radius 3, 64-cell grid), for the
+  family's arm; outside the phase's file list. `core/tests/preset.rs` (`radius` joins
+  `STRUCTURAL`), `core/src/render/scenes/mod.rs` (`family_params("cellular")`, the tier argument
+  to the factory), `core/src/render/tier/tests.rs` and the regenerated `presets/README.md` were
+  also touched.
 
 ### Close triggers
 

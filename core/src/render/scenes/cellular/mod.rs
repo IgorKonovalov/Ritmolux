@@ -6,6 +6,16 @@
 //! neighbours is born when bit `k` of `birth` is set, and a live one survives
 //! when bit `k` of `survive` is. Conway's Life is `birth = 8`, `survive = 12`.
 //!
+//! `larger_than_life` widens the neighbourhood to a box of side
+//! `2 * radius + 1` and replaces the masks with two intervals over the box's
+//! filled fraction: a dead cell is born inside `birth_lo..=birth_hi`, a live one
+//! survives inside `survive_lo..=survive_hi`. The fractions are turned into
+//! whole counts on the CPU ([`interval_counts`]), so the shader compares
+//! integers. The box is summed **separated** — a row pass, then a column sum in
+//! the step pass — at `2 * (2r + 1)` reads a cell rather than `(2r + 1)^2`, and
+//! `radius` is capped by the tier on top of that
+//! ([`TierConfig::cellular_radius`](crate::render::TierConfig::cellular_radius)).
+//!
 //! # The grid is content, not a resolution
 //!
 //! `[cellular] grid` is how many cells a side holds, and a pattern is a fixed
@@ -60,7 +70,7 @@ mod shader;
 
 use super::common;
 use super::lines::GeneratorConfig;
-use super::{Scene, SeededRng};
+use super::{FamilyParam, FamilyRange, Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
 use crate::render::feedback::PingPongField;
 use crate::render::gpu;
@@ -74,12 +84,16 @@ pub enum CellularFamily {
     /// Conway's Life and every rule in its space.
     #[default]
     LifeLike,
+    /// Birth and survival as two intervals over the filled fraction of a box of
+    /// side `2 * radius + 1` — Evans's Larger than Life, whose rules carry
+    /// travelling bugs and blobs where a radius-1 rule settles.
+    LargerThanLife,
 }
 
 impl CellularFamily {
     /// Every family, in the order the step shader's family index numbers them
     /// and the generated reference lists them.
-    pub const ALL: [CellularFamily; 1] = [CellularFamily::LifeLike];
+    pub const ALL: [CellularFamily; 2] = [CellularFamily::LifeLike, CellularFamily::LargerThanLife];
 
     /// Parse the canonical `[cellular] family = "..."` value, or `None`.
     pub fn from_name(name: &str) -> Option<Self> {
@@ -90,6 +104,7 @@ impl CellularFamily {
     pub fn as_str(self) -> &'static str {
         match self {
             CellularFamily::LifeLike => "life_like",
+            CellularFamily::LargerThanLife => "larger_than_life",
         }
     }
 
@@ -98,6 +113,24 @@ impl CellularFamily {
     fn index(self) -> u32 {
         match self {
             CellularFamily::LifeLike => 0,
+            CellularFamily::LargerThanLife => 1,
+        }
+    }
+
+    /// The fraction of cells a seed makes live. A sparse soup dies out under a
+    /// larger neighbourhood's thresholds, so that family seeds denser.
+    fn density(self) -> f32 {
+        match self {
+            CellularFamily::LifeLike => LIFE_DENSITY,
+            CellularFamily::LargerThanLife => LTL_DENSITY,
+        }
+    }
+
+    /// Whether a generation needs the row pass first.
+    fn sums_rows(self) -> bool {
+        match self {
+            CellularFamily::LifeLike => false,
+            CellularFamily::LargerThanLife => true,
         }
     }
 }
@@ -168,6 +201,18 @@ const RESEED_RADIUS: f32 = 0.2;
 
 /// The fraction of cells a `life_like` seed makes live.
 const LIFE_DENSITY: f32 = 0.35;
+/// The fraction of cells a `larger_than_life` seed makes live.
+const LTL_DENSITY: f32 = 0.5;
+
+/// The largest `radius` any tier lets a `larger_than_life` preset ask for —
+/// the top of its declared range, and the constant the row and column loops run
+/// to.
+pub const MAX_RADIUS: f32 = 10.0;
+
+/// How much slack an interval bound gets when it is turned into a whole count,
+/// so a bound written as an exact fraction — `3/8` at radius 1 — keeps the
+/// count it names on both ends despite `f32` rounding.
+const INTERVAL_SLACK: f32 = 1e-4;
 
 /// Where the age channel stops counting: generations since a cell last
 /// changed, saturating here. A half float holds every whole number to 2048
@@ -190,6 +235,11 @@ const DEFAULT_BIRTH: f32 = default_of(PARAMS, "birth");
 const DEFAULT_SURVIVE: f32 = default_of(PARAMS, "survive");
 const DEFAULT_STEP_RATE: f32 = default_of(PARAMS, "step_rate");
 const DEFAULT_TRAIL: f32 = default_of(PARAMS, "trail");
+const DEFAULT_RADIUS: f32 = default_of(PARAMS, "radius");
+const DEFAULT_BIRTH_LO: f32 = default_of(PARAMS, "birth_lo");
+const DEFAULT_BIRTH_HI: f32 = default_of(PARAMS, "birth_hi");
+const DEFAULT_SURVIVE_LO: f32 = default_of(PARAMS, "survive_lo");
+const DEFAULT_SURVIVE_HI: f32 = default_of(PARAMS, "survive_hi");
 const DEFAULT_AGE_TINT: f32 = default_of(PARAMS, "age_tint");
 const DEFAULT_HUE: f32 = 0.0;
 const DEFAULT_ZOOM: f32 = 1.0;
@@ -232,6 +282,47 @@ pub(crate) fn applied_trail(value: f32) -> f32 {
     } else {
         DEFAULT_TRAIL
     }
+}
+
+/// A bound `radius` as the step shader reads it: clamped into `1..=cap` and
+/// rounded, where `cap` is the tier's
+/// [`cellular_radius`](crate::render::TierConfig::cellular_radius) held inside
+/// [`MAX_RADIUS`]. A non-finite value falls back to the declared default,
+/// itself capped.
+pub(crate) fn applied_radius(value: f32, cap: f32) -> u32 {
+    let cap = cap.clamp(1.0, MAX_RADIUS);
+    let v = if value.is_finite() {
+        value
+    } else {
+        DEFAULT_RADIUS
+    };
+    v.clamp(1.0, cap).round() as u32
+}
+
+/// How many cells the box of `radius` holds besides its centre: the
+/// denominator of every `larger_than_life` fraction.
+pub(crate) fn neighbourhood(radius: u32) -> u32 {
+    let side = 2 * radius + 1;
+    side * side - 1
+}
+
+/// A `larger_than_life` interval of filled fractions `[lo, hi]` as the whole
+/// neighbour counts it admits, `[first, last]` inclusive, over a box of
+/// `radius`. An empty interval — `hi` below `lo`, or one that holds no whole
+/// count — comes out with `first > last`, which the shader's comparison admits
+/// nothing through. Non-finite bounds fall back to `fallback`.
+pub(crate) fn interval_counts(lo: f32, hi: f32, radius: u32, fallback: [f32; 2]) -> [u32; 2] {
+    let n = neighbourhood(radius) as f32;
+    let lo = if lo.is_finite() { lo } else { fallback[0] };
+    let hi = if hi.is_finite() { hi } else { fallback[1] };
+    let first = (lo.clamp(0.0, 1.0) * n - INTERVAL_SLACK).ceil().max(0.0);
+    let last = (hi.clamp(0.0, 1.0) * n + INTERVAL_SLACK).floor();
+    if last < first {
+        // `u32::MAX` then `0`: no count is both at least one and at most the
+        // other.
+        return [u32::MAX, 0];
+    }
+    [first as u32, last as u32]
 }
 
 /// Integrates a generation rate over injected `dt` into whole generations.
@@ -316,6 +407,42 @@ pub const PARAMS: &[ParamSpec] = &[
         kind: ParamKind::Structural,
     },
     ParamSpec {
+        name: "radius",
+        default: 5.0,
+        range: Some([1.0, MAX_RADIUS]),
+        doc: "How far the neighbourhood reaches, in cells: a square of side 2 x radius + 1 \
+              about each cell. Capped by the quality tier.",
+        kind: ParamKind::Structural,
+    },
+    ParamSpec {
+        name: "birth_lo",
+        default: 0.28,
+        range: Some([0.0, 1.0]),
+        doc: "The least filled fraction of its neighbourhood at which a dead cell is born.",
+        kind: ParamKind::Modal,
+    },
+    ParamSpec {
+        name: "birth_hi",
+        default: 0.385,
+        range: Some([0.0, 1.0]),
+        doc: "The most filled fraction of its neighbourhood at which a dead cell is born.",
+        kind: ParamKind::Modal,
+    },
+    ParamSpec {
+        name: "survive_lo",
+        default: 0.26,
+        range: Some([0.0, 1.0]),
+        doc: "The least filled fraction of its neighbourhood at which a live cell survives.",
+        kind: ParamKind::Modal,
+    },
+    ParamSpec {
+        name: "survive_hi",
+        default: 0.47,
+        range: Some([0.0, 1.0]),
+        doc: "The most filled fraction of its neighbourhood at which a live cell survives.",
+        kind: ParamKind::Modal,
+    },
+    ParamSpec {
         name: "step_rate",
         default: 10.0,
         range: Some([0.0, 60.0]),
@@ -358,6 +485,40 @@ pub const PARAMS: &[ParamSpec] = &[
     common::PALETTE_CONTOUR,
 ];
 
+/// One row of [`FAMILY_PARAMS`], its ranges in [`CellularFamily::ALL`]'s
+/// order. `None` is a family that does not read the parameter.
+macro_rules! per_family {
+    ($name:literal: $life_like:expr, $larger_than_life:expr $(,)?) => {
+        FamilyParam {
+            name: $name,
+            ranges: &[
+                FamilyRange {
+                    family: "life_like",
+                    range: $life_like,
+                },
+                FamilyRange {
+                    family: "larger_than_life",
+                    range: $larger_than_life,
+                },
+            ],
+        }
+    };
+}
+
+/// Every parameter only some families read (ADR-0180 rule 4), with the range
+/// that reads there — so the generated reference prints `birth` as
+/// `life_like`'s and inert elsewhere. A parameter missing from here reads the
+/// same on every family.
+pub const FAMILY_PARAMS: &[FamilyParam] = &[
+    per_family!("birth": Some([0.0, MAX_RULE]), None),
+    per_family!("survive": Some([0.0, MAX_RULE]), None),
+    per_family!("radius": None, Some([1.0, MAX_RADIUS])),
+    per_family!("birth_lo": None, Some([0.0, 1.0])),
+    per_family!("birth_hi": None, Some([0.0, 1.0])),
+    per_family!("survive_lo": None, Some([0.0, 1.0])),
+    per_family!("survive_hi": None, Some([0.0, 1.0])),
+];
+
 /// The one uniform every step-shader pass reads, written once a frame.
 ///
 /// **One buffer for all three passes, and that is load-bearing.** Which pass is
@@ -373,13 +534,16 @@ struct StepParams {
     /// x: family index, y: wrap (1 torus), z: grid (cells per side), w: live
     /// threshold against the hash's top 24 bits.
     a: [u32; 4],
-    /// x: birth mask, y: survive mask, zw: unused.
+    /// x: birth mask, y: survive mask, z: radius (cells), w: unused.
     b: [u32; 4],
     /// x: the field's seed, y: the stamp's seed, z: stamp radius squared
     /// (cells²), w: unused.
     c: [u32; 4],
     /// xy: stamp centre (cells), zw: unused.
     d: [u32; 4],
+    /// `larger_than_life`'s two intervals as whole neighbour counts,
+    /// inclusive: xy births a dead cell, zw keeps a live one.
+    e: [u32; 4],
 }
 
 #[repr(C)]
@@ -414,15 +578,22 @@ struct Resources {
     /// The grid these textures were built for.
     grid: u32,
     field: PingPongField,
+    /// Each cell's live count along its row, written by the row pass and summed
+    /// down the column by the step pass — `larger_than_life`'s separated box.
+    /// Kept alive so its view stays valid, as `PingPongField` keeps its pair.
+    _rows: wgpu::Texture,
+    rows_view: wgpu::TextureView,
     /// The step shader compiled once per [`StepPass`], all three over one
     /// layout and bound to the same resources.
     seed_pipeline: wgpu::RenderPipeline,
     stamp_pipeline: wgpu::RenderPipeline,
     step_pipeline: wgpu::RenderPipeline,
+    rows_pipeline: wgpu::RenderPipeline,
     present_pipeline: wgpu::RenderPipeline,
     step_uniform: wgpu::Buffer,
     present_uniform: wgpu::Buffer,
     step_bg: ReadPair,
+    rows_bg: ReadPair,
     present_bg: ReadPair,
     /// The shared gradient LUT pair (ADR-0021). A fresh pair is dirty, so a
     /// (re)build uploads on its first frame.
@@ -451,21 +622,87 @@ impl Resources {
             std::mem::size_of::<PresentParams>(),
         );
 
-        // The field before the uniform: `[Texture, Uniform]` is a shape no other
-        // layout in the crate has (ADR-0058). The reaction-diffusion sim binds
-        // the same two entries the other way round, so swapping these would
-        // collide with it.
+        let rows = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("cellular-rows"),
+            size: wgpu::Extent3d {
+                width: grid,
+                height: grid,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            // The field's own format: a row count is a whole number no larger
+            // than `2 * MAX_RADIUS + 1`, which a half float holds exactly.
+            format: PingPongField::FORMAT,
+            // `COPY_SRC` only so a probe can read the counts back, as the
+            // field's own textures carry it.
+            usage: wgpu::TextureUsages::TEXTURE_BINDING
+                | wgpu::TextureUsages::RENDER_ATTACHMENT
+                | wgpu::TextureUsages::COPY_SRC,
+            view_formats: &[],
+        });
+        let rows_view = rows.create_view(&wgpu::TextureViewDescriptor::default());
+
+        // `[Texture, Texture, Uniform]` — the field, the row counts, the
+        // uniform — is a shape no other layout in the crate has (ADR-0058).
         let step_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("cellular-step-layout"),
+            entries: &[
+                gpu::texture(0, false),
+                gpu::texture(1, false),
+                gpu::uniform(2, wgpu::ShaderStages::FRAGMENT),
+            ],
+        });
+        let step_bg = ReadPair {
+            a: step_bind_group(
+                device,
+                &step_layout,
+                field.view_a(),
+                &rows_view,
+                &step_uniform,
+            ),
+            b: step_bind_group(
+                device,
+                &step_layout,
+                field.view_b(),
+                &rows_view,
+                &step_uniform,
+            ),
+        };
+        // The row pass reads the field and the same uniform. `[Texture,
+        // Uniform]` is unique too; the reaction-diffusion sim binds the same
+        // two entries the other way round, so swapping these would collide.
+        let rows_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("cellular-rows-layout"),
             entries: &[
                 gpu::texture(0, false),
                 gpu::uniform(1, wgpu::ShaderStages::FRAGMENT),
             ],
         });
-        let step_bg = ReadPair {
-            a: step_bind_group(device, &step_layout, field.view_a(), &step_uniform),
-            b: step_bind_group(device, &step_layout, field.view_b(), &step_uniform),
+        let rows_bg = ReadPair {
+            a: rows_bind_group(device, &rows_layout, field.view_a(), &step_uniform),
+            b: rows_bind_group(device, &rows_layout, field.view_b(), &step_uniform),
         };
+        let rows_shader = gpu::fullscreen_shader(
+            device,
+            "cellular-rows",
+            gpu::FULLSCREEN_VS_UV_FLIPPED,
+            &format!(
+                "{}{}{}",
+                radius_const(),
+                shader::STEP_COMMON,
+                shader::ROWS_SHADER
+            ),
+        );
+        let rows_pipeline = gpu::fullscreen_pipeline(
+            device,
+            &rows_shader,
+            &[&rows_layout],
+            PingPongField::FORMAT,
+            wgpu::BlendState::REPLACE,
+            "cellular-rows",
+        );
         let step_pipeline_for = |pass: StepPass| {
             let label = pass.label();
             let shader = gpu::fullscreen_shader(
@@ -531,13 +768,17 @@ impl Resources {
         Self {
             grid,
             field,
+            _rows: rows,
+            rows_view,
             seed_pipeline,
             stamp_pipeline,
             step_pipeline,
+            rows_pipeline,
             present_pipeline,
             step_uniform,
             present_uniform,
             step_bg,
+            rows_bg,
             present_bg,
             luts,
         }
@@ -566,6 +807,26 @@ impl Resources {
         }
         self.field.swap();
     }
+
+    /// Encode the row pass over the current field — the first half of a
+    /// `larger_than_life` generation. Writes the row counts and leaves the
+    /// field where it was.
+    fn encode_rows(&self, encoder: &mut wgpu::CommandEncoder) {
+        let mut rpass = gpu::color_pass(
+            encoder,
+            "cellular-rows",
+            &self.rows_view,
+            wgpu::LoadOp::Clear(wgpu::Color::BLACK),
+        );
+        rpass.set_pipeline(&self.rows_pipeline);
+        rpass.set_bind_group(0, self.rows_bg.for_field(&self.field), &[]);
+        rpass.draw(0..3, 0..1);
+    }
+}
+
+/// The `MAX_RADIUS` constant the row and step shaders' loops run to.
+fn radius_const() -> String {
+    format!("const MAX_RADIUS: i32 = {};\n", MAX_RADIUS as i32)
 }
 
 /// What one pass of the step shader does: its `MODE` constant, compiled in.
@@ -597,14 +858,16 @@ impl StepPass {
         }
     }
 
-    /// This pass's step shader after the vertex prelude: its two constants,
-    /// the hash, and the body. Built at construction only.
+    /// This pass's step shader after the vertex prelude: its constants, the
+    /// hash, the shared block and the body. Built at construction only.
     fn source(self) -> String {
         format!(
-            "const MODE: u32 = {}u;\nconst AGE_CAP: f32 = {:?};\n{}{}",
+            "const MODE: u32 = {}u;\nconst AGE_CAP: f32 = {:?};\n{}{}{}{}",
             self.mode(),
             AGE_CAP,
+            radius_const(),
             gpu::HASH_WGSL,
+            shader::STEP_COMMON,
             shader::STEP_SHADER
         )
     }
@@ -614,10 +877,37 @@ fn step_bind_group(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,
     input: &wgpu::TextureView,
+    rows: &wgpu::TextureView,
     uniform: &wgpu::Buffer,
 ) -> wgpu::BindGroup {
     device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("cellular-step-bg"),
+        layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(input),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::TextureView(rows),
+            },
+            wgpu::BindGroupEntry {
+                binding: 2,
+                resource: uniform.as_entire_binding(),
+            },
+        ],
+    })
+}
+
+fn rows_bind_group(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+    input: &wgpu::TextureView,
+    uniform: &wgpu::Buffer,
+) -> wgpu::BindGroup {
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("cellular-rows-bg"),
         layout,
         entries: &[
             wgpu::BindGroupEntry {
@@ -684,8 +974,16 @@ pub struct CellularScene {
     pending_stamp: Option<Stamp>,
     /// Last frame's `reseed`, for the rising edge.
     prev_reseed: f32,
+    /// The tier's [`cellular_radius`](crate::render::TierConfig::cellular_radius):
+    /// the widest neighbourhood a bound `radius` reaches the shader with.
+    radius_cap: f32,
     birth: f32,
     survive: f32,
+    radius: f32,
+    birth_lo: f32,
+    birth_hi: f32,
+    survive_lo: f32,
+    survive_hi: f32,
     step_rate: f32,
     reseed: f32,
     trail: f32,
@@ -704,9 +1002,15 @@ pub struct CellularScene {
 }
 
 impl CellularScene {
-    /// The CPU-side state. GPU resources are deferred to the first render
-    /// (module docs).
-    pub fn new(device: &wgpu::Device, surface_format: wgpu::TextureFormat) -> Self {
+    /// The CPU-side state, holding a bound `larger_than_life` radius to
+    /// `radius_cap` — the tier's
+    /// [`cellular_radius`](crate::render::TierConfig::cellular_radius). GPU
+    /// resources are deferred to the first render (module docs).
+    pub fn new(
+        device: &wgpu::Device,
+        surface_format: wgpu::TextureFormat,
+        radius_cap: u32,
+    ) -> Self {
         let config = CellularConfig::default();
         Self {
             device: device.clone(),
@@ -720,8 +1024,14 @@ impl CellularScene {
             stamp_rng: stamp_rng(config.salt),
             pending_stamp: None,
             prev_reseed: 0.0,
+            radius_cap: (radius_cap as f32).clamp(1.0, MAX_RADIUS),
             birth: DEFAULT_BIRTH,
             survive: DEFAULT_SURVIVE,
+            radius: DEFAULT_RADIUS,
+            birth_lo: DEFAULT_BIRTH_LO,
+            birth_hi: DEFAULT_BIRTH_HI,
+            survive_lo: DEFAULT_SURVIVE_LO,
+            survive_hi: DEFAULT_SURVIVE_HI,
             step_rate: DEFAULT_STEP_RATE,
             reseed: 0.0,
             trail: DEFAULT_TRAIL,
@@ -742,21 +1052,35 @@ impl CellularScene {
             radius_sq: 0,
             seed: 0,
         });
+        let radius = applied_radius(self.radius, self.radius_cap);
+        let birth = interval_counts(
+            self.birth_lo,
+            self.birth_hi,
+            radius,
+            [DEFAULT_BIRTH_LO, DEFAULT_BIRTH_HI],
+        );
+        let survive = interval_counts(
+            self.survive_lo,
+            self.survive_hi,
+            radius,
+            [DEFAULT_SURVIVE_LO, DEFAULT_SURVIVE_HI],
+        );
         StepParams {
             a: [
                 self.config.family.index(),
                 u32::from(self.config.wrap),
                 self.config.grid,
-                live_threshold(LIFE_DENSITY),
+                live_threshold(self.config.family.density()),
             ],
             b: [
                 applied_rule(self.birth, DEFAULT_BIRTH),
                 applied_rule(self.survive, DEFAULT_SURVIVE),
-                0,
+                radius,
                 0,
             ],
             c: [field_seed(self.config.salt), stamp.seed, stamp.radius_sq, 0],
             d: [stamp.centre[0], stamp.centre[1], 0, 0],
+            e: [birth[0], birth[1], survive[0], survive[1]],
         }
     }
 }
@@ -800,6 +1124,11 @@ impl Scene for CellularScene {
     fn reset_params(&mut self) {
         self.birth = DEFAULT_BIRTH;
         self.survive = DEFAULT_SURVIVE;
+        self.radius = DEFAULT_RADIUS;
+        self.birth_lo = DEFAULT_BIRTH_LO;
+        self.birth_hi = DEFAULT_BIRTH_HI;
+        self.survive_lo = DEFAULT_SURVIVE_LO;
+        self.survive_hi = DEFAULT_SURVIVE_HI;
         self.step_rate = DEFAULT_STEP_RATE;
         self.reseed = 0.0;
         self.trail = DEFAULT_TRAIL;
@@ -818,6 +1147,11 @@ impl Scene for CellularScene {
         match name {
             "birth" => self.birth = value,
             "survive" => self.survive = value,
+            "radius" => self.radius = value,
+            "birth_lo" => self.birth_lo = value,
+            "birth_hi" => self.birth_hi = value,
+            "survive_lo" => self.survive_lo = value,
+            "survive_hi" => self.survive_hi = value,
             "step_rate" => self.step_rate = value,
             "reseed" => self.reseed = value,
             "trail" => self.trail = value,
@@ -924,7 +1258,11 @@ impl Scene for CellularScene {
         if stamp.is_some() {
             res.encode_step(encoder, StepPass::Stamp);
         }
+        let sums_rows = self.config.family.sums_rows();
         for _ in 0..generations {
+            if sums_rows {
+                res.encode_rows(encoder);
+            }
             res.encode_step(encoder, StepPass::Step);
         }
 

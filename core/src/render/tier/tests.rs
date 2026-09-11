@@ -81,6 +81,9 @@ fn rich_is_never_below_the_floor() {
     // the only thing that ever clamps below the declared range's top.
     let top = crate::render::scenes::analytic_field::MAX_ITERATIONS as u32;
     assert!(floor.field_iterations >= 1 && rich.field_iterations <= top);
+    assert!(rich.cellular_radius >= floor.cellular_radius);
+    let top = crate::render::scenes::cellular::MAX_RADIUS as u32;
+    assert!(floor.cellular_radius >= 1 && rich.cellular_radius <= top);
 }
 
 /// The floor is the pre-tier engine. These are the literals the constants

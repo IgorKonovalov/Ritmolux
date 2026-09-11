@@ -2197,6 +2197,9 @@ const STRUCTURAL: &[(&str, &str)] = &[
     // because a rule is a bitmask and a fractional one names no neighbour count.
     ("cellular", "birth"),
     ("cellular", "survive"),
+    // `cellular::applied_radius`: clamps into the tier's cap and rounds,
+    // because the radius is a loop bound over whole cells.
+    ("cellular", "radius"),
     // `fold_order` / `fold_edge`: the kaleidoscope's two stepped params.
     ("kaleidoscope", "kaleido_order"),
     ("kaleidoscope", "kaleido_edge"),

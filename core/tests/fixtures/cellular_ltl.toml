@@ -1,0 +1,31 @@
+# GOLDEN FIXTURE - do not tune; editing this invalidates the drift baseline (ADR-0023)
+#
+# The `cellular` scene's `larger_than_life` family: the row pass and the
+# column sum, from a fixed seed over a fixed 20 generations.
+#
+#  - `radius = "3"` rather than the default 5: on a 64-cell grid a radius-5
+#    box spans a sixth of the torus, and 3 keeps the structure several boxes
+#    across while still reaching the loops past radius 1.
+#  - The intervals bound explicitly, so a change of default cannot move this
+#    baseline.
+#  - `trail = "0"`, so this baseline is the family's rule and nothing of the
+#    age channel, which `cellular_trail.toml` holds.
+system = "cellular"
+name   = "fixture_cellular_ltl"
+
+[cellular]
+family = "larger_than_life"
+grid   = 64
+
+[generator]
+seed = 7
+
+[params]
+radius     = "3"
+birth_lo   = "0.28"
+birth_hi   = "0.385"
+survive_lo = "0.26"
+survive_hi = "0.47"
+step_rate  = "20"
+trail      = "0"
+hue        = "0.55"
