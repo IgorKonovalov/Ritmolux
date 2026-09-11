@@ -7,46 +7,24 @@ going for, so a verdict is a comparison rather than a general impression.
 
 | preset | system / family | pass | what to look at |
 |--------|-----------------|------|-----------------|
-| `fragment_auroraveil` | fragment_field | 2026-09-11 overnight | Built palette-first: green sheets with violet lit edges over indigo. Do the folds read as depth or as stripes? Ambient — it has to hold up at rest, not only loud. |
 | `fragment_etchingplate` | fragment_field | 2026-09-11 overnight | Cream paper, indigo ink, seven hard bands with a hairline at each edge. Judge the paper: any grey cast in the empty regions and the print reading is gone. |
-| `fragment_kaleidodome` | fragment_field | 2026-09-11 overnight | The only preset here whose mechanism is in the COMPOSITE — an eight-wedge kaleidoscope with a radius-growing spiral. Judge the seams: they must be hard lines. |
 | `swarm_murmuration` | swarm | 2026-09-11 overnight | Cold flock, long trail, bass on `spin`. Does it read as one body with internal structure, or as noise? Judge a few beats in — `trails` restarts empty at a switch. |
-| `swarm_emberstorm` | swarm | 2026-09-11 overnight | The hard counterpart: four-point sparks thrown outward on the hit by `burst` with a snap-attack/slow-release pair. Does the hit read as a THROW or as a zoom? |
-| `curve_spindrift` | parametric_curve | 2026-09-11 overnight | `n` re-rolls twice a second off `hash(floor(time*2))`, so the figure is replaced rather than modulated. Do the re-rolls read as musical or as a glitch? |
 | `lsystem_icecrystal` | lsystem | 2026-09-11 overnight | A bush grammar folded six ways. `visible_depth` on mid adds and removes the fine tips. The two long verticals through the centre are load-bearing and also the first thing that will look like a mistake. |
-| `star_lanterncourt` | star_pattern | 2026-09-11 overnight | Twelve-fold Hankin interlace with four rings and a scalloped rim inside it. Does it read as ONE figure? Watch the rim deepen — that is `ring_scale`, not a separate param. |
-| `star_orrery` | star_pattern | 2026-09-11 overnight | `tiling = "none"` — rings only, no interlace. Is the counter-rotation legible as two families going opposite ways, or just as shimmer? |
-| `reaction_tidepool` | reaction_diffusion | 2026-09-11 overnight | Pale coral maze on dark water; the music drives `flow` (growth speed), not brightness. Judge the contour bands: a flat wash means the regime left the live band. |
-| `attractor_emberdrift` | attractor | 2026-09-11 overnight | Clifford tuple 4 inside its own drifting smoke — the trail has a DIRECTION, given by `fb_dy`/`fb_zoom`. Watch a `reseed`: shake-and-recover, or glitch? |
 | `attractor_lorenzknot` | attractor | 2026-09-11 overnight | Lorenz entry 1, the rho≈100 torus knot, shown as a solid via `perspective`/`depth_fade`/`depth_hue`. Can you see one strand pass BEHIND another? Judge it late — ~8 s emergence. |
 | `spectrum_radialbloom` | spectrum | 2026-09-11 overnight | 48 spokes on a ring; `thickness` and `hue` both vary per element off `bin(index)`. Strongest reactivity in the batch (drive 0.173). Does it read as one object? |
-| `spectrum_horizonline` | spectrum | 2026-09-11 overnight | The same data as scenery: a 40-point polyline ridge on a dusk horizon band. Does the ridge have relief across its whole width, or is the right half flat? |
-| `emitter_confettidrop` | emitter | 2026-09-11 overnight | `spawn_rate` 55→900 on onset: a hit is a POPULATION change, not a flash. Does it read as a throw? And is the thin drizzle at rest still worth looking at? |
-| `emitter_ashfall` | emitter | 2026-09-11 overnight | The ambient one, and the emitter upside down (`source_y` above the frame, `launch_angle` half a turn). Deliberately has no EVENT in it — that is the risk it takes. Weakest numbers in the batch: see the note below. |
 | `shape_strataheart` | shape_field | 2026-09-11 overnight | Pure palette: `palette_steps` (bound, 6→11) is the picture and `coord_mode = 1` makes the bands scaled copies. Do the band edges stay HARD? A halo means bloom is fighting them. |
-| `shape_crescentgate` | shape_field | 2026-09-11 overnight | An authored `[path]` crescent morphing to a disc, in `coord_mode = 0` so contours are offset curves rather than scaled copies. Judge the MIDDLE of the morph — nobody authored that shape. Best judged beside `shape_strataheart`. |
-| `warp_plasmalamp` | warp_mesh | 2026-09-11 overnight | Cells drifting inward, edged by `solarize` riding the mids — the structure is a fold, not geometry. Are the cells soft at rest and rimmed when loud? |
-| `collage_kandinskybeat` | shape_collage | 2026-09-11 overnight | Flat opaque shapes on off-white paper; `recompose` is edge-triggered on a strong onset with a 0.22 s blend. Palette is eight PLATEAUS under linear 0.6, so fills are unshaded and edges hard — check both. |
 | `curve_phosphor` | parametric_curve / lissajous | 2026-09-11 curve families | Green scope trace; `phase` sweep turns it in depth, `n` re-tunes 3:4 ⇄ 5:4 on the bar THROUGH the open ratios. Does the re-tune read as deliberate, or as the trace coming apart? |
 | `curve_lacework` | parametric_curve / lissajous | 2026-09-11 curve families | Cream thread, three reflected copies knit into one round body; `n:d` re-rolls per beat (3:4..5:6). Reads as a ball of thread, not the doily it was aimed at — judge it as that. |
 | `curve_prismscope` | parametric_curve / lissajous | 2026-09-11 curve families | A Lissajous as kaleidoscope SOURCE: 6-wedge Droste tunnel, `d` 4 ⇄ 6 on the beat. The family is not legible through the fold. Keep for the tunnel or bin for hiding its figure. |
 | `curve_cogwheel` | parametric_curve / hypotrochoid (epi, `n = -3.5`) | 2026-09-11 curve families | Brass seven-lobed epicycloid; bass drives `pen` 0.55 → 1.55 so scallops become cusps become loops. Watch a kick: seven knots should grow on the rim. |
 | `curve_blueprint` | parametric_curve / hypotrochoid | 2026-09-11 curve families | White-on-blueprint drawing machine: `draw_progress` on `bar_phase`, re-geared each bar from four closing ratios. `--report` cannot see it (see notes). Judge the reveal's rhythm, not its sync. |
-| `curve_rosewindow` | parametric_curve / hypotrochoid | 2026-09-11 curve families | 26-cusp tracery, opaque paint, 10 stepped panes along the trace; mids swell `pen`. Do the panes read as flat stained glass? Dim-ish by design — jewel palette under `stroke_blend = 1`. |
 | `curve_turnabout` | parametric_curve / hypotrochoid (sign flip) | 2026-09-11 curve families | `n` flips +3 ⇄ −3 on a beat, un-eased: deltoid ⇄ trefoil, the same figure inside out, with the opposite sign ghosted UNDER. Does the ghost make it one object turning over? |
-| `curve_urchin` | parametric_curve / superformula | 2026-09-11 curve families | Best reactivity-to-structure in the pass: bass drops `sharpness` and the star grows spines; `sym` walks 7/9/11 on the bar; rounded body layered under. Loud must read as spines, not tangle. |
 | `curve_diatomplate` | parametric_curve / superformula | 2026-09-11 curve families | Haeckel plate: 18-point shell over 9-lobe core, ink on cream. Mids skew `d` so points lean. Lines read PENCIL-grey, not ink-black (gap 5). Is the skew visible between loud and quiet? |
-| `curve_pinwheel` | parametric_curve / superformula | 2026-09-11 curve families | `d` wanders 1.4..3.4 so a flower grows hooked claws; bass throws `spin` and `trails` 0.8 smear the hooks. Must read as a spinning solid, not fog. Horizon: breathes, no pile-up. |
 | `curve_inkpendulum` | parametric_curve / harmonograph | 2026-09-11 curve families | Victorian harmonograph, 2:3.012, ink on paper. `decay` INVERTED on loudness: quiet collapses to a tight knot, loud opens to the sheet. Watch the knot at rest — it is the quiet state's picture. |
 | `curve_gyre` | parametric_curve / harmonograph | 2026-09-11 curve families | Near-unison damped circle, three-fold rotational mirror = three-armed galaxy; bass lowers `decay` and the arms unwind. Strongest quiet-vs-loud contrast of the four harmonographs. |
-| `curve_tidechart` | parametric_curve / harmonograph | 2026-09-11 curve families | 4:3.006 opaque ribbon, palette stepped along the trace so the damping lands as nested colour shells — a bathymetric chart. Do the bands read as depth or as candy stripe? |
-| `analytic_sandplate` | analytic_field / chladni | 2026-09-11 analytic field | The cymatics demo: pale sand on a vignetted brass plate, modes 1..4 × 5..9, `mode_m` held on the BEAT. Does a kick read as the sand jumping to a new figure, or as a flicker? |
 | `analytic_standingwave` | analytic_field / chladni (`plate_mix` 1) | 2026-09-11 analytic field | The whole signed wave, hot crests and cold troughs, stepped into 6-11 terraces with black nodal seams. Top-middle mode range (7..10 × 11..15). Relief, or quilt? |
 | `analytic_lacegrid` | analytic_field / chladni | 2026-09-11 analytic field | Modes 12..13 × 14..16, the top of the range: hairline white lace, zoomed out to a wallpaper. Check it at 1280x720 too — aliasing near the pixel pitch is the risk. |
 | `analytic_echoplate` | analytic_field / chladni + trails | 2026-09-11 analytic field | Low modes into a zooming max-decay trail. Stills show zoom STREAKS off the current figure, not a stack of old ones. Is the current figure still the brightest layer? Horizon clean. |
-| `analytic_engraving` | analytic_field / chladni + ink | 2026-09-11 analytic field | Slate-indigo ink on cream paper, wide lines, a faint aquatint wash of the wave. Held on the bar: the calm one. Is the ink dark enough to read as print? |
-| `analytic_modesweep` | analytic_field / chladni (unheld) | 2026-09-11 analytic field | No hold: eased bass sweeps `mode_m` 2..16 through every integer. A strip showed 7 distinct figures in 8 frames. Does a crescendo read as the plate CLIMBING, or as a strobe? |
-| `analytic_roundplate` | analytic_field / chladni + kaleidoscope | 2026-09-11 analytic field | The square plate folded six ways into a round cymatic mandala. Round plate, or a kaleidoscope trick? Four gold stubs at the rim are the fold's seam showing. |
 | `analytic_juliacircuit` | analytic_field / escape_time (julia) | 2026-09-11 analytic field | c tours the main cardioid's edge; the bass pushes it OUTSIDE, so quiet = black connected set and loud = the set cracks open pink with gold spiral eyes. Morph, or black/pink flicker? |
 | `analytic_twobandjulia` | analytic_field / escape_time (julia) | 2026-09-11 analytic field | Plan 0163's own question: c_re on bass, c_im on treble, in the valley between cardioid and bulb. No time term, so every change is the music. Musical, or noise? |
 | `analytic_parabolicdust` | analytic_field / escape_time (julia) | 2026-09-11 analytic field | A 3.7x close-up on ONE spiral arm of the dust past the cusp: a nautilus of sparks. The bass THINS it. Watch whether the arm stays in frame across a minute. |
@@ -56,6 +34,26 @@ going for, so a verdict is a comparison rather than a general impression.
 | `analytic_ringorbit` | analytic_field / escape_time + `circle` trap (`power` 3) | 2026-09-11 analytic field | Cubic Julia, circle trap: blue ring filaments nested round a three-fold set. The bass swells the trap circle, so the rings pulse outward. Filaments, or flat glow? |
 | `analytic_pearlstring` | analytic_field / escape_time + `point` trap | 2026-09-11 analytic field | The dendrite c = -0.8+0.156i strung with lavender beads where orbits pass one point. The point orbits with time; the bass re-strings it. Beads on a thread, or spray? |
 | `analytic_searchlight` | analytic_field / escape_time + `line` trap | 2026-09-11 analytic field | A line trap turning like a lighthouse beam through a fixed dendrite (-0.1+0.95i), in acid green. Most animated row in the pass (anim 0.241). A beam through a structure, or churn? |
+
+## Owner verdicts (2026-09-11)
+
+The owner looked at all fifty-one. The twenty-two binned files are deleted and their rows
+are gone from the table above; the notes below still mention some of them, because they are
+the record of what each pass tried.
+
+- **Keep, as they are:** Julia Circuit, Pearl String, Ring Orbit, Searchlight, Stained
+  Glass, Standing Wave, Two-Band Julia, Lacework, Prismscope, Etching Plate, Murmuration.
+  Moving one into `presets/` is `dev`'s act (see the README).
+- **Tune:** Echo Plate (calmer), Parabolic Dust (reframe right, calmer zoom), Seahorse and
+  Lorenz Knot (frame rate: 15 and 20 fps), Blueprint (draw different figures), Phosphor
+  (the trace must close, it has a gap), Strata Heart (vertical). Open-ended: Lace Grid,
+  Diatom Plate, Turnabout, Ice Crystal ("needs something").
+- **Radial Bloom:** to replace one of the shipped radial spectrum presets.
+- **Meh, undecided:** Multibrot, Cogwheel, Gyre, Ink Pendulum.
+- **Binned:** Engraving, Mode Sweep, Round Plate, Sand Plate, Ember Drift, Kandinsky Beat,
+  Pinwheel, Rose Window (curve), Spindrift, Tide Chart, Urchin, Ashfall, Confetti Drop,
+  Aurora Veil, Kaleido Dome, Tidepool, Crescent Gate, Horizon Line, Lantern Court, Orrery,
+  Ember Storm, Plasma Lamp.
 
 ## Notes on this pass
 
