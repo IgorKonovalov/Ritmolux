@@ -338,6 +338,110 @@ documents), so this scene keeps its LUTs in their own bind group exactly as that
 - **Full suite:**
 - **Outstanding `human` phases:**
 
+## Close review (architect, Mode 4) - 2026-09-11 - HELD
+
+> Written by `architect` in a fresh session, unattended batch run. **The plan is not closed.** Its
+> `Status:` line is left as `dev` set it. This section is the review; the implementing lane owns the
+> fix, and the close ceremony re-runs once it lands.
+
+**Verdict: the engine work is sound and every done-when is met in the tree, but the plan is held on
+one blocker - the implementer's `### Close triggers` block was never written.** No `human` phase
+exists, so that is the only thing standing between this plan and `done/`.
+
+**Full suite, run by the reviewer:** `cargo nextest run --workspace` (the full run, not `-P fast`) on
+`44631a6`, this machine's DX12 WARP adapter - **green: 1762 tests run, 1762 passed (10 slow), 6 skipped, exit 0,
+452.9 s.** Every `analytic_field` test, both new goldens and the nine pre-existing baselines the
+log names pass on the finished tree.
+
+### Blocker
+
+- **The `### Close triggers` block is empty - every bullet, `Full suite:` included** (this file,
+  the block above). ADR-0156 makes that bullet the only record that the nine GPU suites ran against
+  the finished tree, and the review rubric treats a missing one as a blocker rather than a minor.
+  The reviewer's own run above is recorded so the re-close is cheap, but it does not substitute for
+  the lane's sign-off: the other five bullets (`presets/` touched, what shipped, operator docs,
+  backlog probes, outstanding `human` phases) are also blank, and the Phase 5 row reads "committed
+  with this row" rather than naming `27f2a63`. Taken on the conservative reading this run was
+  told to take. **Fix:** `dev` fills the block, names the Phase 5 commit, and hands back.
+
+### Minor
+
+- **The recovery line misnames the clamp.** `standalone/src/app_state.rs:894` prints *"geometry is
+  back within the segment cap"* whenever `cap_overflow()` goes from `Some` to `None`, and Phase 4
+  routed the iteration clamp through that same channel - so an escape-time budget bound back under
+  the Floor cap is announced as a geometry recovery. The log's *"No standalone change was needed"*
+  holds for the onset and not for the recovery. Match on `OverflowContext` there, as
+  `CapOverflow`'s `Display` already does.
+- **The mirror's fidelity is proved on one branch only.**
+  `the_gpu_draws_the_set_the_mirror_computes` (`core/src/render/scenes/analytic_field/tests.rs`)
+  holds the CPU port to the GPU at `power = 2`, `map = julia`, `trap = none`. The finiteness sweep
+  (`no_escape_time_sample_is_non_finite_across_the_declared_ranges`, 441 000 samples by the log)
+  leans on the port for fractional powers, the Mandelbrot map and all four traps,
+  none of which any GPU test compares against. One extra capture per untested branch (a
+  fractional power and the Mandelbrot map at least) would let the sweep speak for the shader
+  there too.
+- **`docs/capturing.md:131` lists "all twelve" systems for `--report family=`** and omits
+  `analytic_field`. An operator-doc sweep item; the close owes it.
+- **A pre-existing `fragment_field` defect has no carrier.** The log's Phase 1 note finds that with
+  no post stage active, `fragment_field`'s REPLACE blend overwrites the backdrop at `occlude = 0`,
+  against its own shader comment. The new scene mirrors it faithfully and the parity test pins
+  both. Correct for this plan (which does not touch `fragment_field`), but the finding lives only in
+  this log; it becomes a `design-backlog.md` entry at the close.
+
+### Nit
+
+- `core/src/render/scenes/common.rs:3` and `:366` still say "Twelve systems".
+- `Scene::mirror_overflow` now carries a clamp that is not a mirror's; the doc was updated, the name
+  was not.
+- `docs/plans/README.md`'s roster row reads `approved`; the plan reads `in-progress`.
+
+### Rulings on the log's deviations (no action)
+
+- **One bind group, not the LUTs in their own** (Phase 1): accepted. The plan's instruction existed
+  to dodge the WARP layout quirk; a single group whose shape nothing else in the crate has dodges
+  it the way ADR-0058's guard is built to check, without a new allowlist entry.
+- **The smooth count** (Phase 2): accepted, and the plan was wrong - its
+  `n + 1 - log2(log|z|)/log(power)` does not reduce to the textbook form at `power = 2`. The
+  shipped `n + 1 - log_p(ln|z_n| / ln R)` is continuous across every integer step, which
+  `the_smooth_count_is_continuous_across_every_integer_step` asserts with a control.
+- **`OverflowContext::Iterations`** (Phase 4): accepted as authorised. `tier.rs` calls widening that
+  enum an architect decision; Phase 4's own *"clamped and says so through the same channel a tier
+  demotion announces itself"* is that decision. A demotion rebuilds every scene
+  (`tier_governor.rs::apply_tier`), so the Floor cap does reach a live session.
+- **`TierConfig::field_iterations` = 64 / 512 from arithmetic** (Phase 4): accepted, because the
+  doc says so and `docs/on-device-validation.md` carries the measurement as two items.
+- **The `sanity` coverage floor of 0.08 is borrowed**: accepted, because the comment says it is and
+  says when to re-derive it.
+
+### What was checked and held
+
+- **Lens 1.** All five phases are present, each has one in-vocabulary `**Owner skill:** dev`, and no
+  phase was added without note (`presets/proposed/` in `44631a6` is out of scope for this review).
+  Every named test was opened: the 3,5 plate is held to an independent CPU formula at >0.99 pixel
+  agreement **with a 2,4 control that must disagree**; squareness at 1280x800 by both a centre crop
+  against an 800x800 render and the plate's own diagonal symmetry; `occlude` as a two-system parity
+  with a non-vacuity assert; Julia connected/dust by 4-connected components plus a textbook-
+  iteration mask; banding with a `palette_steps = 8` control the statistic must convict; the trap
+  sweep by the halving property; `trap = none` byte-identical in-run and against the un-re-blessed
+  Phase 2 golden; the tier pair byte-identical within Floor and the clamp equal to the at-cap
+  picture with a notice. No tautologies found.
+- **Lens 2.** No platform, capture or foobar type in `core/`; the C ABI and `core-cabi/` are
+  untouched; the `Scene` trait gained no method; both new modules carry the hot-path panic pragma
+  and sit under `render/`, which the hygiene guard scans; `render` allocates nothing per frame (the
+  clamp is a `Copy` value).
+- **Lens 3.** `docs/presets.md` (the `[field]` table, the system row, the error surface),
+  `presets/README.md` (generated, per-family annotated), `docs/preset-guide.md` (one picture per
+  family) and `docs/on-device-validation.md` are swept. `check-doc-links`, `toc --check`,
+  `check-reader-prose`, `check-index-rows`, `check-comment-hygiene` and `check-backlog-claims` all
+  exit 0 on this tree. Version bump owed at the close: **minor** (a new system is a feature).
+- **Lens 4.** Aspect comes from the target (`a.x` is `Scene::render`'s `aspect`), and the test that
+  would catch the grid-aspect bug runs at 1280x800 - the configuration where the two sources
+  disagree. Every escape-time term is clamped CPU-side before the shader. The numeric thresholds are
+  same-run comparisons with controls, not frozen cross-machine numbers.
+- **Lens 5.** No layer inversion, no seam widened; the family switch is a uniform branch inside one
+  scene, as ADR-0180 rule 1 intends, and the three placed families have a home that needs no new
+  `SystemKind`.
+
 ## Followups (after this lands)
 
 - Route to `preset-author`: `chladni` and `escape_time` with orbit traps, and specifically the
