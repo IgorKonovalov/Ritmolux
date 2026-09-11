@@ -41,7 +41,6 @@ seed = 6
 palette_steps = 0.30
 gamma = 0.40
 scale = { attack = 0.03, release = 0.45 }
-rotation = 0.8
 
 [params]
 shape = "4"
@@ -55,7 +54,8 @@ palette_contour = "0.55"
 gamma = "0.70 + clamp(bass * 0.94, 0, 0.80)"
 
 scale = "0.52 + clamp(onset * 0.20, 0, 0.12)"
-rotation = "sin(time * 0.13) * 0.10"
+# Dead upright, by the owner's verdict: a heart that sways reads as tilted.
+rotation = "0"
 pan_y = "0.0"
 stroke = "0"
 

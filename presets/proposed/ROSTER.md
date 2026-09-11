@@ -48,8 +48,10 @@ the record of what each pass tried.
   Lorenz Knot (frame rate: 15 and 20 fps), Blueprint (draw different figures), Phosphor
   (the trace must close, it has a gap), Strata Heart (vertical). Open-ended: Lace Grid,
   Diatom Plate, Turnabout, Ice Crystal ("needs something").
-- **Radial Bloom:** to replace one of the shipped radial spectrum presets.
-- **Meh, undecided:** Multibrot, Cogwheel, Gyre, Ink Pendulum.
+- **Radial Bloom:** keep, and it REPLACES the shipped `spectrum_halo` - a curation act for
+  `dev`/`architect`, not a content edit.
+- **Meh, to tune:** Multibrot, Cogwheel, Gyre, Ink Pendulum - options to be rendered.
+- **Strata Heart:** "vertical" meant dead upright - the sway is removed.
 - **Binned:** Engraving, Mode Sweep, Round Plate, Sand Plate, Ember Drift, Kandinsky Beat,
   Pinwheel, Rose Window (curve), Spindrift, Tide Chart, Urchin, Ashfall, Confetti Drop,
   Aurora Veil, Kaleido Dome, Tidepool, Crescent Gate, Horizon Line, Lantern Court, Orrery,
