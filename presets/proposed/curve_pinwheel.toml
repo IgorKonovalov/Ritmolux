@@ -1,0 +1,60 @@
+# Pinwheel — a skewed superformula thrown into a spin, trailing comets.
+#
+# The look: a six-lobed superformula whose two lobe exponents are far apart
+# (`d = 3`, so n3 = 3 * n2): every lobe is lopsided, a hook with a steep
+# leading edge and a long trailing shoulder, so the figure has a handedness -
+# a pinwheel, not a star. It spins, and long `trails` smear each hook into a
+# comet tail behind it.
+#
+# What drives it:
+#   - `d` is the structural lever: it swings between ~1.4 (nearly symmetric
+#     lobes, a flower) and ~3.4 (hard hooks) on a slow noise, so the pinwheel
+#     is sometimes a flower that grows claws.
+#   - `spin` rides the bass: a kick throws the wheel round, and the trail
+#     draws the throw as an arc of smeared hooks. At rest it barely turns and
+#     the trail collapses onto the figure.
+#   - `sym` re-rolls on the bar between 5, 6 and 8 hooks.
+#
+# Judge: the trail should read as motion blur of a solid object - a spinning
+# wheel - not as a fog. If loud frames go to a uniform disc, the trail is
+# too long for the spin.
+#
+# Horizon, 2026-09-11: 5 simulated minutes at 96x96, --set bass=0.6,mid=0.45,
+# against a static star_pattern control (delta 0.0000, monotone 0.00 on all
+# three). Coverage 0.526 -> 0.531 (monotone 0.40), peak/mean 16.0 -> 11.9
+# (0.60): the trail breathes, it does not pile up.
+system = "parametric_curve"
+name = "Pinwheel"
+
+[curve]
+family = "superformula"
+
+[palette]
+name = "ember"
+
+[params]
+sym        = "select(hash(bar_index * 3) < 0.33, 5, select(hash(bar_index * 3) < 0.66, 6, 8))"
+sharpness  = "0.4"
+lobe       = "0.6"
+d          = "2.4 + (noise(time * 0.07) - 0.5) * 2"
+samples    = "1440"
+scale      = "0.85"
+spin       = "0.03 + clamp(bass * 0.3, 0, 0.26)"
+thickness  = "2.6"
+softness   = "0.3"
+glow       = "0.7"
+brightness = "0.7"
+hue        = "0.35"
+hue_spread = "0.6"
+trails     = "0.8"
+bloom_amount    = "0.3"
+bloom_threshold = "0.8"
+bg_bright  = "0.06"
+bg_vignette = "0.8"
+
+[hold]
+sym = "bar"
+
+[smoothing]
+sym = 0.4
+spin = { attack = 0.05, release = 0.5 }

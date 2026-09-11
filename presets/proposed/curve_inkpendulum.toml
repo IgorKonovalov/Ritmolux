@@ -1,0 +1,51 @@
+# Ink Pendulum — a real harmonograph drawing, ink on paper.
+#
+# The look: the thing a Victorian drawing machine made. Two pendulums a hair
+# off 2:3 swing a pen across cream paper and die away, so the figure spirals
+# inward in overlapping loops that crowd into a dark knot at the centre. The
+# slight detune (`d = 3.012`) makes consecutive loops drift, which is what
+# gives a harmonograph its woven moire.
+#
+# What drives it:
+#   - `decay` is the structural lever, and it runs INVERTED on loudness:
+#     quiet passages damp the pendulums hard, so the drawing collapses into
+#     a small tight spiral; loud ones let them swing, so the figure opens out
+#     to the full sheet with sparse outer loops.
+#   - `phase` (the offset between the two pendulums) drifts on noise, which
+#     turns the whole figure's handedness slowly.
+#   - no spin: a pen on paper does not rotate.
+#
+# Judge: the density gradient is the point - sparse loops outside, a dense
+# knot inside. At rest the knot should be small and legible; at peak the
+# figure should fill the sheet. If the knot is a solid ink blob, `decay` is
+# collapsing the inner turns below the fit (the family falls back to chords).
+system = "parametric_curve"
+name = "Ink Pendulum"
+
+[curve]
+family = "harmonograph"
+
+[params]
+n          = "2"
+d          = "3.012"
+phase      = "0.2 + noise(time * 0.05) * 0.4"
+decay      = "0.22 - clamp((bass + mid) * 0.11, 0, 0.16)"
+samples    = "2048"
+scale      = "0.95"
+spin       = "0"
+thickness  = "2.4"
+softness   = "0.1"
+glow       = "0.25"
+brightness = "2"
+saturation = "0"
+ink_amount   = "1"
+paper_hue    = "0.1"
+paper_sat    = "0.12"
+paper_bright = "0.95"
+ink_hue      = "0.0"
+ink_sat      = "0.55"
+ink_bright   = "0.15"
+ink_gamma    = "0.2"
+
+[smoothing]
+decay = { attack = 0.15, release = 0.9 }

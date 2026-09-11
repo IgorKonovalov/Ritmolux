@@ -1,0 +1,56 @@
+# Tide Chart — a harmonograph whose colour bands mark the pendulums dying.
+#
+# The look: a 4:3 harmonograph, slightly detuned, drawn as a thick opaque
+# ribbon with the palette STEPPED along the trace - so the colour changes in
+# hard bands as the pen goes, and because the trace spirals inward as it
+# damps, the bands land as concentric rings: the outer sweeps are one colour,
+# the next shell another, the knot at the centre the last. It reads like a
+# bathymetric chart, depth by colour.
+#
+# What drives it:
+#   - `decay` is the structural lever and it is what places the bands: bass
+#     lowers it, the figure opens, and every colour shell grows wider; at
+#     rest the shells crowd into a tighter, deeper chart.
+#   - `phase` wanders on noise, reshaping the loops.
+#   - treble lifts the contour line between bands.
+#
+# Judge: the bands should read as depth - nested shells - not as a candy
+# stripe. The ribbon is opaque (`stroke_blend = 1`), so crossings should be
+# over/under, not brighter.
+system = "parametric_curve"
+name = "Tide Chart"
+
+[curve]
+family = "harmonograph"
+
+[palette]
+stops = [
+  { at = 0.0, color = "#f2e6c4" },
+  { at = 0.25, color = "#9fd4c2" },
+  { at = 0.5, color = "#3a9ab4" },
+  { at = 0.75, color = "#2a64b8" },
+  { at = 1.0, color = "#4a3fc0" },
+]
+
+[params]
+n          = "4"
+d          = "3.006"
+phase      = "0.1 + noise(time * 0.06) * 0.5"
+decay      = "0.14 - clamp(bass * 0.12, 0, 0.1)"
+samples    = "2048"
+scale      = "0.92"
+spin       = "0"
+thickness  = "3.4"
+softness   = "0.12"
+glow       = "0.2"
+brightness = "0.9"
+stroke_blend = "1"
+hue        = "0"
+hue_spread = "1"
+palette_steps   = "6"
+palette_contour = "0.3 + clamp(treb * 0.5, 0, 0.4)"
+bg_bright  = "0"
+
+[smoothing]
+decay = { attack = 0.1, release = 0.8 }
+palette_contour = 0.2

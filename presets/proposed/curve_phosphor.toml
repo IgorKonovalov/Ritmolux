@@ -1,0 +1,65 @@
+# Phosphor — a Lissajous figure on an XY oscilloscope.
+#
+# The look: one thin green trace on a dark tube, the 3:4 figure turning in
+# depth the way a scope's does when its two oscillators are a hair out of
+# tune. That turning is `phase` sweeping the offset between the axes; nothing
+# rotates the figure in the plane (`spin = 0`), so every change of shape is
+# the family's own.
+#
+# What drives it:
+#   - `phase` is a slow `time` sweep with a small mid-driven offset on top.
+#     The offset NUDGES the figure on a busy passage; it cannot make it turn
+#     faster, because the grammar has no accumulator to integrate a rate
+#     (see ROSTER.md, engine gaps).
+#   - `n` (the x frequency) is held on the bar and eased, so every few beats
+#     the figure travels from 3:4 to 5:4 (or back) THROUGH the open,
+#     non-closing ratios in between - the only moment the trace comes apart.
+#   - bass widens the figure a little; `trails` is the phosphor persistence.
+#
+# Judge: does the phase sweep read as a figure turning in 3D, and does the
+# ratio change read as a deliberate re-tuning rather than a glitch? The
+# phosphor smear should be a short tail behind the moving trace, not a fog.
+#
+# Horizon, 2026-09-11: 5 simulated minutes at 96x96, --set bass=0.6,mid=0.45,
+# against a static control (flat on all three). Coverage 0.154 -> 0.220 at
+# monotone 0.50, footprint 0.153 -> 0.158 (0.56): the figure re-tunes, so
+# coverage wanders with it; no one-way accumulation.
+system = "parametric_curve"
+name = "Phosphor"
+
+[curve]
+family = "lissajous"
+
+[palette]
+stops = [
+  { at = 0.0, color = "#02140a" },
+  { at = 0.55, color = "#1fd36a" },
+  { at = 1.0, color = "#d8ffe6" },
+]
+
+[params]
+n          = "select(hash(bar_index) > 0.5, 5, 3)"
+d          = "4"
+phase      = "mod(time * 0.035 + mid * 0.02, 1)"
+samples    = "1400"
+scale      = "0.78 + clamp(bass * 0.07, 0, 0.06)"
+spin       = "0"
+thickness  = "1.6"
+softness   = "0.35"
+glow       = "0.9"
+brightness = "0.85"
+hue        = "0.62"
+hue_spread = "0.18"
+trails     = "0.72"
+bloom_amount    = "0.35"
+bloom_threshold = "0.6"
+bg_bright  = "0.12"
+bg_hue     = "0.05"
+bg_vignette = "0.7"
+
+[hold]
+n = "bar"
+
+[smoothing]
+n = 0.8
+scale = 0.2

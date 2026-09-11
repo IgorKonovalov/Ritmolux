@@ -1,0 +1,67 @@
+# Prismscope — a Lissajous figure seen through a kaleidoscope.
+#
+# The look: a single 5:6 Lissajous trace, drawn once, folded by the
+# screen-space kaleidoscope into six mirrored wedges with a Droste spiral, so
+# the figure repeats inward in shrinking rings. Unlike Lacework (a geometry
+# mirror of whole copies) the fold here cuts THROUGH the figure, and the
+# wedges show pieces of it - a prism, not a doily.
+#
+# What drives it:
+#   - `phase` sweeps the offset between the axes on `time`, nudged by the
+#     mids, which is what makes the pieces in each wedge slide and change.
+#   - `d` is held on the beat between 4 and 6 (against a fixed n = 5, so
+#     the figure alternates between the 5:4 and 5:6 knots) and eased, so on a
+#     hit the figure passes through 5:5 - a bare diagonal line - on its way
+#     and re-knots. (5:5 as a resting value was tried: the fold cut a line
+#     out of frame and the whole screen went black.)
+#   - bass travels the Droste zoom (`kaleido_zoom`), a pulse inward.
+#   - `pan_x` sits off-centre so the fold cuts through the figure rather
+#     than folding it onto its own symmetry.
+#
+# Judge: the wedges must be hard-seamed, and the figure should read as
+# line fragments, not as a spoke pattern. Honest caveat: the Lissajous is
+# not recognisable as a Lissajous through this fold - the picture is a
+# kaleidoscope tunnel whose SOURCE is a curve. Keep it for the tunnel or bin
+# it for not showing its family.
+system = "parametric_curve"
+name = "Prismscope"
+
+[curve]
+family = "lissajous"
+
+[palette]
+stops = [
+  { at = 0.0, color = "#0a0020" },
+  { at = 0.3, color = "#3b2cff" },
+  { at = 0.55, color = "#16e0d0" },
+  { at = 0.8, color = "#ffe45c" },
+  { at = 1.0, color = "#ff4fa8" },
+]
+
+[params]
+n          = "5"
+d          = "select(hash(beat_index * 5) > 0.5, 6, 4)"
+phase      = "mod(time * 0.04 + mid * 0.03, 1)"
+samples    = "1200"
+scale      = "0.7"
+pan_x      = "0.18"
+spin       = "0.03"
+thickness  = "2.0"
+softness   = "0.3"
+glow       = "0.8"
+brightness = "0.75"
+hue        = "0.3"
+hue_spread = "0.7"
+kaleido_order  = "6"
+kaleido_spiral = "1"
+kaleido_radial = "1.7"
+kaleido_zoom   = "mod(time * 0.05, 1) + clamp(bass * 0.2, 0, 0.18)"
+kaleido_inner  = "0"
+bloom_amount    = "0.3"
+bloom_threshold = "0.7"
+
+[hold]
+d = "beat"
+
+[smoothing]
+d = 0.35

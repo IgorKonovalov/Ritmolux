@@ -27,6 +27,19 @@ going for, so a verdict is a comparison rather than a general impression.
 | `shape_crescentgate` | shape_field | 2026-09-11 overnight | An authored `[path]` crescent morphing to a disc, in `coord_mode = 0` so contours are offset curves rather than scaled copies. Judge the MIDDLE of the morph — nobody authored that shape. Best judged beside `shape_strataheart`. |
 | `warp_plasmalamp` | warp_mesh | 2026-09-11 overnight | Cells drifting inward, edged by `solarize` riding the mids — the structure is a fold, not geometry. Are the cells soft at rest and rimmed when loud? |
 | `collage_kandinskybeat` | shape_collage | 2026-09-11 overnight | Flat opaque shapes on off-white paper; `recompose` is edge-triggered on a strong onset with a 0.22 s blend. Palette is eight PLATEAUS under linear 0.6, so fills are unshaded and edges hard — check both. |
+| `curve_phosphor` | parametric_curve / lissajous | 2026-09-11 curve families | Green scope trace; `phase` sweep turns it in depth, `n` re-tunes 3:4 ⇄ 5:4 on the bar THROUGH the open ratios. Does the re-tune read as deliberate, or as the trace coming apart? |
+| `curve_lacework` | parametric_curve / lissajous | 2026-09-11 curve families | Cream thread, three reflected copies knit into one round body; `n:d` re-rolls per beat (3:4..5:6). Reads as a ball of thread, not the doily it was aimed at — judge it as that. |
+| `curve_prismscope` | parametric_curve / lissajous | 2026-09-11 curve families | A Lissajous as kaleidoscope SOURCE: 6-wedge Droste tunnel, `d` 4 ⇄ 6 on the beat. The family is not legible through the fold. Keep for the tunnel or bin for hiding its figure. |
+| `curve_cogwheel` | parametric_curve / hypotrochoid (epi, `n = -3.5`) | 2026-09-11 curve families | Brass seven-lobed epicycloid; bass drives `pen` 0.55 → 1.55 so scallops become cusps become loops. Watch a kick: seven knots should grow on the rim. |
+| `curve_blueprint` | parametric_curve / hypotrochoid | 2026-09-11 curve families | White-on-blueprint drawing machine: `draw_progress` on `bar_phase`, re-geared each bar from four closing ratios. `--report` cannot see it (see notes). Judge the reveal's rhythm, not its sync. |
+| `curve_rosewindow` | parametric_curve / hypotrochoid | 2026-09-11 curve families | 26-cusp tracery, opaque paint, 10 stepped panes along the trace; mids swell `pen`. Do the panes read as flat stained glass? Dim-ish by design — jewel palette under `stroke_blend = 1`. |
+| `curve_turnabout` | parametric_curve / hypotrochoid (sign flip) | 2026-09-11 curve families | `n` flips +3 ⇄ −3 on a beat, un-eased: deltoid ⇄ trefoil, the same figure inside out, with the opposite sign ghosted UNDER. Does the ghost make it one object turning over? |
+| `curve_urchin` | parametric_curve / superformula | 2026-09-11 curve families | Best reactivity-to-structure in the pass: bass drops `sharpness` and the star grows spines; `sym` walks 7/9/11 on the bar; rounded body layered under. Loud must read as spines, not tangle. |
+| `curve_diatomplate` | parametric_curve / superformula | 2026-09-11 curve families | Haeckel plate: 18-point shell over 9-lobe core, ink on cream. Mids skew `d` so points lean. Lines read PENCIL-grey, not ink-black (gap 5). Is the skew visible between loud and quiet? |
+| `curve_pinwheel` | parametric_curve / superformula | 2026-09-11 curve families | `d` wanders 1.4..3.4 so a flower grows hooked claws; bass throws `spin` and `trails` 0.8 smear the hooks. Must read as a spinning solid, not fog. Horizon: breathes, no pile-up. |
+| `curve_inkpendulum` | parametric_curve / harmonograph | 2026-09-11 curve families | Victorian harmonograph, 2:3.012, ink on paper. `decay` INVERTED on loudness: quiet collapses to a tight knot, loud opens to the sheet. Watch the knot at rest — it is the quiet state's picture. |
+| `curve_gyre` | parametric_curve / harmonograph | 2026-09-11 curve families | Near-unison damped circle, three-fold rotational mirror = three-armed galaxy; bass lowers `decay` and the arms unwind. Strongest quiet-vs-loud contrast of the four harmonographs. |
+| `curve_tidechart` | parametric_curve / harmonograph | 2026-09-11 curve families | 4:3.006 opaque ribbon, palette stepped along the trace so the damping lands as nested colour shells — a bathymetric chart. Do the bands read as depth or as candy stripe? |
 
 ## Notes on this pass
 
@@ -142,3 +155,116 @@ only the outline is drawn, so the bands have a hairline to live in and the conto
 disappears entirely. `shape_crescentgate` was authored with both and rendered as a bare
 outline on black. Neither parameter is inert and nothing warns; they simply do not
 compose. This is a sentence in `presets/README.md`, not an engine change.
+
+## Notes on the curve-families pass (2026-09-11)
+
+**Thirteen presets, all `parametric_curve`, all on the four families Plan 0162 landed**
+(its Implementation log confirms `lissajous`, `hypotrochoid`, `superformula`,
+`harmonograph`; the epicycloid is the hypotrochoid at negative `n`, not a fifth name).
+Three Lissajous, four hypotrochoid, three superformula, three harmonograph. Every one
+was rendered at `--tier rich --signal dynamic:110 --frame-at 300 --size 640x360`
+after its last edit and looked at, and all but Lacework, Cogwheel and Blueprint also got a
+six-frame `--strip` to see motion. Every one binds its family's structural
+lever to audio or to a held re-roll: `pen`, `sharpness`, `sym`, `lobe`, `d`-as-skew,
+`decay`, the sign of `n`, or the ratio itself. None leaves it at the default.
+
+**Binned: `curve_origami`** (superformula, `samples` 18 → 60 on bass, meant to fold the
+star into flat facets). The arc fit smooths a coarse sample instead of faceting it, so the
+star came back lopsided and kinked, like a broken render. See gap 2.
+
+**Re-cut after the first render:** all three ink-on-paper presets (Diatom Plate, Ink
+Pendulum, Blueprint) came back as near-invisible hairlines, and it took `brightness` at
+its maximum plus `ink_gamma` 0.2 to get a legible line (gap 5). Gyre's first cut used a
+reflected mirror, which clipped every ring into lens-shaped arcs, so it is now a plain
+three-fold rotation. Prismscope's first cut rested on the 5:5 ratio, which is a bare
+diagonal, and the fold threw it out of frame: a black screen on some beats. Pinwheel's
+lobes were too round to hook, so the trail smeared them into a ring. Lacework went from 6:7
+to 3:4 because the dense ratios read as a scribble.
+
+**`--report` (tier floor) found one real bug and two blind spots.** The bug: Blueprint's
+first cut had `draw_progress` riding `bar_phase` from 0, so every probe frame drew
+NOTHING (all columns 0.000, cover 0.000). It now floors at 0.12. The blind spots are in
+gap 6. Weakest whole-frame rows: Turnabout (drive 0.013), Pinwheel (0.012) and Cogwheel
+(0.014). All three spend their energy on small geometry (cusp loops, a spin that the
+probe's still frames cannot see), and Cogwheel's footprint figure is not much higher.
+Judge those three in motion, not from the number.
+
+**Horizon run** on the three with `trails` (Phosphor, Pinwheel, Gyre): five simulated
+minutes each at 96x96 against a static `star_pattern` control that read `delta 0.0000,
+monotone 0.00`. All three read monotone 0.40-0.60 on every statistic, which is breathing,
+not accumulation. The verdicts are in each header.
+
+**The best four, if the morning is short:** Urchin, Cogwheel, Gyre, Ink Pendulum. Each
+has a structural change on the music that reads in a single glance.
+
+## Engine gaps this pass hit — curve-families pass
+
+Routed feedback for `architect`, ordered by how much authoring time each one cost.
+
+### 1. A family's `phase` is a position, and nothing integrates it
+
+The classic oscilloscope Lissajous turns in depth at a rate, and the look wants that rate
+on the music: faster on a busy passage. `spin` is a rate the scene integrates, but it turns
+the figure in the plane. `phase`, the offset between the axes and the thing that makes a
+Lissajous or harmonograph turn in depth, is a position, and the grammar has no accumulator
+to integrate an audio-driven speed into it. So Phosphor and Prismscope bind
+`time * k + mid * c`, and the mid term is only a jitter on top of a constant sweep. That
+comment was corrected in both headers after drafting. **What would close it:** a
+`phase_rate` beside `phase` (integrated like `spin`), or a general "integrate this binding"
+marker.
+
+### 2. `samples` cannot facet the arc-fitted families, and the reference says it can
+
+`presets/README.md` says of `samples`: *"fewer reads as a polygon"*. That holds for the rose's
+chord web. It does not hold for the four new families, which are fitted with arcs. At 18
+samples the superformula came back as a smooth, lopsided, kinked star, not a polygon. That
+cost one preset (Origami, binned). **What would close it:** a per-preset chord mode, or the
+sentence in the reference qualified per family, which the Phase 5 per-family range cell
+could carry.
+
+### 3. Doc drift: the `[curve]` structural table still describes only the rose
+
+`presets/README.md`'s `### [curve] — for parametric_curve` table lists `maurer_rose` as the
+only value and calls `family` *Required*. `docs/presets.md` (Plan 0162 Phase 6) lists five
+families and says an absent table draws the rose. The code accepted all four new names, so
+the table is stale, and Phase 6's sweep missed it. Separately, `bg_angle`'s generated row
+says *"fraction of a full turn"* and the hand-written backdrop table in the same file says
+*radians*. I did not bind `bg_angle` in this pass, so I have not checked which is true.
+
+### 4. A reflected line-scene mirror clips a figure into its wedge
+
+At `mirror_order = 2, mirror_reflect = 1` a harmonograph came back as lens-shaped arcs, with
+every ring cut at the wedge edge. That is presumably the mirror working as designed: it
+takes one wedge and reflects it. But a centred, round figure is exactly what an author
+reaches for a mirror with, and the result reads as a bug. This is a second sighting beside
+the previous pass's gap 3 (no axis reflection). A sentence in the reference would have
+saved a render.
+
+### 5. The ink pass cannot make a hairline dark
+
+On paper, a line scene's stroke only reaches the ink colour where the lit pixel is
+bright, and a thin anti-aliased stroke never gets there. Getting a legible line needed
+`brightness` at its maximum (`2`), `ink_gamma` 0.2 and `thickness` 2.2-2.6. The result
+still reads as pencil grey rather than ink black, and at 2.6 px it is no longer a hairline.
+I did not try the `multiply`-layer dark-on-light route, which the reference documents for
+this. That is the next author's first move on Diatom Plate and Ink Pendulum, and it may
+close this.
+
+### 6. `--report` cannot see a `bar_phase`-driven reveal, or a figure on paper
+
+Blueprint's whole motion is `draw_progress` on `bar_phase`, and the probe holds that
+still, so the preset reads `drive 0.003, cover 0.006`. That is the weakest row in the
+folder, for the preset with the most motion in the pass. The ink presets read `cover`
+0.06-0.10 because their background is light paper. Neither is wrong arithmetic, and both
+invite an author to retune the wrong thing. This is the same class as the previous
+pass's gap 4 (the order the report prints its tables in).
+
+### 7. Smaller: the harmonograph's length is a constant, and a pick needs nested selects
+
+- `HARMONOGRAPH_TURNS = 4` fixes the trace length, so Gyre shows only four rings at low
+  `decay`, and a deeper tunnel is not reachable. A `turns` lever would have been the
+  second structural knob on the family.
+- Re-rolling a ratio from a table of four needs two three-deep `select` chains over the
+  same `hash(bar_index)`, one for `n` and one for its matching `d` (Blueprint), and the
+  pairing is kept consistent by hand. A `pick(i, a, b, c, …)` function would make the
+  intent one line per parameter.

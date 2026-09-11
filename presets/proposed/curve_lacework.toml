@@ -1,0 +1,63 @@
+# Lacework — a Lissajous folded into a ball of thread.
+#
+# The look: cream thread on a deep wine ground. One Lissajous figure (3:4 up
+# to 5:6) is mirrored into three reflected copies, and the copies' crossings
+# knit into one round woven body - more a ball of thread, or an armillary
+# sphere, than a flat doily. Where Phosphor is one trace turning in depth,
+# this one is a textile: many crossings, slow.
+#
+# What drives it:
+#   - `n` is re-rolled on each beat from 3, 4 or 5 (`d` is always `n + 1`), and
+#     eased, so on a hit the weave loosens through open ratios and re-knots
+#     at a new density. That re-knot is the event of the piece.
+#   - `phase` wanders on `noise`, which slides the thread along itself
+#     without changing the ratio.
+#   - bass opens the rosette slightly (`scale`); treble thins the colour
+#     spread along the thread.
+#
+# Judge: it should read as one woven body, not as a scribble. The three-way
+# mirror is structural - if the copies read as three separate figures, the
+# preset has failed. A four-way mirror was tried first and read as a square
+# of fabric; three reads rounder. Worth comparing if this one is a near miss.
+system = "parametric_curve"
+name = "Lacework"
+
+[curve]
+family = "lissajous"
+
+[palette]
+stops = [
+  { at = 0.0, color = "#2a0710" },
+  { at = 0.45, color = "#b0485a" },
+  { at = 0.8, color = "#f3dcc0" },
+  { at = 1.0, color = "#fff6e6" },
+]
+
+[params]
+n          = "3 + floor(hash(beat_index * 7) * 3)"
+d          = "4 + floor(hash(beat_index * 7) * 3)"
+phase      = "noise(time * 0.06) * 0.5"
+samples    = "2048"
+scale      = "0.62 + clamp(bass * 0.08, 0, 0.07)"
+spin       = "0.02"
+thickness  = "1.1"
+softness   = "0.2"
+glow       = "0.45"
+brightness = "0.7"
+hue        = "0.72"
+hue_spread = "0.26 - clamp(treb * 0.1, 0, 0.1)"
+mirror_order   = "3"
+mirror_reflect = "1"
+bg_bright  = "0.35"
+bg_hue     = "0.02"
+bg_hue_span = "0.08"
+bg_vignette = "0.8"
+
+[hold]
+n = "beat"
+d = "beat"
+
+[smoothing]
+n = 0.5
+d = 0.5
+scale = 0.25

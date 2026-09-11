@@ -1,0 +1,56 @@
+# Cogwheel — an epicycloid whose cusps swell into loops on the bass.
+#
+# The look: a brass seven-lobed flower, the curve a circle traces rolling
+# OUTSIDE a fixed one (`n` negative: the epicycloid half of the family).
+# `n = -3.5` with `d = 7` walks seven cusps over two turns of the fixed
+# circle, so the figure closes into one unbroken loop.
+#
+# What drives it:
+#   - `pen` is the structural lever and the whole reactive idea. At rest it
+#     sits near 0.55, well inside the rolling circle, and the cusps are rounded
+#     into soft scallops. Bass pushes it past 1, where each cusp becomes a
+#     small loop - a hit visibly grows seven knots on the rim.
+#   - `spin` turns the gear slowly; the treble rides the stroke colour.
+#   - `phase` walks the pen's starting angle on a slow noise, so even at
+#     rest the loops creep round the rim.
+#
+# Judge: watch the cusps across a kick. Scallop -> point -> loop should read
+# as one mechanism tightening, not as a flicker. If the loops never appear,
+# `pen` is not crossing 1 and the preset is a static flower.
+system = "parametric_curve"
+name = "Cogwheel"
+
+[curve]
+family = "hypotrochoid"
+
+[palette]
+stops = [
+  { at = 0.0, color = "#1a0d02" },
+  { at = 0.4, color = "#8a5314" },
+  { at = 0.75, color = "#e8b04a" },
+  { at = 1.0, color = "#fff1c8" },
+]
+
+[params]
+n          = "-3.5"
+d          = "7"
+pen        = "0.55 + clamp(bass * 1.15, 0, 1.0)"
+phase      = "noise(time * 0.1) * 0.3"
+samples    = "1200"
+scale      = "0.8"
+spin       = "0.05"
+thickness  = "2.6"
+softness   = "0.3"
+glow       = "0.7"
+brightness = "0.85"
+hue        = "0.7 + clamp(treb * 0.25, 0, 0.15)"
+hue_spread = "0.2"
+bloom_amount    = "0.3"
+bloom_threshold = "0.7"
+bg_bright  = "0.14"
+bg_hue     = "0.1"
+bg_vignette = "0.8"
+
+[smoothing]
+pen = { attack = 0.04, release = 0.35 }
+hue = 0.3

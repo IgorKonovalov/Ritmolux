@@ -1,0 +1,58 @@
+# Blueprint — a drawing machine that draws a new spirograph each bar.
+#
+# The look: pale linework on blueprint blue, the pen visibly ARRIVING -
+# `draw_progress` rides the bar phase, so each bar the hypotrochoid is traced
+# from its first point to its last and then begins again. Every bar the
+# machine is re-geared: `n` (the radius ratio of the rolling circle) is
+# re-rolled from four ratios, each paired with the cusp count `d` that closes
+# it (d / n whole), so what gets drawn is always a complete figure:
+#     11/5 = 2.2  -> d 11 (five turns)
+#      5/2 = 2.5  -> d  5 (two turns)
+#     12/5 = 2.4  -> d 12 (five turns)
+#      9/4 = 2.25 -> d  9 (four turns)
+#
+# What drives it: the bar phase (the reveal), the bar counter (the gear),
+# bass on `pen` (loud rolls it toward the rim and the loops open), and the
+# ink pass for the blue paper.
+#
+# The reveal never starts from nothing: `draw_progress` floors at 0.12, so a
+# frame at bar phase 0 (every `--report` probe frame, and all of silence)
+# still shows the first stroke. Without that floor `--report` read the
+# preset as a blank frame, cover 0.000.
+#
+# Judge: does the reveal read as a pen drawing, and does the re-gear land
+# at the start of a reveal rather than mid-stroke? `bar_phase` is counter-
+# derived most of the time (see docs/presets.md on [hold] "bar"), so the
+# reveal is steady, not downbeat-locked - judge its rhythm, not its sync.
+system = "parametric_curve"
+name = "Blueprint"
+
+[curve]
+family = "hypotrochoid"
+
+[params]
+n          = "select(hash(bar_index) < 0.25, 2.2, select(hash(bar_index) < 0.5, 2.5, select(hash(bar_index) < 0.75, 2.4, 2.25)))"
+d          = "select(hash(bar_index) < 0.25, 11, select(hash(bar_index) < 0.5, 5, select(hash(bar_index) < 0.75, 12, 9)))"
+pen        = "0.75 + clamp(bass * 0.35, 0, 0.3)"
+draw_progress = "0.12 + 0.88 * smoothstep(0.0, 0.85, bar_phase)"
+samples    = "1800"
+scale      = "0.84"
+spin       = "0.015"
+thickness  = "2.0"
+softness   = "0.15"
+glow       = "0.35"
+brightness = "1.6"
+hue        = "0.5"
+hue_spread = "0"
+saturation = "0"
+ink_amount   = "1"
+paper_hue    = "0.6"
+paper_sat    = "0.85"
+paper_bright = "0.3"
+ink_hue      = "0.55"
+ink_sat      = "0.1"
+ink_bright   = "0.98"
+ink_gamma    = "0.4"
+
+[smoothing]
+pen = 0.3

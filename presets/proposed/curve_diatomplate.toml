@@ -1,0 +1,71 @@
+# Diatom Plate — a natural-history engraving of a radiolarian shell.
+#
+# The look: black line on cream paper, like a plate from Haeckel. Two
+# concentric superformulae at high symmetry: an outer shell of 18 fine
+# points and an inner one of 9 fatter lobes, both drawn as hairlines. The
+# whole piece is still at rest and changes shape rather than brightness -
+# ink on paper cannot glow, so every audio term is on structure.
+#
+# What drives it:
+#   - `d`, the skew between the two lobe exponents, is the lever. Mids push
+#     it away from 1, so the points lean and each lobe gets a shoulder on
+#     one side - the shell looks like it is being turned in the hand.
+#   - `lobe` on the bass swells the outer lobes from thin spikes toward a
+#     polygon.
+#   - the inner shell counter-rotates slowly; the outer one barely moves.
+#
+# Judge: the paper must be clean cream with no grey cast, the lines dark and
+# crisp. The skew is subtle - compare a loud frame with a quiet one and ask
+# whether the outline itself has changed.
+system = "parametric_curve"
+name = "Diatom Plate"
+
+[curve]
+family = "superformula"
+
+[params]
+sym        = "18"
+sharpness  = "0.9"
+lobe       = "0.9 + clamp(bass * 1.6, 0, 1.4)"
+d          = "1 + clamp(mid * 1.2, 0, 1.0)"
+samples    = "2048"
+scale      = "0.92"
+spin       = "0.008"
+thickness  = "2.6"
+softness   = "0.1"
+glow       = "0.25"
+brightness = "2"
+saturation = "0"
+ink_amount   = "1"
+paper_hue    = "0.11"
+paper_sat    = "0.18"
+paper_bright = "0.94"
+ink_hue      = "0.62"
+ink_sat      = "0.35"
+ink_bright   = "0.1"
+ink_gamma    = "0.2"
+
+[smoothing]
+lobe = 0.25
+d = 0.4
+
+[layer]
+system = "parametric_curve"
+join = "under"
+
+[layer.curve]
+family = "superformula"
+
+[layer.params]
+sym        = "9"
+sharpness  = "2.2"
+lobe       = "2.5"
+d          = "1.2 - clamp(mid * 0.5, 0, 0.4)"
+samples    = "1024"
+scale      = "0.46"
+spin       = "-0.02"
+thickness  = "1.8"
+softness   = "0.1"
+glow       = "0.2"
+brightness = "1.8"
+saturation = "0"

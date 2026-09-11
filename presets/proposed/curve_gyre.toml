@@ -1,0 +1,66 @@
+# Gyre — a damped circular pendulum spiralling into a glowing core.
+#
+# The look: a near-unison harmonograph (1:1.02, axes a quarter turn apart)
+# traces a circle that is slowly precessing, and `decay` damps it into an
+# inward spiral. A three-fold rotational mirror (no reflection - a reflected
+# mirror clips the rings into lens-shaped arcs) makes three interleaved arms,
+# a spiral galaxy at rest. The palette runs deep blue at the outer ring to
+# warm pale at the core, along the trace.
+#
+# What drives it:
+#   - `decay` is the structural lever. Bass lowers it, and the rings unwind
+#     outward into a wide loose spiral; between hits it climbs back and the
+#     spiral tightens, the outer rings shrinking into the core. The gyre
+#     breathes open on the kick.
+#   - `d` drifts on noise between 1.01 and 1.04, which changes how fast the
+#     rings precess against each other - the tunnel's twist.
+#   - `spin` turns the whole gyre, faster when the mids are busy; onset pushes
+#     bloom for a brief core flare.
+#
+# Judge: does the breathing read at a kick, or is the decay change too small
+# to see? The inner rings must stay separate lines; if the core is a solid
+# blob, the fit has fallen back to chords under a hard decay.
+#
+# Horizon, 2026-09-11: 5 simulated minutes at 96x96, --set bass=0.6,mid=0.45,
+# against a static control (flat on all three). Coverage 0.344 -> 0.346
+# (monotone 0.60), footprint 0.068 -> 0.072 (0.44): stable.
+system = "parametric_curve"
+name = "Gyre"
+
+[curve]
+family = "harmonograph"
+
+[palette]
+stops = [
+  { at = 0.0, color = "#02040f" },
+  { at = 0.35, color = "#1b3a8a" },
+  { at = 0.7, color = "#7fd0ff" },
+  { at = 1.0, color = "#fff2dd" },
+]
+
+[params]
+n          = "1"
+d          = "1.01 + noise(time * 0.08) * 0.03"
+phase      = "0.25"
+decay      = "0.22 - clamp(bass * 0.2, 0, 0.17)"
+samples    = "2048"
+scale      = "0.95"
+spin       = "0.06 + clamp(mid * 0.08, 0, 0.07)"
+thickness  = "1.6"
+softness   = "0.35"
+glow       = "0.8"
+brightness = "0.75"
+hue        = "0.3"
+hue_spread = "0.7"
+mirror_order = "3"
+trails     = "0.4"
+bloom_amount    = "0.25 + clamp(onset * 0.35, 0, 0.3)"
+bloom_threshold = "0.6"
+bg_bright  = "0.1"
+bg_hue     = "0.1"
+bg_vignette = "0.9"
+
+[smoothing]
+decay = { attack = 0.06, release = 0.6 }
+spin = 0.8
+bloom_amount = { attack = 0.02, release = 0.3 }

@@ -1,0 +1,88 @@
+# Turnabout — a spirograph that flips between rolling inside and outside.
+#
+# The look: the hypotrochoid family's sign is the whole idea. `n = 3` rolls a
+# circle a third the size INSIDE the fixed one (three inward cusps, a
+# curved triangle); `n = -3` rolls it OUTSIDE (the epicycloid: three outward
+# lobes, a trefoil). The same three-fold figure turned inside out. A beat
+# re-rolls the sign, with NO easing on purpose: easing would walk `n` through
+# zero, where the ratio floors and the trace blows up into a scribble.
+#
+# What drives it:
+#   - `n`'s sign, held on the beat (a hit may or may not turn the figure
+#     inside out - `hash` decides).
+#   - `pen` wanders 0.6..1.6 on noise pushed by the mids, so the cusps round
+#     off or throw loops, on both the inner and outer figure.
+#   - bass swells the figure (`scale`) - added after `--report` read the pen
+#     alone as almost no whole-frame change.
+#   - `spin` is steady; a layer of the opposite sign sits UNDER at low
+#     brightness, so the figure you are not seeing is always ghosted.
+#
+# Judge: does the flip read as the same object turning inside out, or just
+# as two different shapes alternating? The ghost layer is there to make it
+# the former; if it muddies the frame, it is the first thing to cut.
+system = "parametric_curve"
+name = "Turnabout"
+
+[curve]
+family = "hypotrochoid"
+
+[palette]
+stops = [
+  { at = 0.0, color = "#00131a" },
+  { at = 0.4, color = "#00a88a" },
+  { at = 0.8, color = "#b8ff6a" },
+  { at = 1.0, color = "#f8fff0" },
+]
+
+[params]
+n          = "select(hash(beat_index * 11) > 0.5, 3, -3)"
+d          = "3"
+pen        = "0.6 + noise(time * 0.12) * 0.6 + clamp(mid * 0.45, 0, 0.38)"
+samples    = "900"
+scale      = "0.74 + clamp(bass * 0.14, 0, 0.12)"
+spin       = "0.05"
+thickness  = "3.0"
+softness   = "0.3"
+glow       = "0.8"
+brightness = "0.85"
+hue        = "0.62"
+hue_spread = "0.25"
+bloom_amount    = "0.3"
+bloom_threshold = "0.7"
+bg_bright  = "0.04"
+bg_vignette = "0.85"
+
+[hold]
+n = "beat"
+
+[smoothing]
+pen = 0.25
+scale = { attack = 0.04, release = 0.3 }
+
+[layer]
+system = "parametric_curve"
+join = "under"
+
+[layer.curve]
+family = "hypotrochoid"
+
+[layer.params]
+n          = "select(hash(beat_index * 11) > 0.5, -3, 3)"
+d          = "3"
+pen        = "0.6 + noise(time * 0.12) * 0.6 + clamp(mid * 0.45, 0, 0.38)"
+samples    = "900"
+scale      = "0.74 + clamp(bass * 0.14, 0, 0.12)"
+spin       = "0.05"
+thickness  = "1.4"
+softness   = "0.4"
+glow       = "0.3"
+brightness = "0.4"
+hue        = "0.3"
+hue_spread = "0.1"
+
+[layer.hold]
+n = "beat"
+
+[layer.smoothing]
+pen = 0.25
+scale = { attack = 0.04, release = 0.3 }
