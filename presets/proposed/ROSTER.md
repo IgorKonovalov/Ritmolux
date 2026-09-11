@@ -7,32 +7,9 @@ going for, so a verdict is a comparison rather than a general impression.
 
 | preset | system / family | pass | what to look at |
 |--------|-----------------|------|-----------------|
-| `fragment_etchingplate` | fragment_field | 2026-09-11 overnight | Cream paper, indigo ink, seven hard bands with a hairline at each edge. Judge the paper: any grey cast in the empty regions and the print reading is gone. |
-| `swarm_murmuration` | swarm | 2026-09-11 overnight | Cold flock, long trail, bass on `spin`. Does it read as one body with internal structure, or as noise? Judge a few beats in — `trails` restarts empty at a switch. |
-| `lsystem_icecrystal` | lsystem | 2026-09-11 overnight | A bush grammar folded six ways. `visible_depth` on mid adds and removes the fine tips. The two long verticals through the centre are load-bearing and also the first thing that will look like a mistake. |
-| `attractor_lorenzknot` | attractor | 2026-09-11 overnight | Lorenz entry 1, the rho≈100 torus knot, shown as a solid via `perspective`/`depth_fade`/`depth_hue`. Can you see one strand pass BEHIND another? Judge it late — ~8 s emergence. |
-| `spectrum_radialbloom` | spectrum | 2026-09-11 overnight | 48 spokes on a ring; `thickness` and `hue` both vary per element off `bin(index)`. Strongest reactivity in the batch (drive 0.173). Does it read as one object? |
-| `shape_strataheart` | shape_field | 2026-09-11 overnight | Pure palette: `palette_steps` (bound, 6→11) is the picture and `coord_mode = 1` makes the bands scaled copies. Do the band edges stay HARD? A halo means bloom is fighting them. |
-| `curve_phosphor` | parametric_curve / lissajous | 2026-09-11 curve families | Green scope trace; `phase` sweep turns it in depth, `n` SNAPS 3:4 ⇄ 5:4 on the bar (it was eased, which left the trace open with a gap). Is the loop unbroken at every moment? |
-| `curve_lacework` | parametric_curve / lissajous | 2026-09-11 curve families | Cream thread, three reflected copies knit into one round body; `n:d` re-rolls per beat (3:4..5:6). Reads as a ball of thread, not the doily it was aimed at — judge it as that. |
-| `curve_prismscope` | parametric_curve / lissajous | 2026-09-11 curve families | A Lissajous as kaleidoscope SOURCE: 6-wedge Droste tunnel, `d` 4 ⇄ 6 on the beat. The family is not legible through the fold. Keep for the tunnel or bin for hiding its figure. |
-| `curve_cogwheel` | parametric_curve / hypotrochoid (epi, `n = -3.5`) | 2026-09-11 second look | Steel saw blade: bass throws `spin` and `pen`, a 0.8 trail blurs the teeth. Horizon 10 min: fills its sweep, footprint flat. |
-| `curve_blueprint` | parametric_curve / hypotrochoid | 2026-09-11 curve families | White-on-blueprint drawing machine: `draw_progress` on `bar_phase`, re-geared each bar from eight closing ratios (3- to 11-fold, two epicycloids) with the pen re-rolled too. `--report` cannot see it (see notes). Judge the reveal's rhythm, not its sync. |
-| `curve_turnabout` | parametric_curve / hypotrochoid (sign flip) | 2026-09-11 second look | n ±3 flip on the beat, and each beat REDRAWS the figure in ~0.33 s over a 0.93 trail. A `--set` still shows only an 8 % stroke (time_since_beat 0). |
-| `curve_inkpendulum` | parametric_curve / harmonograph | 2026-09-11 second look | Ink on paper, drawn live: `draw_progress` on `bar_phase`, ratio and phase re-rolled per bar (2:3, 3:4, 1:2, 3:5). Line still pencil-grey (gap 5). |
-| `curve_gyre` | parametric_curve / harmonograph | 2026-09-11 second look | Elliptical damped loops fanned by `mirror_order` re-rolled 3/4/5 per bar; magenta into gold core, bass unwinds. Horizon 10 min: flat. |
-| `analytic_standingwave` | analytic_field / chladni (`plate_mix` 1) | 2026-09-11 analytic field | The whole signed wave, hot crests and cold troughs, stepped into 6-11 terraces with black nodal seams. Top-middle mode range (7..10 × 11..15). Relief, or quilt? |
-| `analytic_lacegrid` | analytic_field / chladni | 2026-09-11 second look | Top-range modes as lace, `plate_mix` 0.55 sheen under the thread, silver ⇄ gold palette each bar. Does the gold bar read as new cloth? Check 1280x720 for aliasing. |
-| `analytic_echoplate` | analytic_field / chladni + trails | 2026-09-11 analytic field | Low modes into a zooming max-decay trail, re-taken on the bar (calmed from the beat). Stills show zoom STREAKS off the current figure, not a stack of old ones. Is the current figure still the brightest layer? Horizon clean. |
-| `analytic_juliacircuit` | analytic_field / escape_time (julia) | 2026-09-11 analytic field | c tours the main cardioid's edge; the bass pushes it OUTSIDE, so quiet = black connected set and loud = the set cracks open pink with gold spiral eyes. Morph, or black/pink flicker? |
-| `analytic_twobandjulia` | analytic_field / escape_time (julia) | 2026-09-11 analytic field | Plan 0163's own question: c_re on bass, c_im on treble, in the valley between cardioid and bulb. No time term, so every change is the music. Musical, or noise? |
-| `analytic_parabolicdust` | analytic_field / escape_time (julia) | 2026-09-11 analytic field | A 3.7x close-up on ONE spiral arm of the dust past the cusp: a nautilus of sparks. The bass THINS it. Watch whether the arm stays in frame across a minute. |
-| `analytic_seahorse` | analytic_field / escape_time (mandelbrot) | 2026-09-11 analytic field | ~220x into Seahorse Valley; bass drives `iterations` 40..160 (was 400, which cost the app ~15 fps), so quiet lets the black swallow the filaments and loud carves them back (checked with a --set pair). Rich only: Floor clamps it. |
-| `analytic_multibrot` | analytic_field / escape_time (julia, `power`) | 2026-09-11 second look | Whole `power` 3..7 re-rolled per bar on the JULIA map, `c` radius sized from the same hash. Filaments per power; watch for the occasional solid-blob frame. |
-| `analytic_stainedglass` | analytic_field / escape_time + `cross` trap | 2026-09-11 analytic field | Cross trap, stepped jewel palette, contour leading. The bass slides the trap and re-cuts every pane. Flat glass with lead, or a psychedelic poster? The corners show striped exterior. |
-| `analytic_ringorbit` | analytic_field / escape_time + `circle` trap (`power` 3) | 2026-09-11 analytic field | Cubic Julia, circle trap: blue ring filaments nested round a three-fold set. The bass swells the trap circle, so the rings pulse outward. Filaments, or flat glow? |
-| `analytic_pearlstring` | analytic_field / escape_time + `point` trap | 2026-09-11 analytic field | The dendrite c = -0.8+0.156i strung with lavender beads where orbits pass one point. The point orbits with time; the bass re-strings it. Beads on a thread, or spray? |
-| `analytic_searchlight` | analytic_field / escape_time + `line` trap | 2026-09-11 analytic field | A line trap turning like a lighthouse beam through a fixed dendrite (-0.1+0.95i), in acid green. Most animated row in the pass (anim 0.241). A beam through a structure, or churn? |
+| `curve_blueprint` | parametric_curve / hypotrochoid | 2026-09-11 curve families | White-on-blueprint drawing machine: each bar draws a figure, holds it finished for the last quarter, then re-gears onto a fresh sheet (eight closing ratios, 3- to 11-fold, two epicycloids, pen re-rolled too). Does the hold give the eye time to read the drawing? |
+| `curve_turnabout` | parametric_curve / hypotrochoid (sign flip) | 2026-09-11 second look | n ±3 flip on the beat, and each beat REDRAWS the figure in ~0.33 s over a 0.93 trail; whole until the first onset. Stroke now 4.8 at 0.85: still a pen, or a tube? |
+| `curve_inkpendulum` | parametric_curve / harmonograph | 2026-09-11 second look | Ink on paper, drawn live: each bar draws the harmonograph, holds it for the last fifth, then a fresh sheet with a new ratio (2:3, 3:4, 1:2, 3:5) and phase. Line still pencil-grey (gap 5). |
 
 ## Owner verdicts (2026-09-11)
 
@@ -40,9 +17,23 @@ The owner looked at all fifty-one. The twenty-two binned files are deleted and t
 are gone from the table above; the notes below still mention some of them, because they are
 the record of what each pass tried.
 
+**Twenty-three have since shipped** (`eb5eab4`): the eleven kept as they were, the tuned
+Echo Plate, Parabolic Dust, Seahorse, Lorenz Knot, Phosphor and Strata Heart, the
+second-look Lace Grid, Multibrot, Cogwheel and Gyre, Ice Crystal, and Radial Bloom in
+place of `spectrum_halo`. Their rows are gone from the table above; `git show eb5eab4^`
+has them.
+
+**Blueprint, Turnabout and Ink Pendulum were held back by the behavioral suite, not by
+the owner.** Their reveals sat at an 8-12 % stub in every probe frame and failed sanity,
+animation or reactivity. On 2026-09-11 all three were re-cut so a probe frame shows a
+whole figure. Blueprint and Ink Pendulum now hold the finished drawing at the end of
+each bar, Turnabout stands whole until the first onset, and Turnabout's stroke is
+heavier. With the files temporarily embedded, every gate they had failed passes, and
+distinctness passes too. Each header carries its numbers. They are ready for `dev` to
+move whenever the owner has had a second look at the re-cut.
+
 - **Keep, as they are:** Julia Circuit, Pearl String, Ring Orbit, Searchlight, Stained
   Glass, Standing Wave, Two-Band Julia, Lacework, Prismscope, Etching Plate, Murmuration.
-  Moving one into `presets/` is `dev`'s act (see the README).
 - **Tune:** Echo Plate (calmer), Parabolic Dust (reframe right, calmer zoom), Seahorse and
   Lorenz Knot (frame rate: 15 and 20 fps), Blueprint (draw different figures), Phosphor
   (the trace must close, it has a gap), Strata Heart (vertical). Open-ended: Lace Grid,
