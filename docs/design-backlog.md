@@ -74,6 +74,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0202 — `preset_warning` carries no position at all, so the one problem class an author cannot see in the file tab is the one the system picker produces by the dozen](#0202--preset_warning-carries-no-position-at-all-so-the-one-problem-class-an-author-cannot-see-in-the-file-tab-is-the-one-the-system-picker-produces-by-the-dozen)
 - [0203 — the smoke run captured from a microphone while the default is loopback, and nobody established why](#0203--the-smoke-run-captured-from-a-microphone-while-the-default-is-loopback-and-nobody-established-why)
 - [0204 — the studio's sliders read one range per parameter, so a curve family's own range is unreachable from them](#0204--the-studios-sliders-read-one-range-per-parameter-so-a-curve-familys-own-range-is-unreachable-from-them)
+- [0205 — a windowless player reports `0.0 fps` and writes no diagnostics rows, while rendering normally](#0205--a-windowless-player-reports-00-fps-and-writes-no-diagnostics-rows-while-rendering-normally)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -3935,3 +3936,48 @@ cover both.
 
 **Low.** No curve preset on the new families ships yet, and the studio edits the file as text as
 well as by slider; it becomes worth taking when the first such preset is curated into the set.
+
+## 0205 — a windowless player reports `0.0 fps` and writes no diagnostics rows, while rendering normally
+
+Run the studio with `playerMode: "windowless"` and its footer reads `0.0 fps · p99 0.0 ms`
+indefinitely, while the picture moves and the preview counter climbs. `%APPDATA%\Ritmolux\diagnostics.log`
+gains **no rows at all** for the whole session. Both are true of a player that is demonstrably
+working: the same run reported `stream: render+readback 3.92 ms, pipe write 0.46 ms, mean over 1800
+frames`.
+
+The cause is one call site. `Diag::record_frame` is what advances the rolling window every fps and
+frame-time figure is derived from, and it is called in exactly **one** place in the repository —
+at the end of `Renderer::render`, immediately after `queue.present(surface_tex)`. A windowless run
+draws through `render_tapped` instead, which shares `draw_frame` but never presents, so
+`record_frame` never runs, `metrics().fps` stays at its initial zero, and `show.rs` faithfully
+publishes that zero in every `health` event. The silent log is the second half of the same split:
+`DiagLog` is owned by `app_state.rs`, the windowed application, and the `--stream` loop has no
+reference to it.
+
+Neither symptom is cosmetic for the audience they reach. The studio's footer is the only frame-rate
+an operator in windowless mode ever sees, and it shows a zero that is false. And
+`packaging/studio/READ-ME-FIRST.md` sends a tester to `diagnostics.log` to identify a wrong audio
+device — the single most useful thing a tester can report — which in that mode is a file that was
+never written.
+
+A fix is a decision about where the frame clock belongs, not a patch at the call site: either
+`record_frame` moves to cover both draw paths, or the headless path gets its own counter and
+`health` stops claiming a figure it does not have. The honest interim is for the studio to render
+no number rather than a zero.
+
+- **Raised:** 2026-09-11, running [Plan 0167](plans/0167-the-studio-becomes-handable.md) Phase 8 on
+  Windows. **Owner if taken:** `architect` for where the clock lives, then `dev`.
+- **Verified 2026-09-11** — the frame clock has exactly one call site, on the present path:
+  `present: self\.diag\.record_frame\(\) in: core/src/render/mod.rs`
+- **Verified 2026-09-11** — and the headless stream loop never reaches it:
+  `absent: record_frame in: standalone/src/stream.rs`
+- **Verified 2026-09-11** — nor does that loop hold the diagnostics writer:
+  `absent: diag_log in: standalone/src/stream.rs`
+- **Verified 2026-09-11** — while the health event publishes the never-advanced counter:
+  `present: fps: metrics\.fps in: standalone/src/show.rs`
+
+### Priority
+
+**Medium.** It misleads exactly the two audiences the studio was built for — an operator editing on
+a laptop, which is what windowless mode is *for*, and a first tester following the handoff note.
+Nothing is wrong with the picture, so it costs no show; it costs trust in the readings.

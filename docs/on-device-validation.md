@@ -572,6 +572,48 @@ open rather than being marked covered.
 _(Plan 0147 Phase 6. The console figure is also a second-adapter witness for that plan's Phase 4:
 the same preset that runs 53 fps on the integrated part holds 165.0 with the console open here.)_
 
+## Ran 2026-09-11 — the studio beside the player, Windows half ([Plan 0167](plans/0167-the-studio-becomes-handable.md) Phase 8)
+
+**Half the phase. The macOS arm is unrun, so the phase stays open** — its done-when names both
+machines, and one machine's readings are not the comparison it asks for.
+
+Two runs, same build (`0.117.0`), same machine (RTX 3080 Laptop, DX12), same preset held (`Whorl`),
+`--input loopback`, `Rich` tier pinned, rotation held. **The preset must match across the pair** —
+a first attempt compared `Whorl` against whatever the studio happened to load and read as a 76 %
+collapse, nearly all of which was preset cost rather than preview cost.
+
+| | player alone | studio attached | delta |
+|---|---|---|---|
+| samples | 257 | 92 | |
+| fps mean | 140.1 | **125.8** | **−10.2 %** |
+| fps min / max | 71.3 / 165.0 | 102.3 / 146.6 | |
+| `frame_ms_avg` | 7.31 | 8.04 | +0.73 ms |
+| `frame_ms_p99` | 14.56 | 15.30 | +0.74 ms |
+| player frames dropped | — | **0 of 17,077** | |
+| preview | — | 2,915 painted / **23 dropped** | 0.78 % |
+
+**The comparison the phase exists for.** [Plan 0159](plans/done/0159-the-studio-opens.md) Phase 4
+recorded **42 → 35.4 fps, −15.7 %**; this pair is **−10.2 %**, so the gap narrowed. Read the
+**percentage**, not the pair: the unattached baselines differ more than threefold (140.1 against
+42), so the absolute figures are not two measurements of the same thing.
+
+**Fullscreen was toggled three times during the run and the preview survived every one** — the
+gesture that used to end it. Frames kept painting and the strip kept reporting.
+
+**`bgra8` reproduced here, which discharges one of the plan's own risks.** Its risk list allows
+that the development adapter might negotiate RGBA, leaving Phase 4's swizzle exercised only by a
+synthetic test. It negotiated `640x360 @ 165 bgra8` in windowed mode and the colours are correct,
+so the swizzle is confirmed by observation rather than by proxy. The windowless path negotiated
+`30 rgba8` in the same session, so both formats are covered on this box.
+
+**One defect came out of the run, and it is filed rather than recorded here:**
+[design-backlog 0205](design-backlog.md) — in windowless mode the player reports `0.0 fps` and
+writes no `diagnostics.log` rows at all while rendering normally.
+
+_(Plan 0167 Phase 8, Windows half. The player's own figures are read from `diagnostics.log`, whose
+third column is `frame_ms_avg` rather than a p50 — the `health` event's `frame_ms_p50` is a
+different statistic and the two are not interchangeable.)_
+
 ## Rig-gated — the OSC bindings move to `/rlx/v1` (Plan 0152 Phase 5)
 
 **Not iGPU-gated and not runnable at the desk either.** It needs the lighting rig — Arena, the
