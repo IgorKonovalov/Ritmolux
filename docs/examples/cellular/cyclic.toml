@@ -1,0 +1,22 @@
+# The `cyclic` family of the cellular system, for the illustrated guide's
+# picture of it. Teaching material, not a shipped preset: the classic
+# three-colour, threshold-3 cyclic automaton on a 160-cell torus, fast enough
+# that its noise has organized into spirals by the time the picture is taken.
+# A cell's colour is its place in the cycle, laid once round the palette.
+system = "cellular"
+name = "Cyclic spirals"
+
+[cellular]
+family = "cyclic"
+grid   = 160
+
+[generator]
+seed = 3
+
+[palette]
+name = "aurora"
+
+[params]
+states    = "3"
+threshold = "3"
+step_rate = "24 + clamp(bass * 16, 0, 16)"

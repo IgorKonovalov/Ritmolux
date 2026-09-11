@@ -123,6 +123,8 @@ sample density),
 summarised [below](#the-path-table)),
 `[field]` (which closed-form world the analytic field draws, and for escape time
 its map and orbit trap — [below](#the-field-table)),
+`[cellular]` (which automaton the cellular system runs, on how large a grid, and
+whether its edges wrap — [below](#the-cellular-table)),
 `[spectrum]` (the readout's element count, layout and per-element easing —
 summarised [below](#the-spectrum-table)), `[feedback]` (how an accumulation reads
 its own past — [below](#the-feedback-table)), `[smoothing]` (per-parameter
@@ -175,6 +177,7 @@ that table is maintained alongside the presets and is the authoritative list.
 | `warp_mesh` | The previous frame, resampled through a grid with **one transform per vertex** — the only system that draws nothing of its own. |
 | `shape_collage` | Flat opaque elements on their own off-white paper, composited in painter order — the only system in which one object is genuinely *in front of* another, and the only one that draws a graphic rather than light. |
 | `analytic_field` | A fullscreen closed-form function of position from one of two families — the Chladni plate's nodal lines, or an escape-time Julia or Mandelbrot set with optional orbit traps ([below](#the-field-table)). |
+| `cellular` | A discrete cellular automaton on a grid of cells, from one of three families — Conway's Life and every birth/survival rule, Larger than Life's wide neighbourhoods, or the cyclic automaton's spirals — painted with the history of each cell ([below](#the-cellular-table)). |
 
 **There is deliberately no per-system preset count here.** A count re-drifts every time
 a preset is added and nothing fails when it does. `presets/` is the list; `ls presets/*.toml`
@@ -357,6 +360,117 @@ the point.
 
 The range that reads for each parameter, and the family it is inert on, is printed in the
 `analytic_field` table of [`presets/README.md`](../presets/README.md).
+
+### The `[cellular]` table
+
+A `cellular` preset runs a discrete cellular automaton: a square grid of cells, each generation
+every cell deciding its next state from its neighbours'. `[cellular]` picks which automaton, on how
+large a grid:
+
+```toml
+system = "cellular"
+
+[cellular]
+family = "life_like"   # "life_like" (the default), "larger_than_life" or "cyclic"
+grid   = 256           # cells per side, 16..=1024; the default is 256
+wrap   = true          # a torus (the default); false makes every cell past the border dead
+```
+
+All three keys are read once, at load, and are **not bindable**. An unknown family, or a grid
+outside `16..=1024`, is a load error. A preset with no `[cellular]` table runs `life_like` on a
+256-cell torus.
+
+**`grid` is content, not resolution.** A pattern is a fixed number of cells — a glider is five —
+so the grid decides how large every pattern looks: double it and every glider draws at half the
+size. The grid never follows the window, and it is stretched over the frame as it is, so on a wide
+window a cell is wider than it is tall.
+
+**Every cell is drawn from the seed.** The starting field, and every disc a `reseed` refills, is
+hashed from the preset's `[generator] seed` — never from a clock — so the same preset driven by the
+same music runs the same history. `seed = "random"` does **not** vary it: the automaton always uses
+the preset's declared number (`0` when it declared `"random"`).
+
+Four parameters read the same on every family:
+
+- **`step_rate`** is **generations per second**, not per frame, so the automaton runs at the same
+  speed at 30 fps and at 144. Bound to audio it speeds up and slows down with the music — and
+  because an automaton's history depends on every step before it, two runs at different rates
+  diverge for good.
+- **`reseed`** refills **one disc** of the grid (a fifth of its side in radius, at a position drawn
+  from the seed) with fresh cells, **once per rise past 0.5** — held high, it refills once, not every
+  frame. `reseed = "beat"` puts a disc on every beat; routed through a
+  [`[latch]`](#the-latch-table--arm-on-one-thing-fire-on-another) it fires on a condition of its own.
+- **`trail`** and **`age_tint`** paint history. The grid remembers, for every cell, how many
+  generations since it last changed; a cell that has just died glows and fades out over `trail`
+  generations, sliding `age_tint` of the way along the palette as it goes. `trail = "0"` draws only
+  the live cells — a binary checkerboard, which is what a raw automaton looks like and rarely what a
+  preset wants. Both are inert on `cyclic`, which has no dead cells.
+
+The three families, following
+[ADR-0180](adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md) —
+every parameter in the last two columns is read by **one family only** and does nothing on the
+others:
+
+| `family` | The rule | Structural | Modal |
+|---|---|---|---|
+| `life_like` | A dead cell with `k` live neighbours among its eight is born if bit `k` of `birth` is set; a live one survives if bit `k` of `survive` is | `birth`, `survive` | — |
+| `larger_than_life` | The same, over a square of side `2 × radius + 1`, with birth and survival as ranges of how full that square is | `radius` | `birth_lo`, `birth_hi`, `survive_lo`, `survive_hi` |
+| `cyclic` | Each cell holds one of `states` colours and advances to the next one round the cycle when at least `threshold` of its eight neighbours already hold it | `states`, `threshold` | — |
+
+#### `life_like`: a rule is two bitmasks
+
+A rule in Life's space is written `B…/S…`: the neighbour counts that bring a dead cell to life, and
+the counts that keep a live one alive. `birth` and `survive` are those two lists as **bitmasks over
+the counts 0 to 8** — add `2^k` for every count `k` in the list:
+
+| Rule | `B` list | `birth` | `S` list | `survive` |
+|---|---|---|---|---|
+| **Conway's Life, `B3/S23`** | 3 | `8` (= 2³) | 2, 3 | `12` (= 2² + 2³) |
+| HighLife, `B36/S23` | 3, 6 | `72` (= 8 + 64) | 2, 3 | `12` |
+| Seeds, `B2/S` | 2 | `4` | none | `0` |
+| Day & Night, `B3678/S34678` | 3, 6, 7, 8 | `456` | 3, 4, 6, 7, 8 | `472` |
+
+So **Conway's Life is `birth = "8"`, `survive = "12"`** — the defaults. Both are whole numbers
+from `0` to `511`, rounded before the automaton sees them.
+
+#### `larger_than_life`: a rule is two ranges over a wider square
+
+`radius` sets the square each cell reads: side `2 × radius + 1`, the cell itself left out, so
+radius 5 reads 120 neighbours. `birth_lo`..`birth_hi` and `survive_lo`..`survive_hi` are **fractions
+of that square** that must be live, inclusive at both ends — so a rule keeps its meaning when you
+change the radius. At radius 1 with fractions that land on whole counts this *is* `life_like`:
+Conway is `birth_lo = birth_hi = "0.375"` (3 of 8) and `survive_lo = "0.25"`, `survive_hi = "0.375"`.
+
+Above radius 1 the rules grow blobs and bugs that keep travelling where a radius-1 rule settles
+into still lifes. The defaults — radius 5, births at `0.28`..`0.385`, survival at `0.26`..`0.47` —
+are one such rule, and a sensitive one: a single neighbour count off either end of a range can be
+the difference between a field that keeps moving and one that freezes.
+
+#### `cyclic`: a rule is a cycle
+
+Every cell is one of `states` colours, and advances to the next one round the cycle when at least
+`threshold` of its eight neighbours already hold it. From noise this organizes, within a few
+hundred generations, into **interlocking rotating spirals**; the defaults — 3 colours, threshold 3 —
+get there fastest. There are no dead cells: every cell is lit, at palette position
+`state / states`, so the cycle is laid round the palette once and a spiral's arms are the palette in
+order. `hue` rotates it, as on every system.
+
+#### Holding a rule, and the quality tier
+
+Every structural parameter — `birth`, `survive`, `radius`, `states`, `threshold` — is rounded to a
+whole number, and bound to audio it re-picks the rule on every frame. Bind it through
+[`[hold]`](#the-hold-table--re-sample-on-a-musical-edge-hold-in-between) so it changes on the beat or
+the bar instead. Stepping `states` down is safe: a cell holding a colour past the new cycle is read
+round it and written back inside it on the next generation.
+
+**`grid` and `radius` are capped by the quality tier**, because both change what is drawn: the
+Floor tier allows a 512-cell grid and radius 6, the Rich tier 1024 and 10. A preset asking within
+the Floor caps runs identically on both. One asking for more runs at the cap and **says so** — the
+standalone prints what was asked and what it runs at, the same way it reports an iteration cap or a
+tier demotion. Author against the Floor caps.
+
+The range that reads for each parameter, and the families it is inert on, is printed in the
+`cellular` table of [`presets/README.md`](../presets/README.md).
 
 ### The `[path]` table
 
@@ -1475,9 +1589,9 @@ that merely waste a line. Neither ever crashes a running visual (NFR 10).
 - An expression that fails to compile — an unknown identifier, a bad number, a
   wrong argument count, an unbalanced parenthesis, a stray character.
 - An invalid structural table (`[curve]`, `[generator]`, `[particles]`, `[path]`,
-  `[spectrum]`, `[field]`, `[palette]`, `[smoothing]`, `[latch]`) - including a `[path] d`
-  the parser refuses, which names the character offset it stopped at, and a `[field] map` or
-  `trap` on a family that has no orbit.
+  `[spectrum]`, `[field]`, `[cellular]`, `[palette]`, `[smoothing]`, `[latch]`) - including a
+  `[path] d` the parser refuses, which names the character offset it stopped at, a `[field] map`
+  or `trap` on a family that has no orbit, and a `[cellular] grid` outside `16..=1024`.
 
 **Warnings — the preset still loads and renders:**
 

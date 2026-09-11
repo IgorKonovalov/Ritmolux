@@ -1,0 +1,29 @@
+# The `larger_than_life` family of the cellular system, for the illustrated
+# guide's picture of it. Teaching material, not a shipped preset: the family's
+# default rule (radius 5, births at 0.28-0.385 of the neighbourhood, survival
+# at 0.26-0.47), whose blobs and bugs keep travelling where a radius-1 rule
+# settles, on a 192-cell torus with a long ember wake behind them.
+system = "cellular"
+name = "Larger than Life"
+
+[cellular]
+family = "larger_than_life"
+grid   = 192
+
+[generator]
+seed = 5
+
+[palette]
+name = "ember"
+
+[params]
+radius     = "5"
+birth_lo   = "0.28"
+birth_hi   = "0.385"
+survive_lo = "0.26"
+survive_hi = "0.47"
+step_rate  = "12 + clamp(bass * 18, 0, 18)"
+trail      = "24"
+age_tint   = "0.55"
+hue        = "0.8"
+brightness = "1.2"

@@ -188,6 +188,28 @@ footprint so the vendor spread is on record.
       *looks like* on this tier, not just how dense it is, so it routes to `architect` with the
       number rather than being quietly lowered. _(Plan 0163 Phase 4 set the cap without target
       hardware; this is where the measurement comes from.)_
+- [ ] **The cellular system at the Floor caps, on the low-end box, 1080p.** Plan 0164 added
+      `cellular`, whose cost is one pass per generation over the grid — two for
+      `larger_than_life`, whose neighbourhood is summed as a row pass and a column sum — and capped
+      it per tier with `TierConfig::FLOOR.cellular_grid` = **512** and `cellular_radius` = **6**,
+      both from **arithmetic, not a measurement** (their doc comments in `core/src/render/tier.rs`
+      carry it). No shipped preset draws the system yet, so point `RLX_PRESET_DIR` at
+      `docs/examples/cellular/` and load **`larger_than_life.toml`**; then write the heaviest frame
+      the caps allow beside it — the same file with `grid = 512` in its `[cellular]` table,
+      `radius = "6"` and `step_rate = "60"`. Overlay on (`F3`), report **(a)** whether fps holds
+      ≥ 60 @ 1080p on both, and **(b)** the p99. Load **`life_like.toml`** and **`cyclic.toml`** too,
+      which read eight neighbours and should cost a fraction of it. **If the heavy frame misses, the
+      levers are `cellular_grid` and `cellular_radius`** — and lowering either changes what a
+      preset *looks like* on this tier (a smaller grid draws every pattern larger; a smaller radius
+      runs a different rule), so it routes to `architect` with the numbers. _(Plan 0164 Phases 3
+      and 5 set both caps without target hardware.)_
+- [ ] **The cellular system's look, any box.** Load the three files in `docs/examples/cellular/`
+      and say, for each, whether it reads as structure or as noise: `life_like.toml` for whether
+      the fading wake carries the history, `larger_than_life.toml` for whether its blobs visibly
+      travel, `cyclic.toml` for whether the spirals are visible as spirals and rotate. Also run one
+      **same-system dissolve** between two cellular presets: a stateful scene steps twice per frame
+      for the dissolve's duration (design-backlog 0142), and on this system that shows as the
+      automaton briefly running at double speed — say whether it reads as a defect.
 - [ ] **Frame-time p99 with the debug overlay on, any box.** Plan 0030 put the three post stages
       behind a `PostStage` trait, so a rendered frame now costs ~4 vtable calls plus ~4 `TextureView`
       Arc bumps it did not before. Expected to be unmeasurable against a render pass, but it was
@@ -383,6 +405,15 @@ not run at the plan's close, so the rich tier currently ships numbers nobody has
       demotion and the clamp that follows it; say whether that change reads as a defect on screen.
       **If it does, that is an `architect` call**, not a constant to lower. _(Plan 0163's own risk
       register names this as worth watching on the on-device pass.)_
+- [ ] **The cellular system at `Rich`'s caps, on the discrete GPU, native fullscreen.**
+      `TierConfig::RICH.cellular_grid` = **1024** and `cellular_radius` = **10**, the tops of what
+      the loader and the parameter accept, provisional like every field above. Load the heavy
+      `larger_than_life` frame from the low-end item above with `grid = 1024`, `radius = "10"` and
+      `--tier rich`, and report **(a)** whether it holds the display's refresh rate and **(b)** the
+      p99. Then let it run **unpinned** on a frame that misses: a demotion to Floor rebuilds the
+      scene at the Floor caps, so the grid halves and the radius drops to 6 — **content, not
+      density**. Report what the standalone prints at the demotion and after it, and say whether
+      the change reads as a defect on screen. **If it does, that is an `architect` call.**
 
 ## Runnable now — the foobar2000 component's clean-profile install (Plan 0102 Phase 5)
 

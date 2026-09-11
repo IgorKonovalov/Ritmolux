@@ -66,7 +66,7 @@ Four things are worth naming, because they are the whole model:
 
 Some systems also take a **structural table** — `[curve]` here, `[generator]` for the two generator
 systems, `[particles]` for the attractor, `[spectrum]` for the readout, `[field]` for the analytic
-field. Those are declarative
+field, `[cellular]` for the automaton. Those are declarative
 configuration read once when the preset loads, **not** expressions: they choose *which figure*, and
 the params then animate it.
 
@@ -77,8 +77,9 @@ the params then animate it.
 One image each, captured under the same stimulus at the same moment in the clip, so they are
 comparable. Each is a real shipped preset — the file name is under the picture — except where a
 system or a family has none yet, and there the picture renders a teaching preset instead:
-`parametric_curve` adds four more, one per curve family beyond the rose, and `analytic_field` ships
-no preset at all, so both of its pictures are teaching presets. The **parameter reference** — every parameter of every
+`parametric_curve` adds four more, one per curve family beyond the rose, and `analytic_field` and
+`cellular` ship no preset at all, so all five of their pictures are teaching presets. The
+**parameter reference** — every parameter of every
 system, with its default, the range that reads and what it does — is
 [`../presets/README.md`](../presets/README.md).
 
@@ -337,6 +338,49 @@ and stained-glass cells come from.
 **Reach for this when** the look is mathematics you can name: cymatic figures, fractal boundaries,
 orbit-trap filigree. Which parameter belongs to which family, and what the quality tier does to
 `iterations`, is the [`[field]` table](presets.md#the-field-table) in the grammar reference.
+
+### `cellular`
+
+![Conway's Life on a black ground: pale blue clouds of recently active cells with darker, fading
+edges, scattered with small still lifes and blinkers drawn as rings and crosses of single
+cells](images/gallery/cellular.png)
+
+*`family = "life_like"` — [`docs/examples/cellular/life_like.toml`](examples/cellular/life_like.toml)*
+
+A **cellular automaton**: a square grid of cells, every generation each cell deciding its next state
+from its neighbours'. The grid remembers — every cell carries how long ago it last changed — so a
+cell that has just died keeps glowing and fades out over `trail` generations. That wake is what
+turns a blinking checkerboard into something with history in it. `step_rate` is in generations per
+second, which makes it the lever for the music: bind it to the bass and the automaton runs faster
+when the bass does.
+
+The picture above is **Conway's Life**, `birth = "8"`, `survive = "12"` — a rule written as two
+bitmasks over the neighbour counts, which the [`[cellular]` table](presets.md#the-cellular-table)
+spells out. Left to itself Life settles into still lifes and blinkers, so reach for `reseed` — a
+disc of fresh cells on every rise, a beat or a latch — to keep it fed.
+
+![Blobs and short trails in cream and amber on black, each travelling across the frame with a
+dark brown wake behind it, a few small round cells drifting between them](images/cellular/larger_than_life.png)
+
+*`family = "larger_than_life"` — [`docs/examples/cellular/larger_than_life.toml`](examples/cellular/larger_than_life.toml)*
+
+**Larger than Life** reads a wide square of neighbours rather than eight, with birth and survival as
+ranges of how full it is. Above radius 1 its rules grow blobs and bugs that keep travelling where
+Life would settle — and the ember wake here is the path each one took.
+
+![Interlocking spirals of three flat colours — purple, turquoise and sea green — covering the
+whole frame, their arms curling round dozens of small cores](images/cellular/cyclic.png)
+
+*`family = "cyclic"` — [`docs/examples/cellular/cyclic.toml`](examples/cellular/cyclic.toml)*
+
+The **cyclic** automaton: every cell is one of `states` colours and advances to the next when enough
+neighbours already have. From noise it organizes itself, within a few hundred generations, into
+rotating spirals, and a cell's colour is simply its place in the cycle laid round the palette.
+
+**Reach for this when** the look is growth, colonies, waves or spirals that build up over time and
+hold their history. The grid is a count of cells, not a resolution — a larger grid draws every
+pattern smaller — and the families' own parameters are in the
+[`[cellular]` table](presets.md#the-cellular-table).
 
 ---
 

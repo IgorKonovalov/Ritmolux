@@ -313,6 +313,28 @@ const IMAGES = [
     tier: "rich",
   },
 
+  // --- the cellular system's families beyond life_like --------------------
+  //
+  // The gallery entry below pictures `life_like`; these picture the other two
+  // families, from teaching presets for the analytic field's reason - no
+  // shipped preset draws the system yet - and filed outside the gallery too.
+  {
+    out: "docs/images/cellular/larger_than_life.png",
+    presetFile: "docs/examples/cellular/larger_than_life.toml",
+    signal: "dynamic:110",
+    hop: 300,
+    size: "1280x720",
+    tier: "rich",
+  },
+  {
+    out: "docs/images/cellular/cyclic.png",
+    presetFile: "docs/examples/cellular/cyclic.toml",
+    signal: "dynamic:110",
+    hop: 300,
+    size: "1280x720",
+    tier: "rich",
+  },
+
   // --- the gallery: one per SystemKind ------------------------------------
 
   {

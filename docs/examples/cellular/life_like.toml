@@ -1,7 +1,8 @@
 # The `life_like` family of the cellular system, for the illustrated guide's
 # picture of it. Teaching material, not a shipped preset: Conway's Life
 # (`birth = 8`, `survive = 12`) on a 160-cell torus, the bass driving how many
-# generations run each second and every beat refilling one disc of the grid.
+# generations run each second, with a long wake so the history of every cell
+# reads as colour rather than as a checkerboard.
 system = "cellular"
 name = "Life"
 
@@ -19,6 +20,7 @@ name = "ice"
 birth      = "8"
 survive    = "12"
 step_rate  = "8 + clamp(bass * 20, 0, 20)"
-reseed     = "beat"
+trail      = "20"
+age_tint   = "0.6"
 hue        = "0.3"
 brightness = "1.2"
