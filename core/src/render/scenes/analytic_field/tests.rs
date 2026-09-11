@@ -173,6 +173,9 @@ fn julia(c: [f32; 2]) -> Escape {
         power: 2.0,
         interior: 0.0,
         mandelbrot: false,
+        trap: 0,
+        trap_radius: 0.5,
+        trap_rotate: 0.0,
     }
     .packed()
 }
@@ -205,6 +208,15 @@ fn no_escape_time_sample_is_non_finite_across_the_declared_ranges() {
     let power = across("power", &[1.0, 2.5, 0.0, 1e9]);
     let radius = across("escape_radius", &[0.0, 1e12]);
     let iterations = [1.0, 64.0, MAX_ITERATIONS];
+    // Every trap, each at its radius range's ends and past them.
+    let traps: Vec<(u32, f32, f32)> = TrapShape::ALL
+        .iter()
+        .flat_map(|t| {
+            across("trap_radius", &[-1e30, 1e30])
+                .into_iter()
+                .map(move |r| (t.index(), r, 0.3))
+        })
+        .collect();
 
     // The field coordinates a frame can reach: the widest aspect and the
     // smallest zoom in range, plus a pan far past the frame.
@@ -222,7 +234,12 @@ fn no_escape_time_sample_is_non_finite_across_the_declared_ranges() {
             for &pw in &power {
                 for &r in &radius {
                     for &it in &iterations {
-                        for mandelbrot in [false, true] {
+                        for (i, mandelbrot) in [false, true].into_iter().enumerate() {
+                            // One trap setting per combination rather than all
+                            // of them, cycled so every trap meets every other
+                            // axis somewhere without multiplying the sweep.
+                            let (trap, trap_radius, trap_rotate) =
+                                traps[(checked / points.len() + i) % traps.len()];
                             let e = Escape {
                                 c: [re, im],
                                 iterations: it,
@@ -230,6 +247,9 @@ fn no_escape_time_sample_is_non_finite_across_the_declared_ranges() {
                                 power: pw,
                                 interior: 1.0,
                                 mandelbrot,
+                                trap,
+                                trap_radius,
+                                trap_rotate,
                             }
                             .packed();
                             for &p in &points {
@@ -393,6 +413,62 @@ fn the_gpu_draws_the_set_the_mirror_computes() {
          drifted from the shader, and the tests that read through it no longer speak for it",
         100.0 * (1.0 - agreement)
     );
+}
+
+/// Every trap shape round-trips through its name, and the shader index is its
+/// position in the roster with `none` at zero — the value the shader's
+/// `trap != 0u` tests.
+#[test]
+fn every_trap_round_trips_and_none_is_index_zero() {
+    for (position, trap) in TrapShape::ALL.into_iter().enumerate() {
+        assert_eq!(TrapShape::from_name(trap.as_str()), Some(trap));
+        assert_eq!(trap.index() as usize, position, "{trap:?}");
+    }
+    assert_eq!(TrapShape::None.index(), 0);
+    assert_eq!(FieldConfig::default().trap, TrapShape::None);
+}
+
+/// **A trapped pixel's colour moves no faster than `trap_radius` does** — on
+/// every shape the nearest approach is 1-Lipschitz in the radius, since moving
+/// the shape by `d` moves every distance to it by at most `d`. That is the
+/// continuity `trap_radius` sweeps with, stated as arithmetic: no radius value
+/// can hold a jump. Checked across a sweep, on orbits inside the set and out.
+#[test]
+fn a_trap_coordinate_moves_no_faster_than_its_radius() {
+    let step = 0.01;
+    let mut compared = 0usize;
+    for trap in [
+        TrapShape::Point,
+        TrapShape::Line,
+        TrapShape::Cross,
+        TrapShape::Circle,
+    ] {
+        for (i, j) in (0..9).flat_map(|i| (0..9).map(move |j| (i, j))) {
+            let p = [(i as f32 - 4.0) * 0.35, (j as f32 - 4.0) * 0.35];
+            let mut previous: Option<f32> = None;
+            for k in 0..=200 {
+                let e = Escape {
+                    trap: trap.index(),
+                    trap_radius: k as f32 * step,
+                    trap_rotate: 0.1,
+                    ..julia(C_INSIDE)
+                }
+                .packed();
+                let coord = mirror::escape(p, &e).coord;
+                if let Some(prev) = previous {
+                    compared += 1;
+                    assert!(
+                        (coord - prev).abs() <= step * 1.001 + 1e-6,
+                        "{trap:?} at {p:?}: a radius step of {step} moved the colour \
+                         coordinate by {} — a discontinuity",
+                        (coord - prev).abs()
+                    );
+                }
+                previous = Some(coord);
+            }
+        }
+    }
+    assert_eq!(compared, 4 * 81 * 200);
 }
 
 /// The palette coordinate the escape arm hands on is the smooth count over a

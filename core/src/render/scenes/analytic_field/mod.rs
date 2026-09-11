@@ -116,6 +116,68 @@ impl EscapeMap {
     }
 }
 
+/// Escape time only: the shape an orbit is measured against (`[field] trap`).
+///
+/// With a trap, a pixel is coloured by the **smallest distance its orbit came
+/// to the shape** rather than by how fast it escaped — which is what draws the
+/// filaments, rings and stained-glass cells of orbit-trap imagery. Each shape
+/// sits `trap_radius` from the origin, turned by `trap_rotate`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TrapShape {
+    /// No trap: the smooth escape count colours the picture.
+    #[default]
+    None,
+    /// A point `trap_radius` from the origin along `trap_rotate`.
+    Point,
+    /// A line `trap_radius` from the origin, its normal along `trap_rotate`.
+    Line,
+    /// Two perpendicular lines crossing at the point `Point` would sit at,
+    /// turned by `trap_rotate`.
+    Cross,
+    /// A circle of radius `trap_radius` about the origin; `trap_rotate` is inert
+    /// on it.
+    Circle,
+}
+
+impl TrapShape {
+    /// Every shape, in the order the shader's trap index numbers them.
+    pub const ALL: [TrapShape; 5] = [
+        TrapShape::None,
+        TrapShape::Point,
+        TrapShape::Line,
+        TrapShape::Cross,
+        TrapShape::Circle,
+    ];
+
+    /// Parse the canonical `[field] trap = "..."` value, or `None`.
+    pub fn from_name(name: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|trap| trap.as_str() == name)
+    }
+
+    /// The canonical name — [`from_name`](Self::from_name)'s inverse.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            TrapShape::None => "none",
+            TrapShape::Point => "point",
+            TrapShape::Line => "line",
+            TrapShape::Cross => "cross",
+            TrapShape::Circle => "circle",
+        }
+    }
+
+    /// The integer the shader's trap `switch` selects on: its position in
+    /// [`ALL`](Self::ALL), `0` being no trap at all.
+    fn index(self) -> u32 {
+        match self {
+            TrapShape::None => 0,
+            TrapShape::Point => 1,
+            TrapShape::Line => 2,
+            TrapShape::Cross => 3,
+            TrapShape::Circle => 4,
+        }
+    }
+}
+
 /// `[field]` — the structural configuration, fixed while the preset is loaded
 /// and delivered through `Scene::configure`, in the shape `[curve]` and
 /// `[particles]` already use.
@@ -126,6 +188,9 @@ pub struct FieldConfig {
     /// Escape time only: whether `c` is a parameter or the pixel. The loader
     /// refuses a `map` on any other family.
     pub map: EscapeMap,
+    /// Escape time only: the orbit trap, if any. The loader refuses a `trap`
+    /// on any other family.
+    pub trap: TrapShape,
 }
 
 /// The largest mode number either axis of the plate accepts. Past it the nodal
@@ -202,6 +267,12 @@ const DEFAULT_ITERATIONS: f32 = default_of(PARAMS, "iterations");
 const DEFAULT_ESCAPE_RADIUS: f32 = default_of(PARAMS, "escape_radius");
 const DEFAULT_POWER: f32 = default_of(PARAMS, "power");
 const DEFAULT_INTERIOR: f32 = default_of(PARAMS, "interior");
+const DEFAULT_TRAP_RADIUS: f32 = default_of(PARAMS, "trap_radius");
+const DEFAULT_TRAP_ROTATE: f32 = default_of(PARAMS, "trap_rotate");
+
+/// How far from the origin a trap may sit, and how far `trap_radius` may push
+/// it — past every orbit's escape radius a trap is simply never approached.
+pub const TRAP_RADIUS_LIMIT: f32 = 256.0;
 
 /// The parameter names this scene consumes — the vocabulary a preset binding is
 /// checked against at load (ADR-0020). **Keep in sync with `set_param` below**;
@@ -286,6 +357,22 @@ pub const PARAMS: &[ParamSpec] = &[
         kind: ParamKind::Modal,
     },
     ParamSpec {
+        name: "trap_radius",
+        default: 0.5,
+        range: Some([0.0, 2.0]),
+        doc: "How far the orbit trap sits from the origin — the circle's radius, the line's \
+              offset, the point's and the cross's distance. Inert with no `trap`.",
+        kind: ParamKind::Modal,
+    },
+    ParamSpec {
+        name: "trap_rotate",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Turns the orbit trap about the origin, in whole turns. Inert on a `circle` and \
+              with no `trap`.",
+        kind: ParamKind::Modal,
+    },
+    ParamSpec {
         name: "color_span",
         default: 1.0,
         range: Some([0.0, 4.0]),
@@ -347,6 +434,8 @@ pub const FAMILY_PARAMS: &[FamilyParam] = &[
     per_family!("escape_radius": None, Some([2.0, 256.0])),
     per_family!("power": None, Some([1.5, MAX_POWER])),
     per_family!("interior": None, Some([0.0, 1.0])),
+    per_family!("trap_radius": None, Some([0.0, 2.0])),
+    per_family!("trap_rotate": None, Some([0.0, 1.0])),
 ];
 
 #[repr(C)]
@@ -359,6 +448,7 @@ struct Params {
     e: [f32; 4],
     f: [f32; 4],
     g: [f32; 4],
+    h: [f32; 4],
 }
 
 /// The fullscreen analytic field, driven by named preset parameters and one
@@ -387,6 +477,8 @@ pub struct AnalyticFieldScene {
     escape_radius: f32,
     power: f32,
     interior: f32,
+    trap_radius: f32,
+    trap_rotate: f32,
     /// How much of this field's coverage the backdrop resolves against
     /// (ADR-0085). Set by the renderer every frame through
     /// [`Scene::set_occlude`] — **not** a named param, so `reset_params` leaves
@@ -460,6 +552,8 @@ impl AnalyticFieldScene {
             escape_radius: DEFAULT_ESCAPE_RADIUS,
             power: DEFAULT_POWER,
             interior: DEFAULT_INTERIOR,
+            trap_radius: DEFAULT_TRAP_RADIUS,
+            trap_rotate: DEFAULT_TRAP_ROTATE,
             occlude: crate::render::post::DEFAULT_OCCLUDE,
         }
     }
@@ -506,6 +600,8 @@ impl Scene for AnalyticFieldScene {
         self.escape_radius = DEFAULT_ESCAPE_RADIUS;
         self.power = DEFAULT_POWER;
         self.interior = DEFAULT_INTERIOR;
+        self.trap_radius = DEFAULT_TRAP_RADIUS;
+        self.trap_rotate = DEFAULT_TRAP_ROTATE;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
@@ -528,6 +624,8 @@ impl Scene for AnalyticFieldScene {
             "escape_radius" => self.escape_radius = value,
             "power" => self.power = value,
             "interior" => self.interior = value,
+            "trap_radius" => self.trap_radius = value,
+            "trap_rotate" => self.trap_rotate = value,
             _ => {}
         }
     }
@@ -594,6 +692,19 @@ impl Scene for AnalyticFieldScene {
                     EscapeMap::Julia => 0.0,
                     EscapeMap::Mandelbrot => 1.0,
                 },
+                0.0,
+            ],
+            h: [
+                self.config.trap.index() as f32,
+                bounded(
+                    self.trap_radius,
+                    -TRAP_RADIUS_LIMIT,
+                    TRAP_RADIUS_LIMIT,
+                    DEFAULT_TRAP_RADIUS,
+                ),
+                // Whole turns to radians; `fract` keeps a long-running bound
+                // angle from losing precision without moving the picture.
+                std::f32::consts::TAU * bounded(self.trap_rotate, -1e6, 1e6, 0.0).fract(),
                 0.0,
             ],
         };

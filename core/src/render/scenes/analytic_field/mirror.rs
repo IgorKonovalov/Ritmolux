@@ -24,6 +24,11 @@ pub(super) struct Escape {
     pub power: f32,
     pub interior: f32,
     pub mandelbrot: bool,
+    /// The trap index (`TrapShape::index`), its radius, and its turn in
+    /// whole turns — packed into radians as `render` packs it.
+    pub trap: u32,
+    pub trap_radius: f32,
+    pub trap_rotate: f32,
 }
 
 impl Escape {
@@ -44,7 +49,28 @@ impl Escape {
             power: bounded(self.power, MIN_POWER, MAX_POWER, super::DEFAULT_POWER),
             interior: bounded(self.interior, 0.0, 1.0, super::DEFAULT_INTERIOR),
             mandelbrot: self.mandelbrot,
+            trap: self.trap,
+            trap_radius: bounded(
+                self.trap_radius,
+                -super::TRAP_RADIUS_LIMIT,
+                super::TRAP_RADIUS_LIMIT,
+                super::DEFAULT_TRAP_RADIUS,
+            ),
+            trap_rotate: std::f32::consts::TAU * bounded(self.trap_rotate, -1e6, 1e6, 0.0).fract(),
         }
+    }
+}
+
+/// The shader's `trap_distance`, `rotate` in radians.
+fn trap_distance(w: [f32; 2], shape: u32, radius: f32, rotate: f32) -> f32 {
+    let cs = [rotate.cos(), rotate.sin()];
+    let u = [w[0] * cs[0] + w[1] * cs[1], w[1] * cs[0] - w[0] * cs[1]];
+    let v = [u[0] - radius, u[1]];
+    match shape {
+        1 => v[0].hypot(v[1]),
+        2 => v[0].abs(),
+        3 => v[0].abs().min(v[1].abs()),
+        _ => (w[0].hypot(w[1]) - radius).abs(),
     }
 }
 
@@ -96,10 +122,14 @@ pub(super) fn escape(p: [f32; 2], e: &Escape) -> Out {
 
     let mut n = 0u32;
     let mut escaped = false;
+    let mut nearest = 1e20f32;
     while n < iterations {
         let w = cpow(z, e.power);
         z = [w[0] + c[0], w[1] + c[1]];
         n += 1;
+        if e.trap != 0 {
+            nearest = nearest.min(trap_distance(z, e.trap, e.trap_radius, e.trap_rotate));
+        }
         if z[0] * z[0] + z[1] * z[1] > r2 {
             escaped = true;
             break;
@@ -107,7 +137,7 @@ pub(super) fn escape(p: [f32; 2], e: &Escape) -> Out {
     }
 
     let dot = z[0] * z[0] + z[1] * z[1];
-    if escaped {
+    let mut out = if escaped {
         let log_mod = 0.5 * dot.min(1e37).ln();
         let nu = n as f32 + 1.0 - (log_mod / e.radius.ln()).max(1.0).ln() / e.power.ln();
         Out {
@@ -125,5 +155,9 @@ pub(super) fn escape(p: [f32; 2], e: &Escape) -> Out {
             steps: n,
             nu: 0.0,
         }
+    };
+    if e.trap != 0 {
+        out.coord = nearest.min(64.0);
     }
+    out
 }

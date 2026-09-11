@@ -683,6 +683,179 @@ fn a_bass_driven_c_re_morphs_the_topology() {
     );
 }
 
+// ---------------------------------------------------------------------------
+// Orbit traps
+// ---------------------------------------------------------------------------
+
+/// The four trap shapes, as `[field] trap` spells them.
+const TRAPS: [&str; 4] = ["point", "line", "cross", "circle"];
+
+/// A trapped Julia preset at `C_INSIDE` over the default spectrum palette, the
+/// set lit, so the trap's colouring reaches every pixel.
+fn trapped(trap: &str, radius: f32) -> String {
+    format!(
+        "system = \"analytic_field\"\nname = \"trap\"\n\
+         [field]\nfamily = \"escape_time\"\ntrap = \"{trap}\"\n\
+         [params]\nc_re = \"{}\"\nc_im = \"{}\"\niterations = \"48\"\n\
+         interior = \"1\"\nzoom = \"{ESCAPE_ZOOM}\"\ncolor_span = \"2\"\n\
+         trap_radius = \"{radius}\"\ntrap_rotate = \"0.1\"\n",
+        C_INSIDE.0, C_INSIDE.1
+    )
+}
+
+/// **Each of the four trap shapes produces a visibly distinct structure from
+/// the same `c`** — distinct from each other and from the untrapped picture.
+#[test]
+fn each_trap_shape_draws_a_distinct_structure_from_the_same_c() {
+    use rlx_core::render::metrics::frame_diff;
+    const SIZE: u32 = 96;
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
+        return;
+    };
+    let untrapped = capture(&mut renderer, &trapped("none", 0.5));
+    let shapes: Vec<(&str, CaptureImage)> = TRAPS
+        .iter()
+        .map(|&trap| (trap, capture(&mut renderer, &trapped(trap, 0.5))))
+        .collect();
+    for (i, (a, img_a)) in shapes.iter().enumerate() {
+        let from_none = frame_diff(img_a, &untrapped);
+        println!("{a} vs none: {from_none:.4}");
+        assert!(
+            from_none > 0.03,
+            "the {a} trap barely changes the untrapped picture ({from_none:.4})"
+        );
+        for (b, img_b) in shapes.iter().skip(i + 1) {
+            let apart = frame_diff(img_a, img_b);
+            println!("{a} vs {b}: {apart:.4}");
+            assert!(
+                apart > 0.03,
+                "the {a} and {b} traps draw nearly the same picture ({apart:.4})"
+            );
+        }
+    }
+}
+
+/// **`trap_radius` sweeps continuously without a discontinuity in the image.**
+///
+/// Each shape is stepped through the radius in even increments and the frame
+/// difference between neighbours read off. Two properties of a continuous
+/// sweep, and a discontinuity breaks both: every step moves the frame by about
+/// as much as every other, and **halving the step roughly halves the change** —
+/// a jump in the picture does not shrink when it is approached more finely.
+/// The arithmetic half — the colour coordinate is 1-Lipschitz in the radius —
+/// is asserted on the CPU in the scene's own tests; this is the picture.
+#[test]
+fn trap_radius_sweeps_without_a_discontinuity() {
+    use rlx_core::render::metrics::frame_diff;
+    const SIZE: u32 = 64;
+    const STEP: f32 = 0.01;
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
+        return;
+    };
+    let median = |mut v: Vec<f32>| {
+        v.sort_by(f32::total_cmp);
+        v[v.len() / 2]
+    };
+    for trap in TRAPS {
+        let frames: Vec<CaptureImage> = (0..=16)
+            .map(|k| capture(&mut renderer, &trapped(trap, 0.4 + STEP * k as f32)))
+            .collect();
+        let single: Vec<f32> = frames
+            .windows(2)
+            .map(|w| frame_diff(&w[0], &w[1]))
+            .collect();
+        let double: Vec<f32> = frames
+            .windows(3)
+            .map(|w| frame_diff(&w[0], &w[2]))
+            .collect();
+        let worst = single.iter().copied().fold(0.0f32, f32::max);
+        let (one, two) = (median(single), median(double));
+        println!(
+            "{trap}: a {STEP} step moves the frame {one:.4} (worst {worst:.4}), a double \
+             step {two:.4}"
+        );
+        assert!(
+            one > 0.0005,
+            "{trap}: the radius sweep does not move the picture at all (median {one:.5})"
+        );
+        assert!(
+            worst < 3.0 * one + 0.004,
+            "{trap}: one radius step moved the frame by {worst:.4} against a median {one:.4} \
+             — a discontinuity"
+        );
+        assert!(
+            one < 0.7 * two,
+            "{trap}: halving the radius step left the change at {one:.4} of {two:.4} — the \
+             picture is jumping, not sweeping"
+        );
+    }
+}
+
+/// **`trap = "none"` is byte-identical to the untrapped escape-time picture** —
+/// with the trap's own parameters bound to anything, since nothing reads them.
+/// The Phase 2 half of the same claim is the `analytic_field_escape` golden,
+/// captured before traps existed and not re-blessed since.
+#[test]
+fn trap_none_is_byte_identical_to_no_trap() {
+    const SIZE: u32 = 96;
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
+        return;
+    };
+    let fixture = include_str!("fixtures/analytic_field_escape.toml");
+    let untrapped = capture(&mut renderer, fixture);
+    let explicit = capture(
+        &mut renderer,
+        &fixture.replace(
+            "map    = \"julia\"",
+            "map    = \"julia\"\ntrap   = \"none\"",
+        ),
+    );
+    let with_levers = capture(
+        &mut renderer,
+        &format!(
+            "{}trap_radius = \"1.7\"\ntrap_rotate = \"0.3\"\n",
+            fixture.replace(
+                "map    = \"julia\"",
+                "map    = \"julia\"\ntrap   = \"none\"",
+            )
+        ),
+    );
+    assert!(
+        fixture.contains("map    = \"julia\""),
+        "the fixture's `map` line moved, so the replacements above changed nothing"
+    );
+    assert_eq!(
+        untrapped.rgba, explicit.rgba,
+        "an explicit `trap = \"none\"` is not the untrapped picture"
+    );
+    assert_eq!(
+        untrapped.rgba, with_levers.rgba,
+        "`trap_radius` / `trap_rotate` moved a picture with no trap"
+    );
+}
+
+/// `[field] trap` is escape time's alone and names its roster when misspelled.
+#[test]
+fn the_trap_is_validated_at_load() {
+    let on_plate = Preset::from_toml_str(
+        "system = \"analytic_field\"\n[field]\nfamily = \"chladni\"\ntrap = \"cross\"\n",
+    )
+    .expect_err("a trap on the plate must not load");
+    assert!(
+        on_plate.to_string().contains("escape_time"),
+        "the error must say which family a trap belongs to: {on_plate}"
+    );
+    let unknown = Preset::from_toml_str(
+        "system = \"analytic_field\"\n[field]\nfamily = \"escape_time\"\ntrap = \"square\"\n",
+    )
+    .expect_err("an unknown trap must not load");
+    let message = unknown.to_string();
+    assert!(
+        message.contains("square") && message.contains("circle"),
+        "the error must name the bad value and the roster: {message}"
+    );
+}
+
 /// `[field] map` is escape time's alone, and names its roster when it is
 /// misspelled — both load errors, never a silent default.
 #[test]

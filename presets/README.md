@@ -893,6 +893,8 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | `escape_radius` | `16` | `escape_time` `2` – `256`; inert on `chladni` | How far an orbit must travel to count as escaped; larger smooths the colour bands' spacing. |
 | `power` | `2` | `escape_time` `1.5` – `8`; inert on `chladni` | The exponent in z -> z^power + c: 2 is the classic set, higher whole powers add lobes, and a fractional power tears along the negative real axis. |
 | `interior` | `0` | `escape_time` `0` – `1`; inert on `chladni` | How much light the set itself emits; 0 is the textbook black interior. |
+| `trap_radius` | `0.5` | `escape_time` `0` – `2`; inert on `chladni` | How far the orbit trap sits from the origin — the circle's radius, the line's offset, the point's and the cross's distance. Inert with no `trap`. |
+| `trap_rotate` | `0` | `escape_time` `0` – `1`; inert on `chladni` | Turns the orbit trap about the origin, in whole turns. Inert on a `circle` and with no `trap`. |
 | `color_span` | `1` | `0` – `4` | How much of the palette the field's level covers; 0 is one flat colour. |
 | `color_center` | `0` | `-1` – `1` | Shifts which part of the palette the field's level starts from. |
 | `brightness` | `1` | `0` – `2` | The scene's overall light level, multiplying what it draws before the composite. |

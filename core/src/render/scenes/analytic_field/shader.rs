@@ -36,6 +36,9 @@ struct Params {
     // x: power (clamped CPU-side into [1.1, 8]), y: interior light,
     // z: map (0 julia, 1 mandelbrot), w: unused
     g: vec4<f32>,
+    // x: trap (0 none, 1 point, 2 line, 3 cross, 4 circle), y: trap_radius,
+    // z: trap_rotate in radians, w: unused
+    h: vec4<f32>,
 }
 
 // One group, the LUTs before the uniform. The order is what keeps this layout a
@@ -184,6 +187,32 @@ fn cpow(z: vec2<f32>, power: f32) -> vec2<f32> {
     return out;
 }
 
+// How far `w` is from the orbit trap. Every shape is measured in the trap's own
+// frame — `w` turned back by `trap_rotate` — and sits `trap_radius` out, so the
+// distance moves continuously with both parameters. Single exit, for `cpow`'s
+// reason: it is called inside the orbit loop.
+fn trap_distance(w: vec2<f32>, shape: u32, radius: f32, rotate: f32) -> f32 {
+    let cs = vec2<f32>(cos(rotate), sin(rotate));
+    let u = vec2<f32>(w.x * cs.x + w.y * cs.y, w.y * cs.x - w.x * cs.y);
+    let v = u - vec2<f32>(radius, 0.0);
+    var d: f32;
+    switch shape {
+        case 1u: {
+            d = length(v);
+        }
+        case 2u: {
+            d = abs(v.x);
+        }
+        case 3u: {
+            d = min(abs(v.x), abs(v.y));
+        }
+        default: {
+            d = abs(length(w) - radius);
+        }
+    }
+    return d;
+}
+
 // Escape time: z -> z^power + c, iterated until |z| passes the escape radius
 // or the budget runs out. `map` chooses whether c is the constant (Julia, the
 // orbit starting at the pixel) or the pixel (Mandelbrot, the orbit starting at
@@ -209,15 +238,23 @@ fn escape_time(p: vec2<f32>) -> Sample {
     var z = select(q, vec2<f32>(0.0), mandelbrot);
     let c = select(params.f.xy, q, mandelbrot);
     let r2 = radius * radius;
+    let trap = u32(params.h.x + 0.5);
 
     var n = 0u;
     var escaped = false;
+    // The nearest the orbit has come to the trap. Only a trapped field reads
+    // it, and the branch that updates it is on a uniform, so `trap = none`
+    // runs exactly the arithmetic it ran before traps existed.
+    var nearest = 1e20;
     loop {
         if (n >= iterations) {
             break;
         }
         z = cpow(z, power) + c;
         n = n + 1u;
+        if (trap != 0u) {
+            nearest = min(nearest, trap_distance(z, trap, params.h.y, params.h.z));
+        }
         if (dot(z, z) > r2) {
             escaped = true;
             break;
@@ -235,6 +272,13 @@ fn escape_time(p: vec2<f32>) -> Sample {
         // bounded for a point that never escaped.
         s.coord = 0.25 * min(length(z), 2.0);
         s.light = clamp(params.g.y, 0.0, 1.0);
+    }
+    // A trapped field is coloured by the nearest approach, inside the set and
+    // out of it alike: that distance, not the escape step, is what draws the
+    // filaments. Capped so an orbit that overflowed `length` cannot hand the
+    // palette an infinity.
+    if (trap != 0u) {
+        s.coord = min(nearest, 64.0);
     }
     return s;
 }

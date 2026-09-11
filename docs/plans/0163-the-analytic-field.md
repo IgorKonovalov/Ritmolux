@@ -242,8 +242,8 @@ documents), so this scene keeps its LUTs in their own bind group exactly as that
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — the system, and Chladni through it | dev | done | 65d57d4 |
-| 2 — the escape-time family | dev | done | committed with this row |
-| 3 — orbit traps | dev | not started | |
+| 2 — the escape-time family | dev | done | 232afb3 |
+| 3 — orbit traps | dev | done | committed with this row |
 | 4 — the tier cap and the golden regime | dev | not started | |
 | 5 — documentation and the reference | dev | not started | |
 
@@ -295,6 +295,14 @@ documents), so this scene keeps its LUTs in their own bind group exactly as that
 - Phase 2, a second golden (`analytic_field_escape`, an EXTRA fixture in `core/tests/golden.rs`)
   was added here rather than in Phase 4, so Phase 3's `trap = "none"` has a Phase 2 baseline to be
   compared with.
+- Phase 3, trap geometry (the plan names the shapes, not their placement): every shape sits
+  `trap_radius` from the origin in a frame turned by `trap_rotate` (whole turns) - the point and
+  the cross's centre at that distance, the line at that offset, the circle at that radius, where
+  `trap_rotate` is inert. A trapped pixel's palette coordinate is the nearest approach itself,
+  inside the set and out; `trap` on `chladni` is a load error.
+- Phase 3, "`trap = "none"` is byte-identical to Phase 2's output": the `analytic_field_escape`
+  golden, blessed at Phase 2 and not re-blessed, reads mean 0.0000 / max outlier 0 after this
+  phase on this machine's WARP; `trap_none_is_byte_identical_to_no_trap` holds the in-run half.
 
 ### Close triggers
 

@@ -93,6 +93,8 @@ pub enum Roster {
     FieldFamily,
     /// `[field] map`.
     EscapeMap,
+    /// `[field] trap`.
+    TrapShape,
 }
 
 impl Roster {
@@ -123,6 +125,7 @@ impl Roster {
             Roster::Tiling => crate::render::scenes::lines::hankin::TILINGS.to_vec(),
             Roster::FieldFamily => FieldFamily::ALL.iter().map(|f| f.as_str()).collect(),
             Roster::EscapeMap => EscapeMap::ALL.iter().map(|m| m.as_str()).collect(),
+            Roster::TrapShape => TrapShape::ALL.iter().map(|t| t.as_str()).collect(),
         }
     }
 

@@ -15,6 +15,10 @@ pub(in crate::preset::schema) struct RawField {
     /// Escape time only; absent means `julia`.
     #[serde(default)]
     pub(in crate::preset::schema) map: Option<String>,
+    /// `"none"` / `"point"` / `"line"` / `"cross"` / `"circle"`: the orbit
+    /// trap. Escape time only; absent means `none`.
+    #[serde(default)]
+    pub(in crate::preset::schema) trap: Option<String>,
 }
 
 impl RawField {
@@ -56,7 +60,28 @@ impl RawField {
                 ))
             })?,
         };
-        Ok(FieldConfig { family, map })
+        // A trap, likewise: only an orbit can pass near one.
+        let trap = match self.trap {
+            None => TrapShape::default(),
+            Some(name) if family != FieldFamily::EscapeTime => {
+                return Err(PresetError::Config(format!(
+                    "[field] trap = '{name}' is escape_time only; the '{}' family has no \
+                     orbit to pass near it",
+                    family.as_str()
+                )));
+            }
+            Some(name) => TrapShape::from_name(&name).ok_or_else(|| {
+                PresetError::Config(format!(
+                    "unknown [field] trap '{name}' (expected one of: {})",
+                    TrapShape::ALL
+                        .iter()
+                        .map(|t| t.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ))
+            })?,
+        };
+        Ok(FieldConfig { family, map, trap })
     }
 }
 
@@ -86,6 +111,13 @@ pub(in crate::preset::schema) const FIELD: TableDesc = TableDesc {
             default: "julia",
             doc: "Escape time only: julia iterates from the pixel with c the constant, \
                   mandelbrot makes the pixel c.",
+        },
+        KeyDesc {
+            name: "trap",
+            kind: KeyKind::Roster(Roster::TrapShape),
+            default: "none",
+            doc: "Escape time only: colour each pixel by how near its orbit came to this shape \
+                  instead of by how fast it escaped.",
         },
     ],
 };
