@@ -55,8 +55,10 @@ filing it as new.
   repeated sub-expression is written out each time.
 
 **Scenes / vocabulary**
-- **One curve family** (`maurer_rose`). Superformula, harmonograph, epicycloid are catalogued
-  (`docs/generative-techniques-catalogue.md`) and cheap, but not built.
+- **Five curve families** since Plan 0162 — `maurer_rose`, `lissajous`, `hypotrochoid`,
+  `superformula`, `harmonograph` — with `pen`, `sym`, `sharpness`, `lobe` and `decay` beside them.
+  The epitrochoid needs no arm of its own: it is `hypotrochoid` with a negative `n`. Fractal
+  flames stay catalogued (`docs/generative-techniques-catalogue.md`) and unbuilt.
 - **Four star tilings** (4/6/8/12). `variant` is a **continuous** contact angle since Plan 0054
   (ADR-0060) — fractional values are real rosettes and `[smoothing]` on it morphs. The rosette's
   **interior** is still empty at every angle, which is the open half of design-backlog 0007.

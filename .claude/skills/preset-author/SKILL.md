@@ -76,7 +76,7 @@ that "needs just a small code change" is not a preset, it's a routed request.
 |----------|------|-------------------|
 | `fragment_field` | full-screen domain-warp field | none |
 | `swarm` | ~10k-particle CPU flow swarm | none |
-| `parametric_curve` | Maurer-rose line curve | `[curve] family = "maurer_rose"` (optional; only family) |
+| `parametric_curve` | line curve: rose, Lissajous, hypotrochoid, superformula, harmonograph | `[curve] family = …` (optional; defaults `maurer_rose`) |
 | `lsystem` | branching L-system growth | `[generator]` — **required** |
 | `star_pattern` | Hankin star rosette | `[generator]` — **required** |
 | `reaction_diffusion` | Gray-Scott coral/maze field | none (regime lives in `feed`/`kill`/`flow`) |

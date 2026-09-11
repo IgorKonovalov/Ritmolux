@@ -60,13 +60,22 @@ life comes through the bindings. Draws **opaquely**, so `bg_*` has no visible ef
 | `hue_spread` | `1.0` | `0.1 – 1.0` | width of the per-particle hue band. **`1.0` is full rainbow; drop it for a coherent cloud.** |
 | `hue_center` | `0.5` | `0 – 1` | centre of that band — two presets differing only here read as different colours. |
 
-## `parametric_curve` — Maurer-rose line curve
-*Precise, geometric, hypnotic.* `[curve] family = "maurer_rose"` (the only family; optional).
+## `parametric_curve` — line curves
+*Precise, geometric, hypnotic.* `[curve]` is optional; inside it `family` is required and names
+one of five: `maurer_rose` (the default when the table is absent), `lissajous`, `hypotrochoid`,
+`superformula`, `harmonograph`. The outside-rolling epitrochoid is the same family as
+`hypotrochoid` with a **negative `n`** — the sign picks which circle rolls.
+
+**`n` and `d` mean something different in every family**, and so do `pen`, `sym`, `sharpness`,
+`lobe` and `decay`, which only some of them read. The per-family ranges are in
+`presets/README.md`, generated from the engine's own declarations — read them there rather than
+from a copy here, which is how this section went stale in the first place. The rows below are the
+**rose's** reading.
 
 | Param | Default | Typical | Controls / natural driver |
 |-------|---------|---------|---------------------------|
-| `n` | `6.0` | `2 – 12` | petal frequency. Keep integer-ish (`floor`). |
-| `d` | `71.0` | `2 – 360` | angular step — the "web" density. |
+| `n` | `6.0` | `2 – 12` | petal frequency (rose). Keep integer-ish (`floor`). |
+| `d` | `71.0` | `2 – 360` | angular step (rose) — the "web" density. |
 | `phase` | `0.0` | `0 – tau` | radians **inside** the sine: reshapes petals as it advances (distinct from `spin`, which rotates the finished figure). Morph on `bar`/`bass`. |
 | `radial_offset` | `0.0` | `-1 – 1` | added to the radius — opens the rose into spiral/annular/rosette forms. Nonzero pushes `r` past `[-1,1]`; large values blow past the frame (intended, the renderer clips). |
 | `samples` | `361.0` | `120 – 720` | chord count; capped by `MAX_SEGMENTS`. |

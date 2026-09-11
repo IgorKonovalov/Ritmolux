@@ -245,7 +245,7 @@ documents), so this scene keeps its LUTs in their own bind group exactly as that
 | 2 — the escape-time family | dev | done | 232afb3 |
 | 3 — orbit traps | dev | done | 9ae4650 |
 | 4 — the tier cap and the golden regime | dev | done | cf11972 |
-| 5 — documentation and the reference | dev | done | committed with this row |
+| 5 — documentation and the reference | dev | done | 27f2a63 |
 
 ### Notes
 
@@ -330,13 +330,29 @@ documents), so this scene keeps its LUTs in their own bind group exactly as that
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** `presets/README.md` only - the generated parameter block, regenerated in
+  65d57d4 (`the_parameter_reference_block_is_current` fails on any new parameter). No
+  `presets/*.toml` was added or changed.
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** feature - a 13th system, `analytic_field`, carrying two families: `chladni`
+  (65d57d4) and `escape_time` with Julia and Mandelbrot maps and a smooth iteration count
+  (232afb3), plus four orbit traps (9ae4650) and a tier-capped iteration budget that reports its
+  own clamp (cf11972).
+- **Operator docs touched:** `docs/presets.md`, `docs/preset-guide.md`, `presets/README.md`
+  (generated block), `docs/on-device-validation.md`, `docs/examples/field/` (two teaching presets),
+  `docs/images/field/`, `docs/images/gallery/analytic_field.png` and `scripts/docs-shots.mjs`
+  (gallery entry, pulled forward into Phase 1 because
+  `hygiene::every_system_has_a_gallery_image` fails without it).
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 on the finished tree, in
+  the per-phase gate run after Phase 5.
+- **Full suite:** **not run by this lane** - the session ended while the command was still in
+  flight, which is why this block was empty and why the plan was held. The run of record is the
+  **reviewer's**, recorded in the Mode 4 section below: `cargo nextest run --workspace` (the full
+  run, not `-P fast`) on `44631a6`, this machine's DX12 WARP adapter - exit 0, 1762 tests run,
+  1762 passed (10 slow), 6 skipped, 452.9 s. Every `analytic_field` test and the nine pre-existing
+  baselines named above pass on the finished tree. A re-close that wants the lane's own run rather
+  than the reviewer's should say so; nothing else in this block depends on it.
+- **Outstanding `human` phases:** none - all five phases are `dev` and all five landed.
 
 ## Close review (architect, Mode 4) - 2026-09-11 - HELD
 

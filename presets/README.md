@@ -4091,7 +4091,7 @@ expressions. Validated at load; a bad value is a surfaced error.
 
 | Key      | Values           | Notes                          |
 |----------|------------------|--------------------------------|
-| `family` | `maurer_rose`    | The curve family. Required.    |
+| `family` | `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` | The curve family. Required inside the table; the table itself is optional and absent means `maurer_rose`. An unknown name is a surfaced error. The epitrochoid is `hypotrochoid` with a negative `n` — the sign picks which circle rolls. `n` and `d` are read per family; their ranges are in the generated parameter block above. |
 
 ### `[generator]` — for `lsystem`
 

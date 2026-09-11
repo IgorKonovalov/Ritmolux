@@ -78,8 +78,11 @@ negative outside a `select`) becomes broken geometry, not an error. You clamp; t
 
 ## Structural tables — the parts with rules
 
-- **`[curve]`** — `parametric_curve` only. `family = "maurer_rose"` is the **only** value; absent
-  means the family default. A second family is engine work.
+- **`[curve]`** — `parametric_curve` only. `family` is one of `maurer_rose`, `lissajous`,
+  `hypotrochoid`, `superformula`, `harmonograph`, and is **required inside the table**; the table
+  itself is optional and absent means `maurer_rose`. An unknown name is a surfaced error, not a
+  fallback. `n` and `d` are read per family — ranges in `presets/README.md`. A sixth family is
+  engine work.
 - **`[generator]` as L-system** — required for `lsystem`. Non-empty `axiom`; ≥1 `rules` entry with a
   **single-character** key; `angle_deg` finite (default 25); `max_depth` in `1..=7` (default 4).
   Turtle vocabulary: `F`/`G` draw, `f` moves without drawing, `+`/`-` turn, `[`/`]` push/pop, any
