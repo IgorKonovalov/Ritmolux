@@ -1,6 +1,6 @@
 {
   "name": "ritmolux-studio",
-  "version": "0.116.0",
+  "version": "0.117.0",
   "private": true,
   "description": "The Ritmolux studio: an Electron shell that edits a preset by driving the player.",
   "author": "Igor Konovalov",
