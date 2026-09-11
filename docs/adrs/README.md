@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0190.** *(0120 was reserved for
+**Next free number: 0191.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -211,4 +211,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0187](0187-the-preview-pipe-has-a-fixed-shape-and-names-its-true-format.md) | The preview pipe has a fixed shape and names the format it actually carries | accepted 2026-09-11 (Plan 0167), revises 0176, Outcome |
 | [0188](0188-the-two-implementer-lanes-hand-off-automatically.md) | The two implementer lanes hand off to each other automatically, and every other seam stays manual | accepted 2026-09-10 (no plan), amends 0177 |
 | [0189](0189-an-edit-forks-the-preset-and-the-studio-holds-rotation.md) | An edit forks the preset on first touch, and the studio holds rotation while attached | accepted 2026-09-10 (Plan 0168), revises 0184 |
+| [0190](0190-preset-toml-is-checked-by-the-loader-and-never-reformatted.md) | Preset TOML is checked by the engine's own loader and never reformatted | proposed (Plan 0169) |
 <!-- roster:end -->
