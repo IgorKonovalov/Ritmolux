@@ -46,7 +46,6 @@ place. The plan file carries the real link.
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
 | [0160](0160-the-silhouettes-preconditions-stop-being-silent.md) | The silhouette's preconditions stop being silent | approved | dev, human | ADR-0179: four preconditions on `[path]` that fail silently. **0092 closed 2026-09-09**, so its Phase 7 axis fix is in. Phase 2 is prose in `presets/README.md`. |
 | [0166](0166-the-basics-read-in-russian.md) | The basics read in Russian | approved | dev, human | ADR-0185: five docs gain a Russian sibling `.ru.md` stamped with the source sha. **Phase 3 is a `human` review that blocks publication.** Touches no Rust - orderable against any lane. |
-| [0167](0167-the-studio-becomes-handable.md) | The studio becomes handable | in-progress | dev, studio-builder, human | Phases 1-6 landed 2026-09-10. **Phase 7 (`human`) unrun; Phase 8 has its Windows readings 2026-09-11 and still owes the macOS arm.** Filed backlog 0205. Does not close until both finish. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-09 — [0158] and [0159] are drafted, and they are a program rather than a
@@ -64,7 +63,7 @@ it. The note is [in the archive](README-archive.md#prior-sequencing-notes-supers
 [0163]: done/0163-the-analytic-field.md
 [0164]: done/0164-the-cellular-system.md
 [0165]: done/0165-the-release-path-stops-being-the-first-compile.md
-[0167]: 0167-the-studio-becomes-handable.md
+[0167]: done/0167-the-studio-becomes-handable.md
 [0168]: done/0168-the-studio-stops-surprising-the-author.md
 [0180]: ../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md
 
@@ -609,34 +608,26 @@ next `studio-builder` plan**, not by a rebase and not by anything now in flight.
 > declared only as a map *element* kind, and [0159] Phase 8's walk read `key.kind` and stopped at
 > `map`. The debt above is spent; the rest of the note stands as the record.
 
-**Added 2026-09-10 — [0167] does not close, and [0168] is what unblocks it.** 0167's six
-implementing phases landed and backlog 0199, 0200 and 0201 are archived, but its two `human`
-phases are unrun for the second time and its own text forbids closing on that. **Phase 7 is
-blocked on [0168]**: a smoke run measured the studio rewriting three curated presets in six
-minutes, without asking, because rotation moves the preset under the editor while the author
-works, and handing a tester that build is how they lose work and blame themselves.
-[ADR-0189](../adrs/0189-an-edit-forks-the-preset-and-the-studio-holds-rotation.md) reverses
-[0159] Phase 6's write-through model — an edit forks, and the studio holds rotation while
-attached. **Phase 8 is not blocked and can run now**; it is the on-device check, it needs no
-editing gesture, and it has a prior worth comparing against (a windowless frame rate drifting
-`52.4 -> 44.3` fps over six seconds, recorded in 0167's smoke-run section as an observation, not
-a claim). Order: 0168 whole, then 0167 Phase 7, then close 0167. 0168 is studio-only, so it
-contends with nothing on this roster.
-
-> **Half discharged 2026-09-10 by [0168], closed.** The fork, the held rotation and the problems
-> list all landed, so [0167] Phase 7 is unblocked and the ordering above is spent. What stands is
-> the rest: **both of [0167]'s `human` phases are still unrun**, Phase 8 still has the
-> `52.4 -> 44.3` fps prior worth comparing against, and 0167 still does not close until they run.
->
-> **Updated 2026-09-11 — Phase 8 ran on Windows and is still open.** The studio-attached pair
-> measured like-for-like on one held preset reads `140.1 -> 125.8` fps, **-10.2 %** against
-> [0159] Phase 4's -15.7 %, with zero player frames dropped of 17,077; fullscreen survived three
-> toggles and `bgra8` was negotiated windowed, which retires the plan's own risk that the swizzle
-> stayed synthetic-only. **The macOS arm is still owed**, and the run filed
-> [backlog 0205](../design-backlog.md) — a windowless player reports `0.0 fps` and writes no
-> diagnostics rows while rendering normally. **Phase 7 has not been attempted.**
+~~**Added 2026-09-10 — [0167] does not close, and [0168] is what unblocks it.**~~ — **spent 2026-09-11**, when 0167 closed short of both `human` phases by the owner's decision. What survives it is the *Standing* entry below. The note is [in the archive](README-archive.md#prior-sequencing-notes-superseded).
 
 ## Standing (not a plan)
+
+- **Plan [0167] Phases 7 and 8 — the studio has never been validated by a person** (2026-09-11).
+  The plan is `done` on Phases 1-6, **closed with both `human` phases short by the owner's
+  decision** so that it would not go stale. That is the second plan to close owing them
+  ([0159]'s Phases 10-11 were the first), and this entry is where they now live — not a third plan,
+  which would only inherit the pattern. Two items, each with one home:
+  - **Phase 8's macOS arm** — the studio beside a fullscreen player for one full track. The Windows
+    half ran (`140.1 -> 125.8` fps, −10.2 % against Plan 0159's −15.7 %); the comparison the phase
+    asks for needs both machines. **It lives in
+    [`docs/on-device-validation.md`](../on-device-validation.md)'s studio entry.**
+  - **Phase 7, the tester handoff** — one VJ who has never seen the repository, the studio zip, and
+    nothing but `packaging/studio/READ-ME-FIRST.md`. Unblocked since [0168] closed. What they cannot
+    do becomes backlog entries with probes.
+
+  **What is waiting on them:** nothing is blocked in code. What is unknown is whether the studio is
+  usable by someone other than its author, and a studio release that claims so is unsupported until
+  Phase 7 runs.
 
 - **Plan [0135] Phase 5 — the unplug gate. Blocked on hardware, not on judgement** (2026-08-30).
   The plan is `done` on Phases 1-4 and the policy this would test is the **repaired** one — seconds
@@ -793,6 +784,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0167 — The studio becomes handable](done/0167-the-studio-becomes-handable.md) — closed 2026-09-11 **without Phases 7-8 (owner call)**. Review: **no blockers, four majors.** Version: **0.120.0** (minor). ADR-0186 + 0187 accepted. Filed [backlog 0209](../design-backlog.md). [Write-up](README-archive.md).
 - [0164 — The cellular system](done/0164-the-cellular-system.md) — closed 2026-09-11. Review: **no blockers, no majors, two minors, two nits.** Version: **0.119.0** (minor). No ADR paired. Filed [backlog 0207 + 0208](../design-backlog.md). [Write-up](README-archive.md).
 - [0163 — The analytic field](done/0163-the-analytic-field.md) — closed 2026-09-11 after a held review the same day. Review: **no blockers, no majors, four minors, three nits.** Version: **0.118.0** (minor). Filed [backlog 0206](../design-backlog.md). [Write-up](README-archive.md).
 - [0162 — The curve families](done/0162-the-curve-families.md) — closed 2026-09-11. Review: **no blockers, no majors, four minors, two nits.** Version: **0.117.0** (minor). ADR-0180 Outcome addendum. Filed [backlog 0204](../design-backlog.md). [Write-up](README-archive.md).

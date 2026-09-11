@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0167 - The studio becomes handable](#0167---the-studio-becomes-handable)
   - [0164 - The cellular system](#0164---the-cellular-system)
   - [0163 - The analytic field](#0163---the-analytic-field)
   - [0162 - The curve families](#0162---the-curve-families)
@@ -174,6 +175,7 @@ hand-edited.
   - [0002 — Rust enforcement tooling](#0002--rust-enforcement-tooling)
   - [0001 — Core + standalone MVP, then foobar parity](#0001--core--standalone-mvp-then-foobar-parity)
 - [Prior sequencing notes (superseded)](#prior-sequencing-notes-superseded)
+  - [Moved 2026-09-11 from `README.md` — the note that 0167 does not close, spent](#moved-2026-09-11-from-readmemd--the-note-that-0167-does-not-close-spent)
   - [Moved 2026-09-10 from `README.md` — the 0158/0159 program note, spent](#moved-2026-09-10-from-readmemd--the-01580159-program-note-spent)
   - [Superseded 2026-09-11 by the joint close of Plans 0163 and 0164 (was in `README.md`)](#superseded-2026-09-11-by-the-joint-close-of-plans-0163-and-0164-was-in-readmemd)
   - [Superseded 2026-09-10 by Plan 0158's close (was in `README.md`)](#superseded-2026-09-10-by-plan-0158s-close-was-in-readmemd)
@@ -198,6 +200,56 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0167 - The studio becomes handable](done/0167-the-studio-becomes-handable.md)
+
+- closed 2026-09-11, **short of both `human` phases, by the owner's decision** that a plan waiting
+on a person should not go stale. Six phases on `main` directly: `80fc61c` (1, the preview pipe stops
+moving under the reader), `fbae516` (2, `stream` names its true format), `2cd608a` (3, `--schema`
+declares the grammar), `a001a52` (4, the studio paints what it was told), `428a2ee` + `a967927` (5,
+the player mode is a per-machine setting), `d033ce6` (6, the two debts discharged). Review: **no
+blockers, four majors, six minors, five nits.** Version: **0.120.0** (minor). ADR-0186 accepted;
+ADR-0187 accepted with an `Outcome`. Filed backlog 0209.
+
+**This is the second plan to close owing the studio's validation by a person.** 0159 closed owing
+its Phases 10-11; this plan was written to run them as Phases 7 and 8, and its own Risks section
+said a second deferral means it does not close. The owner overrode that. Phase 7 (the tester
+handoff) never ran, though 0168 unblocked it; Phase 8 ran its Windows half (`67b7308`: 140.1 to
+125.8 fps, -10.2 % against 0159's -15.7 %) and not its macOS half. Both now live in `README.md`'s
+*Standing (not a plan)*, with the macOS reading owed in `docs/on-device-validation.md` — one home
+each, not a third plan.
+
+**The majors, none fixed at the close:**
+- **The blit's cost was never measured.** Phase 1's reading compared `frame_ms_avg`, which read
+6.061 ms in both columns — the 165 Hz vsync period — so the column could not carry the cost it was
+cited for. ADR-0187's "cheaper than the readback" stays an argument; its `Outcome` says so.
+- **CI no longer runs the Phase 6 schema walks.** They read a built player's `--schema`, CI's
+`studio` job builds none, and each walk returns before its first assertion and counts as a pass.
+Filed as backlog 0209.
+- **Phase 1's resize test is weaker than its done-when** (`core/tests/console_preview.rs`): it
+checks the readback size on a headless run, never a windowed resize, the pipe's byte count or the
+`stream` event. Undisclosed in the log.
+- **The structural-`kind` test uses a hand-built fixture** (`ParamPanel.test.tsx`) where the
+done-when says every parameter the schema marks.
+
+**Minors:** `docs/running.md` still described the preview as raw RGBA8 at the window's size —
+**repaired at this close**; `HOLD_EDGES` in `studio/shared/fields.ts` is an undisclosed hand copy of
+the engine's hold edges; the Settings panel shows "Saved." before the write resolves, including when
+it fails; the `stdout@WxH` parser has no unit test; the Phase 2 test checks `pixel_order()` against
+textures built from the same source rather than the emitted event string; Phase 2 left the studio's
+spec-diff test red, disclosed only in Phase 4's row. **Nits:** `expect(true).toBe(true)` as a skip
+notice; `preset.rs` pins `SCHEMA_VERSION == 1`, a frozen value the first legitimate bump fails
+(ADR-0071); `Math.round` against `f32::round` disagree on negative halves.
+
+**Layering held:** no platform type in `core/` (`PixelOrder` is wgpu vocabulary), no audio-callback
+code touched, `core-cabi/`, spec 0001 and `plugin-foobar/` unchanged, spec 0003 carries the
+`stream.format` set.
+
+**The full suite at the close:** `cargo nextest run --workspace` — **1861 passed, 1 failed, 6
+skipped of 1862, 731.5 s.** The one failure is `every_shipped_preset_has_a_gallery_card`, and it is
+not this plan's: a parallel content session had three untracked copies of `proposed/` curves sitting
+in `presets/` while the run read the directory. The committed tree passed that test earlier the same
+day, after `eb5eab4`.
 
 ### [0164 - The cellular system](done/0164-the-cellular-system.md)
 
@@ -8031,6 +8083,41 @@ stays in `lmv-core`, and is out of the Miri job's scope, so the FFI pointer hand
 uncovered (its C side remains the Plan 0001 Phase-6 smoke program's job, per ADR-0003).
 
 ## Prior sequencing notes (superseded)
+
+### Moved 2026-09-11 from `README.md` — the note that 0167 does not close, spent
+
+Spent when [0167] closed on 2026-09-11 short of both `human` phases, by the owner's decision. Kept verbatim as the record of the ordering the close overrode.
+
+**Added 2026-09-10 — [0167] does not close, and [0168] is what unblocks it.** 0167's six
+implementing phases landed and backlog 0199, 0200 and 0201 are archived, but its two `human`
+phases are unrun for the second time and its own text forbids closing on that. **Phase 7 is
+blocked on [0168]**: a smoke run measured the studio rewriting three curated presets in six
+minutes, without asking, because rotation moves the preset under the editor while the author
+works, and handing a tester that build is how they lose work and blame themselves.
+[ADR-0189](../adrs/0189-an-edit-forks-the-preset-and-the-studio-holds-rotation.md) reverses
+[0159] Phase 6's write-through model — an edit forks, and the studio holds rotation while
+attached. **Phase 8 is not blocked and can run now**; it is the on-device check, it needs no
+editing gesture, and it has a prior worth comparing against (a windowless frame rate drifting
+`52.4 -> 44.3` fps over six seconds, recorded in 0167's smoke-run section as an observation, not
+a claim). Order: 0168 whole, then 0167 Phase 7, then close 0167. 0168 is studio-only, so it
+contends with nothing on this roster.
+
+> **Half discharged 2026-09-10 by [0168], closed.** The fork, the held rotation and the problems
+> list all landed, so [0167] Phase 7 is unblocked and the ordering above is spent. What stands is
+> the rest: **both of [0167]'s `human` phases are still unrun**, Phase 8 still has the
+> `52.4 -> 44.3` fps prior worth comparing against, and 0167 still does not close until they run.
+>
+> **Updated 2026-09-11 — Phase 8 ran on Windows and is still open.** The studio-attached pair
+> measured like-for-like on one held preset reads `140.1 -> 125.8` fps, **-10.2 %** against
+> [0159] Phase 4's -15.7 %, with zero player frames dropped of 17,077; fullscreen survived three
+> toggles and `bgra8` was negotiated windowed, which retires the plan's own risk that the swizzle
+> stayed synthetic-only. **The macOS arm is still owed**, and the run filed
+> [backlog 0205](../design-backlog.md) — a windowless player reports `0.0 fps` and writes no
+> diagnostics rows while rendering normally. **Phase 7 has not been attempted.**
+
+[0159]: done/0159-the-studio-opens.md
+[0167]: done/0167-the-studio-becomes-handable.md
+[0168]: done/0168-the-studio-stops-surprising-the-author.md
 
 ### Moved 2026-09-10 from `README.md` — the 0158/0159 program note, spent
 

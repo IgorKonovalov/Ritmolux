@@ -572,10 +572,12 @@ open rather than being marked covered.
 _(Plan 0147 Phase 6. The console figure is also a second-adapter witness for that plan's Phase 4:
 the same preset that runs 53 fps on the integrated part holds 165.0 with the console open here.)_
 
-## Ran 2026-09-11 — the studio beside the player, Windows half ([Plan 0167](plans/0167-the-studio-becomes-handable.md) Phase 8)
+## Ran 2026-09-11 — the studio beside the player, Windows half ([Plan 0167](plans/done/0167-the-studio-becomes-handable.md) Phase 8)
 
-**Half the phase. The macOS arm is unrun, so the phase stays open** — its done-when names both
-machines, and one machine's readings are not the comparison it asks for.
+**Half the phase. The macOS arm is unrun** — its done-when names both machines, and one machine's
+readings are not the comparison it asks for. Plan 0167 closed on 2026-09-11 with this arm still
+unrun, by the owner's decision, so **this entry is where the macOS reading is owed now**; the plans
+index carries it under *Standing (not a plan)*.
 
 Two runs, same build (`0.117.0`), same machine (RTX 3080 Laptop, DX12), same preset held (`Whorl`),
 `--input loopback`, `Rich` tier pinned, rotation held. **The preset must match across the pair** —

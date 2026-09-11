@@ -12,7 +12,7 @@
 > (the file under the editor stays the player's own, and this plan does not reopen it),
 > [0183](../../adrs/0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md),
 > [0178](../../adrs/0178-the-studio-shell-conventions.md)
-> **Blocks:** [0167](../0167-the-studio-becomes-handable.md) Phase 7 — the tester handoff does not run
+> **Blocks:** [0167](0167-the-studio-becomes-handable.md) Phase 7 — the tester handoff does not run
 > until Phase 1 below has landed.
 
 ## TL;DR

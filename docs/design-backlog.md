@@ -78,6 +78,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0206 — with no post stage active a fullscreen field's REPLACE blend overwrites the backdrop, so `occlude = 0` lets nothing through](#0206--with-no-post-stage-active-a-fullscreen-fields-replace-blend-overwrites-the-backdrop-so-occlude--0-lets-nothing-through)
 - [0207 — the cap-recovery line says "geometry is back within the segment cap" for every context, and three of the five are not geometry](#0207--the-cap-recovery-line-says-geometry-is-back-within-the-segment-cap-for-every-context-and-three-of-the-five-are-not-geometry)
 - [0208 — a system count written into prose goes stale on the next system, and fourteen places have now carried one](#0208--a-system-count-written-into-prose-goes-stale-on-the-next-system-and-fourteen-places-have-now-carried-one)
+- [0209 — the studio's schema walks pass in CI by walking nothing, because the CI job builds no player](#0209--the-studios-schema-walks-pass-in-ci-by-walking-nothing-because-the-ci-job-builds-no-player)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -344,9 +345,9 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0194 | `release.yml` promises a dry run it cannot provide, because the publish gate reads the ref and not the event | [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md) Phase 2. The hazard was already realized once; see 0196. **Closed 2026-09-10** |
 | 0195 | `check-index-rows.mjs` is the one gate that never adopted the tracked-set enumeration | [ADR-0182](adrs/0182-a-plan-lane-may-live-inside-the-repository.md) + [Plan 0165](plans/done/0165-the-release-path-stops-being-the-first-compile.md) Phase 0. Both probes still pass. **Closed 2026-09-10** |
 | 0197 | `ParamKind::quantize` is the mechanism ADR-0180 rule 2 exists for, and nothing tests it | Two tests, verified by mutation. Filed and closed the same day, at [Plan 0161](plans/done/0161-the-structural-parameter-is-held.md)'s close. The wiring stays uncovered; see the body. **Closed 2026-09-10** |
-| 0199 | The studio always spawns a windowed player, so a one-screen machine gets a show window in the way | [ADR-0186](adrs/0186-the-studios-player-mode-is-a-per-machine-setting.md) + [Plan 0167](plans/0167-the-studio-becomes-handable.md) Phase 5. Demonstrated live, not only tested. **Closed 2026-09-10** |
-| 0200 | The `stream` event names a channel order the windowed preview does not use | [ADR-0187](adrs/0187-the-preview-pipe-has-a-fixed-shape-and-names-its-true-format.md) + [Plan 0167](plans/0167-the-studio-becomes-handable.md) Phases 2 and 4. Report, not convert. **Closed 2026-09-10** |
-| 0201 | The preview stops updating mid-session while the show keeps drawing | [ADR-0187](adrs/0187-the-preview-pipe-has-a-fixed-shape-and-names-its-true-format.md) + [Plan 0167](plans/0167-the-studio-becomes-handable.md) Phase 1. The preview target stopped moving. **Closed 2026-09-10** |
+| 0199 | The studio always spawns a windowed player, so a one-screen machine gets a show window in the way | [ADR-0186](adrs/0186-the-studios-player-mode-is-a-per-machine-setting.md) + [Plan 0167](plans/done/0167-the-studio-becomes-handable.md) Phase 5. Demonstrated live, not only tested. **Closed 2026-09-10** |
+| 0200 | The `stream` event names a channel order the windowed preview does not use | [ADR-0187](adrs/0187-the-preview-pipe-has-a-fixed-shape-and-names-its-true-format.md) + [Plan 0167](plans/done/0167-the-studio-becomes-handable.md) Phases 2 and 4. Report, not convert. **Closed 2026-09-10** |
+| 0201 | The preview stops updating mid-session while the show keeps drawing | [ADR-0187](adrs/0187-the-preview-pipe-has-a-fixed-shape-and-names-its-true-format.md) + [Plan 0167](plans/done/0167-the-studio-becomes-handable.md) Phase 1. The preview target stopped moving. **Closed 2026-09-10** |
 <!-- roster:end -->
 
 ## Open entries
@@ -3855,7 +3856,7 @@ That would be a small gap if warnings were rare. They are not, and the reason is
 changing a preset's system keeps the outgoing system's `[params]` bindings and structural tables,
 and **each one the incoming system does not declare is its own warning**. One click produces
 several, which is what
-[Plan 0167](plans/0167-the-studio-becomes-handable.md)'s smoke run observed. Plan 0168 Phase 2 puts
+[Plan 0167](plans/done/0167-the-studio-becomes-handable.md)'s smoke run observed. Plan 0168 Phase 2 puts
 every problem in a modal, which makes them *legible*; it cannot make them *locatable*, and the two
 are different things when the author's next question is "which line".
 
@@ -3867,7 +3868,7 @@ warning is exactly that second shape: it knows the parameter's name. Adding `par
 mechanism**, where adding `line`/`col` would need the warning raised somewhere that still holds a
 position. Settle which before building either.
 
-- **Raised:** 2026-09-10, from [Plan 0167](plans/0167-the-studio-becomes-handable.md)'s
+- **Raised:** 2026-09-10, from [Plan 0167](plans/done/0167-the-studio-becomes-handable.md)'s
   developer-machine smoke run, finding B — the separable half the routing deliberately did not take.
   **Owner if taken:** `architect` to choose between `param` and a true span (it moves spec 0003
   either way), then `dev` for the player side and `studio-builder` for the marker.
@@ -3888,7 +3889,7 @@ open on the player's event surface for another reason.
 
 ## 0203 — the smoke run captured from a microphone while the default is loopback, and nobody established why
 
-[Plan 0167](plans/0167-the-studio-becomes-handable.md)'s smoke run, 2026-09-10, reported its capture
+[Plan 0167](plans/done/0167-the-studio-becomes-handable.md)'s smoke run, 2026-09-10, reported its capture
 endpoint as `live WASAPI 48000/4 Microphone Array (Realtek(R) Audio)`. That is an `eCapture`
 endpoint — `CaptureMode::LineIn` — and `InputMode`'s `#[default]` is `Loopback`, which taps a render
 device. So either the machine's config selected `line-in`, or something chose it, and **nobody
@@ -3908,7 +3909,7 @@ that line back.
 is a non-issue; a silent fallback from a failed loopback start to an input device would be a real
 defect worth a plan. Nothing has established which.
 
-- **Raised:** 2026-09-10, from [Plan 0167](plans/0167-the-studio-becomes-handable.md)'s smoke run,
+- **Raised:** 2026-09-10, from [Plan 0167](plans/done/0167-the-studio-becomes-handable.md)'s smoke run,
   finding C — recorded there as an observation, not acted on.
   **Owner if taken:** `dev`. It is a `standalone/` question and needs the machine's own
   `config.toml` read first, which costs nothing and may close the entry outright.
@@ -3990,7 +3991,7 @@ A fix is a decision about where the frame clock belongs, not a patch at the call
 `health` stops claiming a figure it does not have. The honest interim is for the studio to render
 no number rather than a zero.
 
-- **Raised:** 2026-09-11, running [Plan 0167](plans/0167-the-studio-becomes-handable.md) Phase 8 on
+- **Raised:** 2026-09-11, running [Plan 0167](plans/done/0167-the-studio-becomes-handable.md) Phase 8 on
   Windows. **Owner if taken:** `architect` for where the clock lives, then `dev`.
 - **Verified 2026-09-11** — the frame clock has exactly one call site, on the present path:
   `present: self\.diag\.record_frame\(\) in: core/src/render/mod.rs`
@@ -4117,3 +4118,34 @@ to `system` in the reader documents and in `.rs` comments.
 **Low.** Every instance so far has been cosmetic and every one was caught, so the cost to date is
 reviewer attention rather than a wrong build. It is worth an entry because the catching is the
 expensive part and it recurs on a fixed schedule: once per new system, forever.
+
+## 0209 — the studio's schema walks pass in CI by walking nothing, because the CI job builds no player
+
+[Plan 0167](plans/done/0167-the-studio-becomes-handable.md) Phase 6 deleted the studio's
+hand-kept `KINDS` fallback and replaced it with walks over the **live** schema a built player
+exports: every structural table's keys, every map's entry kind, the grammar's variables and
+functions. That was the right repair — the fallback was the copy that drifted — and it moved the
+check somewhere CI cannot reach. The CI `studio` job runs `npm test` on `ubuntu-latest` with no
+cargo step, so `live` is undefined there and every walk returns before its first assertion
+(`studio/shared/fields.test.ts`, `grammar.test.ts`, `windowless.test.ts`). Each counts as a pass.
+Before Phase 6 the fallback still ran in CI; now the `[hold]` and grammar checks run only on a
+machine that happens to have built the player, and CI's green says nothing about them.
+
+The shape of the fix is one of two: have the `studio` job build the player first (a release build
+of `standalone`, and its minutes), or commit a schema snapshot the walks read in CI and a Rust test
+that fails when the snapshot and `--schema` disagree — the same pairing ADR-0170 uses for the
+parameter reference.
+
+- **Raised:** 2026-09-11, at Plan 0167's close review. **Owner if taken:** `architect` for which of
+  the two, then `dev` and `studio-builder`.
+- **Verified 2026-09-11** — the walks still skip rather than fail when no player is built:
+  `present: skipped the live walk: no built ritmolux in target/ in: studio/shared/fields.test.ts`
+- **Verified 2026-09-11** — and the CI job still builds none. A string probe cannot see this half,
+  because other jobs in the same workflow file do run cargo:
+  `unprobeable: the studio job's steps are not separable by a single-file string probe`
+
+### Priority
+
+**Medium.** Nothing is broken today — the walks pass on the development machine. But the next
+engine change that adds a structural kind the studio cannot edit will reach `main` green, and the
+first person to notice will be an author in the editor.

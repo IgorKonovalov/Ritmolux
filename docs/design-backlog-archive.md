@@ -9498,7 +9498,7 @@ thing anyone opening the studio on one screen hits, it is in front of Plan 0159'
 handoff rather than behind it, and the repair is small and mostly already built.
 
 **CLOSED 2026-09-10** — [ADR-0186](adrs/0186-the-studios-player-mode-is-a-per-machine-setting.md) +
-[Plan 0167](plans/0167-the-studio-becomes-handable.md) Phase 5. `StudioSettings` gained
+[Plan 0167](plans/done/0167-the-studio-becomes-handable.md) Phase 5. `StudioSettings` gained
 `playerMode`, the supervisor picks the argv from it, and the setting lives in a panel off the header
 rather than in the editing surface. The `absent: --stream` probe was falsified by the repair itself
 — putting `--stream` in `supervisor.ts` is exactly what the entry asked for — and it retires with
@@ -9563,7 +9563,7 @@ of the studio is judging colour and a preset author tuning a palette against it 
 against a lie, and it is in front of Plan 0159's Phase 10 tester handoff rather than behind it.
 
 **CLOSED 2026-09-10** — [ADR-0187](adrs/0187-the-preview-pipe-has-a-fixed-shape-and-names-its-true-format.md) +
-[Plan 0167](plans/0167-the-studio-becomes-handable.md) Phases 2 and 4. The answer was **report, not
+[Plan 0167](plans/done/0167-the-studio-becomes-handable.md) Phases 2 and 4. The answer was **report, not
 convert**: `STREAM_FORMAT` is gone and the `stream` event names the order the frames actually carry,
 with spec 0003's row moving from one value to a closed set. Both `present:` probes were falsified by
 the repair and retire with this body. **Three corrections to the entry's own account.** The mapping
@@ -9652,7 +9652,7 @@ nothing on screen says the picture is stale — the footer's own dropped count r
 It sits in front of Plan 0159's Phase 10 tester handoff with 0200.
 
 **CLOSED 2026-09-10** — [ADR-0187](adrs/0187-the-preview-pipe-has-a-fixed-shape-and-names-its-true-format.md) +
-[Plan 0167](plans/0167-the-studio-becomes-handable.md) Phase 1. The repair took neither of the two
+[Plan 0167](plans/done/0167-the-studio-becomes-handable.md) Phase 1. The repair took neither of the two
 options this entry named: rather than re-emitting `stream` on resize (a spec change) or forbidding
 resize, **the preview target stopped moving**. It has its own size, filled by a sampling blit from
 the intermediate; `Renderer::resize` rebuilds the intermediate and leaves the preview alone, so the

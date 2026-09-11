@@ -1,8 +1,8 @@
 # ADR-0187 — The preview pipe has a fixed shape and names the format it actually carries
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-11, at Plan 0167's close, with an Outcome
 > **Date:** 2026-09-10
-> **Related plan(s):** [0167 — The studio becomes handable](../plans/0167-the-studio-becomes-handable.md)
+> **Related plan(s):** [0167 — The studio becomes handable](../plans/done/0167-the-studio-becomes-handable.md)
 > **Related:** [ADR-0176](0176-the-player-is-driven-over-osc-control-in-and-reports-on-its-standard-streams.md)
 > (the event roster, and the `stream` row this changes),
 > [ADR-0178](0178-the-studio-shell-conventions.md) (the studio's frame path, and its `Outcome` on
@@ -134,3 +134,30 @@ records what it would have to be able to tell apart.
 The writer thread still exits silently on a size disagreement. After this decision no size
 disagreement can arise, so the silence is unreachable rather than repaired — a deliberate call at
 Plan 0167's interview, recorded in that plan's "What this plan does NOT do".
+
+## Outcome — 2026-09-11, at Plan 0167's close
+
+The decision held: the pipe's geometry no longer follows the window, and `stream` names the
+channel order the pipe carries. Five things came out differently from the text above, and the
+last one leaves this ADR's central cost claim unmeasured.
+
+- **The fixed size lives on a separate tap, not on the preview target.** `PreviewTap`
+  (`core/src/render/preview.rs`) owns the fixed-size texture the readback copies from, and the
+  intermediate the show draws into is untouched. The scale **letterboxes** rather than stretching,
+  so a 16:10 window arrives inside a 16:9 frame with bars rather than squashed.
+- **The format mapping lives in `core`, as `PixelOrder`.** The Decision placed it where the
+  windowed path emits `stream`, but `standalone` cannot name a `TextureFormat`. Both run modes
+  now read one source for the format, where this ADR expected two.
+- **Alternative C's reason is weaker than it reads.** It was rejected as a CPU pass on the show's
+  thread. The GPU blit that shipped could have converted to RGBA in the same pass at no extra
+  cost, so the reason does not rule out a player-side conversion. Declaring the format is still
+  the right shape; it is just not the only one left standing.
+- **The studio swizzles on the CPU**, measured at 0.225 ms a frame at 640x360, rather than in the
+  fragment shader Alternative C called free. At that size it is cheap enough; a larger preview
+  would bring the shader back.
+- **The blit's cost was not measured.** Phase 1's reading compared `frame_ms_avg` with and without
+  the preview, and both columns read 6.061 ms, which is the 165 Hz vsync period. That column was
+  capped by the display, so it cannot carry the blit's cost. Only the p99 moved, 6.338 to 6.412 ms.
+  **"Cheaper than the readback it feeds" is therefore still an argument**, and the comparison
+  against Plan 0159's 42 to 35.4 fps is unmade; Plan 0167 closed with its Phase 8 macOS arm unrun,
+  and a vsync-off reading is what would settle it.

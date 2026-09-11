@@ -4,7 +4,7 @@
 > **Date:** 2026-09-10
 > **Related plan(s):** none — the four-document rollout is this ADR's own commit.
 > Evidence comes from [0159 — The studio opens](../plans/done/0159-the-studio-opens.md) and
-> [0167 — The studio becomes handable](../plans/0167-the-studio-becomes-handable.md).
+> [0167 — The studio becomes handable](../plans/done/0167-the-studio-becomes-handable.md).
 > **Related:** [ADR-0177](0177-a-fourth-skill-lane-builds-the-studio.md) (added the lane, and
 > decided the opposite of this; **amended here**), [ADR-0017](0017-preset-author-skill-lane.md)
 > (the lane-by-ADR precedent), [ADR-0120](0120-the-close-brief-is-a-section-of-the-plan.md)

@@ -99,10 +99,13 @@ than merely low.
 ### Mirroring the show to another program
 
 `--preview stdout` sends the frames the projector is showing to whatever spawned the player, as
-raw RGBA8 on standard output. It is how an editor watches the **real** show rather than a second
-headless one, and it rides the same intermediate the console's corner preview does — the frame is
-drawn into it, copied to its real destination unchanged, and copied a second time to a staging
-buffer for the mirror.
+raw pixels on standard output. It is how an editor watches the **real** show rather than a second
+headless one. The mirror is a **scaled, letterboxed copy at a fixed size** — 640x360 unless
+`--preview stdout@WIDTHxHEIGHT` names another — so resizing or fullscreening the window never
+changes what the reader receives, and the channel order it carries is named in the `stream`
+event's `format` field rather than assumed. The frame is drawn to its real destination unchanged;
+the copy for the mirror is taken beside it. The full comparison with the headless stream is in
+[`docs/capturing.md`](capturing.md).
 
 **The display loop never waits for it.** The staging copy rides the frame's own submission and its
 mapping is taken on the **next** frame with a non-blocking poll, so a frame that is not ready yet

@@ -1,8 +1,8 @@
 # ADR-0186 — The studio's player mode is a per-machine setting, and the windowless path is a peer
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-11, at Plan 0167's close
 > **Date:** 2026-09-10
-> **Related plan(s):** [0167 — The studio becomes handable](../plans/0167-the-studio-becomes-handable.md)
+> **Related plan(s):** [0167 — The studio becomes handable](../plans/done/0167-the-studio-becomes-handable.md)
 > **Related:** [ADR-0183](0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md)
 > (amended here — its Decision is written against a windowless path that was a subset and no longer
 > is), [ADR-0175](0175-the-studio-is-a-separate-application-that-never-draws-a-frame.md) (the studio
