@@ -346,11 +346,11 @@ const IMAGES = [
   // --- the cellular system's families beyond life_like --------------------
   //
   // The gallery entry below pictures `life_like`; these picture the other two
-  // families, from teaching presets for the analytic field's reason - no
-  // shipped preset draws the system yet - and filed outside the gallery too.
+  // families, each from the one shipped world that draws it. Filed outside the
+  // gallery for the curves' reason.
   {
     out: "docs/images/cellular/larger_than_life.png",
-    presetFile: "docs/examples/cellular/larger_than_life.toml",
+    presetFile: "presets/cellular_tide_bugs.toml",
     signal: "dynamic:110",
     hop: 300,
     size: "1280x720",
@@ -358,7 +358,7 @@ const IMAGES = [
   },
   {
     out: "docs/images/cellular/cyclic.png",
-    presetFile: "docs/examples/cellular/cyclic.toml",
+    presetFile: "presets/cellular_spiral_bloom.toml",
     signal: "dynamic:110",
     hop: 300,
     size: "1280x720",
@@ -530,12 +530,11 @@ const IMAGES = [
     tier: "rich",
   },
   {
-    // cellular — UNJUDGED, and not a choice: the system ships no preset yet,
-    // so its slot renders the teaching preset the guide prints for the
-    // life_like family, the system's first. Swap it for a shipped world when
-    // the content lane lands one.
+    // cellular — UNJUDGED, and not a choice: `cellular_ember_life` is the one
+    // shipped world on the life_like family, the family the slot pictured
+    // before it through a teaching preset.
     out: "docs/images/gallery/cellular.png",
-    presetFile: "docs/examples/cellular/life_like.toml",
+    presetFile: "presets/cellular_ember_life.toml",
     signal: "dynamic:110",
     hop: 300,
     size: "1280x720",

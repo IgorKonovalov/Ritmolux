@@ -8,7 +8,7 @@
 #   mid       -> birth_hi: a busy midrange widens the birth window a touch, so the colony grows
 #                fatter and more tangled; a thin passage lets it thin out into separate bugs.
 #   onset     -> reseed: a hard hit drops a fresh disc of soup, which organises into new bugs.
-#   time      -> reseed floor every 14 s, and a slow palette crossfade toward violet.
+#   time      -> reseed floor every 5 s, and a slow palette crossfade toward violet.
 system = "cellular"
 name = "Tide Bugs"
 

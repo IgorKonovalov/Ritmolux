@@ -77,8 +77,7 @@ the params then animate it.
 One image each, captured under the same stimulus at the same moment in the clip, so they are
 comparable. Each is a real preset, and the file name is under the picture: a `presets/` name is a
 shipped preset, while a `docs/examples/` name is a teaching preset, written to show one family
-plainly and never shipped. The families of `parametric_curve`, `analytic_field` and `cellular` are
-pictured that way, one teaching preset each, so each picture shows its family and nothing else. The
+plainly and never shipped. A family no shipped preset draws yet is pictured through one of those. The
 **parameter reference** — every parameter of every
 system, with its default, the range that reads and what it does — is
 [`../presets/README.md`](../presets/README.md).
@@ -343,11 +342,12 @@ orbit-trap filigree. Which parameter belongs to which family, and what the quali
 
 ### `cellular`
 
-![Conway's Life on a black ground: pale blue clouds of recently active cells with darker, fading
-edges, scattered with small still lifes and blinkers drawn as rings and crosses of single
-cells](images/gallery/cellular.png)
+![Conway's Life as a field of coals: broad clouds of white-gold and amber cells cooling through
+orange to deep red at their edges, split by black channels scattered with small still lifes and
+blinkers drawn as single-cell rings and crosses](images/gallery/cellular.png)
 
-*`family = "life_like"` — [`docs/examples/cellular/life_like.toml`](examples/cellular/life_like.toml)*
+*`family = "life_like"` — `presets/cellular_ember_life.toml`; the teaching preset is
+[`docs/examples/cellular/life_like.toml`](examples/cellular/life_like.toml)*
 
 A **cellular automaton**: a square grid of cells, every generation each cell deciding its next state
 from its neighbours'. The grid remembers — every cell carries how long ago it last changed — so a
@@ -361,19 +361,23 @@ bitmasks over the neighbour counts, which the [`[cellular]` table](presets.md#th
 spells out. Left to itself Life settles into still lifes and blinkers, so reach for `reseed` — a
 disc of fresh cells on every rise, a beat or a latch — to keep it fed.
 
-![Blobs and short trails in cream and amber on black, each travelling across the frame with a
-dark brown wake behind it, a few small round cells drifting between them](images/cellular/larger_than_life.png)
+![Large pale-violet blobs with speckled interiors and bright rims on black, chains of smaller
+rounded cells in lilac and indigo linking them across the frame](images/cellular/larger_than_life.png)
 
-*`family = "larger_than_life"` — [`docs/examples/cellular/larger_than_life.toml`](examples/cellular/larger_than_life.toml)*
+*`family = "larger_than_life"` — `presets/cellular_tide_bugs.toml`; the teaching preset is
+[`docs/examples/cellular/larger_than_life.toml`](examples/cellular/larger_than_life.toml)*
 
 **Larger than Life** reads a wide square of neighbours rather than eight, with birth and survival as
-ranges of how full it is. Above radius 1 its rules grow blobs and bugs that keep travelling where
-Life would settle — and the ember wake here is the path each one took.
+ranges of how full it is. Above radius 1 its rules grow blobs and bugs that crawl, merge and split.
+Left alone they settle too, into still rings within a minute, so the preset pictured drops a fresh
+disc of soup on every hard onset and at least every five seconds; the speckled blobs above are those
+discs, organising.
 
-![Interlocking spirals of three flat colours — purple, turquoise and sea green — covering the
+![Interlocking spirals of three flat colours — coral, cornflower blue and sage green — covering the
 whole frame, their arms curling round dozens of small cores](images/cellular/cyclic.png)
 
-*`family = "cyclic"` — [`docs/examples/cellular/cyclic.toml`](examples/cellular/cyclic.toml)*
+*`family = "cyclic"` — `presets/cellular_spiral_bloom.toml`; the teaching preset is
+[`docs/examples/cellular/cyclic.toml`](examples/cellular/cyclic.toml)*
 
 The **cyclic** automaton: every cell is one of `states` colours and advances to the next when enough
 neighbours already have. From noise it organizes itself, within a few hundred generations, into
