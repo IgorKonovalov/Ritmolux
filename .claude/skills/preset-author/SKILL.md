@@ -70,19 +70,23 @@ that "needs just a small code change" is not a preset, it's a routed request.
 
 ## The authoring surface in one screen
 
-**Nine systems** (`system = "…"`, the underscore name — distinct from a scene's display name):
+**The system roster is deliberately not copied here.** A table of it lived in this spot and was
+wrong: it named nine systems while the engine carried fourteen, and it had been behind for three
+of them before a single night's work took it further. Every system a preset may name
+(`system = "…"`, the underscore name — distinct from a scene's display name), and every
+structural table beside it, lives in two documents that cannot drift from the engine the way a
+copy here does:
 
-| `system` | Look | Structural config |
-|----------|------|-------------------|
-| `fragment_field` | full-screen domain-warp field | none |
-| `swarm` | ~10k-particle CPU flow swarm | none |
-| `parametric_curve` | line curve: rose, Lissajous, hypotrochoid, superformula, harmonograph | `[curve] family = …` (optional; defaults `maurer_rose`) |
-| `lsystem` | branching L-system growth | `[generator]` — **required** |
-| `star_pattern` | Hankin star rosette | `[generator]` — **required** |
-| `reaction_diffusion` | Gray-Scott coral/maze field | none (regime lives in `feed`/`kill`/`flow`) |
-| `attractor` | GPU compute particles on a strange attractor | `[particles] family = …` (optional; defaults `de_jong`) |
-| `spectrum` | N elements off the log-spaced band array — bars, polyline or radial ring | `[spectrum]` (optional; `elements` 2..=64, `layout`, per-element `smoothing`) |
-| `emitter` | objects thrown from below that arc, twinkle and fall out of shot | none (the throw and the spreads are all `[params]`) |
+- **[`docs/preset-guide.md`](../../../docs/preset-guide.md)** — one picture per system. This is the
+  orientation the table was trying to be, and it is the place to start when you do not yet know
+  which system a look wants.
+- **[`presets/README.md`](../../../presets/README.md)** — every parameter with its default, range
+  and meaning, **generated from the engine's own `ParamSpec` declarations** (ADR-0170), plus the
+  hand-written structural tables (`[curve]`, `[generator]`, `[particles]`, `[spectrum]`, …). A
+  parameter that is not in there does not exist.
+
+`ls presets/*.toml` is the third answer and the cheapest: the shipped set is named
+`<system>_<look>.toml`, so the roster is in the filenames.
 
 **Every** preset, whatever its system, may additionally bind the engine-wide composite: the shared
 view transform (`zoom`, `pan_x`, `pan_y`), the background pre-pass (`bg_*`), feedback `trails`, the
