@@ -7,9 +7,6 @@ going for, so a verdict is a comparison rather than a general impression.
 
 | preset | system / family | pass | what to look at |
 |--------|-----------------|------|-----------------|
-| `curve_blueprint` | parametric_curve / hypotrochoid | 2026-09-11 curve families | White-on-blueprint drawing machine: each bar draws a figure, holds it finished for the last quarter, then re-gears onto a fresh sheet (eight closing ratios, 3- to 11-fold, two epicycloids, pen re-rolled too). Does the hold give the eye time to read the drawing? |
-| `curve_turnabout` | parametric_curve / hypotrochoid (sign flip) | 2026-09-11 second look | n ±3 flip on the beat, and each beat REDRAWS the figure in ~0.33 s over a 0.93 trail; whole until the first onset. Stroke now 4.8 at 0.85: still a pen, or a tube? |
-| `curve_inkpendulum` | parametric_curve / harmonograph | 2026-09-11 second look | Ink on paper, drawn live: each bar draws the harmonograph, holds it for the last fifth, then a fresh sheet with a new ratio (2:3, 3:4, 1:2, 3:5) and phase. Line still pencil-grey (gap 5). |
 
 ## Owner verdicts (2026-09-11)
 
@@ -29,8 +26,8 @@ animation or reactivity. On 2026-09-11 all three were re-cut so a probe frame sh
 whole figure. Blueprint and Ink Pendulum now hold the finished drawing at the end of
 each bar, Turnabout stands whole until the first onset, and Turnabout's stroke is
 heavier. With the files temporarily embedded, every gate they had failed passes, and
-distinctness passes too. Each header carries its numbers. They are ready for `dev` to
-move whenever the owner has had a second look at the re-cut.
+distinctness passes too. Each header carries its numbers. They shipped the same day, each
+with a gallery card, which leaves the table above empty until the next authoring pass.
 
 - **Keep, as they are:** Julia Circuit, Pearl String, Ring Orbit, Searchlight, Stained
   Glass, Standing Wave, Two-Band Julia, Lacework, Prismscope, Etching Plate, Murmuration.

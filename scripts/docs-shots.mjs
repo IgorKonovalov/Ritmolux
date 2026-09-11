@@ -195,10 +195,12 @@ const CARDS = [
   "lsystem_rime",
   "lsystem_sumimono",
   "lsystem_vellum",
-  // parametric_curve (10)
+  // parametric_curve (13)
+  "curve_blueprint",
   "curve_broadside",
   "curve_cogwheel",
   "curve_gyre",
+  "curve_inkpendulum",
   "curve_ionwake",
   "curve_lacework",
   "curve_loom",
@@ -206,6 +208,7 @@ const CARDS = [
   "curve_phosphor",
   "curve_prismscope",
   "curve_rosemono",
+  "curve_turnabout",
   // reaction_diffusion (7)
   "reaction_etching",
   "reaction_fluxmono",
