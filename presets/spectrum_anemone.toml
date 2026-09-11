@@ -2,15 +2,16 @@
 # a small hub on cream paper (Plan 0104 Phase 2). Authored fresh-slate
 # (ADR-0089).
 #
-# IT SHARES A LAYOUT WITH `spectrum_halo` AND NOTHING ELSE, AND THAT IS
+# IT SHARES A LAYOUT WITH `spectrum_radialbloom` AND NOTHING ELSE, AND THAT IS
 # DELIBERATE. The system offers three layouts and the family needs four worlds,
 # so one layout carries two of them; the pair is separated on every other axis
-# the scene has. Halo is 48 thin luminous spokes standing on a wide ring over a
-# dark violet field, drawn through the ADDITIVE seam. This is 12 heavy wedges on
-# a small hub over cream paper, drawn through the OVER seam. Halo's silhouette
-# is an annulus with a fringe; this one's is a starburst whose spokes are the
-# figure. If the advisory distinctness report ever pairs them, that is the
-# shared layout talking and this paragraph is the answer.
+# the scene has. Radial Bloom is 48 thin luminous spokes standing on a wide ring
+# over a dark indigo field, drawn almost entirely through the ADDITIVE seam
+# (`stroke_blend` 0.15). This is 12 heavy wedges on a small hub over cream
+# paper, drawn through the OVER seam. Radial Bloom's silhouette is an annulus
+# with a fringe; this one's is a starburst whose spokes are the figure. If the
+# advisory distinctness report ever pairs them, that is the shared layout
+# talking and this paragraph is the answer.
 #
 # `stroke_blend` = 1 IS THE WHOLE WORLD. At 0 the batch is additive light and
 # overlapping strokes sum - which is what every other line preset in the library
@@ -83,8 +84,8 @@ base = "0.20 + hash(index * 23) * 0.12 + noise(time * 1.8 + index * 9) * 0.10"
 curve = "0.6"
 scale = "1.55"
 
-# The hub. Small, so the wedges dominate - the opposite proportion from Halo,
-# where the ring is the body and the spokes are its fringe.
+# The hub. Small, so the wedges dominate - the opposite proportion from Radial
+# Bloom, where the ring is the body and the spokes are its fringe.
 radius = "0.2 + clamp(bass * 0.235, 0, 0.20)"
 
 # Heavy wedges: 12 spokes around a circle is a 30-degree slot each, and 16 fills
