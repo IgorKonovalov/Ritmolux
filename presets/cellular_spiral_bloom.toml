@@ -1,0 +1,52 @@
+# Spiral Bloom - the cyclic automaton: every cell holds one of eight colours and advances when
+# enough neighbours already hold the next. From seeded noise the field organises into interlocking
+# rotating spirals whose arms are the palette laid round in order.
+#
+# What drives what:
+#   mid       -> step_rate: the spirals spin faster on a busy passage (10..24 generations/s).
+#   beat      -> reseed: on roughly one beat in three a disc of fresh noise is dropped in, which
+#                boils for a second and then crystallises into a new cluster of spirals.
+#   time      -> reseed floor every 12 s; a slow hue drift so the arms rotate through colour.
+#   treb      -> saturation: bright top end pulls the colour fully saturated; a dull passage
+#                leaves it slightly muted.
+#
+# Horizon verdict (shot --horizon 10, 96x96, bass 0.6 mid 0.45): alive at ten minutes. Footprint
+# holds 0.17-0.19 from 30 s to the end (delta -0.02) - the spirals keep turning and never lock into
+# a static mosaic. Breathing, not drifting.
+system = "cellular"
+name = "Spiral Bloom"
+representative = true
+
+[generator]
+seed = 5
+
+[cellular]
+family = "cyclic"
+grid = 180
+wrap = true
+
+[params]
+# The classic 3-state / threshold-3 rule: noise organises into swirling spirals within seconds.
+# Swept against 4/2, 5/2, 6/2, 8/1, 12/1 and 8/3 - 8/3 never organises (frozen noise), and the
+# higher counts fold into blocky terraces rather than spirals.
+states = "3"
+threshold = "3"
+step_rate = "10 + clamp(mid * 16, 0, 14)"
+reseed = "max(beat * (hash(beat_index * 1.3) > 0.66), mod(time, 12) < 0.2)"
+hue = "mod(time * 0.012, 1)"
+saturation = "0.72 + clamp(treb * 0.4, 0, 0.24)"
+brightness = "0.8"
+
+[smoothing]
+step_rate = 0.3
+saturation = 0.25
+
+# A closed loop: the last stop returns to the first colour, so the cycle's wrap is seamless.
+[palette]
+stops = [
+  { at = 0.000, color = "#ff3d6e" },   # rose
+  { at = 0.250, color = "#ffb13d" },   # amber
+  { at = 0.500, color = "#3dffc4" },   # mint
+  { at = 0.750, color = "#3d6bff" },   # cobalt
+  { at = 1.000, color = "#ff3d6e" },   # rose again
+]

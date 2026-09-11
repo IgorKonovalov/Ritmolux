@@ -1,0 +1,54 @@
+# Ember Life - Conway's Life as a field of coals. Live cells burn white-gold; every cell that dies
+# leaves a wake that cools through orange and red to char over `trail` generations, so the history
+# of the automaton reads as heat rather than as noise.
+#
+# What drives what:
+#   mid       -> step_rate: the colony runs faster when the music is busy (8..20 generations/s).
+#   bass      -> trail: a heavy passage lets the embers glow longer before they go dark.
+#   beat      -> reseed: on roughly two beats in five (hash of the beat count) a fresh disc of
+#                soup is thrown onto the field and burns out into new gliders and oscillators.
+#   time      -> reseed floor: every 10 s a disc lands regardless, so a quiet track never lets the
+#                colony die to still-lifes.
+#   noise     -> hue: a slow wander along the fire palette, never a jump.
+#
+# Horizon verdict (shot --horizon 10, 96x96, bass 0.6 mid 0.45): alive at ten minutes. Coverage
+# wanders 0.18-0.23 and footprint holds near 0.52 with no one-way trend - the reseed floor is what
+# keeps the colony from settling into still-lifes. Breathing, not drifting.
+system = "cellular"
+name = "Ember Life"
+representative = true
+
+[generator]
+seed = 11
+
+[cellular]
+family = "life_like"
+grid = 200
+wrap = true
+
+[params]
+# B3/S23 - Conway's Life.
+birth = "8"
+survive = "12"
+step_rate = "8 + clamp(mid * 14, 0, 12)"
+reseed = "max(beat * (hash(beat_index * 3.7) > 0.6), mod(time, 10) < 0.2)"
+trail = "20 + clamp(bass * 14, 0, 12)"
+age_tint = "0.85"
+hue = "noise(time * 0.03) * 0.06"
+brightness = "1.0"
+saturation = "0.95"
+
+[smoothing]
+trail = 0.4
+step_rate = 0.3
+
+# Live cells sit at the palette origin; a dying cell's wake slides age_tint of the way along it.
+# So the gradient runs hot -> cold: the live colour first, char last.
+[palette]
+stops = [
+  { at = 0.00, color = "#fff4d6" },   # white-hot
+  { at = 0.18, color = "#ffc24a" },   # gold
+  { at = 0.45, color = "#ff5a14" },   # orange
+  { at = 0.75, color = "#8f1206" },   # deep red
+  { at = 1.00, color = "#1c0406" },   # char
+]

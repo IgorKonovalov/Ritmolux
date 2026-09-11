@@ -1,0 +1,61 @@
+# Tide Bugs - Larger than Life on a radius-5 box: soft blobs and travelling "bugs" that crawl,
+# merge and split like plankton under cold water. Live tissue is pale cyan; what it leaves behind
+# sinks through teal into deep blue.
+#
+# What drives what:
+#   bass      -> step_rate: the tide moves on the low end (6..16 generations/s), and zoom breathes
+#                a few percent on it so a kick swells the whole field.
+#   mid       -> birth_hi: a busy midrange widens the birth window a touch, so the colony grows
+#                fatter and more tangled; a thin passage lets it thin out into separate bugs.
+#   onset     -> reseed: a hard hit drops a fresh disc of soup, which organises into new bugs.
+#   time      -> reseed floor every 14 s, and a slow palette crossfade toward violet.
+system = "cellular"
+name = "Tide Bugs"
+
+[generator]
+seed = 23
+
+[cellular]
+family = "larger_than_life"
+grid = 256
+wrap = true
+
+[params]
+# Radius 5 sits inside the Floor tier's cap of 6, so no tier clamps it.
+radius = "5"
+birth_lo = "0.28"
+birth_hi = "0.385"
+survive_lo = "0.26"
+survive_hi = "0.47"
+step_rate = "6 + clamp(bass * 12, 0, 10)"
+# Reseed is the heartbeat, not an accent. Measured on a 10-minute horizon: this rule, left alone,
+# freezes into ~30 still rings within a minute (motion 0.000 from 60 s on), and neither tightening
+# nor widening the intervals keeps bugs alive - they either die to black or fuse into froth. So a
+# disc of soup lands on every hard onset and at least every 5 s, and the look is what boils out of
+# it: bugs that crawl, merge and settle into rings until the next hit.
+reseed = "max(onset > 0.8, mod(time, 5) < 0.2)"
+trail = "26"
+age_tint = "0.7"
+zoom = "1.0 + clamp(bass * 0.06, 0, 0.05)"
+brightness = "0.95"
+palette_mix = "smoothstep(0.3, 0.7, noise(time * 0.04 + 50))"
+
+[smoothing]
+step_rate = 0.35
+zoom = 0.12
+
+[palette]
+stops = [
+  { at = 0.00, color = "#e6fffb" },   # pale cyan tissue
+  { at = 0.30, color = "#4fe0d2" },   # teal
+  { at = 0.65, color = "#1a5fa8" },   # sea blue
+  { at = 1.00, color = "#040a24" },   # abyss
+]
+
+[palette_b]
+stops = [
+  { at = 0.00, color = "#fbe8ff" },   # pale lilac
+  { at = 0.30, color = "#c07cff" },   # violet
+  { at = 0.65, color = "#4a2aa8" },   # indigo
+  { at = 1.00, color = "#0a0624" },   # night
+]

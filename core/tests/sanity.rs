@@ -494,13 +494,14 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // them — and the borrowed floor sat 4.07x under it, past the 2.2x slack
         // this file allows. Half that minimum, like every floor above.
         SystemKind::AnalyticField => 0.16,
-        // **Not derived from a distribution either**: the system ships no
-        // preset content. `reaction_diffusion`'s number, because both paint a
-        // stateful grid whose live share is what the frame shows — a borrowed
-        // number, not a measurement. **Re-derive it from this test's printed
-        // distribution when the first preset ships**, at half the family
-        // minimum like every floor above.
-        SystemKind::Cellular => 0.09,
+        // **Derived from the distribution on 2026-09-11**, when the family's
+        // first three worlds shipped, from a `0.09` borrowed off
+        // `ReactionDiffusion`. The lowest shipped member is `Tide Bugs` at
+        // 0.6057 — a larger_than_life field whose settled rings leave black
+        // between the reseeded discs — and the borrowed floor sat 6.73x under
+        // it, past the 2.2x slack this file allows. Half that minimum, like
+        // every floor above.
+        SystemKind::Cellular => 0.30,
     }
 }
 
