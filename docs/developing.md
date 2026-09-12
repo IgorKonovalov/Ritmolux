@@ -25,6 +25,69 @@ nothing.
 The headless capture CLI and the visual-QA harness have their own page,
 [Headless capture and video](capturing.md).
 
+## Editing presets in VS Code
+
+Install **Even Better TOML** (`tamasfe.even-better-toml`). That is the whole setup: a committed
+`.taplo.toml` at the repository root associates `presets/**/*.toml` and `docs/examples/**/*.toml` with
+`presets/preset.schema.json`, so the extension picks it up with nothing per-user to configure. You
+then get, inside a preset:
+
+- **completion** on `[params]` keys, offering that `system`'s parameters and not another system's;
+- **hover documentation** on a key — what it does, its default, its typical range and its kind;
+- **an underline on a key no system accepts**, which is the mistake the loader deliberately forgives
+  (an unknown parameter is a warning and the binding is kept, ADR-0020), so the editor is where it
+  becomes visible as you type it;
+- the closed rosters as a dropdown on `system`, `[curve] family`, `[spectrum] layout` and every other
+  key drawn from a fixed set.
+
+`presets/preset.schema.json` is **generated** from the engine's own `ParamSpec` and `TableDesc`
+declarations, and `core/tests/preset_schema.rs` fails if the committed copy is stale. Regenerate it
+rather than editing it:
+
+```sh
+RLX_UPDATE_PRESET_SCHEMA=1 cargo nextest run -p rlx-core the_committed_schema_is_current
+```
+
+**Turn format-on-save off for TOML.** The extension ships a formatter, and this project does not
+format TOML: the presets carry deliberate local alignment that every formatter measured against them
+destroyed (ADR-0190). `.taplo.toml` carries no `[formatting]` table, but that cannot stop your
+editor's own format-on-save, so if you have it on globally, exclude TOML in your settings:
+
+```json
+"[toml]": { "editor.formatOnSave": false }
+```
+
+Without that, one save reflows the file and the diff touches every line. `.vscode/` is gitignored, so
+this lives in your own settings rather than in the repository.
+
+Optionally, a task that runs the checker on the open file. In `.vscode/tasks.json`:
+
+```json
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "check preset",
+      "type": "shell",
+      "command": "cargo run -q -p standalone --bin ritmolux -- --check ${file}",
+      "problemMatcher": {
+        "owner": "ritmolux",
+        "fileLocation": ["absolute"],
+        "pattern": {
+          "regexp": "^(.*):(\\d+):(\\d+): (error|warning)\\[([^\\]]+)\\]: (.*)$",
+          "file": 1, "line": 2, "column": 3, "severity": 4, "code": 5, "message": 6
+        }
+      }
+    }
+  ]
+}
+```
+
+That gives the checker's diagnostics in the Problems panel. The schema and the checker cover
+different things and both are worth having: the schema knows every name and roster and underlines
+live, and only `--check` compiles an expression. See
+[the preset authoring guide](presets.md) for what it reports.
+
 ## The pre-push gate
 
 A checked-in `.githooks/pre-push` runs the fast subset of CI before a push, so a

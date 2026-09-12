@@ -552,3 +552,463 @@ pub fn hash_str(text: &str) -> u64 {
     }
     hash
 }
+
+// ---------------------------------------------------------------------------
+// The editor schema (ADR-0190)
+// ---------------------------------------------------------------------------
+
+/// The JSON Schema an editor completes preset TOML from, as committed to
+/// `presets/preset.schema.json` and associated with preset files by `.taplo.toml`.
+///
+/// **A second rendering of the declarations [`document`] prints**, not a second
+/// copy of them: the structural half walks [`TABLES`], the parameter half walks
+/// [`SystemKind::param_specs`] and [`GLOBAL_PARAMS`], and neither writes a name
+/// or a roster of its own. `core/tests/preset_schema.rs` holds the committed file
+/// to this function and validates the whole preset corpus against the *same*
+/// declarations — so the file, the editor and the loader cannot disagree about
+/// what a preset may contain.
+///
+/// Draft-07, because that is what Even Better TOML's Taplo backend implements —
+/// in particular the `if`/`then` the per-system parameter sets need.
+///
+/// ## What it does and does not enforce
+///
+/// `additionalProperties: false` appears **only** where the engine's declaration
+/// is authoritative for the whole key set: the document root, each structural
+/// table, and each system's `[params]`. It is deliberately absent from the
+/// author-keyed maps — `[smoothing]`, `[hold]`, `[occupancy]`, `[latch]` — whose
+/// keys the preset chooses.
+///
+/// **No range is enforced anywhere.** [`ParamSpec::range`] is documented as
+/// neither a clamp nor a validation bound, and presets set a value outside it on
+/// purpose; a range that underlined a correct preset would be worse than no range
+/// at all. It is carried as prose in `markdownDescription`, where an author reads
+/// it and nothing acts on it.
+///
+/// Every `[params]` value is `type: string`: a binding is an expression, and
+/// `glow = 1.0` is a load error rather than a shorthand.
+pub fn json_schema() -> String {
+    let mut out = String::with_capacity(256 * 1024);
+    out.push_str("{\n");
+    out.push_str("  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n");
+    out.push_str("  \"title\": \"Ritmolux preset\",\n");
+    out.push_str("  \"description\": ");
+    out.push_str(&json_string(
+        "Generated from the engine's own parameter and table declarations. Do not \
+         edit by hand: re-run the core test suite with RLX_UPDATE_PRESET_SCHEMA=1.",
+    ));
+    out.push_str(",\n  \"type\": \"object\",\n");
+    out.push_str("  \"additionalProperties\": false,\n");
+
+    out.push_str("  \"properties\": {\n");
+    push_table_properties(&mut out, 2, &super::raw::PRESET);
+    out.push_str("\n  },\n");
+
+    // Each distinct parameter declaration is written **once**, under
+    // `definitions`, and every system accepting it `$ref`s that one entry.
+    // Without the indirection the 28 cases below carry some 1,250 copies of a
+    // hover text, and a one-word edit to a parameter's doc line rewrites the file
+    // in 28 places instead of one.
+    let definitions = param_definitions();
+
+    // The per-system parameter sets. One `if`/`then` per system per surface: the
+    // root's `[params]` and a `[layer]`'s own accept different sets, because a
+    // layer binds its scene's parameters and never the compositing stages.
+    out.push_str("  \"allOf\": [\n");
+    let mut first = true;
+    for surface in [ParamSurface::Root, ParamSurface::Layer] {
+        for kind in SystemKind::ALL {
+            push_separator(&mut out, &mut first);
+            push_system_case(&mut out, 2, kind, surface, &definitions);
+        }
+    }
+    out.push_str("\n  ],\n");
+
+    out.push_str("  \"definitions\": {\n");
+    let mut first = true;
+    for table in TABLES {
+        // The root is the document itself rather than a definition, and nothing
+        // `$ref`s it.
+        if table.name == super::raw::PRESET.name {
+            continue;
+        }
+        push_separator(&mut out, &mut first);
+        push_definition(&mut out, 2, table);
+    }
+    for (key, spec) in &definitions {
+        push_separator(&mut out, &mut first);
+        push_param_definition(&mut out, 2, key, spec);
+    }
+    out.push_str("\n  }\n}\n");
+    out
+}
+
+/// Every **distinct** parameter declaration in the engine, each with the
+/// `definitions` key the schema refs it by.
+///
+/// Deduplicated by declaration rather than by name, which is the whole point:
+/// 29 of the 208 parameter names are declared differently by different systems —
+/// `d` is a curve's sampling step and an attractor's fourth coefficient, with
+/// different sentences and different defaults — so one entry per *name* would
+/// show the wrong default and the wrong prose on hover for whichever system lost.
+///
+/// The key is `param.<name>` for a name with a single declaration, and
+/// `param.<name>.<owner>` for each variant of one declared more than once, where
+/// `owner` is the first roster to declare that variant. Readable rather than
+/// numbered, and stable because both rosters are `const` arrays walked in
+/// declaration order. A key that would collide anyway takes a numeric suffix, so
+/// two variants can never silently land on one definition.
+fn param_definitions() -> Vec<(String, &'static ParamSpec)> {
+    let labelled = SystemKind::ALL
+        .iter()
+        .map(|kind| (kind.as_str(), kind.param_specs()))
+        .chain(
+            STAGE_LABELS
+                .iter()
+                .copied()
+                .zip(GLOBAL_PARAMS.iter().copied()),
+        );
+
+    // (owner label, spec), one per distinct declaration, in walk order.
+    let mut distinct: Vec<(&'static str, &'static ParamSpec)> = Vec::new();
+    for (label, specs) in labelled {
+        for spec in specs {
+            if !distinct
+                .iter()
+                .any(|(_, seen)| same_declaration(seen, spec))
+            {
+                distinct.push((label, spec));
+            }
+        }
+    }
+
+    let mut out: Vec<(String, &'static ParamSpec)> = Vec::with_capacity(distinct.len());
+    for (label, spec) in &distinct {
+        let ambiguous = distinct
+            .iter()
+            .filter(|(_, other)| other.name == spec.name)
+            .count()
+            > 1;
+        let mut key = if ambiguous {
+            format!("param.{}.{label}", spec.name)
+        } else {
+            format!("param.{}", spec.name)
+        };
+        // Belt and braces: a key already taken would otherwise overwrite its
+        // twin in the JSON object, which is a silently wrong hover rather than a
+        // failure.
+        let mut next = 2;
+        while out.iter().any(|(taken, _)| *taken == key) {
+            key = format!("param.{}.{label}.{next}", spec.name);
+            next += 1;
+        }
+        out.push((key, spec));
+    }
+    out
+}
+
+/// Whether two specs are the same declaration — the same name saying the same
+/// thing about the same default.
+///
+/// Bit equality on the floats rather than `==`, so the comparison is total: a
+/// `NaN` default would otherwise never equal itself and would be written once per
+/// roster that declares it.
+fn same_declaration(a: &ParamSpec, b: &ParamSpec) -> bool {
+    let bits = |range: Option<[f32; 2]>| range.map(|[lo, hi]| (lo.to_bits(), hi.to_bits()));
+    a.name == b.name
+        && a.doc == b.doc
+        && a.default.to_bits() == b.default.to_bits()
+        && bits(a.range) == bits(b.range)
+        && a.kind.as_str() == b.kind.as_str()
+}
+
+/// The definition key for `spec`, found by declaration.
+fn definition_key<'k>(
+    definitions: &'k [(String, &'static ParamSpec)],
+    spec: &ParamSpec,
+) -> Option<&'k str> {
+    definitions
+        .iter()
+        .find(|(_, candidate)| same_declaration(candidate, spec))
+        .map(|(key, _)| key.as_str())
+}
+
+/// One parameter declaration as a `definitions` entry: a string, what it does,
+/// and its default, range and kind as hover prose.
+fn push_param_definition(out: &mut String, depth: usize, key: &str, spec: &ParamSpec) {
+    let pad = "  ".repeat(depth);
+    out.push_str(&format!("{pad}{}: {{\n", json_string(key)));
+    out.push_str(&format!("{pad}  \"type\": \"string\",\n"));
+    out.push_str(&format!(
+        "{pad}  \"description\": {},\n",
+        json_string(spec.doc)
+    ));
+    out.push_str(&format!(
+        "{pad}  \"markdownDescription\": {}\n",
+        json_string(&markdown_for(spec))
+    ));
+    out.push_str(&format!("{pad}}}"));
+}
+
+/// Which `[params]` surface a per-system case is about.
+///
+/// The two accept different sets, which is why the distinction exists in the
+/// schema at all: [`is_known_param`] admits the compositing stages at the root,
+/// and the layer surface admits only the layer system's own roster — the rule the
+/// loader already enforces by warning.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum ParamSurface {
+    /// The document's own `[params]`.
+    Root,
+    /// A `[layer]`'s `[layer.params]`.
+    Layer,
+}
+
+/// Every parameter one surface of `kind` accepts, in the order an author meets
+/// them: the system's own roster first, then the engine stages'.
+///
+/// **The membership test this renders is the loader's**, read off the same two
+/// rosters `is_known_param` and `compile_bindings` consult — so a key the editor
+/// underlines is exactly a key the loader would warn about, and a key it accepts
+/// is one the loader reads. `core/tests/preset_schema.rs` validates against this
+/// same function, which is what makes the committed JSON and the corpus check one
+/// model rather than two.
+///
+/// A name declared by the system and again by a stage appears **once**, at its
+/// first occurrence — the order `kind_of_param` resolves in.
+pub fn params_of(kind: SystemKind, surface: ParamSurface) -> Vec<&'static ParamSpec> {
+    let mut out: Vec<&'static ParamSpec> = Vec::new();
+    let rosters = kind.param_specs().iter().chain(
+        GLOBAL_PARAMS
+            .iter()
+            .filter(|_| surface == ParamSurface::Root)
+            .flat_map(|stage| stage.iter()),
+    );
+    for spec in rosters {
+        if !out.iter().any(|seen| seen.name == spec.name) {
+            out.push(spec);
+        }
+    }
+    out
+}
+
+/// One `if`/`then` pair: when `system` is `kind`, that surface's `[params]` keys
+/// are this system's.
+///
+/// The `if` **requires** `system` as well as matching it, because a subschema for
+/// an absent key is vacuously satisfied — without the `required` every case would
+/// fire on a document that declares no system at all, and the parameter set of
+/// whichever fired last would be the one enforced.
+fn push_system_case(
+    out: &mut String,
+    depth: usize,
+    kind: SystemKind,
+    surface: ParamSurface,
+    definitions: &[(String, &'static ParamSpec)],
+) {
+    let pad = "  ".repeat(depth);
+    let params = params_of(kind, surface);
+    let name = json_string(kind.as_str());
+    out.push_str(&format!("{pad}{{\n"));
+    match surface {
+        ParamSurface::Root => {
+            out.push_str(&format!(
+                "{pad}  \"if\": {{ \"required\": [\"system\"], \"properties\": {{ \"system\": {{ \"const\": {name} }} }} }},\n"
+            ));
+            out.push_str(&format!(
+                "{pad}  \"then\": {{ \"properties\": {{ \"params\": "
+            ));
+            push_params_object(out, depth + 2, &params, definitions);
+            out.push_str(&format!(" }} }}\n{pad}}}"));
+        }
+        ParamSurface::Layer => {
+            out.push_str(&format!(
+                "{pad}  \"if\": {{ \"required\": [\"layer\"], \"properties\": {{ \"layer\": {{ \"required\": [\"system\"], \"properties\": {{ \"system\": {{ \"const\": {name} }} }} }} }} }},\n"
+            ));
+            out.push_str(&format!(
+                "{pad}  \"then\": {{ \"properties\": {{ \"layer\": {{ \"properties\": {{ \"params\": "
+            ));
+            push_params_object(out, depth + 2, &params, definitions);
+            out.push_str(&format!(" }} }} }} }}\n{pad}}}"));
+        }
+    }
+}
+
+/// The `[params]` object for one system: every accepted name as a string
+/// property, and nothing else admitted.
+fn push_params_object(
+    out: &mut String,
+    depth: usize,
+    params: &[&'static ParamSpec],
+    definitions: &[(String, &'static ParamSpec)],
+) {
+    let pad = "  ".repeat(depth);
+    out.push_str("{\n");
+    out.push_str(&format!("{pad}  \"type\": \"object\",\n"));
+    out.push_str(&format!("{pad}  \"additionalProperties\": false,\n"));
+    out.push_str(&format!("{pad}  \"properties\": {{\n"));
+    let mut first = true;
+    for spec in params {
+        // Every spec reached here came out of a roster `param_definitions` also
+        // walked, so the lookup cannot miss. A miss would mean the two walks had
+        // stopped reading the same declarations, and writing the parameter inline
+        // instead would hide that behind a hover that merely looks right.
+        let key = definition_key(definitions, spec)
+            .expect("every parameter roster is walked by param_definitions");
+        push_separator(out, &mut first);
+        out.push_str(&format!(
+            "{pad}    {}: {{ \"$ref\": \"#/definitions/{key}\" }}",
+            json_string(spec.name)
+        ));
+    }
+    out.push_str(&format!("\n{pad}  }} }}"));
+}
+
+/// The hover text for one parameter: what it does, then its default, its range
+/// and its kind.
+///
+/// The range is **prose here and a bound nowhere**, for the reason
+/// [`json_schema`] gives: a preset may legitimately set a value outside it.
+fn markdown_for(spec: &ParamSpec) -> String {
+    let mut text = format!("{}\n\n", spec.doc);
+    text.push_str(&format!("- default `{:?}`\n", spec.default));
+    match spec.range {
+        Some([lo, hi]) => text.push_str(&format!(
+            "- typical range `{lo:?}` to `{hi:?}` — a guide, not a bound: the engine \
+             neither clamps to it nor rejects a value outside it\n"
+        )),
+        None => text.push_str("- no typical range declared\n"),
+    }
+    text.push_str(&format!("- {} parameter\n", spec.kind.as_str()));
+    // No system is named: one declaration is shared by every system that makes
+    // it, so a sentence naming one of them would be wrong on the others.
+    text.push_str("\nThe value is an expression, always quoted.");
+    text
+}
+
+/// One structural table as a `definitions` entry.
+fn push_definition(out: &mut String, depth: usize, table: &TableDesc) {
+    let pad = "  ".repeat(depth);
+    out.push_str(&format!("{pad}{}: {{\n", json_string(table.name)));
+    out.push_str(&format!(
+        "{pad}  \"description\": {},\n",
+        json_string(table.doc)
+    ));
+    out.push_str(&format!("{pad}  \"type\": \"object\",\n"));
+    // Authoritative: `core/src/preset/schema/tests.rs` reads the field roster
+    // serde derived for this table and asserts it is exactly these keys, so a key
+    // the editor refuses is a key the loader has no field for.
+    out.push_str(&format!("{pad}  \"additionalProperties\": false,\n"));
+    out.push_str(&format!("{pad}  \"properties\": {{\n"));
+    push_table_properties(out, depth + 2, table);
+    out.push_str(&format!("\n{pad}  }}\n{pad}}}"));
+}
+
+/// Every key of `table` as a JSON Schema property.
+fn push_table_properties(out: &mut String, depth: usize, table: &TableDesc) {
+    let pad = "  ".repeat(depth);
+    let mut first = true;
+    for key in table.keys {
+        push_separator(out, &mut first);
+        out.push_str(&format!("{pad}{}: {{\n", json_string(key.name)));
+        push_kind_body(out, depth + 1, &key.kind);
+        out.push_str(&format!(
+            ",\n{pad}  \"description\": {}",
+            json_string(key.doc)
+        ));
+        // An empty `default` means absence denotes something other than a value —
+        // a required key, or one whose absence turns a feature off — so there is
+        // no default to quote.
+        if !key.default.is_empty() {
+            out.push_str(&format!(
+                ",\n{pad}  \"markdownDescription\": {}",
+                json_string(&format!("{}\n\nDefault `{}`.", key.doc, key.default))
+            ));
+        }
+        out.push_str(&format!("\n{pad}}}"));
+    }
+}
+
+/// The type half of one key's schema — everything but its description.
+///
+/// The mapping is [`KeyKind`]'s and nothing here invents a roster: a
+/// [`KeyKind::Roster`] asks the type that owns the closed set, so an `enum` in the
+/// schema is the same list the loader accepts.
+fn push_kind_body(out: &mut String, depth: usize, kind: &KeyKind) {
+    let pad = "  ".repeat(depth);
+    match kind {
+        KeyKind::Bool => out.push_str(&format!("{pad}\"type\": \"boolean\"")),
+        KeyKind::Int => out.push_str(&format!("{pad}\"type\": \"integer\"")),
+        KeyKind::Float => out.push_str(&format!("{pad}\"type\": \"number\"")),
+        // Free text and an expression are both strings to an editor; the
+        // difference is what the loader does with them, not what TOML may hold.
+        KeyKind::Text | KeyKind::Expr => out.push_str(&format!("{pad}\"type\": \"string\"")),
+        KeyKind::Roster(roster) => {
+            out.push_str(&format!("{pad}\"type\": \"string\",\n{pad}\"enum\": ["));
+            let mut first = true;
+            for value in roster.values() {
+                if !first {
+                    out.push_str(", ");
+                }
+                first = false;
+                out.push_str(&json_string(value));
+            }
+            out.push(']');
+        }
+        // Seconds, or the `{ attack, release }` pair ADR-0035 widened it to.
+        KeyKind::Easing => out.push_str(&format!(
+            "{pad}\"anyOf\": [\n{pad}  {{ \"type\": \"number\" }},\n{pad}  {{ \"type\": \"object\", \"additionalProperties\": false, \"properties\": {{ \"attack\": {{ \"type\": \"number\" }}, \"release\": {{ \"type\": \"number\" }} }} }}\n{pad}]"
+        )),
+        // A number, or the word `random` (ADR-0051).
+        KeyKind::Seed => out.push_str(&format!(
+            "{pad}\"anyOf\": [\n{pad}  {{ \"type\": \"number\" }},\n{pad}  {{ \"type\": \"string\", \"enum\": [\"random\"] }}\n{pad}]"
+        )),
+        // A named edge, or a period in seconds — which the loader accepts bare or
+        // quoted. Written as an unconstrained string beside the number rather than
+        // as an `enum` of the two words, because an `enum` would underline the
+        // legal `"2.0"`; the two words are carried as `examples`, which an editor
+        // offers and does not enforce.
+        KeyKind::Hold => out.push_str(&format!(
+            "{pad}\"anyOf\": [\n{pad}  {{ \"type\": \"number\" }},\n{pad}  {{ \"type\": \"string\", \"examples\": [\"beat\", \"bar\"] }}\n{pad}]"
+        )),
+        // `#rrggbb` (or a bare `rrggbb`), or an `[r, g, b]` array in 0..=1. The
+        // string carries no `pattern`: the loader's message about a malformed hex
+        // names the offending value, and a pattern would underline a half-typed
+        // colour on every keystroke.
+        KeyKind::Colour => out.push_str(&format!(
+            "{pad}\"anyOf\": [\n{pad}  {{ \"type\": \"string\" }},\n{pad}  {{ \"type\": \"array\", \"items\": {{ \"type\": \"number\" }} }}\n{pad}]"
+        )),
+        // Author-chosen keys, so no `additionalProperties: false`: the engine is
+        // authoritative for the value's shape and the preset for the key set.
+        KeyKind::Map(of) => {
+            out.push_str(&format!(
+                "{pad}\"type\": \"object\",\n{pad}\"additionalProperties\": {{\n"
+            ));
+            push_kind_body(out, depth + 1, of);
+            out.push_str(&format!("\n{pad}}}"));
+        }
+        KeyKind::List(of) => {
+            out.push_str(&format!("{pad}\"type\": \"array\",\n{pad}\"items\": {{\n"));
+            push_kind_body(out, depth + 1, of);
+            out.push_str(&format!("\n{pad}}}"));
+        }
+        KeyKind::Table(name) => {
+            out.push_str(&format!("{pad}\"$ref\": \"#/definitions/{name}\""));
+        }
+    }
+}
+
+/// Write `",\n"` before every element but the first.
+fn push_separator(out: &mut String, first: &mut bool) {
+    if !*first {
+        out.push_str(",\n");
+    }
+    *first = false;
+}
+
+/// `text` as a JSON string literal, quotes included.
+fn json_string(text: &str) -> String {
+    let mut out = String::with_capacity(text.len() + 2);
+    push_string(&mut out, text);
+    out
+}

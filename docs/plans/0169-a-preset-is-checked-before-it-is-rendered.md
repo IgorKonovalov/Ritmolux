@@ -250,9 +250,9 @@ step, ahead of `shot` — the skill is the lane's, not `dev`'s.
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — `--check` reports the loader's verdict at a position | dev | done | `0449b7f` |
-| 2 — the house-style rules and the gate | dev | done | committed with this row |
-| 3 — the editor schema | dev | not started | |
-| 4 — the editor, verified on the owner's machine | human | not started | |
+| 2 — the house-style rules and the gate | dev | done | `73a9a10` |
+| 3 — the editor schema | dev | done | committed with this row |
+| 4 — the editor, verified on the owner's machine | human | not started — the user's | |
 
 ### Notes
 

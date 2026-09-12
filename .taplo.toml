@@ -1,0 +1,34 @@
+# Associates the generated preset schema with the files it describes, so an
+# editor with Even Better TOML installed completes parameter names, shows each
+# one's documentation on hover, and underlines a key no system accepts. No
+# per-user setup: the extension finds this file at the workspace root.
+#
+# THE `[formatting]` TABLE IS DELIBERATELY ABSENT, AND MUST STAY ABSENT.
+# This project does not format TOML (ADR-0190). The presets carry deliberate,
+# local alignment no formatter models — column-padded inline tables, `=` columns
+# aligned per block, a two-space gap before a trailing comment — and `taplo fmt`
+# measured against this corpus rewrote 99 to 121 of 124 files under every
+# configuration tried and panicked on eight shipped presets under its defaults.
+# A `[formatting]` table here would switch on the one Taplo feature that was
+# rejected on measurement.
+#
+# The extension still ships a formatter this file cannot disable. It runs only if
+# your VS Code formats TOML on save; docs/developing.md says how to turn that off
+# for TOML alone.
+#
+# One rule and no exclusions: the two globs below reach preset files and nothing
+# else. This repository's own manifests (`Cargo.toml`, `deny.toml`, `config.toml`)
+# live outside both, so they need no rule to keep the preset schema away from
+# them — and a defensive second rule would rest on Taplo's rule-precedence order,
+# which nothing here checks.
+#
+# `presets/preset.schema.json` is GENERATED from the engine's own ParamSpec and
+# TableDesc declarations, and `core/tests/preset_schema.rs` fails if the
+# committed copy is stale. Regenerate it with RLX_UPDATE_PRESET_SCHEMA=1 rather
+# than editing it.
+
+[[rule]]
+name = "ritmolux-preset"
+include = ["presets/**/*.toml", "docs/examples/**/*.toml"]
+# Relative to this file, so it resolves the same in a clone at any path.
+schema.path = "presets/preset.schema.json"
