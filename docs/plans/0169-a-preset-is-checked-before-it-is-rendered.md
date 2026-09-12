@@ -13,10 +13,17 @@ engine's own loader without opening a GPU adapter, and prints each error and war
 `path:line:col: severity[rule]: message`. It exits non-zero on an error, and on a warning too under
 `--strict`. A handful of house-style rules the loader does not own ride on the same pass. A GPU-free
 integration test runs it over `presets/`, `presets/proposed/`, `presets/pending/` and
-`docs/examples/`, so the existing `nextest` run becomes the gate. For the editor, a JSON Schema
-rendered from the `--schema` export is committed beside the presets and associated through
-`.taplo.toml`, so Even Better TOML completes parameter names, shows their documentation on hover and
-underlines an unknown key. **Nothing formats a preset** — ADR-0190 records why, with the dry run.
+`docs/examples/`, so the existing `nextest` run becomes the gate. For the editor, JSON Schemas
+rendered from the engine's declarations are committed beside the presets — **one self-contained file
+per system**, chosen by the filename's family prefix in a generated `.taplo.toml`, plus a generic
+file for everything else — so Even Better TOML completes parameter names, shows their documentation
+on hover and flags an unknown key. **Nothing formats a preset** — ADR-0190 records why, with the dry
+run.
+
+**Amended 2026-09-13.** Phase 4 failed on the owner's machine: Taplo validates a single schema's
+`if`/`then` but ignores it for hover and completion, so Phase 3's one-file shape gave no completion
+and no hover on any parameter. Phases 5 and 6 replace it with the per-system shape; the evidence is
+under Phase 4.
 
 ## Context & problem
 
@@ -67,15 +74,19 @@ flowchart LR
         F["--check / --strict"]
         T["tests/preset_check.rs<br/>the gate"]
     end
-    subgraph repo["committed files"]
-        J["presets/preset.schema.json"]
-        TP[".taplo.toml"]
+    subgraph repo["committed files (generated)"]
+        J["presets/preset.schema.json<br/>generic fallback"]
+        JS["presets/schema/&lt;system&gt;.schema.json<br/>one per system"]
+        TP[".taplo.toml<br/>family prefix -> schema"]
     end
     X --> J
+    X --> JS
+    X --> TP
     L --> C
     C --> F
     C --> T
-    J --> TP --> E["VS Code + Even Better TOML<br/>completion, hover, unknown key"]
+    J --> TP
+    JS --> TP --> E["VS Code + Even Better TOML<br/>completion, hover, unknown key"]
 ```
 
 ## Implementation phases
@@ -195,6 +206,102 @@ flowchart LR
     `swarm` parameter; hovering a key shows its doc line.
   - Misspelling a key underlines it, and fixing it clears the underline.
   - Saving an unedited preset leaves `git diff` empty.
+- **Outcome (2026-09-12): failed.** In VS Code, completion in `[params]` offered only the editor's
+  word list, hover on a parameter showed nothing, and the status bar read "no schema selected". The
+  cause was isolated by driving Even Better TOML 0.21.2's own bundled Taplo server over node IPC
+  exactly as the extension launches it (`dist/server.js`), from a session scratchpad, not committed:
+  - **Association** failed first, then worked: Taplo joins a relative include glob onto the
+    workspace root (`c:\Users\...`) and matches it against the document URL with the scheme stripped
+    (`/c:/Users/...`), so on Windows only a glob beginning `/` matches. With that fix (uncommitted in
+    `.taplo.toml` on 2026-09-12) `taplo/associatedSchema` returned `preset.schema.json`, source
+    `config`. The status bar item is not evidence either way.
+  - **Validation honours `allOf` + `if`/`then`:** a misspelled key produced *"Additional properties
+    are not allowed ('wrapp' was unexpected)"*, placed on the `[params]` header line, not on the key.
+  - **Hover and completion ignore `if`/`then`.** Hover worked on `system`, `name` and `[params]`
+    (unconditional) and returned null on every parameter; completion in `[params]` returned 0 items.
+    With `fragment_field`'s `params` hoisted out of the conditional, hover returned the doc line and
+    completion returned that system's 46 names.
+  - **Rejected shapes, each measured:** `oneOf`/`anyOf` over the systems merges hover text across
+    systems, offers all 230 names, and reports a violation as the whole document at line 1. A rule
+    pointing at `preset.schema.json#/definitions/...` fails (the fragment is read as part of the
+    filename, `ENOENT`). A small per-system file that only `$ref`s the shared schema fails (*"could
+    not determine schema URL"*). `additionalProperties: {not: {}}` moves the underline onto the key
+    but the message quotes the value and never names the key.
+  - **What worked end to end:** a self-contained per-system file on a rule
+    `/**/presets/fragment_*.toml`, beside a generic rule on `/**/presets/*.toml` that **excludes**
+    the family glob. The fragment file got its own schema and the swarm file the generic one — and
+    since Taplo breaks a tie between equal-priority rules by taking the later one, which was the
+    generic rule, the `exclude` is what selected it, not rule order.
+
+### Phase 5 — one editor schema per system
+- **Owner skill:** dev
+- **What:** Render a self-contained JSON Schema per system, a generic fallback, and the `.taplo.toml`
+  that selects between them by filename family; tighten the `file-name` rule to that same family.
+- **Files touched:** `core/src/preset/schema/system.rs` (the family column),
+  `core/src/preset/schema/export.rs`, `core/tests/preset_schema.rs`, `presets/schema/` (new, 14
+  generated files), `presets/preset.schema.json` (regenerated), `.taplo.toml` (now generated),
+  `standalone/src/preset_check.rs`, `standalone/tests/preset_check.rs`, `docs/developing.md`,
+  `docs/presets.md` if it states the `file-name` rule.
+- **Shape:**
+  - **The family is declared on the system**, as a third column of `system.rs`'s `TABLE` read
+    through `SystemKind::family()`: `fragment`, `swarm`, `curve`, `lsystem`, `star`, `reaction`,
+    `attractor`, `spectrum`, `emitter`, `shape`, `warp`, `collage`, `analytic`, `cellular`. It
+    cannot be derived — `shape_field` shares every segment with another system — so it is written
+    down once, and both the editor rules and the `file-name` rule read it. Each family is one
+    `_`-separated segment of its system's name, and no two systems share one; hold both at compile
+    time or in a test.
+  - **`presets/schema/<system>.schema.json`**, one per `SystemKind`: the generic schema's top-level
+    object with `system` pinned to that system (`const`), `params` as that system's properties with
+    `additionalProperties: false` and **no `if`/`then` anywhere on the top-level path**, and
+    `definitions` pruned to what the file references. `[layer]` names its own system, so inside a
+    per-system file its `params` are any string: no layer branches, which would pull every system's
+    definitions back in (about 200 KB per file against about 66 KB, measured on a prototype). The
+    `--schema` document is unchanged.
+  - **`presets/preset.schema.json` stays** as the fallback for any TOML under `presets/` or
+    `docs/examples/` that no family rule claims — the teaching examples, and a library file named off
+    its family, which `--check` warns about. Its `if`/`then` shape is unchanged: it validates and does
+    not complete.
+  - **`.taplo.toml` is generated**, header comment included. One `[[rule]]` per system, including
+    `/**/presets/<family>_*.toml`, `/**/presets/proposed/<family>_*.toml` and
+    `/**/presets/pending/<family>_*.toml`, then one generic rule including `/**/presets/*.toml`,
+    `/**/presets/proposed/*.toml`, `/**/presets/pending/*.toml` and `/**/docs/examples/**/*.toml`
+    and **excluding every family glob**. The selection must rest on `exclude`, never on rule order.
+    Every glob begins with `/`, and the header says why (Phase 4's outcome).
+  - **The `file-name` rule** becomes: a library file's prefix, up to the first `_`, equals its
+    system's family. On an unknown `system` the rule stays silent (the loader already errors). The
+    diagnostic names the expected family, so it reads as the reason the editor gave the file no
+    per-system schema.
+  - **One command regenerates all of it:** `RLX_UPDATE_PRESET_SCHEMA=1` rewrites the generic file,
+    every per-system file and `.taplo.toml`, and removes a `presets/schema/*.schema.json` no system
+    renders.
+- **Done when:**
+  - The drift test fails on any stale generated file — each of the 16 — and on an extra file in
+    `presets/schema/`; the env var repairs every case.
+  - Every tracked library TOML validates against **its family's** file with zero violations, and
+    every tracked TOML under `presets/` and `docs/examples/` still validates against the generic file.
+  - Against `fragment_field.schema.json`, a `[params]` key belonging only to `swarm` (`force`) is a
+    violation naming the key, and `system = "swarm"` is a violation.
+  - The `file-name` gate passes on the tree. Its fixtures move with the rule: `collage_x.toml`
+    declaring `shape_collage` passes, and `shape_x.toml` declaring `shape_collage` now fails.
+  - `core/build.rs` embeds exactly the `*.toml` set it did before; nothing in `presets/schema/` is
+    picked up.
+  - `docs/developing.md`'s editor section says which files get completion (library files named for
+    their family) and which get validation only (`docs/examples/`, `[layer]`), and names the one
+    regenerate command.
+  - **Before handing Phase 6 to the owner**, re-run Phase 4's probe shape against the regenerated
+    tree: drive `dist/server.js` of the installed extension over node IPC, open a `fragment_*` and a
+    `swarm_*` preset, and record in the log the associated schema, a hover on a parameter, and the
+    completion count for each. The probe is not committed.
+
+### Phase 6 — the editor, verified again
+- **Owner skill:** human
+- **What:** Phase 4's check, on the per-system schemas.
+- **Done when:**
+  - In a `fragment_*` preset's `[params]`, completion offers that system's parameters and not a
+    `swarm` parameter; hovering a parameter shows its doc line.
+  - Misspelling a key raises a Problems entry naming it (on the `[params]` header — the chosen
+    placement, see Risks), and fixing it clears the entry.
+  - Saving an unedited preset leaves `git diff` empty.
 
 ## Data shapes
 
@@ -222,7 +329,19 @@ pub fn check(path: &Path, src: &str) -> Vec<Diagnostic>;
   schema in the editor. Giving `Preset::warnings` structure is a core change with the studio as a
   consumer, so it is out of scope here — see Followups.
 - **Taplo's JSON Schema support** (draft-07 `if`/`then`) is trusted, not tested by any gate. Phase 4
-  is the only evidence, and it is why that phase exists.
+  is the only evidence, and it is why that phase exists. **It was wrong for hover and completion**
+  (Phase 4's outcome), which is what Phase 5 answers. Nothing in CI can run the extension, so the
+  per-system shape is still held only by Phase 5's recorded probe and Phase 6; a Taplo upgrade that
+  changes glob or schema handling will not be noticed by any gate.
+- **The underline sits on the `[params]` header, not the misspelled key.** Chosen by the owner on
+  2026-09-13 over `additionalProperties: {not: {}}`, which places it on the key at the price of a
+  message that never names the key. In a long `[params]` block the header can be a hundred lines
+  above the typo; the Problems panel entry names the key, and `--check` places it too.
+- **About 925 KB of generated JSON is committed** across the 14 per-system files (a prototype
+  measured about 66 KB each, pretty-printed). None of it ships; `build.rs` reads only `*.toml`.
+- **The editor now depends on the filename.** A library file named off its family gets validation
+  but no completion. The tightened `file-name` rule warns on exactly that file, and the gate fails
+  it in `presets/`, so the two cannot disagree on the tracked tree.
 - **Even Better TOML's formatter** is outside anything this repository can switch off. The docs say
   so and Phase 4 checks one save; a user who enables format-on-save anyway will produce a reformat
   diff, which review will catch because it will touch every line.
@@ -233,6 +352,9 @@ pub fn check(path: &Path, src: &str) -> Vec<Diagnostic>;
 - Enforce `ParamSpec::range`, restate a rule the loader already enforces, or add an ESLint or npm
   toolchain.
 - Change the loader's behaviour: an unknown parameter stays a warning with the binding kept.
+- Give `[layer]`, or the teaching files under `docs/examples/`, per-system completion. Both keep
+  validation from the generic schema; `[layer]` params are any string inside a per-system file.
+- Change the `--schema` document, which Plan 0172 snapshots.
 - Check TOML outside presets and examples (`Cargo.toml`, `deny.toml`, `config.toml`).
 - Touch `studio/`. The studio already reports the player's errors, and whether it shows `--check`'s
   house-style warnings is a later `studio-builder` question.
@@ -252,7 +374,9 @@ step, ahead of `shot` — the skill is the lane's, not `dev`'s.
 | 1 — `--check` reports the loader's verdict at a position | dev | done | `0449b7f` |
 | 2 — the house-style rules and the gate | dev | done | `73a9a10` |
 | 3 — the editor schema | dev | done | `43aabb3` |
-| 4 — the editor, verified on the owner's machine | human | not started — the user's | |
+| 4 — the editor, verified on the owner's machine | human | failed 2026-09-12 — see its Outcome; replaced by 5 + 6 | |
+| 5 — one editor schema per system | dev | not started | |
+| 6 — the editor, verified again | human | not started — the user's | |
 
 ### Notes
 
