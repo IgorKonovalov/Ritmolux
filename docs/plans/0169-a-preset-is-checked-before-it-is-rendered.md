@@ -251,20 +251,72 @@ step, ahead of `shot` — the skill is the lane's, not `dev`'s.
 |---|---|---|---|
 | 1 — `--check` reports the loader's verdict at a position | dev | done | `0449b7f` |
 | 2 — the house-style rules and the gate | dev | done | `73a9a10` |
-| 3 — the editor schema | dev | done | committed with this row |
+| 3 — the editor schema | dev | done | `43aabb3` |
 | 4 — the editor, verified on the owner's machine | human | not started — the user's | |
 
 ### Notes
 
+**Files touched beyond a phase's list.** `standalone/tests/stream_split.rs`, in `0449b7f`. The new
+`println!` of diagnostics and the `eprintln!("{failure}")` refusal each tripped an existing gate in
+that file — `nothing_writes_prose_to_standard_output_while_a_sink_could_be_open` and
+`no_human_diagnostic_line_can_begin_with_a_brace` — whose allowlists are that gate's designed
+accommodation. `preset_check.rs` was added to `STDOUT_WRITERS` with its reason, and `{failure}` to
+`MESSAGE_PLACEHOLDERS`; `CheckFailure`'s only variant opens with the literal `--check `.
+
+**An exit code the plan does not name, added then removed.** Phase 1 first refused a directory
+holding no `*.toml` as a usage failure. That is outside the plan's exit-code table and it would have
+made Phase 2's gate red on `presets/proposed/` and `presets/pending/`, which hold only a README
+today. Removed before `0449b7f`: an empty directory exits 0 and the summary reports `checked 0
+files`.
+
+**Phase 2's gate walks `docs/examples/` recursively.** Fourteen of its fifteen files are in
+subdirectories, so a flat read would have covered one. The `--check` CLI stays non-recursive as
+Phase 1 specifies. Raised before Phase 1 and approved by the user at the Step 2 gate.
+
+**Phase 3 renders `layer` as one object, not an array.** The phase says "each `[[layer]]`";
+`RawPreset.layer` is `Option<RawLayer>`, a single optional table, so the schema and its `if`/`then`
+case address `layer` as an object.
+
+**`hold` admits any string rather than an `enum` of the two words.** The loader accepts a period
+bare or quoted (`"2.0"`), so an `enum` of `beat`/`bar` would underline a legal value. The words are
+carried as `examples`.
+
+**Beyond the plan: the schema was validated with a real draft-07 validator.** ADR-0190 trusts
+Taplo's `if`/`then` support without a gate, and Phase 3's own test is a second rendering of the same
+declarations rather than a JSON reading. So the committed file was additionally run through `ajv` 6
+against all 127 tracked presets parsed by `smol-toml` — both already present in
+`studio/node_modules` and `site/node_modules`, nothing installed: **0 violations**. Six negative
+cases were caught, each naming the key: a misspelled `[params]` key, an off-roster `layout`, an
+off-roster `system`, an unknown top-level table, a bare-number binding, and a layer binding a
+compositing parameter. Run from the session scratchpad and not committed, the shape ADR-0190's own
+dry run took. This is evidence about the JSON, not a substitute for Phase 4: it says a draft-07
+validator agrees, not that the extension does.
+
+**Noticed, not acted on:** neither `docs/README.md`'s "Repository layout", `CLAUDE.md`'s tree, nor
+`presets/README.md` mentions `presets/preset.schema.json`, `.taplo.toml` or `.editorconfig`. All
+three are outside the phases' file lists.
+
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`**
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** yes, one added file — `presets/preset.schema.json`, generated. **No
+  `.toml` was added, removed or edited**, so the embedded set, the seeded set and the five preset
+  gates cover exactly what they covered before.
+- **Plan header `Closes:`** none — the header carries no `Closes:` line.
+- **What shipped:** a feature. Two new flags on the shipped binary (`--check <path>`, `--strict`),
+  one new committed generated artifact (`presets/preset.schema.json`), and two new root dotfiles
+  (`.taplo.toml`, `.editorconfig`). No engine or render behaviour changed; the loader is unchanged
+  and still forgives an unknown parameter with a warning.
+- **Operator docs touched:** `docs/configuration.md` (both flags, with the exit codes and the
+  diagnostic shape), `docs/presets.md` (a "Check it before you render it" step in the authoring
+  loop), `docs/developing.md` (a new "Editing presets in VS Code" section: the extension, the
+  regenerate command, the format-on-save warning and an optional task with a problem matcher).
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0.
+- **Full suite:** `cargo nextest run --workspace --no-fail-fast`, exit 0 — **1912 passed, 0 failed,
+  6 skipped** in 620 s. The other seven Node gates were run and are green; `toc.mjs --check` reports
+  7 blocks current.
+- **Outstanding `human` phases:** Phase 4, in full — verifying completion, hover, the unknown-key
+  underline and a byte-identical save in VS Code with Even Better TOML installed. Nothing in this
+  session touched it.
 
 ## Followups (after this lands)
 
