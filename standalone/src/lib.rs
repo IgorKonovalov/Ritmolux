@@ -40,6 +40,11 @@ pub mod control;
 pub mod events;
 pub mod gpu;
 pub mod osc;
+// The `--check` preset checker (ADR-0190). A library module rather than a binary
+// one for the reason `config` is: `standalone/tests/` runs it over the whole
+// preset corpus as the gate, which needs the checker callable without spawning
+// a process per file.
+pub mod preset_check;
 pub mod rss;
 pub mod shot;
 // The Spout video-out (ADR-0125). Behind a default-off feature AND a Windows

@@ -21,10 +21,11 @@ use winit::window::{Fullscreen, Window, WindowId};
 use crate::app_state::{APP_TITLE, AppState, HIDDEN_TICK};
 use crate::capture_start::list_devices_and_exit;
 use crate::cli::{
-    InputSource, missing_companion, parse_console_flag, parse_control_arg, parse_downbeat_log_arg,
-    parse_events_flag, parse_input_args, parse_osc_arg, parse_preview_arg, parse_soak_arg,
-    parse_tier_arg, print_help, resolve_config_path, resolve_control, resolve_input, resolve_osc,
-    unrecognized_flag, valued_valueless_flag, windowed_flag,
+    InputSource, missing_companion, parse_check_arg, parse_console_flag, parse_control_arg,
+    parse_downbeat_log_arg, parse_events_flag, parse_input_args, parse_osc_arg, parse_preview_arg,
+    parse_soak_arg, parse_strict_flag, parse_tier_arg, print_help, resolve_config_path,
+    resolve_control, resolve_input, resolve_osc, unrecognized_flag, valued_valueless_flag,
+    windowed_flag,
 };
 use crate::console;
 use crate::preset_dir::startup_preset_names;
@@ -32,6 +33,7 @@ use crate::stream;
 use standalone::config::{self, Config};
 use standalone::control::Control;
 use standalone::events::{Event, Events};
+use standalone::preset_check;
 
 pub(crate) struct App {
     /// Loaded once at startup; the window is created from it on `resumed` and
@@ -430,6 +432,32 @@ pub fn run() {
     if std::env::args().skip(1).any(|arg| arg == "--schema") {
         println!("{}", rlx_core::preset::export::document());
         return;
+    }
+
+    // The engine's verdict on a preset file, then exit (ADR-0190). Beside
+    // `--schema` and for its reasons: this is a **query**, answered without a
+    // window, a GPU device or a capture client, and a query that moved the
+    // per-user directory on the way past would be a side effect nobody asked
+    // for. An author runs it in a loop while writing a preset, so the whole
+    // cost is one process start.
+    match parse_check_arg() {
+        Ok(Some(path)) => {
+            match preset_check::run(&path, parse_strict_flag()) {
+                Ok(code) => std::process::exit(code),
+                // Exit 2 is what this file uses for an argument list that is
+                // wrong in shape, and a path naming nothing is the operator's
+                // spelling rather than a preset that failed.
+                Err(failure) => {
+                    eprintln!("{failure}");
+                    std::process::exit(2);
+                }
+            }
+        }
+        Ok(None) => {}
+        Err(message) => {
+            eprintln!("{message}");
+            std::process::exit(2);
+        }
     }
 
     // Carry a per-user directory left under the earlier name across to

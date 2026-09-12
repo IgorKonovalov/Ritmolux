@@ -22,6 +22,8 @@ telemetry.
 | `--list-devices` | — | Enumerate audio capture endpoints and exit (Windows-only) |
 | `--list-adapters` | — | Enumerate graphics adapters and exit, from both rosters |
 | `--schema` | — | Print the preset schema as JSON on stdout and exit |
+| `--check` | `<path>` | Check a preset file, or a directory of them, and exit |
+| `--strict` | — | Make a `--check` warning cost the same exit code an error does. Needs `--check` |
 | `--events` | — | Report as JSON lines on stderr, for a parent process |
 | `--preview` | `stdout` \| `stdout@WxH` | Mirror the windowed show to a parent process, as a fixed-size copy |
 | `--input` | `loopback` \| `line-in` | Where audio comes from (Windows-only) |
@@ -101,6 +103,35 @@ The parameter half is rendered from the same declarations the reference table in
 [the preset library's README](../presets/README.md) is, so the two cannot disagree. The `hash`
 changes when and only when the document does: a studio that cached the schema compares it against
 the one the player reports on startup to know whether its panels are stale.
+
+**`--check <path>`** is the verdict on a preset before it is rendered. It runs the engine's own
+loader — the same one a show runs — and prints what that loader said, one line per diagnostic on
+stdout:
+
+```
+presets/fragment_tunnel.toml:34:1: error[engine]: parameter 'glow' has an invalid expression: unexpected end of expression
+```
+
+The shape is `path:line:col: severity[rule]: message`, which an editor's problem matcher reads
+directly. Line and column are 1-based and the column counts characters rather than bytes. A summary
+line — files checked, errors, warnings — goes to **stderr**, so a caller piping stdout into a matcher
+gets diagnostics alone on the stream it parses.
+
+`<path>` is a file, or a directory whose `*.toml` files are checked **non-recursively**: a
+subdirectory such as `presets/pending/` is held back by construction, which is the same convention
+the shipped set is embedded under. An empty directory is not an error — the summary says `checked 0
+files`, so a run over nothing reports itself rather than passing silently.
+
+**Exit codes: `0` clean, `1` a preset failed, `2` the command was wrong.** A path naming nothing is
+`2`, because a missing file is the spelling rather than the content. `--strict` moves a warning into
+the failing class, which is what a gate wants and what an author mid-edit does not: the class the
+loader forgives on purpose is a parameter name it does not recognise, where the binding is kept and
+nothing reads it — a silent typo, and the one `--strict` exists for.
+
+Like `--help` and `--schema` it creates no window, no GPU device and no capture client, so an
+author's "does this compile" loop costs one process start. **Nothing about it writes**: there is no
+`--fix` and no formatter, and [ADR-0190](adrs/0190-preset-toml-is-checked-by-the-loader-and-never-reformatted.md)
+records the measurement that decided it.
 
 **`--console`** is a presence flag with no value: it turns the console **on** for this run and
 never off, and it does not write itself into `config.toml` (the same shape `--input`, `--device`

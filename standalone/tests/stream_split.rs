@@ -28,7 +28,16 @@ use std::path::{Path, PathBuf};
 /// This list is the whole allowlist, and a new leading placeholder fails the
 /// test until somebody has looked at what it interpolates — which is the point,
 /// since the alternative is a rule nobody is reminded of.
-const MESSAGE_PLACEHOLDERS: [&str; 5] = ["{}", "{msg}", "{message}", "{err}", "{PRESET_DIR_ENV}"];
+const MESSAGE_PLACEHOLDERS: [&str; 6] = [
+    "{}",
+    "{msg}",
+    "{message}",
+    "{err}",
+    // `preset_check::CheckFailure`, whose every variant's `Display` opens
+    // with the literal `--check `.
+    "{failure}",
+    "{PRESET_DIR_ENV}",
+];
 
 /// Every `.rs` file under `standalone/src/`.
 fn sources() -> Vec<PathBuf> {
@@ -109,13 +118,17 @@ fn format_literals(source: &str, macro_name: &str) -> Vec<String> {
 /// process before a sink could exist, or belongs to a different binary
 /// entirely. A new file writing to stdout fails the test until somebody has
 /// checked which of those it is.
-const STDOUT_WRITERS: [(&str, &str); 5] = [
+const STDOUT_WRITERS: [(&str, &str); 6] = [
     (
         "capture_win.rs",
         "--list-devices prints the roster and exits",
     ),
     ("cli.rs", "--help prints the flag roster and exits"),
     ("run.rs", "--schema prints the document and exits"),
+    (
+        "preset_check.rs",
+        "--check prints its diagnostics and exits; the summary line goes to          stderr precisely so stdout carries diagnostics alone",
+    ),
     (
         "horizon.rs",
         "the `shot` CLI, a separate binary that opens no sink",

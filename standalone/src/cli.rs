@@ -111,6 +111,18 @@ pub(crate) const FLAGS: &[FlagSpec] = &[
         help: "print the preset schema as JSON and exit",
     },
     FlagSpec {
+        name: "--check",
+        takes_value: true,
+        requires: None,
+        help: "<path> check a preset file, or a directory of them, and exit",
+    },
+    FlagSpec {
+        name: "--strict",
+        takes_value: false,
+        requires: Some("--check"),
+        help: "exit non-zero on a warning as well as on an error",
+    },
+    FlagSpec {
         name: "--list-adapters",
         takes_value: false,
         requires: None,
@@ -467,6 +479,32 @@ pub(crate) fn parse_downbeat_log_arg() -> Option<PathBuf> {
 /// other opt-in launch flag here.
 pub(crate) fn parse_console_flag() -> bool {
     std::env::args().skip(1).any(|arg| arg == "--console")
+}
+
+/// The path `--check <path>` / `--check=<path>` names, or `None` when the flag
+/// is absent (ADR-0190).
+///
+/// `Err` on the flag with nothing after it: unlike `--soak`, there is no
+/// sensible default path to check. A directory with no presets in it is not this
+/// scanner's business — that is a verdict on the world rather than on the
+/// spelling, and `preset_check::targets` reports it.
+pub(crate) fn parse_check_arg() -> Result<Option<PathBuf>, String> {
+    let mut args = std::env::args().skip(1);
+    while let Some(arg) = args.next() {
+        if let Some(value) = flag_value(&arg, "--check", &mut args) {
+            return value.map(|path| Some(PathBuf::from(path)));
+        }
+    }
+    Ok(None)
+}
+
+/// Whether `--strict` was passed: a `--check` warning costs the same exit code
+/// an error does.
+///
+/// A bare presence flag, read only alongside `--check` — `missing_companion`
+/// refuses it on its own, so nothing here has to.
+pub(crate) fn parse_strict_flag() -> bool {
+    std::env::args().skip(1).any(|arg| arg == "--strict")
 }
 
 /// The tier `--tier <name>` / `--tier=<name>` pins, or `None` when the flag is
