@@ -1,0 +1,23 @@
+# Editor defaults for this repository.
+#
+# THIS IS NOT A FORMATTER, and the project has none for TOML (ADR-0190): the
+# presets carry deliberate, local alignment — column-padded inline tables, `=`
+# columns aligned per block, a two-space gap before a trailing comment — that
+# every TOML formatter measured against this corpus destroyed. What is below is
+# the short list an editor can honour without reflowing anything: whitespace at
+# the ends of lines and of the file, and spaces rather than tabs.
+#
+# `ritmolux --check` enforces exactly these three as the `trailing-whitespace`,
+# `final-newline` and `tab` rules, so an editor that ignores this file still
+# cannot land a violation. Nothing here is about alignment, and nothing here
+# should grow to be.
+
+root = true
+
+[*.toml]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true

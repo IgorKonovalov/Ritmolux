@@ -147,13 +147,19 @@ fn find_char_boundary(src: &str, at: usize) -> usize {
     at
 }
 
-/// Every diagnostic the engine has about `src`, read as the preset at `path`.
+/// Every diagnostic there is about `src`, read as the preset at `path`.
 ///
-/// `path` is carried for rendering and for the rules that judge a filename; the
-/// loader itself never sees it.
+/// Two passes, in this order: what the engine says, then the house-style rules
+/// the engine does not own. The engine's verdict comes first because it is the
+/// one that can stop a preset from rendering — an author reading a run of
+/// diagnostics wants the blocking one at the top.
+///
+/// `path` reaches the rules that judge a filename or a directory; the loader
+/// itself never sees it.
 pub fn check(path: &Path, src: &str) -> Vec<Diagnostic> {
-    let _ = path;
-    engine_diagnostics(src)
+    let mut out = engine_diagnostics(src);
+    out.extend(house_style(path, src));
+    out
 }
 
 /// The loader's verdict, positioned.
@@ -181,6 +187,261 @@ fn engine_diagnostics(src: &str) -> Vec<Diagnostic> {
             .map(|message| Diagnostic::warning(RULE_ENGINE, None, message))
             .collect(),
     }
+}
+
+// ---------------------------------------------------------------------------
+// The house-style rules
+// ---------------------------------------------------------------------------
+
+/// The filename's prefix names one of the systems it declares.
+pub const RULE_FILE_NAME: &str = "file-name";
+/// The file opens with a comment saying what it is.
+pub const RULE_HEADER_COMMENT: &str = "header-comment";
+/// A `#rrggbb` colour is written in lowercase.
+pub const RULE_HEX_CASE: &str = "hex-case";
+/// No line ends in a space or a tab.
+pub const RULE_TRAILING_WHITESPACE: &str = "trailing-whitespace";
+/// The file ends in exactly one newline.
+pub const RULE_FINAL_NEWLINE: &str = "final-newline";
+/// No tab character anywhere.
+pub const RULE_TAB: &str = "tab";
+
+/// Every house-style rule id, for a caller that wants to name them.
+pub const HOUSE_RULES: [&str; 6] = [
+    RULE_FILE_NAME,
+    RULE_HEADER_COMMENT,
+    RULE_HEX_CASE,
+    RULE_TRAILING_WHITESPACE,
+    RULE_FINAL_NEWLINE,
+    RULE_TAB,
+];
+
+/// The rules the loader does not own, all warnings.
+///
+/// **Every rule here holds on the whole corpus the day it lands** — that is the
+/// admission bar ADR-0190 sets, and it is what keeps this list from becoming a
+/// wish. A property that does not already hold is either not a rule or is a
+/// content change, which belongs to the `preset-author` lane rather than here.
+///
+/// Warnings rather than errors because none of them stops a preset rendering.
+/// The gate is what makes them binding, by refusing warnings in the directories
+/// whose content is finished.
+fn house_style(path: &Path, src: &str) -> Vec<Diagnostic> {
+    let mut out = Vec::new();
+    if is_library_file(path) {
+        out.extend(file_name_rule(path, src));
+        out.extend(header_comment_rule(src));
+    }
+    out.extend(hex_case_rule(src));
+    out.extend(whitespace_rules(src));
+    out
+}
+
+/// Whether `path` is a file of the shipped preset **library** — `presets/`,
+/// `presets/proposed/` or `presets/pending/`.
+///
+/// The two naming rules apply only there. `docs/examples/` is exempt on purpose:
+/// its files are named for what they teach (`step-1-constants.toml`), and
+/// `minimal.toml` is bare of a header comment because being bare is the lesson.
+///
+/// Read off the directory names rather than off a repository root, so the answer
+/// does not depend on where the process was started: a bare `proposed` or
+/// `pending` counts only underneath a `presets`.
+fn is_library_file(path: &Path) -> bool {
+    let Some(parent) = path.parent().and_then(|p| p.file_name()) else {
+        return false;
+    };
+    if parent == "presets" {
+        return true;
+    }
+    if parent != "proposed" && parent != "pending" {
+        return false;
+    }
+    path.parent()
+        .and_then(|p| p.parent())
+        .and_then(|p| p.file_name())
+        .is_some_and(|name| name == "presets")
+}
+
+/// The filename's prefix, up to the first `_`, is one of the `_`-separated
+/// segments of the `system` value.
+///
+/// Weaker than "the prefix equals `system`", and true rather than tidy: the
+/// prefix is a **family** name, so `analytic_*` files declare `analytic_field`
+/// and `collage_*` files declare `shape_collage`. Equality was measured against
+/// the corpus and fails every file (ADR-0190); this holds on all of them.
+///
+/// A file whose name carries no `_` has itself as the prefix, which is the right
+/// reading: `minimal.toml` would have to declare a system with `minimal` as a
+/// segment.
+fn file_name_rule(path: &Path, src: &str) -> Vec<Diagnostic> {
+    let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+        return Vec::new();
+    };
+    let Ok(doc) = DeTable::parse(src) else {
+        // Unparseable TOML is already an `engine` error, and a second diagnostic
+        // about its filename would be noise on top of the one that matters.
+        return Vec::new();
+    };
+    let Some((key_span, value)) = lookup(doc.get_ref(), "system") else {
+        return Vec::new();
+    };
+    let Some(system) = value.get_ref().as_str() else {
+        return Vec::new();
+    };
+    let prefix = stem.split('_').next().unwrap_or(stem);
+    if system.split('_').any(|segment| segment == prefix) {
+        return Vec::new();
+    }
+    vec![Diagnostic::warning(
+        RULE_FILE_NAME,
+        Some(key_span),
+        format!(
+            "the filename's prefix `{prefix}` is not a segment of the system \
+             `{system}`; a library file is named for the family it belongs to"
+        ),
+    )]
+}
+
+/// The file opens with a `#` comment before its first key.
+///
+/// The header is what tells a reader opening a preset cold what look it is for,
+/// and it is the one piece of documentation a preset carries.
+fn header_comment_rule(src: &str) -> Vec<Diagnostic> {
+    let opens_with_a_comment = src
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .is_some_and(|line| line.starts_with('#'));
+    if opens_with_a_comment {
+        return Vec::new();
+    }
+    vec![Diagnostic::warning(
+        RULE_HEADER_COMMENT,
+        None,
+        "the file does not open with a `#` comment saying what it is".to_owned(),
+    )]
+}
+
+/// Every `#rrggbb` colour string is lowercase.
+///
+/// Walks the parsed document rather than the lines, which is the whole reason
+/// this is structural: `presets/collage_suprematist.toml` names `#E2E0DA` inside
+/// a prose comment, and a line matcher would convict it for discussing a colour
+/// it does not set.
+fn hex_case_rule(src: &str) -> Vec<Diagnostic> {
+    let Ok(doc) = DeTable::parse(src) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    visit_strings(doc.get_ref(), &mut |span, text| {
+        if !is_hex_colour(text) || !text.contains(|ch: char| ch.is_ascii_uppercase()) {
+            return;
+        }
+        out.push(Diagnostic::warning(
+            RULE_HEX_CASE,
+            Some(span),
+            format!("the colour `{text}` is not lowercase"),
+        ));
+    });
+    out
+}
+
+/// Whether `text` is a `#rrggbb` colour.
+///
+/// Exactly six hex digits behind a `#`. The loader also accepts a bare `rrggbb`
+/// and an `[r, g, b]` array; neither has a case to get wrong, so neither is this
+/// rule's business.
+fn is_hex_colour(text: &str) -> bool {
+    text.strip_prefix('#')
+        .is_some_and(|body| body.len() == 6 && body.chars().all(|ch| ch.is_ascii_hexdigit()))
+}
+
+/// Call `visit` with the span and content of every string **value** in the
+/// document, at any depth.
+///
+/// Values only, never keys: a key is an identifier the loader matches exactly,
+/// so its case is already the loader's business rather than a style question.
+fn visit_strings(table: &DeTable<'_>, visit: &mut impl FnMut(Range<usize>, &str)) {
+    for (_, value) in table.iter() {
+        visit_value(value, visit);
+    }
+}
+
+/// [`visit_strings`] for one value.
+fn visit_value(value: &toml::Spanned<DeValue<'_>>, visit: &mut impl FnMut(Range<usize>, &str)) {
+    match value.get_ref() {
+        DeValue::String(text) => visit(value.span(), text.as_ref()),
+        DeValue::Table(inner) => visit_strings(inner, visit),
+        DeValue::Array(items) => {
+            for item in items.iter() {
+                visit_value(item, visit);
+            }
+        }
+        DeValue::Integer(_) | DeValue::Float(_) | DeValue::Boolean(_) | DeValue::Datetime(_) => {}
+    }
+}
+
+/// No trailing space or tab on any line, no tab anywhere, and exactly one
+/// newline at the end.
+///
+/// One pass for the three, because they are all statements about the raw bytes
+/// and each needs the same line offsets. A trailing `\r` is **not** trailing
+/// whitespace: `.gitattributes` checks `*.toml` out as LF, but a clone that
+/// produced CRLF anyway would otherwise fail every line of every file, which
+/// would be a reading about the checkout rather than about the preset.
+fn whitespace_rules(src: &str) -> Vec<Diagnostic> {
+    let mut out = Vec::new();
+    let mut at = 0usize;
+    for line in src.split_inclusive('\n') {
+        let body = line.strip_suffix('\n').unwrap_or(line);
+        let body = body.strip_suffix('\r').unwrap_or(body);
+
+        if let Some(tab) = body.find('\t') {
+            out.push(Diagnostic::warning(
+                RULE_TAB,
+                Some(at + tab..at + tab + 1),
+                "a tab character; this file is indented with spaces".to_owned(),
+            ));
+        }
+
+        let trimmed = body.trim_end_matches([' ', '\t']);
+        if trimmed.len() < body.len() {
+            out.push(Diagnostic::warning(
+                RULE_TRAILING_WHITESPACE,
+                Some(at + trimmed.len()..at + body.len()),
+                "the line ends in whitespace".to_owned(),
+            ));
+        }
+        at += line.len();
+    }
+
+    // Two ways to be wrong and they are opposite mistakes, so they are named
+    // apart. An empty file is neither: it has nothing to end.
+    if !src.is_empty() {
+        // Strip exactly one line terminator, then ask whether another is behind
+        // it. Written this way rather than by counting trailing newlines because
+        // a terminator may be two bytes: `"a\r\n"` ends in one newline and a
+        // length comparison reads it as two.
+        let message = match src.strip_suffix('\n') {
+            None => Some("the file does not end in a newline"),
+            Some(rest) => rest
+                .strip_suffix('\r')
+                .unwrap_or(rest)
+                .ends_with('\n')
+                .then_some("the file ends in more than one newline"),
+        };
+        if let Some(message) = message {
+            // The last byte, so the diagnostic lands on the final line rather
+            // than at the top of a file whose every other line is fine.
+            out.push(Diagnostic::warning(
+                RULE_FINAL_NEWLINE,
+                Some(src.len().saturating_sub(1)..src.len()),
+                message.to_owned(),
+            ));
+        }
+    }
+    out
 }
 
 /// One line of prose for a load failure.

@@ -79,6 +79,35 @@ the one place it is maintained; this document does not duplicate it.
 
 That is the whole loop: copy, edit an expression, save, pick.
 
+### Check it before you render it
+
+`ritmolux --check my_first.toml` runs the engine's own loader over the file and
+prints what it found, without opening a window or a GPU adapter:
+
+```
+my_first.toml:12:1: error[engine]: parameter 'burst' has an invalid expression: unexpected end of expression
+my_first.toml:1:1: warning[engine]: unknown parameter 'wrap' for system 'swarm' (binding kept, but nothing reads it)
+```
+
+It answers in one process start, which makes it the first thing to reach for and
+`shot` the second: a render tells you how a preset *looks*, and this tells you
+whether it compiles at all. Point it at a directory to check every preset in it.
+`--strict` makes a warning cost an exit code too, which is what a gate wants and
+what you do not while you are still editing. Errors exit `1`, a wrong command
+exits `2`, and nothing is ever written — the project has no TOML formatter, on
+purpose ([ADR-0190](adrs/0190-preset-toml-is-checked-by-the-loader-and-never-reformatted.md)).
+
+Alongside the loader's verdict it applies a short list of house-style rules, all
+warnings, each named by a rule id so you can tell them apart from the engine's:
+`file-name` (a library file's prefix names its system's family), `header-comment`
+(a preset opens by saying what it is), `hex-case` (a `#rrggbb` colour is
+lowercase), and `trailing-whitespace`, `final-newline` and `tab`. The last three
+are what `.editorconfig` asks your editor for, so an editor that honours it
+cannot produce them.
+
+Every preset in the repository is held to all of this by the test run, so a
+preset landing in the curated set has already passed what you just ran.
+
 ---
 
 ## Anatomy of a preset file

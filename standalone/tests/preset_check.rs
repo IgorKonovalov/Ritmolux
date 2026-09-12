@@ -287,55 +287,110 @@ fn an_empty_directory_reports_zero_files_and_exits_zero() {
 }
 
 // ---------------------------------------------------------------------------
-// The library, over the corpus
+// The gate, over the corpus
 // ---------------------------------------------------------------------------
 
-/// **Every preset the repository tracks passes the checker.** The whole reason
-/// the checker is a library module: this reads `presets/`, `presets/proposed/`,
-/// `presets/pending/` and `docs/examples/` through one loader pass rather than
-/// 127 process starts.
+/// Where a directory's warnings are binding, and where they are only reported.
+///
+/// **`presets/pending/` is the one exception, and it is not a loophole.** It
+/// holds content that is authored and approved and held back by a known engine
+/// or harness gap — which is exactly the state in which a preset may legitimately
+/// trip a loader warning, since the parameter it binds may be the thing that does
+/// not exist yet. Every other directory holds finished content, so a warning
+/// there is a defect. Errors are binding everywhere, `pending/` included: nothing
+/// is approved in a state where it does not load.
+const DIRECTORIES: [(&str, Warnings); 4] = [
+    ("presets", Warnings::Fail),
+    ("presets/proposed", Warnings::Fail),
+    ("presets/pending", Warnings::Report),
+    ("docs/examples", Warnings::Fail),
+];
+
+/// What a warning costs in one directory.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Warnings {
+    Fail,
+    Report,
+}
+
+/// **The gate.** Every tracked preset in the four directories loads, and every
+/// one outside `presets/pending/` has nothing said about it.
+///
+/// The whole reason the checker is a library module: this reads all four
+/// directories through one loader pass rather than 127 process starts, so it is
+/// cheap enough to be an ordinary member of the test run — which is what makes
+/// `.githooks/pre-push` and CI the gate without either of them naming it.
 #[test]
-fn the_whole_corpus_is_free_of_errors() {
-    let mut failed: Vec<String> = Vec::new();
+fn the_corpus_holds_to_the_engine_and_to_the_house_style() {
+    let root = repo_root();
+    let mut errors: Vec<String> = Vec::new();
+    let mut binding_warnings: Vec<String> = Vec::new();
+    let mut tolerated: Vec<String> = Vec::new();
     let mut checked = 0usize;
-    for file in corpus() {
-        let src = std::fs::read_to_string(&file)
-            .unwrap_or_else(|e| panic!("read {}: {e}", file.display()));
-        checked += 1;
-        for diagnostic in preset_check::check(&file, &src) {
-            if diagnostic.severity == Severity::Error {
-                failed.push(diagnostic.render(&file, &src));
+
+    for (dir, policy) in DIRECTORIES {
+        for file in files_in(&root.join(dir)) {
+            let src = std::fs::read_to_string(&file)
+                .unwrap_or_else(|e| panic!("read {}: {e}", file.display()));
+            checked += 1;
+            for diagnostic in preset_check::check(&file, &src) {
+                let line = diagnostic.render(&file, &src);
+                match (diagnostic.severity, policy) {
+                    (Severity::Error, _) => errors.push(line),
+                    (Severity::Warning, Warnings::Fail) => binding_warnings.push(line),
+                    (Severity::Warning, Warnings::Report) => tolerated.push(line),
+                }
             }
         }
     }
+
+    // A walk that stopped reading the tree would otherwise pass by finding
+    // nothing, which is the one way a corpus gate fails quietly.
     assert!(
         checked >= 100,
         "the corpus walk found only {checked} files, which means it stopped \
          reading the tree rather than that the library shrank"
     );
+
+    // Printed, never asserted: `pending/` is where a warning is allowed to
+    // stand, and a reader of a green run should still see what is standing.
+    for line in &tolerated {
+        eprintln!("tolerated in presets/pending/: {line}");
+    }
+
     assert!(
-        failed.is_empty(),
+        errors.is_empty(),
         "these presets do not load:\n{}",
-        failed.join("\n")
+        errors.join("\n")
+    );
+    assert!(
+        binding_warnings.is_empty(),
+        "{} warning(s) in directories that hold finished content:\n{}\n\
+         The content belongs to the `preset-author` lane and the policy to \
+         `architect`: fix the preset, or route the rule — do not widen the \
+         tolerated set.",
+        binding_warnings.len(),
+        binding_warnings.join("\n")
     );
 }
 
-/// Every tracked preset, across the four directories.
+/// Every `*.toml` the gate reads under `dir`.
 ///
 /// `docs/examples/` is walked **recursively** while the `--check` CLI reads a
 /// directory flat: fourteen of the fifteen examples live in a subdirectory named
 /// for what it teaches (`tuning/`, `curves/`), and a gate that read only the top
-/// level would cover one of them. The preset directories are flat and are read
-/// flat, which is what keeps `presets/pending/` out of a walk of `presets/`.
-fn corpus() -> Vec<PathBuf> {
-    let root = repo_root();
-    let mut files = Vec::new();
-    for dir in ["presets", "presets/proposed", "presets/pending"] {
-        files.extend(flat_tomls(&root.join(dir)));
+/// level would cover one of them. The three preset directories are flat, and are
+/// read through the CLI's own resolver so the gate cannot disagree with
+/// `--check <dir>` about which files those are — which is also what keeps
+/// `presets/pending/` out of a walk of `presets/`.
+fn files_in(dir: &Path) -> Vec<PathBuf> {
+    if dir.ends_with("examples") {
+        let mut out = Vec::new();
+        collect_tomls(dir, &mut out);
+        out.sort();
+        return out;
     }
-    collect_tomls(&root.join("docs/examples"), &mut files);
-    files.sort();
-    files
+    flat_tomls(dir)
 }
 
 /// The `*.toml` directly in `dir`, through the same resolver the CLI uses — so
@@ -355,6 +410,248 @@ fn collect_tomls(dir: &Path, out: &mut Vec<PathBuf>) {
             out.push(path);
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// The house-style rules, one fixture and one near-miss each
+// ---------------------------------------------------------------------------
+
+/// Write `body` as `<scratch>/<dir>/<name>` and return its path.
+///
+/// `dir` matters: the two naming rules apply only to a **library** file, which is
+/// one whose parent directory is `presets/`, `presets/proposed/` or
+/// `presets/pending/`. So a fixture for those rules has to sit in a directory
+/// spelled that way, and a fixture for the exemption has to sit somewhere else.
+fn file_in(dir: &str, name: &str, body: &str) -> PathBuf {
+    let parent = scratch("rules").join(dir);
+    std::fs::create_dir_all(&parent).expect("create rule fixture dir");
+    let path = parent.join(name);
+    std::fs::write(&path, body).expect("write rule fixture");
+    path
+}
+
+/// The rules that fired on a fixture, by id.
+fn rules_on(path: &Path) -> Vec<&'static str> {
+    let src = std::fs::read_to_string(path).expect("read rule fixture");
+    preset_check::check(path, &src)
+        .into_iter()
+        .map(|diagnostic| diagnostic.rule)
+        .collect()
+}
+
+/// Assert `rule` fired on `tripped` and did not fire on `clean`.
+///
+/// The near-miss is the half that matters: a rule with only a positive case
+/// passes just as well when it fires on everything, which would turn the gate
+/// into noise the first time a correct preset tripped it.
+fn rule_separates(rule: &'static str, tripped: &Path, clean: &Path) {
+    assert!(
+        rules_on(tripped).contains(&rule),
+        "`{rule}` did not fire on {}",
+        tripped.display()
+    );
+    assert!(
+        !rules_on(clean).contains(&rule),
+        "`{rule}` fired on {}, which does not trip it",
+        clean.display()
+    );
+}
+
+/// **`file-name`**: the prefix up to the first `_` is one of the `_`-separated
+/// segments of `system`.
+///
+/// Not equality — that was measured against the corpus and fails every file,
+/// because the prefix is a family name (ADR-0190). `shape_x` declaring
+/// `shape_collage` passes; `swarm_x` declaring `attractor` does not.
+#[test]
+fn the_file_name_rule_reads_the_prefix_against_the_system_segments() {
+    let tripped = file_in(
+        "presets",
+        "swarm_x.toml",
+        "# A swarm that is not one.\nsystem = \"attractor\"\n",
+    );
+    let clean = file_in(
+        "presets",
+        "shape_x.toml",
+        "# A collage.\nsystem = \"shape_collage\"\n",
+    );
+    rule_separates("file-name", &tripped, &clean);
+}
+
+/// **`file-name` and `header-comment` apply to library files only.**
+/// `docs/examples/` is exempt: its files are named for what they teach
+/// (`step-1-constants.toml`) and `minimal.toml` is bare of a header on purpose,
+/// so applying either rule there would convict the teaching material for
+/// teaching.
+#[test]
+fn the_two_naming_rules_do_not_reach_outside_the_library() {
+    // The same content that trips both rules inside `presets/`.
+    let body = "system = \"attractor\"\n";
+    let in_library = file_in("presets", "swarm_exempt.toml", body);
+    let in_examples = file_in("examples", "swarm_exempt.toml", body);
+
+    let library_rules = rules_on(&in_library);
+    assert!(
+        library_rules.contains(&"file-name") && library_rules.contains(&"header-comment"),
+        "the fixture does not trip both naming rules inside presets/: {library_rules:?}"
+    );
+    let example_rules = rules_on(&in_examples);
+    assert!(
+        !example_rules.contains(&"file-name") && !example_rules.contains(&"header-comment"),
+        "a naming rule reached outside the library: {example_rules:?}"
+    );
+}
+
+/// **`header-comment`**: the file opens with a `#` comment before its first key.
+#[test]
+fn the_header_comment_rule_wants_a_comment_before_the_first_key() {
+    let tripped = file_in(
+        "presets",
+        "shape_noheader.toml",
+        "system = \"shape_collage\"\n",
+    );
+    let clean = file_in(
+        "presets",
+        "shape_header.toml",
+        "# What this preset is for.\nsystem = \"shape_collage\"\n",
+    );
+    rule_separates("header-comment", &tripped, &clean);
+}
+
+/// **`hex-case`**: a `#rrggbb` colour is lowercase.
+///
+/// The near-miss here is doing double duty. `#ddeeff` in the same shape must not
+/// fire — and `presets/collage_suprematist.toml` names `#E2E0DA` inside a prose
+/// comment, which is why the rule walks the parsed document rather than the
+/// lines. A line matcher would convict that file for discussing a colour it does
+/// not set, so the third fixture is a comment.
+#[test]
+fn the_hex_case_rule_reads_colour_values_and_not_comments() {
+    let stops = |colour: &str| {
+        format!(
+            "# Colours.\nsystem = \"shape_collage\"\n\n\
+             [[palette.stops]]\nat = 0.0\ncolor = \"{colour}\"\n\n\
+             [[palette.stops]]\nat = 1.0\ncolor = \"#112233\"\n"
+        )
+    };
+    let tripped = file_in("presets", "shape_upper.toml", &stops("#AABBCC"));
+    let clean = file_in("presets", "shape_lower.toml", &stops("#ddeeff"));
+    rule_separates("hex-case", &tripped, &clean);
+
+    let in_a_comment = file_in(
+        "presets",
+        "shape_comment.toml",
+        "# The plateau renders `#E2E0DA`, which is the exception.\n\
+         system = \"shape_collage\"\n",
+    );
+    assert!(
+        !rules_on(&in_a_comment).contains(&"hex-case"),
+        "an uppercase colour named in a comment was convicted; the rule has \
+         stopped reading the document and started reading lines"
+    );
+}
+
+/// **`trailing-whitespace`**: no line ends in a space or a tab.
+#[test]
+fn the_trailing_whitespace_rule_reads_the_end_of_each_line() {
+    let tripped = file_in(
+        "presets",
+        "shape_trail.toml",
+        "# Trailing.\nsystem = \"shape_collage\"   \n",
+    );
+    let clean = file_in(
+        "presets",
+        "shape_notrail.toml",
+        "# Clean.\nsystem = \"shape_collage\"\n",
+    );
+    rule_separates("trailing-whitespace", &tripped, &clean);
+}
+
+/// **`final-newline`**: the file ends in exactly one newline.
+///
+/// Two opposite mistakes, and both are the rule's: none at all, and more than
+/// one. A CRLF ending is **not** either of them — `.gitattributes` checks
+/// `*.toml` out as LF, and a clone that produced CRLF anyway must not fail every
+/// file in the tree.
+#[test]
+fn the_final_newline_rule_wants_exactly_one() {
+    let clean = file_in(
+        "presets",
+        "shape_onenl.toml",
+        "# One.\nsystem = \"shape_collage\"\n",
+    );
+    let none = file_in(
+        "presets",
+        "shape_nonl.toml",
+        "# None.\nsystem = \"shape_collage\"",
+    );
+    let two = file_in(
+        "presets",
+        "shape_twonl.toml",
+        "# Two.\nsystem = \"shape_collage\"\n\n",
+    );
+    rule_separates("final-newline", &none, &clean);
+    rule_separates("final-newline", &two, &clean);
+
+    let crlf = file_in(
+        "presets",
+        "shape_crlf.toml",
+        "# CRLF.\r\nsystem = \"shape_collage\"\r\n",
+    );
+    let rules = rules_on(&crlf);
+    assert!(
+        !rules.contains(&"final-newline") && !rules.contains(&"trailing-whitespace"),
+        "a CRLF checkout is convicted by the whitespace rules: {rules:?}"
+    );
+}
+
+/// **`tab`**: no tab character anywhere.
+#[test]
+fn the_tab_rule_reads_the_whole_line() {
+    let tripped = file_in(
+        "presets",
+        "shape_tab.toml",
+        "# Tabbed.\nsystem = \"shape_collage\"\n\n[params]\n\tcount = \"8\"\n",
+    );
+    let clean = file_in(
+        "presets",
+        "shape_spaces.toml",
+        "# Spaced.\nsystem = \"shape_collage\"\n\n[params]\ncount = \"8\"\n",
+    );
+    rule_separates("tab", &tripped, &clean);
+}
+
+/// **Every rule the module names has a case above.** A rule added to
+/// `HOUSE_RULES` and to nothing else is a rule nobody has shown to fire, and the
+/// gate would carry it over the whole corpus on trust.
+#[test]
+fn every_house_rule_is_covered_by_a_fixture() {
+    // The rule ids the cases above assert on, each through `rule_separates` or
+    // a direct `contains`.
+    const COVERED: [&str; 6] = [
+        "file-name",
+        "header-comment",
+        "hex-case",
+        "trailing-whitespace",
+        "final-newline",
+        "tab",
+    ];
+    let missing: Vec<&str> = preset_check::HOUSE_RULES
+        .into_iter()
+        .filter(|rule| !COVERED.contains(rule))
+        .collect();
+    assert!(
+        missing.is_empty(),
+        "these house-style rules have no fixture in this file: {missing:?}"
+    );
+    let stale: Vec<&str> = COVERED
+        .into_iter()
+        .filter(|rule| !preset_check::HOUSE_RULES.contains(rule))
+        .collect();
+    assert!(
+        stale.is_empty(),
+        "these rule ids are asserted here and no longer exist: {stale:?}"
+    );
 }
 
 /// Whether `line` opens with exactly `<path>:<line>:<col>: <severity>[`.
