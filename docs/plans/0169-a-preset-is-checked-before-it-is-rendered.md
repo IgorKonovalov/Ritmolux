@@ -376,7 +376,7 @@ step, ahead of `shot` — the skill is the lane's, not `dev`'s.
 | 3 — the editor schema | dev | done | `43aabb3` |
 | 4 — the editor, verified on the owner's machine | human | failed 2026-09-12 — see its Outcome; replaced by 5 + 6 | |
 | 5 — one editor schema per system | dev | done | `9e6faf1` |
-| 6 — the editor, verified again | human | not started — the user's | |
+| 6 — the editor, verified again | human | done 2026-09-13 — see Notes | |
 
 ### Notes
 
@@ -459,6 +459,25 @@ parsed by `smol-toml` (from `site/node_modules`), each against its family's sche
 Against `fragment_field.schema.json`, `force` was refused as an additional property, `system =
 "swarm"` as not the constant, and a swarm `[layer]` binding `force` passed. Scratchpad, not committed.
 
+**Phase 6, on the owner's machine (2026-09-13),** in VS Code with Even Better TOML 0.21.2, on
+`presets/fragment_drostemono.toml`. All three done-when items held:
+- **Completion** under `[params]` listed that system's names, among them `field_speed` and
+  `fold_speed`, which `fragment_field.schema.json` declares and `analytic_field.schema.json` does not.
+  **Hover** on `kaleido_spiral` showed its doc line.
+- **A misspelled key** (`stopss` in `[palette]`) raised *Additional properties are not allowed
+  ('stopss' was unexpected)* on the `[palette]` header, the placement chosen in Risks.
+- **Saving the unedited file** left `git diff` empty.
+
+The status bar item read `analytic_field.schema.json` while the fragment schema was in force. It is
+not evidence, as Phase 4 found: the extension (`dist/extension.js`) sets that text only on a
+`taplo/didChangeSchemaAssociation` notification for the active document, and never resets it on an
+editor switch, so it can carry an earlier file's schema. The quick pick behind it marks the true one.
+
+**Noticed, not acted on:** in `[palette]` with `stops` bound, completion offers `name`. The schema
+states the two are mutually exclusive only in `description`; nothing in it encodes the exclusion, so
+neither completion nor validation knows. The loader still refuses both. A `not: {required: [name,
+stops]}` would make validation know; whether completion would honour it is unmeasured.
+
 **Noticed, not acted on:** neither `docs/README.md`'s "Repository layout", `CLAUDE.md`'s tree, nor
 `presets/README.md` mentions `presets/preset.schema.json`, `presets/schema/`, `.taplo.toml` or
 `.editorconfig`. All three are outside the phases' file lists.
@@ -485,9 +504,8 @@ Against `fragment_field.schema.json`, `force` was refused as an additional prope
 - **Full suite (after Phase 5):** `cargo nextest run --workspace --no-fail-fast`, exit 0 — **1915
   passed, 0 failed, 6 skipped** in 556 s. `-P fast`, clippy with `-D warnings`, `fmt --check`, the
   six other Node gates and `toc.mjs --check` were green at `9e6faf1`.
-- **Outstanding `human` phases:** Phase 6, in full — completion and hover in a `fragment_*` preset,
-  the Problems entry for a misspelled key, and a byte-identical save, in VS Code with Even Better
-  TOML installed. Phase 4 failed and is replaced by 5 + 6.
+- **Outstanding `human` phases:** none. Phase 4 failed and is replaced by 5 + 6; Phase 6 passed on
+  2026-09-13.
 
 ## Followups (after this lands)
 
