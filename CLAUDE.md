@@ -74,9 +74,13 @@ presets/             # The curated preset library (*.toml) — build.rs globs an
     ├── README.md    #   THE parameter reference (name/default/range/meaning per system, GENERATED
                      #   from the engine's ParamSpec declarations per ADR-0170) + the hand-written
                      #   structural/palette/smoothing tables and the essays around it.
-    └── pending/     #   Authored, approved, NOT shipped — held back by a known engine or harness
-                     #   gap, not by the look. build.rs's read_dir is non-recursive (ADR-0022), so
-                     #   a subdirectory is skipped by construction. See its own README.
+    ├── pending/     #   Authored, approved, NOT shipped — held back by a known engine or harness
+    │                #   gap, not by the look. build.rs's read_dir is non-recursive (ADR-0022), so
+    │                #   a subdirectory is skipped by construction. See its own README.
+    └── schema/      #   GENERATED editor JSON Schemas, one per system, beside the generic
+                     #   preset.schema.json; the root .taplo.toml (also generated) picks one by
+                     #   filename family (ADR-0190). Never hand-edited: core/tests/preset_schema.rs
+                     #   holds them to the engine, RLX_UPDATE_PRESET_SCHEMA=1 rewrites them.
 tools/
 └── sd-filter/       # Python sidecar for the diffusion-filter pass (ADR-0122). Not a cargo crate,
                      #   not in the workspace, never shipped; its cost figures live in exactly one

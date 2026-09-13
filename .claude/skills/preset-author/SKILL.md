@@ -221,7 +221,18 @@ Lead with a `#` comment describing the scene and what drives what (house convent
 deliberately: a slow `time` drift for evolution, `bar` for per-beat breathing, `beat`/`onset` for
 accents, `[smoothing]` where a driver would otherwise snap. Craft: `references/craft.md`.
 
-### 4 — Render, verify, measure (this is what makes the lane trustworthy)
+### 4 — Check, render, verify, measure (this is what makes the lane trustworthy)
+**Check before you render.** `--check` runs the engine's own loader over the file with no GPU and
+answers in one process start: every error and warning at `path:line:col`, plus the house-style rules
+(`file-name`, `header-comment`, `hex-case`, whitespace). `--strict` makes a warning fail too, which is
+the setting to draft under — it is the only tool here that shows a misspelled parameter, and the
+test suite refuses a warning in `presets/` anyway. Reference: `docs/presets.md`, "Check it before you
+render it".
+
+```sh
+cargo run -q -p standalone --bin ritmolux -- --check presets/my_draft.toml --strict
+```
+
 A preset you haven't rendered is a guess — and **a bare still is a dead still** (default stimulus is
 silence). Point `shot` straight at the file; there is no copy-into-`%APPDATA%` dance any more:
 
@@ -415,7 +426,8 @@ could not express (`references/api-feedback.md`).
 - **A misspelled param name still loads.** Since ADR-0020 the loader *warns* — but the binding is
   kept and nothing reads it. Worse for this lane: **`shot` prints load errors and swallows
   warnings**, so a typo is invisible in exactly the tool you verify through (a known open minor).
-  Check names against `presets/README.md` rather than trusting a clean render.
+  **`ritmolux --check <file> --strict` is what catches it** (step 4) — run it before every render
+  rather than trusting a clean one.
 - **A bare still is silent.** Always `--set` a loud frame or use `--signal`.
 - **`--set` cannot drive the spectrum — only `--signal` / `--audio` can.** `apply_set` writes the
   frame *scalars* and there is deliberately no key for the 64-band array, so **every `bin()` term

@@ -1,10 +1,10 @@
 # ADR-0190 — Preset TOML is checked by the engine's own loader and never reformatted
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-13 (Plan 0169 closed)
 > **Date:** 2026-09-11
 > **Amended:** 2026-09-13, while proposed — the editor schema is one self-contained file per system,
 > after Plan 0169 Phase 4 measured the single-file shape (see Notes)
-> **Related plan(s):** [0169 — A preset is checked before it is rendered](../plans/0169-a-preset-is-checked-before-it-is-rendered.md)
+> **Related plan(s):** [0169 — A preset is checked before it is rendered](../plans/done/0169-a-preset-is-checked-before-it-is-rendered.md)
 > **Related:** [ADR-0170](0170-a-parameters-reference-row-is-generated-from-the-declaration-the-engine-reads.md)
 > (the parameter declarations the editor schema is generated from, and the regenerate-by-env-var
 > shape its drift test copies), [ADR-0020](0020-preset-grammar-v2-branching-functions-tempo.md)

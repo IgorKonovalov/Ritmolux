@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0169 - A preset is checked before it is rendered](#0169---a-preset-is-checked-before-it-is-rendered)
   - [0167 - The studio becomes handable](#0167---the-studio-becomes-handable)
   - [0164 - The cellular system](#0164---the-cellular-system)
   - [0163 - The analytic field](#0163---the-analytic-field)
@@ -200,6 +201,52 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0169 - A preset is checked before it is rendered](done/0169-a-preset-is-checked-before-it-is-rendered.md)
+
+- closed 2026-09-13. Five `dev` phases on `main` directly: `0449b7f` (1, `--check` reports the
+loader's verdict at a position), `73a9a10` (2, the house-style rules and the gate), `43aabb3` (3, the
+editor schema), `9e6faf1` (5, one editor schema per system). Phase 4 (`human`) **failed** on
+2026-09-12 - Taplo validates through `if`/`then` but neither hovers nor completes through it - and
+the plan was amended in place; Phase 6 re-ran the check on the per-system schemas and passed on the
+owner's machine. Review: **no blockers, no majors, three minors, two nits.** Version: **0.122.0**
+(minor). ADR-0190 accepted; its body had already been amended while proposed to record Alternatives
+D and E. The architect's full `cargo nextest run --workspace` at the close: 1915 passed, 6 skipped,
+matching the log.
+
+**What the review verified rather than read.** The doc examples in `docs/presets.md` and
+`docs/configuration.md` were reproduced byte for byte against the built binary; exit codes 0/1/2 and
+`--check` with no value were exercised; `--check presets --strict` reads 112 files clean. The
+`preset_check` binary is not excluded by `-P fast`, so pre-push and CI both run the gate.
+
+**Minors, none fixed at the close:**
+- **The schema test is not the "one model, two renderings" the plan specified.** Phase 3 asked for
+one in-memory schema description rendered as JSON and as the validator. What landed shares the
+*inputs* - `export::table`, `params_of`, `Roster::accepts` - but the `KeyKind`-to-constraint mapping
+is written twice, once as JSON text in `export.rs` and once as Rust in `core/tests/preset_schema.rs`,
+so an emitter mistake (say, an `enum` on `hold`) passes the test. The key sets, which are what an
+author's squiggle mostly comes from, are shared. Undisclosed in the log; `dev`'s two uncommitted
+`ajv` runs over the corpus (0 violations) are what actually covers the JSON.
+- **Library classification reads the path as spelled.** `is_library_file` takes the parent
+directory's *name*, so `--check shape_x.toml` run from inside `presets/` skips `file-name` and
+`header-comment`, while `--check` over the per-user preset directory - also named `presets` - applies
+them to `my_first.toml`, with a message about an editor schema that directory never gets. Warnings
+only, exit 0 unless `--strict`.
+- **The shipped-set test's zero-file guard is vacuous.** `the_shipped_presets_check_clean_with_nothing_to_say`
+accepts `checked 112 files` OR `" files: 0 errors, 0 warnings"`, and the second matches `checked 0
+files`, which the comment above it says the assertion exists to refuse. The corpus gate's own
+`checked >= 100` covers the same risk.
+
+**Nits:** a `STDOUT_WRITERS` reason string in `standalone/tests/stream_split.rs` carries a run of ten
+spaces where a line continuation was lost; `core/` now renders an editor's config file
+(`taplo_config()`) and knows repository paths, which the plan placed there and nothing ships.
+
+**Also at the close:** `preset-author`'s step 4 now runs `ritmolux --check <file> --strict` ahead of
+`shot`, as the plan asked; root `README.md` and `CLAUDE.md` name `presets/schema/` and `.taplo.toml`
+(the log's noticed-not-acted-on item). The editor hover inherits backlog 0204's single range per
+parameter - no probe moved, noted on the entry. The followup (structured warnings) is Plan 0172's
+ADR-0192. Preset curation: no `.toml` touched, nothing to curate; the defect-workaround grep does not
+apply (no engine defect fixed).
 
 ### [0167 - The studio becomes handable](done/0167-the-studio-becomes-handable.md)
 

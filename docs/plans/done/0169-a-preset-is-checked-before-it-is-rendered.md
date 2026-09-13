@@ -1,10 +1,13 @@
 # 0169 — A preset is checked before it is rendered
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-13. Phases 1-3 `0449b7f`, `73a9a10`, `43aabb3`; Phase 4 failed
+> and was replaced by Phase 5 `9e6faf1` and Phase 6 (passed on the owner's machine). Mode 4 review:
+> **no blockers, no majors, three minors, two nits**; full `--workspace` suite re-run at the close,
+> 1915 passed. ADR-0190 accepted. Version 0.122.0.
 > **Created:** 2026-09-11
 > **Owner skill(s):** `dev`, `human`
-> **Related ADRs:** [0190](../adrs/0190-preset-toml-is-checked-by-the-loader-and-never-reformatted.md),
-> [0170](../adrs/0170-a-parameters-reference-row-is-generated-from-the-declaration-the-engine-reads.md)
+> **Related ADRs:** [0190](../../adrs/0190-preset-toml-is-checked-by-the-loader-and-never-reformatted.md),
+> [0170](../../adrs/0170-a-parameters-reference-row-is-generated-from-the-declaration-the-engine-reads.md)
 
 ## TL;DR
 
@@ -510,4 +513,5 @@ stops]}` would make validation know; whether completion would honour it is unmea
 ## Followups (after this lands)
 
 - Give `Preset::warnings` structure (a kind plus the key it concerns) so `--check` and the studio can
-  place every warning, not just the unknown key the schema already covers.
+  place every warning, not just the unknown key the schema already covers. **Claimed at the close by
+  Plan 0172** (ADR-0192, `param` on warnings).

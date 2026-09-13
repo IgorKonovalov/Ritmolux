@@ -3959,6 +3959,9 @@ cover both.
   `absent: family_params in: core/src/preset/schema/export.rs`
 - **Verified 2026-09-11** — while the studio's slider takes its two ends from the one pair:
   `present: const \[lo, hi\] = spec\.range in: studio/renderer/components/ParamRow.tsx`
+- **Updated 2026-09-13**, at Plan 0169's close: a second consumer reads the same single pair. The
+  editor schemas under `presets/schema/` print each parameter's one `range` in its hover text, so a
+  Lissajous `d` hovers as `1` to `360` too. A fix to the export's shape should regenerate those.
 
 ### Priority
 

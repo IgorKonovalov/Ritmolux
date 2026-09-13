@@ -68,6 +68,8 @@ studio/              # The Electron studio (ADR-0175, ADR-0178): a third applica
 milkconv/            # The MilkDrop `.milk` -> preset converter (ADR-0113, Plan 0100). Never ships,
                      #   nothing shipped depends on it, so it is outside `default-members` too.
 presets/             # The curated preset library (*.toml) — embedded at build time, seeded on first run.
+                     #   schema/ and preset.schema.json are GENERATED editor schemas, selected per file
+                     #   by the generated root .taplo.toml (ADR-0190). Never embedded, never shipped.
 scripts/             # Repo maintenance: the seven Node gates the pre-push hook and CI's `links` job
                      #   run (see "Developer setup" below), plus check-site-links.mjs and
                      #   check-site-routes.mjs, an eighth and ninth that run in neither because they

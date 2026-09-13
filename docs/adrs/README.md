@@ -211,7 +211,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0187](0187-the-preview-pipe-has-a-fixed-shape-and-names-its-true-format.md) | The preview pipe has a fixed shape and names the format it actually carries | accepted 2026-09-11 (Plan 0167), revises 0176, Outcome |
 | [0188](0188-the-two-implementer-lanes-hand-off-automatically.md) | The two implementer lanes hand off to each other automatically, and every other seam stays manual | accepted 2026-09-10 (no plan), amends 0177 |
 | [0189](0189-an-edit-forks-the-preset-and-the-studio-holds-rotation.md) | An edit forks the preset on first touch, and the studio holds rotation while attached | accepted 2026-09-10 (Plan 0168), revises 0184 |
-| [0190](0190-preset-toml-is-checked-by-the-loader-and-never-reformatted.md) | Preset TOML is checked by the engine's own loader and never reformatted | proposed (Plan 0169) |
+| [0190](0190-preset-toml-is-checked-by-the-loader-and-never-reformatted.md) | Preset TOML is checked by the engine's own loader and never reformatted | accepted 2026-09-13 (Plan 0169) |
 | [0191](0191-a-frame-delta-is-replaced-at-every-entry-and-nothing-below-keeps-a-policy.md) | A frame delta is replaced at every entry that takes one, and nothing below keeps a policy of its own | proposed (Plan 0171), amends 0152 |
 | [0192](0192-a-preset-warning-names-its-parameter.md) | A preset warning names the parameter it is about | proposed (Plan 0172), extends 0176 |
 <!-- roster:end -->
