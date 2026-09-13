@@ -375,7 +375,7 @@ step, ahead of `shot` — the skill is the lane's, not `dev`'s.
 | 2 — the house-style rules and the gate | dev | done | `73a9a10` |
 | 3 — the editor schema | dev | done | `43aabb3` |
 | 4 — the editor, verified on the owner's machine | human | failed 2026-09-12 — see its Outcome; replaced by 5 + 6 | |
-| 5 — one editor schema per system | dev | done | committed with this row |
+| 5 — one editor schema per system | dev | done | `9e6faf1` |
 | 6 — the editor, verified again | human | not started — the user's | |
 
 ### Notes
@@ -465,25 +465,29 @@ Against `fragment_field.schema.json`, `force` was refused as an additional prope
 
 ### Close triggers
 
-- **`presets/` touched:** yes, one added file — `presets/preset.schema.json`, generated. **No
-  `.toml` was added, removed or edited**, so the embedded set, the seeded set and the five preset
-  gates cover exactly what they covered before.
+- **`presets/` touched:** yes, fifteen added files, all generated — `presets/preset.schema.json`
+  (Phase 3) and the fourteen `presets/schema/<system>.schema.json` (Phase 5). **No `.toml` was
+  added, removed or edited**, so the embedded set, the seeded set and the five preset gates cover
+  exactly what they covered before.
 - **Plan header `Closes:`** none — the header carries no `Closes:` line.
 - **What shipped:** a feature. Two new flags on the shipped binary (`--check <path>`, `--strict`),
-  one new committed generated artifact (`presets/preset.schema.json`), and two new root dotfiles
-  (`.taplo.toml`, `.editorconfig`). No engine or render behaviour changed; the loader is unchanged
-  and still forgives an unknown parameter with a warning.
+  fifteen committed generated schemas (`presets/preset.schema.json`, `presets/schema/*.schema.json`),
+  a generated root `.taplo.toml`, a root `.editorconfig`, and a new public
+  `SystemKind::family()` in `core/`. The `file-name` rule is stricter after Phase 5: the prefix must
+  equal the family, not just be a segment of the system name. No engine or render behaviour changed;
+  the loader is unchanged and still forgives an unknown parameter with a warning.
 - **Operator docs touched:** `docs/configuration.md` (both flags, with the exit codes and the
-  diagnostic shape), `docs/presets.md` (a "Check it before you render it" step in the authoring
-  loop), `docs/developing.md` (a new "Editing presets in VS Code" section: the extension, the
-  regenerate command, the format-on-save warning and an optional task with a problem matcher).
+  diagnostic shape), `docs/presets.md` (a "Check it before you render it" step in the authoring loop;
+  Phase 5 restated `file-name` as the family rule), `docs/developing.md` (an "Editing presets in VS
+  Code" section; Phase 5 rewrote it to say which files complete and which only validate, and to name
+  the renamed regenerate command).
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0.
-- **Full suite:** `cargo nextest run --workspace --no-fail-fast`, exit 0 — **1912 passed, 0 failed,
-  6 skipped** in 620 s. The other seven Node gates were run and are green; `toc.mjs --check` reports
-  7 blocks current.
-- **Outstanding `human` phases:** Phase 4, in full — verifying completion, hover, the unknown-key
-  underline and a byte-identical save in VS Code with Even Better TOML installed. Nothing in this
-  session touched it.
+- **Full suite (after Phase 5):** `cargo nextest run --workspace --no-fail-fast`, exit 0 — **1915
+  passed, 0 failed, 6 skipped** in 556 s. `-P fast`, clippy with `-D warnings`, `fmt --check`, the
+  six other Node gates and `toc.mjs --check` were green at `9e6faf1`.
+- **Outstanding `human` phases:** Phase 6, in full — completion and hover in a `fragment_*` preset,
+  the Problems entry for a misspelled key, and a byte-identical save, in VS Code with Even Better
+  TOML installed. Phase 4 failed and is replaced by 5 + 6.
 
 ## Followups (after this lands)
 
