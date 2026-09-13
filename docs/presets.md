@@ -99,7 +99,9 @@ purpose ([ADR-0190](adrs/0190-preset-toml-is-checked-by-the-loader-and-never-ref
 
 Alongside the loader's verdict it applies a short list of house-style rules, all
 warnings, each named by a rule id so you can tell them apart from the engine's:
-`file-name` (a library file's prefix names its system's family), `header-comment`
+`file-name` (a library file's prefix is its system's family — `collage_` for
+`shape_collage` — which is also what gives it that system's completions in the
+editor), `header-comment`
 (a preset opens by saying what it is), `hex-case` (a `#rrggbb` colour is
 lowercase), and `trailing-whitespace`, `final-newline` and `tab`. The last three
 are what `.editorconfig` asks your editor for, so an editor that honours it

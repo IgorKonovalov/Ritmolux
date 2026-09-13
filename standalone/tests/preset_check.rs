@@ -457,25 +457,53 @@ fn rule_separates(rule: &'static str, tripped: &Path, clean: &Path) {
     );
 }
 
-/// **`file-name`**: the prefix up to the first `_` is one of the `_`-separated
-/// segments of `system`.
+/// **`file-name`**: the prefix up to the first `_` is the system's family.
 ///
-/// Not equality — that was measured against the corpus and fails every file,
-/// because the prefix is a family name (ADR-0190). `shape_x` declaring
-/// `shape_collage` passes; `swarm_x` declaring `attractor` does not.
+/// The family, not any segment of the system name: `shape_x` declaring
+/// `shape_collage` shares the segment `shape` and would still be handed
+/// `shape_field`'s editor schema, so it fails; `collage_x` passes. A prefix naming
+/// an unrelated system (`swarm_x` declaring `attractor`) fails too, and an
+/// unknown `system` is left to the loader's error.
 #[test]
-fn the_file_name_rule_reads_the_prefix_against_the_system_segments() {
-    let tripped = file_in(
+fn the_file_name_rule_reads_the_prefix_against_the_systems_family() {
+    let clean = file_in(
+        "presets",
+        "collage_x.toml",
+        "# A collage.\nsystem = \"shape_collage\"\n",
+    );
+    let shares_a_segment = file_in(
+        "presets",
+        "shape_x.toml",
+        "# A collage named for the shape field.\nsystem = \"shape_collage\"\n",
+    );
+    let unrelated = file_in(
         "presets",
         "swarm_x.toml",
         "# A swarm that is not one.\nsystem = \"attractor\"\n",
     );
-    let clean = file_in(
-        "presets",
-        "shape_x.toml",
-        "# A collage.\nsystem = \"shape_collage\"\n",
+    rule_separates("file-name", &shares_a_segment, &clean);
+    rule_separates("file-name", &unrelated, &clean);
+
+    let src = std::fs::read_to_string(&shares_a_segment).expect("read rule fixture");
+    let message = preset_check::check(&shares_a_segment, &src)
+        .into_iter()
+        .find(|d| d.rule == "file-name")
+        .map(|d| d.message)
+        .unwrap_or_default();
+    assert!(
+        message.contains("`collage`"),
+        "the diagnostic does not name the family the file should carry: {message}"
     );
-    rule_separates("file-name", &tripped, &clean);
+
+    let unknown = file_in(
+        "presets",
+        "shape_unknown.toml",
+        "# No such system.\nsystem = \"no_such_system\"\n",
+    );
+    assert!(
+        !rules_on(&unknown).contains(&"file-name"),
+        "`file-name` fired on an unknown system, which is the loader's error to report"
+    );
 }
 
 /// **`file-name` and `header-comment` apply to library files only.**
@@ -507,12 +535,12 @@ fn the_two_naming_rules_do_not_reach_outside_the_library() {
 fn the_header_comment_rule_wants_a_comment_before_the_first_key() {
     let tripped = file_in(
         "presets",
-        "shape_noheader.toml",
+        "collage_noheader.toml",
         "system = \"shape_collage\"\n",
     );
     let clean = file_in(
         "presets",
-        "shape_header.toml",
+        "collage_header.toml",
         "# What this preset is for.\nsystem = \"shape_collage\"\n",
     );
     rule_separates("header-comment", &tripped, &clean);
@@ -534,13 +562,13 @@ fn the_hex_case_rule_reads_colour_values_and_not_comments() {
              [[palette.stops]]\nat = 1.0\ncolor = \"#112233\"\n"
         )
     };
-    let tripped = file_in("presets", "shape_upper.toml", &stops("#AABBCC"));
-    let clean = file_in("presets", "shape_lower.toml", &stops("#ddeeff"));
+    let tripped = file_in("presets", "collage_upper.toml", &stops("#AABBCC"));
+    let clean = file_in("presets", "collage_lower.toml", &stops("#ddeeff"));
     rule_separates("hex-case", &tripped, &clean);
 
     let in_a_comment = file_in(
         "presets",
-        "shape_comment.toml",
+        "collage_comment.toml",
         "# The plateau renders `#E2E0DA`, which is the exception.\n\
          system = \"shape_collage\"\n",
     );
@@ -556,12 +584,12 @@ fn the_hex_case_rule_reads_colour_values_and_not_comments() {
 fn the_trailing_whitespace_rule_reads_the_end_of_each_line() {
     let tripped = file_in(
         "presets",
-        "shape_trail.toml",
+        "collage_trail.toml",
         "# Trailing.\nsystem = \"shape_collage\"   \n",
     );
     let clean = file_in(
         "presets",
-        "shape_notrail.toml",
+        "collage_notrail.toml",
         "# Clean.\nsystem = \"shape_collage\"\n",
     );
     rule_separates("trailing-whitespace", &tripped, &clean);
@@ -577,17 +605,17 @@ fn the_trailing_whitespace_rule_reads_the_end_of_each_line() {
 fn the_final_newline_rule_wants_exactly_one() {
     let clean = file_in(
         "presets",
-        "shape_onenl.toml",
+        "collage_onenl.toml",
         "# One.\nsystem = \"shape_collage\"\n",
     );
     let none = file_in(
         "presets",
-        "shape_nonl.toml",
+        "collage_nonl.toml",
         "# None.\nsystem = \"shape_collage\"",
     );
     let two = file_in(
         "presets",
-        "shape_twonl.toml",
+        "collage_twonl.toml",
         "# Two.\nsystem = \"shape_collage\"\n\n",
     );
     rule_separates("final-newline", &none, &clean);
@@ -595,7 +623,7 @@ fn the_final_newline_rule_wants_exactly_one() {
 
     let crlf = file_in(
         "presets",
-        "shape_crlf.toml",
+        "collage_crlf.toml",
         "# CRLF.\r\nsystem = \"shape_collage\"\r\n",
     );
     let rules = rules_on(&crlf);
@@ -610,12 +638,12 @@ fn the_final_newline_rule_wants_exactly_one() {
 fn the_tab_rule_reads_the_whole_line() {
     let tripped = file_in(
         "presets",
-        "shape_tab.toml",
+        "collage_tab.toml",
         "# Tabbed.\nsystem = \"shape_collage\"\n\n[params]\n\tcount = \"8\"\n",
     );
     let clean = file_in(
         "presets",
-        "shape_spaces.toml",
+        "collage_spaces.toml",
         "# Spaced.\nsystem = \"shape_collage\"\n\n[params]\ncount = \"8\"\n",
     );
     rule_separates("tab", &tripped, &clean);

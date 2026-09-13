@@ -28,24 +28,39 @@ The headless capture CLI and the visual-QA harness have their own page,
 ## Editing presets in VS Code
 
 Install **Even Better TOML** (`tamasfe.even-better-toml`). That is the whole setup: a committed
-`.taplo.toml` at the repository root associates `presets/**/*.toml` and `docs/examples/**/*.toml` with
-`presets/preset.schema.json`, so the extension picks it up with nothing per-user to configure. You
-then get, inside a preset:
+`.taplo.toml` at the repository root tells the extension which schema each preset file gets, with
+nothing per-user to configure.
 
-- **completion** on `[params]` keys, offering that `system`'s parameters and not another system's;
-- **hover documentation** on a key — what it does, its default, its typical range and its kind;
-- **an underline on a key no system accepts**, which is the mistake the loader deliberately forgives
-  (an unknown parameter is a warning and the binding is kept, ADR-0020), so the editor is where it
-  becomes visible as you type it;
-- the closed rosters as a dropdown on `system`, `[curve] family`, `[spectrum] layout` and every other
-  key drawn from a fixed set.
+**Which schema a file gets depends on its name.** A library file — one directly in `presets/`,
+`presets/proposed/` or `presets/pending/` — named for its system's family (`fragment_*.toml` for
+`fragment_field`, `collage_*.toml` for `shape_collage`, `curve_*.toml` for `parametric_curve`) gets
+that system's own schema from `presets/schema/`. Inside it you get:
 
-`presets/preset.schema.json` is **generated** from the engine's own `ParamSpec` and `TableDesc`
-declarations, and `core/tests/preset_schema.rs` fails if the committed copy is stale. Regenerate it
-rather than editing it:
+- **completion** on `[params]` keys, offering that system's parameters and the compositing stages',
+  and not another system's;
+- **hover documentation** on a parameter — what it does, its default, its typical range and its kind;
+- **a Problems entry naming a key the system does not accept**, which is the mistake the loader
+  deliberately forgives (an unknown parameter is a warning and the binding is kept, ADR-0020). The
+  underline sits on the `[params]` header rather than on the key itself, so read the Problems panel
+  for the name;
+- the closed rosters as a dropdown on `[curve] family`, `[spectrum] layout` and every other key drawn
+  from a fixed set.
+
+Everything else gets **validation only**, from the generic `presets/preset.schema.json`: the teaching
+files under `docs/examples/`, and a library file named off its family. Those still get an entry for
+an unknown key, but no parameter completion and no parameter hover. So does every `[layer]`, in any
+file: a layer names its own system, and a per-system schema does not narrow the layer's `[params]`.
+`ritmolux --check` warns (`file-name`) on a library file named off its family, which is exactly the
+file that would lose completion.
+
+All sixteen files — the generic schema, the fourteen per-system schemas and `.taplo.toml` itself — are
+**generated** from the engine's own `ParamSpec`, `TableDesc` and `SystemKind` declarations, and
+`core/tests/preset_schema.rs` fails if any of them is stale or `presets/schema/` holds a file no
+system renders. One command regenerates all of them, and removes a schema left behind by a system
+that no longer exists:
 
 ```sh
-RLX_UPDATE_PRESET_SCHEMA=1 cargo nextest run -p rlx-core the_committed_schema_is_current
+RLX_UPDATE_PRESET_SCHEMA=1 cargo nextest run -p rlx-core the_generated_editor_files_are_current
 ```
 
 **Turn format-on-save off for TOML.** The extension ships a formatter, and this project does not

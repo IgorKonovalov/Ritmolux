@@ -598,32 +598,35 @@ fn every_system_has_a_gallery_image() {
 /// than mirrored, so a system added later cannot be absent from both sides at
 /// once.
 ///
-/// Every string literal inside the `const TABLE` block is a canonical name --
-/// the table's other two columns are a `SystemKind` variant and a `PARAMS` path,
-/// neither of which is quoted. Reading the quotes rather than a per-row pattern
-/// is what makes this survive rustfmt wrapping one row across four lines and
-/// leaving the next on one.
+/// Each row of the `const TABLE` block opens with a `SystemKind::` variant, and
+/// the first string literal after it is that row's canonical name -- the second
+/// is its family, which is not a system. So the body is split at each
+/// `SystemKind::` and only the first quoted string of each piece is read. Reading
+/// quotes rather than a per-row pattern is what makes this survive rustfmt
+/// wrapping one row across several lines and leaving the next on one.
 fn system_names(schema: &str) -> Vec<String> {
     let mut out = Vec::new();
-    let start = match schema.find("const TABLE:") {
-        Some(i) => i,
-        None => return out,
+    let Some(table) = schema.find("const TABLE:") else {
+        return out;
     };
-    let end = schema[start..]
+    // The body, past the type annotation, which names `SystemKind::VARIANT_COUNT`.
+    let Some(open) = schema[table..].find("= {").map(|i| table + i) else {
+        return out;
+    };
+    let end = schema[open..]
         .find("\n};")
-        .map(|i| start + i)
+        .map(|i| open + i)
         .unwrap_or(schema.len());
-    let mut rest = &schema[start..end];
-    while let Some(open) = rest.find('"') {
-        let after = &rest[open + 1..];
-        let Some(close) = after.find('"') else {
-            break;
+    for row in schema[open..end].split("SystemKind::").skip(1) {
+        let Some((_, after)) = row.split_once('"') else {
+            continue;
         };
-        let name = &after[..close];
+        let Some((name, _)) = after.split_once('"') else {
+            continue;
+        };
         if !name.is_empty() {
             out.push(name.to_string());
         }
-        rest = &after[close + 1..];
     }
     out
 }

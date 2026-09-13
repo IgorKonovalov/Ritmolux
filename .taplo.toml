@@ -1,34 +1,227 @@
-# Associates the generated preset schema with the files it describes, so an
-# editor with Even Better TOML installed completes parameter names, shows each
-# one's documentation on hover, and underlines a key no system accepts. No
-# per-user setup: the extension finds this file at the workspace root.
+# GENERATED - do not edit. core/tests/preset_schema.rs fails if this file, the
+# generic schema or any per-system schema is stale. Regenerate all of them with
+#
+#   RLX_UPDATE_PRESET_SCHEMA=1 cargo nextest run -p rlx-core the_generated_editor_files_are_current
+#
+# Associates the generated JSON Schemas with the preset files they describe, so
+# an editor with Even Better TOML installed completes parameter names, shows each
+# one's documentation on hover, and flags a key the preset's system does not
+# accept. No per-user setup: the extension finds this file at the workspace root.
 #
 # THE `[formatting]` TABLE IS DELIBERATELY ABSENT, AND MUST STAY ABSENT.
 # This project does not format TOML (ADR-0190). The presets carry deliberate,
-# local alignment no formatter models — column-padded inline tables, `=` columns
-# aligned per block, a two-space gap before a trailing comment — and `taplo fmt`
+# local alignment no formatter models - column-padded inline tables, `=` columns
+# aligned per block, a two-space gap before a trailing comment - and `taplo fmt`
 # measured against this corpus rewrote 99 to 121 of 124 files under every
 # configuration tried and panicked on eight shipped presets under its defaults.
 # A `[formatting]` table here would switch on the one Taplo feature that was
-# rejected on measurement.
+# rejected on measurement. The extension still ships a formatter this file cannot
+# disable; docs/developing.md says how to keep it off for TOML.
 #
-# The extension still ships a formatter this file cannot disable. It runs only if
-# your VS Code formats TOML on save; docs/developing.md says how to turn that off
-# for TOML alone.
+# ONE SCHEMA PER SYSTEM, SELECTED BY THE FILENAME. Taplo validates through a
+# schema's `if`/`then` but reads neither hover text nor completions through one,
+# so a single schema keyed on `system` completes nothing inside `[params]` (Plan
+# 0169 Phase 4). Each system therefore has a self-contained schema under
+# presets/schema/, and a library file reaches it through its filename's family
+# prefix: `collage_*.toml` gets shape_collage's. `ritmolux --check` warns on a
+# library file named off its family, which is exactly the file that would get no
+# completion.
 #
-# One rule and no exclusions: the two globs below reach preset files and nothing
-# else. This repository's own manifests (`Cargo.toml`, `deny.toml`, `config.toml`)
-# live outside both, so they need no rule to keep the preset schema away from
-# them — and a defensive second rule would rest on Taplo's rule-precedence order,
-# which nothing here checks.
+# The last rule is the fallback: presets/preset.schema.json, which validates
+# every system's parameters and completes none. It covers the teaching files in
+# docs/examples/ and any library file no family rule claims, and it EXCLUDES every
+# family glob. That exclusion is what hands a family file its own schema, not
+# rule order: Taplo breaks a tie between matching rules by taking the later one,
+# which is the fallback.
 #
-# `presets/preset.schema.json` is GENERATED from the engine's own ParamSpec and
-# TableDesc declarations, and `core/tests/preset_schema.rs` fails if the
-# committed copy is stale. Regenerate it with RLX_UPDATE_PRESET_SCHEMA=1 rather
-# than editing it.
+# EVERY GLOB STARTS WITH `/`. Taplo joins a relative glob onto the workspace root
+# path (`c:/Users/...` on Windows, no leading slash) but matches it against the
+# document URL with only the scheme stripped (`/c:/Users/...`), so on Windows a
+# relative glob never matches and the editor reports no schema. A leading `/`
+# makes the glob count as absolute, which skips the join; `/**/` then matches the
+# URL path on Windows and macOS alike.
+#
+# This repository's own manifests (`Cargo.toml`, `deny.toml`, `config.toml`) sit
+# outside every glob, so no rule is needed to keep a preset schema off them.
+# `schema.path` is relative to this file, so it resolves the same in a clone at
+# any path.
+
+[[rule]]
+name = "ritmolux-fragment_field"
+include = [
+  "/**/presets/fragment_*.toml",
+  "/**/presets/proposed/fragment_*.toml",
+  "/**/presets/pending/fragment_*.toml",
+]
+schema.path = "presets/schema/fragment_field.schema.json"
+
+[[rule]]
+name = "ritmolux-swarm"
+include = [
+  "/**/presets/swarm_*.toml",
+  "/**/presets/proposed/swarm_*.toml",
+  "/**/presets/pending/swarm_*.toml",
+]
+schema.path = "presets/schema/swarm.schema.json"
+
+[[rule]]
+name = "ritmolux-parametric_curve"
+include = [
+  "/**/presets/curve_*.toml",
+  "/**/presets/proposed/curve_*.toml",
+  "/**/presets/pending/curve_*.toml",
+]
+schema.path = "presets/schema/parametric_curve.schema.json"
+
+[[rule]]
+name = "ritmolux-lsystem"
+include = [
+  "/**/presets/lsystem_*.toml",
+  "/**/presets/proposed/lsystem_*.toml",
+  "/**/presets/pending/lsystem_*.toml",
+]
+schema.path = "presets/schema/lsystem.schema.json"
+
+[[rule]]
+name = "ritmolux-star_pattern"
+include = [
+  "/**/presets/star_*.toml",
+  "/**/presets/proposed/star_*.toml",
+  "/**/presets/pending/star_*.toml",
+]
+schema.path = "presets/schema/star_pattern.schema.json"
+
+[[rule]]
+name = "ritmolux-reaction_diffusion"
+include = [
+  "/**/presets/reaction_*.toml",
+  "/**/presets/proposed/reaction_*.toml",
+  "/**/presets/pending/reaction_*.toml",
+]
+schema.path = "presets/schema/reaction_diffusion.schema.json"
+
+[[rule]]
+name = "ritmolux-attractor"
+include = [
+  "/**/presets/attractor_*.toml",
+  "/**/presets/proposed/attractor_*.toml",
+  "/**/presets/pending/attractor_*.toml",
+]
+schema.path = "presets/schema/attractor.schema.json"
+
+[[rule]]
+name = "ritmolux-spectrum"
+include = [
+  "/**/presets/spectrum_*.toml",
+  "/**/presets/proposed/spectrum_*.toml",
+  "/**/presets/pending/spectrum_*.toml",
+]
+schema.path = "presets/schema/spectrum.schema.json"
+
+[[rule]]
+name = "ritmolux-emitter"
+include = [
+  "/**/presets/emitter_*.toml",
+  "/**/presets/proposed/emitter_*.toml",
+  "/**/presets/pending/emitter_*.toml",
+]
+schema.path = "presets/schema/emitter.schema.json"
+
+[[rule]]
+name = "ritmolux-shape_field"
+include = [
+  "/**/presets/shape_*.toml",
+  "/**/presets/proposed/shape_*.toml",
+  "/**/presets/pending/shape_*.toml",
+]
+schema.path = "presets/schema/shape_field.schema.json"
+
+[[rule]]
+name = "ritmolux-warp_mesh"
+include = [
+  "/**/presets/warp_*.toml",
+  "/**/presets/proposed/warp_*.toml",
+  "/**/presets/pending/warp_*.toml",
+]
+schema.path = "presets/schema/warp_mesh.schema.json"
+
+[[rule]]
+name = "ritmolux-shape_collage"
+include = [
+  "/**/presets/collage_*.toml",
+  "/**/presets/proposed/collage_*.toml",
+  "/**/presets/pending/collage_*.toml",
+]
+schema.path = "presets/schema/shape_collage.schema.json"
+
+[[rule]]
+name = "ritmolux-analytic_field"
+include = [
+  "/**/presets/analytic_*.toml",
+  "/**/presets/proposed/analytic_*.toml",
+  "/**/presets/pending/analytic_*.toml",
+]
+schema.path = "presets/schema/analytic_field.schema.json"
+
+[[rule]]
+name = "ritmolux-cellular"
+include = [
+  "/**/presets/cellular_*.toml",
+  "/**/presets/proposed/cellular_*.toml",
+  "/**/presets/pending/cellular_*.toml",
+]
+schema.path = "presets/schema/cellular.schema.json"
 
 [[rule]]
 name = "ritmolux-preset"
-include = ["presets/**/*.toml", "docs/examples/**/*.toml"]
-# Relative to this file, so it resolves the same in a clone at any path.
+include = [
+  "/**/presets/*.toml",
+  "/**/presets/proposed/*.toml",
+  "/**/presets/pending/*.toml",
+  "/**/docs/examples/**/*.toml",
+]
+exclude = [
+  "/**/presets/fragment_*.toml",
+  "/**/presets/proposed/fragment_*.toml",
+  "/**/presets/pending/fragment_*.toml",
+  "/**/presets/swarm_*.toml",
+  "/**/presets/proposed/swarm_*.toml",
+  "/**/presets/pending/swarm_*.toml",
+  "/**/presets/curve_*.toml",
+  "/**/presets/proposed/curve_*.toml",
+  "/**/presets/pending/curve_*.toml",
+  "/**/presets/lsystem_*.toml",
+  "/**/presets/proposed/lsystem_*.toml",
+  "/**/presets/pending/lsystem_*.toml",
+  "/**/presets/star_*.toml",
+  "/**/presets/proposed/star_*.toml",
+  "/**/presets/pending/star_*.toml",
+  "/**/presets/reaction_*.toml",
+  "/**/presets/proposed/reaction_*.toml",
+  "/**/presets/pending/reaction_*.toml",
+  "/**/presets/attractor_*.toml",
+  "/**/presets/proposed/attractor_*.toml",
+  "/**/presets/pending/attractor_*.toml",
+  "/**/presets/spectrum_*.toml",
+  "/**/presets/proposed/spectrum_*.toml",
+  "/**/presets/pending/spectrum_*.toml",
+  "/**/presets/emitter_*.toml",
+  "/**/presets/proposed/emitter_*.toml",
+  "/**/presets/pending/emitter_*.toml",
+  "/**/presets/shape_*.toml",
+  "/**/presets/proposed/shape_*.toml",
+  "/**/presets/pending/shape_*.toml",
+  "/**/presets/warp_*.toml",
+  "/**/presets/proposed/warp_*.toml",
+  "/**/presets/pending/warp_*.toml",
+  "/**/presets/collage_*.toml",
+  "/**/presets/proposed/collage_*.toml",
+  "/**/presets/pending/collage_*.toml",
+  "/**/presets/analytic_*.toml",
+  "/**/presets/proposed/analytic_*.toml",
+  "/**/presets/pending/analytic_*.toml",
+  "/**/presets/cellular_*.toml",
+  "/**/presets/proposed/cellular_*.toml",
+  "/**/presets/pending/cellular_*.toml",
+]
 schema.path = "presets/preset.schema.json"

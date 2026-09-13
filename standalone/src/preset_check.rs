@@ -29,7 +29,7 @@ use std::fmt;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 
-use rlx_core::preset::{Preset, PresetError};
+use rlx_core::preset::{Preset, PresetError, SystemKind};
 use toml::de::{DeTable, DeValue};
 
 /// How much a diagnostic costs the caller.
@@ -193,7 +193,7 @@ fn engine_diagnostics(src: &str) -> Vec<Diagnostic> {
 // The house-style rules
 // ---------------------------------------------------------------------------
 
-/// The filename's prefix names one of the systems it declares.
+/// A library file's prefix is its system's family.
 pub const RULE_FILE_NAME: &str = "file-name";
 /// The file opens with a comment saying what it is.
 pub const RULE_HEADER_COMMENT: &str = "header-comment";
@@ -263,17 +263,18 @@ fn is_library_file(path: &Path) -> bool {
         .is_some_and(|name| name == "presets")
 }
 
-/// The filename's prefix, up to the first `_`, is one of the `_`-separated
-/// segments of the `system` value.
+/// The filename's prefix, up to the first `_`, is the declared system's
+/// **family** ([`SystemKind::family`]): `collage_*` files declare
+/// `shape_collage`, `curve_*` files `parametric_curve`.
 ///
-/// Weaker than "the prefix equals `system`", and true rather than tidy: the
-/// prefix is a **family** name, so `analytic_*` files declare `analytic_field`
-/// and `collage_*` files declare `shape_collage`. Equality was measured against
-/// the corpus and fails every file (ADR-0190); this holds on all of them.
+/// The family is what `.taplo.toml` selects a library file's editor schema by,
+/// so a file this rule warns on is exactly one the editor gives no completion.
+/// Matching any segment of the system name would not be enough: `shape_x.toml`
+/// declaring `shape_collage` shares the segment `shape` and still reaches
+/// `shape_field`'s schema.
 ///
-/// A file whose name carries no `_` has itself as the prefix, which is the right
-/// reading: `minimal.toml` would have to declare a system with `minimal` as a
-/// segment.
+/// A file whose name carries no `_` has itself as the prefix. An unknown
+/// `system` is silent here, because the loader already reports it as an error.
 fn file_name_rule(path: &Path, src: &str) -> Vec<Diagnostic> {
     let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
         return Vec::new();
@@ -286,19 +287,22 @@ fn file_name_rule(path: &Path, src: &str) -> Vec<Diagnostic> {
     let Some((key_span, value)) = lookup(doc.get_ref(), "system") else {
         return Vec::new();
     };
-    let Some(system) = value.get_ref().as_str() else {
+    let Some(kind) = value.get_ref().as_str().and_then(SystemKind::from_name) else {
         return Vec::new();
     };
     let prefix = stem.split('_').next().unwrap_or(stem);
-    if system.split('_').any(|segment| segment == prefix) {
+    let family = kind.family();
+    if prefix == family {
         return Vec::new();
     }
     vec![Diagnostic::warning(
         RULE_FILE_NAME,
         Some(key_span),
         format!(
-            "the filename's prefix `{prefix}` is not a segment of the system \
-             `{system}`; a library file is named for the family it belongs to"
+            "the filename's prefix `{prefix}` is not `{family}`, the family of `{system}`; \
+             a library file is named `{family}_*.toml`, which is what gives it that \
+             system's editor schema",
+            system = kind.as_str()
         ),
     )]
 }

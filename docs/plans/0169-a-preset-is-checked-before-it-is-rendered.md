@@ -375,7 +375,7 @@ step, ahead of `shot` — the skill is the lane's, not `dev`'s.
 | 2 — the house-style rules and the gate | dev | done | `73a9a10` |
 | 3 — the editor schema | dev | done | `43aabb3` |
 | 4 — the editor, verified on the owner's machine | human | failed 2026-09-12 — see its Outcome; replaced by 5 + 6 | |
-| 5 — one editor schema per system | dev | not started | |
+| 5 — one editor schema per system | dev | done | committed with this row |
 | 6 — the editor, verified again | human | not started — the user's | |
 
 ### Notes
@@ -416,9 +416,52 @@ compositing parameter. Run from the session scratchpad and not committed, the sh
 dry run took. This is evidence about the JSON, not a substitute for Phase 4: it says a draft-07
 validator agrees, not that the extension does.
 
+**Phase 5 touched `core/tests/hygiene.rs`, outside its file list.** `every_system_has_a_gallery_image`
+reads system names by taking every string literal inside `system.rs`'s `TABLE`, so the family column
+read as eight systems with no gallery image and the fast profile went red. Its `system_names` now
+takes only the first literal after each `SystemKind::`. No assertion changed.
+
+**The drift test was renamed**, `the_committed_schema_is_current` to
+`the_generated_editor_files_are_current`, since it now holds sixteen files; the regenerate command in
+`docs/developing.md` and in `.taplo.toml`'s header names the new test. **`presets/preset.schema.json`
+did not change by a byte** in Phase 5 — the plan lists it as regenerated; only `json_schema`'s doc
+comment moved.
+
+**What the env var repairs.** An extra `presets/schema/*.schema.json` is reported and removed. An
+extra file of any other kind in that directory is reported and **not** removed — the plan names only
+`*.schema.json` for removal — so the done-when's "the env var repairs every case" holds for the
+sixteen files and extra schemas, not for a stray README.
+
+**The family checks are compile-time** (`const` asserts beside the row-order one): each family is a
+segment of its system's name, and no two systems share one. Both were seeded to fail and did.
+
+**The `--check` fixtures moved from `shape_*` to `collage_*`** throughout `preset_check.rs`, since
+every house-rule fixture declares `shape_collage` and would now also trip `file-name`.
+
+**Phase 5's probe** of the installed Even Better TOML 0.21.2, driving `dist/server.js` over node IPC
+with the extension's `initializationOptions`, its `package.json` defaults, and VS Code's URI spelling
+(`file:///c%3A/...`). `schema.catalogs` was emptied so nothing was fetched. A blank line was inserted
+under `[params]` for completion, and a `wrapp = "1"` line for the diagnostic. Run from the session
+scratchpad, not committed:
+
+| file | `taplo/associatedSchema` | hover on first `[params]` key | completion under `[params]` | `wrapp` |
+|---|---|---|---|---|
+| `presets/fragment_driftmono.toml` | `presets/schema/fragment_field.schema.json`, source `config` | `palette_steps`: its doc line | 45 items | line 86 (`[params]`): *Additional properties are not allowed ('wrapp' was unexpected)* |
+| `presets/swarm_braid.toml` | `presets/schema/swarm.schema.json`, source `config` | `field_freq`: its doc line | 46 items | line 61 (`[params]`), same message |
+| `docs/examples/cellular/cyclic.toml` | `presets/preset.schema.json`, source `config` | `states`: null | 0 items | line 19 (`[params]`), same message |
+
+Taplo omits keys a table already binds. So 45 is fragment_field's 61 accepted names less the 16 the
+file binds, and 46 is swarm's 70 less 24. Neither list held a name exclusive to the other system (0 of
+16 swarm-only names, 0 of 7 fragment-only), nor any name outside its own schema.
+
+**Beyond the plan, as in Phase 3:** `ajv` 6 (from `studio/node_modules`) over the 112 library files
+parsed by `smol-toml` (from `site/node_modules`), each against its family's schema: **0 violations**.
+Against `fragment_field.schema.json`, `force` was refused as an additional property, `system =
+"swarm"` as not the constant, and a swarm `[layer]` binding `force` passed. Scratchpad, not committed.
+
 **Noticed, not acted on:** neither `docs/README.md`'s "Repository layout", `CLAUDE.md`'s tree, nor
-`presets/README.md` mentions `presets/preset.schema.json`, `.taplo.toml` or `.editorconfig`. All
-three are outside the phases' file lists.
+`presets/README.md` mentions `presets/preset.schema.json`, `presets/schema/`, `.taplo.toml` or
+`.editorconfig`. All three are outside the phases' file lists.
 
 ### Close triggers
 

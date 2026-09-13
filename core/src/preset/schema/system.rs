@@ -52,12 +52,12 @@ pub enum SystemKind {
     Cellular,
 }
 
-/// **The** roster of built-in systems: every variant, its canonical name, and
-/// the parameter names its scene consumes, in the order the engine builds their
-/// scenes.
+/// **The** roster of built-in systems: every variant, its canonical name, its
+/// family, and the parameter names its scene consumes, in the order the engine
+/// builds their scenes.
 ///
-/// The single place all three lists live. [`SystemKind::ALL`],
-/// [`SystemKind::from_name`], [`SystemKind::as_str`] and
+/// The single place all four lists live. [`SystemKind::ALL`],
+/// [`SystemKind::from_name`], [`SystemKind::as_str`], [`SystemKind::family`] and
 /// [`SystemKind::param_names`] all read this, so they cannot disagree with each
 /// other; what keeps *this* honest is [`SystemKind::row`], the one exhaustive
 /// match over the enum, which fails the build when a variant has no entry.
@@ -67,63 +67,92 @@ pub enum SystemKind {
 /// pair); this is where they are gathered for the loader's typo check
 /// (ADR-0020). They do **not** include the global compositing params, which any
 /// preset may bind whatever its system -- [`is_known_param`] unions those in.
-const TABLE: [(SystemKind, &str, &[ParamSpec]); SystemKind::VARIANT_COUNT] = {
+///
+/// The family column is written down rather than derived, because no rule
+/// derives it: `shape_field` and `shape_collage` share the segment `shape`, and
+/// the collage's family is its *second* segment.
+const TABLE: [(SystemKind, &str, &str, &[ParamSpec]); SystemKind::VARIANT_COUNT] = {
     use crate::render::scenes;
     [
         (
             SystemKind::FragmentField,
             "fragment_field",
+            "fragment",
             scenes::fragment_field::PARAMS,
         ),
-        (SystemKind::Swarm, "swarm", scenes::swarm::PARAMS),
+        (SystemKind::Swarm, "swarm", "swarm", scenes::swarm::PARAMS),
         (
             SystemKind::ParametricCurve,
             "parametric_curve",
+            "curve",
             scenes::lines::parametric::PARAMS,
         ),
         (
             SystemKind::LSystem,
+            "lsystem",
             "lsystem",
             scenes::lines::lsystem::PARAMS,
         ),
         (
             SystemKind::StarPattern,
             "star_pattern",
+            "star",
             scenes::lines::star::PARAMS,
         ),
         (
             SystemKind::ReactionDiffusion,
             "reaction_diffusion",
+            "reaction",
             scenes::reaction_diffusion::PARAMS,
         ),
         (
             SystemKind::Attractor,
+            "attractor",
             "attractor",
             scenes::particles::PARAMS,
         ),
         (
             SystemKind::Spectrum,
             "spectrum",
+            "spectrum",
             scenes::lines::spectrum::PARAMS,
         ),
-        (SystemKind::Emitter, "emitter", scenes::emitter::PARAMS),
+        (
+            SystemKind::Emitter,
+            "emitter",
+            "emitter",
+            scenes::emitter::PARAMS,
+        ),
         (
             SystemKind::ShapeField,
             "shape_field",
+            "shape",
             scenes::shape_field::PARAMS,
         ),
-        (SystemKind::WarpMesh, "warp_mesh", scenes::warp_mesh::PARAMS),
+        (
+            SystemKind::WarpMesh,
+            "warp_mesh",
+            "warp",
+            scenes::warp_mesh::PARAMS,
+        ),
         (
             SystemKind::ShapeCollage,
             "shape_collage",
+            "collage",
             scenes::shape_collage::PARAMS,
         ),
         (
             SystemKind::AnalyticField,
             "analytic_field",
+            "analytic",
             scenes::analytic_field::PARAMS,
         ),
-        (SystemKind::Cellular, "cellular", scenes::cellular::PARAMS),
+        (
+            SystemKind::Cellular,
+            "cellular",
+            "cellular",
+            scenes::cellular::PARAMS,
+        ),
     ]
 };
 
@@ -140,6 +169,70 @@ const _: () = {
         i += 1;
     }
 };
+
+/// Every family is one `_`-separated segment of its own system's name, and no
+/// two systems share a family. Checked at compile time for the same reason as
+/// the row order: a library filename selects its editor schema by family, so two
+/// systems on one family would hand one of them the other's parameter set.
+const _: () = {
+    let mut i = 0;
+    while i < SystemKind::VARIANT_COUNT {
+        assert!(
+            is_segment(TABLE[i].1.as_bytes(), TABLE[i].2.as_bytes()),
+            "a system's family must be one `_`-separated segment of its name"
+        );
+        let mut j = i + 1;
+        while j < SystemKind::VARIANT_COUNT {
+            assert!(
+                !bytes_eq(TABLE[i].2.as_bytes(), TABLE[j].2.as_bytes()),
+                "no two systems may share a family"
+            );
+            j += 1;
+        }
+        i += 1;
+    }
+};
+
+/// Byte equality, usable in a `const` context where `==` on slices is not.
+const fn bytes_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut i = 0;
+    while i < a.len() {
+        if a[i] != b[i] {
+            return false;
+        }
+        i += 1;
+    }
+    true
+}
+
+/// Whether `segment` is non-empty and equals one of `name`'s `_`-separated
+/// segments.
+const fn is_segment(name: &[u8], segment: &[u8]) -> bool {
+    if segment.is_empty() {
+        return false;
+    }
+    let mut start = 0;
+    let mut i = 0;
+    while i <= name.len() {
+        if i == name.len() || name[i] == b'_' {
+            if i - start == segment.len() {
+                let mut k = 0;
+                while k < segment.len() && name[start + k] == segment[k] {
+                    k += 1;
+                }
+                if k == segment.len() {
+                    return true;
+                }
+            }
+            start = i + 1;
+        }
+        i += 1;
+    }
+    false
+}
 
 impl SystemKind {
     /// How many variants [`SystemKind`] has. Kept honest by `row`: a new
@@ -197,8 +290,8 @@ impl SystemKind {
     pub fn from_name(name: &str) -> Option<Self> {
         TABLE
             .iter()
-            .find(|(_, canonical, _)| *canonical == name)
-            .map(|(kind, _, _)| *kind)
+            .find(|(_, canonical, _, _)| *canonical == name)
+            .map(|(kind, _, _, _)| *kind)
     }
 
     /// The canonical name of this system -- the exact string
@@ -206,6 +299,18 @@ impl SystemKind {
     /// field.
     pub fn as_str(self) -> &'static str {
         TABLE[self.row()].1
+    }
+
+    /// The family this system's library presets are named for: the filename
+    /// prefix, up to the first `_`, of every `presets/*.toml` that drives it
+    /// (`collage` for `shape_collage`).
+    ///
+    /// One `_`-separated segment of [`SystemKind::as_str`], and unique across
+    /// systems — both checked at compile time. The editor's schema association
+    /// and `ritmolux --check`'s `file-name` rule both read it, so a filename the
+    /// checker accepts is one the editor gives that system's schema.
+    pub fn family(self) -> &'static str {
+        TABLE[self.row()].2
     }
 
     /// The parameters this system's scene consumes, as the scene declares them
@@ -216,7 +321,7 @@ impl SystemKind {
     /// `presets/README.md` be derived from the same declaration the loader
     /// checks a binding against.
     pub fn param_specs(self) -> &'static [ParamSpec] {
-        TABLE[self.row()].2
+        TABLE[self.row()].3
     }
 
     /// Just the names, for a caller that wants to print or join them.
@@ -224,7 +329,7 @@ impl SystemKind {
     /// Allocates. Use [`declares`] for a membership test, which is what almost
     /// every caller actually wants.
     pub fn param_names(self) -> Vec<&'static str> {
-        spec_names(TABLE[self.row()].2)
+        spec_names(TABLE[self.row()].3)
     }
 }
 

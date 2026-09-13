@@ -571,6 +571,12 @@ pub fn hash_str(text: &str) -> u64 {
 /// Draft-07, because that is what Even Better TOML's Taplo backend implements —
 /// in particular the `if`/`then` the per-system parameter sets need.
 ///
+/// **This file validates and does not complete.** Taplo reads hover text and
+/// completions only off unconditional properties, so a `[params]` key inside one
+/// of the `if`/`then` cases below gets neither. It is the fallback `.taplo.toml`
+/// applies to a file no family rule claims; [`system_json_schema`] is what a
+/// library file named for its family gets.
+///
 /// ## What it does and does not enforce
 ///
 /// `additionalProperties: false` appears **only** where the engine's declaration
@@ -642,6 +648,266 @@ pub fn json_schema() -> String {
     out.push_str("\n  }\n}\n");
     out
 }
+
+/// Where the per-system schemas are committed, relative to the repository root.
+pub const SYSTEM_SCHEMA_DIR: &str = "presets/schema";
+
+/// Where the generic schema is committed, relative to the repository root.
+pub const GENERIC_SCHEMA_PATH: &str = "presets/preset.schema.json";
+
+/// Where the editor association is committed, relative to the repository root.
+pub const TAPLO_CONFIG_PATH: &str = ".taplo.toml";
+
+/// The committed path of `kind`'s own schema, relative to the repository root.
+pub fn system_schema_path(kind: SystemKind) -> String {
+    format!("{SYSTEM_SCHEMA_DIR}/{}.schema.json", kind.as_str())
+}
+
+/// Every generated editor file, as `(path relative to the repository root,
+/// content)`: the generic schema, one schema per system, and `.taplo.toml`.
+///
+/// **The one list** the drift test compares and the regenerate command writes,
+/// so no file can be rendered and not checked, or checked and not rendered.
+pub fn editor_files() -> Vec<(String, String)> {
+    let mut out = vec![(GENERIC_SCHEMA_PATH.to_owned(), json_schema())];
+    out.extend(
+        SystemKind::ALL
+            .iter()
+            .map(|kind| (system_schema_path(*kind), system_json_schema(*kind))),
+    );
+    out.push((TAPLO_CONFIG_PATH.to_owned(), taplo_config()));
+    out
+}
+
+/// The JSON Schema for a preset driving `kind`, self-contained, as committed
+/// under `presets/schema/`.
+///
+/// **No `if`/`then` on the path from the root to a parameter.** Taplo validates
+/// through a conditional but reads neither hover text nor completions through
+/// one, so [`json_schema`]'s per-system cases complete nothing. Here `system` is
+/// a `const` and `params` is this system's property set, unconditionally — the
+/// set [`params_of`] gives the generic file's matching case, `$ref`ing the same
+/// definition keys.
+///
+/// **`[layer]` is not narrowed.** A layer names its own system, and narrowing it
+/// here would take one conditional per system and every system's parameter
+/// definitions in every file. Its `params` stays what the table declares: any
+/// name, bound to a string. The generic file still validates a layer's names.
+///
+/// `definitions` is pruned to what this file references — the structural tables
+/// reachable from the root, and this system's parameter declarations. A `$ref`
+/// into another file is not something Taplo resolves, so nothing is shared.
+pub fn system_json_schema(kind: SystemKind) -> String {
+    let definitions = param_definitions();
+    let params = params_of(kind, ParamSurface::Root);
+    let name = json_string(kind.as_str());
+
+    let mut out = String::with_capacity(96 * 1024);
+    out.push_str("{\n");
+    out.push_str("  \"$schema\": \"http://json-schema.org/draft-07/schema#\",\n");
+    out.push_str(&format!(
+        "  \"title\": {},\n",
+        json_string(&format!("Ritmolux preset: {}", kind.as_str()))
+    ));
+    out.push_str("  \"description\": ");
+    out.push_str(&json_string(&format!(
+        "The schema for a preset driving `{}`, selected by a library filename beginning \
+         `{}_`. Generated from the engine's own parameter and table declarations. Do not \
+         edit by hand: re-run the core test suite with RLX_UPDATE_PRESET_SCHEMA=1.",
+        kind.as_str(),
+        kind.family()
+    )));
+    out.push_str(",\n  \"type\": \"object\",\n");
+    out.push_str("  \"additionalProperties\": false,\n");
+
+    out.push_str("  \"properties\": {\n");
+    push_table_properties_with(
+        &mut out,
+        2,
+        &super::raw::PRESET,
+        |out, depth, key| match key.name {
+            "system" => {
+                let pad = "  ".repeat(depth);
+                out.push_str(&format!(
+                    "{pad}\"type\": \"string\",\n{pad}\"const\": {name}"
+                ));
+                true
+            }
+            "params" => {
+                push_params_body(out, depth, &params, &definitions);
+                true
+            }
+            _ => false,
+        },
+    );
+    out.push_str("\n  },\n");
+
+    let tables = reachable_tables(&super::raw::PRESET);
+    out.push_str("  \"definitions\": {\n");
+    let mut first = true;
+    for table in TABLES {
+        if tables.contains(&table.name) {
+            push_separator(&mut out, &mut first);
+            push_definition(&mut out, 2, table);
+        }
+    }
+    for (key, spec) in &definitions {
+        if params
+            .iter()
+            .any(|accepted| same_declaration(accepted, spec))
+        {
+            push_separator(&mut out, &mut first);
+            push_param_definition(&mut out, 2, key, spec);
+        }
+    }
+    out.push_str("\n  }\n}\n");
+    out
+}
+
+/// The name of every structural table a `$ref` reaches from `root`'s keys, at
+/// any depth, `root` itself excluded unless something refers back to it.
+fn reachable_tables(root: &TableDesc) -> Vec<&'static str> {
+    fn visit(kind: &KeyKind, seen: &mut Vec<&'static str>) {
+        match kind {
+            KeyKind::Table(name) => {
+                if !seen.contains(name) {
+                    seen.push(*name);
+                    for key in table(name).map_or(&[][..], |t| t.keys) {
+                        visit(&key.kind, seen);
+                    }
+                }
+            }
+            KeyKind::Map(of) | KeyKind::List(of) => visit(of, seen),
+            _ => {}
+        }
+    }
+    let mut seen = Vec::new();
+    for key in root.keys {
+        visit(&key.kind, &mut seen);
+    }
+    seen
+}
+
+/// The three library directories, as the `.taplo.toml` globs spell them.
+const LIBRARY_DIRS: [&str; 3] = ["presets", "presets/proposed", "presets/pending"];
+
+/// The glob matching a library file of `family` in `dir`, one of
+/// [`LIBRARY_DIRS`].
+fn family_glob(dir: &str, family: &str) -> String {
+    format!("/**/{dir}/{family}_*.toml")
+}
+
+/// `.taplo.toml`: which schema Even Better TOML applies to which preset file.
+///
+/// One rule per system, matching its family's filenames in the three library
+/// directories, then one fallback rule on the generic schema that **excludes**
+/// every family glob. The exclusion is what routes a family file to its own
+/// schema: Taplo breaks a tie between two matching rules by taking the later one,
+/// which is the fallback, so rule order alone would select the wrong file.
+///
+/// Every glob begins with `/`. Taplo joins a relative glob onto the workspace
+/// root's filesystem path but matches it against the document URL with only the
+/// scheme stripped, and on Windows those two differ by a leading `/`, so a
+/// relative glob matches nothing there. The generated header says so too, for
+/// the reader who opens the file rather than this function.
+pub fn taplo_config() -> String {
+    let mut out = String::with_capacity(8 * 1024);
+    out.push_str(TAPLO_HEADER);
+    for kind in SystemKind::ALL {
+        out.push_str("\n[[rule]]\n");
+        out.push_str(&format!("name = \"ritmolux-{}\"\n", kind.as_str()));
+        push_toml_globs(
+            &mut out,
+            "include",
+            LIBRARY_DIRS
+                .iter()
+                .map(|dir| family_glob(dir, kind.family())),
+        );
+        out.push_str(&format!("schema.path = \"{}\"\n", system_schema_path(kind)));
+    }
+    out.push_str("\n[[rule]]\n");
+    out.push_str("name = \"ritmolux-preset\"\n");
+    push_toml_globs(
+        &mut out,
+        "include",
+        LIBRARY_DIRS
+            .iter()
+            .map(|dir| format!("/**/{dir}/*.toml"))
+            .chain(std::iter::once("/**/docs/examples/**/*.toml".to_owned())),
+    );
+    push_toml_globs(
+        &mut out,
+        "exclude",
+        SystemKind::ALL.iter().flat_map(|kind| {
+            LIBRARY_DIRS
+                .iter()
+                .map(|dir| family_glob(dir, kind.family()))
+        }),
+    );
+    out.push_str(&format!("schema.path = \"{GENERIC_SCHEMA_PATH}\"\n"));
+    out
+}
+
+/// `key = [ ... ]`, one quoted glob per line.
+fn push_toml_globs(out: &mut String, key: &str, globs: impl Iterator<Item = String>) {
+    out.push_str(&format!("{key} = [\n"));
+    for glob in globs {
+        out.push_str(&format!("  \"{glob}\",\n"));
+    }
+    out.push_str("]\n");
+}
+
+/// The comment block `.taplo.toml` opens with. Written out rather than
+/// rendered, because nothing in it is a declaration the engine owns.
+const TAPLO_HEADER: &str = "\
+# GENERATED - do not edit. core/tests/preset_schema.rs fails if this file, the
+# generic schema or any per-system schema is stale. Regenerate all of them with
+#
+#   RLX_UPDATE_PRESET_SCHEMA=1 cargo nextest run -p rlx-core the_generated_editor_files_are_current
+#
+# Associates the generated JSON Schemas with the preset files they describe, so
+# an editor with Even Better TOML installed completes parameter names, shows each
+# one's documentation on hover, and flags a key the preset's system does not
+# accept. No per-user setup: the extension finds this file at the workspace root.
+#
+# THE `[formatting]` TABLE IS DELIBERATELY ABSENT, AND MUST STAY ABSENT.
+# This project does not format TOML (ADR-0190). The presets carry deliberate,
+# local alignment no formatter models - column-padded inline tables, `=` columns
+# aligned per block, a two-space gap before a trailing comment - and `taplo fmt`
+# measured against this corpus rewrote 99 to 121 of 124 files under every
+# configuration tried and panicked on eight shipped presets under its defaults.
+# A `[formatting]` table here would switch on the one Taplo feature that was
+# rejected on measurement. The extension still ships a formatter this file cannot
+# disable; docs/developing.md says how to keep it off for TOML.
+#
+# ONE SCHEMA PER SYSTEM, SELECTED BY THE FILENAME. Taplo validates through a
+# schema's `if`/`then` but reads neither hover text nor completions through one,
+# so a single schema keyed on `system` completes nothing inside `[params]` (Plan
+# 0169 Phase 4). Each system therefore has a self-contained schema under
+# presets/schema/, and a library file reaches it through its filename's family
+# prefix: `collage_*.toml` gets shape_collage's. `ritmolux --check` warns on a
+# library file named off its family, which is exactly the file that would get no
+# completion.
+#
+# The last rule is the fallback: presets/preset.schema.json, which validates
+# every system's parameters and completes none. It covers the teaching files in
+# docs/examples/ and any library file no family rule claims, and it EXCLUDES every
+# family glob. That exclusion is what hands a family file its own schema, not
+# rule order: Taplo breaks a tie between matching rules by taking the later one,
+# which is the fallback.
+#
+# EVERY GLOB STARTS WITH `/`. Taplo joins a relative glob onto the workspace root
+# path (`c:/Users/...` on Windows, no leading slash) but matches it against the
+# document URL with only the scheme stripped (`/c:/Users/...`), so on Windows a
+# relative glob never matches and the editor reports no schema. A leading `/`
+# makes the glob count as absolute, which skips the join; `/**/` then matches the
+# URL path on Windows and macOS alike.
+#
+# This repository's own manifests (`Cargo.toml`, `deny.toml`, `config.toml`) sit
+# outside every glob, so no rule is needed to keep a preset schema off them.
+# `schema.path` is relative to this file, so it resolves the same in a clone at
+# any path.
+";
 
 /// Every **distinct** parameter declaration in the engine, each with the
 /// `definitions` key the schema refs it by.
@@ -842,11 +1108,23 @@ fn push_params_object(
     params: &[&'static ParamSpec],
     definitions: &[(String, &'static ParamSpec)],
 ) {
-    let pad = "  ".repeat(depth);
     out.push_str("{\n");
-    out.push_str(&format!("{pad}  \"type\": \"object\",\n"));
-    out.push_str(&format!("{pad}  \"additionalProperties\": false,\n"));
-    out.push_str(&format!("{pad}  \"properties\": {{\n"));
+    push_params_body(out, depth + 1, params, definitions);
+    out.push_str(" }");
+}
+
+/// [`push_params_object`] without its braces: the lines a per-system file writes
+/// inside its `params` property, beside that property's description.
+fn push_params_body(
+    out: &mut String,
+    depth: usize,
+    params: &[&'static ParamSpec],
+    definitions: &[(String, &'static ParamSpec)],
+) {
+    let pad = "  ".repeat(depth);
+    out.push_str(&format!("{pad}\"type\": \"object\",\n"));
+    out.push_str(&format!("{pad}\"additionalProperties\": false,\n"));
+    out.push_str(&format!("{pad}\"properties\": {{\n"));
     let mut first = true;
     for spec in params {
         // Every spec reached here came out of a roster `param_definitions` also
@@ -857,11 +1135,11 @@ fn push_params_object(
             .expect("every parameter roster is walked by param_definitions");
         push_separator(out, &mut first);
         out.push_str(&format!(
-            "{pad}    {}: {{ \"$ref\": \"#/definitions/{key}\" }}",
+            "{pad}  {}: {{ \"$ref\": \"#/definitions/{key}\" }}",
             json_string(spec.name)
         ));
     }
-    out.push_str(&format!("\n{pad}  }} }}"));
+    out.push_str(&format!("\n{pad}}}"));
 }
 
 /// The hover text for one parameter: what it does, then its default, its range
@@ -906,12 +1184,30 @@ fn push_definition(out: &mut String, depth: usize, table: &TableDesc) {
 
 /// Every key of `table` as a JSON Schema property.
 fn push_table_properties(out: &mut String, depth: usize, table: &TableDesc) {
+    push_table_properties_with(out, depth, table, |_, _, _| false);
+}
+
+/// [`push_table_properties`], with `body` offered each key's type half first.
+///
+/// `body` returns `true` when it wrote that half itself, and the key's
+/// [`KeyKind`] is then not rendered. Everything else about the property — its
+/// name, its description, its default — is written the same way either way, so a
+/// per-system file's `system` and `params` read on hover exactly as the generic
+/// file's do.
+fn push_table_properties_with(
+    out: &mut String,
+    depth: usize,
+    table: &TableDesc,
+    mut body: impl FnMut(&mut String, usize, &KeyDesc) -> bool,
+) {
     let pad = "  ".repeat(depth);
     let mut first = true;
     for key in table.keys {
         push_separator(out, &mut first);
         out.push_str(&format!("{pad}{}: {{\n", json_string(key.name)));
-        push_kind_body(out, depth + 1, &key.kind);
+        if !body(out, depth + 1, key) {
+            push_kind_body(out, depth + 1, &key.kind);
+        }
         out.push_str(&format!(
             ",\n{pad}  \"description\": {}",
             json_string(key.doc)
