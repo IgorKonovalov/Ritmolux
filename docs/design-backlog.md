@@ -77,6 +77,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0215 — the seam Plan 0109 saw on two MilkDrop 1.x presets is unexplained, and the test doc that frames it still attributes a +x cut to MilkDrop](#0215--the-seam-plan-0109-saw-on-two-milkdrop-1x-presets-is-unexplained-and-the-test-doc-that-frames-it-still-attributes-a-x-cut-to-milkdrop)
 - [0216 — the converted waveform follows neither reference: modes 0-5 draw other figures than the source, and modes 6-7 sit between the source and `foo_vis_milk2`](#0216--the-converted-waveform-follows-neither-reference-modes-0-5-draw-other-figures-than-the-source-and-modes-6-7-sit-between-the-source-and-foo_vis_milk2)
 - [0217 — `path_cost`'s arity probe draws a curved leaf, so from `samples = 32` up it prices the arc chain and not the polyline its header reports](#0217--path_costs-arity-probe-draws-a-curved-leaf-so-from-samples--32-up-it-prices-the-arc-chain-and-not-the-polyline-its-header-reports)
+- [0218 — a `[smoothing]`-eased value never reaches a whole-number target, so a floored step one generation up never draws](#0218--a-smoothing-eased-value-never-reaches-a-whole-number-target-so-a-floored-step-one-generation-up-never-draws)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -3957,3 +3958,48 @@ slope. The ceiling's argument is about the worst case an author can load, and th
 
 **Low.** Nothing renders wrong and the ceiling still stands. What is wrong is that the one test
 named as the ceiling's measurement cannot re-measure it.
+
+## 0218 — a `[smoothing]`-eased value never reaches a whole-number target, so a floored step one generation up never draws
+
+`Easing::step` in `core/src/preset/schema/easing.rs` is the one-pole
+`held + alpha * (raw - held)`, with no snap once the gap is below float precision. In f32 the gap
+stops shrinking about one ulp short of the target: the last `alpha * gap` rounds to nothing, so an
+ease toward `2.0` settles at `1.9999998` and stays there. A consumer that rounds that value is
+unaffected. A consumer that **truncates** it is not: `LSystemScene::update` takes
+`self.visible_depth.max(1.0) as usize`, so a binding such as `3 + floor(clamp(onset * 2.33, 0, 1.4))`
+plus a `[smoothing]` constant draws generation 3 forever and never the 4 it names.
+
+Measured 2026-09-14 on a throwaway `lsystem` preset whose target steps from 1 to 2 at `t = 1`,
+rendered at `t = 10` (`--frames 600`, smoothing `0.1`): unsmoothed draws generation 2, smoothed
+draws generation 1 after ninety time constants, and smoothed toward `1.5 + floor(...)` draws 2.
+A held `--set` still cannot show it, because the smoother has no prior state on its first frame and
+passes the target through; only a rise from an earlier value does, so `--signal` strips are the
+instrument.
+
+It had shipped in five presets. `lsystem_bower`, `lsystem_coral`, `lsystem_rime` and
+`lsystem_vellum` bound `N + floor(...)` and never drew their top step; `lsystem_icecrystal` bound a
+fraction below 1 against a parameter doc that then called `visible_depth` a fraction. All five now
+target `N.5` and say why in a comment. That fix is content and it holds, but it is a trap every
+future author walks into, because the obvious binding is the broken one and nothing reports it.
+
+**What a fix looks like, if it is taken:** either snap `Easing::step` to `raw` once
+`(raw - held).abs()` is within a few ulps of `raw` (one line, and it ends every ease in finite
+time), or have `--check` warn on a `[smoothing]`
+entry whose binding is an integer-valued `floor(...)` step on a parameter the scene truncates. The
+snap is the cheaper and the more general of the two. **Unaudited:** whether any consumer other than
+`visible_depth` truncates an eased parameter; `as usize` and `floor` on a smoothed value anywhere in
+`core/src/render/scenes` are the places to look.
+
+- **Raised:** 2026-09-14, by `preset-author` while repairing `lsystem_icecrystal`. **Owner if
+  taken:** `architect` for the snap-or-warn choice, then `dev`.
+- **Verified 2026-09-14** — the ease has no snap:
+  `present: held \+ alpha \* \(raw - held\) in: core/src/preset/schema/easing.rs`
+- **Verified 2026-09-14** — the L-system truncates the eased depth:
+  `present: let want = self\.visible_depth\.max\(1\.0\) as usize; in: core/src/render/scenes/lines/lsystem.rs`
+- **Verified 2026-09-14** — the shipped dodge is in place on the preset whose hit step was dead:
+  `present: visible_depth = "3\.5 \+ floor in: presets/lsystem_bower.toml`
+
+### Priority
+
+**Low.** Nothing renders broken once a preset carries the half offset, and all five shipped ones
+do. What is wrong is that the natural binding silently loses its top step.
