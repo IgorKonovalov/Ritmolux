@@ -364,8 +364,8 @@ Outcome kinds: implementers `phases_done` or `parked` (`reason`: `human_phase` |
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The headless contract, observed rather than assumed | dev | done | `142e24a` |
-| 2 — Conductor mode in the skills, and the hooks that make it safe | dev | committed with this row | |
-| 3 — The conductor's core: queue, state, plan reading, locks, one step | dev | not started | |
+| 2 — Conductor mode in the skills, and the hooks that make it safe | dev | done | `b6990c6` |
+| 3 — The conductor's core: queue, state, plan reading, locks, one step | dev | committed with this row | |
 | 4 — The lane loop, end to end against a scratch repository | dev | not started | |
 | 4b — The close digest: what happened, readable the morning after | dev | not started | |
 | 5 — The operator surface and the documents | dev | not started | |
@@ -377,6 +377,8 @@ Outcome kinds: implementers `phases_done` or `parked` (`reason`: `human_phase` |
 - Phase 1: `--max-budget-usd` is checked between turns - a `0.0001` cap spent `0.051` (spike README).
 - Phase 2: the hook bite checks and the lock tests are `tools/conductor/test/hooks.test.mjs` and `with-lock.test.mjs` (Phase 3's test directory), not a `scripts/fixtures/` tree.
 - Phase 2: outcome kinds added beyond the Data shapes list - `fixed` (fix round, with `resolved` finding-to-commit pairs), `closed` carries its `verdict`, and `merge_conflict` as a review park reason.
+- Phase 3: added `tools/conductor/test/helpers.mjs` (shared fixtures) beside the listed test files; `.gitignore` also gains `!tools/conductor/spike/`.
+- Phase 3: conductor-side park reasons `budget`, `api`, `no_outcome`, `bad_outcome` (`lib/step.mjs`).
 
 ### Close triggers
 

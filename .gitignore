@@ -69,6 +69,16 @@ renders/
 # spike/clip.wav and pass on exactly one machine (Plan 0106 Phase 7a).
 spike/
 
+# ...except the conductor's probe (Plan 0187 Phase 1), which is committed evidence rather than
+# scratch: the CLI version the conductor accepts is the one its README table was produced on.
+!tools/conductor/spike/
+
+# The conductor's runtime record and the owner's own limits (Plan 0187, ADR-0205). state/ holds
+# session transcripts, reviews, the inbox and the lock log; local.json holds the per-step spend
+# caps, which are the owner's figures and never committed.
+tools/conductor/state/
+tools/conductor/local.json
+
 # The diffusion filter's Python environment (Plan 0106). `docs/diffusion-filter.md`
 # tells a creator to build it at the repo root with `python -m venv .venv`, so it
 # lands here by instruction rather than by accident - and it is gigabytes of
