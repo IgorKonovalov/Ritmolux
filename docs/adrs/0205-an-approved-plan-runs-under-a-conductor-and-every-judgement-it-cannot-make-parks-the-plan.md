@@ -203,3 +203,46 @@ judgement.
   contract is observed (the spike's evidence table), the state machine is tested against a fake CLI,
   and the second lane stays disabled in `queue.json`. The pilot's wall time, spend and parks are
   owed to a fresh `architect` session, which records them here and decides lane b.
+
+**2026-09-14, the first live run: lane a, 17:26 to 18:39.** Recorded from the digest, the inbox and
+`state/conductor.json` by a fresh `architect` session. This run finished after Plan 0187 closed.
+
+- **What ran.** Queue `a: 0175, 0185, 0181, 0180, 0182`, `max_open_worktrees = 3`, one lane. Result:
+  1 h 13 min, **0 merged, 3 parked, $25.18 notional**, spent entirely by three implement sessions:
+  0175 in 24 min for $5.83, 0185 in 19 min for $3.71, 0180 in 31 min for $15.64. Both lock waits were
+  under a minute, as one lane would give. **No review session, fix round, close, fast-forward or
+  worktree removal ran.** So the close lock, the close-tip gate added in the Outcome above, the review
+  session's `--add-dir`, and the allowlist a review or close session needs have still never been
+  observed live. The one fix nobody else reviewed is still unread.
+- **Two parks were the Decision working.** 0175 and 0180 each parked `plan_wrong` on a real defect in
+  its own plan, written into the plan's log, instead of working around it. That is the first live
+  evidence against Plan 0187's "a session that improvises instead of parking" risk. It is two cases,
+  not a rate.
+- **One park and one silent stop were conductor defects**, each confirmed against the code:
+  1. `conductor.mjs` writes `state/conductor.pid` before anything creates `state/`, so the first
+     `run` on a clean checkout fails with `ENOENT`. The CLI tests never hit it because their fixture
+     creates the directory first.
+  2. The pre-review gate runs `check-backlog-claims.mjs`. A plan whose fix deliberately breaks a
+     probe of the entry it `Closes` then parks as `gate_red`, before the review whose close would
+     archive that entry. 0185 parked this way on backlog 0206, and its own Risks section predicted it.
+     The gate was making the call ADR-0108 leaves to `architect`, before `architect` could make it.
+  3. The session allowlist refuses `git checkout`, `git restore` and `git stash`. The `dev` skill's
+     conductor mode tells a parking session to leave the tree clean, but the allowlist leaves it no
+     way to undo files its own test run rewrote. 0180's lane is parked with 8 golden PNGs a bless
+     re-encoded. A park does not check the tree, and `resume` would start the next session on it.
+  4. The lane stops without saying so at `max_open_worktrees`. The event it raises goes to a hook
+     `run` never wires up. Three parks held three worktrees, so 0182 never started and 0181 sat
+     behind parked 0185. Neither the digest nor the run's output says the lane stopped on the cap.
+- **The sessions reported the owner's seven-day usage at 0.84-0.85 during the run.** The conductor
+  spends against that limit as well as against its notional dollar caps, and the digest shows only
+  the dollars. Noted here, not acted on.
+- **Plan 0187 Phase 6 does not hold.** Its done-when asked for two plans closed on `main` with no owner
+  action. Zero closed, and the path that turns a plan into a merged commit has never run. The pilot is
+  still owed. [Plan 0188](../plans/0188-the-conductor-survives-its-first-run.md) fixes the four
+  defects and carries the pilot as its closing `human` phase: resume 0185, then 0181 behind it.
+- **Lane b stays off.** Nothing a second lane adds has been seen on one lane: the close lock ordering
+  two closes, two gates queued on the suite lock, a close tip holding two lanes' code. The worktree
+  cap also counts across all lanes, and this single lane filled it in 73 minutes, so a second lane
+  would have opened nothing more. Lane b is reconsidered only after a conductor-run plan has merged
+  end to end, and only together with the cap. Two lanes of parks need either a higher cap or fewer
+  parks, and this run showed neither.
