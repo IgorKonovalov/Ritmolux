@@ -1,6 +1,6 @@
 # 0180 — The converted picture follows the source
 
-> **Status:** approved (2026-09-14)
+> **Status:** in-progress (2026-09-14)
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`
 > **Related ADRs:** [0199](../adrs/0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md)
@@ -419,18 +419,96 @@ pub fn run_wave_point(&mut self, index: usize, sample: f32, left: f32, right: f3
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(`main` directly, or the worktree path plus its branch)_
+**Lane:** `C:\Users\Igor Konovalov\WORK\rlx-plan-0180`, branch `plan-0180-the-converted-picture-follows-the-source`.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Read the rest of the source, and render the seam | dev | not started | |
+| 1 — Read the rest of the source, and render the seam | dev | done | committed with this row |
 | 2 — The comp stage gets the source's polar pair | dev | not started | |
 | 3 — The per-vertex program gets the source's `x`/`y` | dev | not started | |
 | 4 — The seam is found | dev | not started | |
 | 5 — The analyzer publishes a left/right pair | dev | not started | |
 | 6 — The waveform draws the source's eight figures | dev | not started | |
 
+### Phase 1 — the source read
+
+All lines are `xeiraex/milkdrop2`, `vis_milk2/`, at the line numbers `d4c843a` carries (see Notes for
+how the copy was identified). Nothing is copied into the repository.
+
+**The per-mode waveform table** (`CPlugin::DrawWave`, `milkdropfs.cpp` l.2765-3259). Units: a clip
+unit is `0.5` frame heights on a landscape target once the aspect term is applied (shorter-axis units
+in general). A unit sample is `fWave` after l.933-942: the 8-bit sample times `fWaveScale / 128`, then
+the one-pole `fWaveSmoothing` run along the trace. `m` is `wave_mystery`, folded into `-1..1` by
+l.2869-2877 for modes 0, 1 and 4 only. The centre is `(wave_x*2-1, wave_y*2-1)` clip, which after
+l.3312 negates every y is uv `(wave_x, wave_y)` with y down. `A_x`/`A_y` are `m_fAspectX`/`m_fAspectY`.
+
+| mode | lines | base geometry | channel and sample offset | coefficient on the sample term | `time`, `m`, `wave_x`/`wave_y` | aspect | points |
+|---|---|---|---|---|---|---|---|
+| 0 | 2886-2925 | circle, radius `0.5` clip (`0.25` fh), angle `i/239 * 6.28` | `fR[i+120]`; points 0-23 cosine-blend from `fR[i+360]` | `0.4` clip (`0.2` fh) on the radius | angle `+ time*0.2`; `m` adds `1` clip to the radius; centred on `(wave_x, wave_y)` | x times `A_y`, y times `A_x` | 240, closed by repeating point 0 when not blending |
+| 1 | 2927-2948 | radius `0.53` clip | radius `fR[i]`; angle `fL[i+32]` | `0.43` clip on the radius; `1.57` rad on the angle | angle `+ time*2.3`; `m` adds `1` clip to the radius; centred | as 0 | 240, open |
+| 2 | 2950-2976 | none: an x-y scope about the centre | x `fR[i]`, y `fL[i+32]` | `1` clip on each axis | none; `m` unused | as 0 | 480 |
+| 3 | 2977-3004 | mode 2's geometry, line for line | as 2 | as 2 | as 2 | as 2 | 480 |
+| 4 | 3005-3065 | horizontal line, x `-1 + 2i/n` clip plus `wave_x*2-1`, at y `wave_y*2-1` | y `fL[i+o]`, x `fR[i+25+o]`, `o = (480-n)/2` | `0.47` clip on y, `0.44` clip on x; then momentum `v = v*w2 + w1*(2v[i-1] - v[i-2])` for `i > 1`, `w1 = 0.45 + 0.5*(m*0.5+0.5)`, `w2 = 1 - w1` | none | none on either term | `n = min(480, texW/3)` |
+| 5 | 3067-3098 | none: a product figure about the centre | `x0 = fR[i]fL[i+32] + fL[i]fR[i+32]`, `y0 = fR[i]² - fL[i+32]²` | `1` clip per unit squared | rotated by `time*0.3`; `m` unused | as 0 | 480 |
+| 6 | 3100-3244 | line at angle `1.57*m` (`m` unfolded) from `-3` to `+3` clip along itself, slid by `wave_x*2-1` along its normal, clipped to `±1.1` clip on each axis, `n` equal steps | `fL[i+120]` | `0.25` clip along the clip-space normal | none; `wave_y` unused | none | `n = min(240, texW/3)` |
+| 7 | 3100-3244 | mode 6's line twice | `+normal*(0.25*fL[i+120] + s)` and `+normal*(0.25*fR[i+120] - s)`, `s = wave_y²` clip | as 6 | as 6, with `wave_y` setting `s` | none | `2n`, broken at `n` |
+
+- **`SmoothWave`** (l.2549-2577) inserts between consecutive points the midpoint
+  `(-0.15 v[i-1] + 1.15 v[i] + 1.15 v[i+1] - 0.15 v[i+2]) / 2`, ends clamped, so `n` points become
+  `2n - 1`. It runs once on every built-in figure after the y negation (l.3319-3335), unconditionally
+  and on each side of mode 7's break separately, and on a custom wave unless it draws dots (l.2722).
+- **Mode 5 reads both channels.** Modes 1, 2, 3, 5 and 7 read both; modes 0 and 6 read one.
+- **Corrections to Plan 0173's summary.** Mode 1 is polar, not an x-y scope. Modes 1 and 5 read
+  `time` as well as mode 0. Mode 3's geometry is mode 2's, and they differ in alpha only (l.2982-2991).
+  Mode 6's `0.25` clip is along a clip-space normal, so it is `0.125` fh only for a horizontal line.
+- Alpha is per mode as well (l.2892, 2930, 2955-2961, 2982-2991, 3070-3076), which this table does not
+  carry.
+
+**The warp uv chain** (`CPlugin::ComputeGridAlphaValues`, l.1839-1916). The source's corrected space
+is `(uv - 0.5) * (A_x, A_y) + 0.5`, and l.1915-1916 undo it.
+
+| stage | source | `vs_main` (`warp_mesh/shaders.rs`) | reading |
+|---|---|---|---|
+| zoom | l.1877-1882, about the frame centre, corrected | about the frame centre, x times `aspect` | agrees: a uniform scale commutes with the axis scaling |
+| `sx`/`sy` | l.1889-1890, about `(cx, cy)` in corrected space | about `(cx, cy)` in raw uv | differs: the raw-uv centre is `0.5 + (c - 0.5)/A` |
+| procedural warp | l.1895-1898, `0.0035*warp` added in corrected space, phases from raw clip x, y | added in raw uv, same phases | differs: amplitude `1/A` per axis |
+| rotation | l.1902-1908, about `(cx, cy)` in corrected space, isotropic | about `(cx, cy)` in raw uv, isotropic | the rotation agrees; its centre differs as for `sx`/`sy` |
+| `dx`/`dy` | l.1911-1912, subtracted in corrected space | subtracted in raw uv | differs: raw `dx/A_x`, `dy/A_y` |
+
+**The chain also differs at:** `sx`/`sy` and rotation (the centre's offset from `0.5`), the procedural
+warp (its amplitude) and `dx`/`dy`, each by `1/A` on the shorter axis: `1.778` on y at 16:9, on x at
+9:16. The source applies every stage once per rendered frame with that frame's values. `vs_main` takes
+per-second values after the runtime's 30 fps conversion and raises or multiplies them by `dt`.
+
+**`UvToMathSpace`** (l.3862-3878). It reads `m_fAspectX`/`m_fAspectY` (`plugin.cpp` l.2027-2028: the
+longer axis `1`, the shorter `short/long`, from the internal texture size). `u = 0` is the left edge
+(`px = (u*2-1)*A_x`), and `v = 0` is the top (the comp vertex's `sy = -(v*2-1)`, `plugin.cpp` l.2048).
+The centre-column values (`plugin.cpp` l.2061-2101) overwrite `ang` on the comp grid's duplicated
+centre column and row. Off the centre point they hold what the exact function gives on either side of
+those lines (`1.5pi` up, `0.5pi` down, `pi` left, `2pi`/`0` right above/below). They exist so that
+interpolation does not run across the cut. A fragment epilogue interpolates nothing, so they do not
+matter per fragment.
+
+**The seam, before anything moves.** Converted with `milkconv`, rendered by `shot` at 1920x1080 under
+`--signal click:120 --frame-at 360` (hop 360, about 3.8 s):
+
+- *Songflower (Moss Posy)*, `target/plan0180/p1-songflower.png`: **a seam on both horizontal rays.**
+  On `-x` (left edge to centre) it is a hard colour step across the midline. On `+x` (centre to right
+  edge) it is a thin dark line with the colour continuous across it. Under `--set` for 300 frames
+  (`p1-songflower-set.png`) the view has drifted off-centre and no seam is visible.
+- *chasers 19 Portal*, `p1-chasers.png` (hop 360) and `p1-chasers-h200.png` (hop 200): no straight
+  seam is visible under the click signal. Under `--set bass=0.6,mid=0.5,treb=0.45` for 300 frames
+  (`p1-chasers-set.png`): **a straight edge on the midline in both halves**, left `x ≈ 200-760` and
+  right `x ≈ 1150-1700`, mirrored by the preset's fold, so its ray cannot be read from either half
+  alone on this frame.
+
 ### Notes
+
+- **Phase 1 read a local copy, not a checkout of `d4c843a`.** This session had no network. The copy is
+  a clone of `xeiraex/milkdrop2` at HEAD `bee728e`, left in an earlier session's scratch directory.
+  Its only identification with `d4c843a` is that every line this plan and ADR-0199 cite at that commit
+  (`milkdropfs.cpp` l.1839, 2549, 3862; `plugin.cpp` l.2027, 2061; `pluginshell.cpp` l.2019) is at that
+  number with that content.
 
 ### Close triggers
 

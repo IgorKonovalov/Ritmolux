@@ -3830,6 +3830,7 @@ converted preset reads differently from the reference. The citations are in the 
 a transformed version of the look it was authored for, and nothing in the conversion flags it.
 
 - **Promoted 2026-09-14** to [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) Phases 1-3: read the warp uv chain, give the comp stage the source's polar pair, aspect-correct the per-vertex `x`/`y`. [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md) Phase 2 names the uv chain as a candidate cause of the wash.
+- **Updated 2026-09-14** - [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) Phase 1 read the warp uv chain at `xeiraex/milkdrop2` `d4c843a`. `CPlugin::ComputeGridAlphaValues` (`milkdropfs.cpp` l.1877-1916) applies zoom, `sx`/`sy`, the procedural warp, rotation and `dx`/`dy` in the aspect-corrected space and undoes it at l.1915-1916. **The divergence is not confined to the program's inputs.** `vs_main` agrees on zoom and on the rotation itself. It differs at the `sx`/`sy` and rotation centre, the warp's amplitude and `dx`/`dy`, each by `1/aspect` on the shorter axis (1.78 on y at 16:9). `CPlugin::UvToMathSpace` (l.3862-3878) reads `m_fAspectX`/`m_fAspectY` (`plugin.cpp` l.2027-2028, longer axis 1), with `u = 0` at the left edge. The plan's log holds the stage table.
 
 ## 0215 — the seam Plan 0109 saw on two MilkDrop 1.x presets is unexplained, and the test doc that frames it still attributes a +x cut to MilkDrop
 
@@ -3906,6 +3907,7 @@ ADR-0071's prose error.
 mis-scaled one. That is a bigger gap than the 4.7 % this line of work started from.
 
 - **Promoted 2026-09-14** to [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) Phases 5-6 and [ADR-0199](adrs/0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md): modes draw the released source's figure at the scale `foo_vis_milk2` renders, from a left/right pair the analyzer already receives, with a hard stop back to a mono stand-in if anything below the analyzer would change.
+- **Updated 2026-09-14** - [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) Phase 1 read `CPlugin::DrawWave` (`milkdropfs.cpp` l.2765-3259, `xeiraex/milkdrop2` `d4c843a`) in full, and the plan's log holds the per-mode table. It corrects the table above three ways. Mode 1 is polar: radius from `fR[i]`, angle `1.57 * fL[i+32]`, turning at `2.3` rad/s (l.2941-2942). Mode 3's geometry is mode 2's (l.2998-3003 against l.2969-2974), and the two differ in alpha only. Mode 5 turns at `0.3` rad/s (l.3085), so modes 1 and 5 read `time` as well as mode 0. Every built-in figure passes through `SmoothWave` (l.2549) once, after the y negation at l.3312.
 
 ## 0217 — `path_cost`'s arity probe draws a curved leaf, so from `samples = 32` up it prices the arc chain and not the polyline its header reports
 
