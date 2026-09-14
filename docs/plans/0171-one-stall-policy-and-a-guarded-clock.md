@@ -128,8 +128,8 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The clock is guarded at every entry | dev | done | committed with this row |
-| 2 — One policy below the entries | dev | not started | |
+| 1 — The clock is guarded at every entry | dev | done | 12b05f6 |
+| 2 — One policy below the entries | dev | done | committed with this row |
 
 ### Notes
 

@@ -622,12 +622,9 @@ impl MilkRuntime {
         } else {
             1.0
         };
-        // The `*_att` envelopes, on the injected real `dt`.
-        let alpha = if dt > 0.0 && dt.is_finite() {
-            1.0 - (-dt / ATT_TAU).exp()
-        } else {
-            0.0
-        };
+        // The `*_att` envelopes, on the injected real `dt` — finite and positive
+        // by the renderer entry's substitution (ADR-0191), so not re-checked.
+        let alpha = 1.0 - (-dt / ATT_TAU).exp();
         for (slot, level) in self.att.iter_mut().zip([frame.bass, frame.mid, frame.treb]) {
             *slot += alpha * (level * BAND_SCALE - *slot);
         }

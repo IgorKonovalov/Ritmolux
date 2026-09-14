@@ -160,6 +160,14 @@ const DUAL_LIVE_BUDGET_MS: f32 = 18.0;
 /// A caller's frame delta, made safe to accumulate: `dt` itself when it is
 /// finite and positive, [`scenes::FALLBACK_DT`] otherwise.
 ///
+/// **The one place a frame delta is checked, and the nominal step is the
+/// engine's only answer to a degenerate one.** Everything below reads the value
+/// this returns and none of it re-checks — every `Scene::advance`, the
+/// composite's per-second decay, the transition's step, the MilkDrop runtime's
+/// envelopes, the cellular generation clock, the now-playing banner. A second
+/// finiteness guard on a `dt` anywhere in `core/src/` fails
+/// `core/tests/hygiene.rs`, because a second guard is a second policy.
+///
 /// **Every `Renderer` entry that takes a caller's `dt` calls this as its first
 /// statement** and hands its result — never the raw value — to the scene clock,
 /// the now-playing banner and `draw_frame`. An entry that steps the clock by

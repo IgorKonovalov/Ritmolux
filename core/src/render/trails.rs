@@ -558,13 +558,10 @@ impl PostStage for Trails {
     }
 
     /// Take this frame's real elapsed seconds — the base every per-second rate
-    /// here is scaled by (ADR-0019/ADR-0048). Non-finite or negative values are
-    /// dropped rather than stored: a `NaN` would poison the decay exponent, and
-    /// the previous frame's step is a far better guess than a broken one.
+    /// here is scaled by (ADR-0019/ADR-0048). Stored as given: the renderer entry
+    /// that took the frame has already replaced a degenerate delta (ADR-0191).
     fn set_dt(&mut self, dt: f32) {
-        if dt.is_finite() && dt >= 0.0 {
-            self.dt = dt;
-        }
+        self.dt = dt;
     }
 
     /// Take the active preset's `[feedback]` table (ADR-0048) — the warp kind and

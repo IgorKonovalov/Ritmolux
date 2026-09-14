@@ -320,18 +320,17 @@ impl Transition {
     /// the outgoing preset; they are held for the rest of the dissolve.
     ///
     /// [`finished`](Self::finished) becomes true once `t` reaches 1.
+    ///
+    /// `dt` is trusted: the renderer entry that took the frame has already
+    /// replaced a degenerate delta with one nominal step (ADR-0191), so a stalled
+    /// frame advances the dissolve like any other rather than holding it.
     pub(crate) fn advance(
         &mut self,
         dt: f32,
         outgoing_ink: InkParams,
         outgoing_exposure: f32,
     ) -> Option<usize> {
-        let step = if dt.is_finite() && dt > 0.0 {
-            dt / self.dur
-        } else {
-            0.0
-        };
-        self.t = (self.t + step).min(1.0);
+        self.t = (self.t + dt / self.dur).min(1.0);
         if self.stage == Stage::Capture {
             self.stage = Stage::Dissolve;
             self.outgoing_ink = Some(outgoing_ink);
@@ -1199,16 +1198,21 @@ mod tests {
         }
     }
 
-    /// A non-positive or non-finite `dt` holds the dissolve rather than jumping it
-    /// backwards or to NaN — the frontend can inject either after a stall.
+    /// A degenerate `dt` reaches the dissolve as the renderer entry's nominal
+    /// step, so a stalled frame advances it by `FALLBACK_DT`'s share like any
+    /// other frame — it neither holds nor jumps backwards or to NaN (ADR-0191).
     #[test]
-    fn a_degenerate_dt_holds_progress() {
-        let mut tr = Transition::new(0, 1, 1.0, TransitionKind::Crossfade, Mode::Freeze);
-        tr.advance(0.5, default_ink(), 1.0); // past the capture frame
-        let held = tr.progress();
-        for dt in [0.0, -0.5, f32::NAN] {
-            tr.advance(dt, default_ink(), 1.0);
-            assert_eq!(tr.progress(), held, "dt {dt} must not move progress");
+    fn a_degenerate_dt_advances_progress_by_the_nominal_share() {
+        for bad in [0.0, -0.5, f32::NAN, f32::INFINITY] {
+            let mut tr = Transition::new(0, 1, 1.0, TransitionKind::Crossfade, Mode::Freeze);
+            tr.advance(0.25, default_ink(), 1.0); // past the capture frame
+            let before = tr.progress();
+            tr.advance(crate::render::sanitize_frame_dt(bad), default_ink(), 1.0);
+            assert_eq!(
+                tr.progress(),
+                before + crate::render::scenes::FALLBACK_DT / tr.dur,
+                "a {bad} delta must advance the dissolve one nominal step"
+            );
         }
     }
 }
