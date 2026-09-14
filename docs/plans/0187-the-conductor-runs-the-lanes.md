@@ -1,6 +1,6 @@
 # 0187 — The conductor runs the lanes
 
-> **Status:** approved (2026-09-14)
+> **Status:** in-progress
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`, `human`
 > **Related ADRs:** [0205](../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md) (proposed),
@@ -359,11 +359,11 @@ Outcome kinds: implementers `phases_done` or `parked` (`reason`: `human_phase` |
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(`main` directly, or the worktree path plus its branch)_
+**Lane:** `main` directly
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The headless contract, observed rather than assumed | dev | not started | |
+| 1 — The headless contract, observed rather than assumed | dev | committed with this row | |
 | 2 — Conductor mode in the skills, and the hooks that make it safe | dev | not started | |
 | 3 — The conductor's core: queue, state, plan reading, locks, one step | dev | not started | |
 | 4 — The lane loop, end to end against a scratch repository | dev | not started | |
@@ -372,6 +372,9 @@ Outcome kinds: implementers `phases_done` or `parked` (`reason`: `human_phase` |
 | 6 — The pilot: one lane, two plans, watched | human | not started | |
 
 ### Notes
+
+- Phase 1: the root `.gitignore`'s `spike/` rule matches `tools/conductor/spike/`, so its three files were staged with `git add -f`.
+- Phase 1: `--max-budget-usd` is checked between turns - a `0.0001` cap spent `0.051` (spike README).
 
 ### Close triggers
 
