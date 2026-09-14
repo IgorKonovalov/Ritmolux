@@ -214,7 +214,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0190](0190-preset-toml-is-checked-by-the-loader-and-never-reformatted.md) | Preset TOML is checked by the engine's own loader and never reformatted | accepted 2026-09-13 (Plan 0169) |
 | [0191](0191-a-frame-delta-is-replaced-at-every-entry-and-nothing-below-keeps-a-policy.md) | A frame delta is replaced at every entry that takes one, and nothing below keeps a policy of its own | accepted 2026-09-14 (Plan 0171; Outcome), amends 0152 |
 | [0192](0192-a-preset-warning-names-its-parameter.md) | A preset warning names the parameter it is about | accepted 2026-09-14 (Plan 0172; Outcome), extends 0176 |
-| [0193](0193-a-test-that-reads-the-clock-runs-alone.md) | A test that reads the clock runs alone, and the lint exemption that marks it is what selects it | proposed (Plan 0174), extends 0173 |
+| [0193](0193-a-test-that-reads-the-clock-runs-alone.md) | A test that reads the clock runs alone, and the lint exemption that marks it is what selects it | accepted 2026-09-14 (Plan 0174), Outcome; extends 0173 |
 | [0194](0194-a-family-dependent-range-travels-in-the-schema-and-the-player-reports-the-family.md) | A family-dependent range travels in the schema, and the player reports the family | proposed (Plan 0179), extends 0180 |
 | [0195](0195-a-low-density-is-a-trace-count-and-the-law-scales-only-a-cloud.md) | A low `density` is a trace count, and the density law scales only a cloud | proposed (Plan 0183), amends 0140 |
 | [0196](0196-the-report-hears-the-musical-clock-in-a-column-of-its-own.md) | The report hears the musical clock in a column of its own, and every existing column keeps its stimulus | proposed (Plan 0182), supplements 0134 |

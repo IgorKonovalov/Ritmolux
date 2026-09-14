@@ -159,8 +159,13 @@ failing the push; nothing else here needs Node. That skip is about the hook only
 — CI's `links` job runs the same checks on `ubuntu-latest`, where they cannot
 skip and are not bypassable.
 
-**Measured warm wall time: ~48.6 s** (2026-08-08; dominated by the tests — `fmt`
-and `clippy` are under two seconds between them). The hook excludes the nine
+**Measured warm wall time of the test step: ~410 s** (2026-09-14, one run on the reference
+machine; `fmt` and `clippy` add under two seconds between them). About 165 s of that is idle.
+Every test that asserts on wall-clock time runs **alone**: nextest waits for the running tests to
+drain, runs it, and starts nothing beside it. So you will see the run pause on those tests.
+`.config/nextest.toml` names them, and a guard in `core/tests/hygiene.rs` holds that list to the tests that
+read the clock
+([ADR-0193](adrs/0193-a-test-that-reads-the-clock-runs-alone.md)). The hook excludes the nine
 GPU-heavy suites that iterate every shipped preset or scene through a real
 adapter. **Which nine is not written here** — since
 [ADR-0156](adrs/0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md)

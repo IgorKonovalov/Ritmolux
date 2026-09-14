@@ -46,12 +46,11 @@ place. The plan file carries the real link.
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. **Runs after 0180**, which re-draws the waveform its wash is measured on. The verdict decides whether backlog 0109 is buyable. Needs the reference rig. |
 | [0160](0160-the-silhouettes-preconditions-stop-being-silent.md) | The silhouette's preconditions stop being silent | approved | dev, human | ADR-0179: four silent `[path]` preconditions. **Amended 2026-09-14:** optional Phase 1b folds in backlog 0217 (arity probe re-prices a polyline). Phase 2 is prose. |
 | [0166](0166-the-basics-read-in-russian.md) | The basics read in Russian | approved | dev, human | ADR-0185: five docs gain a stamped `.ru.md`. **Phase 3 is a `human` review that blocks publication.** Amended 2026-09-14: `pages.yml` depth, gate-count prose collides with 0178. |
-| [0174](0174-the-clock-reading-tests-run-alone.md) | The clock-reading tests run alone | in-progress | dev | ADR-0193 (proposed). Phases 1-2 landed; the control-path pair reproduced and routed to backlog 0219 + 0220. **`-P fast` rose 154 s** - the close decides whether the hook affords it. |
 | [0175](0175-an-eased-value-arrives.md) | An eased value arrives at its target | approved | dev | Backlog 0218 + **0212 folded in as Phase 3** (three sign guards deleted). The `N.5` offsets stay. Touches `LatchBank::advance`, disjoint from 0181 in `evaluate.rs`. |
 | [0176](0176-a-release-tag-reaches-origin.md) | A release tag reaches origin | approved | dev, human | Backlog 0196 + ADR-0203 (proposed): annotated tags, and a gate that reads origin. **Phase 3 is `human`**: push the stranded tags, publish v0.123.0 only. **Blocks 0103 Phase 5.** |
-| [0177](0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) | The test tree stops touching the machine and stops costing its disk | approved | dev, studio-builder | ADR-0204 (proposed). Starts after 0174 closes (nextest.toml, stream_show.rs). Phase 4 measures target/ growth before the prune and fold. |
+| [0177](0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) | The test tree stops touching the machine and stops costing its disk | approved | dev, studio-builder | ADR-0204 (proposed). Keep 0174's run-alone binaries as their own targets. Phase 4 measures target/ growth before the prune and fold. |
 | [0178](0178-what-the-operator-reads-is-true.md) | What the operator reads is true | approved | dev, human | Backlog 0172, 0185, 0207, 0208 + ADR-0202 (proposed): drift line, `--list-presets`, banner, recovery line, count gate. **Lands after 0176 and 0166.** Phase 5 `human` settles 0203. |
-| [0179](0179-a-parameters-range-belongs-to-its-family.md) | A parameter's range belongs to its family | approved | dev, studio-builder | ADR-0194: the schema carries per-family ranges, `preset` reports the family; backlog 0198 `deposit_arms` goes Structural. **Phase 4 waits for 0174 to close.** |
+| [0179](0179-a-parameters-range-belongs-to-its-family.md) | A parameter's range belongs to its family | approved | dev, studio-builder | ADR-0194: the schema carries per-family ranges, `preset` reports the family; backlog 0198 `deposit_arms` goes Structural. Phase 4's wait on 0174 is discharged. |
 | [0180](0180-the-converted-picture-follows-the-source.md) | The converted picture follows the source | approved | dev | ADR-0199 (proposed). Backlog 0214-0216: comp rad/ang, per-vertex x/y, the seam, source waveform figures at host scale from an L/R pair. **Runs before 0142** - no rig. |
 | [0181](0181-a-scene-advances-after-its-frames-bindings.md) | A scene advances after its frame's bindings | approved | dev | ADR-0198. **Backlog 0142 is falsified** (same-system dissolves always freeze), so no guard - **the user confirmed the reversal at approval**. Only emitter + collage goldens may move. |
 | [0182](0182-the-report-hears-a-counter.md) | The report hears a counter | approved | dev | Backlog 0192 + ADR-0196 (proposed): a `count` column read off a fast synthetic clock at silence. No existing column moves. **Phase 1 stops if report wall time doubles.** |
@@ -283,15 +282,15 @@ plans; delivery and infrastructure go first, which is the user's call.** Every a
 re-checked against the tree and none was withdrawn; each carries a dated `Amended 2026-09-14` note
 naming what moved. The order:
 
-- **Delivery and infrastructure lane.** [0174] closes first (in progress). Then [0176], because
+- **Delivery and infrastructure lane.** [0174] closed first (2026-09-14). Then [0176], because
   [0103] Phase 5 cannot invite a download until a tag reliably reaches origin; its `human` Phase 3
   follows its Phase 2 closely, since the new gate refuses every push while the stranded tags are
-  local. Then [0177], which owns files 0174 is still editing. [0178] edits the same gate-count
+  local. Then [0177], which re-derives its mergeable set from 0174's final run-alone filter. [0178] edits the same gate-count
   prose as [0166] Phase 1 and [0176]; whichever lands second rebases onto the others.
 - **Engine lane.** [0175], then [0185] before [0181] - 0185 moves no golden, which keeps 0181's
   bless set to the emitter and collage baselines. Then [0180] before [0142]: 0180 re-draws the
   waveform 0142's wash is measured on and needs no rig. After those, [0184], [0183], [0182],
-  [0179] (its Phase 4 waits for 0174) and [0186], in any order that keeps each bless set clean.
+  [0179] (its Phase 4's wait on 0174 is discharged) and [0186], in any order that keeps each bless set clean.
 - **Still gated on a human, unchanged:** [0120] Phase 1, [0133] Phase 9, [0166] Phase 3, and
   [0103] Phases 4-6.
 - **All eleven approved 2026-09-14 with [0175], and [0181]'s reversal of an interview pick confirmed.** Backlog 0142's double-advance is
@@ -313,7 +312,7 @@ naming what moved. The order:
 [0184]: 0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md
 [0185]: 0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage.md
 [0186]: 0186-the-flatness-gate-tells-a-figure-from-its-ground.md
-[0174]: 0174-the-clock-reading-tests-run-alone.md
+[0174]: done/0174-the-clock-reading-tests-run-alone.md
 [0175]: 0175-an-eased-value-arrives.md
 [0120]: 0120-the-standalone-ships-on-ubuntu.md
 [0166]: 0166-the-basics-read-in-russian.md
@@ -849,6 +848,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0174 — The clock-reading tests run alone](done/0174-the-clock-reading-tests-run-alone.md) — closed 2026-09-14. Review: **no blockers, no majors, three minors, one nit.** Version: none (test-only). ADR-0193 accepted (Outcome). Filed 0221. [Write-up](README-archive.md).
 - [0172 — The studio's readings become true](done/0172-the-studios-readings-become-true.md) — closed 2026-09-14. Review: **no blockers, no majors, four minors, three nits.** Version: **0.123.0** (minor). ADR-0192 accepted (Outcome). [Write-up](README-archive.md).
 - [0173 — The MilkDrop geometry reads the source](done/0173-the-milkdrop-geometry-reads-the-source.md) — closed 2026-09-14. Review: **no blockers, no majors, three minors.** Version: **none** (docs only). Filed [backlog 0214-0216](../design-backlog.md). [Write-up](README-archive.md).
 - [0170 — The horizon reads the frame's own ground](done/0170-the-horizon-reads-the-frames-own-ground.md) — closed 2026-09-14. Review: **no blockers, no majors, three minors, two nits.** Version: **0.122.2** (patch). No ADR paired. Filed [backlog 0213](../design-backlog.md). [Write-up](README-archive.md).

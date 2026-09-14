@@ -79,7 +79,8 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0217 — `path_cost`'s arity probe draws a curved leaf, so from `samples = 32` up it prices the arc chain and not the polyline its header reports](#0217--path_costs-arity-probe-draws-a-curved-leaf-so-from-samples--32-up-it-prices-the-arc-chain-and-not-the-polyline-its-header-reports)
 - [0218 — a `[smoothing]`-eased value never reaches a whole-number target, so a floored step one generation up never draws](#0218--a-smoothing-eased-value-never-reaches-a-whole-number-target-so-a-floored-step-one-generation-up-never-draws)
 - [0219 — a `ctl/preset` datagram on loopback never reached the listener's queue, in 3 of 79 loaded runs, and nothing counted it](#0219--a-ctlpreset-datagram-on-loopback-never-reached-the-listeners-queue-in-3-of-79-loaded-runs-and-nothing-counted-it)
-- [0220 — a headless walk of the system roster stalls at `emitter`: the ask's frame is drained and the preset never reaches the screen](#0220--a-headless-walk-of-the-system-roster-stalls-at-emitter-the-asks-frame-is-drained-and-the-preset-never-reaches-the-screen)
+- [0220 — a headless walk of the system roster stalls at `emitter`: the ping sent with the ask is answered and the preset never reaches the screen](#0220--a-headless-walk-of-the-system-roster-stalls-at-emitter-the-ping-sent-with-the-ask-is-answered-and-the-preset-never-reaches-the-screen)
+- [0221 — the run-alone override costs `-P fast` 165 s, twice its tests' serial time, because each of its 18 testcases drains the machine separately](#0221--the-run-alone-override-costs--p-fast-165-s-twice-its-tests-serial-time-because-each-of-its-18-testcases-drains-the-machine-separately)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -4118,14 +4119,22 @@ and a lost `ctl/preset` there shows up as a click that does nothing.
 **Medium.** It is a loopback datagram lost on the control path the studio uses. It is intermittent
 and has so far been seen only under heavy concurrent GPU load.
 
-## 0220 — a headless walk of the system roster stalls at `emitter`: the ask's frame is drained and the preset never reaches the screen
+## 0220 — a headless walk of the system roster stalls at `emitter`: the ping sent with the ask is answered and the preset never reaches the screen
 
 `every_system_is_reported_by_the_key_the_schema_labels_its_roster_with` in
 `standalone/tests/stream_show.rs` spawns the player with `--stream --events --control`, holds
 rotation, then sends one `ctl/preset` per `SystemKind::ALL` entry. After each one it waits for the
 `preset` event naming it. Each ask is followed by a `ctl/ping`. The ping is answered by the same
-`apply_control_rest` drain that applies the preset, so a `pong` proves that the ask's frame was
-drained.
+`apply_control_rest` drain that applies the preset — but the two are **separate datagrams**, so a
+`pong` proves that the *ping* was drained, not that the preset was.
+
+> **Corrected 2026-09-14 at Plan 0174's close.** The entry as raised read the pong as proof the
+> ask's frame was drained, and concluded *"the ask was not lost"*. That does not follow: 0219 shows a
+> single loopback datagram vanishing with `rejected 0, dropped 0`, and the same thing happening to
+> the preset datagram while the ping behind it arrived would print exactly the report below. A lost
+> datagram is therefore a **fourth candidate**, and 0219 and 0220 may be one defect. Against it:
+> both failures stopped on the same ask, which a random loss over fifteen datagrams would do about
+> one time in fourteen. The test's `Ask::ping` doc comment carries the same overclaim.
 
 On 2026-09-14, under the load described in 0219, the walk failed twice in 79 runs. Both times it
 stopped at **ask 9 of 14, `emitter`**, with 8 systems already reported:
@@ -4140,11 +4149,12 @@ stdout: 576000 bytes at the ask, 208857600 bytes now
   | {"v":1,"ev":"health","fps":29.9807,...,"ctl_rejected":0,"ctl_dropped":0,"ctl_refused":0,...}
 ```
 
-So the ask was not lost. Its frame was drained, the child kept drawing at 30 fps, and no `roster`,
-`preset` or `preset_error` line followed in two minutes: received, and not acted on. `report_active_preset` in `standalone/src/show.rs` emits only when
-`renderer.preset_name()` changes, so the preset on screen never became `emitter`. There are three
-candidates, none yet distinguished: `select_preset_by_name` returned `false`; it returned `true` and
-the dissolve never completed; or the selection was overridden. The walk's ninth step does not follow
+The ping behind the ask was drained, the child kept drawing at 30 fps, and no `roster`, `preset` or
+`preset_error` line followed in two minutes. `report_active_preset` in `standalone/src/show.rs`
+emits only when `renderer.preset_name()` changes, so the preset on screen never became `emitter`.
+There are four candidates, none yet distinguished: the preset datagram never reached the queue (see
+0219); `select_preset_by_name` returned `false`; it returned `true` and the dissolve never completed;
+or the selection was overridden. The walk's ninth step does not follow
 on from anything earlier in the walk: the same ask succeeded in 77 other runs.
 
 The earlier red run recorded in ADR-0193 stopped at ask 2 of 12, with nothing kept that could say
@@ -4157,8 +4167,47 @@ why. Whether it was the same defect is unknown.
   `present: events\.emit\(&Event::Pong \{ nonce: \*nonce \}\); in: standalone/src/show.rs`
 - **Verified 2026-09-14** — the walk sends a ping with every ask:
   `present: Evidence only, never asserted: see .Ask::ping. in: standalone/tests/stream_show.rs`
+- **Verified 2026-09-14** (the close's correction) — the ping goes out as its own datagram after the
+  preset's: `present: Action::Ping\(nonce\)\.encode\(&mut buf\); in: standalone/tests/stream_show.rs`
 
 ### Priority
 
 **Medium.** A `ctl/preset` the player drains and does not show is the studio's library click doing
 nothing. It is intermittent and has so far been seen only under heavy concurrent GPU load.
+
+## 0221 — the run-alone override costs `-P fast` 165 s, twice its tests' serial time, because each of its 18 testcases drains the machine separately
+
+ADR-0193's override gives each selected testcase every nextest slot. On 2026-09-14, at Plan 0174's
+close, one run per arm on the same tree, back to back on the reference machine: `-P fast` took
+**244.6 s without it and 409.5 s with it**. The selected set takes about 85 s when its tests run
+one at a time. The rest is idle slots, which are paid once per selected testcase and not once per
+binary. There are 18 selected testcases, and 11 of them are `help_cli` (8 tests, 0.3 s of work
+between them) and `stream_pipe` (3). That lands on every pre-push, every `dev` phase gate and CI's
+`check` job. The close accepted the cost and routed the cheaper shape here.
+
+Shapes worth measuring, none yet measured. Each keeps ADR-0193's guard honest:
+
+- **Fewer, larger exclusive testcases.** Fold `help_cli`'s eight into one test per timing-sensitive
+  property. That is a test edit, and the guard reads binaries, so it does not notice.
+- **Take `help_cli` out of the class.** Its 1 s bound sits around a process that exits in
+  milliseconds. Listing it in `CLOCK_ALONE_EXEMPT` with a reason is the guard's own escape. It
+  weakens ADR-0193's Decision point 2, and it needs a sentence there, not only an entry.
+- **Fewer than every slot.** `threads-required` at a fraction of the machine removes most of the
+  load for less drain. That is ADR-0193 Alternative B's question in a new shape, and it needs an
+  ADR amendment.
+
+Whether nextest's queue holds unrelated tests behind a waiting exclusive one, or lets them fill the
+slots while it waits, has not been checked. That decides how much any of these buys, so check it
+first.
+
+- **Raised:** 2026-09-14, by `architect` at Plan 0174's close. **Owner if taken:** `dev`, with an
+  `architect` amendment to ADR-0193 for the third shape.
+- **Verified 2026-09-14** — the override claims every slot for each selected test:
+  `present: threads-required = "num-test-threads" in: .config/nextest.toml`
+- **Verified 2026-09-14** — `help_cli` is selected whole:
+  `present: binary\(help_cli\) in: .config/nextest.toml`
+
+### Priority
+
+**Medium.** No test is wrong. The cost is 165 s on every push, and a gate that hurts gets bypassed
+(ADR-0033 Alternative F).

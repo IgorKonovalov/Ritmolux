@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0174 - The clock-reading tests run alone](#0174---the-clock-reading-tests-run-alone)
   - [0172 - The studio's readings become true](#0172---the-studios-readings-become-true)
   - [0173 - The MilkDrop geometry reads the source](#0173---the-milkdrop-geometry-reads-the-source)
   - [0170 - The horizon reads the frame's own ground](#0170---the-horizon-reads-the-frames-own-ground)
@@ -206,6 +207,49 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0174 - The clock-reading tests run alone](done/0174-the-clock-reading-tests-run-alone.md)
+
+- closed 2026-09-14. Three `dev` phases on `main` directly: `6c33ddb` (1, the run-alone override),
+`b39abc3` (2, the control-path pair says why it failed) and `68e15fe` (3, the hygiene guard holds
+the override to the clippy exemption). Review: **no blockers, no majors, three minors, one nit.**
+Version: **none**. The plan changed tests, the test schedule and docs, and no shipped artifact.
+ADR-0193 accepted with an Outcome. Filed backlog 0221 and corrected 0220 in place. The architect's
+gate at the close, at `22acbc5`: `cargo nextest run --workspace --no-fail-fast`, 1933 passed, 6
+skipped, 697.2 s, matching the log's 679.4 s. `RUSTDOCFLAGS="-D warnings" cargo doc --workspace
+--no-deps` was clean.
+
+**The decision the plan handed to the close.** Its Risks section asked whether the hook could
+afford the override. Re-measured, one run per arm, same tree, back to back: `-P fast` **244.6 s
+without the override, 409.5 s with it**. `dev`'s pair read 244.5 s and 398.2 s. The user accepted
+the cost at the close and chose to file the cheaper shape (backlog 0221), not hold the close.
+`docs/developing.md` quoted ~48.6 s from 2026-08-08, already stale before this plan. It now carries
+the reading and says why the run pauses.
+
+**What the review verified rather than read.** The guard's parser refuses `|`, `not`, `-`, bare
+`test()` and regex metacharacters, and its second test pins each form. The two directions check
+file-level against `binary()` and fn-level against `(binary & test(=))`, and the exemption list is
+held to still carry the lint and to stay out of the filter. `stream_show`'s wait is bounded from
+the ask, not per line. `Timeout` and `Disconnected` are told apart, and the report keeps the late
+check, liveness, stdout bytes, the pong and a bounded stderr tail. No deadline constant moved.
+`control_loopback` widens nothing on `Control`. Nothing under `core/src/` or `standalone/src/`
+changed.
+
+**Minors, none fixed in code at the close:**
+- **Backlog 0220 concluded "the ask was not lost" from a pong, and the pong cannot say that.** The
+  preset and the ping are separate datagrams, and 0219 is exactly a single loopback datagram
+  vanishing with every counter at zero. Corrected in place with a fourth candidate and a probe. The
+  same overclaim is in code, owed by `dev`: `Ask::ping`'s doc comment in `stream_show.rs` ("a pong
+  with no `preset` event means the ask's frame was drained") and `CLOCK_ALONE_EXEMPT`'s 0220
+  reason in `hygiene.rs` ("a drained ctl/preset").
+- **The guard binds an outer `#[allow]` to the next `fn ` in the text.** An allow on a statement,
+  an `impl` or a `mod` inside a test file would name the wrong function, and
+  `cfg_attr(..., allow(...))` is not read at all. No file does either today. Most misbindings fail
+  loudly, because the wrong function is not in the filter either.
+- **The hook's cost, above.** Accepted, and routed to backlog 0221.
+
+**Nit:** both `CLOCK_ALONE_EXEMPT` reasons carry a run of ten spaces mid-sentence, a lost line
+continuation that shows in the guard's failure message.
 
 ### [0172 - The studio's readings become true](done/0172-the-studios-readings-become-true.md)
 

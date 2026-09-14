@@ -1,8 +1,8 @@
 # ADR-0193 — A test that reads the clock runs alone, and the lint exemption that marks it is what selects it
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-14 (Plan 0174), with an Outcome
 > **Date:** 2026-09-14
-> **Related plan(s):** [0174](../plans/0174-the-clock-reading-tests-run-alone.md)
+> **Related plan(s):** [0174](../plans/done/0174-the-clock-reading-tests-run-alone.md)
 > **Extends:** [0173](0173-a-cost-probe-takes-the-best-of-each-duration-not-the-best-difference.md)
 > (a cost probe takes the best of each duration), [0156](0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md)
 > (the per-phase gate is scoped), [0071](0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
@@ -161,6 +161,26 @@ there.
 **Rejected because it asks for renames and still leaves a new timed test uncaught until someone
 remembers the suffix.** The clippy exemption cannot be left off, because the lint refuses the clock
 read without it. That makes it the one marker that is already complete.
+
+## Outcome (2026-09-14, Plan 0174's close)
+
+**The decision landed as written, and its cost is larger than this ADR's arithmetic.** The Negative
+section added the serial times, about 131 s, and left the real figure to the plan. Measured on
+the reference machine, one run per arm on the same tree, back to back: `-P fast` took **244.6 s
+without the override and 409.5 s with it, +165 s**. `dev`'s own Phase 1 pair read +154 s. That is
+roughly twice the ~85 s the selected set takes when its tests run one at a time. The increase is the
+drain, not the work. Each of the 18 selected testcases takes the whole machine separately, so
+`help_cli`'s eight tests, 0.3 s of work between them, pay eight drains. The full `--workspace`
+run at the close took 697.2 s. No pre-override `--workspace` figure on this tree exists to compare
+it with. **The cost is accepted.** Finding a cheaper selection shape is backlog 0221.
+
+**Point 3 routed both control-path tests to the backlog, not the override.** Both reproduced under
+load: 3 of 79 and 2 of 79 runs. Neither was starvation. `control_loopback` lost a datagram that
+never reached the queue (backlog 0219). `stream_show` stalled with the ask's ping answered and no
+`preset` event (backlog 0220). The close found 0220's first reading overclaimed. The ping is a
+separate datagram, so it cannot show the preset was drained, and 0219's loss is a live candidate for
+both entries. The routing does not change, because ADR-0193 sends a lost ask and an unanswered ask
+to the same place.
 
 ## Notes
 

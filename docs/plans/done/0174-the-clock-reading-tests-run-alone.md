@@ -1,10 +1,13 @@
 # 0174 — The clock-reading tests run alone, and the two that fail on the control path are diagnosed first
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-14. Phases `6c33ddb`, `b39abc3`, `68e15fe` on `main` directly.
+> Mode 4: no blockers, no majors, three minors, one nit. Verified at the close: `--workspace` 1933
+> passed / 6 skipped (697.2 s), and a same-tree `-P fast` pair, 244.6 s without the override and
+> 409.5 s with it. The hook's cost is accepted, and backlog 0221 carries a cheaper shape.
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`
-> **Related ADRs:** [0193](../adrs/0193-a-test-that-reads-the-clock-runs-alone.md) (proposed),
-> [0173](../adrs/0173-a-cost-probe-takes-the-best-of-each-duration-not-the-best-difference.md)
+> **Related ADRs:** [0193](../../adrs/0193-a-test-that-reads-the-clock-runs-alone.md) (accepted, Outcome),
+> [0173](../../adrs/0173-a-cost-probe-takes-the-best-of-each-duration-not-the-best-difference.md)
 
 > **Amended 2026-09-14** (architect backlog sweep, outside the log): a Risks bullet records that
 > Phase 1's measured drain-wait cost already lands on the pre-push `-P fast` tier, not only on

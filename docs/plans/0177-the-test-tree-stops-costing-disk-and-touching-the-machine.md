@@ -7,7 +7,7 @@
 > [0193](../adrs/0193-a-test-that-reads-the-clock-runs-alone.md), [0156](../adrs/0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md),
 > [0147](../adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md), [0033](../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md)
 > **Closes:** design-backlog 0181, 0161, 0213, 0179, 0183, 0184, 0182
-> **Sequenced after:** [Plan 0174](0174-the-clock-reading-tests-run-alone.md) closes. That plan owns
+> **Sequenced after:** [Plan 0174](done/0174-the-clock-reading-tests-run-alone.md) closes. That plan owns
 > `.config/nextest.toml`, is editing `standalone/tests/stream_show.rs` and `control_loopback.rs` in the
 > main checkout right now, and its Phase 3 adds the `hygiene.rs` guard this plan extends.
 

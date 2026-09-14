@@ -10,7 +10,7 @@
 > [0025](../adrs/0025-foobar-component-version-single-sourced.md),
 > [0001](../adrs/0001-rust-core-wgpu-cabi-foobar-shim.md)
 > **Coordinates with:** [0133](0133-the-engine-drives-the-lights.md) (also edits `standalone/src/run.rs`)
-> and [0174](0174-the-clock-reading-tests-run-alone.md) (owns `.config/nextest.toml`'s groups) —
+> and [0174](done/0174-the-clock-reading-tests-run-alone.md) (owns `.config/nextest.toml`'s groups) —
 > sequence or merge `main` before Phase 2.
 
 > **Amended 2026-09-14** (architect backlog sweep): line references follow the shell's split — the
