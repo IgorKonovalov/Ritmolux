@@ -27,7 +27,7 @@ import { runLanes } from "./lib/lane.mjs";
 import { findPlan, nextStep, readPlanFile } from "./lib/plan.mjs";
 import { loadLocal, loadQueue, stateSets } from "./lib/queue.mjs";
 import { loadState, planRecord, recoverInterrupted, saveState, statePaths, totalSpend } from "./lib/state.mjs";
-import { activeChildren } from "./lib/step.mjs";
+import { activeChildren, killTree } from "./lib/step.mjs";
 
 export const TOOL_DIR = dirname(fileURLToPath(import.meta.url));
 export const REPO = resolve(TOOL_DIR, "..", "..");
@@ -138,7 +138,7 @@ async function cmdRun(args, o) {
   };
 
   const interrupt = () => {
-    for (const child of activeChildren) child.kill();
+    for (const child of activeChildren) killTree(child);
     recoverInterrupted(p.stateDir, state);
     regenerate(p, state);
     rmSync(pidFile(p), { force: true });

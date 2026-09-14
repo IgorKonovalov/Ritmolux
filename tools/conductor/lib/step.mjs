@@ -10,7 +10,7 @@
 //   bad_outcome     an rlx-outcome block that fails validation, or names another plan
 //   <session's own> the outcome is kind "parked"
 
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
@@ -18,6 +18,25 @@ import { parseOutcome, readResult } from "./outcome.mjs";
 
 /** Sessions currently running in this process, so an interrupt can end them rather than orphan them. */
 export const activeChildren = new Set();
+
+/**
+ * Ends a session and everything it started. `child.kill()` alone ends only the CLI process: the
+ * cargo / nextest it spawned, and a with-lock wrapper holding the suite lock, would live on — and a
+ * lock whose holder is alive is never taken over. On Windows `taskkill /T` walks the tree; elsewhere
+ * the session is spawned as its own process group and the whole group is signalled.
+ */
+export function killTree(child) {
+  if (!child.pid) return;
+  if (process.platform === "win32") {
+    spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+    return;
+  }
+  try {
+    process.kill(-child.pid, "SIGKILL");
+  } catch {
+    child.kill("SIGKILL");
+  }
+}
 
 export function renderPrompt(template, vars) {
   const text = template.replace(/\{\{(\w+)\}\}/g, (m, k) => {
@@ -80,6 +99,9 @@ export function runStep(opts) {
       cwd,
       env: { ...process.env, ...env, RLX_CONDUCTOR: "1" },
       stdio: ["ignore", "pipe", "pipe"],
+      // Its own process group, so killTree can signal the session and its descendants together.
+      // Not on Windows, where `detached` opens a console window and taskkill walks the tree anyway.
+      detached: process.platform !== "win32",
     });
     activeChildren.add(child);
     let stderr = "";
@@ -91,7 +113,7 @@ export function runStep(opts) {
     let timedOut = false;
     const timer = setTimeout(() => {
       timedOut = true;
-      child.kill();
+      killTree(child);
     }, timeoutMs);
     let settled = false;
     const settle = (exitCode, spawnError) => {
