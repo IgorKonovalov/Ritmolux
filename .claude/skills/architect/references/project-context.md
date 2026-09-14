@@ -16,6 +16,11 @@ samples into GPU-rendered visuals via **wgpu**. Two frontends consume the core:
 The core is **source-agnostic**: it accepts PCM frames and a render target and knows nothing
 about where they came from. That single abstraction is why one visual codebase serves both.
 
+A third application sits beside them and is not a frontend of the core: the **studio**
+(`studio/`, Electron + TypeScript, ADR-0175 and ADR-0178). It edits a preset by driving one player
+process over the control protocol (ADR-0176, `docs/specs/0003-studio-control-protocol.md`) and
+never draws a frame itself. It links no Rust; its seam to the engine is that protocol.
+
 ## Repo layout
 
 Cargo workspace. This is the intended shape for orientation, not an inventory — trust
@@ -27,7 +32,8 @@ core/            # Rust library crate — DSP + render engine + scenes + preset 
   build.rs       #   globs presets/*.toml into the embedded set (ADR-0022)
   src/audio.rs   #   source-agnostic sample intake (validated at boundary)
   src/dsp/       #   bands/fft/onset/beat — pure, deterministic, unit-tested
-  src/preset/    #   the .toml schema + the pure expression evaluator (expr.rs, schema.rs)
+  src/preset/    #   the .toml schema (schema/ — system.rs, raw/, load.rs, export.rs) + the pure
+                 #   expression evaluator (expr.rs)
   src/milk/      #   the MilkDrop RUNTIME (ADR-0113) — bytecode VM + shader emitter. Distinct
                  #   from milkconv/, the ahead-of-time converter below.
   src/render/    #   wgpu device/surface/context, the composite stages, and scenes/
@@ -41,21 +47,32 @@ plugin-foobar/   # C++ shim — foobar2000 SDK glue, links core's C ABI (Windows
 milkconv/        # the MilkDrop `.milk` -> preset converter (ADR-0113, Plan 0100). Never ships and
                  #   nothing shipped depends on it, so it sits OUTSIDE `default-members` like
                  #   core-cabi — one more reason `--workspace` is the load-bearing scope.
-presets/         # the curated preset library (*.toml) + README.md (the param roster)
+studio/          # the Electron studio (ADR-0175, ADR-0178) — TypeScript only, lane studio-builder.
+                 #   Not built by any cargo command; a release artifact of its own carrying a
+                 #   player at resources/player/.
+presets/         # the curated preset library (*.toml) + README.md (the param reference — its
+                 #   params block GENERATED from ParamSpec, ADR-0170)
   pending/       #   authored + approved but NOT shipped, held back by a known engine/harness gap.
                  #   Non-recursive read_dir in build.rs (ADR-0022) skips it by construction.
                  #   A plan that closes such a gap owes a look at what this holds.
+  schema/        #   GENERATED per-system editor JSON Schemas; with the root .taplo.toml (also
+                 #   generated) and RLX_UPDATE_PRESET_SCHEMA=1 to rewrite them (ADR-0190)
 tools/sd-filter/ # Python sidecar for the diffusion-filter pass (ADR-0122). Not a cargo crate.
-scripts/         # the six Node gates; the first three are yours at every close (see SKILL.md)
+site/            # the Astro Starlight documentation site (ADR-0154) — reads docs/ in place; the
+                 #   PUBLISHED map in src/plugins/rewrite-links.mjs is the publish boundary
+packaging/       # what a v* tag ships (ADR-0038) — macos/ and studio/ build recipes + READ-ME-FIRSTs
+scripts/         # the Node gates (CLAUDE.md lists them); pre-push and CI's links job run most of
+                 #   them, pages.yml runs the two that need a built site. check-doc-links,
+                 #   check-backlog-claims, check-index-rows and toc are yours at every close.
 docs/
 ├── adrs/        # ADR-NNNN + README index
 ├── plans/       # plan NNNN + README index + done/
-├── specs/       # NNNN-<subsystem>.md — living behavioral contracts (C ABI, ring/DSP)
-└── diagrams/    # standalone mermaid — declared as an output location, never yet created.
-                 #   133 docs carry EMBEDDED mermaid instead; prefer embedding.
+└── specs/       # NNNN-<subsystem>.md — living behavioral contracts (C ABI, ring/DSP, control
+                 #   protocol). Diagrams have no directory: mermaid lives in the doc it explains
+                 #   (ADR-0171).
 .claude/
-├── skills/      # architect + dev + preset-author
-├── hooks/       # block-broad-git-add.js
+├── skills/      # architect + dev + preset-author + studio-builder
+├── hooks/       # block-broad-git-add.js + block-attribution-trailers.js (both DENY hooks)
 └── settings.json
 ```
 
@@ -91,8 +108,9 @@ Rust (run from repo root):
 
 - Build everything: `cargo build`
 - Run the standalone: `cargo run -p standalone`
-- Tests: `cargo test --workspace` (or `cargo test -p rlx-core` for just the core — the package is
-  `rlx-core`, not `core`; the directory and the package name differ)
+- Tests: `cargo nextest run --workspace` — the full suite a close owes — or `-P fast` for the
+  per-phase tier (ADR-0156, ADR-0157). `-p rlx-core` narrows to the core; the package is
+  `rlx-core`, not `core`, and a package-scoped run is never what a close cites.
 - Lints (treated as errors): `cargo clippy --workspace --all-targets -- -D warnings`
 - Format check: `cargo fmt --all --check`  (apply: `cargo fmt --all`)
 - Build the C-ABI artifacts: `cargo build -p rlx-core-cabi` (emits `rlx_core_c.lib`/`.dll`; the
@@ -102,7 +120,7 @@ Rust (run from repo root):
 `default-members`, so the bare forms come back green having never touched the C ABI.
 
 foobar plugin (Windows, C++): built with its own project/toolchain under `plugin-foobar/` linking
-the core's staticlib + generated header. Check the plugin's own README for the current invocation.
+the core's staticlib + the hand-written header. Check the plugin's own README for the current invocation.
 
 Headless visual QA: `cargo run -p standalone --example shot -- <flags>` (see `docs/capturing.md`).
 That is how the `preset-author` lane self-verifies, and how you can eyeball a render change during
@@ -133,12 +151,20 @@ here; the index is one glob away and this file would only go stale.
 
 ## Ownership map
 
-Three skills. `architect` (this skill) owns `docs/` — plans, ADRs, diagrams, reviews. `dev` owns
-all code: `core/`, `standalone/`, `plugin-foobar/`. `preset-author` owns preset **content** —
-`.toml` presets, expression bindings, and the structural/palette/smoothing tables — and never
-engine Rust (ADR-0017). Phase owner tags use the vocabulary `dev` (all code) and `human` (a task
-only the user can do — a product call, a cert, installing a system audio driver); preset-authoring
-is its own lane, not a phase owner. There are no sibling *implementer* skills — `dev` owns all code.
+Four skills. `architect` (this skill) owns `docs/` — plans, ADRs, diagrams, reviews. `dev` owns
+all Rust and C++: `core/`, `core-cabi/`, `rlx-ring/`, `standalone/`, `plugin-foobar/`,
+`milkconv/`. `studio-builder` owns `studio/`, the Electron studio, and never Rust, C++ or a
+protocol widening (ADR-0177). `preset-author` owns preset **content** — `.toml` presets, expression
+bindings, and the structural/palette/smoothing tables — lands presets in the shipped set directly
+(ADR-0081), and never touches engine Rust (ADR-0017).
+
+Phase owner tags use the vocabulary `dev`, `studio-builder` and `human` (a task only the user can do
+— a product call, a cert, installing a system audio driver); preset-authoring is its own lane, not
+a phase owner. **The two implementers hand off automatically, in both directions**
+([ADR-0188](../../../../docs/adrs/0188-the-two-implementer-lanes-hand-off-automatically.md)): a lane
+reaching a phase the other owns commits, checks `git status` is clean, and invokes the sibling with
+the plan, the phase and the commits landed; the receiver restates and still waits for "go". Every
+other handoff — above all the one back to you — stays manual.
 
 `preset-author` feeds you through **`docs/design-backlog.md`** — captured friction not yet promoted
 to an ADR or plan. It is the one inbound channel that isn't a conversation, so check it when

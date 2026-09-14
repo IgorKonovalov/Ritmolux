@@ -2,7 +2,7 @@
 
 > **Status:** draft | in-progress | done | abandoned
 > **Created:** YYYY-MM-DD
-> **Owner skill(s):** <dev | human> (list all that appear in phase owner tags below)
+> **Owner skill(s):** <dev | studio-builder | human> (list all that appear in phase owner tags below)
 > **Related ADRs:** NNNN-foo (link if any)
 
 ## TL;DR
@@ -36,11 +36,13 @@ between phases; the architect reviews the whole plan once at the end. Order phas
 is valuable on its own (a walking skeleton), not just plumbing.
 
 **Every phase MUST carry a single `**Owner skill:**` line** with exactly one value: `dev` (all
-code) or `human` (a task only the user can do). The tag is machine-readable — `dev` reads it at
-the start of each phase and stops/surfaces on a `human` phase. Missing tags fail Mode 4 review.
+Rust and C++), `studio-builder` (everything under `studio/`) or `human` (a task only the user can
+do). The tag is machine-readable — each implementing lane reads it at the start of each phase,
+hands a sibling-owned phase to the other implementer (ADR-0188), and stops/surfaces on a `human`
+phase. Order phases so each lane's run is contiguous. Missing tags fail Mode 4 review.
 
 ### Phase 1 — <name>
-- **Owner skill:** <dev | human>
+- **Owner skill:** <dev | studio-builder | human>
 - **What:** One sentence on what this phase produces.
 - **Files touched:** Rough list — `core/src/dsp/fft.rs`, `standalone/src/main.rs`, etc.
 - **Done when:** Concrete acceptance — "`cargo run -p standalone` shows spectrum bars reacting
@@ -82,12 +84,12 @@ by name if you can.
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(`main` directly, or the worktree path plus its branch — `WORK/rlx-plan-NNNN` on
-`plan-NNNN-<slug>`)_
+**Lane:** _(`main` directly, or the worktree path plus its branch — `WORK/rlx-plan-NNNN` or
+`.claude/worktrees/<name>`, on `plan-NNNN-<slug>` or the harness's branch)_
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — <name> | <dev \| human> | <done \| not started \| abandoned> | `<sha>` |
+| 1 — <name> | <dev \| studio-builder \| human> | <done \| not started \| abandoned> | `<sha>` |
 | 2 — <name> | … | … | … |
 
 ### Notes
@@ -106,9 +108,9 @@ version bump: the level is architect's call per ADR-0005.)_
 - **`presets/` touched:** _(yes + which files, or no)_
 - **Plan header `Closes:`** _(the `design-backlog NNNN` entries named in the header, or none)_
 - **What shipped:** _(feature / fix-only / docs-chore-only)_
-- **Operator docs touched:** _(from Mode 4's sweep table — `README.md`, `presets/README.md`,
-  `docs/presets.md`, `docs/preset-palettes.md`, `docs/capturing.md`, `docs/on-device-validation.md`,
-  `docs/nfr.md` — or none)_
+- **Operator docs touched:** _(the rows of Mode 4's operator-doc sweep table this plan touched —
+  name each file, including any generated file regenerated: the `presets/README.md` params block,
+  `presets/schema/` + `.taplo.toml` — or none)_
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** _(exit code, and any entry named)_
 - **Full suite:** _(the command as run — `cargo nextest run --workspace`, not `-P fast` — its exit
   code, and the pass/skip counts off nextest's `Summary` line. This is the once-per-plan run

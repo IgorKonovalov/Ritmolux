@@ -31,13 +31,19 @@ how much damage a violation does.
 
 ## The C ABI is a contract
 
-- The `extern "C"` surface is **minimal and versioned**: opaque handle create/free, push-samples,
-  render-into-target, resize — and little else. The C++ plugin compiles against it separately, so
-  a mismatch is a link/runtime failure, not a compile error.
+- The `extern "C"` surface is **minimal and versioned**, and
+  [`docs/specs/0001-c-abi.md`](../../../../docs/specs/0001-c-abi.md) is the authority on its exact
+  shape — compare against the spec, and never restate its function roster anywhere else (a copy of
+  it drifts on the next ABI change). The C++ plugin compiles against it separately, so a mismatch
+  is a link/runtime failure, not a compile error.
 - **Changing the ABI shape is ADR-worthy**, not a casual edit. Adding a parameter, changing a
   struct layout, or altering ownership/lifetime semantics all count.
 - Ownership and lifetimes across the boundary are explicit and documented: who allocates, who
   frees, whether a pointer outlives the call. No implicit `Box::leak` without a matching free.
+- **The studio control protocol is the same kind of contract.** The OSC vocabulary and the event
+  roster the studio relies on are recorded in
+  [`docs/specs/0003-studio-control-protocol.md`](../../../../docs/specs/0003-studio-control-protocol.md)
+  (ADR-0176); widening either is ADR-worthy, and the studio never works around a missing message.
 
 ## Determinism where it's testable
 

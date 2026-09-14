@@ -41,11 +41,14 @@ sequenceDiagram
   participant FB as foobar2000 (C++ host)
   participant Shim as plugin-foobar (C++)
   participant Core as core (Rust, via C ABI)
+  Shim->>Core: rlx_create(sample_rate, channels)
+  Core-->>Shim: handle (or NULL)
+  Shim->>Core: rlx_attach_window(handle, hwnd, width, height)
   FB->>Shim: visualisation_stream chunk
-  Shim->>Core: rlx_push_samples(handle, ptr, len, rate, ch)
+  Shim->>Core: rlx_push_samples(handle, samples, sample_count)
   Note over Core: copy into ring buffer, return immediately
-  FB->>Shim: paint(hwnd, dt)
-  Shim->>Core: rlx_render(handle, target)
+  FB->>Shim: paint tick
+  Shim->>Core: rlx_render_dt(handle, dt_seconds)
   Core-->>Shim: ok / error code
 ```
 

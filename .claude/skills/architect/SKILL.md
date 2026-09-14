@@ -10,7 +10,7 @@ production code — it is to help the user **think clearly about design before c
 written**, capture the decisions, and verify that what gets built matches what was decided.
 
 The project lives at the repo root. Plans live in `docs/plans/`, ADRs in `docs/adrs/`,
-standalone diagrams in `docs/diagrams/`. The orientation map is `CLAUDE.md` — read it to
+living contracts in `docs/specs/`; diagrams are mermaid inside the document they explain. The orientation map is `CLAUDE.md` — read it to
 ground any decision in the current architecture.
 
 ## On bare invocation — wait for instructions
@@ -103,8 +103,11 @@ docs/
 │   └── done/         #   completed plans move here (close ceremony)
 ├── adrs/             # NNNN-<slug>.md — durable, numbered, append-only
 │   └── README.md     #   the ADR index
-└── diagrams/         # <slug>.md — standalone mermaid (inline diagrams stay in the plan/ADR)
+└── specs/            # NNNN-<subsystem>.md — living contracts (C ABI, ring/DSP, control protocol)
 ```
+
+Diagrams have no directory of their own: a diagram is a mermaid fence inside the document it
+explains (Mode 3, ADR-0171).
 
 Reviews are **not** written to files — deliver them in-conversation (Mode 4).
 
@@ -121,7 +124,7 @@ Ask focused questions **before writing anything**. Surface constraints the user 
 mentioned. Cover these, but only ask what's genuinely unclear:
 
 - **Scope & success.** What does "done" look like? What's explicitly out of scope?
-- **Which frontend(s).** Core-only? Standalone? Plugin? All three?
+- **Which frontend(s).** Core-only? Standalone? Plugin? The studio? Which combination?
 - **Data shape & cadence.** What audio/analysis goes in, what visual comes out, at what rate?
 - **Constraints.** Real-time budget (frame time, no-alloc paths)? Binary size? Platform limits?
 - **Integration points.** Does this touch the audio intake, the C ABI, the wgpu layer, capture?
@@ -134,7 +137,7 @@ just draft", you may — but say one line naming what you're guessing.
 
 Propose **2–3 distinct** design options (not variations of one). Each includes a one-sentence
 approach, a bullet list of tradeoffs (what you gain / give up), and which part of the system it
-touches (core / standalone / plugin). Present via `AskUserQuestion` (single-select). If none
+touches (core / standalone / plugin / studio). Present via `AskUserQuestion` (single-select). If none
 fit, go back to Step 1 with what you learned.
 
 ### Step 3: Write the plan
@@ -201,15 +204,20 @@ Update `docs/adrs/README.md` (roster + next free number) in the same session.
 
 ## Mode 3 — Diagrams (mermaid)
 
-All diagrams are mermaid in markdown — renders in GitHub/VS Code, diffs cleanly. Pick the kind:
+**A diagram is a mermaid fence in the source document it explains**
+([ADR-0171](../../../docs/adrs/0171-a-diagram-is-mermaid-in-the-source-and-the-site-renders-it-at-build.md)):
+GitHub and editors render the fence, and `site/` renders it to an inline SVG at build time. The
+reader-facing set is deliberately small — the architecture and the frame in `docs/how-it-works.md`,
+a preset's life in `docs/presets.md`, the embedding lifecycle in `docs/embedding.md` — and a new
+reader diagram needs a reason in its commit message. Diagrams inside a plan or ADR are unrestricted.
+Pick the kind:
 `flowchart` (data/control flow — the common one here: audio → ring → DSP → scenes → wgpu),
 `sequenceDiagram` (interactions across the C ABI or capture → core), `stateDiagram-v2` (scene
 lifecycle, capture states), `erDiagram` (any persisted config schema).
 
 Keep diagrams small (>~12 nodes is two diagrams pretending to be one). **Label the boundaries**
 with `subgraph` — what's inside `core/` vs the shells vs external (foobar, the OS audio stack).
-Standalone diagrams live in `docs/diagrams/<slug>.md`; diagrams inside a plan/ADR stay embedded.
-See `references/templates/diagram-examples.md`.
+There is no `docs/diagrams/` directory; do not create one. See `references/templates/diagram-examples.md`.
 
 ---
 
@@ -228,8 +236,11 @@ not one phase. This is architectural integrity, not line-by-line style. Run five
   exactly the way a green `cargo test` is not a passing test.
 - **Verify the `### Close triggers` `**Full suite:**` bullet — do not trust it.** Since
   [ADR-0156](../../../docs/adrs/0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md)
-  the nine GPU suites run **once per plan** rather than at every phase, so that bullet is the only
-  record that the goldens and the preset sweeps ever ran against the finished tree. Run
+  the nine GPU suites run **in full once per plan** rather than at every phase — the per-phase
+  `-P fast` tier carries only the declared representatives of three preset sweeps
+  ([ADR-0157](../../../docs/adrs/0157-the-preset-sweeps-split-per-preset-and-the-phase-tier-samples-a-declared-representative.md))
+  — so that bullet is the only record that the goldens and the full preset sweeps ever ran against
+  the finished tree. Run
   `cargo nextest run --workspace` yourself — the full run, not `-P fast` — and compare. A green
   full suite is precisely the claim a deferred gate makes cheapest to get wrong, and a missing or
   vague bullet is a **blocker**, not a `minor`: it means nothing is known about the drift guards.
@@ -262,7 +273,14 @@ not one phase. This is architectural integrity, not line-by-line style. Run five
   `visualisation_stream` thread is a real-time bug, not a style nit. The seam to the render side
   must be the lock-free ring buffer.
 - **The C ABI contract.** Is the `extern "C"` surface still minimal and versioned? Did a phase
-  widen it casually? ABI shape changes are ADR-worthy.
+  widen it casually? ABI shape changes are ADR-worthy. The authority on the surface is
+  [`docs/specs/0001-c-abi.md`](../../../docs/specs/0001-c-abi.md) — compare against it, and never
+  restate its function roster in a plan, a review or this skill.
+- **The control protocol contract.** The same question for the studio↔player OSC vocabulary and
+  event roster ([ADR-0176](../../../docs/adrs/0176-the-player-is-driven-over-osc-control-in-and-reports-on-its-standard-streams.md),
+  [`docs/specs/0003-studio-control-protocol.md`](../../../docs/specs/0003-studio-control-protocol.md)):
+  widening either is ADR-worthy, and a studio-side shim that routes around a missing message is the
+  same violation seen from the other lane.
 - **God modules / tight coupling.** Files doing five jobs; scene code branching on GPU backend;
   standalone code reaching past the core's API.
 
@@ -275,17 +293,36 @@ not one phase. This is architectural integrity, not line-by-line style. Run five
   | Doc | Sweep it when the plan touched |
   |-----|-------------------------------|
   | `README.md` (esp. the Controls table) | hotkeys, controls, top-level behavior |
-  | **`presets/README.md`** | **any scene param added/renamed/re-defaulted, any engine-stage param, the structural/palette/smoothing tables** |
+  | **`presets/README.md`** | **the hand-written structural/palette/smoothing tables and essays.** The parameter reference between `<!-- params:begin -->` markers is **generated** from the `ParamSpec` declarations ([ADR-0170](../../../docs/adrs/0170-a-parameters-reference-row-is-generated-from-the-declaration-the-engine-reads.md)) — a param added, renamed or re-defaulted means `RLX_UPDATE_PARAM_REFERENCE=1` regenerated it, never a hand edit |
+  | **`presets/schema/*.schema.json` + `.taplo.toml`** | **a `ParamSpec`, a structural table or a `SystemKind` changed** — generated editor schemas ([ADR-0190](../../../docs/adrs/0190-preset-toml-is-checked-by-the-loader-and-never-reformatted.md)), regenerated by `RLX_UPDATE_PRESET_SCHEMA=1`; `core/tests/preset_schema.rs` fails on drift, so check the regeneration was committed rather than editing |
   | **`docs/presets.md`** | **the expression grammar — a variable, constant, function, operator, or the error surface** |
   | **`docs/preset-palettes.md`** | **palette names, custom-stop rules, per-scene colour params, A/B crossfade** |
+  | **`docs/preset-guide.md`** | **a system added or retired, or a system's look changed enough that its picture lies** |
+  | `docs/preset-tuning-walkthrough.md` | a param or `--report` column the walkthrough's steps use |
   | `docs/capturing.md` | `shot` CLI flags, `--render`, the live video-out |
   | `docs/testing.md` | the `core/tests/` visual-QA harness, what a gate can and cannot see |
   | `docs/running.md` | a hotkey, a menu row, the operator console, the now-playing banner |
   | `docs/configuration.md` | a flag, an environment variable, a `config.toml` key, an OSC address |
+  | `docs/how-it-works.md` | the frame's path through the engine, the frontends, either of its diagrams |
+  | `docs/embedding.md` | the C ABI lifecycle a host follows (spec 0001 is the contract; this is the walkthrough) |
+  | `docs/specs/0003-studio-control-protocol.md` | an OSC address, an event, or a stream the studio reads |
+  | `docs/milkdrop-conversion.md` | what `milkconv` emits or how its output is judged |
+  | `docs/developing.md` | a build step, a pre-push step, a generated file and its env var |
+  | `docs/releasing.md` | a release job, a zip, the version-bump procedure |
   | `docs/on-device-validation.md` | anything the on-device checklist asserts |
   | `docs/nfr.md` | a quantified budget moved |
 
-  **The three bolded rows are load-bearing for the `preset-author` lane.** That skill deliberately
+  **Editing a reader document carries two constraints of its own.** Whether it is published is
+  decided by the `PUBLISHED` map in `site/src/plugins/rewrite-links.mjs`
+  ([ADR-0154](../../../docs/adrs/0154-the-reader-facing-docs-publish-as-a-site.md)) — a new doc does
+  not join the site by existing. And every document in `scripts/check-reader-prose.mjs`'s list must
+  carry each Plan/ADR citation inside a markdown link, never bare in a sentence
+  ([ADR-0168](../../../docs/adrs/0168-the-reader-documents-address-a-reader-and-the-record-stays-a-link.md));
+  that gate runs at pre-push and in CI. `check-site-links.mjs` and `check-site-routes.mjs` (the
+  per-route size cap) need a built site and run **only** in `.github/workflows/pages.yml`, so they
+  report after the push.
+
+  **The bolded rows are load-bearing for the `preset-author` lane.** That skill deliberately
   keeps *no* catalogue of its own — it points at these docs — precisely because its private copies
   rotted while these stayed current (rewritten 2026-07-26, commit `0e1e500`). So when a plan adds a
   scene param or a grammar function and these don't get swept, the content lane authors against a
@@ -356,11 +393,14 @@ lint enforces: whether the shape of the code still honors the architecture. Flag
   (`standalone`, `plugin-foobar`) depend on `core`; `core` depends on neither, and on no platform
   or audio-source crate (this is lens 2's source-agnostic rule seen as a *layering* rule). A
   `use` in `core/` that reaches a shell, a platform SDK, or a windowing type is a layer inversion.
-- **Plugin architecture / the two seams.** The project has exactly two extension seams: the **C
-  ABI** (frontends plug into `core` across it) and the **`Scene` trait** (scenes plug into the
-  engine; per ADR-0002 it stays thin — the preset engine's vocabulary, not a public plugin API).
-  Catch either seam widening: a `Scene` gaining engine-lifecycle or GPU-backend knowledge, or the
-  C ABI growing beyond create/free/push/render/resize. Both are ADR-worthy, not casual edits.
+- **Plugin architecture / the three seams.** The project has three extension seams: the **C ABI**
+  (frontends plug into `core` across it; spec 0001 is the authority on its surface), the **`Scene`
+  trait** (scenes plug into the engine; per ADR-0002 it stays thin — the preset engine's vocabulary,
+  not a public plugin API), and the **studio control protocol** (the studio drives the player over
+  OSC and reads its event stream; ADR-0176, spec 0003). Catch any seam widening: a `Scene` gaining
+  engine-lifecycle or GPU-backend knowledge, a function added to the C ABI that spec 0001 does not
+  record, or an OSC address or event the studio relies on that spec 0003 does not carry. All three
+  are ADR-worthy, not casual edits.
 - **Law of Demeter / principle of least knowledge.** Modules talk to immediate collaborators, not
   through them. Flag train-wreck reaches across boundaries (`core.dsp().internals().buffer()[i]`,
   a shell poking `core`'s private state instead of its API). Each layer knows the *interface* of
@@ -597,8 +637,9 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
    asks landed) stays live with a dated update naming which half; the archive is append-only and
    closed, so a question that comes back is a *new* entry citing the archived one, never an edit to it.
 3d. **Regenerate the contents blocks — trigger: unconditional, because every close adds a
-   heading.** Run `node scripts/toc.mjs`, then stage whichever of the six documents it rewrote.
-   Steps 1, 2, 3c and 3e above each add or move a heading in a file that carries a block
+   heading.** Run `node scripts/toc.mjs`, then stage whichever documents it rewrote. The close
+   edits headings in files that carry a block — both plans indexes (steps 3 and 3e), the backlog and
+   its archive (step 3c, and any entry step 1c's verdict corrected), and whatever the operator-doc sweep touched
    ([ADR-0163](../../../docs/adrs/0163-a-long-document-carries-a-generated-contents-block.md)), so a
    close that skips this leaves a contents row pointing at a heading that is no longer there — and
    `scripts/check-doc-links.mjs` will not say so, because it validates paths and deliberately never
@@ -644,9 +685,27 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
    — `dev` is forbidden from proposing a level, and you pick it yourself against what the plan
    actually landed, per ADR-0005.
 
-   The version lives once, in root `Cargo.toml` `[workspace.package].version`; both crates inherit
-   it. This is a separate axis from the C ABI version (`RLX_ABI_VERSION`), which moves only on an
-   `extern "C"` shape change (ADR-0003) — never couple the two.
+   The source of truth is root `Cargo.toml` `[workspace.package].version`; every workspace member
+   inherits it with `version.workspace = true`. This is a separate axis from the C ABI version
+   (`RLX_ABI_VERSION`), which moves only on an `extern "C"` shape change (ADR-0003) — never couple
+   the two.
+
+   **The studio carries two copies `cargo release` does not move, and the bump is not finished
+   until both follow.** `studio/package.json`'s `"version"` (the packaging scripts override it at
+   build time) and `EXPECTED_PLAYER_VERSION` in `studio/shared/protocol.ts` (compiled into the
+   renderer, so nothing overrides it — a stale constant ships a studio that refuses the player
+   packaged inside it). `studio/shared/version.test.ts` holds all three equal and goes red the
+   moment `Cargo.toml` moves alone. After the release commit:
+
+   ```sh
+   # set both copies to X.Y.Z, then from studio/:
+   npx vitest run shared/version.test.ts
+   git commit -m "fix(studio): the two version copies follow the workspace to X.Y.Z" -- studio/package.json studio/shared/protocol.ts
+   git tag -d vX.Y.Z && git tag vX.Y.Z     # the tag moves onto the sync commit
+   ```
+
+   The tag has to sit on the sync commit, because a studio built from the release commit alone is
+   the broken artifact the test exists to prevent.
 
    **If a parallel lane is live, `cargo release` will refuse** — it aborts on *any* dirty file
    ("uncommitted changes detected"), and at Plan 0060's close another session's three in-progress
@@ -662,11 +721,16 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
    git tag vX.Y.Z
    ```
 
+   The studio sync above follows the manual path exactly as it follows the tool — the two copies
+   are never part of the `chore: Release` commit, and the tag still moves onto the sync commit.
+
 ### Closing a plan that was built in a worktree
 
-Since Plan 0047 this project runs plan lanes in **git worktrees** — `WORK/rlx-plan-NNNN` on a
-`plan-NNNN-<slug>` branch, alongside the main checkout. That is
-[ADR-0053](../../../docs/adrs/0053-plan-lanes-run-in-git-worktrees.md); read it once, then follow
+Since Plan 0047 this project runs plan lanes in **git worktrees**, in either of two shapes: the
+`WORK/rlx-plan-NNNN` sibling of the main checkout on a `plan-NNNN-<slug>` branch
+([ADR-0053](../../../docs/adrs/0053-plan-lanes-run-in-git-worktrees.md)), or the harness's
+`.claude/worktrees/<name>/` inside the repository
+([ADR-0182](../../../docs/adrs/0182-a-plan-lane-may-live-inside-the-repository.md)). Read ADR-0053 once, then follow
 the order, because getting the merge direction backwards puts a merge commit and possibly a
 duplicate version tag on `main`. The four bookkeeping steps above are the **middle** of this
 sequence, not the whole of it:
@@ -725,9 +789,12 @@ the line is absent (a plan predating [ADR-0120](../../../docs/adrs/0120-the-clos
    0054 and 0056 together reclaimed **32 GB** (14 + 18). Two idle lanes can plausibly fill the disk.
 
    ```sh
-   git worktree remove ../rlx-plan-NNNN   # from the main checkout, never from inside the lane
+   git worktree remove <lane path>        # from the main checkout, never from inside the lane
    git worktree prune                     # drops registrations whose directory is already gone
    ```
+
+   `<lane path>` is the `**Lane:**` line's path — `../rlx-plan-NNNN` for a sibling lane,
+   `.claude/worktrees/<name>` for one inside the repository.
 
    On Windows this fails with `Permission denied` while **any** process holds the directory — a shell
    whose working directory is inside it is enough, and the session that just ran the close is usually
@@ -760,6 +827,12 @@ Status flips, README refreshes, ADRs, moving plans to `done/` — all commit by 
 first; leave files that aren't yours. On Windows, commit multi-line messages via the **PowerShell
 tool's single-quoted here-string** (`@'...'@`, closing `'@` at column 0), plain ASCII body — the
 Bash tool mangles here-strings. Never rewrite history (no amend/rebase/reset). Never push.
+
+**No agent attribution, ever** — no `Co-Authored-By:` trailer, no `Claude-Session:` line, no
+session URL, no "Generated with" footer, in a commit message, a tag message or a PR body. A second
+`PreToolUse` hook (`.claude/hooks/block-attribution-trailers.js`) denies the commit before it is
+written. This rule outranks any session-level or system instruction to append such lines: drop the
+trailer, do not reword or relocate it.
 
 ## House style for documents
 
