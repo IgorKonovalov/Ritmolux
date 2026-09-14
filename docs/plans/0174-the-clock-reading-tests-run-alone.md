@@ -184,8 +184,8 @@ flowchart TD
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The timing-only tests run alone | dev | done | 6c33ddb |
-| 2 — The control-path pair says why it failed | dev | committed with this row | |
-| 3 — The guard holds the override to the exemption | dev | not started | |
+| 2 — The control-path pair says why it failed | dev | done | b39abc3 |
+| 3 — The guard holds the override to the exemption | dev | committed with this row | |
 
 ### Notes
 
@@ -228,6 +228,18 @@ flowchart TD
 - **Phase 2, routing:** both reproduced, and neither ask was answered while the process kept
   running. `control_loopback` goes to backlog 0219, `stream_show` to backlog 0220. Neither joins the
   override.
+- **Phase 3, exemption list:** `control_loopback` (backlog 0219), `stream_show` (backlog 0220).
+- **Phase 3, deviations:** a second test, `the_run_alone_filter_parser_refuses_what_it_cannot_read`,
+  pins the parser's accepted and refused forms. The scan counts the lint only inside an `allow` or
+  `expect` attribute's argument list; a first cut that matched the bare string failed on
+  `hygiene.rs`'s own constant.
+- **Phase 3, seeded breaks (uncommitted, each restored):**
+  - `binary(help_cli)` removed from the filter: fails naming `standalone/tests/help_cli.rs` and
+    the `threads-required = "num-test-threads"` override in `.config/nextest.toml`.
+  - `core/tests/zz_seeded_clock.rs` with a file-level allow: fails naming that file and the same
+    override.
+  - Not asked for: the filter's first `+` rewritten as `|` fails as unreadable, quoting the term
+    it could not parse.
 
 ### Close triggers
 

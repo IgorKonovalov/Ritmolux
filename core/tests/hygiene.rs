@@ -14,6 +14,9 @@
 //!     shape this repository keeps finding rot in.
 //! (f) A frame delta is checked for finiteness in exactly one place in
 //!     `core/src/`, `sanitize_frame_dt` (ADR-0191).
+//! (g) Every integration test exempted from `clippy::disallowed_methods` is
+//!     scheduled alone by `.config/nextest.toml`, or listed with a reason, and
+//!     that override names nothing else (ADR-0193).
 
 use std::path::{Path, PathBuf};
 
@@ -943,4 +946,554 @@ fn checks_dt_finiteness(line: &str) -> bool {
         from = at + method.len();
     }
     line.contains("is_finite(dt)")
+}
+
+// ---------------------------------------------------------------------------
+// (g) A test that reads the clock runs alone (ADR-0193)
+// ---------------------------------------------------------------------------
+
+/// The lint `clippy.toml` raises on every clock read; a test that reads one has
+/// to carry an exemption from it, which is what makes the exemption a complete
+/// marker of the class.
+const CLOCK_LINT: &str = "clippy::disallowed_methods";
+
+/// The setting that identifies the one `.config/nextest.toml` override whose
+/// filter schedules tests alone.
+const ALONE_SETTING: &str = "threads-required = \"num-test-threads\"";
+
+/// Integration test binaries that carry [`CLOCK_LINT`] and are deliberately
+/// **not** named by the run-alone override, as `(binary, reason)`. Every entry
+/// must still carry the exemption and must stay out of the filter, so a stale
+/// one fails rather than silently excusing a future test.
+const CLOCK_ALONE_EXEMPT: &[(&str, &str)] = &[
+    (
+        "control_loopback",
+        "backlog 0219: under load a loopback ctl/preset never reached the listener, and running          alone would hide it rather than remove load",
+    ),
+    (
+        "stream_show",
+        "backlog 0220: under load a drained ctl/preset never reached the screen, and running          alone would hide it rather than remove load",
+    ),
+];
+
+/// One `+`-separated term of the run-alone override's filter.
+#[derive(Debug, PartialEq)]
+enum AloneTerm {
+    /// `binary(name)` or `binary(/regex/)`: every test in the matching binaries.
+    Binary(NamePattern),
+    /// `(binary(name) & test(=name))`: one test in one binary, for a file whose
+    /// exemption is on a single function rather than the whole file.
+    Test { binary: String, test: String },
+}
+
+/// The binary-name matchers the guard can evaluate without a regex engine.
+#[derive(Debug, PartialEq)]
+enum NamePattern {
+    /// `name`, or `/^name$/`.
+    Exact(String),
+    /// `/^name/`.
+    Prefix(String),
+    /// `/name$/`.
+    Suffix(String),
+    /// `/name/`.
+    Contains(String),
+}
+
+impl NamePattern {
+    fn matches(&self, binary: &str) -> bool {
+        match self {
+            NamePattern::Exact(name) => binary == name,
+            NamePattern::Prefix(name) => binary.starts_with(name.as_str()),
+            NamePattern::Suffix(name) => binary.ends_with(name.as_str()),
+            NamePattern::Contains(name) => binary.contains(name.as_str()),
+        }
+    }
+}
+
+/// Whether `name` is a plain identifier: the only literal a pattern may hold.
+fn is_plain_name(name: &str) -> bool {
+    !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+/// The argument of `head(...)` when `term` is exactly that call.
+fn call_argument<'a>(term: &'a str, head: &str) -> Option<&'a str> {
+    term.strip_prefix(head)?
+        .strip_prefix('(')?
+        .strip_suffix(')')
+}
+
+/// A `binary(...)` argument as a [`NamePattern`].
+fn parse_binary_argument(arg: &str) -> Result<NamePattern, String> {
+    let Some(regex) = arg
+        .strip_prefix('/')
+        .and_then(|rest| rest.strip_suffix('/'))
+    else {
+        return if is_plain_name(arg) {
+            Ok(NamePattern::Exact(arg.to_owned()))
+        } else {
+            Err(format!("`binary({arg})` is not a plain binary name"))
+        };
+    };
+    let (anchored_start, rest) = match regex.strip_prefix('^') {
+        Some(rest) => (true, rest),
+        None => (false, regex),
+    };
+    let (anchored_end, name) = match rest.strip_suffix('$') {
+        Some(name) => (true, name),
+        None => (false, rest),
+    };
+    if !is_plain_name(name) {
+        return Err(format!(
+            "`binary(/{regex}/)` is a regex beyond an optionally anchored plain name"
+        ));
+    }
+    let name = name.to_owned();
+    Ok(match (anchored_start, anchored_end) {
+        (true, true) => NamePattern::Exact(name),
+        (true, false) => NamePattern::Prefix(name),
+        (false, true) => NamePattern::Suffix(name),
+        (false, false) => NamePattern::Contains(name),
+    })
+}
+
+/// Parse the run-alone override's filter into its terms.
+///
+/// # The syntax it accepts
+///
+/// A union of terms joined by `+`, each of them one of:
+///
+/// - `binary(name)`, a plain identifier;
+/// - `binary(/re/)`, where `re` is a plain identifier optionally anchored by a
+///   leading `^` and/or a trailing `$`;
+/// - `(binary(name) & test(=name))`, one test of one binary.
+///
+/// Anything else — `not`, `-`, `|`, a `test()` outside that parenthesised form,
+/// a regex with metacharacters in it — is an `Err` naming the term. That is the
+/// point: a filter rewritten into a form this cannot read must fail the guard,
+/// never be read as naming nothing.
+fn parse_alone_filter(filter: &str) -> Result<Vec<AloneTerm>, String> {
+    let mut terms = Vec::new();
+    let mut depth = 0i32;
+    let mut start = 0;
+    let mut pieces = Vec::new();
+    for (at, c) in filter.char_indices() {
+        match c {
+            '(' => depth += 1,
+            ')' => depth -= 1,
+            '+' if depth == 0 => {
+                pieces.push(&filter[start..at]);
+                start = at + 1;
+            }
+            _ => {}
+        }
+        if depth < 0 {
+            return Err(format!("unbalanced `)` in `{filter}`"));
+        }
+    }
+    if depth != 0 {
+        return Err(format!("unbalanced `(` in `{filter}`"));
+    }
+    pieces.push(&filter[start..]);
+
+    for piece in pieces {
+        let term = piece.trim();
+        if let Some(arg) = call_argument(term, "binary") {
+            terms.push(AloneTerm::Binary(parse_binary_argument(arg)?));
+            continue;
+        }
+        let Some(inner) = term.strip_prefix('(').and_then(|t| t.strip_suffix(')')) else {
+            return Err(format!("`{term}` is not a form the guard reads"));
+        };
+        let parts: Vec<&str> = inner.split('&').map(str::trim).collect();
+        let [binary, test] = parts.as_slice() else {
+            return Err(format!("`{term}` is not `(binary(name) & test(=name))`"));
+        };
+        let binary = call_argument(binary, "binary").filter(|name| is_plain_name(name));
+        let test = call_argument(test, "test")
+            .and_then(|arg| arg.strip_prefix('='))
+            .filter(|name| is_plain_name(name));
+        let (Some(binary), Some(test)) = (binary, test) else {
+            return Err(format!("`{term}` is not `(binary(name) & test(=name))`"));
+        };
+        terms.push(AloneTerm::Test {
+            binary: binary.to_owned(),
+            test: test.to_owned(),
+        });
+    }
+    Ok(terms)
+}
+
+/// The filter of the one `[[profile.default.overrides]]` block in `toml` that
+/// carries [`ALONE_SETTING`]. Zero such blocks, two, or a filter that is not a
+/// single-line literal string is an `Err`.
+fn alone_override_filter(toml: &str) -> Result<String, String> {
+    let mut blocks: Vec<Vec<&str>> = Vec::new();
+    let mut in_override = false;
+    for line in toml.lines().map(str::trim) {
+        if line.starts_with('[') {
+            in_override = line == "[[profile.default.overrides]]";
+            if in_override {
+                blocks.push(Vec::new());
+            }
+            continue;
+        }
+        if in_override && let Some(block) = blocks.last_mut() {
+            block.push(line);
+        }
+    }
+    let alone: Vec<&Vec<&str>> = blocks
+        .iter()
+        .filter(|block| block.contains(&ALONE_SETTING))
+        .collect();
+    let [block] = alone.as_slice() else {
+        return Err(format!(
+            "expected exactly one [[profile.default.overrides]] block setting \
+             `{ALONE_SETTING}`, found {}",
+            alone.len()
+        ));
+    };
+    let filters: Vec<&str> = block
+        .iter()
+        .filter_map(|line| line.strip_prefix("filter"))
+        .map(|rest| rest.trim_start())
+        .filter_map(|rest| rest.strip_prefix('='))
+        .map(str::trim)
+        .collect();
+    let [filter] = filters.as_slice() else {
+        return Err(format!(
+            "the `{ALONE_SETTING}` override carries {} `filter` lines, not one",
+            filters.len()
+        ));
+    };
+    filter
+        .strip_prefix('\'')
+        .and_then(|f| f.strip_suffix('\''))
+        .filter(|f| !f.contains('\''))
+        .map(str::to_owned)
+        .ok_or_else(|| {
+            format!(
+                "the `{ALONE_SETTING}` override's filter is not a one-line literal string: {filter}"
+            )
+        })
+}
+
+/// What one integration test file says about the clock.
+struct ClockExemption {
+    /// `<member>/tests/<binary>.rs`, with forward slashes.
+    rel: String,
+    /// The file stem, which is the test binary's name.
+    binary: String,
+    /// Whether an inner `#![...]` attribute exempts the whole file.
+    file_level: bool,
+    /// The functions an outer `#[...]` attribute exempts.
+    functions: Vec<String>,
+}
+
+/// The lint-level attributes an exemption can be written with.
+const EXEMPTING_LEVELS: [&str; 2] = ["allow", "expect"];
+
+/// A lint-level attribute starting at byte `at` of `text`: whether it is an
+/// inner attribute, and the byte range of its parenthesised argument list.
+///
+/// Reads `#`, an optional `!`, `[`, one of [`EXEMPTING_LEVELS`], `(`, with any
+/// whitespace between, then balances parentheses to the closing one. A `"`
+/// string inside the list is skipped whole, escapes included, so a parenthesis
+/// in a `reason` does not end it. `None` for anything else starting with `#`.
+fn lint_attribute_at(text: &str, at: usize) -> Option<(bool, std::ops::Range<usize>)> {
+    let rest = text.get(at..)?.strip_prefix('#')?;
+    let (inner, rest) = match rest.trim_start().strip_prefix('!') {
+        Some(after) => (true, after),
+        None => (false, rest),
+    };
+    let rest = rest.trim_start().strip_prefix('[')?.trim_start();
+    let level = leading_ident(rest);
+    if !EXEMPTING_LEVELS.contains(&level.as_str()) {
+        return None;
+    }
+    let rest = rest[level.len()..].trim_start().strip_prefix('(')?;
+    let open = text.len() - rest.len();
+    let mut depth = 1usize;
+    let mut chars = rest.char_indices();
+    while let Some((offset, c)) = chars.next() {
+        match c {
+            '"' => {
+                while let Some((_, s)) = chars.next() {
+                    match s {
+                        '\\' => {
+                            chars.next();
+                        }
+                        '"' => break,
+                        _ => {}
+                    }
+                }
+            }
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some((inner, open..open + offset));
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+/// Where `text` (comments already stripped) carries [`CLOCK_LINT`] in a
+/// lint-level attribute: whole-file or per function, or `None` when it does not.
+///
+/// Only an attribute's argument list counts, so a string or an identifier that
+/// merely spells the lint's name is not an exemption. An inner attribute makes
+/// it file-level; an outer one attaches it to the next `fn` below it.
+fn clock_exemption(rel: String, binary: String, text: &str) -> Option<ClockExemption> {
+    let mut found = ClockExemption {
+        rel,
+        binary,
+        file_level: false,
+        functions: Vec::new(),
+    };
+    let mut any = false;
+    for (at, _) in text.match_indices('#') {
+        let Some((inner, args)) = lint_attribute_at(text, at) else {
+            continue;
+        };
+        if !text[args.clone()].contains(CLOCK_LINT) {
+            continue;
+        }
+        any = true;
+        if inner {
+            found.file_level = true;
+        } else if let Some(name) = text[args.end..]
+            .find("fn ")
+            .map(|fn_at| leading_ident(&text[args.end + fn_at + 3..]))
+            .filter(|name| !name.is_empty())
+        {
+            found.functions.push(name);
+        }
+    }
+    any.then_some(found)
+}
+
+/// Every workspace member's direct `tests/*.rs` file, as `(rel, binary, text)`.
+fn integration_test_files(root: &Path) -> Vec<(String, String, String)> {
+    let manifest =
+        std::fs::read_to_string(root.join("Cargo.toml")).expect("read the workspace manifest");
+    let members = manifest
+        .lines()
+        .find_map(|line| line.trim().strip_prefix("members = ["))
+        .and_then(|rest| rest.strip_suffix(']'))
+        .expect("the workspace manifest lists `members = [...]` on one line");
+    let mut files = Vec::new();
+    for member in members
+        .split(',')
+        .map(|m| m.trim().trim_matches('"'))
+        .filter(|m| !m.is_empty())
+    {
+        let dir = root.join(member).join("tests");
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        let mut paths: Vec<PathBuf> = entries
+            .filter_map(|entry| entry.ok().map(|e| e.path()))
+            .filter(|p| p.is_file() && p.extension().is_some_and(|ext| ext == "rs"))
+            .collect();
+        paths.sort();
+        for path in paths {
+            let binary = path
+                .file_stem()
+                .expect("a file has a stem")
+                .to_string_lossy()
+                .into_owned();
+            let text = std::fs::read_to_string(&path)
+                .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+            files.push((format!("{member}/tests/{binary}.rs"), binary, text));
+        }
+    }
+    files
+}
+
+/// **Every clock-reading integration test is scheduled alone, and only those
+/// are** (ADR-0193).
+///
+/// Both directions over every workspace member's `tests/*.rs`:
+///
+/// - a file carrying [`CLOCK_LINT`] is named by the run-alone override's filter —
+///   by `binary(...)` when the exemption is file-level, or by that binary's
+///   `test(=...)` when it sits on one function — or is listed in
+///   [`CLOCK_ALONE_EXEMPT`] with a reason;
+/// - every binary and test the filter names still carries the exemption, and
+///   every pattern in it still matches a file.
+///
+/// # What it cannot see
+///
+/// A clock read in a `src/` test module: that runs in the library's own test
+/// binary, which is not isolated (ADR-0193's Negative). And a clock read that
+/// reaches `Instant::now` without tripping the lint, such as through a helper
+/// crate the lint does not see into.
+#[test]
+fn every_clock_reading_test_is_scheduled_alone() {
+    let root = workspace_root();
+    let config_path = root.join(".config/nextest.toml");
+    let config = std::fs::read_to_string(&config_path)
+        .unwrap_or_else(|e| panic!("read {}: {e}", config_path.display()));
+    let filter =
+        alone_override_filter(&config).unwrap_or_else(|e| panic!(".config/nextest.toml: {e}"));
+    let terms = parse_alone_filter(&filter).unwrap_or_else(|e| {
+        panic!(
+            ".config/nextest.toml: the run-alone override's filter cannot be read by this \
+             guard, so it cannot be held to the clippy exemption: {e}"
+        )
+    });
+
+    let files = integration_test_files(&root);
+    let exemptions: Vec<ClockExemption> = files
+        .iter()
+        .filter_map(|(rel, binary, text)| {
+            clock_exemption(rel.clone(), binary.clone(), &strip_line_comments(text))
+        })
+        .collect();
+    assert!(
+        !terms.is_empty() && !exemptions.is_empty(),
+        "the guard found {} filter terms and {} exempted files, so it is checking nothing",
+        terms.len(),
+        exemptions.len()
+    );
+
+    let names_binary = |binary: &str| {
+        terms
+            .iter()
+            .any(|term| matches!(term, AloneTerm::Binary(pattern) if pattern.matches(binary)))
+    };
+    let names_test = |binary: &str, test: &str| {
+        terms.iter().any(|term| {
+            matches!(term, AloneTerm::Test { binary: b, test: t } if b == binary && t == test)
+        })
+    };
+    let override_name =
+        "the `threads-required = \"num-test-threads\"` override in .config/nextest.toml";
+    let mut failures: Vec<String> = Vec::new();
+
+    for found in &exemptions {
+        let exempt = CLOCK_ALONE_EXEMPT.iter().find(|(b, _)| *b == found.binary);
+        let named = names_binary(&found.binary)
+            || found.functions.iter().any(|f| names_test(&found.binary, f));
+        if let Some((_, reason)) = exempt {
+            if named {
+                failures.push(format!(
+                    "{} is in CLOCK_ALONE_EXEMPT ({reason}) and is also named by {override_name}; \
+                     remove one of the two",
+                    found.rel
+                ));
+            }
+            continue;
+        }
+        if found.file_level && !names_binary(&found.binary) {
+            failures.push(format!(
+                "{} carries a file-level `{CLOCK_LINT}` exemption and {override_name} does not \
+                 name its binary; add `binary({})` to that filter, or list it in \
+                 CLOCK_ALONE_EXEMPT with a reason",
+                found.rel, found.binary
+            ));
+        }
+        for function in &found.functions {
+            if !names_binary(&found.binary) && !names_test(&found.binary, function) {
+                failures.push(format!(
+                    "{} exempts `{function}` from `{CLOCK_LINT}` and {override_name} does not \
+                     name it; add `(binary({}) & test(={function}))` to that filter, or list \
+                     the binary in CLOCK_ALONE_EXEMPT with a reason",
+                    found.rel, found.binary
+                ));
+            }
+        }
+    }
+
+    for term in &terms {
+        match term {
+            AloneTerm::Binary(pattern) => {
+                let matched: Vec<&(String, String, String)> = files
+                    .iter()
+                    .filter(|(_, binary, _)| pattern.matches(binary))
+                    .collect();
+                if matched.is_empty() {
+                    failures.push(format!(
+                        "{override_name} names `{pattern:?}`, which matches no integration test \
+                         binary; remove it"
+                    ));
+                }
+                for (rel, binary, _) in matched {
+                    let carries = exemptions
+                        .iter()
+                        .any(|e| &e.binary == binary && e.file_level);
+                    if !carries {
+                        failures.push(format!(
+                            "{override_name} schedules all of {rel} alone, and it carries no \
+                             file-level `{CLOCK_LINT}` exemption; take it out of the filter"
+                        ));
+                    }
+                }
+            }
+            AloneTerm::Test { binary, test } => {
+                let carries = exemptions
+                    .iter()
+                    .any(|e| &e.binary == binary && e.functions.iter().any(|f| f == test));
+                if !carries {
+                    failures.push(format!(
+                        "{override_name} names `{binary}` test `{test}`, and no integration test \
+                         file `{binary}.rs` exempts a function of that name from `{CLOCK_LINT}`; \
+                         take it out of the filter"
+                    ));
+                }
+            }
+        }
+    }
+
+    for (binary, reason) in CLOCK_ALONE_EXEMPT {
+        if !exemptions.iter().any(|e| e.binary == *binary) {
+            failures.push(format!(
+                "CLOCK_ALONE_EXEMPT lists `{binary}` ({reason}), and no integration test file of \
+                 that name carries `{CLOCK_LINT}`; remove the entry"
+            ));
+        }
+    }
+
+    assert!(
+        failures.is_empty(),
+        "the run-alone schedule and the clock exemption disagree (ADR-0193):\n  {}",
+        failures.join("\n  ")
+    );
+}
+
+/// The filter parser reads the forms the override is written in and refuses
+/// every other, so a rewrite it cannot follow fails the guard above instead of
+/// reading as a filter that names nothing.
+#[test]
+fn the_run_alone_filter_parser_refuses_what_it_cannot_read() {
+    assert_eq!(
+        parse_alone_filter("binary(/_cost$/) + binary(help_cli) + (binary(dsp) & test(=one_hop))"),
+        Ok(vec![
+            AloneTerm::Binary(NamePattern::Suffix("_cost".to_owned())),
+            AloneTerm::Binary(NamePattern::Exact("help_cli".to_owned())),
+            AloneTerm::Test {
+                binary: "dsp".to_owned(),
+                test: "one_hop".to_owned(),
+            },
+        ])
+    );
+    for unreadable in [
+        "binary(/a.*_cost$/)",
+        "not binary(help_cli)",
+        "binary(help_cli) - test(=x)",
+        "binary(help_cli) | binary(stream_pipe)",
+        "test(=one_hop)",
+        "(binary(dsp) & test(one_hop))",
+        "(binary(dsp) & test(=one_hop) & test(=two))",
+        "binary(help_cli",
+        "",
+    ] {
+        assert!(
+            parse_alone_filter(unreadable).is_err(),
+            "`{unreadable}` should be refused, not read"
+        );
+    }
 }
