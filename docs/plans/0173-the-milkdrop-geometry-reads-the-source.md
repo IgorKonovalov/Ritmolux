@@ -141,8 +141,8 @@ original v2.25c release commit. Facts, with file, function and line, are on back
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Read the two facts from the source | dev | done | `83a419d` |
-| 2 — The seam matches the reference | dev | committed with this row, no code change | |
-| 3 — The waveform takes the reference's base amplitude | dev | not started | |
+| 2 — The seam matches the reference | dev | done, no code change | `6b8c45e` |
+| 3 — The waveform takes the reference's base amplitude | dev | skipped on the phase's own stop branch, committed with this row | |
 
 ### Notes
 
@@ -154,6 +154,10 @@ original v2.25c release commit. Facts, with file, function and line, are on back
   this at an escalation after Phase 1. The pinning test
   `ang_cuts_on_plus_x_and_turns_counter_clockwise_on_screen` is unchanged and pins the native
   function, not the converted one.
+- **Phase 3 did not run, and its done-when is unmet.** The source's mode-6/7 constant is `0.125`
+  frame heights per unit sample, not near `0.15 x 1.047`, so the phase's stop branch applied: the
+  finding is recorded on 0120 and `draw.rs` and `milkconv/tests/draw_layer.rs` are unchanged. The
+  user confirmed the skip at the same escalation.
 - **Followups noticed, not acted on:**
   - The emitted comp-stage epilogue (`milkconv/src/shader/emit.rs` `fs_main`) uses the warp stage's
     `rad`/`ang` for both stages; the source's comp stage is clockwise, `0..2pi`, cut on +x, with
@@ -164,6 +168,12 @@ original v2.25c release commit. Facts, with file, function and line, are on back
     per-vertex cut on −x.
   - What produces 0119's observed seam on *Songflower* and *chasers 19 Portal* is not settled by the
     source: the per-vertex `ang` a converted preset reads cuts on −x, not +x.
+  - Waveform differences the source shows beyond the amplitude, all on 0120's update: the source's
+    modes 1-5 are different figures from `draw.rs`'s 1-5; the mode-6/7 line angle is
+    `1.57 * wave_mystery` where `draw.rs` uses `wave_mystery * PI`; mode 7's separation is
+    `(wave_y*0.5+0.5)^2` clip units where `draw.rs` uses a fixed `0.03`; mode 0's circle is radius
+    `0.25 + 0.2 * sample` frame heights turning with time, where `draw.rs` uses `0.2 + 0.1 * mystery`
+    and `0.1 * sample`, and does not turn.
 
 ### Close triggers
 
