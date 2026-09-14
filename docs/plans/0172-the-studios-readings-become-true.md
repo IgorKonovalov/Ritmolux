@@ -179,7 +179,7 @@ flowchart LR
 |---|---|---|---|
 | 1 — The frame clock covers both live paths | dev | done | c303c1f |
 | 2 — The player's schema is snapshotted | dev | done | 6ce0594 |
-| 3 — A preset warning names its parameter | dev | done | committed with this row |
+| 3 — A preset warning names its parameter | dev | done | db0df8e |
 | 4 — The studio reads the snapshot, anchors warnings and shows the rate | studio-builder | not started | |
 
 ### Notes
@@ -221,8 +221,11 @@ flowchart LR
 - **Plan header `Closes:`** design-backlog 0202, 0205, 0209
 - **What shipped:**
 - **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 1 after Phase 3 — 2 broken, both
+  on 0205: `absent: record_frame in: standalone/src/stream.rs` (matched at line 753) and
+  `absent: diag_log in: standalone/src/stream.rs` (matched at line 756). Both became true when Phase 1 landed.
+- **Full suite:** `cargo nextest run --workspace --no-fail-fast` on the Phase 3 tree (db0df8e), exit 0,
+  1931 passed, 6 skipped. Phase 4 is TypeScript and runs no cargo.
 - **Outstanding `human` phases:**
 
 ## Followups (after this lands)
