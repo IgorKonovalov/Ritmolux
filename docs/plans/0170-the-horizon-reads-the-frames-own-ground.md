@@ -123,61 +123,41 @@ flowchart LR
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — `--horizon` and `--report` measure from the frame's own ground | dev | done | 58a0a65 |
-| 2 — The Larger than Life default is documented as settling | dev | done | committed with this row |
+| 2 — The Larger than Life default is documented as settling | dev | done | 4888399 |
 
 ### Notes
 
-- **Phase 1, scope widened at the Step 2 gate, by the user's answer:** `standalone/src/shot/horizon/tests.rs`
-  is edited (its `the_ground_is_sampled_once_for_the_whole_run` asserted the corner ground; renamed
-  `the_ground_is_pooled_over_every_row_and_held_for_the_whole_run`); `--horizon --json` gains a
-  `"ground":[r,g,b]` key beside the text header line; and `report.rs`'s **second** corner read, the
-  silent baseline behind `reactivity_footprint`, moves to `modal_ground` too, so `corner` is gone from
-  `shot` entirely.
-- **Phase 1, a documented property is weakened.** Pooling makes the ground depend on which rows were
-  sampled, so `docs/capturing.md`'s "a row at interval *k* does not depend on how far the run was
-  asked to go" now holds only while two runs print the same ground; the page says so.
-  `standalone/tests/shot_cli.rs`'s prefix assertion is unchanged and passes.
-- **Phase 1, 0210's recipe** (`cellular_tide_bugs` with `reseed = "0"`, `trail = "0"`,
-  `step_rate = "12"`, `--horizon 3 --interval 30 --size 96x96`): before, coverage 0.4975 / 0.9806 /
-  0.9818 x4 / 1.0000 with footprint `- / 0.3532 / 0.0015 / 0 / 0 / 0 / 0.0003`; after, header
-  `ground (0, 0, 0)`, coverage 0.5025 / 0.0194 / 0.0182 x5 with footprint
-  `- / 0.6826 / 0.0720 / 0 / 0 / 0.0337 / 0.0139`. Under the corrected mask the 150 s and 180 s rows
-  are not zero.
-- **Phase 1, `shot --presets presets --report --json` before and after**, with a temporary
-  uncommitted stderr trace of each preset's corner and modal ground on both captures: 458 values
-  moved across 102 of 113 presets — `coverage` on 93, `level` on 93, `reactivity_footprint` on 91.
-  Every moved `coverage`/`level` is on a preset whose scored-frame corner differs from its modal
-  ground, and every moved `reactivity_footprint` on one whose silent-baseline corner does. No other
-  column moved, and no family's `distinctness` block (the near-duplicate flags) moved. Largest
-  `cover` moves: On White 0.9922 -> 0.2580, Collage Mono 0.8755 -> 0.1524, Echo Plate
-  0.9951 -> 0.3498, Seahorse 0.9801 -> 0.4148, Pulse 0.9868 -> 0.4571, Petalfall 0.9885 -> 0.4651,
-  Radial Bloom 0.9722 -> 0.4699, Shatter 0.9973 -> 0.5798; rises include Anemone 0.5233 -> 0.8769
-  and Banded Mandala 0.7719 -> 0.9938. Tide Bugs 0.6172 -> 0.6389.
-- **Phase 1, `docs/capturing.md`'s sample report rows** had their `cover`/`level` cells updated to
-  the new reading (Shatter 0.580 / 0.0487, Stipple 0.335 / 0.5804) and the sentence reading them.
-- **Phase 1, backlog probe:** 0210's `present: images\.first\(\)\.map_or\(\[0, 0, 0, 255\], corner\)`
-  probe is broken by this phase (`check-backlog-claims.mjs` exits 1).
-- **Phase 2:** the test is now
-  `the_default_rule_is_still_moving_at_generation_2000_on_a_128_torus_from_salts_12_and_13`; its
-  assertions are unchanged (this run: control 214 live, 0 differ). `docs/presets.md`'s preceding
-  paragraph, which said the rules "keep travelling", was reworded alongside the new paragraph so the
-  two do not contradict. Backlog 0211's second probe is broken by this phase, as the plan expected.
-- **Followups noticed, not acted on:** `cargo clippy -p rlx-core --all-targets -- -D warnings` (the
-  single-crate form) fails on dead fields `instance` and `gpu` in `core/src/render/context.rs`,
-  untouched here; the `--workspace` form is clean. `docs/preset-tuning-walkthrough.md`'s five `--report` rows
-  carry `cover` values from the corner convention (and an older column set); `docs/capturing.md`'s
-  "`reaction_coral_bloom` reports **0.128**" names a preset that is not in `presets/`;
-  `presets/cellular_tide_bugs.toml`'s header records "motion 0.000 from 60 s on", while 0210's recipe
-  under the pooled ground reads nonzero footprint at 150 s and 180 s.
+- **Deviation, P1 (58a0a65), agreed at the Step 2 gate:** also edited `standalone/src/shot/horizon/tests.rs`
+  (corner-ground test rewritten as `the_ground_is_pooled_over_every_row_and_held_for_the_whole_run`);
+  `--horizon --json` gains `"ground":[r,g,b]`; `report.rs`'s silent-baseline corner read (behind
+  `reactivity_footprint`) moved to `modal_ground` too. `docs/capturing.md`'s "row *k* does not depend
+  on the horizon's length" is restated as holding only while two runs print the same ground; its
+  sample report rows' `cover`/`level` cells were updated.
+- **P1, 0210's recipe** (reseed 0, trail 0, step_rate 12, `--horizon 3 --interval 30 --size 96x96`):
+  coverage 0.4975/0.9806/0.9818x4/1.0000 became 0.5025/0.0194/0.0182x5, header `ground (0, 0, 0)`;
+  footprint at 150 s and 180 s reads 0.0337 and 0.0139 (was 0 and 0.0003).
+- **P1, `--report --json` before/after** (with a temporary, uncommitted corner-vs-modal trace): `cover` moved
+  on 93 of 113 presets, `level` on 93, `reactivity_footprint` on 91; every move is on a preset whose
+  corner differs from its modal ground on that capture; no other column and no `distinctness` block
+  moved. Largest `cover` moves: On White 0.9922->0.2580, Collage Mono 0.8755->0.1524, Echo Plate
+  0.9951->0.3498, Seahorse 0.9801->0.4148, Shatter 0.9973->0.5798; up: Anemone 0.5233->0.8769.
+- **P2:** preceding `larger_than_life` paragraph in `docs/presets.md` ("keep travelling") also reworded.
+- **Followups noticed:** `docs/preset-tuning-walkthrough.md`'s `--report` rows carry corner-era `cover`;
+  `docs/capturing.md` cites `reaction_coral_bloom`, not in `presets/`; `cellular_tide_bugs.toml`'s
+  header says "motion 0.000 from 60 s on"; `cargo clippy -p rlx-core --all-targets` alone fails on
+  dead fields in `core/src/render/context.rs` (the `--workspace` form is clean).
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** no
 - **Plan header `Closes:`** design-backlog 0210, 0211
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** fix-only (`shot --horizon` / `--report` readings; `--horizon --json` gains a `ground` key)
+- **Operator docs touched:** `docs/capturing.md`, `docs/presets.md`
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 1 — 2 broken: 0210 (`corner` probe
+  in `horizon.rs`), 0211 (old test name in `cellular/tests.rs`)
+- **Full suite:** `cargo nextest run --workspace` exit 100 — 1234 passed, 1 failed
+  (`path_cost::the_contour_arity_is_priced_against_the_floor_tier`, a wall-clock probe; passes alone),
+  682 not run; rerun `cargo nextest run --workspace --no-fail-fast` exit 0 — 1917 passed, 6 skipped
+- **Outstanding `human` phases:** none
 
 ## Followups (after this lands)
