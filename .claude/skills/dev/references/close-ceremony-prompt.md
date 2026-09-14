@@ -50,8 +50,10 @@ not let you close your own plan.
 The skeleton lives in `.claude/skills/architect/references/templates/plan.md`. If the plan predates
 it, copy the skeleton in rather than skipping the log.
 
-- **`**Lane:**`** — `main` directly, or the worktree path plus its branch (`WORK/rlx-plan-NNNN` on
-  `plan-NNNN-<slug>`). Architect's worktree-close sequence takes both from this line instead of
+- **`**Lane:**`** — `main` directly, or the worktree path plus its branch. A worktree is either the
+  sibling `WORK/rlx-plan-NNNN` or the harness's in-repo `.claude/worktrees/<name>/`
+  ([ADR-0182](../../../../docs/adrs/0182-a-plan-lane-may-live-inside-the-repository.md)), on
+  `plan-NNNN-<slug>`; write the path that is actually there. Architect's worktree-close sequence takes both from this line instead of
   asking the user, so give it both. Write it on the first phase commit.
 - **The table** — `phase | owner | state | commit`. `state` is `done` / `not started` /
   `abandoned`, and **never a quality word**: a phase state is a fact, not an assessment. `owner` is
@@ -93,7 +95,7 @@ Written *after* the close block is committed. Three lines, nothing else:
 
 ```
 Plan 0001 — <plan title>  (`docs/plans/0001-<slug>.md`)
-Lane: `main`   (or: `WORK/rlx-plan-0001` on branch `plan-0001-<slug>`)
+Lane: `main`   (or: `WORK/rlx-plan-0001` / `.claude/worktrees/<name>` on branch `plan-0001-<slug>`)
 Next: start a fresh session and run `/architect close plan 0001`
 ```
 

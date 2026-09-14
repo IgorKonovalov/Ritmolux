@@ -300,17 +300,17 @@ The plan and relevant ADRs win on specifics. Defaults when the plan is silent:
   for genuine init-time invariants and say why in the message.
 - **Validate at boundaries, trust within.** Sample rate / channel count / buffer sizes checked
   once where audio enters the core; the hot path downstream assumes them valid.
-- **Comments are for *why*, not *what*.** A name says what; a comment exists for a non-obvious
-  why — a real-time invariant, an FFI lifetime, a workaround. Default to none.
 - **A comment carries the mechanism; the decision record stays in `docs/`** — [ADR-0127](../../../docs/adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md).
   You are the lane most exposed to this, because you write comments with a plan document open and
-  its reasoning leaks into them. Keep the mechanism, the invariant, the trap, and the formula or
-  constant a reader cannot re-derive. Send why-this-beat-the-alternative, what was measured, and
+  its reasoning leaks into them. A comment states what the code does, the invariant it holds, the
+  trap that would bite whoever changes it, and any formula or constant a reader cannot re-derive —
+  a name that already says it needs no comment. Send why-this-beat-the-alternative, what was measured, and
   what the code did before to the ADR or plan, **cited by bare number** — `ADR-0046`,
   `Plan 0045 Phase 3` — never by a relative link (it rots on the next `plans/done/` move; rustdoc
   intra-doc links are fine and stay). **Write no plan-relative narration**: describe the code as it
   is, not as a history — there is no "this plan" once the session closes.
-  `scripts/check-comment-hygiene.mjs` gates those two classes at pre-push; `hygiene-allow: <reason>`
+  `scripts/check-comment-hygiene.mjs` gates those two classes in `.rs` and `.cpp`/`.h` comments, at
+  pre-push and in CI's `links` job; `hygiene-allow: <reason>`
   escapes a false positive. Length is not gated, and it is a Mode 4 review lens.
 - **No secrets** in code, tests, or commit messages.
 - **Tests live where the plan says**, and test the behavior the plan's done-when names. No
@@ -321,7 +321,7 @@ The plan and relevant ADRs win on specifics. Defaults when the plan is silent:
 Read on demand:
 
 - `references/project-context.md` — where files live, the canonical `cargo` / plugin-build
-  commands, and the three-lane ownership map.
+  commands, the generated artifacts you regenerate, and the four-lane ownership map.
 - `references/commit-conventions.md` — conventional-commit types/scopes for this repo, when to
   split commits.
 - `references/close-ceremony-prompt.md` — the field guide for the `## Implementation log`: how

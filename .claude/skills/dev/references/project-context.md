@@ -13,7 +13,8 @@ core/            # package `rlx-core` — DSP + render + scenes + preset engine.
   build.rs       #   globs presets/*.toml into the EMBEDDED table (ADR-0022) — generated, not edited
   src/audio.rs   #   source-agnostic sample intake, validated at the boundary
   src/dsp/       #   bands/fft/onset/beat — pure, deterministic, unit-tested
-  src/preset/    #   .toml schema (schema.rs) + the pure expression evaluator (expr.rs)
+  src/preset/    #   the .toml loader (schema/ — a directory: load.rs, system.rs, raw/, export.rs …)
+                 #   + the pure expression evaluator (expr.rs)
   src/milk/      #   the MilkDrop RUNTIME (ADR-0113): per-frame bytecode VM + shader emitter.
                  #   Not milkconv/ — that is the ahead-of-time converter and never ships.
   src/render/    #   wgpu layer, the composite stages, and scenes/ (NOT core/src/scenes/)
@@ -21,7 +22,7 @@ core/            # package `rlx-core` — DSP + render + scenes + preset engine.
 core-cabi/       # package `rlx-core-cabi` — the C ABI and nothing else (ADR-0072).
                  #   The ONLY crate declaring cdylib/staticlib; emitted lib stem is `rlx_core_c`.
   src/lib.rs     #   the extern "C" surface (was core/src/ffi.rs)
-  include/       #   rlx_core.h — the C mirror the shim compiles against
+  include/       #   rlx_core.h — the HAND-WRITTEN C mirror the shim compiles against (no cbindgen, ADR-0003)
   tests/ffi.rs   #   the ABI conformance suite
                  #   OUTSIDE workspace `default-members` — see the commands table below
 rlx-ring/        # package `rlx-ring` — the lock-free SPSC ring, zero-dependency so Miri gates it
@@ -32,14 +33,28 @@ milkconv/        # package `milkconv` — the MilkDrop `.milk` -> preset convert
                  #   NEVER ships and nothing shipped depends on it, so it is OUTSIDE
                  #   `default-members` like core-cabi: `--workspace`, `-p milkconv`, or its own
                  #   tests build it, and the everyday loop does not.
-presets/         # the shipped preset library (*.toml) + README.md (the param roster)
+presets/         # the shipped preset library (*.toml) + README.md (its param reference is GENERATED)
   pending/       #   authored + approved but NOT shipped, held back by a known engine/harness gap.
                  #   build.rs's read_dir is non-recursive (ADR-0022), so it is skipped by design.
+  schema/        #   GENERATED editor JSON Schemas, one per system (ADR-0190) — never hand-edited
+.taplo.toml      # GENERATED — maps a preset filename family to its schema (ADR-0190)
+studio/          # the Electron studio — `studio-builder`'s lane (ADR-0177), TypeScript only.
+                 #   Not built by any cargo command; it carries a player at resources/player/.
+site/            # the documentation site (ADR-0154) — an npm project, never shipped
+packaging/       # what a `v*` tag ships (ADR-0038): macos/, studio/, the READ-ME-FIRST files
 tools/sd-filter/ # Python sidecar for the diffusion-filter pass (ADR-0122). Not a cargo crate.
-scripts/         # the six Node gates (doc links, index rows, backlog claims, filter figures,
-                 #   comment hygiene, contents blocks) — pre-push and CI's `links` job run all six
+scripts/         # the Node gates (and a few renderers) — CLAUDE.md's `scripts/` entry is the roster
 docs/adrs/  docs/plans/  docs/specs/
 ```
+
+**What `.githooks/pre-push` runs, in order** — read the hook itself when it matters; this is a map,
+not a copy: the Node doc gates (doc links, index rows, backlog claims, filter figures, comment
+hygiene, contents blocks, reader prose — skipped with a notice when `node` is absent), the
+`sd-filter` Python suite (skipped without `python3`), the studio's `typecheck` / `lint` / `test`
+(skipped on a clone with no `studio/node_modules`), then `fmt`, `clippy --workspace --all-targets`
+and `nextest --workspace -P fast`. CI's `links` job runs the same Node gates. Two more gates —
+`check-site-links.mjs` and `check-site-routes.mjs` — need a built site and run only in
+`.github/workflows/pages.yml`.
 
 ## The machine-local cargo config (opt-in)
 
@@ -83,7 +98,7 @@ specification `core` did not match any packages". The directory and the package 
 | Run the standalone           | `cargo run -p standalone` |
 | Test all / just core         | `cargo test --workspace` / `cargo test -p rlx-core` |
 | **Test, per phase**          | `cargo nextest run --workspace -P fast` — the narrowed set, plus **2 presets per family** (ADR-0156, ADR-0157) |
-| **Test, last phase + close** | `cargo nextest run --workspace` — the full suite, **all 81 presets**, owed once per plan |
+| **Test, last phase + close** | `cargo nextest run --workspace` — the full suite, **the whole preset library**, owed once per plan |
 | Lints (errors)               | `cargo clippy --workspace --all-targets -- -D warnings` |
 | Format check / apply         | `cargo fmt --all --check` / `cargo fmt --all` |
 | Build C-ABI artifacts        | `cargo build -p rlx-core-cabi` (emits `rlx_core_c.lib` / `.dll`) |
@@ -108,10 +123,10 @@ their price is set by the `preset-author` lane's output rather than by the chang
 ADR-0157 the exclusion is not total — three of the nine run a preset sample, described next.
 
 **Which scope renders which presets (ADR-0157).** `-P fast` renders the **representatives** — the
-two presets per family that declare `representative = true`, so **24 of 81** through `animation`,
-`reactivity` and `sanity`'s loudness gate. The bare `--workspace` run renders **all 81**, and also
-adds `sanity`'s per-family shape gate and `distinctness`, neither of which is ever sampled. So a
-defect in one of the other 57 presets waits for the close rather than failing the phase that caused
+two presets per family that declare `representative = true` — through `animation`,
+`reactivity` and `sanity`'s loudness gate. The bare `--workspace` run renders **the whole library**,
+and also adds `sanity`'s per-family shape gate and `distinctness`, neither of which is ever sampled.
+So a defect in any non-representative preset waits for the close rather than failing the phase that caused
 it — that is the deliberate trade, and it is why the once-per-plan full run is not optional. The
 close path is unchanged, and so is CI's `coverage` job — which renders the whole library on
 Windows and is what ADR-0081's curation gate actually rests on. CI's `check` job cites `-P fast`,
@@ -135,22 +150,49 @@ touches scenes, the composite, or the preset engine, since a green test suite do
 picture is right.
 
 **foobar plugin (Windows, C++):** built under `plugin-foobar/` with its own project/toolchain,
-linking the core's staticlib + generated header. Read the plugin's own README for the current
-invocation rather than guessing.
+linking the C ABI crate's staticlib and the hand-written `core-cabi/include/rlx_core.h`. Read the
+plugin's own README for the current invocation rather than guessing.
+
+## Generated artifacts and feature-gated code
+
+Some committed files are **rendered from the engine's declarations** and fail a drift test when the
+declaration moves without them. Regenerate — never hand-edit — in the same phase commit:
+
+| You changed | Regenerate with | What it rewrites |
+|-------------|-----------------|------------------|
+| A `ParamSpec`, a structural table's declaration, or a `SystemKind` | `RLX_UPDATE_PRESET_SCHEMA=1 cargo nextest run -p rlx-core --test preset_schema` | `presets/schema/*.schema.json`, `presets/preset.schema.json`, `.taplo.toml` (ADR-0190) |
+| A `ParamSpec` (name, default, range, doc) | `RLX_UPDATE_PARAM_REFERENCE=1 cargo nextest run -p rlx-core --test preset` | the generated params block in `presets/README.md` (ADR-0170) |
+| A render change that moves a golden on purpose | `RLX_BLESS=1 cargo nextest run -p rlx-core --test golden` | the golden baselines |
+
+A preset file an engine change forces you to edit is checked in one process start with no GPU:
+`cargo run -q -p standalone --bin ritmolux -- --check <path> --strict`.
+
+**Code behind `#[cfg(feature = "spout")]` is not type-checked when the feature is off**, so every
+local `build`, `clippy` and `nextest` is blind to it, and pre-push does not run it — only CI's
+`spout` job does (ADR-0181). If a phase touches anything `standalone/src/stream.rs` reaches, compile
+it yourself (`docs/developing.md` has the one-time SDK fetch):
+
+```powershell
+cargo check -p standalone --features spout
+```
 
 ## Ownership map
 
-- **`dev`** (you) — all code: `core/`, `standalone/`, `plugin-foobar/`.
+Four lanes (CLAUDE.md, "How we work"):
+
+- **`dev`** (you) — all Rust and C++: `core/`, `core-cabi/`, `rlx-ring/`, `standalone/`,
+  `plugin-foobar/`, `milkconv/`.
+- **`studio-builder`** (ADR-0177) — everything under `studio/`, TypeScript only; never Rust or C++.
 - **`architect`** — all of `docs/`: plans, ADRs, diagrams, reviews.
+- **`preset-author`** (ADR-0017) — preset *content* (`.toml` presets, expression bindings, the
+  structural/palette/smoothing tables), never engine Rust. Its engine gaps reach you as a plan,
+  routed through `architect`.
 
-Phase owner vocabulary: **`dev`** (all code) and **`human`** (a task only the user can do — a
-product call, a signing cert, installing a system audio driver like BlackHole). There is no
-sibling *implementer* skill, so you never hand off to another implementer mid-plan — only back to
-architect at the end.
-
-A third lane, **`preset-author`** (ADR-0017), owns preset *content* (`.toml` presets, expression
-bindings, and the structural/palette/smoothing tables) and never engine Rust. Its engine gaps reach
-you as a plan, routed through `architect`.
+Phase owner vocabulary: **`dev`**, **`studio-builder`** and **`human`** (a task only the user can do
+— a product call, a signing cert, installing a system audio driver like BlackHole). A plan may
+alternate `dev` and `studio-builder` phases; that seam **hands off automatically in both directions**
+(ADR-0188) — SKILL.md Step 3 carries the mechanics. Every other handoff stays manual, and you never
+invoke `architect`: the close review happens in a fresh session.
 
 **Shipping a preset is no longer your code change.** Since
 [ADR-0022](../../../../docs/adrs/0022-build-time-preset-embedding.md), `core/build.rs` globs
