@@ -1,6 +1,6 @@
 # 0176 — A release tag reaches origin
 
-> **Status:** approved (2026-09-14)
+> **Status:** in-progress
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`, `human`
 > **Related ADRs:** [0203](../adrs/0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md) (proposed), [0038](../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md), [0005](../adrs/0005-versioning-and-release-cadence.md)
@@ -248,15 +248,21 @@ flowchart LR
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(`main` directly, or the worktree path plus its branch)_
+**Lane:** `main` directly
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The gate reads the property that failed | dev | not started | |
+| 1 — The gate reads the property that failed | dev | done | committed with this row |
 | 2 — The ceremony writes annotated tags, and the documents say why | dev | not started | |
 | 3 — The stranded tags reach origin, and one release is published | human | not started | |
 
 ### Notes
+
+- Phase 1, bite check by hand: a copy of the script with the `type !== "tag"` branch replaced by
+  `if (false)` runs `--self-test` to `3 of 4`, exit 1 (the lightweight case exits 0).
+- Phase 1, `--remote` exercised from a scratch repository pointed at `origin`: a `0.121.1` manifest
+  exits 0; a `0.123.0` manifest exits 1 after the full poll, printing `nothing for this tag`.
+  The lightweight-on-origin branch of its report was not exercised - `origin` carries no such tag.
 
 ### Close triggers
 

@@ -251,6 +251,19 @@ jobs:
       # CLAUDE.md has asked for bare-number citation throughout, and that is how
       # those five documents accumulated 235 of them.
       - run: node scripts/check-reader-prose.mjs
+      # And the eighth (ADR-0203): the version main declares has an annotated
+      # release tag on origin. The pre-push hook reads the same property offline,
+      # but that hook is opt-in per clone and bypassable, and a tag that never
+      # left the machine is what stranded every silent release recorded - so this
+      # is where it cannot be skipped. The checkout here is shallow with no tags,
+      # so the offline reading cannot run; --remote asks origin instead, for the
+      # tag and its peeled ^{} line (which exists only for an annotated tag), and
+      # polls for up to 60 s so a tag pushed right after main is not a false red.
+      # Only on a push to main: no other ref declares the version that ships.
+      # --self-test runs everywhere, and proves the offline reading still bites.
+      - run: node scripts/check-release-tag.mjs --self-test
+      - if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: node scripts/check-release-tag.mjs --remote
       # And the diffusion filter's own suite (Plan 0106 Phase 7c). It belongs in
       # this job rather than in the `check` matrix for the same reasons the three
       # gates above do: it is cheap, platform-independent, needs no GPU, no
