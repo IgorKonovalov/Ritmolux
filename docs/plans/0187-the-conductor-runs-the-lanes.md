@@ -386,7 +386,13 @@ Outcome kinds: implementers `phases_done` or `parked` (`reason`: `human_phase` |
 - Phase 5: `lib/step.mjs` (a Phase 3 file) gained `activeChildren` so `abort` and Ctrl+C end live sessions; command tests are in `test/cli.test.mjs`.
 - Phase 5: `resume` refuses only `human_phase` (row not done) and `main_dirty` (checkout still dirty) as still true; every other reason is accepted, and `review_failed` grants two fresh fix rounds.
 - Followup: no test runs the conductor against the real CLI; the review session writing its file under `state/reviews/` through `--add-dir`, and a real session honouring conductor mode end to end, are first exercised by Phase 6.
-- Followup: the digest's per-run lock-wait totals add a plan's whole `lockWaits` to every run that plan touched, so a plan spanning two runs is counted in both.
+- Fix round (review before close), finding 1 (major, `run` refused after any merge): `1a93c0c`.
+- Fix round, findings 2-3 (a resumed merge park ff'd ungated; a no-op re-merge and gate on an ff refused with `main` already in the branch): `1185f38`.
+- Fix round, finding 4 (numeric `through` parked as a disagreement): `84f43bc`.
+- Fix round, finding 5 (a timed-out or interrupted session left its descendants and the suite lock alive): `da87591`. Its test detaches the fixture's grandchild on Windows, where a Node parent's job object would otherwise kill it and hide the defect.
+- Fix round, finding 6 (the gate missed the sd-filter and conductor suites): `635865a`; adds `tools/conductor/test/gate.test.mjs`.
+- Fix round, findings 8-9 (garbled `nextStep` comment; lock waits double-counted across runs): `5cf6524`. `lockWaits` in state is now a list of `{lock, ms, at}`.
+- Fix round, finding 7 (allowlist unexercised): no change, left to Phase 6.
 
 ### Close triggers
 
@@ -395,7 +401,7 @@ Outcome kinds: implementers `phases_done` or `parked` (`reason`: `human_phase` |
 - **What shipped:** feature (repository tooling under `tools/conductor/`, two `.claude/hooks/`, conductor-mode sections in three skills; nothing in a shipped artifact)
 - **Operator docs touched:** `docs/developing.md`, `CLAUDE.md`, `docs/plans/README.md` `## Conventions`, `tools/conductor/README.md` (new), `.github/workflows/ci.yml`
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, no entry named
-- **Full suite:** `cargo nextest run --workspace` - exit 0, `1933 tests run: 1933 passed (5 slow), 6 skipped` (605.9 s); `node --test "tools/conductor/test/*.test.mjs"` - 101 pass, 0 fail
+- **Full suite:** `cargo nextest run --workspace` - exit 0, `1933 tests run: 1933 passed (5 slow), 6 skipped` (605.9 s); `node --test "tools/conductor/test/*.test.mjs"` - 110 pass, 0 fail after the fix round (no Rust changed in it)
 - **Outstanding `human` phases:** Phase 6 (the pilot)
 
 ## Followups (after this lands)
