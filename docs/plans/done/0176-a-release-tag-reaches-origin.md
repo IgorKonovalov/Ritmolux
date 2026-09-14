@@ -1,11 +1,16 @@
 # 0176 — A release tag reaches origin
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-14. Phases `9c0d318`, `90b629e` on `main` directly; Phase 3
+> (`human`) run by the owner before the close. Mode 4: no blockers, no majors, three minors, two
+> nits. Verified at the close: `--workspace` suite and `cargo doc -D warnings` on `d3dcb5c`; offline
+> gate, `--self-test` 4 of 4 and `--stranded` (0 tags) green; one Release run since the bulk push, for
+> `v0.123.0`, five assets; no release for the other nine; both workflows `active`. **Still open:** the
+> `links` job's `--self-test` and `--remote` steps have never run in CI; the close push is their first.
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`, `human`
-> **Related ADRs:** [0203](../adrs/0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md) (proposed), [0038](../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md), [0005](../adrs/0005-versioning-and-release-cadence.md)
+> **Related ADRs:** [0203](../../adrs/0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md) (accepted), [0038](../../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md), [0005](../../adrs/0005-versioning-and-release-cadence.md)
 > **Closes:** design-backlog 0196
-> **Blocks:** [Plan 0103](0103-the-project-gets-an-audience.md) Phase 5 — nobody outside is asked to download a build until a tag reliably becomes a release
+> **Blocks:** [Plan 0103](../0103-the-project-gets-an-audience.md) Phase 5 — nobody outside is asked to download a build until a tag reliably becomes a release
 
 ## TL;DR
 
@@ -254,7 +259,7 @@ flowchart LR
 |---|---|---|---|
 | 1 — The gate reads the property that failed | dev | done | 9c0d318 |
 | 2 — The ceremony writes annotated tags, and the documents say why | dev | done | 90b629e |
-| 3 — The stranded tags reach origin, and one release is published | human | not started | |
+| 3 — The stranded tags reach origin, and one release is published | human | done (verified at the close) | origin |
 
 ### Notes
 

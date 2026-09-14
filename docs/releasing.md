@@ -169,8 +169,8 @@ So can the Windows studio, which needs the same Spout SDK because the player it 
 with the feature:
 
 ```powershell
-.\packaging\spoutetch-sdk.ps1           # once; idempotent
-.\packaging\studiouild-studio.ps1       # same script, same checks, as CI runs
+.\packaging\spout\fetch-sdk.ps1           # once; idempotent
+.\packaging\studio\build-studio.ps1       # same script, same checks, as CI runs
 ```
 
 Its macOS sibling is `packaging/studio/bundle-studio.sh`, and like `packaging/macos/bundle.sh` it

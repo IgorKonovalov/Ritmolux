@@ -1,8 +1,8 @@
 # ADR-0203 — A release tag is annotated, and what gets checked is whether origin has it
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-14 (Plan 0176)
 > **Date:** 2026-09-14
-> **Related plan(s):** [0176](../plans/0176-a-release-tag-reaches-origin.md)
+> **Related plan(s):** [0176](../plans/done/0176-a-release-tag-reaches-origin.md)
 > **Extends:** [0038](0038-tag-driven-release-unsigned-universal-mac-app.md) (tag-driven release),
 > [0005](0005-versioning-and-release-cadence.md) (one version bump per plan, at the close)
 

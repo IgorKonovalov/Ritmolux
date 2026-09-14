@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0176 - A release tag reaches origin](#0176---a-release-tag-reaches-origin)
   - [0174 - The clock-reading tests run alone](#0174---the-clock-reading-tests-run-alone)
   - [0172 - The studio's readings become true](#0172---the-studios-readings-become-true)
   - [0173 - The MilkDrop geometry reads the source](#0173---the-milkdrop-geometry-reads-the-source)
@@ -207,6 +208,48 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0176 - A release tag reaches origin](done/0176-a-release-tag-reaches-origin.md)
+
+- closed 2026-09-14. Two `dev` phases on `main` directly: `9c0d318` (1, `check-release-tag.mjs`
+and its pre-push and CI wiring) and `90b629e` (2, annotated tags in `docs/releasing.md` and the
+architect close step, and the gate inventories). Phase 3 (`human`) was run by the owner before the
+close. Review: **no blockers, no majors, three minors, two nits.** Version: **none**. The plan changed
+a gate script, a hook, a CI job and docs, and no shipped artifact, and the owner's call was that
+`v0.123.0` is the one published release. ADR-0203 accepted. Archived backlog 0196. The architect's
+gate at the close, at `d3dcb5c`: `cargo nextest run --workspace` and
+`RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`, 1933 passed, 6 skipped, 608.0 s, matching the log; `cargo doc` clean.
+
+**Phase 3, verified against GitHub rather than read.** `--stranded` lists no tag. All twelve tags
+from `v0.115.0` to `v0.123.0` are annotated objects locally. `origin` advertises `v0.123.0` with
+its peeled line at `832cfc0`. The only Release run since the bulk push is `34851019951`, for
+`v0.123.0`, green, and its release carries five assets. No release exists for the other nine. CI,
+Release and Pages all read `active`.
+
+**What the close could not verify.** The `links` job's two new steps have never run in CI. The
+`v0.123.0` tag names `832cfc0`, which predates the `ci.yml` change, so that run's `links` job had
+neither step. The bulk push that carried `main` to `d3dcb5c` ran with `ci.yml` disabled. Phase 3's
+last done-when, the `--remote` step green on a push to `main`, is therefore open until the push that
+carries this close. Read that run's `links` job before treating the gate as live.
+
+**Minors:**
+- **The offline gate reads `HEAD` and the working tree's `Cargo.toml`, not the ref being pushed.**
+  `pre-push` receives the pushed refs on stdin and the script ignores them. Pushing `main` from a
+  checkout sitting on another branch, or pushing a lane branch, gates the wrong commit. Harmless
+  under this project's habit of pushing `main` from the main checkout.
+- **`--stranded` is documented as "always exit 0" and is not.** An unreachable `origin` makes
+  `git ls-remote` throw out of `execFileSync`, and the listing dies with a Node stack trace and exit 1.
+- **Phase 1's second done-when has no record.** The offline mode convicting the lightweight
+  `v0.123.0` before Phase 3 is not in the log, and it cannot be re-run now that the tag is repaired.
+  The self-test's lightweight case carries the mechanism, and Phase 3's premise table carries the
+  state, so the claim rests on those two.
+
+**Nits:**
+- `--remote` asks whether `origin` has the tag, not whether it names the commit the local tag does.
+  A tag pushed early and then moved by the studio sync stays green on the stale commit. ADR-0203 scopes
+  the check to "reached origin", and the ceremony moves the tag before any push.
+- Fixed at the close: `docs/releasing.md`'s Windows studio rehearsal block carried a form feed and a
+  backspace where `` and `` belonged. The log flagged it, and it predated this plan.
 
 ### [0174 - The clock-reading tests run alone](done/0174-the-clock-reading-tests-run-alone.md)
 

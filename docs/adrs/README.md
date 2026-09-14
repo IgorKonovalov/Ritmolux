@@ -223,7 +223,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0199](0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md) | A converted waveform draws the released source's figure at the scale its host renders, from a stereo pair the analyzer already receives | proposed (Plan 0180), extends 0139 |
 | [0201](0201-a-fullscreen-scene-presents-premultiplied-over-the-backdrop.md) | A fullscreen scene presents premultiplied over the backdrop, and the chain's occlude value is the only switch | proposed (Plan 0185), extends 0026 |
 | [0202](0202-a-written-count-of-the-systems-is-refused-by-a-gate.md) | A written-out count of the systems is refused by a gate, and the threshold is five | proposed (Plan 0178), extends 0168 |
-| [0203](0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md) | A release tag is annotated, and what gets checked is whether origin has it | proposed (Plan 0176), extends 0038 |
+| [0203](0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md) | A release tag is annotated, and what gets checked is whether origin has it | accepted 2026-09-14 (Plan 0176), extends 0038 |
 | [0204](0204-a-cheap-integration-test-shares-one-binary-and-a-test-that-needs-its-own-stays-its-own.md) | A cheap integration test shares one binary per package, and a test that needs its own binary keeps one | proposed (Plan 0177), extends 0156 |
 | [0205](0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md) | An approved plan runs under a conductor, and every judgement it cannot make parks the plan | proposed (Plan 0187), supersedes 0188 in part |
 <!-- roster:end -->
