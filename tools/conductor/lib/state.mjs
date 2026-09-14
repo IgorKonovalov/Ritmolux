@@ -58,7 +58,8 @@ export function planRecord(state, plan) {
     fixes: [],
     closed: null,
     merge: null,
-    lockWaits: { close_ms: 0 },
+    // One { lock, ms, at } per wait, so the digest can put each wait in the run it happened in.
+    lockWaits: [],
     started: null,
     ended: null,
   };

@@ -175,9 +175,10 @@ export function renderDigest(state, { repo, stateDir }) {
       runSpend += spend;
       laneLines.push(`lane ${lane}: ${merged} merged, ${parked} parked, ${usd(spend)}`);
       for (const r of recs) {
-        if (inRun(r.started) || r.steps.some((x) => inRun(x.started))) {
-          closeWait += r.lockWaits?.close_ms ?? 0;
-          suiteWait += r.lockWaits?.suite_ms ?? 0;
+        for (const w of Array.isArray(r.lockWaits) ? r.lockWaits : []) {
+          if (!inRun(w.at)) continue;
+          if (w.lock === "close") closeWait += w.ms;
+          else if (w.lock === "suite") suiteWait += w.ms;
         }
       }
     }

@@ -113,9 +113,9 @@ export function runs(plan) {
 }
 
 /**
- * The next thing the plan needs: an implementer run over its not-yet-done phases, a human phase
- * to park at, or `review` when every phase is done except, at most, nothing. `lastRun` is true
- * when no implementer phase follows the run.
+ * The next thing the plan needs, from the first run holding a phase the log does not mark done:
+ * `implement` over that run's pending phases, `human` to park at, or `review` once every phase is
+ * done. `lastRun` is true when no implementer run follows it.
  */
 export function nextStep(plan) {
   const done = donePhases(plan);

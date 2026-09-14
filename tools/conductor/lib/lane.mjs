@@ -35,6 +35,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  *        onChange?(), beforeMerge?(plan) }
  */
 
+function recordWait(rec, lock, ms) {
+  if (!Array.isArray(rec.lockWaits)) rec.lockWaits = [];
+  rec.lockWaits.push({ lock, ms, at: now() });
+}
+
 function save(ctx) {
   saveState(ctx.stateDir, ctx.state);
   ctx.onChange?.();
@@ -168,9 +173,7 @@ async function gate(ctx, rec, label) {
     label: `${rec.plan}-${label}`,
     lockDir: ctx.lockDir,
     lockPollMs: ctx.lockPollMs,
-    onLockWait: (name, ms) => {
-      rec.lockWaits[`${name}_ms`] = (rec.lockWaits[`${name}_ms`] ?? 0) + ms;
-    },
+    onLockWait: (name, ms) => recordWait(rec, name, ms),
   });
   rec.gates ??= [];
   rec.gates.push({ label, ok: g.ok, ran: g.ran, failed: g.failed ?? null, at: now() });
@@ -270,7 +273,7 @@ export async function runPlan(ctx, lane, plan) {
         dir: ctx.lockDir,
         pollMs: ctx.lockPollMs,
         what: `review ${plan}`,
-        onWaited: (ms) => (rec.lockWaits.close_ms += ms),
+        onWaited: (ms) => recordWait(rec, CLOSE, ms),
       });
       const round = rec.verdicts.length + 1;
       const file = planFileIn(wt, plan);
@@ -350,7 +353,7 @@ export async function runPlan(ctx, lane, plan) {
 
   const lock =
     ctx.held.get(plan) ??
-    (await take(CLOSE, { dir: ctx.lockDir, pollMs: ctx.lockPollMs, what: `merge ${plan}`, onWaited: (ms) => (rec.lockWaits.close_ms += ms) }));
+    (await take(CLOSE, { dir: ctx.lockDir, pollMs: ctx.lockPollMs, what: `merge ${plan}`, onWaited: (ms) => recordWait(rec, CLOSE, ms) }));
   try {
     await ctx.beforeMerge?.(plan);
     const m = await fastForwardMain({

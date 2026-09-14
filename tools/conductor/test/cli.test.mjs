@@ -204,7 +204,7 @@ test("run refuses a second conductor, and abort with nothing running recovers in
   rmSync(join(p.stateDir, "conductor.pid"));
 
   const state = loadState(p.stateDir);
-  state.plans["0101"] = { plan: "0101", status: "running", lane: "a", steps: [{ kind: "implement", started: "2026-09-14T10:00:00.000Z", ended: null }], parks: [], verdicts: [], fixes: [], lockWaits: { close_ms: 0 } };
+  state.plans["0101"] = { plan: "0101", status: "running", lane: "a", steps: [{ kind: "implement", started: "2026-09-14T10:00:00.000Z", ended: null }], parks: [], verdicts: [], fixes: [], lockWaits: [] };
   writeFileSync(statePaths(p.stateDir).file, JSON.stringify(state));
   const aborted = await cli("abort");
   assert.equal(aborted.code, 0);
