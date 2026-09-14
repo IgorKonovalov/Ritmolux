@@ -474,10 +474,19 @@ of that square** that must be live, inclusive at both ends — so a rule keeps i
 change the radius. At radius 1 with fractions that land on whole counts this *is* `life_like`:
 Conway is `birth_lo = birth_hi = "0.375"` (3 of 8) and `survive_lo = "0.25"`, `survive_hi = "0.375"`.
 
-Above radius 1 the rules grow blobs and bugs that keep travelling where a radius-1 rule settles
-into still lifes. The defaults — radius 5, births at `0.28`..`0.385`, survival at `0.26`..`0.47` —
-are one such rule, and a sensitive one: a single neighbour count off either end of a range can be
-the difference between a field that keeps moving and one that freezes.
+Above radius 1 the rules grow blobs and bugs that travel for a while, where a radius-1 rule settles
+into still lifes quickly. The defaults — radius 5, births at `0.28`..`0.385`, survival at
+`0.26`..`0.47` — are one such rule, and a sensitive one: a single neighbour count off either end of
+a range can be the difference between a field that keeps moving longer and one that freezes at once.
+
+**A `larger_than_life` world with no `reseed` settles.** On the default rule that takes about a
+minute: `Tide Bugs`' own field — the default 256-cell grid, seed 23 — run at 12 generations a second
+with its reseed switched off has frozen into about thirty small rings on black by the one-minute
+mark. Whether a field
+lasts longer depends on the grid and the seed as much as on the rule, so no rule here is a promise
+that a world stays alive. **`reseed` is how a world stays alive** — bind it to a beat, an onset or a
+slow timer, and every disc of fresh soup it drops boils into new bugs before the field settles
+again.
 
 #### `cyclic`: a rule is a cycle
 

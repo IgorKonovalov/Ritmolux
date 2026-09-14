@@ -122,8 +122,8 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `--horizon` and `--report` measure from the frame's own ground | dev | done | committed with this row |
-| 2 — The Larger than Life default is documented as settling | dev | not started | |
+| 1 — `--horizon` and `--report` measure from the frame's own ground | dev | done | 58a0a65 |
+| 2 — The Larger than Life default is documented as settling | dev | done | committed with this row |
 
 ### Notes
 
@@ -157,7 +157,14 @@ flowchart LR
   the new reading (Shatter 0.580 / 0.0487, Stipple 0.335 / 0.5804) and the sentence reading them.
 - **Phase 1, backlog probe:** 0210's `present: images\.first\(\)\.map_or\(\[0, 0, 0, 255\], corner\)`
   probe is broken by this phase (`check-backlog-claims.mjs` exits 1).
-- **Followups noticed, not acted on:** `docs/preset-tuning-walkthrough.md`'s five `--report` rows
+- **Phase 2:** the test is now
+  `the_default_rule_is_still_moving_at_generation_2000_on_a_128_torus_from_salts_12_and_13`; its
+  assertions are unchanged (this run: control 214 live, 0 differ). `docs/presets.md`'s preceding
+  paragraph, which said the rules "keep travelling", was reworded alongside the new paragraph so the
+  two do not contradict. Backlog 0211's second probe is broken by this phase, as the plan expected.
+- **Followups noticed, not acted on:** `cargo clippy -p rlx-core --all-targets -- -D warnings` (the
+  single-crate form) fails on dead fields `instance` and `gpu` in `core/src/render/context.rs`,
+  untouched here; the `--workspace` form is clean. `docs/preset-tuning-walkthrough.md`'s five `--report` rows
   carry `cover` values from the corner convention (and an older column set); `docs/capturing.md`'s
   "`reaction_coral_bloom` reports **0.128**" names a preset that is not in `presets/`;
   `presets/cellular_tide_bugs.toml`'s header records "motion 0.000 from 60 s on", while 0210's recipe

@@ -1205,20 +1205,27 @@ fn radius_one_with_whole_thresholds_is_life_like() {
     );
 }
 
-/// **A radius above 1 is still moving after 2,000 generations** — the property
-/// the family exists for (Plan 0164 Phase 3): the declared default rule (radius 5, births at
-/// 34..=46 of 120 neighbours, survival at 32..=56) from two seeded soups,
-/// compared at generation 2,000 with itself 60 generations on — a span every
-/// oscillator of period 1 to 6, 10, 12, 15, 20 and 30 returns to itself
-/// across, so a field that had settled into still lifes and those oscillators
-/// would compare equal.
+/// **The default rule, on a 128-cell torus from salts 12 and 13, is still moving
+/// at generation 2,000** (Plan 0164 Phase 3): the declared default (radius 5,
+/// births at 34..=46 of 120 neighbours, survival at 32..=56) from those two
+/// seeded soups, compared at generation 2,000 with itself 60 generations on — a
+/// span every oscillator of period 1 to 6, 10, 12, 15, 20 and 30 returns to
+/// itself across, so a field that had settled into still lifes and those
+/// oscillators would compare equal.
+///
+/// **This is a claim about one grid and two seeds, not about the rule or the
+/// family.** Whether a `larger_than_life` field keeps moving depends on the grid
+/// and the soup: the same default rule on a 256-cell grid from generator seed 23
+/// settles into still rings within about 720 generations (design-backlog 0211),
+/// which is why an unreseeded world on this family is documented as settling. A
+/// green run here does not say a preset on the default rule stays alive.
 ///
 /// The control is a radius-4 rule (births at 26..=34 of 80 neighbours,
 /// survival at 24..=42) that from the same soup does settle, into a few hundred
 /// still cells: without it, "moving" could be a property of the measurement
 /// rather than of the rule.
 #[test]
-fn larger_than_life_is_still_moving_after_two_thousand_generations() {
+fn the_default_rule_is_still_moving_at_generation_2000_on_a_128_torus_from_salts_12_and_13() {
     let Some(ctx) = context() else {
         return;
     };
