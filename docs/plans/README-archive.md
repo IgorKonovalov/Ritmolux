@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0170 - The horizon reads the frame's own ground](#0170---the-horizon-reads-the-frames-own-ground)
   - [0171 - One stall policy, and a guarded clock](#0171---one-stall-policy-and-a-guarded-clock)
   - [0169 - A preset is checked before it is rendered](#0169---a-preset-is-checked-before-it-is-rendered)
   - [0167 - The studio becomes handable](#0167---the-studio-becomes-handable)
@@ -202,6 +203,67 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0170 - The horizon reads the frame's own ground](done/0170-the-horizon-reads-the-frames-own-ground.md)
+
+- closed 2026-09-14. Two `dev` phases on lane `plan-0170-horizon-ground`: `58a0a65` (1, `--horizon`
+and `--report` measure from the frame's own ground) and `4888399` (2, the Larger than Life default is
+documented as settling). Review: **no blockers, no majors, three minors, two nits.** Version:
+**0.122.2** (patch - two `shot` readings corrected, one additive JSON key). No ADR paired; the plan
+extends ADR-0126's estimator and records its rejected alternatives in its own Decision. Closed backlog
+0210 and 0211; filed 0213. The architect's gate at the close, on the lane after merging `main`:
+`cargo fmt --check`, `cargo clippy --workspace --all-targets -D warnings`, and `cargo nextest run
+--workspace --no-fail-fast`: 1918 passed, 6 skipped. The log's 1917 plus the one test `main` brought.
+
+**What the review verified rather than read.** `pooled_modal_ground` is the old `modal_ground` body
+with the pixel loop widened to a slice, and `modal_ground` now calls it on a one-image slice, so the
+equality the plan asked for holds by construction as well as by test. That test covers six shapes
+including the empty image and the `NO_GROUND` flat histogram. The half-lit-plus-six-settled test
+asserts that the soup alone resolves to the live cell before it asserts that the pool resolves to
+black, so it cannot pass vacuously. `NO_GROUND` is black, which is what `coverage` was already
+given for a groundless frame, so no third treatment exists.
+
+Re-running backlog 0210's recipe reproduces the log exactly: coverage 0.0182 from 60 s on, header
+`ground (0, 0, 0)`. **The same run is also a finding the log recorded without drawing.** Against the
+corrected mask the footprint reads 0.0720 at 60 s and 0.0337 and 0.0139 at 150 s and 180 s, while
+coverage holds at 0.0182. So the field is settled, not frozen: something small still moves inside it.
+The corner mask diluted that motion about fifty times, which is where 0211's *"0.0000 at every row
+from 90 s"* and Tide Bugs' header came from. The close commit changes `docs/presets.md`'s "has
+frozen" to "has settled". No other corner reader is left in `standalone/`; the three in `core/tests/` predate the plan and are out of its scope.
+
+**Minors, none fixed at the close:**
+- **A horizon row is independent of the run's length only while two runs pool to the same ground.**
+Phase 1 restated this in `docs/capturing.md`, but `a_horizon_is_reproducible_and_does_not_depend_on_its_own_length`
+in `standalone/tests/shot_cli.rs`, which that paragraph cites, still states the unconditional form
+and never compares the `ground` keys. It passes because its fixture's ground is black at both
+lengths. Filed as backlog 0213.
+- **Recorded measurements in preset headers and the walkthrough are corner-era.** The plan changed the
+instrument they quote, and `presets/` was not touched, as the plan intended. The horizon
+coverage, peak/mean and motion rows in the headers of `analytic_echoplate`, `attractor_thomasred`,
+`cellular_tide_bugs`, `curve_cogwheel`, `curve_gyre`, `curve_turnabout`, `emitter_heartfall`, `spectrum_ridge`,
+`swarm_braid`, `swarm_drift`, `swarm_stipple`, `warp_cauldron`, `warp_millrace`, `warp_sirocco`,
+`warp_smoke` and `warp_wellhead` were read against a corner pixel. Tide Bugs is the one known to be
+wrong rather than merely unverified. So were the `--report` `cover`
+figures in `shape_lion` and `fragment_driftmono` and every `cover` cell in
+`docs/preset-tuning-walkthrough.md`. A trend verdict (delta, monotone) survives a ruler change
+better than a level does, but no header says which ruler it used. This is a list for the content
+lane, not a re-tune. The walkthrough's tables already predate the `drive`, `rate` and `level`
+columns, so they read as a transcript.
+- **The implementation log is longer than the plan's `## Implementation phases` section**, 46 lines
+against 38. The overage is the before/after `--report` measurement the plan asked `dev` to record,
+which is the right content in the wrong weight.
+
+**Nits:** `docs/capturing.md` still cites `reaction_coral_bloom`, which is not in `presets/`. `dev`
+noticed it and it predates this plan. And `cargo clippy -p rlx-core --all-targets` alone still fails
+on the dead fields in `core/src/render/context.rs`, as both this log and 0171's recorded; the
+`--workspace` form the gate runs is clean.
+
+**Also at the close:** operator docs swept. `docs/capturing.md` and `docs/presets.md` were updated
+in the phases. The preset-author lane's `references/render-loop.md` still defined `cover` against
+the corner pixel and was repaired in the close commit. `presets/README.md` is generated and the
+default did not move. Preset curation: no `.toml` touched. The defect-workaround grep for backlog
+0210 and 0211 over `presets/*.toml` is clean; `cellular_tide_bugs.toml`'s *"motion 0.000 from 60 s
+on"* does **not** stand, and it is on the list above. The merge hazard 0171's close predicted on `cellular/tests.rs` and the ledger did not materialize: `git merge main` resolved on its own.
 
 ### [0171 - One stall policy, and a guarded clock](done/0171-one-stall-policy-and-a-guarded-clock.md)
 

@@ -177,7 +177,7 @@ rots. What this page carries is the four readings you act on most:
 |--------|-----------|------------------------|
 | `bass` `mid` `treb` `onset` | how much the frame changes when that input alone is lit | `0.000` — nothing you bound to it reaches the picture: a typo'd param, a gain too small, or a term the clamp swallows. One live column is enough for CI; a *designed* preset usually wants two or three. |
 | `anim` | change between an early and a late silent frame | near zero — frozen at rest. It needs a `time` drift somewhere. |
-| `cover` | fraction of the loud frame differing from its own corner pixel | near zero — the peak has **no structure against its own background**: dead, flung out of frame, or so blown out that the corner is lit too. Which one it is, only the still will tell you (`craft.md`, the additive ceiling). |
+| `cover` | fraction of the loud frame differing from its own ground — the mean colour of its most populous luminance band | near zero — the peak has **no structure against its own background**: dead, flung out of frame, or so blown out that the blow-out has become the ground. Which one it is, only the still will tell you (`craft.md`, the additive ceiling). |
 | `level` | mean **linear light** over the pixels `cover` counts as lit | nothing on its own — it is a comparison number, never a threshold. Read it before/after your own edit, or across a family. It excludes the background by construction, so it cannot see a look that went wrong by changing its ground. |
 | `NEAR-DUP` | pairwise shape distance under `0.08` | it is not a new look. Change the geometry, not the colour. |
 

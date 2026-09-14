@@ -481,8 +481,8 @@ a range can be the difference between a field that keeps moving longer and one t
 
 **A `larger_than_life` world with no `reseed` settles.** On the default rule that takes about a
 minute: `Tide Bugs`' own field — the default 256-cell grid, seed 23 — run at 12 generations a second
-with its reseed switched off has frozen into about thirty small rings on black by the one-minute
-mark. Whether a field
+with its reseed switched off has settled into about thirty small rings on black by the one-minute
+mark, and its coverage does not change after that. Whether a field
 lasts longer depends on the grid and the seed as much as on the rule, so no rule here is a promise
 that a world stays alive. **`reseed` is how a world stays alive** — bind it to a beat, an onset or a
 slow timer, and every disc of fresh soup it drops boils into new bugs before the field settles

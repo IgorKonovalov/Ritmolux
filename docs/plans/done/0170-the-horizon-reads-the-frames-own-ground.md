@@ -1,9 +1,11 @@
 # 0170 — The horizon reads the frame's own ground
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-14. Phases `58a0a65` (1) and `4888399` (2). Mode 4: no blockers,
+> no majors, three minors, two nits. Architect's full `cargo nextest run --workspace` after merging
+> `main`: 1918 passed, 6 skipped. Backlog 0210's recipe reproduced. Backlog 0213 filed. Version 0.122.2 (patch).
 > **Created:** 2026-09-11
 > **Owner skill(s):** `dev`
-> **Related ADRs:** [0126](../adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md)
+> **Related ADRs:** [0126](../../adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md)
 > (accepted — this plan extends its estimator to the two `shot` readings that never adopted it)
 > **Closes:** design-backlog 0210, 0211.
 
@@ -161,3 +163,12 @@ flowchart LR
 - **Outstanding `human` phases:** none
 
 ## Followups (after this lands)
+
+- **The horizon's length-independence test still states the unconditional property.**
+  `a_horizon_is_reproducible_and_does_not_depend_on_its_own_length` in `standalone/tests/shot_cli.rs`
+  never compares the two runs' `ground` keys, though pooling makes shared rows equal only while the
+  ground is. Filed as design-backlog 0213.
+- **Corner-era measurements stand in eighteen preset headers and in `docs/preset-tuning-walkthrough.md`.**
+  The list is in the close write-up in `docs/plans/README-archive.md`; re-measuring is content work.
+  `cellular_tide_bugs.toml`'s *"motion 0.000 from 60 s on"* is known wrong: the corrected horizon reads
+  footprint 0.0337 and 0.0139 at 150 s and 180 s.

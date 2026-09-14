@@ -46,7 +46,6 @@ place. The plan file carries the real link.
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
 | [0160](0160-the-silhouettes-preconditions-stop-being-silent.md) | The silhouette's preconditions stop being silent | approved | dev, human | ADR-0179: four preconditions on `[path]` that fail silently. **0092 closed 2026-09-09**, so its Phase 7 axis fix is in. Phase 2 is prose in `presets/README.md`. |
 | [0166](0166-the-basics-read-in-russian.md) | The basics read in Russian | approved | dev, human | ADR-0185: five docs gain a Russian sibling `.ru.md` stamped with the source sha. **Phase 3 is a `human` review that blocks publication.** Touches no Rust - orderable against any lane. |
-| [0170](0170-the-horizon-reads-the-frames-own-ground.md) | The horizon reads the frame's own ground | approved | dev | Backlog 0210 + 0211: `--horizon` and `--report` take ADR-0126's modal ground; the Larger than Life default is documented as settling. Disjoint from every other plan. |
 | [0172](0172-the-studios-readings-become-true.md) | The studio's readings become true | approved | dev, studio-builder | ADR-0192 (proposed), backlog 0202, 0205, 0209: windowless fps, a schema snapshot, `param` on warnings. Reconciled with closed 0169 at approval. **0171 closed 2026-09-14**; lane 1 is next. |
 | [0173](0173-the-milkdrop-geometry-reads-the-source.md) | The MilkDrop geometry reads the source | approved | dev | Backlog 0119 + 0120 from MilkDrop 2's released source: `atan2` handedness, waveform amplitude. No rig. **Runs before 0142**, which reuses its source commit. |
 <!-- roster:end -->
@@ -62,9 +61,10 @@ consumer of the new `param`). ADR-0191 and ADR-0192 stay `proposed` until their 
   0172 Phase 4 hands off to `studio-builder` automatically (ADR-0188).
 - **Lane 2 - [0170] then [0173].** 0170 touches `metrics.rs` and `shot/` only. 0173 needs no rig,
   and its Phase 1 source commit is what [0142] Phase 2 reads, so it goes before 0142.
+  **[0170] closed 2026-09-14**, so lane 2 is next with 0173.
 
 [0169]: done/0169-a-preset-is-checked-before-it-is-rendered.md
-[0170]: 0170-the-horizon-reads-the-frames-own-ground.md
+[0170]: done/0170-the-horizon-reads-the-frames-own-ground.md
 [0171]: done/0171-one-stall-policy-and-a-guarded-clock.md
 [0172]: 0172-the-studios-readings-become-true.md
 [0173]: 0173-the-milkdrop-geometry-reads-the-source.md
@@ -805,6 +805,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0170 — The horizon reads the frame's own ground](done/0170-the-horizon-reads-the-frames-own-ground.md) — closed 2026-09-14. Review: **no blockers, no majors, three minors, two nits.** Version: **0.122.2** (patch). No ADR paired. Filed [backlog 0213](../design-backlog.md). [Write-up](README-archive.md).
 - [0171 — One stall policy, and a guarded clock](done/0171-one-stall-policy-and-a-guarded-clock.md) — closed 2026-09-14. Review: **no blockers, no majors, two minors, two nits.** Version: **0.122.1** (patch). ADR-0191 accepted (Outcome). Filed [backlog 0212](../design-backlog.md). [Write-up](README-archive.md).
 - [0169 — A preset is checked before it is rendered](done/0169-a-preset-is-checked-before-it-is-rendered.md) — closed 2026-09-13. Review: **no blockers, no majors, three minors, two nits.** Version: **0.122.0** (minor). ADR-0190 accepted. [Write-up](README-archive.md).
 - [0167 — The studio becomes handable](done/0167-the-studio-becomes-handable.md) — closed 2026-09-11 **without Phases 7-8 (owner call)**. Review: **no blockers, four majors.** Version: **0.120.0** (minor). ADR-0186 + 0187 accepted. Filed [backlog 0209](../design-backlog.md). [Write-up](README-archive.md).
