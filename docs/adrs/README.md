@@ -73,7 +73,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0050](0050-downbeat-and-phrase-tracking-with-confidence-fallback.md) | Downbeat and phrase tracking: bar-aware time variables, gated by a measured confidence with a deterministic counter fallback | accepted (Plan 0048; Outcome) |
 | [0051](0051-seeded-grammar-randomness-with-per-run-opt-in.md) | `hash(x)` and `noise(x)` in the grammar, seeded per preset; an opt-in per-run seed that capture paths always pin | accepted |
 | [0052](0052-analysis-diagnostics-are-native-only.md) | The analysis diagnostics surface is native-only and does not cross the C ABI | accepted (Plan 0049; Outcome) |
-| [0053](0053-plan-lanes-run-in-git-worktrees.md) | Plan lanes run in git worktrees, and a close merges main *into* the branch before fast-forwarding main | accepted, amended by 0141 (revoked by 0147), supplemented by 0182; Outcome |
+| [0053](0053-plan-lanes-run-in-git-worktrees.md) | Plan lanes run in git worktrees, and a close merges main *into* the branch before fast-forwarding main | accepted, amended by 0141 (revoked by 0147), supplemented by 0182, amended by 0205; Outcome |
 | [0054](0054-runtime-tier-switching-rebuilds-on-the-live-context.md) | A runtime quality-tier change rebuilds the engine's GPU resources on the live context | accepted 2026-08-04 (Plan 0050; Outcome) |
 | [0055](0055-backdrop-leaves-the-post-chain.md) | The backdrop leaves the post chain: the composite carries premultiplied alpha and the backdrop is composited underneath | accepted 2026-07-31 (Plan 0045) |
 | [0056](0056-additive-scenes-emit-premultiplied-alpha.md) | A scene that draws into the chain emits premultiplied alpha equal to its own coverage, and the alpha blend saturates rather than sums | accepted 2026-08-01 (Plan 0051; Outcome) |
@@ -141,7 +141,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0118](0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md) | The MilkDrop feedback field quantizes in the encoded domain, per bundle | accepted 2026-08-17 (Plan 0108), three Outcome |
 
 | [0119](0119-the-video-echo-blends-toward-its-copy-rather-than-adding-it.md) | The video echo blends toward its copy rather than adding it | accepted 2026-08-19 (Plan 0109) |
-| [0120](0120-the-close-brief-is-a-section-of-the-plan.md) | The close brief is a section of the plan, written as the phases land | accepted 2026-08-25 (0112) |
+| [0120](0120-the-close-brief-is-a-section-of-the-plan.md) | The close brief is a section of the plan, written as the phases land | accepted 2026-08-25 (0112), amended by 0205 |
 | [0121](0121-the-diffusion-filter-is-an-offline-stage-with-profiles-and-it-interpolates-its-own-stride.md) | The diffusion filter is an offline stage with profiles, and it interpolates its own stride | accepted 2026-08-25 (Plan 0106), one Outcome |
 | [0122](0122-a-sidecar-tool-documents-itself-in-one-place.md) | A sidecar tool documents itself in one place, and a gate keeps its numbers from spreading | accepted 2026-08-25 (Plan 0106) |
 | [0123](0123-a-flat-graphic-scene-paints-its-own-paper-and-composites-opaque-elements-in-one-pass.md) | A flat-graphic scene paints its own paper and composites opaque elements in one distance-field pass | accepted 2026-08-26 (Plan 0113), Outcome |
@@ -177,7 +177,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0153](0153-a-per-element-rate-integrates-per-element.md) | A per-element rate integrates per element | accepted 2026-09-08 (Plan 0140; extends 0132) |
 | [0154](0154-the-reader-facing-docs-publish-as-a-site.md) | The reader-facing docs publish as a site, and `docs/` stays the single source | accepted 2026-09-05 (Plan 0143), Outcome; extended by 0166, 0169, 0171, narrowed by 0167 |
 | [0155](0155-the-window-takes-the-adapter-and-the-preset-the-operator-names.md) | The window takes the adapter and the preset the operator names | accepted 2026-08-31 (Plan 0144), refines 0146 + 0148 |
-| [0156](0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md) | The per-phase gate is scoped, and the whole suite is owed once per plan | accepted 2026-08-31 (Plan 0145), extends 0033, Outcome |
+| [0156](0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md) | The per-phase gate is scoped, and the whole suite is owed once per plan | accepted 2026-08-31 (Plan 0145), extends 0033, Outcome; extended by 0205 |
 | [0157](0157-the-preset-sweeps-split-per-preset-and-the-phase-tier-samples-a-declared-representative.md) | The preset sweeps split per preset, and the per-phase tier samples a declared representative | accepted 2026-08-31 (Plan 0146), extends 0156, Outcome |
 | [0158](0158-a-joined-end-carries-its-own-miter-length.md) | A joined end carries its own miter length, not a flag the shader expands by a half-width | accepted 2026-09-02 (Plan 0149), supersedes the geometry half of 0041, unblocked by 0160, Decision corrected before acceptance |
 | [0159](0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md) | The component gets its own size cap, and the recipe that builds it is what carries it | accepted 2026-09-02 (Plan 0148), Outcome, amends nfr.md 4 |
@@ -209,12 +209,12 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0185](0185-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md) | The documentation translates a slice, and a stamp makes staleness visible | proposed 2026-09-10 (Plan 0166), extends 0154, 0167 |
 | [0186](0186-the-studios-player-mode-is-a-per-machine-setting.md) | The studio's player mode is a per-machine setting, and the windowless path is a peer | accepted 2026-09-11 (Plan 0167), amends 0183 |
 | [0187](0187-the-preview-pipe-has-a-fixed-shape-and-names-its-true-format.md) | The preview pipe has a fixed shape and names the format it actually carries | accepted 2026-09-11 (Plan 0167), revises 0176, Outcome |
-| [0188](0188-the-two-implementer-lanes-hand-off-automatically.md) | The two implementer lanes hand off to each other automatically, and every other seam stays manual | accepted 2026-09-10 (no plan), amends 0177 |
+| [0188](0188-the-two-implementer-lanes-hand-off-automatically.md) | The two implementer lanes hand off to each other automatically, and every other seam stays manual | accepted 2026-09-10 (no plan), amends 0177; superseded in part by 0205 |
 | [0189](0189-an-edit-forks-the-preset-and-the-studio-holds-rotation.md) | An edit forks the preset on first touch, and the studio holds rotation while attached | accepted 2026-09-10 (Plan 0168), revises 0184 |
 | [0190](0190-preset-toml-is-checked-by-the-loader-and-never-reformatted.md) | Preset TOML is checked by the engine's own loader and never reformatted | accepted 2026-09-13 (Plan 0169) |
 | [0191](0191-a-frame-delta-is-replaced-at-every-entry-and-nothing-below-keeps-a-policy.md) | A frame delta is replaced at every entry that takes one, and nothing below keeps a policy of its own | accepted 2026-09-14 (Plan 0171; Outcome), amends 0152 |
 | [0192](0192-a-preset-warning-names-its-parameter.md) | A preset warning names the parameter it is about | accepted 2026-09-14 (Plan 0172; Outcome), extends 0176 |
-| [0193](0193-a-test-that-reads-the-clock-runs-alone.md) | A test that reads the clock runs alone, and the lint exemption that marks it is what selects it | accepted 2026-09-14 (Plan 0174), Outcome; extends 0173 |
+| [0193](0193-a-test-that-reads-the-clock-runs-alone.md) | A test that reads the clock runs alone, and the lint exemption that marks it is what selects it | accepted 2026-09-14 (Plan 0174), Outcome; extends 0173; extended by 0205 |
 | [0194](0194-a-family-dependent-range-travels-in-the-schema-and-the-player-reports-the-family.md) | A family-dependent range travels in the schema, and the player reports the family | proposed (Plan 0179), extends 0180 |
 | [0195](0195-a-low-density-is-a-trace-count-and-the-law-scales-only-a-cloud.md) | A low `density` is a trace count, and the density law scales only a cloud | proposed (Plan 0183), amends 0140 |
 | [0196](0196-the-report-hears-the-musical-clock-in-a-column-of-its-own.md) | The report hears the musical clock in a column of its own, and every existing column keeps its stimulus | proposed (Plan 0182), supplements 0134 |
@@ -225,5 +225,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0202](0202-a-written-count-of-the-systems-is-refused-by-a-gate.md) | A written-out count of the systems is refused by a gate, and the threshold is five | proposed (Plan 0178), extends 0168 |
 | [0203](0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md) | A release tag is annotated, and what gets checked is whether origin has it | accepted 2026-09-14 (Plan 0176), extends 0038 |
 | [0204](0204-a-cheap-integration-test-shares-one-binary-and-a-test-that-needs-its-own-stays-its-own.md) | A cheap integration test shares one binary per package, and a test that needs its own binary keeps one | proposed (Plan 0177), extends 0156 |
-| [0205](0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md) | An approved plan runs under a conductor, and every judgement it cannot make parks the plan | proposed (Plan 0187), supersedes 0188 in part |
+| [0205](0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md) | An approved plan runs under a conductor, and every judgement it cannot make parks the plan | accepted 2026-09-14 (Plan 0187), Outcome; supersedes 0188 in part |
 <!-- roster:end -->

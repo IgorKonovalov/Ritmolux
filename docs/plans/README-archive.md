@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0187 - The conductor runs the lanes](#0187---the-conductor-runs-the-lanes)
   - [0176 - A release tag reaches origin](#0176---a-release-tag-reaches-origin)
   - [0174 - The clock-reading tests run alone](#0174---the-clock-reading-tests-run-alone)
   - [0172 - The studio's readings become true](#0172---the-studios-readings-become-true)
@@ -208,6 +209,38 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0187 - The conductor runs the lanes](done/0187-the-conductor-runs-the-lanes.md)
+
+- closed 2026-09-14 **without Phase 6, by the owner's call: the pilot runs live.** Six `dev` phases on
+`main` directly: `142e24a` (1, the headless-contract spike and its evidence table, CLI 2.1.270),
+`b6990c6` (2, conductor mode in three skills, the push/history and suite-lock hooks),
+`0a90ec7` (3, queue, state, plan reader, locks, one step), `fad5459` (4, the lane loop) and
+`35d6ef5` (4b, the digest), `96a78eb` (5, the commands, README, CI and docs). A review before the
+close raised nine findings, fixed in `1a93c0c`..`5cf6524` with finding 7 left to the pilot.
+Review: **no blockers, one major, four minors.** The major was fixed at the close in `36dd75f` by
+the reviewing session on the owner's authorization, so it has had no independent review. Version:
+**none** - repository tooling, hooks and skill text, no shipped artifact. ADR-0205 accepted with an
+Outcome. The architect's gate at `93817f6`: `cargo nextest run --workspace` 1933 passed, 6 skipped,
+623.7 s, matching the log; `cargo doc` with warnings denied clean; the conductor's suite 110 pass,
+111 after the fix.
+
+**The major.** The conductor gated a plan before its review, then fast-forwarded `main` to whatever
+tip the close session left - after that session had merged `main` in, bumped and tagged - treating
+it as gated. On two lanes that tip is the first tree holding both lanes' code, and it reached `main`
+on the session's word alone. The lane now records the tip its own gate passed on, and the
+fast-forward gates any other tip; a new scenario parks a red close-tip gate with `main` unmoved, and
+seven lane tests fail against the old comparison.
+
+**Minors, open, carried in the plan's `## Close review` and Followups:** the `closed` outcome's
+version and tag are not compared with `Cargo.toml`; two likely allowlist misses (a multi-line
+PowerShell commit, the studio version test's `cd studio`); a close now runs the full suite up to four
+times; and the roster row read `approved` for an `in-progress` plan, removed here.
+
+**What the close could not verify.** No conductor-run plan exists yet. Everything past the spike's
+observed contract is tested against a fake CLI, including the fix. The pilot's wall time, spend and
+parks are owed to a fresh `architect` session, which appends them to ADR-0205's Outcome and decides
+whether `queue.json` enables lane b.
 
 ### [0176 - A release tag reaches origin](done/0176-a-release-tag-reaches-origin.md)
 

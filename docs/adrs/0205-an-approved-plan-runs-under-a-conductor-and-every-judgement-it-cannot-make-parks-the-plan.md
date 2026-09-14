@@ -1,8 +1,8 @@
 # ADR-0205 — An approved plan runs under a conductor, and every judgement it cannot make parks the plan
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-14 (Plan 0187), with an Outcome
 > **Date:** 2026-09-14
-> **Related plan(s):** [0187](../plans/0187-the-conductor-runs-the-lanes.md)
+> **Related plan(s):** [0187](../plans/done/0187-the-conductor-runs-the-lanes.md)
 > **Supersedes in part:** [0188](0188-the-two-implementer-lanes-hand-off-automatically.md) (its
 > "every other seam stays manual" and its rejected Alternative D, for conductor-run plans only)
 > **Amends:** [0053](0053-plan-lanes-run-in-git-worktrees.md) (who performs a lane's fast-forward
@@ -182,3 +182,24 @@ judgement.
   every park, and every push. What stays manual for every other plan: everything ADR-0188 lists.
 - **The `preset-author` lane is not conducted.** Its seam into `architect` is a routing judgement
   (ADR-0081), and nothing here changes it.
+
+## Outcome
+
+**2026-09-14, at Plan 0187's close.** Two things the Decision did not say, and one it could not yet.
+
+- **"Verifies the result itself" had a gap at the close, and the conductor now gates the close tip.**
+  As built, the conductor's gate ran before the review, and the fast-forward treated the tip the
+  close session left as already gated. That session merges `main`, bumps and tags, so the tree that
+  reached `main` - on two lanes, the first tree holding both lanes' code - was verified only by the
+  session's own claim, which is the one thing this decision says the conductor never takes. Fixed at
+  the close: the fast-forward compares against the tip the conductor's own gate last passed on, so
+  every close tip is gated before `main` moves. The price is one more full gate per close.
+- **The close review of the conductor was not run by the conductor.** Plan 0187 was built on `main`
+  in human-started sessions and closed by a human-started `architect` session, which also wrote the
+  fix above on the owner's authorization. The fix has had no review from a session that did not write
+  it.
+- **The pilot had not run when this was accepted.** Plan 0187 closed without its Phase 6 by the
+  owner's call, to be tested live. So nothing above rests on a real conductor-run plan: the headless
+  contract is observed (the spike's evidence table), the state machine is tested against a fake CLI,
+  and the second lane stays disabled in `queue.json`. The pilot's wall time, spend and parks are
+  owed to a fresh `architect` session, which records them here and decides lane b.

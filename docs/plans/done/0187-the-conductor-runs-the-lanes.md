@@ -1,13 +1,16 @@
 # 0187 — The conductor runs the lanes
 
-> **Status:** in-progress
+> **Status:** done (2026-09-14) - closed **without Phase 6** (owner call: the pilot runs live).
+> Phases 1-5 at `142e24a`..`96a78eb`, a pre-close fix round `1a93c0c`..`5cf6524`, and the close
+> review's one major fixed at the close in `36dd75f` on the owner's authorization. Mode 4: no
+> blockers, one major (fixed), four minors. Version: none.
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`, `human`
-> **Related ADRs:** [0205](../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md) (proposed),
-> [0188](../adrs/0188-the-two-implementer-lanes-hand-off-automatically.md) (superseded in part),
-> [0053](../adrs/0053-plan-lanes-run-in-git-worktrees.md), [0120](../adrs/0120-the-close-brief-is-a-section-of-the-plan.md),
-> [0156](../adrs/0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md),
-> [0193](../adrs/0193-a-test-that-reads-the-clock-runs-alone.md), [0005](../adrs/0005-versioning-and-release-cadence.md)
+> **Related ADRs:** [0205](../../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md) (accepted, Outcome),
+> [0188](../../adrs/0188-the-two-implementer-lanes-hand-off-automatically.md) (superseded in part),
+> [0053](../../adrs/0053-plan-lanes-run-in-git-worktrees.md), [0120](../../adrs/0120-the-close-brief-is-a-section-of-the-plan.md),
+> [0156](../../adrs/0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md),
+> [0193](../../adrs/0193-a-test-that-reads-the-clock-runs-alone.md), [0005](../../adrs/0005-versioning-and-release-cadence.md)
 > **Closes:** none
 
 ## TL;DR
@@ -369,7 +372,7 @@ Outcome kinds: implementers `phases_done` or `parked` (`reason`: `human_phase` |
 | 4 — The lane loop, end to end against a scratch repository | dev | done | `fad5459` |
 | 4b — The close digest: what happened, readable the morning after | dev | done | `35d6ef5` |
 | 5 — The operator surface and the documents | dev | done | `96a78eb` |
-| 6 — The pilot: one lane, two plans, watched | human | not started | |
+| 6 — The pilot: one lane, two plans, watched | human | not run at close (owner call: tested live) | |
 
 ### Notes
 
@@ -405,4 +408,48 @@ Outcome kinds: implementers `phases_done` or `parked` (`reason`: `human_phase` |
 - **Full suite:** `cargo nextest run --workspace` - exit 0, `1933 tests run: 1933 passed (5 slow), 6 skipped` (605.9 s); `node --test "tools/conductor/test/*.test.mjs"` - 110 pass, 0 fail after the fix round (no Rust changed in it)
 - **Outstanding `human` phases:** Phase 6 (the pilot)
 
+## Close review
+
+Human-started Mode 4, 2026-09-14, at `93817f6`. Delivered in conversation and recorded here as
+well, because the same session then fixed its own major on the owner's authorization and closed, so
+no later reader was in the room for either.
+
+**Verdict: no blockers, one major (fixed in this session), four minors. Closed without Phase 6.**
+
+**Verified, not read from the log:** `cargo nextest run --workspace` 1933 passed, 6 skipped
+(623.7 s), matching the log's bullet; `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`
+clean; `node --test "tools/conductor/test/*.test.mjs"` 110 pass before the fix, 111 after;
+doc links, index rows, backlog claims, comment hygiene, reader prose, contents blocks, release tag
+and `--stranded` all exit 0. The `lane.test.mjs` scenarios were read against each Phase 4 and 4b
+done-when and assert what they name. The disclosed deviations (hook bite checks in
+`tools/conductor/test/`, the extra outcome kinds, the CI glob) are sound. No shipped crate changed.
+
+**Major, fixed in `36dd75f`.** `tools/conductor/lib/lane.mjs` passed the close head to the
+fast-forward as the last gated tip, so what the close session merged in from `main`, bumped and
+tagged reached `main` verified only by that session's claim - the first moment two lanes' code
+meets. The lane now records the tip its own gate passed on; every close tip is gated (`post-close`)
+before `main` moves. A new scenario parks a red close-tip gate with `main` unmoved; seven lane tests
+fail against the old comparison. **The fix was written and checked by the reviewing session, so it
+has had no independent review;** the live pilot is its first outside reading.
+
+**Minors (open):**
+- `tools/conductor/lib/close.mjs:78` - a `closed` outcome's `version`/`tag` are not compared with
+  root `Cargo.toml`; a bump with `tag: null` skips the tag check. The close-tip gate's
+  `check-release-tag.mjs` now catches the missing tag, not a tag off the tip.
+- `tools/conductor/settings.conductor.json` - two likely misses, unexercised: a multi-line
+  PowerShell here-string commit may not match `PowerShell(git commit *)`, and the studio version test
+  needs a `cd studio` the allowlist refuses (`npm --prefix studio exec` would pass).
+- A close now runs the full suite up to four times - the conductor pre-review, the review session on
+  the same tree, the review's close gate after merging `main`, and the conductor's close-tip gate -
+  at ~10 min each. The pilot's wall time decides whether the review may read the conductor's gate log.
+- `docs/plans/README.md` roster read `approved` for an `in-progress` plan; removed at this close.
+
+**Earlier round, resolved before this review** (the `### Notes` lines name each): findings 1-6 and
+8-9 in `1a93c0c`, `1185f38`, `84f43bc`, `da87591`, `635865a`, `5cf6524`; finding 7 left to the pilot.
+
 ## Followups (after this lands)
+
+- **The pilot, live.** `local.json` with the owner's caps, then `run --lane a` on 0175 and 0185.
+  Its wall time, spend and every park go to a fresh `architect` session, which appends the pilot to
+  ADR-0205's `Outcome` and decides whether `queue.json` enables lane b.
+- The three open minors above - the version cross-check, the allowlist, the suite count.
