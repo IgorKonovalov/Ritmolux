@@ -1,6 +1,7 @@
-# nextest configuration. Two jobs: keep the reporting tests audible, and define
+# nextest configuration. Three concerns: keep the reporting tests audible, define
 # the narrowed test set as a profile (ADR-0156) so one file says what the
-# pre-push hook, CI's `check` job and the `dev` lane's per-phase gate all run.
+# pre-push hook, CI's `check` job and the `dev` lane's per-phase gate all run,
+# and schedule the tests that read the clock alone (ADR-0193).
 #
 # --- job 1: the reporting tests ---
 #
@@ -86,3 +87,31 @@ success-output = "immediate"
 # about a family's whole distribution.
 [profile.fast]
 default-filter = 'not (binary(golden) + binary(attractor) + binary(reaction_diffusion) + binary(background_composite) + binary(ink) + binary(reactivity) + binary(animation) + binary(sanity) + binary(distinctness)) + test(/^(animation|reactivity|sanity_loudness)_rep_/)'
+
+# --- job 4: the clock-reading tests run alone ---
+#
+# A test that asserts on wall-clock time reads everything else scheduled on the
+# machine, and under the default schedule that is the rest of the suite. A cost
+# probe's slope then prices the load, and a deadline measures how busy the other
+# slots were. `threads-required = "num-test-threads"` makes one of these tests
+# claim every slot: nextest waits for the running tests to drain, starts it, and
+# starts nothing beside it until it exits (ADR-0193). It removes the suite's own
+# load only - another process on the machine still contends.
+#
+# `num-test-threads` rather than `num-cpus`: it names every slot the run has, so
+# it stays exact under an explicit `-j`.
+#
+# The selector is the `clippy::disallowed_methods` exemption, because the lint
+# refuses a clock read without one: every integration test file carrying it is
+# named here by binary, or by single test where the exemption is fn-level (`dsp`).
+# `stream_show` and `control_loopback` carry it and are deliberately absent -
+# both stop at a `ctl/preset` ask, and running them alone could hide a lost ask
+# rather than remove load.
+#
+# `profile.fast` inherits this block, like job 1's. Checked from the record, not
+# from a green run, on cargo-nextest 0.9.140: in a `-P fast` JUnit report no other
+# testcase's [timestamp, timestamp + time] interval overlaps one of these by more
+# than the report's 1 ms resolution.
+[[profile.default.overrides]]
+filter = 'binary(/_cost$/) + binary(help_cli) + binary(stream_pipe) + (binary(dsp) & test(=one_hop_analyzes_well_under_the_hop_interval))'
+threads-required = "num-test-threads"

@@ -1,6 +1,6 @@
 # 0174 — The clock-reading tests run alone, and the two that fail on the control path are diagnosed first
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`
 > **Related ADRs:** [0193](../adrs/0193-a-test-that-reads-the-clock-runs-alone.md) (proposed),
@@ -179,15 +179,29 @@ flowchart TD
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(`main` directly, or the worktree path plus its branch)_
+**Lane:** `main` directly
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The timing-only tests run alone | dev | not started | |
+| 1 — The timing-only tests run alone | dev | committed with this row | |
 | 2 — The control-path pair says why it failed | dev | not started | |
 | 3 — The guard holds the override to the exemption | dev | not started | |
 
 ### Notes
+
+- **Phase 1, record used:** nextest's JUnit report from an uncommitted `[profile.fast.junit]`
+  stanza; intervals are `[timestamp, timestamp + time]` per testcase. After: 18 selected testcases,
+  13 with no overlap, 5 overlapping one or more others by exactly 1 ms each (the report's
+  resolution). Before, same record: 18 of 18 overlapping, 15 to 173 others each.
+- **Phase 1, `cargo nextest list -P fast -E '<the override filter>'`:** 18 tests - every test of
+  `arc_cost` (1), `collage_cost` (1), `field_cost` (1), `mark_cost` (1), `path_cost` (2),
+  `help_cli` (8), `stream_pipe` (3), plus `dsp one_hop_analyzes_well_under_the_hop_interval`. None
+  of the seven binaries has an `#[ignore]`d test.
+- **Phase 1, `-P fast` wall time, one run each (a reading, not a benchmark), user's uncommitted
+  `presets/lsystem_*.toml` edits in the tree for both:**
+  - before: `Summary [ 244.495s] 1633 tests run: 1633 passed (5 slow), 304 skipped`
+  - after: `Summary [ 398.197s] 1633 tests run: 1633 passed (2 slow), 304 skipped`
+  - +153.7 s; the plan's serial figure for the selected set is ~85 s.
 
 ### Close triggers
 
