@@ -1,6 +1,6 @@
 # 0171 — One stall policy, and a guarded clock
 
-> **Status:** draft
+> **Status:** approved 2026-09-14
 > **Created:** 2026-09-11
 > **Owner skill(s):** `dev`
 > **Related ADRs:** [0191](../adrs/0191-a-frame-delta-is-replaced-at-every-entry-and-nothing-below-keeps-a-policy.md)

@@ -1,6 +1,6 @@
 # 0172 — The studio's readings become true
 
-> **Status:** draft
+> **Status:** approved 2026-09-14
 > **Created:** 2026-09-11
 > **Owner skill(s):** `dev`, `studio-builder`
 > **Related ADRs:** [0192](../adrs/0192-a-preset-warning-names-its-parameter.md) (proposed),
@@ -53,11 +53,12 @@ flowchart LR
         RT["render_tapped (windowless)"] --> RF
         L["loader: warning = message + param?"]
         X["--schema export"]
+        SNT["preset_schema test: snapshot == document()"]
     end
     subgraph sa["standalone/"]
         ST["--stream loop + DiagLog rows"]
         EV["events: preset_warning {file, message, param}"]
-        SNT["test: snapshot == --schema"]
+        CHK["--check places a warning by param"]
     end
     subgraph repo["committed"]
         SNAP["docs/specs/player-schema.json"]
@@ -69,6 +70,7 @@ flowchart LR
     end
     RT --> ST
     L --> EV --> M
+    L --> CHK
     X --> SNT
     SNAP --> SNT
     SNAP --> W
@@ -92,15 +94,19 @@ flowchart LR
 
 ### Phase 2 — The player's schema is snapshotted and held to the engine
 - **Owner skill:** dev
-- **What:** Commit the `--schema` document at `docs/specs/player-schema.json`, and add a test in
-  `standalone/tests/` that renders the document through the same function `--schema` uses and fails
-  when it differs from the file, printing the command that regenerates it.
-- **Files touched:** `docs/specs/player-schema.json`, `standalone/tests/schema_snapshot.rs`.
+- **What:** Commit the `--schema` document (`rlx_core::preset::export::document()`) at
+  `docs/specs/player-schema.json`, and add a test beside the editor-schema test in
+  `core/tests/preset_schema.rs` that fails when `document()` differs from the file, printing the
+  command that regenerates it. It regenerates under the **same** `RLX_UPDATE_PRESET_SCHEMA=1` switch,
+  so one command rewrites every file derived from the export.
+- **Files touched:** `docs/specs/player-schema.json`, `core/tests/preset_schema.rs`,
+  `docs/developing.md` (the regenerate paragraph names the new file).
 - **Notes for the implementer:**
   - Compare with line endings normalized; a Windows checkout must not fail on CRLF alone.
-  - Plan 0169 (draft) commits a JSON Schema rendered from the same export for the editor. That is a
-    different artifact for a different reader; if 0169 has landed, check that the two cannot be one
-    file before adding a second.
+  - **Amended at approval, 2026-09-14:** Plan 0169 has landed. Its `presets/schema/*.schema.json`
+    are JSON Schemas rendered for taplo, selected by filename family; this snapshot is the studio's
+    panel feed. They are two artifacts for two readers and stay two files. The snapshot does **not**
+    go under `presets/schema/`, whose test fails on a file no system renders.
 - **Done when:** the test passes on the tree, and fails naming the regenerate command when one
   parameter's default in the snapshot is edited by hand (shown once in the log, then reverted).
 
@@ -112,15 +118,21 @@ flowchart LR
   absent), and spec 0003's `preset_warning` row gains the field.
 - **Files touched:** `core/src/preset/schema/mod.rs`, `core/src/preset/schema/load.rs`,
   `core/src/preset/mod.rs`, `standalone/src/preset_dir.rs`, `standalone/src/events.rs`,
+  `standalone/src/preset_check.rs`, `standalone/tests/preset_check.rs`,
   `docs/specs/0003-studio-control-protocol.md`, `core/tests/preset.rs`.
 - **Notes for the implementer:**
+  - **Amended at approval, 2026-09-14:** Plan 0169's `--check` is the second consumer.
+    `engine_diagnostics` in `preset_check.rs` emits every warning at file level, and its comment names
+    this exact change as the reason. When a warning carries `param`, it places it through
+    `locate_param`, the same way it places an error, and the comment goes.
   - If a warning reaches the C ABI anywhere, stop: that is spec 0001's shape, not this plan's.
   - The `--schema` export may change if it documents the event shape; regenerate the Phase 2 snapshot
     in this commit if so.
   - Spec 0003 says an added field is additive under the same `v`; no version moves.
 - **Done when:** loading a preset that binds a parameter its system does not declare emits a
   `preset_warning` whose `param` is that binding's name; a warning about no binding emits
-  `param: null`; each class of push site that sets `param` has one such test.
+  `param: null`; each class of push site that sets `param` has one such test; `ritmolux --check` on
+  the first preset reports the warning on that binding's line rather than at file level.
 
 ### Phase 4 — The studio reads the snapshot, anchors warnings and shows the rate
 - **Owner skill:** studio-builder
@@ -146,8 +158,9 @@ flowchart LR
 - **Diag's rate is wall-clock.** On the windowless path it reports the tap's throughput, which is what
   the operator is running at; it is not a display refresh. The footer should not be read as one.
 - **A missed push site is silent.** ADR-0192's Negative; the per-class tests are the only net.
-- **Plan 0169 overlaps twice** — both touch the warning type and both commit a file derived from
-  `--schema`. Whichever lands second reconciles; neither should duplicate the other's artifact.
+- **Plan 0169 overlapped twice, and landed first** (closed 2026-09-13). This plan reconciles both at
+  approval: the snapshot is a separate file held by 0169's own test and switch (Phase 2), and
+  `--check` becomes a consumer of `param` (Phase 3).
 
 ## What this plan does NOT do
 

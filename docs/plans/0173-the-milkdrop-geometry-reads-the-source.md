@@ -1,6 +1,6 @@
 # 0173 — The MilkDrop geometry reads the source
 
-> **Status:** draft
+> **Status:** approved 2026-09-14
 > **Created:** 2026-09-11
 > **Owner skill(s):** `dev`
 > **Related ADRs:** [0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)

@@ -46,11 +46,28 @@ place. The plan file carries the real link.
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
 | [0160](0160-the-silhouettes-preconditions-stop-being-silent.md) | The silhouette's preconditions stop being silent | approved | dev, human | ADR-0179: four preconditions on `[path]` that fail silently. **0092 closed 2026-09-09**, so its Phase 7 axis fix is in. Phase 2 is prose in `presets/README.md`. |
 | [0166](0166-the-basics-read-in-russian.md) | The basics read in Russian | approved | dev, human | ADR-0185: five docs gain a Russian sibling `.ru.md` stamped with the source sha. **Phase 3 is a `human` review that blocks publication.** Touches no Rust - orderable against any lane. |
-| [0170](0170-the-horizon-reads-the-frames-own-ground.md) | The horizon reads the frame's own ground | draft | dev | Backlog 0210 + 0211: `--horizon` and `--report` take ADR-0126's modal ground; the Larger than Life default is documented as settling, not changed. No new ADR. |
-| [0171](0171-one-stall-policy-and-a-guarded-clock.md) | One stall policy, and a guarded clock | draft | dev | ADR-0191 (proposed), backlog 0188-0190: every frame entry replaces a bad `dt` before the clock moves; three downstream guards go, a hygiene test holds it at one. |
-| [0172](0172-the-studios-readings-become-true.md) | The studio's readings become true | draft | dev, studio-builder | ADR-0192 (proposed), backlog 0202, 0205, 0209: windowless fps, a committed schema snapshot, `param` on warnings. Overlaps 0169 twice. |
-| [0173](0173-the-milkdrop-geometry-reads-the-source.md) | The MilkDrop geometry reads the source | draft | dev | Backlog 0119 + 0120 from MilkDrop 2's released source: `atan2` handedness, waveform base amplitude. No rig; each phase has a stop branch. |
+| [0170](0170-the-horizon-reads-the-frames-own-ground.md) | The horizon reads the frame's own ground | approved | dev | Backlog 0210 + 0211: `--horizon` and `--report` take ADR-0126's modal ground; the Larger than Life default is documented as settling. Disjoint from every other plan. |
+| [0171](0171-one-stall-policy-and-a-guarded-clock.md) | One stall policy, and a guarded clock | approved | dev | ADR-0191 (proposed), backlog 0188-0190: one `dt` guard at every frame entry, three downstream guards go. **Runs before 0172**: both edit the entries in `capture_api.rs`. |
+| [0172](0172-the-studios-readings-become-true.md) | The studio's readings become true | approved | dev, studio-builder | ADR-0192 (proposed), backlog 0202, 0205, 0209: windowless fps, a schema snapshot, `param` on warnings. Reconciled with closed 0169 at approval. After 0171. |
+| [0173](0173-the-milkdrop-geometry-reads-the-source.md) | The MilkDrop geometry reads the source | approved | dev | Backlog 0119 + 0120 from MilkDrop 2's released source: `atan2` handedness, waveform amplitude. No rig. **Runs before 0142**, which reuses its source commit. |
 <!-- roster:end -->
+
+**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two lanes.**
+Drafted 2026-09-11 from the backlog; 0172 was amended at approval because [0169] closed in between
+(its snapshot stays a separate file under 0169's own test and switch, and `--check` becomes a
+consumer of the new `param`). ADR-0191 and ADR-0192 stay `proposed` until their plans close.
+
+- **Lane 1 - [0171] then [0172], in series.** Both edit the live entries in `capture_api.rs` and
+  `render/mod.rs`: 0171 puts the `dt` guard first in each, 0172 adds `record_frame` beside it.
+  0172 Phase 4 hands off to `studio-builder` automatically (ADR-0188).
+- **Lane 2 - [0170] then [0173].** 0170 touches `metrics.rs` and `shot/` only. 0173 needs no rig,
+  and its Phase 1 source commit is what [0142] Phase 2 reads, so it goes before 0142.
+
+[0169]: done/0169-a-preset-is-checked-before-it-is-rendered.md
+[0170]: 0170-the-horizon-reads-the-frames-own-ground.md
+[0171]: 0171-one-stall-policy-and-a-guarded-clock.md
+[0172]: 0172-the-studios-readings-become-true.md
+[0173]: 0173-the-milkdrop-geometry-reads-the-source.md
 
 ~~**Added 2026-09-09 — [0158] and [0159] are drafted, and they are a program rather than a
 pair.**~~ — **fully spent 2026-09-10**, when [0159] closed behind [0158]. Both halves of the

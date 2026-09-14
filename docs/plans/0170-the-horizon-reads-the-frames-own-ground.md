@@ -1,6 +1,6 @@
 # 0170 — The horizon reads the frame's own ground
 
-> **Status:** draft
+> **Status:** approved 2026-09-14
 > **Created:** 2026-09-11
 > **Owner skill(s):** `dev`
 > **Related ADRs:** [0126](../adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md)
