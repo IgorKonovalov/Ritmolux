@@ -252,8 +252,8 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The gate reads the property that failed | dev | done | committed with this row |
-| 2 — The ceremony writes annotated tags, and the documents say why | dev | not started | |
+| 1 — The gate reads the property that failed | dev | done | 9c0d318 |
+| 2 — The ceremony writes annotated tags, and the documents say why | dev | done | committed with this row |
 | 3 — The stranded tags reach origin, and one release is published | human | not started | |
 
 ### Notes
@@ -263,6 +263,12 @@ flowchart LR
 - Phase 1, `--remote` exercised from a scratch repository pointed at `origin`: a `0.121.1` manifest
   exits 0; a `0.123.0` manifest exits 1 after the full poll, printing `nothing for this tag`.
   The lightweight-on-origin branch of its report was not exercised - `origin` carries no such tag.
+- Phase 2 edits a **third** tag-writing site in the architect `SKILL.md` beyond the two the phase
+  names: the worktree-close recovery paragraph (`main` moving during the close) also wrote
+  `git tag -d vX.Y.Z && git tag vX.Y.Z`, and the done-when grep matched it. It now reads
+  `git tag -a -f vX.Y.Z -m "chore: Release vX.Y.Z"`.
+- Phase 2 also adds a `--stranded`-once-per-close line to that skill step, beside the one the phase
+  names (run the offline check after tagging).
 
 ### Close triggers
 

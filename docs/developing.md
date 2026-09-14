@@ -133,6 +133,8 @@ What it runs, stopping at the first failure and naming the step that failed:
 | Contents blocks | `node scripts/toc.mjs --check` |
 | Contents blocks (self-test) | `node scripts/toc.mjs --self-test` |
 | Reader prose | `node scripts/check-reader-prose.mjs` |
+| Release tag | `node scripts/check-release-tag.mjs` |
+| Release tag (self-test) | `node scripts/check-release-tag.mjs --self-test` |
 | Format | `cargo fmt --all --check` |
 | Lint | `cargo clippy --workspace --all-targets -- -D warnings` |
 | Tests | `cargo nextest run --workspace -P fast` (narrowed — see below) |
@@ -149,11 +151,18 @@ comment may carry a relative link or plan-relative narration
 ([ADR-0127](adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md)),
 every citation in a reader document must sit inside a link
 ([ADR-0168](adrs/0168-the-reader-documents-address-a-reader-and-the-record-stays-a-link.md)),
-and every generated contents block must still match the headings beneath it
-([ADR-0163](adrs/0163-a-long-document-carries-a-generated-contents-block.md)).
-The two that could go green on a rule that had quietly stopped working — a roster
-detector matching nothing, an anchor rule that is merely plausible — carry a
-`--self-test` beside their check.
+every generated contents block must still match the headings beneath it
+([ADR-0163](adrs/0163-a-long-document-carries-a-generated-contents-block.md)),
+and the version root `Cargo.toml` declares must carry an annotated tag on `HEAD`'s
+history, because `git push --follow-tags` never sends a lightweight one
+([ADR-0203](adrs/0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md)).
+The three that could go green on a rule that had quietly stopped working — a roster
+detector matching nothing, an anchor rule that is merely plausible, a tag-type check
+that no longer looks — carry a `--self-test` beside their check.
+**The release-tag step refuses a push, not only a release:** from the moment a close
+moves the version, every push fails until that version's tag is annotated. CI's
+`links` job cannot read local tags, so it runs the same script with `--remote` on a
+push to `main` instead, and asks `origin`.
 If `node` is not on your `PATH` they all **skip with a notice** rather than
 failing the push; nothing else here needs Node. That skip is about the hook only
 — CI's `links` job runs the same checks on `ubuntu-latest`, where they cannot

@@ -150,7 +150,7 @@ docs/                # Full one-line-per-doc map: README.md "Repository layout".
                      #   CLONE — nothing runs until `git config core.hooksPath .githooks`, and the
                      #   studio step skips itself again on a clone with no studio/node_modules.
                      #   See README + ADR-0033.
-scripts/             # Repo maintenance. Nine Node gates. SEVEN run by pre-push and by the CI
+scripts/             # Repo maintenance. Ten Node gates. EIGHT run by pre-push and by the CI
                      #   `links` job; the other TWO run in neither, because they need a BUILT site -
                      #   they live in .github/workflows/pages.yml. check-site-links.mjs asserts that
                      #   no site-relative href in site/dist/ ends in .md, that every one resolves to
@@ -159,8 +159,8 @@ scripts/             # Repo maintenance. Nine Node gates. SEVEN run by pre-push 
                      #   from the menu rather than only by search, and that no route the splitter
                      #   produced exceeds 30,000 bytes of source (ADR-0166) - a route over that means
                      #   ADR-0166's arithmetic needs redoing, never that the constant needs raising.
-                     #   Of the seven, the first three and toc.mjs also run in the close
-                     #   ceremony, because a close is what breaks them. check-doc-links.mjs asserts
+                     #   Of the eight, the first three, toc.mjs and check-release-tag.mjs also run
+                     #   in the close ceremony, because a close is what breaks them. check-doc-links.mjs asserts
                      #   every relative markdown link resolves (moving a plan to plans/done/ breaks
                      #   links in both directions, and rejects a design-backlog fragment outright
                      #   per ADR-0149); check-index-rows.mjs holds every roster row to 320 bytes AND
@@ -173,7 +173,12 @@ scripts/             # Repo maintenance. Nine Node gates. SEVEN run by pre-push 
                      #   — a block is generated, never hand-edited; check-reader-prose.mjs holds the
                      #   reader documents it lists to the opposite of ADR-0127's rule — every Plan/ADR
                      #   citation inside a markdown link, never bare in a sentence (ADR-0168), the
-                     #   two rules meeting at a filename list inside that script.
+                     #   two rules meeting at a filename list inside that script;
+                     #   check-release-tag.mjs asserts the version root Cargo.toml declares has an
+                     #   ANNOTATED `v` tag - offline at pre-push (exists, annotated, on HEAD's
+                     #   history), `--remote` in CI on a push to main (origin advertises it), and
+                     #   at the close after the tag is written, with `--stranded` listing any older
+                     #   tag origin lacks (ADR-0203).
                      #   scripts/fixtures/ holds their seeded bite checks.
                      #   RENDERERS, NOT GATES: docs-shots.mjs (regenerates docs/images/),
                      #   tuple-sheets.mjs + tuple-paths.mjs (attractor roster/walk contact

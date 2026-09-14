@@ -44,8 +44,14 @@ build of the tag carries all three:
 # edit "version" in studio/package.json and EXPECTED_PLAYER_VERSION in studio/shared/protocol.ts
 (cd studio && npx vitest run shared/version.test.ts)   # holds all three equal
 git commit -m "fix(studio): the two version copies follow the workspace to X.Y.Z" -- studio/package.json studio/shared/protocol.ts
-git tag -d vX.Y.Z && git tag vX.Y.Z
+git tag -a -f vX.Y.Z -m "chore: Release vX.Y.Z"
+node scripts/check-release-tag.mjs     # the tag exists, is annotated, and is on HEAD's history
 ```
+
+**Move the tag with `-a -f`, never with `git tag -d` and a plain `git tag`.** `-f` moves it; `-a`
+keeps it an annotated tag object carrying the message `cargo release` wrote. A plain `git tag`
+writes a *lightweight* tag, and the push below never sends one of those
+([ADR-0203](adrs/0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md)).
 
 **`EXPECTED_PLAYER_VERSION` is the copy that ships wrong.** The packaging scripts override
 `package.json`'s version at build time, but the constant is compiled into the renderer bundle, so a
@@ -65,8 +71,16 @@ a deliberate future act (freezing the C ABI and standalone behavior), never back
 pushes — the architect never does.
 
 ```sh
-git push --follow-tags
+git push --follow-tags origin main
 ```
+
+**`--follow-tags` sends annotated tags only**, and only those pointing at a commit the push carries.
+A lightweight tag stays on your machine without a word, which is how eight of the ten tags stranded
+on 2026-09-14 got there; two annotated ones were left behind by whatever push was actually run. So
+the property is checked rather than the habit: the pre-push hook runs
+`node scripts/check-release-tag.mjs`, which refuses the push while the version `main` declares has
+no annotated tag on `HEAD`'s history, and CI's `links` job runs it with `--remote` on every push to
+`main`, which goes red until `origin` advertises that tag as annotated.
 
 **Push one tag, not a backlog of them.** GitHub does not start workflows for tags pushed in bulk, so
 a `git push --tags` carrying more than three of them fires nothing at all — no Release run, no
@@ -115,7 +129,10 @@ string.
 **A tag push is outward-facing.** Since ADR-0038 this is the last step of every close ceremony
 whose tag gets pushed, so every plan close now publishes a public prerelease whether or not that
 build was meant for anyone. `--prerelease` while in `0.x` softens the implication; it does not
-remove it. If a close should *not* publish, do not push the tag.
+remove it. If a close should *not* publish, do not push the tag — and expect `main`'s CI to go
+red on its next push: the `links` job's release-tag step fails until that version's tag reaches
+`origin`, or until the next close bumps the version past it. That red run is the documented cost of
+holding a tag back, not a fault to chase.
 
 **Editing anything under `.github/workflows/` needs the `workflow` OAuth scope** on the git
 credential. Without it the push is rejected with a scope error that names neither the file nor
@@ -161,6 +178,27 @@ needs a Mac — the ad-hoc signature, the `lipo` calls and the `plutil` assertio
 equivalent. Both take `--skip-build` / `-SkipBuild` to reuse the release binaries and the
 installed `node_modules`, for iterating on the zip's layout without paying for an `lto = "fat"`
 rebuild.
+
+### A tag that did not reach origin
+
+The gate reads only the version at the tip, so two bumps before one push can still strand the
+older tag. List every local `v*` tag `origin` lacks — a listing, never a failure, and it names no
+`batch/*` scratch ref:
+
+```sh
+node scripts/check-release-tag.mjs --stranded     # one line per tag: name, annotated or lightweight
+```
+
+Repair each one on the commit it already names, then push it **by name**, never with `--tags`:
+
+```sh
+git tag -a -f vX.Y.Z 'vX.Y.Z^{commit}' -m "chore: Release vX.Y.Z"   # only if it printed lightweight
+git push origin vX.Y.Z
+```
+
+One tag per push publishes one release. Several in one push can fire nothing at all (see "Push
+one tag" above), so if a whole backlog of them should reach `origin` *without* releases, disable
+`release.yml` and `ci.yml` for that one push rather than rely on that suppression.
 
 ### While you are here: read the component's size
 

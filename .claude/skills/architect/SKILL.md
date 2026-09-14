@@ -703,11 +703,16 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
    # set both copies to X.Y.Z, then from studio/:
    npx vitest run shared/version.test.ts
    git commit -m "fix(studio): the two version copies follow the workspace to X.Y.Z" -- studio/package.json studio/shared/protocol.ts
-   git tag -d vX.Y.Z && git tag vX.Y.Z     # the tag moves onto the sync commit
+   git tag -a -f vX.Y.Z -m "chore: Release vX.Y.Z"   # the tag moves onto the sync commit, annotated
+   node scripts/check-release-tag.mjs                # exits 0: annotated, and on HEAD's history
    ```
 
    The tag has to sit on the sync commit, because a studio built from the release commit alone is
-   the broken artifact the test exists to prevent.
+   the broken artifact the test exists to prevent. **Every tag you write is annotated (`-a`)**:
+   `git push --follow-tags` never sends a lightweight one, and a plain `git tag` writes exactly that
+   (ADR-0203). **Run `node scripts/check-release-tag.mjs` after every tag you write or move**, and
+   `node scripts/check-release-tag.mjs --stranded` once per close — it lists any older `v*` tag that
+   never reached `origin`, which the tip-only gate cannot see.
 
    **If a parallel lane is live, `cargo release` will refuse** — it aborts on *any* dirty file
    ("uncommitted changes detected"), and at Plan 0060's close another session's three in-progress
@@ -720,7 +725,7 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
    # edit [workspace.package].version in root Cargo.toml
    cargo update --workspace --offline      # moves only the workspace members in Cargo.lock
    git commit -m "chore: Release" -- Cargo.toml Cargo.lock
-   git tag vX.Y.Z
+   git tag -a vX.Y.Z -m "chore: Release vX.Y.Z"
    ```
 
    The studio sync above follows the manual path exactly as it follows the tool — the two copies
@@ -791,7 +796,7 @@ the line is absent (a plan predating [ADR-0120](../../../docs/adrs/0120-the-clos
    **`main` can move during the close, not just before it.** At Plan 0099 a parallel session landed two
    doc commits while the bookkeeping was being written and the `--ff-only` was refused twice. Recovery
    is cheap but has one non-obvious step: after each re-`git merge main`, the `vX.Y.Z` tag is stranded
-   on a commit that is no longer the branch tip, so `git tag -d vX.Y.Z && git tag vX.Y.Z` **before**
+   on a commit that is no longer the branch tip, so `git tag -a -f vX.Y.Z -m "chore: Release vX.Y.Z"` **before**
    retrying the fast-forward.
 5. **The user pushes** — `main` and the tag. You never push.
 6. **Remove the lane's worktree — the same session the plan closes, not "later".** Each worktree carries
