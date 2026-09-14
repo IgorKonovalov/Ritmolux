@@ -287,8 +287,8 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The ease snaps at its fixed point | dev | done | committed with this row |
-| 2 — The reader and the five presets say what is true | dev | not started | |
+| 1 — The ease snaps at its fixed point | dev | done | 26ce31f |
+| 2 — The reader and the five presets say what is true | dev | done | committed with this row |
 | 3 — Nothing below the seam keeps a frame-delta policy | dev | not started | |
 
 ### Notes
