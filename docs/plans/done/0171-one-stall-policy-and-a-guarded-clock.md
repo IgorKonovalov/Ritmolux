@@ -1,10 +1,12 @@
 # 0171 — One stall policy, and a guarded clock
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-14. Phases `12b05f6` (1) and `bb4d318` (2). Mode 4: no blockers,
+> no majors, two minors, two nits. Architect's full `cargo nextest run --workspace`: 1916 passed, 6 skipped, matching the log.
+> ADR-0191 accepted with an Outcome. Version 0.122.1 (patch).
 > **Created:** 2026-09-11
 > **Owner skill(s):** `dev`
-> **Related ADRs:** [0191](../adrs/0191-a-frame-delta-is-replaced-at-every-entry-and-nothing-below-keeps-a-policy.md)
-> (proposed), amending [0152](../adrs/0152-the-frame-delta-is-sanitized-at-the-scene-seam.md)
+> **Related ADRs:** [0191](../../adrs/0191-a-frame-delta-is-replaced-at-every-entry-and-nothing-below-keeps-a-policy.md)
+> (accepted), amending [0152](../../adrs/0152-the-frame-delta-is-sanitized-at-the-scene-seam.md)
 > **Closes:** design-backlog 0188, 0189, 0190.
 
 ## TL;DR
@@ -171,3 +173,8 @@ flowchart LR
 - **Outstanding `human` phases:** none
 
 ## Followups (after this lands)
+
+- **Three positivity-only guards survive below the entries, and the hygiene test cannot see them:**
+  `Easing::step`'s `dt <= 0.0` snap to `raw`, the latch countdown's `dt.max(0.0)` in
+  `render/evaluate.rs`, and the MilkDrop decay's `dt.max(1e-6)` in `warp_mesh/shader.rs`. All are
+  unreachable on the frame path. Filed as design-backlog 0212; recorded in ADR-0191's Outcome.

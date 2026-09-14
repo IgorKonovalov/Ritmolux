@@ -1,8 +1,8 @@
 # ADR-0191 — A frame delta is replaced at every entry that takes one, and nothing below keeps a policy of its own
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-14 (Plan 0171), with an Outcome
 > **Date:** 2026-09-11
-> **Related plan(s):** [0171](../plans/0171-one-stall-policy-and-a-guarded-clock.md)
+> **Related plan(s):** [0171](../plans/done/0171-one-stall-policy-and-a-guarded-clock.md)
 > **Amends:** [ADR-0152](0152-the-frame-delta-is-sanitized-at-the-scene-seam.md) — moves its check
 > above the scene clock, and retires the three policies it left standing below it.
 
@@ -93,3 +93,26 @@ frame carries for a behaviour nobody has observed.
 The cheapest repair, and the one backlog 0190 names as a possible doc fix. It lost because four
 answers to one question survive, and the next guard is added or removed by a reader who cannot tell
 which of them is deliberate.
+
+## Outcome (2026-09-14, at Plan 0171's close)
+
+The Decision landed as written: `sanitize_frame_dt` in `core/src/render/mod.rs` is called first by
+`render`, `render_tapped` and `capture_stream`, every `draw_frame` caller hands it either that result
+or a `FALLBACK_DT` literal, and `core/tests/hygiene.rs` holds the finiteness-guard population at one.
+Two things the Context got wrong, recorded here rather than edited in.
+
+**The population below the check was five, not three.** The Context names the composite, the
+transition and the MilkDrop envelopes. The hygiene scan, run over all of `core/src/`, found a fourth
+in the cellular `GenerationClock::advance` (non-finite ran zero generations), and the now-playing
+banner carried a fifth that the plan had named only conditionally. Both were deleted under this
+Decision. That is the third time a hand enumeration of this population came up short, which is the
+argument for the counting test rather than a correction to it.
+
+**"Nothing below keeps a policy" holds for finiteness, not for positivity.** Three guards on a frame
+delta survive, each checking sign or size only, so the test's pattern does not match them:
+`Easing::step` returns `raw` for `dt <= 0.0` (a snap, where the arithmetic would hold), the latch
+countdown in `render/evaluate.rs` clamps `dt.max(0.0)`, and the MilkDrop decay exponent in
+`warp_mesh/shader.rs` floors `dt.max(1e-6)`. The entry's substitution makes all three unreachable on
+the frame path, so nothing renders differently; they are the same kind of dormant second answer this
+ADR retired, in a spelling the gate was not written to see. Filed as design-backlog 0212, with the
+MilkDrop floor noted as possibly arithmetic rather than policy (`0^0` against `0^dt`).
