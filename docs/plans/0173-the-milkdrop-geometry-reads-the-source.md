@@ -140,11 +140,30 @@ original v2.25c release commit. Facts, with file, function and line, are on back
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Read the two facts from the source | dev | committed with this row | |
-| 2 — The seam matches the reference | dev | not started | |
+| 1 — Read the two facts from the source | dev | done | `83a419d` |
+| 2 — The seam matches the reference | dev | committed with this row, no code change | |
 | 3 — The waveform takes the reference's base amplitude | dev | not started | |
 
 ### Notes
+
+- **Phase 2 took the agreement branch on a different function than the phase names.** The phase
+  keys on `vertex_position`, but a converted preset's per-vertex `ang` comes from
+  `MilkRuntime::run_vertex` (`core/src/milk/mod.rs`, called from `warp_mesh/encode.rs`), and that one
+  matches the source. `vertex_position` differs from the source in range and cut and is read only by
+  the native `[per_vertex]` path (`core/src/render/evaluate.rs`); it was left alone. The user chose
+  this at an escalation after Phase 1. The pinning test
+  `ang_cuts_on_plus_x_and_turns_counter_clockwise_on_screen` is unchanged and pins the native
+  function, not the converted one.
+- **Followups noticed, not acted on:**
+  - The emitted comp-stage epilogue (`milkconv/src/shader/emit.rs` `fs_main`) uses the warp stage's
+    `rad`/`ang` for both stages; the source's comp stage is clockwise, `0..2pi`, cut on +x, with
+    `rad` 1 at the corners (0119's update, fact 3). Outside this plan's scope by its own
+    "does NOT do".
+  - The doc comment on `ang_cuts_on_plus_x_and_turns_counter_clockwise_on_screen`
+    (`warp_mesh/tests.rs`) says MilkDrop's `atan2` "has the same cut" on +x; the source puts the
+    per-vertex cut on −x.
+  - What produces 0119's observed seam on *Songflower* and *chasers 19 Portal* is not settled by the
+    source: the per-vertex `ang` a converted preset reads cuts on −x, not +x.
 
 ### Close triggers
 
