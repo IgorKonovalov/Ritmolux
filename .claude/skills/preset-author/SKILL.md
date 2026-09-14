@@ -32,20 +32,22 @@ in-repo documents are maintained by the architect close ceremony and are the wor
 | The expression language: variables, constants, functions, comparisons, idioms, error surface | **`docs/presets.md`** |
 | Colour in depth: built-in palettes, custom stops, per-scene colour params, A/B crossfade | **`docs/preset-palettes.md`** |
 | The `shot` CLI in full | **`docs/capturing.md`** |
+| One system's exact `[params]` set as data — every name it accepts, with default, range and doc text (the structural tables are listed too, but unscoped: every system's file carries all of them) | **`presets/schema/<system>.schema.json`** (one per system; `presets/preset.schema.json` is the generic fallback) |
 
 Those docs are good today, but **code still wins** if they ever disagree. The source of truth for
 each surface:
 
 | Surface | Code |
 |---------|------|
-| Valid `system = "…"` names | `SystemKind::from_name` / `SystemKind::ALL` — `core/src/preset/schema.rs` |
+| Valid `system = "…"` names, and each system's filename family | `SystemKind::from_name` / `SystemKind::ALL` / `SystemKind::family` — `core/src/preset/schema/system.rs` |
 | Expression variables | `VAR_NAMES` — `core/src/preset/expr.rs` |
 | Expression functions + arity | `Func::from_name` / `Func::arity` — `core/src/preset/expr.rs` |
-| A scene's exact param set | that scene's `PARAMS` const beside its `set_param` — `core/src/render/scenes/**` |
-| Engine-stage params (`bg_*`, `trails`, `kaleido_*`, `ink_*`/`paper_*`) | the `PARAMS` const in `core/src/render/{background,trails,kaleidoscope,ink}.rs` |
-| Structural tables + validation | `RawPreset` / `into_lsystem` / `into_star` / `build_config` — `core/src/preset/schema.rs` |
-| Palette names + stop rules | `NamedPalette::from_name`, `validate_stops` — `core/src/render/palette.rs` |
-| `shot` CLI flags | the arg parser in `standalone/examples/shot.rs` |
+| A scene's exact param set | that scene's `PARAMS` const (`ParamSpec` declarations) beside its `set_param` — `core/src/render/scenes/**` |
+| Engine-stage params (`bg_*`, `trails`, `kaleido_*`, `bloom_*`, `occlude`, `exposure`, `ink_*`/`paper_*`) | `GLOBAL_PARAMS` in `core/src/preset/schema/system.rs`, which gathers the `PARAMS` of `core/src/render/{background,trails,kaleidoscope,bloom,tonemap,ink}.rs` and `post.rs`'s `CHAIN_PARAMS` |
+| Structural tables + validation | `RawPreset` (`schema/raw/preset.rs`), `into_lsystem` / `into_star` (`schema/raw/generator.rs`), `build_config` (`schema/load.rs`) — all under `core/src/preset/schema/` |
+| Palette names + stop rules | `NamedPalette::from_name` — `core/src/render/palette.rs`; `validate_stops` — `core/src/preset/schema/raw/palette.rs` |
+| `shot` CLI flags | the arg parser in `standalone/examples/shot.rs`; `--set` keys and `--signal` kinds in `standalone/src/shot/args.rs` |
+| `ritmolux --check` rules | `standalone/src/preset_check.rs` |
 
 If a doc and the code disagree, the **code wins** — surface the drift (and, if it's a capability you
 wanted, that's API feedback).
@@ -57,16 +59,20 @@ want — **do not read the codebase or glob `presets/`.** In a sentence or two, 
 preset content — audio-reactive `.toml` looks — render-and-verify them, and flag engine gaps) and ask
 what they want to build or tune. Then wait. The reads above are task-grounded, not a startup routine.
 
-## Who else lives here — the three-lane ecosystem
+## Who else lives here — the four-lane ecosystem
 
 - **`architect`** — owns `docs/`: plans, ADRs, diagrams, reviews. When a look needs something the
   preset surface can't express (a new scene, a new param, a new function, a new curve family, a
   shader), you hand a **feedback note** to `architect`, who decides whether it's an ADR + plan.
+  `architect` also curates the shipped *set* at plan close (ADR-0081).
 - **`dev`** — owns all engine code (`core/`, `standalone/`, `plugin-foobar/`). `dev` builds the
   scenes and grammar you compose against.
+- **`studio-builder`** — owns `studio/`, the Electron studio that edits a preset by driving the
+  player (ADR-0177). It is a tool you may author *in*, never code you edit; a studio defect or a
+  missing studio affordance is a note to that lane.
 
-The hard rule: **`architect` designs, `dev` builds, you compose content — never invert.** A preset
-that "needs just a small code change" is not a preset, it's a routed request.
+The hard rule: **`architect` designs, `dev` and `studio-builder` build, you compose content — never
+invert.** A preset that "needs just a small code change" is not a preset, it's a routed request.
 
 ## The authoring surface in one screen
 
@@ -86,18 +92,24 @@ copy here does:
   parameter that is not in there does not exist.
 
 `ls presets/*.toml` is the third answer and the cheapest: the shipped set is named
-`<system>_<look>.toml`, so the roster is in the filenames.
+`<family>_<look>.toml`, where the family is one `_`-separated segment of the system name
+(`curve_*` is `parametric_curve`, `collage_*` is `shape_collage`, `analytic_*` is
+`analytic_field` — `SystemKind::family` is the map), so the roster is in the filenames.
 
-**Every** preset, whatever its system, may additionally bind the engine-wide composite: the shared
-view transform (`zoom`, `pan_x`, `pan_y`), the background pre-pass (`bg_*`), feedback `trails`, the
-screen-space kaleidoscope (`kaleido_*`), `bloom_*`, the frame `exposure`, and the terminal
-ink-on-paper remap (`ink_amount`, `paper_*`, `ink_*`). Line systems also take the geometry mirror
-(`mirror_*`).
+**Every** preset, whatever its system, may additionally bind the engine-wide composite: the
+background pre-pass (`bg_*`), feedback `trails`, the screen-space kaleidoscope (`kaleido_*`),
+`bloom_*`, the frame `exposure`, and the terminal ink-on-paper remap (`ink_amount`, `paper_*`,
+`ink_*`). The shared view transform (`zoom`, `pan_x`, `pan_y`) is declared by **almost** every
+system — `shape_field` and `shape_collage` take no `zoom`, and `warp_mesh` no `pan_x`/`pan_y`; the
+system's schema or `presets/README.md` table is the check. Line systems also take the geometry
+mirror (`mirror_*`).
 
 **The expression grammar** (every `[params]` value is a quoted string, even a bare number):
 
-- **Variables (19):** `bass mid treb onset beat bar time tempo novelty bass_raw mid_raw treb_raw
-  onset_raw beat_index time_since_beat beat_in_bar bar_index bar_phase index`.
+- **Variables:** `bass mid treb onset beat bar time tempo novelty bass_raw mid_raw treb_raw
+  onset_raw beat_index time_since_beat beat_in_bar bar_index bar_phase index`, plus `x y rad ang`
+  — the vertex's own position, live only inside a `[per_vertex]` binding and `0` elsewhere — and the
+  names you declare in a `[latch]` table (ADR-0137), which resolve onto reserved slots at load.
   **Since ADR-0049 (Plan 0048) `bass`/`mid`/`treb`/`onset` really are `0..1`** — each is a fraction
   of its own slowly-decaying recent peak, so `> 0.5` means "loud for this track" on any track at any
   gain. Real-music means are about `0.42 / 0.41 / 0.22 / 0.20`. **The old "bands read small" habit is
@@ -132,8 +144,8 @@ ink-on-paper remap (`ink_amount`, `paper_*`, `ink_*`). Line systems also take th
 - **`hash(x)` / `noise(x)` are the seeded randomness** (Plan 0047). `hash` scatters — neighbouring
   arguments give unrelated results in `[0, 1)`; `noise` wanders — smooth over one unit of `x`, in
   `[0, 1]`. Both are pure functions of the argument and the preset's `[generator] seed`, so nothing
-  about determinism changes. **Reach for `noise(time * k)` instead of summing detuned sines** (the
-  older files fake a wander with three or four; `attractor_dejong` has four), and for `hash` when you
+  about determinism changes. **Reach for `noise(time * k)` instead of summing detuned sines** (older
+  files fake a wander with three or four), and for `hash` when you
   want something genuinely *different* per beat or per element rather than merely louder:
   `hash(floor(time * 2))`, `hash(index * 64)`. Sum `noise` calls at different rates for depth; offset
   the argument (`+ 50`) to decorrelate two parameters. `seed = "random"` re-rolls on every preset
@@ -174,7 +186,9 @@ ink-on-paper remap (`ink_amount`, `paper_*`, `ink_*`). Line systems also take th
 
 **Beyond expressions:** `[smoothing]` low-passes a param (a time constant in seconds, a bare number —
 not an expression) so band/beat motion eases instead of snapping; `[palette]` / `[palette_b]` +
-bindable `palette_mix` set colour on the four shader-coloured scenes.
+bindable `palette_mix` set colour on every scene (ADR-0059). `[hold]` re-samples a value on a musical
+edge and holds it in between; `[latch]` arms on one condition and fires on another — the two
+answers to "hold this until the next beat" (`docs/presets.md` has a section on each).
 
 **The two things to internalise:** almost every binding is still **gain-then-bound** —
 `clamp(bass * G, 0, C)` — over a **baseline**: `0.4 + clamp(...)`, never bare reactive. But since
@@ -224,14 +238,33 @@ accents, `[smoothing]` where a driver would otherwise snap. Craft: `references/c
 ### 4 — Check, render, verify, measure (this is what makes the lane trustworthy)
 **Check before you render.** `--check` runs the engine's own loader over the file with no GPU and
 answers in one process start: every error and warning at `path:line:col`, plus the house-style rules
-(`file-name`, `header-comment`, `hex-case`, whitespace). `--strict` makes a warning fail too, which is
-the setting to draft under — it is the only tool here that shows a misspelled parameter, and the
-test suite refuses a warning in `presets/` anyway. Reference: `docs/presets.md`, "Check it before you
-render it".
+(`hex-case`, `trailing-whitespace`, `final-newline`, `tab` everywhere; `file-name` and
+`header-comment` only on library files in `presets/`, `presets/proposed/` and `presets/pending/`).
+`--strict` makes a warning fail too, which is the setting to draft under — it is the fastest verdict
+on a misspelled parameter, a full check with no GPU and no render, and the test suite refuses a
+warning in `presets/` anyway. Reference: `docs/presets.md`, "Check it before you render it".
 
 ```sh
 cargo run -q -p standalone --bin ritmolux -- --check presets/my_draft.toml --strict
 ```
+
+**The editor schemas, and why the filename matters.** The engine's parameter declarations are also
+rendered as JSON Schemas (ADR-0190): one self-contained file per system under `presets/schema/`,
+selected by the root `.taplo.toml`, so VS Code with Even Better TOML completes parameter names,
+shows each one's doc on hover, and underlines a key the system does not accept. They are generated
+— never hand-edit them; if one looks wrong the engine declaration is what's wrong (API feedback).
+The schema is picked by the **filename's family prefix**, not by `system = "…"`:
+`analytic_*` → `analytic_field`, `collage_*` → `shape_collage`, `curve_*` → `parametric_curve`,
+and so on — `.taplo.toml` is the full map. Family schemas cover files in `presets/`,
+`presets/proposed/` and `presets/pending/`. A file there named off its family gets **either** the
+generic schema (validation, **no completion**) **or, worse, another family's** — `shape_x.toml`
+declaring `shape_collage` matches the `shape_*` glob and is completed and underlined against
+`shape_field`'s parameters, so correct keys show as unknown. Every teaching file under
+`docs/examples/` gets the generic schema, and a draft in a working folder outside those paths gets
+no schema at all. So name a draft by its family from the first save; `--check`'s `file-name` rule
+warns on an off-family name, but only for a file in those three library folders. The schemas are an
+editor aid only: `--check` is still the verdict, and it is the only one of the two that sees an
+expression error.
 
 A preset you haven't rendered is a guess — and **a bare still is a dead still** (default stimulus is
 silence). Point `shot` straight at the file; there is no copy-into-`%APPDATA%` dance any more:
@@ -424,10 +457,10 @@ could not express (`references/api-feedback.md`).
   Nothing about the dissolve is preset-authored today — a per-preset `[transition]` is a deliberate
   follow-up, not a gap to work around.
 - **A misspelled param name still loads.** Since ADR-0020 the loader *warns* — but the binding is
-  kept and nothing reads it. Worse for this lane: **`shot` prints load errors and swallows
-  warnings**, so a typo is invisible in exactly the tool you verify through (a known open minor).
-  **`ritmolux --check <file> --strict` is what catches it** (step 4) — run it before every render
-  rather than trusting a clean one.
+  kept and nothing reads it, so the render looks "fine, just not doing what I asked". `shot` prints
+  the warning to stderr (`shot: preset …: warning: …`), where it scrolls past a build log easily;
+  **`ritmolux --check <file> --strict` is what makes it fail** (step 4) — run it before every render
+  rather than trusting a clean-looking one.
 - **A bare still is silent.** Always `--set` a loud frame or use `--signal`.
 - **`--set` cannot drive the spectrum — only `--signal` / `--audio` can.** `apply_set` writes the
   frame *scalars* and there is deliberately no key for the 64-band array, so **every `bin()` term
@@ -462,13 +495,16 @@ could not express (`references/api-feedback.md`).
 - **`[palette]` now reaches every scene, line scenes included** (Plan 0054 / ADR-0059) — it used to
   be silently inert on them. Each line scene walks `hue_spread` along its own axis: path position,
   generation depth, radius, band index. Two axes are genuinely flat and the docs say so — a
-  bracket-free grammar has one generation, and `star_pattern`'s radius has no spread.
+  bracket-free grammar has one generation, and a **bare** `star_pattern` interlace has no radial
+  spread. Declare `[generator] rings` (ADR-0079) and the star's radius axis becomes live.
 - **A partial `ink_amount` is a transition, not a resting value** — it blends toward a near-black
   source and greys the paper. Pick `0` or `1`, or travel between them.
 - **Division can yield NaN/Inf**, which flows straight into the scene as broken geometry — avoid
   `/ bass` style denominators that can reach zero.
-- **Geometry caps are real:** `MAX_SEGMENTS = 20_000` across the line scenes, `max_depth ≤ 7` for an
-  L-system. Overflow is surfaced, not silent — but the figure is truncated.
+- **Geometry caps are real:** the line scenes share a per-tier segment cap
+  (`TierConfig::max_segments` in `core/src/render/tier.rs` — author against the `Floor` value, which
+  is the one shipped presets are held to), and `max_depth ≤ 7` for an L-system. Overflow is surfaced,
+  not silent — but the figure is truncated.
 
 ## Commit hygiene
 
@@ -485,6 +521,11 @@ parser rejects — use the `Write` tool, and check the diff.
 
 - **You do not write engine Rust** (`core/`, `standalone/`, `plugin-foobar/`). A look that needs code
   is a routed request to `architect` + `dev`, not a workaround.
+- **You do not edit `studio/`** — that is `studio-builder`'s TypeScript, even when the friction you
+  hit was in the studio.
+- **You do not hand-edit generated files** — `presets/schema/*.json`, `.taplo.toml`, and the
+  generated parameter block in `presets/README.md`. A wrong row there is a wrong engine declaration,
+  which is feedback.
 - **You do not start a new world from an old preset file** (the fresh-slate rule, ADR-0089) —
   consult old files only for a measured ceiling, recorded in the new header.
 - **You do not invent grammar.** Verify against the code; if it's missing, that's feedback.

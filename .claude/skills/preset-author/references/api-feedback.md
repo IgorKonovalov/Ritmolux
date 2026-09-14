@@ -41,16 +41,19 @@ filing it as new.
 ## Gaps that are still real (verify before reporting — the surface keeps moving)
 
 **Expression grammar**
-- **No stateful expressions** (`smooth()`, `slew()`, a per-frame accumulator, a latch). The
-  evaluator is pure by hard invariant; smoothing lives in the render layer as `[smoothing]`, which
-  covers easing but **not** "hold this value until the next beat". Beat-latched state is a real,
-  repeatedly-felt gap.
+- **No stateful expressions** (`smooth()`, `slew()`, a per-frame accumulator). The evaluator is
+  pure by hard invariant, and state lives in render-layer tables instead: `[smoothing]` eases,
+  ~~beat-latched state~~ is **delivered** — `[latch]` (ADR-0137) arms on one condition and fires on
+  another, and `[hold]` re-samples a value on a musical edge and holds it in between (both in
+  `docs/presets.md`). What is still absent is an expression that reads its own previous value.
 - ~~**No per-bin spectrum access**~~ — **delivered by Plan 0034.** `bin(x)` samples the 64-band
   log-spaced array at a normalized position; a `spectrum` system draws N elements off it; and a
   binding naming `index` is evaluated once per element. Note `bin()` is a **narrow probe** (~2 of
   the 64 bands, a window ~0.032 wide in `x`), not a region average — see backlog 0016. Still
   absent: `bin_range(lo, hi)`.
-- **No randomness / noise function** (by design: determinism, NFR §6).
+- ~~**No randomness / noise function**~~ — **delivered by ADR-0051.** `hash(x)` scatters and
+  `noise(x)` wanders, both seeded by `[generator] seed`, so determinism holds (`docs/presets.md`,
+  "`hash(x)` and `noise(x)` — seeded randomness").
 - No user-defined variables or intermediate bindings — a long expression cannot be factored, so a
   repeated sub-expression is written out each time.
 
@@ -59,24 +62,28 @@ filing it as new.
   `superformula`, `harmonograph` — with `pen`, `sym`, `sharpness`, `lobe` and `decay` beside them.
   The epitrochoid needs no arm of its own: it is `hypotrochoid` with a negative `n`. Fractal
   flames stay catalogued (`docs/generative-techniques-catalogue.md`) and unbuilt.
-- **Four star tilings** (4/6/8/12). `variant` is a **continuous** contact angle since Plan 0054
-  (ADR-0060) — fractional values are real rosettes and `[smoothing]` on it morphs. The rosette's
-  **interior** is still empty at every angle, which is the open half of design-backlog 0007.
+- **Four star tilings** (4/6/8/12), plus `tiling = "none"` for a rings-only figure. `variant` is a
+  **continuous** contact angle since Plan 0054 (ADR-0060) — fractional values are real rosettes and
+  `[smoothing]` on it morphs. ~~The rosette's interior is empty~~ — **delivered by ADR-0079**:
+  `[generator] rings` fills it with concentric rings of motifs, moved by `ring_phase`,
+  `ring_spread` and `ring_scale` (design-backlog 0007 is closed). The motif roster is closed, so a
+  motif outside it is still feedback.
 - **No author-supplied shader/WGSL pass** — you cannot write a look the built-in scenes can't draw.
 - **Particle/segment counts are not preset-settable**: the attractor's particle count is fixed
   (`samples` on the curve is, but the swarm's and attractor's populations are not).
 - **No tempo-varying structural morph on the rose** beyond `n`/`d`/`phase`/`radial_offset`.
 
 **Composite / colour**
-- The composite order is **fixed**, not a graph — no reordering, no per-stage routing, no
-  multi-scene compositing (two scenes at once).
+- The composite order is **fixed**, not a graph — no reordering, no per-stage routing. A preset
+  may compose **one** second scene through `[layer]` (ADR-0090), sharing the main scene's
+  `[palette]`; a third scene, or a second palette for the layer, is still absent.
 - **`mirror_*` is line-only**; the screen-space kaleidoscope is the general tool.
 - ~~**`[palette]` is silently inert on the three line scenes**~~ — **fixed by Plan 0054 /
   ADR-0059.** Every scene now reaches `[palette]`, `[palette_b]`, `palette_mix`, `hue_spread` and
   `saturation`. Each line scene walks `hue_spread` along its own axis (path position / generation
   depth / radius / band index) — the table is in `presets/README.md`. Two live limits: a
-  bracket-free grammar (`lsystem_arrowhead`) has one generation, and `star_pattern`'s radial ramp
-  is measurably flat until its interior is redesigned.
+  bracket-free grammar (a Koch-style `F = "F+F--F+F"`, as in `lsystem_rime`) has one generation, and
+  a bare `star_pattern` interlace has a flat radial ramp — declaring `rings` makes it live.
 - Palette interpolation is plain RGB (no OKLab / perceptual blending yet).
 
 **Transitions**
@@ -95,25 +102,29 @@ From `docs/nfr.md` — a preset that violates these is a bug, and pushing past t
 - **60 fps @ 1080p on an integrated GPU** is the floor. The levers that blow it: dense line geometry
   (`samples`, `max_depth`, `visible_depth`, high `mirror_order`), heavy additive overdraw (swarm
   `size` × density), and stacking composite stages (`trails` + `kaleido_*` + a heavy scene).
-- **`MAX_SEGMENTS = 20_000`** caps line geometry; overflow is surfaced, not silent, but truncated.
+- **The line-geometry segment cap** (`TierConfig::max_segments`, per tier; author against `Floor`)
+  — overflow is surfaced, not silent, but truncated.
 - **Determinism / seeded randomness** (NFR §6) — there is no unseeded randomness in the grammar;
   don't assume any.
 
 ## Curation handoff — shipping a preset
 
-**Embedding is no longer a Rust edit.** `core/build.rs` globs `presets/*.toml` and `include_str!`s
-them, so *dropping a file into `presets/` ships it* — no `EMBEDDED` array, no length type, no count
-assert (ADR-0022). What that changes for this lane:
+**This lane lands presets itself** ([ADR-0081](../../../../docs/adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md)).
+`core/build.rs` globs `presets/*.toml` and `include_str!`s them, so *committing a file into
+`presets/` ships it* — no `EMBEDDED` array, no count to bump (ADR-0022). ADR-0017's old boundary
+("`dev` embeds") stood on embedding being a Rust edit; ADR-0022 removed that premise and ADR-0081
+moved the boundary. What that means in practice:
 
-- The mechanical work of curation is now a **content commit** you can prepare in full.
-- The **decision** to ship still isn't unilateral: an embedded preset joins the behavioral gates —
-  `sanity` (not blank, not a dot), `reactivity` (moves for at least one band) and `animation` (not
-  frozen) iterate the whole embedded set, so a weak preset fails CI for everyone. Verify with
-  `--report` before proposing.
-- ADR-0017 drew the lane boundary at "`dev` embeds" when embedding meant editing Rust. That premise
-  is gone; if the user wants this lane to land curated presets directly, that is a boundary change
-  worth an `architect` note rather than an improvisation.
+- **The gate authorizes the commit.** An embedded preset joins the behavioral suite — `sanity`,
+  `reactivity`, `animation` and `distinctness` iterate the whole embedded set, so a weak preset
+  fails CI for everyone. Run `ritmolux --check <file> --strict` and `cargo nextest run -p rlx-core`
+  before committing, and read `--report` for what the suite cannot judge (SKILL.md step 7).
+- **`architect` curates the *set*,** at plan-close cadence — whether a family converged, whether a
+  preset earns its place against what already ships. That is a review of what you landed, not a
+  permission you wait for.
+- **`dev` does not courier content.** It edits a preset only when an engine change forces it (a
+  renamed param, a retired default).
 
-Hand off like: "Preset `<name>` is a strong ship candidate — it renders X, passes `--report` with
-reactivity on bass/treble, and is not a near-dup of Y. Shipping it is now just committing
-`presets/<name>.toml`; say the word and I'll prepare that commit, or route it to `dev`."
+What you still hand off rather than decide: a look you think belongs in the **curated rotation**
+("`<name>` renders X, reacts on bass/treble per `--report`, is not a near-dup of Y — worth weighing
+against the set"), and every engine gap from the sections above.

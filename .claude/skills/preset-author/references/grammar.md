@@ -5,15 +5,15 @@
 > plan close. This file is the authoring layer on top: what to reach for when, what bites, and
 > what the error surface actually does to you mid-session. Source of truth stays the code —
 > `VAR_NAMES` / `Func::from_name` in `core/src/preset/expr.rs`, `RawPreset` in
-> `core/src/preset/schema.rs`.
+> `core/src/preset/schema/raw/preset.rs` (every top-level table it accepts is a field there).
 
 ## File shape
 
 ```toml
-system = "attractor"        # required — one of the nine; unknown rejects the file
+system = "attractor"        # required — one of `SystemKind::ALL`; unknown rejects the file
 name   = "Lorenz Drift"     # optional — display name, and what `--preset` matches
 
-[particles]                 # structural config: [curve] | [generator] | [particles] | [path]
+[particles]                 # structural config, e.g. [curve] | [generator] | [particles] | [path]
 family = "lorenz"
 
 [generator]                 # any system may carry one just for the seed
@@ -37,6 +37,13 @@ palette_mix = "bar"
 `[smoothing]` values are the opposite: bare numbers, and an expression there is an error.
 Bindings apply name-sorted, so file order is irrelevant (group them for a human reader anyway).
 
+The full set of top-level tables beyond the ones above: the structural tables `[curve]`,
+`[generator]`, `[particles]`, `[path]`, `[spectrum]`, `[mesh]`, `[field]`, `[cellular]`,
+`[feedback]` and `[milk]` (each read by the system it belongs to); `[per_vertex]` (bindings evaluated
+once per mesh vertex); `[hold]` and `[latch]` (held values and armed events); and `[layer]` (one
+optional second scene, ADR-0090). Every per-system schema under `presets/schema/` lists them all,
+unscoped — which ones a system actually reads is in `presets/README.md` and `docs/presets.md`.
+
 ## Reaching for the right tool
 
 | You want | Write |
@@ -52,7 +59,8 @@ Bindings apply name-sorted, so file order is irrelevant (group them for a human 
 | "loud AND fast" / "beat OR strong hit" | `min(bass > 0.3, tempo > 120)` / `max(beat, onset > 0.6)` — no booleans exist; comparisons give clean `1`/`0` |
 | behaviour that changes with tempo | `select(tempo > 128, fast, calm)` — never use `tempo` raw, it's BPM |
 | a driver that stops jittering | move it to `[smoothing]`, don't fake it with arithmetic |
-| a value held until the next beat | **not expressible** — the evaluator is pure and stateless. API feedback. |
+| a value held until the next beat | a `[hold]` entry — re-samples the binding on a musical edge and holds it in between (`docs/presets.md`, "The `[hold]` table"). The expression itself stays pure |
+| an event armed by one thing and fired by another | a `[latch]` entry (ADR-0137) — its name becomes a variable reading `1` for its hold window (`docs/presets.md`, "The `[latch]` table") |
 
 Chained comparisons (`a > b > c`) parse left-associatively and compare a `0`/`1` against `c` —
 write `min(a > b, b > c)`.
@@ -61,16 +69,17 @@ write `min(a > b, b > c)`.
 
 **Hard error — the whole file is rejected and the app keeps its last good set (never crashes):**
 malformed TOML; unknown `system`; an expression that fails to compile (unknown identifier, wrong
-arity, unbalanced parens, stray character, `1 2` trailing tokens); an invalid `[curve]` /
-`[generator]` / `[particles]` / `[path]` / `[palette]` / `[smoothing]` value.
+arity, unbalanced parens, stray character, `1 2` trailing tokens); an invalid value in any
+structural, `[palette]`, `[smoothing]`, `[hold]` or `[latch]` table.
 
 **Warning — the preset loads and everything else applies:** a binding whose param name no system or
 engine stage consumes. The message names the param and the system.
 
-> **The warning is where this lane gets bitten.** The standalone prints warnings on load and on
-> every hot-reload; **`shot` prints errors only**. So a typo'd param is invisible in the tool you
-> verify through, and the render looks "fine, just not doing what I asked". Check names against
-> `presets/README.md`, or run the app against the folder when a binding seems inert.
+> **The warning is where this lane gets bitten.** The binding is kept and nothing reads it, so the
+> render looks "fine, just not doing what I asked". The standalone prints warnings on load and on
+> every hot-reload, and `shot` prints them to stderr too — but only
+> `ritmolux --check <file> --strict` turns one into a failure, so run it before trusting a render.
+> An editor with the generated schemas underlines the same key live (SKILL.md step 4).
 
 **Not validated at all:** the numeric *range* an expression produces. Output is written straight
 into the scene param — no clamping, no NaN check. `NaN`/`inf` (a zero denominator, `sqrt` of a
@@ -88,10 +97,14 @@ negative outside a `select`) becomes broken geometry, not an error. You clamp; t
   Turtle vocabulary: `F`/`G` draw, `f` moves without drawing, `+`/`-` turn, `[`/`]` push/pop, any
   other char is an inert variable.
 - **`[generator]` as star** — required for `star_pattern`. `tiling` ∈
-  `square|4|4.4.4.4`, `hexagon|6|6.6.6`, `octagon|8|4.8.8`, `dodecagon|12|3.12.12`;
-  `contact_angle_deg` finite (default 30).
-- **`[particles]`** — `attractor` only. `family` ∈ `de_jong|clifford|thomas|lorenz` (default
-  `de_jong`).
+  `square|4|4.4.4.4`, `hexagon|6|6.6.6`, `octagon|8|4.8.8`, `dodecagon|12|3.12.12`, or `none`
+  (no interlace — a rings-only composition); `contact_angle_deg` finite (default 30). `rings` is a
+  list of `{ motif, count, radius, … }` entries that fill the rosette's interior with concentric rings
+  of repeated motifs (ADR-0079); `tiling = "none"` with no `rings` is a load error, since there would
+  be no figure. The motif roster is closed. Shipped examples: `star_corona`,
+  `star_mandala_bordered`, `star_zellij`.
+- **`[particles]`** — `attractor` only. `family` is a map family (`de_jong|clifford|thomas|lorenz`,
+  default `de_jong`) **or** an IFS figure from the same namespace (`fern|tree|dragon|sierpinski|spiral`).
 - **`[path]`** — `shape_field` only, and the one structural table carrying **geometry**. `d` is
   inline SVG path data for one closed contour (required); `morph_to` is a second contour the
   bindable `morph` travels to (optional); `samples` is the arity both resample to, `3..=64`,
@@ -105,6 +118,7 @@ negative outside a `select`) becomes broken geometry, not an error. You clamp; t
 - **`[smoothing]`** — `param = seconds`, non-negative and finite; `0` means instant. Runs on real
   elapsed time (identical at any refresh rate) and resets on a preset switch.
 
-**Geometry cap:** the line scenes share `MAX_SEGMENTS = 20_000`. A too-dense figure (high `samples`,
-`max_depth`, or `mirror_order`) is truncated and the drop is surfaced — lower the density rather
-than living with a clipped figure.
+**Geometry cap:** the line scenes share a per-tier segment cap, `TierConfig::max_segments` in
+`core/src/render/tier.rs`; shipped presets are authored against the `Floor` tier's value. A
+too-dense figure (high `samples`, `max_depth`, or `mirror_order`) is truncated and the drop is
+surfaced — lower the density rather than living with a clipped figure.

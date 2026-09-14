@@ -1,6 +1,7 @@
 # Render-and-verify with the `shot` CLI
 
-> Confirm any flag against the arg parser in `standalone/examples/shot.rs`; the runnable
+> Confirm any flag against the arg parser in `standalone/examples/shot.rs` (the `--set` keys and
+> `--signal` kinds are parsed in `standalone/src/shot/args.rs`); the runnable
 > command reference is `docs/capturing.md`. A preset you have not rendered **with audio
 > injected** is a guess — this loop is what makes the lane trustworthy.
 
@@ -26,11 +27,13 @@ audio one of two ways:
    cargo run -p standalone --example shot -- --preset-file presets/my_draft.toml \
      --set bass=1,mid=1,treb=1,onset=1,beat=1,bar=0.5 --out loud.png
    ```
-   `--set` keys: `bass mid treb onset bar` (f32) and `beat` (non-zero → true). `=1` is already at
-   the top of the useful band range. Vary it to probe moments — `beat=0` for the off-beat,
-   `onset=1` for a hit, `bass=0.1,mid=0.1,treb=0.05` for the quiet frame.
-   **`--set` cannot set `tempo` or `novelty`** — those come from the real DSP, so a preset that
-   branches on `tempo` must be judged through `--signal`/`--audio`.
+   `--set` keys are the grammar's own variable names: `bass mid treb onset bar tempo novelty
+   bass_raw mid_raw treb_raw onset_raw time_since_beat bar_phase` (floats), `beat` (non-zero → true),
+   and the counters `beat_index beat_in_bar bar_index` (truncated to whole numbers). An unknown key is
+   an error. `=1` is already at the top of the useful band range. Vary it to probe moments —
+   `beat=0` for the off-beat, `onset=1` for a hit, `bass=0.1,mid=0.1,treb=0.05` for the quiet frame,
+   `tempo=140` for a preset that branches on `select(tempo > 128, …)`. `time` and the spectrum are
+   not keys: `time` follows `--frames`, and `bin()` reads `0` in every `--set` still.
 
 2. **`--signal` / `--audio`** → synthesizes PCM, runs the **real DSP analyzer**, and renders a
    **filmstrip** (frames tiled across time) so you see motion and beat response:
@@ -39,7 +42,9 @@ audio one of two ways:
      --signal click:120 --strip 8 --out strip.png
    ```
    `--signal` kinds: `click:<bpm>`, `bass:<hz>`, `treble:<hz>`/`treb:<hz>`, `noise:<seed>`,
-   `chord`. `--audio <clip.wav>` drives from a 16-bit PCM WAV (uncompressed only).
+   `chord`, and `dynamic:<bpm>` — the one kind with dynamics (a groove that gets louder and quieter),
+   so the one to judge a threshold or a bloom on. `--audio <clip.wav>` drives from a 16-bit PCM WAV
+   (uncompressed only).
 
 **Rule of thumb: `--set` for composition and colour; `--signal` for motion and beat response.**
 
@@ -66,10 +71,9 @@ $env:RLX_PRESET_DIR = "./presets"; cargo run -p standalone --release   # app rel
 
 The app **never seeds** into an override folder — it is yours.
 
-> **`shot` prints load *errors* but not load *warnings*.** An unknown/misspelled param name is a
-> warning, so it is invisible here (a known open minor). The running standalone prints warnings on
-> every load and hot-reload — if a binding seems to do nothing, run the app against the folder, or
-> re-check the name in `presets/README.md`.
+> **A load warning does not stop a capture.** An unknown/misspelled param name is a warning: `shot`
+> prints it to stderr (`shot: preset …: warning: …`) and renders anyway, so it is easy to miss under
+> a build log. `ritmolux --check <file> --strict` fails on it — run that first (SKILL.md step 4).
 
 ## Other modes
 

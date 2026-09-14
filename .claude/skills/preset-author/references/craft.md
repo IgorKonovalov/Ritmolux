@@ -44,8 +44,8 @@ and it survives being added to whatever preset dissolves into yours.
 
 **The mirror failure: over-driven motion evacuates the frame.** The swarm shows it most clearly —
 `force = "1.1 + clamp(bass * 16, 0, 3)"` peaks near `4` against a scene default of `1.4`, hard enough
-to fling every particle to the frame edge and leave the middle black (`DEFAULT_FORCE` really is `1.4`
-— check a scene's defaults before you decide what "hard" means). Loud rendered as *less*. Keep swarm
+to fling every particle to the frame edge and leave the middle black (the declared default really is
+`1.4` — check a scene's defaults in `presets/README.md` before you decide what "hard" means). Loud rendered as *less*. Keep swarm
 `force` inside roughly `0.7–2.4` and `burst` inside a couple of units, and treat every param that can
 push the picture out of the frame — `force`, `burst`, `scale`, `zoom`, the attractor's `a`..`d`
 coefficients — with the same suspicion.
@@ -94,13 +94,15 @@ A look using three or four of these feels *composed*; one feels like a meter.
 
 ## Colour
 
-The four shader-coloured scenes sample a shared **palette LUT**; the line scenes use their own
-cosine `hue`. So colour is a two-part decision: *which gradient*, and *where in it you sit*.
+Every scene samples the shared **palette LUT** (line scenes included, since ADR-0059 — each walks
+`hue_spread` along its own generator axis). So colour is a two-part decision: *which gradient*, and
+*where in it you sit*.
 
 - **Pick the gradient first.** A built-in (`ember`, `ice`, `mono`, `aurora`, or the default
   full-hue `spectrum`) or custom `stops` for an exact mood. A tight custom gradient is usually more
   elegant than the full wheel.
-- **Then narrow the window.** `color_span` (fragment/RD) and `hue_spread` (swarm/attractor) are the
+- **Then narrow the window.** `color_span` (fragment/RD) and `hue_spread` (swarm/attractor, and the
+  line scenes' axis walk) are the
   cohesion knobs: **low = one colour family**, high = a rainbow. This is the single biggest lever
   between "designed" and "novelty screensaver". Watch the RD exception — its field only reaches
   ~`0..0.4`, so a full custom gradient there needs `color_span` around `2.0–2.5`.
@@ -163,14 +165,16 @@ These are engine-wide and bindable, so treat them as instruments, not decoration
   literally nothing — measured, a draft holding `brightness` under 1.0 rendered **pixel-identical**
   with bloom on and at `bloom_amount = 0`. Something must deliberately cross 1.0, and the cheapest
   fuel is **`glow`**, because it drives the stroke's core rather than its width (raising `thickness`
-  spreads the same light over a bigger quad and can move the peak the wrong way). `presets/star_lantern.toml`
-  is the shipped worked example and its header records what the renders taught.
+  spreads the same light over a bigger quad and can move the peak the wrong way). Shipped headers
+  that record the choice: `presets/attractor_lorenzgallery.toml` ("over 1.0 deliberately") and
+  `presets/attractor_clifford.toml` (only the densest filaments cross it).
   **And verify it on a moving stimulus, never on a `--set` still.** A held `--set bass=1` flatters
   every stage, but the threshold makes this one a cliff rather than a slope: at `bass = 1` the
-  figure sits far over range and the halo is enormous, while on real material — bass *mean* around
-  0.007 against peaks near 0.19 — the frame may never cross the threshold at all. Use
-  `--signal dynamic:<bpm>` or `--audio`, and read a `--set` still as the loudest single frame the
-  preset will ever have.
+  figure sits far over range and the halo is enormous, while real material spends most of its time
+  well below its own peak — since ADR-0049 a band is a fraction of its own recent peak, with bass
+  *means* around `0.42`, so `1` is the peak itself and not the typical frame — and the frame may
+  cross the threshold far less often than the still suggests. Use `--signal dynamic:<bpm>` or `--audio`, and read a `--set` still as the loudest
+  single frame the preset will ever have.
 - **`exposure`** (Plan 0045) — one linear multiplier on the whole frame before the tonemap. The honest
   way to make a finished preset brighter or darker without re-balancing every element against its own
   background. Binding it to audio pumps the entire picture, which reads as the *camera* reacting; that

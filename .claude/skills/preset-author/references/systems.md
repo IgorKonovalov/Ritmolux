@@ -1,7 +1,8 @@
 # Scene & parameter catalogue — authoring guidance
 
-> **The authoritative param roster is `presets/README.md`; defaults are the `DEFAULT_*` consts
-> beside each scene's `set_param`.** This file adds what those don't: what each scene is *for*,
+> **The authoritative param roster is `presets/README.md`, generated from each scene's `PARAMS`
+> (`ParamSpec` declarations, beside its `set_param`); the scene's `DEFAULT_*` consts are derived from
+> those same declarations via `default_of`.** This file adds what those don't: what each scene is *for*,
 > the typical working range of each param (distilled from the shipped set, not an engine limit),
 > and which audio input it naturally rides. Where the two disagree, the code wins.
 
@@ -16,12 +17,13 @@ preset's bindings. **Any param you don't bind keeps its default** — you only w
 reaction-diffusion) or `hue_spread` (+ `hue_center` on swarm/attractor). The shader scenes sample
 it per pixel or per particle; the four **line** scenes sample it on the CPU per segment. Since
 Plan 0054 / ADR-0059 each line scene walks `hue_spread` along **its own generator's axis** — path
-position (`parametric_curve`), generation depth (`lsystem`), radius (`star_pattern`, currently
-flat — see below), band index (`spectrum`). `hue_spread = 0` everywhere is one flat `hue`, which is
+position (`parametric_curve`), generation depth (`lsystem`), radius (`star_pattern` — flat on a
+bare interlace, live once `rings` is declared; see below), band index (`spectrum`). `hue_spread = 0` everywhere is one flat `hue`, which is
 what these scenes drew before. See `docs/preset-palettes.md` and `presets/README.md`'s axis table.
 
-**Every scene also takes** the shared view transform (`zoom`, `pan_x`, `pan_y`) and the engine
-stages `bg_hue`/`bg_bright`/`bg_vignette` + the ramp
+**Almost every scene takes** the shared view transform (`zoom`, `pan_x`, `pan_y`) — the exceptions
+are `shape_field` and `shape_collage` (no `zoom`) and `warp_mesh` (no `pan_x`/`pan_y`). **Every scene
+takes** the engine stages `bg_hue`/`bg_bright`/`bg_vignette` + the ramp
 (`bg_angle`/`bg_hue_span`/`bg_shade`/`bg_shade_end`/`bg_ramp_gamma`) + the band
 (`bg_band_amount`/`bg_band_angle`/`bg_band_pos`/`bg_band_width`/`bg_band_curve`/`bg_band_hue`/`bg_band_hue_span`),
 `trails`,
@@ -78,7 +80,7 @@ from a copy here, which is how this section went stale in the first place. The r
 | `d` | `71.0` | `2 – 360` | angular step (rose) — the "web" density. |
 | `phase` | `0.0` | `0 – tau` | radians **inside** the sine: reshapes petals as it advances (distinct from `spin`, which rotates the finished figure). Morph on `bar`/`bass`. |
 | `radial_offset` | `0.0` | `-1 – 1` | added to the radius — opens the rose into spiral/annular/rosette forms. Nonzero pushes `r` past `[-1,1]`; large values blow past the frame (intended, the renderer clips). |
-| `samples` | `361.0` | `120 – 720` | chord count; capped by `MAX_SEGMENTS`. |
+| `samples` | `361.0` | `120 – 720` | chord count; capped by the tier's segment cap (`TierConfig::max_segments`). |
 | `thickness` | `2.0` | `1 – 5` | stroke weight. |
 | `hue` | `0.6` | `0 – 1` (+drift) | where the figure sits in the palette. |
 | `hue_spread` | `0.0` | `0 – 1` | walks the palette **along the traced path** — first chord to last. Normalized over `samples`, so `draw_progress` draws the gradient on. |
@@ -109,14 +111,15 @@ from a copy here, which is how this section went stale in the first place. The r
 Only depths up to `max_depth` are built, so `visible_depth` is clamped to what exists.
 
 **`hue_spread` needs a grammar with branches.** Generation depth is bracket nesting, so a rule set
-with no `[` (`lsystem_arrowhead`'s `F -> G-F-G`, `G -> F+G+F`) has exactly one generation and the
-ramp is flat there however large `hue_spread` gets — a property of that figure, not a gap. A
-branching grammar (`lsystem_fern` reaches generation 11 at `visible_depth = 6`) ramps across its
-whole depth, because the divisor is the built figure's own deepest generation.
+with no `[` (`lsystem_rime`'s Koch rule `F = "F+F--F+F"`) has exactly one generation and the ramp is
+flat there however large `hue_spread` gets — a property of that figure, not a gap. A branching
+grammar (`lsystem_bower`'s `F = "F[+F]F[-F]F"`) ramps across its whole depth, because the divisor is
+the built figure's own deepest generation.
 
 ## `star_pattern` — Hankin star rosette
-*Symmetric, architectural, mandala.* `[generator]` **required** (`tiling` 4/6/8/12,
-`contact_angle_deg`).
+*Symmetric, architectural, mandala.* `[generator]` **required** (`tiling` 4/6/8/12 or `none`,
+`contact_angle_deg`, and optional `rings` — concentric rings of repeated motifs inside the rosette,
+ADR-0079; `none` with no `rings` is a load error).
 
 | Param | Default | Typical | Controls / natural driver |
 |-------|---------|---------|---------------------------|
@@ -124,23 +127,29 @@ whole depth, because the divisor is the built figure's own deepest generation.
 | `rotation` | `0.0` | radians | absolute angle. |
 | `draw_progress` | `1.0` | `0 – 1` | draw-on reveal. |
 | `hue` | `0.5` | `0 – 1` (+drift) | where the figure sits in the palette. |
-| `hue_spread` | `0.0` | — | radius axis, **inert** on this rosette (see below). |
+| `hue_spread` | `0.0` | `0 – 1` with `rings` | radius axis — **inert** on a bare interlace, live once `rings` is declared (see below). |
+| `ring_phase` / `ring_spread` / `ring_scale` | identity | — | move the `rings` ornament: counter-rotate alternate rings / multiply every radius / multiply every motif's size. Inert without `rings`. |
 | `saturation` | `1.0` | `0 – 2` | shared chroma modulation. |
 | `palette_mix` | `0.0` | `0 – 1` | A/B crossfade with `[palette_b]`. |
 | `thickness` | `2.0` | `2 – 6` | stroke weight. |
 | `scale` | `1.0` | `0.8 – 1.0` | size. |
 | `brightness` | `1.0` | `0.8 – 1.6` | multiplier. |
 
-**Two things measured, so you don't re-derive them.** (1) `hue_spread` does nothing here: the
-rosette is `2n` congruent segments about the frame centre, so every segment sits at the same
-radius (spread `1.2e-7`) and there is no range to walk. `[palette]` itself works — reach for that.
-(2) The interior is empty at every contact angle: at 12-fold / 20° the strokes live between radius
-0.54 and 0.90, so 60% of the disc is bare, and 87% at 55°. That is design-backlog 0007's open half;
-don't try to fill it from a preset.
+**Two things measured, so you don't re-derive them.** (1) On a bare interlace `hue_spread` does
+nothing: the rosette is `2n` congruent segments about the frame centre, so every segment sits at the
+same radius and there is no range to walk — `[palette]` itself works. (2) A bare interlace leaves the
+interior empty: the strokes live in an outer annulus. **`rings` is the answer to both** — it puts
+segments at several radii, so the ramp spans the combined figure and the interior fills. On a
+composite (rings *plus* a tiling) the interlace sits at one end of the ramp and the ornament spreads
+along the rest. Shipped: `star_corona` and `star_mandala_bordered` (rings only), `star_zellij`
+(rings plus an 8-fold interlace). **Animate a mandala on `ring_spread` / `ring_scale`, not spin
+alone** — a many-fold ring figure turned by any angle lands almost on itself, so rotation reads as
+frozen to the `animation` gate and, at a distance, to the eye; spend `ring_phase` on the
+counter-rotation as ornament.
 
 **A `floor` around `mod(…, 3)` is the old idiom and is now wrong** — the floor was there because
 `variant` used to index. Removing it alone is worse (a sawtooth snaps 2 → 0 at the wrap); replace
-the whole driver with a triangle or sine sweep. The two shipped presets still carry the old form.
+the whole driver with a triangle or sine sweep, as `star_rosewindow` does.
 
 ## `reaction_diffusion` — Gray-Scott field
 *Coral, maze, mitosis — slow, organic, alive.* A running simulation: parameters steer a **regime**,
@@ -160,8 +169,10 @@ they don't redraw a figure, so changes take a second or two to read. Composites 
 
 ## `attractor` — GPU compute particles on a strange attractor
 *Filamentary, chaotic, luminous.* `[particles] family = de_jong | clifford | thomas | lorenz`
-(optional; defaults `de_jong`). The family sets the map **and** the meaning of `a`/`b`/`c`/`d`,
-each defaulting to that family's canonical value.
+(optional; defaults `de_jong`), or an IFS figure from the same namespace —
+`fern | tree | dragon | sierpinski | spiral` (`attractor_fern`, `attractor_dragon` ship). The map
+family sets the map **and** the meaning of `a`/`b`/`c`/`d`, each defaulting to that family's
+canonical value; the `tuple` roster and walk below are the map families' surface.
 
 | Param | Default | Typical | Controls / natural driver |
 |-------|---------|---------|---------------------------|
@@ -233,13 +244,13 @@ reach.
 | Param | Typical | Controls / natural driver |
 |-------|---------|---------------------------|
 | `base` | `0.1 – 0.6` | the length every element has **before** audio, in world units (the frame is 2 tall). Deliberately non-zero: at `0` the readout vanishes in a silence and reads as broken. Bind to `time` for a resting breath. |
-| `scale` | well above `1` | multiplier on the element's own band level — the bands read **small**, same caveat as `bass`/`mid`/`treb`. |
+| `scale` | `0.5 – 2.5` | how far a **full** band pushes the element above its `base` (default `1.2`). Bands are `0..1` since ADR-0049, so this is a length, not a rescue gain. |
 | `radius` | `0.2 – 0.6` | **`radial_ring` only** — the inner circle the spokes stand on. No effect on the other two layouts. |
 | `rotation` | radians | turns the whole figure; the natural motion on the ring, a tilt on bars/polyline. |
 | `hue_spread` | `0 – 1` | walks the palette across the elements, so you can see *where* a peak is. `1` on `radial_ring` wraps continuously. |
 
-**This is the only line system that reads `[palette]`** — the other three colour through their own
-cosine `hue`. It honours the view transform, the geometry mirror (transformative on `bars`/
+Like every scene it reads `[palette]` (ADR-0059), walking `hue_spread` across the band index. It
+honours the view transform, the geometry mirror (transformative on `bars`/
 `polyline`, near-noop on `radial_ring` for the same reason as `star_pattern`), and every engine stage.
 
 **Per-element bindings.** A binding whose text names `index` is evaluated once per element, with
@@ -280,7 +291,9 @@ they launched on. There is also no `dt` in it, so the motion is identical on eve
 **Do the crest arithmetic before tuning.** A mark launched at `v` against `g` turns over `v² / (2g)`
 world units above the source line (at `y = -1.12` unless `source_y` moves it), and a frame is
 `|y| <= 1`. So a crest *inside* the frame draws a visible horizontal ceiling where the population
-piles up. `emitter_sparks.toml` puts its crest off-frame at `y = 1.28` deliberately.
+piles up. `emitter_perseids.toml` puts its crest off-frame deliberately; `emitter_emberjet.toml` is
+the inverse — a fountain, where the arc turning over in frame *is* the figure — and its header does
+the arithmetic both ways.
 
 ### The source, and the two warm-ups (Plan 0090)
 
@@ -351,7 +364,7 @@ Full parameter roster and defaults: [`presets/README.md`](../../../../presets/RE
 
 | Param | Default | Note |
 |-------|---------|------|
-| `zoom` / `pan_x` / `pan_y` | `1` / `0` / `0` | camera **in** on line/swarm/attractor; **out** (shows more) on fragment/RD. |
+| `zoom` / `pan_x` / `pan_y` | `1` / `0` / `0` | camera **in** on line/swarm/attractor; **out** (shows more) on fragment/RD. Not declared everywhere: no `zoom` on `shape_field`/`shape_collage`, no `pan_*` on `warp_mesh`. |
 | `bg_hue` / `bg_bright` / `bg_vignette` | `0` / `0` / `0` | backdrop is black until `bg_bright > 0`. Visible behind sparse scenes and RD voids; **invisible behind `fragment_field`**. |
 | `bg_angle` / `bg_hue_span` | `0` / `0` | **the directional ramp** (Plan 0080/ADR-0094): the backdrop paints a *segment* of your `[palette]` along one axis instead of one point of it. `bg_angle` is **radians**, `0` = bottom-to-top; `bg_hue_span` is how far the coordinate travels, `bg_hue` being the coordinate at the ramp's **start**. Placement is your stops' own `at` positions — there is no `bg_ramp_center`. The segment **wraps** if it leaves `[0, 1]`. |
 | `bg_shade` / `bg_shade_end` | `0.72` / `1.0` | the brightness ramp's two ends, on that same axis. These two numbers **are** the fixed `0.72 -> 1.0` upward tilt the pass used to hardcode, so leaving them alone changes nothing — but a backdrop can now be brighter at the **bottom**, which it never could be. |
