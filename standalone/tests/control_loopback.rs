@@ -120,6 +120,43 @@ fn wait_for_delivery(control: &Control) -> bool {
     true
 }
 
+/// Wait for the delivery of what was just sent, or fail with what the listener
+/// saw.
+///
+/// On a miss it keeps watching for one more [`DELIVERY`] before failing, so the
+/// message tells a late delivery from one that never came; the test has already
+/// failed by then, and the extra wait is paid only on that path. The listener's
+/// counters say whether the datagram arrived and was refused (`rejected`) or
+/// arrived to a full queue (`dropped`). Whether the listener thread is still
+/// running is not observable through `Control`'s public surface, so the message
+/// says so rather than guess.
+fn expect_delivery(control: &Control, what: &str) {
+    let sent = Instant::now();
+    if wait_for_delivery(control) {
+        return;
+    }
+    let missed_after = sent.elapsed();
+    let late = if wait_for_delivery(control) {
+        format!(
+            "it arrived LATE, {:.2} s after the send",
+            sent.elapsed().as_secs_f64()
+        )
+    } else {
+        format!(
+            "still nothing {:.2} s after the send",
+            sent.elapsed().as_secs_f64()
+        )
+    };
+    panic!(
+        "{what}: nothing reached the listener within {DELIVERY:?} (gave up after \
+         {:.2} s); {late}; listener counters: rejected {}, dropped {}; listener \
+         thread liveness: not observable through Control",
+        missed_after.as_secs_f64(),
+        control.rejected(),
+        control.dropped(),
+    );
+}
+
 /// The index of the first differing byte, and what the two frames hold there.
 fn first_difference(a: &CaptureImage, b: &CaptureImage) -> Option<String> {
     a.rgba
@@ -164,10 +201,7 @@ fn a_param_datagram_moves_the_next_frame() {
             value: 0.8,
         },
     );
-    assert!(
-        wait_for_delivery(&control),
-        "nothing reached the listener within {DELIVERY:?}"
-    );
+    expect_delivery(&control, "ctl/param bg_bright 0.8");
 
     let Some(driven) = frame_of(vec![lit("dim", "0.2")], |renderer| {
         let applied = standalone::control::apply_to_renderer(control.drain(), renderer);
@@ -215,10 +249,7 @@ fn a_preset_datagram_selects_by_name() {
             name: Name::new("second").expect("a short name fits inline"),
         },
     );
-    assert!(
-        wait_for_delivery(&control),
-        "nothing reached the listener within {DELIVERY:?}"
-    );
+    expect_delivery(&control, "ctl/preset `second`");
     let applied = standalone::control::apply_to_renderer(control.drain(), &mut renderer);
     assert!(applied.switched, "a name the roster holds switches");
 
@@ -250,7 +281,7 @@ fn a_preset_datagram_selects_by_name() {
             name: Name::new("no_such_preset").expect("a short name fits inline"),
         },
     );
-    assert!(wait_for_delivery(&control), "the second send arrived");
+    expect_delivery(&control, "ctl/preset `no_such_preset`, the second send");
     let applied = standalone::control::apply_to_renderer(control.drain(), &mut renderer);
     assert!(
         !applied.switched,

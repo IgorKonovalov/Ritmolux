@@ -183,8 +183,8 @@ flowchart TD
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The timing-only tests run alone | dev | committed with this row | |
-| 2 — The control-path pair says why it failed | dev | not started | |
+| 1 — The timing-only tests run alone | dev | done | 6c33ddb |
+| 2 — The control-path pair says why it failed | dev | committed with this row | |
 | 3 — The guard holds the override to the exemption | dev | not started | |
 
 ### Notes
@@ -202,6 +202,32 @@ flowchart TD
   - before: `Summary [ 244.495s] 1633 tests run: 1633 passed (5 slow), 304 skipped`
   - after: `Summary [ 398.197s] 1633 tests run: 1633 passed (2 slow), 304 skipped`
   - +153.7 s; the plan's serial figure for the selected set is ~85 s.
+- **Phase 2, deviations:**
+  - `stream_show`'s walk sends a `ctl/ping` after every `ctl/preset` and the report says whether its
+    `pong` came back. The plan did not name it. Nothing asserts on it.
+  - The new `wait_for` bound applies to every wait in `stream_show.rs`, not only the walk's. The
+    startup waits (`hello`, first `roster`, first `preset`) are bounded from the spawn.
+  - Both failure paths keep reading for one more deadline after a miss, to tell late from absent.
+    Only the failure path pays this.
+- **Phase 2, finding:** whether `Control`'s listener thread is running is not observable from its
+  public surface. No accessor was added; the message says so. Backlog 0219 carries it.
+- **Phase 2, failure messages checked by seeded breaks (uncommitted):** `stream_show` with
+  `LINE_DEADLINE` at 4 s and ask 3 renamed to a missing preset; `control_loopback` with `DELIVERY`
+  at 1 s and the delivery drained before the wait.
+- **Phase 2, reproduction attempts** (reference machine, `stream_show` + `control_loopback` binaries
+  run by `cargo nextest run -p standalone`):
+  - A: round-based, with `golden` + `attractor` + `reaction_diffusion` started 8 s before each
+    round. Round 1 passed. Round 2 was killed mid-run: each round idled ~2 min on the heavy suite.
+  - B: 25 min, the same heavy suite kept running continuously beside back-to-back runs. 79 runs,
+    5 failed:
+    - runs 29, 61, 63: `control_loopback a_preset_datagram_selects_by_name`, first delivery,
+      still nothing 10 s after the send, `rejected 0, dropped 0`
+    - runs 69, 70: `stream_show every_system_...`, ask 9 of 14 (`emitter`), still absent 120 s
+      after the ask, child running at 30 fps, the ask's ping answered
+  - `-P fast` and `--workspace` attempts were not run; B routed both tests.
+- **Phase 2, routing:** both reproduced, and neither ask was answered while the process kept
+  running. `control_loopback` goes to backlog 0219, `stream_show` to backlog 0220. Neither joins the
+  override.
 
 ### Close triggers
 

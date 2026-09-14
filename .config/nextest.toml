@@ -104,9 +104,10 @@ default-filter = 'not (binary(golden) + binary(attractor) + binary(reaction_diff
 # The selector is the `clippy::disallowed_methods` exemption, because the lint
 # refuses a clock read without one: every integration test file carrying it is
 # named here by binary, or by single test where the exemption is fn-level (`dsp`).
-# `stream_show` and `control_loopback` carry it and are deliberately absent -
-# both stop at a `ctl/preset` ask, and running them alone could hide a lost ask
-# rather than remove load.
+# `stream_show` and `control_loopback` carry it and are deliberately absent:
+# under load each has reproduced a `ctl/preset` that is lost or not acted on
+# (backlog 0219, 0220), and running them alone would hide that rather than
+# remove load.
 #
 # `profile.fast` inherits this block, like job 1's. Checked from the record, not
 # from a green run, on cargo-nextest 0.9.140: in a `-P fast` JUnit report no other

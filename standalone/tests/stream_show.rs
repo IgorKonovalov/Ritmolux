@@ -31,8 +31,10 @@ use std::io::{BufRead, Read};
 use std::net::{SocketAddr, UdpSocket};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::mpsc::Receiver;
-use std::time::Duration;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::mpsc::{Receiver, RecvTimeoutError};
+use std::time::{Duration, Instant};
 
 use rlx_core::preset::SystemKind;
 use standalone::osc::decode::{Action, Name, Transport};
@@ -48,13 +50,28 @@ const TARGET: &str = "name = \"Show Target\"\nsystem = \"spectrum\"\n";
 /// The unclosed string is a parse failure the loader can put a line number on.
 const BROKEN: &str = "name = \"Show Probe Broken\nsystem = \"spectrum\"\n";
 
-/// How long to wait for the next line of a running child's standard error.
+/// How long to wait for a wanted line of a running child's standard error,
+/// counted from the moment the thing that should produce it happened — the
+/// spawn, or the datagram that asked for it.
 ///
 /// Generous rather than tight: it covers process start, the adapter request and
 /// the config read on a runner already busy with the rest of the suite. The wait
 /// is only ever paid in full by a genuine failure — the receive returns the
 /// moment a line arrives.
+///
+/// The bound is on the **wanted** line, not on the next line of any kind: a
+/// player writes a `health` event every second while it draws, so a per-line
+/// timeout would never expire on a child that keeps running and never answers.
 const LINE_DEADLINE: Duration = Duration::from_secs(60);
+
+/// How many trailing `health` events a missed-wait report keeps. Each one
+/// carries the frame rate and the control counters at that second, which is
+/// what says whether the child was drawing and whether the listener refused
+/// anything; the rest of them are the same line again.
+const REPORT_HEALTH_LINES: usize = 3;
+
+/// How many other lines a missed-wait report keeps, newest last.
+const REPORT_OTHER_LINES: usize = 40;
 
 /// The nonce sent on `ctl/ping`, distinctive enough that finding it in a line
 /// cannot be a coincidence.
@@ -84,6 +101,23 @@ fn scratch(tag: &str) -> PathBuf {
     dir
 }
 
+/// The thread draining a child's standard output, and the running byte count it
+/// keeps so a failed wait can say whether frames were still being written.
+struct Drain {
+    handle: std::thread::JoinHandle<()>,
+    bytes: Arc<AtomicU64>,
+}
+
+impl Drain {
+    fn bytes(&self) -> u64 {
+        self.bytes.load(Ordering::Relaxed)
+    }
+
+    fn join(self) {
+        self.handle.join().expect("the drain thread did not panic");
+    }
+}
+
 /// Spawn the player headless, with standard output drained by a thread so the
 /// writer never blocks on a full pipe.
 ///
@@ -93,18 +127,14 @@ fn scratch(tag: &str) -> PathBuf {
 /// developer's real per-user directory on any platform — the presets are
 /// redirected already, and this keeps the config, the diagnostics log and the
 /// directory migration off it too.
-fn spawn(presets: &Path, extra: &[&str]) -> (Child, std::thread::JoinHandle<()>) {
+fn spawn(presets: &Path, extra: &[&str]) -> (Child, Drain) {
     spawn_with_data_root(presets, Path::new(""), extra)
 }
 
 /// [`spawn`], with the per-user data root pointed at `root` rather than cleared,
 /// so what the run writes under it — the diagnostics log — lands in a directory
 /// this test owns instead of the developer's own.
-fn spawn_with_data_root(
-    presets: &Path,
-    root: &Path,
-    extra: &[&str],
-) -> (Child, std::thread::JoinHandle<()>) {
+fn spawn_with_data_root(presets: &Path, root: &Path, extra: &[&str]) -> (Child, Drain) {
     let mut args = vec![
         "--stream", "--sink", "stdout", "--events", "--fps", "30", "--size", "160x90",
     ];
@@ -120,18 +150,205 @@ fn spawn_with_data_root(
         .spawn()
         .expect("spawn the built binary");
     let mut pipe = child.stdout.take().expect("stdout was piped");
-    let drain = std::thread::spawn(move || {
-        let mut buf = vec![0u8; 64 * 1024];
-        while let Ok(n) = pipe.read(&mut buf)
-            && n > 0
-        {}
+    let bytes = Arc::new(AtomicU64::new(0));
+    let handle = std::thread::spawn({
+        let bytes = Arc::clone(&bytes);
+        move || {
+            let mut buf = vec![0u8; 64 * 1024];
+            while let Ok(n) = pipe.read(&mut buf)
+                && n > 0
+            {
+                bytes.fetch_add(n as u64, Ordering::Relaxed);
+            }
+        }
     });
-    (child, drain)
+    (child, Drain { handle, bytes })
+}
+
+/// A running child's standard error as it arrives, and every line the most
+/// recent wait read, so a wait that ends without its line can say what the
+/// child said instead.
+struct Lines {
+    rx: Receiver<String>,
+    /// When the watch began, which is the spawn for every caller: the bound for
+    /// a line the run emits on its own, such as `hello`.
+    opened: Instant,
+    read: Vec<String>,
+}
+
+/// Why a wait ended without the line it wanted.
+#[derive(Clone, Copy, Debug)]
+enum Missed {
+    /// [`LINE_DEADLINE`] passed since the wait's starting instant.
+    Deadline,
+    /// The child's standard error closed: it exited, or was killed.
+    Closed,
+}
+
+impl Lines {
+    /// Wait for the first line `want` accepts, until [`LINE_DEADLINE`] after
+    /// `since`. Every line read, wanted or not, is kept until the next wait.
+    fn wait_for<T>(
+        &mut self,
+        since: Instant,
+        want: impl Fn(&str) -> Option<T>,
+    ) -> Result<T, Missed> {
+        self.read.clear();
+        self.wait_more(since + LINE_DEADLINE, want)
+    }
+
+    /// Keep reading into the same record until `until`, for the report's late
+    /// check: whether the line arrived after the deadline, or never.
+    fn wait_more<T>(
+        &mut self,
+        until: Instant,
+        want: impl Fn(&str) -> Option<T>,
+    ) -> Result<T, Missed> {
+        loop {
+            let left = until.saturating_duration_since(Instant::now());
+            match self.rx.recv_timeout(left) {
+                Ok(line) => {
+                    let found = want(&line);
+                    self.read.push(line);
+                    if let Some(found) = found {
+                        return Ok(found);
+                    }
+                }
+                Err(RecvTimeoutError::Timeout) => return Err(Missed::Deadline),
+                Err(RecvTimeoutError::Disconnected) => return Err(Missed::Closed),
+            }
+        }
+    }
+}
+
+/// One thing the test did that a line should answer, recorded as it was done.
+struct Ask {
+    /// What was asked for, as the report names it.
+    what: String,
+    /// When it was asked: the send, or the spawn for a line the run emits
+    /// unprompted.
+    since: Instant,
+    /// The child's standard output byte count at that instant.
+    stdout_at_ask: u64,
+    /// The nonce of a `ctl/ping` sent straight after the ask, if one was.
+    ///
+    /// The listener keeps no count of `ctl/preset` datagrams and the player
+    /// reports nothing for a name that selects nothing, so an unanswered preset
+    /// ask alone cannot say whether it arrived. A `pong` for this nonce can: it
+    /// is emitted by the same drain that applies the preset, so a pong with no
+    /// `preset` event means the ask's frame was drained and the switch did not
+    /// show, and no pong means the datagrams or the drain never got there.
+    ping: Option<i32>,
+}
+
+impl Ask {
+    fn now(what: impl Into<String>, drain: &Drain) -> Self {
+        Self {
+            what: what.into(),
+            since: Instant::now(),
+            stdout_at_ask: drain.bytes(),
+            ping: None,
+        }
+    }
+}
+
+/// Everything a wait that ended without its line can say about the child, as
+/// one readable block: which ask went unanswered and how long after it was sent,
+/// whether the line turned up late, whether the child was alive, whether its
+/// standard output was still moving, and what it wrote on standard error since
+/// the ask — every non-`health` line (a `preset` or `roster` for something else,
+/// a `preset_error`) and the last few `health` lines, whose `ctl_*` counters say
+/// whether the listener rejected, dropped or refused anything.
+///
+/// On a [`Missed::Deadline`] it keeps reading for one more [`LINE_DEADLINE`]
+/// before reporting, so the report tells a late answer from a missing one. The
+/// test has already failed by then; the extra wait is paid only on that path.
+fn missed_report<T>(
+    ask: &Ask,
+    missed: Missed,
+    lines: &mut Lines,
+    want: impl Fn(&str) -> Option<T>,
+    child: &mut Child,
+    drain: &Drain,
+) -> String {
+    let Ask {
+        what,
+        since,
+        stdout_at_ask,
+        ping,
+    } = ask;
+    let missed_after = since.elapsed();
+    let late = match missed {
+        Missed::Deadline => {
+            let again = lines.wait_more(Instant::now() + LINE_DEADLINE, want);
+            match again {
+                Ok(_) => format!(
+                    "it arrived LATE, {:.1} s after the ask",
+                    since.elapsed().as_secs_f64()
+                ),
+                Err(Missed::Deadline) => format!(
+                    "still absent {:.1} s after the ask",
+                    since.elapsed().as_secs_f64()
+                ),
+                Err(Missed::Closed) => format!(
+                    "standard error closed {:.1} s after the ask without it",
+                    since.elapsed().as_secs_f64()
+                ),
+            }
+        }
+        Missed::Closed => "standard error had closed".to_owned(),
+    };
+    let alive = match child.try_wait() {
+        Ok(None) => "still running".to_owned(),
+        Ok(Some(status)) => format!("exited, {status}"),
+        Err(err) => format!("unknown ({err})"),
+    };
+    let pong = match ping {
+        None => "no ping was sent with this ask".to_owned(),
+        Some(nonce) => {
+            let answered = lines.read.iter().any(|line| {
+                is_event(line, "pong") && line.contains(&format!("\"nonce\":{nonce}}}"))
+            });
+            if answered {
+                format!("ctl/ping {nonce} sent with the ask WAS answered")
+            } else {
+                format!("ctl/ping {nonce} sent with the ask was NOT answered")
+            }
+        }
+    };
+    let (health, other): (Vec<&String>, Vec<&String>) =
+        lines.read.iter().partition(|line| is_event(line, "health"));
+    let mut report = format!(
+        "{what}: nothing after {:.1} s ({missed:?}, bound {LINE_DEADLINE:?}); {late}\n\
+         child: {alive}\n\
+         {pong}\n\
+         stdout: {stdout_at_ask} bytes at the ask, {} bytes now\n\
+         stderr since the ask: {} lines, {} of them health; the last {} other lines and \
+         the last {} health lines follow\n",
+        missed_after.as_secs_f64(),
+        drain.bytes(),
+        lines.read.len(),
+        health.len(),
+        other.len().min(REPORT_OTHER_LINES),
+        health.len().min(REPORT_HEALTH_LINES),
+    );
+    for line in other.iter().rev().take(REPORT_OTHER_LINES).rev() {
+        report.push_str("  | ");
+        report.push_str(line);
+        report.push('\n');
+    }
+    for line in health.iter().rev().take(REPORT_HEALTH_LINES).rev() {
+        report.push_str("  | ");
+        report.push_str(line);
+        report.push('\n');
+    }
+    report
 }
 
 /// Read the child's standard error line by line **while it runs**, forwarding
 /// every line on a channel and accumulating the whole of it for the assertions.
-fn watch(child: &mut Child) -> (std::thread::JoinHandle<String>, Receiver<String>) {
+fn watch(child: &mut Child) -> (std::thread::JoinHandle<String>, Lines) {
+    let opened = Instant::now();
     let pipe = child.stderr.take().expect("stderr was piped");
     let (tx, rx) = std::sync::mpsc::channel::<String>();
     let handle = std::thread::spawn(move || {
@@ -145,28 +362,23 @@ fn watch(child: &mut Child) -> (std::thread::JoinHandle<String>, Receiver<String
         }
         text
     });
-    (handle, rx)
-}
-
-/// Wait for the first line `want` accepts, or `None` if the run ends first.
-fn wait_for<T>(rx: &Receiver<String>, want: impl Fn(&str) -> Option<T>) -> Option<T> {
-    while let Ok(line) = rx.recv_timeout(LINE_DEADLINE) {
-        if let Some(found) = want(&line) {
-            return Some(found);
-        }
-    }
-    None
+    let lines = Lines {
+        rx,
+        opened,
+        read: Vec::new(),
+    };
+    (handle, lines)
 }
 
 /// Wait for the child, join both threads, and hand back its standard error — or
 /// `None` when the runner cannot run this mode at all.
 fn finish(
     mut child: Child,
-    drain: std::thread::JoinHandle<()>,
+    drain: Drain,
     collector: std::thread::JoinHandle<String>,
 ) -> Option<String> {
     let status = child.wait().expect("wait for the player");
-    drain.join().expect("the drain thread did not panic");
+    drain.join();
     let stderr = collector.join().expect("the collector did not panic");
     if let Some(reason) = unrunnable(&stderr) {
         eprintln!("skipped: {reason}");
@@ -216,11 +428,13 @@ fn a_headless_run_emits_the_roster_the_preset_and_a_preset_error() {
     // Ten seconds of frames at 30 fps: the run has to outlive process start on a
     // loaded runner plus one 150 ms watcher poll after the edit below.
     let (mut child, drain) = spawn(&dir, &["--frames", "300"]);
-    let (collector, rx) = watch(&mut child);
+    let (collector, mut lines) = watch(&mut child);
 
-    let startup_roster = wait_for(&rx, |line| {
-        is_event(line, "roster").then(|| line.to_owned())
-    });
+    let startup_roster = lines
+        .wait_for(lines.opened, |line| {
+            is_event(line, "roster").then(|| line.to_owned())
+        })
+        .ok();
     if startup_roster.is_some() {
         std::fs::write(dir.join("broken.toml"), BROKEN).expect("write the broken preset");
     }
@@ -268,11 +482,11 @@ fn a_headless_run_binds_the_control_listener_and_drains_it() {
     std::fs::write(dir.join("two.toml"), TARGET).expect("write the second preset");
 
     let (mut child, drain) = spawn(&dir, &["--frames", "300", "--control", "127.0.0.1:0"]);
-    let (collector, rx) = watch(&mut child);
+    let (collector, mut lines) = watch(&mut child);
 
     // The port is ephemeral: it exists only in `hello`, which is emitted before
     // the first frame, so the datagrams below cannot be sent until it arrives.
-    let target = wait_for(&rx, hello_control);
+    let target = lines.wait_for(lines.opened, hello_control).ok();
     if let Some(target) = target {
         let socket = UdpSocket::bind("127.0.0.1:0").expect("bind the sender");
         let mut buf = Vec::new();
@@ -317,7 +531,7 @@ fn a_headless_run_binds_the_control_listener_and_drains_it() {
 #[test]
 fn a_headless_run_with_no_per_user_directory_keeps_the_embedded_set() {
     let (mut child, drain) = spawn(Path::new(""), &["--frames", "30"]);
-    let (collector, _rx) = watch(&mut child);
+    let (collector, _lines) = watch(&mut child);
     let Some(stderr) = finish(child, drain, collector) else {
         return;
     };
@@ -422,12 +636,12 @@ fn schema_system_keys() -> Vec<String> {
 /// slowest plausible runner on every run.
 fn stop(
     mut child: Child,
-    drain: std::thread::JoinHandle<()>,
+    drain: Drain,
     collector: std::thread::JoinHandle<String>,
 ) -> Option<String> {
     let _ = child.kill();
     let _ = child.wait();
-    drain.join().expect("the drain thread did not panic");
+    drain.join();
     let stderr = collector.join().expect("the collector did not panic");
     if let Some(reason) = unrunnable(&stderr) {
         eprintln!("skipped: {reason}");
@@ -461,35 +675,77 @@ fn every_system_is_reported_by_the_key_the_schema_labels_its_roster_with() {
     }
 
     let (mut child, drain) = spawn(&dir, &["--frames", "9000", "--control", "127.0.0.1:0"]);
-    let (collector, rx) = watch(&mut child);
+    let (collector, mut lines) = watch(&mut child);
 
     let mut seen: Vec<(String, String)> = Vec::new();
-    if let Some(target) = wait_for(&rx, hello_control) {
-        let socket = UdpSocket::bind("127.0.0.1:0").expect("bind the sender");
-        let mut buf = Vec::new();
-        // Rotation off first: the director would otherwise move the show
-        // underneath the walk and the events would not line up with the asks.
-        Action::Transport(Transport::Hold).encode(&mut buf);
-        socket
-            .send_to(&buf, target)
-            .expect("send ctl/transport hold");
-
-        for kind in SystemKind::ALL {
-            let key = kind.as_str();
-            Action::Preset {
-                name: Name::new(key).expect("a system key inside the inline cap"),
-            }
-            .encode(&mut buf);
-            socket.send_to(&buf, target).expect("send ctl/preset");
-            let line = wait_for(&rx, |line| {
-                (is_event(line, "preset") && field(line, "name").as_deref() == Some(key))
-                    .then(|| line.to_owned())
-            });
-            let Some(line) = line else { break };
-            seen.push((
-                key.to_owned(),
-                field(&line, "system").unwrap_or_else(|| panic!("no system field on: {line}")),
+    // The report of the one wait that ended without its line, taken while the
+    // child is still in the state that wait left it in.
+    let mut unanswered: Option<String> = None;
+    let hello = Ask {
+        what: "the `hello` line naming the bound control address".to_owned(),
+        since: lines.opened,
+        stdout_at_ask: 0,
+        ping: None,
+    };
+    match lines.wait_for(hello.since, hello_control) {
+        Err(missed) => {
+            unanswered = Some(missed_report(
+                &hello,
+                missed,
+                &mut lines,
+                hello_control,
+                &mut child,
+                &drain,
             ));
+        }
+        Ok(target) => {
+            let socket = UdpSocket::bind("127.0.0.1:0").expect("bind the sender");
+            let mut buf = Vec::new();
+            // Rotation off first: the director would otherwise move the show
+            // underneath the walk and the events would not line up with the asks.
+            Action::Transport(Transport::Hold).encode(&mut buf);
+            socket
+                .send_to(&buf, target)
+                .expect("send ctl/transport hold");
+
+            for (step, kind) in SystemKind::ALL.into_iter().enumerate() {
+                let key = kind.as_str();
+                Action::Preset {
+                    name: Name::new(key).expect("a system key inside the inline cap"),
+                }
+                .encode(&mut buf);
+                let mut ask = Ask::now(
+                    format!(
+                        "ctl/preset `{key}` (ask {} of {}), awaiting its `preset` event",
+                        step + 1,
+                        SystemKind::VARIANT_COUNT
+                    ),
+                    &drain,
+                );
+                socket.send_to(&buf, target).expect("send ctl/preset");
+                // Evidence only, never asserted: see `Ask::ping`.
+                let nonce = PING_NONCE + step as i32;
+                Action::Ping(nonce).encode(&mut buf);
+                socket.send_to(&buf, target).expect("send ctl/ping");
+                ask.ping = Some(nonce);
+                let want = |line: &str| {
+                    (is_event(line, "preset") && field(line, "name").as_deref() == Some(key))
+                        .then(|| line.to_owned())
+                };
+                match lines.wait_for(ask.since, want) {
+                    Ok(line) => seen.push((
+                        key.to_owned(),
+                        field(&line, "system")
+                            .unwrap_or_else(|| panic!("no system field on: {line}")),
+                    )),
+                    Err(missed) => {
+                        unanswered = Some(missed_report(
+                            &ask, missed, &mut lines, want, &mut child, &drain,
+                        ));
+                        break;
+                    }
+                }
+            }
         }
     }
     let Some(stderr) = stop(child, drain, collector) else {
@@ -497,11 +753,22 @@ fn every_system_is_reported_by_the_key_the_schema_labels_its_roster_with() {
     };
 
     let keys = schema_system_keys();
+    // The report rather than the whole of standard error: a walk that stalls
+    // leaves a minute of `health` lines behind it, and the lines that say why
+    // are the few the report keeps.
+    let why = unanswered.unwrap_or_else(|| {
+        let tail: Vec<&str> = stderr.lines().rev().take(REPORT_OTHER_LINES).collect();
+        let tail: Vec<&str> = tail.into_iter().rev().collect();
+        format!(
+            "no wait missed; the last lines of stderr:\n{}",
+            tail.join("\n")
+        )
+    });
     assert_eq!(
         seen.len(),
         SystemKind::VARIANT_COUNT,
         "the walk reported {} of {} systems; it stops at the first preset that \
-         never reaches the screen:\n{stderr}",
+         never reaches the screen:\n{why}",
         seen.len(),
         SystemKind::VARIANT_COUNT
     );
@@ -534,11 +801,13 @@ fn the_roster_names_the_directory_and_the_preset_names_its_file() {
     std::fs::write(dir.join("probe.toml"), GOOD).expect("write the good preset");
 
     let (mut child, drain) = spawn(&dir, &["--frames", "300"]);
-    let (collector, rx) = watch(&mut child);
-    let seen = wait_for(&rx, |line| {
-        (is_event(line, "preset") && field(line, "name").as_deref() == Some("Show Probe"))
-            .then(|| line.to_owned())
-    });
+    let (collector, mut lines) = watch(&mut child);
+    let seen = lines
+        .wait_for(lines.opened, |line| {
+            (is_event(line, "preset") && field(line, "name").as_deref() == Some("Show Probe"))
+                .then(|| line.to_owned())
+        })
+        .ok();
     let Some(stderr) = stop(child, drain, collector) else {
         return;
     };
@@ -591,10 +860,12 @@ fn the_roster_names_the_directory_and_the_preset_names_its_file() {
 #[test]
 fn the_embedded_set_reports_no_file_and_no_directory() {
     let (mut child, drain) = spawn(Path::new(""), &["--frames", "60"]);
-    let (collector, rx) = watch(&mut child);
-    let seen = wait_for(&rx, |line| {
-        is_event(line, "preset").then(|| line.to_owned())
-    });
+    let (collector, mut lines) = watch(&mut child);
+    let seen = lines
+        .wait_for(lines.opened, |line| {
+            is_event(line, "preset").then(|| line.to_owned())
+        })
+        .ok();
     let Some(stderr) = stop(child, drain, collector) else {
         return;
     };
@@ -638,7 +909,7 @@ fn a_headless_run_reports_no_preview_counters() {
     // `health` is emitted once a second while frames are drawn, so the run has
     // to outlive one interval: 90 frames at 30 fps is three.
     let (mut child, drain) = spawn(&dir, &["--frames", "90"]);
-    let (collector, _rx) = watch(&mut child);
+    let (collector, _lines) = watch(&mut child);
     let Some(stderr) = finish(child, drain, collector) else {
         return;
     };
@@ -680,7 +951,7 @@ fn a_headless_run_writes_diagnostics_rows_with_a_live_rate() {
 
     // Rows are written once a second: 90 frames at 30 fps is three.
     let (mut child, drain) = spawn_with_data_root(&presets, &root, &["--frames", "90"]);
-    let (collector, _rx) = watch(&mut child);
+    let (collector, _lines) = watch(&mut child);
     let Some(stderr) = finish(child, drain, collector) else {
         return;
     };

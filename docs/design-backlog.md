@@ -78,6 +78,8 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0216 — the converted waveform follows neither reference: modes 0-5 draw other figures than the source, and modes 6-7 sit between the source and `foo_vis_milk2`](#0216--the-converted-waveform-follows-neither-reference-modes-0-5-draw-other-figures-than-the-source-and-modes-6-7-sit-between-the-source-and-foo_vis_milk2)
 - [0217 — `path_cost`'s arity probe draws a curved leaf, so from `samples = 32` up it prices the arc chain and not the polyline its header reports](#0217--path_costs-arity-probe-draws-a-curved-leaf-so-from-samples--32-up-it-prices-the-arc-chain-and-not-the-polyline-its-header-reports)
 - [0218 — a `[smoothing]`-eased value never reaches a whole-number target, so a floored step one generation up never draws](#0218--a-smoothing-eased-value-never-reaches-a-whole-number-target-so-a-floored-step-one-generation-up-never-draws)
+- [0219 — a `ctl/preset` datagram on loopback never reached the listener's queue, in 3 of 79 loaded runs, and nothing counted it](#0219--a-ctlpreset-datagram-on-loopback-never-reached-the-listeners-queue-in-3-of-79-loaded-runs-and-nothing-counted-it)
+- [0220 — a headless walk of the system roster stalls at `emitter`: the ask's frame is drained and the preset never reaches the screen](#0220--a-headless-walk-of-the-system-roster-stalls-at-emitter-the-asks-frame-is-drained-and-the-preset-never-reaches-the-screen)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -4008,3 +4010,90 @@ snap is the cheaper and the more general of the two. **Unaudited:** whether any 
 
 **Low.** Nothing renders broken once a preset carries the half offset, and all five shipped ones
 do. What is wrong is that the natural binding silently loses its top step.
+
+## 0219 — a `ctl/preset` datagram on loopback never reached the listener's queue, in 3 of 79 loaded runs, and nothing counted it
+
+`a_preset_datagram_selects_by_name` in `standalone/tests/control_loopback.rs` binds a `Control` on
+`127.0.0.1:0`, builds a headless renderer, sends one `ctl/preset second` datagram and waits for
+`has_pending()`. On 2026-09-14, on the reference machine, with `golden`, `attractor` and
+`reaction_diffusion` running in a second nextest process beside it, the test failed 3 times in 79
+back-to-back runs of the `stream_show` and `control_loopback` binaries. All three failed at that
+first wait, and all three said the same thing:
+
+```text
+ctl/preset `second`: nothing reached the listener within 5s (gave up after 5.00 s); still nothing
+10.00 s after the send; listener counters: rejected 0, dropped 0
+```
+
+So the datagram was neither late, refused by the decoder, nor dropped on a full queue. It never
+reached the queue. The `send_to` had returned `Ok`. The other three tests in the binary, which
+also send on loopback, passed in all 79 runs. Of the four, this is the only one that builds the
+renderer after binding the listener and before sending. That is an observation, not a cause.
+
+**What the evidence cannot say:**
+
+- Whether the listener thread was still running. `Control` exposes no liveness, and the test was
+  not given one (ADR-0193 kept `Control`'s public surface fixed for the diagnosis).
+- Whether `recv_from` was failing. `listen` in `standalone/src/control.rs` swallows every receive
+  error with a bare `continue` and counts nothing, so a listener whose receive keeps failing looks
+  exactly like an idle one.
+
+Those two gaps are the first thing to close. The studio drives the player through this listener,
+and a lost `ctl/preset` there shows up as a click that does nothing.
+
+- **Raised:** 2026-09-14, by `dev` during the ADR-0193 diagnosis. **Owner if taken:** `dev`; making
+  the swallowed receive error observable comes before any fix.
+- **Verified 2026-09-14** — a receive error is swallowed without a count:
+  `present: let Ok\(\(len, _from\)\) = socket\.recv_from\(&mut buf\) else \{ in: standalone/src/control.rs`
+- **Verified 2026-09-14** — the test's delivery failure reports the listener counters and a late check:
+  `present: still nothing \{:\.2\} s after the send in: standalone/tests/control_loopback.rs`
+
+### Priority
+
+**Medium.** It is a loopback datagram lost on the control path the studio uses. It is intermittent
+and has so far been seen only under heavy concurrent GPU load.
+
+## 0220 — a headless walk of the system roster stalls at `emitter`: the ask's frame is drained and the preset never reaches the screen
+
+`every_system_is_reported_by_the_key_the_schema_labels_its_roster_with` in
+`standalone/tests/stream_show.rs` spawns the player with `--stream --events --control`, holds
+rotation, then sends one `ctl/preset` per `SystemKind::ALL` entry. After each one it waits for the
+`preset` event naming it. Each ask is followed by a `ctl/ping`. The ping is answered by the same
+`apply_control_rest` drain that applies the preset, so a `pong` proves that the ask's frame was
+drained.
+
+On 2026-09-14, under the load described in 0219, the walk failed twice in 79 runs. Both times it
+stopped at **ask 9 of 14, `emitter`**, with 8 systems already reported:
+
+```text
+ctl/preset `emitter` (ask 9 of 14), awaiting its `preset` event: nothing after 60.0 s (Deadline,
+bound 60s); still absent 120.0 s after the ask
+child: still running
+ctl/ping 424250 sent with the ask WAS answered
+stdout: 576000 bytes at the ask, 208857600 bytes now
+  | {"v":1,"ev":"pong","nonce":424250}
+  | {"v":1,"ev":"health","fps":29.9807,...,"ctl_rejected":0,"ctl_dropped":0,"ctl_refused":0,...}
+```
+
+So the ask was not lost. Its frame was drained, the child kept drawing at 30 fps, and no `roster`,
+`preset` or `preset_error` line followed in two minutes: received, and not acted on. `report_active_preset` in `standalone/src/show.rs` emits only when
+`renderer.preset_name()` changes, so the preset on screen never became `emitter`. There are three
+candidates, none yet distinguished: `select_preset_by_name` returned `false`; it returned `true` and
+the dissolve never completed; or the selection was overridden. The walk's ninth step does not follow
+on from anything earlier in the walk: the same ask succeeded in 77 other runs.
+
+The earlier red run recorded in ADR-0193 stopped at ask 2 of 12, with nothing kept that could say
+why. Whether it was the same defect is unknown.
+
+- **Raised:** 2026-09-14, by `dev` during the ADR-0193 diagnosis. **Owner if taken:** `dev`.
+- **Verified 2026-09-14** — the `preset` event fires only on a change of the name on screen:
+  `present: if name == self\.reported_preset \{ in: standalone/src/show.rs`
+- **Verified 2026-09-14** — the pong is emitted by the drain that applies the preset:
+  `present: events\.emit\(&Event::Pong \{ nonce: \*nonce \}\); in: standalone/src/show.rs`
+- **Verified 2026-09-14** — the walk sends a ping with every ask:
+  `present: Evidence only, never asserted: see .Ask::ping. in: standalone/tests/stream_show.rs`
+
+### Priority
+
+**Medium.** A `ctl/preset` the player drains and does not show is the studio's library click doing
+nothing. It is intermittent and has so far been seen only under heavy concurrent GPU load.
