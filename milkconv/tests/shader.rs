@@ -142,6 +142,192 @@ fn a_comp_stage_module_validates() {
     assert_eq!(translated.blur_level, 3);
 }
 
+/// **The warp stage's polar pair is the EEL per-vertex program's**, so its
+/// epilogue text is pinned here byte for byte: the comp stage's pair is built
+/// differently, and the two must not drift into each other.
+#[test]
+fn the_warp_stage_polar_pair_is_the_per_vertex_one() {
+    let warp_text = warp("shader_body { ret = GetPixel(uv) * rad * ang; }").wgsl;
+    let pair = "    let _rlx_p = (_rlx_uv_orig - vec2<f32>(0.5, 0.5)) * vec2<f32>(2.0, -2.0) * U.aspect.zw;\n\
+                \x20   var _rlx_rad: f32 = length(_rlx_p);\n\
+                \x20   var _rlx_ang: f32 = atan2(_rlx_p.y, _rlx_p.x);\n\
+                \x20   var _rlx_ret: vec3<f32> = vec3<f32>(0.0);\n";
+    assert!(
+        warp_text.contains(pair),
+        "the warp stage's rad/ang epilogue changed:\n{warp_text}"
+    );
+    let comp_text = translate(
+        Stage::Comp,
+        "shader_body { ret = GetPixel(uv) * rad * ang; }",
+        false,
+    )
+    .expect("translates")
+    .wgsl;
+    assert!(
+        !comp_text.contains(pair),
+        "the comp stage must not carry the warp stage's pair:\n{comp_text}"
+    );
+}
+
+/// Capture size for the comp-stage polar pair: **exactly 16:9**, so the aspect
+/// pair is `(1, 0.5625)` and the edge midpoints are one half-pixel from a pixel
+/// centre.
+const POLAR_W: u32 = 320;
+/// See [`POLAR_W`].
+const POLAR_H: u32 = 180;
+
+/// Convert a MilkDrop 2 preset whose comp shader is `body` and capture it at
+/// [`POLAR_W`]x[`POLAR_H`]; `None` without an adapter (ADR-0016).
+fn capture_comp(body: &str) -> Option<rlx_core::render::CaptureImage> {
+    use rlx_core::dsp::AnalysisFrame;
+    use rlx_core::preset::Preset;
+    use rlx_core::render::{HeadlessOptions, Renderer};
+
+    let mut renderer = match Renderer::new_headless(HeadlessOptions {
+        width: POLAR_W,
+        height: POLAR_H,
+        prefer_software: false,
+    }) {
+        Ok(renderer) => renderer,
+        Err(e) => {
+            eprintln!("skipping: no adapter ({e})");
+            return None;
+        }
+    };
+    let source = format!(
+        "[preset00]\n\
+         MILKDROP_PRESET_VERSION=201\n\
+         fDecay=0.9\n\
+         fWaveAlpha=0.0\n\
+         comp_1=`shader_body\n\
+         comp_2=`{{\n\
+         comp_3=`{body}\n\
+         comp_4=`}}\n"
+    );
+    let mut preset = Preset::from_toml_str(&convert_md2(&source).toml).expect("loads");
+    preset.name = "polar".into();
+    renderer.set_presets(vec![preset]);
+    Some(
+        renderer
+            .capture_preset("polar", &AnalysisFrame::default(), 2)
+            .expect("captures"),
+    )
+}
+
+/// One channel of one pixel of a capture, `0..=255`.
+fn channel(image: &rlx_core::render::CaptureImage, x: u32, y: u32, c: u32) -> u8 {
+    let i = ((y * image.width + x) * 4 + c) as usize;
+    image.rgba.get(i).copied().unwrap_or(0)
+}
+
+/// Assert that each `(x, y, channel)` is lit and that the frame centre is dark
+/// in every channel — the centre reads none of the windows the bodies below
+/// test, so a stage that lit everything would fail there.
+fn assert_lit(image: &rlx_core::render::CaptureImage, lit: &[(u32, u32, u32)], what: &str) {
+    for &(x, y, c) in lit {
+        let v = channel(image, x, y, c);
+        assert!(
+            v > 128,
+            "{what}: pixel ({x}, {y}) channel {c} reads {v}, so the comp stage's value \
+             there is outside the window the body tests"
+        );
+    }
+    for c in 0..3 {
+        let v = channel(image, POLAR_W / 2, POLAR_H / 2, c);
+        assert!(
+            v < 64,
+            "{what}: the frame centre is lit in channel {c} ({v}), so the windows are \
+             not selective and the lit pixels above prove nothing"
+        );
+    }
+}
+
+/// **The comp stage reads the source's `rad`/`ang`**, as `CPlugin::UvToMathSpace`
+/// builds them at `xeiraex/milkdrop2` `d4c843a`, evaluated by the emitted module
+/// on a real adapter at 16:9 (aspect pair `(1, 0.5625)`).
+///
+/// Each body lights one channel where a value falls inside a window, so the
+/// assertion is on the emitted arithmetic and survives the sRGB target. The
+/// windows are the exact values at the edge midpoints and corners, widened by
+/// what one half-pixel moves them at this size (under `0.003` in `rad`, under
+/// `0.006` rad in `ang`):
+///
+/// - `rad` is `1` at each corner, `1/sqrt(1 + 0.5625²) = 0.8716` at the left and
+///   right edge midpoints and `0.5625/sqrt(1 + 0.5625²) = 0.4903` at the top and
+///   bottom ones;
+/// - `ang` is `0` at the right edge's midpoint, `pi/2` at the bottom's, `pi` at
+///   the left's and `3pi/2` at the top's — clockwise on screen;
+/// - the two pixels either side of the `+x` ray read `ang` near `0` below it and
+///   near `2pi` above it, the near-`2pi` discontinuity.
+#[test]
+fn the_comp_stage_reads_the_sources_polar_pair() {
+    let (r, b) = (POLAR_W - 1, POLAR_H - 1);
+    let (mx, my) = (POLAR_W / 2, POLAR_H / 2);
+
+    let Some(rad) = capture_comp(
+        "float a = (abs(rad - 0.8716) < 0.006) ? 1 : 0; \
+         float b = (abs(rad - 0.4903) < 0.006) ? 1 : 0; \
+         float c = (abs(rad - 1.0) < 0.006) ? 1 : 0; \
+         ret = float3(a, b, c);",
+    ) else {
+        return;
+    };
+    assert_lit(
+        &rad,
+        &[
+            (r, my - 1, 0),
+            (r, my, 0),
+            (0, my - 1, 0),
+            (0, my, 0),
+            (mx - 1, 0, 1),
+            (mx, 0, 1),
+            (mx - 1, b, 1),
+            (mx, b, 1),
+            (0, 0, 2),
+            (r, 0, 2),
+            (0, b, 2),
+            (r, b, 2),
+        ],
+        "rad",
+    );
+
+    let Some(ang) = capture_comp(
+        "float a = (ang < 0.03) ? 1 : 0; \
+         float b = (ang > 6.2531853) ? 1 : 0; \
+         float c = (abs(ang - 1.5707963) < 0.03) ? 1 : 0; \
+         ret = float3(a, b, c);",
+    ) else {
+        return;
+    };
+    assert_lit(
+        &ang,
+        &[
+            // Below the +x ray `ang` starts at 0; the row above it ends near 2pi.
+            (r, my, 0),
+            (r, my - 1, 1),
+            (mx - 1, b, 2),
+            (mx, b, 2),
+        ],
+        "ang at 0, 2pi and pi/2",
+    );
+    // The discontinuity, stated from the other side: neither pixel reads the
+    // other's value.
+    assert!(channel(&ang, r, my - 1, 0) < 64 && channel(&ang, r, my, 1) < 64);
+
+    let Some(ang_half) = capture_comp(
+        "float a = (abs(ang - 3.1415926) < 0.03) ? 1 : 0; \
+         float b = (abs(ang - 4.7123890) < 0.03) ? 1 : 0; \
+         ret = float3(a, b, 0);",
+    ) else {
+        return;
+    };
+    assert_lit(
+        &ang_half,
+        &[(0, my - 1, 0), (0, my, 0), (mx - 1, 0, 1), (mx, 0, 1)],
+        "ang at pi and 3pi/2",
+    );
+}
+
 /// **The matrix constructor keeps HLSL's mathematical matrix.** HLSL fills
 /// rows, WGSL fills columns; the emitted `transpose` is what lets `mul`
 /// translate positionally without silently transposing every rotation in the

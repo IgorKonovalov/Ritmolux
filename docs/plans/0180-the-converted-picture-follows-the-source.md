@@ -423,8 +423,8 @@ pub fn run_wave_point(&mut self, index: usize, sample: f32, left: f32, right: f3
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Read the rest of the source, and render the seam | dev | done | committed with this row |
-| 2 — The comp stage gets the source's polar pair | dev | not started | |
+| 1 — Read the rest of the source, and render the seam | dev | done | `725c8d5` |
+| 2 — The comp stage gets the source's polar pair | dev | done | committed with this row |
 | 3 — The per-vertex program gets the source's `x`/`y` | dev | not started | |
 | 4 — The seam is found | dev | not started | |
 | 5 — The analyzer publishes a left/right pair | dev | not started | |
@@ -509,6 +509,19 @@ matter per fragment.
   Its only identification with `d4c843a` is that every line this plan and ADR-0199 cite at that commit
   (`milkdropfs.cpp` l.1839, 2549, 3862; `plugin.cpp` l.2027, 2061; `pluginshell.cpp` l.2019) is at that
   number with that content.
+- **Phase 2's evaluation is on a real adapter, in `milkconv/tests/shader.rs`.**
+  `the_comp_stage_reads_the_sources_polar_pair` renders the emitted comp stage at 320x180 and tests
+  each value through a lit window, so its tolerances are the exact values widened by one half-pixel
+  (`0.006` in `rad`, `0.03` rad in `ang`). It fails with the warp stage's `(2, -2)` sign put back in
+  the comp epilogue. `the_warp_stage_polar_pair_is_the_per_vertex_one` pins the warp text.
+- **Phase 2's bless moved one baseline by cause and re-encoded eight by noise, and the eight are not
+  in the commit.** Before the bless, with the fixture already changed, the golden run read
+  `warp_mesh_shader` at mean `0.0067`, outlier 6. It read eight other baselines at mean `≤ 0.0013`,
+  outlier `≤ 2`: `backdrop_band`, `backdrop_ramp`, `shape_collage`, `shape_collage_roster`,
+  `shape_field`, `warp_mesh`, `warp_mesh_milk` and `warp_mesh_stroke`. `RLX_BLESS=1` rewrote all nine.
+  `warp_mesh_shader.png` is committed. This session's permissions refused `git checkout`,
+  `git restore` and `git stash` on the other eight, so they are left modified in the working tree
+  and uncommitted. The golden run passes against either version of them.
 
 ### Close triggers
 

@@ -1410,15 +1410,35 @@ impl Emitter {
                  \x20   var _rlx_uv_orig: vec2<f32> = _in_uv;\n",
             ),
         }
-        // MilkDrop's `rad`/`ang` normalization — the longer axis reads 1, so the
-        // pair matches what the EEL per-vertex program saw
-        // (`MilkRuntime::run_vertex`). `U.aspect.zw` is that pair in both
-        // orientations.
+        // `U.aspect.zw` is the source's `m_fAspectX`/`m_fAspectY` in both
+        // orientations: the longer axis 1, the shorter below it.
+        match self.stage {
+            // The warp stage's `rad`/`ang` — the longer axis reads 1, so the pair
+            // matches what the EEL per-vertex program saw
+            // (`MilkRuntime::run_vertex`): +y up, `atan2` in `-pi..pi`.
+            Stage::Warp => out.push_str(
+                "    let _rlx_p = (_rlx_uv_orig - vec2<f32>(0.5, 0.5)) * vec2<f32>(2.0, -2.0) * U.aspect.zw;\n\
+                 \x20   var _rlx_rad: f32 = length(_rlx_p);\n\
+                 \x20   var _rlx_ang: f32 = atan2(_rlx_p.y, _rlx_p.x);\n",
+            ),
+            // The comp stage's pair is built differently, as
+            // `CPlugin::UvToMathSpace` builds it (`milkdropfs.cpp` l.3862-3878 at
+            // `xeiraex/milkdrop2` `d4c843a`): +y DOWN, `rad` divided by the
+            // aspect pair's length so it reads 1 at the corners, and `ang` lifted
+            // into `0..2pi`, so it turns clockwise on screen and cuts on +x.
+            // The source's hand-set centre-column values (`plugin.cpp` l.2061)
+            // only stop per-vertex interpolation smearing across the cut, and a
+            // per-fragment evaluation interpolates nothing, so they are not
+            // reproduced.
+            Stage::Comp => out.push_str(
+                "    let _rlx_p = (_rlx_uv_orig - vec2<f32>(0.5, 0.5)) * 2.0 * U.aspect.zw;\n\
+                 \x20   var _rlx_rad: f32 = length(_rlx_p) / length(U.aspect.zw);\n\
+                 \x20   var _rlx_ang: f32 = atan2(_rlx_p.y, _rlx_p.x);\n\
+                 \x20   _rlx_ang = select(_rlx_ang, _rlx_ang + 6.2831853, _rlx_ang < 0.0);\n",
+            ),
+        }
         out.push_str(
-            "    let _rlx_p = (_rlx_uv_orig - vec2<f32>(0.5, 0.5)) * vec2<f32>(2.0, -2.0) * U.aspect.zw;\n\
-             \x20   var _rlx_rad: f32 = length(_rlx_p);\n\
-             \x20   var _rlx_ang: f32 = atan2(_rlx_p.y, _rlx_p.x);\n\
-             \x20   var _rlx_ret: vec3<f32> = vec3<f32>(0.0);\n\
+            "    var _rlx_ret: vec3<f32> = vec3<f32>(0.0);\n\
              \x20   var _rlx_hue: vec3<f32> = mix(\n\
              \x20       mix(U.hue[0].xyz, U.hue[1].xyz, _rlx_uv.x),\n\
              \x20       mix(U.hue[2].xyz, U.hue[3].xyz, _rlx_uv.x),\n\

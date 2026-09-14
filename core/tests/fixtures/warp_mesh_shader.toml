@@ -359,8 +359,10 @@ fn rlx_quantize(c: vec3<f32>, steps: f32) -> vec3<f32> {
 
 @fragment
 fn fs_main(@location(0) _in_uv: vec2<f32>) -> @location(0) vec4<f32> {
-    let p = (_in_uv - vec2<f32>(0.5, 0.5)) * vec2<f32>(2.0, -2.0) * U.aspect.zw;
-    let rad = length(p);
+    // The comp stage's rad, the way milkconv's emitter writes it for this stage:
+    // +y down, divided by the aspect pair's length so it reads 1 at the corners.
+    let p = (_in_uv - vec2<f32>(0.5, 0.5)) * 2.0 * U.aspect.zw;
+    let rad = length(p) / length(U.aspect.zw);
 
     let field = rlx_GetPixel(_in_uv);
     let glow = rlx_GetBlur1(_in_uv) * 0.6 + rlx_GetBlur2(_in_uv) * 0.3 + rlx_GetBlur3(_in_uv) * 0.1;
