@@ -358,7 +358,12 @@ export async function runPlan(ctx, lane, plan) {
       worktree: wt,
       branch: rec.branch,
       tag: rec.closed.tag,
+      gatedHead: rec.closed.head,
       runGate: (label) => gate(ctx, rec, label),
+      onGated: (sha) => {
+        rec.closed.head = sha;
+        save(ctx);
+      },
     });
     if (!m.ok) return park(ctx, rec, { reason: m.reason, detail: m.detail, read: m.gate?.failed?.log ?? null });
     rec.merge = { head: m.head, remerged: m.remerged, at: now() };

@@ -4,7 +4,7 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
@@ -266,6 +266,58 @@ test("main advancing on a conflicting change between close and merge parks", asy
   assert.equal(rec.park.reason, "merge_conflict");
   assert.ok(existsSync(rec.worktree));
   assert.equal(git(["status", "--porcelain"], rec.worktree).stdout, "", "the aborted merge left the worktree clean");
+});
+
+test("a conflict the owner resolves in the lane is gated and re-tagged before main moves", async () => {
+  const { ctx, repo } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
+  ctx.beforeMerge = async () => {
+    writeFileSync(join(repo, "phase-0101-1.txt"), "a different phase 1 on main\n");
+    sh(["add", "phase-0101-1.txt"], repo);
+    sh(["commit", "-q", "-m", "feat: a conflicting commit on main"], repo);
+  };
+  await runLanes(ctx);
+  const rec = ctx.state.plans["0101"];
+  assert.equal(rec.park.reason, "merge_conflict");
+
+  // The owner merges main in the lane, resolves, commits, and resumes.
+  const wt = rec.worktree;
+  assert.notEqual(git(["merge", "main"], wt).code, 0);
+  writeFileSync(join(wt, "phase-0101-1.txt"), "resolved by the owner\n");
+  sh(["add", "phase-0101-1.txt"], wt);
+  sh(["commit", "-q", "--no-edit"], wt);
+  const tagMessageBefore = git(["tag", "-l", "--format=%(contents)", "v0.1.1"], repo).stdout;
+  rec.status = "queued";
+  rec.park = null;
+  ctx.beforeMerge = undefined;
+
+  await runLanes(ctx);
+  const done = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(done.status, "merged", JSON.stringify(done.park));
+  assert.deepEqual(done.gates.map((g) => g.label), ["pre-review", "post-close"], "the resolved tip was gated, once");
+  assert.equal(done.merge.remerged, false);
+  assert.equal(tagObjectType("v0.1.1", repo), "tag");
+  assert.equal(resolveCommit("v0.1.1", repo), resolveCommit("main", repo), "the tag moved onto the resolved tip");
+  assert.equal(git(["tag", "-l", "--format=%(contents)", "v0.1.1"], repo).stdout, tagMessageBefore);
+  assert.equal(readFileSync(join(repo, "phase-0101-1.txt"), "utf8"), "resolved by the owner\n");
+});
+
+test("a fast-forward refused while main is already in the branch parks without a re-merge or a gate", async () => {
+  const { ctx, repo } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
+  const lock = join(repo, ".git", "index.lock");
+  ctx.beforeMerge = async () => writeFileSync(lock, "");
+  const mainBefore = resolveCommit("main", repo);
+  try {
+    await runLanes(ctx);
+  } finally {
+    if (existsSync(lock)) rmSync(lock);
+  }
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "parked");
+  assert.equal(rec.park.reason, "merge_failed");
+  assert.match(rec.park.detail, /main is already in plan-0101-fixture/);
+  assert.deepEqual(rec.gates.map((g) => g.label), ["pre-review"], "no gate ran for a re-merge that could not help");
+  assert.equal(resolveCommit("main", repo), mainBefore);
+  assert.equal(resolveCommit("HEAD", rec.worktree), rec.closed.head, "no merge commit was made on the branch");
 });
 
 test("two lanes closing at once serialize on the close lock", async () => {
