@@ -170,6 +170,32 @@ test("a human phase parks with its worktree kept, the lane runs on, and a depend
   assert.match(needs, /^- \*\*0101 parked\*\* at Phase 2 \(`human_phase`\)\. Phase 2 is owned by human\. Read: docs\/plans\/0101-fixture\.md Phase 2\. Holds `[^`]*rlx-plan-0101`\.$/m);
   assert.match(needs, /^ {2}Resume: `node tools\/conductor\/conductor\.mjs resume 0101`$/m);
   assert.match(digest("### Closed"), /^- \*\*0102 - Plan 0102 fixture\*\*/m);
+
+  // A park on a clean worktree records no path list and prints nothing extra.
+  assert.equal("dirty" in parked.park, false);
+  assert.ok(!inbox.includes("Left dirty"));
+  assert.ok(!needs.includes("Left dirty"));
+});
+
+test("a park that leaves the worktree dirty names the paths, capped, in the record, the inbox and the digest", async () => {
+  const { ctx, digest } = scratch({
+    plans: [{ number: "0101", phases: [dev("1")] }],
+    lanes: { a: ["0101"] },
+    spec: { "0101": { dirtyPark: { untracked: 13 } } },
+  });
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "parked");
+  assert.equal(rec.park.reason, "check_red");
+  const shown = ["VERSION", ...Array.from({ length: 9 }, (_, i) => `bless-${String(i + 1).padStart(2, "0")}.png`)];
+  assert.deepEqual(rec.park.dirty, { paths: shown, more: 4 }, "ten paths shown, the other four counted");
+
+  const text = `${shown.map((p) => `\`${p}\``).join(", ")} and 4 more`;
+  const inbox = readFileSync(statePaths(ctx.stateDir).inbox, "utf8");
+  assert.ok(inbox.includes(`- **Left dirty:** ${text}. \`resume\` refuses until the worktree is clean.`), inbox);
+  const needs = digest("### Needs you");
+  assert.match(needs, /^- \*\*0101 parked\*\* \(`check_red`\)\. .* Holds `[^`]*rlx-plan-0101`\. Left dirty: .*$/m);
+  assert.ok(needs.includes(` Left dirty: ${text}.\n`), needs);
 });
 
 test("a review with one major takes exactly one fix round and a re-review, then merges", async () => {
@@ -433,7 +459,7 @@ test("a probe the close leaves red parks gate_red at post-close and main does no
   const rec = loadState(ctx.stateDir).plans["0101"];
   assert.equal(rec.status, "parked");
   assert.equal(rec.park.reason, "gate_red");
-  assert.match(rec.park.detail, /after the close: check-backlog-claims.mjs/);
+  assert.match(rec.park.detail, /after the close: check-backlog-claims\.mjs/);
   assert.deepEqual(rec.gates.map((g) => [g.label, g.ok]), [["pre-review", true], ["post-close", false]]);
   assert.equal(resolveCommit("main", repo), mainBefore, "main did not move");
 });

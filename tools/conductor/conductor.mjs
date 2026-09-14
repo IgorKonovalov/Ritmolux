@@ -22,7 +22,7 @@ import { fileURLToPath } from "node:url";
 import { pidAlive } from "./with-lock.mjs";
 import { writeDigest } from "./lib/digest.mjs";
 import { currentBranch, isClean } from "./lib/git.mjs";
-import { appendPark } from "./lib/inbox.mjs";
+import { appendPark, dirtyText, dirtyWorktree } from "./lib/inbox.mjs";
 import { runLanes } from "./lib/lane.mjs";
 import { findPlan, nextStep, readPlanFile } from "./lib/plan.mjs";
 import { loadLocal, loadQueue, stateSets } from "./lib/queue.mjs";
@@ -201,6 +201,9 @@ function cmdStatus(args, o) {
 /** Why a park still holds, or null when the owner has acted on it. */
 function parkStillTrue(p, rec) {
   const { reason, phase } = rec.park;
+  // Whatever the reason, no new session starts on a tree the last one left dirty.
+  const dirty = dirtyWorktree(rec.worktree);
+  if (dirty) return `the worktree ${rec.worktree} has uncommitted changes: ${dirtyText(dirty)}; commit them, or \`git restore\` them there, first`;
   if (reason === "human_phase") {
     const where = rec.worktree && existsSync(rec.worktree) ? rec.worktree : p.repo;
     const found = findPlan(where, rec.plan);
@@ -268,8 +271,10 @@ function cmdPark(args, o) {
   }
   rec.status = "parked";
   rec.park = { reason: "owner", detail: "parked by the owner", phase: null, read: null, worktree: rec.worktree, at: new Date().toISOString() };
+  const dirty = dirtyWorktree(rec.worktree);
+  if (dirty) rec.park.dirty = dirty;
   rec.parks.push(rec.park);
-  appendPark(statePaths(p.stateDir).inbox, { plan, reason: "owner", detail: "parked by the owner", worktree: rec.worktree });
+  appendPark(statePaths(p.stateDir).inbox, { plan, reason: "owner", detail: "parked by the owner", worktree: rec.worktree, dirty });
   saveState(p.stateDir, state);
   regenerate(p, state);
   o.log(`conductor: plan ${plan} parked; \`resume ${plan}\` queues it again`);

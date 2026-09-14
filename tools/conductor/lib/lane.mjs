@@ -18,7 +18,7 @@ import { verifyClose, verifyFix, verifyImplement } from "./close.mjs";
 import { removeLane, laneNames, openLane } from "./cleanup.mjs";
 import { defaultGate, gateForStage, runGate } from "./gate.mjs";
 import { head, resolveCommit } from "./git.mjs";
-import { appendCleanupFailure, appendPark } from "./inbox.mjs";
+import { appendCleanupFailure, appendPark, dirtyWorktree } from "./inbox.mjs";
 import { CLOSE, take } from "./locks.mjs";
 import { fastForwardMain } from "./merge.mjs";
 import { findPlan, nextStep, rangeLabel, readPlanFile } from "./plan.mjs";
@@ -125,10 +125,14 @@ async function laneLoop(ctx, lane) {
 function park(ctx, rec, { reason, detail, phase = null, read = null }) {
   rec.status = "parked";
   rec.park = { reason, detail, phase, read, worktree: rec.worktree, at: now() };
+  // No session is trusted to have left the tree clean. The paths are recorded and never reverted:
+  // they may be the evidence the owner needs.
+  const dirty = dirtyWorktree(rec.worktree);
+  if (dirty) rec.park.dirty = dirty;
   rec.parks.push(rec.park);
   rec.ended = now();
   if (ctx.state.lanes[rec.lane]) ctx.state.lanes[rec.lane] = { plan: null, step: null };
-  appendPark(statePaths(ctx.stateDir).inbox, { plan: rec.plan, reason, detail, read, worktree: rec.worktree });
+  appendPark(statePaths(ctx.stateDir).inbox, { plan: rec.plan, reason, detail, read, worktree: rec.worktree, dirty });
   event(ctx, "park", { plan: rec.plan, reason });
   save(ctx);
   return rec;

@@ -205,8 +205,8 @@ until it merges. Run it as a human-started `dev` lane.
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — `run` works on a clean checkout | dev | done | `a676f13` |
-| 2 — A backlog probe is judged by the close, not parked before it | dev | committed with this row | |
-| 3 — A park leaves a lane that can be resumed | dev | not started | |
+| 2 — A backlog probe is judged by the close, not parked before it | dev | done | `24300e7` |
+| 3 — A park leaves a lane that can be resumed | dev | committed with this row | |
 | 4 — A lane that stops says why | dev | not started | |
 | 5 — The pilot, resumed | human | not started | |
 
@@ -214,5 +214,8 @@ until it merges. Run it as a human-started `dev` lane.
 
 - Phase 2: the two probe scenarios stand the backlog probe in with a marker file (`PROBE_RED`) that a
   gate step named `check-backlog-claims.mjs` reads; the fixture plan's `Closes:` still reads `none`.
+- Phase 3: the owner's `park NNNN` records dirty paths too (`cmdPark`, beyond `parkStillTrue`). The
+  allowlist test is a new file, `test/settings.test.mjs`. The commit also repairs two escapes in
+  Phase 2's test code (a literal newline in `lane-scenario.mjs`, an unescaped `.` in a regex).
 
 ### Close triggers

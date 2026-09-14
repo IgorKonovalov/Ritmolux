@@ -298,7 +298,9 @@ implementer run.
 - **Never ask a question.** Nobody is there. Everything that would stop a human-started session —
   "When the plan is wrong", a `human` phase inside the range, a stop condition the plan states, a
   question only the owner can answer, a check you cannot make green inside the phase — ends this one
-  with a `parked` outcome naming it. Commit finished work first and leave the tree clean. A park is
+  with a `parked` outcome naming it. Commit finished work first and leave the tree clean: put back a
+  file the session did not mean to change, such as a golden a test run re-encoded, with
+  `git restore <path>` (`git checkout` and `git stash` are refused). `resume` refuses a dirty lane. A park is
   the correct result, not a failure; working around the plan is the failure.
 - **Every `cargo nextest` or `cargo test` runs through the suite lock**:
   `node <path from RLX-CONDUCTOR-SUITE-LOCK> suite -- cargo nextest run ...`. A hook denies the bare

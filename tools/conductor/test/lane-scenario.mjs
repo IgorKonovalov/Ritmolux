@@ -4,7 +4,11 @@
 //
 //   { "plans": { "0101": { "reviews": ["major", "clean"], "bogusCommit": true, "lightweightTag": true,
 //                          "noCloseReview": true, "budget": "implement", "minors": 1, "numericThrough": true,
-//                          "delayMs": { "review": 400 }, "breaksProbe": true, "probeStaysRed": true } } }
+//                          "delayMs": { "review": 400 }, "breaksProbe": true, "probeStaysRed": true,
+//                          "dirtyPark": { "untracked": 13 } } } }
+//
+// `dirtyPark` makes the implement session rewrite the tracked VERSION, write `untracked` new files,
+// and park with them all left in the worktree.
 //
 // `breaksProbe` commits PROBE_RED with the first implemented phase, standing in for a backlog probe
 // the plan's own delivery turns red; the close session removes it, as a close archives the entry,
@@ -34,6 +38,14 @@ export default async ({ cwd, vars, env }) => {
     const planName = readdirSync(plansDir).find((f) => f.startsWith(`${plan}-`));
     const planPath = join(plansDir, planName ?? "missing");
 
+    if (mode === "implement" && ps.dirtyPark) {
+      // A session whose test run rewrote a tracked file and blessed new ones, and which parks
+      // without putting them back.
+      writeFileSync(join(cwd, "VERSION"), "rewritten by a test run\n");
+      for (let i = 1; i <= (ps.dirtyPark.untracked ?? 0); i++) writeFileSync(join(cwd, `bless-${String(i).padStart(2, "0")}.png`), "png\n");
+      return { text: block({ kind: "parked", plan, reason: "check_red", detail: "a golden drifted and cannot be made green inside the phase" }), costUsd: 1 };
+    }
+
     if (mode === "implement") {
       let text = readFileSync(planPath, "utf8");
       const order = [...text.matchAll(/^### Phase (\w+) — /gm)].map((m) => m[1]);
@@ -51,8 +63,7 @@ export default async ({ cwd, vars, env }) => {
         writeFileSync(join(cwd, `phase-${plan}-${id}.txt`), `phase ${id} of ${plan}\n`);
         git("add", `phase-${plan}-${id}.txt`, `docs/plans/${planName}`);
         if (ps.breaksProbe && commits.length === 0 && !existsSync(join(cwd, "PROBE_RED"))) {
-          writeFileSync(join(cwd, "PROBE_RED"), `plan ${plan} delivered what the probe asserts is missing
-`);
+          writeFileSync(join(cwd, "PROBE_RED"), `plan ${plan} delivered what the probe asserts is missing\n`);
           git("add", "PROBE_RED");
         }
         git("commit", "-q", "-m", `feat: plan ${plan} phase ${id}`);

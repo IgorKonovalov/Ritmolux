@@ -87,6 +87,13 @@ Ctrl+C on `run` does the same as `abort`.
 | `budget`, `api`, `no_outcome`, `bad_outcome` | Raise the budget in `local.json`, or wait out a usage limit. Resuming re-runs the step from what the plan log and `git` show. |
 | `merge_conflict`, `merge_failed`, `main_dirty` | Resolve it in the lane, or clean the main checkout. A resumed plan goes straight back to the fast-forward. |
 
+**Whatever the reason, `resume` refuses a lane whose worktree is dirty.** A session is told to leave
+the tree clean and may run `git restore` to do it, but a park does not prove that it did. The park
+records the dirty paths: the first 10 and a count of the rest, in `conductor.json`, the inbox entry
+and the digest's **Needs you** line. The conductor never reverts them, because they may be the
+evidence you need, such as the goldens a test run re-encoded. Read them, then commit them or
+`git restore` them in the lane, and resume.
+
 A merged plan whose worktree could not be removed (Windows refuses while any shell sits inside it) is
 an inbox entry, not a park: close the shell, then `git worktree remove`, `git worktree prune` and
 `git branch -d`.

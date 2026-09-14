@@ -13,7 +13,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { relative } from "node:path";
 
 import { tagObjectType } from "./git.mjs";
-import { resumeCommand } from "./inbox.mjs";
+import { dirtyText, resumeCommand } from "./inbox.mjs";
 import { findPlan, readPlanFile } from "./plan.mjs";
 import { statePaths, totalSpend, writeAtomic } from "./state.mjs";
 
@@ -100,7 +100,8 @@ export function renderDigest(state, { repo, stateDir }) {
         const where = p.phase ? ` at Phase ${p.phase}` : "";
         needs.push(
           `- **${rec.plan} parked**${where} (\`${p.reason}\`)${current ? "" : " - since resumed"}. ${p.detail}. ` +
-            `Read: ${p.read ?? "the plan"}. Holds \`${p.worktree ?? "no worktree"}\`.`,
+            `Read: ${p.read ?? "the plan"}. Holds \`${p.worktree ?? "no worktree"}\`.` +
+            (p.dirty ? ` Left dirty: ${dirtyText(p.dirty)}.` : ""),
         );
         if (current) needs.push(`  Resume: \`${resumeCommand(rec.plan)}\``);
       }

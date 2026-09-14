@@ -183,6 +183,28 @@ test("run starts again after a merge, and a resumed sibling of the merged plan r
   assert.equal(state.plans["0102"].status, "merged", JSON.stringify(state.plans["0102"].park));
 });
 
+test("resume refuses a park whose worktree is dirty, naming the paths, and accepts once it is clean", async () => {
+  const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] });
+  writeFileSync(join(p.toolDir, "spec.json"), JSON.stringify({ plans: { "0101": { dirtyPark: { untracked: 0 } } } }));
+  await cli("run");
+  const rec = loadState(p.stateDir).plans["0101"];
+  assert.equal(rec.park.reason, "check_red");
+  assert.deepEqual(rec.park.dirty, { paths: ["VERSION"], more: 0 });
+
+  const refused = await cli("resume", "0101");
+  assert.equal(refused.code, 1);
+  assert.equal(
+    refused.err[0],
+    `conductor: refusing to resume 0101 - its park reason (check_red) still holds: the worktree ${rec.worktree} has uncommitted changes: \`VERSION\`; commit them, or \`git restore\` them there, first`,
+  );
+  assert.equal(loadState(p.stateDir).plans["0101"].status, "parked");
+
+  sh(["restore", "VERSION"], rec.worktree);
+  const accepted = await cli("resume", "0101");
+  assert.equal(accepted.code, 0, accepted.err.join("\n"));
+  assert.equal(loadState(p.stateDir).plans["0101"].status, "queued");
+});
+
 test("park parks a queued plan with an inbox entry, and resume queues it again", async () => {
   const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] });
   const parked = await cli("park", "0101");

@@ -201,7 +201,9 @@ mode. Where this section and the rest of the skill disagree, this section wins, 
 - **Never invoke `dev` (or any skill) through the Skill tool.** The conductor starts the next run.
 - **Never ask a question.** A wrong plan, a `human` phase in the range, a stop condition the plan
   states, a question only the owner can answer, or a check you cannot make green inside the phase ends
-  the session with a `parked` outcome. Commit finished work first; leave the tree clean.
+  the session with a `parked` outcome. Commit finished work first; leave the tree clean, putting back a
+  file the session did not mean to change with `git restore <path>` (`git checkout` and `git stash` are
+  refused). `resume` refuses a dirty lane.
 - **Every `cargo nextest` / `cargo test`** — the version test after a sync, a player-side check — runs as
   `node <path from RLX-CONDUCTOR-SUITE-LOCK> suite -- cargo ...`. A hook denies the bare form.
 - **On the plan's last implementer run**, write the `## Implementation log` close block the way `dev`'s
