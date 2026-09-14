@@ -298,50 +298,53 @@ fn occlude_reading(renderer: &mut Renderer, system: &str, body: &str, stage: &st
     (covered_moved, adding_raised)
 }
 
-/// **`occlude` behaves as it does on `fragment_field`** — on both of the two
-/// paths it can reach, asserted as a comparison between the two systems rather
-/// than as a recollection of what the reference does.
+/// **`occlude` means the same thing on every fullscreen field, whoever owns
+/// the seam** — asserted outright on `analytic_field`, `fragment_field`,
+/// `shape_field` and `shape_collage`, on both of the two paths it can reach.
 ///
-/// - **A post stage active** (`trails` bound): the chain's last fold owns the
-///   seam (ADR-0085). At `occlude = 1` lighting the sky changes nothing; at `0`
-///   it raises the frame. Asserted outright on both systems, which is what makes
-///   the comparison non-vacuous.
-/// - **No stage active**: the scene lands on the backdrop itself, and here the
-///   two fields must simply agree. Both draw with a replacing blend, so the sky
-///   under them does not show at either end — the comparison holds the new
-///   field to what the reference does, whatever that is.
+/// - **A post stage active** (`trails` bound): the scene draws into a scratch
+///   with no backdrop under it, and the chain's last fold owns the seam
+///   (ADR-0085).
+/// - **No stage active**: the scene draws straight onto the backdrop and owns
+///   the seam itself, through the alpha its present blends with.
+///
+/// On both, lighting the sky moves nothing at `occlude = 1` and raises the frame
+/// at `occlude = 0`.
 #[test]
-fn occlude_behaves_as_it_does_on_fragment_field() {
+fn occlude_lets_the_sky_through_on_every_fullscreen_field() {
     const SIZE: u32 = 64;
     let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
-    let field = "[field]\nfamily = \"chladni\"\n[params]\nmode_n = \"3\"\nmode_m = \"5\"\n";
-    let fold = "[params]\nwarp = \"0.5\"\n";
+    let systems = [
+        (
+            "analytic_field",
+            "[field]\nfamily = \"chladni\"\n[params]\nmode_n = \"3\"\nmode_m = \"5\"\n",
+        ),
+        ("fragment_field", "[params]\nwarp = \"0.5\"\n"),
+        ("shape_field", "[params]\n"),
+        ("shape_collage", "[params]\n"),
+    ];
+    let covers = |reading: (f32, f32)| reading.0 < 0.05;
+    let adds = |reading: (f32, f32)| reading.1 > 0.3;
+    let mut failures = Vec::new();
     for (path, stage) in [("stage active", "trails = \"0.5\"\n"), ("no stage", "")] {
-        let analytic = occlude_reading(&mut renderer, "analytic_field", field, stage);
-        let reference = occlude_reading(&mut renderer, "fragment_field", fold, stage);
-        println!(
-            "{path}: analytic_field moves {:.4} at occlude 1 and raises {:.3} at 0; \
-             fragment_field moves {:.4} and raises {:.3}",
-            analytic.0, analytic.1, reference.0, reference.1
-        );
-        let covers = |reading: (f32, f32)| reading.0 < 0.05;
-        let adds = |reading: (f32, f32)| reading.1 > 0.3;
-        assert_eq!(
-            (covers(analytic), adds(analytic)),
-            (covers(reference), adds(reference)),
-            "{path}: the analytic field's occlude ({analytic:?}) does not behave \
-             as fragment_field's does ({reference:?})"
-        );
-        if !stage.is_empty() {
-            assert!(
-                covers(reference) && adds(reference),
-                "{path}: fragment_field no longer covers at occlude 1 and adds at \
-                 0 ({reference:?}), so the comparison above compares nothing"
+        for (system, body) in systems {
+            let reading = occlude_reading(&mut renderer, system, body, stage);
+            println!(
+                "{path}: {system} moves {:.4} at occlude 1 and raises {:.3} at 0",
+                reading.0, reading.1
             );
+            if !(covers(reading) && adds(reading)) {
+                failures.push(format!("{path}: {system} {reading:?}"));
+            }
         }
     }
+    assert!(
+        failures.is_empty(),
+        "these fields do not cover at occlude 1 and add at 0 (moved under 0.05, \
+         raised over 0.3): {failures:#?}"
+    );
 }
 
 /// **An unknown family name is a load error**, naming the roster; an absent

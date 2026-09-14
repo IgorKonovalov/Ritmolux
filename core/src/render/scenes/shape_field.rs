@@ -861,7 +861,7 @@ impl ShapeFieldScene {
                 bind_group,
                 None,
                 surface_format,
-                wgpu::BlendState::REPLACE,
+                wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING,
                 "shape-field",
             ),
             shape: marks::DEFAULT_SHAPE,

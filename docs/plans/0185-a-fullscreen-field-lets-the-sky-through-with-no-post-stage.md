@@ -1,6 +1,6 @@
 # 0185 — A fullscreen field lets the sky through with no post stage
 
-> **Status:** approved (2026-09-14)
+> **Status:** in-progress
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`
 > **Related ADRs:** [0201](../adrs/0201-a-fullscreen-scene-presents-premultiplied-over-the-backdrop.md) (proposed),
@@ -174,14 +174,21 @@ flowchart LR
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(`main` directly, or the worktree path plus its branch)_
+**Lane:** `plan-0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage`, worktree `C:\Users\Igor Konovalov\WORK\rlx-plan-0185`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The four fields present premultiplied, and the test says so | dev | not started | |
+| 1 — The four fields present premultiplied, and the test says so | dev | done | committed with this row |
 | 2 — The reader says what the parameter does | dev | not started | |
 
 ### Notes
+
+- Phase 1: the parity test is renamed to `occlude_lets_the_sky_through_on_every_fullscreen_field`,
+  so backlog 0206's name probe goes red (see Risks). With the four blends put back to `REPLACE` the
+  new test fails on the no-stage path only, all four systems reading `(0.0, 0.0)`; the stage-active
+  path reads `(0.0, 1.0)` on all four both before and after.
+- Phase 1: capture metrics (`core/src/render/metrics.rs`) ignore alpha; no alpha read found in the
+  capture or stream code.
 
 ### Close triggers
 

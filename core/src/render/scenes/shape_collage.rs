@@ -1071,7 +1071,7 @@ impl ShapeCollageScene {
                 bind_group,
                 None,
                 surface_format,
-                wgpu::BlendState::REPLACE,
+                wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING,
                 "shape-collage",
             ),
             elements: Vec::with_capacity(2 * cap),

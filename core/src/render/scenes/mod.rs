@@ -655,8 +655,12 @@ pub(crate) trait Scene {
     /// the seam instead — a scene must never apply this twice.
     ///
     /// Only a scene that **presents premultiplied over the backdrop** (ADR-0026 —
-    /// the reaction-diffusion, attractor and fragment-field presents) has anything
-    /// to do here. The additive families draw through
+    /// the reaction-diffusion, cellular, attractor and warp-mesh presents, and the
+    /// fragment-field, analytic-field, shape-field and shape-collage fullscreen
+    /// fields) has anything to do here. Such a scene writes `occlude` into its
+    /// alpha and its present pipeline blends `PREMULTIPLIED_ALPHA_BLENDING`, so
+    /// the backdrop resolves as `scene + bg * (1 - occlude)`; at the literal `1.0`
+    /// that blend is exactly a replace. The additive families draw through
     /// [`gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE`](crate::render::gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE),
     /// whose colour destination factor is `One`: with no stage active their light
     /// already adds to the backdrop rather than replacing it, so there is no

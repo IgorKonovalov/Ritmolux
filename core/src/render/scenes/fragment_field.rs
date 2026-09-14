@@ -326,7 +326,7 @@ impl FragmentFieldScene {
                 uniform_bg,
                 Some(lut_bg),
                 surface_format,
-                wgpu::BlendState::REPLACE,
+                wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING,
                 "fragment-field",
             ),
             time: 0.0,
@@ -512,8 +512,10 @@ impl Scene for FragmentFieldScene {
         };
         self.gpu.write_uniform(queue, &params);
 
-        // Load over the engine backdrop (ADR-0018); this fullscreen field is
-        // opaque, so it covers the backdrop as before.
+        // Load over the engine backdrop (ADR-0018). The present blends
+        // premultiplied-OVER with alpha `occlude`, so the backdrop resolves as
+        // `field + bg * (1 - occlude)`: covered at 1 (exactly a replace), added
+        // to at 0.
         self.gpu
             .draw(encoder, "fragment-field-pass", view, wgpu::LoadOp::Load);
     }
