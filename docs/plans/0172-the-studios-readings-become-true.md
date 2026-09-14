@@ -178,8 +178,8 @@ flowchart LR
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The frame clock covers both live paths | dev | done | c303c1f |
-| 2 — The player's schema is snapshotted | dev | done | committed with this row |
-| 3 — A preset warning names its parameter | dev | not started | |
+| 2 — The player's schema is snapshotted | dev | done | 6ce0594 |
+| 3 — A preset warning names its parameter | dev | done | committed with this row |
 | 4 — The studio reads the snapshot, anchors warnings and shows the rate | studio-builder | not started | |
 
 ### Notes
@@ -198,6 +198,22 @@ flowchart LR
   `println!` adds, byte-equal to the built player's `--schema` output. Done-when's hand-edit check: the
   first `"default":0.4` in the snapshot changed to `0.5` made `the_player_schema_snapshot_is_current`
   fail printing the regenerate command; reverted, green.
+- Phase 3: the core type is `rlx_core::preset::PresetWarning { message, param: Option<String> }`,
+  re-exported beside `PresetError`; it implements `Display` and `Deref<Target = str>` to the message, so
+  the other test files reading `preset.warnings` as strings (`warp_mesh.rs`, `layer.rs`,
+  `saturation.rs`, `feedback.rs`, `analytic_field.rs`, in-crate scene tests, `examples/shot.rs`)
+  compile unchanged and are not in this commit. `param` uses `PresetError::param`'s label spelling
+  (`glow`, `[layer] glow`, `[per_vertex] x`, `[layer] [per_vertex] x`), so `--check`'s `locate_param`
+  places it with no new parsing; the studio's current `markersFor` matches a bare name only, so a
+  layer or per-vertex label reaches it unanchored until Phase 4 decides otherwise. Sites set `param`:
+  unknown / compositing binding (both surfaces), the three resting-value checks
+  (`thickness`, `coord_mode`, `color_span`), `[smoothing]` on a per-element binding, unknown
+  `[per_vertex]` binding and `[smoothing]` on one, vertex-variable reach (both surfaces). Sites left
+  `null`: inert `[occupancy] exempt`, inert `[hold]` entry, inert `[latch]`, `[per_vertex]` on a
+  non-mesh system, `blend` on an under join — each names no binding the preset has. The `--schema`
+  document does not describe events; the snapshot did not move. No warning reaches the C ABI. The
+  existing `--check` CLI test that pinned a warning at `1:1` now pins it at the binding's `5:1`. Tests
+  beyond the files listed: none; the `preset_warning` event tests sit in `standalone/src/events.rs`.
 
 ### Close triggers
 

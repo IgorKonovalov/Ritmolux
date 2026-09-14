@@ -10,12 +10,14 @@
 //!   ([`PresetError::span`](rlx_core::preset::PresetError::span)), and that is the
 //!   only arm that does.
 //! - An expression error names its parameter
-//!   ([`PresetError::param`](rlx_core::preset::PresetError::param)), so the
+//!   ([`PresetError::param`](rlx_core::preset::PresetError::param)), and so does
+//!   a warning about a binding
+//!   ([`PresetWarning::param`](rlx_core::preset::PresetWarning::param)), so the
 //!   key is looked up in a second, span-carrying parse of the same source
 //!   ([`toml::de::DeTable::parse`]) and the diagnostic lands on that key.
-//! - A structural-config error and every entry of [`Preset::warnings`] are
-//!   strings with nothing positional in them, so they are reported at the file
-//!   level — line 1, column 1.
+//! - A structural-config error and a warning about no single binding carry
+//!   nothing positional, so they are reported at the file level — line 1,
+//!   column 1.
 //!
 //! `toml` is already a dependency of this crate for `config.toml`, so the
 //! spanned parse costs no new name in the graph (NFR section 4).
@@ -180,11 +182,15 @@ fn engine_diagnostics(src: &str) -> Vec<Diagnostic> {
         Ok(preset) => preset
             .warnings
             .into_iter()
-            // File level: a warning is a `String` with nothing positional in
-            // it. Giving `Preset::warnings` structure is a core change with the
-            // studio as a second consumer, so the editor schema is what places
-            // the common unknown-key case for now (ADR-0190).
-            .map(|message| Diagnostic::warning(RULE_ENGINE, None, message))
+            // A warning about a binding is placed exactly as an error naming one
+            // is; one about no single binding stays at the file level.
+            .map(|warning| {
+                let span = warning
+                    .param
+                    .as_deref()
+                    .and_then(|param| locate_param(src, param));
+                Diagnostic::warning(RULE_ENGINE, span, warning.message)
+            })
             .collect(),
     }
 }

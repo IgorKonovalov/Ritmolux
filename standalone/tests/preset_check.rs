@@ -187,13 +187,11 @@ fn a_misspelled_parameter_warns_and_only_strict_fails() {
         line.contains("warning[engine]") && line.contains("glwo"),
         "the diagnostic does not name the severity, the rule and the typo: {line}"
     );
-    // File level, because `Preset::warnings` is a `Vec<String>` with nothing
-    // positional in it. The editor schema is what puts a real position on this
-    // class (ADR-0190); when the loader's warnings gain structure this moves.
+    // Line 5 is `glwo`: the warning names its binding (ADR-0192), and the
+    // binding is placed the way an error naming one is.
     assert!(
-        positioned_at(line, &path, "1:1", "warning"),
-        "a warning is reported at the file level until the loader's warnings \
-         carry a position: {line}"
+        positioned_at(line, &path, "5:1", "warning"),
+        "the warning is not on the misspelled binding's key: {line}"
     );
 
     let (strict_code, strict_stdout, _) = run(&["--check", &arg, "--strict"]);
@@ -206,6 +204,92 @@ fn a_misspelled_parameter_warns_and_only_strict_fails() {
         strict_stdout, stdout,
         "`--strict` changes the exit code and nothing about what is reported"
     );
+}
+
+/// **Every warning that names a binding lands on that binding's key, and one
+/// that names none stays at the file level.** Walked through the library over
+/// one fixture per labelled class, so a label the loader spells in a way
+/// `--check` cannot peel back into a key path fails here rather than quietly
+/// falling back to `1:1`.
+#[test]
+fn a_warning_lands_on_the_binding_it_names_and_an_unanchored_one_at_the_file() {
+    // (what, source, the key the warning belongs on, `None` for file level)
+    let cases: [(&str, &str, Option<&str>); 7] = [
+        (
+            "an undeclared binding",
+            "# x\nsystem = \"fragment_field\"\n[params]\nzoom = \"1\"\nglwo = \"1\"\n",
+            Some("glwo"),
+        ),
+        (
+            "an undeclared layer binding",
+            "# x\nsystem = \"swarm\"\n[params]\nforce = \"1\"\n\
+             [layer]\nsystem = \"fragment_field\"\n[layer.params]\nglwo = \"1\"\n",
+            Some("glwo"),
+        ),
+        (
+            "a resting dead-zone value",
+            "# x\nsystem = \"parametric_curve\"\n[params]\nn = \"3\"\nthickness = \"0.016\"\n",
+            Some("thickness"),
+        ),
+        (
+            "an unknown per-vertex binding",
+            "# x\nsystem = \"warp_mesh\"\n[per_vertex]\nrot = \"x\"\nwobble = \"x\"\n",
+            Some("wobble"),
+        ),
+        (
+            "a layer vertex-variable reach",
+            "# x\nsystem = \"fragment_field\"\n[params]\nzoom = \"0.6\"\n\
+             [layer]\nsystem = \"warp_mesh\"\n[layer.params]\nwarp = \"1\"\nzoom = \"rad\"\n",
+            Some("zoom"),
+        ),
+        (
+            "an inert hold entry",
+            "# x\nsystem = \"parametric_curve\"\n[params]\nn = \"3\"\n[hold]\nd = \"bar\"\n",
+            None,
+        ),
+        (
+            "a blend on an under join",
+            "# x\nsystem = \"swarm\"\n[params]\nforce = \"1\"\n\
+             [layer]\nsystem = \"swarm\"\nblend = \"screen\"\n",
+            None,
+        ),
+    ];
+    for (what, src, key) in cases {
+        let path = Path::new("fixture.toml");
+        let warnings: Vec<_> = preset_check::check(path, src)
+            .into_iter()
+            .filter(|d| d.rule == preset_check::RULE_ENGINE && d.severity == Severity::Warning)
+            .collect();
+        assert_eq!(
+            warnings.len(),
+            1,
+            "{what}: expected one engine warning, got {warnings:?}"
+        );
+        let span = warnings[0].span.clone();
+        match key {
+            // The LAST occurrence of `<key> =`, which each fixture arranges to be
+            // the binding the warning is about: a same-named key earlier in the
+            // file is the case a wrong key path would land on instead.
+            Some(key) => {
+                let at = src
+                    .rfind(&format!("\n{key} ="))
+                    .map(|i| i + 1)
+                    .expect("the fixture has the key");
+                assert_eq!(
+                    span,
+                    Some(at..at + key.len()),
+                    "{what}: the warning is not on the `{key}` binding: {}",
+                    warnings[0].render(path, src)
+                );
+            }
+            None => assert_eq!(
+                span,
+                None,
+                "{what}: a warning about no single binding was placed: {}",
+                warnings[0].render(path, src)
+            ),
+        }
+    }
 }
 
 /// **A path naming nothing is exit 2, the code this binary uses for an argument

@@ -49,7 +49,7 @@ Adding an event or a field is additive under the same `v`; changing or removing 
 | `preset` | `name`, `index`, `system`, `file` | The preset **on screen** changed |
 | `roster` | `names`, `dir` | Every preset reload |
 | `preset_error` | `file`, `message`, `line`, `col`, `param` | A preset failed to load |
-| `preset_warning` | `file`, `message` | A preset loaded with a non-fatal problem |
+| `preset_warning` | `file`, `message`, `param` | A preset loaded with a non-fatal problem; `param` labels the binding it is about as `preset_error`'s does, or is `null` ([ADR-0192](../adrs/0192-a-preset-warning-names-its-parameter.md)) |
 | `health` | `fps`, `frame_ms_p50`, `frame_ms_p99`, `ctl_rejected`, `ctl_dropped`, `ctl_refused`, `preview_sent`, `preview_dropped` | Once a second while frames are drawn |
 | `stream` | `width`, `height`, `fps`, `format` (`rgba8` \| `bgra8`) | Once, before the first frame on a frame pipe |
 | `pong` | `nonce` | Answering a `ctl/ping` |

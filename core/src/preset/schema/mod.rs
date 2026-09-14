@@ -355,12 +355,64 @@ pub struct Preset {
     /// table. `None` — the overwhelmingly common case — takes exactly the code
     /// path a preset took before layers existed: no new pass, no new target.
     pub layer: Option<Layer>,
-    /// Non-fatal problems found while loading — today, bindings naming a
-    /// parameter this system does not consume (ADR-0020). The preset loaded and
-    /// its good bindings apply; these are surfaced so a typo stops failing
-    /// silently. Empty for a clean preset. Load-time only — never read per
-    /// frame.
-    pub warnings: Vec<String>,
+    /// Non-fatal problems found while loading — bindings naming a parameter
+    /// this system does not consume (ADR-0020), resting values in a dead zone,
+    /// inert table entries. The preset loaded and its good bindings apply; these
+    /// are surfaced so a typo stops failing silently. Empty for a clean preset.
+    /// Load-time only — never read per frame.
+    pub warnings: Vec<PresetWarning>,
+}
+
+/// One non-fatal problem found while loading a preset, and the binding it is
+/// about when it is about one (ADR-0192).
+///
+/// `param` is spelled as [`PresetError::param`] spells an expression error's
+/// label — `glow`, `[layer] glow`, `[per_vertex] x`, `[layer] [per_vertex] x` —
+/// so a consumer that places an error by its label places a warning by the same
+/// route. It is `None` for a warning about no single binding: a structural key,
+/// a table that is inert as a whole, or a table entry naming a binding the
+/// preset does not have (there is no binding line to point at).
+///
+/// Derefs to the message, so a warning reads as the text it always was; the
+/// label is the added structure, not a change to what is said.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PresetWarning {
+    /// The sentence a person reads.
+    pub message: String,
+    /// The label of the binding the warning is about, or `None`.
+    pub param: Option<String>,
+}
+
+impl PresetWarning {
+    /// A warning about the binding labelled `param`.
+    pub fn about(param: impl Into<String>, message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+            param: Some(param.into()),
+        }
+    }
+
+    /// A warning about no single binding.
+    pub fn unanchored(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+            param: None,
+        }
+    }
+}
+
+impl fmt::Display for PresetWarning {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
+impl std::ops::Deref for PresetWarning {
+    type Target = str;
+
+    fn deref(&self) -> &str {
+        &self.message
+    }
 }
 
 #[cfg(test)]

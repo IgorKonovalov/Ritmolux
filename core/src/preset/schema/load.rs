@@ -112,12 +112,15 @@ impl Preset {
                     continue;
                 };
                 if value < crate::render::scenes::lines::MIN_USEFUL_THICKNESS {
-                    warnings.push(format!(
-                        "parameter 'thickness' rests at {value}, inside the stroke floor's dead \
-                         zone: every value below {:.3} renders the identical hairline (about \
-                         0.27 px at 1080p), so tuning within that range changes nothing. Line \
-                         presets ship between 1.5 and 3.2",
-                        crate::render::scenes::lines::MIN_USEFUL_THICKNESS
+                    warnings.push(PresetWarning::about(
+                        "thickness",
+                        format!(
+                            "parameter 'thickness' rests at {value}, inside the stroke floor's \
+                             dead zone: every value below {:.3} renders the identical hairline \
+                             (about 0.27 px at 1080p), so tuning within that range changes \
+                             nothing. Line presets ship between 1.5 and 3.2",
+                            crate::render::scenes::lines::MIN_USEFUL_THICKNESS
+                        ),
                     ));
                 }
             }
@@ -157,14 +160,14 @@ impl Preset {
             if shape == Some(crate::render::scenes::marks::RING_SHAPE)
                 && mode.is_some_and(|m| m.is_finite() && m.clamp(0.0, max_mode).round() >= 1.0)
             {
-                warnings.push(
+                warnings.push(PresetWarning::about(
+                    "coord_mode",
                     "parameter 'coord_mode' is ignored on a `ring`: an annulus's centre lies in \
                      its hole, so a ray from there crosses the outline twice and the \
                      scaled-copy coordinate has no single value. The figure is drawn with the \
                      distance instead. Defining it against the outer rim was the alternative \
-                     and it renders a `disc` — the hole stops existing"
-                        .to_string(),
-                );
+                     and it renders a `disc` — the hole stops existing",
+                ));
             }
         }
 
@@ -212,17 +215,20 @@ impl Preset {
                 if span.is_finite()
                     && texels < crate::render::scenes::shape_field::MIN_INTERIOR_TEXELS
                 {
-                    warnings.push(format!(
-                        "parameter 'color_span' rests at {span}, which draws the figure's whole \
-                         interior through about {texels:.0} of the palette's {} texels. Below \
-                         roughly {:.0} the LUT's linear filtering is interpolating more than it \
-                         is reading and the figure comes back looking upscaled rather than \
-                         shaded — the estimate is exact in the coordinate and approximate on \
-                         screen, since how much of the frame the figure covers depends on its \
-                         shape and framing. Bind or set `palette_steps` to remove the \
-                         interpolation entirely",
-                        crate::render::palette::LUT_SIZE,
-                        crate::render::scenes::shape_field::MIN_INTERIOR_TEXELS,
+                    warnings.push(PresetWarning::about(
+                        "color_span",
+                        format!(
+                            "parameter 'color_span' rests at {span}, which draws the figure's \
+                             whole interior through about {texels:.0} of the palette's {} \
+                             texels. Below roughly {:.0} the LUT's linear filtering is \
+                             interpolating more than it is reading and the figure comes back \
+                             looking upscaled rather than shaded — the estimate is exact in the \
+                             coordinate and approximate on screen, since how much of the frame \
+                             the figure covers depends on its shape and framing. Bind or set \
+                             `palette_steps` to remove the interpolation entirely",
+                            crate::render::palette::LUT_SIZE,
+                            crate::render::scenes::shape_field::MIN_INTERIOR_TEXELS,
+                        ),
                     ));
                 }
             }
@@ -244,10 +250,12 @@ impl Preset {
         occupancy_exempt.dedup();
         for name in &occupancy_exempt {
             if !params.iter().any(|b| &b.name == name) {
-                warnings.push(format!(
+                // Unanchored: the name is one this preset does not bind, so there
+                // is no binding line to point at.
+                warnings.push(PresetWarning::unanchored(format!(
                     "[occupancy] exempt entry '{name}' is inert: this preset binds no such \
                      parameter"
-                ));
+                )));
             }
         }
 
@@ -291,10 +299,10 @@ impl Preset {
                         .any(|b| b.expr.uses_latch(slot));
             }
             if !read {
-                warnings.push(format!(
+                warnings.push(PresetWarning::unanchored(format!(
                     "[latch] '{}' is inert: no binding in this preset names it",
                     latch.name
-                ));
+                )));
             }
         }
 
@@ -406,44 +414,53 @@ pub(super) fn build_per_vertex(
     hold: &BTreeMap<String, RawHold>,
     latch_names: &[String],
     surface: Surface,
-    warnings: &mut Vec<String>,
+    warnings: &mut Vec<PresetWarning>,
 ) -> Result<Vec<Binding>, PresetError> {
     let label = surface.prefix();
     if raw.is_empty() {
         return Ok(Vec::new());
     }
     if system != SystemKind::WarpMesh {
-        warnings.push(format!(
+        warnings.push(PresetWarning::unanchored(format!(
             "{label}[per_vertex] is inert for system '{}': only `warp_mesh` evaluates a \
              per-vertex program (bindings kept, but nothing reads them)",
             system.as_str()
-        ));
+        )));
     }
     let mut out = Vec::with_capacity(raw.len());
     for (param, source) in raw {
+        // The label an expression error on this binding carries, and so the one
+        // a warning about it carries too.
+        let labelled = format!("{label}[per_vertex] {param}");
         let expr =
             expr::compile_with_latches(&source, latch_names).map_err(|err| PresetError::Expr {
-                param: format!("{label}[per_vertex] {param}"),
+                param: labelled.clone(),
                 err,
             })?;
         if !declares(
             crate::render::scenes::warp_mesh::PER_VERTEX_PARAMS,
             param.as_str(),
         ) {
-            warnings.push(format!(
-                "unknown {label}[per_vertex] parameter '{param}' (expected one of: {}) \
-                 (binding kept, but nothing reads it)",
-                crate::render::scenes::spec_names(
-                    crate::render::scenes::warp_mesh::PER_VERTEX_PARAMS
-                )
-                .join(", ")
+            warnings.push(PresetWarning::about(
+                labelled.clone(),
+                format!(
+                    "unknown {label}[per_vertex] parameter '{param}' (expected one of: {}) \
+                     (binding kept, but nothing reads it)",
+                    crate::render::scenes::spec_names(
+                        crate::render::scenes::warp_mesh::PER_VERTEX_PARAMS
+                    )
+                    .join(", ")
+                ),
             ));
         }
         if smoothing.contains_key(&param) {
-            warnings.push(format!(
-                "{label}[smoothing] entry '{param}' is ignored: it names a [per_vertex] \
-                 binding, which is evaluated once per mesh vertex and has no single \
-                 value to ease"
+            warnings.push(PresetWarning::about(
+                labelled,
+                format!(
+                    "{label}[smoothing] entry '{param}' is ignored: it names a [per_vertex] \
+                     binding, which is evaluated once per mesh vertex and has no single \
+                     value to ease"
+                ),
             ));
         }
         // A load error where the smoothing entry above is a warning: an easing
@@ -479,7 +496,7 @@ pub(super) fn build_per_vertex(
 pub(super) fn build_layer(
     raw: RawLayer,
     latch_names: &[String],
-    warnings: &mut Vec<String>,
+    warnings: &mut Vec<PresetWarning>,
 ) -> Result<Layer, PresetError> {
     let system = SystemKind::from_name(&raw.system)
         .ok_or_else(|| PresetError::UnknownSystem(raw.system.clone()))?;
@@ -510,12 +527,12 @@ pub(super) fn build_layer(
         })?,
     };
     if raw.blend.is_some() && join == LayerJoin::Under {
-        warnings.push(format!(
+        warnings.push(PresetWarning::unanchored(format!(
             "[layer] blend = '{}' is ignored on an under join: the layer shares the \
              main scene's composite, so there is no junction for a blend mode to \
              apply at (blend belongs to join = \"over\")",
             blend.as_str()
-        ));
+        )));
     }
 
     // The layer's bindings, name-sorted off the BTreeMap like the preset's own.
@@ -809,16 +826,17 @@ pub(super) fn compile_bindings(
     params: BTreeMap<String, String>,
     latch_names: &[String],
     surface: Surface,
-    warnings: &mut Vec<String>,
+    warnings: &mut Vec<PresetWarning>,
 ) -> Result<Vec<Binding>, PresetError> {
     let prefix = surface.prefix();
     // The raw params come from a BTreeMap, so bindings land name-sorted:
     // evaluation is order-independent, but determinism is cheap to keep.
     let mut out = Vec::with_capacity(params.len());
     for (param, source) in params {
+        let labelled = format!("{prefix}{param}");
         let expr =
             expr::compile_with_latches(&source, latch_names).map_err(|err| PresetError::Expr {
-                param: format!("{prefix}{param}"),
+                param: labelled.clone(),
                 err,
             })?;
         let known = match surface {
@@ -834,16 +852,22 @@ pub(super) fn compile_bindings(
                     .iter()
                     .any(|stage| declares(stage, param.as_str()))
             {
-                warnings.push(format!(
-                    "[layer] parameter '{param}' is a compositing parameter; a layer \
-                     binds only its own scene's params — bind it at the top level, \
-                     where it drives the whole preset (binding kept, but nothing \
-                     reads it here)"
+                warnings.push(PresetWarning::about(
+                    labelled,
+                    format!(
+                        "[layer] parameter '{param}' is a compositing parameter; a layer \
+                         binds only its own scene's params — bind it at the top level, \
+                         where it drives the whole preset (binding kept, but nothing \
+                         reads it here)"
+                    ),
                 ));
             } else {
-                warnings.push(format!(
-                    "unknown {prefix}parameter '{param}' for system '{}' (binding kept, but nothing reads it)",
-                    system.as_str()
+                warnings.push(PresetWarning::about(
+                    labelled,
+                    format!(
+                        "unknown {prefix}parameter '{param}' for system '{}' (binding kept, but nothing reads it)",
+                        system.as_str()
+                    ),
                 ));
             }
         }
@@ -872,7 +896,7 @@ pub(super) fn fold_smoothing(
     params: &mut [Binding],
     smoothing: &BTreeMap<String, RawSmoothing>,
     surface: Surface,
-    warnings: &mut Vec<String>,
+    warnings: &mut Vec<PresetWarning>,
 ) -> Result<(), PresetError> {
     let prefix = surface.prefix();
     for (param, entry) in smoothing {
@@ -890,13 +914,16 @@ pub(super) fn fold_smoothing(
             .get(&binding.name)
             .map_or(Easing::INSTANT, |entry| entry.to_easing());
         if binding.expr.uses_index() && smoothing.contains_key(&binding.name) {
-            warnings.push(format!(
-                "{} entry '{}' is ignored: the binding names `index`, so it is \
-                 evaluated per element and cannot be eased as one value \
-                 (use {} smoothing for the element levels)",
-                surface.table("smoothing"),
-                binding.name,
-                surface.table("spectrum"),
+            warnings.push(PresetWarning::about(
+                format!("{prefix}{}", binding.name),
+                format!(
+                    "{} entry '{}' is ignored: the binding names `index`, so it is \
+                     evaluated per element and cannot be eased as one value \
+                     (use {} smoothing for the element levels)",
+                    surface.table("smoothing"),
+                    binding.name,
+                    surface.table("spectrum"),
+                ),
             ));
             binding.tau = Easing::INSTANT;
         }
@@ -926,7 +953,7 @@ pub(super) fn fold_hold<'b>(
     bindings: impl Iterator<Item = &'b mut Binding>,
     hold: &BTreeMap<String, RawHold>,
     surface: Surface,
-    warnings: &mut Vec<String>,
+    warnings: &mut Vec<PresetWarning>,
 ) -> Result<(), PresetError> {
     if hold.is_empty() {
         return Ok(());
@@ -955,10 +982,11 @@ pub(super) fn fold_hold<'b>(
     }
     for param in edges.keys() {
         if !folded.contains(param) {
-            warnings.push(format!(
+            // Unanchored: the entry names a binding this surface does not have.
+            warnings.push(PresetWarning::unanchored(format!(
                 "{} entry '{param}' is inert: this preset binds no such parameter",
                 surface.table("hold"),
-            ));
+            )));
         }
     }
     Ok(())
@@ -970,15 +998,22 @@ pub(super) fn fold_hold<'b>(
 /// The names are crate-wide because expression slots are positional, so nothing
 /// stops a `[params]` binding from naming one; only a `[per_vertex]` table ever
 /// binds them.
-pub(super) fn warn_vertex_use(params: &[Binding], surface: Surface, warnings: &mut Vec<String>) {
+pub(super) fn warn_vertex_use(
+    params: &[Binding],
+    surface: Surface,
+    warnings: &mut Vec<PresetWarning>,
+) {
     let prefix = surface.prefix();
     for binding in params {
         if binding.expr.uses_vertex() {
-            warnings.push(format!(
-                "{prefix}parameter '{}' names a per-vertex variable (x/y/rad/ang), \
-                 which reads 0 outside a {} table",
-                binding.name,
-                surface.table("per_vertex"),
+            warnings.push(PresetWarning::about(
+                format!("{prefix}{}", binding.name),
+                format!(
+                    "{prefix}parameter '{}' names a per-vertex variable (x/y/rad/ang), \
+                     which reads 0 outside a {} table",
+                    binding.name,
+                    surface.table("per_vertex"),
+                ),
             ));
         }
     }

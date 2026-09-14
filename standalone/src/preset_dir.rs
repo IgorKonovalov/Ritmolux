@@ -172,6 +172,7 @@ pub(crate) fn reload_presets(renderer: &mut Renderer, dir: &Path, events: Option
         events.emit(&Event::PresetWarning {
             file: path,
             message: warning,
+            param: warning.param.as_deref(),
         });
     }
     // The roster on **every** reload, whatever changed: a studio's library view

@@ -1279,6 +1279,178 @@ wrap = "0.4"
     );
 }
 
+// ---------------------------------------------------------------------------
+// A warning names its binding (ADR-0192)
+// ---------------------------------------------------------------------------
+
+/// The one warning `src` loads with, whose message contains `needle`.
+fn the_warning(src: &str, needle: &str) -> rlx_core::preset::PresetWarning {
+    let preset = Preset::from_toml_str(src).expect("a preset with only warnings still loads");
+    let matching: Vec<_> = preset
+        .warnings
+        .iter()
+        .filter(|w| w.contains(needle))
+        .cloned()
+        .collect();
+    assert_eq!(
+        matching.len(),
+        1,
+        "expected exactly one warning mentioning `{needle}`, got {:?}",
+        preset.warnings
+    );
+    matching.into_iter().next().expect("checked above")
+}
+
+/// Assert the warning mentioning `needle` in `src` labels `param`.
+fn assert_labels(src: &str, needle: &str, param: Option<&str>) {
+    let warning = the_warning(src, needle);
+    assert_eq!(
+        warning.param.as_deref(),
+        param,
+        "the warning `{}` carries the wrong label",
+        warning.message
+    );
+}
+
+/// **A binding the system does not declare** labels that binding — at the top
+/// level by its bare name, inside a layer with the `[layer] ` prefix an
+/// expression error there carries.
+#[test]
+fn an_undeclared_binding_warning_names_the_binding() {
+    assert_labels(
+        "system = \"fragment_field\"\n[params]\nglwo = \"1\"\n",
+        "glwo",
+        Some("glwo"),
+    );
+    assert_labels(
+        "system = \"swarm\"\n[params]\nforce = \"1\"\n\
+         [layer]\nsystem = \"fragment_field\"\n[layer.params]\nglwo = \"1\"\n",
+        "glwo",
+        Some("[layer] glwo"),
+    );
+}
+
+/// **A compositing parameter bound inside a layer** labels the layer binding.
+#[test]
+fn a_compositing_parameter_in_a_layer_warning_names_the_binding() {
+    assert_labels(
+        "system = \"swarm\"\n[params]\nforce = \"1\"\n\
+         [layer]\nsystem = \"swarm\"\n[layer.params]\nbloom_amount = \"1\"\n",
+        "compositing parameter",
+        Some("[layer] bloom_amount"),
+    );
+}
+
+/// **A binding resting at a value that renders nothing different** labels that
+/// binding — the three resting-value checks share one shape.
+#[test]
+fn a_resting_value_warning_names_the_binding() {
+    assert_labels(
+        "system = \"parametric_curve\"\n[params]\nthickness = \"0.016\"\n",
+        "dead zone",
+        Some("thickness"),
+    );
+    assert_labels(
+        "system = \"shape_field\"\n[params]\nshape = \"1\"\ncoord_mode = \"1\"\n",
+        "ring",
+        Some("coord_mode"),
+    );
+    assert_labels(
+        "system = \"shape_field\"\n[params]\nshape = \"3\"\ncolor_span = \"0.037\"\n",
+        "texels",
+        Some("color_span"),
+    );
+}
+
+/// **A `[smoothing]` entry naming a per-element binding** labels the binding it
+/// cannot ease.
+#[test]
+fn a_smoothed_per_element_binding_warning_names_the_binding() {
+    assert_labels(
+        "system = \"spectrum\"\n[spectrum]\nelements = 8\n\
+         [params]\nthickness = \"2 + bin(index) * 8\"\n[smoothing]\nthickness = 0.3\n",
+        "index",
+        Some("thickness"),
+    );
+}
+
+/// **A `[per_vertex]` binding** labels itself as an expression error on it
+/// would: an unknown name, and a `[smoothing]` entry that cannot reach it.
+#[test]
+fn a_per_vertex_binding_warning_names_the_binding() {
+    assert_labels(
+        "system = \"warp_mesh\"\n[per_vertex]\nwobble = \"x * 0.1\"\n",
+        "wobble",
+        Some("[per_vertex] wobble"),
+    );
+    assert_labels(
+        "system = \"warp_mesh\"\n[per_vertex]\nrot = \"x * 0.1\"\n[smoothing]\nrot = 0.3\n",
+        "[smoothing]",
+        Some("[per_vertex] rot"),
+    );
+}
+
+/// **A `[params]` binding reaching for a vertex variable** labels that binding,
+/// on both surfaces.
+#[test]
+fn a_vertex_variable_reach_warning_names_the_binding() {
+    assert_labels(
+        "system = \"warp_mesh\"\n[params]\nzoom = \"rad\"\n",
+        "per-vertex variable",
+        Some("zoom"),
+    );
+    assert_labels(
+        "system = \"fragment_field\"\n[params]\nzoom = \"0.6\"\n\
+         [layer]\nsystem = \"warp_mesh\"\n[layer.params]\nzoom = \"rad\"\n",
+        "per-vertex variable",
+        Some("[layer] zoom"),
+    );
+}
+
+/// **A warning about no single binding carries no label**: a table entry naming
+/// a binding the preset does not have, a table inert as a whole, and a
+/// structural key.
+#[test]
+fn a_warning_about_no_binding_carries_no_label() {
+    let cases: [(&str, &str, &str); 5] = [
+        (
+            "an inert [occupancy] entry",
+            "system = \"fragment_field\"\n[params]\nglow = \"1\"\n\
+             [occupancy]\nexempt = [\"unbound\"]\n",
+            "[occupancy]",
+        ),
+        (
+            "an inert [hold] entry",
+            "system = \"parametric_curve\"\n[params]\nn = \"3\"\n[hold]\nd = \"bar\"\n",
+            "[hold]",
+        ),
+        (
+            "an inert [latch]",
+            "system = \"fragment_field\"\n\
+             [latch]\nrecut = { arm = \"time > 1\", fire = \"onset > 0.5\" }\n",
+            "[latch]",
+        ),
+        (
+            "a [per_vertex] table on a system with no mesh",
+            "system = \"fragment_field\"\n[per_vertex]\nrot = \"x\"\n",
+            "is inert for system",
+        ),
+        (
+            "a blend on an under join",
+            "system = \"swarm\"\n[params]\nforce = \"1\"\n\
+             [layer]\nsystem = \"swarm\"\nblend = \"screen\"\n",
+            "under join",
+        ),
+    ];
+    for (label, src, needle) in cases {
+        let warning = the_warning(src, needle);
+        assert_eq!(
+            warning.param, None,
+            "{label}: a warning about no single binding carries a label: {warning:?}"
+        );
+    }
+}
+
 /// A preset binding only known names — including the **global** compositing
 /// params any system may bind — warns about nothing.
 #[test]

@@ -110,6 +110,10 @@ pub enum Event<'a> {
         file: &'a Path,
         /// The loader's own sentence.
         message: &'a str,
+        /// The label of the binding the warning is about, spelled as
+        /// `preset_error`'s `param` is. `None` for a warning about no single
+        /// binding (ADR-0192).
+        param: Option<&'a str>,
     },
     /// Once a second while a frame is being drawn.
     Health {
@@ -238,17 +242,18 @@ impl Event<'_> {
                 out.push_str(&json_string(message));
                 push_optional_u32(&mut out, "line", *line);
                 push_optional_u32(&mut out, "col", *col);
-                out.push_str(",\"param\":");
-                match param {
-                    Some(param) => out.push_str(&json_string(param)),
-                    None => out.push_str("null"),
-                }
+                push_optional_str(&mut out, "param", *param);
             }
-            Event::PresetWarning { file, message } => {
+            Event::PresetWarning {
+                file,
+                message,
+                param,
+            } => {
                 out.push_str(",\"file\":");
                 out.push_str(&json_string(&file.display().to_string()));
                 out.push_str(",\"message\":");
                 out.push_str(&json_string(message));
+                push_optional_str(&mut out, "param", *param);
             }
             Event::Health {
                 fps,
@@ -314,6 +319,16 @@ fn push_optional_u64(out: &mut String, key: &str, value: Option<u64>) {
     out.push_str("\":");
     match value {
         Some(value) => out.push_str(&value.to_string()),
+        None => out.push_str("null"),
+    }
+}
+
+fn push_optional_str(out: &mut String, key: &str, value: Option<&str>) {
+    out.push_str(",\"");
+    out.push_str(key);
+    out.push_str("\":");
+    match value {
+        Some(value) => out.push_str(&json_string(value)),
         None => out.push_str("null"),
     }
 }
@@ -449,6 +464,12 @@ mod tests {
             Event::PresetWarning {
                 file: Path::new("/presets/aurora.toml"),
                 message: "binds `warpp`, which no system consumes",
+                param: Some("warpp"),
+            },
+            Event::PresetWarning {
+                file: Path::new("/presets/aurora.toml"),
+                message: "[latch] 'pulse' is inert",
+                param: None,
             },
             Event::Health {
                 fps: 59.8,
@@ -738,6 +759,70 @@ bg_bright = \"nope(1)\"
         assert!(
             rendered.contains("\"line\":null"),
             "a missing position should be null rather than absent: {rendered}"
+        );
+    }
+
+    /// The `preset_warning` a load produces, rendered exactly as the shell
+    /// renders it from a `LoadReport` entry.
+    fn warning_lines(source: &str) -> Vec<String> {
+        let preset = rlx_core::preset::Preset::from_toml_str(source)
+            .expect("a preset with only warnings still loads");
+        preset
+            .warnings
+            .iter()
+            .map(|warning| {
+                Event::PresetWarning {
+                    file: Path::new("probe.toml"),
+                    message: warning,
+                    param: warning.param.as_deref(),
+                }
+                .line()
+            })
+            .collect()
+    }
+
+    /// A binding the preset's system does not declare is a `preset_warning`
+    /// whose `param` is that binding's name — the field a studio anchors the
+    /// warning's marker by.
+    #[test]
+    fn an_undeclared_binding_warning_carries_the_binding_name() {
+        let lines = warning_lines(
+            "system = \"fragment_field\"
+name = \"probe\"
+[params]
+glwo = \"1.0\"
+",
+        );
+        assert_eq!(
+            lines.len(),
+            1,
+            "one undeclared binding, one warning: {lines:?}"
+        );
+        assert!(
+            lines[0].contains("\"param\":\"glwo\""),
+            "the warning does not carry the binding's name: {}",
+            lines[0]
+        );
+    }
+
+    /// A warning about no single binding carries `param: null`, present rather
+    /// than omitted, so a parent reads one fixed shape.
+    #[test]
+    fn a_warning_about_no_binding_carries_a_null_param() {
+        let lines = warning_lines(
+            "system = \"fragment_field\"
+name = \"probe\"
+[params]
+glow = \"1.0\"
+[occupancy]
+exempt = [\"nothing_bound\"]
+",
+        );
+        assert_eq!(lines.len(), 1, "one inert entry, one warning: {lines:?}");
+        assert!(
+            lines[0].contains("\"param\":null"),
+            "a warning about no binding should carry a null param: {}",
+            lines[0]
         );
     }
 

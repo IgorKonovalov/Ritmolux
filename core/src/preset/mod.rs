@@ -30,7 +30,8 @@ pub use expr::{
 pub use schema::export;
 pub use schema::{
     Binding, Easing, GLOBAL_PARAMS, HoldEdge, KeyDesc, KeyKind, Latch, Layer, LayerBlend,
-    LayerJoin, Preset, PresetError, Roster, SystemKind, TableDesc, is_known_param, kind_of_param,
+    LayerJoin, Preset, PresetError, PresetWarning, Roster, SystemKind, TableDesc, is_known_param,
+    kind_of_param,
 };
 
 // The shipped example presets, embedded at compile time so the C-ABI/foobar
@@ -86,10 +87,11 @@ pub struct LoadReport {
     /// `(path, error)` for each `.toml` that failed to read or compile.
     pub errors: Vec<(PathBuf, PresetError)>,
     /// `(path, warning)` for each non-fatal problem in a preset that **did**
-    /// load — today, a binding naming a parameter its system does not consume
-    /// (ADR-0020). Surfacing these is what stops a typo from failing silently;
-    /// the preset itself is in `presets` and renders normally.
-    pub warnings: Vec<(PathBuf, String)>,
+    /// load — a binding naming a parameter its system does not consume
+    /// (ADR-0020), among others. Surfacing these is what stops a typo from
+    /// failing silently; the preset itself is in `presets` and renders normally.
+    /// Each warning keeps the binding label it carries (ADR-0192).
+    pub warnings: Vec<(PathBuf, PresetWarning)>,
 }
 
 /// Load every `*.toml` in `dir`, compiling each into a [`Preset`]. Missing or
