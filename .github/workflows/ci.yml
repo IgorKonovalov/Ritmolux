@@ -264,6 +264,17 @@ jobs:
       - run: node scripts/check-release-tag.mjs --self-test
       - if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: node scripts/check-release-tag.mjs --remote
+      # The conductor's own suite (ADR-0205): the queue and plan readers, the lane
+      # state machine against throwaway git repositories, the digest, the operator
+      # commands, the two PreToolUse hooks' bite checks and the machine-wide lock.
+      # It belongs here for the reason the gates above do - cheap, platform-free,
+      # no GPU - and because a fake CLI stands in for claude, it spends nothing and
+      # needs no network. A glob, not a directory: `node --test <dir>` is not a
+      # test-file pattern on Node 22.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test "tools/conductor/test/*.test.mjs"
       # And the diffusion filter's own suite (Plan 0106 Phase 7c). It belongs in
       # this job rather than in the `check` matrix for the same reasons the three
       # gates above do: it is cheap, platform-independent, needs no GPU, no

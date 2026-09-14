@@ -4,16 +4,30 @@
 // gate, a fresh review-and-close session, a fast-forward of main and the lane's removal. It never
 // pushes. Every judgement it cannot make parks the plan.
 //
-//   node tools/conductor/conductor.mjs check      preflight only: local.json, CLI version, queue
+//   node tools/conductor/conductor.mjs run [--lane a|b] [--once]
+//   node tools/conductor/conductor.mjs status
+//   node tools/conductor/conductor.mjs resume NNNN
+//   node tools/conductor/conductor.mjs park NNNN
+//   node tools/conductor/conductor.mjs abort
+//   node tools/conductor/conductor.mjs check
 //
-// Runs from the main checkout. Everything it writes at runtime lives under tools/conductor/state/.
+// Runs from the main checkout. Runtime output lives under tools/conductor/state/ and in
+// tools/conductor/digest.md, both gitignored. tools/conductor/README.md is the operator guide.
 
 import { spawnSync } from "node:child_process";
-import { dirname, join, resolve } from "node:path";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { pidAlive } from "./with-lock.mjs";
+import { writeDigest } from "./lib/digest.mjs";
+import { currentBranch, isClean } from "./lib/git.mjs";
+import { appendPark } from "./lib/inbox.mjs";
+import { runLanes } from "./lib/lane.mjs";
+import { findPlan, nextStep, readPlanFile } from "./lib/plan.mjs";
 import { loadLocal, loadQueue } from "./lib/queue.mjs";
-import { loadState } from "./lib/state.mjs";
+import { loadState, planRecord, recoverInterrupted, saveState, statePaths, totalSpend } from "./lib/state.mjs";
+import { activeChildren } from "./lib/step.mjs";
 
 export const TOOL_DIR = dirname(fileURLToPath(import.meta.url));
 export const REPO = resolve(TOOL_DIR, "..", "..");
@@ -33,6 +47,7 @@ export function paths({ repo = REPO, toolDir = TOOL_DIR } = {}) {
     settings: join(toolDir, "settings.conductor.json"),
     prompts: join(toolDir, "prompts"),
     withLock: join(toolDir, "with-lock.mjs"),
+    worktreeRoot: dirname(repo),
   };
 }
 
@@ -67,19 +82,248 @@ export function preflight(p = paths(), { claude } = {}) {
   return { errors, local, queue, state, claude: command };
 }
 
-async function main(argv) {
-  const [command] = argv;
-  if (command === "check") {
-    const r = preflight();
-    if (r.errors.length) {
-      for (const e of r.errors) console.error(`conductor: ${e}`);
+const pidFile = (p) => join(p.stateDir, "conductor.pid");
+
+function runningPid(p) {
+  if (!existsSync(pidFile(p))) return null;
+  const pid = Number(readFileSync(pidFile(p), "utf8").trim());
+  return pidAlive(pid) ? pid : null;
+}
+
+function regenerate(p, state) {
+  writeDigest(p.digest, state, { repo: p.repo, stateDir: p.stateDir });
+}
+
+const minutes = (iso) => (iso ? `${Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000))} min` : "?");
+const isPlan = (s) => /^\d{4}$/.test(s ?? "");
+
+async function cmdRun(args, o) {
+  const p = o.p;
+  const laneIdx = args.indexOf("--lane");
+  const lane = laneIdx >= 0 ? args[laneIdx + 1] : null;
+  const pf = preflight(p, { claude: o.claude });
+  const errors = [...pf.errors];
+  if (currentBranch(p.repo) !== "main") errors.push(`the main checkout ${p.repo} is not on main`);
+  if (lane && !pf.queue.lanes?.[lane]) errors.push(`queue.json has no lane "${lane}"`);
+  const other = runningPid(p);
+  if (other) errors.push(`a conductor is already running (pid ${other}); \`status\` shows it, \`abort\` stops it`);
+  if (errors.length) {
+    for (const e of errors) o.err(`conductor: ${e}`);
+    return 1;
+  }
+
+  const state = pf.state;
+  const recovered = recoverInterrupted(p.stateDir, state);
+  if (recovered) o.log(`conductor: ${recovered} step(s) were in flight when the last run stopped; they will run again`);
+  writeFileSync(pidFile(p), String(process.pid));
+
+  const ctx = {
+    repo: p.repo,
+    worktreeRoot: o.worktreeRoot ?? p.worktreeRoot,
+    stateDir: p.stateDir,
+    promptsDir: p.prompts,
+    settingsFile: p.settings,
+    withLockPath: p.withLock,
+    claude: pf.claude,
+    local: pf.local,
+    queue: pf.queue,
+    state,
+    gate: o.gate,
+    lockDir: o.lockDir,
+    lockPollMs: o.lockPollMs,
+    pollMs: o.pollMs,
+    once: args.includes("--once"),
+    lanes: lane ? [lane] : undefined,
+    onChange: () => regenerate(p, state),
+  };
+
+  const interrupt = () => {
+    for (const child of activeChildren) child.kill();
+    recoverInterrupted(p.stateDir, state);
+    regenerate(p, state);
+    rmSync(pidFile(p), { force: true });
+    o.err("conductor: interrupted; in-flight steps will run again on the next `run`");
+    process.exit(130);
+  };
+  if (o.signals !== false) {
+    process.once("SIGINT", interrupt);
+    process.once("SIGTERM", interrupt);
+  }
+  try {
+    await runLanes(ctx);
+  } finally {
+    if (o.signals !== false) {
+      process.removeListener("SIGINT", interrupt);
+      process.removeListener("SIGTERM", interrupt);
+    }
+    regenerate(p, state);
+    rmSync(pidFile(p), { force: true });
+  }
+  const recs = Object.values(state.plans);
+  o.log(
+    `conductor: run ended - ${recs.filter((r) => r.status === "merged").length} merged, ` +
+      `${recs.filter((r) => r.status === "parked").length} parked. Nothing was pushed.`,
+  );
+  o.log(`digest: ${p.digest}`);
+  return 0;
+}
+
+function cmdStatus(args, o) {
+  const p = o.p;
+  const state = loadState(p.stateDir);
+  const pid = runningPid(p);
+  o.log(pid ? `conductor: running (pid ${pid})` : "conductor: not running");
+  const { lanes } = loadQueue(p.queue, p.repo, new Set(Object.keys(state.plans)));
+  const laneNames = [...new Set([...Object.keys(lanes ?? {}), ...Object.keys(state.lanes)])].sort();
+  for (const lane of laneNames) {
+    const l = pid ? state.lanes[lane] : null;
+    if (!l?.plan) {
+      o.log(`lane ${lane}: idle`);
+      continue;
+    }
+    const rec = state.plans[l.plan];
+    const step = l.step ? `step ${l.step} for ${minutes(l.stepStarted)}` : "between steps";
+    o.log(`lane ${lane}: plan ${l.plan}, ${step}, spend so far $${totalSpend(rec).toFixed(2)}`);
+  }
+  const parked = Object.values(state.plans).filter((r) => r.status === "parked");
+  if (parked.length === 0) o.log("parked: none");
+  else {
+    o.log("parked:");
+    for (const r of parked) o.log(`- ${r.plan} (${r.park.reason}): ${r.park.detail}`);
+  }
+  regenerate(p, state);
+  o.log(`digest: ${p.digest}`);
+  return 0;
+}
+
+/** Why a park still holds, or null when the owner has acted on it. */
+function parkStillTrue(p, rec) {
+  const { reason, phase } = rec.park;
+  if (reason === "human_phase") {
+    const where = rec.worktree && existsSync(rec.worktree) ? rec.worktree : p.repo;
+    const found = findPlan(where, rec.plan);
+    if (!found) return `plan ${rec.plan} is not in ${where}`;
+    const next = nextStep(readPlanFile(found.path));
+    if (next.kind === "human" && next.phases[0] === phase) {
+      const rel = relative(where, found.path).replace(/\\/g, "/");
+      return `Phase ${phase} is still not marked done in the ## Implementation log of ${rel} in ${where}; commit the row there first`;
+    }
+  }
+  if (reason === "main_dirty" && (currentBranch(p.repo) !== "main" || !isClean(p.repo))) {
+    return `the main checkout is still dirty or not on main`;
+  }
+  return null;
+}
+
+function cmdResume(args, o) {
+  const p = o.p;
+  const [plan] = args;
+  if (!isPlan(plan)) {
+    o.err("usage: conductor.mjs resume NNNN");
+    return 2;
+  }
+  if (runningPid(p)) {
+    o.err("conductor: a run is in progress; resume after it ends, or `abort` it first");
+    return 1;
+  }
+  const state = loadState(p.stateDir);
+  const rec = state.plans[plan];
+  if (!rec || rec.status !== "parked") {
+    o.err(`conductor: plan ${plan} is not parked (${rec?.status ?? "never started"})`);
+    return 1;
+  }
+  const still = parkStillTrue(p, rec);
+  if (still) {
+    o.err(`conductor: refusing to resume ${plan} - its park reason (${rec.park.reason}) still holds: ${still}`);
+    return 1;
+  }
+  const reason = rec.park.reason;
+  rec.status = "queued";
+  rec.park = null;
+  if (reason === "review_failed") rec.fixRounds = 0;
+  saveState(p.stateDir, state);
+  regenerate(p, state);
+  o.log(`conductor: plan ${plan} is queued again; \`run\` picks it up in lane ${rec.lane}`);
+  return 0;
+}
+
+function cmdPark(args, o) {
+  const p = o.p;
+  const [plan] = args;
+  if (!isPlan(plan)) {
+    o.err("usage: conductor.mjs park NNNN");
+    return 2;
+  }
+  if (runningPid(p)) {
+    o.err("conductor: a run is in progress; park after it ends, or `abort` it first");
+    return 1;
+  }
+  const state = loadState(p.stateDir);
+  const rec = planRecord(state, plan);
+  if (rec.status === "merged" || rec.status === "parked") {
+    o.err(`conductor: plan ${plan} is already ${rec.status}`);
+    return 1;
+  }
+  rec.status = "parked";
+  rec.park = { reason: "owner", detail: "parked by the owner", phase: null, read: null, worktree: rec.worktree, at: new Date().toISOString() };
+  rec.parks.push(rec.park);
+  appendPark(statePaths(p.stateDir).inbox, { plan, reason: "owner", detail: "parked by the owner", worktree: rec.worktree });
+  saveState(p.stateDir, state);
+  regenerate(p, state);
+  o.log(`conductor: plan ${plan} parked; \`resume ${plan}\` queues it again`);
+  return 0;
+}
+
+function cmdAbort(args, o) {
+  const p = o.p;
+  const pid = runningPid(p);
+  if (pid) {
+    // On Windows a signal cannot run the conductor's handler, so the whole tree goes: the
+    // conductor and every claude session under it.
+    if (process.platform === "win32") spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" });
+    else process.kill(pid, "SIGTERM");
+    const deadline = Date.now() + 15_000;
+    while (pidAlive(pid) && Date.now() < deadline) spawnSync(process.execPath, ["-e", "setTimeout(()=>{},200)"]);
+    if (pidAlive(pid)) {
+      o.err(`conductor: pid ${pid} did not stop`);
       return 1;
     }
-    console.log("conductor: preflight OK");
-    return 0;
   }
-  console.error("usage: node tools/conductor/conductor.mjs check");
-  return 2;
+  const state = loadState(p.stateDir);
+  const n = recoverInterrupted(p.stateDir, state);
+  rmSync(pidFile(p), { force: true });
+  regenerate(p, state);
+  o.log(pid ? `conductor: stopped pid ${pid}; ${n} in-flight step(s) will run again on the next \`run\`` : "conductor: not running");
+  return 0;
+}
+
+function cmdCheck(args, o) {
+  const r = preflight(o.p, { claude: o.claude });
+  if (r.errors.length) {
+    for (const e of r.errors) o.err(`conductor: ${e}`);
+    return 1;
+  }
+  o.log("conductor: preflight OK");
+  return 0;
+}
+
+const COMMANDS = { run: cmdRun, status: cmdStatus, resume: cmdResume, park: cmdPark, abort: cmdAbort, check: cmdCheck };
+
+/** `overrides` exists for tests: { p, claude, gate, worktreeRoot, lockDir, lockPollMs, pollMs, log, err, signals }. */
+export async function main(argv, overrides = {}) {
+  const o = {
+    p: paths(),
+    log: (s) => console.log(s),
+    err: (s) => console.error(s),
+    ...overrides,
+  };
+  const [command, ...args] = argv;
+  const fn = COMMANDS[command];
+  if (!fn) {
+    o.err("usage: node tools/conductor/conductor.mjs run [--lane a|b] [--once] | status | resume NNNN | park NNNN | abort | check");
+    return 2;
+  }
+  return fn(args, o);
 }
 
 const norm = (p) => (process.platform === "win32" ? resolve(p).toLowerCase() : resolve(p));

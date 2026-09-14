@@ -1073,6 +1073,11 @@ Later, unordered: better tempo tracking, preset sharing/library, signed installe
   `in-progress` → `done` (then `git mv` to `done/` and drop from this roster). Review
   happens at plan end, in a fresh `/architect` session — not by the session that wrote
   the code.
+- **Conductor-run plans:** an `approved` plan listed in `tools/conductor/queue.json` runs under the
+  conductor (ADR-0205): its approval is the go, each same-owner run and the review-and-close are
+  separate headless sessions, a `human` phase or any judgement it cannot make parks the plan, the
+  close review is committed as the plan's `## Close review` section, and nothing is pushed.
+
 [0100]: done/0100-the-engine-speaks-milkdrop.md
 [0101]: done/0101-the-engine-renders-a-music-video.md
 [0102]: done/0102-the-component-ships.md

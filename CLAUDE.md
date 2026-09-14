@@ -82,9 +82,16 @@ presets/             # The curated preset library (*.toml) — build.rs globs an
                      #   filename family (ADR-0190). Never hand-edited: core/tests/preset_schema.rs
                      #   holds them to the engine, RLX_UPDATE_PRESET_SCHEMA=1 rewrites them.
 tools/
-└── sd-filter/       # Python sidecar for the diffusion-filter pass (ADR-0122). Not a cargo crate,
-                     #   not in the workspace, never shipped; its cost figures live in exactly one
-                     #   page (docs/diffusion-filter.md) and check-filter-figures.mjs holds them there.
+├── sd-filter/       # Python sidecar for the diffusion-filter pass (ADR-0122). Not a cargo crate,
+│                    #   not in the workspace, never shipped; its cost figures live in exactly one
+│                    #   page (docs/diffusion-filter.md) and check-filter-figures.mjs holds them there.
+└── conductor/       # The conductor (ADR-0205): zero-dependency Node that runs approved plans from
+                     #   its committed queue.json through headless `claude -p` sessions in worktree
+                     #   lanes to a fast-forwarded main, and never pushes. Neither a gate nor a
+                     #   renderer - a program that starts other programs and spends money - so it
+                     #   refuses to start without the gitignored local.json of spend caps, and
+                     #   refuses a CLI version spike/README.md did not verify. Runtime record in
+                     #   state/ and digest.md, both gitignored; its README is the operator guide.
 site/                # The documentation front end (ADR-0154): an
                      #   Astro Starlight site publishing the READER-FACING subset of docs/ with real
                      #   search, live at igorkonovalov.github.io/Ritmolux/. One of the repository's
@@ -279,6 +286,17 @@ ADR-0177): reaching a phase the sibling implementer owns, a lane commits, verifi
 clean, and invokes the sibling through the Skill tool with three lines — plan, phase, commits
 landed. The receiver restates and **still waits for an explicit "go"**; automation removes the
 copy-paste, not the approval. Nothing else is ever auto-invoked, least of all `architect`.
+
+**A conductor-run plan is the one place those seams change**
+([ADR-0205](docs/adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md)).
+For an `approved` plan listed in `tools/conductor/queue.json`, **the approval is the "go"**: each
+same-owner run of phases is a separate headless session handed its exact range. **The close review
+is a separate process**, started with the plan and the lane and nothing an implementer wrote, which
+is what "fresh session" means there. It is committed as the plan's `## Close review` section. The
+conductor, not a lane, starts the next session, so no lane invokes a sibling or `architect` through
+the Skill tool in that mode. A `human` phase, a red gate or any other judgement the conductor cannot
+make parks the plan, and nothing is pushed. **Everything else stays as ADR-0188 left it**: a
+human-started session restates and waits, and the `dev ↔ studio-builder` handoff is unchanged.
 
 The loop:
 

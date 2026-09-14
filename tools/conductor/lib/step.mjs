@@ -16,6 +16,9 @@ import { dirname } from "node:path";
 
 import { parseOutcome, readResult } from "./outcome.mjs";
 
+/** Sessions currently running in this process, so an interrupt can end them rather than orphan them. */
+export const activeChildren = new Set();
+
 export function renderPrompt(template, vars) {
   const text = template.replace(/\{\{(\w+)\}\}/g, (m, k) => {
     if (!(k in vars)) throw new Error(`prompt template variable {{${k}}} has no value`);
@@ -78,6 +81,7 @@ export function runStep(opts) {
       env: { ...process.env, ...env, RLX_CONDUCTOR: "1" },
       stdio: ["ignore", "pipe", "pipe"],
     });
+    activeChildren.add(child);
     let stderr = "";
     child.stdout.on("data", (d) => appendFileSync(transcriptPath, d));
     child.stderr.on("data", (d) => {
@@ -93,6 +97,7 @@ export function runStep(opts) {
     const settle = (exitCode, spawnError) => {
       if (settled) return;
       settled = true;
+      activeChildren.delete(child);
       clearTimeout(timer);
       const r = readResult(readFileSync(transcriptPath, "utf8"));
       const base = {

@@ -206,6 +206,47 @@ cargo check -p standalone --features spout
 
 Bypass once with `git push --no-verify`.
 
+## Running approved plans under the conductor
+
+`tools/conductor/` runs approved plans to a merged `main` with nobody at the keyboard. It works in up
+to two worktree lanes, and each plan gets separate headless `claude -p` sessions: its implementer
+runs, then a review that also closes the plan, then a fast-forward of `main` and removal of the lane
+([ADR-0205](adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md)).
+It never pushes. Anything it cannot decide — a `human` phase, a red gate, a review still failing
+after two fix rounds, a spend cap — **parks** the plan and moves on to the next one.
+
+```sh
+node tools/conductor/conductor.mjs check          # local.json, the CLI version, the queue
+node tools/conductor/conductor.mjs run            # both lanes, until the queue is merged or parked
+node tools/conductor/conductor.mjs status         # what each lane is doing, and every park
+```
+
+**Before the first run:**
+
+- **Spend caps.** Write `tools/conductor/local.json` with your per-step caps. It is gitignored, and
+  the conductor refuses to start without it.
+- **The main checkout.** Keep it clean while a run is live: a fast-forward refuses a dirty one.
+
+**What changes for a plan it runs:**
+
+- **The approval is the go.** The plan's `Status: approved` is the only approval it needs.
+- **The review is a separate process.** A fresh session, handed the plan and the lane and nothing an
+  implementer wrote, performs the close review.
+- **The review is committed.** It lands in the plan's `## Close review` section.
+
+Every other seam stays exactly as the skills describe it.
+
+**Next morning, read `tools/conductor/digest.md`.** It lists what needs you first: each park with its
+resume command, and each merge that carried minors.
+
+The operator guide — every command, what to do about each kind of park, and how to verify a new CLI
+version — is [`tools/conductor/README.md`](../tools/conductor/README.md). Its tests need no network
+and spend nothing:
+
+```sh
+node --test "tools/conductor/test/*.test.mjs"
+```
+
 ## What else there is to read
 
 - [Testing and visual QA](testing.md) — the `core/tests/` harness that hard-tests every preset for
