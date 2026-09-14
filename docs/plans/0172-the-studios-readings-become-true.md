@@ -180,7 +180,7 @@ flowchart LR
 | 1 — The frame clock covers both live paths | dev | done | c303c1f |
 | 2 — The player's schema is snapshotted | dev | done | 6ce0594 |
 | 3 — A preset warning names its parameter | dev | done | db0df8e |
-| 4 — The studio reads the snapshot, anchors warnings and shows the rate | studio-builder | done | committed with this row |
+| 4 — The studio reads the snapshot, anchors warnings and shows the rate | studio-builder | done | fc4c9ee |
 
 ### Notes
 
