@@ -552,6 +552,61 @@ fn a_frame_of_one_tone_is_all_ground_and_nothing_is_lit() {
     assert_eq!(coverage(&bare, BLACK, 8), 1.0);
 }
 
+#[test]
+fn a_pooled_ground_lets_settled_frames_outvote_a_half_lit_first_frame() {
+    // A cellular world's first frame: a seed soup, half live cells on black.
+    // Alone it is an exact tie, and ties resolve to the brighter band — the
+    // live cell — which is the inverted ruler a horizon must not hold.
+    let cell = [169, 188, 186, 255];
+    let soup = image(32, 32, |x, y| if (x + y) % 2 == 0 { cell } else { BLACK });
+    assert_eq!(modal_ground(&soup), cell, "the fixture must be the tie");
+
+    // Six settled frames: a few rings on black, 12 of 1024 pixels live.
+    let settled = image(32, 32, |x, y| if y == 16 && x < 12 { cell } else { BLACK });
+    let mut series = vec![soup];
+    series.extend(std::iter::repeat_n(settled, 6));
+    assert_eq!(pooled_modal_ground(&series), BLACK);
+}
+
+#[test]
+fn the_pooled_ground_of_one_image_is_that_images_modal_ground() {
+    let paper = [245, 245, 245, 255];
+    let noise = image(96, 96, |x, y| {
+        let mut z = (u64::from(y) * 96 + u64::from(x)).wrapping_add(0x9E37_79B9_7F4A_7C15);
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        let v = ((z ^ (z >> 31)) >> 33) as u8;
+        [v, v / 2, 255 - v, 255]
+    });
+    for (name, img) in [
+        (
+            "light figure on black",
+            left_bar(32, 32, [255, 255, 255, 255]),
+        ),
+        (
+            "ink on paper",
+            image(32, 32, |x, _| if x < 8 { BLACK } else { paper }),
+        ),
+        ("one tone", solid(16, 16, [250, 248, 246, 255])),
+        (
+            "flat histogram",
+            image(256, 8, |x, _| {
+                let v = x as u8;
+                [v, v, v, 255]
+            }),
+        ),
+        ("coloured noise", noise),
+        ("empty", image(0, 0, |_, _| BLACK)),
+    ] {
+        assert_eq!(
+            pooled_modal_ground(std::slice::from_ref(&img)),
+            modal_ground(&img),
+            "{name}"
+        );
+    }
+    assert_eq!(pooled_modal_ground(&[]), NO_GROUND);
+}
+
 // -----------------------------------------------------------------------
 // The level statistic (ADR-0150)
 // -----------------------------------------------------------------------

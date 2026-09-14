@@ -242,11 +242,27 @@ around a stable mean reads a `delta` near zero whatever its `monotone`. Where th
 line falls between *drifting* and *alive* is a judgement about the look, which is
 why the tool declines to make it.
 
+**Every row is measured against one ground, and the header names it.** A pixel is
+lit when it departs from that ground, and the ground is the most populous
+luminance band of **every row pooled together** — the estimator the sanity lens
+uses ([ADR-0126](adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md)),
+over the whole run rather than one frame. It is estimated once and held, so no
+statistic moves because its ruler did. It is pooled because the first row cannot
+be trusted with it: a cellular world starts as a seed soup that is live at about
+half its pixels, and a ground read from that frame alone can be a live cell, which
+inverts the table — a field frozen into a few rings on black would read as 98 %
+covered. A world with two equal grounds, a duotone, gets one of them; the header
+line is how you see which.
+
 Two properties hold and are asserted rather than assumed
 (`standalone/tests/shot_cli.rs`): the same world at the same horizon produces
 **identical** rows across runs, and a row at interval *k* does not depend on how
-far the run was asked to go — so a two-minute run and a ten-minute run agree on
-every row they share. The wall clock and resident set in the cost block are the
+far the run was asked to go **as long as the two runs name the same ground** — so
+a two-minute run and a ten-minute run agree on every row they share when their
+header lines agree. Pooling makes that condition real: a longer run pools more
+rows, and a world whose population changes enough over the extra minutes can
+move its modal band, and with it every row. Compare the two `ground` lines before
+comparing rows. The wall clock and resident set in the cost block are the
 exception: those are properties of the box, reported and never asserted
 ([ADR-0071](adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)).
 
@@ -689,8 +705,8 @@ cross-machine byte equality does not hold and nothing here asserts it.
 
 ```
   preset           bass    mid   treb  onset  drive   anim    rate  cover  level  rise  fall
-  Shatter         0.099  0.064  0.013  0.106  0.103  0.092 0.0357+  0.997 0.0316   11+    4+
-  Stipple         0.050  0.013  0.001  0.011  0.057  0.010 0.0132+  0.222 0.5313    7+   26+
+  Shatter         0.099  0.064  0.013  0.106  0.103  0.092 0.0357+  0.580 0.0487   11+    4+
+  Stipple         0.050  0.013  0.001  0.011  0.057  0.010 0.0132+  0.335 0.5804    7+   26+
 ```
 
 | column | question it answers |
@@ -699,7 +715,7 @@ cross-machine byte equality does not hold and nothing here asserts it.
 | `drive` | how far the frame moves under the **combined** stimulus — silence against everything up at once, same depth and same size ([the two motion readings](#the-two-motion-readings)) |
 | `anim` | how far the frame moves between two capture depths **under silence** — does it have a life of its own |
 | `rate` | how far the frame moves **frame to frame** — the only column that walks consecutive frames, and the only one measured at 96x96 ([the two motion readings](#the-two-motion-readings)) |
-| `cover` | fraction of the frame that differs from the corner background — [a low value is often correct](#a-low-cover-is-not-a-defect) |
+| `cover` | fraction of the frame that differs from the frame's own ground — [a low value is often correct](#a-low-cover-is-not-a-defect) |
 | `level` | how much **light** the picture carries: mean linear light over the pixels `cover` counts as lit ([what the level column measures](#what-the-level-column-measures)) |
 | `rise` `fall` | the **transient probe** (below) — frames to settle after a step up, and after the matching step down; a **`+` suffix** means the value is a *lower bound*, not a measurement (below); [read them as evidence, not a verdict](#what-the-transient-columns-cannot-see) |
 
@@ -722,8 +738,8 @@ Two halves, and both matter:
 - **Over the lit set**, the same pixels `cover` counts, so an authored
   background does not dilute the reading. The two columns read one picture from
   two directions: `cover` is how much of the frame is lit, `level` is how bright
-  that lit part is. In the sample above `Shatter` fills the frame at a low level
-  and `Stipple` lights a fifth of it, brightly.
+  that lit part is. In the sample above `Shatter` lights more than half the frame at a
+  low level and `Stipple` lights a third of it, brightly.
 
 **It is a comparison number and never a threshold.** There is no level a preset
 ought to hit, and one row's cell says nothing on its own. What it is for is a
@@ -936,9 +952,11 @@ the two are not the same defect.
 
 #### A low `cover` is not a defect
 
-`cover` counts pixels differing from the corner-sampled background by more than a
-threshold, on any channel — a **symmetric** difference, so dark-on-light and
-light-on-dark are measured identically. An ink-remapped look is not penalised by
+`cover` counts pixels differing from the frame's own ground by more than a
+threshold, on any channel. The ground is the scored frame's most populous
+luminance band, the estimator the sanity lens uses — not a sampled pixel, which
+on a cellular world can land on a live cell. The difference is **symmetric**, so
+dark-on-light and light-on-dark are measured identically. An ink-remapped look is not penalised by
 construction, and a low reading is not evidence of one.
 
 What a low `cover` means is that the frame is sparse, and sparse is often the

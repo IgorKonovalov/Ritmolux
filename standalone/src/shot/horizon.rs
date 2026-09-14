@@ -42,7 +42,7 @@ use std::time::Instant;
 
 use rlx_core::dsp::AnalysisFrame;
 use rlx_core::preset::Preset;
-use rlx_core::render::metrics::{coverage, footprint_diff, peak_to_mean};
+use rlx_core::render::metrics::{coverage, footprint_diff, peak_to_mean, pooled_modal_ground};
 use rlx_core::render::{CaptureImage, Tier};
 
 use crate::shot::json::{json_string, num};
@@ -154,6 +154,8 @@ pub struct HorizonRun {
     pub height: u32,
     pub minutes: f32,
     pub interval_secs: f32,
+    /// The one reference tone every row was measured against — see `measure`.
+    pub ground: [u8; 4],
     pub samples: Vec<HorizonSample>,
     pub cost: RunCost,
 }
@@ -309,6 +311,12 @@ pub fn text_table(source: &str, run: &HorizonRun) -> String {
         run.width,
         run.height
     );
+    let [r, g, b, _] = run.ground;
+    let _ = writeln!(
+        out,
+        "  ground ({r}, {g}, {b}): the modal luminance band of every row pooled, held for \
+         the whole run"
+    );
     // The header states what the run *reached*, so when that is short of what
     // was asked for the difference is stated too — right above the table rather
     // than on stderr, because the table is what gets read and copied into a
@@ -415,6 +423,8 @@ pub fn json_report(source: &str, run: &HorizonRun) -> String {
     );
     let _ = write!(out, "\"truncated\":false,");
     let _ = write!(out, "\"interval_secs\":{},", num(run.interval_secs));
+    let [r, g, b, _] = run.ground;
+    let _ = write!(out, "\"ground\":[{r},{g},{b}],");
 
     out.push_str("\"samples\":[");
     for (i, s) in run.samples.iter().enumerate() {
@@ -547,14 +557,23 @@ struct TruncatedRun {
 // The run itself
 // ---------------------------------------------------------------------------
 
-/// Measure one run's rows from the captured interval images.
+/// Measure one run's rows from the captured interval images, returning the
+/// ground they were measured against beside them.
 ///
-/// The background is sampled **once**, from the first image, and held for every
-/// row. Re-sampling per row would let the mask move under the statistics, so a
-/// world whose backdrop brightens would report a coverage change that is really
-/// a change of ruler.
-fn measure(frames: &[u32], images: &[CaptureImage]) -> Vec<HorizonSample> {
-    let bg = images.first().map_or([0, 0, 0, 255], corner);
+/// The ground is estimated **once**, as [`pooled_modal_ground`] over every
+/// sampled image together, and held for every row. Re-sampling per row would
+/// let the mask move under the statistics, so a world whose backdrop brightens
+/// would report a coverage change that is really a change of ruler.
+///
+/// Pooled rather than read off frame 0 because frame 0 cannot be trusted to
+/// show the ground: a cellular world's seed soup is live at about half its
+/// pixels, so its corner — or its own modal band, tied and resolved to the
+/// brighter one — can be a live cell, and the whole table then counts the
+/// ground as figure. The trap in pooling is that the ground depends on which
+/// rows were sampled, so two runs of different lengths share rows only while
+/// they share a ground; the header prints it so a reader can check.
+fn measure(frames: &[u32], images: &[CaptureImage]) -> ([u8; 4], Vec<HorizonSample>) {
+    let bg = pooled_modal_ground(images);
     let mut samples = Vec::with_capacity(images.len());
     for (i, img) in images.iter().enumerate() {
         samples.push(HorizonSample {
@@ -568,18 +587,7 @@ fn measure(frames: &[u32], images: &[CaptureImage]) -> Vec<HorizonSample> {
             peak_to_mean: peak_to_mean(img, bg, COVERAGE_EPS),
         });
     }
-    samples
-}
-
-/// The frame's own ground, sampled at the top-left pixel — the same convention
-/// `--report`'s coverage column uses, so "lit" means one thing across the two.
-fn corner(img: &CaptureImage) -> [u8; 4] {
-    [
-        img.rgba.first().copied().unwrap_or(0),
-        img.rgba.get(1).copied().unwrap_or(0),
-        img.rgba.get(2).copied().unwrap_or(0),
-        255,
-    ]
+    (bg, samples)
 }
 
 /// Render the horizon and print it.
@@ -639,6 +647,7 @@ pub fn run(presets: Vec<Preset>, source: &str, req: &HorizonRequest) -> Result<(
     let wall_secs = started.elapsed().as_secs_f32();
     let rss_after = crate::rss::current_rss_bytes();
 
+    let (ground, samples) = measure(&frames, &images);
     let run = HorizonRun {
         preset: name,
         tier: req.tier,
@@ -646,7 +655,8 @@ pub fn run(presets: Vec<Preset>, source: &str, req: &HorizonRequest) -> Result<(
         height: req.height,
         minutes: req.minutes,
         interval_secs: req.interval_secs,
-        samples: measure(&frames, &images),
+        ground,
+        samples,
         cost: RunCost {
             frames: total,
             wall_secs,

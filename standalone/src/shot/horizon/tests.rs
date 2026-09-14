@@ -13,6 +13,7 @@ fn a_run(samples: Vec<HorizonSample>) -> HorizonRun {
         height: 96,
         minutes: 1.0,
         interval_secs: 30.0,
+        ground: [0, 0, 0, 255],
         samples,
         cost: RunCost {
             frames: 3600,
@@ -240,51 +241,70 @@ fn the_json_carries_every_row_and_distinguishes_absent_motion_from_none() {
     assert!(json.contains("\"footprint\":{\"first\":0.0000"));
 }
 
-/// The background is sampled once and held, so a statistic cannot move because
-/// the ruler moved.
+/// The ground is estimated once, over every row pooled, and held — so a
+/// statistic cannot move because the ruler moved, and a first frame whose
+/// top-left pixel is lit does not invert the table (design-backlog 0210).
 #[test]
-fn the_ground_is_sampled_once_for_the_whole_run() {
-    // The figure sits in the **last** pixels, not the first: the top-left pixel
-    // is what `corner` samples as the ground, so a fixture that lit it would be
-    // measuring its own figure as the background.
-    let img = |bg: u8, lit: u32| CaptureImage {
+fn the_ground_is_pooled_over_every_row_and_held_for_the_whole_run() {
+    // `first_lit` pixels of `fill` from the top-left, `last_lit` white pixels at
+    // the end, and `ground` everywhere else.
+    let img = |ground: u8, first_lit: u32, last_lit: u32| CaptureImage {
         width: 8,
         height: 8,
         rgba: (0..64u32)
             .flat_map(|i| {
-                if i >= 64 - lit {
+                if i < first_lit {
+                    [169, 188, 186, 255]
+                } else if i >= 64 - last_lit {
                     [255, 255, 255, 255]
                 } else {
-                    [bg, bg, bg, 255]
+                    [ground, ground, ground, 255]
                 }
             })
             .collect(),
     };
 
-    // Two frames whose figure is identical and whose *ground* lifts. Held
-    // against the first frame's ground, the second frame's lifted backdrop is
-    // itself lit — which is the honest reading, and the point is that it is the
-    // same reading `coverage` would give a caller passing that ground by hand.
-    let frames = [0u32, 60];
-    let samples = measure(&frames, &[img(0, 8), img(120, 8)]);
-    assert_eq!(samples.len(), 2);
+    // Frame 0 is a seed soup — half lit, its top-left pixel a live cell. Two
+    // settled frames follow, then one whose figure is unchanged and whose
+    // ground lifts. Pooled, black holds 144 of 256 pixels and is the ground.
+    let soup = img(0, 32, 0);
+    assert_eq!(
+        &soup.rgba[..3],
+        &[169, 188, 186],
+        "the corner is a live cell"
+    );
+    let frames = [0u32, 60, 120, 180];
+    let (ground, samples) = measure(&frames, &[soup, img(0, 0, 8), img(0, 0, 8), img(120, 0, 8)]);
+    assert_eq!(ground, [0, 0, 0, 255]);
+    assert_eq!(samples.len(), 4);
     assert_eq!(samples[0].frame, 0);
-    assert_eq!(samples[1].frame, 60);
+    assert_eq!(samples[3].frame, 180);
+    assert_eq!(
+        samples[0].coverage, 0.5,
+        "the soup reads as half lit, not half ground"
+    );
     assert!(
-        (samples[0].coverage - 8.0 / 64.0).abs() < 1e-4,
+        (samples[1].coverage - 8.0 / 64.0).abs() < 1e-4,
         "8 of 64 pixels lit: {}",
-        samples[0].coverage
+        samples[1].coverage
     );
     assert_eq!(
-        samples[1].coverage, 1.0,
-        "the lifted ground reads lit against the run's own first-frame ground"
+        samples[3].coverage, 1.0,
+        "the lifted ground reads lit against the run's one held ground"
     );
     assert!(samples[0].footprint_diff.is_none(), "no predecessor");
     assert!(samples[1].footprint_diff.is_some());
 
+    // The ground the rows were measured against is printed where they are read.
+    let mut run = a_run(samples);
+    run.ground = ground;
+    let table = text_table("--presets presets", &run);
+    assert!(table.contains("ground (0, 0, 0)"), "{table}");
+    assert!(json_report("--presets presets", &run).contains("\"ground\":[0,0,0]"));
+
     // An empty capture is not a panic — the mode reports nothing rather than
     // dividing by an absent frame.
-    assert!(measure(&[], &[]).is_empty());
+    assert!(measure(&[], &[]).1.is_empty());
 }
 
 /// A `--horizon` the `--interval` does not divide is rounded **down** to the

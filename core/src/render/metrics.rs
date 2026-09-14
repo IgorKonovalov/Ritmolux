@@ -450,10 +450,26 @@ pub const MIN_GROUND_SHARE: f32 = 1.0 / TONE_BANDS as f32;
 /// arbitrary but deterministic — a duotone at equal populations has two grounds
 /// and no estimator over one histogram can pick between them.
 pub fn modal_ground(img: &CaptureImage) -> [u8; 4] {
+    pooled_modal_ground(std::slice::from_ref(img))
+}
+
+/// [`modal_ground`] over **one histogram summed across every image** — one
+/// ground for a whole series, from the same band mean and the same
+/// [`MIN_GROUND_SHARE`] rule.
+///
+/// For a caller that must hold one reference across many frames (the `shot`
+/// horizon, whose ruler may not move between rows) and cannot trust any single
+/// frame to carry it: a cellular world's first frame is a seed soup near a 50 %
+/// tie, and pooling lets the settled frames outvote it. Every pixel weighs the
+/// same, so images of different sizes pool by pixel count, not per image.
+///
+/// [`modal_ground`] is this over a one-image slice, so the two cannot drift. An
+/// empty slice has no pixels and returns [`NO_GROUND`].
+pub fn pooled_modal_ground(images: &[CaptureImage]) -> [u8; 4] {
     let mut counts = [0u64; TONE_BANDS];
     let mut sums = [[0u64; 3]; TONE_BANDS];
     let mut total: u64 = 0;
-    for px in img.rgba.chunks_exact(4) {
+    for px in images.iter().flat_map(|img| img.rgba.chunks_exact(4)) {
         total += 1;
         let band = ((luma(px) / 256.0) * TONE_BANDS as f32) as usize;
         let band = band.min(TONE_BANDS - 1);

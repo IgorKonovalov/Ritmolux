@@ -21,8 +21,8 @@ use rlx_core::preset::{
     Variables,
 };
 use rlx_core::render::metrics::{
-    StepResponse, coverage, footprint_diff, frame_diff, mean_lit_level, quadrant_spread,
-    segment_settled, step_response, struct_diff,
+    StepResponse, coverage, footprint_diff, frame_diff, mean_lit_level, modal_ground,
+    quadrant_spread, segment_settled, step_response, struct_diff,
 };
 use rlx_core::render::metrics::{set_extent_diagnostic, take_draw_extent};
 use rlx_core::render::{CaptureImage, Renderer, Tier};
@@ -298,10 +298,10 @@ fn build_family_report(
     let mut fixed_caps = Vec::new();
     for (index, name) in names.iter().enumerate() {
         let base = capture(r, name, &silent, REPORT_FRAMES)?;
-        // The silent capture's corner, like the coverage column's: the
-        // darkest pixel a vignetted backdrop leaves, so "lit" is measured
-        // against the frame's own ground rather than absolute black.
-        let base_bg = corner(&base);
+        // The silent capture's own ground, estimated the way the coverage
+        // column's is, so "lit" is measured against the frame's ground rather
+        // than absolute black — or a lit corner pixel.
+        let base_bg = modal_ground(&base);
         let mut reactivity = [0.0f32; 4];
         let mut reactivity_low = [0.0f32; 4];
         let mut reactivity_footprint = [0.0f32; 4];
@@ -335,7 +335,10 @@ fn build_family_report(
         // combined-stimulus differential the per-band columns cannot express
         // (ADR-0134). No new capture: both frames are already here.
         let drive = frame_diff(&late, &fixed);
-        let bg = corner(&fixed);
+        // The scored frame's modal luminance band (ADR-0126), the estimator the
+        // sanity lens uses — never its corner pixel, which on a cellular world
+        // can be a live cell and inverts the column.
+        let bg = modal_ground(&fixed);
         let cov = coverage(&fixed, bg, COVERAGE_EPS);
         // Same capture, same background, same lit predicate as `cov` — the two
         // are the occupancy and the level of one picture.
@@ -1101,15 +1104,6 @@ fn is_dead_gate(gate: &GateReport) -> bool {
 /// bound (ADR-0062) — the finding `core/tests/saturation.rs` gates on.
 fn is_saturated(gate: &GateReport) -> bool {
     matches!(gate.flag.kind, GateKind::Saturated { .. })
-}
-
-fn corner(img: &CaptureImage) -> [u8; 4] {
-    [
-        img.rgba.first().copied().unwrap_or(0),
-        img.rgba.get(1).copied().unwrap_or(0),
-        img.rgba.get(2).copied().unwrap_or(0),
-        255,
-    ]
 }
 
 /// The --report text tables, as a string.

@@ -1,6 +1,6 @@
 # 0170 — The horizon reads the frame's own ground
 
-> **Status:** approved 2026-09-14
+> **Status:** in-progress
 > **Created:** 2026-09-11
 > **Owner skill(s):** `dev`
 > **Related ADRs:** [0126](../adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md)
@@ -118,14 +118,50 @@ flowchart LR
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled on the first phase commit)_
+**Lane:** branch `plan-0170-horizon-ground`, worktree `.claude/worktrees/plan-0170-horizon-ground`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `--horizon` and `--report` measure from the frame's own ground | dev | not started | |
+| 1 — `--horizon` and `--report` measure from the frame's own ground | dev | done | committed with this row |
 | 2 — The Larger than Life default is documented as settling | dev | not started | |
 
 ### Notes
+
+- **Phase 1, scope widened at the Step 2 gate, by the user's answer:** `standalone/src/shot/horizon/tests.rs`
+  is edited (its `the_ground_is_sampled_once_for_the_whole_run` asserted the corner ground; renamed
+  `the_ground_is_pooled_over_every_row_and_held_for_the_whole_run`); `--horizon --json` gains a
+  `"ground":[r,g,b]` key beside the text header line; and `report.rs`'s **second** corner read, the
+  silent baseline behind `reactivity_footprint`, moves to `modal_ground` too, so `corner` is gone from
+  `shot` entirely.
+- **Phase 1, a documented property is weakened.** Pooling makes the ground depend on which rows were
+  sampled, so `docs/capturing.md`'s "a row at interval *k* does not depend on how far the run was
+  asked to go" now holds only while two runs print the same ground; the page says so.
+  `standalone/tests/shot_cli.rs`'s prefix assertion is unchanged and passes.
+- **Phase 1, 0210's recipe** (`cellular_tide_bugs` with `reseed = "0"`, `trail = "0"`,
+  `step_rate = "12"`, `--horizon 3 --interval 30 --size 96x96`): before, coverage 0.4975 / 0.9806 /
+  0.9818 x4 / 1.0000 with footprint `- / 0.3532 / 0.0015 / 0 / 0 / 0 / 0.0003`; after, header
+  `ground (0, 0, 0)`, coverage 0.5025 / 0.0194 / 0.0182 x5 with footprint
+  `- / 0.6826 / 0.0720 / 0 / 0 / 0.0337 / 0.0139`. Under the corrected mask the 150 s and 180 s rows
+  are not zero.
+- **Phase 1, `shot --presets presets --report --json` before and after**, with a temporary
+  uncommitted stderr trace of each preset's corner and modal ground on both captures: 458 values
+  moved across 102 of 113 presets — `coverage` on 93, `level` on 93, `reactivity_footprint` on 91.
+  Every moved `coverage`/`level` is on a preset whose scored-frame corner differs from its modal
+  ground, and every moved `reactivity_footprint` on one whose silent-baseline corner does. No other
+  column moved, and no family's `distinctness` block (the near-duplicate flags) moved. Largest
+  `cover` moves: On White 0.9922 -> 0.2580, Collage Mono 0.8755 -> 0.1524, Echo Plate
+  0.9951 -> 0.3498, Seahorse 0.9801 -> 0.4148, Pulse 0.9868 -> 0.4571, Petalfall 0.9885 -> 0.4651,
+  Radial Bloom 0.9722 -> 0.4699, Shatter 0.9973 -> 0.5798; rises include Anemone 0.5233 -> 0.8769
+  and Banded Mandala 0.7719 -> 0.9938. Tide Bugs 0.6172 -> 0.6389.
+- **Phase 1, `docs/capturing.md`'s sample report rows** had their `cover`/`level` cells updated to
+  the new reading (Shatter 0.580 / 0.0487, Stipple 0.335 / 0.5804) and the sentence reading them.
+- **Phase 1, backlog probe:** 0210's `present: images\.first\(\)\.map_or\(\[0, 0, 0, 255\], corner\)`
+  probe is broken by this phase (`check-backlog-claims.mjs` exits 1).
+- **Followups noticed, not acted on:** `docs/preset-tuning-walkthrough.md`'s five `--report` rows
+  carry `cover` values from the corner convention (and an older column set); `docs/capturing.md`'s
+  "`reaction_coral_bloom` reports **0.128**" names a preset that is not in `presets/`;
+  `presets/cellular_tide_bugs.toml`'s header records "motion 0.000 from 60 s on", while 0210's recipe
+  under the pooled ground reads nonzero footprint at 150 s and 180 s.
 
 ### Close triggers
 
