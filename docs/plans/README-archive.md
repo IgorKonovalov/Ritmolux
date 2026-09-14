@@ -226,11 +226,12 @@ its peeled line at `832cfc0`. The only Release run since the bulk push is `34851
 `v0.123.0`, green, and its release carries five assets. No release exists for the other nine. CI,
 Release and Pages all read `active`.
 
-**What the close could not verify.** The `links` job's two new steps have never run in CI. The
-`v0.123.0` tag names `832cfc0`, which predates the `ci.yml` change, so that run's `links` job had
-neither step. The bulk push that carried `main` to `d3dcb5c` ran with `ci.yml` disabled. Phase 3's
-last done-when, the `--remote` step green on a push to `main`, is therefore open until the push that
-carries this close. Read that run's `links` job before treating the gate as live.
+**What the close could not verify, and the push after it did.** At the close the `links` job's two
+new steps had never run in CI. The `v0.123.0` tag names `832cfc0`, which predates the `ci.yml`
+change, so that run's `links` job had neither step, and the bulk push that carried `main` to
+`d3dcb5c` ran with `ci.yml` disabled. The push of the close commit `1f42327` was their first run, CI
+run `34854444537`: `--self-test` 4 of 4 on `ubuntu-latest`, and `--remote` green on its first read
+(`origin advertises refs/tags/v0.123.0 and refs/tags/v0.123.0^{}`). Phase 3's last done-when holds.
 
 **Minors:**
 - **The offline gate reads `HEAD` and the working tree's `Cargo.toml`, not the ref being pushed.**
