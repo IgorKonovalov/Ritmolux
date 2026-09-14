@@ -1,10 +1,13 @@
 # 0172 — The studio's readings become true
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-14. Phases `c303c1f` (1), `6ce0594` (2), `db0df8e` (3) and
+> `fc4c9ee` (4). Mode 4: no blockers, no majors, four minors, three nits. Architect's full
+> `cargo nextest run --workspace` on a clean checkout of `e24f564`: 1931 passed, 6 skipped, matching the log.
+> ADR-0192 accepted with an Outcome. Version 0.123.0 (minor).
 > **Created:** 2026-09-11
 > **Owner skill(s):** `dev`, `studio-builder`
-> **Related ADRs:** [0192](../adrs/0192-a-preset-warning-names-its-parameter.md) (proposed),
-> [0170](../adrs/0170-a-parameters-reference-row-is-generated-from-the-declaration-the-engine-reads.md)
+> **Related ADRs:** [0192](../../adrs/0192-a-preset-warning-names-its-parameter.md) (accepted),
+> [0170](../../adrs/0170-a-parameters-reference-row-is-generated-from-the-declaration-the-engine-reads.md)
 > (the snapshot pairing this plan reuses)
 > **Closes:** design-backlog 0202, 0205, 0209.
 

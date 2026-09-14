@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0172 - The studio's readings become true](#0172---the-studios-readings-become-true)
   - [0173 - The MilkDrop geometry reads the source](#0173---the-milkdrop-geometry-reads-the-source)
   - [0170 - The horizon reads the frame's own ground](#0170---the-horizon-reads-the-frames-own-ground)
   - [0171 - One stall policy, and a guarded clock](#0171---one-stall-policy-and-a-guarded-clock)
@@ -179,6 +180,7 @@ hand-edited.
   - [0002 — Rust enforcement tooling](#0002--rust-enforcement-tooling)
   - [0001 — Core + standalone MVP, then foobar parity](#0001--core--standalone-mvp-then-foobar-parity)
 - [Prior sequencing notes (superseded)](#prior-sequencing-notes-superseded)
+  - [Moved 2026-09-14 from `README.md` — the two-lane note for 0170-0173, spent](#moved-2026-09-14-from-readmemd--the-two-lane-note-for-0170-0173-spent)
   - [Moved 2026-09-11 from `README.md` — the note that 0167 does not close, spent](#moved-2026-09-11-from-readmemd--the-note-that-0167-does-not-close-spent)
   - [Moved 2026-09-10 from `README.md` — the 0158/0159 program note, spent](#moved-2026-09-10-from-readmemd--the-01580159-program-note-spent)
   - [Superseded 2026-09-11 by the joint close of Plans 0163 and 0164 (was in `README.md`)](#superseded-2026-09-11-by-the-joint-close-of-plans-0163-and-0164-was-in-readmemd)
@@ -204,6 +206,65 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0172 - The studio's readings become true](done/0172-the-studios-readings-become-true.md)
+
+- closed 2026-09-14. Three `dev` phases and one `studio-builder` phase on `main` directly: `c303c1f`
+(1, the frame clock covers the windowless path), `6ce0594` (2, the player schema snapshot and its drift
+test), `db0df8e` (3, a preset warning names its binding) and `fc4c9ee` (4, the studio reads the
+snapshot, anchors warnings and checks the rate). Review: **no blockers, no majors, four minors, three
+nits.** Version: **0.123.0** (minor). ADR-0192 accepted with an Outcome. Closed backlog 0202, 0205 and
+0209; added a dated update to 0181. The architect's gate at the close: `cargo nextest run --workspace
+--no-fail-fast` on a clean detached checkout of `e24f564` (the main checkout carried another lane's
+uncommitted `ParamSpec` edits, which the snapshot test would have caught): 1931 passed, 6 skipped,
+matching the log. No Rust moved
+after `db0df8e`, where the log's run was taken.
+
+**What the review verified rather than read.** `render_tapped` records the frame after
+`read_back` returns, so a failed readback is not counted, and `frame_tap.rs` asserts three
+`capture_frame` calls leave `frames_total` and `fps` at zero before six taps move them. The stream
+loop's `DiagLog` uses the windowed app's resolver and opens in append mode. `stream_show.rs` points
+the data root at a scratch directory and reads `fps` and `frames_total` by header name, not by index.
+The snapshot test compares with CRLF normalized, against `document()` plus the newline `println!`
+adds. The Phase 3 tests exercise every labelled push-site class in the core, and `--check`'s test
+walks five labelled shapes and two unanchored ones, each asserting the exact span of the **last**
+occurrence of the key, so a wrong key path that landed on an earlier same-named key would fail. The
+walks and the diagnostics test pass in the main checkout (31 tests), against the release player there.
+The CI `studio` job still runs no cargo step, and the snapshot is inside its checkout.
+
+**Minors, none fixed in code at the close:**
+- **`standalone/tests/stream_pipe.rs` now writes into the developer's real data root.** Its `run`
+  helper spawns `--stream` with the inherited environment, and Phase 1 gave that loop the per-user
+  `diagnostics.log`. The phase's own note forbade this for a test that writes a log; this test
+  predates the phase and was not in its file list. Recorded as a dated update on backlog 0181, the
+  same class.
+- **The walks prefer a built player over the snapshot.** On a machine with a stale binary in
+  `target/`, they walk that binary, not the document the Rust test holds to the tree. `dev` hit
+  exactly this with `windowless.test.ts` against a three-day-old release build. The order predates
+  the plan; now that the snapshot is the checked source, it is the more trustworthy of the two.
+  Recorded in the 0209 close note.
+- **`docs/presets.md` said a new grammar name owes `--schema` nothing.** It now owes the snapshot a
+  regeneration. Repaired in the close commit, as was `docs/specs/README.md`, which listed the
+  directory's specs and did not account for a generated JSON file among them.
+- **The implementation log is longer than the plan's `## Implementation phases` section**, about 83
+  lines against 75. The Phase 3 and Phase 4 notes carry the push-site roster and the done-when counts,
+  which is the right content at too much weight.
+
+**Nits:** `PresetWarning` implements `Deref<Target = str>` so the existing string-reading tests compile
+unchanged. That is `Deref` on a type that is not a pointer, and a caller's `warning.contains(..)`
+reads the message without saying so. The `.taplo.toml` header and
+`the_generated_editor_files_are_current`'s failure message still quote the narrower regenerate command,
+which rewrites the sixteen editor files but not the snapshot. A person following it meets the snapshot
+test's own message next, so it heals in one step. And `renderer/App.test.tsx:60` builds a
+`preset_warning` fixture without `param` behind an `as PlayerEvent` cast, so it no longer matches the
+schema it claims.
+
+**Also at the close:** operator docs swept. `docs/developing.md` and spec 0003 were updated in the
+phases; `docs/presets.md` and `docs/specs/README.md` in the close commit. `packaging/studio/READ-ME-FIRST.md`
+sends a tester to `diagnostics.log`, which is now true in both player modes. `docs/on-device-validation.md`
+records the 0205 finding as history and stands. Preset curation: no `.toml` touched, and the
+workaround grep for ADR-0192, Plan 0172 and backlog 0202, 0205 and 0209 over `presets/*.toml` is
+clean. The two-lane sequencing note for 0170-0173 is spent and moved to the prior notes below.
 
 ### [0173 - The MilkDrop geometry reads the source](done/0173-the-milkdrop-geometry-reads-the-source.md)
 
@@ -8278,6 +8339,32 @@ stays in `lmv-core`, and is out of the Miri job's scope, so the FFI pointer hand
 uncovered (its C side remains the Plan 0001 Phase-6 smoke program's job, per ADR-0003).
 
 ## Prior sequencing notes (superseded)
+
+### Moved 2026-09-14 from `README.md` — the two-lane note for 0170-0173, spent
+
+Spent when [0172] closed on 2026-09-14, the last of the four. Kept verbatim as the record of how the
+two lanes were ordered.
+
+**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two lanes.**
+Drafted 2026-09-11 from the backlog; 0172 was amended at approval because [0169] closed in between
+(its snapshot stays a separate file under 0169's own test and switch, and `--check` becomes a
+consumer of the new `param`). ADR-0191 and ADR-0192 stay `proposed` until their plans close.
+
+- **Lane 1 - [0171] then [0172], in series.** Both edit the live entries in `capture_api.rs` and
+  `render/mod.rs`: 0171 puts the `dt` guard first in each, 0172 adds `record_frame` beside it.
+  **[0171] closed 2026-09-14**, so 0172 branches from a `main` that already carries the guard.
+  0172 Phase 4 hands off to `studio-builder` automatically (ADR-0188).
+- **Lane 2 - [0170] then [0173].** 0170 touches `metrics.rs` and `shot/` only. 0173 needs no rig,
+  and its Phase 1 source commit is what [0142] Phase 2 reads, so it goes before 0142.
+  **[0170] and [0173] both closed 2026-09-14**, so lane 2 is spent. [0142] reads the source at
+  `xeiraex/milkdrop2` `d4c843a`, the commit 0173's log names.
+
+[0142]: 0142-the-milkdrop-import-earns-its-verdict.md
+[0169]: done/0169-a-preset-is-checked-before-it-is-rendered.md
+[0170]: done/0170-the-horizon-reads-the-frames-own-ground.md
+[0171]: done/0171-one-stall-policy-and-a-guarded-clock.md
+[0172]: done/0172-the-studios-readings-become-true.md
+[0173]: done/0173-the-milkdrop-geometry-reads-the-source.md
 
 ### Moved 2026-09-11 from `README.md` — the note that 0167 does not close, spent
 

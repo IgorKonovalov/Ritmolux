@@ -32,6 +32,11 @@ statements + scenarios); CLAUDE.md is orientation. They must not drift apart.
 | [0002-ring-determinism.md](0002-ring-determinism.md) | SPSC ring seam + pure-function DSP determinism | 0001 (+ CLAUDE.md non-negotiables); Plan 0005 |
 | [0003-studio-control-protocol.md](0003-studio-control-protocol.md) | The OSC control-in vocabulary a studio drives the player through | 0176, 0175, 0164, 0143 |
 
+`player-schema.json` beside them is **not a spec**. It is the document `ritmolux --schema` prints,
+committed so the studio's tests have one to read where no player is built, and generated rather than
+authored: `core/tests/preset_schema.rs` fails when it drifts from the engine, and
+`RLX_UPDATE_PRESET_SCHEMA=1` rewrites it. Never hand-edit it.
+
 ## Posture: minimal and lazy (no gate, no ritual yet)
 
 Per ADR-0004, this layer is deliberately lightweight:

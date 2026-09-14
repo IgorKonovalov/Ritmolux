@@ -1,8 +1,8 @@
 # ADR-0192 — A preset warning names the parameter it is about
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-14 (Plan 0172), with an Outcome
 > **Date:** 2026-09-11
-> **Related plan(s):** [0172](../plans/0172-the-studios-readings-become-true.md)
+> **Related plan(s):** [0172](../plans/done/0172-the-studios-readings-become-true.md)
 > **Extends:** [ADR-0176](0176-the-player-is-driven-over-osc-control-in-and-reports-on-its-standard-streams.md)
 > — one field on one event of [spec 0003](../specs/0003-studio-control-protocol.md).
 
@@ -62,3 +62,17 @@ for a person, which any rewording would break.
 ### Alternative C — Leave it, since the modal lists every warning
 The modal makes a warning readable. It cannot make it locatable, and the author's next question is
 which line.
+
+## Outcome (2026-09-14, Plan 0172)
+
+The Decision landed as written, with two refinements the text above does not state:
+
+- **`param` is a label, not a bare name.** It is spelled as `preset_error`'s `param` is: `glow`,
+  `[layer] glow`, `[per_vertex] x`, `[layer] [per_vertex] x`. That spelling is what lets
+  `ritmolux --check` place a warning through the same key lookup it uses for an error.
+- **On the wire the field is always present**, a string or `null`, never omitted. "Optional" above
+  means nullable.
+
+The first Positive holds for a **top-level** binding only. The studio's `markersFor` matches a bare
+`[params]` name, so a `[layer]` or `[per_vertex]` label stays in the problems list, as an expression
+error with that label already did. `--check` places all four label shapes.

@@ -1800,9 +1800,13 @@ list is four chances to drift, and a stale roster silently costs the content lan
 a capability. A change to the grammar is **ADR territory** — flag it rather than
 quietly widening the vocabulary here.
 
-`--schema`'s `grammar` object is **not** one of those copies and needs no edit:
-it is generated from the same declarations the parser reads, and a test diffs it
-against them in both directions. What a new name owes there is nothing.
+`--schema`'s `grammar` object is **not** one of those copies and needs no hand
+edit: it is generated from the same declarations the parser reads, and a test
+diffs it against them in both directions. What a new name owes there is one
+regeneration. The document is also committed, as `docs/specs/player-schema.json`,
+for the studio's tests to read, and `core/tests/preset_schema.rs` fails until
+`RLX_UPDATE_PRESET_SCHEMA=1 cargo nextest run -p rlx-core --test preset_schema`
+rewrites it ([Developing](developing.md) has the whole set that command covers).
 
 > **Format stability:** the app is pre-1.0 and in active development, so the
 > preset format may still change between releases. Preset-format stability begins

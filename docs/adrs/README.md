@@ -213,6 +213,6 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0189](0189-an-edit-forks-the-preset-and-the-studio-holds-rotation.md) | An edit forks the preset on first touch, and the studio holds rotation while attached | accepted 2026-09-10 (Plan 0168), revises 0184 |
 | [0190](0190-preset-toml-is-checked-by-the-loader-and-never-reformatted.md) | Preset TOML is checked by the engine's own loader and never reformatted | accepted 2026-09-13 (Plan 0169) |
 | [0191](0191-a-frame-delta-is-replaced-at-every-entry-and-nothing-below-keeps-a-policy.md) | A frame delta is replaced at every entry that takes one, and nothing below keeps a policy of its own | accepted 2026-09-14 (Plan 0171; Outcome), amends 0152 |
-| [0192](0192-a-preset-warning-names-its-parameter.md) | A preset warning names the parameter it is about | proposed (Plan 0172), extends 0176 |
+| [0192](0192-a-preset-warning-names-its-parameter.md) | A preset warning names the parameter it is about | accepted 2026-09-14 (Plan 0172; Outcome), extends 0176 |
 | [0193](0193-a-test-that-reads-the-clock-runs-alone.md) | A test that reads the clock runs alone, and the lint exemption that marks it is what selects it | proposed (Plan 0174), extends 0173 |
 <!-- roster:end -->

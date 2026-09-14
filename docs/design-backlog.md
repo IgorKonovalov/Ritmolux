@@ -66,14 +66,11 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0192 - `--report` cannot see a `beat_index`-driven response, so a deliberately musical preset measures as inert](#0192-----report-cannot-see-a-beat_index-driven-response-so-a-deliberately-musical-preset-measures-as-inert)
 - [0196 — most `v*` tags produce no Release run at all, and the cause Plan 0165 named cannot explain nineteen of them](#0196--most-v-tags-produce-no-release-run-at-all-and-the-cause-plan-0165-named-cannot-explain-nineteen-of-them)
 - [0198 — `deposit_arms` tears along the branch cut at a fractional value, and nothing rounds it](#0198--deposit_arms-tears-along-the-branch-cut-at-a-fractional-value-and-nothing-rounds-it)
-- [0202 — `preset_warning` carries no position at all, so the one problem class an author cannot see in the file tab is the one the system picker produces by the dozen](#0202--preset_warning-carries-no-position-at-all-so-the-one-problem-class-an-author-cannot-see-in-the-file-tab-is-the-one-the-system-picker-produces-by-the-dozen)
 - [0203 — the smoke run captured from a microphone while the default is loopback, and nobody established why](#0203--the-smoke-run-captured-from-a-microphone-while-the-default-is-loopback-and-nobody-established-why)
 - [0204 — the studio's sliders read one range per parameter, so a curve family's own range is unreachable from them](#0204--the-studios-sliders-read-one-range-per-parameter-so-a-curve-familys-own-range-is-unreachable-from-them)
-- [0205 — a windowless player reports `0.0 fps` and writes no diagnostics rows, while rendering normally](#0205--a-windowless-player-reports-00-fps-and-writes-no-diagnostics-rows-while-rendering-normally)
 - [0206 — with no post stage active a fullscreen field's REPLACE blend overwrites the backdrop, so `occlude = 0` lets nothing through](#0206--with-no-post-stage-active-a-fullscreen-fields-replace-blend-overwrites-the-backdrop-so-occlude--0-lets-nothing-through)
 - [0207 — the cap-recovery line says "geometry is back within the segment cap" for every context, and three of the five are not geometry](#0207--the-cap-recovery-line-says-geometry-is-back-within-the-segment-cap-for-every-context-and-three-of-the-five-are-not-geometry)
 - [0208 — a system count written into prose goes stale on the next system, and fourteen places have now carried one](#0208--a-system-count-written-into-prose-goes-stale-on-the-next-system-and-fourteen-places-have-now-carried-one)
-- [0209 — the studio's schema walks pass in CI by walking nothing, because the CI job builds no player](#0209--the-studios-schema-walks-pass-in-ci-by-walking-nothing-because-the-ci-job-builds-no-player)
 - [0212 — three frame-delta guards below the entries check only the sign, so the one-policy gate cannot see them and each keeps an answer of its own](#0212--three-frame-delta-guards-below-the-entries-check-only-the-sign-so-the-one-policy-gate-cannot-see-them-and-each-keeps-an-answer-of-its-own)
 - [0213 — the horizon's length-independence test compares rows and never the ground they were measured against, so its doc still states a property pooling made conditional](#0213--the-horizons-length-independence-test-compares-rows-and-never-the-ground-they-were-measured-against-so-its-doc-still-states-a-property-pooling-made-conditional)
 - [0214 — a converted comp shader reads the warp stage's `rad`/`ang`, and a converted per-vertex program reads raw uv `x`/`y`, where the reference builds both differently](#0214--a-converted-comp-shader-reads-the-warp-stages-radang-and-a-converted-per-vertex-program-reads-raw-uv-xy-where-the-reference-builds-both-differently)
@@ -356,6 +353,9 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0211 | The `larger_than_life` default settles on the shipped grid, and its test claimed the family moves | [Plan 0170](plans/done/0170-the-horizon-reads-the-frames-own-ground.md) Phase 2. Documented, not re-swept. **Closed 2026-09-14** |
 | 0119 | `ang`'s branch cut on +x seams every per-vertex program continuous in it | [Plan 0173](plans/done/0173-the-milkdrop-geometry-reads-the-source.md) Phases 1-2. Converted `ang` already matched; diagnosis inverted. See 0214, 0215. **Closed 2026-09-14** |
 | 0120 | The converted waveform renders larger than the reference's, and `wave_scale` is applied raw | [Plan 0173](plans/done/0173-the-milkdrop-geometry-reads-the-source.md) Phase 1; Phase 3 stopped. Source reads `0.125`. See 0216. **Closed 2026-09-14** |
+| 0202 | `preset_warning` carries no position, so the editor cannot mark a warning's line | [ADR-0192](adrs/0192-a-preset-warning-names-its-parameter.md) + [Plan 0172](plans/done/0172-the-studios-readings-become-true.md) Phases 3-4. `param`, not a span. **Closed 2026-09-14** |
+| 0205 | A windowless player reports `0.0 fps` and writes no diagnostics rows | [Plan 0172](plans/done/0172-the-studios-readings-become-true.md) Phase 1. One clock on both live paths. See 0181. **Closed 2026-09-14** |
+| 0209 | The studio's schema walks pass in CI by walking nothing | [Plan 0172](plans/done/0172-the-studios-readings-become-true.md) Phases 2 and 4. A committed snapshot, held by a Rust test. **Closed 2026-09-14** |
 <!-- roster:end -->
 
 ## Open entries
@@ -3032,6 +3032,22 @@ the file's `run`/`run_both` helper — which isolates the migration and every fu
 effect at once. Migration-specific behaviour is already covered by the four unit tests against
 `migrate_app_dir_in`, so nothing is lost by keeping it out of the subprocess cases.
 
+### Update 2026-09-14 — a second subprocess file now writes into the real data root
+
+[Plan 0172](plans/done/0172-the-studios-readings-become-true.md) Phase 1 gave the `--stream` loop the
+windowed app's `diagnostics.log`, at the path `resolve_log_path` finds under the per-user data root.
+`standalone/tests/stream_show.rs` points that root at a scratch directory, and the studio's
+`windowless.test.ts` and `templates.test.ts` clear it. **`standalone/tests/stream_pipe.rs` does
+neither**: its `run` helper spawns `--stream` with the inherited environment. So a run of that file
+that lasts past the log's one-second cadence appends rows to the developer's own `diagnostics.log`,
+and a log from an older build is rotated away. It is the same class as the migration above, and the
+same one-line fix in the helper covers it.
+
+- **Verified 2026-09-14** — the pipe tests spawn `--stream` with no data-root isolation:
+  `absent: APPDATA in: standalone/tests/stream_pipe.rs`
+- **Verified 2026-09-14** — while the loop they reach now opens the per-user log:
+  `present: DiagLog::new\(crate::cli::resolve_log_path\(\)\) in: standalone/src/stream.rs`
+
 ## 0182 — Thirty-seven of the forty-six test targets could share one binary, and nine `binary()` predicates are why the merge has to be partial
 
 **Raised by:** `architect`, while designing [Plan 0153](plans/done/0153-the-debug-tree-stops-carrying-dependency-line-tables.md)
@@ -3524,49 +3540,6 @@ after someone authors one.
 **Low.** Unreachable from the shipped library, and the fix is a one-line declaration whose cost only
 grows if a preset lands on the parameter first.
 
-## 0202 — `preset_warning` carries no position at all, so the one problem class an author cannot see in the file tab is the one the system picker produces by the dozen
-
-Spec 0003 gives `preset_error` five fields — `file`, `message`, `line`, `col`, `param` — and gives
-`preset_warning` two: `file` and `message`. `markersFor` places a marker only where an event put
-one, deliberately (the studio runs no parser of its own), so it can anchor an error two ways and a
-warning **no way at all**. A warning is therefore invisible in the file tab by construction, and the
-author is told a preset "loaded with a non-fatal problem" without being told where.
-
-That would be a small gap if warnings were rare. They are not, and the reason is structural:
-changing a preset's system keeps the outgoing system's `[params]` bindings and structural tables,
-and **each one the incoming system does not declare is its own warning**. One click produces
-several, which is what
-[Plan 0167](plans/done/0167-the-studio-becomes-handable.md)'s smoke run observed. Plan 0168 Phase 2 puts
-every problem in a modal, which makes them *legible*; it cannot make them *locatable*, and the two
-are different things when the author's next question is "which line".
-
-**The cheap repair may not be a span.** `preset_error` is already anchored two ways — a TOML syntax
-failure carries `line`/`col`, and an expression failure carries `param` instead, because it is
-raised after the document was parsed into values that no longer hold a position. A binding-dropped
-warning is exactly that second shape: it knows the parameter's name. Adding `param` to
-`preset_warning` would let `markersFor` find its line through the `[params]` table with **no new
-mechanism**, where adding `line`/`col` would need the warning raised somewhere that still holds a
-position. Settle which before building either.
-
-- **Raised:** 2026-09-10, from [Plan 0167](plans/done/0167-the-studio-becomes-handable.md)'s
-  developer-machine smoke run, finding B — the separable half the routing deliberately did not take.
-  **Owner if taken:** `architect` to choose between `param` and a true span (it moves spec 0003
-  either way), then `dev` for the player side and `studio-builder` for the marker.
-- **Verified 2026-09-10** — the spec gives the warning two fields and no position:
-  `present: preset_warning.*file.*message.*non-fatal in: docs/specs/0003-studio-control-protocol.md`
-- **Verified 2026-09-10** — and the studio's schema mirrors it, `file` and `message` and nothing
-  else: `present: ev: z\.literal\('preset_warning'\), in: studio/shared/protocol.ts`
-- **Verified 2026-09-10** — while the error it sits beside carries all five, which is the asymmetry:
-  `present: preset_error.*line.*col.*param in: docs/specs/0003-studio-control-protocol.md`
-- **Verified 2026-09-10** — and `param` is already a working anchor, so the cheap repair exists:
-  `present: carries the \*\*parameter's name\*\* instead in: studio/renderer/editor/diagnostics.ts`
-
-### Priority
-
-**Medium.** It is not in front of the tester handoff — Plan 0168 Phase 2's list makes a warning
-readable, which is enough to hand over — and it becomes worth taking the next time a `dev` lane is
-open on the player's event surface for another reason.
-
 ## 0203 — the smoke run captured from a microphone while the default is loopback, and nobody established why
 
 [Plan 0167](plans/done/0167-the-studio-becomes-handable.md)'s smoke run, 2026-09-10, reported its capture
@@ -3645,53 +3618,6 @@ cover both.
 
 **Low.** No curve preset on the new families ships yet, and the studio edits the file as text as
 well as by slider; it becomes worth taking when the first such preset is curated into the set.
-
-## 0205 — a windowless player reports `0.0 fps` and writes no diagnostics rows, while rendering normally
-
-Run the studio with `playerMode: "windowless"` and its footer reads `0.0 fps · p99 0.0 ms`
-indefinitely, while the picture moves and the preview counter climbs. `%APPDATA%\Ritmolux\diagnostics.log`
-gains **no rows at all** for the whole session. Both are true of a player that is demonstrably
-working: the same run reported `stream: render+readback 3.92 ms, pipe write 0.46 ms, mean over 1800
-frames`.
-
-The cause is one call site. `Diag::record_frame` is what advances the rolling window every fps and
-frame-time figure is derived from, and it is called in exactly **one** place in the repository —
-at the end of `Renderer::render`, immediately after `queue.present(surface_tex)`. A windowless run
-draws through `render_tapped` instead, which shares `draw_frame` but never presents, so
-`record_frame` never runs, `metrics().fps` stays at its initial zero, and `show.rs` faithfully
-publishes that zero in every `health` event. The silent log is the second half of the same split:
-`DiagLog` is owned by `app_state.rs`, the windowed application, and the `--stream` loop has no
-reference to it.
-
-Neither symptom is cosmetic for the audience they reach. The studio's footer is the only frame-rate
-an operator in windowless mode ever sees, and it shows a zero that is false. And
-`packaging/studio/READ-ME-FIRST.md` sends a tester to `diagnostics.log` to identify a wrong audio
-device — the single most useful thing a tester can report — which in that mode is a file that was
-never written.
-
-A fix is a decision about where the frame clock belongs, not a patch at the call site: either
-`record_frame` moves to cover both draw paths, or the headless path gets its own counter and
-`health` stops claiming a figure it does not have. The honest interim is for the studio to render
-no number rather than a zero.
-
-- **Raised:** 2026-09-11, running [Plan 0167](plans/done/0167-the-studio-becomes-handable.md) Phase 8 on
-  Windows. **Owner if taken:** `architect` for where the clock lives, then `dev`.
-- **Verified 2026-09-11** — the frame clock has exactly one call site, on the present path:
-  `present: self\.diag\.record_frame\(\) in: core/src/render/mod.rs`
-- **Verified 2026-09-11** — and the headless stream loop never reaches it:
-  `absent: record_frame in: standalone/src/stream.rs`
-- **Verified 2026-09-11** — nor does that loop hold the diagnostics writer:
-  `absent: diag_log in: standalone/src/stream.rs`
-- **Verified 2026-09-11** — while the health event publishes the never-advanced counter:
-  `present: fps: metrics\.fps in: standalone/src/show.rs`
-
-### Priority
-
-**Medium.** It misleads exactly the two audiences the studio was built for — an operator editing on
-a laptop, which is what windowless mode is *for*, and a first tester following the handoff note.
-Nothing is wrong with the picture, so it costs no show; it costs trust in the readings.
-
----
 
 ## 0206 — with no post stage active a fullscreen field's REPLACE blend overwrites the backdrop, so `occlude = 0` lets nothing through
 
@@ -3801,37 +3727,6 @@ to `system` in the reader documents and in `.rs` comments.
 **Low.** Every instance so far has been cosmetic and every one was caught, so the cost to date is
 reviewer attention rather than a wrong build. It is worth an entry because the catching is the
 expensive part and it recurs on a fixed schedule: once per new system, forever.
-
-## 0209 — the studio's schema walks pass in CI by walking nothing, because the CI job builds no player
-
-[Plan 0167](plans/done/0167-the-studio-becomes-handable.md) Phase 6 deleted the studio's
-hand-kept `KINDS` fallback and replaced it with walks over the **live** schema a built player
-exports: every structural table's keys, every map's entry kind, the grammar's variables and
-functions. That was the right repair — the fallback was the copy that drifted — and it moved the
-check somewhere CI cannot reach. The CI `studio` job runs `npm test` on `ubuntu-latest` with no
-cargo step, so `live` is undefined there and every walk returns before its first assertion
-(`studio/shared/fields.test.ts`, `grammar.test.ts`, `windowless.test.ts`). Each counts as a pass.
-Before Phase 6 the fallback still ran in CI; now the `[hold]` and grammar checks run only on a
-machine that happens to have built the player, and CI's green says nothing about them.
-
-The shape of the fix is one of two: have the `studio` job build the player first (a release build
-of `standalone`, and its minutes), or commit a schema snapshot the walks read in CI and a Rust test
-that fails when the snapshot and `--schema` disagree — the same pairing ADR-0170 uses for the
-parameter reference.
-
-- **Raised:** 2026-09-11, at Plan 0167's close review. **Owner if taken:** `architect` for which of
-  the two, then `dev` and `studio-builder`.
-- **Verified 2026-09-11** — the walks still skip rather than fail when no player is built:
-  `present: skipped the live walk: no built ritmolux in target/ in: studio/shared/fields.test.ts`
-- **Verified 2026-09-11** — and the CI job still builds none. A string probe cannot see this half,
-  because other jobs in the same workflow file do run cargo:
-  `unprobeable: the studio job's steps are not separable by a single-file string probe`
-
-### Priority
-
-**Medium.** Nothing is broken today — the walks pass on the development machine. But the next
-engine change that adds a structural kind the studio cannot edit will reach `main` green, and the
-first person to notice will be an author in the editor.
 
 ## 0212 — three frame-delta guards below the entries check only the sign, so the one-policy gate cannot see them and each keeps an answer of its own
 

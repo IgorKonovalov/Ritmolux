@@ -216,6 +216,9 @@ accepted cost" are different documents and only one of them is honest.
 - [0211 — the `larger_than_life` default rule stops moving within a minute on the shipped preset's grid, while the test that chose it runs a grid half that size](#0211--the-larger_than_life-default-rule-stops-moving-within-a-minute-on-the-shipped-presets-grid-while-the-test-that-chose-it-runs-a-grid-half-that-size)
 - [0119 — `ang`'s branch cut on the +x axis seams every per-vertex program that is continuous in it](#0119--angs-branch-cut-on-the-x-axis-seams-every-per-vertex-program-that-is-continuous-in-it)
 - [0120 — the converted waveform figure renders larger than the reference's, and `wave_scale` is applied raw](#0120--the-converted-waveform-figure-renders-larger-than-the-references-and-wave_scale-is-applied-raw)
+- [0202 — `preset_warning` carries no position at all, so the one problem class an author cannot see in the file tab is the one the system picker produces by the dozen](#0202--preset_warning-carries-no-position-at-all-so-the-one-problem-class-an-author-cannot-see-in-the-file-tab-is-the-one-the-system-picker-produces-by-the-dozen)
+- [0205 — a windowless player reports `0.0 fps` and writes no diagnostics rows, while rendering normally](#0205--a-windowless-player-reports-00-fps-and-writes-no-diagnostics-rows-while-rendering-normally)
+- [0209 — the studio's schema walks pass in CI by walking nothing, because the CI job builds no player](#0209--the-studios-schema-walks-pass-in-ci-by-walking-nothing-because-the-ci-job-builds-no-player)
 <!-- toc:end -->
 
 ## 0001 — reaction_diffusion reaches only 2 of the 5 Plan-0018 composite levers
@@ -10267,3 +10270,153 @@ source cannot explain that gap, because that host does not feed the 8-bit path. 
 modes 0-5 drawing different figures from the source's, and the mode-6/7 angle range and mode-7
 separation differing. Both residues are one question, which reference the waveform follows, and they
 are 0216. Its three `present:` probes retire with this body; 0216 re-probes the `0.15`.
+
+---
+
+## 0202 — `preset_warning` carries no position at all, so the one problem class an author cannot see in the file tab is the one the system picker produces by the dozen
+
+Spec 0003 gives `preset_error` five fields — `file`, `message`, `line`, `col`, `param` — and gives
+`preset_warning` two: `file` and `message`. `markersFor` places a marker only where an event put
+one, deliberately (the studio runs no parser of its own), so it can anchor an error two ways and a
+warning **no way at all**. A warning is therefore invisible in the file tab by construction, and the
+author is told a preset "loaded with a non-fatal problem" without being told where.
+
+That would be a small gap if warnings were rare. They are not, and the reason is structural:
+changing a preset's system keeps the outgoing system's `[params]` bindings and structural tables,
+and **each one the incoming system does not declare is its own warning**. One click produces
+several, which is what
+[Plan 0167](plans/done/0167-the-studio-becomes-handable.md)'s smoke run observed. Plan 0168 Phase 2 puts
+every problem in a modal, which makes them *legible*; it cannot make them *locatable*, and the two
+are different things when the author's next question is "which line".
+
+**The cheap repair may not be a span.** `preset_error` is already anchored two ways — a TOML syntax
+failure carries `line`/`col`, and an expression failure carries `param` instead, because it is
+raised after the document was parsed into values that no longer hold a position. A binding-dropped
+warning is exactly that second shape: it knows the parameter's name. Adding `param` to
+`preset_warning` would let `markersFor` find its line through the `[params]` table with **no new
+mechanism**, where adding `line`/`col` would need the warning raised somewhere that still holds a
+position. Settle which before building either.
+
+- **Raised:** 2026-09-10, from [Plan 0167](plans/done/0167-the-studio-becomes-handable.md)'s
+  developer-machine smoke run, finding B — the separable half the routing deliberately did not take.
+  **Owner if taken:** `architect` to choose between `param` and a true span (it moves spec 0003
+  either way), then `dev` for the player side and `studio-builder` for the marker.
+- **Verified 2026-09-10** — the spec gives the warning two fields and no position:
+  `present: preset_warning.*file.*message.*non-fatal in: docs/specs/0003-studio-control-protocol.md`
+- **Verified 2026-09-10** — and the studio's schema mirrors it, `file` and `message` and nothing
+  else: `present: ev: z\.literal\('preset_warning'\), in: studio/shared/protocol.ts`
+- **Verified 2026-09-10** — while the error it sits beside carries all five, which is the asymmetry:
+  `present: preset_error.*line.*col.*param in: docs/specs/0003-studio-control-protocol.md`
+- **Verified 2026-09-10** — and `param` is already a working anchor, so the cheap repair exists:
+  `present: carries the \*\*parameter's name\*\* instead in: studio/renderer/editor/diagnostics.ts`
+
+### Priority
+
+**Medium.** It is not in front of the tester handoff — Plan 0168 Phase 2's list makes a warning
+readable, which is enough to hand over — and it becomes worth taking the next time a `dev` lane is
+open on the player's event surface for another reason.
+
+**CLOSED 2026-09-14** — [ADR-0192](adrs/0192-a-preset-warning-names-its-parameter.md) + [Plan 0172](plans/done/0172-the-studios-readings-become-true.md) Phase 3 (core, event, `--check`) and Phase 4
+(studio). The cheap repair this entry named is the one taken: `preset_warning` carries `param`,
+spelled as `preset_error`'s label or `null`, and `markersFor` places it by the route an expression
+error takes, with no new mechanism on either side. No span was built (ADR-0192, Alternative A). Two
+limits stand, both recorded in ADR-0192's Outcome: a warning about no single binding stays in the list
+only, and the editor anchors a top-level binding only, so a `[layer]` or `[per_vertex]` label is
+placed by `ritmolux --check` and not by the file tab. Its four probes retire with this body.
+
+---
+
+## 0205 — a windowless player reports `0.0 fps` and writes no diagnostics rows, while rendering normally
+
+Run the studio with `playerMode: "windowless"` and its footer reads `0.0 fps · p99 0.0 ms`
+indefinitely, while the picture moves and the preview counter climbs. `%APPDATA%\Ritmolux\diagnostics.log`
+gains **no rows at all** for the whole session. Both are true of a player that is demonstrably
+working: the same run reported `stream: render+readback 3.92 ms, pipe write 0.46 ms, mean over 1800
+frames`.
+
+The cause is one call site. `Diag::record_frame` is what advances the rolling window every fps and
+frame-time figure is derived from, and it is called in exactly **one** place in the repository —
+at the end of `Renderer::render`, immediately after `queue.present(surface_tex)`. A windowless run
+draws through `render_tapped` instead, which shares `draw_frame` but never presents, so
+`record_frame` never runs, `metrics().fps` stays at its initial zero, and `show.rs` faithfully
+publishes that zero in every `health` event. The silent log is the second half of the same split:
+`DiagLog` is owned by `app_state.rs`, the windowed application, and the `--stream` loop has no
+reference to it.
+
+Neither symptom is cosmetic for the audience they reach. The studio's footer is the only frame-rate
+an operator in windowless mode ever sees, and it shows a zero that is false. And
+`packaging/studio/READ-ME-FIRST.md` sends a tester to `diagnostics.log` to identify a wrong audio
+device — the single most useful thing a tester can report — which in that mode is a file that was
+never written.
+
+A fix is a decision about where the frame clock belongs, not a patch at the call site: either
+`record_frame` moves to cover both draw paths, or the headless path gets its own counter and
+`health` stops claiming a figure it does not have. The honest interim is for the studio to render
+no number rather than a zero.
+
+- **Raised:** 2026-09-11, running [Plan 0167](plans/done/0167-the-studio-becomes-handable.md) Phase 8 on
+  Windows. **Owner if taken:** `architect` for where the clock lives, then `dev`.
+- **Verified 2026-09-11** — the frame clock has exactly one call site, on the present path:
+  `present: self\.diag\.record_frame\(\) in: core/src/render/mod.rs`
+- **Verified 2026-09-11** — and the headless stream loop never reaches it:
+  `absent: record_frame in: standalone/src/stream.rs`
+- **Verified 2026-09-11** — nor does that loop hold the diagnostics writer:
+  `absent: diag_log in: standalone/src/stream.rs`
+- **Verified 2026-09-11** — while the health event publishes the never-advanced counter:
+  `present: fps: metrics\.fps in: standalone/src/show.rs`
+
+### Priority
+
+**Medium.** It misleads exactly the two audiences the studio was built for — an operator editing on
+a laptop, which is what windowless mode is *for*, and a first tester following the handoff note.
+Nothing is wrong with the picture, so it costs no show; it costs trust in the readings.
+
+**CLOSED 2026-09-14** — [Plan 0172](plans/done/0172-the-studios-readings-become-true.md) Phase 1. The clock was moved to cover both draw paths; no
+second counter was added. `render_tapped` calls `record_frame` after its readback, as `render` does
+after its present, and no capture entry calls it. The `--stream` loop enables diagnostics and writes
+the windowed app's `diagnostics.log` rows at the same resolved path. A windowless `health` now
+reports the tap's throughput, which is not a display refresh. Both `absent:` probes went red on
+delivery and retire with this body, with the other two. One side effect is recorded on 0181: a
+`--stream` test that does not redirect the data root now appends rows to the developer's own log.
+
+---
+
+## 0209 — the studio's schema walks pass in CI by walking nothing, because the CI job builds no player
+
+[Plan 0167](plans/done/0167-the-studio-becomes-handable.md) Phase 6 deleted the studio's
+hand-kept `KINDS` fallback and replaced it with walks over the **live** schema a built player
+exports: every structural table's keys, every map's entry kind, the grammar's variables and
+functions. That was the right repair — the fallback was the copy that drifted — and it moved the
+check somewhere CI cannot reach. The CI `studio` job runs `npm test` on `ubuntu-latest` with no
+cargo step, so `live` is undefined there and every walk returns before its first assertion
+(`studio/shared/fields.test.ts`, `grammar.test.ts`, `windowless.test.ts`). Each counts as a pass.
+Before Phase 6 the fallback still ran in CI; now the `[hold]` and grammar checks run only on a
+machine that happens to have built the player, and CI's green says nothing about them.
+
+The shape of the fix is one of two: have the `studio` job build the player first (a release build
+of `standalone`, and its minutes), or commit a schema snapshot the walks read in CI and a Rust test
+that fails when the snapshot and `--schema` disagree — the same pairing ADR-0170 uses for the
+parameter reference.
+
+- **Raised:** 2026-09-11, at Plan 0167's close review. **Owner if taken:** `architect` for which of
+  the two, then `dev` and `studio-builder`.
+- **Verified 2026-09-11** — the walks still skip rather than fail when no player is built:
+  `present: skipped the live walk: no built ritmolux in target/ in: studio/shared/fields.test.ts`
+- **Verified 2026-09-11** — and the CI job still builds none. A string probe cannot see this half,
+  because other jobs in the same workflow file do run cargo:
+  `unprobeable: the studio job's steps are not separable by a single-file string probe`
+
+### Priority
+
+**Medium.** Nothing is broken today — the walks pass on the development machine. But the next
+engine change that adds a structural kind the studio cannot edit will reach `main` green, and the
+first person to notice will be an author in the editor.
+
+**CLOSED 2026-09-14** — [Plan 0172](plans/done/0172-the-studios-readings-become-true.md) Phases 2 and 4, the second of this entry's two shapes.
+`docs/specs/player-schema.json` is the document `ritmolux --schema` prints; `core/tests/preset_schema.rs`
+fails when it drifts from `export::document()`, and `RLX_UPDATE_PRESET_SCHEMA=1` rewrites it with the
+editor schemas. The walks in `fields.test.ts` and `grammar.test.ts` read a built player when there
+is one and the snapshot otherwise, and **fail** when there is neither. `windowless.test.ts` needs a
+live player and still skips without one. Both probes retire with this body. One limit stands: on a
+machine with a stale player in `target/`, the walks read that binary rather than the snapshot the
+Rust test keeps current.

@@ -46,28 +46,18 @@ place. The plan file carries the real link.
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
 | [0160](0160-the-silhouettes-preconditions-stop-being-silent.md) | The silhouette's preconditions stop being silent | approved | dev, human | ADR-0179: four preconditions on `[path]` that fail silently. **0092 closed 2026-09-09**, so its Phase 7 axis fix is in. Phase 2 is prose in `presets/README.md`. |
 | [0166](0166-the-basics-read-in-russian.md) | The basics read in Russian | approved | dev, human | ADR-0185: five docs gain a Russian sibling `.ru.md` stamped with the source sha. **Phase 3 is a `human` review that blocks publication.** Touches no Rust - orderable against any lane. |
-| [0172](0172-the-studios-readings-become-true.md) | The studio's readings become true | approved | dev, studio-builder | ADR-0192 (proposed), backlog 0202, 0205, 0209: windowless fps, a schema snapshot, `param` on warnings. Reconciled with closed 0169 at approval. **0171 closed 2026-09-14**; lane 1 is next. |
 | [0174](0174-the-clock-reading-tests-run-alone.md) | The clock-reading tests run alone | approved | dev | ADR-0193 (proposed): timed tests run alone under nextest, a guard ties them to the clippy exemption. **Phase 2 diagnoses `stream_show` + `control_loopback` first** - both stop at a `ctl/preset` datagram. |
 <!-- roster:end -->
 
-**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two lanes.**
-Drafted 2026-09-11 from the backlog; 0172 was amended at approval because [0169] closed in between
-(its snapshot stays a separate file under 0169's own test and switch, and `--check` becomes a
-consumer of the new `param`). ADR-0191 and ADR-0192 stay `proposed` until their plans close.
+~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
+lanes.**~~ - **fully spent 2026-09-14**, when [0172] closed behind [0171]. All four plans closed the
+same day in the order the note set. What survives it is one pointer: [0142] reads the MilkDrop source
+at `xeiraex/milkdrop2` `d4c843a`, the commit 0173's log names. The note is
+[in the archive](README-archive.md#prior-sequencing-notes-superseded).
 
-- **Lane 1 - [0171] then [0172], in series.** Both edit the live entries in `capture_api.rs` and
-  `render/mod.rs`: 0171 puts the `dt` guard first in each, 0172 adds `record_frame` beside it.
-  **[0171] closed 2026-09-14**, so 0172 branches from a `main` that already carries the guard.
-  0172 Phase 4 hands off to `studio-builder` automatically (ADR-0188).
-- **Lane 2 - [0170] then [0173].** 0170 touches `metrics.rs` and `shot/` only. 0173 needs no rig,
-  and its Phase 1 source commit is what [0142] Phase 2 reads, so it goes before 0142.
-  **[0170] and [0173] both closed 2026-09-14**, so lane 2 is spent. [0142] reads the source at
-  `xeiraex/milkdrop2` `d4c843a`, the commit 0173's log names.
-
-[0169]: done/0169-a-preset-is-checked-before-it-is-rendered.md
 [0170]: done/0170-the-horizon-reads-the-frames-own-ground.md
 [0171]: done/0171-one-stall-policy-and-a-guarded-clock.md
-[0172]: 0172-the-studios-readings-become-true.md
+[0172]: done/0172-the-studios-readings-become-true.md
 [0173]: done/0173-the-milkdrop-geometry-reads-the-source.md
 
 ~~**Added 2026-09-09 — [0158] and [0159] are drafted, and they are a program rather than a
@@ -806,6 +796,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0172 — The studio's readings become true](done/0172-the-studios-readings-become-true.md) — closed 2026-09-14. Review: **no blockers, no majors, four minors, three nits.** Version: **0.123.0** (minor). ADR-0192 accepted (Outcome). [Write-up](README-archive.md).
 - [0173 — The MilkDrop geometry reads the source](done/0173-the-milkdrop-geometry-reads-the-source.md) — closed 2026-09-14. Review: **no blockers, no majors, three minors.** Version: **none** (docs only). Filed [backlog 0214-0216](../design-backlog.md). [Write-up](README-archive.md).
 - [0170 — The horizon reads the frame's own ground](done/0170-the-horizon-reads-the-frames-own-ground.md) — closed 2026-09-14. Review: **no blockers, no majors, three minors, two nits.** Version: **0.122.2** (patch). No ADR paired. Filed [backlog 0213](../design-backlog.md). [Write-up](README-archive.md).
 - [0171 — One stall policy, and a guarded clock](done/0171-one-stall-policy-and-a-guarded-clock.md) — closed 2026-09-14. Review: **no blockers, no majors, two minors, two nits.** Version: **0.122.1** (patch). ADR-0191 accepted (Outcome). Filed [backlog 0212](../design-backlog.md). [Write-up](README-archive.md).
