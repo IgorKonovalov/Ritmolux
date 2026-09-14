@@ -3992,6 +3992,11 @@ snap is the cheaper and the more general of the two. **Unaudited:** whether any 
 
 - **Raised:** 2026-09-14, by `preset-author` while repairing `lsystem_icecrystal`. **Owner if
   taken:** `architect` for the snap-or-warn choice, then `dev`.
+- **Planned 2026-09-14** as [Plan 0175](plans/0175-an-eased-value-arrives.md): snap, no warning.
+  Two corrections to the text above. The stall gap is `ulp / (2 * alpha)`, about 144 ulps at tau 2 s
+  and 144 Hz, so "within a few ulps" is the wrong test and "no progress" is the right one. And the
+  snap does not make `N + floor(...)` work on a transient, so the `N.5` offsets stay. The audit found
+  two more truncating consumers: `shape_collage` `count` and `parametric` `samples`.
 - **Verified 2026-09-14** — the ease has no snap:
   `present: held \+ alpha \* \(raw - held\) in: core/src/preset/schema/easing.rs`
 - **Verified 2026-09-14** — the L-system truncates the eased depth:
