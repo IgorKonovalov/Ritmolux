@@ -1,6 +1,6 @@
 # 0177 — The test tree stops touching the machine and stops costing its disk
 
-> **Status:** draft
+> **Status:** approved (2026-09-14)
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`, `studio-builder`
 > **Related ADRs:** [0204](../adrs/0204-a-cheap-integration-test-shares-one-binary-and-a-test-that-needs-its-own-stays-its-own.md) (proposed, this plan),

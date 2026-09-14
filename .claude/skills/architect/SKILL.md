@@ -244,6 +244,8 @@ not one phase. This is architectural integrity, not line-by-line style. Run five
   `cargo nextest run --workspace` yourself — the full run, not `-P fast` — and compare. A green
   full suite is precisely the claim a deferred gate makes cheapest to get wrong, and a missing or
   vague bullet is a **blocker**, not a `minor`: it means nothing is known about the drift guards.
+  Run `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` in the same sitting — CI runs it
+  and no local step does, so a close that skips it can tag a red `main` (backlog 0179).
 - **Silence in it is not
   certification:** done-when results are reported by exception, so a criterion with no note carries
   `dev`'s *belief* that it passed and nothing more — which is precisely the claim this lens exists
@@ -763,6 +765,16 @@ the line is absent (a plan predating [ADR-0120](../../../docs/adrs/0120-the-clos
    The same asymmetry is why `clippy` above is already written `--workspace --all-targets`. Note the
    hook is **not** the backstop it looks like: it is opt-in per clone, `--no-verify` skips it, and
    its `nextest` step is narrowed (`-P fast`) rather than complete.
+
+   **The gate also owes `cargo doc`, because it is the one CI gate nothing local mirrors**
+   (backlog 0179). Plan 0137 made two items public whose doc comments linked private helpers; that
+   is an error under `-D warnings` only once the item is public, so the trigger is a visibility
+   change rather than a doc edit, and it shipped a red `main` under a release tag. Run it before the
+   tag, beside the `nextest` above:
+
+   ```sh
+   RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps
+   ```
 3. **Then steps 1–4 above** — plan status, ADRs, both READMEs, and `cargo release <level>` — all
    **on the branch**. The version is chosen against what `main` actually reached, not against the
    branch's base (Plan 0047 sat at `v0.23.0` while `main` had already taken `v0.24.0`), and the

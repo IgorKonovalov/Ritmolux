@@ -1,6 +1,6 @@
 # 0179 — A parameter's range belongs to its family
 
-> **Status:** draft
+> **Status:** approved (2026-09-14)
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`, `studio-builder`
 > **Related ADRs:** [0194](../adrs/0194-a-family-dependent-range-travels-in-the-schema-and-the-player-reports-the-family.md) (proposed),

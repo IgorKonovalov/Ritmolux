@@ -1,6 +1,6 @@
 # 0175 — An eased value arrives at its target
 
-> **Status:** draft
+> **Status:** approved (2026-09-14)
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`
 > **Related ADRs:** [0019](../adrs/0019-eased-parameters.md), [0035](../adrs/0035-asymmetric-attack-release-easing.md)

@@ -1,6 +1,6 @@
 # 0186 — The flatness gate tells a figure from its ground
 
-> **Status:** draft
+> **Status:** approved (2026-09-14)
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`, `human`
 > **Related ADRs:** [0161](../adrs/0161-the-blot-anchor-becomes-a-defect-record-because-term-two-reads-the-fringe.md)

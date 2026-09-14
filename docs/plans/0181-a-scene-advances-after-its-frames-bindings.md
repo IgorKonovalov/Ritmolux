@@ -1,6 +1,6 @@
 # 0181 — A scene advances after its frame's bindings
 
-> **Status:** draft
+> **Status:** approved (2026-09-14)
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`
 > **Related ADRs:** [0198](../adrs/0198-a-scene-advances-after-its-frames-bindings.md) (proposed),
@@ -22,8 +22,7 @@ The plan was drafted to add a once-per-frame guard for backlog 0142 (a same-syst
 advancing a shared scene twice). **Reading the tree falsified that entry**: the dissolve governor
 never runs a same-system dissolve live, so the double advance is unreachable in a shipped build.
 This plan builds no guard. It pins the veto that makes the path unreachable, and closes the test
-hatch that could build it anyway. **This reverses an interview answer and needs the user's
-confirmation at approval.**
+hatch that could build it anyway. **This reverses an interview answer, and the user confirmed it at approval on 2026-09-14.**
 
 ## Context & problem
 

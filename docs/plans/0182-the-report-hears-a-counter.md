@@ -1,6 +1,6 @@
 # 0182 — The report hears a counter
 
-> **Status:** draft
+> **Status:** approved (2026-09-14)
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`
 > **Related ADRs:** [0196](../adrs/0196-the-report-hears-the-musical-clock-in-a-column-of-its-own.md) (proposed),

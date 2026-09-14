@@ -1,6 +1,6 @@
 # 0185 — A fullscreen field lets the sky through with no post stage
 
-> **Status:** draft
+> **Status:** approved (2026-09-14)
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`
 > **Related ADRs:** [0201](../adrs/0201-a-fullscreen-scene-presents-premultiplied-over-the-backdrop.md) (proposed),

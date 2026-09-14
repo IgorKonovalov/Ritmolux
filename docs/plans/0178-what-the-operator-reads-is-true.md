@@ -1,6 +1,6 @@
 # 0178 — What the operator reads is true
 
-> **Status:** draft
+> **Status:** approved (2026-09-14)
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`, `human`
 > **Related ADRs:** [0202](../adrs/0202-a-written-count-of-the-systems-is-refused-by-a-gate.md) (proposed), [0007](../adrs/0007-line-geometry-generators.md), [0162](../adrs/0162-the-application-is-renamed-to-ritmolux.md), [0022](../adrs/0022-build-time-preset-embedding.md)

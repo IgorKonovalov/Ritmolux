@@ -1,6 +1,6 @@
 # 0176 — A release tag reaches origin
 
-> **Status:** draft
+> **Status:** approved (2026-09-14)
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`, `human`
 > **Related ADRs:** [0203](../adrs/0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md) (proposed), [0038](../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md), [0005](../adrs/0005-versioning-and-release-cadence.md)

@@ -1,6 +1,6 @@
 # 0183 — A low density is a trace count
 
-> **Status:** draft
+> **Status:** approved (2026-09-14)
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`, `human`
 > **Related ADRs:** [0195](../adrs/0195-a-low-density-is-a-trace-count-and-the-law-scales-only-a-cloud.md) (proposed),
