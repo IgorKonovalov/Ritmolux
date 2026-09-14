@@ -179,7 +179,7 @@ flowchart LR
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The four fields present premultiplied, and the test says so | dev | done | 87dee5a |
-| 2 — The reader says what the parameter does | dev | done | committed with this row |
+| 2 — The reader says what the parameter does | dev | done | 2e4fe7a |
 
 ### Notes
 
@@ -198,12 +198,16 @@ flowchart LR
 
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`**
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** yes, `presets/README.md` prose only (2e4fe7a); no `.toml` changed.
+- **Plan header `Closes:`** design-backlog 0206.
+- **What shipped:** fix (four scene present blends, 87dee5a) plus reader docs (2e4fe7a).
+- **Operator docs touched:** `presets/README.md` (Backdrop occlusion; curved band).
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 1, one broken:
+  0206 `present: occlude_behaves_as_it_does_on_fragment_field in: core/tests/analytic_field.rs`
+  (the test was renamed in 87dee5a).
+- **Full suite:** `cargo nextest run --workspace --no-fail-fast` under the suite lock, over the tree
+  both phases committed, exit 0: 1933 passed (4 slow), 6 skipped; `git status` showed no changed
+  baseline after it.
+- **Outstanding `human` phases:** none.
 
 ## Followups (after this lands)
