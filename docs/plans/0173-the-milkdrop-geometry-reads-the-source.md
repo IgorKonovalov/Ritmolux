@@ -133,56 +133,40 @@ flowchart LR
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** `main` directly, no worktree.
-
-**Source read:** `github.com/xeiraex/milkdrop2` at `d4c843a4fb4f53aef755957fc9478780325748cd`, the
-original v2.25c release commit. Facts, with file, function and line, are on backlog 0119 and 0120.
+**Lane:** `main` directly, no worktree. Source read: `xeiraex/milkdrop2` at `d4c843a` (v2.25c).
 
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Read the two facts from the source | dev | done | `83a419d` |
-| 2 — The seam matches the reference | dev | done, no code change | `6b8c45e` |
-| 3 — The waveform takes the reference's base amplitude | dev | skipped on the phase's own stop branch, committed with this row | |
+| 2 — The seam matches the reference | dev | done | `6b8c45e` |
+| 3 — The waveform takes the reference's base amplitude | dev | not started | `ea63b19` |
 
 ### Notes
 
-- **Phase 2 took the agreement branch on a different function than the phase names.** The phase
-  keys on `vertex_position`, but a converted preset's per-vertex `ang` comes from
-  `MilkRuntime::run_vertex` (`core/src/milk/mod.rs`, called from `warp_mesh/encode.rs`), and that one
-  matches the source. `vertex_position` differs from the source in range and cut and is read only by
-  the native `[per_vertex]` path (`core/src/render/evaluate.rs`); it was left alone. The user chose
-  this at an escalation after Phase 1. The pinning test
-  `ang_cuts_on_plus_x_and_turns_counter_clockwise_on_screen` is unchanged and pins the native
-  function, not the converted one.
-- **Phase 3 did not run, and its done-when is unmet.** The source's mode-6/7 constant is `0.125`
-  frame heights per unit sample, not near `0.15 x 1.047`, so the phase's stop branch applied: the
-  finding is recorded on 0120 and `draw.rs` and `milkconv/tests/draw_layer.rs` are unchanged. The
-  user confirmed the skip at the same escalation.
-- **Followups noticed, not acted on:**
-  - The emitted comp-stage epilogue (`milkconv/src/shader/emit.rs` `fs_main`) uses the warp stage's
-    `rad`/`ang` for both stages; the source's comp stage is clockwise, `0..2pi`, cut on +x, with
-    `rad` 1 at the corners (0119's update, fact 3). Outside this plan's scope by its own
-    "does NOT do".
-  - The doc comment on `ang_cuts_on_plus_x_and_turns_counter_clockwise_on_screen`
-    (`warp_mesh/tests.rs`) says MilkDrop's `atan2` "has the same cut" on +x; the source puts the
-    per-vertex cut on −x.
-  - What produces 0119's observed seam on *Songflower* and *chasers 19 Portal* is not settled by the
-    source: the per-vertex `ang` a converted preset reads cuts on −x, not +x.
-  - Waveform differences the source shows beyond the amplitude, all on 0120's update: the source's
-    modes 1-5 are different figures from `draw.rs`'s 1-5; the mode-6/7 line angle is
-    `1.57 * wave_mystery` where `draw.rs` uses `wave_mystery * PI`; mode 7's separation is
-    `(wave_y*0.5+0.5)^2` clip units where `draw.rs` uses a fixed `0.03`; mode 0's circle is radius
-    `0.25 + 0.2 * sample` frame heights turning with time, where `draw.rs` uses `0.2 + 0.1 * mystery`
-    and `0.1 * sample`, and does not turn.
+- **Phase 2 changed no code, keyed on a different function than the phase names.** A converted
+  preset's `ang` is `MilkRuntime::run_vertex`'s (`core/src/milk/mod.rs`), which matches the source;
+  `vertex_position` differs in range and cut but only the native path reads it, and is unchanged.
+  User's call at an escalation after Phase 1.
+- **Phase 3's done-when is unmet: the phase did not run.** The source constant is `0.125` frame
+  heights per unit sample, not near `0.157`, so its stop branch applied (0120's update). User
+  confirmed.
+- **Followups, not acted on:** the emitted comp-stage `rad`/`ang` (`milkconv/src/shader/emit.rs`)
+  differs from the source's (0119 fact 3); the doc comment on
+  `ang_cuts_on_plus_x_and_turns_counter_clockwise_on_screen` says MilkDrop cuts on +x, the source
+  says −x; 0119's observed seam is unexplained by the source; `draw.rs` modes 0-5 and the mode-6/7
+  angle and mode-7 separation differ from the source (0120's update).
 
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`** design-backlog 0119, 0120
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** no.
+- **Plan header `Closes:`** design-backlog 0119, 0120 — both still live; each carries a 2026-09-14
+  update.
+- **What shipped:** docs-chore-only — `docs/design-backlog.md` and this plan; no code, no goldens.
+- **Operator docs touched:** none.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, 132 reductions hold across
+  57 live entries (12 unprobeable).
+- **Full suite:** `cargo nextest run --workspace`, exit 0 — 1918 run, 1918 passed (11 slow),
+  6 skipped.
+- **Outstanding `human` phases:** none.
 
 ## Followups (after this lands)
