@@ -373,6 +373,9 @@ impl Renderer {
     /// A `sink` error stops the run and comes back as
     /// [`RenderError::Sink`] carrying the consumer's own
     /// message.
+    ///
+    /// A `dt` that is not finite and positive is replaced by `FALLBACK_DT` for the
+    /// whole run (`sanitize_frame_dt`, ADR-0191).
     pub fn capture_stream(
         &mut self,
         name: &str,
@@ -381,6 +384,7 @@ impl Renderer {
         analysis: &mut dyn FnMut(u32) -> AnalysisFrame,
         sink: &mut dyn FnMut(u32, &CaptureImage) -> Result<(), String>,
     ) -> Result<(), RenderError> {
+        let dt = super::sanitize_frame_dt(dt);
         self.reset_for_capture(name)?;
 
         let (width, height) = (self.ctx.config.width, self.ctx.config.height);
@@ -693,12 +697,16 @@ impl Renderer {
     /// next is encoded (the retention Plan 0099 measured) — and it is why this is
     /// a *source* entry point and not a display one: there is no present deadline
     /// here, only throughput.
+    ///
+    /// A `dt` that is not finite and positive is replaced by one nominal step
+    /// before the clock sees it (`sanitize_frame_dt`, ADR-0191).
     pub fn render_tapped(
         &mut self,
         tap: &mut FrameTap,
         frame: &AnalysisFrame,
         dt: f32,
     ) -> Result<CaptureImage, RenderError> {
+        let dt = super::sanitize_frame_dt(dt);
         let (width, height) = (tap.width, tap.height);
         self.time += dt;
         let mut encoder = self

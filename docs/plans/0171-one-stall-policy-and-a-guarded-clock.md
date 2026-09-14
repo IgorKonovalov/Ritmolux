@@ -1,6 +1,6 @@
 # 0171 — One stall policy, and a guarded clock
 
-> **Status:** approved 2026-09-14
+> **Status:** in-progress
 > **Created:** 2026-09-11
 > **Owner skill(s):** `dev`
 > **Related ADRs:** [0191](../adrs/0191-a-frame-delta-is-replaced-at-every-entry-and-nothing-below-keeps-a-policy.md)
@@ -124,11 +124,11 @@ flowchart LR
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled on the first phase commit)_
+**Lane:** branch `plan-0171-stall-policy`, worktree `.claude/worktrees/plan-0171-stall-policy`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The clock is guarded at every entry | dev | not started | |
+| 1 — The clock is guarded at every entry | dev | done | committed with this row |
 | 2 — One policy below the entries | dev | not started | |
 
 ### Notes
