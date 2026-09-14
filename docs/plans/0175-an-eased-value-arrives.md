@@ -1,6 +1,6 @@
 # 0175 — An eased value arrives at its target
 
-> **Status:** approved (2026-09-14)
+> **Status:** in-progress
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`
 > **Related ADRs:** [0019](../adrs/0019-eased-parameters.md), [0035](../adrs/0035-asymmetric-attack-release-easing.md)
@@ -282,15 +282,22 @@ flowchart LR
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(`main` directly, or the worktree path plus its branch)_
+**Lane:** `plan-0175-an-eased-value-arrives`, worktree `C:\Users\Igor Konovalov\WORK\rlx-plan-0175`
+(conductor run)
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The ease snaps at its fixed point | dev | not started | |
+| 1 — The ease snaps at its fixed point | dev | done | committed with this row |
 | 2 — The reader and the five presets say what is true | dev | not started | |
 | 3 — Nothing below the seam keeps a frame-delta policy | dev | not started | |
 
 ### Notes
+
+- Phase 1: no `lines/` test observed the drawn depth, so the `lsystem` test is a headless capture in
+  `core/src/render/scenes/lines/tests.rs` (`an_eased_visible_depth_draws_the_generation_it_settles_on`),
+  comparing the eased run's last frame against an unsmoothed twin's. With the snap disabled it failed
+  on "still draws generation 1".
+- Phase 1: the three near-unit-`alpha` pairs stayed inside their interval; no clamp was added.
 
 ### Close triggers
 

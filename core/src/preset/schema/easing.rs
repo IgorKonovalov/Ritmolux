@@ -71,6 +71,27 @@ impl Easing {
     /// Both operands are checked because guarding `raw` alone does not fix it:
     /// a stored `-inf` against a *finite* `raw` selects `attack` and computes
     /// `-inf + inf`, which is `NaN` on the very next frame.
+    ///
+    /// **The ease ends by snapping to `raw` at its fixed point.** In f32 the
+    /// one-pole never arrives on its own: a frame moves `held` only while
+    /// `alpha * gap` is at least half the float spacing `u` at `held`, so it
+    /// stalls at a gap of about `u / (2 * alpha)` and stays there. A consumer
+    /// that truncates the value (`as usize`, `floor`) would then draw one step
+    /// low forever. So a frame that makes **no progress** returns `raw`.
+    ///
+    /// The test is "no progress", not "within some distance", because the stall
+    /// gap scales with `1 / alpha`: toward `2.0` it is ~3 spacings at tau 0.1 s
+    /// and 60 Hz but ~144 at tau 2 s and 144 Hz, so any fixed threshold is
+    /// outside some slow ease's stall and never fires. The fixed point always
+    /// comes: `alpha < 1` puts the exact sum strictly between `held` and `raw`,
+    /// round-to-nearest keeps it in `[held, raw]`, so the value moves
+    /// monotonically and must reach `raw` or a stall in finitely many frames.
+    /// The jump is at most the stall gap, about `2^-24 / alpha` of the value.
+    ///
+    /// **`alpha > 0` guards the snap.** For `dt / tau` below roughly `3e-8`,
+    /// `1 - exp(-dt/tau)` rounds to exactly zero and every frame makes no
+    /// progress; without the guard the slowest possible ease would become an
+    /// instant one. There the value holds.
     pub fn step(self, held: f32, raw: f32, dt: f32) -> f32 {
         if !held.is_finite() || !raw.is_finite() {
             return raw;
@@ -86,7 +107,11 @@ impl Easing {
         // alpha = 1 - exp(-dt/tau): the fraction of the gap closed this frame,
         // frame-rate-independent because `dt` is real elapsed time (ADR-0019).
         let alpha = 1.0 - (-dt / tau).exp();
-        held + alpha * (raw - held)
+        let next = held + alpha * (raw - held);
+        if next == held && alpha > 0.0 {
+            return raw;
+        }
+        next
     }
 }
 
