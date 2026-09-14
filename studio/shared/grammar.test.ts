@@ -4,15 +4,18 @@
  *
  * The roster is walked off the **built player's** own schema document, so a
  * function added to the grammar is coloured with no edit here and a name this
- * file invented would fail rather than pass. It **skips with a notice** when
- * there is no built player, which is ADR-0016's shape.
+ * file invented would fail rather than pass. With no built player — CI's studio
+ * job builds none — it reads the committed `docs/specs/player-schema.json`,
+ * which `core/tests/preset_schema.rs` holds byte-equal to what
+ * `ritmolux --schema` prints. **It never skips**: a missing snapshot fails the
+ * file, because a walk over nothing passes every assertion.
  *
  * It lives under `shared/` rather than beside `expr-language.ts` because
- * reading the live document needs Node, which nothing under `renderer/` may
+ * reading the document needs Node, which nothing under `renderer/` may
  * import — the test files there included.
  */
 import { execFileSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { EditorState } from '@codemirror/state'
@@ -22,18 +25,26 @@ import { parseSchemaDocument } from '../electron/player/schema'
 import { presetLanguage } from '../renderer/editor/expr-language'
 import type { SchemaDocument } from './schema'
 
-function liveDocument(): SchemaDocument | undefined {
+const ROOT = join(__dirname, '..', '..')
+const SNAPSHOT = join(ROOT, 'docs', 'specs', 'player-schema.json')
+
+/** The built player's document, else the committed snapshot; throws with neither. */
+function schemaDocument(): { document: SchemaDocument; source: string } {
   const name = process.platform === 'win32' ? 'ritmolux.exe' : 'ritmolux'
   for (const profile of ['release', 'debug']) {
-    const candidate = join(__dirname, '..', '..', 'target', profile, name)
+    const candidate = join(ROOT, 'target', profile, name)
     if (existsSync(candidate)) {
-      return parseSchemaDocument(execFileSync(candidate, ['--schema'], { encoding: 'utf8' }))
+      const text = execFileSync(candidate, ['--schema'], { encoding: 'utf8' })
+      return { document: parseSchemaDocument(text), source: candidate }
     }
   }
-  return undefined
+  if (!existsSync(SNAPSHOT)) {
+    throw new Error(`no built ritmolux in target/ and no schema snapshot at ${SNAPSHOT}`)
+  }
+  return { document: parseSchemaDocument(readFileSync(SNAPSHOT, 'utf8')), source: SNAPSHOT }
 }
 
-const live = liveDocument()
+const { document: live, source } = schemaDocument()
 
 /** The token class the mode gives the single identifier in `line`. */
 function classify(line: string, document: SchemaDocument): string[] {
@@ -50,21 +61,16 @@ function classify(line: string, document: SchemaDocument): string[] {
 }
 
 describe('the grammar the player exports', () => {
-  it('needs a built player to walk, and says so when there is none', () => {
-    if (live === undefined) console.warn('skipped: no built ritmolux in target/')
-    expect(true).toBe(true)
-  })
-
   it('carries all three rosters, and none of them empty', () => {
-    if (live === undefined) return
     const { variables, functions, constants } = live.grammar
+    const names = variables.length + functions.length + constants.length
+    console.info(`walking ${names} grammar names from ${source}`)
     for (const [label, roster] of Object.entries({ variables, functions, constants })) {
       expect(roster.length, `the ${label} roster is empty`).toBeGreaterThan(0)
     }
   })
 
   it('names each identifier once, so a name cannot be two things at colouring time', () => {
-    if (live === undefined) return
     const all = [...live.grammar.variables, ...live.grammar.functions, ...live.grammar.constants]
     expect(new Set(all).size).toBe(all.length)
   })
@@ -72,7 +78,6 @@ describe('the grammar the player exports', () => {
 
 describe('what the editor colours', () => {
   it('colours every name the engine declares, whichever roster it is in', () => {
-    if (live === undefined) return
     const expected: Record<string, string> = {}
     for (const name of live.grammar.variables) expected[name] = 'grammarVariable'
     for (const name of live.grammar.functions) expected[name] = 'grammarFunction'
@@ -84,7 +89,6 @@ describe('what the editor colours', () => {
   })
 
   it('colours no name the engine does not declare', () => {
-    if (live === undefined) return
     // A typo must look like a typo. If this were coloured, an author would read
     // a misspelling as a function the engine has and wonder why it does nothing.
     const invented = 'wobblesnoot'

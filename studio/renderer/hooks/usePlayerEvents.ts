@@ -98,7 +98,7 @@ function reduce(state: PlayerState, event: PlayerEvent): PlayerState {
             message: event.message,
             line: null,
             col: null,
-            param: null,
+            param: event.param,
             kind: 'warning',
           } satisfies Problem,
           ...state.problems,

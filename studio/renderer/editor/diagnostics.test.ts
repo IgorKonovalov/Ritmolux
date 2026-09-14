@@ -55,6 +55,20 @@ describe('placing a problem', () => {
     expect(marker.severity).toBe('warning')
   })
 
+  it('marks the binding a warning named, by the route an expression error takes', () => {
+    // A warning has no position either; its `param` is the whole anchor.
+    const markers = markersFor(TEXT, FILE, [
+      problem({ param: 'warp', kind: 'warning', message: 'binds nothing' }),
+    ])
+    expect(markers).toHaveLength(1)
+    expect(TEXT.slice(markers[0].from, markers[0].to)).toBe('warp = "0.4"')
+    expect(markers[0].severity).toBe('warning')
+  })
+
+  it('leaves a warning about no binding unmarked, because it has no line', () => {
+    expect(markersFor(TEXT, FILE, [problem({ kind: 'warning' })])).toEqual([])
+  })
+
   it('clears when the problem does', () => {
     expect(markersFor(TEXT, FILE, [])).toEqual([])
   })

@@ -87,6 +87,11 @@ export const presetWarningSchema = z.object({
   ev: z.literal('preset_warning'),
   file: z.string(),
   message: z.string(),
+  /**
+   * The binding the warning is about, labelled as `preset_error`'s `param` is,
+   * or `null` for a warning about no single binding (ADR-0192).
+   */
+  param: z.string().nullable(),
 })
 
 export const healthSchema = z.object({

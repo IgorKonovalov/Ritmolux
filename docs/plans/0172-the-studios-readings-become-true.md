@@ -180,7 +180,7 @@ flowchart LR
 | 1 — The frame clock covers both live paths | dev | done | c303c1f |
 | 2 — The player's schema is snapshotted | dev | done | 6ce0594 |
 | 3 — A preset warning names its parameter | dev | done | db0df8e |
-| 4 — The studio reads the snapshot, anchors warnings and shows the rate | studio-builder | not started | |
+| 4 — The studio reads the snapshot, anchors warnings and shows the rate | studio-builder | done | committed with this row |
 
 ### Notes
 
@@ -214,18 +214,42 @@ flowchart LR
   document does not describe events; the snapshot did not move. No warning reaches the C ABI. The
   existing `--check` CLI test that pinned a warning at `1:1` now pins it at the binding's `5:1`. Tests
   beyond the files listed: none; the `preset_warning` event tests sit in `standalone/src/events.rs`.
+- Phase 4: one file beyond the list, approved at the "go": `studio/renderer/hooks/usePlayerEvents.ts`
+  hard-coded `param: null` on a warning and now forwards `event.param`; without it no warning reached
+  `markersFor` with a label. `markersFor` itself needed no logic change — it already routed any problem
+  carrying `param` through `readParams` whatever its kind — so `diagnostics.ts` gained a header sentence
+  and its test two cases (a warning marker on its binding's line; a `null`-param warning unmarked). It
+  matches top-level `[params]` names only, so a `[layer] …` or `[per_vertex] …` label stays list-only,
+  as an expression error with that label already did. `presetWarningSchema.param` is
+  `z.string().nullable()`, required rather than optional, per `protocol.ts`'s null-not-absent rule.
+  `windowless.test.ts` runs `--frames 90` rather than 30 (three `health` intervals) and buffers partial
+  stderr lines before `JSON.parse`. The walks' player lookup keeps `release` before `debug`: the first
+  `npm test` read a `target/release/ritmolux.exe` from 2026-09-11 and the windowless test failed with
+  `fps` 0 against it; after `cargo build --release -p standalone --bin ritmolux` it passed. Done-when
+  counts: with both `target/*/ritmolux.exe` moved aside, the walks read `docs/specs/player-schema.json`
+  — 12 kinds across 16 tables, 42 grammar names, 18 tests passed; with the snapshot also moved aside
+  both files failed at load naming the missing snapshot; all restored. `renderer/App.test.tsx:60` builds
+  a `preset_warning` fixture without `param` through an `as PlayerEvent` cast; typecheck accepts it and
+  it was not touched.
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** no
 - **Plan header `Closes:`** design-backlog 0202, 0205, 0209
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 1 after Phase 3 — 2 broken, both
-  on 0205: `absent: record_frame in: standalone/src/stream.rs` (matched at line 753) and
-  `absent: diag_log in: standalone/src/stream.rs` (matched at line 756). Both became true when Phase 1 landed.
+- **What shipped:** feature — `render_tapped` feeds the frame clock and `--stream` writes
+  `diagnostics.log`; the committed `docs/specs/player-schema.json` and its drift test; `param` on
+  `preset_warning` through core, the event, `--check` and the studio's markers; the studio's schema
+  walks read the snapshot when no player is built.
+- **Operator docs touched:** `docs/developing.md` (regenerate command), `docs/specs/0003-studio-control-protocol.md`
+  (`preset_warning` row).
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 1 after Phase 4 — 3 broken. On
+  0205: `absent: record_frame in: standalone/src/stream.rs` (matched at line 753) and
+  `absent: diag_log in: standalone/src/stream.rs` (matched at line 756), true since Phase 1. On 0209:
+  `present: skipped the live walk: no built ritmolux in target/ in: studio/shared/fields.test.ts`, no
+  match since Phase 4 removed that line.
 - **Full suite:** `cargo nextest run --workspace --no-fail-fast` on the Phase 3 tree (db0df8e), exit 0,
-  1931 passed, 6 skipped. Phase 4 is TypeScript and runs no cargo.
-- **Outstanding `human` phases:**
+  1931 passed, 6 skipped. Phase 4 is TypeScript and runs no cargo. Its gate: `npm run typecheck` and
+  `npm run lint` clean, `npm test` 29 files, 264 tests passed, against a release player rebuilt at db0df8e.
+- **Outstanding `human` phases:** none
 
 ## Followups (after this lands)

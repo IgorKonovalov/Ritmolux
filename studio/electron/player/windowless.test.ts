@@ -21,7 +21,7 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { frameBytes, playerEventSchema, type StreamEvent } from '@shared/protocol'
+import { frameBytes, playerEventSchema, type HealthEvent, type StreamEvent } from '@shared/protocol'
 
 import { playerArgs } from './supervisor'
 
@@ -55,6 +55,7 @@ function mainWindowHandle(pid: number): number | undefined {
 
 interface Run {
   stream: StreamEvent | undefined
+  health: HealthEvent[]
   stdoutBytes: number
   handle: number | undefined
   stderr: string
@@ -65,15 +66,26 @@ async function windowlessRun(player: string): Promise<Run> {
   const child = spawn(
     player,
     // The mode's own vector, plus the two bounds a test needs: a small frame
-    // and an end. Neither is a flag the studio passes.
-    [...playerArgs('windowless'), '--size', '160x90', '--frames', '30'],
+    // and an end. Neither is a flag the studio passes. Ninety frames at the
+    // pipe's 30 fps is three seconds, so the once-a-second `health` event is
+    // emitted more than once.
+    [...playerArgs('windowless'), '--size', '160x90', '--frames', '90'],
     {
       env: { ...process.env, APPDATA: '', HOME: '', XDG_DATA_HOME: '' },
       stdio: ['ignore', 'pipe', 'pipe'],
     },
   )
 
-  const run: Run = { stream: undefined, stdoutBytes: 0, handle: undefined, stderr: '' }
+  const run: Run = {
+    stream: undefined,
+    health: [],
+    stdoutBytes: 0,
+    handle: undefined,
+    stderr: '',
+  }
+  // A chunk boundary can fall inside a line, so only complete lines are parsed
+  // and the tail waits for the next chunk.
+  let pending = ''
   child.stdout.on('data', (chunk: Buffer) => {
     run.stdoutBytes += chunk.length
     // Asked once the frames are actually flowing: by then a windowed run's
@@ -86,10 +98,14 @@ async function windowlessRun(player: string): Promise<Run> {
   child.stderr.setEncoding('utf8')
   child.stderr.on('data', (chunk: string) => {
     run.stderr += chunk
-    for (const line of chunk.split('\n')) {
+    const lines = (pending + chunk).split('\n')
+    pending = lines.pop() ?? ''
+    for (const line of lines) {
       if (!line.startsWith('{')) continue
       const parsed = playerEventSchema.safeParse(JSON.parse(line))
-      if (parsed.success && parsed.data.ev === 'stream') run.stream = parsed.data
+      if (!parsed.success) continue
+      if (parsed.data.ev === 'stream') run.stream = parsed.data
+      if (parsed.data.ev === 'health') run.health.push(parsed.data)
     }
   })
 
@@ -122,6 +138,13 @@ describe('a windowless player', () => {
     // event named, and nothing left over.
     expect(run.stdoutBytes).toBeGreaterThan(0)
     expect(run.stdoutBytes % frameBytes(run.stream)).toBe(0)
+
+    // The footer's rate is read off `health`, and a windowless run draws
+    // through the frame tap rather than a present: the reading has to be the
+    // rate it drew at, not the 0.0 of a clock nothing fed.
+    const last = run.health.at(-1)
+    expect(last, `the run reported no health in three seconds:\n${run.stderr}`).toBeDefined()
+    expect(last?.fps ?? 0).toBeGreaterThan(0)
 
     if (process.platform !== 'win32') {
       console.warn('skipped the no-window half: only Windows is asked for a window handle here')

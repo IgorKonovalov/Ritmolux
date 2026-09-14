@@ -2,20 +2,22 @@
  * Every kind the schema declares has a control, and none of them is listed here
  * (Plan 0159 Phase 8, deepened by Plan 0167 Phase 6).
  *
- * The walk runs over the document the **built player** printed, so a table, a
+ * The walk runs over the document the **built player** prints, so a table, a
  * kind or a map element added to the engine reaches this test without an edit.
- * It **skips with a notice** when there is no built player, which is ADR-0016's
- * shape and the rule the studio's other player-dependent tests follow. There is
- * deliberately **no hand-kept fallback roster**: a list of kinds maintained here
- * is a second copy of the engine's vocabulary, and the first time it fell behind
- * it would report coverage the walk does not have — which is exactly what hid
- * `hold` until this phase.
+ * With no built player — CI's studio job builds none — it reads the committed
+ * `docs/specs/player-schema.json`, which `core/tests/preset_schema.rs` holds
+ * byte-equal to what `ritmolux --schema` prints. **It never skips**: a missing
+ * snapshot fails the file, because a walk over nothing passes every assertion.
+ * There is deliberately **no hand-kept fallback roster**: a list of kinds
+ * maintained here is a second copy of the engine's vocabulary, and the first
+ * time it fell behind it would report coverage the walk does not have — which
+ * is exactly what hid `hold`.
  *
  * It lives beside the resolver rather than beside the component because reading
- * the live document needs Node, which a file under `renderer/` may not have.
+ * the document needs Node, which a file under `renderer/` may not have.
  */
 import { execFileSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
@@ -25,18 +27,26 @@ import { editorForKind, literalFor, mapElementEditor } from './fields'
 import type { SchemaDocument, TableKey } from './schema'
 import { structuralTables } from './templates'
 
-function liveDocument(): SchemaDocument | undefined {
+const ROOT = join(__dirname, '..', '..')
+const SNAPSHOT = join(ROOT, 'docs', 'specs', 'player-schema.json')
+
+/** The built player's document, else the committed snapshot; throws with neither. */
+function schemaDocument(): { document: SchemaDocument; source: string } {
   const name = process.platform === 'win32' ? 'ritmolux.exe' : 'ritmolux'
   for (const profile of ['release', 'debug']) {
-    const candidate = join(__dirname, '..', '..', 'target', profile, name)
+    const candidate = join(ROOT, 'target', profile, name)
     if (existsSync(candidate)) {
-      return parseSchemaDocument(execFileSync(candidate, ['--schema'], { encoding: 'utf8' }))
+      const text = execFileSync(candidate, ['--schema'], { encoding: 'utf8' })
+      return { document: parseSchemaDocument(text), source: candidate }
     }
   }
-  return undefined
+  if (!existsSync(SNAPSHOT)) {
+    throw new Error(`no built ritmolux in target/ and no schema snapshot at ${SNAPSHOT}`)
+  }
+  return { document: parseSchemaDocument(readFileSync(SNAPSHOT, 'utf8')), source: SNAPSHOT }
 }
 
-const live = liveDocument()
+const { document: live, source } = schemaDocument()
 
 /**
  * Every kind a key can present, **including the element kinds a composite
@@ -51,26 +61,22 @@ function elementKinds(key: TableKey): string[] {
 }
 
 function kinds(): string[] {
-  if (live === undefined) return []
   return [...new Set(structuralTables(live).flatMap((table) => table.keys.flatMap(elementKinds)))]
 }
 
 /** Every map key the engine declares, across every structural table. */
 function mapKeys(): TableKey[] {
-  if (live === undefined) return []
   return structuralTables(live).flatMap((table) => table.keys.filter((key) => key.kind === 'map'))
 }
 
 describe('the kind resolver', () => {
-  it('needs a built player to walk, and says so when there is none', () => {
-    if (live === undefined) {
-      console.warn('skipped the live walk: no built ritmolux in target/')
-    }
-    expect(true).toBe(true)
+  it('walks a document with tables in it, and says which one', () => {
+    const tables = structuralTables(live).length
+    console.info(`walking ${kinds().length} kinds across ${tables} tables from ${source}`)
+    expect(tables).toBeGreaterThan(0)
   })
 
   it('resolves a control for every kind the schema declares', () => {
-    if (live === undefined) return
     const walked = kinds()
     expect(walked.length).toBeGreaterThan(6)
     for (const kind of walked) {
@@ -79,14 +85,12 @@ describe('the kind resolver', () => {
   })
 
   it('walks the element kinds a composite names, which is where hold lives', () => {
-    if (live === undefined) return
     // Not an assertion about `hold` by name: it is the assertion that the walk
     // reaches past a composite at all, and `hold` is declared nowhere else.
     expect(kinds()).toContain('hold')
   })
 
   it('does not answer readonly for everything, which would make the walk vacuous', () => {
-    if (live === undefined) return
     const editable = kinds().filter((kind) => editorForKind(kind) !== 'readonly')
     expect(editable.length).toBeGreaterThan(4)
   })
@@ -107,21 +111,18 @@ describe('the kind resolver', () => {
 
 describe('the entries of a map', () => {
   it('gives every hold map a control, because the engine says what one entry is', () => {
-    if (live === undefined) return
     const holds = mapKeys().filter((key) => key.of?.kind === 'hold')
     expect(holds.length).toBeGreaterThan(0)
     for (const key of holds) expect(mapElementEditor(key)).toBe('scalar')
   })
 
   it('leaves an expression map to the panel and the file tab', () => {
-    if (live === undefined) return
     for (const key of mapKeys().filter((k) => k.of?.kind === 'expr')) {
       expect(mapElementEditor(key), `${key.name} should not be edited here`).toBeUndefined()
     }
   })
 
   it('leaves a map of tables alone, because an entry is not one line', () => {
-    if (live === undefined) return
     for (const key of mapKeys().filter((k) => k.of?.kind === 'table')) {
       expect(mapElementEditor(key)).toBeUndefined()
     }

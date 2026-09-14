@@ -12,7 +12,9 @@
  * marked there. An expression failure carries neither, because it is raised
  * after the document was parsed into values that no longer hold a position, and
  * carries the **parameter's name** instead (spec 0003) — which is enough to
- * find its line in the `[params]` table.
+ * find its line in the `[params]` table. A warning about a binding carries the
+ * same `param` and takes the same route; one about no single binding carries
+ * `null` and stays in the list only (ADR-0192).
  *
  * Kept free of any CodeMirror import so it can be tested as what it is: a
  * function from a file's text and a list of events to a list of ranges.
