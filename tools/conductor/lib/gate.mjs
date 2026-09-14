@@ -5,13 +5,18 @@
 // state/gates/. `nextest` runs under the machine-wide suite lock. The gate never retries a red: a
 // flake is a defect to fix (ADR-0193), and a retry would bury it.
 
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { SUITE, withLock } from "./locks.mjs";
 
-/** What the pre-push hook runs, at full strength: the whole suite rather than `-P fast`, plus `cargo doc`. */
+/**
+ * What the pre-push hook runs, at full strength: the whole suite rather than `-P fast`, plus
+ * `cargo doc` and the conductor's own tests, which CI runs and the hook does not. A step with
+ * `onlyIf` skips when that path is absent from the worktree; one with `onlyIfCommand` skips when that
+ * command does not run, as the hook skips the diffusion-filter suite with no python3 on PATH.
+ */
 export function defaultGate() {
   const node = (script, ...args) => ({ name: `${script} ${args.join(" ")}`.trim(), cmd: ["node", `scripts/${script}`, ...args] });
   return [
@@ -26,6 +31,8 @@ export function defaultGate() {
     node("check-reader-prose.mjs"),
     node("check-release-tag.mjs"),
     node("check-release-tag.mjs", "--self-test"),
+    { name: "conductor tests", cmd: ["node", "--test", "tools/conductor/test/*.test.mjs"] },
+    { name: "sd-filter tests", cmd: ["python3", "tools/sd-filter/test_sd_filter.py"], onlyIfCommand: ["python3", "--version"] },
     { name: "studio typecheck", cmd: ["npm", "--prefix", "studio", "run", "typecheck"], onlyIf: "studio/node_modules" },
     { name: "studio lint", cmd: ["npm", "--prefix", "studio", "run", "lint"], onlyIf: "studio/node_modules" },
     { name: "studio test", cmd: ["npm", "--prefix", "studio", "test"], onlyIf: "studio/node_modules" },
@@ -75,6 +82,7 @@ export async function runGate({ cwd, commands = defaultGate(), logDir, label, lo
   const ran = [];
   for (const [i, c] of commands.entries()) {
     if (c.onlyIf && !existsSync(join(cwd, c.onlyIf))) continue;
+    if (c.onlyIfCommand && spawnSync(c.onlyIfCommand[0], c.onlyIfCommand.slice(1), { cwd, stdio: "ignore" }).status !== 0) continue;
     const exec = () => runCommand(c.cmd, cwd, c.env ?? {});
     const r = c.lock
       ? await withLock(
