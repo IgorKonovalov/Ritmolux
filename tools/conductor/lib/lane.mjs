@@ -3,7 +3,8 @@
 //   open the lane -> for each same-owner run not done: one implement session, then verify its claim
 //   -> a `human` phase parks -> conductor gate -> take the close lock -> review session
 //   -> blockers/majors: release the lock, fix session, verify, gate, re-review (two fix rounds max)
-//   -> closed: verify the close -> fast-forward main (one automatic re-merge) -> release the lock
+//   -> closed: verify the close -> gate the close tip -> fast-forward main (one automatic re-merge)
+//   -> release the lock
 //   -> remove the lane.
 //
 // Every judgement the loop cannot make parks the plan: the plan keeps its worktree and branch, the
@@ -177,6 +178,10 @@ async function gate(ctx, rec, label) {
   });
   rec.gates ??= [];
   rec.gates.push({ label, ok: g.ok, ran: g.ran, failed: g.failed ?? null, at: now() });
+  // The tip the conductor itself last saw green. The fast-forward compares against this, never
+  // against the close head: the close session merges main, bumps and tags, and its own gate run is
+  // a claim like any other.
+  if (g.ok) rec.gatedHead = head(rec.worktree);
   save(ctx);
   return g;
 }
@@ -361,10 +366,10 @@ export async function runPlan(ctx, lane, plan) {
       worktree: wt,
       branch: rec.branch,
       tag: rec.closed.tag,
-      gatedHead: rec.closed.head,
+      gatedHead: rec.gatedHead ?? null,
       runGate: (label) => gate(ctx, rec, label),
       onGated: (sha) => {
-        rec.closed.head = sha;
+        rec.gatedHead = sha;
         save(ctx);
       },
     });

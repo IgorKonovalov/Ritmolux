@@ -3,9 +3,10 @@
 // Refuses a main checkout that is dirty or not on main — the owner's work in progress is never
 // touched. Three things can stand between a close and the fast-forward, and each is handled once:
 //
-//   - the branch moved since the gate last passed on it (`gatedHead`): a plan resumed after a merge
-//     park whose conflict the owner resolved in the lane. The gate runs on the new tip and the
-//     annotated tag moves onto it before anything reaches main.
+//   - the branch moved since the conductor's gate last passed on it (`gatedHead`): always true after
+//     a close, whose session merged main, bumped and tagged; true again for a plan resumed after a
+//     merge park whose conflict the owner resolved in the lane. The gate runs on the new tip and the
+//     annotated tag moves onto it before anything reaches main. A missing `gatedHead` gates too.
 //   - main moved since the close (main is not an ancestor of the branch): one automatic re-merge in
 //     the worktree, the gate again, the tag moved, the fast-forward retried once.
 //   - the fast-forward is refused although main IS an ancestor (a held index.lock, a file in the
@@ -38,7 +39,7 @@ export async function fastForwardMain({ repo, worktree, branch, tag, gatedHead, 
   }
 
   let remerged = false;
-  if (gatedHead && head(worktree) !== gatedHead) {
+  if (head(worktree) !== gatedHead) {
     if (!isClean(worktree)) {
       return { ok: false, reason: "disagreement", detail: `${branch} has uncommitted changes since the close` };
     }

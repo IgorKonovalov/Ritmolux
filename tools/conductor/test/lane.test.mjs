@@ -113,6 +113,8 @@ test("a dev run then a studio-builder run with a clean review merges, tagged, la
   assert.ok(closedPlan.done);
   assert.ok(readPlanFile(closedPlan.path).hasCloseReview);
   assert.ok(existsSync(join(repo, "phase-0101-3.txt")));
+  assert.deepEqual(rec.gates.map((g) => g.label), ["pre-review", "post-close"], "the close tip is gated before main moves");
+  assert.equal(rec.gatedHead, resolveCommit("main", repo), "what reached main is what the conductor gated");
 
   const closed = digest("### Closed");
   assert.match(closed, /^- \*\*0101 - Plan 0101 fixture\*\* - 0\.1\.1, tag `v0\.1\.1` annotated, merge `[0-9a-f]{7}`, 0 fix rounds, /m);
@@ -181,7 +183,7 @@ test("a review with one major takes exactly one fix round and a re-review, then 
   assert.equal(rec.verdicts.length, 2);
   assert.equal(rec.verdicts[0].majors, 1);
   assert.equal(rec.fixes[0].resolved[0].finding, 0);
-  assert.deepEqual(rec.gates.map((g) => g.label), ["pre-review", "fix-1"]);
+  assert.deepEqual(rec.gates.map((g) => g.label), ["pre-review", "fix-1", "post-close"]);
 
   const fixSha = rec.fixes[0].resolved[0].commit.slice(0, 7);
   const closed = digest("### Closed");
@@ -261,7 +263,24 @@ test("main advancing on a disjoint file between close and merge re-merges once a
   assert.equal(resolveCommit("v0.1.1", repo), resolveCommit("main", repo), "the tag moved onto the new tip");
   assert.equal(git(["tag", "-l", "--format=%(contents)", "v0.1.1"], repo).stdout, "chore: Release v0.1.1", "its message was kept");
   assert.ok(existsSync(join(repo, "owner-note.txt")));
-  assert.deepEqual(rec.gates.map((g) => g.label), ["pre-review", "remerge"]);
+  assert.deepEqual(rec.gates.map((g) => g.label), ["pre-review", "post-close", "remerge"]);
+});
+
+test("a red gate on the close tip parks and main does not move", async () => {
+  const { ctx, repo } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
+  // The close session claims its own gate passed; the conductor's run on the close tip is what counts.
+  ctx.beforeMerge = async () => {
+    ctx.gate = [{ name: "red-after-close", cmd: [process.execPath, "-e", "process.exit(3)"] }];
+  };
+  const mainBefore = resolveCommit("main", repo);
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "parked");
+  assert.equal(rec.park.reason, "gate_red");
+  assert.match(rec.park.detail, /after the close: red-after-close/);
+  assert.deepEqual(rec.gates.map((g) => g.label), ["pre-review", "post-close"]);
+  assert.equal(resolveCommit("main", repo), mainBefore, "main did not move");
+  assert.ok(existsSync(rec.worktree), "the parked plan keeps its worktree");
 });
 
 test("main advancing on a conflicting change between close and merge parks", async () => {
@@ -304,7 +323,11 @@ test("a conflict the owner resolves in the lane is gated and re-tagged before ma
   await runLanes(ctx);
   const done = loadState(ctx.stateDir).plans["0101"];
   assert.equal(done.status, "merged", JSON.stringify(done.park));
-  assert.deepEqual(done.gates.map((g) => g.label), ["pre-review", "post-close"], "the resolved tip was gated, once");
+  assert.deepEqual(
+    done.gates.map((g) => g.label),
+    ["pre-review", "post-close", "post-close"],
+    "the close tip was gated before the conflict, and the resolved tip once after it",
+  );
   assert.equal(done.merge.remerged, false);
   assert.equal(tagObjectType("v0.1.1", repo), "tag");
   assert.equal(resolveCommit("v0.1.1", repo), resolveCommit("main", repo), "the tag moved onto the resolved tip");
@@ -326,7 +349,7 @@ test("a fast-forward refused while main is already in the branch parks without a
   assert.equal(rec.status, "parked");
   assert.equal(rec.park.reason, "merge_failed");
   assert.match(rec.park.detail, /main is already in plan-0101-fixture/);
-  assert.deepEqual(rec.gates.map((g) => g.label), ["pre-review"], "no gate ran for a re-merge that could not help");
+  assert.deepEqual(rec.gates.map((g) => g.label), ["pre-review", "post-close"], "no gate ran for a re-merge that could not help");
   assert.equal(resolveCommit("main", repo), mainBefore);
   assert.equal(resolveCommit("HEAD", rec.worktree), rec.closed.head, "no merge commit was made on the branch");
 });
@@ -357,6 +380,10 @@ test("two lanes closing at once serialize on the close lock", async () => {
   );
   // Both versions landed in order on one main.
   assert.deepEqual([state.plans[first].closed.tag, state.plans[second].closed.tag], ["v0.1.1", "v0.1.2"]);
+  // The second close merged the first plan's code in; the conductor gated that combination itself.
+  const later = state.plans[second];
+  assert.deepEqual(later.gates.map((g) => g.label), ["pre-review", "post-close"]);
+  assert.equal(later.gatedHead, later.merge.head, "the tip that reached main is the one the conductor gated");
 });
 
 test("a budget-exhausted step parks with its spend recorded", async () => {

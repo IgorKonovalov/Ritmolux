@@ -393,6 +393,7 @@ Outcome kinds: implementers `phases_done` or `parked` (`reason`: `human_phase` |
 - Fix round, finding 6 (the gate missed the sd-filter and conductor suites): `635865a`; adds `tools/conductor/test/gate.test.mjs`.
 - Fix round, findings 8-9 (garbled `nextStep` comment; lock waits double-counted across runs): `5cf6524`. `lockWaits` in state is now a list of `{lock, ms, at}`.
 - Fix round, finding 7 (allowlist unexercised): no change, left to Phase 6.
+- Close review major (the close tip reached `main` gated only by the review session's claim): fixed in the close session on the owner's authorization - the fast-forward compares against the tip the conductor last gated, so every close tip is gated (`post-close`) before `main` moves. Commit named in `## Close review`.
 
 ### Close triggers
 
