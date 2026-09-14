@@ -804,8 +804,8 @@
     },
     "param.rotation.spectrum": {
       "type": "string",
-      "description": "Turns the readout, as a fraction of a full turn.",
-      "markdownDescription": "Turns the readout, as a fraction of a full turn.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "description": "Turns the readout, in radians.",
+      "markdownDescription": "Turns the readout, in radians.\n\n- default `0.0`\n- typical range `0.0` to `6.2831855` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.thickness.spectrum": {
       "type": "string",
@@ -834,8 +834,8 @@
     },
     "param.bg_angle": {
       "type": "string",
-      "description": "Direction the backdrop ramp runs in, as a fraction of a full turn.",
-      "markdownDescription": "Direction the backdrop ramp runs in, as a fraction of a full turn.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "description": "Direction the backdrop ramp runs in, in radians; 0 runs bottom to top.",
+      "markdownDescription": "Direction the backdrop ramp runs in, in radians; 0 runs bottom to top.\n\n- default `0.0`\n- typical range `0.0` to `6.2831855` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.bg_hue_span": {
       "type": "string",
@@ -864,8 +864,8 @@
     },
     "param.bg_band_angle": {
       "type": "string",
-      "description": "Direction the band runs in, independently of the ramp, as a fraction of a turn.",
-      "markdownDescription": "Direction the band runs in, independently of the ramp, as a fraction of a turn.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "description": "Direction the band runs in, independently of the ramp, in radians.",
+      "markdownDescription": "Direction the band runs in, independently of the ramp, in radians.\n\n- default `0.0`\n- typical range `0.0` to `6.2831855` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.bg_band_pos": {
       "type": "string",
@@ -939,8 +939,8 @@
     },
     "param.kaleido_angle": {
       "type": "string",
-      "description": "Rotates the whole fold, as a fraction of a full turn.",
-      "markdownDescription": "Rotates the whole fold, as a fraction of a full turn.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "description": "Rotates the whole fold, in radians.",
+      "markdownDescription": "Rotates the whole fold, in radians.\n\n- default `0.0`\n- typical range `0.0` to `6.2831855` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.kaleido_center_x": {
       "type": "string",

@@ -1159,8 +1159,8 @@ pub const PARAMS: &[ParamSpec] = &[
     ParamSpec {
         name: "rotation",
         default: 0.0,
-        range: Some([0.0, 1.0]),
-        doc: "Turns the shape, as a fraction of a full turn.",
+        range: Some([0.0, std::f32::consts::TAU]),
+        doc: "Turns the shape, in radians.",
         kind: ParamKind::Modal,
     },
     ParamSpec {

@@ -927,8 +927,8 @@ pub const PARAMS: &[ParamSpec] = &[
     ParamSpec {
         name: "kaleido_angle",
         default: 0.0,
-        range: Some([0.0, 1.0]),
-        doc: "Rotates the whole fold, as a fraction of a full turn.",
+        range: Some([0.0, std::f32::consts::TAU]),
+        doc: "Rotates the whole fold, in radians.",
         kind: ParamKind::Modal,
     },
     ParamSpec {

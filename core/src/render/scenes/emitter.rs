@@ -817,8 +817,8 @@ pub const PARAMS: &[ParamSpec] = &[
     ParamSpec {
         name: "launch_angle",
         default: 0.0,
-        range: Some([-1.0, 1.0]),
-        doc: "Direction of launch, as a fraction of a turn from straight up.",
+        range: Some([-std::f32::consts::PI, std::f32::consts::PI]),
+        doc: "Direction of launch, in radians clockwise from straight up.",
         kind: ParamKind::Modal,
     },
     ParamSpec {

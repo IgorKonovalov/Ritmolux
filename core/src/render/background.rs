@@ -683,8 +683,8 @@ pub const PARAMS: &[ParamSpec] = &[
     ParamSpec {
         name: "bg_angle",
         default: 0.0,
-        range: Some([0.0, 1.0]),
-        doc: "Direction the backdrop ramp runs in, as a fraction of a full turn.",
+        range: Some([0.0, std::f32::consts::TAU]),
+        doc: "Direction the backdrop ramp runs in, in radians; 0 runs bottom to top.",
         kind: ParamKind::Modal,
     },
     ParamSpec {
@@ -725,8 +725,8 @@ pub const PARAMS: &[ParamSpec] = &[
     ParamSpec {
         name: "bg_band_angle",
         default: 0.0,
-        range: Some([0.0, 1.0]),
-        doc: "Direction the band runs in, independently of the ramp, as a fraction of a turn.",
+        range: Some([0.0, std::f32::consts::TAU]),
+        doc: "Direction the band runs in, independently of the ramp, in radians.",
         kind: ParamKind::Modal,
     },
     ParamSpec {

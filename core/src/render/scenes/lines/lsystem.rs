@@ -285,15 +285,16 @@ pub const PARAMS: &[ParamSpec] = &[
     ParamSpec {
         name: "visible_depth",
         default: 1.0,
-        range: Some([0.0, 1.0]),
-        doc: "How deep into the grammar's recursion is drawn; below 1 the fine branches are missing.",
+        range: Some([1.0, 7.0]),
+        doc: "Which recursion generation is drawn, counted from 1 and capped at `max_depth`; a \
+              fraction floors to the generation below it, and anything under 2 draws the first.",
         kind: ParamKind::Modal,
     },
     ParamSpec {
         name: "rotation",
         default: 0.0,
-        range: Some([0.0, 1.0]),
-        doc: "Turns the whole figure, as a fraction of a full turn.",
+        range: Some([0.0, std::f32::consts::TAU]),
+        doc: "Turns the whole figure, in radians.",
         kind: ParamKind::Modal,
     },
     crate::render::scenes::common::hue(DEFAULT_HUE),

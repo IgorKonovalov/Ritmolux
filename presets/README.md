@@ -544,8 +544,8 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
-| `visible_depth` | `1` | `0` – `1` | How deep into the grammar's recursion is drawn; below 1 the fine branches are missing. |
-| `rotation` | `0` | `0` – `1` | Turns the whole figure, as a fraction of a full turn. |
+| `visible_depth` | `1` | `1` – `7` | Which recursion generation is drawn, counted from 1 and capped at `max_depth`; a fraction floors to the generation below it, and anything under 2 draws the first. |
+| `rotation` | `0` | `0` – `6.2831855` | Turns the whole figure, in radians. |
 | `hue` | `0.3` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. |
 | `hue_spread` | `0` | `0` – `1` | How far along the palette the colour travels from one end of the figure to the other. |
 | `saturation` | `1` | `0` – `1` | Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own. |
@@ -577,7 +577,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
 | `variant` | `1` | `0` – `8` | Moves the construction's contact angle, continuously: this is an angle offset rather than an index into a list. |
-| `rotation` | `0` | `0` – `1` | Turns the whole pattern, as a fraction of a full turn. |
+| `rotation` | `0` | `0` – `6.2831855` | Turns the whole pattern, in radians. |
 | `hue` | `0.5` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. |
 | `hue_spread` | `0` | `0` – `1` | How far along the palette the colour travels from one end of the figure to the other. |
 | `saturation` | `1` | `0` – `1` | Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own. |
@@ -698,7 +698,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | `radius` | `0.35` | `0` – `1` | Radius of the ring the readout is drawn around, in the radial layouts. |
 | `span` | `1` | `0` – `1` | How much of the frequency axis is shown; below 1 the top end is cut. |
 | `baseline` | `-0.85` |  | Where the flat layout's zero line sits vertically. |
-| `rotation` | `0` | `0` – `1` | Turns the readout, as a fraction of a full turn. |
+| `rotation` | `0` | `0` – `6.2831855` | Turns the readout, in radians. |
 | `thickness` | `6` | `0.5` – `12` | Stroke width in pixels at the render target, before softness widens the falloff. |
 | `hue` | `0.55` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. |
 | `hue_spread` | `0` | `0` – `1` | How far along the palette the colour travels from one end of the figure to the other. |
@@ -731,7 +731,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | `spawn_rate` | `120` | `0` – `2000` | New objects launched per second. |
 | `gravity` | `1.5` | `-4` – `8` | Downward acceleration, in frame heights per second squared; negative floats them up. |
 | `launch_speed` | `1.75` | `0` – `6` | Speed each object leaves the source at. |
-| `launch_angle` | `0` | `-1` – `1` | Direction of launch, as a fraction of a turn from straight up. |
+| `launch_angle` | `0` | `-3.1415927` – `3.1415927` | Direction of launch, in radians clockwise from straight up. |
 | `spread` | `0.55` | `0` – `1` | How wide the launch directions fan out about that angle. |
 | `lifetime` | `3` | `0.1` – `20` | Seconds an object lives before it fades out. |
 | `lifetime_spread` | `0.45` | `0` – `1` | How much lifetimes vary between objects; 0 makes them all die together. |
@@ -784,7 +784,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | `palette_mix` | `0` | `0` – `1` | Crossfades from the preset's palette to its second one; 0 is the first, 1 the second. |
 | `palette_contour` | `0` | `0` – `1` | Draws a line at each band edge when the palette is stepped; 0 draws none. |
 | `gamma` | `1` | `0.25` – `4` | Shapes the falloff from the shape's edge; below 1 it bites sooner. |
-| `rotation` | `0` | `0` – `1` | Turns the shape, as a fraction of a full turn. |
+| `rotation` | `0` | `0` – `6.2831855` | Turns the shape, in radians. |
 | `stroke` | `0` | `0` – `1` | Draws the outline instead of the filled figure, at this half-width; 0 fills. |
 | `morph` | `0` | `0` – `1` | Travels the authored path towards its morph_to silhouette; inert without one. |
 
@@ -951,13 +951,13 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | `bg_hue` | `0` | `0` – `1` | Where the backdrop starts in the preset's palette, as a coordinate along it. |
 | `bg_bright` | `0` | `0` – `1` | How lit the backdrop is; 0 is black and the scene draws on nothing. |
 | `bg_vignette` | `0` | `0` – `1` | Darkens the backdrop toward the corners, pulling the eye to the middle. |
-| `bg_angle` | `0` | `0` – `1` | Direction the backdrop ramp runs in, as a fraction of a full turn. |
+| `bg_angle` | `0` | `0` – `6.2831855` | Direction the backdrop ramp runs in, in radians; 0 runs bottom to top. |
 | `bg_hue_span` | `0` | `-0.5` – `0.5` | How far along the palette the ramp travels from `bg_hue`; 0 is a flat colour. |
 | `bg_shade` | `0.72` | `0` – `1` | Brightness multiplier at the ramp's start, so a sky can be dark at one edge. |
 | `bg_shade_end` | `1` | `0` – `1` | Brightness multiplier at the ramp's far end. |
 | `bg_ramp_gamma` | `1` | `0.25` – `4` | Bends the ramp's progress: below 1 the far colour arrives early, above 1 it holds off. |
 | `bg_band_amount` | `0` | `0` – `1` | Strength of a second colour band laid across the ramp; 0 removes it. |
-| `bg_band_angle` | `0` | `0` – `1` | Direction the band runs in, independently of the ramp, as a fraction of a turn. |
+| `bg_band_angle` | `0` | `0` – `6.2831855` | Direction the band runs in, independently of the ramp, in radians. |
 | `bg_band_pos` | `0.5` | `0` – `1` | Where across the frame the band sits. |
 | `bg_band_width` | `0.15` | `0.02` – `1` | How wide the band is; narrow reads as a horizon, wide as a wash. |
 | `bg_band_curve` | `0` | `-1` – `1` | Bows the band into an arc instead of a straight line. |
@@ -992,7 +992,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
-| `kaleido_angle` | `0` | `0` – `1` | Rotates the whole fold, as a fraction of a full turn. |
+| `kaleido_angle` | `0` | `0` – `6.2831855` | Rotates the whole fold, in radians. |
 | `kaleido_center_x` | `0.5` | `0` – `1` | The horizontal point the wedges radiate from, in uv. |
 | `kaleido_center_y` | `0.5` | `0` – `1` | The vertical point the wedges radiate from, in uv. |
 | `kaleido_tile` | `1` | `1` – `8` | Repeats the source across the frame before it is folded, so one wedge shows several copies. |

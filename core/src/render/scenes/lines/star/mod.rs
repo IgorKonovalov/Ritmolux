@@ -673,8 +673,8 @@ pub const PARAMS: &[ParamSpec] = &[
     ParamSpec {
         name: "rotation",
         default: 0.0,
-        range: Some([0.0, 1.0]),
-        doc: "Turns the whole pattern, as a fraction of a full turn.",
+        range: Some([0.0, TAU]),
+        doc: "Turns the whole pattern, in radians.",
         kind: ParamKind::Modal,
     },
     crate::render::scenes::common::hue(DEFAULT_HUE),

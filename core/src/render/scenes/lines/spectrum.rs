@@ -194,8 +194,8 @@ pub const PARAMS: &[ParamSpec] = &[
     ParamSpec {
         name: "rotation",
         default: 0.0,
-        range: Some([0.0, 1.0]),
-        doc: "Turns the readout, as a fraction of a full turn.",
+        range: Some([0.0, std::f32::consts::TAU]),
+        doc: "Turns the readout, in radians.",
         kind: ParamKind::Modal,
     },
     crate::render::scenes::lines::thickness(DEFAULT_THICKNESS),
