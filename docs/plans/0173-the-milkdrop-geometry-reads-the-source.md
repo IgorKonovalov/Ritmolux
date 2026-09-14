@@ -1,6 +1,6 @@
 # 0173 — The MilkDrop geometry reads the source
 
-> **Status:** approved 2026-09-14
+> **Status:** in-progress
 > **Created:** 2026-09-11
 > **Owner skill(s):** `dev`
 > **Related ADRs:** [0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)
@@ -133,11 +133,14 @@ flowchart LR
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled on the first phase commit)_
+**Lane:** `main` directly, no worktree.
+
+**Source read:** `github.com/xeiraex/milkdrop2` at `d4c843a4fb4f53aef755957fc9478780325748cd`, the
+original v2.25c release commit. Facts, with file, function and line, are on backlog 0119 and 0120.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Read the two facts from the source | dev | not started | |
+| 1 — Read the two facts from the source | dev | committed with this row | |
 | 2 — The seam matches the reference | dev | not started | |
 | 3 — The waveform takes the reference's base amplitude | dev | not started | |
 

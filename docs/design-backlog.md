@@ -1905,6 +1905,56 @@ procurement question rather than three engineering ones.
 - **Verified 2026-08-20** — the wrap is still unconditional and still has no continuity treatment:
   `present: ang \+= std::f32::consts::TAU in: core/src/render/scenes/warp_mesh/mesh.rs`
 
+### Update 2026-09-14 — [Plan 0173](plans/0173-the-milkdrop-geometry-reads-the-source.md) Phase 1 read the reference's `ang` from MilkDrop 2's released source. **The `ang` a converted per-vertex program reads already agrees with it; the value this entry names is not the one converted presets read.**
+
+**Source read:** `github.com/xeiraex/milkdrop2`, commit `d4c843a4fb4f53aef755957fc9478780325748cd`
+(*"Original Milkdrop 2 v2.25c source code"*, the 2013 BSD-3-Clause release, before any of that
+mirror's own commits). The mirror's later commits do not touch `milkdropfs.cpp` at all, and touch
+`plugin.cpp` only outside the lines cited. Facts only; nothing is copied into this repository.
+
+1. **Per-vertex `ang`, the EEL `per_vertex` input.** `vis_milk2/plugin.cpp`,
+   `CPlugin::AllocateMyDX9Stuff`, l.2276-2285: the mesh vertex is `x = col/gridX*2-1`,
+   `y = row/gridY*2-1`, and `ang = atan2f(y*m_fAspectY, x*m_fAspectX)`; the exact centre vertex is
+   set to `0` (l.2282). Row 0 is the **bottom** of the screen: the same vertex gets
+   `tv_orig = -y*0.5+0.5` (l.2292) and the program's `y = y*-0.5*m_fAspectY+0.5`
+   (`vis_milk2/milkdropfs.cpp`, `CPlugin::ComputeGridAlphaValues`, l.1840), both `1` at row 0. So
+   the `y` handed to `atan2f` is **+up on screen**, and l.1842 passes the result to the program with
+   no wrap. The aspect pair is set at `plugin.cpp` l.2027-2028: the longer axis `1`, the shorter
+   below it. **So `ang` is in `(-pi, pi]`, 0 at three o'clock, counter-clockwise on screen, with the
+   cut on −x (nine o'clock).**
+2. **Warp-shader `ang`.** `milkdropfs.cpp`, `CPlugin::WarpedBlit_Shaders`, l.2249-2253: the mesh is
+   drawn in two halves, and the left half of the centre row has its vertex `ang` overwritten with
+   `-pi` for one and `+pi` for the other, so the interpolated attribute does not smear across the
+   seam. Same convention as fact 1, cut on −x.
+3. **Comp-shader `ang` is built differently.** `milkdropfs.cpp`, `CPlugin::UvToMathSpace`,
+   l.3862-3877, called from `plugin.cpp` `AllocateMyDX9Stuff` l.2060 with `v = 0` at the top
+   (l.2046-2048): `py = (v*2-1)*m_fAspectY` is **+down**, `atan2f(py, px)` is lifted into
+   `0..2pi` (l.3877), and `rad` is divided by `sqrt(ax²+ay²)` so it reads 1 at the corners. That is
+   **clockwise on screen with the cut on +x** — the function's own comment says counter-clockwise,
+   which holds only in its y-down "math space". The two centre columns get hand-set values from
+   l.2061.
+
+**This engine, against those:**
+
+- **Converted per-vertex:** `MilkRuntime::run_vertex` (`core/src/milk/mod.rs`) takes `ny = 1 - y*2`
+  (+up) and `atan2(ny*ay, nx*ax)` with the same longer-axis-is-1 aspect pair and no wrap, and
+  `warp_mesh/encode.rs` calls it for every vertex of a converted preset. It matches fact 1, centre
+  vertex included (`atan2(0, 0) = 0`).
+- **Emitted warp epilogue:** `milkconv/src/shader/emit.rs` `fs_main` takes `atan2(p.y, p.x)` with
+  `p` +up — matches fact 2.
+- **Emitted comp epilogue:** the same epilogue line as the warp stage — **differs from fact 3** in
+  handedness, range and cut, and in `rad`'s normalization.
+- **`vertex_position`** (`warp_mesh/mesh.rs`) — the `0..tau`, cut-on-+x value this entry's finding
+  and its pinning test describe — **is not read by a converted preset.** Its one render-path caller
+  is `core/src/render/evaluate.rs`, for the native `[per_vertex]` vocabulary.
+
+**Ours agrees for the per-vertex and warp-stage `ang` a converted preset reads, and differs in the
+emitted comp-stage `ang` by handedness (counter-clockwise against clockwise), range (`-pi..pi`
+against `0..2pi`) and cut (−x against +x).**
+
+- **Verified 2026-09-14** — the converted per-vertex `ang` is the reference's unwrapped `atan2`:
+  `present: let ang = py\.atan2\(px\); in: core/src/milk/mod.rs`
+
 ---
 
 ## 0120 — the converted waveform figure renders larger than the reference's, and `wave_scale` is applied raw
@@ -2009,6 +2059,49 @@ re-derive it.
   `present: \*slot = held \* scale in: core/src/render/scenes/warp_mesh/draw.rs`
 - **Verified 2026-08-28** — still true after Plan 0127, which measured the constant and did not
   apply it: `present: \*slot = held \* scale in: core/src/render/scenes/warp_mesh/draw.rs`
+
+### Update 2026-09-14 — [Plan 0173](plans/0173-the-milkdrop-geometry-reads-the-source.md) Phase 1 read the waveform from MilkDrop 2's released source. **Its mode-6/7 constant is smaller than ours, not 4.7 % larger, so it does not explain the `foo_vis_milk2` reading.**
+
+**Source read:** `github.com/xeiraex/milkdrop2`, commit `d4c843a4fb4f53aef755957fc9478780325748cd`
+(the original v2.25c release), the same commit as 0119's update. The mirror's later commits do not
+touch `milkdropfs.cpp`, and touch `pluginshell.cpp` only outside `AnalyzeNewSound`. Facts only.
+
+- **Sample range.** `vis_milk2/pluginshell.cpp`, `CPluginShell::AnalyzeNewSound`, l.2018: each
+  Winamp 8-bit sample becomes `(byte ^ 128) - 128`, so `-128..127`. `vis_milk2/milkdropfs.cpp`,
+  `CPlugin::RenderFrame`, l.933-942: every sample is multiplied by `fWaveScale / 128`, with
+  `fWaveSmoothing` as a one-pole running mix along the trace. **A full-scale trace is
+  `±1 × fWaveScale`.**
+- **Space.** `CPlugin::DrawWave` builds every vertex in D3D clip space, `-1..1` on both axes, so
+  **one frame height is 2 units**; l.3312 negates every `y` before drawing.
+- **Modes 6 and 7** (`DrawWave`, l.3100-3242). A line at angle `1.57 * wave_mystery` (l.3130, so
+  `±pi/2`) whose endpoints are pushed out to ±3 and clipped to ±1.1 (l.3140-3190), so it runs 5 %
+  past each frame edge. **Mode 6 offsets each point along the line's normal by `0.25 * fL[i]`**
+  (l.3206-3207). Mode 7 draws the left channel at `0.25 * fL[i] + sep` and the right at
+  `0.25 * fR[i] - sep`, with `sep = (wave_y*0.5+0.5)^2` (l.3221-3235). **Nothing clamps the offset**;
+  a trace past the frame edge is cut by the viewport, not limited. `SmoothWave` (l.2549, applied at
+  l.3326) then inserts one midpoint per segment with a `-0.15, 1.15, 1.15, -0.15` kernel.
+- **So mode 6's base amplitude is `0.25` clip units, which is `0.125` frame heights per unit sample:
+  a full-scale trace at `fWaveScale = 1` draws `0.25` frame heights peak-to-peak** (127/128 of that at
+  the 8-bit ceiling), plus the line's own width.
+- **Modes 0-5 do not share a figure with this engine's 1-5.** Mode 0 is a circle of radius
+  `0.5 + 0.4 * fR[i] + wave_mystery` clip units, turning at `time * 0.2` (l.2903-2913). 1 is an
+  x-y oscilloscope wound into a spiral (`rad = 0.53 + 0.43 * fR`, angle from `fL[i+32]`); 2 and 3
+  plot `fR[i]` against `fL[i+32]` at unit scale; 4 is a horizontal "script" at `0.47`/`0.44`;
+  5 is a rotating product figure. Only 6 and 7 are the same figure in both engines, so only they
+  have a constant to compare.
+
+**What that does to the 0.316 reading.** `draw.rs`'s `0.15` gives `0.30` peak-to-peak plus width,
+which is Plan 0127's `0.3019`. The released source gives `0.25` plus width. `foo_vis_milk2` 0.2.0.0
+drew `0.316`, which is **1.26x** the released source's figure. That host does not feed samples
+through the Winamp 8-bit path above, so the level its trace arrives at is not in this source; that
+is the risk Plan 0173 named, and it is where the gap sits. Separately, Plan 0127's objection that the
+top decile would touch the frame edge is answered: the reference does not clamp there either.
+
+**Ours differs by a factor of 1.2 in modes 6 and 7 (`0.15` against the source's `0.125` frame heights
+per unit sample), in the opposite direction from the `foo_vis_milk2` capture.**
+
+- **Verified 2026-09-14** — the mode-6/7 factor is still `0.15`:
+  `present: sample\(i\) \* 0\.15 \+ offset in: core/src/render/scenes/warp_mesh/draw.rs`
 
 ---
 
