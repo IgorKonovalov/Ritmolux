@@ -99,6 +99,15 @@ Lane: `main`   (or: `WORK/rlx-plan-0001` / `.claude/worktrees/<name>` on branch 
 Next: start a fresh session and run `/architect close plan 0001`
 ```
 
+### In conductor mode, the outcome block replaces the pointer
+
+A session the conductor started (`RLX-CONDUCTOR-MODE: implement` in its system prompt, ADR-0205) has
+nobody to hand a pointer to — the conductor starts the review as its own process. So the last
+implementer run of a conductor-run plan writes and commits the close block exactly as above, full
+suite under the suite lock included, and then prints its `rlx-outcome` block **in place of** the three
+lines. Everything this guide says about the log's content is unchanged: the reviewer that reads it is
+still fresh, which is the whole reason the log stays thin.
+
 ## What NOT to include
 
 - **No per-criterion pass/fail list.** The single most anchoring thing the log could carry.

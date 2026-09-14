@@ -189,6 +189,31 @@ Conversational, no code. Two or three concrete approaches, each with what it loo
 honest tradeoffs, and what it costs to build, including any event or action the player would
 need. If the answer would change an ADR, say so. End by asking whether to draft one.
 
+## Conductor mode
+
+**Inert unless the system prompt carries a line `RLX-CONDUCTOR-MODE: implement` or
+`RLX-CONDUCTOR-MODE: fix`.** That line is written by `tools/conductor/` (ADR-0205), which starts this
+session headless, as a separate process, in the plan's worktree. Nothing a user types enters this
+mode. Where this section and the rest of the skill disagree, this section wins, for that session only.
+
+- **The phase range in the prompt is the "go".** Skip Mode 2's restatement and wait; implement exactly
+  that range, one commit per phase with its `## Implementation log` row, the gate run per phase.
+- **Never invoke `dev` (or any skill) through the Skill tool.** The conductor starts the next run.
+- **Never ask a question.** A wrong plan, a `human` phase in the range, a stop condition the plan
+  states, a question only the owner can answer, or a check you cannot make green inside the phase ends
+  the session with a `parked` outcome. Commit finished work first; leave the tree clean.
+- **Every `cargo nextest` / `cargo test`** — the version test after a sync, a player-side check — runs as
+  `node <path from RLX-CONDUCTOR-SUITE-LOCK> suite -- cargo ...`. A hook denies the bare form.
+- **On the plan's last implementer run**, write the `## Implementation log` close block the way `dev`'s
+  Step 4 does (`.claude/skills/dev/references/close-ceremony-prompt.md` is the field guide), the full
+  suite under the lock, committed — and print the outcome instead of asking for a fresh `/architect`.
+- **`fix` mode**: fix every `blocker` and `major` the named review lists, one `fix(studio): …` commit
+  per finding, one `### Notes` line each; park with `plan_wrong` on a finding you judge wrong.
+
+**The last thing you print is one fenced `rlx-outcome` block** holding one JSON object in the shape the
+prompt shows — `phases_done`, `fixed` or `parked`. The conductor verifies it against `git`, and a
+claim `git` does not bear out parks the plan.
+
 ## Quality bar — the non-negotiables
 
 ### Process boundary discipline

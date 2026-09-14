@@ -277,6 +277,49 @@ with reality, a crate that doesn't behave as assumed, a done-when that's impossi
 This protocol is slow on purpose. A wrong-plan phase that ships costs far more than a five-minute
 escalation.
 
+## Conductor mode
+
+**Inert unless the system prompt carries a line `RLX-CONDUCTOR-MODE: implement` or
+`RLX-CONDUCTOR-MODE: fix`.** That line is written by `tools/conductor/` (ADR-0205), which starts this
+session headless, as a separate process, with the worktree as its cwd. Nothing a user types enters
+this mode — a person saying "conductor mode" in a normal session gets the four-step workflow above,
+restate-and-wait included. Where this section and the rest of the skill disagree, this section wins,
+and only for the session the conductor started.
+
+**`implement`** — the prompt names the plan, a phase range and whether it is the plan's last
+implementer run.
+
+- **The range is the "go".** Skip Step 1's restatement and Step 2's wait. The plan's `approved` status
+  was the approval; the range is the scope. Flip `Status:` to `in-progress` if it is not already.
+- **Implement exactly that range**, per Step 3 — one commit per phase, its log row inside the commit,
+  the done-when checks — and nothing outside it.
+- **Never invoke `studio-builder` (or any skill) through the Skill tool.** ADR-0188's auto-handoff is
+  replaced here: the conductor starts the next run as its own process.
+- **Never ask a question.** Nobody is there. Everything that would stop a human-started session —
+  "When the plan is wrong", a `human` phase inside the range, a stop condition the plan states, a
+  question only the owner can answer, a check you cannot make green inside the phase — ends this one
+  with a `parked` outcome naming it. Commit finished work first and leave the tree clean. A park is
+  the correct result, not a failure; working around the plan is the failure.
+- **Every `cargo nextest` or `cargo test` runs through the suite lock**:
+  `node <path from RLX-CONDUCTOR-SUITE-LOCK> suite -- cargo nextest run ...`. A hook denies the bare
+  form in this mode.
+- **On the last implementer run**, do Step 4 — full suite under the lock, the close block committed —
+  and then print the outcome block **instead of** the three-line pointer. The conductor starts the
+  review.
+
+**`fix`** — the prompt names the plan, the round, the review file and its numbered findings.
+
+- Fix every `blocker` and `major`; `minor` and `nit` are yours to leave. One `fix(...)` commit per
+  finding or tightly coupled group, and one line per fix in the plan's `### Notes` naming the finding
+  and the commit. Nothing else in the plan moves.
+- A finding you think is wrong is not yours to overrule: park with `plan_wrong` and name it.
+
+**The outcome block is the last thing you print** — exactly one fenced block tagged `rlx-outcome`
+holding one JSON object, in the shapes the prompt shows: `phases_done`, `fixed` or `parked` (reasons
+`human_phase`, `stop_condition`, `plan_wrong`, `question`, `check_red`). It is a claim, and the
+conductor checks it against `git` — commits that do not exist, log rows that do not match, or a dirty
+tree park the plan as a disagreement.
+
 ## What you do NOT do
 
 - **You write exactly two things inside a plan** — the `Status:` line at Step 2, and the

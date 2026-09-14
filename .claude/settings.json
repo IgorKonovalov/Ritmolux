@@ -11,6 +11,14 @@
           {
             "type": "command",
             "command": "node .claude/hooks/block-attribution-trailers.js"
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/block-push-and-history-rewrite.js"
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/conductor-suite-lock.js"
           }
         ]
       }

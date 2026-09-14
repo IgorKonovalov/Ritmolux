@@ -835,6 +835,44 @@ the line is absent (a plan predating [ADR-0120](../../../docs/adrs/0120-the-clos
 One standing hazard is left, from ADR-0053's Negative section: the **stash stack is shared across every
 worktree**, so a bare `git stash` / `git stash pop` can take another lane's entry — prefer a WIP commit.
 
+### Conductor mode — a close review nobody is watching
+
+**Inert unless the system prompt carries a line `RLX-CONDUCTOR-MODE: review`.** That line is written by
+`tools/conductor/` (ADR-0205), which starts this session headless, as a separate process, in the plan's
+worktree, handing it the plan, the lane, a round number and a review path — and nothing an implementer
+wrote. That separation is what "fresh session" means for a conductor-run plan: this is not an
+auto-invocation of you from a lane, which stays forbidden. Nothing a user types enters this mode; where
+it and the rest of this skill disagree, it wins for that session only.
+
+1. **Run Mode 4** against the plan and the lane, all five lenses, exactly as a human-started close —
+   including running the full `nextest` and `cargo doc` yourself. Every `cargo nextest` runs as
+   `node <path from RLX-CONDUCTOR-SUITE-LOCK> suite -- cargo nextest ...`; a hook denies the bare form.
+2. **Write the review to the review path**, in the output shape Mode 4 describes. There is no
+   conversation to deliver it into.
+3. **Any `blocker` or `major`: stop there.** No bookkeeping, no merge, no bump. End with a `verdict`
+   outcome. The conductor sends the findings to a fresh `dev` fix session and starts a fresh review
+   after it; you will see this round's review path under the next round's prior rounds.
+4. **No blocker and no major: close on the branch.** Run the worktree close sequence's steps 1–3 in
+   this worktree — `git merge main`, the whole gate, the bookkeeping steps 1–4 including the version
+   bump, the studio's two copies and an **annotated** tag on the branch tip, and
+   `node scripts/check-release-tag.mjs`. The close commit also adds a **`## Close review`** section to
+   the plan, after `## Implementation log`: this round's review in full, then one line for every
+   finding an earlier round raised and a fix round resolved, naming the fix commit. A conductor-run
+   close has no reader in the room; that section is the evidence of what was checked, and it moves
+   into `done/` beside the log it graded.
+5. **Never fast-forward `main`, never remove the worktree or delete the branch, never push.** Steps 4,
+   6 and 7 of the sequence are the conductor's; step 5 is the owner's.
+6. **Park rather than improvise** when the merge conflicts, the gate goes red, or the plan turns out
+   wrong — a `parked` outcome with reason `merge_conflict`, `check_red` or `plan_wrong`.
+
+**The last thing you print is one fenced `rlx-outcome` block** holding one JSON object, in the shapes
+the prompt shows: `verdict` (the counts, the review path, and `findings` — **every** finding of the
+round, each `{severity, file, line, what}`), `closed` (the version and tag, or `null` for a
+docs/chore-only close, carrying the same verdict), or `parked`. The finding lines are what the owner
+reads in the morning, verbatim; write each so it stands on its own. The conductor verifies a `closed`
+against `git` — plan under `done/` with `Status: done`, a `## Close review` section, a clean tree, an
+annotated tag on the tip — and parks on any disagreement.
+
 ---
 
 ## Commit hygiene (for your own doc commits)
