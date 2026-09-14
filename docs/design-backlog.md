@@ -79,6 +79,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0214 — a converted comp shader reads the warp stage's `rad`/`ang`, and a converted per-vertex program reads raw uv `x`/`y`, where the reference builds both differently](#0214--a-converted-comp-shader-reads-the-warp-stages-radang-and-a-converted-per-vertex-program-reads-raw-uv-xy-where-the-reference-builds-both-differently)
 - [0215 — the seam Plan 0109 saw on two MilkDrop 1.x presets is unexplained, and the test doc that frames it still attributes a +x cut to MilkDrop](#0215--the-seam-plan-0109-saw-on-two-milkdrop-1x-presets-is-unexplained-and-the-test-doc-that-frames-it-still-attributes-a-x-cut-to-milkdrop)
 - [0216 — the converted waveform follows neither reference: modes 0-5 draw other figures than the source, and modes 6-7 sit between the source and `foo_vis_milk2`](#0216--the-converted-waveform-follows-neither-reference-modes-0-5-draw-other-figures-than-the-source-and-modes-6-7-sit-between-the-source-and-foo_vis_milk2)
+- [0217 — `path_cost`'s arity probe draws a curved leaf, so from `samples = 32` up it prices the arc chain and not the polyline its header reports](#0217--path_costs-arity-probe-draws-a-curved-leaf-so-from-samples--32-up-it-prices-the-arc-chain-and-not-the-polyline-its-header-reports)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -4022,3 +4023,42 @@ ADR-0071's prose error.
 
 **Medium.** The waveform-led converted presets draw a different figure in most modes, not a
 mis-scaled one. That is a bigger gap than the 4.7 % this line of work started from.
+
+## 0217 — `path_cost`'s arity probe draws a curved leaf, so from `samples = 32` up it prices the arc chain and not the polyline its header reports
+
+`the_contour_arity_is_priced_against_the_floor_tier` in `core/tests/path_cost.rs` times one figure,
+`LEAF` (two cubics), at `samples` of 8, 16, 32, 48 and 64. `PathShape::from_dense` in
+`core/src/preset/path.rs` fits the dense contour to arcs and keeps the fit unless
+`pieces.len() > MAX_ARC_PIECES || pieces.len() * 2 > points.len()`. The leaf fits to 16 pieces, as
+the same file's arc comparison reports. So the fit is kept from `samples = 32` up, and
+the three largest cases draw the same 16-piece chain.
+
+The reading agrees. On 2026-09-14, alone on the reference machine (AMD Radeon integrated, DX12,
+1920x1080, floor tier), the test printed 4.250, 4.232 and 4.230 ms for 32, 48 and 64. The arc
+comparison's leaf row reads 4.15 ms. The module header's table still reports a polyline slope
+(4.33 ms at 32, 7.70 ms at 64, "~0.105 ms per segment, flat across the range"). So does
+`MAX_SAMPLES`'s own doc in `path.rs` ("At **64** the field alone is 46 %"). Those figures were true of
+the polyline before the arc route, and they are still true of a figure whose fit is discarded, such
+as a polygon. This test can no longer re-take them.
+
+The test still passes, because its last assertion compares 64 against 8, and 8 is a polyline.
+
+**What a fix looks like:** price the arity on a figure whose fit is always discarded, so every case
+is a polyline. An all-corners polygon, or the `morph_to = d` trick `polyline_probe` already uses.
+Re-take the header table from that run and name its date. Check `MAX_SAMPLES`'s doc against the new
+slope. The ceiling's argument is about the worst case an author can load, and that is the polyline.
+
+- **Raised:** 2026-09-14, while diagnosing the flaky pre-push failure that became
+  [ADR-0193](adrs/0193-a-cost-probe-runs-alone.md). **Owner if taken:** `dev`; there is no design
+  question.
+- **Verified 2026-09-14** — the arity probe draws the curved leaf:
+  `present: d = \\"\{LEAF\}\\"\\nsamples = \{samples\} in: core/tests/path_cost.rs`
+- **Verified 2026-09-14** — the arity range still reaches past twice the leaf's 16 pieces:
+  `present: const ARITIES: \[usize; 5\] = \[8, 16, 32, 48, MAX_SAMPLES\]; in: core/tests/path_cost.rs`
+- **Verified 2026-09-14** — the fit is kept once the resample has twice the pieces:
+  `present: pieces\.len\(\) \* 2 > points\.len\(\) in: core/src/preset/path.rs`
+
+### Priority
+
+**Low.** Nothing renders wrong and the ceiling still stands. What is wrong is that the one test
+named as the ceiling's measurement cannot re-measure it.

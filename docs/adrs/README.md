@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0193.** *(0120 was reserved for
+**Next free number: 0194.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -214,4 +214,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0190](0190-preset-toml-is-checked-by-the-loader-and-never-reformatted.md) | Preset TOML is checked by the engine's own loader and never reformatted | accepted 2026-09-13 (Plan 0169) |
 | [0191](0191-a-frame-delta-is-replaced-at-every-entry-and-nothing-below-keeps-a-policy.md) | A frame delta is replaced at every entry that takes one, and nothing below keeps a policy of its own | accepted 2026-09-14 (Plan 0171; Outcome), amends 0152 |
 | [0192](0192-a-preset-warning-names-its-parameter.md) | A preset warning names the parameter it is about | proposed (Plan 0172), extends 0176 |
+| [0193](0193-a-cost-probe-runs-alone.md) | A cost probe runs alone, because the suite around it is the contention | proposed (Plan 0174), extends 0173 |
 <!-- roster:end -->

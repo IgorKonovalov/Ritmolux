@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0174** (ADRs are a separate sequence — next free there is **0193**.)
+**Next free number: 0175** (ADRs are a separate sequence — next free there is **0194**.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -47,6 +47,7 @@ place. The plan file carries the real link.
 | [0160](0160-the-silhouettes-preconditions-stop-being-silent.md) | The silhouette's preconditions stop being silent | approved | dev, human | ADR-0179: four preconditions on `[path]` that fail silently. **0092 closed 2026-09-09**, so its Phase 7 axis fix is in. Phase 2 is prose in `presets/README.md`. |
 | [0166](0166-the-basics-read-in-russian.md) | The basics read in Russian | approved | dev, human | ADR-0185: five docs gain a Russian sibling `.ru.md` stamped with the source sha. **Phase 3 is a `human` review that blocks publication.** Touches no Rust - orderable against any lane. |
 | [0172](0172-the-studios-readings-become-true.md) | The studio's readings become true | approved | dev, studio-builder | ADR-0192 (proposed), backlog 0202, 0205, 0209: windowless fps, a schema snapshot, `param` on warnings. Reconciled with closed 0169 at approval. **0171 closed 2026-09-14**; lane 1 is next. |
+| [0174](0174-the-cost-probes-run-alone.md) | The cost probes run alone | approved | dev | ADR-0193 (proposed): one nextest override runs every `*_cost` binary with no other test beside it, after a pre-push flake. **One phase, config only** - orderable against any lane. |
 <!-- roster:end -->
 
 **Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two lanes.**
