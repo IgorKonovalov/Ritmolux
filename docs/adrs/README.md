@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0205.** *(0200 is reserved for [Plan 0186](../plans/0186-the-flatness-gate-tells-a-figure-from-its-ground.md) Phase 2, which writes it whichever way its stop gate falls.)* *(0120 was reserved for
+**Next free number: 0206.** *(0200 is reserved for [Plan 0186](../plans/0186-the-flatness-gate-tells-a-figure-from-its-ground.md) Phase 2, which writes it whichever way its stop gate falls.)* *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -225,4 +225,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0202](0202-a-written-count-of-the-systems-is-refused-by-a-gate.md) | A written-out count of the systems is refused by a gate, and the threshold is five | proposed (Plan 0178), extends 0168 |
 | [0203](0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md) | A release tag is annotated, and what gets checked is whether origin has it | proposed (Plan 0176), extends 0038 |
 | [0204](0204-a-cheap-integration-test-shares-one-binary-and-a-test-that-needs-its-own-stays-its-own.md) | A cheap integration test shares one binary per package, and a test that needs its own binary keeps one | proposed (Plan 0177), extends 0156 |
+| [0205](0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md) | An approved plan runs under a conductor, and every judgement it cannot make parks the plan | proposed (Plan 0187), supersedes 0188 in part |
 <!-- roster:end -->
