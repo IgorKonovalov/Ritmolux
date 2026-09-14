@@ -153,6 +153,37 @@ test("resume refuses a human-phase park the log does not mark done, and accepts 
   assert.deepEqual(done.steps.map((s) => s.kind), ["implement", "implement", "review"]);
 });
 
+test("run starts again after a merge, and a resumed sibling of the merged plan runs to its merge", async () => {
+  const { p, cli } = setup(
+    [
+      { number: "0101", phases: [dev("1")] },
+      { number: "0102", phases: [dev("1"), human("2")] },
+    ],
+    { a: ["0101", "0102"] },
+  );
+  const first = await cli("run");
+  assert.equal(first.code, 0, first.err.join("\n"));
+  let state = loadState(p.stateDir);
+  assert.equal(state.plans["0101"].status, "merged");
+  assert.equal(state.plans["0102"].status, "parked");
+
+  // The merged plan stays listed in queue.json and now sits under done/; that must not refuse a run.
+  const again = await cli("run");
+  assert.equal(again.code, 0, again.err.join("\n"));
+  assert.equal((await cli("check")).code, 0);
+
+  const rec = loadState(p.stateDir).plans["0102"];
+  const planPath = join(rec.worktree, "docs", "plans", "0102-fixture.md");
+  writeFileSync(planPath, readFileSync(planPath, "utf8").replace(/^\| 2 — Step 2 \| human \| not started \|/m, "| 2 — Step 2 | human | done |"));
+  sh(["commit", "-q", "-am", "docs(plans): phase 2 done by the owner"], rec.worktree);
+  assert.equal((await cli("resume", "0102")).code, 0);
+
+  const finish = await cli("run");
+  assert.equal(finish.code, 0, finish.err.join("\n"));
+  state = loadState(p.stateDir);
+  assert.equal(state.plans["0102"].status, "merged", JSON.stringify(state.plans["0102"].park));
+});
+
 test("park parks a queued plan with an inbox entry, and resume queues it again", async () => {
   const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] });
   const parked = await cli("park", "0101");

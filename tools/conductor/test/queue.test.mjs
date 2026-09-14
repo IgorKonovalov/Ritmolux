@@ -64,6 +64,13 @@ test("a closed plan, a missing plan, a duplicate and a malformed key are each re
   assert.match(text, /plan 0101: unknown key "later"/);
 });
 
+test("a closed plan the conductor itself merged stays accepted in the queue", () => {
+  const repo = scratchRepo();
+  const queue = { lanes: { a: ["0090", "0101"] } };
+  assert.match(validateQueue(queue, repo, new Set(["0090"])).errors.join("\n"), /plan 0090: already closed/);
+  assert.deepEqual(validateQueue(queue, repo, new Set(["0090"]), new Set(["0090"])).errors, []);
+});
+
 test("local.json is required, and every step budget must be set by the owner", () => {
   const dir = tmp();
   assert.match(loadLocal(join(dir, "local.json")).errors[0], /local\.json not found/);

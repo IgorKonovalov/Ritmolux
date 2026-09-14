@@ -25,7 +25,7 @@ import { currentBranch, isClean } from "./lib/git.mjs";
 import { appendPark } from "./lib/inbox.mjs";
 import { runLanes } from "./lib/lane.mjs";
 import { findPlan, nextStep, readPlanFile } from "./lib/plan.mjs";
-import { loadLocal, loadQueue } from "./lib/queue.mjs";
+import { loadLocal, loadQueue, stateSets } from "./lib/queue.mjs";
 import { loadState, planRecord, recoverInterrupted, saveState, statePaths, totalSpend } from "./lib/state.mjs";
 import { activeChildren } from "./lib/step.mjs";
 
@@ -77,7 +77,7 @@ export function preflight(p = paths(), { claude } = {}) {
     );
   }
   const state = loadState(p.stateDir);
-  const queue = loadQueue(p.queue, p.repo, new Set(Object.keys(state.plans)));
+  const queue = loadQueue(p.queue, p.repo, ...stateSets(state));
   errors.push(...queue.errors);
   return { errors, local, queue, state, claude: command };
 }
@@ -173,7 +173,7 @@ function cmdStatus(args, o) {
   const state = loadState(p.stateDir);
   const pid = runningPid(p);
   o.log(pid ? `conductor: running (pid ${pid})` : "conductor: not running");
-  const { lanes } = loadQueue(p.queue, p.repo, new Set(Object.keys(state.plans)));
+  const { lanes } = loadQueue(p.queue, p.repo, ...stateSets(state));
   const laneNames = [...new Set([...Object.keys(lanes ?? {}), ...Object.keys(state.lanes)])].sort();
   for (const lane of laneNames) {
     const l = pid ? state.lanes[lane] : null;

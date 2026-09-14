@@ -27,10 +27,13 @@ function readJson(path, what) {
 
 /**
  * Validates the queue against the repository. `startedPlans` are plans the conductor's state
- * already owns, which may legitimately read `in-progress` rather than `approved`.
+ * already owns, which may legitimately read `in-progress` rather than `approved`. `mergedPlans`
+ * are plans the conductor's state records as merged: they sit under done/ and stay listed in the
+ * committed queue, so they are accepted there rather than rejected as closed — otherwise every run
+ * after the first merge would refuse to start.
  * Returns { errors, lanes: {name: [plan]}, plans: {plan: {lane, after, add_dirs, path}} }.
  */
-export function validateQueue(queue, repo, startedPlans = new Set()) {
+export function validateQueue(queue, repo, startedPlans = new Set(), mergedPlans = new Set()) {
   const errors = [];
   const out = { errors, lanes: {}, plans: {} };
   if (!queue || typeof queue !== "object" || !queue.lanes || typeof queue.lanes !== "object") {
@@ -82,6 +85,10 @@ export function validateQueue(queue, repo, startedPlans = new Set()) {
       errors.push(`plan ${plan}: no docs/plans/${plan}-*.md`);
       continue;
     }
+    if (found.done && mergedPlans.has(plan)) {
+      entry.path = found.path;
+      continue;
+    }
     if (found.done) {
       errors.push(`plan ${plan}: already closed (${found.file} is under docs/plans/done/)`);
       continue;
@@ -105,10 +112,16 @@ export function validateQueue(queue, repo, startedPlans = new Set()) {
   return out;
 }
 
-export function loadQueue(path, repo, startedPlans) {
+export function loadQueue(path, repo, startedPlans, mergedPlans) {
   const r = readJson(path, "queue.json");
   if (r.error) return { errors: [r.error], lanes: {}, plans: {} };
-  return validateQueue(r.value, repo, startedPlans);
+  return validateQueue(r.value, repo, startedPlans, mergedPlans);
+}
+
+/** The started and merged plan sets validateQueue takes, read from the conductor's state. */
+export function stateSets(state) {
+  const recs = Object.values(state.plans);
+  return [new Set(recs.map((r) => r.plan)), new Set(recs.filter((r) => r.status === "merged").map((r) => r.plan))];
 }
 
 /** Validates local.json. Every budget is required: the conductor carries no default spend. */
