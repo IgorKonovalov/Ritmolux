@@ -207,7 +207,7 @@ until it merges. Run it as a human-started `dev` lane.
 | 1 — `run` works on a clean checkout | dev | done | `a676f13` |
 | 2 — A backlog probe is judged by the close, not parked before it | dev | done | `24300e7` |
 | 3 — A park leaves a lane that can be resumed | dev | done | `856d5cb` |
-| 4 — A lane that stops says why | dev | committed with this row | |
+| 4 — A lane that stops says why | dev | done | `f15ce4a` |
 | 5 — The pilot, resumed | human | not started | |
 
 ### Notes
@@ -222,3 +222,13 @@ until it merges. Run it as a human-started `dev` lane.
   the cap stop. The output test is in `test/cli.test.mjs`, which the phase's file list does not name.
 
 ### Close triggers
+
+- **`presets/` touched:** no
+- **Plan header `Closes:`** none
+- **What shipped:** fix-only (the conductor, its tests, its README, and the conductor-mode sentence in
+  the `dev` and `studio-builder` skills)
+- **Operator docs touched:** `tools/conductor/README.md`
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0
+- **Full suite:** `cargo nextest run --workspace`, exit 0 - 1933 tests run: 1933 passed (7 slow),
+  6 skipped. Conductor tests: `node --test "tools/conductor/test/*.test.mjs"`, 124 pass, 0 fail.
+- **Outstanding `human` phases:** Phase 5 - the pilot, resumed
