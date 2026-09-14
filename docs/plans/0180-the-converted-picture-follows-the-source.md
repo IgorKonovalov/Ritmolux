@@ -424,8 +424,8 @@ pub fn run_wave_point(&mut self, index: usize, sample: f32, left: f32, right: f3
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Read the rest of the source, and render the seam | dev | done | `725c8d5` |
-| 2 — The comp stage gets the source's polar pair | dev | done | committed with this row |
-| 3 — The per-vertex program gets the source's `x`/`y` | dev | not started | |
+| 2 — The comp stage gets the source's polar pair | dev | done | `707a0bb` |
+| 3 — The per-vertex program gets the source's `x`/`y` | dev | parked, not started | |
 | 4 — The seam is found | dev | not started | |
 | 5 — The analyzer publishes a left/right pair | dev | not started | |
 | 6 — The waveform draws the source's eight figures | dev | not started | |
@@ -522,6 +522,23 @@ matter per fragment.
   `warp_mesh_shader.png` is committed. This session's permissions refused `git checkout`,
   `git restore` and `git stash` on the other eight, so they are left modified in the working tree
   and uncommitted. The golden run passes against either version of them.
+- **Phase 3 is parked before any code, as the plan being wrong.** Phase 1's sentence names four
+  differing stages, so Phase 3 has `vs_main` apply them in the source's space, touching
+  `warp_mesh/shaders.rs` and its tests. But `vs_main` is the one vertex stage for **native and
+  converted** presets alike (`encode.rs` `encode_warp`: a converted warp shader reuses it, and a
+  bundle without one uses the built-in pipeline). The native fixture `core/tests/fixtures/warp_mesh.toml`
+  binds `warp = "0.25"`, and `presets/warp_smoke.toml`, `warp_sirocco.toml` and `warp_cauldron.toml`
+  bind the same stages. So a change confined to `shaders.rs` moves `warp_mesh.png`, which the plan
+  makes a stop, and changes the native vocabulary, which the plan rules out. Confining the change to
+  converted presets needs a signal the shader can read. The candidates are a uniform lane filled in
+  `warp_mesh/encode.rs` `upload_uniforms` from `scene.milk.is_some()`, or per-axis values written into
+  the vertex's unused `t2` lanes by `warp_mesh/mesh.rs`. Neither file is in Phase 3's list, and the
+  choice between them is a design call. `cx`/`cy` and `dx`/`dy` alone could be remapped CPU-side in
+  `milk/mod.rs`, but the warp's per-axis amplitude cannot.
+- **Two more plan statements disagree with Phase 1's read, for the same amendment.** Phase 6's note
+  gives mode 0 alone a `time` term, but modes 1 (l.2942, `time*2.3`) and 5 (l.3085-3086, `time*0.3`)
+  have one too. Every bless on this machine also re-encodes the eight baselines named above, so
+  Phases 3, 4 and 6's bless rule cannot be met here without a restore this session could not run.
 
 ### Close triggers
 
