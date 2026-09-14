@@ -56,11 +56,13 @@ file that would lose completion.
 All sixteen files — the generic schema, the fourteen per-system schemas and `.taplo.toml` itself — are
 **generated** from the engine's own `ParamSpec`, `TableDesc` and `SystemKind` declarations, and
 `core/tests/preset_schema.rs` fails if any of them is stale or `presets/schema/` holds a file no
-system renders. One command regenerates all of them, and removes a schema left behind by a system
-that no longer exists:
+system renders. The same test file holds a seventeenth file from the same export to it:
+`docs/specs/player-schema.json`, the document `ritmolux --schema` prints, which the studio's schema
+walks read when no player is built. One command regenerates all of them, and removes a schema left
+behind by a system that no longer exists:
 
 ```sh
-RLX_UPDATE_PRESET_SCHEMA=1 cargo nextest run -p rlx-core the_generated_editor_files_are_current
+RLX_UPDATE_PRESET_SCHEMA=1 cargo nextest run -p rlx-core --test preset_schema
 ```
 
 **Turn format-on-save off for TOML.** The extension ships a formatter, and this project does not

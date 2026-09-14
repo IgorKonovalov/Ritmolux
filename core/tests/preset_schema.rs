@@ -74,6 +74,41 @@ fn the_generated_editor_files_are_current() {
     );
 }
 
+/// Where the player's `--schema` document is committed, relative to the repo root.
+///
+/// Not under `presets/schema/`: that directory holds the editor's JSON Schemas and
+/// its drift check refuses a file no system renders. This is the studio's panel
+/// feed, read by its schema walks when no player is built.
+const PLAYER_SCHEMA: &str = "docs/specs/player-schema.json";
+
+/// **The committed player schema is what `ritmolux --schema` prints** — the
+/// document [`export::document`] renders, byte for byte bar the line endings,
+/// with the trailing newline `println!` adds.
+///
+/// Regenerates under the same `RLX_UPDATE_PRESET_SCHEMA=1` switch as the editor
+/// files, so `RLX_UPDATE_PRESET_SCHEMA=1 cargo nextest run -p rlx-core --test
+/// preset_schema` rewrites every file derived from the export.
+#[test]
+fn the_player_schema_snapshot_is_current() {
+    let path = repo_root().join(PLAYER_SCHEMA);
+    let generated = format!("{}\n", export::document());
+    if std::env::var_os("RLX_UPDATE_PRESET_SCHEMA").is_some() {
+        std::fs::write(&path, &generated)
+            .unwrap_or_else(|e| panic!("write {}: {e}", path.display()));
+    }
+    let committed = std::fs::read_to_string(&path)
+        .unwrap_or_else(|e| panic!("{PLAYER_SCHEMA} cannot be read: {e}"));
+    // Compared without the line endings, so a clone that checked the file out
+    // as CRLF does not fail a test about its content.
+    assert!(
+        committed.replace("\r\n", "\n") == generated,
+        "{PLAYER_SCHEMA} is not what `ritmolux --schema` prints. Regenerate it with\n\
+         \n    RLX_UPDATE_PRESET_SCHEMA=1 cargo nextest run -p rlx-core --test preset_schema\n\n\
+         It is rendered by rlx_core::preset::export::document(); a hand edit is what \
+         this fails on."
+    );
+}
+
 /// **The drift check names each of the sixteen files, and an extra schema, and
 /// the regenerate command repairs every case.** Run against a scratch copy, so a
 /// check that had silently stopped comparing one of the files cannot pass

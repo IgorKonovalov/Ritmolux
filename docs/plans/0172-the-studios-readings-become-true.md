@@ -177,8 +177,8 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The frame clock covers both live paths | dev | done | committed with this row |
-| 2 — The player's schema is snapshotted | dev | not started | |
+| 1 — The frame clock covers both live paths | dev | done | c303c1f |
+| 2 — The player's schema is snapshotted | dev | done | committed with this row |
 | 3 — A preset warning names its parameter | dev | not started | |
 | 4 — The studio reads the snapshot, anchors warnings and shows the rate | studio-builder | not started | |
 
@@ -190,6 +190,14 @@ flowchart LR
   files the phase does not list: `core/tests/frame_tap.rs` (tap feeds the clock, captures do not) and
   `standalone/tests/stream_show.rs` (a spawned `--stream` run with its data root pointed at a scratch
   directory writes rows with a non-zero `fps`; fails with `enable_diagnostics` removed, checked once).
+- Phase 2: the regenerate command is `RLX_UPDATE_PRESET_SCHEMA=1 cargo nextest run -p rlx-core --test
+  preset_schema` (the whole test binary), so one command covers the editor files and the snapshot;
+  `docs/developing.md` names that form. The narrower `the_generated_editor_files_are_current` command
+  quoted in `.taplo.toml`'s generated header and in that test's own message is unchanged and still
+  regenerates the sixteen editor files only. The snapshot is `document()` plus the trailing newline
+  `println!` adds, byte-equal to the built player's `--schema` output. Done-when's hand-edit check: the
+  first `"default":0.4` in the snapshot changed to `0.5` made `the_player_schema_snapshot_is_current`
+  fail printing the regenerate command; reverted, green.
 
 ### Close triggers
 
