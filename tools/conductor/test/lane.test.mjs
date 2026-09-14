@@ -8,6 +8,7 @@ import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs
 import { join } from "node:path";
 import { test } from "node:test";
 
+import { writeDigest } from "../lib/digest.mjs";
 import { git, resolveCommit, tagObjectType } from "../lib/git.mjs";
 import { runLanes } from "../lib/lane.mjs";
 import { findPlan, readPlanFile } from "../lib/plan.mjs";
@@ -66,13 +67,26 @@ export function scratch({ plans, lanes, after = {}, spec = {}, local = {} }) {
     pollMs: 50,
     events: (name, data) => appendFileSync(events, JSON.stringify({ t: Date.now(), plan: data.plan, event: `conductor-${name}` }) + "\n"),
   };
+  // The digest lives outside the scratch repository, as the real one lives in a gitignored path:
+  // a file inside would make the main checkout dirty and refuse every fast-forward.
+  const digestPath = join(tmp("rlx-digest-"), "digest.md");
+  ctx.onChange = () => writeDigest(digestPath, ctx.state, { repo, stateDir });
+  const digest = (heading) => {
+    const text = readFileSync(digestPath, "utf8");
+    if (!heading) return text;
+    const start = text.indexOf(`${heading}\n`);
+    assert.ok(start >= 0, `digest has no ${heading}:\n${text}`);
+    const rest = text.slice(start + heading.length + 1);
+    const end = rest.search(/^#{2,3} /m);
+    return end < 0 ? rest : rest.slice(0, end);
+  };
   const readEvents = () =>
     readFileSync(events, "utf8")
       .trim()
       .split("\n")
       .filter(Boolean)
       .map((l) => JSON.parse(l));
-  return { ctx, repo, readEvents };
+  return { ctx, repo, readEvents, digest };
 }
 
 const dev = (id) => ({ id, owner: "dev" });
@@ -81,7 +95,7 @@ const human = (id) => ({ id, owner: "human" });
 const kinds = (rec) => rec.steps.map((s) => (s.owner ? `${s.kind}:${s.owner}` : s.kind));
 
 test("a dev run then a studio-builder run with a clean review merges, tagged, lane removed", async () => {
-  const { ctx, repo } = scratch({ plans: [{ number: "0101", phases: [dev("1"), dev("2"), studio("3")] }], lanes: { a: ["0101"] } });
+  const { ctx, repo, digest } = scratch({ plans: [{ number: "0101", phases: [dev("1"), dev("2"), studio("3")] }], lanes: { a: ["0101"] } });
   const worktreeBefore = join(ctx.worktreeRoot, "rlx-plan-0101");
   await runLanes(ctx);
   const rec = loadState(ctx.stateDir).plans["0101"];
@@ -99,6 +113,11 @@ test("a dev run then a studio-builder run with a clean review merges, tagged, la
   assert.ok(closedPlan.done);
   assert.ok(readPlanFile(closedPlan.path).hasCloseReview);
   assert.ok(existsSync(join(repo, "phase-0101-3.txt")));
+
+  const closed = digest("### Closed");
+  assert.match(closed, /^- \*\*0101 - Plan 0101 fixture\*\* - 0\.1\.1, tag `v0\.1\.1` annotated, merge `[0-9a-f]{7}`, 0 fix rounds, /m);
+  assert.match(closed, /Review: `docs\/plans\/done\/0101-fixture\.md` `## Close review`\./);
+  assert.match(digest("### Needs you"), /^- nothing: no park, and every merge was clean\.$/m);
 });
 
 test("a closed outcome whose plan has no ## Close review parks as a disagreement", async () => {
@@ -117,7 +136,7 @@ test("a closed outcome whose plan has no ## Close review parks as a disagreement
 });
 
 test("a human phase parks with its worktree kept, the lane runs on, and a dependant is held", async () => {
-  const { ctx, repo } = scratch({
+  const { ctx, repo, digest } = scratch({
     plans: [
       { number: "0101", phases: [dev("1"), human("2"), dev("3")] },
       { number: "0102", phases: [dev("1")] },
@@ -141,10 +160,15 @@ test("a human phase parks with its worktree kept, the lane runs on, and a depend
   const inbox = readFileSync(statePaths(ctx.stateDir).inbox, "utf8");
   assert.match(inbox, /plan 0101 parked: human_phase/);
   assert.match(inbox, /Resume:\*\* `node tools\/conductor\/conductor\.mjs resume 0101`/);
+
+  const needs = digest("### Needs you");
+  assert.match(needs, /^- \*\*0101 parked\*\* at Phase 2 \(`human_phase`\)\. Phase 2 is owned by human\. Read: docs\/plans\/0101-fixture\.md Phase 2\. Holds `[^`]*rlx-plan-0101`\.$/m);
+  assert.match(needs, /^ {2}Resume: `node tools\/conductor\/conductor\.mjs resume 0101`$/m);
+  assert.match(digest("### Closed"), /^- \*\*0102 - Plan 0102 fixture\*\*/m);
 });
 
 test("a review with one major takes exactly one fix round and a re-review, then merges", async () => {
-  const { ctx } = scratch({
+  const { ctx, digest } = scratch({
     plans: [{ number: "0101", phases: [dev("1")] }],
     lanes: { a: ["0101"] },
     spec: { "0101": { reviews: ["major", "clean"] } },
@@ -158,6 +182,14 @@ test("a review with one major takes exactly one fix round and a re-review, then 
   assert.equal(rec.verdicts[0].majors, 1);
   assert.equal(rec.fixes[0].resolved[0].finding, 0);
   assert.deepEqual(rec.gates.map((g) => g.label), ["pre-review", "fix-1"]);
+
+  const fixSha = rec.fixes[0].resolved[0].commit.slice(0, 7);
+  const closed = digest("### Closed");
+  assert.match(closed, /, 1 fix round, /);
+  assert.ok(
+    closed.includes(`  - major \`phase-0101-1.txt:1\` major finding in round 1 - resolved in \`${fixSha}\``),
+    `the major is listed as resolved by the fix commit:\n${closed}`,
+  );
 });
 
 test("a review still carrying a blocker after two fix rounds parks", async () => {
@@ -265,7 +297,7 @@ test("two lanes closing at once serialize on the close lock", async () => {
 });
 
 test("a budget-exhausted step parks with its spend recorded", async () => {
-  const { ctx } = scratch({
+  const { ctx, digest } = scratch({
     plans: [{ number: "0101", phases: [dev("1")] }],
     lanes: { a: ["0101"] },
     spec: { "0101": { budget: "implement" } },
@@ -276,6 +308,9 @@ test("a budget-exhausted step parks with its spend recorded", async () => {
   assert.equal(rec.park.reason, "budget");
   assert.equal(rec.steps[0].result.spendUsd, 7.5);
   assert.equal(rec.steps[0].result.subtype, "error_max_budget_usd");
+
+  assert.match(digest("### Failed and parked"), /^- \*\*0101\*\* spend cap hit in `0101-01-implement`: spent \$7\.50\.$/m);
+  assert.match(digest("### Totals"), /^- lane a: 0 merged, 1 parked, \$7\.50\.$/m);
 });
 
 test("a red conductor gate parks before any review", async () => {

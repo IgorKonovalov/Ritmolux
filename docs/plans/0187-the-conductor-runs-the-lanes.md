@@ -366,8 +366,8 @@ Outcome kinds: implementers `phases_done` or `parked` (`reason`: `human_phase` |
 | 1 — The headless contract, observed rather than assumed | dev | done | `142e24a` |
 | 2 — Conductor mode in the skills, and the hooks that make it safe | dev | done | `b6990c6` |
 | 3 — The conductor's core: queue, state, plan reading, locks, one step | dev | done | `0a90ec7` |
-| 4 — The lane loop, end to end against a scratch repository | dev | committed with this row | |
-| 4b — The close digest: what happened, readable the morning after | dev | not started | |
+| 4 — The lane loop, end to end against a scratch repository | dev | done | `fad5459` |
+| 4b — The close digest: what happened, readable the morning after | dev | committed with this row | |
 | 5 — The operator surface and the documents | dev | not started | |
 | 6 — The pilot: one lane, two plans, watched | human | not started | |
 
@@ -381,6 +381,7 @@ Outcome kinds: implementers `phases_done` or `parked` (`reason`: `human_phase` |
 - Phase 3: conductor-side park reasons `budget`, `api`, `no_outcome`, `bad_outcome` (`lib/step.mjs`).
 - Phase 4: added `tools/conductor/test/lane-scenario.mjs` (the fake sessions' repository behaviour); a fix round goes to `/studio-builder` when every blocker and major names a file under `studio/`, else `/dev`.
 - Phase 4: two scenarios beyond the done-when list - a red conductor gate parks before review, and `plan.mjs` normalizes CRLF (a scratch checkout under this machine's `core.autocrlf=true` read no phases).
+- Phase 4b: the digest's scenario assertions went into `lane.test.mjs` (a Phase 4 file). That the CLI accepts the digest's `resume` command, and that `status` regenerates the digest, are tested in Phase 5, where those commands exist.
 
 ### Close triggers
 
