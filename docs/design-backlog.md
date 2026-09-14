@@ -1525,6 +1525,8 @@ tree, which is not discoverable from the panel.
 
 - **Verified 2026-08-16** — nothing in the shim asks the host whether layout editing is on:
   `absent: is_edit_mode_enabled in: plugin-foobar/foo_ritmolux.cpp`
+- **Verified 2026-09-14** - the context-menu handler moved to its own file in Plan 0126's split, and nothing there asks either:
+  `absent: is_edit_mode_enabled in: plugin-foobar/host_window.cpp`
 - **Seen on-device 2026-08-24**, post-0107, at [Plan 0107](plans/done/0107-the-foobar-menu-picks-a-preset.md)
   Phase 5: layout-edit right-click still surfaces the component's menu — now Preset ▸ and four
   items — wholly in place of Cut / Copy / Replace / Remove. The entry's evidence was a code probe
@@ -2238,6 +2240,8 @@ shell-occupancy rescue, reading the tonal statistic at the quiet excitation too,
 lens, is a real decision with real alternatives and belongs in an ADR. It should land **before Plan
 0113 Phase 6**, which is where the emptying canvas arrives. Phases 3-5 are unaffected.
 
+- **Promoted 2026-09-14** to [Plan 0186](plans/0186-the-flatness-gate-tells-a-figure-from-its-ground.md): five figure/ground candidates measured against two blot anchors under a stop condition registered before any number is read; its Phase 2 human gate writes ADR-0200 whichever way it falls, and a negative result is a valid end. The composition-or-fill question for Sumi, Whorl, Supernova and Neon Tunnel is carved out and re-filed at that close if still open.
+
 ## 0140 — the band contour can only ever be an anti-aliased grey, so on a hard-banded palette it is the one thing that puts shading into a two-ink print
 
 [ADR-0133](adrs/0133-the-band-contour-fires-where-the-ink-changes.md) fixed *which* edges
@@ -2287,6 +2291,8 @@ the frame — so the contour is the only source of intermediate values in the pi
 **Low.** One preset wants it, the workaround (full strength, ink core, soft edges) is shipped and
 looks good, and the fix costs a parameter on a surface that was deliberately kept free of one.
 Revisit if a second limited-ink world lands on a contoured scene.
+
+- **Promoted 2026-09-14** to [Plan 0184](plans/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 1 and [ADR-0197](adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md): the contour gains a hard/soft style and an ink taken from a palette coordinate, on every scene that draws it, with the default byte-identical.
 
 ## 0142 — a same-system dissolve runs `Scene::update` twice in one frame, so every stateful scene advances at 2x for its duration
 
@@ -2389,6 +2395,8 @@ reach — but it is now the shared failure mode of six rates rather than two, an
 `Scene::update` that grows state joins it silently. Revisit when a dissolve visibly misbehaves, or
 when someone needs the dual-live path testable for another reason.
 
+- **Falsified 2026-09-14**, recorded by [Plan 0181](plans/0181-a-scene-advances-after-its-frames-bindings.md). `dissolve_mode` passes `scenes::shares_resources(a, b)` to `dual_live_eligible`, and `shares_resources` answers true for any same-system pair (`a == b`), so every same-system dissolve takes `Mode::Freeze` and the shared scene is evaluated once per frame. The double-run is reachable only through the `#[cfg(test)]` `begin_transition_forced`, which is how this entry read it; Plan 0181 makes that hatch refuse a shared pair. Correct in place and archive at Plan 0181's close.
+
 ---
 
 ## 0146 — `warp_mesh` colours its light at deposit time, so the palette cannot band the accumulated field
@@ -2434,6 +2442,8 @@ small enough to fold into someone else's plan.
 **Medium.** It closes a system to a palette class rather than breaking anything that ships, and the
 cohort has four systems that do work. It rises if `warp_mesh` is wanted for a limited-ink world
 specifically, because nothing else in the engine makes a decay contour.
+
+- **Promoted 2026-09-14** to [Plan 0184](plans/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 2 and [ADR-0197](adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md): `warp_mesh` `color_source` deposits uncoloured light and colours the field by its level at present time; the two colour paths exclude each other, and the phase stops if the level outgrows `color_span`.
 
 ---
 
@@ -2565,6 +2575,8 @@ guess, which is what the 85 % window was.
 - **Verified 2026-08-29** - and the frame still carries the lock flag a consumer would need: `present: pub downbeat_locked in: core/src/dsp/mod.rs`
 - **Verified 2026-08-29** - and the published set still omits every one of them, which is the claim itself: `absent: bar_index|beat_in_bar|bar_phase|downbeat_locked in: standalone/src/osc.rs`. **This bullet was an `unprobeable:` opt-out until Plan 0132 closed**, on the reasoning that the sink lived on an unmerged lane and no probe against it resolved on `main`. That lane merged, so the opt-out expired and the reduction is a real one: it goes red the day the grid is published, which is the day this entry is discharged.
 
+- **Updated 2026-09-14** - [Plan 0133](plans/0133-the-engine-drives-the-lights.md) was amended so its Phase 3 weighs this entry's own fix, publishing the existing bar grid and `downbeat_locked` over OSC, before it designs a gate on the folded tempo.
+
 ## 0158 - the tempo octave is unsettled by design, so every consumer folds it, and the rig observed the fold running the opposite way from the documented bias
 
 > **Filed 2026-08-29** from the live lighting rig, after the 2026-08-29 set.
@@ -2603,6 +2615,8 @@ the grid.
 
 - **Verified 2026-08-29** - the search range is still 60-200 with no octave resolution: `present: const MAX_BPM: f32 = 200.0 in: core/src/dsp/tempo.rs`
 - **Verified 2026-08-29** - and the estimator still declines to settle the octave: `present: does not settle the octave in: core/src/dsp/tempo.rs`
+
+- **Updated 2026-09-14** - [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3 now opens with this entry's diagnosis (was the rig's high reading a warm-up artefact?) before it ships a fold, since a tempo lock flag may beat one.
 
 ## 0160 - the test suite re-creates a `target/` inside the worktree that no redirect reaches, and its own comment says it cannot
 
@@ -2664,6 +2678,8 @@ has to be re-stated, since it is the part that is wrong independently of the pat
 - **Verified 2026-09-01** - the scratch path roots at the directory cargo writes to, not at the source location: `present: env!\("CARGO_TARGET_TMPDIR"\) in: standalone/tests/shot_cli.rs`
 - **Verified 2026-09-01** - and no longer builds that path off the repo root: `absent: let dir = repo_root\(\) in: standalone/tests/shot_cli.rs`
 - **Verified 2026-08-29** - the sibling that was always correct still is: `present: current_exe in: standalone/tests/shot_cli.rs`
+
+- **Updated 2026-09-14** - this entry's own claim was delivered by Plan 0136 Phase 8, and the class survives in `standalone/tests/stream_show.rs`'s `scratch()`, which 0161 now carries; [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) closes both.
 
 ## 0161 - three committed scripts still resolve cargo output under `<repo>/target`, which the artifact-store docs assert nothing does
 
@@ -2734,6 +2750,8 @@ looking.
 - **Verified 2026-09-01** - and no longer builds a cargo output path off the repo root: `absent: repo_root\}/target/ in: packaging/macos/bundle.sh`
 - **Verified 2026-08-29** - the two render scripts still assume the old layout: `unprobeable: renders/ is gitignored, so both scripts exist on the authoring machine and in no checkout - probing them passes here and breaks every fresh clone`
 - **Verified 2026-08-29** - the script the plan actually fixed no longer does: `absent: Join-Path \$repo "target in: plugin-foobar/build.ps1`
+
+- **Promoted 2026-09-14** to [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phases 2 and 9. **The "no committed violator" line above is false**: `standalone/tests/stream_show.rs` still builds `CARGO_MANIFEST_DIR/../target`, and four studio tests join `ROOT/target`. The plan adds guards in `core/tests/hygiene.rs` and the studio's eslint config so the rule stops depending on a sweep.
 
 ## 0163 - `level/bass` reads exactly 1.0 on every local peak by construction, so the lighting consumer that read it as a dimmer value saw pinned dynamics, and the recorded diagnosis blamed an input gain that cannot move it
 
@@ -2822,6 +2840,8 @@ and it belongs with whatever plan next touches that document.
 
 - **PROMOTED 2026-09-01 -> [Plan 0147](plans/done/0147-what-the-show-costs-and-what-its-numbers-mean.md) Phase 1**, as the documentation ask this entry says it is. The
   phase lands first in that plan because [Plan 0133](plans/0133-the-engine-drives-the-lights.md) is approved and meets this on its first evening.
+
+- **Updated 2026-09-14** - the preset-author residue is folded into [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5: one paragraph in `docs/presets.md` that the band terms reach 1.0 on every local peak, repeated where that plan's look grammar names its bindable terms. A lighting-shaped level term stays out.
 
 ## 0165 - the windowed app cannot ask for the discrete GPU, so every windowed frame-time figure this project has quoted is an integrated-GPU figure
 
@@ -2943,6 +2963,8 @@ would serve the same end deliberately rather than as a side effect.
 - **Verified 2026-08-31** - selection by name is a first-exact-match, so a duplicate name makes one preset unreachable: `present: position\(\|n\| n == name\) in: core/src/render/roster.rs`
 - **Verified 2026-08-31** - `unprobeable: the drift itself is a property of a machine's %APPDATA% preset directory, which exists in no checkout - presets/ is clean by construction and a probe against it would pass forever while saying nothing about the condition`
 
+- **Promoted 2026-09-14** to [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phases 1-2: a startup line naming files outside the embedded set and duplicate display names, and a `--list-presets` flag. Nothing is pruned.
+
 ## 0179 — `cargo doc` is the one CI gate no local step mirrors, so making an item public cannot fail until after the push
 
 **Raised by:** `architect`, at [Plan 0137](plans/done/0137-the-metrics-measure-light.md)'s close
@@ -2996,6 +3018,7 @@ A third option worth naming only to reject: adding `#[allow(rustdoc::private_int
 the module level. It would have made this specific failure impossible and would also have made the
 next real broken link invisible.
 
+- **Promoted 2026-09-14** to [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 7: a scoped `cargo doc -p rlx-core` joins the hook only if it catches Plan 0137's class within the clippy step's cost; the close-ceremony gate line lands with the architect at approval.
 
 ## 0181 — Running the test suite migrates the developer's real `%APPDATA%` directory
 
@@ -3051,6 +3074,8 @@ same one-line fix in the helper covers it.
 - **Verified 2026-09-14** — while the loop they reach now opens the per-user log:
   `present: DiagLog::new\(crate::cli::resolve_log_path\(\)\) in: standalone/src/stream.rs`
 
+- **Promoted 2026-09-14** to [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 1: every spawned binary gets a scratch data root through one helper, held by a `hygiene.rs` guard. The re-derivation found `stream_split` and `shot_cli` reach the real root too. [Plan 0120](plans/0120-the-standalone-ships-on-ubuntu.md) Phase 2 carries the Linux arm.
+
 ## 0182 — Thirty-seven of the forty-six test targets could share one binary, and nine `binary()` predicates are why the merge has to be partial
 
 **Raised by:** `architect`, while designing [Plan 0153](plans/done/0153-the-debug-tree-stops-carrying-dependency-line-tables.md)
@@ -3088,6 +3113,8 @@ Plan 0153 takes the per-binary payload down from 40.5 MB to 15.0 MB, so the valu
 falls with it — 36 x 15 MB rather than 36 x 40 MB. It composes rather than competes: the two
 multiply out to the same `.pdb` line item shrinking on both axes.
 
+- **Promoted 2026-09-14** to [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 8 and [ADR-0204](adrs/0204-a-cheap-integration-test-shares-one-binary-and-a-test-that-needs-its-own-stays-its-own.md): a partial merge, re-derived at HEAD after Plan 0174 closes. The 37-of-46 count above is stale; the plan's own derivation is the live one.
+
 ## 0183 — Nothing bounds the incremental cache, and 509 crate-hash directories accumulated inside a single day
 
 **Raised by:** `architect`, while designing [Plan 0153](plans/done/0153-the-debug-tree-stops-carrying-dependency-line-tables.md)
@@ -3121,6 +3148,8 @@ ordinary and the fix is a documented periodic `rm -rf target/debug/incremental`.
 Note that [ADR-0147](adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md) already
 names disk as a live cost with *"discipline and not a gate"* as its only defence; this entry is that
 cost measured inside one checkout rather than across lanes.
+
+- **Promoted 2026-09-14** to [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phases 4 and 6: measure crate-hash churn per tool first, then document a bound or prune.
 
 ## 0184 — Cargo emits a new artifact generation per fingerprint change and never collects the old one, and the pinned stable toolchain has no GC
 
@@ -3156,6 +3185,8 @@ in `deps/` and 771 MB in `incremental/` belonged to `lmv_*`, the crate name that
 to `rlx_*`; no `Cargo.toml` in the workspace names `lmv` any more. A rename orphans every artifact
 under the old name permanently, and nothing surfaces that. Worth one line in the rename checklist,
 wherever the next one is recorded.
+
+- **Promoted 2026-09-14** to [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 5: a prune script in `scripts/` whose live set is what cargo's JSON reports, rather than `cargo-sweep` or an mtime rule.
 
 ## 0185 — The `--help` banner still calls the application `ritmolux`
 
@@ -3193,6 +3224,8 @@ plan-relative narration.
 **What a fix looks like.** One character in `cli.rs`, plus the `settings/tests.rs` fixture path for
 consistency. It is a `dev` edit rather than a docs one, which is the only reason a docs lane left it
 standing. If the golden `--help` output is ever pinned byte-for-byte, pin it after this moves.
+
+- **Promoted 2026-09-14** to [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 3: the banner's product token is capitalised; the binary name stays lower-case.
 
 ## 0186 — the density law scales a preset's *trace count*, so eight low-`density` worlds draw 4x the strokes at 1/4 the brightness on a large display
 
@@ -3271,6 +3304,8 @@ which is exactly the sentence that is false for a trace.
 
 Either way the two stale headers above want a sweep, and `presets/README.md`'s note wants the trace
 half added beside the cloud half it already has.
+
+- **Promoted 2026-09-14** to [Plan 0183](plans/0183-a-low-density-is-a-trace-count.md) and [ADR-0195](adrs/0195-a-low-density-is-a-trace-count-and-the-law-scales-only-a-cloud.md): at or below density 0.08 the drawn count is the tier anchor's at every size, at or above 0.16 the law applies unchanged, and the count blends linearly between. The table above misses `attractor_lorenzknot` at 0.02.
 
 ## 0187 — two measurements of the same console on the same adapter class disagree by 2x, and nothing explains which one the machine actually does
 
@@ -3359,6 +3394,8 @@ settle it.
 **Low.** One frame, at a preset switch, at a default rather than a wild value. It is filed because it
 is a *structural* ordering and the population it affects is growing, not because anyone has seen it.
 
+- **Promoted 2026-09-14** to [Plan 0181](plans/0181-a-scene-advances-after-its-frames-bindings.md) and [ADR-0198](adrs/0198-a-scene-advances-after-its-frames-bindings.md): `set_time` and `advance` move below the binding walk. **Two corrections to the text above:** only `emitter` and `shape_collage` read parameters inside `advance`, so the change is not golden-moving for every preset; and on a switch frame the incoming scene integrates the previous preset's values, not the scene's defaults.
+
 ## 0192 - `--report` cannot see a `beat_index`-driven response, so a deliberately musical preset measures as inert
 
 `shot --report`'s four reactivity columns and its `drive` column each capture a **held** analysis
@@ -3414,6 +3451,8 @@ interview this entry is asking for.
 it costs is judgement — a curator reading `onset 0.000` concludes a preset ignores the music, when the
 preset may be the most rhythmically driven thing in the set. That misreading has now happened once,
 to the author who could tell the difference.
+
+- **Promoted 2026-09-14** to [Plan 0182](plans/0182-the-report-hears-a-counter.md) and [ADR-0196](adrs/0196-the-report-hears-the-musical-clock-in-a-column-of-its-own.md): a `count` column read off a synthetic musical clock; every existing column keeps its stimulus and its numbers.
 
 ## 0196 — most `v*` tags produce no Release run at all, and the cause Plan 0165 named cannot explain nineteen of them
 
@@ -3492,6 +3531,8 @@ and the project has been shipping from a release page that stopped at `v0.103.0`
 reached `v0.113.0`. It becomes **High** the moment anyone outside the project is asked to download
 a build.
 
+- **Promoted 2026-09-14** to [Plan 0176](plans/0176-a-release-tag-reaches-origin.md) and [ADR-0203](adrs/0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md). **The diagnosis moved:** CI runs on every tag push and its run list matches the Release run list, and none of the silent tags has a CI run, so they were never pushed when made. `v0.115.0`-`v0.120.0`, `v0.122.x` and `v0.123.0` are missing from origin, most of them lightweight (the ceremony's re-tag writes that form, and `--follow-tags` skips it), but `v0.118.0` and `v0.119.0` are annotated and missing too, so the gate reads origin rather than the tag type. The stranded tags are pushed as tags with one release, `v0.123.0`.
+
 ---
 
 ## 0198 — `deposit_arms` tears along the branch cut at a fractional value, and nothing rounds it
@@ -3543,6 +3584,8 @@ after someone authors one.
 **Low.** Unreachable from the shipped library, and the fix is a one-line declaration whose cost only
 grows if a preset lands on the parameter first.
 
+- **Promoted 2026-09-14** to [Plan 0179](plans/0179-a-parameters-range-belongs-to-its-family.md) Phase 1: `deposit_arms` becomes `ParamKind::Structural`; rounding in the shader was rejected.
+
 ## 0203 — the smoke run captured from a microphone while the default is loopback, and nobody established why
 
 [Plan 0167](plans/done/0167-the-studio-becomes-handable.md)'s smoke run, 2026-09-10, reported its capture
@@ -3585,6 +3628,8 @@ defect worth a plan. Nothing has established which.
 cannot close — a silent fallback to the wrong endpoint — would be a defect every user hits without
 knowing.
 
+- **Promoted 2026-09-14** to [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 5. The code shows no loopback-to-microphone fallback; the settings overlay's Input mode row persists `line-in` on one arrow press, which is the likely cause. A human on-device check settles it.
+
 ## 0204 — the studio's sliders read one range per parameter, so a curve family's own range is unreachable from them
 
 [Plan 0162](plans/done/0162-the-curve-families.md) gave `parametric_curve` five families that read
@@ -3622,6 +3667,8 @@ cover both.
 **Low.** No curve preset on the new families ships yet, and the studio edits the file as text as
 well as by slider; it becomes worth taking when the first such preset is curated into the set.
 
+- **Promoted 2026-09-14** to [Plan 0179](plans/0179-a-parameters-range-belongs-to-its-family.md) and [ADR-0194](adrs/0194-a-family-dependent-range-travels-in-the-schema-and-the-player-reports-the-family.md): the schema carries a per-family range (the attractor's `a`..`d` included), the `preset` event reports the family, and the studio's slider reads the family's range. `SCHEMA_VERSION` does not move - the field is additive.
+
 ## 0206 — with no post stage active a fullscreen field's REPLACE blend overwrites the backdrop, so `occlude = 0` lets nothing through
 
 `fragment_field`'s shader comment promises that *"at 0 the sky adds through an opaque field"*, and
@@ -3657,6 +3704,8 @@ is the thing that goes red.
 from the chain rather than from `bg_*`, which 0069 already recommends for a different reason. What
 it costs is a parameter that reads as broken on the simplest preset an author can write.
 
+- **Promoted 2026-09-14** to [Plan 0185](plans/0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage.md) and [ADR-0201](adrs/0201-a-fullscreen-scene-presents-premultiplied-over-the-backdrop.md), **widened from two scenes to four**: `shape_field` and `shape_collage` share the same REPLACE present. No shipped preset moves.
+
 ---
 
 ## 0207 — the cap-recovery line says "geometry is back within the segment cap" for every context, and three of the five are not geometry
@@ -3690,6 +3739,8 @@ than a rough edge.
 **Low.** It is one console line, seen only by an operator already reading `stderr`, and only on the
 frame a clamp releases. It is on this list because it is the second half of a pair whose first half
 is correct, which is how it stayed wrong across two plans that each looked straight at it.
+
+- **Promoted 2026-09-14** to [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 3: the recovery line renders per context, as the onset line already does.
 
 ---
 
@@ -3730,6 +3781,8 @@ to `system` in the reader documents and in `.rs` comments.
 **Low.** Every instance so far has been cosmetic and every one was caught, so the cost to date is
 reviewer attention rather than a wrong build. It is worth an entry because the catching is the
 expensive part and it recurs on a fixed schedule: once per new system, forever.
+
+- **Promoted 2026-09-14** to [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 4 and [ADR-0202](adrs/0202-a-written-count-of-the-systems-is-refused-by-a-gate.md): a count gate over the reader documents and `.rs` comments, and the gate inventory rewritten without numbers. [Plan 0120](plans/0120-the-standalone-ships-on-ubuntu.md) Phase 5 uses count-free platform wording.
 
 ## 0212 — three frame-delta guards below the entries check only the sign, so the one-policy gate cannot see them and each keeps an answer of its own
 
@@ -3783,6 +3836,8 @@ kept ones do not use, with an allowlist entry for each kept one.
 **Low.** Unreachable, nothing renders wrong, and bounded to three lines and one test pattern. It is
 filed because ADR-0191's Decision says "only answer" and the tree has three more.
 
+- **Promoted 2026-09-14** into [Plan 0175](plans/0175-an-eased-value-arrives.md) Phase 3: all three guards are deleted (`Easing::step` then holds on `dt = 0` rather than snapping), and the hygiene predicate widens to the sign spellings. The four probes above go red on delivery.
+
 ## 0213 — the horizon's length-independence test compares rows and never the ground they were measured against, so its doc still states a property pooling made conditional
 
 `a_horizon_is_reproducible_and_does_not_depend_on_its_own_length` in `standalone/tests/shot_cli.rs`
@@ -3811,6 +3866,8 @@ a message that names a ground change, and restate the doc in the conditional for
 
 **Low.** Green and deterministic today. The cost is a misdirected diagnosis on the day a fixture's
 ground moves.
+
+- **Promoted 2026-09-14** to [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 3: the horizon test compares the two runs' `ground` before the rows.
 
 ## 0214 — a converted comp shader reads the warp stage's `rad`/`ang`, and a converted per-vertex program reads raw uv `x`/`y`, where the reference builds both differently
 
@@ -3850,6 +3907,8 @@ converted preset reads differently from the reference. The citations are in the 
 **Medium.** Both are silent. Every comp shader or per-vertex program that reads these inputs renders
 a transformed version of the look it was authored for, and nothing in the conversion flags it.
 
+- **Promoted 2026-09-14** to [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) Phases 1-3: read the warp uv chain, give the comp stage the source's polar pair, aspect-correct the per-vertex `x`/`y`. [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md) Phase 2 names the uv chain as a candidate cause of the wash.
+
 ## 0215 — the seam Plan 0109 saw on two MilkDrop 1.x presets is unexplained, and the test doc that frames it still attributes a +x cut to MilkDrop
 
 Plan 0109's Phase 5 look gate saw a seam running from the frame centre to the right edge on
@@ -3881,6 +3940,8 @@ way.
 ### Priority
 
 **Medium**, as 0119 was. It shows on real content, and the diagnosis it had is gone.
+
+- **Promoted 2026-09-14** to [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) Phases 1 and 4: render the seam before anything moves, then find its ray and rewrite the stale test doc. [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md) Phase 4 adds a "seam present?" column for the reference side.
 
 ## 0216 — the converted waveform follows neither reference: modes 0-5 draw other figures than the source, and modes 6-7 sit between the source and `foo_vis_milk2`
 
@@ -3922,6 +3983,8 @@ ADR-0071's prose error.
 **Medium.** The waveform-led converted presets draw a different figure in most modes, not a
 mis-scaled one. That is a bigger gap than the 4.7 % this line of work started from.
 
+- **Promoted 2026-09-14** to [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) Phases 5-6 and [ADR-0199](adrs/0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md): modes draw the released source's figure at the scale `foo_vis_milk2` renders, from a left/right pair the analyzer already receives, with a hard stop back to a mono stand-in if anything below the analyzer would change.
+
 ## 0217 — `path_cost`'s arity probe draws a curved leaf, so from `samples = 32` up it prices the arc chain and not the polyline its header reports
 
 `the_contour_arity_is_priced_against_the_floor_tier` in `core/tests/path_cost.rs` times one figure,
@@ -3960,6 +4023,8 @@ slope. The ceiling's argument is about the worst case an author can load, and th
 
 **Low.** Nothing renders wrong and the ceiling still stands. What is wrong is that the one test
 named as the ceiling's measurement cannot re-measure it.
+
+- **Promoted 2026-09-14** into [Plan 0160](plans/0160-the-silhouettes-preconditions-stop-being-silent.md) as optional Phase 1b: re-price the arity on a polyline and re-take the header table. If that phase is skipped this entry stays live.
 
 ## 0218 — a `[smoothing]`-eased value never reaches a whole-number target, so a floored step one generation up never draws
 

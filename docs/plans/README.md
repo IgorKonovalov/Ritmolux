@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0176** (ADRs are a separate sequence — next free there is **0194**.)
+**Next free number: 0187** (ADRs are a separate sequence — next free there is **0205**; 0200 is reserved for Plan 0186 Phase 2.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -40,14 +40,25 @@ place. The plan file carries the real link.
 <!-- roster:begin cap=320 -->
 | Plan | Title | Status | Owner | Live constraint |
 |------|-------|--------|-------|-----------------|
-| [0120](0120-the-standalone-ships-on-ubuntu.md) | The standalone ships on Ubuntu | approved | dev, human | ADR-0131 (proposed): a PulseAudio capture arm plus an `ubuntu-latest` CI arm. **Phase 1 is a `human` stop gate before `dev`** — only one of its three outcomes lets `dev` start. |
-| [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | approved | dev, human | **A new Phase 1 fixes backlog 0102 + 0103 before anything advertises the component** — foobar's UI starves until playback starts. **Phases 4-6 unblocked, 0150 closed.** 0156 Phase 2 shortens the README first. |
-| [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + **0174**: Art-Net to the fixtures, verified against `rlx-artnet-sim` because **the rig is unreachable**. Phases 1-8 need none; 9 is the rig session. Phase 8 hard-depends on 0115 Phase 2. |
-| [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. Fixes the wash, then writes ADR-0113's third Outcome. **The verdict decides whether backlog 0109 is buyable.** Needs the reference rig. |
-| [0160](0160-the-silhouettes-preconditions-stop-being-silent.md) | The silhouette's preconditions stop being silent | approved | dev, human | ADR-0179: four preconditions on `[path]` that fail silently. **0092 closed 2026-09-09**, so its Phase 7 axis fix is in. Phase 2 is prose in `presets/README.md`. |
-| [0166](0166-the-basics-read-in-russian.md) | The basics read in Russian | approved | dev, human | ADR-0185: five docs gain a Russian sibling `.ru.md` stamped with the source sha. **Phase 3 is a `human` review that blocks publication.** Touches no Rust - orderable against any lane. |
-| [0174](0174-the-clock-reading-tests-run-alone.md) | The clock-reading tests run alone | approved | dev | ADR-0193 (proposed): timed tests run alone under nextest, a guard ties them to the clippy exemption. **Phase 2 diagnoses `stream_show` + `control_loopback` first** - both stop at a `ctl/preset` datagram. |
-| [0175](0175-an-eased-value-arrives.md) | An eased value arrives at its target | draft | dev | Backlog 0218: `Easing::step` snaps where a step makes no progress. **The `N.5` offsets stay** - a floored step draws on arrival, which outlasts a transient. Core-only, orderable against any lane. |
+| [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | approved | dev, human | Phase 1 fixes backlog 0102 + 0103 (`viz_session.cpp`, `host_window.cpp`) first. **Phase 5 now waits on Plan 0176** - a tag must reach origin and publish. Phase 4 shrinks to topics + preview. |
+| [0120](0120-the-standalone-ships-on-ubuntu.md) | The standalone ships on Ubuntu | approved | dev, human | ADR-0131 (proposed): PulseAudio capture + an `ubuntu-latest` CI arm. **Phase 1 is a `human` stop gate before `dev`.** Guard is 5 zips + 1 tarball; folds backlog 0181 (Linux arm) + 0208. |
+| [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + 0174 (proposed): Art-Net verified against `rlx-artnet-sim`. **Phase 8 opens on a decision** - 0115's tap is headless-only, and a windowed resolve is an ADR. Phase 9 is the rig. |
+| [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. **Runs after 0180**, which re-draws the waveform its wash is measured on. The verdict decides whether backlog 0109 is buyable. Needs the reference rig. |
+| [0160](0160-the-silhouettes-preconditions-stop-being-silent.md) | The silhouette's preconditions stop being silent | approved | dev, human | ADR-0179: four silent `[path]` preconditions. **Amended 2026-09-14:** optional Phase 1b folds in backlog 0217 (arity probe re-prices a polyline). Phase 2 is prose. |
+| [0166](0166-the-basics-read-in-russian.md) | The basics read in Russian | approved | dev, human | ADR-0185: five docs gain a stamped `.ru.md`. **Phase 3 is a `human` review that blocks publication.** Amended 2026-09-14: `pages.yml` depth, gate-count prose collides with 0178. |
+| [0174](0174-the-clock-reading-tests-run-alone.md) | The clock-reading tests run alone | in-progress | dev | ADR-0193 (proposed). Phases 1-2 landed; the control-path pair reproduced and routed to backlog 0219 + 0220. **`-P fast` rose 154 s** - the close decides whether the hook affords it. |
+| [0175](0175-an-eased-value-arrives.md) | An eased value arrives at its target | draft | dev | Backlog 0218 + **0212 folded in as Phase 3** (three sign guards deleted). The `N.5` offsets stay. Touches `LatchBank::advance`, disjoint from 0181 in `evaluate.rs`. |
+| [0176](0176-a-release-tag-reaches-origin.md) | A release tag reaches origin | draft | dev, human | Backlog 0196 + ADR-0203 (proposed): annotated tags, and a gate that reads origin. **Phase 3 is `human`**: push the stranded tags, publish v0.123.0 only. **Blocks 0103 Phase 5.** |
+| [0177](0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) | The test tree stops touching the machine and stops costing its disk | draft | dev, studio-builder | ADR-0204 (proposed). **Starts after 0174 closes** (nextest.toml, stream_show.rs). Phase 4 measures target/ growth before the prune and fold. |
+| [0178](0178-what-the-operator-reads-is-true.md) | What the operator reads is true | draft | dev, human | Backlog 0172, 0185, 0207, 0208 + ADR-0202 (proposed): drift line, `--list-presets`, banner, recovery line, count gate. **Lands after 0176 and 0166.** Phase 5 `human` settles 0203. |
+| [0179](0179-a-parameters-range-belongs-to-its-family.md) | A parameter's range belongs to its family | draft | dev, studio-builder | ADR-0194: the schema carries per-family ranges, `preset` reports the family; backlog 0198 `deposit_arms` goes Structural. **Phase 4 waits for 0174 to close.** |
+| [0180](0180-the-converted-picture-follows-the-source.md) | The converted picture follows the source | draft | dev | ADR-0199 (proposed). Backlog 0214-0216: comp rad/ang, per-vertex x/y, the seam, source waveform figures at host scale from an L/R pair. **Runs before 0142** - no rig. |
+| [0181](0181-a-scene-advances-after-its-frames-bindings.md) | A scene advances after its frame's bindings | draft | dev | ADR-0198. **Backlog 0142 is falsified** (same-system dissolves always freeze), so no guard: **reverses the interview pick, confirm at approval**. Only emitter + collage goldens may move. |
+| [0182](0182-the-report-hears-a-counter.md) | The report hears a counter | draft | dev | Backlog 0192 + ADR-0196 (proposed): a `count` column read off a fast synthetic clock at silence. No existing column moves. **Phase 1 stops if report wall time doubles.** |
+| [0183](0183-a-low-density-is-a-trace-count.md) | A low density is a trace count | draft | dev, human | ADR-0195 (proposed): a trace (density <= 0.08) draws the tier anchor's count at every size; clouds keep ADR-0140. **No golden moves.** Phase 3 is a `human` look gate at 1080p Rich. |
+| [0184](0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) | Limited ink: a contour that is an ink, and a warp field that bands | draft | dev, human | ADR-0197 (proposed): hard ink contours on six scenes; `warp_mesh` bands by level. **Phase 2 stops if level outgrows `color_span`.** Phase 4: look gate. |
+| [0185](0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage.md) | A fullscreen field lets the sky through with no post stage | draft | dev | ADR-0201: four fields present premultiplied, not two. **No golden may move** (exact at occlude 1). Core-only, orderable against any lane. |
+| [0186](0186-the-flatness-gate-tells-a-figure-from-its-ground.md) | The flatness gate tells a figure from its ground | draft | dev, human | Backlog 0128: five figure/ground candidates vs two blot anchors at 96 and 192 px. **Phase 2 is a human gate that writes ADR-0200**; a negative result is a valid end. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
@@ -146,7 +157,7 @@ shape, because most of what it decided was sequencing rather than design:
   contour), 0146 (`warp_mesh` colours at deposit), 0100, 0101, 0095, 0092, 0069 — are look-affecting
   and larger, and several price themselves as a redesign of the composite. Backlog 0021 and 0032
   remain parked with named triggers. **0157 and 0158 are not unclaimed** despite reading that way
-  from the roster: [0133]'s Phase 2 closes both.
+  from the roster: [0133]'s Phase 3 closes both.
 - **One design premise was reopened and one was left alone.** [ADR-0158] supersedes the *geometry*
   half of ADR-0041 because that ADR rejected a true miter on the ground that *"a mitred corner and a
   rounded one differ by less than the blur that is already there"* — and Plan 0114 took
@@ -265,6 +276,46 @@ sized in samples, so 21 of 64 bands are bin-starved at 96 kHz — pinned by a te
 waiting on someone reporting a mushy low end on a 96 kHz interface).
 
 ## Recommended execution sequence
+
+**Added 2026-09-14 - a backlog sweep drafted [0176] through [0186] and amended all eight active
+plans; delivery and infrastructure go first, which is the user's call.** Every active plan was
+re-checked against the tree and none was withdrawn; each carries a dated `Amended 2026-09-14` note
+naming what moved. The order:
+
+- **Delivery and infrastructure lane.** [0174] closes first (in progress). Then [0176], because
+  [0103] Phase 5 cannot invite a download until a tag reliably reaches origin; its `human` Phase 3
+  follows its Phase 2 closely, since the new gate refuses every push while the stranded tags are
+  local. Then [0177], which owns files 0174 is still editing. [0178] edits the same gate-count
+  prose as [0166] Phase 1 and [0176]; whichever lands second rebases onto the others.
+- **Engine lane.** [0175], then [0185] before [0181] - 0185 moves no golden, which keeps 0181's
+  bless set to the emitter and collage baselines. Then [0180] before [0142]: 0180 re-draws the
+  waveform 0142's wash is measured on and needs no rig. After those, [0184], [0183], [0182],
+  [0179] (its Phase 4 waits for 0174) and [0186], in any order that keeps each bless set clean.
+- **Still gated on a human, unchanged:** [0120] Phase 1, [0133] Phase 9, [0166] Phase 3, and
+  [0103] Phases 4-6.
+- **Confirm at approval: [0181] reverses an interview pick.** Backlog 0142's double-advance is
+  unreachable - `shares_resources` answers true for any same-system pair, so every such dissolve
+  freezes - and the once-per-frame guard chosen for it would guard nothing.
+- **Not promoted, on their own instructions:** backlog 0021, 0032, 0038, 0042, 0069, 0075, 0079,
+  0087, 0092, 0094, 0095, 0100, 0101, 0154, 0187 (parked on a trigger, routed, declined or waiting
+  on hardware); 0108 and 0109 wait on [0142]'s verdict; 0125 and 0126 wait on a human side-by-side
+  of the diffusion `quality` profile.
+
+[0176]: 0176-a-release-tag-reaches-origin.md
+[0177]: 0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md
+[0178]: 0178-what-the-operator-reads-is-true.md
+[0179]: 0179-a-parameters-range-belongs-to-its-family.md
+[0180]: 0180-the-converted-picture-follows-the-source.md
+[0181]: 0181-a-scene-advances-after-its-frames-bindings.md
+[0182]: 0182-the-report-hears-a-counter.md
+[0183]: 0183-a-low-density-is-a-trace-count.md
+[0184]: 0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md
+[0185]: 0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage.md
+[0186]: 0186-the-flatness-gate-tells-a-figure-from-its-ground.md
+[0174]: 0174-the-clock-reading-tests-run-alone.md
+[0175]: 0175-an-eased-value-arrives.md
+[0120]: 0120-the-standalone-ships-on-ubuntu.md
+[0166]: 0166-the-basics-read-in-russian.md
 
 **Rewritten 2026-08-18, and this is the live sequence.** What it replaced — the 2026-08-16
 sequence and the prior sequence notes under it — is in
