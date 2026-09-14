@@ -1,6 +1,6 @@
 # 0188 — The conductor survives its first run
 
-> **Status:** approved (2026-09-15)
+> **Status:** in-progress
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`, `human`
 > **Related ADRs:** [0205](../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md) (the Outcome's first-live-run entry is this plan's source),
@@ -199,3 +199,17 @@ until it merges. Run it as a human-started `dev` lane.
 
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
+
+**Lane:** `main` directly
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — `run` works on a clean checkout | dev | committed with this row | |
+| 2 — A backlog probe is judged by the close, not parked before it | dev | not started | |
+| 3 — A park leaves a lane that can be resumed | dev | not started | |
+| 4 — A lane that stops says why | dev | not started | |
+| 5 — The pilot, resumed | human | not started | |
+
+### Notes
+
+### Close triggers

@@ -21,7 +21,7 @@ function sh(args, cwd) {
 const dev = (id) => ({ id, owner: "dev" });
 const human = (id) => ({ id, owner: "human" });
 
-function setup(plans, lanes) {
+function setup(plans, lanes, { gate } = {}) {
   const repo = tmp("rlx-cli-repo-");
   sh(["init", "-q", "-b", "main"], repo);
   for (const [k, v] of [["user.email", "t@example.invalid"], ["user.name", "T"], ["commit.gpgsign", "false"], ["tag.gpgSign", "false"], ["core.autocrlf", "false"]]) {
@@ -37,7 +37,6 @@ function setup(plans, lanes) {
   writeFileSync(join(toolDir, "queue.json"), JSON.stringify({ lanes }));
   writeFileSync(join(toolDir, "local.json"), JSON.stringify({ budget_usd: { implement: 5, fix: 3, review: 4 }, max_open_worktrees: 3 }));
   const p = { ...paths({ repo, toolDir }), settings: join(TOOL_DIR, "settings.conductor.json"), prompts: join(TOOL_DIR, "prompts"), withLock: join(TOOL_DIR, "with-lock.mjs") };
-  mkdirSync(p.stateDir, { recursive: true });
 
   const specFile = join(toolDir, "spec.json");
   writeFileSync(specFile, JSON.stringify({ plans: {} }));
@@ -51,7 +50,7 @@ function setup(plans, lanes) {
   const o = {
     p,
     claude: FAKE,
-    gate: [{ name: "noop", cmd: [process.execPath, "-e", "0"] }],
+    gate: gate?.(p) ?? [{ name: "noop", cmd: [process.execPath, "-e", "0"] }],
     worktreeRoot: tmp("rlx-cli-lanes-"),
     lockDir: tmp("rlx-cli-locks-"),
     lockPollMs: 20,
@@ -197,6 +196,7 @@ test("park parks a queued plan with an inbox entry, and resume queues it again",
 
 test("run refuses a second conductor, and abort with nothing running recovers in-flight steps", async () => {
   const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] });
+  mkdirSync(p.stateDir, { recursive: true });
   writeFileSync(join(p.stateDir, "conductor.pid"), String(process.pid));
   const refused = await cli("run");
   assert.equal(refused.code, 1);
@@ -210,6 +210,44 @@ test("run refuses a second conductor, and abort with nothing running recovers in
   assert.equal(aborted.code, 0);
   assert.equal(aborted.out[0], "conductor: not running");
   assert.equal(loadState(p.stateDir).plans["0101"].steps[0].result.status, "interrupted");
+});
+
+test("run on a checkout with no state/ writes the pid file for the run and removes it after", async () => {
+  // The gate runs mid-run, inside the lane: it is green only while the pid file exists.
+  const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] }, {
+    gate: (p) => [{ name: "pid-file-present", cmd: [process.execPath, "-e", `process.exit(require("fs").existsSync(${JSON.stringify(join(p.stateDir, "conductor.pid"))}) ? 0 : 1)`] }],
+  });
+  assert.equal(existsSync(p.stateDir), false);
+  const r = await cli("run");
+  assert.equal(r.code, 0, r.err.join("\n"));
+  const rec = loadState(p.stateDir).plans["0101"];
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  assert.ok(rec.gates.length > 0 && rec.gates.every((g) => g.ok), "the pid file existed while the gate ran");
+  assert.equal(existsSync(join(p.stateDir, "conductor.pid")), false, "the pid file is removed when the run ends");
+});
+
+test("status, resume, park and abort each run on a checkout with no state/", async () => {
+  const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] });
+  const fresh = async (...argv) => {
+    rmSync(p.stateDir, { recursive: true, force: true });
+    return cli(...argv);
+  };
+
+  const status = await fresh("status");
+  assert.equal(status.code, 0, status.err.join("\n"));
+  assert.equal(status.out[0], "conductor: not running");
+
+  const resume = await fresh("resume", "0101");
+  assert.equal(resume.code, 1);
+  assert.deepEqual(resume.err, ["conductor: plan 0101 is not parked (never started)"]);
+
+  const park = await fresh("park", "0101");
+  assert.equal(park.code, 0, park.err.join("\n"));
+  assert.equal(loadState(p.stateDir).plans["0101"].park.reason, "owner");
+
+  const abort = await fresh("abort");
+  assert.equal(abort.code, 0, abort.err.join("\n"));
+  assert.deepEqual(abort.out, ["conductor: not running"]);
 });
 
 test("unknown commands and malformed plan numbers are usage errors", async () => {

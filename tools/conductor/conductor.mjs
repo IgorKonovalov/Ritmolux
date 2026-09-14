@@ -15,7 +15,7 @@
 // tools/conductor/digest.md, both gitignored. tools/conductor/README.md is the operator guide.
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -115,6 +115,8 @@ async function cmdRun(args, o) {
   const state = pf.state;
   const recovered = recoverInterrupted(p.stateDir, state);
   if (recovered) o.log(`conductor: ${recovered} step(s) were in flight when the last run stopped; they will run again`);
+  // A clean checkout has no state/ yet: nothing before this line writes into it.
+  mkdirSync(p.stateDir, { recursive: true });
   writeFileSync(pidFile(p), String(process.pid));
 
   const ctx = {
