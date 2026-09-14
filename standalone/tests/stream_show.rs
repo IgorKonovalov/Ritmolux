@@ -94,6 +94,17 @@ fn scratch(tag: &str) -> PathBuf {
 /// redirected already, and this keeps the config, the diagnostics log and the
 /// directory migration off it too.
 fn spawn(presets: &Path, extra: &[&str]) -> (Child, std::thread::JoinHandle<()>) {
+    spawn_with_data_root(presets, Path::new(""), extra)
+}
+
+/// [`spawn`], with the per-user data root pointed at `root` rather than cleared,
+/// so what the run writes under it — the diagnostics log — lands in a directory
+/// this test owns instead of the developer's own.
+fn spawn_with_data_root(
+    presets: &Path,
+    root: &Path,
+    extra: &[&str],
+) -> (Child, std::thread::JoinHandle<()>) {
     let mut args = vec![
         "--stream", "--sink", "stdout", "--events", "--fps", "30", "--size", "160x90",
     ];
@@ -101,9 +112,9 @@ fn spawn(presets: &Path, extra: &[&str]) -> (Child, std::thread::JoinHandle<()>)
     let mut child = Command::new(env!("CARGO_BIN_EXE_ritmolux"))
         .args(&args)
         .env("RLX_PRESET_DIR", presets)
-        .env("APPDATA", "")
-        .env("HOME", "")
-        .env("XDG_DATA_HOME", "")
+        .env("APPDATA", root)
+        .env("HOME", root)
+        .env("XDG_DATA_HOME", root)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -643,4 +654,77 @@ fn a_headless_run_reports_no_preview_counters() {
             "a run with no preview pipe should report both counters as null: {line}"
         );
     }
+}
+
+/// Where a run whose data root env vars all name `root` writes its diagnostics
+/// log — the per-OS arms of `standalone::preset_data_root`, plus the app dir.
+fn diagnostics_log_under(root: &Path) -> PathBuf {
+    #[cfg(target_os = "macos")]
+    let root = root.join("Library").join("Application Support");
+    #[cfg(not(target_os = "macos"))]
+    let root = root.to_path_buf();
+    root.join(standalone::APP_DIR_NAME).join("diagnostics.log")
+}
+
+/// A headless run writes the same `diagnostics.log` rows a windowed run writes,
+/// and the rate in them is the rate it drew at rather than zero.
+///
+/// The data root is this test's own directory, so the log it reads is the one
+/// this run wrote and the developer's real per-user directory is never touched.
+#[test]
+fn a_headless_run_writes_diagnostics_rows_with_a_live_rate() {
+    let presets = scratch("diaglog-presets");
+    std::fs::write(presets.join("probe.toml"), GOOD).expect("write the good preset");
+    let root = scratch("diaglog-root");
+    let log = diagnostics_log_under(&root);
+
+    // Rows are written once a second: 90 frames at 30 fps is three.
+    let (mut child, drain) = spawn_with_data_root(&presets, &root, &["--frames", "90"]);
+    let (collector, _rx) = watch(&mut child);
+    let Some(stderr) = finish(child, drain, collector) else {
+        return;
+    };
+
+    let text = std::fs::read_to_string(&log).unwrap_or_else(|err| {
+        panic!(
+            "the run wrote no diagnostics log at {} ({err}):\n{stderr}",
+            log.display()
+        )
+    });
+    let mut lines = text.lines().filter(|line| !line.starts_with('#'));
+    let header: Vec<&str> = lines
+        .next()
+        .expect("the log has a header")
+        .split('\t')
+        .collect();
+    let column = |name: &str| {
+        header
+            .iter()
+            .position(|c| *c == name)
+            .unwrap_or_else(|| panic!("the header has no `{name}` column: {header:?}"))
+    };
+    let (fps, frames_total) = (column("fps"), column("frames_total"));
+
+    let rows: Vec<Vec<&str>> = lines.map(|line| line.split('\t').collect()).collect();
+    assert!(
+        !rows.is_empty(),
+        "a three-second run wrote a header and no rows:\n{text}"
+    );
+    for row in &rows {
+        assert_eq!(
+            row.len(),
+            header.len(),
+            "row width matches the header: {row:?}"
+        );
+    }
+    let last = rows.last().expect("checked non-empty above");
+    let rate: f32 = last[fps].parse().expect("the fps field is a number");
+    let drawn: u64 = last[frames_total]
+        .parse()
+        .expect("the frames_total field is a number");
+    assert!(
+        rate > 0.0 && drawn > 0,
+        "the last row reports {rate} fps over {drawn} frames for a run that drew \
+         frames the whole time:\n{text}"
+    );
 }

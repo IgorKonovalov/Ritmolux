@@ -700,6 +700,12 @@ impl Renderer {
     ///
     /// A `dt` that is not finite and positive is replaced by one nominal step
     /// before the clock sees it (`sanitize_frame_dt`, ADR-0191).
+    ///
+    /// **Feeds the diagnostics frame clock**, as [`render`](Self::render) does,
+    /// because a tap is the whole of a windowless run's live output and
+    /// [`metrics`](Self::metrics) is what that run reports. The rate it yields is
+    /// the tap's throughput, not a display refresh. No capture entry point feeds
+    /// it: their frames are drawn offline and would make a rate of nothing.
     pub fn render_tapped(
         &mut self,
         tap: &mut FrameTap,
@@ -716,7 +722,7 @@ impl Renderer {
                 label: Some("rlx-frame-tap"),
             });
         capture::record_clear(&mut encoder, &tap.view);
-        let _ = self.draw_frame(
+        let draw_calls = self.draw_frame(
             frame,
             &mut encoder,
             &tap.view,
@@ -737,6 +743,12 @@ impl Renderer {
         #[cfg(feature = "text")]
         self.text_layer.end_frame();
 
-        capture::read_back(&self.ctx.device, &tap.buffer, width, height, tap.padded_bpr)
+        let image =
+            capture::read_back(&self.ctx.device, &tap.buffer, width, height, tap.padded_bpr)?;
+        // After the readback, so a frame that failed to come back is not counted
+        // as delivered, and the clock spans the whole draw-to-bytes cost.
+        self.diag.set_draw_calls(draw_calls);
+        self.diag.record_frame();
+        Ok(image)
     }
 }

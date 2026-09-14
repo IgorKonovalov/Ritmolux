@@ -1,6 +1,6 @@
 # 0172 — The studio's readings become true
 
-> **Status:** approved 2026-09-14
+> **Status:** in-progress
 > **Created:** 2026-09-11
 > **Owner skill(s):** `dev`, `studio-builder`
 > **Related ADRs:** [0192](../adrs/0192-a-preset-warning-names-its-parameter.md) (proposed),
@@ -173,16 +173,23 @@ flowchart LR
 > Written by `dev` and `studio-builder` — one row per phase as that phase's commit lands, and the close
 > block after the last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled on the first phase commit)_
+**Lane:** `main` directly
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The frame clock covers both live paths | dev | not started | |
+| 1 — The frame clock covers both live paths | dev | done | committed with this row |
 | 2 — The player's schema is snapshotted | dev | not started | |
 | 3 — A preset warning names its parameter | dev | not started | |
 | 4 — The studio reads the snapshot, anchors warnings and shows the rate | studio-builder | not started | |
 
 ### Notes
+
+- Phase 1: `render_tapped` also sets `draw_calls`, as `render` does beside `record_frame`. The
+  `--stream` loop calls `enable_diagnostics(true)` (the clock is gated on it) and resolves its log path
+  through `cli::resolve_log_path` inside `stream.rs`, so `run.rs` is untouched. Tests landed in two
+  files the phase does not list: `core/tests/frame_tap.rs` (tap feeds the clock, captures do not) and
+  `standalone/tests/stream_show.rs` (a spawned `--stream` run with its data root pointed at a scratch
+  directory writes rows with a non-zero `fps`; fails with `enable_diagnostics` removed, checked once).
 
 ### Close triggers
 

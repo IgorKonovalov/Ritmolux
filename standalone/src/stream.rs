@@ -746,6 +746,14 @@ pub fn run(
         .map_err(|err| format!("--stream: the capture format is unusable: {err}"))?;
     // Held for the run: dropping the handle stops the stream.
     let _capture_handle = capture.handle;
+    let capture_token = capture.verdict.token();
+
+    // The same `diagnostics.log`, at the same path and in the same row format,
+    // as the windowed app writes — so a tester is sent to one file whichever
+    // mode the player ran in. `record_frame` is gated on collection, and the rate
+    // a windowless run reports in `health` and in these rows is read off it.
+    renderer.enable_diagnostics(true);
+    let mut diag_log = crate::diaglog::DiagLog::new(crate::cli::resolve_log_path());
 
     let mut tap = renderer.open_tap();
     eprintln!("{}", sink.opened());
@@ -894,6 +902,14 @@ pub fn run(
         // itself and blocks rather than dropping, so there is no producer-side
         // loss to report and `null` says so.
         show.report_health(&renderer, done, None);
+        // The analysis snapshot and RSS are read only on the seconds a row is
+        // due; this runs every frame.
+        diag_log.maybe_log(
+            &renderer.metrics(),
+            || renderer.analysis_metrics(),
+            standalone::rss::current_rss_bytes,
+            &capture_token,
+        );
 
         if should_report(frames, REPORT_EVERY) {
             resident.sample();

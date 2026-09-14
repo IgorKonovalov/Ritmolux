@@ -133,3 +133,52 @@ fn a_tapped_frame_is_byte_identical_to_the_capture_at_the_same_clock() {
         );
     }
 }
+
+/// A windowless run's frames reach the diagnostics clock, so the rate it reports
+/// is the rate it draws at rather than zero — and a capture's frames do not,
+/// because an offline frame has no rate to contribute.
+#[test]
+fn tapped_frames_feed_the_frame_clock_and_captures_do_not() {
+    /// Enough deltas for a rate: the first frame only starts the chain.
+    const FRAMES: u64 = 6;
+
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
+        return;
+    };
+    renderer.enable_diagnostics(true);
+    let frame = AnalysisFrame::default();
+
+    for _ in 0..3 {
+        renderer
+            .capture_frame(&frame)
+            .expect("capture_frame on a fresh headless renderer");
+    }
+    let after_captures = renderer.metrics();
+    assert_eq!(
+        (after_captures.frames_total, after_captures.fps),
+        (0, 0.0),
+        "capture_frame fed the frame clock; an offline frame has no rate"
+    );
+
+    let mut tap = renderer.open_tap();
+    for _ in 0..FRAMES {
+        renderer
+            .render_tapped(&mut tap, &frame, CAPTURE_FRAME_DT)
+            .expect("render_tapped on a fresh headless renderer");
+    }
+    let metrics = renderer.metrics();
+    assert_eq!(
+        metrics.frames_total,
+        FRAMES - 1,
+        "every tapped frame after the first should record one delta"
+    );
+    assert!(
+        metrics.fps > 0.0 && metrics.fps.is_finite(),
+        "{FRAMES} tapped frames left the reported rate at {}",
+        metrics.fps
+    );
+    assert!(
+        metrics.draw_calls > 0,
+        "a tapped frame should report the passes it drew"
+    );
+}
