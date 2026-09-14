@@ -2,8 +2,8 @@
 //
 // Generated from state/ and git only — never written by hand, never inside a worktree — so
 // deleting it and regenerating from the same state yields the same bytes. It carries no generation
-// timestamp for that reason. Newest run first; each run's section is Needs you, Closed, Failed and
-// parked, Totals.
+// timestamp for that reason. Newest run first; each run's section is Needs you, Not started (only
+// when a queued plan was not opened), Closed, Failed and parked, Totals.
 //
 // A finding line copies the verdict outcome the reviewer emitted — severity, file:line, what — and
 // nothing else; the digest never summarizes review prose. An event (a step, a park, a merge)
@@ -113,10 +113,23 @@ export function renderDigest(state, { repo, stateDir }) {
         if (minors > 0) minorsMerged.push(`- **${rec.plan} merged with ${minors} minor${minors === 1 ? "" : "s"}** - see Closed.`);
       }
     }
+    for (const s of run.stops ?? []) {
+      needs.push(
+        `- **Lane ${s.lane} stopped at the worktree cap** (\`max_open_worktrees\` ${s.max}): ${s.plan} was not opened. ` +
+          `Worktrees held by ${s.holding.join(", ")}.`,
+      );
+    }
     out.push("### Needs you", "");
     if (needs.length + minorsMerged.length === 0) out.push("- nothing: no park, and every merge was clean.");
     else out.push(...needs, ...minorsMerged);
     out.push("");
+
+    // Not started: left out when the run opened every queued plan it could.
+    if (run.notStarted?.length) {
+      out.push("### Not started", "");
+      for (const n of run.notStarted) out.push(`- **${n.plan}** (lane ${n.lane}): ${n.reason}`);
+      out.push("");
+    }
 
     // Closed
     out.push("### Closed", "");

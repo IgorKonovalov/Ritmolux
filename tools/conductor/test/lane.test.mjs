@@ -198,6 +198,46 @@ test("a park that leaves the worktree dirty names the paths, capped, in the reco
   assert.ok(needs.includes(` Left dirty: ${text}.\n`), needs);
 });
 
+test("a lane that reaches the worktree cap stops, and the run and the digest say why", async () => {
+  const { ctx, readEvents, digest } = scratch({
+    plans: [
+      { number: "0101", phases: [dev("1"), human("2")] },
+      { number: "0102", phases: [dev("1")] },
+      { number: "0103", phases: [dev("1")] },
+    ],
+    lanes: { a: ["0101", "0102", "0103"] },
+    after: { "0103": ["0101"] },
+    local: { max_open_worktrees: 1 },
+  });
+  await runLanes(ctx);
+  const state = loadState(ctx.stateDir);
+  assert.equal(state.plans["0101"].status, "parked");
+  assert.equal(state.plans["0102"], undefined, "the cap held 0102 back");
+
+  const run = state.runs.at(-1);
+  assert.equal(run.stops.length, 1);
+  const { at, ...stop } = run.stops[0];
+  assert.deepEqual(stop, { lane: "a", reason: "worktree_cap", plan: "0102", holding: ["0101"], max: 1 });
+  assert.ok(at);
+  assert.deepEqual(run.notStarted, [
+    { plan: "0102", lane: "a", reason: "worktree cap" },
+    { plan: "0103", lane: "a", reason: "after 0101 (parked)" },
+  ]);
+  assert.ok(readEvents().some((e) => e.event === "conductor-worktree-cap" && e.plan === "0102"));
+
+  const needs = digest("### Needs you");
+  const capLines = needs.split("\n").filter((l) => l.includes("worktree cap"));
+  assert.deepEqual(capLines, ["- **Lane a stopped at the worktree cap** (`max_open_worktrees` 1): 0102 was not opened. Worktrees held by 0101."]);
+  assert.equal(digest("### Not started").trim(), "- **0102** (lane a): worktree cap\n- **0103** (lane a): after 0101 (parked)");
+});
+
+test("a run that opens every queued plan it can has no Not started list", async () => {
+  const { ctx, digest } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
+  await runLanes(ctx);
+  assert.equal(loadState(ctx.stateDir).runs.at(-1).notStarted.length, 0);
+  assert.ok(!digest().includes("### Not started"));
+});
+
 test("a review with one major takes exactly one fix round and a re-review, then merges", async () => {
   const { ctx, digest } = scratch({
     plans: [{ number: "0101", phases: [dev("1")] }],

@@ -21,7 +21,7 @@ function sh(args, cwd) {
 const dev = (id) => ({ id, owner: "dev" });
 const human = (id) => ({ id, owner: "human" });
 
-function setup(plans, lanes, { gate } = {}) {
+function setup(plans, lanes, { gate, maxOpenWorktrees = 3 } = {}) {
   const repo = tmp("rlx-cli-repo-");
   sh(["init", "-q", "-b", "main"], repo);
   for (const [k, v] of [["user.email", "t@example.invalid"], ["user.name", "T"], ["commit.gpgsign", "false"], ["tag.gpgSign", "false"], ["core.autocrlf", "false"]]) {
@@ -35,7 +35,7 @@ function setup(plans, lanes, { gate } = {}) {
   // The tool directory sits outside the repository, so its state never dirties the main checkout.
   const toolDir = tmp("rlx-cli-tool-");
   writeFileSync(join(toolDir, "queue.json"), JSON.stringify({ lanes }));
-  writeFileSync(join(toolDir, "local.json"), JSON.stringify({ budget_usd: { implement: 5, fix: 3, review: 4 }, max_open_worktrees: 3 }));
+  writeFileSync(join(toolDir, "local.json"), JSON.stringify({ budget_usd: { implement: 5, fix: 3, review: 4 }, max_open_worktrees: maxOpenWorktrees }));
   const p = { ...paths({ repo, toolDir }), settings: join(TOOL_DIR, "settings.conductor.json"), prompts: join(TOOL_DIR, "prompts"), withLock: join(TOOL_DIR, "with-lock.mjs") };
 
   const specFile = join(toolDir, "spec.json");
@@ -203,6 +203,23 @@ test("resume refuses a park whose worktree is dirty, naming the paths, and accep
   const accepted = await cli("resume", "0101");
   assert.equal(accepted.code, 0, accepted.err.join("\n"));
   assert.equal(loadState(p.stateDir).plans["0101"].status, "queued");
+});
+
+test("run prints a lane's stop at the worktree cap as it happens", async () => {
+  const { cli } = setup(
+    [
+      { number: "0101", phases: [dev("1"), human("2")] },
+      { number: "0102", phases: [dev("1")] },
+    ],
+    { a: ["0101", "0102"] },
+    { maxOpenWorktrees: 1 },
+  );
+  const r = await cli("run", "--lane", "a");
+  assert.equal(r.code, 0, r.err.join("\n"));
+  const stop = r.out.indexOf("conductor: lane a stopped at the worktree cap (max_open_worktrees 1, held by 0101); 0102 not started");
+  assert.ok(stop >= 0, r.out.join("\n"));
+  assert.ok(stop > r.out.indexOf("conductor: 0101 parked (human_phase)"), "after the park that filled the cap");
+  assert.ok(stop < r.out.findIndex((l) => l.startsWith("conductor: run ended")), "before the run ends");
 });
 
 test("park parks a queued plan with an inbox entry, and resume queues it again", async () => {

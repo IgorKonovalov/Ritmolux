@@ -206,8 +206,8 @@ until it merges. Run it as a human-started `dev` lane.
 |---|---|---|---|
 | 1 — `run` works on a clean checkout | dev | done | `a676f13` |
 | 2 — A backlog probe is judged by the close, not parked before it | dev | done | `24300e7` |
-| 3 — A park leaves a lane that can be resumed | dev | committed with this row | |
-| 4 — A lane that stops says why | dev | not started | |
+| 3 — A park leaves a lane that can be resumed | dev | done | `856d5cb` |
+| 4 — A lane that stops says why | dev | committed with this row | |
 | 5 — The pilot, resumed | human | not started | |
 
 ### Notes
@@ -217,5 +217,8 @@ until it merges. Run it as a human-started `dev` lane.
 - Phase 3: the owner's `park NNNN` records dirty paths too (`cmdPark`, beyond `parkStillTrue`). The
   allowlist test is a new file, `test/settings.test.mjs`. The commit also repairs two escapes in
   Phase 2's test code (a literal newline in `lane-scenario.mjs`, an unescaped `.` in a regex).
+- Phase 4: **Not started** carries reasons beyond the two named: `--once`, `stopped`, and
+  `after NNNN (<status>)` for a dependency that is not parked. `run` prints every lane event, not only
+  the cap stop. The output test is in `test/cli.test.mjs`, which the phase's file list does not name.
 
 ### Close triggers

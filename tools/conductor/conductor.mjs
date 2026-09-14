@@ -94,6 +94,28 @@ function regenerate(p, state) {
   writeDigest(p.digest, state, { repo: p.repo, stateDir: p.stateDir });
 }
 
+/** The line `run` prints for a lane event as it happens, or null for one it does not print. */
+export function eventLine(name, d) {
+  switch (name) {
+    case "worktree-cap":
+      return `conductor: lane ${d.lane} stopped at the worktree cap (max_open_worktrees ${d.max}, held by ${d.holding.join(", ")}); ${d.plan} not started`;
+    case "lane-open":
+      return `conductor: ${d.plan} opened its lane at ${d.worktree}`;
+    case "implement-step":
+    case "review-step":
+    case "fix-step":
+      return `conductor: ${d.plan} step ${d.label} started`;
+    case "park":
+      return `conductor: ${d.plan} parked (${d.reason})`;
+    case "closed":
+      return `conductor: ${d.plan} closed${d.tag ? `, tag ${d.tag}` : ""}`;
+    case "ff":
+      return `conductor: ${d.plan} fast-forwarded main to ${d.head.slice(0, 7)}`;
+    default:
+      return null;
+  }
+}
+
 const minutes = (iso) => (iso ? `${Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000))} min` : "?");
 const isPlan = (s) => /^\d{4}$/.test(s ?? "");
 
@@ -137,6 +159,10 @@ async function cmdRun(args, o) {
     once: args.includes("--once"),
     lanes: lane ? [lane] : undefined,
     onChange: () => regenerate(p, state),
+    events: (name, data) => {
+      const line = eventLine(name, data);
+      if (line) o.log(line);
+    },
   };
 
   const interrupt = () => {

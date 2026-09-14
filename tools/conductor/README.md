@@ -57,10 +57,19 @@ All of them run from the main checkout.
 
 Ctrl+C on `run` does the same as `abort`.
 
+`run` prints one line per event as it happens: a lane opening, a step starting, a park, a close, a
+fast-forward. **A lane stops when opening its next plan would exceed `max_open_worktrees`**, and says
+so, naming the plans that hold the worktrees. That cap is the disk bound, not a queue: the lane does
+not wait for a slot. Remove a finished lane or settle a parked one, then `run` again.
+
 ## What to read afterwards
 
 - **`tools/conductor/digest.md`** is the morning-after record, newest run first:
-  - **Needs you:** every park with its resume command, then every merge that carried minors.
+  - **Needs you:** every park with its resume command, every lane that stopped at the worktree cap,
+    then every merge that carried minors.
+  - **Not started:** each queued plan the run did not open, with why: `worktree cap`, `--once`, or
+    `after NNNN (parked)` naming the plan it waits on and that plan's status. Left out when the run
+    opened everything it could.
   - **Closed:** each merged plan's tag, merge commit, fix rounds, wall time and spend, and every
     review finding exactly as the reviewer emitted it.
   - **Failed and parked:** gate reds with the failing tests, disagreements, spend-cap hits, session

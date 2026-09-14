@@ -99,26 +99,52 @@ export async function runLanes(ctx) {
   }
 }
 
+/**
+ * Records in the run every plan of `lane` still queued when the lane stops, with why it did not
+ * start: the first unmerged plan it waits on and that plan's status, or else `stopped` — the lane's
+ * own reason for stopping (`worktree cap`, `--once`, `stopped`).
+ */
+function recordNotStarted(ctx, lane, stopped) {
+  ctx.run.notStarted ??= [];
+  for (const plan of ctx.queue.lanes[lane] ?? []) {
+    if (merged(ctx, plan) || (ctx.state.plans[plan]?.status ?? "queued") !== "queued") continue;
+    const dep = (ctx.queue.plans[plan]?.after ?? []).find((d) => !merged(ctx, d));
+    const reason = dep ? `after ${dep} (${ctx.state.plans[dep]?.status ?? "queued"})` : stopped;
+    ctx.run.notStarted.push({ plan, lane, reason });
+  }
+}
+
 async function laneLoop(ctx, lane) {
   for (;;) {
-    if (ctx.stopRequested?.()) return;
+    if (ctx.stopRequested?.()) return recordNotStarted(ctx, lane, "stopped");
     const pick = pickNext(ctx, lane);
     if (pick.plan) {
       const rec = ctx.state.plans[pick.plan];
       const hasLane = rec?.worktree && !rec.laneRemoved;
       if (!hasLane && openWorktreeCount(ctx.state) >= ctx.local.max_open_worktrees) {
-        event(ctx, "worktree-cap", { lane, plan: pick.plan });
+        // The cap is the disk bound (ADR-0205), so the lane stops rather than waiting; the stop is a
+        // fact in the run record, for the digest and the run's output.
+        const holding = Object.values(ctx.state.plans)
+          .filter((r) => r.worktree && !r.laneRemoved)
+          .map((r) => r.plan)
+          .sort();
+        const stop = { lane, reason: "worktree_cap", plan: pick.plan, holding, max: ctx.local.max_open_worktrees, at: now() };
+        ctx.run.stops ??= [];
+        ctx.run.stops.push(stop);
+        recordNotStarted(ctx, lane, "worktree cap");
+        save(ctx);
+        event(ctx, "worktree-cap", stop);
         return;
       }
       await runPlan(ctx, lane, pick.plan);
-      if (ctx.once) return;
+      if (ctx.once) return recordNotStarted(ctx, lane, "--once");
       continue;
     }
     if (pick.wait) {
       await sleep(ctx.pollMs ?? 5000);
       continue;
     }
-    return;
+    return recordNotStarted(ctx, lane, "stopped");
   }
 }
 
