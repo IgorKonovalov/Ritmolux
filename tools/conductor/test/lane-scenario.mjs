@@ -3,7 +3,7 @@
 // outcome. Per-plan misbehaviour is switched on by FAKE_LANE_SPEC:
 //
 //   { "plans": { "0101": { "reviews": ["major", "clean"], "bogusCommit": true, "lightweightTag": true,
-//                          "noCloseReview": true, "budget": "implement", "minors": 1,
+//                          "noCloseReview": true, "budget": "implement", "minors": 1, "numericThrough": true,
 //                          "delayMs": { "review": 400 } } } }
 //
 // Every session appends `<mode>-start` and `<mode>-end` to FAKE_EVENTS with a timestamp.
@@ -50,7 +50,8 @@ export default async ({ cwd, vars, env }) => {
         commits.push(git("rev-parse", "--short", "HEAD"));
       }
       const claimed = ps.bogusCommit ? [...commits, "deadbee"] : commits;
-      return { text: block({ kind: "phases_done", plan, through: ids.at(-1), commits: claimed }), costUsd: 1 };
+      const through = ps.numericThrough ? Number(ids.at(-1)) : ids.at(-1);
+      return { text: block({ kind: "phases_done", plan, through, commits: claimed }), costUsd: 1 };
     }
 
     if (mode === "fix") {

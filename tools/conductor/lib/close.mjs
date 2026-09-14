@@ -24,7 +24,8 @@ export function verifyImplement({ cwd, plan, phases, before, outcome }) {
   const made = commitsBetween(before, head(cwd), cwd);
   if (made.length === 0) problems.push("the step made no commit");
   claimedCommits(outcome.commits, made, cwd, problems);
-  if (outcome.through !== phases.at(-1)) {
+  // Phase ids are strings ("4b"); a session may print a numeric `through`, which validation accepts.
+  if (String(outcome.through) !== phases.at(-1)) {
     problems.push(`outcome says through Phase ${outcome.through}; the step was Phases ${phases[0]}-${phases.at(-1)}`);
   }
   const found = findPlan(cwd, plan);

@@ -220,6 +220,17 @@ test("an outcome claiming a commit git does not have parks as a disagreement", a
   assert.deepEqual(kinds(rec), ["implement:dev"], "no review started");
 });
 
+test("a numeric `through` in an implementer's outcome is the same phase as its string id", async () => {
+  const { ctx } = scratch({
+    plans: [{ number: "0101", phases: [dev("1"), dev("2")] }],
+    lanes: { a: ["0101"] },
+    spec: { "0101": { numericThrough: true } },
+  });
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+});
+
 test("a lightweight tag on a closed plan parks rather than merging", async () => {
   const { ctx, repo } = scratch({
     plans: [{ number: "0101", phases: [dev("1")] }],
