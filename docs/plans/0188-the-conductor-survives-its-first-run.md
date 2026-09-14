@@ -1,6 +1,6 @@
 # 0188 — The conductor survives its first run
 
-> **Status:** draft
+> **Status:** approved (2026-09-15)
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`, `human`
 > **Related ADRs:** [0205](../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md) (the Outcome's first-live-run entry is this plan's source),
