@@ -185,7 +185,7 @@ flowchart TD
 |---|---|---|---|
 | 1 — The timing-only tests run alone | dev | done | 6c33ddb |
 | 2 — The control-path pair says why it failed | dev | done | b39abc3 |
-| 3 — The guard holds the override to the exemption | dev | committed with this row | |
+| 3 — The guard holds the override to the exemption | dev | done | 68e15fe |
 
 ### Notes
 
@@ -243,12 +243,14 @@ flowchart TD
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** none
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** test and test-schedule changes only (`.config/nextest.toml`, three test files),
+  plus backlog entries 0219 and 0220
+- **Operator docs touched:** none
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0
+- **Full suite:** `cargo nextest run --workspace --no-fail-fast` at 68e15fe, exit 0,
+  `Summary [ 679.386s] 1933 tests run: 1933 passed (5 slow), 6 skipped`; 682 s wall
+- **Outstanding `human` phases:** none
 
 ## Followups (after this lands)
