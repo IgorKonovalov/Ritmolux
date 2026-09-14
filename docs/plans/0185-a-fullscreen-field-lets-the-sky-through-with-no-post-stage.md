@@ -178,8 +178,8 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The four fields present premultiplied, and the test says so | dev | done | committed with this row |
-| 2 — The reader says what the parameter does | dev | not started | |
+| 1 — The four fields present premultiplied, and the test says so | dev | done | 87dee5a |
+| 2 — The reader says what the parameter does | dev | done | committed with this row |
 
 ### Notes
 
@@ -189,6 +189,12 @@ flowchart LR
   path reads `(0.0, 1.0)` on all four both before and after.
 - Phase 1: capture metrics (`core/src/render/metrics.rs`) ignore alpha; no alpha read found in the
   capture or stream code.
+- Phase 2: `presets/README.md` only. The empty-chain list under "Backdrop occlusion" named
+  `fragment_field` alone of the fields; it now names all four plus cellular and warp mesh. The
+  curved-band essay's "`fragment_field` hides it completely" is qualified to the default
+  `occlude = 1`. `docs/preset-palettes.md` and `docs/presets.md` are unchanged.
+- Noticed, not acted on: `presets/README.md` "Backdrop occlusion" still says "No shipped preset binds
+  `occlude` today"; the plan's Context counts six that do.
 
 ### Close triggers
 
