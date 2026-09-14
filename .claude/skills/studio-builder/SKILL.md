@@ -35,10 +35,24 @@ summary; on any conflict the ADR wins.
    stderr, frames on stdout).
 3. [`docs/adrs/0175-the-studio-is-a-separate-application-that-never-draws-a-frame.md`](../../../docs/adrs/0175-the-studio-is-a-separate-application-that-never-draws-a-frame.md)
    — *why* the studio never renders, and why Electron. Read it when something feels heavy.
-4. **`docs/specs/0003-studio-control-protocol.md`** — the vocabulary and the event roster. It is
-   written by Plan 0158; if it does not exist yet, the player side has not landed and you stop.
-5. Any plan in `docs/plans/` with `Status: in-progress` or `draft` carrying phases tagged
-   `Owner skill: studio-builder`. Glob first; do not trust memory about which is current.
+4. **`docs/specs/0003-studio-control-protocol.md`** — the vocabulary and the event roster. The
+   spec is the roster; `studio/shared/protocol.spec.test.ts` holds the unions to its tables.
+5. **The ADRs that shaped the studio after the shell** — read the one a task touches:
+   [ADR-0183](../../../docs/adrs/0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md)
+   (one player, not a show plus an editing child),
+   [ADR-0184](../../../docs/adrs/0184-the-player-reports-what-it-loaded-and-the-studio-re-derives-nothing.md)
+   (every fact about what the player loaded arrives on the event stream; the studio re-derives none),
+   [ADR-0186](../../../docs/adrs/0186-the-studios-player-mode-is-a-per-machine-setting.md)
+   (windowed or windowless, per machine),
+   [ADR-0187](../../../docs/adrs/0187-the-preview-pipe-has-a-fixed-shape-and-names-its-true-format.md)
+   (the preview pipe's fixed geometry and its true channel order),
+   [ADR-0189](../../../docs/adrs/0189-an-edit-forks-the-preset-and-the-studio-holds-rotation.md)
+   (an edit forks the preset; the studio holds rotation),
+   [ADR-0190](../../../docs/adrs/0190-preset-toml-is-checked-by-the-loader-and-never-reformatted.md)
+   (preset TOML is checked, never reformatted). `docs/adrs/README.md` lists any newer one.
+6. Any plan in `docs/plans/` with `Status: in-progress` or `approved` carrying phases tagged
+   `Owner skill: studio-builder`. Start from `docs/plans/README.md`'s roster, then open the plan
+   file — the file's `Status:` line wins over the roster. Do not trust memory about which is current.
 
 If ADR-0178 or the spec is missing, the architecture is not in place — surface it and stop. Do
 not invent shell conventions; that is how Electron applications get CVEs.
@@ -48,10 +62,17 @@ not invent shell conventions; that is how Electron applications get CVEs.
 Three processes, three bundlers, four tsconfigs, one child.
 
 - **Main** (`studio/electron/main.ts`, esbuild to `dist/main/index.cjs`) owns the player: it
-  resolves the binary (bundled, then settings, then `PATH`), spawns it headless with `--stream
-  --sink stdout --events --control`, holds the UDP socket that sends `ctl` actions, parses the
-  event lines off stderr, splits stdout into frames, kills the child on quit. It owns the OS:
-  dialogs, menu, window state, the external-URL opener. It holds **no editing logic**.
+  resolves the binary (bundled, then settings, then `PATH`), spawns **one** player in the mode
+  the machine's `playerMode` setting names (`studio/shared/player-mode.ts`, ADR-0186) —
+  `windowed`, the default, spawns `--preview stdout` and the player opens the show window the
+  preview mirrors; `windowless` spawns `--stream --sink stdout` and the preview is the only
+  picture. Both vectors carry `--events --control 127.0.0.1:0` (`playerArgs` in
+  `studio/electron/player/supervisor.ts`; a flag on one vector and not the other is a
+  mode-dependent bug). Main reads the bound control address from `hello` rather than predicting
+  it, holds the UDP socket that sends `ctl` actions, parses the event lines off stderr, splits
+  stdout into frames with the geometry and channel order the `stream` event reports, and kills the
+  child on quit. It owns the OS surface — window state, settings, the external-URL opener — and
+  holds **no editing logic**.
 - **Preload** (`studio/electron/preload/index.ts`, esbuild to `dist/preload/index.cjs`) is the
   only place Node capabilities cross the `contextBridge`. One `window.api`, assembled from
   per-domain modules under `preload/api/`, typed as `ElectronAPI = typeof api`.
@@ -61,7 +82,9 @@ Three processes, three bundlers, four tsconfigs, one child.
 
 **IPC mirrors the protocol and carries no logic.** Three domain channels and only three:
 `player:ctl` (one `CtlAction`), `player:event` (one `PlayerEvent`), `player:frame` (one frame
-over a `MessagePort` as a transferable buffer). Both unions live in `studio/shared/protocol.ts`
+over a `MessagePort`). The frame is **not** transferred — `MessagePortMain` transfers only ports,
+so its bytes are copied once across the process boundary; each side avoids a second copy by
+cutting the buffer once and viewing it in place (ADR-0178's Outcome). Both unions live in `studio/shared/protocol.ts`
 with Zod schemas beside them, and a test holds that file to the spec's tables. A fourth domain
 channel is a protocol widening: route to `architect`.
 
@@ -111,9 +134,9 @@ Decide which mode the user is in first; ask if ambiguous.
 
 1. **Restate the spec in one sentence** and confirm: "Reading this as a panel listing the active
    preset's params from the schema, a slider per constant binding, `ctl/param` per drag step, an
-   atomic save on release. Confirm?"
-2. **Verify the shell exists.** If `studio/electron/main.ts` is absent, Plan 0159 Phase 1 has not
-   shipped; surface and stop.
+   atomic write of the fork on release. Confirm?"
+2. **Verify the shell exists.** It has shipped; if `studio/electron/main.ts` is absent you are in
+   the wrong checkout or on a stale branch — surface and stop.
 3. **Locate what the player provides.** Which event, action or schema field does the view need?
    If the spec does not list it, say so — that is `architect` + `dev` work. **Never fake data in
    the renderer to make a view work.**
@@ -188,9 +211,25 @@ any of these relaxed, stop and surface it; never add `'unsafe-eval'` to make a t
 ### The main process never blocks on the child
 Reading the frame pipe is byte splitting and a `postMessage`; if the renderer has not consumed
 the last frame, drop the new one and count it. The count is shown in the footer; a dropped
-preview frame is a normal reading, not a defect, and the studio says so. The event reader
-parses a line, validates it with the Zod schema, and forwards it; a malformed line is counted
-and shown, never thrown.
+preview frame is a normal reading, not a defect, and the studio says so. **Know what that counter
+cannot see** (ADR-0178's Outcome): `FramePump` counts only a frame that arrives while one is
+unacknowledged, so loss upstream of it — in the OS pipe or main's read cadence — reads as `0`, and
+the dominant cost measured was the player blocking on a full pipe, not a drop. The player's own
+accounting is `health`'s `preview_sent` / `preview_dropped` (ADR-0184); reach for those before
+drawing a conclusion from the footer. The event reader parses a line, validates it with the Zod
+schema, and forwards it; a malformed line is counted and shown, never thrown.
+
+### The player is the source of every fact about what it loaded
+The file under the editor is the player's own `preset.file`; the system is `preset.system`; the
+watched directory is `roster.dir` (ADR-0184). **Main never resolves a preset path itself** and the
+renderer never infers one — a second resolver is exactly what ADR-0184 refuses, and ADR-0189 did
+not reopen it. If a fact is missing from an event, that is a feedback note, not a lookup.
+
+### Read the frame format; never assume one
+The `stream` event names the pipe's geometry **and** its channel order — `format` is `rgba8` or
+`bgra8`, read from the texture the frames are produced at (ADR-0187). Every consumer of frame bytes
+reads it; a pipe whose order the studio cannot name is refused and left unread, never painted with
+swapped channels.
 
 ### Validate at boundaries, trust inside
 Every event line main parses and every action main forwards goes through the schema in
@@ -198,11 +237,23 @@ Every event line main parses and every action main forwards goes through the sch
 is parsed, never `as Foo`. Past the boundary, trust the types; do not validate the same payload
 three times down the stack.
 
+### A preset the studio did not create is never written to
+ADR-0189. The first editing gesture against a preset — a slider release, a palette edit, `Ctrl+S`
+— prompts once for a name and **forks** it: the whole document, taken from the text the studio
+already holds for that path at gesture time (not re-read after the prompt), is written under the
+new name into the watched directory, and the editor switches to the fork. Every later gesture in
+the session writes the fork silently. An embedded preset takes the same path; the fork is its first
+file. While attached the studio sends `ctl/transport hold` and says so on the surface
+(`useHeldRotation`), so rotation cannot move the preset out from under an edit. A save path that
+reaches an original — shipped, proposed, or authored by hand — is a defect, not a convenience.
+
 ### Files the player watches are written atomically, and only where edited
-A preset save is a temporary file plus a rename, never a partial write the watcher can catch
-mid-way. The written file differs from the original only on the edited lines: the header
-comments in `presets/*.toml` are the project's own record and a writer that loses them is a
-regression. The byte-equality test in Plan 0159 Phase 3 is the contract.
+A write is a temporary file plus a rename, never a partial write the watcher can catch mid-way. The
+written file differs from its source only on the edited lines: the header comments are the
+project's own record and a writer that loses them is a regression. **Preset TOML is checked, never
+reformatted** (ADR-0190) — no formatter runs over a file the studio writes, because a re-padded
+file breaks the line-level contract `studio/shared/toml.ts` states. The contract is held by
+`studio/shared/toml.test.ts` and `studio/electron/preset/writer.test.ts`.
 
 ### Non-React resources dispose on unmount
 CodeMirror views, the preview's `MessagePort` listener, `ResizeObserver`s, timers — every
@@ -217,6 +268,14 @@ binding returns a cleanup function; no fire-and-forget listeners.
 Every direct dependency in `studio/package.json`, runtime and dev, is `X.Y.Z` — no `^`, no `~`,
 no `>=`. An upgrade is a manifest edit plus `npm install` in one commit. `npm`, not `pnpm`
 (ADR-0178).
+
+### The version has three copies, and cargo moves one
+`Cargo.toml`'s `[workspace.package] version` is the source (ADR-0005). The studio carries two
+copies: `version` in `studio/package.json` (the packaging scripts override it at build time) and
+`EXPECTED_PLAYER_VERSION` in `studio/shared/protocol.ts`, which **nothing overrides** — it is
+compiled into the renderer, and a stale one ships a studio that refuses the player packaged beside
+it. `cargo release` moves neither. `studio/shared/version.test.ts` holds all three equal, so a red
+version test after a release bump is the two copies owed, not a test to relax.
 
 ## House style
 
@@ -258,8 +317,8 @@ The plan and the ADRs win on specifics. Defaults when they are silent:
 
 - `references/project-context.md` — the `studio/` layout, the canonical `npm` commands, the
   sibling-lane ownership map, what the player provides. Deliberately carries **no copy of the
-  protocol or the schema**: the spec and `ritmolux --schema` are the sources, and a private
-  copy here is the copy that rots.
+  protocol or the schema**: the spec, `ritmolux --schema` and its committed snapshot are the
+  sources, and a private copy here is the copy that rots.
 - `.claude/skills/architect/references/project-context.md` — crate layout and the engine's rules,
   for grounding when a question crosses into the player.
 - `../trading/market-analyzer/.claude/skills/ui-builder/` (outside this repository) — the lane
