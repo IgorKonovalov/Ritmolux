@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0173 - The MilkDrop geometry reads the source](#0173---the-milkdrop-geometry-reads-the-source)
   - [0170 - The horizon reads the frame's own ground](#0170---the-horizon-reads-the-frames-own-ground)
   - [0171 - One stall policy, and a guarded clock](#0171---one-stall-policy-and-a-guarded-clock)
   - [0169 - A preset is checked before it is rendered](#0169---a-preset-is-checked-before-it-is-rendered)
@@ -203,6 +204,47 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0173 - The MilkDrop geometry reads the source](done/0173-the-milkdrop-geometry-reads-the-source.md)
+
+- closed 2026-09-14. Three `dev` phases on `main` directly, all docs-only: `83a419d` (1, both facts
+read from `xeiraex/milkdrop2` at `d4c843a` and written onto backlog 0119 and 0120), `6b8c45e` (2, the
+converted `ang` already agrees, no code) and `ea63b19` (3, skipped on its stop branch). Review: **no
+blockers, no majors, three minors.** Version: **none** - no shipped artifact moved. No ADR paired.
+Closed backlog 0119 and 0120; filed 0214, 0215 and 0216. The architect's gate at the close:
+`cargo nextest run --workspace` on `main` at `57f6b38`: 1918 passed, 6 skipped, matching the log.
+
+**What the review verified rather than read.** The three source files were fetched at `d4c843a` and
+every line the two backlog updates cite was re-read: the per-vertex `atan2f` (`plugin.cpp`
+l.2276-2285), the program's `y` (`milkdropfs.cpp` l.1840), `UvToMathSpace` (l.3862-3877), the
+`fWaveScale / 128` scaling (l.933-942), the 8-bit sample conversion (`pluginshell.cpp` l.2018) and
+the mode-6/7 `0.25` offsets (l.3206-3235). Each matches what the log claims. On this side,
+`run_vertex`'s `atan2(py, px)` with `py` +up, the shared warp/comp epilogue in `emit.rs`, and
+`draw.rs`'s `0.15` all match too. The per-vertex `ang` has cut on −x since `661e03f` (2026-08-16),
+**three days before Plan 0109's gate saw the +x seam**. That is what turns 0119's close into a
+falsified diagnosis, not a confirmed one.
+
+**Found by the review, not by the plan.** The same source lines show the reference hands the
+per-vertex program an aspect-scaled `x`/`y` (l.1839-1840), and runs its uv chain in that corrected
+space before undoing it (l.1877-1916). This engine hands raw uv. That went into 0214 with the
+comp-stage pair, and whether the warp chain matches is left unread there.
+
+**Minors, none fixed in code at the close:**
+- **Phase 2 keyed on a different function than it names.** The phase said `vertex_position`, and the
+  `ang` a converted preset reads is `run_vertex`'s. `dev` escalated it and the user chose, so it is a
+  recorded deviation, not drift. Its done-when is met in substance.
+- **The pinning test's doc is now wrong in three sentences.** It still says MilkDrop has the same
+  cut and that no source is available (`warp_mesh/tests.rs`). Filed inside 0215, with a probe that
+  goes red when it is rewritten.
+- **The log's phase table read `not started` for Phase 3 beside a commit.** Corrected to
+  `skipped (stop branch)` in the close commit.
+
+**One nit in the archived 0120 body:** it writes mode 7's separation as `(wave_y*0.5+0.5)^2` with
+`wave_y` meaning the clip-space position. In the preset's own `0..1` units that is `wave_y²`, which is
+how 0216 states it. The archive is verbatim, so it stands there.
+
+**Curation (3b):** `presets/` not touched, and no engine defect was fixed, so there is no stale
+workaround to grep for. **No operator doc moved.**
 
 ### [0170 - The horizon reads the frame's own ground](done/0170-the-horizon-reads-the-frames-own-ground.md)
 

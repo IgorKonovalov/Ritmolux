@@ -1,9 +1,12 @@
 # 0173 — The MilkDrop geometry reads the source
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-14. Phases 1-2 landed as `83a419d` and `6b8c45e`, both docs-only.
+> Phase 3 took its own stop branch (`ea63b19`). Mode 4 review: **no blockers, no majors, three minors.**
+> The review re-read every cited source line at `d4c843a` and ran `cargo nextest run --workspace` green.
+> Backlog 0119 and 0120 archived; residues filed as 0214, 0215 and 0216. Version: none.
 > **Created:** 2026-09-11
 > **Owner skill(s):** `dev`
-> **Related ADRs:** [0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)
+> **Related ADRs:** [0113](../../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)
 > **Closes:** design-backlog 0119, 0120.
 
 ## TL;DR
@@ -139,7 +142,7 @@ flowchart LR
 |---|---|---|---|
 | 1 — Read the two facts from the source | dev | done | `83a419d` |
 | 2 — The seam matches the reference | dev | done | `6b8c45e` |
-| 3 — The waveform takes the reference's base amplitude | dev | not started | `ea63b19` |
+| 3 — The waveform takes the reference's base amplitude | dev | skipped (stop branch) | `ea63b19` |
 
 ### Notes
 

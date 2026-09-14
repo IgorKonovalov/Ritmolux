@@ -214,6 +214,8 @@ accepted cost" are different documents and only one of them is honest.
 - [0190 — the `dt` seam's comment names three downstream sites as unguarded, and all three still carry a guard, on three different policies](#0190--the-dt-seams-comment-names-three-downstream-sites-as-unguarded-and-all-three-still-carry-a-guard-on-three-different-policies)
 - [0210 — `--horizon` takes its ground from frame 0's corner pixel, and on a seeded cellular field that pixel can be a live cell, so a dead field reads as fully covered](#0210----horizon-takes-its-ground-from-frame-0s-corner-pixel-and-on-a-seeded-cellular-field-that-pixel-can-be-a-live-cell-so-a-dead-field-reads-as-fully-covered)
 - [0211 — the `larger_than_life` default rule stops moving within a minute on the shipped preset's grid, while the test that chose it runs a grid half that size](#0211--the-larger_than_life-default-rule-stops-moving-within-a-minute-on-the-shipped-presets-grid-while-the-test-that-chose-it-runs-a-grid-half-that-size)
+- [0119 — `ang`'s branch cut on the +x axis seams every per-vertex program that is continuous in it](#0119--angs-branch-cut-on-the-x-axis-seams-every-per-vertex-program-that-is-continuous-in-it)
+- [0120 — the converted waveform figure renders larger than the reference's, and `wave_scale` is applied raw](#0120--the-converted-waveform-figure-renders-larger-than-the-references-and-wave_scale-is-applied-raw)
 <!-- toc:end -->
 
 ## 0001 — reaction_diffusion reaches only 2 of the 5 Plan-0018 composite levers
@@ -9968,3 +9970,300 @@ above was read through 0210's inverted mask.** Re-run at the close with the corr
 field holds coverage at 0.0182 from 60 s on, but its footprint reads 0.0337 and 0.0139 at 150 s and
 180 s rather than zero, so it settles rather than freezes. The reading this entry chose is unaffected. The `present:`
 test-name probe was falsified by the rename and retires with this body.
+
+---
+
+## 0119 — `ang`'s branch cut on the +x axis seams every per-vertex program that is continuous in it
+
+**Raised by:** `architect`, from [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md)'s
+Phase 5 look gate (2026-08-19). **Owner if taken:** `dev`.
+
+- **Verified 2026-08-19** — the wrap is unconditional and has no continuity treatment:
+  `present: ang \+= std::f32::consts::TAU in: core/src/render/scenes/warp_mesh/mesh.rs`
+
+### The finding
+
+`vertex_position` computes `ang = atan2(py, px)` and lifts the negative half by `TAU`, so `ang` is
+`0..tau` **with a discontinuity along the +x axis**. Any per-vertex program whose output varies
+continuously with `ang` therefore jumps across that ray, and the jump is a visible seam running from
+the frame centre to the right edge.
+
+**This supersedes Plan 0108's reading of the same symptom.** That plan attributed the seam to a sign
+in the emitted warp epilogue's polar pair (`milkconv/src/shader/emit.rs`) and built a reproduction
+fixture for it, and [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md)
+Phase 5 asked whether the seam survived the mirror fixes. It did — **on *Songflower (Moss Posy)* and
+*chasers 19 Portal*, both MilkDrop 1.x presets carrying no `warp_` or `comp_` block at all.** `emit.rs`
+never runs on them. Whatever is true of the emitted epilogue, it is not what produces this seam.
+
+The two look different only because of what surrounds them: on *Songflower* the cut runs centre to
+right edge, which is the branch cut plainly; on *chasers 19 Portal* it reads full-width because that
+preset's own fold mirrors it.
+
+### What a fix would be
+
+Unknown, and it is a design call rather than a patch — which is why this is an entry. The reference
+has the same branch cut in `atan2`, so MilkDrop presets are *authored* against a discontinuity at +x
+and simply avoid it or hide it; the question is whether this engine's `ang` lands the cut in the same
+place and with the same handedness as the reference's, and it is measurable against a converted
+fixture rather than arguable. Do not "fix" it by smoothing the wrap — that would break every preset
+that uses the cut deliberately.
+
+### Priority
+
+**Medium.** It is one of the two remaining named geometry defects of the import (the other being
+[0113](design-backlog.md)'s
+wash), it shows on real content rather than only on a fixture, and the diagnosis is now specific
+enough to act on.
+
+### Update 2026-08-20 — [Plan 0111](plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 4 pinned **our** half and could not reach the reference's. The entry stays live, **half discharged**.
+
+**What landed.** `ang_cuts_on_plus_x_and_turns_counter_clockwise_on_screen` pins this engine's
+construction from `vertex_position`'s arithmetic rather than from a picture: the cut is on **+x** and
+is a genuine discontinuity of nearly a full turn (asserted against the two neighbouring vertices),
+`ang` is continuous elsewhere along the swept column, and it increases **counter-clockwise as seen on
+screen** because y is flipped before the `atan2`. `milkconv/tests/warp_geometry.rs` already holds the
+emitted WGSL epilogue and the draw layer to the same y-down/y-up asymmetry, so the three agree by
+test. Neither fact can now move silently.
+
+**What did not, and this entry's own "What a fix would be" was wrong about it.** That section says
+the question "is measurable against a converted fixture rather than arguable". **It is not.** A
+converted fixture measures *this engine*, which is the half already pinned; the missing half is the
+reference's handedness, and no `.milk` file records the convention it was authored against. The phase
+required the comparison be derived from the source format's convention or the reference
+implementation with the source named, and never from a picture — none of those exist in this
+environment. A corpus-wide search for a preset stating a rotation direction returns two files, both
+building their own Kardan rotation from `q` variables rather than reading the per-vertex `ang`.
+
+So the seam is **not** corrected and is **not** recorded as authored-against either; that second
+claim needs the missing half and asserting it would be exactly the prose error
+[ADR-0071](adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md) catches.
+
+**What would settle it, most direct first:** MilkDrop 2's `milkdropfs.cpp` mesh setup, where the sign
+of the `y` handed to `atan2f` is one line; the authoring documentation that shipped with MilkDrop; or
+one reference capture of a deliberately handedness-revealing preset, which is a look-gate artifact
+and not a test. **This is the same procurement wall 0120 and 0122
+stopped on**, and one source clears all three — which is the argument for treating it as one
+procurement question rather than three engineering ones.
+
+- **Verified 2026-08-20** — the wrap is still unconditional and still has no continuity treatment:
+  `present: ang \+= std::f32::consts::TAU in: core/src/render/scenes/warp_mesh/mesh.rs`
+
+### Update 2026-09-14 — [Plan 0173](plans/done/0173-the-milkdrop-geometry-reads-the-source.md) Phase 1 read the reference's `ang` from MilkDrop 2's released source. **The `ang` a converted per-vertex program reads already agrees with it; the value this entry names is not the one converted presets read.**
+
+**Source read:** `github.com/xeiraex/milkdrop2`, commit `d4c843a4fb4f53aef755957fc9478780325748cd`
+(*"Original Milkdrop 2 v2.25c source code"*, the 2013 BSD-3-Clause release, before any of that
+mirror's own commits). The mirror's later commits do not touch `milkdropfs.cpp` at all, and touch
+`plugin.cpp` only outside the lines cited. Facts only; nothing is copied into this repository.
+
+1. **Per-vertex `ang`, the EEL `per_vertex` input.** `vis_milk2/plugin.cpp`,
+   `CPlugin::AllocateMyDX9Stuff`, l.2276-2285: the mesh vertex is `x = col/gridX*2-1`,
+   `y = row/gridY*2-1`, and `ang = atan2f(y*m_fAspectY, x*m_fAspectX)`; the exact centre vertex is
+   set to `0` (l.2282). Row 0 is the **bottom** of the screen: the same vertex gets
+   `tv_orig = -y*0.5+0.5` (l.2292) and the program's `y = y*-0.5*m_fAspectY+0.5`
+   (`vis_milk2/milkdropfs.cpp`, `CPlugin::ComputeGridAlphaValues`, l.1840), both `1` at row 0. So
+   the `y` handed to `atan2f` is **+up on screen**, and l.1842 passes the result to the program with
+   no wrap. The aspect pair is set at `plugin.cpp` l.2027-2028: the longer axis `1`, the shorter
+   below it. **So `ang` is in `(-pi, pi]`, 0 at three o'clock, counter-clockwise on screen, with the
+   cut on −x (nine o'clock).**
+2. **Warp-shader `ang`.** `milkdropfs.cpp`, `CPlugin::WarpedBlit_Shaders`, l.2249-2253: the mesh is
+   drawn in two halves, and the left half of the centre row has its vertex `ang` overwritten with
+   `-pi` for one and `+pi` for the other, so the interpolated attribute does not smear across the
+   seam. Same convention as fact 1, cut on −x.
+3. **Comp-shader `ang` is built differently.** `milkdropfs.cpp`, `CPlugin::UvToMathSpace`,
+   l.3862-3877, called from `plugin.cpp` `AllocateMyDX9Stuff` l.2060 with `v = 0` at the top
+   (l.2046-2048): `py = (v*2-1)*m_fAspectY` is **+down**, `atan2f(py, px)` is lifted into
+   `0..2pi` (l.3877), and `rad` is divided by `sqrt(ax²+ay²)` so it reads 1 at the corners. That is
+   **clockwise on screen with the cut on +x** — the function's own comment says counter-clockwise,
+   which holds only in its y-down "math space". The two centre columns get hand-set values from
+   l.2061.
+
+**This engine, against those:**
+
+- **Converted per-vertex:** `MilkRuntime::run_vertex` (`core/src/milk/mod.rs`) takes `ny = 1 - y*2`
+  (+up) and `atan2(ny*ay, nx*ax)` with the same longer-axis-is-1 aspect pair and no wrap, and
+  `warp_mesh/encode.rs` calls it for every vertex of a converted preset. It matches fact 1, centre
+  vertex included (`atan2(0, 0) = 0`).
+- **Emitted warp epilogue:** `milkconv/src/shader/emit.rs` `fs_main` takes `atan2(p.y, p.x)` with
+  `p` +up — matches fact 2.
+- **Emitted comp epilogue:** the same epilogue line as the warp stage — **differs from fact 3** in
+  handedness, range and cut, and in `rad`'s normalization.
+- **`vertex_position`** (`warp_mesh/mesh.rs`) — the `0..tau`, cut-on-+x value this entry's finding
+  and its pinning test describe — **is not read by a converted preset.** Its one render-path caller
+  is `core/src/render/evaluate.rs`, for the native `[per_vertex]` vocabulary.
+
+**Ours agrees for the per-vertex and warp-stage `ang` a converted preset reads, and differs in the
+emitted comp-stage `ang` by handedness (counter-clockwise against clockwise), range (`-pi..pi`
+against `0..2pi`) and cut (−x against +x).**
+
+- **Verified 2026-09-14** — the converted per-vertex `ang` is the reference's unwrapped `atan2`:
+  `present: let ang = py\.atan2\(px\); in: core/src/milk/mod.rs`
+
+**CLOSED 2026-09-14** — [Plan 0173](plans/done/0173-the-milkdrop-geometry-reads-the-source.md) Phases 1-2, on the agreement branch, with no code
+change. The half this entry was left holding, the reference's handedness, is read from the source:
+counter-clockwise on screen, `(-pi, pi]`, cut on −x. The `ang` a converted per-vertex program reads
+has matched that since `661e03f` (2026-08-16). **That inverts this entry's diagnosis.**
+`vertex_position`'s +x cut is read only by native `[per_vertex]` presets, and `run_vertex` cut on −x
+three days before Plan 0109's look gate saw the seam. So the centre-to-right-edge seam on *Songflower
+(Moss Posy)* and *chasers 19 Portal* cannot be this branch cut, and it is still unexplained. See 0215.
+The same read found the emitted comp-stage `rad`/`ang` and the per-vertex `x`/`y` diverging from the
+source. See 0214. Its three `present:` probes retire with this body. The wrap is still there, and it
+is correct for the native vocabulary.
+
+---
+
+## 0120 — the converted waveform figure renders larger than the reference's, and `wave_scale` is applied raw
+
+**Raised by:** `architect`, from [Plan 0109](plans/done/0109-the-milkdrop-import-gets-its-geometry-back.md)'s
+Phase 5 look gate (2026-08-19). **Owner if taken:** `dev`.
+
+- **Verified 2026-08-19** — the authored scale is a bare multiply on the trace samples, with no
+  normalization constant and no comment on units:
+  `present: held \* scale in: core/src/render/scenes/warp_mesh/draw.rs`
+
+### The finding
+
+Two of the seven judged pairs reported an oversized waveform figure, independently and unprompted:
+*Blur Mix 3* ("a bit upscaled", `nWaveMode = 6`, `fWaveScale = 3.266`) and *Cauldron painterly 5*
+("wave became very large", `nWaveMode = 5`, `fWaveScale = 1.139`). `draw.rs` applies the value as
+`*slot = held * scale`, straight from `fWaveScale`, on a trace already normalized to `-1..1`.
+MilkDrop's `fWaveScale` is not a bare multiplier on such a trace — the reference normalizes by the
+sample range — so a missing constant is a plausible single home.
+
+**It is a candidate and not a diagnosis, deliberately.** The complaint does not scale with the
+authored value: the preset with the *larger* `fWaveScale` read as *less* wrong, at a different
+`nWaveMode`. So there may be two defects here rather than one, and a third observation is recorded
+without a mechanism at all: *Blur Mix 3*'s **crisp trace spans roughly the middle 57 % of the frame**
+while its blurred halo reaches the edges, where Plan 0108 described the reference as drawing
+"horizontal full-width traces". Amplitude and extent are different quantities and may have different
+causes.
+
+### What a fix would be
+
+Derive the reference's constant from MilkDrop's own waveform construction rather than by matching a
+picture, then decide whether the x-extent is the same defect or a second one. Both are checkable
+against `milkconv/tests/draw_layer.rs`, which already builds the figure as geometry and can assert a
+span without a capture.
+
+### Priority
+
+**Medium.** It touches the whole waveform-led family — the *Blur Mix* / *Fog Tunnel* / *Cauldron*
+presets — but unlike the wash it makes a preset look mis-tuned rather than unrecognisable.
+
+### Update 2026-08-19 — [Plan 0111](plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 5 **split this entry in two**. The x-extent is a separate defect and is now [0122](design-backlog-archive.md); the amplitude constant **stays live and undecided**.
+
+**The amplitude half stopped, on the branch the phase was given for it.** The reference's
+normalization is not derivable from any source available in this environment: there is no MilkDrop
+source and no authoring documentation beside the corpus, and a `.milk` preset does not record the
+convention it was authored against. Nothing was changed, and matching a picture was refused — it
+would produce a number right for one preset at one wave mode and wrong for the corpus.
+
+**What the corpus does settle, and it narrows the question usefully.** Across the 552 presets in
+`milkdrop-original` that set `fWaveScale`:
+
+```text
+  n=552  min=0.0000  p10=0.0100  p25=0.2920  median=0.9724  p75=1.5540  p90=3.2350  max=100.0000
+```
+
+**The median is 0.9724 — unity.** So `fWaveScale` is authored as a multiplier *about 1*, and what is
+missing is a single **base amplitude** (what a unit-scale wave should occupy), not a per-preset or
+mode-dependent correction. That also weakens this entry's own "factor of 279 across the seven pinned
+presets, so it cannot be a bare multiplier" argument: `p10 = 0.01` means a tenth of the corpus
+authors near-zero scales deliberately, and a near-flat trace is a *visible flat line* rather than an
+invisible one, so the spread is consistent with a bare multiplier over a correct base.
+
+Any candidate constant must keep both ends of that distribution usable. Whoever takes this needs one
+of: MilkDrop 2's waveform draw, its authoring documentation, or a reference capture of a preset built
+to be amplitude-revealing.
+
+
+### Update 2026-08-28 — [Plan 0127](plans/done/0127-the-picture-stops-depending-on-the-volume-slider.md) took the measurement this entry stopped for, and it **falsifies the entry's title**. Phase 4 was written to apply a base amplitude constant and was **skipped** on the reading; nothing in `draw.rs` changed, so this stays live.
+
+**The reference capture happened.** Phase 3 built two purpose-authored `.milk` presets
+(`nWaveMode = 6`, `fWaveScale = 1.0`, `fWaveSmoothing = 0`, `fWaveParam = 0`, warp/zoom/rot/echo
+neutral, a thin opaque white line on black) and drove both `foo_vis_milk2` 0.2.0.0 and this engine
+from one 60 s 48 kHz full-scale 200 Hz sine, verified 0.0 dBFS peak. Two readings, each with the
+screenshot it came from, in `WORK/lmv-0127-gate/` outside the repo:
+
+| | reference (`foo_vis_milk2`) | ours |
+|---|---|---|
+| peak-to-peak at `fWaveScale = 1`, full-scale input | **0.316** frame heights | **0.3019** frame heights |
+| x-extent at 16:9 | **1.000** of frame width | 1.000 (after Plan 0127 Phase 2) |
+
+**So we render 4.7 % SMALLER than the reference at unit scale, not larger.** The ratio is a single
+number — ours is linear to within 0.9 % across a 4x sweep of `wave_scale` (0.3037 / 0.3019 / 0.3009
+at 0.5 / 1.0 / 2.0) — so `draw.rs`'s mode-6/7 factor of `0.15` implies MilkDrop's is ~`0.157`.
+**The oversized figure two Plan 0109 judges reported was [0123](design-backlog-archive.md)**,
+the volume dependence, which is now closed — not a missing base amplitude. This entry's own reading
+of that interaction ("an un-normalized trace times an un-normalized `wave_scale` is hypersensitive")
+was right; the half it attributed to `wave_scale` was not there.
+
+**Why the constant was not applied anyway.** Phase 4's second done-when required both ends of the
+corpus distribution to stay usable. Measured at 1920x1080 on the geometry the draw layer builds:
+`p10 = 0.01` draws 5 px (0.0046 H), a visible flat line; `p90 = 3.235` draws 0.9722 H — inside the
+frame with 15 px of margin; `p90` scaled by 1.047 draws exactly 1.0000 H, rows 0..1079, **clipped at
+the frame edge**. Applying the constant fails the criterion the phase existed to satisfy, for 4.7 %.
+
+**What is left of this entry, and it is much less than its title claims.** The base amplitude is
+measured and it is very nearly right; whether the last 4.7 % is worth a change that re-blesses the
+converted goldens and pushes the top decile of the corpus to the frame edge is a judgement nobody
+has needed to make. **Priority drops to low.** Whoever picks it up starts from `1.047` and does not
+re-derive it.
+
+- **Verified 2026-08-19** — the scale is still a bare multiply with no normalization constant:
+  `present: \*slot = held \* scale in: core/src/render/scenes/warp_mesh/draw.rs`
+- **Verified 2026-08-28** — still true after Plan 0127, which measured the constant and did not
+  apply it: `present: \*slot = held \* scale in: core/src/render/scenes/warp_mesh/draw.rs`
+
+### Update 2026-09-14 — [Plan 0173](plans/done/0173-the-milkdrop-geometry-reads-the-source.md) Phase 1 read the waveform from MilkDrop 2's released source. **Its mode-6/7 constant is smaller than ours, not 4.7 % larger, so it does not explain the `foo_vis_milk2` reading.**
+
+**Source read:** `github.com/xeiraex/milkdrop2`, commit `d4c843a4fb4f53aef755957fc9478780325748cd`
+(the original v2.25c release), the same commit as 0119's update. The mirror's later commits do not
+touch `milkdropfs.cpp`, and touch `pluginshell.cpp` only outside `AnalyzeNewSound`. Facts only.
+
+- **Sample range.** `vis_milk2/pluginshell.cpp`, `CPluginShell::AnalyzeNewSound`, l.2018: each
+  Winamp 8-bit sample becomes `(byte ^ 128) - 128`, so `-128..127`. `vis_milk2/milkdropfs.cpp`,
+  `CPlugin::RenderFrame`, l.933-942: every sample is multiplied by `fWaveScale / 128`, with
+  `fWaveSmoothing` as a one-pole running mix along the trace. **A full-scale trace is
+  `±1 × fWaveScale`.**
+- **Space.** `CPlugin::DrawWave` builds every vertex in D3D clip space, `-1..1` on both axes, so
+  **one frame height is 2 units**; l.3312 negates every `y` before drawing.
+- **Modes 6 and 7** (`DrawWave`, l.3100-3242). A line at angle `1.57 * wave_mystery` (l.3130, so
+  `±pi/2`) whose endpoints are pushed out to ±3 and clipped to ±1.1 (l.3140-3190), so it runs 5 %
+  past each frame edge. **Mode 6 offsets each point along the line's normal by `0.25 * fL[i]`**
+  (l.3206-3207). Mode 7 draws the left channel at `0.25 * fL[i] + sep` and the right at
+  `0.25 * fR[i] - sep`, with `sep = (wave_y*0.5+0.5)^2` (l.3221-3235). **Nothing clamps the offset**;
+  a trace past the frame edge is cut by the viewport, not limited. `SmoothWave` (l.2549, applied at
+  l.3326) then inserts one midpoint per segment with a `-0.15, 1.15, 1.15, -0.15` kernel.
+- **So mode 6's base amplitude is `0.25` clip units, which is `0.125` frame heights per unit sample:
+  a full-scale trace at `fWaveScale = 1` draws `0.25` frame heights peak-to-peak** (127/128 of that at
+  the 8-bit ceiling), plus the line's own width.
+- **Modes 0-5 do not share a figure with this engine's 1-5.** Mode 0 is a circle of radius
+  `0.5 + 0.4 * fR[i] + wave_mystery` clip units, turning at `time * 0.2` (l.2903-2913). 1 is an
+  x-y oscilloscope wound into a spiral (`rad = 0.53 + 0.43 * fR`, angle from `fL[i+32]`); 2 and 3
+  plot `fR[i]` against `fL[i+32]` at unit scale; 4 is a horizontal "script" at `0.47`/`0.44`;
+  5 is a rotating product figure. Only 6 and 7 are the same figure in both engines, so only they
+  have a constant to compare.
+
+**What that does to the 0.316 reading.** `draw.rs`'s `0.15` gives `0.30` peak-to-peak plus width,
+which is Plan 0127's `0.3019`. The released source gives `0.25` plus width. `foo_vis_milk2` 0.2.0.0
+drew `0.316`, which is **1.26x** the released source's figure. That host does not feed samples
+through the Winamp 8-bit path above, so the level its trace arrives at is not in this source; that
+is the risk Plan 0173 named, and it is where the gap sits. Separately, Plan 0127's objection that the
+top decile would touch the frame edge is answered: the reference does not clamp there either.
+
+**Ours differs by a factor of 1.2 in modes 6 and 7 (`0.15` against the source's `0.125` frame heights
+per unit sample), in the opposite direction from the `foo_vis_milk2` capture.**
+
+- **Verified 2026-09-14** — the mode-6/7 factor is still `0.15`:
+  `present: sample\(i\) \* 0\.15 \+ offset in: core/src/render/scenes/warp_mesh/draw.rs`
+
+**CLOSED 2026-09-14** — [Plan 0173](plans/done/0173-the-milkdrop-geometry-reads-the-source.md) Phase 1. Phase 3 stopped on its own branch, and
+`draw.rs` is unchanged. The base amplitude this entry asked for is read from the source: modes 6 and 7
+offset by `0.25` clip units per unit sample, which is `0.125` frame heights, and nothing clamps at the
+frame edge. That answers Plan 0127's top-decile objection, and it means the `1.047` this entry said to
+start from is not the source's constant. **The two references now disagree with each other.** Ours is
+`0.15`, the released source `0.125`, and `foo_vis_milk2` drew `0.158` on Plan 0127's capture. The
+source cannot explain that gap, because that host does not feed the 8-bit path. The read also found
+modes 0-5 drawing different figures from the source's, and the mode-6/7 angle range and mode-7
+separation differing. Both residues are one question, which reference the waveform follows, and they
+are 0216. Its three `present:` probes retire with this body; 0216 re-probes the `0.15`.
