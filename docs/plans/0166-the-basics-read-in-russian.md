@@ -5,10 +5,22 @@
 > **Owner skill(s):** `dev`, `human`
 > **Related ADRs:** [0185](../adrs/0185-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md)
 
+> **Amended 2026-09-14, before any phase landed (architect validity sweep).** Four changes, each made
+> in place below.
+> (1) Two figures were re-measured on the tree: 5,618 words across the five sources, and 11,626
+> bytes for `docs/running.md`. Only `running.md` moved in the sources since approval (`b301507`,
+> +7/-4), so the slice is still the one ADR-0185 argued.
+> (2) A fourth `READ-ME-FIRST.md` now exists, `packaging/studio/` (`9a4410a`). It is outside the
+> slice, and *What this plan does NOT do* now names the two studio zips.
+> (3) Phase 1's new gate falsifies the Node-gate counts written in `CLAUDE.md`, `README.md` and
+> `ci.yml`'s comments, so those files join Phase 1.
+> (4) The shallow-clone trap was handled for the gate but not for the banner. The banner reads git
+> history in the site build, and `pages.yml` checks out at depth 1. Phase 1 now covers that too.
+
 ## TL;DR
 
 Five documents — the three `packaging/*/READ-ME-FIRST.md`, `docs/running.md` and
-`docs/how-it-works.md`, about 5,578 words — gain a Russian sibling `.ru.md`, published as one
+`docs/how-it-works.md`, about 5,600 words — gain a Russian sibling `.ru.md`, published as one
 `Русский` group in the site menu, with the foobar component zip shipping its Russian install file
 beside the English one. Each translation carries a `translated-from: <sha>` stamp; a new gate hard-
 fails a missing stamp and prints an advisory row for a stale one, and the site renders a dated
@@ -77,7 +89,12 @@ uses.
   notice on a translated page.
 - **Files touched:** `scripts/check-translations.mjs`, `scripts/fixtures/translations/`,
   `site/src/plugins/translation-banner.mjs`, `site/astro.config.mjs`, `.githooks/pre-push`,
-  `.github/workflows/*` (the `links` job).
+  `.github/workflows/ci.yml` (the `links` job, and its own "the seventh" comment),
+  `.github/workflows/pages.yml` (the `build` job's checkout depth), and the prose that counts the
+  Node gates. Today that is `CLAUDE.md`'s `scripts/` entry ("Nine Node gates. SEVEN run by
+  pre-push…", and "Of the seven…") and `README.md`'s `scripts/` row ("the seven Node gates… an
+  eighth and ninth"). Grep for the counts rather than trusting this list, and prefer count-free
+  wording where the sentence allows it (backlog 0208's rule).
 - **Done when:**
   - A `.ru.md` with no stamp, or a stamp that is not a 40-hex or short sha, exits non-zero and names
     the file and line.
@@ -86,6 +103,14 @@ uses.
   - On a **shallow clone** the staleness half prints a notice and withholds its rows rather than
     reporting every translation as stale — `git log -1` returns the tip commit for every path there,
     which is the trap ADR-0108's advisory block already handles.
+  - **The banner has the same trap, and it would publish it.** The banner reads git history during
+    the site build, and `.github/workflows/pages.yml`'s `build` job uses `actions/checkout@v4` at
+    its default depth of 1. Unguarded, the live site would show every Russian page as stale. Two
+    guards are required, not one. The `build` job checks out with `fetch-depth: 0`, so the
+    published notice is true. The plugin also detects a shallow repository and renders **no**
+    notice there, so a shallow local or CI build cannot publish a false one.
+  - The Node-gate counts in `CLAUDE.md`, `README.md` and `ci.yml`'s comments describe the tree after
+    this phase: a grep for the old number words beside "gate" finds nothing stale.
   - Seeded fixtures cover all three states (missing, stale, current), and the gate is wired into
     pre-push and the CI `links` job.
   - The banner plugin renders a dated notice for a stale page and nothing for a current one, and a
@@ -127,7 +152,8 @@ uses.
   - `node scripts/check-site-links.mjs` and `node scripts/check-site-routes.mjs` pass against
     `site/dist/` — every route menu-reachable, no site-relative href ending in `.md`, and **no route
     over `ROUTE_SOURCE_CEILING`**, which the slice clears with room: the largest source is
-    `docs/running.md` at 11,331 bytes and inflates to roughly 20,000.
+    `docs/running.md` at 11,626 bytes (measured 2026-09-14). It inflates to roughly 20,000, against a
+    30,000 ceiling.
   - Each Russian page cross-links to its English twin and each English twin to its Russian one.
   - A page whose source has moved shows the notice; the others show nothing.
 
@@ -177,6 +203,11 @@ const state = !stamped ? 'FAIL' : current.startsWith(stamped) ? 'current' : 'sta
 - **A remark plugin that throws is swallowed.** The site's content layer stores an entry without its
   rendered HTML rather than aborting, so a broken banner serves a titled empty page. Phase 1's
   done-when requires the guard, not just the feature.
+- **Plan 0178 adds a gate too, and both plans edit the same count prose.** Plan 0178 (operator text
+  and counts, drafted 2026-09-14) adds the prose system-count gate from backlog 0208, and it moves
+  the same `CLAUDE.md` / `README.md` / `ci.yml` sentences to count-free wording. Whichever plan
+  lands second rebases onto the other's wording rather than restoring a number. If 0178 lands
+  first, Phase 1's count edit may be a no-op, which is the desired outcome.
 - **The advisory can be ignored indefinitely.** That is the accepted cost of ADR-0185's decision, not
   an oversight — but if the close notes show the same translation stale three closes running, the
   honest response is to retire that page rather than let it lie.
@@ -188,7 +219,8 @@ const state = !stamped ? 'FAIL' : current.startsWith(stamped) ? 'current' : 'sta
 - **No translation of the preset surface.** `presets/README.md`, `docs/presets.md`,
   `docs/preset-palettes.md`, `docs/preset-guide.md` and the tuning walkthrough stay English.
 - **No Starlight i18n, no `/ru/` locale, no language picker.**
-- **No Russian in the Windows or macOS zips.** The foobar component only.
+- **No Russian in the Windows or macOS zips, nor in the two studio zips.** The foobar component
+  only. `packaging/studio/READ-ME-FIRST.md` is outside the slice, like the other two.
 - **No second language.** Nothing here is built as a general i18n framework, and a request for one
   should reopen ADR-0185 rather than extend this.
 - **No translation of `docs/adrs/`, `docs/plans/`, or the design backlog.** Those address

@@ -10,7 +10,23 @@
 > [0109](../adrs/0109-the-beat-clock-counts-onsets-not-beats.md),
 > [0046](../adrs/0046-linear-light-hdr-composite-bloom-tonemap.md)
 >
-> **Closes:** design-backlog 0157, 0158
+> **ADR status:** ADR-0145 and ADR-0174 are still `proposed` while this plan is approved. They are
+> accepted at this plan's close (the Mode 4 ceremony), with an `Outcome` if the phases falsify
+> anything they record — not silently treated as accepted by the "go".
+>
+> **Closes:** design-backlog 0157, 0158, and the preset-author residue of 0163 (Phase 5)
+
+> **Amended 2026-09-14** (architect backlog sweep): **Phase 8's premise was wrong and is rewritten.**
+> Plan 0115's `FrameTap` exists, but `Renderer::render_tapped` is a headless path — it draws
+> *instead of* presenting and blocks on a readback of the display-encoded, dithered
+> `Rgba8UnormSrgb` frame, and its one consumer is `--stream`; Plan 0115 left windowed tapping
+> unbuilt. Phase 8 now opens on a decision between three shapes, one of which is an ADR. Also:
+> Phase 2 and Phase 3's file lists follow the shell and OSC splits (`run.rs`, `osc/encode.rs`,
+> `osc/decode.rs`, spec 0003); Phase 3 weighs **publishing the bar grid the engine already
+> computes** (backlog 0157's own fix) before designing a gate, and **diagnoses the 200.9 BPM
+> reading first** (backlog 0158); Phase 5's binding list is the real `VAR_NAMES` roster and takes
+> backlog 0163's residue; Phase 7's console conditional is resolved and names spec 0003's
+> `/rlx/v1/ctl/` vocabulary; Phase 10 names `docs/configuration.md` and the site's `PUBLISHED` map.
 
 ## TL;DR
 
@@ -78,7 +94,7 @@ flowchart LR
         subgraph core["core/ — GPU-abstract, source-agnostic"]
             an["Analyzer<br/>+ folded tempo, musical beat — Phase 3"]
             df["draw_frame"]
-            tap["FrameTap (Plan 0115)<br/>+ linear resolve — Phase 8"]
+            tap["frame resolve — Phase 8<br/>shape decided there<br/>(FrameTap is headless-only)"]
         end
         loop["shell frame loop<br/>holds the AnalysisFrame"]
         look["look evaluator<br/>TOML in the expression grammar"]
@@ -154,8 +170,12 @@ which nothing but the rig can answer. Phase 9 is the whole of the second half, i
   grammar** — a constant colour is the whole visual ambition.
 - **Files touched:** new `standalone/src/artnet.rs` (+ `artnet/tests.rs`), new
   `standalone/tests/artnet_loopback.rs`, `standalone/src/config.rs`, `standalone/src/app_state.rs`,
-  `standalone/src/cli.rs`, `standalone/src/lib.rs`, `standalone/Cargo.toml` (dev-dependency on
-  `rlx-artnet-sim`).
+  `standalone/src/cli.rs`, `standalone/src/lib.rs`, `standalone/src/run.rs`,
+  `standalone/Cargo.toml` (dev-dependency on `rlx-artnet-sim`). `run.rs` is where the `[osc]`
+  precedent is wired — `parse_osc_arg` / `resolve_osc` from `cli.rs` resolve the flag against the
+  config section and `OscSink::bind` builds the sink, which `app_state.rs` then holds as
+  `osc: Option<OscSink>`; the `[artnet]` sink follows the same three steps in the same two files.
+  (Plan 0120 also edits `run.rs`; merge `main` if both lanes are live.)
 - **How:**
   - **The fixture map is the design work of this phase**, and it is the part most likely to be
     revised later, so keep it small and literal: node addresses, a universe range, pixels per
@@ -201,8 +221,26 @@ which nothing but the rig can answer. Phase 9 is the whole of the second half, i
   gate the beat counter, in three lines each, and **every consumer of this telemetry will write the
   same two workarounds.** Publish both signals from the engine instead. **This phase never needed
   the rig** and is unchanged by ADR-0174.
-- **Files touched:** `core/src/dsp/` (the analyzer), `standalone/src/osc.rs`, plus tests.
+- **Files touched:** `core/src/dsp/` (the analyzer), `standalone/src/osc.rs` and its submodules
+  `standalone/src/osc/encode.rs` (the outbound table is a fixed-size array sized by
+  `ADDRESS_COUNT`, so a new address is a constant change the compiler holds) and
+  `standalone/src/osc/decode.rs`, `docs/specs/0003-studio-control-protocol.md` (the authority on
+  both directions of the OSC vocabulary, per `osc.rs`'s own header — a new telemetry address is a
+  spec edit, not only a code one), `docs/configuration.md`'s OSC table, plus tests.
 - **How:**
+  - **First, diagnose the reading that motivated the fold (backlog 0158).** The rig saw the
+    estimator report ~200.9 BPM, where the documented bias runs the other way. Before choosing a
+    fold window, establish which of the entry's explanations holds — in particular whether that
+    reading was a warm-up artefact of the estimator's first seconds rather than a settled octave
+    error. If it was warm-up, a **tempo-lock flag** (publish the estimate only once it is stable, or
+    publish a `tempo_locked` beside it) may serve every consumer better than a fold, and the phase
+    says which it chose and why.
+  - **Then weigh publishing what the engine already computes (backlog 0157).** The analyzer already
+    carries a bar grid — `bar_index`, `beat_in_bar`, `bar_phase` and the downbeat lock state — that
+    presets read through the expression grammar and the OSC telemetry does not send. That entry's
+    own fix is to **publish that grid and a `downbeat_locked` flag over OSC**, additively, and it may
+    remove the need to design a new gate on the folded tempo at all. Consider it before the gate
+    below, and record in the log why the gate was or was not still needed.
   - **Both signals are additive.** Nothing existing changes meaning: `tempo` keeps reporting what
     the estimator says, and `beat_index` keeps counting onsets, because presets and the OSC contract
     are bound to both. The new signals sit beside them. **A golden baseline that moves is a
@@ -218,6 +256,9 @@ which nothing but the rig can answer. Phase 9 is the whole of the second half, i
     the rig. Gating by the folded tempo is what the bridge did and it worked; whether that is the
     right mechanism inside the engine is this phase's design question.
 - **Done when:**
+  - The log records **the diagnosis of the 200.9 BPM reading** (warm-up artefact or settled octave
+    error, and the evidence), and **whether the bar grid was published over OSC** — with spec 0003
+    and `docs/configuration.md` updated for every address added.
   - The log records **what the estimator reports and what the fold produces, on real material**, and
     names the machine and the material per
     [ADR-0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md).
@@ -271,10 +312,25 @@ which nothing but the rig can answer. Phase 9 is the whole of the second half, i
 - **Files touched:** `standalone/src/artnet.rs` or a new look module, the expression evaluator's
   binding surface, `presets/` or a new `looks/` directory, plus tests.
 - **How:**
-  - **Reuse the grammar; do not invent a second one.** The evaluator already handles `bass`, `mid`,
-    `treb`, `onset`, `beat`, `tempo`, `time`. A look adds a spatial coordinate and returns a colour.
-    What that costs the grammar is this phase's design question, and if the answer is "a new
-    capability in the evaluator" then it is `dev` work in `core` and needs saying.
+  - **Reuse the grammar; do not invent a second one.** The evaluator's variable roster is
+    `VAR_NAMES` in `core/src/preset/expr.rs`, and it is already wider than a lighting look needs to
+    start: `bass`, `mid`, `treb` and `onset`, each with a `*_raw` twin; `beat`, `beat_index`,
+    `time_since_beat`; the bar grid `bar`, `beat_in_bar`, `bar_index`, `bar_phase`; `time`, `tempo`,
+    `novelty`; and the spatial and per-element variables `x`, `y`, `rad`, `ang` and `index`. A look
+    returns a colour per universe. **The spatial-coordinate question starts from reusing `index`
+    (the universe) and `x`/`y`** rather than adding a name; what that costs the grammar is this
+    phase's design question, and if the answer is "a new capability in the evaluator" then it is
+    `dev` work in `core` and needs saying.
+  - **The band terms peak at 1.0 by construction (backlog 0163's residue).** The bands are levelled
+    by `PeakNormalizer` (ADR-0049) against their own running peak — instant attack, 2.5 s release —
+    so `bass` reads exactly 1.0 on every local peak (on four-on-the-floor material, every kick)
+    whatever the input level, and the reading is scale-invariant. A look that uses one as a dimmer
+    sees pinned dynamics, which is how the lighting bridge misread it. The `*_raw` twins are what
+    carry level. Confirm in `core/src/dsp/gain.rs` which of the four terms share the normalizer
+    before writing the sentence, rather than taking this bullet's word for it. **Add one paragraph
+    saying so to `docs/presets.md`** where the band variables are defined, and repeat it wherever
+    this phase documents a look's bindable terms. A lighting-shaped level term is **not** in scope —
+    that is its own ADR.
   - **Decide where looks live and say why.** Beside `presets/` as a sibling directory is the obvious
     shape; embedding them the way `core/build.rs` globs presets (ADR-0022) is the obvious mechanism.
   - Selection is by name in `config.toml`, plus a CLI override, following `[osc]`'s precedent.
@@ -285,6 +341,8 @@ which nothing but the rig can answer. Phase 9 is the whole of the second half, i
     produce byte-identical rasters. That is the determinism rule applied to this path, it is free to
     assert here, and it is what makes Phase 6's comparison mean anything.
   - The evaluator's new bindings are covered by tests that assert values, not non-emptiness.
+  - `docs/presets.md` states that the band terms read 1.0 on every local peak and that the `*_raw`
+    twins carry level (backlog 0163).
   - `cargo nextest run --workspace` green, no golden baseline moves.
 
 ### Phase 6 — The look that already works, ported
@@ -318,8 +376,12 @@ which nothing but the rig can answer. Phase 9 is the whole of the second half, i
 - **What:** the controls a live set needs. Blackout, master level, look selection.
 - **Files touched:** `standalone/src/app_state.rs`, the settings surface, `standalone/src/artnet.rs`.
 - **How:** mirror the existing operator surfaces rather than inventing one — the settings modal and
-  the hotkey set are the precedent, and [Plan 0131](done/0131-the-operator-gets-a-console.md)'s console is
-  where this eventually belongs if that plan has landed.
+  the hotkey set are the precedent, and [Plan 0131](done/0131-the-operator-gets-a-console.md)'s
+  console (closed) is where these controls belong. **There is now a second operator surface:** the
+  `/rlx/v1/ctl/` control-in vocabulary [Plan 0158](done/0158-the-player-grows-a-studio-facing-surface.md)
+  added, whose authority is `docs/specs/0003-studio-control-protocol.md`. Whether blackout, master
+  level and look selection are also reachable over it is a decision this phase records either way;
+  adding an address there widens a contract and is ADR-worthy (ADR-0176), not a casual edit.
   - **Blackout must be reachable in one keystroke**, because its use case is "something is wrong
     right now, in front of an audience".
   - **Coupling is opt-in and off**, per ADR-0145: the operator's look selection is held across a
@@ -334,15 +396,43 @@ which nothing but the rig can answer. Phase 9 is the whole of the second half, i
 ### Phase 8 — The picture drives the lamps
 
 - **Owner skill:** dev
-- **Depends on:** [Plan 0115](done/0115-the-engine-becomes-a-live-video-source.md) Phase 2 having landed
-  the frame tap. **This plan does not build that tap.** If 0115 has not reached Phase 2, this phase
-  waits and Phases 1 to 7 do not.
+- **Precondition — a decision, and possibly an ADR, before any code.** This phase was written
+  assuming it could resolve onto [Plan 0115](done/0115-the-engine-becomes-a-live-video-source.md)'s
+  frame tap from the windowed frame loop. **That tap does not serve the window.** 0115 closed and
+  its Phase 2 landed `FrameTap` (`core/src/render/capture.rs`) and `Renderer::open_tap` /
+  `Renderer::render_tapped` (`core/src/render/capture_api.rs`), but `render_tapped` is a
+  **headless source path**: it draws into the tap's own texture *instead of* presenting, then blocks
+  on a readback of the full-resolution frame, and its only consumer is the `--stream` loop in
+  `standalone/src/stream.rs`. 0115 left windowed tapping unbuilt on purpose — *"streaming and
+  previewing would mean either two render paths per frame or presenting the tapped texture"*. So
+  Phase 8 opens by choosing one of three shapes, recorded in the log with the reason:
+  - **(a) The picture path runs under `--stream` only.** The Art-Net sink samples the tapped frame
+    in the headless loop; the windowed app drives the lamps only from a look (Phases 5-7). No core
+    change. Costs: a show that wants the picture on the lamps has no window, and the Spout / preview
+    story is whatever `--stream` already offers.
+  - **(b) Render twice per frame in the window** — once to the surface, once into a tap — and
+    resolve the second. No new core API, but it pays a whole second `draw_frame` per frame plus a
+    blocking readback on the display loop, which the frame-time budget and ADR-0145's inline-send
+    measurement (Phase 4) must be re-read against.
+  - **(c) A new core resolve on the windowed path** — a linear-light downsample of the composite to
+    the rig's raster, read back at 170 x 24 rather than full resolution. The cheapest at runtime and
+    the most honest colour, but it **widens the core render API** beside the one 0115 built, which
+    is an ADR before it is a phase.
+
+  **(a) or (b) are `dev`'s to take and log. (c) stops the phase and routes to `architect` for an
+  ADR**, exactly as Phase 3's "estimator work" exit routes out. Which shapes are acceptable to the
+  operator — whether a picture-on-the-lamps show may be windowless — is a product call; if the log
+  cannot answer it from the plan, ask the user before building.
 - **What:** resolve the rendered frame down to the rig's raster in linear light, so the lamps show
   the actual preset. ADR-0144's best idea, arriving without Arena or NDI.
-- **How:** establish first — by reading the code, and recording it in the log — **whether the
-  tonemap's output offscreen is linear float or already display-encoded** (ADR-0144's unverified
-  fact 5). If it is encoded, the resolve decodes to linear before averaging and re-encodes once.
+- **How:** ADR-0144's unverified fact 5 — linear or display-encoded — **is already answered for the
+  tap**: it reads back `Rgba8UnormSrgb`, display-referred and dithered in the encoded domain
+  (ADR-0096; recorded in Plan 0115's risks). Under shapes (a) and (b) the resolve therefore decodes
+  to linear before averaging and re-encodes once, and should say in a comment that the dither is
+  averaged in, not removed. Under (c) the answer depends on which offscreen the new resolve reads,
+  and establishing it — by reading the code, recorded in the log — is part of the ADR.
 - **Done when:**
+  - **The log records which of (a), (b), (c) was taken and why**, and for (c) names the ADR.
   - **The discriminating test passes, and it is exact.** Resolve a frame that is half full-white and
     half full-black. A correct linear average is 0.5 in linear light, which sRGB-encodes to roughly
     **0.735** (about byte 188); averaging the encoded bytes gives 127.5 (byte 128). The test asserts
@@ -391,16 +481,21 @@ which nothing but the rig can answer. Phase 9 is the whole of the second half, i
 - **Owner skill:** dev
 - **What:** write the operator guide, and bring the rig knowledge into the repository.
 - **Files touched:** new `docs/lighting.md`, `README.md`, `docs/nfr.md`, `docs/testing.md`,
-  `presets/README.md` or the looks equivalent.
+  `docs/configuration.md` (the authority on every flag, environment variable and `config.toml` key
+  — `[artnet]` and its CLI override land there, not only in `lighting.md`),
+  `site/src/plugins/rewrite-links.mjs` if `lighting.md` is to be published (a new doc reaches the
+  site only by being added to `PUBLISHED`, ADR-0154), `presets/README.md` or the looks equivalent.
 - **How:** `docs/lighting.md` carries the fixture map format, the config keys and CLI flags, the
   look-authoring reference, the operator controls, and — **the part that only exists outside the
   repo today** — the rig facts: latching nodes, full-universe frames, the height coordinate, the
   static-IP requirement and the WireGuard capture of `192.168.1.0/24`, **as Phase 9 confirmed or
   corrected them**. `docs/testing.md` gains `rlx-artnet-sim`: what it is, how to run the viewer, and
   the enumerated list of what it cannot see.
-- **Done when** `node scripts/check-doc-links.mjs` exits 0, the config keys documented match what
-  `config.rs` actually parses (checked against the code, not against this plan), and the README's
-  flag list matches the binary's.
+- **Done when** `node scripts/check-doc-links.mjs` exits 0, the config keys documented in
+  `docs/configuration.md` and `docs/lighting.md` match what `config.rs` actually parses (checked
+  against the code, not against this plan), the flag list matches the binary's, and the log says
+  whether `lighting.md` was added to the site's `PUBLISHED` map (and if so, `check-reader-prose.mjs`
+  and `toc.mjs --check` exit 0 over it).
 
 ## Risks & open questions
 
@@ -440,7 +535,8 @@ which nothing but the rig can answer. Phase 9 is the whole of the second half, i
 - **No fixture profiles, no patching UI, no dimmer curves, no cue stack.** The fixture map describes
   a pixel surface; it does not become a lighting console's data model.
 - **No second machine, no NDI, no Spout, no video transport of any kind.** ADR-0145 records why.
-- **This plan does not build Plan 0115's frame tap.** Phase 8 resolves onto it.
+- **This plan does not build a windowed frame tap on its own authority.** Phase 8 either uses
+  Plan 0115's headless tap as it is (shapes a, b) or stops for an ADR (shape c).
 - **It does not delete the external bridge or the OSC sink.** Both stay supported, per ADR-0145.
 - **No foobar plugin support.** Standalone only, so `RLX_ABI_VERSION` does not move.
 - **No sACN.** The rig speaks Art-Net; a second transport waits for a rig that needs it.

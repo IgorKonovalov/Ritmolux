@@ -9,18 +9,31 @@
 > **Amended:** 2026-08-16 — Phase 1 added after [Plan 0102](done/0102-the-component-ships.md)'s
 > Phase 5 found the shipped component starves its host; former Phases 1-5 renumbered 2-6
 > **Closes:** design-backlog 0102, design-backlog 0103
-> **Soft dependency:** [0101](done/0101-the-engine-renders-a-music-video.md) (nothing here can currently record motion)
+> **Soft dependency:** [0101](done/0101-the-engine-renders-a-music-video.md) (closed — `shot --render` records motion)
 > **Hard dependency for Phase 5:** [0102](done/0102-the-component-ships.md)
-> **Coordinates with:** [0156](done/0156-the-site-becomes-the-reference.md) — its Phase 2 has moved the
+> **Coordinates with:** [0156](done/0156-the-site-becomes-the-reference.md) (closed) — it moved the
 > operator and developer sections out of `README.md` into `docs/` (ADR-0169): the file Phase 2 here
-> reorders is now **355 lines, not 650**, and its operator material is
+> reorders is now **346 lines, not 650**, and its operator material is
 > [running.md](../running.md) and [configuration.md](../configuration.md).
-> The architecture diagram moves to `docs/how-it-works.md` in 0156's Phase 3.
+> The architecture diagram now lives in `docs/how-it-works.md`; the README's `## Architecture` is a
+> short paragraph pointing at it.
+> **Hard dependency for Phase 5 (added 2026-09-14):** Plan 0176 — a `v*` tag must verifiably reach
+> `origin` and produce a published release before anything is submitted (backlog 0196).
+
+> **Amended 2026-09-14** (architect backlog sweep): Phase 1's files follow Plan 0126 Phase 8's split
+> of `foo_ritmolux.cpp` (`1779520`) into `host_window.cpp` / `viz_session.cpp`; the repository
+> figures are re-measured, which shrinks Phase 4 to topics + social preview and turns Phase 2 into
+> "move Download up" (the README no longer opens on a diagram); Phase 3's "if 0101 has not landed"
+> branch is dropped; the risks name the five release zips and the studio question; the "no website"
+> exclusion is rewritten against ADR-0154/0167/0169; and backlog 0196 is folded in as a precondition
+> on Phase 5 — the close ceremony's re-tag writes lightweight tags that `git push --follow-tags`
+> skips, so a tag can exist locally and never fire a release.
 
 ## TL;DR
 
 Ninety-seven plans, 110 ADRs, 66 releases — and **1 star, 0 forks, and no repository
-description**. This plan does the small, unglamorous, mostly non-technical things that stand
+description** when this plan was written (2026-08-16; re-measured 2026-09-14 in the table below).
+This plan does the small, unglamorous, mostly non-technical things that stand
 between a finished product and anyone knowing it exists: a README that leads with the product,
 a demo that moves, repository metadata, a component submission, and three posts. Its done-whens
 are about **shipping the artifacts, not about the outcome** — nobody can plan adoption, and a plan
@@ -38,19 +51,24 @@ The engine is real and measured: 165 fps median at Rich/1080p with zero dropped 
 a linear-light HDR composite, dual-resolution analysis, two frontends off one core, a golden suite
 pinned on a software rasterizer. None of that is visible to anyone.
 
-The concrete state of the repository, checked 2026-08-16:
+The concrete state of the repository, checked 2026-08-16 and re-measured 2026-09-14
+(`gh repo view`):
 
-| | |
-|---|---|
-| Stars / forks | 1 / 0 |
-| Repository description | **empty** |
-| Topics | none |
-| Age | 26 days |
-| Demo video | none — every image in the repo is a still |
-| Component in foobar2000's repository | not submitted |
+| | 2026-08-16 | 2026-09-14 |
+|---|---|---|
+| Stars / forks | 1 / 0 | 4 / 0 |
+| Repository description | **empty** | set |
+| Homepage | none | the documentation site |
+| Topics | none | **none** |
+| Custom social preview | none | **none** |
+| Demo video | none — every image in the repo is a still | unchanged |
+| Component in foobar2000's repository | not submitted | not submitted |
 
-The README is good, but it opens on architecture: a stranger's first screen is a mermaid diagram
-of the audio path, not what the thing is or what it looks like moving. And the one genuinely
+When this plan was written the README opened on architecture: a stranger's first screen was a
+mermaid diagram of the audio path. That half is fixed — it now opens on `hero.png` and a gallery
+table, and the diagram moved to `docs/how-it-works.md`. What is still true is that
+**`## Download` sits below `## Architecture` and the long `## Repository layout` block**, so a
+stranger scrolls past a directory tree before finding the thing to install. And the one genuinely
 uncontested position this project holds — a serious visualizer inside foobar2000, where the only
 competitor is a port of a 2007 plugin — is reachable through a component nobody can install.
 
@@ -71,9 +89,14 @@ first because every later phase increases the number of people who meet the defe
 - **What:** Fix [design-backlog 0102](../design-backlog.md) — the panel attaches its wgpu surface
   before it has a real client rect — and [design-backlog 0103](../design-backlog.md) — the panel's
   `WM_CONTEXTMENU` shadows foobar2000's layout-edit menu, so it cannot be removed by the documented
-  route. Both pre-date this plan and both live in `plugin-foobar/foo_ritmolux.cpp`.
-- **Files touched:** `plugin-foobar/foo_ritmolux.cpp`; an ADR if the decision below goes the way it
-  probably has to.
+  route. Both pre-date this plan. Since Plan 0126 Phase 8 (`1779520`) split the shim, the surface
+  lifetime lives in `plugin-foobar/viz_session.cpp` (`VizSession::ensure_handle`, the
+  `needs_reattach` flag, the watchdog, and the diagnostics row that prints `gpu_bytes`) and the
+  shared window procedure in `plugin-foobar/host_window.cpp` (`wnd_proc`, its `WM_CONTEXTMENU`
+  arm). `plugin-foobar/foo_ritmolux.cpp` keeps the `ui_element_instance` that holds the callback.
+- **Files touched:** `plugin-foobar/viz_session.cpp`, `plugin-foobar/host_window.cpp`,
+  `plugin-foobar/foo_ritmolux.cpp` (the edit-mode query reaches the panel through its
+  `ui_element_instance_callback`); an ADR if the decision below goes the way it probably has to.
 - **Notes for the implementer — read the backlog entries first; the 2026-08-16 evidence narrows
   the choice they leave open.** Entry 0102 offers two fixes: **defer the attach** until a
   non-degenerate `WM_SIZE`, or **re-check `needs_reattach` from the 500 ms watchdog** commit
@@ -92,7 +115,7 @@ first because every later phase increases the number of people who meet the defe
   below is not measurable without it.
   For 0103, `ui_element_instance_callback` exposes the edit-mode query, but the **pop-out host has
   no such callback and no layout to edit**, so the two hosts stop sharing one `WM_CONTEXTMENU`
-  branch. That sharing is deliberate in this file. **If the fix ends that arrangement, it is an
+  branch. That sharing is deliberate in `host_window.cpp`. **If the fix ends that arrangement, it is an
   ADR** — the shim's two-host design is exactly the kind of thing a future reader will otherwise
   re-litigate from scratch.
 - **Done when:** on a fresh foobar2000 with the panel docked and **nothing playing**, the plugin's
@@ -101,21 +124,28 @@ first because every later phase increases the number of people who meet the defe
   measurement violated. The diagnostics log reports the surface's real configured size. And with
   layout editing enabled, right-clicking the panel surfaces **foobar2000's** menu and Remove works,
   while with it disabled the component's own menu still appears.
-  **Then re-run [Plan 0102 Phase 5](../on-device-validation.md)'s checklist**, which is where the
-  original evidence lives and which is the only functional check this component has.
+  **Then re-run Plan 0102 Phase 5's checklist** — the section of
+  [`on-device-validation.md`](../on-device-validation.md) headed *"Runnable now — the foobar2000
+  component's clean-profile install"* — which is where the original evidence lives and which is the
+  only functional check this component has.
 
 ### Phase 2 — the README leads with the product
 
 - **Owner skill:** dev
-- **What:** Restructure the first screen. What it is, the hero picture, the download, the controls
-  — then architecture. Prepare (but do not apply) the repository description and topic list.
-- **Files touched:** `README.md`, and a short `packaging/repo-metadata.md` holding the description
-  text and topic list for Phase 4 to apply.
-- **Notes for the implementer:** everything below "Architecture" is already strong and should mostly
-  keep its wording — this is a reordering, not a rewrite. The status paragraph (pre-1.0, formats may
-  change) stays visible; understating instability to look finished would be the wrong trade.
+- **What:** The hero picture and the gallery already lead (Plan 0156). What remains is order:
+  **move `## Download` up**, above `## Architecture` and `## Repository layout`, so the first screen
+  is what it is, what it looks like, and how to get it. Prepare (but do not apply) the topic list;
+  the description is already set on the repository.
+- **Files touched:** `README.md`, and a short `packaging/repo-metadata.md` holding the topic list
+  (and the description text as applied, so it has a committed source) for Phase 4.
+- **Notes for the implementer:** the sections are already strong and should mostly keep their
+  wording — this is a reordering, not a rewrite. The status paragraph (pre-1.0, formats may change)
+  stays visible; understating instability to look finished would be the wrong trade. **Open
+  question for this phase:** a `v*` tag now ships the studio as well (two of its five zips), and the
+  README does not mention it. Whether the first screen pitches the studio, or keeps it for the
+  site, is a product call — raise it with the user before reordering rather than deciding it here.
 - **Done when:** a reader who has never seen the project learns what it is, sees it, and finds the
-  download **without scrolling past a diagram**. The description text and topics exist as committed
+  download **without scrolling past the repository layout**. The topic list exists as committed
   text for Phase 4.
 
 ### Phase 3 — a demo that moves
@@ -128,30 +158,37 @@ first because every later phase increases the number of people who meet the defe
 - **Notes for the implementer:** **this is the phase that wants
   [0101](done/0101-the-engine-renders-a-music-video.md)** — `shot --render` is the only way this repo
   can record motion, and screen-capturing the window would be the one image here that is not a
-  reproducible render. If 0101 has not landed, ship the still and say in the commit that the clip
-  is owed; do not introduce a hand-captured video.
+  reproducible render. 0101 has closed, so `--render` is available; do not introduce a
+  hand-captured video.
 - **Done when:** the clip and the still are committed, regenerable by an argument-free script, and
   the manifest records the preset, stimulus and size behind each.
 
 ### Phase 4 — the repository says what it is
 
 - **Owner skill:** human
-- **What:** Apply the metadata. Outward-facing, so the user does it:
+- **What:** Apply the metadata. Outward-facing, so the user does it. The description and homepage
+  were already set by 2026-09-14, so this phase is topics and the preview:
 
   ```sh
-  gh repo edit --description "<from packaging/repo-metadata.md>" \
-               --add-topic music-visualizer --add-topic rust --add-topic wgpu \
+  gh repo edit --add-topic music-visualizer --add-topic rust --add-topic wgpu \
                --add-topic foobar2000 --add-topic audio-visualization
   ```
 
   Plus the social preview image from Phase 3, in the repository settings.
-- **Done when:** the repository has a description, topics and a preview image, and a link pasted
-  into a chat shows the picture rather than a grey placeholder.
+- **Done when:** the repository has topics and a custom preview image
+  (`gh repo view --json repositoryTopics,usesCustomOpenGraphImage`), and a link pasted into a chat
+  shows the picture rather than a grey placeholder.
 
 ### Phase 5 — the component reaches its audience
 
 - **Owner skill:** human
 - **What:** Submit the `.fb2k-component` to the foobar2000 component repository.
+- **Precondition (added 2026-09-14, backlog 0196):** Plan 0176 has landed, and the tag carrying
+  Phase 1's fix is **on `origin` and has a published release with the component zip attached** —
+  checked with `git ls-remote --tags origin` and `gh release view <tag>`, not assumed from a local
+  `git tag`. The failure this guards against is silent: most `v*` tags since `v0.115.0` exist only
+  locally, because the close ceremony's re-tag writes a lightweight tag and `--follow-tags` pushes
+  only annotated ones.
 - **Done when:** the submission is filed. **Hard-depends on
   [0102](done/0102-the-component-ships.md)** — there is nothing to submit until that plan produces a
   released artifact, and submitting a locally built DLL with no release behind it would be worse
@@ -173,18 +210,24 @@ first because every later phase increases the number of people who meet the defe
   in CI and has **never executed on Apple hardware** ([NFR §9](../nfr.md#9-test-hardware-matrix-what-the-user-has)).
   An announcement will produce Mac downloads. The README already says this; Phase 2 must keep it
   above the fold rather than tidying it away, and Phase 6's posts should say it in the post itself.
-- **Both binaries are unsigned**, so the first-run experience on both platforms is an OS warning.
-  This is known and accepted ([NFR §8](../nfr.md#8-distribution-v1)); what it means here is that
-  the friction is highest at exactly the moment attention is highest.
-- **The library is small and lopsided** — 39 presets, four systems with exactly one world each
-  ([Plan 0104](done/0104-the-library-stops-being-lopsided.md)). A visitor who tries it judges the
-  content, not the composite. There is a real argument for running 0104 first; that is a
-  sequencing call for the roster, not a blocker written into this plan.
+- **Every shipped artifact is unsigned** — a `v*` tag now ships five zips (the standalone for
+  Windows and macOS, the foobar2000 component, and the studio for Windows and macOS), so the
+  first-run experience on both platforms is an OS warning. This is known and accepted
+  ([NFR §8](../nfr.md#8-distribution-v1)); what it means here is that the friction is highest at
+  exactly the moment attention is highest. **Phases 2 and 6 must decide whether to pitch the
+  studio** — it is a release artifact nobody has been told about, and a post that names it invites
+  a third first-run path.
+- **The library was small and lopsided** when this plan was written — four systems with exactly one
+  world each. [Plan 0104](done/0104-the-library-stops-being-lopsided.md) has since closed and the
+  embedded set has grown several-fold, so this risk is largely retired; a visitor still judges the
+  content, not the composite.
 - **This plan cannot promise adoption** and does not. Every done-when is an artifact. **Phase 1 is
   the one exception to that and is held to a measured property instead**, which is the right trade
   but a different kind of promise from the rest of the plan.
-- **Phase 1 is the third change to `foo_ritmolux.cpp`'s window/ownership path**, after `6f2862c`'s render
-  timer and the surface work before it. [Backlog 0102](../design-backlog.md) says in as many words
+- **Phase 1 is not the first change to the shim's window/ownership path** — `6f2862c`'s render
+  timer and the surface work before it, then [Plan 0107](done/0107-the-foobar-menu-picks-a-preset.md)'s
+  menu rebuild and Plan 0126's split into `host_window.cpp` / `viz_session.cpp` all came first.
+  [Backlog 0102](../design-backlog.md) says in as many words
   that it *"wants a design pass over surface lifetime, not another edge case handled"* — and that
   it was filed rather than fixed precisely to avoid *"a third guess layered on two"*. Treat a fix
   that only makes the reported symptom go away as a failure of this phase, not a pass.
@@ -195,14 +238,21 @@ first because every later phase increases the number of people who meet the defe
 - **Phase 1 has a release cost the others do not.** It changes shipped plugin behaviour, so the
   fixed component only reaches anyone on the next `v*` tag — which means the ordering constraint is
   stronger than "Phase 1 first": **the tag has to be pushed and its release green before Phase 5
-  submits anything.**
-- **Contention:** `plugin-foobar/foo_ritmolux.cpp` (Phase 1), `README.md`, `docs/images/`, `scripts/`.
-  Nothing on the roster touches these except a close ceremony's image re-render, which
-  [0087](done/0087-the-line-renderer-draws-a-curve.md) owes — sequence if they land together.
+  submits anything.** Backlog 0196 showed that "pushed" cannot be read off a local `git tag`: most
+  recent tags never reached `origin`. Phase 5's precondition (Plan 0176) is what makes this bullet
+  checkable.
+- **Contention:** `plugin-foobar/viz_session.cpp`, `host_window.cpp`, `foo_ritmolux.cpp` (Phase 1),
+  `README.md`, `docs/images/`, `scripts/`. A close ceremony's image re-render is the usual other
+  writer to `docs/images/` — sequence if they land together.
 
 ## What this plan does NOT do
 
-- **No website, no landing page, no domain.** The repository is the landing page.
+- **No new website work, and no domain.** The documentation site already exists
+  ([ADR-0154](../adrs/0154-the-reader-facing-docs-publish-as-a-site.md)), owns its own entrance and
+  install page ([ADR-0167](../adrs/0167-the-site-owns-its-entrance-and-the-install-page-is-the-testers-own-file.md)),
+  and is where the README sends a reader for reference
+  ([ADR-0169](../adrs/0169-the-site-is-organised-by-reader-task-and-the-readme-stops-being-a-reference.md)).
+  This plan links to it; it does not redesign it or buy it a domain.
 - **No paid promotion, no mailing list, no social accounts.**
 - **No code signing** — that stays a future plan and a `human` cost.
 - **No submission to app stores or package managers.**

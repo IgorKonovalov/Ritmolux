@@ -6,6 +6,11 @@
 > **Related ADRs:** [0193](../adrs/0193-a-test-that-reads-the-clock-runs-alone.md) (proposed),
 > [0173](../adrs/0173-a-cost-probe-takes-the-best-of-each-duration-not-the-best-difference.md)
 
+> **Amended 2026-09-14** (architect backlog sweep, outside the log): a Risks bullet records that
+> Phase 1's measured drain-wait cost already lands on the pre-push `-P fast` tier, not only on
+> `--workspace`; and "does NOT do" records that backlog 0182's partial test-binary merge (Plan 0177,
+> sequenced after this plan) must keep this override's selected binaries as their own targets.
+
 ## TL;DR
 
 Tests that assert on wall-clock time have failed the gate at least five times, and every one passed
@@ -155,6 +160,15 @@ flowchart TD
 - **The drain wait.** An isolated test waits for every running slot to finish before it starts. In
   the full `--workspace` run some tests take tens of seconds, so the wall-time cost there can exceed
   the serial figure. Phase 1 records `-P fast`. Whoever runs the close records `--workspace`.
+- **The drain wait already reaches the pre-push tier (added 2026-09-14).** Phase 1's one reading
+  took `-P fast` from 244.5 s to 398.2 s, **+153.7 s against the ~85 s serial figure** this plan
+  gave for the selected set. The bullet above placed the drain-wait cost on `--workspace`; the
+  reading says `-P fast` pays it too, and `-P fast` is what `.githooks/pre-push`, CI's `check` job
+  and `dev`'s per-phase gate all run. One run is a reading, not a benchmark — but **the close
+  decides, on a re-measurement, whether the hook can afford the override as written**, or whether
+  the selection needs a cheaper shape (for example a separate nextest test group sized to the
+  machine rather than whole-machine exclusivity). This plan does not touch the hook, so that
+  decision is a finding for the close, not a phase.
 - **Phase 2 may not reproduce.** Two failures in many runs is a low rate. The plan accepts that
   outcome: it leaves both tests with failure messages that settle the question the next time.
 - **Phase 2 may find a real control-path defect.** That is a backlog entry and possibly its own
@@ -170,6 +184,12 @@ flowchart TD
 - Add `retries` or `slow-timeout`. ADR-0193 rejects retries.
 - Touch `.githooks/pre-push`, `ci.yml`, or `src/` test modules.
 - Explain `animation_rep_shape_facet`'s one failure under three worktrees' load. It reads no clock.
+- Merge any test binaries. Backlog 0182's partial merge is Plan 0177, sequenced **after** this plan,
+  and it must **keep every binary this override selects as its own target** — the five `*_cost`
+  probes, `help_cli`, `stream_pipe`, and any test file Phase 2 or Phase 3 adds to the filter — plus
+  the nine `-P fast` exclusions, because a `binary()` predicate cannot name a module inside a merged
+  binary. A merge that folds one of them in silently drops it from this override. Plan 0177
+  re-derives the mergeable set from this plan's final filter, not from 0182's count.
 
 ## Implementation log
 

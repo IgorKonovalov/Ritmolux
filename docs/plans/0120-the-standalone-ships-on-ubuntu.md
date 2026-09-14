@@ -9,6 +9,21 @@
 > [0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md),
 > [0025](../adrs/0025-foobar-component-version-single-sourced.md),
 > [0001](../adrs/0001-rust-core-wgpu-cabi-foobar-shim.md)
+> **Coordinates with:** [0133](0133-the-engine-drives-the-lights.md) (also edits `standalone/src/run.rs`)
+> and [0174](0174-the-clock-reading-tests-run-alone.md) (owns `.config/nextest.toml`'s groups) —
+> sequence or merge `main` before Phase 2.
+
+> **Amended 2026-09-14** (architect backlog sweep): line references follow the shell's split — the
+> `Handle` alias, `start_capture`, `CAPTURE_BACKEND` and `capture_lost` live in
+> `standalone/src/capture_start.rs`, not `main.rs`, so Phase 3's cfg list grows past "three sites";
+> Phase 2's done-when names the `check` arm's **six** steps and the `-P fast` profile; the live
+> verdict carries an endpoint; the per-user directory is `~/.local/share/Ritmolux/` (case matters on
+> Linux); Phase 4's guard counts **5 zips + 1 tarball** and its upload globs must name the tarball;
+> Phase 5's sweep adds the site's `PUBLISHED` map, `how-it-works`/`running`/`configuration`, and the
+> two reader gates; the exclusions add the studio, `--stream`/Spout and the Art-Net sink. Two
+> backlog entries fold in: **0181** (Phase 2 — subprocess tests isolate the Linux data root; Plan
+> 0177 fixes the Windows arm first) and **0208** (Phase 5 — count-free platform wording; Plan 0178
+> adds the gate for system counts).
 
 ## TL;DR
 
@@ -16,7 +31,7 @@ The standalone gets a third platform: **Ubuntu 24.04 x86_64**. A new
 `standalone/src/capture_linux.rs` opens the default sink's monitor source through PulseAudio's
 simple API — which `pipewire-pulse` also serves — so an Ubuntu user hears what the machine is
 playing, exactly as a Windows user does. CI gains an `ubuntu-latest` arm, and a `v*` tag gains a
-fourth artifact: a `.tar.gz` staged the same way the Windows zip already is.
+Linux artifact beside its five zips: a `.tar.gz` staged the same way the Windows zip already is.
 
 The first thing that happens is not code. **Phase 1 is a human probe on the target machine**, run
 before `dev` starts, because ADR-0131's central premise — that `@DEFAULT_MONITOR@` resolves under
@@ -25,8 +40,8 @@ PipeWire's PulseAudio compat server — has never been tested from this dev box.
 ## Context & problem
 
 The tree is already shaped for Linux and has never been compiled on it. `preset_data_root()` has an
-`XDG_DATA_HOME` branch (`standalone/src/lib.rs:186`), `current_rss_bytes()` reads
-`/proc/self/statm` (`standalone/src/rss.rs:78`), `capture_handle::Handle` has a `()` third arm
+`XDG_DATA_HOME` branch (`standalone/src/lib.rs:285`), `current_rss_bytes()` reads
+`/proc/self/statm` (`standalone/src/rss.rs:81`), `capture_handle::Handle` has a `()` third arm
 (`standalone/src/capture_start.rs`), and `start_capture` has an arm returning `CaptureVerdict::Unsupported`
 that renders silence-driven visuals (`standalone/src/capture_start.rs`). None of it is built by anything:
 `ci.yml`'s `check` matrix is `[windows-latest, macos-latest]`, and the `links`, `deny` and `miri`
@@ -41,9 +56,11 @@ concept rather than a kernel one, and the decision of which client protocol to s
 Three things are true about this work that shape the phasing:
 
 - **The capture seam already exists and is the right one.** `capture_win.rs` and `capture_mac.rs`
-  are siblings that each hand back a `CaptureHandle` and a `SampleConsumer`; the shell branches on
-  `cfg` in exactly three places. A third backend is an addition, not a refactor, and `core/` is not
-  touched at all.
+  are siblings that each hand back a `CaptureHandle` and a `SampleConsumer`. The shell's platform
+  branches are concentrated in `standalone/src/capture_start.rs` (the `Handle` alias, `start_capture`,
+  `CAPTURE_BACKEND`, `capture_lost`, a macOS-only `use`), plus the `mod` declarations in `main.rs`
+  and a handful of `cfg(windows)` sites in `app_state.rs` that already carry `not(windows)`
+  fallbacks. A third backend is an addition, not a refactor, and `core/` is not touched at all.
 - **The riskiest claim is cheap to test and expensive to be wrong about.** If `@DEFAULT_MONITOR@`
   does not resolve, the backend needs the asynchronous context API to find the default sink name —
   a different and larger program. One `parec` command on the target box settles it, so that command
@@ -174,15 +191,28 @@ The runner needs system packages for winit, wgpu and (from Phase 3) PulseAudio. 
 `libxkbcommon-dev libwayland-dev libpulse-dev pkg-config` and converge — the exact list is one of
 ADR-0131's Notes, not a settled fact.
 
-Update the `check` job's own comment: it currently says the `-E` filter is *"Applied on BOTH matrix
-arms"*, which stops being true here.
+Update the `check` job's own comment: it currently says the `-P fast` profile is *"Applied on BOTH
+matrix arms"*, which stops being true here.
+
+**Isolate the per-user data root in subprocess tests on Linux (backlog 0181, folded in
+2026-09-14).** `help_cli.rs` spawns the built binary into `main()`, which migrates the per-user
+directory, and `stream_pipe.rs` spawns `--stream`, which opens `diagnostics.log` under the same
+root. Plan 0177 points those helpers at a scratch root on Windows and macOS first; this phase owns
+the **Linux arm** of that isolation — `XDG_DATA_HOME` (and `HOME`, since `preset_data_root` falls
+back to it) set to a scratch directory in the same helpers — so neither the runner nor the human's
+Ubuntu box in Phase 6 has its real `~/.local/share/Ritmolux/` mutated by `cargo nextest run`. If
+0177 has not landed when this phase starts, take both arms here and say so in the log.
 
 **Done when:**
 
-- The `ubuntu-latest` arm runs all five existing steps green — `cargo build`, the filtered
-  `cargo nextest run --workspace`, `cargo test --workspace --doc`,
-  `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --all --check` — with the same
-  `-E` filter the other two arms use, not a loosened one.
+- The `ubuntu-latest` arm runs all six existing steps green — `cargo build`,
+  `cargo nextest run --workspace -P fast`, `cargo test --workspace --doc`,
+  `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --all --check`, and
+  `cargo doc --workspace --no-deps` under `RUSTDOCFLAGS: -D warnings` — with the same `-P fast`
+  profile the other two arms use, not a loosened one.
+- The subprocess tests that reach `main()` or `--stream` set the Linux data root to a scratch
+  directory; a run of `help_cli` and `stream_pipe` on the Ubuntu arm leaves `$HOME/.local/share`
+  untouched.
 - **The implementation log records which wgpu adapter, if any, resolves on the runner, and whether
   any GPU-touching test actually executed there rather than skipping.** This is the phase's real
   finding and it must not be absorbed silently: `ubuntu-latest` may ship Mesa's software Vulkan, in
@@ -195,8 +225,13 @@ arms"*, which stops being true here.
 
 - **Owner skill:** dev
 
-Write `standalone/src/capture_linux.rs` as a structural sibling of `capture_mac.rs`, and wire the
-three `cfg` sites in `main.rs` (`mod` declaration, `capture_handle::Handle`, `start_capture`).
+Write `standalone/src/capture_linux.rs` as a structural sibling of `capture_mac.rs`, and wire it
+into every platform branch: the `#[cfg(target_os = "linux")] mod capture_linux;` declaration in
+`main.rs`, and in `standalone/src/capture_start.rs` the `capture_handle::Handle` alias, the
+`start_capture` arm, `CAPTURE_BACKEND` (whose fallback arm reads `"none"` today and gains a
+`"PulseAudio"` Linux arm), `capture_lost`, and the platform-scoped `use` at the head of the file.
+The `cfg(windows)` sites in `app_state.rs` already have `not(windows)` fallbacks; read them rather
+than assume they need no change.
 
 Pin both pulse crates exact in a new `[target.'cfg(target_os = "linux")'.dependencies]` block, per
 NFR §4 and the hygiene guard. Add `x86_64-unknown-linux-gnu` to `deny.toml`'s `[graph].targets` and
@@ -208,7 +243,13 @@ sentence becomes false in this phase.
 
 - `capture_linux.rs` exports `CaptureError`, `CaptureHandle` with `format()`, and
   `start() -> Result<(CaptureHandle, SampleConsumer), CaptureError>` — the same three items
-  `capture_mac.rs` exports, so nothing else in `main.rs` changes shape.
+  `capture_mac.rs` exports, so nothing else in `capture_start.rs` changes shape.
+- The Linux `start_capture` builds its verdict as
+  `CaptureVerdict::live(CAPTURE_BACKEND, format, <endpoint>)` — the verdict carries an endpoint name
+  (token `live {backend} {rate}/{channels} {endpoint}`), and `CaptureStart` carries `endpoint` and
+  `failed_at_activation`. Name the endpoint the stream actually opened (the monitor source's
+  description, or `@DEFAULT_MONITOR@` if nothing better is resolvable, as macOS reports
+  `system audio`); set `failed_at_activation` on the same rule the other two arms use.
 - The format is 48 kHz stereo and goes through `AudioFormat::validate()` at the intake boundary,
   once, like both other backends. The ring is built with the same `RING_CAPACITY_FRAMES = 16_384`
   the other two use.
@@ -242,8 +283,10 @@ executable, for the same reason the macOS job does — this repo is developed on
 `core.filemode=false`.
 
 Write `packaging/linux/READ-ME-FIRST.md` mirroring the Windows one: `chmod +x ritmolux` then run it, the
-same Controls table, F3's audio line reading `live PulseAudio 48000/2` when capture works, and the
-per-user directory at `~/.local/share/ritmolux/`.
+same Controls table, F3's audio line reading `live PulseAudio 48000/2 <endpoint>` when capture
+works, and the per-user directory at `~/.local/share/Ritmolux/` — capital R, from `APP_DIR_NAME`
+in `standalone/src/lib.rs`; Linux paths are case-sensitive, so the lower-case spelling names a
+directory that does not exist.
 
 **Done when:**
 
@@ -252,39 +295,63 @@ per-user directory at `~/.local/share/ritmolux/`.
 - The version is parsed **section-anchored** from `[workspace.package]` in root `Cargo.toml` per
   [ADR-0025](../adrs/0025-foobar-component-version-single-sourced.md), not by a first-match
   `version =` — a naive match reads a member crate's line or a `[profile]` key.
-- The script **verifies from the archive it wrote**, not from the staging directory, and makes the
-  same four assertions the Windows job makes: `ritmolux` and `READ-ME-FIRST.txt` are at the top level, the
-  `.toml` count equals `presets/*.toml` in the repo, and no `.md` file is present.
-- The `release` job's `needs:` gains `linux`, and **its count guard learns about the second archive
-  kind**: it asserts exactly **3 `.zip` and exactly 1 `.tar.gz`** (macOS, Windows and foobar being
-  the three zips). Today it counts `assets/*.zip` and asserts 3, which a silently-skipped Linux job
-  would satisfy — so leaving that check alone would ship a short release without a red job anywhere.
+- The script **verifies from the archive it wrote**, not from the staging directory, and mirrors
+  the Windows job's assertions minus Spout: `ritmolux` and `READ-ME-FIRST.txt` are at the top level
+  (the Windows job also requires `spout-license.txt`, which has no Linux counterpart — `--stream` /
+  Spout is not built here), the `.toml` count equals `presets/*.toml` in the repo, and no `.md` file
+  is present.
+- The `release` job's `needs:` gains `linux` beside its five existing jobs, and **its count guard
+  learns about the second archive kind**: it asserts exactly **5 `.zip` and exactly 1 `.tar.gz`**
+  (the two standalone zips, the foobar2000 component and the two studio zips being the five). Today
+  it counts `assets/*.zip` and asserts 5, which a silently-skipped Linux job would satisfy — so
+  leaving that check alone would ship a short release without a red job anywhere.
+- **Both publish commands carry the tarball.** `gh release upload "$TAG" assets/*.zip --clobber` and
+  `gh release create "$TAG" assets/*.zip …` glob zips only; a `.tar.gz` that is counted but never
+  uploaded is the same short release by a different route.
 - The release notes gain a Linux bullet naming the floor (Ubuntu 24.04 or newer, x86_64) and the
   runtime requirement (PipeWire or PulseAudio — the binary will not start without `libpulse.so.0`).
-- A `workflow_dispatch` dry run produces four artifacts and publishes nothing.
+- A `workflow_dispatch` dry run produces six artifacts and publishes nothing.
 
 ### Phase 5 — The docs say Linux
 
 - **Owner skill:** dev
 
 The operator-doc sweep, done in this phase rather than left to the close. Every place that says the
-project ships on two platforms now says three, and every place that describes the loopback asymmetry
-gains its third entry.
+project ships on two platforms is updated, and every place that describes the loopback asymmetry
+gains its Linux entry.
+
+**Prefer count-free wording to "three" (backlog 0208, folded in 2026-09-14).** "Two platforms"
+becoming "three platforms" is the same drift backlog 0208 records for system counts: a written
+count is falsified by the next platform and nothing reports it. Where a sentence can name the
+platforms, or say "every shipped platform", do that instead of writing a new number. Plan 0178 adds
+a gate for system counts; it does not cover platform counts, so this phase is the only carrier.
 
 **Done when** each of these has been opened and either updated or deliberately left alone:
 
 - `README.md` — the platform statement and anything naming the shipped artifacts.
 - `CLAUDE.md` — the "Architecture at a glance" diagram's frontend list, the `standalone/` and
-  `packaging/` entries under "Where things live", and the **"Loopback capture is not symmetric"**
-  bullet under "Platform realities", which currently contrasts Windows against macOS only.
+  `packaging/` entries under "Where things live" (the `packaging/` entry states a zip count and a
+  READ-ME-FIRST count, both of which move), and the **"Loopback capture is not symmetric"** bullet
+  under "Platform realities", which currently contrasts Windows against macOS only.
 - `docs/nfr.md` — §7's CI platform statement and §8's distribution posture.
-- `docs/releasing.md` — a tag now builds and publishes four artifacts, not two.
+- `docs/releasing.md` — a tag now builds and publishes a tarball beside the zips.
 - `docs/on-device-validation.md` — a Linux section, which Phase 6 then executes.
+- `docs/how-it-works.md` and `docs/running.md` — the operator material ADR-0169 moved out of the
+  README: the frontends and platforms, and anything the running app does differently on Linux
+  (the `D` hotkey under Wayland, the absent now-playing banner).
+- `docs/configuration.md` — `--input` and `--list-devices` are marked Windows-only there; confirm
+  the marking still reads correctly with a third platform, and add any Linux-specific path
+  (`$XDG_DATA_HOME`).
 - `docs/capturing.md` — only if a `shot` flag or harness behaviour differs on Linux; say so in the
   log if nothing changed.
+- `site/src/plugins/rewrite-links.mjs` — **a new `packaging/linux/READ-ME-FIRST.md` reaches the
+  site only if it is added to `PUBLISHED`** beside the Windows, macOS and foobar install pages
+  ([ADR-0167](../adrs/0167-the-site-owns-its-entrance-and-the-install-page-is-the-testers-own-file.md)).
+  Decide deliberately whether it joins; do not assume it does by existing.
 
-And: `node scripts/check-doc-links.mjs`, `node scripts/check-index-rows.mjs` and
-`node scripts/check-backlog-claims.mjs` all exit 0.
+And: `node scripts/check-doc-links.mjs`, `node scripts/check-index-rows.mjs`,
+`node scripts/check-backlog-claims.mjs`, `node scripts/check-reader-prose.mjs` and
+`node scripts/toc.mjs --check` all exit 0.
 
 ### Phase 6 — Run it on the Ubuntu box
 
@@ -297,9 +364,10 @@ Phase 4 (from a `workflow_dispatch` run, or from a local `stage.sh`) on the Ubun
 
 - It extracts and launches; `chmod +x` was or was not needed.
 - Music plays and the visuals react to it.
-- **F3's audio line reads `live PulseAudio 48000/2`.** A `failed PulseAudio …` line is a finding
-  with its reason attached; `unsupported` means the wrong arm compiled.
-- `~/.local/share/ritmolux/` appears and holds `config.toml`, a preset copy and
+- **F3's audio line reads `live PulseAudio 48000/2 <endpoint>`**, and the endpoint names a monitor
+  source. A `failed PulseAudio …` line is a finding with its reason attached; `unsupported` means
+  the wrong arm compiled.
+- `~/.local/share/Ritmolux/` appears and holds `config.toml`, a preset copy and
   `diagnostics.log`; `diagnostics.log`'s `capture` column carries the same verdict token.
 - `F` (fullscreen) works. `D` (next monitor) works, or is a no-op — expected under Wayland, per
   ADR-0131's Negative, and recorded either way rather than treated as a bug.
@@ -343,3 +411,10 @@ finished by this point and a repair belongs in its own scope.
   Audacious equivalent is a separate decision nobody has asked for.
 - **No change to `core/`.** Capture is a shell concern by ADR-0001. A diff touching `core/` in this
   plan is a finding.
+- **No Linux studio build.** The studio ships as a zip per platform carrying its own player
+  ([ADR-0178](../adrs/0178-the-studio-shell-conventions.md)), built for Windows and macOS only; a
+  Linux studio zip is a separate decision.
+- **No `--stream` / Spout on Linux.** Spout is a Windows texture-sharing SDK behind the `spout`
+  feature; the Linux binary is built without it.
+- **No Art-Net sink work.** [Plan 0133](0133-the-engine-drives-the-lights.md) builds the lighting
+  output; whether it runs on the Linux binary is that plan's question, not this one's.

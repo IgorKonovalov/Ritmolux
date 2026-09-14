@@ -4,13 +4,23 @@
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`
 > **Related ADRs:** [0019](../adrs/0019-eased-parameters.md), [0035](../adrs/0035-asymmetric-attack-release-easing.md)
-> **Closes:** design-backlog 0218
+> **Closes:** design-backlog 0218, design-backlog 0212
+
+> **Amended 2026-09-14** after a validity sweep. The changes:
+> - the TL;DR's settling value is corrected;
+> - `ParamKind::Structural` rounding is named as a rejected alternative;
+> - Phase 1 gains an overshoot case at `alpha` near 1 and a settled test file;
+> - Phase 2's grep is narrowed so it can pass;
+> - backlog 0212 is folded in as Phase 3, with a ruling on each of its three guards.
+>
+> Only the rulings are new design. The rest are corrections.
 
 ## TL;DR
 
 `Easing::step` is a one-pole ease with no end state. In f32 it stops moving short of its target and
-never gets there. A parameter the scene **truncates** therefore never takes its top step: an ease
-toward `2.0` settles at `1.9999998` and `as usize` draws `1`. This plan makes the ease return `raw`
+never gets there. A parameter the scene **truncates** therefore never takes its top step. An ease
+toward `2.0` settles a few float spacings short: `1.9999996` at tau 0.1 s and 60 Hz, three spacings
+short. `as usize` then draws `1`. This plan makes the ease return `raw`
 on the first frame where a step makes no progress, so every ease reaches its target exactly, in
 finite time, at every time constant. The five L-system presets keep their `N.5` offsets, because
 the offset is still what makes a **transient** step draw. The comment that justifies the offset is
@@ -31,7 +41,7 @@ therefore stalls at a gap of about `u / (2 * alpha)`:
 | tau, frame rate | `alpha` | stall gap toward `2.0` (`u = 2^-23`) | in spacings | frames to stall from a gap of 1 |
 |---|---|---|---|---|
 | 0.1 s, 60 Hz | 0.15352 | 3.9e-7 | ~3 | ~89 |
-| 2 s, 144 Hz | 0.0034662 | 1.72e-5 | ~144 | ~3160 |
+| 2 s, 144 Hz | 0.0034662 | 1.72e-5 | ~144 | ~3130 |
 
 The entry proposed snapping once the gap is within "a few ulps". That works on the first row and
 fails on the second. The rule that holds on both rows is the **fixed point itself**: return `raw`
@@ -78,11 +88,40 @@ We rejected three alternatives:
 - **Rounding `visible_depth` in the scene.** That would make the natural `N + floor(...)` binding
   cross mid-glide, but it changes what a documented parameter means. It would also revert five
   presets and move `lsystem` goldens. It still would not help `count`, which floors deliberately.
+- **Marking the three truncated parameters `ParamKind::Structural`.** This is the nearer version of
+  the previous alternative. The engine already rounds a Structural value once, after smoothing and
+  before `set_param` (`ParamKind::quantize` in `core/src/render/scenes/mod.rs`; all three are `Modal` today), so no scene code
+  would change. It would fix the stall: `1.9999996` rounds to `2`. But it changes what all three
+  parameters mean, in two ways that cost shipped content:
+  1. The five L-system presets target `N.5` precisely because the scene floors. `f32::round` rounds
+     half away from zero, so `3.5` becomes `4`, and every one of them would draw one generation above
+     what it was tuned to at rest.
+  2. `shape_collage`'s `count` floors on purpose, so an element is admitted only once it has
+     arrived. Rounding admits it halfway.
+
+  Plan 0161's audit marked a parameter Structural only where the scene already rounds, and none of
+  these three does. The snap fixes all three without changing a meaning.
 - **A `--check` warning.** It needs expression analysis to recognise an integer-valued `floor` step
   on a truncated parameter. That is a lot of machinery for a warning, and it makes no binding work.
 
 No ADR. The change completes ADR-0019's easing rather than revisiting any of its trade-offs, and
 this section records the rejected alternatives.
+
+### The three sign guards (backlog 0212)
+
+ADR-0191 makes `sanitize_frame_dt` the engine's only answer to a degenerate frame delta. That
+function never returns a value that is non-finite or `<= 0`. Three guards below it check the delta's
+sign instead of its finiteness, so the hygiene test that counts guards cannot see them, and each
+answers differently. One ruling each:
+
+| Site | Guard today | Ruling | Why |
+|---|---|---|---|
+| `Easing::step`, `core/src/preset/schema/easing.rs` | `dt <= 0.0` in the pass-through condition, returning `raw` | **Delete the `dt` term.** The `tau` terms stay. State the precondition in the doc: `dt` is finite and positive, as `Scene::advance` states it | It is a policy, and a snap is the odd answer. Without it the arithmetic answers, and consistently with Phase 1's snap: `dt = 0` gives `alpha = 0`, and the snap's `alpha > 0` guard makes that **hold**, not snap. A non-finite `dt` outside the precondition poisons one frame, and the existing non-finite-`held` guard returns `raw` on the next. `Easing` is public, and no caller passes a degenerate `dt` today |
+| the latch countdown, `core/src/render/evaluate.rs` | `state.hold_left - dt.max(0.0)` | **Delete the `.max(0.0)` on `dt`.** The outer `.max(0.0)` on `hold_left` stays | Inert. With `dt > 0`, `dt.max(0.0)` is `dt` |
+| the MilkDrop decay, `core/src/render/scenes/warp_mesh/shader.rs` | `decay_per_second.max(0.0).powf(dt.max(1e-6))` | **Delete the `.max(1e-6)` on `dt`.** The `.max(0.0)` on the rate stays | The floor only matters at `dt = 0`, where `0^0 = 1` would stop a zero-rate field from decaying. The seam makes `dt = 0` unreachable, and for every positive `dt`, `0^dt` is already `0` |
+
+None of the three is kept, so the widened hygiene pattern below needs **no** new allowlist entry.
+The test names a guard only if a future reader adds one back.
 
 ## Architecture diagram
 
@@ -107,18 +146,27 @@ flowchart LR
   doc comment says how the ease ends: the stall gap `u / (2 * alpha)`, and why the test is "no
   progress" rather than a distance. A test module pins the behaviour, and a render-layer test shows
   the backlog's symptom is gone.
-- **Files touched:** `core/src/preset/schema/easing.rs`; the easing tests beside the existing
-  smoother tests in `core/src/render/tests.rs` (or a `#[cfg(test)]` module in `easing.rs`, whichever
-  the crate's layout prefers); an `lsystem` test through whatever seam `core/src/render/scenes/lines/`
-  tests already use to observe the drawn depth.
+- **Files touched:** `core/src/preset/schema/easing.rs`. The `Easing::step` unit tests go in
+  `core/src/preset/schema/tests.rs`, the schema module's GPU-free in-crate test file beside the
+  function. They do not go in `core/tests/easing.rs`, which is the capture-based transient probe
+  and measures frames, not the function. They do not go in `core/src/render/tests.rs` either, which
+  holds the render layer's `ParamSmoother` tests. The `lsystem` test goes through whatever seam
+  `core/src/render/scenes/lines/` tests already use to observe the drawn depth.
 - **Done when:**
   - Easing `symmetric(0.1)` from `1.0` toward `2.0` at `dt = 1/60` returns **bit-exactly `2.0`**
     within 120 frames. The stall is at ~89 frames.
   - Easing `symmetric(2.0)` from `1.0` toward `2.0` at `dt = 1/144` returns bit-exactly `2.0` within
-    4000 frames. The stall is at ~3160 frames, and the gap there is ~144 spacings. **This case is
+    4000 frames. The stall is at ~3130 frames, and the gap there is ~144 spacings. **This case is
     what a fixed-ulp threshold fails**, and it is why this test exists.
   - In both eases every frame's value lies in `[held, raw]` and does not decrease. The snap never
     overshoots.
+  - **The overshoot property also holds where `alpha` is near 1**, which is where the monotonic
+    argument's hidden assumption bites. That assumption is that `raw - held` is exact. Sterbenz
+    guarantees exactness only when the two values are within a factor of two. Test `symmetric(0.001)`
+    at `dt = 1/60` (`alpha` rounds to within one spacing of `1`) over operand pairs far apart in
+    magnitude and of both signs: `1e-3` toward `1e6`, `1e6` toward `1e-3`, and `-5.0` toward `3.0`.
+    Assert each result lies in `[min(held, raw), max(held, raw)]`. If a pair fails, clamp the
+    computed step to that interval, and name the pair in the log.
   - Easing `symmetric(1.0e9)` at `dt = 1/144` from `1.0` toward `2.0` returns `1.0` for every frame.
     `alpha` rounds to zero there, and the value holds instead of snapping.
   - Easing toward a lower target (`2.0` to `1.0`) arrives bit-exactly as well. The release side uses
@@ -126,8 +174,8 @@ flowchart LR
   - An `lsystem` scene fed a `visible_depth` that steps from `1` to `2` and is eased at `tau = 0.1`
     draws generation **2** once the ease has settled. This test fails on the tree before the phase
     lands.
-  - The existing `Easing` / `ParamSmoother` tests pass unchanged, including the `dt <= 0` and
-    non-finite pass-throughs. `cargo nextest run --workspace` moves no golden. If one moves, stop and
+  - The existing `Easing` / `ParamSmoother` tests pass unchanged, including the non-finite
+    pass-throughs. The `dt <= 0` pass-through stays in this phase, and Phase 3 rules on it. `cargo nextest run --workspace` moves no golden. If one moves, stop and
     name it in the log. It can only be a truncating consumer arriving, and whether to re-bless it is
     the architect's call.
 
@@ -145,12 +193,46 @@ flowchart LR
   (the two-line ".5 is load-bearing" comment); `presets/lsystem_icecrystal.toml` (the header
   sentences that say a one-pole ease "in f32 never reaches" its target).
 - **Done when:**
-  - `grep -rn "never reaches\|never reach a whole" presets/` returns nothing.
+  - `grep -n "never reaches\|never reach a whole" presets/lsystem_*.toml` returns nothing. The
+    grep is scoped to the five files on purpose. The phrase also appears, meaning something else, in
+    `presets/curve_rosemono.toml` (a band), `presets/spectrum_metermono.toml` (the layout) and
+    `presets/README.md` (the tonemap curve). None of those is about easing, and none is touched.
   - The five presets load and render **byte-identically** to before the phase. Their golden and
     sanity gates pass without a re-bless, which is the evidence that only comments changed.
   - `node scripts/check-reader-prose.mjs` and `node scripts/check-doc-links.mjs` exit 0, and
     `node scripts/toc.mjs --check` reports no drift. The new paragraph adds no heading, so the
     contents block should not move.
+
+### Phase 3 — Nothing below the seam keeps a frame-delta policy
+
+- **Owner skill:** dev
+- **What:** Apply the three rulings in `### The three sign guards (backlog 0212)` above. Then widen
+  `a_frame_delta_is_checked_for_finiteness_in_exactly_one_place` in `core/tests/hygiene.rs` so its
+  line predicate also matches a **sign or size check on a variable named exactly `dt`**:
+  - `dt` compared against `0` with `<`, `<=`, `>` or `>=`;
+  - `dt.max(`, `dt.min(` or `dt.clamp(`.
+
+  `DT_GUARD`'s own line (`if dt.is_finite() && dt > 0.0 {` in `render/mod.rs`) and the
+  `DT_GUARD_ALLOWED` entry in `render/tier.rs` (`dt > threshold`, not a zero comparison) keep
+  matching as they do today. Keep the test's name, because backlog 0212 cites it. Reword its doc
+  and its failure message so both cover sign checks as well as finiteness. Update `Easing::step`'s doc to state the precondition. Replace the
+  `dt <= 0` sentence in any comment that described the removed pass-through.
+- **Files touched:** `core/src/preset/schema/easing.rs`, `core/src/render/evaluate.rs`,
+  `core/src/render/scenes/warp_mesh/shader.rs`, `core/tests/hygiene.rs`, and the easing unit tests in
+  `core/src/preset/schema/tests.rs`.
+- **Done when:**
+  - **The widened predicate bites.** Before the three deletions, with the new predicate in place,
+    the test fails and names exactly the three sites in the ruling table. Record that output in the
+    log. After the deletions it passes, with `DT_GUARD_ALLOWED` unchanged.
+  - **`Easing::step` holds on a zero step.** `symmetric(0.1).step(1.0, 2.0, 0.0)` returns `1.0`.
+    Assert it next to Phase 1's tests. This is the arithmetic answer the ruling chose. It replaces
+    the old snap to `2.0`.
+  - `grep -rnE "\bdt\.(max|min|clamp)\(|\bdt\s*(<|<=|>|>=)\s*0" core/src` matches exactly one line,
+    `sanitize_frame_dt`'s `if dt.is_finite() && dt > 0.0 {` in `core/src/render/mod.rs`. On
+    2026-09-14 it matches that line and the three being deleted.
+  - `cargo nextest run --workspace` moves no golden. All three sites are unreachable with a
+    delta at or below zero, so every captured frame computes the same numbers. A moved baseline is a
+    stop.
 
 ## Risks & open questions
 
@@ -162,8 +244,18 @@ flowchart LR
   `held + alpha * (raw - held)`, and that expression will very likely survive the fix unchanged. The
   probe will stay green while the claim becomes false. `dev` reports the probe exit and leaves the
   entry alone. Archiving it is step 3c at the close.
-- **Backlog 0212's probe reads the same file.** It matches `dt <= 0.0` in `easing.rs`. This plan
-  keeps that guard, so the probe must stay green. If it goes red, the edit went beyond this plan.
+- **Backlog 0212's probes go red on delivery, by design.** Phase 3 deletes the three lines they
+  match: `dt <= 0\.0` in `easing.rs`, `dt\.max\(0\.0\)` in `evaluate.rs`, `dt\.max\(1e-6\)` in
+  `shader.rs`. A fourth probe matches `let method = "dt\.is_finite\(\)";` in `hygiene.rs`, and it
+  goes red too if the widened predicate is restructured. Phases 1 and 2 must leave them green. A red before Phase 3 means an edit went beyond
+  its phase. `dev` reports the exit and leaves the entry for the close.
+- **Plan 0181 moves `advance` in the same file.** It reorders `evaluate_preset` and
+  `evaluate_layer` in `core/src/render/evaluate.rs` and leaves `LatchBank::advance` alone. Phase 3
+  here edits one expression inside `LatchBank::advance`. The two plans touch disjoint functions, so
+  either order merges cleanly.
+- **`sanitize_frame_dt` keeps a tiny positive delta.** A caller's `dt = 1e-9` reaches the warp
+  decay, where the deleted floor used to raise it to `1e-6`. No shell produces such a delta, since a
+  frame interval is milliseconds. The floor invented time rather than guarding anything.
 - **The spectrum scene's per-element smoother calls the same function.** Its elements now arrive
   exactly too, which moves nothing visible. It is listed so the close does not treat it as a
   surprise.
@@ -175,8 +267,9 @@ flowchart LR
   regenerate.
 - **It does not remove the `N.5` offsets.** They remain necessary for transient steps. This plan
   only corrects why the presets say they are there.
-- **It does not touch the `dt <= 0` or non-finite guards.** Backlog 0212 owns which of those is
-  policy.
+- **It does not touch the non-finite `held`/`raw` guard** in `Easing::step` or `tau`'s pass-through
+  terms. Those are about the smoother's own state, not the frame delta. Phase 3 deletes only the
+  `dt` term.
 - **It does not add a `--check` lint** for a floored step on a smoothed parameter.
 - **It does not change `alpha`'s arithmetic** (for example `exp_m1` for precision at tiny
   `dt / tau`). The guard above makes the zero-`alpha` case hold, which is today's behaviour.
@@ -195,6 +288,7 @@ flowchart LR
 |---|---|---|---|
 | 1 — The ease snaps at its fixed point | dev | not started | |
 | 2 — The reader and the five presets say what is true | dev | not started | |
+| 3 — Nothing below the seam keeps a frame-delta policy | dev | not started | |
 
 ### Notes
 

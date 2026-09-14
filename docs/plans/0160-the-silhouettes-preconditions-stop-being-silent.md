@@ -5,6 +5,19 @@
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0179](../adrs/0179-a-precondition-is-checked-at-load-or-it-is-written-down.md) (a precondition is checked at load, or it is written down)
 > **Depends on:** [Plan 0092](done/0092-the-engine-draws-an-authored-path.md) (hard — `[path]` is the surface this is about, and 0092's own Phase 7 fixes the axis these figures are authored in)
+> **Closes:** design-backlog 0217
+
+> **Amended 2026-09-14, before any phase landed (architect validity sweep).** Five changes, each
+> made in place below. (1) The plan gains the `## Implementation log` stub ADR-0120 asks for.
+> (2) Phase 2 now lifts the constraints the shipped `shape_maple` and `shape_lion` headers already
+> state, instead of writing them fresh. (3) The arc-chain piece counts are settled on the fitter's
+> measured output (6, 16, 24), and `MAX_ARC_PIECES`'s doc is brought to the same figure. (4)
+> Phase 3's timing question now accounts for the two channels a load warning has reached since
+> this plan was written: `ritmolux --check` (Plan 0169) and the player's `preset_warning` event
+> (Plan 0159 Phase 5, `bd037d4`). A warning names its binding (`db0df8e`, ADR-0192). (5) A new
+> optional Phase 1b folds in backlog 0217: the arity probe re-prices a polyline, so the figures
+> Phase 2 cites can be re-measured. Plan 0169 checks none of the four preconditions: `--check`
+> runs the existing loader, and the loader still tests the `ring` by name.
 
 ## TL;DR
 
@@ -82,7 +95,9 @@ not open it; it makes the document true about the engine as built.
   - **`load.rs` warns on the geometry, and the `ring` branch is one instance of it rather than a
     branch beside it.** One condition, one message shape, in ADR-0020's warn-but-load form. The
     message names what was found and what is drawn instead — the distance coordinate — the way the
-    existing `ring` message does.
+    existing `ring` message does. It is built as `PresetWarning::about("coord_mode", …)`, as the
+    `ring` warning already is (ADR-0192). That form is what anchors it to the binding's line in
+    `ritmolux --check` and gives the `preset_warning` event its `param`.
   - **The scene draws the distance coordinate for a contour that fails the test**, so the warning and
     the picture agree. A warning beside a degenerate figure is worse than either alone.
   - **A star-shaped authored contour is unaffected** — `coord_mode = 1` is exactly the capability a
@@ -91,10 +106,55 @@ not open it; it makes the document true about the engine as built.
   - The full suite is green and no golden moves: every path literal in the suite today is broad in
     every direction and passes the test.
 
+### Phase 1b — The arity probe prices a polyline (optional; backlog 0217)
+
+- **Owner skill:** dev
+- **Files:** `core/tests/path_cost.rs`, `core/src/preset/path.rs` (`MAX_SAMPLES`'s doc comment only)
+- **Why it is here:** `the_contour_arity_is_priced_against_the_floor_tier` draws `LEAF` at every
+  arity. `PathShape::from_dense` keeps the arc fit unless
+  `pieces.len() > MAX_ARC_PIECES || pieces.len() * 2 > points.len()`, and the leaf fits to 16
+  pieces. From `samples = 32` up, then, the test times the same 16-piece arc chain three times: it
+  read 4.250, 4.232 and 4.230 ms on 2026-09-14. The module header's arity table (7.70 ms at 64,
+  "~0.105 ms per segment, flat across the range") and `MAX_SAMPLES`'s own doc are figures this test
+  can no longer re-take. Phase 2 rewrites the `presets/README.md` paragraph that quotes both.
+- **Done when:**
+  - **Every arity case is on the polyline route, by construction or by assertion, never by
+    assumption.** Two routes work: a figure the fitter always discards (an all-corners polygon comes
+    back from the fitter as the lines it went in as), or the `morph_to = d` route `polyline_probe`
+    already uses. Whichever is chosen, the test states it, and the existing "drew a path rather than
+    the roster's heart" assertion still holds for every case.
+  - **The module header's arity table is re-taken from that run and dated**, naming the machine,
+    tier and resolution as the current table does (ADR-0071: a measurement names its machine). The
+    arc-comparison table beneath it is not re-taken. Its polyline column already comes from
+    `polyline_probe`, so it measured a polyline.
+  - **`MAX_SAMPLES`'s doc in `path.rs` is checked against the new slope.** If the per-segment figure
+    or the share at 64 moved, the doc says the new figure with its date. If the ceiling's argument
+    (the most the field may spend while leaving the composite chain room) no longer holds at 64,
+    **stop and log it**: moving the ceiling is outside this plan (see *What this plan does NOT do*).
+  - **The re-measure runs alone.** `binary(/_cost$/)` has been scheduled alone since Plan 0174
+    Phase 1 (`6c33ddb`, ADR-0193), so this phase does not wait for 0174 to close. It must not change
+    the file's `clippy::disallowed_methods` allow, which is the selector 0174 Phase 3's guard holds
+    the override to.
+  - **If this phase is not taken**, Phase 2 cites the arity slope as the dated Plan 0092 measurement
+    of a polyline ("measured 2026-09-09"), not as a current reading, and backlog 0217 stays live
+    rather than closing with this plan.
+
 ### Phase 2 — The three unhookable constraints are written down
 
 - **Owner skill:** dev
-- **Files:** `presets/README.md`
+- **Files:** `presets/README.md`, `core/src/preset/path.rs` (`MAX_ARC_PIECES`'s doc comment only)
+- **Already written, and lifted rather than re-derived.** The shipped authored-path presets carry
+  most of this phase's content as measured comments. Phase 2 moves it to where an author looks
+  first, and cites the presets as the worked cases:
+  - band alignment, the `color_span` / `color_center` consequences and the `gamma` proof:
+    `presets/shape_maple.toml`'s header (the "THE RULE THE WHOLE FILE IS BUILT ON" and "WHAT MAY
+    AND MAY NOT BE BOUND" blocks) and `presets/shape_lion.toml`'s alignment paragraph;
+  - erosion versus thin features: `presets/shape_lion.toml`'s "THE INTERIOR IS TWO BANDS"
+    paragraph;
+  - `presets/README.md` already has a one-line summary of the rule in its worked-examples row for
+    `shape_maple`, and its `coord_mode` section already calls an inward offset an erosion that
+    rounds a **reflex** corner. The erosion paragraph extends that section rather than restating it
+    elsewhere.
 - **Done when:**
   - **Erosion is stated where the interior bands are documented**, in terms of what an author does
     about it: the band count is set by the figure's **thinnest** feature, not by its overall size,
@@ -112,8 +172,18 @@ not open it; it makes the document true about the engine as built.
   - **The arc-chain paragraph is corrected.** *"A smooth figure gets it"* is false. State the real
     gate: the fit is kept only if it collapses the piece count against a tolerance fixed at the
     tightest figure size, so **detail** is the axis and a detailed contour is discarded however
-    smooth it is. Name the measured cases that do fit — 6 to 24 pieces from 2 to 4 cubics — so the
-    reachable band is visible, and say plainly that a real silhouette is usually outside it.
+    smooth it is. Name the measured cases that do fit, from `core/tests/path_cost.rs`'s arc
+    comparison: a 4-cubic circle at 6 pieces, the 2-cubic leaf at 16 and a 4-cubic blob at 24. The
+    reachable band is then visible. Say plainly that a real silhouette is usually outside it, and
+    state both halves of the gate. The cap is `MAX_ARC_PIECES` (32). The half-arity test means that
+    at `samples = 32` nothing over 16 pieces survives.
+  - **One figure for the measured maximum.** `MAX_ARC_PIECES`'s doc says the measured counts "sit at
+    25 and under", but the fitter's output on the three measured figures tops out at 24. The doc is
+    corrected to name 24 and the figure it came from, so the README and the code quote the same
+    number.
+  - **The arity paragraph's timing figures** (0.105 ms per segment, 46 % at 64) are Phase 1b's
+    re-taken readings with their date. If Phase 1b was not taken, they are cited as the dated Plan
+    0092 measurement.
   - **No count and no threshold is stated that the plan has not measured.** Where the honest answer
     is "usually not", write that.
   - `node scripts/toc.mjs` is clean, and `node scripts/check-doc-links.mjs` passes.
@@ -125,9 +195,17 @@ not open it; it makes the document true about the engine as built.
   - **An author reads Phase 2's three sections and builds one figure against them** — not a review of
     the prose, a use of it. The question is whether the constraints as written are enough to choose a
     band count and a palette configuration without rendering to find out.
-  - **A verdict on whether Phase 1's warning arrives at the right moment.** It fires at load, which is
-    before the author has seen anything; the alternative reading is that it needs to be visible where
-    the figure is, and that would be a different plan.
+  - **A verdict on whether Phase 1's warning arrives at the right moment, and in the right place.**
+    It fires at load. Since this plan was written a load warning reaches the author on three
+    channels, not one:
+    - stderr, as before;
+    - `ritmolux --check`, which places it on the `coord_mode` binding's line (Plan 0169, through
+      the `param` ADR-0192 added);
+    - the studio, through the `preset_warning` event, which anchors it to the same binding (spec
+      0003, Plan 0172 Phase 4).
+
+    The question is which of those an author building a figure actually sees, and whether that is
+    enough. "Visible where the figure is" in the preview itself would still be a different plan.
   - Gates nothing. May carry forward to `docs/design-backlog.md` as new entries.
 
 ## Architecture diagram
@@ -194,3 +272,36 @@ flowchart TD
 - **It does not add a gate for documented constraints.** Nothing here tests that Phase 2's prose
   stays true.
 - **It does not refuse anything.** Every combination that loads today still loads.
+- **It does not move `MAX_SAMPLES`.** Phase 1b re-measures the slope that set the ceiling. If the
+  slope no longer supports 64, that is logged for a later plan, not acted on here.
+
+## Implementation log
+
+> Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
+> last one. **The phases above are the contract; everything here is what happened.**
+> **Observations, never conclusions:** this says where to look, architect decides how it went.
+> No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
+> an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
+
+**Lane:** _(`main` directly, or the worktree path plus its branch)_
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — The precondition is tested on the contour, not on the name | dev | not started | |
+| 1b — The arity probe prices a polyline (optional) | dev | not started | |
+| 2 — The three unhookable constraints are written down | dev | not started | |
+| 3 — The document is checked against the engine, once | human | not started | |
+
+### Notes
+
+### Close triggers
+
+- **`presets/` touched:**
+- **Plan header `Closes:`**
+- **What shipped:**
+- **Operator docs touched:**
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
+- **Full suite:**
+- **Outstanding `human` phases:**
+
+## Followups (after this lands)

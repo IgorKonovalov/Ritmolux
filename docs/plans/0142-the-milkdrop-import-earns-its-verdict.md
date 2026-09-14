@@ -6,6 +6,22 @@
 > **Related ADRs:** [0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)
 > (accepted — this plan appends its third `Outcome`)
 > **Closes:** design-backlog 0113, 0124. **0109 is not taken — this plan decides whether it may be.**
+> **Runs after:** [Plan 0180](0180-the-converted-picture-follows-the-source.md), all of it.
+
+> **Amended 2026-09-14**, at a validity sweep of the active roster. Edited in place:
+>
+> - **Sequencing.** Plan 0180 runs first. It re-draws the waveform, which is a source term of the
+>   field this plan measures, and it re-draws the pictures Phase 4 judges.
+> - **Phase 1.** It extends the instrument Plan 0111 left in `core/src/render/milk_wash.rs` rather
+>   than rebuilding it. It reads that module's `edge` statistic, not `metrics::mean_lit_level`,
+>   which excludes the background by design.
+> - **Decision.** It names the source commit, `xeiraex/milkdrop2` `d4c843a`. Plan 0173 did not read
+>   the feedback loop, so Phase 2's read is still new.
+> - **Phase 2.** It names the source's aspect-corrected uv chain as a candidate cause (backlog 0214).
+> - **Phase 4.** It gains a "seam present?" column (backlog 0215) and one unit-scale mode-0 capture
+>   for ADR-0199.
+> - **Phase 5.** Its `Outcome` names backlog 0216's residue if any remains.
+> - **Phase 6.** It re-ranks backlog 0108, whose 0106/0107 gate has expired.
 
 ## TL;DR
 
@@ -43,9 +59,9 @@ The evidence is seven side-by-side pairs against `foo_vis_milk2` 0.2.0.0 (DX11),
 
 ## Decision
 
-**Instrument first, diagnose second, repair third, and only then judge.** Phases 1-2 rebuild and
-extend the equilibrium instrument across the whole chain rather than at one seam, because three
-hypotheses died at single seams already. Phase 3 is the repair. Phase 4 is the look gate against the
+**Instrument first, diagnose second, repair third, and only then judge.** Phase 1 extends the
+equilibrium instrument Plan 0111 left in `core/src/render/milk_wash.rs`, and Phase 2 reads the
+source against it. Three hypotheses died at single seams already. Phase 3 is the repair. Phase 4 is the look gate against the
 reference rig. Phase 5 writes ADR-0113's third `Outcome` — **which is a legitimate deliverable even
 if the answer is still "merely different"**, dated and naming what remains, rather than leaving
 2026-08-16's silence to stand for it. Phase 6 records the go/no-go for backlog 0109.
@@ -61,9 +77,24 @@ Every earlier attempt on 0113 inferred the reference's behaviour from pictures, 
 reachable. Phase 2 now derives the equilibrium the reference's own warp, decay, echo and gamma path
 implies for a preset with no warp shader (all five washed presets are that kind), and compares it with
 our measured field — *Fog Tunnel*'s background reads 0.298 linear at the field. It repairs only a
-divergence that arithmetic names, and stops as written if there is none. Plan 0173 reads the same file
-for the mesh and the waveform; whichever runs first names the commit and the other reuses it.
-Nothing from the source is copied into the repository.
+divergence that arithmetic names, and stops as written if there is none. Nothing from the source is
+copied into the repository.
+
+**The commit is named.** [Plan 0173](done/0173-the-milkdrop-geometry-reads-the-source.md) read
+`xeiraex/milkdrop2` at `d4c843a` (v2.25c) for the mesh's `ang` and the waveform, and this plan reads
+the same commit. **Plan 0173 did not read the feedback loop**, meaning the decay, echo, gamma and
+their order and domain. Its log says so, and Phase 2's read is still new work.
+
+**Plan 0180 runs first, and why (added 2026-09-14).** That plan makes three changes:
+
+- It re-draws the built-in waveform from the source.
+- It aspect-corrects the per-vertex `x`/`y` a converted program reads.
+- It gives the comp stage the source's polar pair.
+
+The waveform is a **source term** of the equilibrium this plan computes. `milk_wash.rs` renders *Fog
+Tunnel* (mode 0) and *Blur Mix 3* (mode 6) on a silent frame, where mode 0's resting circle still
+deposits light. And every change above moves the pictures Phase 4 judges. Plan 0180 needs no rig, so
+the ordering costs this plan no rig time.
 
 ## Architecture diagram
 
@@ -89,15 +120,29 @@ flowchart LR
 
 ### Phase 1 — The equilibrium instrument, across the whole chain
 - **Owner skill:** dev
-- **What:** Rebuild Plan 0111's instrument and extend it to measure the field's level at **every**
-  seam of the chain, for a washed pair and a clean one.
-- **Files touched:** `core/tests/` (the instrument), `core/src/render/scenes/warp_mesh/`.
+- **What:** Extend the instrument Plan 0111 left behind so it measures the settled field level at
+  every seam of the chain, for a washed subject and a clean one, on the tree Plan 0180 produced.
+- **Files touched:** `core/src/render/milk_wash.rs` (the three-seam bisect,
+  `the_wash_bisect_reports_every_seam`); its fixtures `core/tests/fixtures/milk_wash_fog_tunnel.toml`
+  and `milk_wash_blur_mix_3.toml`; `FieldTrace` in `core/src/render/scenes/warp_mesh/tests.rs`, the
+  per-frame field probe.
 - **Notes for the implementer:**
-  - **Three hypotheses are already dead and the field was ruled clean once.** Do not re-run them;
-    read Plan 0111's implementation log first and record which seams it already covered.
-  - Measure in **linear light**, not code values. If [Plan 0137](done/0137-the-metrics-measure-light.md)
-    has landed, use its level statistic rather than writing a fourth private decode — that is exactly
-    the duplication it exists to retire.
+  - **The instrument exists, and so does the pair.** `milk_wash.rs` already renders the washed *Fog
+    Tunnel* and the clean control *Blur Mix 3* for 300 frames, three of the ~100-frame time
+    constants Plan 0111 Phase 1 measured. It reads one statistic at every seam that exists for these
+    subjects: the field, the present pass and the display. Its module docs say why the backdrop and
+    bloom seams collapse for them. **Extend it; do not rebuild it.** Read its dated table and the
+    Plan 0111 log first, and record which seams it already covered.
+  - **Its readings predate Plan 0180.** That plan re-draws mode 0's resting circle, which these
+    fixtures deposit even on a silent frame. Re-take the table rather than citing the 2026-08-19
+    one.
+  - Measure in **linear light**, not code values, **with `milk_wash`'s `edge` statistic**, the mean
+    over the outermost ring of texels of an `Rgba16Float` intermediate. Do **not** use Plan 0137's
+    `metrics::mean_lit_level`: it decodes 8-bit captures and excludes the background by design, and
+    its own doc states the blind spot, *"a preset that goes wrong by changing its background is
+    invisible here"*. The wash is a background defect in a float field. `edge` has its own caveat
+    for *Fog Tunnel*, since it may sample the solid tube that is the defect. Carry that caveat
+    forward rather than dropping it.
   - The defect is an **equilibrium**, not a frame: the field converges to the wrong level over time.
     A single-frame measurement is what makes a seam look clean, so the instrument must report a
     settled level over many frames.
@@ -117,6 +162,15 @@ flowchart LR
     bundle. Compare that with Phase 1's settled level. A divergence the arithmetic names is Phase 3's
     target; no divergence is the honest stop this phase already allows. Cite file, function, line and
     commit, and copy nothing.
+  - **A named candidate that is not level: the uv chain's space.** The source runs zoom, `sx`/`sy`,
+    rotation and `dx`/`dy` in an aspect-corrected space it undoes at the end
+    (`milkdropfs.cpp` `CPlugin::ComputeGridAlphaValues`, l.1839-1916, backlog 0214). *Fog Tunnel*'s
+    defect reads as a solid tube where the reference draws discrete rings, and that could be
+    geometry as easily as brightness: a resample landing on the wrong texels fills the gaps between
+    rings. Plan 0180 Phase 1 records whether this engine's chain (`vs_main` in
+    `core/src/render/scenes/warp_mesh/shaders.rs`) matches, and Phase 3 repairs any stage it names.
+    Read that log before attributing the tube to level. The per-frame `decay` exponent is applied in
+    `upload_uniforms` (`warp_mesh/encode.rs`) since the scene's `mod.rs` was split on 2026-09-02.
   - The known fact is that only a per-frame decay and a ceiling clamp exist — **nothing bounds the
     equilibrium level**. A decay plus a source term has an equilibrium at `source / (1 - decay)`, so
     the candidates are the decay's units, the source's scale, or the clamp interacting with both.
@@ -158,7 +212,19 @@ flowchart LR
   - **This needs a free machine and the rig staged.** Not a show-night task.
   - Record per-pair verdicts, not an overall impression — the per-pair table is what Phase 5 writes
     its Outcome from.
-- **Done when:** a per-pair table exists for all seven, comparable to 0108's and 0109's.
+  - **Add a "seam present?" column** for *Aderrasi - Songflower (Moss Posy)* and *Eo.S. + Phat -
+    chasers 19 Portal*, in both renderers (backlog 0215). Plan 0180 Phase 4 owns the diagnosis and
+    has already located the seam's ray on this engine. What only this session can say is whether the
+    reference shows the same seam: a left-edge seam in both is authored-against. Record it; do not
+    diagnose here.
+  - **One extra capture for ADR-0199:** a purpose-authored unit-scale `nWaveMode = 0` preset
+    (`fWaveScale = 1`, `fWaveSmoothing = 0`, neutral warp, thin white line on black), on the same
+    full-scale 200 Hz sine Plan 0127 used for mode 6. Record the circle's radius swing in frame
+    heights. It confirms or refutes that one host factor, fitted on mode 6, carries to the other
+    modes. It is recorded here and written into ADR-0199 as an `Outcome`; it is not a verdict on
+    this plan's pairs.
+- **Done when:** a per-pair table exists for all seven, comparable to 0108's and 0109's, with the
+  seam column filled for the two seam presets and the mode-0 reading recorded.
 
 ### Phase 5 — ADR-0113's third Outcome
 - **Owner skill:** dev
@@ -174,6 +240,10 @@ flowchart LR
   - Quote the load-bearing sentence being updated — *"merely different, not better"* — so a reader
     sees what moved.
   - `dev` writes the section; **the verdict itself is the user's from Phase 4.** Do not invent one.
+  - **Name what is still different that is not the wash**, so a "merely different" verdict is not
+    blamed on the wash alone. That means whatever Plan 0180 left open or stopped on (backlog 0216's
+    waveform contract, including the mono stand-in if its Phase 5 stopped; 0215's seam if its ray
+    matched neither branch), plus anything the seam column or the mode-0 capture turned up.
 - **Done when:** ADR-0113 carries a third dated `Outcome` citing Phase 4's per-pair table, and
   backlog 0124's premise — that no gate produced one — is false.
 
@@ -192,8 +262,13 @@ flowchart LR
     "unbought" is recorded rather than the entry looking merely un-picked-up.
   - Either way, note that 0109 sits **above** backlog 0108 by its own arithmetic — ~1,826 files
     against ~71, a 25x difference — so if reach is ever bought, this is the one to buy.
-- **Done when:** backlog 0109 carries a dated go/no-go with the verdict behind it, and the plans
-  README's MilkDrop sequencing note reflects it.
+  - **Re-rank backlog 0108 in the same edit.** Its priority line reads Low "until 0106/0107 land",
+    and both are archived, so that gate has expired and the line points at nothing. Give it a dated
+    update tying its priority to this phase's verdict, behind 0109. Its 218 "convert but render
+    blank" count predates every fidelity plan since and is un-recounted; say so rather than restating
+    it.
+- **Done when:** backlog 0109 carries a dated go/no-go with the verdict behind it, backlog 0108 a
+  dated re-rank against it, and the plans README's MilkDrop sequencing note reflects both.
 
 ## Risks & open questions
 
@@ -207,6 +282,8 @@ flowchart LR
   0109 Phase 4's own instrument. Re-measure; do not cite historical numbers.
 - **Phases 1, 3 and 4 need a free GPU and the reference rig staged.** This is the least
   show-compatible plan on the roster.
+- **Starting before Plan 0180 closes takes Phase 1's table on figures that plan will change.** If it
+  happens anyway, the log says so, and Phase 1 re-takes the table after 0180 lands.
 - **A "still merely different" verdict is a real possible outcome of the whole plan**, and it would
   leave the import's founding claim unvindicated after five plans. That is information worth having,
   and it is what Phase 5 exists to record.
@@ -221,4 +298,7 @@ flowchart LR
 - **It does not reopen ADR-0113's translation approach.** Phase 5 records the verdict on its
   motivating claim; superseding the decision would be a new ADR and is not in scope.
 - **It does not change the converter.** Everything here is runtime — `core/src/milk/` and
-  `warp_mesh` — not `milkconv/`.
+  `warp_mesh` — not `milkconv/`. The one converter fidelity fix in view, the comp stage's `rad`/`ang`
+  (backlog 0214), is Plan 0180 Phase 2.
+- **It does not repair the seam or the waveform** (backlog 0215, 0216). Plan 0180 owns both; this
+  plan only records what the reference shows.
