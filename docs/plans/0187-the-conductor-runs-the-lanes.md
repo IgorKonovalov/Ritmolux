@@ -368,7 +368,7 @@ Outcome kinds: implementers `phases_done` or `parked` (`reason`: `human_phase` |
 | 3 — The conductor's core: queue, state, plan reading, locks, one step | dev | done | `0a90ec7` |
 | 4 — The lane loop, end to end against a scratch repository | dev | done | `fad5459` |
 | 4b — The close digest: what happened, readable the morning after | dev | done | `35d6ef5` |
-| 5 — The operator surface and the documents | dev | committed with this row | |
+| 5 — The operator surface and the documents | dev | done | `96a78eb` |
 | 6 — The pilot: one lane, two plans, watched | human | not started | |
 
 ### Notes
@@ -385,15 +385,17 @@ Outcome kinds: implementers `phases_done` or `parked` (`reason`: `human_phase` |
 - Phase 5: CI runs `node --test "tools/conductor/test/*.test.mjs"` after an `actions/setup-node` 22 step, not `node --test tools/conductor` - a directory is not a test pattern on Node 22 (`Cannot find module`).
 - Phase 5: `lib/step.mjs` (a Phase 3 file) gained `activeChildren` so `abort` and Ctrl+C end live sessions; command tests are in `test/cli.test.mjs`.
 - Phase 5: `resume` refuses only `human_phase` (row not done) and `main_dirty` (checkout still dirty) as still true; every other reason is accepted, and `review_failed` grants two fresh fix rounds.
+- Followup: no test runs the conductor against the real CLI; the review session writing its file under `state/reviews/` through `--add-dir`, and a real session honouring conductor mode end to end, are first exercised by Phase 6.
+- Followup: the digest's per-run lock-wait totals add a plan's whole `lockWaits` to every run that plan touched, so a plan spanning two runs is counted in both.
 
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`**
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** no
+- **Plan header `Closes:`** none
+- **What shipped:** feature (repository tooling under `tools/conductor/`, two `.claude/hooks/`, conductor-mode sections in three skills; nothing in a shipped artifact)
+- **Operator docs touched:** `docs/developing.md`, `CLAUDE.md`, `docs/plans/README.md` `## Conventions`, `tools/conductor/README.md` (new), `.github/workflows/ci.yml`
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, no entry named
+- **Full suite:** `cargo nextest run --workspace` - exit 0, `1933 tests run: 1933 passed (5 slow), 6 skipped` (605.9 s); `node --test "tools/conductor/test/*.test.mjs"` - 101 pass, 0 fail
+- **Outstanding `human` phases:** Phase 6 (the pilot)
 
 ## Followups (after this lands)
