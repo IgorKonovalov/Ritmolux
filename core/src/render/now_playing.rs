@@ -118,10 +118,11 @@ impl NowPlaying {
         self.elapsed = if text.is_empty() { TOTAL_SECS } else { 0.0 };
     }
 
-    /// Advance the envelope by `dt` real seconds. Non-finite or non-positive
-    /// steps are ignored, matching the parameter smoother's rule.
+    /// Advance the envelope by `dt` real seconds. `dt` is trusted: `render`
+    /// replaces a degenerate delta with one nominal step before calling this
+    /// (ADR-0191).
     pub fn advance(&mut self, dt: f32) {
-        if !dt.is_finite() || dt <= 0.0 || self.elapsed >= TOTAL_SECS {
+        if self.elapsed >= TOTAL_SECS {
             return;
         }
         self.elapsed = (self.elapsed + dt).min(TOTAL_SECS);
@@ -470,17 +471,5 @@ mod tests {
         let [artist, title] = np.layout(1920.0, 1080.0);
         assert!(artist.is_none(), "no separator means no artist line");
         assert_eq!(title.unwrap().text, "Untitled Broadcast");
-    }
-
-    #[test]
-    fn a_non_finite_or_backwards_step_is_ignored() {
-        let mut np = NowPlaying::default();
-        np.set("Artist - Title");
-        np.advance(FADE_IN_SECS);
-        let full = np.alpha();
-        np.advance(f32::NAN);
-        np.advance(-1.0);
-        np.advance(0.0);
-        assert_eq!(np.alpha(), full, "a bad dt must not move the envelope");
     }
 }

@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0171 - One stall policy, and a guarded clock](#0171---one-stall-policy-and-a-guarded-clock)
   - [0169 - A preset is checked before it is rendered](#0169---a-preset-is-checked-before-it-is-rendered)
   - [0167 - The studio becomes handable](#0167---the-studio-becomes-handable)
   - [0164 - The cellular system](#0164---the-cellular-system)
@@ -201,6 +202,49 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0171 - One stall policy, and a guarded clock](done/0171-one-stall-policy-and-a-guarded-clock.md)
+
+- closed 2026-09-14. Two `dev` phases on lane `plan-0171-stall-policy`: `12b05f6` (1, the clock is
+guarded at every entry) and `bb4d318` (2, one policy below the entries). Review: **no blockers, no
+majors, two minors, two nits.** Version: **0.122.1** (patch - nothing a viewer sees moves). ADR-0191
+accepted with an Outcome. Closed backlog 0188, 0189 and 0190; filed 0212. The architect's full
+`cargo nextest run --workspace` at the close: 1916 passed, 6 skipped, matching the log.
+
+**What the review verified rather than read.** Every `draw_frame` caller in `core/src/` passes either
+`sanitize_frame_dt`'s result or a `FALLBACK_DT` literal, and `render`, `render_tapped` and
+`capture_stream` call it as their first statement. That covers the one entry no test can reach,
+`render`. Every caller of the MilkDrop `run_frame` passes a positive delta, including every
+`milkconv` test, so the envelope guard was redundant rather than policy, which was the plan's stop
+condition. The log does not record that this check was run. The new clock test runs a valid `0.05`
+before the degenerate cases, so an entry that ignored its `dt` would fail it, and its equalities are
+exact for the reason its doc gives.
+
+**Minors, neither fixed at the close:**
+- **Three positivity-only guards survive, and the hygiene test cannot see them.** `Easing::step`
+snaps to `raw` on `dt <= 0.0`, the latch countdown clamps `dt.max(0.0)`, and the MilkDrop decay
+exponent floors `dt.max(1e-6)`. `dev` named the first. None is reachable on the frame path. Filed as
+backlog 0212 and recorded in ADR-0191's Outcome, because the Decision says "only answer".
+- **The population was five, not three.** Phase 2 deleted the cellular `GenerationClock::advance`
+guard with the user's approval, and it is disclosed in the log. The now-playing guard went too, as the
+plan's conditional note allowed. Both tests pinning the old answers were deleted with nothing in their
+place, which is right: a pure-function test of an input the callers now guarantee would pin nothing.
+The finding is against ADR-0191's Context, not the implementation, and the Outcome records it.
+
+**Nits:** `seam_run` now calls `sanitize_frame_dt` itself before `draw_frame`, so ADR-0152's
+`a_degenerate_frame_delta_cannot_reach_a_scene` proves the composition as the test assembles it, not
+as any entry does. The entries are covered for the clock, not for scene state. Also,
+`docs/specs/0001-c-abi.md` does not say what `rlx_render_dt` does with a degenerate `dt`. The plan
+left the spec alone on purpose, and the behavior is now uniform enough to state in one line if a
+later ABI edit touches that paragraph.
+
+**Also at the close:** no operator doc names the changed behavior. The grep over `docs/`, `presets/README.md`
+and `rlx_core.h` found nothing to sweep. Preset curation: no `.toml` touched. The defect-workaround grep
+for ADR-0152, ADR-0191 and backlog 0188-0190 over `presets/*.toml` is clean. The `-p rlx-core`
+clippy failure on `context.rs`'s dead fields that the log observed predates this plan and was not
+investigated here. **Merge hazard for the other lane:** Plan 0170's branch also edits
+`core/src/render/scenes/cellular/tests.rs` and closes backlog 0210 and 0211 into the same ledger and
+archive tail, so whichever closes second resolves both files.
 
 ### [0169 - A preset is checked before it is rendered](done/0169-a-preset-is-checked-before-it-is-rendered.md)
 

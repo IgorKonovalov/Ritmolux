@@ -2115,11 +2115,12 @@ fn every_capture_path_resolves_the_live_ceiling() {
 }
 
 // ---------------------------------------------------------------------------
-// The frame-delta seam (ADR-0152)
+// The frame-delta seam (ADR-0152, ADR-0191)
 // ---------------------------------------------------------------------------
 
 /// Seed the renderer to a deterministic start for `name`, drive `deltas` through
-/// `draw_frame` one frame each, and read the last frame back.
+/// `sanitize_frame_dt` and on into `draw_frame` one frame each — the order every
+/// entry taking a caller's delta runs them in — and read the last frame back.
 ///
 /// The clock advances one `FALLBACK_DT` per frame **regardless of `dt`**, so two
 /// calls differing only in `deltas` differ only in what the seam was handed. The
@@ -2164,7 +2165,7 @@ fn seam_run(renderer: &mut Renderer, name: &str, deltas: &[f32]) -> CaptureImage
             &mut encoder,
             &view,
             (width, height),
-            dt,
+            super::sanitize_frame_dt(dt),
             super::SaltMode::Pinned,
         );
         if i == last {
@@ -2176,8 +2177,9 @@ fn seam_run(renderer: &mut Renderer, name: &str, deltas: &[f32]) -> CaptureImage
         .expect("seam-run readback")
 }
 
-/// **A degenerate frame delta cannot reach a scene** (ADR-0152). `draw_frame`
-/// substitutes `FALLBACK_DT` for a `dt` that is not finite and positive, so a run
+/// **A degenerate frame delta cannot reach a scene** (ADR-0152, ADR-0191).
+/// `sanitize_frame_dt` substitutes `FALLBACK_DT` for a `dt` that is not finite
+/// and positive before `draw_frame` sees it, so a run
 /// fed one bad frame followed by clean frames is **byte-identical** to a run of
 /// the same length fed clean frames throughout.
 ///
@@ -2256,6 +2258,89 @@ fn a_degenerate_frame_delta_cannot_reach_a_scene() {
                  frames later, so it reached the scene"
             );
         }
+    }
+}
+
+/// **The scene clock takes a degenerate delta as one nominal step, at every entry
+/// that accepts a caller's delta** (ADR-0191).
+///
+/// `self.time` is advanced by the entry, above `draw_frame`, and is handed to
+/// every scene each frame — so a `NaN` reaching it is permanent. The equalities
+/// are exact because the entry's addition and the one written here are the same
+/// `f32` operation on the same operands.
+///
+/// A valid delta of a different size runs first at each entry, and it is what
+/// makes the degenerate cases mean anything: an entry that ignored its `dt` and
+/// always stepped `FALLBACK_DT` would pass them all.
+///
+/// `render` needs a presentable surface no test builds; it calls the same
+/// function in the same place.
+#[test]
+fn a_degenerate_frame_delta_steps_the_clock_by_the_nominal_step_at_every_entry() {
+    let Some(mut renderer) = headless_or_skip(HeadlessOptions {
+        width: 32,
+        height: 32,
+        prefer_software: true,
+    }) else {
+        return;
+    };
+    renderer.set_presets(vec![preset_on("ClockProbe", "fragment_field")]);
+    renderer.select_preset_now(0);
+
+    let nominal = super::scenes::FALLBACK_DT;
+    let valid = 0.05;
+    let degenerate = [f32::NAN, f32::INFINITY, 0.0, -1.0];
+    let frame = AnalysisFrame::default();
+
+    // `render_tapped`: one frame per delta, against a running clock.
+    let mut tap = renderer.open_tap();
+    for (dt, step) in std::iter::once((valid, valid)).chain(degenerate.map(|bad| (bad, nominal))) {
+        let before = renderer.time;
+        renderer
+            .render_tapped(&mut tap, &frame, dt)
+            .expect("a tapped frame renders");
+        assert!(
+            renderer.time.is_finite(),
+            "render_tapped: a {dt} delta left the clock at {}",
+            renderer.time
+        );
+        assert_eq!(
+            renderer.time,
+            before + step,
+            "render_tapped: a {dt} delta must advance the clock by exactly {step}"
+        );
+    }
+
+    // `capture_stream`: the clock resets to zero, then steps once per frame.
+    const FRAMES: u32 = 3;
+    for (dt, step) in std::iter::once((valid, valid)).chain(degenerate.map(|bad| (bad, nominal))) {
+        let mut delivered = 0;
+        renderer
+            .capture_stream(
+                "ClockProbe",
+                FRAMES,
+                dt,
+                &mut |_| AnalysisFrame::default(),
+                &mut |_, _| {
+                    delivered += 1;
+                    Ok(())
+                },
+            )
+            .expect("the stream renders");
+        assert_eq!(
+            delivered, FRAMES,
+            "capture_stream: every frame reached the sink"
+        );
+        let expected = (0..FRAMES).fold(0.0f32, |time, _| time + step);
+        assert!(
+            renderer.time.is_finite(),
+            "capture_stream: a {dt} delta left the clock at {}",
+            renderer.time
+        );
+        assert_eq!(
+            renderer.time, expected,
+            "capture_stream: a {dt} delta must advance the clock {FRAMES} times by exactly {step}"
+        );
     }
 }
 

@@ -1,10 +1,12 @@
 # 0171 — One stall policy, and a guarded clock
 
-> **Status:** approved 2026-09-14
+> **Status:** done — closed 2026-09-14. Phases `12b05f6` (1) and `bb4d318` (2). Mode 4: no blockers,
+> no majors, two minors, two nits. Architect's full `cargo nextest run --workspace`: 1916 passed, 6 skipped, matching the log.
+> ADR-0191 accepted with an Outcome. Version 0.122.1 (patch).
 > **Created:** 2026-09-11
 > **Owner skill(s):** `dev`
-> **Related ADRs:** [0191](../adrs/0191-a-frame-delta-is-replaced-at-every-entry-and-nothing-below-keeps-a-policy.md)
-> (proposed), amending [0152](../adrs/0152-the-frame-delta-is-sanitized-at-the-scene-seam.md)
+> **Related ADRs:** [0191](../../adrs/0191-a-frame-delta-is-replaced-at-every-entry-and-nothing-below-keeps-a-policy.md)
+> (accepted), amending [0152](../../adrs/0152-the-frame-delta-is-sanitized-at-the-scene-seam.md)
 > **Closes:** design-backlog 0188, 0189, 0190.
 
 ## TL;DR
@@ -124,23 +126,55 @@ flowchart LR
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled on the first phase commit)_
+**Lane:** branch `plan-0171-stall-policy`, worktree `.claude/worktrees/plan-0171-stall-policy`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The clock is guarded at every entry | dev | not started | |
-| 2 — One policy below the entries | dev | not started | |
+| 1 — The clock is guarded at every entry | dev | done | 12b05f6 |
+| 2 — One policy below the entries | dev | done | bb4d318 |
 
 ### Notes
 
+- **Deviation, Phase 2 (bb4d318):** the scan found a fifth guard the plan does not list, in
+  `GenerationClock::advance` (`core/src/render/scenes/cellular/mod.rs`, where a non-finite `dt` ran 0
+  generations). It was deleted with user approval, along with the `advance(30.0, f32::INFINITY) == 0`
+  assertion in `cellular/tests.rs`.
+- **Deviation, Phase 1 (12b05f6):** `seam_run`, the helper behind ADR-0152's
+  `a_degenerate_frame_delta_cannot_reach_a_scene`, now passes each delta through
+  `sanitize_frame_dt` before calling `draw_frame`. Without that the test broke once `draw_frame`
+  dropped its check. The clock stays pinned to `FALLBACK_DT` per frame.
+- **Deviation, Phase 2 (bb4d318):** `now_playing.rs`'s `a_non_finite_or_backwards_step_is_ignored`
+  was deleted with its guard, and nothing replaces it.
+- **Hygiene allowlist:** it has one entry, `render/tier.rs` `sustained_miss`, where `dt` is a measured
+  frame-time sample.
+- **Seeded bite, Phase 2:** with `if dt.is_finite() && dt >= 0.0 {` put back into `trails.rs`
+  `set_dt`, the test failed at `core/tests/hygiene.rs:917` and listed
+  `core/src/render/mod.rs: if dt.is_finite() && dt > 0.0 {` and
+  `core/src/render/trails.rs: if dt.is_finite() && dt >= 0.0 {`. The seed was removed before the
+  commit.
+- **Followup, not acted on:** `Easing::step` (`core/src/preset/schema/easing.rs`) returns `raw` for
+  `dt <= 0.0`. That is a positivity check on a frame delta with no finiteness check, so the hygiene
+  pattern does not see it.
+- **Observation:** `cargo clippy -p rlx-core --all-targets -- -D warnings` fails on dead fields
+  `instance`/`gpu` in `core/src/render/context.rs`, which predate this plan. The `--workspace` form
+  is clean.
+
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** no
 - **Plan header `Closes:`** design-backlog 0188, 0189, 0190
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** fix-only (no picture changes; the degenerate-delta path is covered by tests)
+- **Operator docs touched:** none
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 1, 5 broken. All belong to 0188
+  (`dt\.is_finite\(\) && dt > 0\.0` and `fn a_degenerate_dt_holds_progress` in `transition.rs`) or
+  0190 (the `trails.rs`, `transition.rs` and `milk/mod.rs` guard patterns). 0189's two probes still
+  match.
+- **Full suite:** `cargo nextest run --workspace --no-fail-fast`, exit 0, 1916 passed, 6 skipped
+- **Outstanding `human` phases:** none
 
 ## Followups (after this lands)
+
+- **Three positivity-only guards survive below the entries, and the hygiene test cannot see them:**
+  `Easing::step`'s `dt <= 0.0` snap to `raw`, the latch countdown's `dt.max(0.0)` in
+  `render/evaluate.rs`, and the MilkDrop decay's `dt.max(1e-6)` in `warp_mesh/shader.rs`. All are
+  unreachable on the frame path. Filed as design-backlog 0212; recorded in ADR-0191's Outcome.

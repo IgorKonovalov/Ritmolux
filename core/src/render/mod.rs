@@ -157,6 +157,42 @@ const TRANSITION_DURATION_SECS: f32 = DEFAULT_DURATION_SECS;
 /// a few frames, and the rest of the dissolve falls back to the frozen side.
 const DUAL_LIVE_BUDGET_MS: f32 = 18.0;
 
+/// A caller's frame delta, made safe to accumulate: `dt` itself when it is
+/// finite and positive, [`scenes::FALLBACK_DT`] otherwise.
+///
+/// **The one place a frame delta is checked, and the nominal step is the
+/// engine's only answer to a degenerate one.** Everything below reads the value
+/// this returns and none of it re-checks — every `Scene::advance`, the
+/// composite's per-second decay, the transition's step, the MilkDrop runtime's
+/// envelopes, the cellular generation clock, the now-playing banner. A second
+/// finiteness guard on a `dt` anywhere in `core/src/` fails
+/// `core/tests/hygiene.rs`, because a second guard is a second policy.
+///
+/// **Every `Renderer` entry that takes a caller's `dt` calls this as its first
+/// statement** and hands its result — never the raw value — to the scene clock,
+/// the now-playing banner and `draw_frame`. An entry that steps the clock by
+/// `FALLBACK_DT` itself takes no caller delta and has nothing to pass through
+/// here. A new entry that adds a caller's `dt` to `self.time` without calling
+/// this is invisible to every test: the hygiene suite can count guards, not
+/// missing calls.
+///
+/// A shell can hand over a `NaN` (a clock read across a device loss), a zero
+/// (two frames inside one timer tick) or a negative (a clock that jumped
+/// backwards), and the C ABI passes a plugin's delta through unexamined.
+///
+/// The trap it closes is one-way. `self.time` and `Phase::step` are `+=`
+/// accumulators with no other mutator on the live path, so one non-finite frame
+/// poisons them for the life of the process and nothing can ever clear it. The
+/// substitution is a nominal step rather than zero so a degenerate frame
+/// advances the animation instead of freezing it. ADR-0152, ADR-0191.
+pub(crate) fn sanitize_frame_dt(dt: f32) -> f32 {
+    if dt.is_finite() && dt > 0.0 {
+        dt
+    } else {
+        scenes::FALLBACK_DT
+    }
+}
+
 // The five concerns this file keeps out of the `Renderer` (Plan 0126 Phase 2).
 // `routing` answers where a name goes and which scene a system has, `roster` the
 // loaded presets and their per-binding frame state, `evaluate` one frame's bindings,
@@ -315,6 +351,11 @@ impl PixelOrder {
 
 /// Owns the GPU context, the built-in systems, and the loaded presets; renders
 /// one frame per call by evaluating the active preset into the active system.
+///
+/// Every entry point that accepts a caller's frame delta — `render`,
+/// `render_tapped`, `capture_stream` — replaces a degenerate one through
+/// `sanitize_frame_dt` before anything below sees it, and an entry added later
+/// owes the same call.
 pub struct Renderer {
     ctx: RenderContext,
     /// Which sample ceiling this renderer's scenes were built against
@@ -361,8 +402,10 @@ pub struct Renderer {
     transitions_started: u32,
     /// Loaded presets + the active index (pure selection state — see [`Roster`]).
     roster: Roster,
-    /// Shared scene clock (seconds), advanced one fixed step per rendered frame.
-    /// The single source for both an expression's `time` and system animation.
+    /// Shared scene clock (seconds), advanced once per rendered frame by that
+    /// frame's delta — a caller's only after [`sanitize_frame_dt`], a capture's
+    /// fixed step otherwise. The single source for both an expression's `time`
+    /// and system animation.
     time: f32,
     /// Runtime diagnostics: rolling frame-time stats + overlay flags (Plan 0011).
     diag: Diag,
@@ -1118,7 +1161,11 @@ impl Renderer {
     /// any refresh rate; `core` never reads a clock. Lost/outdated surfaces
     /// self-heal by reconfiguring; timeouts/occlusion skip the frame; only a
     /// validation failure (a bug) bubbles up.
+    ///
+    /// A `dt` that is not finite and positive is replaced by one nominal step
+    /// before anything reads it (`sanitize_frame_dt`, ADR-0191).
     pub fn render(&mut self, frame: &AnalysisFrame, dt: f32) -> Result<(), RenderError> {
+        let dt = sanitize_frame_dt(dt);
         self.time += dt;
         // The banner rides the same injected `dt` the scene does, so it lasts the
         // same number of seconds on any refresh rate (ADR-0110 / Plan 0014).
@@ -1211,6 +1258,11 @@ impl Renderer {
     /// calls mix in (ADR-0051) — [`SaltMode::Live`] from the one on-surface
     /// caller, [`SaltMode::Pinned`] from every capture path.
     ///
+    /// **Precondition: `dt` is finite and positive.** Nothing here checks it. A
+    /// caller forwarding a delta it was handed passes it through
+    /// [`sanitize_frame_dt`] first; a capture path passes
+    /// [`FALLBACK_DT`](scenes::FALLBACK_DT) directly.
+    ///
     /// Returns the draw-call count.
     // Eight arguments, one past the lint: they are the frame's inputs and each is
     // read once. The same allowance `evaluate_preset` above carries, and for the
@@ -1225,23 +1277,6 @@ impl Renderer {
         dt: f32,
         salt: SaltMode,
     ) -> u32 {
-        // **The one place a frame delta is checked.** Everything below reads this
-        // value and none of it re-checks: every `Scene::advance`, the composite's
-        // per-second decay, the transition's own step. A shell can hand over a
-        // `NaN` (a clock read across a device loss), a zero (two frames inside one
-        // timer tick) or a negative (a clock that jumped backwards).
-        //
-        // The trap it closes is one-way. `Phase::step` is `+= rate * dt` and the
-        // type has no other mutator, so one non-finite frame poisons an
-        // accumulator for the life of the process and nothing can ever clear it —
-        // and a scene that stores `dt` raw carries that into every rate it drives.
-        // The substitution is `FALLBACK_DT` rather than zero so a degenerate frame
-        // advances a nominal step instead of freezing the animation. ADR-0152.
-        let dt = if dt.is_finite() && dt > 0.0 {
-            dt
-        } else {
-            scenes::FALLBACK_DT
-        };
         let Self {
             ctx,
             // Read where the scenes are BUILT, not where they are drawn - a

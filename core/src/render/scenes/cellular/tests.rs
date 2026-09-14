@@ -402,9 +402,6 @@ fn the_clock_freezes_at_zero_and_drops_a_stalls_backlog() {
     let mut clock = GenerationClock::default();
     assert_eq!(clock.advance(30.0, 2.0), MAX_GENERATIONS_PER_FRAME);
     assert_eq!(clock.advance(30.0, 0.1), 3);
-    // A non-finite dt runs nothing rather than poisoning the sum.
-    assert_eq!(clock.advance(30.0, f32::INFINITY), 0);
-    assert_eq!(clock.advance(30.0, 0.1), 3);
 }
 
 // ---------------------------------------------------------------------------

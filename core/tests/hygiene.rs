@@ -12,6 +12,8 @@
 //! (e) The component size cap in `packaging/foobar/build-component.ps1` is the
 //!     one `docs/nfr.md` §4 states (ADR-0159). Two copies of a number is the
 //!     shape this repository keeps finding rot in.
+//! (f) A frame delta is checked for finiteness in exactly one place in
+//!     `core/src/`, `sanitize_frame_dt` (ADR-0191).
 
 use std::path::{Path, PathBuf};
 
@@ -820,4 +822,125 @@ fn the_component_size_cap_agrees_between_the_recipe_and_the_nfr() {
         !nfr.contains("Soft cap ~10 MB"),
         "docs/nfr.md §4 still carries the unitless `~10 MB` cap ADR-0159 replaced"
     );
+}
+
+// ---------------------------------------------------------------------------
+// (f) One stall policy (ADR-0191)
+// ---------------------------------------------------------------------------
+
+/// The one finiteness guard on a frame delta the engine keeps: the line in
+/// `sanitize_frame_dt`, as `(path under core/src/, trimmed source line)`.
+const DT_GUARD: (&str, &str) = ("render/mod.rs", "if dt.is_finite() && dt > 0.0 {");
+
+/// Finiteness checks on a variable named `dt` that are **not** a frame delta
+/// being guarded, each with the reason it is not. An entry is
+/// `(path under core/src/, trimmed source line, reason)`. Every entry must still
+/// match a line in the tree, so a stale one fails rather than silently widening
+/// what passes.
+const DT_GUARD_ALLOWED: &[(&str, &str, &str)] = &[(
+    "render/tier.rs",
+    "if dt.is_finite() && dt > threshold {",
+    "`sustained_miss` counts measured frame times out of the governor's rolling \
+     history; this `dt` is one sample of that series, never accumulated, and a \
+     non-finite sample is simply not a miss",
+)];
+
+/// **A frame delta is checked in exactly one place** (ADR-0191).
+///
+/// Every `Renderer` entry that takes a caller's delta runs it through
+/// `sanitize_frame_dt`, which substitutes one nominal step. A second guard below
+/// that — keep the previous value, hold, freeze, run nothing — is unreachable on
+/// the frame path and is also a second answer to the same question, which the
+/// next reader cannot tell is deliberate. The population was enumerated by hand
+/// three times and was short each time; this counts it instead.
+///
+/// It matches `dt.is_finite()` or `is_finite(dt)` on a variable or field named
+/// exactly `dt`, which covers either operand order and a negated check, across
+/// every non-test `.rs` under `core/src/`. Line comments are stripped first, so
+/// prose describing the guard does not count.
+///
+/// # What it cannot see
+///
+/// A guard spelled another way (`dt.is_nan()`, a check on a renamed local) and,
+/// above all, an entry point that forgets to call `sanitize_frame_dt`. The
+/// function's doc and the `Renderer` doc are what stand there.
+#[test]
+fn a_frame_delta_is_checked_for_finiteness_in_exactly_one_place() {
+    let src = core_src();
+    let mut files = Vec::new();
+    collect_rs_files(&src, &mut files);
+    assert!(
+        files.iter().any(|f| f.ends_with("tier.rs")) && files.iter().any(|f| f.ends_with("mod.rs")),
+        "the scan no longer reaches the files it must, so it is guarding less than it reads"
+    );
+
+    let mut hits: Vec<(String, String)> = Vec::new();
+    for file in &files {
+        let text = std::fs::read_to_string(file)
+            .unwrap_or_else(|e| panic!("read {}: {e}", file.display()));
+        let rel = file
+            .strip_prefix(&src)
+            .expect("scanned file is under core/src")
+            .to_string_lossy()
+            .replace('\\', "/");
+        for line in strip_line_comments(&text).lines() {
+            if checks_dt_finiteness(line) {
+                hits.push((rel.clone(), line.trim().to_string()));
+            }
+        }
+    }
+
+    for (path, line, reason) in DT_GUARD_ALLOWED {
+        assert!(
+            hits.iter().any(|(p, l)| p == path && l == line),
+            "the allowlist entry `{path}: {line}` ({reason}) no longer matches the tree; \
+             remove it rather than leaving it to excuse a future guard"
+        );
+    }
+    let guards: Vec<&(String, String)> = hits
+        .iter()
+        .filter(|(p, l)| {
+            !DT_GUARD_ALLOWED
+                .iter()
+                .any(|(path, line, _)| p == path && l == line)
+        })
+        .collect();
+
+    let (guard_path, guard_line) = DT_GUARD;
+    assert!(
+        guards
+            .iter()
+            .any(|(p, l)| p == guard_path && l == guard_line),
+        "found no `{guard_line}` in core/src/{guard_path}; either `sanitize_frame_dt` \
+         changed shape and DT_GUARD must follow it, or the scan has broken"
+    );
+    assert_eq!(
+        guards.len(),
+        1,
+        "a frame delta is checked for finiteness in more than one place, and only \
+         `sanitize_frame_dt` may:\n  {}\n\
+         Every renderer entry already replaces a degenerate delta with one nominal step \
+         (ADR-0191), so a guard below it is a second policy. Delete it; if this `dt` is \
+         not a frame delta, add it to DT_GUARD_ALLOWED with the reason.",
+        guards
+            .iter()
+            .map(|(p, l)| format!("core/src/{p}: {l}"))
+            .collect::<Vec<_>>()
+            .join("\n  ")
+    );
+}
+
+/// Whether `line` checks the finiteness of something named exactly `dt`.
+fn checks_dt_finiteness(line: &str) -> bool {
+    let is_ident = |c: char| c.is_alphanumeric() || c == '_';
+    let method = "dt.is_finite()";
+    let mut from = 0;
+    while let Some(rel) = line[from..].find(method) {
+        let at = from + rel;
+        if !line[..at].chars().next_back().is_some_and(is_ident) {
+            return true;
+        }
+        from = at + method.len();
+    }
+    line.contains("is_finite(dt)")
 }

@@ -442,8 +442,10 @@ impl GenerationClock {
     /// whole generations to run now, at most [`MAX_GENERATIONS_PER_FRAME`].
     /// The fraction carries; a backlog past the cap is dropped rather than
     /// carried, so the automaton slows instead of racing to catch up.
+    ///
+    /// `dt` is trusted: the renderer entry that took the frame has already
+    /// replaced a degenerate delta with one nominal step (ADR-0191).
     pub(crate) fn advance(&mut self, rate: f32, dt: f32) -> u32 {
-        let dt = if dt.is_finite() { dt.max(0.0) } else { 0.0 };
         self.owed += f64::from(applied_step_rate(rate)) * f64::from(dt);
         let whole = (self.owed + WHOLE_SLACK).floor();
         let cap = f64::from(MAX_GENERATIONS_PER_FRAME);

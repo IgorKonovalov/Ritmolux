@@ -209,6 +209,9 @@ accepted cost" are different documents and only one of them is honest.
 - [0199 — the studio always spawns a windowed player, so a one-screen machine gets a show window in the way, and the windowless mode that would fix it already exists](#0199--the-studio-always-spawns-a-windowed-player-so-a-one-screen-machine-gets-a-show-window-in-the-way-and-the-windowless-mode-that-would-fix-it-already-exists)
 - [0200 — the `stream` event names a channel order the windowed preview does not use, so every studio frame is drawn with red and blue swapped](#0200--the-stream-event-names-a-channel-order-the-windowed-preview-does-not-use-so-every-studio-frame-is-drawn-with-red-and-blue-swapped)
 - [0201 — the studio's preview stops updating mid-session while the show keeps drawing, and the drop counter cannot see why](#0201--the-studios-preview-stops-updating-mid-session-while-the-show-keeps-drawing-and-the-drop-counter-cannot-see-why)
+- [0188 — a stalled frame must either hold the dissolve or step it, and after the `dt` seam the engine will do both](#0188--a-stalled-frame-must-either-hold-the-dissolve-or-step-it-and-after-the-dt-seam-the-engine-will-do-both)
+- [0189 — `self.time` takes the raw delta one call above the seam that sanitizes it, so a single `NaN` from a host poisons the shared scene clock for the life of the process](#0189--selftime-takes-the-raw-delta-one-call-above-the-seam-that-sanitizes-it-so-a-single-nan-from-a-host-poisons-the-shared-scene-clock-for-the-life-of-the-process)
+- [0190 — the `dt` seam's comment names three downstream sites as unguarded, and all three still carry a guard, on three different policies](#0190--the-dt-seams-comment-names-three-downstream-sites-as-unguarded-and-all-three-still-carry-a-guard-on-three-different-policies)
 <!-- toc:end -->
 
 ## 0001 — reaction_diffusion reaches only 2 of the 5 Plan-0018 composite levers
@@ -9668,3 +9671,178 @@ arrives while one is unacknowledged, so loss upstream of it stays invisible. Tha
 Plan 0167 followup, not as this entry.
 
 ---
+
+## 0188 — a stalled frame must either hold the dissolve or step it, and after the `dt` seam the engine will do both
+
+[ADR-0152](adrs/0152-the-frame-delta-is-sanitized-at-the-scene-seam.md) sanitizes `dt` once in
+`draw_frame`, substituting `FALLBACK_DT` for a non-finite or non-positive delta, so every scene
+downstream **advances a nominal step** on a degenerate frame. `Transition::advance` reads the same
+`dt` from the same call and does the opposite: its own guard **holds** progress, and
+`a_degenerate_dt_holds_progress` asserts that with a doc comment naming the case — *"the frontend can
+inject either after a stall."* Both answers are defensible and the engine is about to hold both, one
+of them unreachable.
+
+- **Raised:** 2026-09-07, at Plan 0140's pre-implementation review, from ADR-0152's correction.
+  **Owner if taken:** `architect` — this is a policy question, not a repair.
+- **Verified 2026-09-07** — the transition keeps a guard the seam makes unreachable from the frame
+  path. The probe goes red **on the repair**, whichever way the policy lands, rather than on decay:
+  `present: dt\.is_finite\(\) && dt > 0\.0 in: core/src/render/transition.rs`
+- **Verified 2026-09-07** — and a passing test pins the *hold* half, so the two policies cannot
+  diverge silently without something going red:
+  `present: fn a_degenerate_dt_holds_progress in: core/src/render/transition.rs`
+
+### The finding
+
+The two are not in conflict today, because before the seam lands every reader sanitizes for itself
+and nobody compares the answers. Afterwards, `Transition::advance` cannot observe a bad `dt` at all —
+`draw_frame` replaced it upstream — so its guard becomes a live test pinning a branch the frame path
+can no longer reach. That is not a bug and nothing renders wrong; it is a stated behaviour that has
+quietly stopped being the behaviour.
+
+Which answer is right is a genuine question and the frame budget is what decides it. A stall long
+enough to produce a bad delta is a stall the viewer saw: stepping the dissolve one nominal frame
+keeps the crossfade on wall-clock and risks a visible jump on resume, and holding it keeps the
+crossfade smooth and lets a long stall stretch the dissolve past its authored duration. Nothing in
+this repo measures either, and no capture path produces a bad `dt`, which is why it is filed rather
+than decided.
+
+Two things this is **not**. It is not the four-copies problem ADR-0152 fixed — one copy of a policy
+nothing else holds is not duplication. And it is not `now_playing`, whose `advance` is called before
+`draw_frame` and so keeps receiving the raw delta by construction.
+
+### Priority
+
+**Low.** Unobserved, cheap to answer once someone decides what a stalled dissolve should look like,
+and bounded: two call sites, one test, one sentence of doc either way. It is filed because the seam
+is what creates the divergence, and the plan that lands the seam is the last moment anyone will be
+looking at both halves at once.
+
+**CLOSED 2026-09-14** — [ADR-0191](adrs/0191-a-frame-delta-is-replaced-at-every-entry-and-nothing-below-keeps-a-policy.md) + [Plan 0171](plans/done/0171-one-stall-policy-and-a-guarded-clock.md) Phase 2. The policy landed on **step**: the
+transition's guard is deleted, a degenerate frame reaches the dissolve as the entry's `FALLBACK_DT`
+and advances it by that share, and `a_degenerate_dt_holds_progress` is replaced by
+`a_degenerate_dt_advances_progress_by_the_nominal_share`. Both `present:` probes were falsified by
+the repair, as written, and retire with this body. The price the entry named is the one ADR-0191's
+Negative section accepts — a long stall no longer stretches a dissolve and may jump on resume — and
+it is still unmeasured in either direction.
+
+## 0189 — `self.time` takes the raw delta one call above the seam that sanitizes it, so a single `NaN` from a host poisons the shared scene clock for the life of the process
+
+[ADR-0152](adrs/0152-the-frame-delta-is-sanitized-at-the-scene-seam.md) closes a one-way trap:
+`Phase::step` is `+= rate * dt` with no other mutator, so one non-finite frame poisons an
+accumulator forever. The guard it shipped sits in `draw_frame`. **`Renderer::render` does
+`self.time += dt` before it calls `draw_frame`** — `core/src/render/mod.rs:971` — and `self.time` is
+a bare `f32` (`mod.rs:318`) with no reset on the live path, handed to every scene each frame through
+`Scene::set_time`. It is the largest accumulator in the engine and it is the one the seam does not
+cover.
+
+- **Raised:** 2026-09-08, at Plan 0140's close, from the Mode 4 review of ADR-0152's own reach.
+  **Owner if taken:** `architect` then `dev` — the repair is small but the placement is a decision.
+- **Verified 2026-09-08** — the accumulator is written once, upstream of the guard, and there is no
+  second write that could clear it:
+  `present: self\.time \+= dt; in: core/src/render/mod.rs`
+- **Verified 2026-09-08** — and the C ABI hands the frontend's delta straight through, so the
+  untrusted value reaches that line unexamined:
+  `present: renderer\.render\(&frame, dt_seconds\) in: core-cabi/src/lib.rs`
+
+### The finding
+
+`rlx_render_dt` takes `dt_seconds: f32` from the C++ shim and passes it to `renderer.render` with no
+check (`core-cabi/src/lib.rs:307` and `:325`). That is the project's own **validate at the boundary**
+rule pointing at a boundary where nothing is validated, and the value's first use on the other side
+is an unguarded `+=` into a clock every scene reads.
+
+The failure is total and silent. Once `self.time` is `NaN`, `set_time` distributes it to every scene
+every frame; nothing in the engine can clear it, because there is no other write to that field and
+no reset outside construction. A restart is the only recovery, and the symptom — every animation
+that reads absolute time stops or goes undefined while the ones driven by `Phase` keep running — is
+not obviously a `dt` problem to whoever sees it.
+
+Two things this is **not**. It is not a duplicate of what ADR-0152 fixed: that ADR's population was
+drawn from a grep inside `scenes/`, and this line is two directories up, which is exactly why it
+survived. And it is not reachable from any capture path — `shot` and the golden harness synthesize
+their deltas — so no gate here can see it, which is the same reason `now_playing.advance(dt)` on the
+line below has carried its own guard since it was written.
+
+### Priority
+
+**Medium.** Unobserved in practice, cheap to fix, and the blast radius is the whole engine. The
+question worth one paragraph before the edit is *where*: sanitizing in `render` duplicates the
+`draw_frame` guard the ADR just spent six deletions consolidating, so the honest shapes are to hoist
+the guard to the top of `render` and let `draw_frame` trust it, or to validate at the C ABI boundary
+where the rule says validation belongs. See 0190, which is the same population question one level
+down.
+
+**CLOSED 2026-09-14** — [ADR-0191](adrs/0191-a-frame-delta-is-replaced-at-every-entry-and-nothing-below-keeps-a-policy.md) + [Plan 0171](plans/done/0171-one-stall-policy-and-a-guarded-clock.md) Phase 1. The guard went to neither place this entry
+weighed alone: `sanitize_frame_dt` is called first by **every** `Renderer` entry that takes a
+caller's delta — `render`, `render_tapped` and `capture_stream` — so the windowless path, which a
+check hoisted into `render` would have missed, is covered too, and the C ABI stays untouched. **Both
+`present:` probes still match after the repair**, and that is correct rather than a miss: they
+reduced the claim to the two lines that carried the raw delta, and both lines still exist, now below
+the substitution. What stands in their place is
+`a_degenerate_frame_delta_steps_the_clock_by_the_nominal_step_at_every_entry`, which drives
+`NaN`, `+inf`, `0.0` and `-1.0` through `render_tapped` and `capture_stream` and asserts the
+clock advances by exactly `FALLBACK_DT`. `render` itself needs a presentable surface no test builds,
+and was confirmed by reading at the close.
+
+## 0190 — the `dt` seam's comment names three downstream sites as unguarded, and all three still carry a guard, on three different policies
+
+The seam at `core/src/render/mod.rs:1082` opens with *"**The one place a frame delta is checked.**
+Everything below reads this value and none of it re-checks: every `Scene::advance`, the composite's
+per-second decay, the transition's own step."* Each of the three named sites still holds a live
+guard, and no two of them agree on what a degenerate frame should do:
+
+| Site | Guard | Policy on a bad `dt` |
+|---|---|---|
+| `render/trails.rs:557` (`set_dt`, the composite's per-second decay) | `dt.is_finite() && dt >= 0.0` | **keep the previous frame's value** |
+| `render/transition.rs:329` (the transition's own step) | `dt.is_finite() && dt > 0.0` | **hold** progress |
+| `milk/mod.rs:626` (reached from `warp_mesh`'s `update`, under a `Scene::advance`) | `dt > 0.0 && dt.is_finite()` | **freeze** the `*_att` envelope at `alpha = 0` |
+
+The seam itself substitutes `FALLBACK_DT` — a **nominal step** — which is a fourth answer.
+
+- **Raised:** 2026-09-08, at Plan 0140's close. **Owner if taken:** `architect` — deciding which
+  guards are redundant and which are policy is the work; deleting them is not.
+- **Verified 2026-09-08** — the comment makes the claim, in the file the guards are in:
+  `present: none of it re-checks in: core/src/render/mod.rs`
+- **Verified 2026-09-08** — and all three named sites still guard:
+  `present: dt\.is_finite\(\) && dt >= 0\.0 in: core/src/render/trails.rs`
+- **Verified 2026-09-08** — the transition half, which 0188 records as deliberate:
+  `present: dt\.is_finite\(\) && dt > 0\.0 in: core/src/render/transition.rs`
+- **Verified 2026-09-08** — and the MilkDrop runtime's, which no plan or ADR in this class names:
+  `present: dt > 0\.0 && dt\.is_finite\(\) in: core/src/milk/mod.rs`
+
+### The finding
+
+None of these is a bug today; all three are unreachable-but-harmless, because the seam substitutes
+upstream and the bad value never arrives. The defect is the **comment**, and what it costs is
+specific. ADR-0152's Negative section says in as many words that after six visible guards were
+deleted, this comment is the only thing standing between the invariant and the next person who adds
+a scene — so a reader who believes it, greps for `is_finite` to confirm, and finds three hits will
+either re-add a fourth copy or delete one of the three without knowing that `transition.rs:329` is
+deliberate (see 0188, which is the record that it is).
+
+The `milk/mod.rs` hit is the one that matters most, because nothing in ADR-0152, ADR-0153 or Plan
+0140 mentions it at all. Its population came from a grep for one spelling inside `scenes/`, and the
+MilkDrop runtime lives in `core/src/milk/`. That is the identical failure mode ADR-0135 was written
+against, and ADR-0152's own `Correction` had already caught it once before implementation started —
+the guard count went from four to six there for the same reason.
+
+**What a fix looks like:** the comment states what is true — the seam is where a delta from the
+frontend is sanitized, and the sites below hold their own policies for reasons named — with the
+three sites and their policies listed, or a decision that reduces them to one. It is a doc repair
+unless the decision goes the other way.
+
+### Priority
+
+**Medium.** Nothing renders wrong and nothing is unsafe. It is filed at this weight because the
+comment is load-bearing by ADR-0152's own argument, and because it is currently the mechanism by
+which the next `dt` guard gets added or removed for the wrong reason. See 0189 for the same
+population question one level up.
+
+**CLOSED 2026-09-14** — [ADR-0191](adrs/0191-a-frame-delta-is-replaced-at-every-entry-and-nothing-below-keeps-a-policy.md) + [Plan 0171](plans/done/0171-one-stall-policy-and-a-guarded-clock.md) Phase 2. The decision went the other way from the
+doc repair this entry sketched: the three guards are deleted and the comment is true again, now on
+`sanitize_frame_dt`, and `core/tests/hygiene.rs` counts the finiteness-guard population so the
+comment is gated rather than trusted. **The population was five, not three** — the scan found the
+cellular `GenerationClock::advance` and the now-playing banner as well — and **three positivity-only
+guards survive** in a spelling the scan does not match (`Easing::step`, the latch countdown, the
+MilkDrop decay exponent). Those are a new entry, 0212, and ADR-0191's Outcome. All three
+`present:` guard probes were falsified by the repair and retire with this body.
