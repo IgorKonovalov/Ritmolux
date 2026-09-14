@@ -9,11 +9,20 @@
 # crystal draws itself in over about twenty-six seconds, holds, and retreats - and
 # bass adds to it, so a loud passage pushes the growth further out along the
 # branch than a quiet one reaches. `visible_depth` takes the mid band, which adds
-# and removes the fine tips: the figure gets more DETAILED when the music does,
-# not brighter. Brightness and glow are constants.
+# and removes a whole generation: the bare six-armed armature at rest, the frost
+# filling in between the arms on a strong mid. The figure gets more DETAILED when
+# the music does, not brighter. Brightness and glow are constants.
 #
-# WHAT TO LOOK AT WHEN JUDGING: the tips. `visible_depth` below 1 should be
-# visibly missing the finest branches, and they should come back on. Second:
+# `visible_depth` IS A GENERATION NUMBER, NOT A FRACTION. The engine draws
+# `floor(visible_depth)`, counted from 1 and capped at `max_depth` - a value below
+# 2 is generation 1, and nothing between whole numbers is drawn. The binding
+# targets 1.5 and 2.5 rather than 1 and 2 because it is smoothed: a one-pole ease
+# approaches its target and in f32 never reaches it, so a step smoothed toward 2.0
+# settles at 1.9999 and floors to 1 forever. The half offset puts every crossing
+# mid-glide.
+#
+# WHAT TO LOOK AT WHEN JUDGING: the frost. At rest the crystal is its armature;
+# a mid above ~0.56 should fill it in, and it should empty again. Second:
 # whether the six-fold mirror reads as frost or as a kaleidoscope cliche - if it
 # is the latter, drop mirror_order to 2 and judge again. Third: the pair of long
 # verticals through the centre are the grammar's trunk repeated by the mirror;
@@ -24,12 +33,15 @@ system = "lsystem"
 name = "Ice Crystal"
 
 [generator]
-# A dense bush grammar: each F becomes eight, so depth 4 is ~4k segments - well
-# under the 20 000 ceiling, and depth 5 would be 32k and truncate silently.
+# A dense bush grammar: each F becomes eight. THE MIRROR IS INSIDE THE SEGMENT
+# BUDGET - `mirror_order` 6 with `mirror_reflect` draws twelve copies - so
+# generation 2 is 64 * 12 = 768 segments and generation 3 would be 6144. It fits
+# the floor tier's 20 000, but rendered loud it washes the crystal into a flat
+# white disc, so the look stops at 2 and `max_depth` says so.
 axiom = "F"
 rules = { F = "FF-[-F+F+F]+[+F-F-F]" }
 angle_deg = 22
-max_depth = 4
+max_depth = 2
 seed = 8
 
 [palette]
@@ -43,14 +55,15 @@ hue = 0.6
 [params]
 # The arrival. A ~26 s round trip on its own, plus up to 0.28 more from bass.
 draw_progress = "clamp(0.82 + 0.16 * sin(time * 0.24) + clamp(bass * 0.24, 0, 0.20), 0, 1)"
-# The fine tips, added and removed by the mids. Both ends of this range are alive:
-# 0.72 is a bare armature, 1.0 the whole grammar.
-visible_depth = "0.72 + clamp(mid * 0.33, 0, 0.28)"
+# The frost, added and removed by the mids: generation 1 at rest, generation 2
+# once mid passes 1 / 1.8 = 0.56, above the ~0.41 a typical passage reads.
+visible_depth = "1.5 + floor(clamp(mid * 1.8, 0, 1.1))"
 
 # A slow continuous turn. Without it the figure is genuinely FROZEN in silence -
 # every other binding here is gated on a band, and `--report`'s anim column reads
 # a still frame as still.
-rotation = "mod(time * 0.018, 1)"
+# `rotation` is radians, so the wrap is a full turn: wrapping at 1 would snap.
+rotation = "mod(time * 0.018, tau)"
 scale = "0.95"
 zoom = "1.0"
 pan_y = "-0.05"
