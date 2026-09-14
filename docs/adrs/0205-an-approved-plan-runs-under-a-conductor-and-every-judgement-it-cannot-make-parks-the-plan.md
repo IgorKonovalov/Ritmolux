@@ -89,6 +89,17 @@ and tags; nothing reaches `origin` until the owner has read the close notes and 
 denies `git push`, `reset --hard`, `rebase` and `commit --amend` is added for every session, not only
 conductor-run ones, turning a `CLAUDE.md` rule into a mechanism like the two deny hooks beside it.
 
+**What happened while nobody watched is readable afterwards, in two records with different
+lifetimes.** The **review** is committed: a conductor-run close adds a `## Close review` section to
+the plan — the final review in full, plus one line per finding an earlier round raised and a fix
+resolved — so the evidence of what the reviewer checked travels with the plan into `done/`. The
+**digest**, `tools/conductor/digest.md` in the main checkout and gitignored, is regenerated from the
+conductor's state and `git` after every step: what needs the owner first (parks with their resume
+command, merges carrying minors), then each close with its verdict, fix rounds, tag, time and spend
+and every finding as one line, then failures, then totals. It is the one record of parks, spend and
+lock waits, none of which reach a commit, and it is kept out of git because nothing else reads it.
+Its finding lines copy the verdict the reviewer emitted; the digest never paraphrases a review.
+
 **Spend is capped per step.** Every session the conductor starts carries `--max-budget-usd` from a
 machine-local configuration the conductor refuses to run without; hitting the cap parks the plan with
 the spend recorded. The figure is the owner's and is never committed.

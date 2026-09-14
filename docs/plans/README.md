@@ -58,7 +58,7 @@ place. The plan file carries the real link.
 | [0184](0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) | Limited ink: a contour that is an ink, and a warp field that bands | approved | dev, human | ADR-0197 (proposed): hard ink contours on six scenes; `warp_mesh` bands by level. **Phase 2 stops if level outgrows `color_span`.** Phase 4: look gate. |
 | [0185](0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage.md) | A fullscreen field lets the sky through with no post stage | approved | dev | ADR-0201: four fields present premultiplied, not two. **No golden may move** (exact at occlude 1). Core-only, orderable against any lane. |
 | [0186](0186-the-flatness-gate-tells-a-figure-from-its-ground.md) | The flatness gate tells a figure from its ground | approved | dev, human | Backlog 0128: five figure/ground candidates vs two blot anchors at 96 and 192 px. **Phase 2 is a human gate that writes ADR-0200**; a negative result is a valid end. |
-| [0187](0187-the-conductor-runs-the-lanes.md) | The conductor runs the lanes | draft | dev, human | ADR-0205 (proposed): approved plans run in worktree lanes via `claude -p`, fresh review, ff to `main`, never a push. **Phase 1 stops if skills or hooks do not load headless.** Phase 6 is a pilot. |
+| [0187](0187-the-conductor-runs-the-lanes.md) | The conductor runs the lanes | draft | dev, human | ADR-0205 (proposed): approved plans run in worktree lanes via `claude -p`, fresh review, ff to `main`, never a push. **Phase 1 stops if skills or hooks do not load headless.** 4b: a gitignored morning digest. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two

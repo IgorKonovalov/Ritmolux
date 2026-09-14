@@ -111,10 +111,17 @@ flowchart TB
     outcome naming it; run `nextest` only through `with-lock.mjs suite --`; the last dev run of a plan
     writes the close block but prints the outcome instead of the three-line pointer.
   - **`architect`:** run Mode 4 against the plan and lane named, write the review to the path named,
-    and end with a `verdict` outcome; **only** when it carries no blockers and no majors, continue into
-    the worktree close sequence steps 1-3 on the branch (merge `main`, gate, bookkeeping, version bump,
-    studio sync, **annotated** tag) and end with `closed`; never fast-forward `main`, never remove the
-    lane — the conductor does.
+    and end with a `verdict` outcome that lists **every finding** (severity, `file:line`, one-line
+    what); **only** when it carries no blockers and no majors, continue into the worktree close
+    sequence steps 1-3 on the branch (merge `main`, gate, bookkeeping, version bump, studio sync,
+    **annotated** tag) and end with `closed`; never fast-forward `main`, never remove the lane — the
+    conductor does.
+  - **The review is committed with the close.** In conductor mode the architect's close commit adds a
+    `## Close review` section to the plan, after `## Implementation log`: the final round's review in
+    full, and one line for every finding an earlier round raised and a fix round resolved, naming the
+    fix commit. A conductor-run close has no reader in the room, so the review is the evidence of
+    what was checked, and it travels with the plan into `done/` beside the log it graded.
+    Human-started closes keep delivering the review in conversation.
   - **The outcome block**, the last thing each session prints, one fenced `rlx-outcome` JSON object
     (see Data shapes). It is a claim the conductor verifies, not a report it trusts.
 - **Hooks:** `block-push-and-history-rewrite.js` is registered for every session and denies
@@ -174,7 +181,8 @@ flowchart TB
   `git branch -d` — a removal failure is an inbox entry, not a park.
 - **Done when**, each a test against the scratch repository:
   - a two-run plan (`dev` then `studio-builder`) with a clean review ends merged on `main`, tagged
-    annotated, with the worktree and branch gone;
+    annotated, with the worktree and branch gone, and the merged plan carries a `## Close review`
+    section — a `closed` outcome whose plan lacks one parks as a disagreement;
   - a plan with a `human` phase parks there with its worktree kept, and the lane opens the next plan
     in the queue whose `after` list is satisfied, while a plan that depends on the parked one is held;
   - a review with one major triggers exactly one fix step and a re-review; a review still carrying a
@@ -187,6 +195,37 @@ flowchart TB
     first's fast-forward;
   - a budget-exhausted step parks with its spend recorded in state.
 
+### Phase 4b — The close digest: what happened, readable the morning after
+- **Owner skill:** dev
+- **What:** `tools/conductor/digest.md`, one gitignored file in the main checkout that the conductor
+  regenerates from its state and `git` after every step and once more when a run ends — so an
+  interrupted run still leaves a current digest. Newest run first; older runs stay below it. It
+  lives outside `state/` and no command deletes it, and it is never written inside a worktree,
+  because worktrees are removed.
+- **Files touched:** `tools/conductor/lib/digest.mjs`, `tools/conductor/test/digest.test.mjs`,
+  `.gitignore`.
+- **Each run's section, in this order:**
+  1. **Needs you** — every park, with its reason, the file to read, the worktree it holds and the
+     `resume` command; then every plan that merged with minors, one line each. Empty says so in one
+     line, because an empty section is the good news.
+  2. **Closed** — per merged plan: title, version and annotated tag (or `none`), the merge commit,
+     fix rounds taken, wall time, spend; then every finding as one line — severity, `file:line`, what
+     — marked `resolved in <sha>` where a fix round closed it; then the path of the `## Close review`
+     section it came from.
+  3. **Failed and parked** — gate reds with the failing test names, disagreements with the claim
+     and what `git` showed, spend-cap hits, API errors.
+  4. **Totals** — per lane and for the run: plans merged, parked, wall time, spend, time spent
+     waiting on each lock.
+- **Done when:**
+  - the Phase 4 scenario tests each assert the digest they leave: the clean two-run plan appears
+    under **Closed** with its tag and zero fix rounds; the human-phase park appears under **Needs you**
+    with a `resume` command that the CLI accepts; the one-major plan lists the major as resolved with
+    the fix commit's sha; the spend-cap park appears under **Failed and parked** with its spend;
+  - the digest is generated only from state and `git` — deleting it and running `status`
+    regenerates an identical file;
+  - a finding line carries only what the verdict outcome carried; the digest never summarizes review
+    prose, so what it says is what the reviewer said.
+
 ### Phase 5 — The operator surface and the documents
 - **Owner skill:** dev
 - **What:** The commands an owner uses, the inbox, and the prose that tells a reader the seams changed.
@@ -197,7 +236,7 @@ flowchart TB
 - **Done when:**
   - `run [--lane a|b] [--once]`, `status`, `resume NNNN`, `park NNNN`, `abort` exist; `status` prints
     per lane the plan, the step, the time in it, the spend so far and every parked plan with its
-    reason; `resume NNNN` refuses a plan whose park reason is still true (a `human` phase the log does
+    reason, and ends with the digest's path; `resume NNNN` refuses a plan whose park reason is still true (a `human` phase the log does
     not mark done);
   - `state/inbox.md` gains one entry per park, naming the plan, the reason, the file to read and the
     command that resumes it;
@@ -212,8 +251,9 @@ flowchart TB
   plan through, then leaves the second unattended. If either has already closed by hand, the pilot
   takes the next two queued plans that are `dev`-only with no `human` phase (0181, 0182).
 - **Done when:** both plans are closed on `main` with annotated tags, their worktrees and branches
-  gone, with no owner action between `run` and the second merge; the owner has read both review files
-  and both close notes and pushed or not pushed by their own call; and the owner reports to a fresh
+  gone, with no owner action between `run` and the second merge; the owner has read
+  `tools/conductor/digest.md` and both plans' `## Close review` sections, says whether the digest
+  alone told them what happened, and pushed or did not push by their own call; and the owner reports to a fresh
   `architect` session the two runs' wall time, spend and every park or surprise. That session enables
   the second lane in `queue.json` — or does not, on what the pilot showed — and records the pilot in
   ADR-0205's `Outcome` at this plan's close.
@@ -249,7 +289,31 @@ Illustrative — Phase 3 fixes the final form.
 
 Outcome kinds: implementers `phases_done` or `parked` (`reason`: `human_phase` | `stop_condition` |
 `plan_wrong` | `question` | `check_red`, plus `detail`); architect `verdict`
-(`blockers`, `majors`, `minors`, `review_path`), `closed` (`version`, `tag` or `null`), or `parked`.
+(`blockers`, `majors`, `minors`, `review_path`, and `findings`: a list of
+`{severity, file, line, what}`), `closed` (`version`, `tag` or `null`), or `parked`.
+
+```markdown
+<!-- tools/conductor/digest.md (gitignored) - one run's section, illustrative -->
+## Run 2026-09-15 01:12 -> 07:40 (lanes a, b)
+
+### Needs you
+- **0183 parked** at Phase 3 (`human` look gate). Read: the plan's Phase 3. Holds `WORK/rlx-plan-0183`.
+  Resume: `node tools/conductor/conductor.mjs resume 0183`
+- **0185 merged with 1 minor** - see Closed.
+
+### Closed
+- **0175 - An eased value arrives at its target** - v0.124.0, tag annotated, merge `a1b2c3d`,
+  0 fix rounds, 1 h 52 min, spend recorded. Review: `docs/plans/done/0175-...md` `## Close review`.
+  - major `core/src/preset/schema/easing.rs:88` snap test missing the alpha-near-1 case - resolved in `e4f5a6b`
+- **0185 - A fullscreen field lets the sky through...** - v0.124.1, ...
+  - minor `docs/presets.md:612` occlude row still says "with a stage"
+
+### Failed and parked
+- none
+
+### Totals
+- lane a: 1 merged, 1 parked; lane b: 1 merged. Suite-lock wait 38 min; close-lock wait 6 min.
+```
 
 ## Risks & open questions
 
@@ -303,6 +367,7 @@ Outcome kinds: implementers `phases_done` or `parked` (`reason`: `human_phase` |
 | 2 — Conductor mode in the skills, and the hooks that make it safe | dev | not started | |
 | 3 — The conductor's core: queue, state, plan reading, locks, one step | dev | not started | |
 | 4 — The lane loop, end to end against a scratch repository | dev | not started | |
+| 4b — The close digest: what happened, readable the morning after | dev | not started | |
 | 5 — The operator surface and the documents | dev | not started | |
 | 6 — The pilot: one lane, two plans, watched | human | not started | |
 
