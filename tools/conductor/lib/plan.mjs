@@ -30,7 +30,9 @@ function section(text, heading) {
   return { lines: lines.slice(start + 1, end), offset: start + 1 };
 }
 
-export function parsePlan(text) {
+export function parsePlan(raw) {
+  // A checkout with core.autocrlf=true hands back CRLF; every pattern below is written for LF.
+  const text = raw.replace(/\r\n/g, "\n");
   const title = text.match(/^# (\d{4}) [—–-] (.+)$/m);
   const status = text.match(/^> \*\*Status:\*\*\s*(.+)$/m);
   const plan = {
