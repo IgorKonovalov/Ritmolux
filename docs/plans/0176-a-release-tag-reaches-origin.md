@@ -253,7 +253,7 @@ flowchart LR
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The gate reads the property that failed | dev | done | 9c0d318 |
-| 2 — The ceremony writes annotated tags, and the documents say why | dev | done | committed with this row |
+| 2 — The ceremony writes annotated tags, and the documents say why | dev | done | 90b629e |
 | 3 — The stranded tags reach origin, and one release is published | human | not started | |
 
 ### Notes
@@ -269,15 +269,22 @@ flowchart LR
   `git tag -a -f vX.Y.Z -m "chore: Release vX.Y.Z"`.
 - Phase 2 also adds a `--stranded`-once-per-close line to that skill step, beside the one the phase
   names (run the offline check after tagging).
+- Followup, not acted on: `docs/releasing.md`'s Windows studio rehearsal block carries a form-feed
+  and a backspace byte where `\f` and `\b` belong (`.\packaging\spout<FF>etch-sdk.ps1`,
+  `.\packaging\studio<BS>uild-studio.ps1`). It predates this plan.
+- From 9c0d318 on, the pre-push hook refuses every push from this checkout until Phase 3 re-creates
+  `v0.123.0` as annotated (the ordering the plan's Risks names).
 
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`**
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** no
+- **Plan header `Closes:`** design-backlog 0196
+- **What shipped:** a new gate script plus its hook and CI wiring (`scripts/`, `.githooks/`,
+  `.github/workflows/`) and docs; no Rust, C++ or studio change
+- **Operator docs touched:** `docs/releasing.md`, `docs/developing.md`, `README.md`, `CLAUDE.md`,
+  `.claude/skills/architect/SKILL.md`
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0
+- **Full suite:** `cargo nextest run --workspace` at 90b629e - exit 0, 1933 passed, 6 skipped
+- **Outstanding `human` phases:** Phase 3 (stranded tags to `origin`, `v0.123.0` published)
 
 ## Followups (after this lands)
