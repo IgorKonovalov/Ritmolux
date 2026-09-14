@@ -4049,7 +4049,7 @@ Re-take the header table from that run and name its date. Check `MAX_SAMPLES`'s 
 slope. The ceiling's argument is about the worst case an author can load, and that is the polyline.
 
 - **Raised:** 2026-09-14, while diagnosing the flaky pre-push failure that became
-  [ADR-0193](adrs/0193-a-cost-probe-runs-alone.md). **Owner if taken:** `dev`; there is no design
+  [ADR-0193](adrs/0193-a-test-that-reads-the-clock-runs-alone.md). **Owner if taken:** `dev`; there is no design
   question.
 - **Verified 2026-09-14** — the arity probe draws the curved leaf:
   `present: d = \\"\{LEAF\}\\"\\nsamples = \{samples\} in: core/tests/path_cost.rs`
