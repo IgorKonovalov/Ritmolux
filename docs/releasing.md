@@ -8,8 +8,10 @@ the operational summary.
 
 ## One version, one command, once per plan
 
-- **Single source of truth:** root `Cargo.toml` `[workspace.package].version`. Both crates
-  inherit it (`version.workspace = true`); nothing else holds an app-version string.
+- **Single source of truth:** root `Cargo.toml` `[workspace.package].version`. Every workspace
+  member inherits it (`version.workspace = true`). **The studio holds two copies that
+  `cargo-release` does not move** — `studio/package.json` `"version"` and
+  `EXPECTED_PLAYER_VERSION` in `studio/shared/protocol.ts` — see "The studio's two copies" below.
 - **Bump authority:** [`cargo-release`](https://github.com/crate-ci/cargo-release), a dev
   tool installed with `cargo install cargo-release` (not a workspace dependency). Config is
   in `release.toml`.
@@ -31,6 +33,26 @@ cargo release <patch|minor> --no-push --no-publish --no-confirm --execute
 `--execute` is what makes it real; without it cargo-release only reports what it
 would do. `push = false` / `publish = false` are already pinned in `release.toml`
 — the explicit flags on the command line are belt-and-braces.
+
+### The studio's two copies follow, then the tag moves
+
+`cargo release` edits `Cargo.toml` and `Cargo.lock` only. Straight after it, bring the studio's
+two copies to the same version in their own commit, then move the tag onto that commit so a
+build of the tag carries all three:
+
+```sh
+# edit "version" in studio/package.json and EXPECTED_PLAYER_VERSION in studio/shared/protocol.ts
+(cd studio && npx vitest run shared/version.test.ts)   # holds all three equal
+git commit -m "fix(studio): the two version copies follow the workspace to X.Y.Z" -- studio/package.json studio/shared/protocol.ts
+git tag -d vX.Y.Z && git tag vX.Y.Z
+```
+
+**`EXPECTED_PLAYER_VERSION` is the copy that ships wrong.** The packaging scripts override
+`package.json`'s version at build time, but the constant is compiled into the renderer bundle, so a
+stale one ships a studio that refuses the player packaged beside it — a refusal indistinguishable
+from a genuinely mismatched bundle. `studio/shared/version.test.ts` fails the studio's suite (and
+the pre-push studio step) until both copies follow. Five separate `fix(studio)` sync commits
+exist because this step lived nowhere a close would read it.
 
 While in the `0.x` band: a feature-plan is a **minor** bump (`0.1.0 -> 0.2.0`), a fix-only
 plan is a **patch** bump (`0.1.0 -> 0.1.1`), and a docs/chore-only plan legitimately gets
@@ -185,7 +207,7 @@ was conditioned on an event that never happened, and the growth arrived anyway.
 
 - The standalone window title (`env!("CARGO_PKG_VERSION")`, resolves to the workspace
   version).
-- The `vX.Y.Z` git tag and all three release-zip names (NFR section 8).
+- The `vX.Y.Z` git tag and every release-zip name (NFR section 8).
 - The macOS bundle's `CFBundleShortVersionString` / `CFBundleVersion`, substituted into
   `packaging/macos/Info.plist.in` at package time. `bundle.sh` asserts the plist and
   `[workspace.package]` agree, so a drift fails the build rather than shipping.
@@ -194,4 +216,8 @@ was conditioned on an event that never happened, and the growth arrived anyway.
   linked DLL and asserts it matches `[workspace.package]`, so — as with the macOS plist — a
   drift fails the build rather than shipping.
 
-All four read the one string in root `Cargo.toml` — none is edited by hand.
+- The studio's `hello` check: `EXPECTED_PLAYER_VERSION` in `studio/shared/protocol.ts`, and
+  `studio/package.json`'s `version`. **These two are edited by hand** at every bump (above) and
+  held to `[workspace.package]` by `studio/shared/version.test.ts`.
+
+Every other surface reads the one string in root `Cargo.toml` and is never edited by hand.

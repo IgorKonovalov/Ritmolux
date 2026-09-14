@@ -168,10 +168,10 @@ scripts/             # Repo maintenance. Nine Node gates. SEVEN run by pre-push 
                      #   entry's probe (ADR-0108); check-filter-figures.mjs keeps the diffusion
                      #   filter's cost figures on one page; check-comment-hygiene.mjs rejects
                      #   relative links and plan-relative narration in .rs and .cpp/.h comments
-                     #   (ADR-0127); toc.mjs regenerates the contents block in each of the six long
-                     #   documents from the headings under it, and --check reports drift (ADR-0163)
+                     #   (ADR-0127); toc.mjs regenerates the contents block in every long document
+                     #   that carries one, from the headings under it, and --check reports drift (ADR-0163)
                      #   — a block is generated, never hand-edited; check-reader-prose.mjs holds the
-                     #   FIVE reader documents to the opposite of ADR-0127's rule — every Plan/ADR
+                     #   reader documents it lists to the opposite of ADR-0127's rule — every Plan/ADR
                      #   citation inside a markdown link, never bare in a sentence (ADR-0168), the
                      #   two rules meeting at a filename list inside that script.
                      #   scripts/fixtures/ holds their seeded bite checks.
@@ -259,8 +259,9 @@ was added per [ADR-0017](docs/adrs/0017-preset-author-skill-lane.md)):
 content — never invert.** The architect never writes production code; `dev` authors no ADRs and writes only two
 things inside a plan — the `Status:` line and the `## Implementation log` — and never reviews its
 own work; `preset-author` never touches engine Rust (a look needing a new scene, param,
-or grammar capability routes back to `architect` + `dev` as feedback, and `dev` — not the author —
-embeds a preset into the shipped set). The handoffs are `architect → dev` (the user's "go"),
+or grammar capability routes back to `architect` + `dev` as feedback; the author lands a preset in
+the shipped set directly, gated on the behavioral suite, and `architect` curates the set at plan
+close — [ADR-0081](docs/adrs/0081-the-content-lane-lands-presets-and-architect-curates-the-set.md)). The handoffs are `architect → dev` (the user's "go"),
 `dev → architect` (the plan's own `## Implementation log`, which `dev` writes as the phases land,
 plus a three-line pointer at it — [ADR-0120](docs/adrs/0120-the-close-brief-is-a-section-of-the-plan.md);
 the review itself still happens in a fresh session), and `preset-author → architect`/`dev`
