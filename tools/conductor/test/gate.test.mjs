@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { defaultGate, runGate } from "../lib/gate.mjs";
+import { defaultGate, gateForStage, runGate } from "../lib/gate.mjs";
 import { tmp } from "./helpers.mjs";
 
 test("the default gate carries the pre-push suites it once missed", () => {
@@ -14,6 +14,22 @@ test("the default gate carries the pre-push suites it once missed", () => {
   // The suites run before the cargo steps, so a red there costs no Rust build.
   const names = defaultGate().map((c) => c.name);
   assert.ok(names.indexOf("sd-filter tests") < names.indexOf("cargo fmt"));
+});
+
+test("the backlog probes run only on a tree a close produced; every other default step runs at every stage", () => {
+  const PROBE = "check-backlog-claims.mjs";
+  const names = (stage) => gateForStage(stage).map((c) => c.name);
+  const all = defaultGate().map((c) => c.name);
+  assert.ok(all.includes(PROBE));
+  const others = all.filter((n) => n !== PROBE);
+  for (const stage of ["post-close", "remerge"]) {
+    assert.ok(names(stage).includes(PROBE), `${stage} runs the probes`);
+    assert.deepEqual(names(stage).filter((n) => n !== PROBE), others, `${stage} keeps every other step`);
+  }
+  for (const stage of ["pre-review", "fix-1", "fix-2", "fix-3"]) {
+    assert.ok(!names(stage).includes(PROBE), `${stage} runs no probe`);
+    assert.deepEqual(names(stage), others, `${stage} keeps every other step`);
+  }
 });
 
 test("a step whose onlyIfCommand does not run is skipped, and one whose command runs is not", async () => {

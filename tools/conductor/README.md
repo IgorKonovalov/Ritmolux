@@ -108,6 +108,23 @@ an inbox entry, not a park: close the shell, then `git worktree remove`, `git wo
   exist and be new, the plan's log rows must match, the tree must be clean, and a close must leave
   the plan under `done/` with a `## Close review` and an annotated tag on the branch tip.
 
+## The gate
+
+The conductor runs its own gate in the worktree and ignores any session's claim that the checks
+passed. The commands are `defaultGate()` in `lib/gate.mjs`: the pre-push hook's list at full
+strength, plus `cargo doc` and these tests. They run in order and stop at the first red.
+
+| Stage | When | Runs |
+|---|---|---|
+| `pre-review` | after the last implementer run, before the review | every command except `check-backlog-claims.mjs` |
+| `fix-N` | after fix round N, before the re-review | every command except `check-backlog-claims.mjs` |
+| `post-close` | on the close tip, before `main` moves | every command |
+| `remerge` | after the automatic re-merge of a moved `main` | every command |
+
+**The backlog probes wait for the close.** A plan can deliver exactly what a live entry's probe says
+is missing, and turn that probe red. Archiving the entry is the close's job (ADR-0108), so a red
+probe before the review is not a defect yet. `post-close` still parks a close that left one red.
+
 ## When the CLI updates
 
 The conductor refuses a `claude --version` not listed in `VERIFIED_CLI` in `conductor.mjs`. To

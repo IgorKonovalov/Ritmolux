@@ -204,12 +204,15 @@ until it merges. Run it as a human-started `dev` lane.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `run` works on a clean checkout | dev | committed with this row | |
-| 2 — A backlog probe is judged by the close, not parked before it | dev | not started | |
+| 1 — `run` works on a clean checkout | dev | done | `a676f13` |
+| 2 — A backlog probe is judged by the close, not parked before it | dev | committed with this row | |
 | 3 — A park leaves a lane that can be resumed | dev | not started | |
 | 4 — A lane that stops says why | dev | not started | |
 | 5 — The pilot, resumed | human | not started | |
 
 ### Notes
+
+- Phase 2: the two probe scenarios stand the backlog probe in with a marker file (`PROBE_RED`) that a
+  gate step named `check-backlog-claims.mjs` reads; the fixture plan's `Closes:` still reads `none`.
 
 ### Close triggers

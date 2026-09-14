@@ -16,7 +16,7 @@ import { join, relative } from "node:path";
 
 import { verifyClose, verifyFix, verifyImplement } from "./close.mjs";
 import { removeLane, laneNames, openLane } from "./cleanup.mjs";
-import { runGate } from "./gate.mjs";
+import { defaultGate, gateForStage, runGate } from "./gate.mjs";
 import { head, resolveCommit } from "./git.mjs";
 import { appendCleanupFailure, appendPark } from "./inbox.mjs";
 import { CLOSE, take } from "./locks.mjs";
@@ -169,7 +169,7 @@ async function session(ctx, rec, kind, { owner, prompt, vars, budget, addDirs = 
 async function gate(ctx, rec, label) {
   const g = await runGate({
     cwd: rec.worktree,
-    commands: ctx.gate,
+    commands: gateForStage(label, ctx.gate ?? defaultGate()),
     logDir: join(ctx.stateDir, "gates"),
     label: `${rec.plan}-${label}`,
     lockDir: ctx.lockDir,

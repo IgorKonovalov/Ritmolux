@@ -4,12 +4,16 @@
 //
 //   { "plans": { "0101": { "reviews": ["major", "clean"], "bogusCommit": true, "lightweightTag": true,
 //                          "noCloseReview": true, "budget": "implement", "minors": 1, "numericThrough": true,
-//                          "delayMs": { "review": 400 } } } }
+//                          "delayMs": { "review": 400 }, "breaksProbe": true, "probeStaysRed": true } } }
+//
+// `breaksProbe` commits PROBE_RED with the first implemented phase, standing in for a backlog probe
+// the plan's own delivery turns red; the close session removes it, as a close archives the entry,
+// unless `probeStaysRed`.
 //
 // Every session appends `<mode>-start` and `<mode>-end` to FAKE_EVENTS with a timestamp.
 
 import { execFileSync } from "node:child_process";
-import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const block = (o) => "Session finished.\n\n```rlx-outcome\n" + JSON.stringify(o) + "\n```\n";
@@ -46,6 +50,11 @@ export default async ({ cwd, vars, env }) => {
         writeFileSync(planPath, text);
         writeFileSync(join(cwd, `phase-${plan}-${id}.txt`), `phase ${id} of ${plan}\n`);
         git("add", `phase-${plan}-${id}.txt`, `docs/plans/${planName}`);
+        if (ps.breaksProbe && commits.length === 0 && !existsSync(join(cwd, "PROBE_RED"))) {
+          writeFileSync(join(cwd, "PROBE_RED"), `plan ${plan} delivered what the probe asserts is missing
+`);
+          git("add", "PROBE_RED");
+        }
         git("commit", "-q", "-m", `feat: plan ${plan} phase ${id}`);
         commits.push(git("rev-parse", "--short", "HEAD"));
       }
@@ -96,6 +105,7 @@ export default async ({ cwd, vars, env }) => {
       const version = `${maj}.${min}.${pat + 1}`;
       writeFileSync(join(cwd, "VERSION"), `${version}\n`);
       git("add", "VERSION", `docs/plans/done/${planName}`);
+      if (existsSync(join(cwd, "PROBE_RED")) && !ps.probeStaysRed) git("rm", "-q", "PROBE_RED");
       git("commit", "-q", "-m", `chore: Release ${version}`);
       if (ps.lightweightTag) git("tag", `v${version}`);
       else git("tag", "-a", `v${version}`, "-m", `chore: Release v${version}`);

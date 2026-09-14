@@ -61,7 +61,10 @@ export function scratch({ plans, lanes, after = {}, spec = {}, local = {} }) {
     local: { budget_usd: { implement: 5, fix: 3, review: 4 }, max_open_worktrees: 3, ...local },
     queue,
     state: loadState(stateDir),
-    gate: [{ name: "marker", cmd: [process.execPath, "-e", "process.exit(require('fs').existsSync('GATE_RED')?1:0)"], lock: "suite" }],
+    gate: [
+      { name: "marker", cmd: [process.execPath, "-e", "process.exit(require('fs').existsSync('GATE_RED')?1:0)"], lock: "suite" },
+      { name: "check-backlog-claims.mjs", cmd: [process.execPath, "-e", "process.exit(require('fs').existsSync('PROBE_RED')?1:0)"], afterClose: true },
+    ],
     lockDir: tmp("rlx-locks-"),
     lockPollMs: 20,
     pollMs: 50,
@@ -401,6 +404,38 @@ test("a budget-exhausted step parks with its spend recorded", async () => {
 
   assert.match(digest("### Failed and parked"), /^- \*\*0101\*\* spend cap hit in `0101-01-implement`: spent \$7\.50\.$/m);
   assert.match(digest("### Totals"), /^- lane a: 0 merged, 1 parked, \$7\.50\.$/m);
+});
+
+test("a probe the implement commit breaks and the close repairs is not gated before the review, and merges", async () => {
+  const { ctx, repo } = scratch({
+    plans: [{ number: "0101", phases: [dev("1")] }],
+    lanes: { a: ["0101"] },
+    spec: { "0101": { breaksProbe: true } },
+  });
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  assert.deepEqual(rec.parks, []);
+  assert.deepEqual(rec.gates.map((g) => [g.label, g.ok]), [["pre-review", true], ["post-close", true]]);
+  assert.ok(!rec.gates[0].ran.includes("check-backlog-claims.mjs"), "the pre-review gate ran no probe");
+  assert.ok(rec.gates[1].ran.includes("check-backlog-claims.mjs"), "the post-close gate ran the probe");
+  assert.equal(existsSync(join(repo, "PROBE_RED")), false);
+});
+
+test("a probe the close leaves red parks gate_red at post-close and main does not move", async () => {
+  const { ctx, repo } = scratch({
+    plans: [{ number: "0101", phases: [dev("1")] }],
+    lanes: { a: ["0101"] },
+    spec: { "0101": { breaksProbe: true, probeStaysRed: true } },
+  });
+  const mainBefore = resolveCommit("main", repo);
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "parked");
+  assert.equal(rec.park.reason, "gate_red");
+  assert.match(rec.park.detail, /after the close: check-backlog-claims.mjs/);
+  assert.deepEqual(rec.gates.map((g) => [g.label, g.ok]), [["pre-review", true], ["post-close", false]]);
+  assert.equal(resolveCommit("main", repo), mainBefore, "main did not move");
 });
 
 test("a red conductor gate parks before any review", async () => {
