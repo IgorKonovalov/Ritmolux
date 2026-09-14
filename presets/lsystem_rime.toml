@@ -50,7 +50,9 @@ stops = [
 # a real-music treble mean is ~0.22, so a typical passage sits at 0.40 (depth 4)
 # and a bright one at 0.55 crosses into depth 5. The floor of 4 is where the
 # boundary first reads as a snowflake rather than as a hexagon with dents.
-visible_depth = "4 + floor(clamp(treb * 1.83, 0, 1.1))"
+# The .5 is load-bearing: the ease never reaches a whole number in f32, so a step toward N.0
+# settles at N - 0.0000002 and floors a generation low. Every crossing sits mid-glide instead.
+visible_depth = "4.5 + floor(clamp(treb * 1.83, 0, 1.1))"
 
 # The crystal turns slowly in place and breathes with the low end. Both are
 # small: a still figure on an empty ground shows every bit of motion it has.

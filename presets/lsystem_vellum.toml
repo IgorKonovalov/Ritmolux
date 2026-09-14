@@ -34,7 +34,9 @@ stops = [
 
 [params]
 # One whole iteration of growth, bought only by a genuine peak.
-visible_depth = "3 + floor(clamp(bass * 1.6, 0, 1.35))"
+# The .5 is load-bearing: the ease never reaches a whole number in f32, so a step toward N.0
+# settles at N - 0.0000002 and floors a generation low. Every crossing sits mid-glide instead.
+visible_depth = "3.5 + floor(clamp(bass * 1.6, 0, 1.35))"
 
 # The page turns almost imperceptibly and the pen never quite rests: the last
 # stretch of the curve draws and undraws continuously, so the growing edge is
