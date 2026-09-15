@@ -160,15 +160,15 @@ cargo run -p standalone --example shot -- --presets presets --report family=swar
 cargo run -p standalone --example shot -- --presets presets --report --json > report.json
 ```
 
-A real row, so the widths are the real widths — `star_rosewindow` alone in a
-scratch library, DX12 software adapter, 2026-09-01. A `geom` column appears only
-for the line families. Under the rows, a `NEAR-DUP: <a> ~ <b>` line per flagged
-pair:
+A real header and one real row, so the widths are the real widths: the `Rose Window` row of
+`--presets presets --report family=star_pattern`, 2026-09-15, printed beside the family's other three
+presets. The line families add a separate `geom` table under the rows, one line per preset. Under
+the rows, a `NEAR-DUP: <a> ~ <b>` line per flagged pair:
 
 ```
-=== star_pattern (1 preset) ===
-  preset           bass    mid   treb  onset  drive   anim    rate  cover  level  rise  fall   geom
-  Rose Window     0.082  0.006  0.009  0.007  0.086  0.038 0.0037+  0.514 0.0532   14+    7+ 1.0000
+=== star_pattern (4 presets) ===
+  preset           bass    mid   treb  onset  count  drive   anim    rate  cover  level  rise  fall
+  Rose Window     0.085  0.006  0.009  0.007  0.011  0.090  0.039 0.0039+  0.216 0.1276   15+    7+
 ```
 
 **The column roster lives in one place and it is not here.**

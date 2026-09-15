@@ -414,8 +414,8 @@ illustrative: the run terminal
 | 3 — Listing tests takes no lock | dev | done | `570400f` |
 | 4 — A green suite is not run again on the same tree | dev | done | `cfb1f1d` |
 | 5 — The conductor-mode close orders its work so the gate runs once, and repairs prose findings | dev | done | `be1ca2b` |
-| 6 — A patch CLI update warns, and every session proves its hooks ran | dev | committed with this row | |
-| 7 — The pilot's leftovers, under the new rule | dev | not started | |
+| 6 — A patch CLI update warns, and every session proves its hooks ran | dev | done | `9ef5cdb` |
+| 7 — The pilot's leftovers, under the new rule | dev | committed with this row | |
 | 8 — A run, watched | human | not started | |
 
 ### Notes
@@ -452,6 +452,12 @@ illustrative: the run terminal
   `readResult` in `lib/outcome.mjs` reads `init` and `shellCalls` from the transcript. A patch below
   a listed version (`2.1.271` against `2.1.272` alone) is refused. The CLI warning shows in **Needs
   you** of the run that recorded it, not only the newest run's.
+- Phase 7's done-when command `shot --presets presets --report family=star` is refused
+  (`unknown family star`). The sample was taken from `family=star_pattern`. The header now carries a
+  `count` column, and `geom` prints as its own table, so the sample drops the `geom` column and its
+  prose says so. The conductor README still shows `cargo nextest` in its run-terminal example
+  lines and names cargo commands where it describes the session reader and the hook. None of those
+  lists what the gate runs. Phase 7 also adds the `fixed_in` check to README `## How it stays safe`.
 - Followup noticed, not acted on: `CLAUDE.md`'s `tools/conductor/` entry still says the conductor
   "refuses a CLI version spike/README.md did not verify". Under ADR-0208 a patch above a verified
   version runs with a warning.

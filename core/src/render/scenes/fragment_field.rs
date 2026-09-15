@@ -215,11 +215,12 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     col = col * (glow * (1.0 - 0.25 * r));
     col = col + vec3<f32>(flash * 0.12);
 
-    // Alpha 1.0: this field covers every pixel, which is the coverage it honestly
-    // has (ADR-0056). `occlude` scales how much of that the backdrop underneath
-    // resolves against (ADR-0085) — at 0 the sky adds through an opaque field.
-    // Reached only when no post stage is active; the chain owns the seam otherwise
-    // and the renderer hands a literal 1.0 here.
+    // Alpha is `occlude` (`params.d.y`). The field covers every pixel, which is the
+    // coverage it honestly has (ADR-0056), and `occlude` scales how much of that
+    // the backdrop underneath resolves against (ADR-0085) — at 1 it replaces the
+    // backdrop, at 0 the sky adds through an opaque field. Reached only when no
+    // post stage is active; the chain owns the seam otherwise and the renderer
+    // hands a literal 1.0 here.
     return vec4<f32>(col, params.d.y);
 }
 "#;

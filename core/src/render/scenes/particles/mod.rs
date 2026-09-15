@@ -1703,11 +1703,11 @@ impl Scene for AttractorScene {
             self.d = d;
         }
 
-        // Integrate the spin. **Here and not in `advance`**: the renderer calls
-        // `advance` before it routes this frame's bindings, so `self.spin` is
-        // last frame's value there and this frame's here. `self.dt` is the real
-        // elapsed seconds `advance` recorded, so the phase stays a pure function
-        // of the injected `dt` sequence.
+        // Integrate the spin. The renderer routes this frame's bindings before it
+        // calls `advance` and then this `update` (ADR-0198), so `self.spin` is this
+        // frame's value here. `self.dt` is the real elapsed seconds `advance`
+        // recorded, so the phase stays a pure function of the injected `dt`
+        // sequence.
         self.spin_time.step(self.spin, self.dt);
 
         // Rising-edge detect on `reseed` (a beat/onset expression): **disturb** the

@@ -167,32 +167,27 @@ an inbox entry, not a park: close the shell, then `git worktree remove`, `git wo
   fast-forwarded, so a version bump and its tag always land on the `main` they were computed against.
 - **The checks.** The conductor believes the repository, not the session. A claimed commit must
   exist and be new, the plan's log rows must match, the tree must be clean, and a close must leave
-  the plan under `done/` with a `## Close review` and an annotated tag on the branch tip.
+  the plan under `done/` with a `## Close review` and an annotated tag on the branch tip. A finding
+  the close marks repaired (`fixed_in`, ADR-0209) must name a commit on the branch that changes that
+  finding's file.
 
 ## The gate
 
 The conductor runs its own gate in the worktree and ignores any session's claim that the checks
-passed. The commands are `defaultGate()` in `lib/gate.mjs`: the pre-push hook's list at full
-strength, plus `cargo doc` and these tests. They run in order and stop at the first red.
-
-| Stage | When | Runs |
-|---|---|---|
-| `pre-review` | after the last implementer run, before the review | every command except `check-backlog-claims.mjs` |
-| `fix-N` | after fix round N, before the re-review | every command except `check-backlog-claims.mjs` |
-| `post-close` | on the close tip, before `main` moves | every command |
-| `remerge` | after the automatic re-merge of a moved `main` | every command |
-
-**A full suite the conductor saw pass is not run again on the same tree** (ADR-0207).
-`state/suite-ledger.jsonl` gets one line per run of exactly `cargo nextest run --workspace` that
-conductor code observed: the tree (`HEAD^{tree}`), the exit code, nextest's `Summary` line, who ran
-it and when. A run is recorded only when the worktree was clean when it started and when it ended.
-Two writers use it. The gate looks the worktree's tree up before its suite step and skips on a green
-record. `with-lock.mjs` does the same for a session's run, because the conductor hands every session
-the ledger in `RLX_SUITE_LEDGER`. A skip prints the record it relied on, in the run terminal and in
-the session's own output, and the digest counts it. The match is the tree and nothing else: any
-change to a tracked file, a doc included, is a new tree. A red run is recorded and never skipped on.
-Any other argument vector, such as `--no-fail-fast` or `-P fast`, neither skips nor records.
-Outside the conductor the variable is unset and the wrapper never reads the ledger.
+passed. **What runs at each stage is `gateForStage` in `lib/gate.mjs`, and nowhere else**: read it
+there rather than from a copy here, which would drift. The commands run in order and stop at the
+first red. The gate runs at four stages: `pre-review` after the last implementer run, `fix-N` after
+each fix round, `post-close` on the tip a close produced before `main` moves, and `remerge` after the
+automatic re-merge of a moved `main`. Only the last two run a step marked `afterClose`. **A full
+workspace suite the conductor saw pass is not run again on the same tree** (ADR-0207).
+`state/suite-ledger.jsonl` holds one line per suite run that conductor code observed, keyed by
+`HEAD^{tree}` and written only when the worktree was clean at both ends, plus one line per skip
+naming the run it relied on. The gate and `with-lock.mjs` both consult it: every session is handed
+the ledger in `RLX_SUITE_LEDGER`. They skip on a green record for the exact tree and print that
+record, and the digest counts every skip. Any change to a tracked file, a doc included, is a new
+tree. A red run is recorded and never skipped on. Any argument vector other than the ledger's own
+(`SUITE_COMMAND` in `lib/ledger.mjs`) neither skips nor records, and outside the conductor the
+wrapper never reads the ledger.
 
 **The backlog probes wait for the close.** A plan can deliver exactly what a live entry's probe says
 is missing, and turn that probe red. Archiving the entry is the close's job (ADR-0108), so a red

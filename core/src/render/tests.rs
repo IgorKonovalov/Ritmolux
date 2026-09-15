@@ -2357,7 +2357,7 @@ fn a_degenerate_frame_delta_cannot_reach_a_scene() {
         let stretched = seam_run(&mut renderer, name, &[dt, dt * 3.0, dt, dt]);
         assert_ne!(
             stretched.rgba, clean.rgba,
-            "{name}: a longer first frame left the picture unchanged, so this \
+            "{name}: a longer second frame left the picture unchanged, so this \
              probe cannot observe what the seam does"
         );
 
