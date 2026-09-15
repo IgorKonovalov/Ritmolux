@@ -231,6 +231,66 @@ test("a lane that reaches the worktree cap stops, and the run and the digest say
   assert.equal(digest("### Not started").trim(), "- **0102** (lane a): worktree cap\n- **0103** (lane a): after 0101 (parked)");
 });
 
+/** Three plans parked in an earlier run, each naming a worktree directory the test builds for real. */
+function parkedHolders(ctx, { present }) {
+  const recs = ["0091", "0092", "0093"].map((plan) => {
+    const worktree = tmp(`rlx-held-${plan}-`);
+    if (!present) rmSync(worktree, { recursive: true, force: true });
+    return {
+      plan,
+      status: "parked",
+      lane: "a",
+      worktree,
+      branch: `plan-${plan}-held`,
+      laneRemoved: false,
+      steps: [],
+      park: { reason: "plan_wrong", detail: "held", phase: null, read: null, worktree, at: "2026-09-14T10:00:00.000Z" },
+      parks: [],
+      fixRounds: 0,
+      verdicts: [],
+      fixes: [],
+      lockWaits: [],
+    };
+  });
+  for (const r of recs) {
+    r.parks.push(r.park);
+    ctx.state.plans[r.plan] = r;
+  }
+  return recs;
+}
+
+test("the cap counts worktrees on disk: three parked plans whose directories are gone do not hold the next one back", async () => {
+  const { ctx } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
+  const held = parkedHolders(ctx, { present: false });
+  const lines = [];
+  ctx.live = (l) => lines.push(l);
+  await runLanes(ctx);
+  const state = loadState(ctx.stateDir);
+  assert.equal(state.plans["0101"].status, "merged", JSON.stringify(state.plans["0101"].park));
+  assert.equal(state.runs.at(-1).stops, undefined, "no cap stop");
+
+  // Each standing-park line names the branch resume reopens from, and no worktree path.
+  for (const r of held) {
+    const line = lines.find((l) => l.includes(` ${r.plan} still parked`));
+    assert.ok(line, lines.join("\n"));
+    assert.ok(line.includes(`resume reopens it from branch ${r.branch}`), line);
+    assert.ok(!line.includes("rlx-held-"), `no worktree path: ${line}`);
+  }
+});
+
+test("the cap counts worktrees on disk: the same three with their directories present stop the lane and are named", async () => {
+  const { ctx } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
+  const held = parkedHolders(ctx, { present: true });
+  const lines = [];
+  ctx.live = (l) => lines.push(l);
+  await runLanes(ctx);
+  const state = loadState(ctx.stateDir);
+  assert.equal(state.plans["0101"], undefined, "0101 was not opened");
+  const { at, ...stop } = state.runs.at(-1).stops[0];
+  assert.deepEqual(stop, { lane: "a", reason: "worktree_cap", plan: "0101", holding: ["0091", "0092", "0093"], max: 3 });
+  for (const r of held) assert.ok(lines.some((l) => l.includes(` ${r.plan} still parked`) && l.includes(`holds ${r.worktree}`)), lines.join("\n"));
+});
+
 test("a run that opens every queued plan it can has no Not started list", async () => {
   const { ctx, digest } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
   await runLanes(ctx);

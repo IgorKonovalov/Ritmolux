@@ -86,16 +86,25 @@ export function failingTests(output) {
 }
 
 /**
- * Runs the gate. Resolves to { ok, ran: [names], failed?: { name, code, log, tail, tests } }.
- * `onLockWait(name, ms)` reports time spent waiting on a lock.
+ * Runs the gate. Resolves to
+ *   { ok, ran: [names], commands: [{ name, code, ms }], failed?: { name, code, log, tail, tests } }.
+ * `onLockWait(name, ms)` reports time spent waiting on a lock. `onCommandStart(command)` and
+ * `onCommandEnd(command, { code, ms, output })` bracket each command that runs; `ms` excludes the
+ * lock wait.
  */
-export async function runGate({ cwd, commands = defaultGate(), logDir, label, lockDir, lockPollMs, onLockWait }) {
+export async function runGate({ cwd, commands = defaultGate(), logDir, label, lockDir, lockPollMs, onLockWait, onCommandStart, onCommandEnd }) {
   mkdirSync(logDir, { recursive: true });
   const ran = [];
+  const timed = [];
   for (const [i, c] of commands.entries()) {
     if (c.onlyIf && !existsSync(join(cwd, c.onlyIf))) continue;
     if (c.onlyIfCommand && spawnSync(c.onlyIfCommand[0], c.onlyIfCommand.slice(1), { cwd, stdio: "ignore" }).status !== 0) continue;
-    const exec = () => runCommand(c.cmd, cwd, c.env ?? {});
+    let t0 = Date.now();
+    const exec = () => {
+      t0 = Date.now();
+      onCommandStart?.(c);
+      return runCommand(c.cmd, cwd, c.env ?? {});
+    };
     const r = c.lock
       ? await withLock(
           c.lock,
@@ -103,16 +112,20 @@ export async function runGate({ cwd, commands = defaultGate(), logDir, label, lo
           exec,
         )
       : await exec();
+    const ms = Date.now() - t0;
     const log = join(logDir, `${label}-${String(i).padStart(2, "0")}-${c.name.replace(/[^\w.-]+/g, "_")}.log`);
     writeFileSync(log, r.output);
     ran.push(c.name);
+    timed.push({ name: c.name, code: r.code, ms });
+    onCommandEnd?.(c, { code: r.code, ms, output: r.output });
     if (r.code !== 0) {
       return {
         ok: false,
         ran,
+        commands: timed,
         failed: { name: c.name, code: r.code, log, tail: r.output.trim().split("\n").slice(-15).join("\n"), tests: failingTests(r.output) },
       };
     }
   }
-  return { ok: true, ran };
+  return { ok: true, ran, commands: timed };
 }

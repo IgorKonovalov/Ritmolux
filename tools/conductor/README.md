@@ -57,10 +57,43 @@ All of them run from the main checkout.
 
 Ctrl+C on `run` does the same as `abort`.
 
-`run` prints one line per event as it happens: a lane opening, a step starting, a park, a close, a
-fast-forward. **A lane stops when opening its next plan would exceed `max_open_worktrees`**, and says
-so, naming the plans that hold the worktrees. That cap is the disk bound, not a queue: the lane does
-not wait for a slot. Remove a finished lane or settle a parked one, then `run` again.
+`run` prints one line per milestone as it happens, each one `HH:MM NNNN <what>`. A line indented
+under a plan number happened inside a step or a gate:
+
+```text
+10:02 0182 implement-01 start  phases 1-3 (dev)
+10:09 0182   commit 3f2a1bc feat(shot): the report hears the musical clock in a count column
+10:09 0182   phase  1 done
+10:14 0182   tests  nextest run -p standalone: 212 passed, 0 failed; lock wait 2m10s, ran 3m02s
+10:15 0182   denied PowerShell: cd studio; npx vitest run
+10:31 0182   usage  5h 0.27 (resets 14:30); 7d 0.02 (resets 09-22 16:00)
+10:40 0182 implement-01 end    phases_done, 38 min, $5.83, 64 turns
+10:40 0182 gate pre-review  checks ok (15, 9s)
+10:43 0182   gate   cargo nextest running
+10:54 0182   gate   cargo nextest ok 10m51s (1940 passed, 0 failed, 6 skipped)
+```
+
+- **Steps:** a start line with the phase range or round and the owner skill, and an end line with the
+  outcome or park reason, the duration, the spend and the turns. Spend arrives only at the end: the
+  CLI reports no running cost inside a session.
+- **Inside a session:** each commit as it lands, each phase its log row marks done, each `cargo
+  nextest`, `cargo test`, `cargo clippy` or `cargo doc` call starting and ending with its counts or
+  failing tests, every change in the 5-hour or 7-day usage window, and every denied command.
+- **Gates:** one line for the node, studio and sd-filter checks, or one per failure, then each cargo
+  command's start and end.
+- **At run start:** every plan still parked, with its age and the worktree it holds, or the branch
+  `resume` reopens it from when the worktree is gone.
+- **Also:** a lane opening, a park, a close, a fast-forward.
+
+The same lines go to `state/live.log`, under one header per run. They are a display, read from the
+CLI's stream: an event kind the reader does not know prints nothing, so a missing line is never
+evidence that something did not happen.
+
+**A lane stops when opening its next plan would exceed `max_open_worktrees`**, and says so, naming the
+plans that hold the worktrees. That cap is the disk bound, not a queue: the lane does not wait for a
+slot. Remove a finished lane or settle a parked one, then `run` again. **The cap counts worktree
+directories that exist on disk**, so a lane you removed with `git worktree remove` stops counting at
+once, whatever `state/conductor.json` says.
 
 ## What to read afterwards
 
@@ -78,11 +111,14 @@ not wait for a slot. Remove a finished lane or settle a parked one, then `run` a
 
   It is gitignored and regenerated from `state/` and `git` after every step, so deleting it loses
   nothing.
+- **`state/live.log`** holds every line the run terminal printed, one header per run, for a run you
+  did not watch.
 - **`## Close review` in each closed plan** holds the review itself, committed with the close.
 - **`state/inbox.md`** gets one entry per park: the reason, the file to read, the worktree it holds,
   and the resume command.
 - **`state/`** holds everything else: `conductor.json` (the runtime record), `transcripts/` (every
-  session's stream), `prompts/`, `reviews/`, `gates/` (each gate command's output) and `locks.jsonl`.
+  session's stream), `prompts/`, `reviews/`, `gates/` (each gate command's output), `locks.jsonl`
+  and `live.log`.
 
 ## Acting on a park
 

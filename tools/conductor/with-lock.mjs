@@ -16,6 +16,7 @@
 // Every lane on the machine shares one lock directory — os.tmpdir()/rlx-conductor-locks, or
 // RLX_LOCK_DIR — which is what makes the lock machine-wide rather than per-worktree.
 // RLX_LOCK_LOG, when set, receives one JSON line per wrapped run: the lock, the wait and the hold.
+// The wrapper also prints the wait and the hold on stderr as it exits.
 // Trap: a PID can be reused by an unrelated process after the holder dies; the lock then waits on a
 // stranger until that process exits. The holder file records the command so a person can tell.
 
@@ -173,6 +174,10 @@ function runWrapped(argv) {
           if (finished) return;
           finished = true;
           lock.release();
+          // Read back by the run terminal's stream reader (lib/live.mjs lockTimes); keep the shape.
+          process.stderr.write(
+            `with-lock: "${name}" waited ${(lock.waitedMs / 1000).toFixed(1)}s, held ${((Date.now() - lock.acquiredAt) / 1000).toFixed(1)}s\n`,
+          );
           if (process.env.RLX_LOCK_LOG) {
             try {
               appendFileSync(

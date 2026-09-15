@@ -13,6 +13,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { StringDecoder } from "node:string_decoder";
 
 import { parseOutcome, readResult } from "./outcome.mjs";
 
@@ -75,10 +76,47 @@ export function claudeArgs({ prompt, settingsFile, appendPromptFile, budgetUsd, 
 }
 
 /**
+ * Splits a byte stream into lines and hands each JSON object on one to `onEvent`. A partial line
+ * waits for the next chunk; a line that is not JSON is dropped; a throwing `onEvent` is ignored,
+ * because nothing a display does may end a session.
+ */
+export function lineReader(onEvent) {
+  const decoder = new StringDecoder("utf8");
+  let pending = "";
+  const deliver = (line) => {
+    if (!line.trim()) return;
+    let e;
+    try {
+      e = JSON.parse(line);
+    } catch {
+      return;
+    }
+    if (!e || typeof e !== "object") return;
+    try {
+      onEvent(e);
+    } catch {}
+  };
+  return {
+    push(chunk) {
+      pending += decoder.write(chunk);
+      const parts = pending.split("\n");
+      pending = parts.pop();
+      for (const line of parts) deliver(line);
+    },
+    end() {
+      pending += decoder.end();
+      deliver(pending);
+      pending = "";
+    },
+  };
+}
+
+/**
  * Runs one step. `claude` is the command vector (default ["claude"]); tests pass
- * [process.execPath, "fake-claude.mjs"]. Resolves to:
+ * [process.execPath, "fake-claude.mjs"]. `onStreamEvent(event)`, when given, receives every
+ * stream-json event as it arrives. Resolves to:
  *   { status: "ok"|"parked", reason?, detail?, outcome?, spendUsd, sessionId, exitCode,
- *     subtype, terminalReason, transcript, rateLimit }
+ *     subtype, terminalReason, transcript, rateLimit, rateLimitFirst, numTurns }
  */
 export function runStep(opts) {
   const {
@@ -88,6 +126,7 @@ export function runStep(opts) {
     env = {},
     timeoutMs = 6 * 60 * 60 * 1000,
     expectPlan,
+    onStreamEvent,
   } = opts;
   const [bin, ...pre] = claude;
   const args = [...pre, ...claudeArgs(opts)];
@@ -105,7 +144,15 @@ export function runStep(opts) {
     });
     activeChildren.add(child);
     let stderr = "";
-    child.stdout.on("data", (d) => appendFileSync(transcriptPath, d));
+    let rateLimitFirst = null;
+    const lines = lineReader((e) => {
+      if (e.type === "rate_limit_event" && rateLimitFirst === null) rateLimitFirst = e.rate_limit_info ?? null;
+      onStreamEvent?.(e);
+    });
+    child.stdout.on("data", (d) => {
+      appendFileSync(transcriptPath, d);
+      lines.push(d);
+    });
     child.stderr.on("data", (d) => {
       stderr += d;
       if (stderr.length > 20_000) stderr = stderr.slice(-20_000);
@@ -121,6 +168,7 @@ export function runStep(opts) {
       settled = true;
       activeChildren.delete(child);
       clearTimeout(timer);
+      lines.end();
       const r = readResult(readFileSync(transcriptPath, "utf8"));
       const base = {
         exitCode,
@@ -130,6 +178,8 @@ export function runStep(opts) {
         terminalReason: r.terminalReason ?? null,
         transcript: transcriptPath,
         rateLimit: r.rateLimit ?? null,
+        rateLimitFirst,
+        numTurns: r.numTurns ?? null,
       };
       const park = (reason, detail) => resolveStep({ ...base, status: "parked", reason, detail });
 

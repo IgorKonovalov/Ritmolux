@@ -14,6 +14,10 @@
 // the plan's own delivery turns red; the close session removes it, as a close archives the entry,
 // unless `probeStaysRed`.
 //
+// `stream` is a list of events the implement session emits (see fake-claude.mjs). `awaitLive` makes
+// the implement session, after each commit, wait until the file FAKE_LIVE_FILE names holds a line
+// naming that commit: proof the conductor printed it while the session was still running.
+//
 // Every session appends `<mode>-start` and `<mode>-end` to FAKE_EVENTS with a timestamp.
 
 import { execFileSync } from "node:child_process";
@@ -67,11 +71,18 @@ export default async ({ cwd, vars, env }) => {
           git("add", "PROBE_RED");
         }
         git("commit", "-q", "-m", `feat: plan ${plan} phase ${id}`);
-        commits.push(git("rev-parse", "--short", "HEAD"));
+        commits.push(git("rev-parse", "--short=7", "HEAD"));
+        if (ps.awaitLive) {
+          const want = `commit ${commits.at(-1)}`;
+          const until = Date.now() + 20_000;
+          while (Date.now() < until && !(existsSync(env.FAKE_LIVE_FILE) && readFileSync(env.FAKE_LIVE_FILE, "utf8").includes(want))) {
+            await new Promise((r) => setTimeout(r, 25));
+          }
+        }
       }
       const claimed = ps.bogusCommit ? [...commits, "deadbee"] : commits;
       const through = ps.numericThrough ? Number(ids.at(-1)) : ids.at(-1);
-      return { text: block({ kind: "phases_done", plan, through, commits: claimed }), costUsd: 1 };
+      return { text: block({ kind: "phases_done", plan, through, commits: claimed }), costUsd: ps.implementCost ?? 1, numTurns: ps.numTurns, stream: ps.stream };
     }
 
     if (mode === "fix") {

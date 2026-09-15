@@ -15,7 +15,7 @@
 // tools/conductor/digest.md, both gitignored. tools/conductor/README.md is the operator guide.
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -24,6 +24,7 @@ import { writeDigest } from "./lib/digest.mjs";
 import { currentBranch, isClean } from "./lib/git.mjs";
 import { appendPark, dirtyText, dirtyWorktree } from "./lib/inbox.mjs";
 import { runLanes } from "./lib/lane.mjs";
+import { ascii } from "./lib/live.mjs";
 import { findPlan, nextStep, readPlanFile } from "./lib/plan.mjs";
 import { loadLocal, loadQueue, stateSets } from "./lib/queue.mjs";
 import { loadState, planRecord, recoverInterrupted, saveState, statePaths, totalSpend } from "./lib/state.mjs";
@@ -101,10 +102,6 @@ export function eventLine(name, d) {
       return `conductor: lane ${d.lane} stopped at the worktree cap (max_open_worktrees ${d.max}, held by ${d.holding.join(", ")}); ${d.plan} not started`;
     case "lane-open":
       return `conductor: ${d.plan} opened its lane at ${d.worktree}`;
-    case "implement-step":
-    case "review-step":
-    case "fix-step":
-      return `conductor: ${d.plan} step ${d.label} started`;
     case "park":
       return `conductor: ${d.plan} parked (${d.reason})`;
     case "closed":
@@ -141,6 +138,20 @@ async function cmdRun(args, o) {
   mkdirSync(p.stateDir, { recursive: true });
   writeFileSync(pidFile(p), String(process.pid));
 
+  // Every line `run` prints while lanes run also goes to state/live.log, under one header per run.
+  const liveLog = join(p.stateDir, "live.log");
+  const appendLive = (text) => {
+    try {
+      appendFileSync(liveLog, text);
+    } catch {}
+  };
+  appendLive(`\n== run ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC, lanes ${(lane ? [lane] : Object.keys(pf.queue.lanes)).join(", ")} ==\n`);
+  const emit = (line) => {
+    const text = ascii(line);
+    o.log(text);
+    appendLive(`${text}\n`);
+  };
+
   const ctx = {
     repo: p.repo,
     worktreeRoot: o.worktreeRoot ?? p.worktreeRoot,
@@ -158,10 +169,12 @@ async function cmdRun(args, o) {
     pollMs: o.pollMs,
     once: args.includes("--once"),
     lanes: lane ? [lane] : undefined,
+    commitPollMs: o.commitPollMs,
     onChange: () => regenerate(p, state),
+    live: emit,
     events: (name, data) => {
       const line = eventLine(name, data);
-      if (line) o.log(line);
+      if (line) emit(line);
     },
   };
 
@@ -342,7 +355,7 @@ function cmdCheck(args, o) {
 
 const COMMANDS = { run: cmdRun, status: cmdStatus, resume: cmdResume, park: cmdPark, abort: cmdAbort, check: cmdCheck };
 
-/** `overrides` exists for tests: { p, claude, gate, worktreeRoot, lockDir, lockPollMs, pollMs, log, err, signals }. */
+/** `overrides` exists for tests: { p, claude, gate, worktreeRoot, lockDir, lockPollMs, pollMs, commitPollMs, log, err, signals }. */
 export async function main(argv, overrides = {}) {
   const o = {
     p: paths(),

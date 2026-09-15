@@ -7,8 +7,12 @@
 //
 //   FAKE_CLAUDE_SCENARIO  path to an ES module whose default export is
 //                         async ({ args, cwd, env, prompt, append, vars }) =>
-//                           { text?, subtype?, exitCode?, costUsd?, noResult? }
+//                           { text?, subtype?, exitCode?, costUsd?, numTurns?, noResult?, stream? }
 //                         It may run git in `cwd` to make the commits a real session would.
+//                         `stream` is a list of events emitted between system/init and the final
+//                         text, in the shapes a real session emits: an assistant tool_use, a user
+//                         tool_result, system/task_notification, system/permission_denied,
+//                         rate_limit_event. A string entry is written as a raw line, JSON or not.
 //   FAKE_CLAUDE_LOG       JSONL file receiving one record per invocation: args, cwd, and the
 //                         RLX_ environment the session saw.
 //   FAKE_CLAUDE_VERSION   what `--version` prints (default: the verified CLI's string).
@@ -63,6 +67,10 @@ if (process.env.FAKE_CLAUDE_SCENARIO) {
 }
 
 emit({ type: "system", subtype: "init", cwd: process.cwd(), model: flag("--model") ?? "fake", permissionMode: flag("--permission-mode") });
+for (const e of outcome.stream ?? []) {
+  if (typeof e === "string") process.stdout.write(`${e}\n`);
+  else emit(e);
+}
 emit({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text: outcome.text ?? "" }] } });
 
 if (!outcome.noResult) {
@@ -74,7 +82,7 @@ if (!outcome.noResult) {
     is_error: subtype !== "success",
     terminal_reason: budget ? "budget_exhausted" : subtype === "success" ? "completed" : "error",
     total_cost_usd: outcome.costUsd ?? 0.01,
-    num_turns: 1,
+    num_turns: outcome.numTurns ?? 1,
     result: subtype === "success" ? outcome.text ?? "" : undefined,
     errors: budget ? [`Reached maximum budget ($${flag("--max-budget-usd")})`] : subtype === "success" ? undefined : ["fake error"],
     permission_denials: [],

@@ -1,6 +1,6 @@
 # 0189 — The conductor can be watched, and stops re-proving a green tree
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-15
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0205](../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md),
@@ -405,11 +405,11 @@ illustrative: the run terminal
 
 ## Implementation log
 
-**Lane:**
+**Lane:** `main` directly
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The run can be watched | dev | not started | |
+| 1 — The run can be watched | dev | committed with this row | |
 | 2 — The digest reports what the operator spends, holds and still owes | dev | not started | |
 | 3 — Listing tests takes no lock | dev | not started | |
 | 4 — A green suite is not run again on the same tree | dev | not started | |
@@ -419,5 +419,11 @@ illustrative: the run terminal
 | 8 — A run, watched | human | not started | |
 
 ### Notes
+
+- Phase 1 also touches `tools/conductor/test/lane-scenario.mjs`, which is not in its file list. The
+  fake session needs it to emit a `stream`, and `awaitLive` holds the session open until its commit
+  line is printed.
+- Phase 1 removes the `conductor: NNNN step LABEL started` event line. The live start line replaces
+  it.
 
 ### Close triggers
