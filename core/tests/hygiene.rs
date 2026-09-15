@@ -861,7 +861,8 @@ const DT_GUARD_ALLOWED: &[(&str, &str, &str)] = &[(
 ///
 /// It matches, on a variable or field named exactly `dt`, a finiteness check
 /// (`dt.is_finite()` or `is_finite(dt)`, which covers a negated check) and a sign
-/// or size check (`dt` compared against `0` with `<`, `<=`, `>` or `>=`, or
+/// or size check (`dt` compared against a literal starting with `0`, so `0.0`
+/// and `0.5` alike, with `<`, `<=`, `>` or `>=`, or
 /// `dt.max(`, `dt.min(`, `dt.clamp(`), across every non-test `.rs` under
 /// `core/src/`. Line comments are stripped first, so prose describing the guard
 /// does not count.
@@ -939,8 +940,9 @@ fn a_frame_delta_is_checked_for_finiteness_in_exactly_one_place() {
 }
 
 /// Whether `line` checks the finiteness, sign or size of something named
-/// exactly `dt`: `dt.is_finite()`, `is_finite(dt)`, `dt` compared against `0`
-/// with `<`, `<=`, `>` or `>=`, or `dt.max(`, `dt.min(`, `dt.clamp(`.
+/// exactly `dt`: `dt.is_finite()`, `is_finite(dt)`, `dt` compared against a
+/// literal starting with `0` (`0.0` and `0.5` alike) with `<`, `<=`, `>` or
+/// `>=`, or `dt.max(`, `dt.min(`, `dt.clamp(`.
 fn checks_dt_finiteness(line: &str) -> bool {
     let is_ident = |c: char| c.is_alphanumeric() || c == '_';
     let method = "dt.is_finite()";
