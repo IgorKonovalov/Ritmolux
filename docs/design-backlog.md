@@ -44,7 +44,6 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0126 — a render is one prompt, one seed and one preset from first frame to last, so nothing varies across a track](#0126--a-render-is-one-prompt-one-seed-and-one-preset-from-first-frame-to-last-so-nothing-varies-across-a-track)
 - [0128 — `tonal_flatness` convicts a flat-graphic composition, and no reference tone and no structural statistic repairs it](#0128--tonal_flatness-convicts-a-flat-graphic-composition-and-no-reference-tone-and-no-structural-statistic-repairs-it)
 - [0140 — the band contour can only ever be an anti-aliased grey, so on a hard-banded palette it is the one thing that puts shading into a two-ink print](#0140--the-band-contour-can-only-ever-be-an-anti-aliased-grey-so-on-a-hard-banded-palette-it-is-the-one-thing-that-puts-shading-into-a-two-ink-print)
-- [0142 — a same-system dissolve runs `Scene::update` twice in one frame, so every stateful scene advances at 2x for its duration](#0142--a-same-system-dissolve-runs-sceneupdate-twice-in-one-frame-so-every-stateful-scene-advances-at-2x-for-its-duration)
 - [0146 — `warp_mesh` colours its light at deposit time, so the palette cannot band the accumulated field](#0146--warp_mesh-colours-its-light-at-deposit-time-so-the-palette-cannot-band-the-accumulated-field)
 - [0154 — a swap spawns a thread that creates a COM object, and one activation in 22 failed with `REGDB_E_CLASSNOTREG` where the retry budget cannot tell that from a dead device](#0154--a-swap-spawns-a-thread-that-creates-a-com-object-and-one-activation-in-22-failed-with-regdb_e_classnotreg-where-the-retry-budget-cannot-tell-that-from-a-dead-device)
 - [0157 - the fixed telemetry set omits the bar grid the engine already computes, so a consumer reconstructs a worse one by hand](#0157---the-fixed-telemetry-set-omits-the-bar-grid-the-engine-already-computes-so-a-consumer-reconstructs-a-worse-one-by-hand)
@@ -62,7 +61,6 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0185 — The `--help` banner still calls the application `ritmolux`](#0185--the---help-banner-still-calls-the-application-ritmolux)
 - [0186 — the density law scales a preset's *trace count*, so eight low-`density` worlds draw 4x the strokes at 1/4 the brightness on a large display](#0186--the-density-law-scales-a-presets-trace-count-so-eight-low-density-worlds-draw-4x-the-strokes-at-14-the-brightness-on-a-large-display)
 - [0187 — two measurements of the same console on the same adapter class disagree by 2x, and nothing explains which one the machine actually does](#0187--two-measurements-of-the-same-console-on-the-same-adapter-class-disagree-by-2x-and-nothing-explains-which-one-the-machine-actually-does)
-- [0191 — `evaluate_preset` advances the scene before it applies the preset's bindings, so the first frame after every switch integrates at the scene's defaults](#0191--evaluate_preset-advances-the-scene-before-it-applies-the-presets-bindings-so-the-first-frame-after-every-switch-integrates-at-the-scenes-defaults)
 - [0192 - `--report` cannot see a `beat_index`-driven response, so a deliberately musical preset measures as inert](#0192-----report-cannot-see-a-beat_index-driven-response-so-a-deliberately-musical-preset-measures-as-inert)
 - [0198 — `deposit_arms` tears along the branch cut at a fractional value, and nothing rounds it](#0198--deposit_arms-tears-along-the-branch-cut-at-a-fractional-value-and-nothing-rounds-it)
 - [0203 — the smoke run captured from a microphone while the default is loopback, and nobody established why](#0203--the-smoke-run-captured-from-a-microphone-while-the-default-is-loopback-and-nobody-established-why)
@@ -361,6 +359,8 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0209 | The studio's schema walks pass in CI by walking nothing | [Plan 0172](plans/done/0172-the-studios-readings-become-true.md) Phases 2 and 4. A committed snapshot, held by a Rust test. **Closed 2026-09-14** |
 | 0196 | Most `v*` tags produce no Release run, and the named cause cannot explain nineteen | [ADR-0203](adrs/0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md) + [Plan 0176](plans/done/0176-a-release-tag-reaches-origin.md). Never pushed, not suppressed. **Closed 2026-09-14** |
 | 0206 | With no post stage a fullscreen field overwrites the sky, so `occlude = 0` does nothing | [ADR-0201](adrs/0201-a-fullscreen-scene-presents-premultiplied-over-the-backdrop.md) + [Plan 0185](plans/done/0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage.md). Four scenes. **Closed 2026-09-15** |
+| 0142 | A same-system dissolve runs `Scene::update` twice in one frame | [ADR-0198](adrs/0198-a-scene-advances-after-its-frames-bindings.md) + [Plan 0181](plans/done/0181-a-scene-advances-after-its-frames-bindings.md) Phase 1. Falsified: every such dissolve freezes. **Closed 2026-09-15** |
+| 0191 | `evaluate_preset` advances the scene before it applies the preset's bindings | [ADR-0198](adrs/0198-a-scene-advances-after-its-frames-bindings.md) + [Plan 0181](plans/done/0181-a-scene-advances-after-its-frames-bindings.md) Phase 2. No golden moved. **Closed 2026-09-15** |
 <!-- roster:end -->
 
 ## Open entries
@@ -2296,111 +2296,6 @@ Revisit if a second limited-ink world lands on a contoured scene.
 
 - **Promoted 2026-09-14** to [Plan 0184](plans/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 1 and [ADR-0197](adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md): the contour gains a hard/soft style and an ink taken from a palette coordinate, on every scene that draws it, with the default byte-identical.
 
-## 0142 — a same-system dissolve runs `Scene::update` twice in one frame, so every stateful scene advances at 2x for its duration
-
-`scene_for_mut` resolves a scene by `SystemKind`, so when a dissolve crosses two presets of the
-**same** system the outgoing side and the live side get the *same* `&mut Box<dyn Scene>`.
-`evaluate_preset` then runs twice against it in one frame, and everything `Scene::update` mutates
-advances twice.
-
-- **Raised:** 2026-08-27, at [Plan 0121](plans/done/0121-a-rate-an-ink-edge-and-a-motion-reading.md)'s
-  close review, and re-raised the same day while planning
-  [0122](plans/done/0122-every-rate-integrates.md) — which moves three more rates into the affected class.
-  **Owner if taken:** `dev`, but the design question is `architect`'s: see below.
-- **Verified 2026-08-27** — the scene is resolved by system, so both sides of a same-system dissolve
-  get one instance:
-  `present: \.find\(\|\(kind, _\)\| \*kind == system\) in: core/src/render/routing.rs`
-- **Verified 2026-08-28** — and `update` carries per-frame state that is not idempotent. Re-pointed
-  at [Plan 0122](plans/done/0122-every-rate-integrates.md)'s close: the accumulator survives
-  unchanged, `advance_spin` does not — it collapsed into the shared `scenes::Phase` and this probe
-  was anchored on the deleted function's name rather than on the claim:
-  `present: self\.spin_time\.step\(self\.spin, self\.dt\); in: core/src/render/scenes/particles/mod.rs`
-- **Verified 2026-08-27** — the third claim, that no test can observe this, does not reduce:
-  `unprobeable: no test reaches the dual-live render path is a negative about the whole suite, not a
-  match count. The mechanism is a cfg(test) escape hatch on the transition's fidelity governor - a
-  headless capture has no frame-time clock, so dual_live_eligible always answers Freeze and the path
-  is reachable only through Transition::set_mode. The pointer is that function's own doc comment in
-  core/src/render/transition.rs`
-- **Updated 2026-09-08** — [Plan 0140](plans/done/0140-every-rate-integrates-for-real.md) did **not**
-  repair this, and did not make it observable. Its Phase 2 sanitizes the frame delta once at the
-  scene seam ([ADR-0152](adrs/0152-the-frame-delta-is-sanitized-at-the-scene-seam.md)), which says
-  nothing about `evaluate_preset` running twice: a sanitized delta is applied twice exactly as an
-  unsanitized one was. The instrument problem below is untouched, and it remains the blocker.
-
-  **The population grew, and one thing above needs correcting.** `evaluate_preset` runs `set_time`,
-  `advance` *and* `update` (`core/src/render/evaluate.rs:311`, `:312`, `:412`), so the double-run
-  reaches `advance` too — which means `shape_collage` was already in this class through its own
-  `elapsed`, rather than joining it when its rates were converted. What actually changed is the
-  amount of state and the number of entry points: `shape_collage` carries **four** more
-  non-idempotent accumulators (`drift` and `spin`, for the live canvas and the outgoing one), and
-  `emitter` gained a `Scene::advance` where it previously had **none**, holding the integral its
-  sprite rotation is measured against. A scene affected only through `update` is now affected
-  through both.
-
-- **Updated 2026-09-11** — [Plan 0164](plans/done/0164-the-cellular-system.md) adds `cellular`, and
-  it is the sharpest instance this entry has collected. Every other affected scene carries a
-  **phase**: a rotation, a noise coordinate, a particle field's clock, where a double-step is an
-  offset and the picture recovers its look if not its position. `cellular` carries a **ping-pong
-  field of cells**, and its `update` integrates the frame's `dt` into a generation counter, so a
-  same-system dissolve does not offset the automaton — it runs the rule an extra generation per
-  frame on the state both sides are reading. For `larger_than_life` and `cyclic`, whose whole
-  interest is travelling structure at a chosen rate, that is a different world rather than the same
-  one early. The reseed edge is the one part that does **not** double: `update` records the level
-  on the first call, so the second sees no rising edge.
-
-  **The layer path is not affected, and knowing which half is which matters for any fix.** A
-  `[layer]` scene is constructed for the preset rather than resolved from the roster
-  (`core/src/render/roster.rs`, `build_layer`), so two dissolving sides' layers share nothing. It is
-  only the base scene — the `Vec<(SystemKind, Box<dyn Scene>)>` with one instance per system — that
-  both sides reach. So the affected population is every stateful base scene and no layer.
-
-  **Still unobserved, for the reason this entry already names.** Plan 0164's own risk item asked its
-  lane to confirm the symptom on `cellular` and it could not: no test reaches the dual-live render
-  path, which is this entry's standing `unprobeable:`. The mechanism above is read from the code,
-  not from a capture.
-
-### The finding
-
-It is **pre-existing and it predates the rates.** `particles::spin_time` has integrated in `update`
-since ADR-0076, and `emitter`'s `self.field.step(time, &cfg)` steps a particle field there too. Both
-double-advance today on a same-system dissolve, and the library has twelve `fragment_field` worlds
-and seventeen attractors — so crossing two presets of one system is the *common* case, not the
-exotic one.
-
-`set_time` was idempotent, which is why nothing noticed: for years the only thing a scene took from
-the renderer per frame was a value, and setting it twice is setting it once. `update` growing state
-changed that quietly, one scene at a time.
-
-**Size:** the affected phase runs at 2x for the dissolve's duration and is permanently offset
-afterward. For a rotation or a noise coordinate a constant offset is invisible, so the visible part
-is the transient — a scene that visibly quickens for the length of a crossfade and then returns.
-
-- **What a fix looks like**, and the choice is a real one:
-  - **Make the integration idempotent per frame** — a frame counter or a dirty flag on the scene, so
-    the second `update` in a frame is a no-op. Smallest change, and it leaves the double
-    *evaluation* (two presets' expressions, two smoothers) doing its work correctly, which it is.
-  - **Give each side its own scene instance**, the way `side.layer` already does for layer scenes
-    (Plan 0076 Phase 2). Structurally right — the two sides genuinely are two presets — and much more
-    expensive: a second instance of every stateful scene, allocated at dissolve start, which is
-    exactly the mid-run GPU allocation ADR-0030 and the WARP trails note both warn about.
-  - **Do nothing, and document it** — the offset is invisible and the transient is short.
-- **The instrument problem is the real blocker, and it is why this is filed rather than planned.**
-  Whatever the fix, nothing in the suite can currently *observe* the bug, so nothing can observe the
-  repair either. A plan would have to start by making the dual-live path reachable from a test —
-  which is its own design question, since the governor's `Freeze` answer under capture is deliberate
-  and correct.
-
-### Priority
-
-**Low-Medium.** Invisible in the steady state and short-lived in the transient, on a path no test can
-reach — but it is now the shared failure mode of six rates rather than two, and every future
-`Scene::update` that grows state joins it silently. Revisit when a dissolve visibly misbehaves, or
-when someone needs the dual-live path testable for another reason.
-
-- **Falsified 2026-09-14**, recorded by [Plan 0181](plans/0181-a-scene-advances-after-its-frames-bindings.md). `dissolve_mode` passes `scenes::shares_resources(a, b)` to `dual_live_eligible`, and `shares_resources` answers true for any same-system pair (`a == b`), so every same-system dissolve takes `Mode::Freeze` and the shared scene is evaluated once per frame. The double-run is reachable only through the `#[cfg(test)]` `begin_transition_forced`, which is how this entry read it; Plan 0181 makes that hatch refuse a shared pair. Correct in place and archive at Plan 0181's close.
-
----
-
 ## 0146 — `warp_mesh` colours its light at deposit time, so the palette cannot band the accumulated field
 
 The palette coordinate in `warp_mesh` is the **deposit angle**: the deposit shader computes
@@ -3352,51 +3247,6 @@ shipped: the cost is a measurement, quoted with its adapter and its present coun
 - `unprobeable:` that no run anywhere has put the two surfaces on displays at different refresh
   rates is a negative about measurement history, not a match countable in any file
 
-
-## 0191 — `evaluate_preset` advances the scene before it applies the preset's bindings, so the first frame after every switch integrates at the scene's defaults
-
-`core/src/render/evaluate.rs` calls `scene.set_time(time)` and `scene.advance(dt)` at lines 312-313,
-`side.chain.set_dt(dt)` at 316, and only then `scene.reset_params()` at 320 followed by the loop that
-evaluates the preset's bindings. So the advance for frame *N* runs against the parameter values left
-by frame *N-1*.
-
-For a preset that is merely continuing, that is a one-frame lag and invisible. **On the frame a
-preset switch takes effect it is not a lag** — the incoming scene has no previous frame, so every
-rate it integrates that frame integrates at the scene's own default, not at the value the preset
-asked for.
-
-- **Raised:** 2026-09-08, at Plan 0140's close. It surfaced from that plan's own Phase 2 seam test,
-  whose negative control had to be built around this ordering. **Owner if taken:** `dev`, if the
-  answer is "move two lines"; `architect` first if it is not.
-- **Verified 2026-09-08** — the advance precedes the reset and the binding loop in the same function:
-  `present: scene\.advance\(dt\); in: core/src/render/evaluate.rs`
-- **Verified 2026-09-08** — and the reset that begins the binding pass is below it:
-  `present: scene\.reset_params\(\); in: core/src/render/evaluate.rs`
-
-### The finding
-
-The magnitude is one frame of one preset's rates at the wrong value, which at 60 Hz is ~17 ms and
-almost certainly invisible for a rate. It is filed rather than fixed for two reasons.
-
-The first is that **the population is growing**: Plan 0140 converted the collage `drift` and `spin`
-and the emitter's sprite rotation to integrate per element, which means each newly-converted rate
-joins the set this ordering starts at a default. The class gets one member wider every time a rate is
-done properly, so the cost of the ordering rises with exactly the work being done to the rate system.
-
-The second is that the reordering is not obviously free. `scene.advance` before the bindings is what
-lets a binding read a value the scene computed this frame; moving the advance below the loop changes
-which frame's parameters drive which frame's integration for *every* preset, not only a switching
-one, and that is a golden-moving change. Whether it moves any *visible* pixel is unknown, and this
-repo's instruments are short-horizon — Plan 0140's own close records that the whole integration
-change was invisible to the goldens, the sweeps and `--report` alike — so a green suite would not
-settle it.
-
-### Priority
-
-**Low.** One frame, at a preset switch, at a default rather than a wild value. It is filed because it
-is a *structural* ordering and the population it affects is growing, not because anyone has seen it.
-
-- **Promoted 2026-09-14** to [Plan 0181](plans/0181-a-scene-advances-after-its-frames-bindings.md) and [ADR-0198](adrs/0198-a-scene-advances-after-its-frames-bindings.md): `set_time` and `advance` move below the binding walk. **Two corrections to the text above:** only `emitter` and `shape_collage` read parameters inside `advance`, so the change is not golden-moving for every preset; and on a switch frame the incoming scene integrates the previous preset's values, not the scene's defaults.
 
 ## 0192 - `--report` cannot see a `beat_index`-driven response, so a deliberately musical preset measures as inert
 

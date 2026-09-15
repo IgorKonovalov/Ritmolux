@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0181 - A scene advances after its frame's bindings](#0181---a-scene-advances-after-its-frames-bindings)
   - [0185 - A fullscreen field lets the sky through with no post stage](#0185---a-fullscreen-field-lets-the-sky-through-with-no-post-stage)
   - [0187 - The conductor runs the lanes](#0187---the-conductor-runs-the-lanes)
   - [0176 - A release tag reaches origin](#0176---a-release-tag-reaches-origin)
@@ -184,6 +185,7 @@ hand-edited.
   - [0002 — Rust enforcement tooling](#0002--rust-enforcement-tooling)
   - [0001 — Core + standalone MVP, then foobar parity](#0001--core--standalone-mvp-then-foobar-parity)
 - [Prior sequencing notes (superseded)](#prior-sequencing-notes-superseded)
+  - [Moved 2026-09-15 from `README.md` — the opening of the engine-lane bullet, spent](#moved-2026-09-15-from-readmemd--the-opening-of-the-engine-lane-bullet-spent)
   - [Moved 2026-09-14 from `README.md` — the two-lane note for 0170-0173, spent](#moved-2026-09-14-from-readmemd--the-two-lane-note-for-0170-0173-spent)
   - [Moved 2026-09-11 from `README.md` — the note that 0167 does not close, spent](#moved-2026-09-11-from-readmemd--the-note-that-0167-does-not-close-spent)
   - [Moved 2026-09-10 from `README.md` — the 0158/0159 program note, spent](#moved-2026-09-10-from-readmemd--the-01580159-program-note-spent)
@@ -210,6 +212,30 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0181 - A scene advances after its frame's bindings](done/0181-a-scene-advances-after-its-frames-bindings.md)
+
+- closed 2026-09-15 by a conductor-run review (ADR-0205), round 1. Three `dev` phases on the lane
+`plan-0181-a-scene-advances-after-its-frames-bindings`: `00c9587` (1, the governor test asserts
+`Mode::Freeze` for a same-system pair of every `SystemKind`, and `begin_transition_forced` keeps
+`Freeze` for a shared pair), `b4d2c15` (2, `evaluate_preset` and `evaluate_layer` call `set_time` and
+`advance` after the bindings, pinned by a fresh-emitter spin test and a fresh-collage canvas test that
+both failed on the unmoved tree) and `5b93cd6` (3, the comments). Review: **no blockers, no majors,
+three minors, one nit.** Version: **0.123.2** (patch, a fix-only plan). ADR-0198 accepted with an
+Outcome: no golden moved, where its Negative predicted the emitter and collage baselines would.
+Backlog 0191 archived as discharged, backlog 0142 as falsified. The review's gate: `cargo nextest run
+--workspace` 1936 passed, 6 skipped, 624.9 s; `cargo doc` with warnings denied, `fmt` and `clippy`
+clean.
+
+**The minor fixed at the close:** `docs/on-device-validation.md` asked a tester to watch a
+same-system cellular dissolve run at double speed, which no build can do. **Open, all comment-only
+`dev` edits:** `particles/mod.rs`'s spin comment still says the renderer advances before it binds;
+`cellular/tests.rs`'s `Driver` claims the renderer's order and runs the old one; and the nit, an
+assertion message in `a_degenerate_frame_delta_cannot_reach_a_scene` calling the stretched frame the
+first.
+
+**Preset curation:** no `.toml` moved, and no shipped preset names ADR-0198, ADR-0135, Plan 0181 or
+backlog 0142/0191.
 
 ### [0185 - A fullscreen field lets the sky through with no post stage](done/0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage.md)
 
@@ -8481,6 +8507,19 @@ stays in `lmv-core`, and is out of the Miri job's scope, so the FFI pointer hand
 uncovered (its C side remains the Plan 0001 Phase-6 smoke program's job, per ADR-0003).
 
 ## Prior sequencing notes (superseded)
+
+### Moved 2026-09-15 from `README.md` — the opening of the engine-lane bullet, spent
+
+Spent when [Plan 0181](done/0181-a-scene-advances-after-its-frames-bindings.md) closed on
+2026-09-15, run by the conductor ahead of [Plan 0175](0175-an-eased-value-arrives.md). The bullet's
+remainder (0180 before 0142, then the rest) stays live in `README.md`. Kept verbatim:
+
+> - **Engine lane.** [0175], then [0181]. [0185] closed 2026-09-15 ahead of it and moved no golden,
+>   so 0181's bless set stays the emitter and collage baselines.
+
+[0175]: 0175-an-eased-value-arrives.md
+[0181]: done/0181-a-scene-advances-after-its-frames-bindings.md
+[0185]: done/0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage.md
 
 ### Moved 2026-09-14 from `README.md` — the two-lane note for 0170-0173, spent
 

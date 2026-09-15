@@ -51,7 +51,6 @@ place. The plan file carries the real link.
 | [0178](0178-what-the-operator-reads-is-true.md) | What the operator reads is true | approved | dev, human | Backlog 0172, 0185, 0207, 0208 + ADR-0202 (proposed): drift line, `--list-presets`, banner, recovery line, count gate. **Lands after 0176 and 0166.** Phase 5 `human` settles 0203. |
 | [0179](0179-a-parameters-range-belongs-to-its-family.md) | A parameter's range belongs to its family | approved | dev, studio-builder | ADR-0194: the schema carries per-family ranges, `preset` reports the family; backlog 0198 `deposit_arms` goes Structural. Phase 4's wait on 0174 is discharged. |
 | [0180](0180-the-converted-picture-follows-the-source.md) | The converted picture follows the source | approved | dev | ADR-0199 (proposed). Backlog 0214-0216: comp rad/ang, per-vertex x/y, the seam, source waveform figures at host scale from an L/R pair. **Runs before 0142** - no rig. |
-| [0181](0181-a-scene-advances-after-its-frames-bindings.md) | A scene advances after its frame's bindings | approved | dev | ADR-0198. **Backlog 0142 is falsified** (same-system dissolves always freeze), so no guard - **the user confirmed the reversal at approval**. Only emitter + collage goldens may move. |
 | [0182](0182-the-report-hears-a-counter.md) | The report hears a counter | approved | dev | Backlog 0192 + ADR-0196 (proposed): a `count` column read off a fast synthetic clock at silence. No existing column moves. **Phase 1 stops if report wall time doubles.** |
 | [0183](0183-a-low-density-is-a-trace-count.md) | A low density is a trace count | approved | dev, human | ADR-0195 (proposed): a trace (density <= 0.08) draws the tier anchor's count at every size; clouds keep ADR-0140. **No golden moves.** Phase 3 is a `human` look gate at 1080p Rich. |
 | [0184](0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) | Limited ink: a contour that is an ink, and a warp field that bands | approved | dev, human | ADR-0197 (proposed): hard ink contours on six scenes; `warp_mesh` bands by level. **Phase 2 stops if level outgrows `color_span`.** Phase 4: look gate. |
@@ -283,8 +282,8 @@ naming what moved. The order:
 - **Delivery and infrastructure lane.** [0174] closed first, then [0176] (both 2026-09-14), which
   discharges [0103] Phase 5's wait on a tag that reliably reaches origin. Then [0177], which re-derives its mergeable set from 0174's final run-alone filter. [0178] edits the same gate-count
   prose as [0166] Phase 1 and [0176]; whichever lands second rebases onto the others.
-- **Engine lane.** [0175], then [0181]. [0185] closed 2026-09-15 ahead of it and moved no golden,
-  so 0181's bless set stays the emitter and collage baselines. Then [0180] before [0142]: 0180 re-draws the
+- **Engine lane.** [0181] and [0185] closed 2026-09-15, both ahead of [0175], and neither moved a
+  golden. [0175] is next; it touches `LatchBank::advance`, which 0181 left alone. Then [0180] before [0142]: 0180 re-draws the
   waveform 0142's wash is measured on and needs no rig. After those, [0184], [0183], [0182],
   [0179] (its Phase 4's wait on 0174 is discharged) and [0186], in any order that keeps each bless set clean.
 - **Still gated on a human, unchanged:** [0120] Phase 1, [0133] Phase 9, [0166] Phase 3, and
@@ -302,7 +301,7 @@ naming what moved. The order:
 [0178]: 0178-what-the-operator-reads-is-true.md
 [0179]: 0179-a-parameters-range-belongs-to-its-family.md
 [0180]: 0180-the-converted-picture-follows-the-source.md
-[0181]: 0181-a-scene-advances-after-its-frames-bindings.md
+[0181]: done/0181-a-scene-advances-after-its-frames-bindings.md
 [0182]: 0182-the-report-hears-a-counter.md
 [0183]: 0183-a-low-density-is-a-trace-count.md
 [0184]: 0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md
@@ -844,6 +843,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0181 — A scene advances after its frame's bindings](done/0181-a-scene-advances-after-its-frames-bindings.md) — closed 2026-09-15. Review: **no blockers, no majors, three minors, one nit.** Version: **0.123.2**. ADR-0198 accepted (Outcome). Archived 0142, 0191. [Write-up](README-archive.md).
 - [0185 — A fullscreen field lets the sky through with no post stage](done/0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage.md) — closed 2026-09-15. Review: **no blockers, no majors, one minor, one nit.** Version: **0.123.1**. ADR-0201 accepted. Archived 0206. [Write-up](README-archive.md).
 - [0187 — The conductor runs the lanes](done/0187-the-conductor-runs-the-lanes.md) — closed 2026-09-14 **without Phase 6 (owner call)**. Review: **no blockers, one major (fixed at close), four minors.** Version: none (tooling). ADR-0205 accepted (Outcome). [Write-up](README-archive.md).
 - [0176 — A release tag reaches origin](done/0176-a-release-tag-reaches-origin.md) — closed 2026-09-14. Review: **no blockers, no majors, three minors, two nits.** Version: none (tooling). ADR-0203 accepted. Archived backlog 0196. [Write-up](README-archive.md).

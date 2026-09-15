@@ -207,9 +207,10 @@ footprint so the vendor spread is on record.
       and say, for each, whether it reads as structure or as noise: `life_like.toml` for whether
       the fading wake carries the history, `larger_than_life.toml` for whether its blobs visibly
       travel, `cyclic.toml` for whether the spirals are visible as spirals and rotate. Also run one
-      **same-system dissolve** between two cellular presets: a stateful scene steps twice per frame
-      for the dissolve's duration (design-backlog 0142), and on this system that shows as the
-      automaton briefly running at double speed — say whether it reads as a defect.
+      **same-system dissolve** between two cellular presets: two presets of one system share one
+      scene, so the dissolve holds the outgoing picture still while the incoming one runs
+      ([ADR-0198](adrs/0198-a-scene-advances-after-its-frames-bindings.md)), and on this system that
+      shows as a frozen automaton fading out — say whether it reads as a defect.
 - [ ] **Frame-time p99 with the debug overlay on, any box.** Plan 0030 put the three post stages
       behind a `PostStage` trait, so a rendered frame now costs ~4 vtable calls plus ~4 `TextureView`
       Arc bumps it did not before. Expected to be unmeasurable against a render pass, but it was
