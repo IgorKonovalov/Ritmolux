@@ -184,6 +184,15 @@ row (status `draft`), bump next-free-number, adjust execution order if affected.
 the 1-minute entrypoint future sessions read; skipping it forces the next session to re-derive
 from `git log`.
 
+**When the user approves a plan whose header names `**Closes:** design-backlog NNNN`, move each
+named entry out of the live backlog in the same session**
+([ADR-0206](../../../docs/adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): the body goes
+verbatim to the end of `docs/design-backlog-archive.md` with a
+`- **Moved to the archive YYYY-MM-DD on promotion**` bullet naming the plan, and a row joins the
+archive's `### Promoted` table. An entry the plan takes only *half* of stays live with a dated bullet
+naming the half. The live file holds only asks no approved plan owns; a promoted body left behind is
+the exact accumulation that made it 321 KB.
+
 ---
 
 ## Mode 2 — Writing an ADR
@@ -591,9 +600,14 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
      The output is a **list for the close notes, not a re-tune** — judging the look is content work
      and stays in the `preset-author` lane.
 3c. **Archive every backlog entry this plan discharged — trigger: the plan header names a
-   `**Closes:** design-backlog NNNN`.** Writing the `CLOSED` marker onto the entry is **half** the
-   step; the body then moves to [`docs/design-backlog-archive.md`](../../../docs/design-backlog-archive.md)
-   and leaves a ledger row behind in `docs/design-backlog.md`. **This step exists because the marker
+   `**Closes:** design-backlog NNNN`.** Since
+   [ADR-0206](../../../docs/adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md) a promoted
+   body is **already** in [`docs/design-backlog-archive.md`](../../../docs/design-backlog-archive.md) —
+   it moved when the plan was approved (see Mode 1 Step 3) — so the step is: append the `CLOSED`
+   marker to that archived body, and move its row from the archive's `### Promoted` table to
+   `### Closed`. An entry the plan discharged without having been promoted (a plan written before
+   ADR-0206, or an entry it discharged by the way) still takes the old path: marker, verbatim move,
+   and a `### Closed` row. **This step exists because the marker
    half is the only half that ever gets done.** Three sweeps have now found the same accumulation —
    2026-08-04 (26 entries), 2026-08-13 (20 more, *"recurring inside ten days"*), and a third batch
    hours later that same day (3 entries, from two closes that ran **after** the second sweep wrote the
@@ -604,7 +618,9 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
    and **Backlog probes** name the entries this plan claims to discharge and the exit `dev` saw from
    `node scripts/check-backlog-claims.mjs`. Both are starting points, **not the decision** — you
    re-run the probes yourself (step 1c is unconditional), and whether an entry is discharged,
-   half-discharged or falsified stays a judgement.
+   half-discharged or falsified stays a judgement. **A promoted entry's probes no longer run** — the
+   gate reads only the live file — so for those the evidence is the plan's done-whens and the
+   archived body's own probe lines, read by you against the finished tree.
 
    Mechanically: move the body verbatim (nothing is summarized — the archive's value is the record of
    how a diagnosis moved, and five entries had their causal claim *inverted* under verification), add
@@ -630,8 +646,8 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
    says where, not what. A cross-reference to **another backlog entry** is a bare `see NNNN`, never
    an anchor link: the anchor is the full text of that entry's heading and can run past eighty
    bytes, which is what pushed six rows over the cap at Plan 0105. This applies to the **ledger
-   only**; the live entry bodies above it are content, sit outside the marked region, and are not
-   measured by anything.
+   only** — the two tables under the archive's `## The ledger`; the entry bodies are content, sit
+   outside the marked regions, and are not measured by anything.
 
    Two things that are not this step. An entry whose premise turns out **false** is corrected in
    place and stays live — a wrong live entry is more dangerous than a closed one, because it sends

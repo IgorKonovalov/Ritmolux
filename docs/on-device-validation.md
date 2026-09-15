@@ -447,12 +447,12 @@ or an older copy shadows the one under test and the version check means nothing.
       the status bar froze at `0:00` under playing audio and the playlist painted no rows, while
       `Responding` stayed `True`. Adding an album to the playing playlist took it to **17.6 ms at
       57 fps** — 8.7x — with preset, `draw_calls` and `gpu_bytes` byte-identical across the
-      transition. That is [backlog 0102](design-backlog.md)'s named stream-format revival path,
+      transition. That is [backlog 0102](design-backlog-archive.md)'s named stream-format revival path,
       reached accidentally, with a symptom that entry does not predict. **Filed there; priority
       raised Medium -> High.** A follow-up run with a populated playlist showed only a brief slow
       patch at the first track, then correct: the bad state runs from panel creation until playback
       starts, so it is worst for a user who looks before pressing play.
-      **(e) Confirmed failing, as expected** — [backlog 0103](design-backlog.md): the panel's
+      **(e) Confirmed failing, as expected** — [backlog 0103](design-backlog-archive.md): the panel's
       right-click shadows foobar2000's layout-edit menu, so Remove is unreachable.
       **(f) Pass** — `%APPDATA%\light-music-visualizer\` is present and shared; the component wrote
       `plugin-diagnostics.log` there during the run. **Noted, not a component defect:** that
@@ -479,13 +479,13 @@ or an older copy shadows the one under test and the version check means nothing.
       and install via File → Preferences → Components. Then, in this order:
       **(a)** the Components list shows the released version, not the dev build's;
       **(b)** dock it as a Default UI panel **before playing anything** and record whether it comes
-      up black — this is [backlog 0102](design-backlog.md), which says the panel renders without
+      up black — this is [backlog 0102](design-backlog-archive.md), which says the panel renders without
       presenting and revives only at a track boundary, and one reporter's account is all the
       evidence there is;
       **(c)** open the pop-out from View → Ritmolux;
       **(d)** play a track, confirm it reacts, change track, press `Space` a few times;
       **(e)** in layout-editing mode, right-click the panel and check whether Remove is reachable —
-      this is [backlog 0103](design-backlog.md), expected to fail, and confirming it on a second
+      this is [backlog 0103](design-backlog-archive.md), expected to fail, and confirming it on a second
       machine is worth the ten seconds;
       **(f)** `%APPDATA%\Ritmolux\` exists and is the same folder the standalone uses.
       **Escalation:** a failure is a new backlog entry or a followup plan, never a re-opened plan —
@@ -513,7 +513,7 @@ or an older copy shadows the one under test and the version check means nothing.
       **Two things to note rather than fix.** The restore is a *dissolve*, not a cut, so a fresh
       handle starts on the roster's first entry and crossfades to the remembered one over ~1 s —
       at every start, and at every mid-playback format change. And the menu still shadows
-      foobar2000's own in layout-editing mode ([backlog 0103](design-backlog.md)), which this plan
+      foobar2000's own in layout-editing mode ([backlog 0103](design-backlog-archive.md)), which this plan
       made larger rather than fixing; Plan 0103 Phase 1 owns it.
       **Escalation:** same rule as above — a failure is a backlog entry or a followup plan.
       **Ran 2026-08-24 — all four pass, no finding.** Component rebuilt from `main` first: the
