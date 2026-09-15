@@ -1997,6 +1997,115 @@ fn a_report_over_unheld_presets_says_nothing_about_holds() {
     );
 }
 
+/// Three twins that differ in one binding each: one reads no clock, one binds its
+/// hue to `beat_index`, and one binds a time-varying hue held on the `bar` edge.
+/// Written by the test, in the shape of [`tiny_report_library`], so the `count`
+/// claims own their subjects.
+fn clock_report_library() -> PathBuf {
+    let dir = scratch("clock-report-library");
+    let twin = |name: &str, hue: &str, hold: &str| {
+        format!(
+            "system = \"parametric_curve\"\nname = \"{name}\"\n\
+             [curve]\nfamily = \"maurer_rose\"\n\
+             [params]\nn = \"6\"\nd = \"71\"\nsamples = \"361\"\nscale = \"0.8\"\n\
+             spin = \"0\"\nhue = \"{hue}\"\nthickness = \"2.0\"\nbrightness = \"0.9\"\n\
+             draw_progress = \"1\"\n{hold}"
+        )
+    };
+    for (file, toml) in [
+        ("still.toml", twin("ClockStill", "0.55", "")),
+        (
+            "counted.toml",
+            twin("ClockCounted", "mod(0.55 + beat_index * 0.125, 1)", ""),
+        ),
+        (
+            "held.toml",
+            twin(
+                "ClockHeld",
+                "mod(0.55 + time * 0.5, 1)",
+                "[hold]\nhue = \"bar\"\n",
+            ),
+        ),
+    ] {
+        std::fs::write(dir.join(file), toml).expect("write clock fixture");
+    }
+    dir
+}
+
+/// `count.mean` inside `preset`'s own JSON object, parsed from its full-precision
+/// text. The preset's key is found first so the three twins' objects cannot be
+/// read for one another.
+fn count_mean_for(json: &str, preset: &str) -> (f32, String) {
+    let start = json
+        .find(&format!("\"{preset}\":{{"))
+        .unwrap_or_else(|| panic!("`{preset}` missing from report JSON:\n{json}"));
+    let tail = &json[start..];
+    let key = "\"count\":{\"mean\":";
+    let at = tail
+        .find(key)
+        .unwrap_or_else(|| panic!("`count.mean` missing from `{preset}`:\n{tail}"))
+        + key.len();
+    let rest = &tail[at..];
+    let end = rest.find([',', '}']).expect("terminated count.mean");
+    let text = rest[..end].trim().to_owned();
+    let value = text
+        .parse::<f32>()
+        .unwrap_or_else(|e| panic!("`{preset}` count.mean `{text}` is not a number: {e}"));
+    (value, text)
+}
+
+/// The `count` column reads the musical clock and nothing else (ADR-0196):
+/// exactly zero for a preset that reads no clock, and above zero for a counter
+/// read directly and for one reached only through a `bar` hold.
+///
+/// The zero is exact rather than small because the two sequences the column
+/// differences share every input but the clock, and two captures of the same
+/// inputs on one machine and binary are byte-identical. A non-zero reading on the
+/// still twin means one of those two premises is false, and the column means
+/// nothing until it is found.
+#[test]
+fn the_count_column_hears_a_counter_and_reads_exactly_zero_without_one() {
+    let dir = clock_report_library();
+    let dir_arg = dir.to_string_lossy().into_owned();
+    let out = run(&["--report", "--json", "--presets", &dir_arg]);
+    if skipped_for_no_adapter(&out) {
+        return;
+    }
+    assert!(
+        out.status.success(),
+        "--report --json failed\nstderr: {}",
+        stderr(&out)
+    );
+    let json = stdout(&out);
+    assert!(json_is_balanced(&json), "not well-formed JSON:\n{json}");
+
+    let (still, still_text) = count_mean_for(&json, "ClockStill");
+    let (counted, _) = count_mean_for(&json, "ClockCounted");
+    let (held, _) = count_mean_for(&json, "ClockHeld");
+    eprintln!("count.mean: still {still_text}, counted {counted}, held {held}");
+
+    assert_eq!(
+        still.to_bits(),
+        0.0f32.to_bits(),
+        "a preset that reads no clock must read exactly 0, got `{still_text}`: the \
+         clock and silent captures differ in something besides the clock, or \
+         capture is not repeatable on this adapter"
+    );
+    assert_eq!(still_text, "0", "the zero is written exactly: {json}");
+    assert!(
+        counted > 0.0,
+        "a hue bound to beat_index must reach count, got {counted}"
+    );
+    assert!(
+        held > 0.0,
+        "a time-varying hue held on `bar` must re-sample under the clock, got {held}"
+    );
+    assert!(
+        json.contains("\"frames\":48,\"frames_per_beat\":5"),
+        "the schedule travels with the number: {json}"
+    );
+}
+
 /// The transient columns carry a real measurement all the way out of the CLI
 /// (Plan 0037 Phase 2), in both presentations.
 ///
@@ -2022,11 +2131,8 @@ fn the_report_transient_columns_separate_the_two_easing_fixtures() {
     /// separately.
     ///
     /// The columns are located **through the header, anchored from the row's
-    /// end** — the easing fixtures are line-family presets, so their table
-    /// also carries the trailing `geom` column (Plan 0075 Phase 2), while a
-    /// family without a line seam prints without it. Counting from the end of
-    /// the header keeps the parse right in both shapes and stays indifferent
-    /// to how the preset name itself tokenizes.
+    /// end**, which keeps the parse right if a column is added before them and
+    /// stays indifferent to how the preset name itself tokenizes.
     fn columns(report: &str) -> (u32, u32, bool) {
         let header: Vec<&str> = report
             .lines()

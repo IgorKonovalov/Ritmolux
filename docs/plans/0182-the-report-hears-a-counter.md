@@ -1,6 +1,6 @@
 # 0182 — The report hears a counter
 
-> **Status:** approved (2026-09-14)
+> **Status:** in-progress
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`
 > **Related ADRs:** [0196](../adrs/0196-the-report-hears-the-musical-clock-in-a-column-of-its-own.md) (proposed),
@@ -219,14 +219,32 @@ fn clock_stimulus() -> Vec<AnalysisFrame> {
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(`main` directly, or the worktree path plus its branch)_
+**Lane:** `C:\Users\Igor Konovalov\WORK\rlx-plan-0182` on branch `plan-0182-the-report-hears-a-counter`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The clock stimulus and the `count` reading | dev | not started | |
+| 1 — The clock stimulus and the `count` reading | dev | done | committed with this row |
 | 2 — The reader says what `count` is | dev | not started | |
 
 ### Notes
+
+- **Phase 1, measurements.** Debug `shot` binaries, before and after, run back to back on the
+  reference machine. `shot` makes the wgpu default adapter request (no `--gpu`); the machine's Dx12
+  roster is AMD Radeon(TM) Graphics (integrated) and NVIDIA GeForce RTX 3080 Laptop GPU (discrete),
+  and nothing `shot` prints says which of the two it took.
+  - `shot --presets presets --report` wall time: **163.4 s before, 203.6 s after** (112 presets).
+  - `--report --json` over `presets/`: 112 `count` objects removed from the after output, and the
+    result is byte-identical to the before output.
+  - `--report family=shape_field`, after (before rows were the same without the `count` cell):
+    `Path Lion       0.167  0.000  0.009  0.000  0.191  0.169  0.000 0.0050+  0.774 0.0895    9+   28+`
+    `Path Maple      0.175  0.000  0.016  0.000  0.169  0.180  0.000 0.0072+  0.854 0.2166   14+   16+`
+  - Clock fixtures (`the_count_column_hears_a_counter_and_reads_exactly_zero_without_one`):
+    still `0`, `beat_index` hue `0.06380889`, `bar`-held hue `0.048871923`.
+- **Phase 1, deviation.** `count.mean` is written with Rust's shortest round-trip float formatting,
+  not through `num`'s four places, so an exact zero reads `0` in the JSON (`0.0000` otherwise).
+- **Phase 1, beyond the file list's wording.** The main table's prose gains a `count` line beside
+  `drive`'s. In `shot_cli.rs`, the transient test's parser comment that described `geom` as the
+  table's trailing column was rewritten.
 
 ### Close triggers
 
