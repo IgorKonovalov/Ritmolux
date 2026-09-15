@@ -76,11 +76,19 @@ function runCommand(cmd, cwd, env) {
         : spawn(bin, args, { cwd, env: { ...process.env, ...env } });
       child.stdout.on("data", collect);
       child.stderr.on("data", collect);
+      // Node emits `close` (code -4058 on Windows) after `error` for a child that never started, so a
+      // child handed to the shell retry must not settle the result: the retried child does.
+      let retried = false;
       child.on("error", (e) => {
-        if (e.code === "ENOENT" && !shell && process.platform === "win32") start(true);
-        else done({ code: 127, output: output + `\n${e.message}` });
+        // A .cmd shim (npm, npx) is not spawnable without a shell on Windows.
+        if (e.code === "ENOENT" && !shell && process.platform === "win32") {
+          retried = true;
+          start(true);
+        } else done({ code: 127, output: output + `\n${e.message}` });
       });
-      child.on("close", (code) => done({ code: code ?? 1, output }));
+      child.on("close", (code) => {
+        if (!retried) done({ code: code ?? 1, output });
+      });
     };
     start(false);
   });
