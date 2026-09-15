@@ -61,7 +61,6 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0185 — The `--help` banner still calls the application `ritmolux`](#0185--the---help-banner-still-calls-the-application-ritmolux)
 - [0186 — the density law scales a preset's *trace count*, so eight low-`density` worlds draw 4x the strokes at 1/4 the brightness on a large display](#0186--the-density-law-scales-a-presets-trace-count-so-eight-low-density-worlds-draw-4x-the-strokes-at-14-the-brightness-on-a-large-display)
 - [0187 — two measurements of the same console on the same adapter class disagree by 2x, and nothing explains which one the machine actually does](#0187--two-measurements-of-the-same-console-on-the-same-adapter-class-disagree-by-2x-and-nothing-explains-which-one-the-machine-actually-does)
-- [0192 - `--report` cannot see a `beat_index`-driven response, so a deliberately musical preset measures as inert](#0192-----report-cannot-see-a-beat_index-driven-response-so-a-deliberately-musical-preset-measures-as-inert)
 - [0198 — `deposit_arms` tears along the branch cut at a fractional value, and nothing rounds it](#0198--deposit_arms-tears-along-the-branch-cut-at-a-fractional-value-and-nothing-rounds-it)
 - [0203 — the smoke run captured from a microphone while the default is loopback, and nobody established why](#0203--the-smoke-run-captured-from-a-microphone-while-the-default-is-loopback-and-nobody-established-why)
 - [0204 — the studio's sliders read one range per parameter, so a curve family's own range is unreachable from them](#0204--the-studios-sliders-read-one-range-per-parameter-so-a-curve-familys-own-range-is-unreachable-from-them)
@@ -361,6 +360,7 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0206 | With no post stage a fullscreen field overwrites the sky, so `occlude = 0` does nothing | [ADR-0201](adrs/0201-a-fullscreen-scene-presents-premultiplied-over-the-backdrop.md) + [Plan 0185](plans/done/0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage.md). Four scenes. **Closed 2026-09-15** |
 | 0142 | A same-system dissolve runs `Scene::update` twice in one frame | [ADR-0198](adrs/0198-a-scene-advances-after-its-frames-bindings.md) + [Plan 0181](plans/done/0181-a-scene-advances-after-its-frames-bindings.md) Phase 1. Falsified: every such dissolve freezes. **Closed 2026-09-15** |
 | 0191 | `evaluate_preset` advances the scene before it applies the preset's bindings | [ADR-0198](adrs/0198-a-scene-advances-after-its-frames-bindings.md) + [Plan 0181](plans/done/0181-a-scene-advances-after-its-frames-bindings.md) Phase 2. No golden moved. **Closed 2026-09-15** |
+| 0192 | `--report` cannot see a `beat_index`-driven response, so a musical preset measures as inert | [ADR-0196](adrs/0196-the-report-hears-the-musical-clock-in-a-column-of-its-own.md) + [Plan 0182](plans/done/0182-the-report-hears-a-counter.md). A `count` column. **Closed 2026-09-15** |
 <!-- roster:end -->
 
 ## Open entries
@@ -3246,65 +3246,6 @@ shipped: the cost is a measurement, quoted with its adapter and its present coun
   `present: pub present_every_n in: standalone/src/config.rs`
 - `unprobeable:` that no run anywhere has put the two surfaces on displays at different refresh
   rates is a negative about measurement history, not a match countable in any file
-
-
-## 0192 - `--report` cannot see a `beat_index`-driven response, so a deliberately musical preset measures as inert
-
-`shot --report`'s four reactivity columns and its `drive` column each capture a **held** analysis
-frame: one band scalar raised to a level, the matching slice of the log spectrum lit to match, and
-`beat: true` set on purpose because, as `standalone/src/shot/report.rs` puts it, it *"is an event, not
-a magnitude"*. The counters are not part of that treatment. `beat_index` and `bar_index` arrive at the
-capture as `AnalysisFrame::default()` left them and **do not advance across the captured frames**.
-
-So a preset whose musical event is a counter reads as dead. Both of Plan 0092's authored-path worlds
-— `presets/shape_maple.toml` and `presets/shape_lion.toml` — step their ring family one band per
-onset via `color_center = mod(k + beat_index/16, 1)`, and the report gives them `onset 0.000` and
-`mid 0.000`, with only `bass` showing. Nothing is broken and no
-gate fires; the instrument simply cannot express the question.
-
-- **Raised:** 2026-09-09, by the `preset-author` lane while landing the two authored-path worlds
-  (Plan 0092; they shipped as `shape_maple` and `shape_lion` at that plan's close). Routed here rather than into Plan 0160 because the fix perturbs a
-  shared instrument. **Owner if taken:** `architect` first — this is an interview, not an edit.
-- **Verified 2026-09-09** - the stimulus holds `beat` as a boolean event and says why:
-  `present: beat: true, in: standalone/src/shot/report.rs`
-- **Verified 2026-09-09** - and no counter is set anywhere in the report's stimulus construction:
-  `absent: beat_index: in: standalone/src/shot/report.rs`
-- **NARROWED 2026-09-10, at Plan 0161's close.** The probe above used to read
-  `absent: beat_index` - the bare identifier, matched over the whole file - so it convicted the
-  entry on any **prose** mention of the counter, not only on a stimulus field that sets it. Plan
-  0161 Phase 6 hit exactly that: a doc comment on the new holds block, pointing at this entry,
-  named `beat_index` while explaining what the report cannot see, and the gate went red on a
-  correct comment. That lane reworded the comment rather than the probe, which is the right call
-  for `dev` and the wrong end to fix it at - a gate that forbids a word from a file's prose is
-  shaping the code instead of checking it. The trailing colon narrows the match to the struct-field
-  form `beat_index:`, which is how the stimulus would actually set it, and leaves prose free.
-
-### The finding
-
-The class is wider than the one preset that found it. Any binding driven by a **counter** rather than
-by a magnitude — `beat_index`, `bar_index`, and anything derived from them — is invisible to every
-column the report prints, including `anim`, because a counter that does not move produces no
-inter-frame motion either. The report's own doc comment already anticipates the neighbouring failure
-(a preset reading several bands together measuring low on each) and added `drive` for it; this is the
-same shape on the axis of time rather than of spectrum.
-
-It is filed rather than fixed because the obvious repair is not free. Advancing a counter inside the
-driven capture changes what every existing preset's columns are measured against, and those numbers
-are what the close ceremony's curation step reads (`--report`, near-duplicate flags, per-band
-reactivity). Moving them silently would make every prior curation verdict incomparable with every
-later one. The candidates are at least three - advance the counters only in the combined-stimulus
-`drive` capture; add a fifth column driven by a counter ramp and leave the four alone; or leave the
-instrument and document the blind spot in `docs/testing.md`'s table - and choosing needs the
-interview this entry is asking for.
-
-### Priority
-
-**Medium.** Nothing renders wrong and no gate is unsound: the report is a reading, not a gate. What
-it costs is judgement — a curator reading `onset 0.000` concludes a preset ignores the music, when the
-preset may be the most rhythmically driven thing in the set. That misreading has now happened once,
-to the author who could tell the difference.
-
-- **Promoted 2026-09-14** to [Plan 0182](plans/0182-the-report-hears-a-counter.md) and [ADR-0196](adrs/0196-the-report-hears-the-musical-clock-in-a-column-of-its-own.md): a `count` column read off a synthetic musical clock; every existing column keeps its stimulus and its numbers.
 
 ---
 

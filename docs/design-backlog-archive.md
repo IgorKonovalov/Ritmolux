@@ -223,6 +223,7 @@ accepted cost" are different documents and only one of them is honest.
 - [0206 — with no post stage active a fullscreen field's REPLACE blend overwrites the backdrop, so `occlude = 0` lets nothing through](#0206--with-no-post-stage-active-a-fullscreen-fields-replace-blend-overwrites-the-backdrop-so-occlude--0-lets-nothing-through)
 - [0142 — a same-system dissolve runs `Scene::update` twice in one frame, so every stateful scene advances at 2x for its duration](#0142--a-same-system-dissolve-runs-sceneupdate-twice-in-one-frame-so-every-stateful-scene-advances-at-2x-for-its-duration)
 - [0191 — `evaluate_preset` advances the scene before it applies the preset's bindings, so the first frame after every switch integrates at the scene's defaults](#0191--evaluate_preset-advances-the-scene-before-it-applies-the-presets-bindings-so-the-first-frame-after-every-switch-integrates-at-the-scenes-defaults)
+- [0192 - `--report` cannot see a `beat_index`-driven response, so a deliberately musical preset measures as inert](#0192-----report-cannot-see-a-beat_index-driven-response-so-a-deliberately-musical-preset-measures-as-inert)
 <!-- toc:end -->
 
 ## 0001 — reaction_diffusion reaches only 2 of the 5 Plan-0018 composite levers
@@ -10732,3 +10733,73 @@ before `update`. A fresh `emitter` now integrates its bound `spin` on its first 
 cost estimate above was wrong in the direction the promotion note says: **no golden moved**, not even
 the emitter and collage baselines. Both string probes still pass after the move, because both lines
 survive it, and they retire with this body.
+
+---
+
+## 0192 - `--report` cannot see a `beat_index`-driven response, so a deliberately musical preset measures as inert
+
+`shot --report`'s four reactivity columns and its `drive` column each capture a **held** analysis
+frame: one band scalar raised to a level, the matching slice of the log spectrum lit to match, and
+`beat: true` set on purpose because, as `standalone/src/shot/report.rs` puts it, it *"is an event, not
+a magnitude"*. The counters are not part of that treatment. `beat_index` and `bar_index` arrive at the
+capture as `AnalysisFrame::default()` left them and **do not advance across the captured frames**.
+
+So a preset whose musical event is a counter reads as dead. Both of Plan 0092's authored-path worlds
+— `presets/shape_maple.toml` and `presets/shape_lion.toml` — step their ring family one band per
+onset via `color_center = mod(k + beat_index/16, 1)`, and the report gives them `onset 0.000` and
+`mid 0.000`, with only `bass` showing. Nothing is broken and no
+gate fires; the instrument simply cannot express the question.
+
+- **Raised:** 2026-09-09, by the `preset-author` lane while landing the two authored-path worlds
+  (Plan 0092; they shipped as `shape_maple` and `shape_lion` at that plan's close). Routed here rather than into Plan 0160 because the fix perturbs a
+  shared instrument. **Owner if taken:** `architect` first — this is an interview, not an edit.
+- **Verified 2026-09-09** - the stimulus holds `beat` as a boolean event and says why:
+  `present: beat: true, in: standalone/src/shot/report.rs`
+- **Verified 2026-09-09** - and no counter is set anywhere in the report's stimulus construction:
+  `absent: beat_index: in: standalone/src/shot/report.rs`
+- **NARROWED 2026-09-10, at Plan 0161's close.** The probe above used to read
+  `absent: beat_index` - the bare identifier, matched over the whole file - so it convicted the
+  entry on any **prose** mention of the counter, not only on a stimulus field that sets it. Plan
+  0161 Phase 6 hit exactly that: a doc comment on the new holds block, pointing at this entry,
+  named `beat_index` while explaining what the report cannot see, and the gate went red on a
+  correct comment. That lane reworded the comment rather than the probe, which is the right call
+  for `dev` and the wrong end to fix it at - a gate that forbids a word from a file's prose is
+  shaping the code instead of checking it. The trailing colon narrows the match to the struct-field
+  form `beat_index:`, which is how the stimulus would actually set it, and leaves prose free.
+
+### The finding
+
+The class is wider than the one preset that found it. Any binding driven by a **counter** rather than
+by a magnitude — `beat_index`, `bar_index`, and anything derived from them — is invisible to every
+column the report prints, including `anim`, because a counter that does not move produces no
+inter-frame motion either. The report's own doc comment already anticipates the neighbouring failure
+(a preset reading several bands together measuring low on each) and added `drive` for it; this is the
+same shape on the axis of time rather than of spectrum.
+
+It is filed rather than fixed because the obvious repair is not free. Advancing a counter inside the
+driven capture changes what every existing preset's columns are measured against, and those numbers
+are what the close ceremony's curation step reads (`--report`, near-duplicate flags, per-band
+reactivity). Moving them silently would make every prior curation verdict incomparable with every
+later one. The candidates are at least three - advance the counters only in the combined-stimulus
+`drive` capture; add a fifth column driven by a counter ramp and leave the four alone; or leave the
+instrument and document the blind spot in `docs/testing.md`'s table - and choosing needs the
+interview this entry is asking for.
+
+### Priority
+
+**Medium.** Nothing renders wrong and no gate is unsound: the report is a reading, not a gate. What
+it costs is judgement — a curator reading `onset 0.000` concludes a preset ignores the music, when the
+preset may be the most rhythmically driven thing in the set. That misreading has now happened once,
+to the author who could tell the difference.
+
+- **Promoted 2026-09-14** to [Plan 0182](plans/done/0182-the-report-hears-a-counter.md) and [ADR-0196](adrs/0196-the-report-hears-the-musical-clock-in-a-column-of-its-own.md): a `count` column read off a synthetic musical clock; every existing column keeps its stimulus and its numbers.
+
+**CLOSED 2026-09-15** — [ADR-0196](adrs/0196-the-report-hears-the-musical-clock-in-a-column-of-its-own.md) + [Plan 0182](plans/done/0182-the-report-hears-a-counter.md). `shot --report` prints a
+`count` column after `onset`: the mean frame-aligned difference between a capture over a synthetic
+musical clock at silence (48 frames, a beat every 5) and a silent capture of the same length.
+Every existing column keeps its stimulus and its number, and `--json` over the library differs by
+the `count` key alone. `Path Maple` reads `count 0.169` and `Path Lion` `0.191` beside their
+unchanged `onset 0.000`, and a clock-free fixture reads exactly `0`. The plan and ADR-0196 predicted
+the second probe above would go red on delivery, and it did not: the stimulus sets the field in
+struct shorthand (`beat_index,`), so `report.rs` still contains no `beat_index:`. Both probes retire
+with this body.

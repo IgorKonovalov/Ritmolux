@@ -143,7 +143,7 @@ flowchart LR
 - **Owner skill:** dev
 - **What:** `--report`'s reactivity reading credits a binding for naming an audio variable. A held
   binding names one and may take its value once a bar, so the reading would over-credit it — the
-  same class as [backlog 0192](../../design-backlog.md), where `--report` cannot see a
+  same class as [backlog 0192](../../design-backlog-archive.md), where `--report` cannot see a
   `beat_index`-driven response and scores a deliberately musical preset as inert. This phase does
   **not** fix 0192; it stops this plan from widening it. The reading reports a held binding as held,
   with its edge, rather than scoring it as if it were per-frame.
@@ -232,7 +232,7 @@ struct ParamHold {
 - **It does not add a phrase counter.** The vocabulary is `beat`, `bar`, and a period in seconds.
   `phrase` would need a counter this engine does not have, and inventing one here would bundle a
   DSP decision into a preset-surface plan.
-- **It does not fix [backlog 0192](../../design-backlog.md)** — `--report`'s blindness to
+- **It does not fix [backlog 0192](../../design-backlog-archive.md)** — `--report`'s blindness to
   `beat_index`-driven response. Phase 5 keeps this plan from widening it.
 - **It does not fix the downbeat tracker** ([backlog 0042](../../design-backlog.md)).
 - **It does not retune any shipped preset.** The two hand-rolled staircases in
@@ -417,7 +417,7 @@ lines; nothing in it was hand-edited.
   than presets binding it to brightness. ADR-0180's Consequences names that measurement as the
   thing rule 4's two groups make pointable-at, and the paragraph is where an author meets it.
 - **One comment reworded to keep another lane's gate honest.** `write_holds`'s doc named
-  `beat_index` while pointing at [backlog 0192](../../design-backlog.md), and 0192's own executable
+  `beat_index` while pointing at [backlog 0192](../../design-backlog-archive.md), and 0192's own executable
   probe is `absent: beat_index in: standalone/src/shot/report.rs`. `check-backlog-claims.mjs` broke
   on it. The comment now says *counter-driven* and states why it does not name the counter — a
   regex cannot tell prose from a stimulus field, and rewriting the entry's probe is

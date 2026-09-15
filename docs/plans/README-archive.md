@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0182 - The report hears a counter](#0182---the-report-hears-a-counter)
   - [0181 - A scene advances after its frame's bindings](#0181---a-scene-advances-after-its-frames-bindings)
   - [0185 - A fullscreen field lets the sky through with no post stage](#0185---a-fullscreen-field-lets-the-sky-through-with-no-post-stage)
   - [0187 - The conductor runs the lanes](#0187---the-conductor-runs-the-lanes)
@@ -212,6 +213,35 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0182 - The report hears a counter](done/0182-the-report-hears-a-counter.md)
+
+- closed 2026-09-15 by a conductor-run review (ADR-0205), round 1. Two `dev` phases on the lane
+`plan-0182-the-report-hears-a-counter`: `5e97086` (1, `shot --report` gains a `count` column after
+`onset`, read as the mean frame-aligned difference between a capture over a synthetic musical clock
+at silence and a silent capture of the same 48 frames. `geom` moves to a one-column block, and
+`--json` gains a `count` object after `drive`) and `162ae7f` (2, `docs/capturing.md`). Review:
+**no blockers, no majors, three minors.** Version: **0.124.0** (minor, a feature plan). ADR-0196
+accepted with an Outcome: the backlog probe it predicted would go red stayed green, and the report's
+wall time rose 25 %, not the doubling the plan's stop guarded. Backlog 0192 archived. The review's
+gate: `cargo nextest run --workspace` 1940 passed, 6 skipped, 624 s; `cargo doc` with warnings denied,
+`fmt` and `clippy` clean. `main` had not moved, so the merge was a no-op.
+
+**Readings the review re-took rather than trusted:**
+
+- the clock fixtures read `0`, `0.06380889` and `0.04887192`;
+- `Path Maple` and `Path Lion` read `count 0.169` and `0.191` beside an unchanged `onset 0.000`.
+
+**Fixed at the close:** ADR-0196's false prediction, recorded in its Outcome. **Open, two:**
+- The preset-author `render-loop.md` sample still prints `geom` as the main table's trailing column
+  and has no `count`, and its pre-ship step 7 still lacks the `count` clause the plan's followup
+  names. The conductor session's permissions deny edits under `.claude/`, so the fix is the owner's
+  or a human-started session's.
+- `report.rs` mirrors core's crate-private `FALLBACK_DT` as `CAPTURE_DT`, and nothing holds the two
+  equal.
+
+**Preset curation:** no `.toml` moved, and no shipped preset names ADR-0196, Plan 0182 or backlog
+0192.
 
 ### [0181 - A scene advances after its frame's bindings](done/0181-a-scene-advances-after-its-frames-bindings.md)
 
@@ -1205,7 +1235,7 @@ by this plan's own Phase 7. The verdict rests on evidence — the whole behavior
 both embedded (364 passed, 3 skipped), and `shot --report family=shape_field` reporting **no
 near-duplicate geometry below shape 0.08** against the six presets already in the family, with bass
 reactivity 0.167 and 0.175 sitting mid-family. Their `onset 0.000` is
-[backlog 0192](../design-backlog.md) rather than a dead preset: the report holds a frame, so
+[backlog 0192](../design-backlog-archive.md) rather than a dead preset: the report holds a frame, so
 `beat_index` never advances and a counter-driven response is invisible to every column it prints.
 The stale-workaround sweep is clean — no shipped preset writes `coord_mode = "2"`, so nothing was
 silently getting mode 1 from the `ParamSpec` range Phase 7 corrected.
