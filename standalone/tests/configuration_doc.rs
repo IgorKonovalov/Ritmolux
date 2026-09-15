@@ -24,8 +24,9 @@
 //! proves that from outside the process), and nothing else here leaves the
 //! filesystem.
 
+mod common;
+
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use standalone::config::Config;
 
@@ -55,7 +56,7 @@ fn documented(doc: &str, name: &str) -> bool {
 /// (`-h is a synonym…`) has no such line, so a prefix test over trimmed lines is
 /// enough and needs no column arithmetic.
 fn rostered_flags() -> Vec<String> {
-    let out = Command::new(env!("CARGO_BIN_EXE_ritmolux"))
+    let out = common::player()
         .arg("--help")
         .output()
         .expect("failed to spawn the ritmolux binary");

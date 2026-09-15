@@ -15,6 +15,8 @@
 //! The events side of the same contract is asserted next to the writer, in
 //! `standalone/src/events.rs`.
 
+mod common;
+
 use std::path::{Path, PathBuf};
 
 /// A leading placeholder whose value has been checked and cannot begin with `{`.
@@ -289,7 +291,7 @@ fn the_allowlist_admits_only_placeholders() {
 
 /// Run `ritmolux` with `args` and return its stdout and stderr.
 fn run(args: &[&str]) -> (String, String) {
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_ritmolux"))
+    let output = common::player()
         .args(args)
         .output()
         .expect("spawn the built binary");

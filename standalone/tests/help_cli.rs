@@ -8,9 +8,9 @@
 //! capture client on this path is the failure, and none of them is observable
 //! from inside the process that would be creating them.
 //!
-//! So this spawns the built binary. `ritmolux` is a `[[bin]]`, so `CARGO_BIN_EXE_ritmolux`
-//! resolves it and cargo rebuilds it before the test runs — unlike the `shot`
-//! CLI beside it, which is an example and has to be located by path.
+//! So this spawns the built binary, through `common::player`. `ritmolux` is a
+//! `[[bin]]`, so cargo rebuilds it before the test runs — unlike the `shot` CLI
+//! beside it, which is an example and has to be located by path.
 //!
 //! GPU-free by construction: every case here exits before a renderer exists, so
 //! they run on any machine including an adapterless CI runner.
@@ -23,7 +23,8 @@
     reason = "the exit bound deliberately times a spawned process; the code under test is clock-free"
 )]
 
-use std::process::Command;
+mod common;
+
 use std::time::{Duration, Instant};
 
 /// The bar for "answers and exits" rather than "starts the app". Generous by
@@ -42,7 +43,7 @@ fn run(args: &[&str]) -> (Option<i32>, String, Duration) {
 /// these cases is what the operator is told before the process ends.
 fn run_both(args: &[&str]) -> (Option<i32>, String, String, Duration) {
     let started = Instant::now();
-    let output = Command::new(env!("CARGO_BIN_EXE_ritmolux"))
+    let output = common::player()
         .args(args)
         .output()
         .expect("failed to spawn the ritmolux binary");
@@ -92,7 +93,7 @@ fn help_is_answered_even_beside_an_unrecognized_argument() {
 /// starting the app and drawing.
 #[test]
 fn an_unrecognized_argument_exits_non_zero_and_names_it() {
-    let output = Command::new(env!("CARGO_BIN_EXE_ritmolux"))
+    let output = common::player()
         .arg("--ocs")
         .arg("127.0.0.1:9000")
         .output()
@@ -108,7 +109,7 @@ fn an_unrecognized_argument_exits_non_zero_and_names_it() {
         "the refusal did not name the nearest flag: {stderr}"
     );
 
-    let output = Command::new(env!("CARGO_BIN_EXE_ritmolux"))
+    let output = common::player()
         .arg("--definitely-not-a-flag")
         .output()
         .expect("failed to spawn the ritmolux binary");

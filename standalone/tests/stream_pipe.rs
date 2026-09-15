@@ -19,8 +19,10 @@
     reason = "these tests time and stall a spawned process deliberately"
 )]
 
+mod common;
+
 use std::io::Read;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::time::{Duration, Instant};
 
 /// The preview geometry `--sink stdout` defaults to.
@@ -60,7 +62,7 @@ struct Run {
 /// fills, and the OS buffer fills because nobody is draining it.
 fn run(args: &[&str], stall_after: Option<usize>) -> Option<Run> {
     let started = Instant::now();
-    let mut child = Command::new(env!("CARGO_BIN_EXE_ritmolux"))
+    let mut child = common::player()
         .args(args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

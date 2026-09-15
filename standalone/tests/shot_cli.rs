@@ -12,8 +12,8 @@
 //! would resolve it (ADR-0033 Alternative E): `image` is a dev-dependency precisely
 //! to keep the PNG codec out of the shipped `ritmolux.exe`, and a `[[bin]]` does not get
 //! dev-dependencies. It would also rename every documented invocation, including
-//! ones in `.claude/skills/**` that cannot be edited. So the binary is located
-//! under `target/<profile>/examples/` instead.
+//! ones in `.claude/skills/**` that cannot be edited. So `common` locates the
+//! binary under `<target>/<profile>/examples/` instead.
 //!
 //! `cargo nextest run` **does** build `examples/` targets — verified by deleting
 //! `target/debug/examples/shot.exe` and watching `cargo nextest run -p
@@ -27,6 +27,8 @@
 //! software Metal fallback (ADR-0016), and CI runners generally have no GPU. The
 //! skip is keyed on the adapter error itself rather than on the OS, so an
 //! adapterless Windows runner is handled too and any *other* failure still fails.
+
+mod common;
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -72,30 +74,10 @@ fn repo_root() -> PathBuf {
         .to_path_buf()
 }
 
-/// Locate `target/<profile>/examples/shot[.exe]` by walking up from this test
-/// binary. The test lives at `target/<profile>/deps/shot_cli-<hash>`, so the
-/// `examples/` sibling is one or two levels up — searching the ancestors instead of
-/// hardcoding the depth keeps this working under `CARGO_TARGET_DIR` and under a
-/// `--target <triple>` layout, neither of which puts `target/debug` where you would
-/// guess.
-fn shot_bin() -> PathBuf {
-    let exe = std::env::current_exe().expect("test binary has a path");
-    let name = format!("shot{}", std::env::consts::EXE_SUFFIX);
-    for dir in exe.ancestors().skip(1).take(4) {
-        let candidate = dir.join("examples").join(&name);
-        if candidate.is_file() {
-            return candidate;
-        }
-    }
-    panic!(
-        "could not find the `shot` example next to {}; run \
-         `cargo build -p standalone --example shot` first",
-        exe.display()
-    );
-}
-
+/// Run `shot` with `args` from the repository root, with a data root of its own
+/// (`common::shot`), so no case reads the developer's per-user preset directory.
 fn run(args: &[&str]) -> Output {
-    Command::new(shot_bin())
+    common::shot()
         .args(args)
         .current_dir(repo_root())
         .output()
@@ -1574,7 +1556,7 @@ fn the_four_colour_tags_survive_into_the_container() {
 #[test]
 fn an_encoder_that_dies_reports_the_encoders_own_failure() {
     let clip = render_clip("broken-pipe.wav", 48_000, 1.0);
-    let fake = shot_bin();
+    let fake = common::shot_executable();
 
     let out = run(&[
         "--preset-file",

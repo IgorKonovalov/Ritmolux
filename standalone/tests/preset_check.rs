@@ -19,14 +19,15 @@
 //! under `presets/`: the gate reads those directories as they are on disk, so a
 //! deliberately broken file parked in one would turn the gate red for everyone.
 
+mod common;
+
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use standalone::preset_check::{self, Severity};
 
 /// Run `ritmolux` with `args`; exit code, stdout, stderr.
 fn run(args: &[&str]) -> (Option<i32>, String, String) {
-    let output = Command::new(env!("CARGO_BIN_EXE_ritmolux"))
+    let output = common::player()
         .args(args)
         .output()
         .expect("failed to spawn the ritmolux binary");

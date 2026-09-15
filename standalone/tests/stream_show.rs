@@ -27,10 +27,12 @@
     reason = "these tests bound a spawned process deliberately"
 )]
 
+mod common;
+
 use std::io::{BufRead, Read};
 use std::net::{SocketAddr, UdpSocket};
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Stdio};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
@@ -122,11 +124,11 @@ impl Drain {
 /// writer never blocks on a full pipe.
 ///
 /// `presets` becomes `RLX_PRESET_DIR`; an empty path leaves the run to resolve
-/// its own, which with `APPDATA` cleared is the unresolved case. `APPDATA`,
-/// `HOME` and `XDG_DATA_HOME` are all cleared so the child cannot reach the
-/// developer's real per-user directory on any platform — the presets are
-/// redirected already, and this keeps the config, the diagnostics log and the
-/// directory migration off it too.
+/// its own, which with the data root cleared is the unresolved case. The data
+/// root is cleared (`common::player_with_data_root` with an empty path) so the
+/// child cannot reach the developer's real per-user directory on any platform —
+/// the presets are redirected already, and this keeps the config, the
+/// diagnostics log and the directory migration off it too.
 fn spawn(presets: &Path, extra: &[&str]) -> (Child, Drain) {
     spawn_with_data_root(presets, Path::new(""), extra)
 }
@@ -139,12 +141,9 @@ fn spawn_with_data_root(presets: &Path, root: &Path, extra: &[&str]) -> (Child, 
         "--stream", "--sink", "stdout", "--events", "--fps", "30", "--size", "160x90",
     ];
     args.extend_from_slice(extra);
-    let mut child = Command::new(env!("CARGO_BIN_EXE_ritmolux"))
+    let mut child = common::player_with_data_root(root)
         .args(&args)
         .env("RLX_PRESET_DIR", presets)
-        .env("APPDATA", root)
-        .env("HOME", root)
-        .env("XDG_DATA_HOME", root)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -604,7 +603,7 @@ fn is_null(line: &str, key: &str) -> bool {
 /// Taken from the same executable under test rather than from `rlx_core` in this
 /// process, so what is compared is what a parent would actually receive.
 fn schema_system_keys() -> Vec<String> {
-    let out = Command::new(env!("CARGO_BIN_EXE_ritmolux"))
+    let out = common::player()
         .arg("--schema")
         .output()
         .expect("run the binary with --schema");

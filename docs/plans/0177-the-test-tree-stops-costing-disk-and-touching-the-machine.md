@@ -1,6 +1,6 @@
 # 0177 — The test tree stops touching the machine and stops costing its disk
 
-> **Status:** approved (2026-09-14)
+> **Status:** in-progress
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`, `studio-builder`
 > **Related ADRs:** [0204](../adrs/0204-a-cheap-integration-test-shares-one-binary-and-a-test-that-needs-its-own-stays-its-own.md) (proposed, this plan),
@@ -370,11 +370,11 @@ flowchart LR
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(`main` directly, or the worktree path plus its branch)_
+**Lane:** `C:\Users\Igor Konovalov\WORK\rlx-plan-0177`, branch `plan-0177-the-test-tree-stops-costing-disk-and-touching-the-machine` (conductor run)
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The spawned player gets a scratch data root | dev | not started | |
+| 1 — The spawned player gets a scratch data root | dev | done | committed with this row |
 | 2 — No test source names the target directory | dev | not started | |
 | 3 — The horizon test reads the ground before the rows | dev | not started | |
 | 4 — Measure what grows in `target/` | dev | not started | |
@@ -385,6 +385,15 @@ flowchart LR
 | 9 — The studio tests ask cargo where the player is | studio-builder | not started | |
 
 ### Notes
+
+- **Phase 1, data root.** `%APPDATA%\Ritmolux` (158 entries) listed with size and mtime before and
+  after `cargo nextest run -p standalone --no-fail-fast` (411 passed, 0 skipped): the two listings
+  are byte-identical, so the diff is empty. No `shot_cli` case needed `--presets presets` added.
+- **Phase 1, helper shape.** `common` exposes `player()`, `player_with_data_root(root)`, `shot()` and
+  `shot_executable()`. `stream_show` spawns through `player_with_data_root`, passing an empty path
+  where it tests the unresolved data root, as it did before. `shot_executable()` exists because
+  `an_encoder_that_dies_reports_the_encoders_own_failure` hands the example's path to `shot` as its
+  stand-in encoder.
 
 ### Close triggers
 

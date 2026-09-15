@@ -17,6 +17,9 @@
 //! (g) Every integration test exempted from `clippy::disallowed_methods` is
 //!     scheduled alone by `.config/nextest.toml`, or listed with a reason, and
 //!     that override names nothing else (ADR-0193).
+//! (h) Every spawn of the player or the `shot` example under `standalone/tests/`
+//!     goes through `standalone/tests/common/mod.rs`, which gives the child a
+//!     scratch per-user data root.
 
 use std::path::{Path, PathBuf};
 
@@ -1496,4 +1499,134 @@ fn the_run_alone_filter_parser_refuses_what_it_cannot_read() {
             "`{unreadable}` should be refused, not read"
         );
     }
+}
+
+// ---------------------------------------------------------------------------
+// (h) A spawned player gets a scratch data root
+// ---------------------------------------------------------------------------
+
+/// What a spawn of a workspace binary has to name: the player's cargo variable,
+/// or the `shot` example's locator. Only [`SPAWN_HELPER`] may name either.
+const SPAWN_NAMES: [&str; 2] = ["CARGO_BIN_EXE_ritmolux", "shot_bin"];
+
+/// The one file under `standalone/tests/` allowed to name [`SPAWN_NAMES`].
+const SPAWN_HELPER: &str = "common/mod.rs";
+
+/// Every `.rs` file under `dir`, recursively, sorted.
+fn rs_files_under(dir: &Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    let mut pending = vec![dir.to_path_buf()];
+    while let Some(next) = pending.pop() {
+        let entries =
+            std::fs::read_dir(&next).unwrap_or_else(|e| panic!("read_dir {}: {e}", next.display()));
+        for entry in entries {
+            let path = entry.expect("dir entry").path();
+            if path.is_dir() {
+                pending.push(path);
+            } else if path.extension().is_some_and(|ext| ext == "rs") {
+                out.push(path);
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+/// Every line of `text` that names one of [`SPAWN_NAMES`] outside a comment, as
+/// `<rel>:<line>: <source>`. Line comments, doc comments included, are stripped
+/// first, which keeps line numbers where they were.
+fn spawn_sites(rel: &str, text: &str) -> Vec<String> {
+    strip_line_comments(text)
+        .lines()
+        .enumerate()
+        .filter(|(_, line)| SPAWN_NAMES.iter().any(|name| line.contains(name)))
+        .map(|(at, line)| format!("{rel}:{}: {}", at + 1, line.trim()))
+        .collect()
+}
+
+/// **No test under `standalone/tests/` spawns the player or `shot` except
+/// through `common`.**
+///
+/// A spawned run that inherits the developer's `APPDATA` (or `HOME`, or
+/// `XDG_DATA_HOME`) migrates their app directory, logs to it, binds the control
+/// port their config names and reads their presets as input. `common::player`
+/// and `common::shot` point all three at a scratch directory; this holds every
+/// spawn to them, so the rule does not depend on someone remembering three
+/// `.env()` calls.
+///
+/// # What it cannot see
+///
+/// A spawn that reaches the binary by a path it builds some other way, such as
+/// joining `ritmolux.exe` onto a directory by hand.
+#[test]
+fn every_spawned_workspace_binary_gets_a_scratch_data_root() {
+    let tests = workspace_root().join("standalone").join("tests");
+    let files = rs_files_under(&tests);
+    for must_scan in ["help_cli.rs", "stream_pipe.rs", "shot_cli.rs"] {
+        assert!(
+            files.iter().any(|f| f.ends_with(must_scan)),
+            "the scan no longer reaches `{must_scan}`, so it is guarding less than it reads"
+        );
+    }
+
+    let helper_path = tests.join(SPAWN_HELPER);
+    let helper = std::fs::read_to_string(&helper_path)
+        .unwrap_or_else(|e| panic!("read {}: {e}", helper_path.display()));
+    let helper_sites = spawn_sites(SPAWN_HELPER, &helper);
+    for name in SPAWN_NAMES {
+        assert!(
+            helper_sites.iter().any(|site| site.contains(name)),
+            "standalone/tests/{SPAWN_HELPER} no longer names `{name}`, so this guard watches \
+             for a name no spawn uses; follow the helper's rename here"
+        );
+    }
+
+    let mut hits = Vec::new();
+    for file in &files {
+        let rel = file
+            .strip_prefix(&tests)
+            .expect("scanned file is under standalone/tests")
+            .to_string_lossy()
+            .replace('\\', "/");
+        if rel == SPAWN_HELPER {
+            continue;
+        }
+        let text = std::fs::read_to_string(file)
+            .unwrap_or_else(|e| panic!("read {}: {e}", file.display()));
+        hits.extend(spawn_sites(&format!("standalone/tests/{rel}"), &text));
+    }
+    assert!(
+        hits.is_empty(),
+        "a test spawns a workspace binary outside standalone/tests/{SPAWN_HELPER}, so the \
+         child reads and writes the developer's real per-user directory:\n  {}\n\
+         Build the command with `common::player()`, `common::player_with_data_root(..)` or \
+         `common::shot()` instead.",
+        hits.join("\n  ")
+    );
+}
+
+/// The spawn guard names a bare spawn by file and line, and passes a comment
+/// that merely mentions the variable.
+#[test]
+fn the_spawn_guard_names_a_bare_spawn_and_ignores_prose() {
+    let bare = "fn run(args: &[&str], stall_after: Option<usize>) -> Option<Run> {\n    \
+                let started = Instant::now();\n    \
+                let mut child = Command::new(env!(\"CARGO_BIN_EXE_ritmolux\"))\n        \
+                .args(args)\n";
+    assert_eq!(
+        spawn_sites("standalone/tests/stream_pipe.rs", bare),
+        vec![
+            "standalone/tests/stream_pipe.rs:3: \
+             let mut child = Command::new(env!(\"CARGO_BIN_EXE_ritmolux\"))"
+                .to_owned()
+        ]
+    );
+
+    let prose = "//! `ritmolux` is a `[[bin]]`, so `CARGO_BIN_EXE_ritmolux` resolves it.\n\
+                 /// The locator was `shot_bin`.\n\
+                 let output = common::player().args(args);\n";
+    assert!(
+        spawn_sites("standalone/tests/help_cli.rs", prose).is_empty(),
+        "a comment naming the variable is not a spawn"
+    );
 }
