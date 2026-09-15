@@ -34,7 +34,7 @@ export const REPO = resolve(TOOL_DIR, "..", "..");
 
 // The CLI versions tools/conductor/spike/README.md's evidence table was produced on. A version not
 // listed here is refused; re-running the spike probe is how one is added.
-export const VERIFIED_CLI = ["2.1.270"];
+export const VERIFIED_CLI = ["2.1.270", "2.1.272"];
 
 export function paths({ repo = REPO, toolDir = TOOL_DIR } = {}) {
   return {

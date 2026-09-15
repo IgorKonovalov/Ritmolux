@@ -12,6 +12,26 @@ version this table was not produced on; re-running the probe is how a new versio
 - **Run:** `node tools/conductor/spike/probe.mjs --model haiku`; raw output under
   `target/conductor-spike/<stamp>/` (never committed)
 
+## Re-verified on 2.1.272
+
+- **Date:** 2026-09-15
+- **CLI:** `claude --version` -> `2.1.272 (Claude Code)`
+- **Run:** `node tools/conductor/spike/probe.mjs --model haiku`; $0.098 (session A) + $0.053 (session B)
+
+Every row of the table below was re-observed and holds unchanged: the skill loads, the deny hook
+reaches the session as a readable tool error, an allowed `Bash` runs and a disallowed one is denied
+without stalling, `Edit`/`Write` land, the `result` event carries the same fields, the budget stop is
+still exit 1 with `error_max_budget_usd` after one turn, and `git worktree remove` leaves no handle.
+
+**One count in the table is no longer this repository's.** The deny-hook row says four
+`PreToolUse:Bash` hooks run per Bash call. Six ran: `.claude/settings.json` has gained
+`block-push-and-history-rewrite.js` and `conductor-suite-lock.js`, so it is four project hooks plus
+the user-level one plus the `--settings` one. That is this repository changing, not the CLI, and the
+hooks compose the same way - the `--settings` hook adds to the project's rather than replacing them.
+
+**Not re-observed:** the probe records `result.keys` but not the values of `terminal_reason`,
+`apiKeySource` or `permission_denials`. Those three readings are carried over from 2.1.270.
+
 ## What the probe does
 
 Two sessions, both `claude -p "/dev implement plan 9999"` with the worktree as cwd, and with
