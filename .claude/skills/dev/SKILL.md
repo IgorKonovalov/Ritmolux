@@ -298,14 +298,18 @@ implementer run.
 - **Never ask a question.** Nobody is there. Everything that would stop a human-started session —
   "When the plan is wrong", a `human` phase inside the range, a stop condition the plan states, a
   question only the owner can answer, a check you cannot make green inside the phase — ends this one
-  with a `parked` outcome naming it. Commit finished work first and leave the tree clean. A park is
+  with a `parked` outcome naming it. Commit finished work first and leave the tree clean: put back a
+  file the session did not mean to change, such as a golden a test run re-encoded, with
+  `git restore <path>` (`git checkout` and `git stash` are refused). `resume` refuses a dirty lane. A park is
   the correct result, not a failure; working around the plan is the failure.
 - **Every `cargo nextest` or `cargo test` runs through the suite lock**:
   `node <path from RLX-CONDUCTOR-SUITE-LOCK> suite -- cargo nextest run ...`. A hook denies the bare
   form in this mode.
-- **On the last implementer run**, do Step 4 — full suite under the lock, the close block committed —
-  and then print the outcome block **instead of** the three-line pointer. The conductor starts the
-  review.
+- **On the last implementer run**, do Step 4 **without its step 0**: do not run the full workspace
+  suite. The conductor's `pre-review` gate runs it next on the same code, and a red there parks the
+  plan as `gate_red` (ADR-0207). Commit the close block, with its `Full suite:` bullet reading
+  *owed to the conductor's pre-review gate (ADR-0207)*. Then print the outcome block **instead of**
+  the three-line pointer. The conductor starts the review.
 
 **`fix`** — the prompt names the plan, the round, the review file and its numbered findings.
 

@@ -15,15 +15,16 @@
 // tools/conductor/digest.md, both gitignored. tools/conductor/README.md is the operator guide.
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { pidAlive } from "./with-lock.mjs";
 import { writeDigest } from "./lib/digest.mjs";
 import { currentBranch, isClean } from "./lib/git.mjs";
-import { appendPark } from "./lib/inbox.mjs";
+import { appendPark, dirtyText, dirtyWorktree } from "./lib/inbox.mjs";
 import { runLanes } from "./lib/lane.mjs";
+import { ascii } from "./lib/live.mjs";
 import { findPlan, nextStep, readPlanFile } from "./lib/plan.mjs";
 import { loadLocal, loadQueue, stateSets } from "./lib/queue.mjs";
 import { loadState, planRecord, recoverInterrupted, saveState, statePaths, totalSpend } from "./lib/state.mjs";
@@ -32,9 +33,29 @@ import { activeChildren, killTree } from "./lib/step.mjs";
 export const TOOL_DIR = dirname(fileURLToPath(import.meta.url));
 export const REPO = resolve(TOOL_DIR, "..", "..");
 
-// The CLI versions tools/conductor/spike/README.md's evidence table was produced on. A version not
-// listed here is refused; re-running the spike probe is how one is added.
-export const VERIFIED_CLI = ["2.1.270"];
+// The CLI versions tools/conductor/spike/README.md's evidence table was produced on. Re-running the
+// spike probe is how one is added. An unlisted version at a higher patch of a listed major.minor runs
+// with a warning; any other unlisted version is refused (ADR-0208).
+export const VERIFIED_CLI = ["2.1.270", "2.1.272"];
+
+/**
+ * What preflight makes of `claude --version`: {} for a listed version, { warning } for one sharing
+ * major and minor with a listed version at a lower patch, { error } for anything else.
+ */
+export function cliVerdict(version, verified = VERIFIED_CLI) {
+  if (verified.includes(version)) return {};
+  const unlisted = `claude ${version} is not a verified CLI version (verified: ${verified.join(", ")})`;
+  const clear = "re-run tools/conductor/spike/probe.mjs and record the evidence before adding it";
+  const [major, minor, patch] = version.split(".").map(Number);
+  const lowerPatch = verified.some((v) => {
+    const [a, b, c] = v.split(".").map(Number);
+    return a === major && b === minor && c < patch;
+  });
+  if (lowerPatch) {
+    return { warning: `${unlisted}; a patch update of a verified version runs with this warning (ADR-0208) - ${clear}` };
+  }
+  return { error: `${unlisted}; ${clear}` };
+}
 
 export function paths({ repo = REPO, toolDir = TOOL_DIR } = {}) {
   return {
@@ -60,26 +81,29 @@ export function claudeVersion(claude) {
 }
 
 /**
- * Everything that must hold before a run starts. Returns { errors, local, queue, state, claude }.
+ * Everything that must hold before a run starts. Returns
+ * { errors, warnings, local, queue, state, claude, cli: { version, warning } | null }.
  * `claude` overrides local.json's command vector (tests pass the fake).
  */
 export function preflight(p = paths(), { claude } = {}) {
   const errors = [];
+  const warnings = [];
   const { errors: localErrors, local } = loadLocal(p.local);
   errors.push(...localErrors);
   const command = claude ?? local?.claude ?? ["claude"];
   const v = claudeVersion(command);
+  let cli = null;
   if (v.error) errors.push(v.error);
-  else if (!VERIFIED_CLI.includes(v.version)) {
-    errors.push(
-      `claude ${v.version} is not a verified CLI version (verified: ${VERIFIED_CLI.join(", ")}); ` +
-        `re-run tools/conductor/spike/probe.mjs and record the evidence before adding it`,
-    );
+  else {
+    const verdict = cliVerdict(v.version);
+    if (verdict.error) errors.push(verdict.error);
+    if (verdict.warning) warnings.push(verdict.warning);
+    cli = { version: v.version, warning: verdict.warning ?? null };
   }
   const state = loadState(p.stateDir);
   const queue = loadQueue(p.queue, p.repo, ...stateSets(state));
   errors.push(...queue.errors);
-  return { errors, local, queue, state, claude: command };
+  return { errors, warnings, local, queue, state, claude: command, cli };
 }
 
 const pidFile = (p) => join(p.stateDir, "conductor.pid");
@@ -92,6 +116,24 @@ function runningPid(p) {
 
 function regenerate(p, state) {
   writeDigest(p.digest, state, { repo: p.repo, stateDir: p.stateDir });
+}
+
+/** The line `run` prints for a lane event as it happens, or null for one it does not print. */
+export function eventLine(name, d) {
+  switch (name) {
+    case "worktree-cap":
+      return `conductor: lane ${d.lane} stopped at the worktree cap (max_open_worktrees ${d.max}, held by ${d.holding.join(", ")}); ${d.plan} not started`;
+    case "lane-open":
+      return `conductor: ${d.plan} opened its lane at ${d.worktree}`;
+    case "park":
+      return `conductor: ${d.plan} parked (${d.reason})`;
+    case "closed":
+      return `conductor: ${d.plan} closed${d.tag ? `, tag ${d.tag}` : ""}`;
+    case "ff":
+      return `conductor: ${d.plan} fast-forwarded main to ${d.head.slice(0, 7)}`;
+    default:
+      return null;
+  }
 }
 
 const minutes = (iso) => (iso ? `${Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000))} min` : "?");
@@ -111,11 +153,28 @@ async function cmdRun(args, o) {
     for (const e of errors) o.err(`conductor: ${e}`);
     return 1;
   }
+  for (const w of pf.warnings) o.err(`conductor: warning: ${w}`);
 
   const state = pf.state;
   const recovered = recoverInterrupted(p.stateDir, state);
   if (recovered) o.log(`conductor: ${recovered} step(s) were in flight when the last run stopped; they will run again`);
+  // A clean checkout has no state/ yet: nothing before this line writes into it.
+  mkdirSync(p.stateDir, { recursive: true });
   writeFileSync(pidFile(p), String(process.pid));
+
+  // Every line `run` prints while lanes run also goes to state/live.log, under one header per run.
+  const liveLog = join(p.stateDir, "live.log");
+  const appendLive = (text) => {
+    try {
+      appendFileSync(liveLog, text);
+    } catch {}
+  };
+  appendLive(`\n== run ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC, lanes ${(lane ? [lane] : Object.keys(pf.queue.lanes)).join(", ")} ==\n`);
+  const emit = (line) => {
+    const text = ascii(line);
+    o.log(text);
+    appendLive(`${text}\n`);
+  };
 
   const ctx = {
     repo: p.repo,
@@ -125,6 +184,7 @@ async function cmdRun(args, o) {
     settingsFile: p.settings,
     withLockPath: p.withLock,
     claude: pf.claude,
+    cli: pf.cli,
     local: pf.local,
     queue: pf.queue,
     state,
@@ -134,7 +194,13 @@ async function cmdRun(args, o) {
     pollMs: o.pollMs,
     once: args.includes("--once"),
     lanes: lane ? [lane] : undefined,
+    commitPollMs: o.commitPollMs,
     onChange: () => regenerate(p, state),
+    live: emit,
+    events: (name, data) => {
+      const line = eventLine(name, data);
+      if (line) emit(line);
+    },
   };
 
   const interrupt = () => {
@@ -199,6 +265,9 @@ function cmdStatus(args, o) {
 /** Why a park still holds, or null when the owner has acted on it. */
 function parkStillTrue(p, rec) {
   const { reason, phase } = rec.park;
+  // Whatever the reason, no new session starts on a tree the last one left dirty.
+  const dirty = dirtyWorktree(rec.worktree);
+  if (dirty) return `the worktree ${rec.worktree} has uncommitted changes: ${dirtyText(dirty)}; commit them, or \`git restore\` them there, first`;
   if (reason === "human_phase") {
     const where = rec.worktree && existsSync(rec.worktree) ? rec.worktree : p.repo;
     const found = findPlan(where, rec.plan);
@@ -266,8 +335,10 @@ function cmdPark(args, o) {
   }
   rec.status = "parked";
   rec.park = { reason: "owner", detail: "parked by the owner", phase: null, read: null, worktree: rec.worktree, at: new Date().toISOString() };
+  const dirty = dirtyWorktree(rec.worktree);
+  if (dirty) rec.park.dirty = dirty;
   rec.parks.push(rec.park);
-  appendPark(statePaths(p.stateDir).inbox, { plan, reason: "owner", detail: "parked by the owner", worktree: rec.worktree });
+  appendPark(statePaths(p.stateDir).inbox, { plan, reason: "owner", detail: "parked by the owner", worktree: rec.worktree, dirty });
   saveState(p.stateDir, state);
   regenerate(p, state);
   o.log(`conductor: plan ${plan} parked; \`resume ${plan}\` queues it again`);
@@ -303,13 +374,14 @@ function cmdCheck(args, o) {
     for (const e of r.errors) o.err(`conductor: ${e}`);
     return 1;
   }
-  o.log("conductor: preflight OK");
+  for (const w of r.warnings) o.err(`conductor: warning: ${w}`);
+  o.log(r.warnings.length ? "conductor: preflight OK, with a warning" : "conductor: preflight OK");
   return 0;
 }
 
 const COMMANDS = { run: cmdRun, status: cmdStatus, resume: cmdResume, park: cmdPark, abort: cmdAbort, check: cmdCheck };
 
-/** `overrides` exists for tests: { p, claude, gate, worktreeRoot, lockDir, lockPollMs, pollMs, log, err, signals }. */
+/** `overrides` exists for tests: { p, claude, gate, worktreeRoot, lockDir, lockPollMs, pollMs, commitPollMs, log, err, signals }. */
 export async function main(argv, overrides = {}) {
   const o = {
     p: paths(),

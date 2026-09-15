@@ -5,6 +5,8 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -82,6 +84,9 @@ const SUITE_DENIED_UNDER_CONDUCTOR = [
   "cd core && cargo nextest run",
   "cargo llvm-cov nextest --workspace",
   "node tools/conductor/with-lock.mjs close -- cargo nextest run --workspace",
+  "cargo nextest run -p rlx-core",
+  "cargo nextest list --workspace && cargo nextest run",
+  "cargo nextest list -p rlx-core; cargo test -p rlx-core",
 ];
 
 const SUITE_ALLOWED_UNDER_CONDUCTOR = [
@@ -91,6 +96,9 @@ const SUITE_ALLOWED_UNDER_CONDUCTOR = [
   "cargo fmt --all --check",
   "echo cargo test",
   'git commit -m "test(core): cargo nextest run is green"',
+  "cargo nextest list -p rlx-core",
+  "cargo nextest list --workspace",
+  "node tools/conductor/with-lock.mjs suite -- cargo nextest list -p rlx-core",
 ];
 
 for (const command of SUITE_DENIED_UNDER_CONDUCTOR) {
@@ -107,3 +115,21 @@ for (const command of SUITE_ALLOWED_UNDER_CONDUCTOR) {
     assert.equal(decision(SUITE_HOOK, command, CONDUCTOR), "allow");
   });
 }
+
+test("the suite hook logs every call to RLX_HOOK_LOG under the conductor, whatever it decides, and nothing outside it", () => {
+  const dir = mkdtempSync(join(tmpdir(), "rlx-hooklog-"));
+  const log = join(dir, "0101-01-implement.log");
+  assert.equal(decision(SUITE_HOOK, "git status", { ...CONDUCTOR, RLX_HOOK_LOG: log }), "allow");
+  assert.equal(decision(SUITE_HOOK, "cargo test -p rlx-core", { ...CONDUCTOR, RLX_HOOK_LOG: log }), "deny");
+  const lines = readFileSync(log, "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  assert.deepEqual(lines.map((l) => [l.hook, l.tool, l.decision]), [
+    ["conductor-suite-lock", "Bash", "allow"],
+    ["conductor-suite-lock", "Bash", "deny"],
+  ]);
+
+  const outside = join(dir, "outside.log");
+  assert.equal(decision(SUITE_HOOK, "git status", { RLX_HOOK_LOG: outside }), "allow");
+  assert.equal(existsSync(outside), false, "no RLX_CONDUCTOR, no log");
+  // An unwritable log path never changes the decision.
+  assert.equal(decision(SUITE_HOOK, "cargo test", { ...CONDUCTOR, RLX_HOOK_LOG: join(dir, "missing-dir", "x.log") }), "deny");
+});

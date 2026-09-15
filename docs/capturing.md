@@ -704,14 +704,15 @@ cross-machine byte equality does not hold and nothing here asserts it.
 ### What the report's columns mean
 
 ```
-  preset           bass    mid   treb  onset  drive   anim    rate  cover  level  rise  fall
-  Shatter         0.099  0.064  0.013  0.106  0.103  0.092 0.0357+  0.580 0.0487   11+    4+
-  Stipple         0.050  0.013  0.001  0.011  0.057  0.010 0.0132+  0.335 0.5804    7+   26+
+  preset           bass    mid   treb  onset  count  drive   anim    rate  cover  level  rise  fall
+  Shatter         0.099  0.064  0.013  0.106  0.077  0.103  0.092 0.0358+  0.580 0.0487   11+    4+
+  Stipple         0.050  0.013  0.001  0.011  0.003  0.057  0.010 0.0132+  0.335 0.5804    7+   26+
 ```
 
 | column | question it answers |
 |---|---|
 | `bass` `mid` `treb` `onset` | how far the frame moves when that stimulus alone comes up, against silence — "does this preset respond to bass at all" |
+| `count` | **does the musical clock reach the picture** — `beat_index`, `bar_index`, the beat and bar phases, and a `beat`- or `bar`-held binding, none of which move in any other column. It is the **mean** over a 48-frame sequence at silence with a beat every 5 frames (720 BPM, deliberately not a tempo), differenced frame by frame against 48 silent frames, so its magnitude is **not comparable** to the settled band cells beside it. A preset that reads no clock reads exactly `0.000`, and one that reads only `beat` shows here as well as in `onset`, because the clock fires `beat` on every step of its counter. Like `drive`, read it **against family neighbours, never as a threshold** ([ADR-0196](adrs/0196-the-report-hears-the-musical-clock-in-a-column-of-its-own.md)) |
 | `drive` | how far the frame moves under the **combined** stimulus — silence against everything up at once, same depth and same size ([the two motion readings](#the-two-motion-readings)) |
 | `anim` | how far the frame moves between two capture depths **under silence** — does it have a life of its own |
 | `rate` | how far the frame moves **frame to frame** — the only column that walks consecutive frames, and the only one measured at 96x96 ([the two motion readings](#the-two-motion-readings)) |
@@ -759,8 +760,24 @@ The tail is what distinguishes a name in this library — `Mono`, `Gallery`,
 presets came to print as one row label in all three tables (design-backlog 0131).
 A `~` in a label means characters were dropped there.
 
-Two extra labeled blocks print under the table (the table itself stays un-widened,
-so every historical number keeps its place): the **realistic-levels** reading
+A family whose scenes draw through the line renderer first gets a one-column
+**`geom`** block, under the prose that follows the table: the in-frame geometry
+fraction, the share of drawn line length inside the frame at the fully-driven
+capture, read while tuning `scale` and never as a threshold
+([ADR-0083](adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md)).
+It is a block rather than a column because the table has no width left for it
+under 100 characters. A preset in such a family that drew no line prints `-`, and
+`--json` carries the value as `in_frame_geometry`.
+
+```
+  preset           geom
+  Gyre           0.9685
+  Loom           0.9962
+  Curve Mono     0.9602
+```
+
+Two more labeled blocks print under the table (new readings go beside the table
+rather than into it, so every historical number keeps its place): the **realistic-levels** reading
 (`reactivity_low` — the same bands at the levels real music reaches, [ADR-0042](adrs/0042-reachability-measured-on-the-expression-tree.md)) and,
 since [Plan 0077](plans/done/0077-the-quiet-sky.md), the **footprint** reading (`reactivity_footprint`) — the same
 differentials divided by the **union of lit pixels** instead of the whole frame
@@ -772,7 +789,7 @@ something to see. On a backdrop-heavy preset the union mask approaches the whole
 frame and the reading degrades toward the mean column — it never sits meaningfully
 below it, so it fails toward the old behaviour rather than inventing reactivity.
 
-Every one of those but the last two is a **settled** measurement: the capture
+Every one of those but `count` and the last two is a **settled** measurement: the capture
 holds one stimulus for every frame it renders, so each smoother has converged
 long before the pixels are read. That is the right question for "does it
 respond", and it is exactly why those columns are **identical for any
@@ -1381,7 +1398,7 @@ figures; whether it needs a re-gain pass is
 
 The `--report --json` schema is a nested object of numbers keyed by
 family/preset: per-band `reactivity`, `reactivity_low` and `reactivity_footprint`,
-`animation`, `drive`, `rate`, `coverage`, `level`, `transient` (`rise_frames` /
+`animation`, `drive`, `count`, `rate`, `coverage`, `level`, `transient` (`rise_frames` /
 `fall_frames` as integers plus their `ratio`), `reachability`, the pairwise
 `pixel`/`shape` distinctness matrices, and `near_duplicates`.
 
@@ -1390,6 +1407,11 @@ family/preset: per-band `reactivity`, `reactivity_low` and `reactivity_footprint
 beside it use ([the two motion readings](#the-two-motion-readings)). A consumer
 that drops `measured_at_px` and compares a `rate` against a differently-sized run
 is reading a different statistic.
+
+`count` is an object for the same reason: `mean`, and the schedule it was read
+under — `frames` (48) and `frames_per_beat` (5). `mean` is written at full
+precision rather than to four places, so a preset that reads no clock shows an
+exact `0`.
 
 `reachability` carries `dead_branches`, `unapproached_ceilings` and
 `saturated_clamps` counts, the full `gates` list (each with `param`, `source`,
@@ -1424,14 +1446,17 @@ under the family they belong to:
   HELD: my_rose [layer] mix on 2.5 s
 ```
 
-The block is **absent** when no preset in the family holds anything — no shipped
-preset declares a `[hold]` table, so the whole library is in that case and the
-lines above are from a hand-written fixture. `--json` carries the same pairs as
+The block is **absent** when no preset in the family holds anything; the lines
+above are from a hand-written fixture. `--json` carries the same pairs as
 `reachability.holds`.
 
-This is containment for `[hold]`, not a fix for the report's blindness to
-`beat_index`-driven response — that is
-[design-backlog 0192](design-backlog.md), and it is a larger hole.
+Naming a hold is containment for the held columns, where the stimulus is one
+frame repeated and a `beat` or `bar` edge never comes round. **A `beat`- or
+`bar`-held binding now moves `count`**: that column's clock fires a beat every 5
+frames and steps the bar counter twice, so a held binding re-samples there, and
+a counter read directly — `beat_index`, `bar_index` — moves it the same way
+([what the report's columns mean](#what-the-reports-columns-mean)). A hold on a
+period in seconds is on the render clock, which every column already runs.
 
 ## The live video-out: `ritmolux --stream`
 

@@ -390,8 +390,6 @@ pub(super) fn evaluate_preset(
         dt,
     } = inputs;
     let Scratch { series, vertex } = scratch;
-    scene.set_time(time);
-    scene.advance(dt);
     // The composite advances on the same measured `dt` the scene does (ADR-0048):
     // the trails accumulation is the one post stage with state between frames, and
     // its decay and `fb_*` rates are per-second.
@@ -484,6 +482,11 @@ pub(super) fn evaluate_preset(
             scene.set_per_vertex(&binding.name, surface.buf);
         }
     }
+    // The scene advances **after** every value this frame binds has landed, so
+    // whatever `advance` integrates is this frame's parameter rather than the
+    // previous frame's (ADR-0198).
+    scene.set_time(time);
+    scene.advance(dt);
     scene.update(frame);
 }
 
@@ -520,8 +523,6 @@ pub(super) fn evaluate_layer(
         dt,
     } = inputs;
     let Scratch { series, vertex } = scratch;
-    scene.set_time(time);
-    scene.advance(dt);
     scene.reset_params();
     for (index, binding) in layer.params.iter().enumerate() {
         if !series.is_empty() && binding.expr.uses_index() {
@@ -551,6 +552,9 @@ pub(super) fn evaluate_layer(
             .quantize(state.smoother.smooth(slot, held, mix.tau, dt));
         chain.set_layer_mix(value);
     }
+    // After the bindings, for `evaluate_preset`'s reason.
+    scene.set_time(time);
+    scene.advance(dt);
     scene.update(frame);
 }
 

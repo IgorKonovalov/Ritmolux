@@ -11,6 +11,7 @@ import { test } from "node:test";
 import { writeDigest } from "../lib/digest.mjs";
 import { git, resolveCommit, tagObjectType } from "../lib/git.mjs";
 import { runLanes } from "../lib/lane.mjs";
+import { readLedger } from "../lib/ledger.mjs";
 import { findPlan, readPlanFile } from "../lib/plan.mjs";
 import { validateQueue } from "../lib/queue.mjs";
 import { loadState, statePaths } from "../lib/state.mjs";
@@ -61,7 +62,10 @@ export function scratch({ plans, lanes, after = {}, spec = {}, local = {} }) {
     local: { budget_usd: { implement: 5, fix: 3, review: 4 }, max_open_worktrees: 3, ...local },
     queue,
     state: loadState(stateDir),
-    gate: [{ name: "marker", cmd: [process.execPath, "-e", "process.exit(require('fs').existsSync('GATE_RED')?1:0)"], lock: "suite" }],
+    gate: [
+      { name: "marker", cmd: [process.execPath, "-e", "process.exit(require('fs').existsSync('GATE_RED')?1:0)"], lock: "suite" },
+      { name: "check-backlog-claims.mjs", cmd: [process.execPath, "-e", "process.exit(require('fs').existsSync('PROBE_RED')?1:0)"], afterClose: true },
+    ],
     lockDir: tmp("rlx-locks-"),
     lockPollMs: 20,
     pollMs: 50,
@@ -167,6 +171,132 @@ test("a human phase parks with its worktree kept, the lane runs on, and a depend
   assert.match(needs, /^- \*\*0101 parked\*\* at Phase 2 \(`human_phase`\)\. Phase 2 is owned by human\. Read: docs\/plans\/0101-fixture\.md Phase 2\. Holds `[^`]*rlx-plan-0101`\.$/m);
   assert.match(needs, /^ {2}Resume: `node tools\/conductor\/conductor\.mjs resume 0101`$/m);
   assert.match(digest("### Closed"), /^- \*\*0102 - Plan 0102 fixture\*\*/m);
+
+  // A park on a clean worktree records no path list and prints nothing extra.
+  assert.equal("dirty" in parked.park, false);
+  assert.ok(!inbox.includes("Left dirty"));
+  assert.ok(!needs.includes("Left dirty"));
+});
+
+test("a park that leaves the worktree dirty names the paths, capped, in the record, the inbox and the digest", async () => {
+  const { ctx, digest } = scratch({
+    plans: [{ number: "0101", phases: [dev("1")] }],
+    lanes: { a: ["0101"] },
+    spec: { "0101": { dirtyPark: { untracked: 13 } } },
+  });
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "parked");
+  assert.equal(rec.park.reason, "check_red");
+  const shown = ["VERSION", ...Array.from({ length: 9 }, (_, i) => `bless-${String(i + 1).padStart(2, "0")}.png`)];
+  assert.deepEqual(rec.park.dirty, { paths: shown, more: 4 }, "ten paths shown, the other four counted");
+
+  const text = `${shown.map((p) => `\`${p}\``).join(", ")} and 4 more`;
+  const inbox = readFileSync(statePaths(ctx.stateDir).inbox, "utf8");
+  assert.ok(inbox.includes(`- **Left dirty:** ${text}. \`resume\` refuses until the worktree is clean.`), inbox);
+  const needs = digest("### Needs you");
+  assert.match(needs, /^- \*\*0101 parked\*\* \(`check_red`\)\. .* Holds `[^`]*rlx-plan-0101`\. Left dirty: .*$/m);
+  assert.ok(needs.includes(` Left dirty: ${text}.\n`), needs);
+});
+
+test("a lane that reaches the worktree cap stops, and the run and the digest say why", async () => {
+  const { ctx, readEvents, digest } = scratch({
+    plans: [
+      { number: "0101", phases: [dev("1"), human("2")] },
+      { number: "0102", phases: [dev("1")] },
+      { number: "0103", phases: [dev("1")] },
+    ],
+    lanes: { a: ["0101", "0102", "0103"] },
+    after: { "0103": ["0101"] },
+    local: { max_open_worktrees: 1 },
+  });
+  await runLanes(ctx);
+  const state = loadState(ctx.stateDir);
+  assert.equal(state.plans["0101"].status, "parked");
+  assert.equal(state.plans["0102"], undefined, "the cap held 0102 back");
+
+  const run = state.runs.at(-1);
+  assert.equal(run.stops.length, 1);
+  const { at, ...stop } = run.stops[0];
+  assert.deepEqual(stop, { lane: "a", reason: "worktree_cap", plan: "0102", holding: ["0101"], max: 1 });
+  assert.ok(at);
+  assert.deepEqual(run.notStarted, [
+    { plan: "0102", lane: "a", reason: "worktree cap" },
+    { plan: "0103", lane: "a", reason: "after 0101 (parked)" },
+  ]);
+  assert.ok(readEvents().some((e) => e.event === "conductor-worktree-cap" && e.plan === "0102"));
+
+  const needs = digest("### Needs you");
+  const capLines = needs.split("\n").filter((l) => l.includes("worktree cap"));
+  assert.deepEqual(capLines, ["- **Lane a stopped at the worktree cap** (`max_open_worktrees` 1): 0102 was not opened. Worktrees held by 0101."]);
+  assert.equal(digest("### Not started").trim(), "- **0102** (lane a): worktree cap\n- **0103** (lane a): after 0101 (parked)");
+});
+
+/** Three plans parked in an earlier run, each naming a worktree directory the test builds for real. */
+function parkedHolders(ctx, { present }) {
+  const recs = ["0091", "0092", "0093"].map((plan) => {
+    const worktree = tmp(`rlx-held-${plan}-`);
+    if (!present) rmSync(worktree, { recursive: true, force: true });
+    return {
+      plan,
+      status: "parked",
+      lane: "a",
+      worktree,
+      branch: `plan-${plan}-held`,
+      laneRemoved: false,
+      steps: [],
+      park: { reason: "plan_wrong", detail: "held", phase: null, read: null, worktree, at: "2026-09-14T10:00:00.000Z" },
+      parks: [],
+      fixRounds: 0,
+      verdicts: [],
+      fixes: [],
+      lockWaits: [],
+    };
+  });
+  for (const r of recs) {
+    r.parks.push(r.park);
+    ctx.state.plans[r.plan] = r;
+  }
+  return recs;
+}
+
+test("the cap counts worktrees on disk: three parked plans whose directories are gone do not hold the next one back", async () => {
+  const { ctx } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
+  const held = parkedHolders(ctx, { present: false });
+  const lines = [];
+  ctx.live = (l) => lines.push(l);
+  await runLanes(ctx);
+  const state = loadState(ctx.stateDir);
+  assert.equal(state.plans["0101"].status, "merged", JSON.stringify(state.plans["0101"].park));
+  assert.equal(state.runs.at(-1).stops, undefined, "no cap stop");
+
+  // Each standing-park line names the branch resume reopens from, and no worktree path.
+  for (const r of held) {
+    const line = lines.find((l) => l.includes(` ${r.plan} still parked`));
+    assert.ok(line, lines.join("\n"));
+    assert.ok(line.includes(`resume reopens it from branch ${r.branch}`), line);
+    assert.ok(!line.includes("rlx-held-"), `no worktree path: ${line}`);
+  }
+});
+
+test("the cap counts worktrees on disk: the same three with their directories present stop the lane and are named", async () => {
+  const { ctx } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
+  const held = parkedHolders(ctx, { present: true });
+  const lines = [];
+  ctx.live = (l) => lines.push(l);
+  await runLanes(ctx);
+  const state = loadState(ctx.stateDir);
+  assert.equal(state.plans["0101"], undefined, "0101 was not opened");
+  const { at, ...stop } = state.runs.at(-1).stops[0];
+  assert.deepEqual(stop, { lane: "a", reason: "worktree_cap", plan: "0101", holding: ["0091", "0092", "0093"], max: 3 });
+  for (const r of held) assert.ok(lines.some((l) => l.includes(` ${r.plan} still parked`) && l.includes(`holds ${r.worktree}`)), lines.join("\n"));
+});
+
+test("a run that opens every queued plan it can has no Not started list", async () => {
+  const { ctx, digest } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
+  await runLanes(ctx);
+  assert.equal(loadState(ctx.stateDir).runs.at(-1).notStarted.length, 0);
+  assert.ok(!digest().includes("### Not started"));
 });
 
 test("a review with one major takes exactly one fix round and a re-review, then merges", async () => {
@@ -401,6 +531,94 @@ test("a budget-exhausted step parks with its spend recorded", async () => {
 
   assert.match(digest("### Failed and parked"), /^- \*\*0101\*\* spend cap hit in `0101-01-implement`: spent \$7\.50\.$/m);
   assert.match(digest("### Totals"), /^- lane a: 0 merged, 1 parked, \$7\.50\.$/m);
+});
+
+test("a probe the implement commit breaks and the close repairs is not gated before the review, and merges", async () => {
+  const { ctx, repo } = scratch({
+    plans: [{ number: "0101", phases: [dev("1")] }],
+    lanes: { a: ["0101"] },
+    spec: { "0101": { breaksProbe: true } },
+  });
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  assert.deepEqual(rec.parks, []);
+  assert.deepEqual(rec.gates.map((g) => [g.label, g.ok]), [["pre-review", true], ["post-close", true]]);
+  assert.ok(!rec.gates[0].ran.includes("check-backlog-claims.mjs"), "the pre-review gate ran no probe");
+  assert.ok(rec.gates[1].ran.includes("check-backlog-claims.mjs"), "the post-close gate ran the probe");
+  assert.equal(existsSync(join(repo, "PROBE_RED")), false);
+});
+
+test("a probe the close leaves red parks gate_red at post-close and main does not move", async () => {
+  const { ctx, repo } = scratch({
+    plans: [{ number: "0101", phases: [dev("1")] }],
+    lanes: { a: ["0101"] },
+    spec: { "0101": { breaksProbe: true, probeStaysRed: true } },
+  });
+  const mainBefore = resolveCommit("main", repo);
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "parked");
+  assert.equal(rec.park.reason, "gate_red");
+  assert.match(rec.park.detail, /after the close: check-backlog-claims\.mjs/);
+  assert.deepEqual(rec.gates.map((g) => [g.label, g.ok]), [["pre-review", true], ["post-close", false]]);
+  assert.equal(resolveCommit("main", repo), mainBefore, "main did not move");
+});
+
+test("a close that repairs one minor and leaves one open shows exactly the open one in Needs you", async () => {
+  const { ctx, digest } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] }, spec: { "0101": { closeRepair: "ok" } } });
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  const repaired = rec.verdicts.at(-1).findings.find((f) => f.fixed_in);
+  assert.ok(repaired, "the verdict kept fixed_in");
+  const needs = digest("### Needs you");
+  assert.deepEqual(
+    needs.split("\n").filter((l) => l.trim()),
+    ["- **0101 merged with 1 open finding**:", "  - minor `phase-0101-1.txt:2` a duplicated constant, left open"],
+  );
+  assert.ok(digest("### Closed").includes(`  - minor \`phase-0101-1.txt:1\` a comment the plan made false - repaired by the close in \`${repaired.fixed_in.slice(0, 7)}\``));
+});
+
+test("a fixed_in commit that does not change the finding's file parks as a disagreement", async () => {
+  const { ctx, repo } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] }, spec: { "0101": { closeRepair: "wrongFile" } } });
+  const mainBefore = resolveCommit("main", repo);
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "parked");
+  assert.equal(rec.park.reason, "disagreement");
+  assert.match(rec.park.detail, /finding 0 is fixed_in [0-9a-f]{7}, which does not change phase-0101-1\.txt/);
+  assert.equal(resolveCommit("main", repo), mainBefore);
+});
+
+test("a fixed_in commit that is not on the branch parks as a disagreement", async () => {
+  const { ctx } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] }, spec: { "0101": { closeRepair: "offBranch" } } });
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "parked");
+  assert.equal(rec.park.reason, "disagreement");
+  assert.match(rec.park.detail, /finding 0 is fixed_in [0-9a-f]{40}, which is not on the branch/);
+});
+
+test("with no fix round and an unmoved main, a plan executes the full suite twice and skips it twice", async () => {
+  const { ctx, digest } = scratch({ plans: [{ number: "0101", phases: [dev("1"), dev("2")] }], lanes: { a: ["0101"] }, spec: { "0101": { ledgerFlow: true } } });
+  ctx.gate = [{ name: "cargo nextest", cmd: [process.execPath, "-e", "console.log('     Summary [   1.000s] 3 tests run: 3 passed')"], lock: "suite", ledger: true }];
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  assert.equal(rec.fixRounds, 0);
+  assert.deepEqual(rec.gates.map((g) => g.label), ["pre-review", "post-close"]);
+
+  const ledger = readLedger(join(ctx.stateDir, "suite-ledger.jsonl"));
+  const executed = ledger.filter((e) => !e.skip);
+  const skipped = ledger.filter((e) => e.skip);
+  assert.deepEqual(executed.map((e) => e.by), ["gate 0101-pre-review", "0101-02-review"], "pre-review and the close's gate");
+  assert.deepEqual(skipped.map((e) => [e.by, e.green.by]), [
+    ["0101-02-review", "gate 0101-pre-review"],
+    ["gate 0101-post-close", "0101-02-review"],
+  ]);
+  assert.deepEqual(rec.gates[1].commands.map((c) => c.skipped), [true]);
+  assert.match(digest("### Totals"), /; 2 suite runs skipped\.$/m);
 });
 
 test("a red conductor gate parks before any review", async () => {

@@ -86,9 +86,10 @@ const SKIP_DIRS = new Set(["target", "node_modules", ".git"]);
 // `## Entries 0068-0069 — ...`, which are section preambles, not entries.
 const ENTRY = /^##\s+(\d{4})\b/;
 
-// Everything above this heading is the closed-entry ledger, which is history.
-// An archived entry is a closed record whose value is the correction it
-// carries; re-probing it would be checking history against the present.
+// Everything above this heading is the file's own rules and contents block.
+// Promoted and closed entries live in the archive, which this gate never reads:
+// an archived body is a record whose value is the correction it carries, and
+// re-probing it would be checking history against the present.
 const LIVE_FROM = /^##\s+Open entries\b/i;
 
 // The dated verification bullet this gate reads. The older undated

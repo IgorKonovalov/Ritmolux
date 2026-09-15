@@ -1,8 +1,8 @@
 # ADR-0196 — The report hears the musical clock in a column of its own, and every existing column keeps its stimulus
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-15 (Plan 0182), with an Outcome
 > **Date:** 2026-09-14
-> **Related plan(s):** [0182](../plans/0182-the-report-hears-a-counter.md)
+> **Related plan(s):** [0182](../plans/done/0182-the-report-hears-a-counter.md)
 > **Supplements:** [0134](0134-motion-is-two-readings-and-anchoring-is-why-neither-can-be-a-threshold.md)
 > (the `drive` column, whose stimulus this leaves alone), [0042](0042-reachability-measured-on-the-expression-tree.md)
 > (the report's stimuli are a recorded judgement, and their history is kept comparable),
@@ -114,6 +114,32 @@ as they are.
 
 - Backlog 0192's probe (`absent: beat_index:` in `report.rs`) goes red on delivery, because the
   stimulus sets that field. That is the entry closing, not decaying.
+
+## Outcome (2026-09-15, at Plan 0182's close)
+
+**The Decision landed as written.**
+
+- **Column and JSON.** `standalone/src/shot/report.rs` builds the stimulus in `clock_stimulus`. It
+  reads `count` as `mean_aligned_diff` over two `capture_preset_over` sequences, taken after every
+  other column's captures. It prints the cell after `onset` and moves `geom` to a one-column block.
+  `--json` writes `"count":{"mean","frames":48,"frames_per_beat":5}` after `"drive"`, with the mean
+  at full precision so an exact zero reads `0`.
+- **Readings.** A clock-free fixture reads exactly `0`. A `beat_index` hue and a `bar`-held hue both
+  read above zero. `Path Maple` and `Path Lion` read `count 0.169` and `0.191` beside an unchanged
+  `onset 0.000`.
+- **No historical number moved.** Plan 0182 Phase 1's log records that a before-and-after
+  `--report --json` over `presets/` differs by the `count` key alone.
+- **The first Negative is now measured.** Wall time of `shot --presets presets --report` went from
+  163.4 s to 203.6 s on the reference machine, +25 %. Readback did not dominate.
+
+**The Neutral consequence did not happen.** Backlog 0192's probe
+`absent: beat_index: in: standalone/src/shot/report.rs` stayed green on the fixed tree. The
+stimulus sets the field in struct shorthand (`beat_index,`), and the probe matched only the
+`beat_index:` form. The entry was archived at the close as discharged, and the probe retired with
+it.
+
+**Open:** `report.rs` mirrors core's crate-private `FALLBACK_DT` as `CAPTURE_DT` to give
+`time_since_beat` its seconds. Nothing holds the two equal.
 
 ## Alternatives considered
 

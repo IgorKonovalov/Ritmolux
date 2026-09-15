@@ -5,6 +5,7 @@
 //
 // Takes the lock, runs the command with inherited stdio, releases the lock, and exits with the
 // command's exit code. The conductor imports `acquire` to hold the close lock across several steps.
+// A wrapped `cargo nextest list` runs no test, so it runs at once without the lock.
 //
 // The lock is a file, <lock dir>/<name>.lock, created by hard-linking a fully written temp file
 // onto the lock path: the link either fails with EEXIST or produces a complete file, so a reader
@@ -16,6 +17,7 @@
 // Every lane on the machine shares one lock directory — os.tmpdir()/rlx-conductor-locks, or
 // RLX_LOCK_DIR — which is what makes the lock machine-wide rather than per-worktree.
 // RLX_LOCK_LOG, when set, receives one JSON line per wrapped run: the lock, the wait and the hold.
+// The wrapper also prints the wait and the hold on stderr as it exits.
 // Trap: a PID can be reused by an unrelated process after the holder dies; the lock then waits on a
 // stranger until that process exits. The holder file records the command so a person can tell.
 
@@ -31,8 +33,10 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { appendRecord, appendSkip, cleanTree, greenRecord, isFullSuite, skipNotice, summaryLine } from "./lib/ledger.mjs";
 
 const GUARD_STALE_MS = 10_000;
 
@@ -150,67 +154,119 @@ export async function acquire(name, opts = {}) {
   };
 }
 
-function runWrapped(argv) {
+/**
+ * Runs a command, forwarding SIGINT and SIGTERM, and resolves to { code, output }. With `capture`
+ * false its stdio is inherited and `output` is empty; with `capture` true its stdout and stderr are
+ * piped through to this process's own as they arrive, and `output` keeps their last megabyte.
+ */
+function spawnRun(command, args, { capture = false } = {}) {
+  return new Promise((resolveRun) => {
+    let finished = false;
+    let output = "";
+    const finish = (code) => {
+      if (finished) return;
+      finished = true;
+      resolveRun({ code, output });
+    };
+    const stdio = capture ? ["inherit", "pipe", "pipe"] : "inherit";
+    const start = (shell) => {
+      const quote = (a) => (/[\s"]/.test(a) ? `"${a.replace(/"/g, '\\"')}"` : a);
+      const child = shell
+        ? spawn([command, ...args].map(quote).join(" "), { stdio, shell: true })
+        : spawn(command, args, { stdio });
+      if (capture) {
+        const keep = (d) => {
+          output += d;
+          if (output.length > 2_000_000) output = output.slice(-1_000_000);
+        };
+        child.stdout.on("data", (d) => (process.stdout.write(d), keep(d)));
+        child.stderr.on("data", (d) => (process.stderr.write(d), keep(d)));
+      }
+      const forward = (sig) => child.kill(sig);
+      process.on("SIGINT", forward);
+      process.on("SIGTERM", forward);
+      child.on("error", (e) => {
+        // A .cmd shim (npm, npx) is not spawnable without a shell on Windows.
+        if (e.code === "ENOENT" && !shell && process.platform === "win32") start(true);
+        else {
+          process.stderr.write(`with-lock: ${e.message}\n`);
+          finish(127);
+        }
+      });
+      child.on("close", (code, signal) => finish(code ?? (signal ? 1 : 0)));
+    };
+    start(false);
+  });
+}
+
+/** True for `cargo [+toolchain] nextest list ...`: it runs no test, so it waits on no lock. */
+export function isTestListing(command, args) {
+  if (!/^cargo(?:\.exe)?$/i.test(basename(command))) return false;
+  const rest = args[0]?.startsWith("+") ? args.slice(1) : args;
+  return rest[0] === "nextest" && rest[1] === "list";
+}
+
+/**
+ * The command-line wrapper, resolving to the exit code. `env`, `cwd` and `run` exist for tests:
+ * `run(command, args, { capture })` stands in for spawning the command and resolves to
+ * { code, output }.
+ *
+ * With RLX_SUITE_LEDGER set, a run of exactly `cargo nextest run --workspace` consults the suite
+ * ledger (ADR-0207, lib/ledger.mjs): on a clean tree the ledger records green it prints one notice
+ * naming the record and exits 0 without running, and otherwise it runs, recording the run when the
+ * worktree was clean at both ends, under RLX_SUITE_LEDGER_BY as its writer. Any other argument
+ * vector, and any run without the variable, neither skips nor records.
+ */
+export async function runWrapped(argv, { env = process.env, cwd = process.cwd(), run = spawnRun } = {}) {
   const sep = argv.indexOf("--");
   if (sep !== 1 || argv.length < 3) {
     process.stderr.write("usage: node with-lock.mjs <name> -- <command> [args...]\n");
-    process.exit(2);
+    return 2;
   }
   const [name] = argv;
   const [command, ...args] = argv.slice(2);
+  // A listing starts at once, takes no lock and writes no lock log entry.
+  if (isTestListing(command, args)) return (await run(command, args, { capture: false })).code;
+
+  const ledger = env.RLX_SUITE_LEDGER;
+  const suite = Boolean(ledger) && isFullSuite(command, args);
+  if (suite) {
+    const green = greenRecord(ledger, cleanTree(cwd));
+    if (green) {
+      appendSkip(ledger, { green, by: env.RLX_SUITE_LEDGER_BY || "a session" });
+      process.stdout.write(`with-lock: ${skipNotice(green)}\n`);
+      return 0;
+    }
+  }
+
   const what = [command, ...args].join(" ");
-  return acquire(name, {
+  const lock = await acquire(name, {
     what,
+    dir: lockDir(env),
+    pollMs: Number(env.RLX_LOCK_POLL_MS || 500),
     onWait: (h) =>
       process.stderr.write(
         `with-lock: waiting for "${name}" (held by pid ${h?.pid ?? "?"}: ${h?.what ?? "unknown"})\n`,
       ),
-  }).then(
-    (lock) =>
-      new Promise((resolveRun) => {
-        let finished = false;
-        const finish = (code) => {
-          if (finished) return;
-          finished = true;
-          lock.release();
-          if (process.env.RLX_LOCK_LOG) {
-            try {
-              appendFileSync(
-                process.env.RLX_LOCK_LOG,
-                JSON.stringify({
-                  lock: name,
-                  what,
-                  waited_ms: lock.waitedMs,
-                  held_ms: Date.now() - lock.acquiredAt,
-                  exit_code: code,
-                  at: new Date().toISOString(),
-                }) + "\n",
-              );
-            } catch {}
-          }
-          resolveRun(code);
-        };
-        const start = (shell) => {
-          const quote = (a) => (/[\s"]/.test(a) ? `"${a.replace(/"/g, '\\"')}"` : a);
-          const child = shell
-            ? spawn([command, ...args].map(quote).join(" "), { stdio: "inherit", shell: true })
-            : spawn(command, args, { stdio: "inherit" });
-          const forward = (sig) => child.kill(sig);
-          process.on("SIGINT", forward);
-          process.on("SIGTERM", forward);
-          child.on("error", (e) => {
-            // A .cmd shim (npm, npx) is not spawnable without a shell on Windows.
-            if (e.code === "ENOENT" && !shell && process.platform === "win32") start(true);
-            else {
-              process.stderr.write(`with-lock: ${e.message}\n`);
-              finish(127);
-            }
-          });
-          child.on("exit", (code, signal) => finish(code ?? (signal ? 1 : 0)));
-        };
-        start(false);
-      }),
-  );
+  });
+  const startTree = suite ? cleanTree(cwd) : null;
+  const { code, output } = await run(command, args, { capture: suite });
+  lock.release();
+  const heldMs = Date.now() - lock.acquiredAt;
+  if (suite && startTree && cleanTree(cwd) === startTree) {
+    appendRecord(ledger, { tree: startTree, exit: code, summary: summaryLine(output), by: env.RLX_SUITE_LEDGER_BY || "a session", ms: heldMs });
+  }
+  // Read back by the run terminal's stream reader (lib/live.mjs lockTimes); keep the shape.
+  process.stderr.write(`with-lock: "${name}" waited ${(lock.waitedMs / 1000).toFixed(1)}s, held ${(heldMs / 1000).toFixed(1)}s\n`);
+  if (env.RLX_LOCK_LOG) {
+    try {
+      appendFileSync(
+        env.RLX_LOCK_LOG,
+        JSON.stringify({ lock: name, what, waited_ms: lock.waitedMs, held_ms: heldMs, exit_code: code, at: new Date().toISOString() }) + "\n",
+      );
+    } catch {}
+  }
+  return code;
 }
 
 const norm = (p) => (process.platform === "win32" ? resolve(p).toLowerCase() : resolve(p));

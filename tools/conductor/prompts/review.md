@@ -15,15 +15,25 @@ implementer wrote except what is in the repository. Earlier rounds of this revie
 
 {{prior_rounds}}
 
-1. Run Mode 4 against the plan and the lane. Write the full review to the review path above.
+1. Run Mode 4 against the plan and the lane. Run its full suite as exactly
+   `node "{{with_lock}}" suite -- cargo nextest run --workspace`; when the wrapper prints a
+   `skipped ... green in the suite ledger` record instead of running, that record is the full-suite
+   evidence, so cite it. Write the full review to the review path above.
 2. If it carries any `blocker` or `major`: stop. Print the `verdict` outcome and nothing after it.
-3. Only if it carries none: continue into the worktree close sequence, steps 1-3, on the branch in
-   this worktree — merge `main`, the whole gate (`nextest` under the suite lock), the bookkeeping,
-   the version bump, the studio sync, an ANNOTATED tag on the branch tip. The close commit adds a
-   `## Close review` section to the plan, after `## Implementation log`: this round's review in full,
-   then one line for every finding an earlier round raised and a fix round resolved, naming the fix
-   commit. Never fast-forward `main`, never remove the worktree, never push: the conductor does the
-   first two and the owner the third.
+3. Only if it carries none: close on the branch in this worktree, in this order (the conductor-mode
+   order of your skill):
+   1. repair every `minor` or `nit` your skill's conductor mode lets a close repair (comment text,
+      assertion or panic message text, Markdown prose), committed, and mark each with `fixed_in`;
+   2. `git merge main`;
+   3. the bookkeeping, the version bump and the studio sync, committed. The close commit adds a
+      `## Close review` section to the plan, after `## Implementation log`: this round's review in
+      full, then one line for every finding an earlier round raised and a fix round resolved, naming
+      the fix commit;
+   4. the whole gate on that tip, `nextest` as exactly the wrapped command above;
+   5. an ANNOTATED tag on the branch tip;
+   6. `node scripts/check-release-tag.mjs`.
+   Never fast-forward `main`, never remove the worktree, never push: the conductor does the first two
+   and the owner the third.
 4. If the merge conflicts or the gate goes red during the close, park; do not work around it.
 
 The last thing you print is exactly one fenced block tagged `rlx-outcome` holding one JSON object.
@@ -36,8 +46,11 @@ The last thing you print is exactly one fenced block tagged `rlx-outcome` holdin
 or, after a clean close:
 
 ```rlx-outcome
-{"kind": "closed", "plan": "{{plan}}", "version": "<X.Y.Z or null>", "tag": "<vX.Y.Z or null>", "verdict": {"round": {{round}}, "blockers": 0, "majors": 0, "minors": 1, "review_path": "{{review_path}}", "findings": [{"severity": "minor", "file": "docs/x.md", "line": 12, "what": "<one line>"}]}}
+{"kind": "closed", "plan": "{{plan}}", "version": "<X.Y.Z or null>", "tag": "<vX.Y.Z or null>", "verdict": {"round": {{round}}, "blockers": 0, "majors": 0, "minors": 2, "review_path": "{{review_path}}", "findings": [{"severity": "minor", "file": "docs/x.md", "line": 12, "what": "<one line>", "fixed_in": "<sha of the repair commit>"}, {"severity": "minor", "file": "core/src/y.rs", "line": 40, "what": "<one line, left open>"}]}}
 ```
+
+`fixed_in` goes only on a finding the close repaired, naming the commit that changes that finding's
+file; every other finding carries none.
 
 or
 

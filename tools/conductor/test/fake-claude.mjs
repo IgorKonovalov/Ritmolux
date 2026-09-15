@@ -7,8 +7,15 @@
 //
 //   FAKE_CLAUDE_SCENARIO  path to an ES module whose default export is
 //                         async ({ args, cwd, env, prompt, append, vars }) =>
-//                           { text?, subtype?, exitCode?, costUsd?, noResult? }
+//                           { text?, subtype?, exitCode?, costUsd?, numTurns?, noResult?, stream?,
+//                             skills?, hooks? }
+//                         `skills` replaces system/init's skill list (null omits it); `hooks: false`
+//                         makes a shell call in `stream` leave no line in RLX_HOOK_LOG.
 //                         It may run git in `cwd` to make the commits a real session would.
+//                         `stream` is a list of events emitted between system/init and the final
+//                         text, in the shapes a real session emits: an assistant tool_use, a user
+//                         tool_result, system/task_notification, system/permission_denied,
+//                         rate_limit_event. A string entry is written as a raw line, JSON or not.
 //   FAKE_CLAUDE_LOG       JSONL file receiving one record per invocation: args, cwd, and the
 //                         RLX_ environment the session saw.
 //   FAKE_CLAUDE_VERSION   what `--version` prints (default: the verified CLI's string).
@@ -62,7 +69,21 @@ if (process.env.FAKE_CLAUDE_SCENARIO) {
   });
 }
 
-emit({ type: "system", subtype: "init", cwd: process.cwd(), model: flag("--model") ?? "fake", permissionMode: flag("--permission-mode") });
+const skills = outcome.skills === undefined ? ["architect", "dev", "studio-builder", "preset-author"] : outcome.skills;
+emit({ type: "system", subtype: "init", cwd: process.cwd(), model: flag("--model") ?? "fake", permissionMode: flag("--permission-mode"), ...(skills ? { skills } : {}) });
+for (const e of outcome.stream ?? []) {
+  if (typeof e === "string") {
+    process.stdout.write(`${e}\n`);
+    continue;
+  }
+  // The real CLI runs the project's PreToolUse hooks on every shell call; the suite-lock hook logs
+  // each one to RLX_HOOK_LOG. `hooks: false` stands in for a CLI that stopped running them.
+  const shell = (e.message?.content ?? []).filter?.((c) => c?.type === "tool_use" && (c.name === "Bash" || c.name === "PowerShell")) ?? [];
+  if (shell.length && outcome.hooks !== false && process.env.RLX_CONDUCTOR === "1" && process.env.RLX_HOOK_LOG) {
+    for (const c of shell) appendFileSync(process.env.RLX_HOOK_LOG, JSON.stringify({ hook: "fake", tool: c.name, decision: "allow" }) + "\n");
+  }
+  emit(e);
+}
 emit({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text: outcome.text ?? "" }] } });
 
 if (!outcome.noResult) {
@@ -74,7 +95,7 @@ if (!outcome.noResult) {
     is_error: subtype !== "success",
     terminal_reason: budget ? "budget_exhausted" : subtype === "success" ? "completed" : "error",
     total_cost_usd: outcome.costUsd ?? 0.01,
-    num_turns: 1,
+    num_turns: outcome.numTurns ?? 1,
     result: subtype === "success" ? outcome.text ?? "" : undefined,
     errors: budget ? [`Reached maximum budget ($${flag("--max-budget-usd")})`] : subtype === "success" ? undefined : ["fake error"],
     permission_denials: [],

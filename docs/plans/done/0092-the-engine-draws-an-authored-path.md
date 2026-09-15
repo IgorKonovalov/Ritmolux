@@ -541,7 +541,7 @@ have read as a thirteenth system. The verdict rests on evidence, not on the look
 behavioral suite is green with both embedded (364 passed, 3 skipped), and
 `shot --report family=shape_field` reports **no near-duplicate geometry below shape 0.08** against
 the six presets already in the family, with bass reactivity 0.167 and 0.175 sitting mid-family.
-Their `onset 0.000` is [backlog 0192](../../design-backlog.md) — the report holds a frame, so
+Their `onset 0.000` is [backlog 0192](../../design-backlog-archive.md) — the report holds a frame, so
 `beat_index` never advances and a counter-driven response measures as inert — and not a dead preset.
 The stale-workaround sweep comes back clean: no shipped preset writes `coord_mode = "2"`, so nothing
 was silently getting mode 1 from the `ParamSpec` range Phase 7 corrected, and no preset other than

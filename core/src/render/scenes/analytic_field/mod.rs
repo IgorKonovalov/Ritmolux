@@ -567,7 +567,7 @@ impl AnalyticFieldScene {
                 bind_group,
                 None,
                 surface_format,
-                wgpu::BlendState::REPLACE,
+                wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING,
                 "analytic-field",
             ),
             config: FieldConfig::default(),

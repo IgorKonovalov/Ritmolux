@@ -184,6 +184,15 @@ row (status `draft`), bump next-free-number, adjust execution order if affected.
 the 1-minute entrypoint future sessions read; skipping it forces the next session to re-derive
 from `git log`.
 
+**When the user approves a plan whose header names `**Closes:** design-backlog NNNN`, move each
+named entry out of the live backlog in the same session**
+([ADR-0206](../../../docs/adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): the body goes
+verbatim to the end of `docs/design-backlog-archive.md` with a
+`- **Moved to the archive YYYY-MM-DD on promotion**` bullet naming the plan, and a row joins the
+archive's `### Promoted` table. An entry the plan takes only *half* of stays live with a dated bullet
+naming the half. The live file holds only asks no approved plan owns; a promoted body left behind is
+the exact accumulation that made it 321 KB.
+
 ---
 
 ## Mode 2 — Writing an ADR
@@ -591,9 +600,14 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
      The output is a **list for the close notes, not a re-tune** — judging the look is content work
      and stays in the `preset-author` lane.
 3c. **Archive every backlog entry this plan discharged — trigger: the plan header names a
-   `**Closes:** design-backlog NNNN`.** Writing the `CLOSED` marker onto the entry is **half** the
-   step; the body then moves to [`docs/design-backlog-archive.md`](../../../docs/design-backlog-archive.md)
-   and leaves a ledger row behind in `docs/design-backlog.md`. **This step exists because the marker
+   `**Closes:** design-backlog NNNN`.** Since
+   [ADR-0206](../../../docs/adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md) a promoted
+   body is **already** in [`docs/design-backlog-archive.md`](../../../docs/design-backlog-archive.md) —
+   it moved when the plan was approved (see Mode 1 Step 3) — so the step is: append the `CLOSED`
+   marker to that archived body, and move its row from the archive's `### Promoted` table to
+   `### Closed`. An entry the plan discharged without having been promoted (a plan written before
+   ADR-0206, or an entry it discharged by the way) still takes the old path: marker, verbatim move,
+   and a `### Closed` row. **This step exists because the marker
    half is the only half that ever gets done.** Three sweeps have now found the same accumulation —
    2026-08-04 (26 entries), 2026-08-13 (20 more, *"recurring inside ten days"*), and a third batch
    hours later that same day (3 entries, from two closes that ran **after** the second sweep wrote the
@@ -604,7 +618,9 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
    and **Backlog probes** name the entries this plan claims to discharge and the exit `dev` saw from
    `node scripts/check-backlog-claims.mjs`. Both are starting points, **not the decision** — you
    re-run the probes yourself (step 1c is unconditional), and whether an entry is discharged,
-   half-discharged or falsified stays a judgement.
+   half-discharged or falsified stays a judgement. **A promoted entry's probes no longer run** — the
+   gate reads only the live file — so for those the evidence is the plan's done-whens and the
+   archived body's own probe lines, read by you against the finished tree.
 
    Mechanically: move the body verbatim (nothing is summarized — the archive's value is the record of
    how a diagnosis moved, and five entries had their causal claim *inverted* under verification), add
@@ -630,8 +646,8 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
    says where, not what. A cross-reference to **another backlog entry** is a bare `see NNNN`, never
    an anchor link: the anchor is the full text of that entry's heading and can run past eighty
    bytes, which is what pushed six rows over the cap at Plan 0105. This applies to the **ledger
-   only**; the live entry bodies above it are content, sit outside the marked region, and are not
-   measured by anything.
+   only** — the two tables under the archive's `## The ledger`; the entry bodies are content, sit
+   outside the marked regions, and are not measured by anything.
 
    Two things that are not this step. An entry whose premise turns out **false** is corrected in
    place and stays live — a wrong live entry is more dangerous than a closed one, because it sends
@@ -847,19 +863,49 @@ it and the rest of this skill disagree, it wins for that session only.
 1. **Run Mode 4** against the plan and the lane, all five lenses, exactly as a human-started close —
    including running the full `nextest` and `cargo doc` yourself. Every `cargo nextest` runs as
    `node <path from RLX-CONDUCTOR-SUITE-LOCK> suite -- cargo nextest ...`; a hook denies the bare form.
+   Run lens 1's suite as exactly `... suite -- cargo nextest run --workspace`, with no extra argument.
+   On a tree the conductor already saw pass, the wrapper does not re-run it: it prints one
+   `with-lock: skipped cargo nextest run --workspace: tree ... run by ... at ...: <Summary>` line naming
+   the ledger record (ADR-0207). **That printed record is lens 1's full-suite evidence**, and you cite
+   it in the review in place of a run. It is written by the process that saw the exit code, not by a
+   session. `dev`'s close block will say its `Full suite:` is owed to the conductor's `pre-review`
+   gate. In conductor mode that is correct, not a missing run.
 2. **Write the review to the review path**, in the output shape Mode 4 describes. There is no
    conversation to deliver it into.
 3. **Any `blocker` or `major`: stop there.** No bookkeeping, no merge, no bump. End with a `verdict`
    outcome. The conductor sends the findings to a fresh `dev` fix session and starts a fresh review
    after it; you will see this round's review path under the next round's prior rounds.
-4. **No blocker and no major: close on the branch.** Run the worktree close sequence's steps 1–3 in
-   this worktree — `git merge main`, the whole gate, the bookkeeping steps 1–4 including the version
-   bump, the studio's two copies and an **annotated** tag on the branch tip, and
-   `node scripts/check-release-tag.mjs`. The close commit also adds a **`## Close review`** section to
-   the plan, after `## Implementation log`: this round's review in full, then one line for every
-   finding an earlier round raised and a fix round resolved, naming the fix commit. A conductor-run
-   close has no reader in the room; that section is the evidence of what was checked, and it moves
-   into `done/` beside the log it graded.
+4. **No blocker and no major: close on the branch, in this order.** It differs from the human-started
+   worktree close sequence, which gates straight after the merge. Here the gate runs **last, on the
+   tip you will tag**, because a tag does not change the tree, so the conductor's `post-close` gate
+   finds your run in the suite ledger and does not repeat it (ADR-0207):
+   1. **Repair** every `minor` or `nit` finding ADR-0209 lets a close repair (below), and commit.
+   2. **`git merge main`**, and resolve there.
+   3. **The bookkeeping, committed**: steps 1–4 of the bookkeeping including the version bump, and
+      the studio's two copies. The close commit also adds a **`## Close review`** section to the plan,
+      after `## Implementation log`: this round's review in full, then one line for every finding an
+      earlier round raised and a fix round resolved, naming the fix commit. A conductor-run close has
+      no reader in the room; that section is the evidence of what was checked, and it moves into
+      `done/` beside the log it graded.
+   4. **The whole gate on that tip**: `fmt`, `clippy`, `nextest` as exactly
+      `... suite -- cargo nextest run --workspace` through the wrapper, and `cargo doc`, with nothing
+      left uncommitted. **A red here parks `check_red`.** Do not tag, and do not work around it.
+   5. **The annotated tag** on the branch tip.
+   6. **`node scripts/check-release-tag.mjs`**.
+
+   **What a close repairs (ADR-0209).** A `minor` or `nit` whose repair cannot change what any
+   program does, and nothing else. That is a closed list: the text of a comment or doc comment in any
+   source file; the message text of an assertion or a panic; Markdown prose anywhere in the
+   repository, every file under `.claude/skills/` included, except a generated region, which is
+   repaired by regenerating it. Code, a test's logic, a constant and an instruction a skill gives stay
+   open. Mark each repaired finding in the `closed` outcome with `"fixed_in": "<sha>"`, the repairing
+   commit. The conductor checks that the commit is on the branch and changes that finding's file, and
+   parks on disagreement. **A close may correct a fact in any lane's skill material that its plan made
+   false, and never changes a rule.** A sample output, a column list, a flag spelling or a count under
+   `.claude/skills/<lane>/` is a fact and follows the tree, whichever lane owns the skill. An
+   instruction, meaning what a lane must or must not do, is that lane's contract: a close that thinks
+   one is wrong raises a backlog entry and leaves it. A doc-comment repair can turn `cargo doc -D
+   warnings` red; step 4 is what catches it.
 5. **Never fast-forward `main`, never remove the worktree or delete the branch, never push.** Steps 4,
    6 and 7 of the sequence are the conductor's; step 5 is the owner's.
 6. **Park rather than improvise** when the merge conflicts, the gate goes red, or the plan turns out
@@ -868,10 +914,11 @@ it and the rest of this skill disagree, it wins for that session only.
 **The last thing you print is one fenced `rlx-outcome` block** holding one JSON object, in the shapes
 the prompt shows: `verdict` (the counts, the review path, and `findings` — **every** finding of the
 round, each `{severity, file, line, what}`), `closed` (the version and tag, or `null` for a
-docs/chore-only close, carrying the same verdict), or `parked`. The finding lines are what the owner
-reads in the morning, verbatim; write each so it stands on its own. The conductor verifies a `closed`
-against `git` — plan under `done/` with `Status: done`, a `## Close review` section, a clean tree, an
-annotated tag on the tip — and parks on any disagreement.
+docs/chore-only close, carrying the same verdict, with `fixed_in` on each finding the close repaired),
+or `parked`. The finding lines are what the owner reads in the morning, verbatim; write each so it
+stands on its own. The conductor verifies a `closed` against `git` — plan under `done/` with
+`Status: done`, a `## Close review` section, a clean tree, every `fixed_in` commit on the branch and
+changing its finding's file, an annotated tag on the tip — and parks on any disagreement.
 
 ---
 

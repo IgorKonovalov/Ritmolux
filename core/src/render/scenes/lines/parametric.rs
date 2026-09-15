@@ -122,9 +122,8 @@ pub struct ParametricCurveScene {
     /// Which curve family to sample, chosen at preset load via `configure`.
     family: CurveFamily,
     /// This frame's elapsed real time, stored by [`advance`](Scene::advance) and
-    /// consumed by [`update`](Scene::update) — `advance` runs before this
-    /// frame's parameter values land, so the rate it would integrate against is
-    /// the previous frame's.
+    /// consumed by [`update`](Scene::update), which steps the rotation against
+    /// this frame's bound `spin`.
     dt: f32,
     /// The integrated rotation ([`Phase`]). **This scene does not read the
     /// shared clock at all**, and has no `set_time`: the figure's rotation was
@@ -530,8 +529,8 @@ impl Scene for ParametricCurveScene {
     }
 
     fn advance(&mut self, dt: f32) {
-        // Stored, not integrated: the `spin` this frame will use has not been
-        // set yet.
+        // Stored, not integrated: `update` steps the rotation, so the scene has
+        // one integration site.
         self.dt = dt;
     }
 

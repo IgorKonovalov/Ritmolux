@@ -15,8 +15,10 @@ follow it; where it and the rest of the skill disagree, conductor mode wins.
 - Do not restate the plan, do not wait, do not ask. Do not invoke any other skill through the Skill
   tool: the conductor starts the next run itself.
 - Run every `cargo nextest` / `cargo test` as `node "{{with_lock}}" suite -- cargo nextest ...`.
-- If the last-run line says `yes`, finish with the close block of the `## Implementation log`
-  (full suite under the lock first), committed, and print the outcome instead of the pointer.
+- If the last-run line says `yes`, finish with the close block of the `## Implementation log`,
+  committed, and print the outcome instead of the pointer. Do not run the full workspace suite: the
+  conductor's `pre-review` gate runs it next on the same tree, so the close block's `Full suite:`
+  bullet reads *owed to the conductor's pre-review gate (ADR-0207)*.
 - Stop and park, rather than work around it, on: a `human` phase inside the range, a stop condition
   the plan states, a plan that is wrong, a question only a person can answer, or a check you cannot
   make green within the phase. Commit what is finished first; leave the tree clean.

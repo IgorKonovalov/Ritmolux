@@ -92,6 +92,23 @@ const PROBE_SETTLE_TOL: f32 = 0.02;
 /// number and the mark that qualifies it describe the same frames.
 const RATE_TAIL: usize = PROBE_WINDOW / 2;
 
+/// Frames in the `count` reading's clock stimulus and in the silent sequence it
+/// is differenced against — the same depth `anim` and `drive` capture at.
+const CLOCK_FRAMES: usize = REPORT_FRAMES_LATE as usize;
+/// Frames between two beats of the clock stimulus: 720 BPM at [`CAPTURE_DT`],
+/// deliberately not a musical tempo (ADR-0196). At 48 frames it gives 9 beats
+/// and bar edges at frames 20 and 40, so `bar_index` takes three values and a
+/// `bar`-held binding re-samples twice. Slowing it toward a real tempo pushes
+/// the first bar edge past the end of the sequence.
+const CLOCK_FRAMES_PER_BEAT: usize = 5;
+/// Beats per bar in the clock stimulus, the analyzer's own `beat_in_bar` range.
+const CLOCK_BEATS_PER_BAR: u32 = 4;
+/// The fixed step every capture advances the render clock by. It mirrors the
+/// core's capture `FALLBACK_DT`, which is crate-private, and is used only to
+/// give `time_since_beat` the seconds the capture actually renders between
+/// frames.
+const CAPTURE_DT: f32 = 1.0 / 60.0;
+
 struct PresetReport {
     name: String,
     reactivity: [f32; 4], // bass, mid, treb, onset
@@ -132,6 +149,22 @@ struct PresetReport {
     /// A **reading, never a gate.** It rides captures `build_family_report`
     /// already holds for `anim` and `cover`, so it costs one CPU loop.
     drive: f32,
+    /// Whether the musical clock reaches the picture: the mean, over
+    /// [`CLOCK_FRAMES`], of [`frame_diff`] between frame *i* of a capture over
+    /// [`clock_stimulus`] and frame *i* of a silent capture of the same length
+    /// (ADR-0196).
+    ///
+    /// Every other column captures a held frame, and a held frame holds its
+    /// counters, so a binding on `beat_index`, `bar_index` or a `[hold]` on the
+    /// `bar` edge reads as inert everywhere else. The two sequences differ in the
+    /// clock fields and nothing else, so a preset that reads no clock variable
+    /// renders them identically and reads exactly `0.0`.
+    ///
+    /// **A mean over a sequence, not one settled depth like the band columns
+    /// beside it**, and at a cadence no music has, so its magnitude compares
+    /// with neither. A periodic binding agrees with silence at some depths,
+    /// which is why no single depth is sampled.
+    count: f32,
     /// Mean [`frame_diff`] between **consecutive** frames over the settled tail
     /// of the transient probe's loud plateau — motion *per frame*, the axis no
     /// other column here can see (ADR-0134). Every other statistic in this
@@ -275,6 +308,8 @@ fn build_family_report(
     let loud = AnalysisFrame::fully_driven();
     let bands = band_stimuli();
     let bands_low = band_stimuli_low();
+    let clock = clock_stimulus();
+    let clock_silent = vec![silent; clock.len()];
 
     // The transient probe runs first and at its own smaller size, so the resize
     // happens twice per family rather than twice per preset.
@@ -347,6 +382,16 @@ fn build_family_report(
         // a single-quadrant frame is suspicious even at decent coverage.
         let _spread = quadrant_spread(&fixed, bg, COVERAGE_EPS);
 
+        // The clock reading takes captures of its own, after every other column
+        // is read, so no existing column's capture changes (ADR-0196).
+        let counted = r
+            .capture_preset_over(name, &clock)
+            .map_err(|e| format!("clock `{name}`: {e}"))?;
+        let uncounted = r
+            .capture_preset_over(name, &clock_silent)
+            .map_err(|e| format!("clock silence `{name}`: {e}"))?;
+        let count = mean_aligned_diff(&counted, &uncounted);
+
         // Both halves off one lookup: the gates and the holds came out of one
         // walk over one binding set and are read back the same way.
         let found = structural
@@ -361,6 +406,7 @@ fn build_family_report(
             reactivity_footprint,
             animation,
             drive,
+            count,
             rate: rates.get(index).copied().unwrap_or(0.0),
             coverage: cov,
             level,
@@ -765,13 +811,14 @@ const CEILINGS_NAMED: usize = 3;
 /// a hold is already inside them. What is not inside them is the static
 /// reading a person does over the same table — a binding that names `bass` is
 /// read as responding to bass, and a held one responds to bass once a bar.
-/// Naming the hold says which rows to read that way. This is containment for
-/// `[hold]`; it is not a fix for the report's blindness to counter-driven
-/// response (design-backlog 0192), which is a different and larger hole.
+/// Naming the hold says which rows to read that way. It is containment for
+/// `[hold]` in the held columns only: a `beat`- or `bar`-held binding re-samples
+/// under the `count` column's clock stimulus, which is where the response the
+/// hold allows is measured (ADR-0196).
 ///
-/// Silent for a family with no held binding, which is the whole shipped
-/// library: a line per family saying nothing happened is the noise the
-/// ceilings block already had to be summarized to avoid.
+/// Silent for a family with no held binding: a line per family saying nothing
+/// happened is the noise the ceilings block already had to be summarized to
+/// avoid.
 fn write_holds(out: &mut String, fam: &FamilyReport) {
     let held: Vec<(&str, &HoldReport)> = fam
         .presets
@@ -933,6 +980,42 @@ fn step_stimulus() -> Vec<AnalysisFrame> {
     frames
 }
 
+/// The `count` reading's stimulus: a synthetic musical clock at silence,
+/// [`CLOCK_FRAMES`] long, with a beat every [`CLOCK_FRAMES_PER_BEAT`] frames from
+/// frame [`CLOCK_FRAMES_PER_BEAT`] (ADR-0196).
+///
+/// Only the clock fields move. Every level, `*_raw`, the band array, the
+/// waveform and `bpm` stay at [`AnalysisFrame::default`], so a capture over this
+/// differs from a silent one of the same length in the clock and nothing else.
+///
+/// `beat` fires on exactly the frames where `beat_index` steps, and
+/// `time_since_beat` is 0 there: the analyzer counts a detection on the hop it
+/// fires on (ADR-0109), and a frame that steps the counter without the event is
+/// one no audio produces. `bar` and `bar_phase` are the beat and bar phases,
+/// and the bar trio is derived from `beat_index` the way the analyzer's own
+/// counter fallback derives it.
+fn clock_stimulus() -> Vec<AnalysisFrame> {
+    let per_beat = CLOCK_FRAMES_PER_BEAT as u32;
+    (0..CLOCK_FRAMES as u32)
+        .map(|i| {
+            let beat_index = i / per_beat;
+            let into_beat = i % per_beat;
+            let beat_phase = into_beat as f32 / per_beat as f32;
+            let beat_in_bar = beat_index % CLOCK_BEATS_PER_BAR;
+            AnalysisFrame {
+                beat: beat_index > 0 && into_beat == 0,
+                beat_index,
+                time_since_beat: into_beat as f32 * CAPTURE_DT,
+                bar: beat_phase,
+                beat_in_bar,
+                bar_index: beat_index / CLOCK_BEATS_PER_BAR,
+                bar_phase: (beat_in_bar as f32 + beat_phase) / CLOCK_BEATS_PER_BAR as f32,
+                ..Default::default()
+            }
+        })
+        .collect()
+}
+
 /// A transient measurement together with whether each direction actually
 /// arrived anywhere inside its window (Plan 0038 Phase 8).
 ///
@@ -985,6 +1068,22 @@ fn mean_consecutive_diff(frames: &[CaptureImage]) -> f32 {
             _ => 0.0,
         })
         .sum();
+    sum / pairs as f32
+}
+
+/// Mean [`frame_diff`] between frame *i* of `a` and frame *i* of `b` — the
+/// `count` reading's statistic.
+///
+/// Frame-aligned rather than a single depth, so a binding that agrees with
+/// silence at some depths (`mod(bar_index, 2)` at a whole number of bars) still
+/// reads. Pairs past the shorter sequence are not compared; no pair at all reads
+/// as no difference.
+fn mean_aligned_diff(a: &[CaptureImage], b: &[CaptureImage]) -> f32 {
+    let pairs = a.len().min(b.len());
+    if pairs == 0 {
+        return 0.0;
+    }
+    let sum: f32 = a.iter().zip(b).map(|(x, y)| frame_diff(x, y)).sum();
     sum / pairs as f32
 }
 
@@ -1123,25 +1222,23 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
             fam.system.as_str(),
             fam.presets.len()
         );
-        // The `geom` column exists only where the measurement does: a family
-        // whose scenes build no segment list has no line seam to measure at,
-        // and a fabricated cell would read as a finding (backlog 0070).
-        //
         // Numeric cells are 6 wide, which is one space of gutter around a
         // `0.500`. `rate` is the exception at 7: its cell can carry a `+`
         // suffix on an unsettled reading, so it is the one column whose
-        // content reaches 7 characters. The budget is what forces this — the
-        // widest row (a line family, so `geom` is present too) has to stay
-        // inside 100 columns or it wraps and stops lining up with its header,
-        // which `no_report_table_line_wraps_at_a_hundred_columns` holds.
-        let show_geometry = fam.presets.iter().any(|p| p.geometry.is_some());
-        let mut header = format!(
-            "  {:<name_w$} {:>6} {:>6} {:>6} {:>6} {:>6} {:>6} {:>7} {:>6} {:>6} {:>5} {:>5}",
+        // content reaches 7 characters. The budget is what forces this — every
+        // row has to stay inside 100 columns or it wraps and stops lining up
+        // with its header, which `no_report_table_line_wraps_at_a_hundred_columns`
+        // holds. At 99 it has no room for another cell, which is why `geom`
+        // prints in a block of its own below.
+        let _ = writeln!(
+            out,
+            "  {:<name_w$} {:>6} {:>6} {:>6} {:>6} {:>6} {:>6} {:>6} {:>7} {:>6} {:>6} {:>5} {:>5}",
             "preset",
             "bass",
             "mid",
             "treb",
             "onset",
+            "count",
             "drive",
             "anim",
             "rate",
@@ -1151,18 +1248,16 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
             "fall",
             name_w = NAME_WIDTH
         );
-        if show_geometry {
-            let _ = write!(header, " {:>6}", "geom");
-        }
-        let _ = writeln!(out, "{header}");
         for p in &fam.presets {
-            let mut row = format!(
-                "  {:<name_w$} {:>6.3} {:>6.3} {:>6.3} {:>6.3} {:>6.3} {:>6.3} {:>7} {:>6.3} {:>6.4} {:>5} {:>5}",
+            let _ = writeln!(
+                out,
+                "  {:<name_w$} {:>6.3} {:>6.3} {:>6.3} {:>6.3} {:>6.3} {:>6.3} {:>6.3} {:>7} {:>6.3} {:>6.4} {:>5} {:>5}",
                 fit_name(&p.name),
                 p.reactivity[0],
                 p.reactivity[1],
                 p.reactivity[2],
                 p.reactivity[3],
+                p.count,
                 p.drive,
                 p.animation,
                 // Marked from the *rise*: an unsettled rise is exactly the case
@@ -1174,17 +1269,6 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
                 transient_cell(p.transient.response.fall_frames, p.transient.fall_settled),
                 name_w = NAME_WIDTH,
             );
-            if show_geometry {
-                match p.geometry {
-                    Some(fraction) => {
-                        let _ = write!(row, " {fraction:>6.4}");
-                    }
-                    None => {
-                        let _ = write!(row, " {:>6}", "-");
-                    }
-                }
-            }
-            let _ = writeln!(out, "{row}");
         }
         // The two motion readings, explained where they are read (ADR-0134).
         // The anchoring caveat sits here rather than in a footnote because the
@@ -1193,6 +1277,16 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
             out,
             "  drive is silence against full drive at the same depth — the combined \
              stimulus the per-band columns above measure only one at a time"
+        );
+        // Beside `drive` because the two share their reading rule, and because
+        // `count` is the one column that is a mean over a sequence: a reader
+        // comparing it with the band cells beside it is comparing two statistics.
+        let _ = writeln!(
+            out,
+            "  count is the musical clock at silence, a beat every \
+             {CLOCK_FRAMES_PER_BEAT} frames for {CLOCK_FRAMES}, as the mean frame-by-frame \
+             difference from silence (ADR-0196) — not a tempo, and not on the band \
+             columns' scale; like drive, read it against family neighbours"
         );
         let _ = writeln!(
             out,
@@ -1207,15 +1301,39 @@ fn text_report(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
              unanchored, and nothing here models anchoring — read both against family \
              neighbours"
         );
+        // The `geom` block exists only where the measurement does: a family
+        // whose scenes build no segment list has no line seam to measure at,
+        // and a fabricated cell would read as a finding (backlog 0070). Inside a
+        // family that has one, a preset that drew no segment prints `-`.
+        let show_geometry = fam.presets.iter().any(|p| p.geometry.is_some());
         if show_geometry {
             let _ = writeln!(
                 out,
-                "  geom is the in-frame geometry fraction: the share of drawn line \
+                "\n  geom is the in-frame geometry fraction: the share of drawn line \
                  length — segments and arcs alike — inside the frame, at the \
                  fully-driven capture (ADR-0083). Read it while tuning `scale` — no \
                  absolute threshold orders the library, and two shipped presets \
                  deliberately leave the frame"
             );
+            let _ = writeln!(
+                out,
+                "  {:<name_w$} {:>6}",
+                "preset",
+                "geom",
+                name_w = NAME_WIDTH
+            );
+            for p in &fam.presets {
+                let cell = match p.geometry {
+                    Some(fraction) => format!("{fraction:.4}"),
+                    None => "-".to_owned(),
+                };
+                let _ = writeln!(
+                    out,
+                    "  {:<name_w$} {cell:>6}",
+                    fit_name(&p.name),
+                    name_w = NAME_WIDTH
+                );
+            }
         }
         // The footprint reading (Plan 0077 Phase 4, backlog 0088), its own
         // block for the same reason the realistic-levels one is: the table
@@ -1397,6 +1515,14 @@ fn render_json(source: &str, reports: &[FamilyReport], tier: Tier) -> String {
             ));
             out.push_str(&format!("\"animation\":{},", num(p.animation)));
             out.push_str(&format!("\"drive\":{},", num(p.drive)));
+            // The schedule travels with the number, as `rate` carries its size.
+            // The mean is written at full precision rather than through `num`,
+            // so a clock-free preset's exact zero is distinguishable from a
+            // reading below four places (ADR-0196).
+            out.push_str(&format!(
+                "\"count\":{{\"mean\":{},\"frames\":{CLOCK_FRAMES},\"frames_per_beat\":{CLOCK_FRAMES_PER_BEAT}}},",
+                p.count
+            ));
             // The size travels with the number rather than being implied by the
             // report's own: `rate` is the one reading measured at PROBE_SIZE,
             // and a consumer that compares it across sizes is reading a

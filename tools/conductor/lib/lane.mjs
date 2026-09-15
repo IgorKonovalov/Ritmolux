@@ -11,17 +11,27 @@
 // inbox gains an entry, and the lane moves to the next queued plan whose `after` list has merged.
 // The repository, not the session, is the evidence at every step (close.mjs).
 
-import { existsSync } from "node:fs";
+import { closeSync, existsSync, fstatSync, mkdirSync, openSync, readSync } from "node:fs";
 import { join, relative } from "node:path";
 
 import { verifyClose, verifyFix, verifyImplement } from "./close.mjs";
 import { removeLane, laneNames, openLane } from "./cleanup.mjs";
-import { runGate } from "./gate.mjs";
-import { head, resolveCommit } from "./git.mjs";
-import { appendCleanupFailure, appendPark } from "./inbox.mjs";
+import { defaultGate, gateForStage, runGate } from "./gate.mjs";
+import { git, head, resolveCommit } from "./git.mjs";
+import { appendCleanupFailure, appendPark, dirtyWorktree } from "./inbox.mjs";
+import {
+  commitBody,
+  gateReader,
+  liveLine,
+  phaseBody,
+  standingParkBody,
+  stepEndBody,
+  stepStartBody,
+  streamReader,
+} from "./live.mjs";
 import { CLOSE, take } from "./locks.mjs";
 import { fastForwardMain } from "./merge.mjs";
-import { findPlan, nextStep, rangeLabel, readPlanFile } from "./plan.mjs";
+import { donePhases, findPlan, nextStep, rangeLabel, readPlanFile } from "./plan.mjs";
 import { endStep, planRecord, saveState, startStep, statePaths } from "./state.mjs";
 import { renderPromptFile, runStep } from "./step.mjs";
 
@@ -32,9 +42,93 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /*
  * ctx: { repo, worktreeRoot, stateDir, promptsDir, settingsFile, withLockPath, claude, local, queue,
- *        state, gate?, lockDir?, lockPollMs?, pollMs?, once?, lanes?, events?(name, data),
- *        onChange?(), beforeMerge?(plan) }
+ *        state, gate?, lockDir?, lockPollMs?, pollMs?, commitPollMs?, once?, lanes?, events?(name, data),
+ *        live?(line), onChange?(), beforeMerge?(plan) }
  */
+
+/**
+ * A lane is open when its record names a worktree and that directory exists. The worktree cap, the
+ * cap's list of holders, a plan's reopen test and the standing-park line all ask this, so a lane the
+ * owner removed with `git worktree remove` stops counting at once. The record's removal flag is
+ * history only: nothing that counts lanes reads it.
+ */
+export function laneOpen(rec) {
+  return Boolean(rec?.worktree) && existsSync(rec.worktree);
+}
+
+/** The suite ledger (ADR-0207): the gate reads and writes it, and every session's wrapper is handed it. */
+const suiteLedger = (ctx) => join(ctx.stateDir, "suite-ledger.jsonl");
+
+/** Emits one run-terminal line; a display that throws never stops a lane. */
+function live(ctx, plan, body) {
+  if (!ctx.live) return;
+  try {
+    ctx.live(liveLine(plan, body));
+  } catch {}
+}
+
+/** The last 64 KiB of a backgrounded command's output file, or null. */
+function readTail(path) {
+  const fd = openSync(path, "r");
+  try {
+    const size = fstatSync(fd).size;
+    const len = Math.min(size, 64 * 1024);
+    const buf = Buffer.alloc(len);
+    readSync(fd, buf, 0, len, size - len);
+    return buf.toString("utf8");
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/**
+ * Polls the worktree while a session runs and emits each commit that lands, then each phase whose
+ * `## Implementation log` row reads done after it. `stop()` takes one last look, so a commit made
+ * just before the session ended is still printed before its end line.
+ */
+function watchCommits(ctx, rec, plan) {
+  const wt = rec.worktree;
+  const base = head(wt);
+  const seen = new Set();
+  const donePrinted = new Set();
+  const doneNow = () => {
+    const found = findPlan(wt, plan);
+    return found ? donePhases(readPlanFile(found.path)) : new Set();
+  };
+  try {
+    for (const id of doneNow()) donePrinted.add(id);
+  } catch {}
+  const poll = () => {
+    if (!base || !existsSync(wt)) return;
+    const r = git(["log", "--reverse", "--format=%H%x09%s", `${base}..HEAD`], wt);
+    if (r.code !== 0 || !r.stdout) return;
+    let fresh = false;
+    for (const line of r.stdout.split("\n")) {
+      const [sha, ...subject] = line.split("\t");
+      if (!sha || seen.has(sha)) continue;
+      seen.add(sha);
+      fresh = true;
+      live(ctx, plan, commitBody(sha, subject.join("\t")));
+    }
+    if (!fresh) return;
+    try {
+      for (const id of doneNow()) {
+        if (donePrinted.has(id)) continue;
+        donePrinted.add(id);
+        live(ctx, plan, phaseBody(id));
+      }
+    } catch {}
+  };
+  const timer = ctx.live ? setInterval(poll, ctx.commitPollMs ?? 3000) : null;
+  return {
+    stop() {
+      if (timer) {
+        clearInterval(timer);
+        poll();
+      }
+    },
+  };
+}
 
 function recordWait(rec, lock, ms) {
   if (!Array.isArray(rec.lockWaits)) rec.lockWaits = [];
@@ -66,7 +160,7 @@ function blocked(ctx, plan, seen = new Set()) {
 }
 
 export function openWorktreeCount(state) {
-  return Object.values(state.plans).filter((r) => r.worktree && !r.laneRemoved).length;
+  return Object.values(state.plans).filter(laneOpen).length;
 }
 
 /** The next plan a lane can run: { plan } | { wait: true } | {}. */
@@ -86,10 +180,15 @@ export function pickNext(ctx, lane) {
 export async function runLanes(ctx) {
   const lanes = ctx.lanes ?? Object.keys(ctx.queue.lanes);
   ctx.held ??= new Map();
-  const run = { started: now(), ended: null, lanes };
+  // `cli` is preflight's reading of `claude --version`, carrying its warning for an unverified patch.
+  const run = { started: now(), ended: null, lanes, ...(ctx.cli ? { cli: ctx.cli } : {}) };
   ctx.state.runs.push(run);
   ctx.run = run;
   save(ctx);
+  const nowMs = Date.now();
+  for (const rec of Object.values(ctx.state.plans).sort((a, b) => a.plan.localeCompare(b.plan))) {
+    if (rec.status === "parked") live(ctx, rec.plan, standingParkBody(rec, { open: laneOpen(rec), nowMs }));
+  }
   try {
     await Promise.all(lanes.map((lane) => laneLoop(ctx, lane)));
   } finally {
@@ -99,36 +198,65 @@ export async function runLanes(ctx) {
   }
 }
 
+/**
+ * Records in the run every plan of `lane` still queued when the lane stops, with why it did not
+ * start: the first unmerged plan it waits on and that plan's status, or else `stopped` — the lane's
+ * own reason for stopping (`worktree cap`, `--once`, `stopped`).
+ */
+function recordNotStarted(ctx, lane, stopped) {
+  ctx.run.notStarted ??= [];
+  for (const plan of ctx.queue.lanes[lane] ?? []) {
+    if (merged(ctx, plan) || (ctx.state.plans[plan]?.status ?? "queued") !== "queued") continue;
+    const dep = (ctx.queue.plans[plan]?.after ?? []).find((d) => !merged(ctx, d));
+    const reason = dep ? `after ${dep} (${ctx.state.plans[dep]?.status ?? "queued"})` : stopped;
+    ctx.run.notStarted.push({ plan, lane, reason });
+  }
+}
+
 async function laneLoop(ctx, lane) {
   for (;;) {
-    if (ctx.stopRequested?.()) return;
+    if (ctx.stopRequested?.()) return recordNotStarted(ctx, lane, "stopped");
     const pick = pickNext(ctx, lane);
     if (pick.plan) {
       const rec = ctx.state.plans[pick.plan];
-      const hasLane = rec?.worktree && !rec.laneRemoved;
-      if (!hasLane && openWorktreeCount(ctx.state) >= ctx.local.max_open_worktrees) {
-        event(ctx, "worktree-cap", { lane, plan: pick.plan });
+      if (!laneOpen(rec) && openWorktreeCount(ctx.state) >= ctx.local.max_open_worktrees) {
+        // The cap is the disk bound (ADR-0205), so the lane stops rather than waiting; the stop is a
+        // fact in the run record, for the digest and the run's output.
+        const holding = Object.values(ctx.state.plans)
+          .filter(laneOpen)
+          .map((r) => r.plan)
+          .sort();
+        const stop = { lane, reason: "worktree_cap", plan: pick.plan, holding, max: ctx.local.max_open_worktrees, at: now() };
+        ctx.run.stops ??= [];
+        ctx.run.stops.push(stop);
+        recordNotStarted(ctx, lane, "worktree cap");
+        save(ctx);
+        event(ctx, "worktree-cap", stop);
         return;
       }
       await runPlan(ctx, lane, pick.plan);
-      if (ctx.once) return;
+      if (ctx.once) return recordNotStarted(ctx, lane, "--once");
       continue;
     }
     if (pick.wait) {
       await sleep(ctx.pollMs ?? 5000);
       continue;
     }
-    return;
+    return recordNotStarted(ctx, lane, "stopped");
   }
 }
 
 function park(ctx, rec, { reason, detail, phase = null, read = null }) {
   rec.status = "parked";
   rec.park = { reason, detail, phase, read, worktree: rec.worktree, at: now() };
+  // No session is trusted to have left the tree clean. The paths are recorded and never reverted:
+  // they may be the evidence the owner needs.
+  const dirty = dirtyWorktree(rec.worktree);
+  if (dirty) rec.park.dirty = dirty;
   rec.parks.push(rec.park);
   rec.ended = now();
   if (ctx.state.lanes[rec.lane]) ctx.state.lanes[rec.lane] = { plan: null, step: null };
-  appendPark(statePaths(ctx.stateDir).inbox, { plan: rec.plan, reason, detail, read, worktree: rec.worktree });
+  appendPark(statePaths(ctx.stateDir).inbox, { plan: rec.plan, reason, detail, read, worktree: rec.worktree, dirty });
   event(ctx, "park", { plan: rec.plan, reason });
   save(ctx);
   return rec;
@@ -147,7 +275,14 @@ async function session(ctx, rec, kind, { owner, prompt, vars, budget, addDirs = 
   ctx.state.lanes[rec.lane] = { plan: rec.plan, step: label, stepStarted: entry.started };
   save(ctx);
   event(ctx, `${kind}-step`, { plan: rec.plan, label });
+  live(ctx, rec.plan, stepStartBody({ label, kind, owner, phases: info.phases, round: info.round }));
+  // The hook appends to a file in this directory; the file itself must not exist until a hook ran.
+  mkdirSync(join(ctx.stateDir, "hooks"), { recursive: true });
+  const reader = streamReader({ readOutput: ctx.readOutput ?? readTail, shared: (ctx.liveShared ??= {}) });
+  const watch = watchCommits(ctx, rec, rec.plan);
+  const t0 = Date.now();
   const result = await runStep({
+    onStreamEvent: ctx.live ? (e) => reader.lines(e).forEach((body) => live(ctx, rec.plan, body)) : undefined,
     claude: ctx.claude,
     cwd: rec.worktree,
     prompt,
@@ -157,9 +292,18 @@ async function session(ctx, rec, kind, { owner, prompt, vars, budget, addDirs = 
     model: ctx.local.model?.[kind],
     addDirs: [...addDirs, ...(ctx.queue.plans[rec.plan]?.add_dirs ?? []).map((d) => join(ctx.repo, d))],
     transcriptPath: join(paths.transcripts, `${label}.jsonl`),
-    env: { RLX_LOCK_LOG: paths.lockLog, ...(ctx.lockDir ? { RLX_LOCK_DIR: ctx.lockDir } : {}) },
+    skill: owner,
+    hookLog: join(ctx.stateDir, "hooks", `${label}.log`),
+    env: {
+      RLX_LOCK_LOG: paths.lockLog,
+      RLX_SUITE_LEDGER: suiteLedger(ctx),
+      RLX_SUITE_LEDGER_BY: label,
+      ...(ctx.lockDir ? { RLX_LOCK_DIR: ctx.lockDir } : {}),
+    },
     expectPlan: rec.plan,
   });
+  watch.stop();
+  live(ctx, rec.plan, stepEndBody({ label, result, ms: Date.now() - t0 }));
   endStep(ctx.stateDir, ctx.state, entry, result);
   ctx.state.lanes[rec.lane] = { plan: rec.plan, step: null };
   save(ctx);
@@ -167,17 +311,25 @@ async function session(ctx, rec, kind, { owner, prompt, vars, budget, addDirs = 
 }
 
 async function gate(ctx, rec, label) {
+  const lines = gateReader({ stage: label });
+  const show = (bodies) => bodies.forEach((b) => live(ctx, rec.plan, b));
+  const t0 = Date.now();
   const g = await runGate({
     cwd: rec.worktree,
-    commands: ctx.gate,
+    commands: gateForStage(label, ctx.gate ?? defaultGate()),
     logDir: join(ctx.stateDir, "gates"),
     label: `${rec.plan}-${label}`,
     lockDir: ctx.lockDir,
     lockPollMs: ctx.lockPollMs,
     onLockWait: (name, ms) => recordWait(rec, name, ms),
+    onCommandStart: (c) => show(lines.start(c)),
+    onCommandEnd: (c, r) => show(lines.end(c, r)),
+    ledger: suiteLedger(ctx),
+    onCommandSkipped: (c, record) => show(lines.skipped(c, `tree ${record.tree.slice(0, 7)} green by ${record.by} at ${record.at}`)),
   });
+  show(lines.finish(g, Date.now() - t0));
   rec.gates ??= [];
-  rec.gates.push({ label, ok: g.ok, ran: g.ran, failed: g.failed ?? null, at: now() });
+  rec.gates.push({ label, ok: g.ok, ran: g.ran, commands: g.commands, failed: g.failed ?? null, at: now() });
   // The tip the conductor itself last saw green. The fast-forward compares against this, never
   // against the close head: the close session merges main, bumps and tags, and its own gate run is
   // a claim like any other.
@@ -220,7 +372,7 @@ export async function runPlan(ctx, lane, plan) {
   const budgets = ctx.local.budget_usd;
   const paths = statePaths(ctx.stateDir);
 
-  if (!rec.worktree || !existsSync(rec.worktree)) {
+  if (!laneOpen(rec)) {
     const found = findPlan(ctx.repo, plan);
     if (!found) return park(ctx, rec, { reason: "plan_wrong", detail: `plan ${plan} is not in the main checkout` });
     const names = laneNames(ctx.worktreeRoot, found.file, plan);

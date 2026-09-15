@@ -1542,6 +1542,119 @@ fn dissolve_mode_freezes_a_shared_scene_pair_and_an_unresolvable_one() {
         "independent scenes still need frame-time evidence, which a headless \
          capture never has"
     );
+    assert!(
+        !renderer.pair_shares_resources(2, 3),
+        "a line scene and a field hold independent state, so only headroom froze them"
+    );
+
+    // Every system, not one sample of it. The roster holds one scene object per
+    // `SystemKind`, so a same-system pair evaluated dual-live would advance and
+    // bind that one object twice in a frame; the veto is what keeps it evaluated
+    // once. `SystemKind::ALL` rather than a literal list, so a system added
+    // later is held to it by being added. The veto input is asserted beside the
+    // mode because a headless renderer's missing headroom freezes every pair, and
+    // the mode alone could not tell the two reasons apart.
+    let pairs: Vec<Preset> = SystemKind::ALL
+        .iter()
+        .flat_map(|kind| {
+            ["A", "B"].map(|side| {
+                of(
+                    &format!("{}{side}", kind.as_str()),
+                    &format!(
+                        "system = \"{}\"\n{}",
+                        kind.as_str(),
+                        bare_system_extras(*kind)
+                    ),
+                )
+            })
+        })
+        .collect();
+    renderer.set_presets(pairs);
+    for (i, kind) in SystemKind::ALL.iter().enumerate() {
+        let (a, b) = (2 * i, 2 * i + 1);
+        assert!(
+            renderer.pair_shares_resources(a, b),
+            "two `{}` presets are one scene object and must read as shared",
+            kind.as_str()
+        );
+        assert_eq!(
+            renderer.dissolve_mode(a, b),
+            Mode::Freeze,
+            "two `{}` presets must dissolve frozen",
+            kind.as_str()
+        );
+    }
+}
+
+/// Whatever structural table a bare `system = "<key>"` preset needs to load:
+/// the two generator-driven line systems refuse to build without one.
+fn bare_system_extras(kind: SystemKind) -> &'static str {
+    match kind {
+        SystemKind::StarPattern => "[generator]\ntiling = \"8\"\n",
+        SystemKind::LSystem => {
+            "[generator]\naxiom = \"F\"\nrules = { F = \"F[+F]F\" }\nangle_deg = 22\nmax_depth = 3\n"
+        }
+        _ => "",
+    }
+}
+
+/// **The test hatch honours the veto.** `begin_transition_forced` bypasses the
+/// governor's headroom half so a headless test can reach the dual-live render
+/// path, but a same-system pair must stay frozen through every dissolve frame:
+/// the governor never builds that frame, so a test that did would be observing a
+/// defect no shipped build can have. An independent pair still goes dual-live
+/// once its opening frame is captured.
+#[test]
+fn a_forced_dual_live_dissolve_keeps_a_shared_scene_pair_frozen() {
+    let Some(mut renderer) = headless_or_skip(HeadlessOptions {
+        width: 48,
+        height: 48,
+        prefer_software: true,
+    }) else {
+        return;
+    };
+    let field = |name: &str| {
+        Preset::from_toml_str(&format!("system = \"fragment_field\"\nname = \"{name}\""))
+            .expect("hand-written field preset is valid")
+    };
+    renderer.set_presets(vec![field("FieldA"), field("FieldB"), preset("Swarm")]);
+    renderer.select_preset_now(0);
+    let stimulus = AnalysisFrame::default();
+    renderer.capture_frame(&stimulus).expect("warm-up frame");
+
+    renderer.begin_transition_forced(1, Mode::DualLive);
+    assert!(
+        renderer.transition.is_some(),
+        "the shared pair must dissolve"
+    );
+    let mut frames = 0;
+    while renderer.transition.is_some() {
+        assert!(
+            !renderer
+                .transition
+                .as_ref()
+                .is_some_and(|tr| tr.is_dual_live()),
+            "dissolve frame {frames} of a same-system pair went dual-live"
+        );
+        renderer
+            .capture_frame(&stimulus)
+            .unwrap_or_else(|e| panic!("shared dissolve frame {frames}: {e}"));
+        frames += 1;
+        assert!(frames < 10_000, "the shared dissolve never finished");
+    }
+
+    // The roster is on FieldB now; FieldB -> Swarm is an independent pair.
+    renderer.begin_transition_forced(2, Mode::DualLive);
+    renderer
+        .capture_frame(&stimulus)
+        .expect("independent dissolve opening frame");
+    assert!(
+        renderer
+            .transition
+            .as_ref()
+            .is_some_and(|tr| tr.is_dual_live()),
+        "an independent pair forced dual-live must be dual-live after its opening frame"
+    );
 }
 
 // --- Plan 0023 Phase 4: the adaptive dual-live upgrade -------------------
@@ -2234,19 +2347,17 @@ fn a_degenerate_frame_delta_cannot_reach_a_scene() {
         // reset away the accumulation — would satisfy every assertion in the
         // loop that follows by rendering one unchanging picture.
         //
-        // **The stretched frame is the second one, and it has to be.**
-        // `evaluate_preset` advances the scene before it applies the preset's
-        // bindings, so on the first frame every rate is still at the scene's own
-        // default — zero, for the collage's `drift` and `spin`. A rate that
-        // integrates turns that first frame's elapsed time into no motion at
-        // all, so stretching it would be unobservable for a reason that has
-        // nothing to do with the seam. The *bad* delta below stays on the first
-        // frame, where it belongs: `0.0 * NaN` is `NaN`, so a degenerate first
-        // frame poisons an accumulator whatever rate is multiplying it.
+        // **What the stretched frame needs is a clean delta the scene integrates
+        // at its bound, non-zero rate**, so the extra elapsed time becomes motion
+        // the final frame still shows. Every frame qualifies, because a scene
+        // advances after its frame's bindings; the second is used so the stretch
+        // never shares a frame with the *bad* delta below. That one stays on the
+        // first frame: `0.0 * NaN` is `NaN`, so a degenerate first frame poisons
+        // an accumulator whatever rate is multiplying it.
         let stretched = seam_run(&mut renderer, name, &[dt, dt * 3.0, dt, dt]);
         assert_ne!(
             stretched.rgba, clean.rgba,
-            "{name}: a longer first frame left the picture unchanged, so this \
+            "{name}: a longer second frame left the picture unchanged, so this \
              probe cannot observe what the seam does"
         );
 
@@ -2718,4 +2829,196 @@ fn a_format_with_no_name_is_refused_rather_than_guessed() {
         "a readback opened at a format its frames could not be described in"
     );
     assert_eq!(renderer.preview_readback_size(), None);
+}
+
+// ---------------------------------------------------------------------------
+// A scene advances on the values its own frame bound (ADR-0198)
+// ---------------------------------------------------------------------------
+
+/// A roster scene that forwards every call to a concrete scene the test still
+/// holds, so a value the `Scene` trait cannot report is readable after the
+/// renderer has driven that scene through its real evaluation path.
+///
+/// `mirror_overflow` and `feedback_field` hand out a borrow a `RefCell` cannot
+/// outlive, so they keep the trait's `None`; neither scene observed here has
+/// either.
+struct Observed<T>(std::rc::Rc<std::cell::RefCell<T>>);
+
+impl<T: super::scenes::Scene> super::scenes::Scene for Observed<T> {
+    fn name(&self) -> &'static str {
+        self.0.borrow().name()
+    }
+    fn update(&mut self, frame: &AnalysisFrame) {
+        self.0.borrow_mut().update(frame);
+    }
+    fn render(
+        &mut self,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        aspect: f32,
+    ) {
+        self.0.borrow_mut().render(queue, encoder, view, aspect);
+    }
+    fn set_target_size(&mut self, width: u32, height: u32) {
+        self.0.borrow_mut().set_target_size(width, height);
+    }
+    fn set_occlude(&mut self, occlude: f32) {
+        self.0.borrow_mut().set_occlude(occlude);
+    }
+    fn advance(&mut self, dt: f32) {
+        self.0.borrow_mut().advance(dt);
+    }
+    fn set_time(&mut self, time: f32) {
+        self.0.borrow_mut().set_time(time);
+    }
+    fn reset_params(&mut self) {
+        self.0.borrow_mut().reset_params();
+    }
+    fn set_param(&mut self, name: &str, value: f32) {
+        self.0.borrow_mut().set_param(name, value);
+    }
+    fn set_param_series(&mut self, name: &str, values: &[f32]) {
+        self.0.borrow_mut().set_param_series(name, values);
+    }
+    fn set_per_vertex(&mut self, name: &str, values: &[f32]) {
+        self.0.borrow_mut().set_per_vertex(name, values);
+    }
+    fn configure(
+        &mut self,
+        cfg: &super::scenes::GeneratorConfig,
+    ) -> Option<super::scenes::lines::CapOverflow> {
+        self.0.borrow_mut().configure(cfg)
+    }
+    fn set_palette(&mut self, palette: &super::palette::Palette) {
+        self.0.borrow_mut().set_palette(palette);
+    }
+    fn set_feedback(&mut self, cfg: super::feedback::FeedbackConfig) {
+        self.0.borrow_mut().set_feedback(cfg);
+    }
+    fn sample_budget(&self) -> Option<u32> {
+        self.0.borrow().sample_budget()
+    }
+}
+
+/// Put `scene` in the roster slot for `kind`, on a renderer whose preset 0 is
+/// of that system, and hand it that preset as a fresh switch would. Returns the
+/// handle the test reads the scene through.
+fn observe<T: super::scenes::Scene + 'static>(
+    renderer: &mut Renderer,
+    kind: SystemKind,
+    scene: T,
+) -> std::rc::Rc<std::cell::RefCell<T>> {
+    let shared = std::rc::Rc::new(std::cell::RefCell::new(scene));
+    let slot = renderer
+        .scenes
+        .iter_mut()
+        .find(|(k, _)| *k == kind)
+        .expect("the roster holds every system");
+    slot.1 = Box::new(Observed(std::rc::Rc::clone(&shared)));
+    renderer.select_preset_now(0);
+    renderer.time = 0.0;
+    renderer.configure_active_scene();
+    shared
+}
+
+/// **The switch frame integrates the bound rate.** A fresh emitter preset
+/// binding `spin = K` has integrated exactly `K * dt` after its first frame, not
+/// the scene's default rate: the scene advances after this frame's bindings, so
+/// the rate it integrates is the one this frame bound.
+///
+/// Exact, not a tolerance: the accumulator starts at `0.0`, and one add of one
+/// product of the same two `f32` values is that product.
+#[test]
+fn a_fresh_emitter_integrates_its_bound_spin_on_its_first_frame() {
+    const K: f32 = 3.25;
+    let Some(mut renderer) = headless_or_skip(HeadlessOptions {
+        width: 48,
+        height: 48,
+        prefer_software: true,
+    }) else {
+        return;
+    };
+    let default = super::scenes::default_of(super::scenes::emitter::PARAMS, "spin");
+    assert_ne!(K, default, "the probe rate must differ from the default");
+    let bound = Preset::from_toml_str(&format!(
+        "system = \"emitter\"\nname = \"SpinK\"\n[params]\nspin = \"{K}\"\n"
+    ))
+    .expect("valid spin-bound emitter preset");
+    renderer.set_presets(vec![bound]);
+    let emitter = super::scenes::emitter::EmitterScene::new(
+        &renderer.ctx.device,
+        super::COMPOSITE_FORMAT,
+        renderer.tier.emitter_objects,
+    );
+    let emitter = observe(&mut renderer, SystemKind::Emitter, emitter);
+
+    renderer
+        .capture_frame(&AnalysisFrame::default())
+        .expect("first emitter frame");
+    let dt = super::scenes::FALLBACK_DT;
+    let integral = emitter.borrow().spin_integral();
+    assert_eq!(
+        integral,
+        K * dt,
+        "the first frame integrated {integral} rather than the bound rate (the \
+         default would give {})",
+        default * dt
+    );
+}
+
+/// **The switch frame builds the bound canvas.** A fresh collage preset binding
+/// a non-default `seed` generates its canvas from that seed on its first frame,
+/// and the second frame regenerates nothing: `rebuild` generates only when the
+/// recipe moves, so an identical recipe across both frames is one generation.
+///
+/// Read off the recipe rather than the pixels, because the defect is which
+/// parameters a generation read, and two canvases can look alike.
+#[test]
+fn a_fresh_collage_builds_its_bound_canvas_once_on_its_first_frame() {
+    const SEED: f32 = 4242.0;
+    let Some(mut renderer) = headless_or_skip(HeadlessOptions {
+        width: 48,
+        height: 48,
+        prefer_software: true,
+    }) else {
+        return;
+    };
+    let default = super::scenes::default_of(super::scenes::shape_collage::PARAMS, "seed");
+    assert_ne!(SEED, default, "the probe seed must differ from the default");
+    let bound = Preset::from_toml_str(&format!(
+        "system = \"shape_collage\"\nname = \"SeedK\"\n[params]\nseed = \"{SEED}\"\n"
+    ))
+    .expect("valid seed-bound collage preset");
+    renderer.set_presets(vec![bound]);
+    let collage = super::scenes::shape_collage::ShapeCollageScene::new(
+        &renderer.ctx.device,
+        super::COMPOSITE_FORMAT,
+        renderer.tier.collage_elements,
+    );
+    let collage = observe(&mut renderer, SystemKind::ShapeCollage, collage);
+
+    let stimulus = AnalysisFrame::default();
+    renderer
+        .capture_frame(&stimulus)
+        .expect("first collage frame");
+    let first = collage
+        .borrow()
+        .built_recipe()
+        .expect("the first frame builds a canvas");
+    renderer
+        .capture_frame(&stimulus)
+        .expect("second collage frame");
+    let second = collage.borrow().built_recipe();
+
+    assert_eq!(
+        first.seed, SEED as u64,
+        "frame 1 generated the canvas from seed {} rather than the bound one",
+        first.seed
+    );
+    assert_eq!(
+        second,
+        Some(first),
+        "frame 2 regenerated the canvas, so frame 1 did not build the bound recipe"
+    );
 }

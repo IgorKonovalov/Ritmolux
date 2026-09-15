@@ -18,6 +18,10 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0188 - The conductor survives its first run](#0188---the-conductor-survives-its-first-run)
+  - [0182 - The report hears a counter](#0182---the-report-hears-a-counter)
+  - [0181 - A scene advances after its frame's bindings](#0181---a-scene-advances-after-its-frames-bindings)
+  - [0185 - A fullscreen field lets the sky through with no post stage](#0185---a-fullscreen-field-lets-the-sky-through-with-no-post-stage)
   - [0187 - The conductor runs the lanes](#0187---the-conductor-runs-the-lanes)
   - [0176 - A release tag reaches origin](#0176---a-release-tag-reaches-origin)
   - [0174 - The clock-reading tests run alone](#0174---the-clock-reading-tests-run-alone)
@@ -183,6 +187,7 @@ hand-edited.
   - [0002 — Rust enforcement tooling](#0002--rust-enforcement-tooling)
   - [0001 — Core + standalone MVP, then foobar parity](#0001--core--standalone-mvp-then-foobar-parity)
 - [Prior sequencing notes (superseded)](#prior-sequencing-notes-superseded)
+  - [Moved 2026-09-15 from `README.md` — the opening of the engine-lane bullet, spent](#moved-2026-09-15-from-readmemd--the-opening-of-the-engine-lane-bullet-spent)
   - [Moved 2026-09-14 from `README.md` — the two-lane note for 0170-0173, spent](#moved-2026-09-14-from-readmemd--the-two-lane-note-for-0170-0173-spent)
   - [Moved 2026-09-11 from `README.md` — the note that 0167 does not close, spent](#moved-2026-09-11-from-readmemd--the-note-that-0167-does-not-close-spent)
   - [Moved 2026-09-10 from `README.md` — the 0158/0159 program note, spent](#moved-2026-09-10-from-readmemd--the-01580159-program-note-spent)
@@ -209,6 +214,131 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0188 - The conductor survives its first run](done/0188-the-conductor-survives-its-first-run.md)
+
+- closed 2026-09-15. Four `dev` phases on `main` directly, no lane: `a676f13` (1, `cmdRun` creates
+`state/` before writing its pid file, and the CLI fixture stops creating it), `24300e7` (2,
+`check-backlog-claims.mjs` becomes an `afterClose` step, so `gateForStage` drops it from
+`pre-review` and `fix-N` and keeps it at `post-close` and `remerge`), `856d5cb` (3, the allowlist
+gains `git restore` and still refuses `checkout` and `stash`; a park records the dirty paths capped
+at ten plus a count, and `parkStillTrue` refuses `resume` on a dirty worktree whatever the park
+reason) and `f15ce4a` (4, a lane stopping at the worktree cap records the stop in the run and every
+queued plan it did not open, with a reason; `cmdRun` wires the event hook to its output). Phase 5,
+`human`, was the pilot itself and produced no commit. Review: **no blockers, no majors, one minor.**
+Version: **0.124.1** (patch, a fix-only plan). ADR-0205 gained a second Outcome recording the pilot.
+The review's gate: `cargo nextest run --workspace` 1940 passed, 6 skipped, 725 s; `cargo doc` with
+warnings denied, exit 0.
+
+**The pilot (Phase 5), 2026-09-15 09:32 to 13:10.** Lane a merged **0185, 0181 and 0182** — 3 h
+38 min, **3 merged, 0 parked, $55.33 notional, zero fix rounds**, every plan passing review round 1.
+Tags `v0.123.1`, `v0.123.2`, `v0.124.0`. Every step ADR-0205's first Outcome recorded as never
+observed live has now run: the review session, the close, the close lock, the close-tip gate, the
+version bump with the studio's two copies, the annotated tag, the fast-forward, the worktree removal.
+0175 and 0180 stayed parked from 2026-09-14, both `plan_wrong`, and were not resumed.
+
+**What the pilot did not prove.** Only Phase 2's fix was exercised: 0185's `pre-review` had gone red
+on a backlog probe on 2026-09-14 and went green here. No run started on a missing `state/`, nothing
+parked, and no lane reached the worktree cap, so Phases 1, 3 and 4 rest on their unit tests against
+a fake CLI. Phase 3's refusal would have caught 0180's dirty lane; the owner cleaned it by hand
+before `resume` was called, so the guard never fired.
+
+**Measured at the close, and new.** A full `cargo nextest run --workspace` holds the machine-wide
+suite lock for 10.4 to 11.0 min and seven ran during the pilot; the conductor's own gate accounted
+for 72 of the run's 218 min, in five inter-step gaps plus a tail. The digest's "Suite-lock wait
+15 min" is three `cargo nextest list` calls blocked behind full runs, not lane contention. On that
+arithmetic **lane b stays off and `max_open_worktrees` stays at 3** — two lanes cannot overlap any
+suite time, and the cap was never the binding constraint, since a lane is serial by construction and
+never wanted a second slot. Recorded in ADR-0205's Outcome; raised as backlog 0223.
+
+**Also raised by the pilot:** backlog 0222 (the digest reports dollars, and a subscription
+operator's constraint is the usage window, which is recorded and never shown), 0224 (a CLI update
+refuses the whole conductor, and clearing it is a probe run and a hand edit to a source constant —
+`2.1.270` to `2.1.272` blocked this run until `3381990`) and 0225 (a review finding under `.claude/`
+left open for a restriction that is written nowhere and may not exist).
+
+**Open, one:** `tools/conductor/README.md`'s per-stage gate table restates `defaultGate()` in prose
+and nothing holds the two together.
+
+**Preset curation:** no `.toml` moved, and no shipped preset names ADR-0205 or Plan 0188.
+
+**Review caveat, on the record.** The Mode 4 review was not written by a fresh session: it was
+written by the session that ran Phase 5, on the owner's instruction, and that session had also
+committed `3381990` into the same subtree. `3381990` is not part of the plan and was not reviewed.
+Phases 1-4 were committed before that session began.
+
+### [0182 - The report hears a counter](done/0182-the-report-hears-a-counter.md)
+
+- closed 2026-09-15 by a conductor-run review (ADR-0205), round 1. Two `dev` phases on the lane
+`plan-0182-the-report-hears-a-counter`: `5e97086` (1, `shot --report` gains a `count` column after
+`onset`, read as the mean frame-aligned difference between a capture over a synthetic musical clock
+at silence and a silent capture of the same 48 frames. `geom` moves to a one-column block, and
+`--json` gains a `count` object after `drive`) and `162ae7f` (2, `docs/capturing.md`). Review:
+**no blockers, no majors, three minors.** Version: **0.124.0** (minor, a feature plan). ADR-0196
+accepted with an Outcome: the backlog probe it predicted would go red stayed green, and the report's
+wall time rose 25 %, not the doubling the plan's stop guarded. Backlog 0192 archived. The review's
+gate: `cargo nextest run --workspace` 1940 passed, 6 skipped, 624 s; `cargo doc` with warnings denied,
+`fmt` and `clippy` clean. `main` had not moved, so the merge was a no-op.
+
+**Readings the review re-took rather than trusted:**
+
+- the clock fixtures read `0`, `0.06380889` and `0.04887192`;
+- `Path Maple` and `Path Lion` read `count 0.169` and `0.191` beside an unchanged `onset 0.000`.
+
+**Fixed at the close:** ADR-0196's false prediction, recorded in its Outcome. **Open, two:**
+- The preset-author `render-loop.md` sample still prints `geom` as the main table's trailing column
+  and has no `count`, and its pre-ship step 7 still lacks the `count` clause the plan's followup
+  names. The conductor session's permissions deny edits under `.claude/`, so the fix is the owner's
+  or a human-started session's.
+- `report.rs` mirrors core's crate-private `FALLBACK_DT` as `CAPTURE_DT`, and nothing holds the two
+  equal.
+
+**Preset curation:** no `.toml` moved, and no shipped preset names ADR-0196, Plan 0182 or backlog
+0192.
+
+### [0181 - A scene advances after its frame's bindings](done/0181-a-scene-advances-after-its-frames-bindings.md)
+
+- closed 2026-09-15 by a conductor-run review (ADR-0205), round 1. Three `dev` phases on the lane
+`plan-0181-a-scene-advances-after-its-frames-bindings`: `00c9587` (1, the governor test asserts
+`Mode::Freeze` for a same-system pair of every `SystemKind`, and `begin_transition_forced` keeps
+`Freeze` for a shared pair), `b4d2c15` (2, `evaluate_preset` and `evaluate_layer` call `set_time` and
+`advance` after the bindings, pinned by a fresh-emitter spin test and a fresh-collage canvas test that
+both failed on the unmoved tree) and `5b93cd6` (3, the comments). Review: **no blockers, no majors,
+three minors, one nit.** Version: **0.123.2** (patch, a fix-only plan). ADR-0198 accepted with an
+Outcome: no golden moved, where its Negative predicted the emitter and collage baselines would.
+Backlog 0191 archived as discharged, backlog 0142 as falsified. The review's gate: `cargo nextest run
+--workspace` 1936 passed, 6 skipped, 624.9 s; `cargo doc` with warnings denied, `fmt` and `clippy`
+clean.
+
+**The minor fixed at the close:** `docs/on-device-validation.md` asked a tester to watch a
+same-system cellular dissolve run at double speed, which no build can do. **Open, all comment-only
+`dev` edits:** `particles/mod.rs`'s spin comment still says the renderer advances before it binds;
+`cellular/tests.rs`'s `Driver` claims the renderer's order and runs the old one; and the nit, an
+assertion message in `a_degenerate_frame_delta_cannot_reach_a_scene` calling the stretched frame the
+first.
+
+**Preset curation:** no `.toml` moved, and no shipped preset names ADR-0198, ADR-0135, Plan 0181 or
+backlog 0142/0191.
+
+### [0185 - A fullscreen field lets the sky through with no post stage](done/0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage.md)
+
+- closed 2026-09-15, the first plan closed by a conductor-run review (ADR-0205). Two `dev` phases
+on the lane `plan-0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage`: `87dee5a` (1,
+`fragment_field`, `analytic_field`, `shape_field` and `shape_collage` present with
+`PREMULTIPLIED_ALPHA_BLENDING`, and one test asserts on all four and both paths that `occlude = 1`
+covers and `occlude = 0` adds) and `2e4fe7a` (2, `presets/README.md` prose). Review, round 1:
+**no blockers, no majors, one minor, one nit.** Version: **0.123.1** (patch, a fix-only plan).
+ADR-0201 accepted. Backlog 0206 archived. The review's gate on the lane before the merge:
+`cargo nextest run --workspace` 1933 passed, 6 skipped, 629.8 s, no baseline changed; `cargo doc`
+with warnings denied clean. The same gate ran again on the tree with `main` merged in.
+
+**The minor, fixed at the close:** `presets/README.md` said no shipped preset binds `occlude`, and
+six do. **The nit, open:** `fragment_field.rs`'s shader comment still opens "Alpha 1.0:" over a line
+that returns `occlude`.
+
+**Preset curation:** no `.toml` moved, and no shipped preset names ADR-0201, Plan 0185 or backlog
+0206 as a workaround. The two presets on affected scenes that bind `occlude` bind `1.0`, which
+renders exactly as before.
 
 ### [0187 - The conductor runs the lanes](done/0187-the-conductor-runs-the-lanes.md)
 
@@ -1158,7 +1288,7 @@ by this plan's own Phase 7. The verdict rests on evidence — the whole behavior
 both embedded (364 passed, 3 skipped), and `shot --report family=shape_field` reporting **no
 near-duplicate geometry below shape 0.08** against the six presets already in the family, with bass
 reactivity 0.167 and 0.175 sitting mid-family. Their `onset 0.000` is
-[backlog 0192](../design-backlog.md) rather than a dead preset: the report holds a frame, so
+[backlog 0192](../design-backlog-archive.md) rather than a dead preset: the report holds a frame, so
 `beat_index` never advances and a counter-driven response is invisible to every column it prints.
 The stale-workaround sweep is clean — no shipped preset writes `coord_mode = "2"`, so nothing was
 silently getting mode 1 from the `ParamSpec` range Phase 7 corrected.
@@ -8460,6 +8590,19 @@ stays in `lmv-core`, and is out of the Miri job's scope, so the FFI pointer hand
 uncovered (its C side remains the Plan 0001 Phase-6 smoke program's job, per ADR-0003).
 
 ## Prior sequencing notes (superseded)
+
+### Moved 2026-09-15 from `README.md` — the opening of the engine-lane bullet, spent
+
+Spent when [Plan 0181](done/0181-a-scene-advances-after-its-frames-bindings.md) closed on
+2026-09-15, run by the conductor ahead of [Plan 0175](0175-an-eased-value-arrives.md). The bullet's
+remainder (0180 before 0142, then the rest) stays live in `README.md`. Kept verbatim:
+
+> - **Engine lane.** [0175], then [0181]. [0185] closed 2026-09-15 ahead of it and moved no golden,
+>   so 0181's bless set stays the emitter and collage baselines.
+
+[0175]: 0175-an-eased-value-arrives.md
+[0181]: done/0181-a-scene-advances-after-its-frames-bindings.md
+[0185]: done/0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage.md
 
 ### Moved 2026-09-14 from `README.md` — the two-lane note for 0170-0173, spent
 

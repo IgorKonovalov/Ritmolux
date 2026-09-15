@@ -1,11 +1,13 @@
 # 0181 — A scene advances after its frame's bindings
 
-> **Status:** approved (2026-09-14)
+> **Status:** done 2026-09-15. Phases `00c9587`, `b4d2c15`, `5b93cd6`; conductor close review round 1:
+> no blockers, no majors, three minors (one fixed at the close), one nit. Full `nextest --workspace`,
+> `cargo doc`, `fmt` and `clippy` re-run green by the review. Version 0.123.2 (patch).
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`
-> **Related ADRs:** [0198](../adrs/0198-a-scene-advances-after-its-frames-bindings.md) (proposed),
-> [0024](../adrs/0024-cross-preset-transitions.md), [0132](../adrs/0132-a-rate-parameter-integrates-a-phase.md),
-> [0135](../adrs/0135-every-scene-rate-integrates-through-one-shared-phase.md)
+> **Related ADRs:** [0198](../../adrs/0198-a-scene-advances-after-its-frames-bindings.md) (accepted),
+> [0024](../../adrs/0024-cross-preset-transitions.md), [0132](../../adrs/0132-a-rate-parameter-integrates-a-phase.md),
+> [0135](../../adrs/0135-every-scene-rate-integrates-through-one-shared-phase.md)
 > **Closes:** design-backlog 0191; design-backlog 0142 (falsified, see below)
 
 ## TL;DR
@@ -255,24 +257,192 @@ flowchart TB
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(`main` directly, or the worktree path plus its branch)_
+**Lane:** `C:\Users\Igor Konovalov\WORK\rlx-plan-0181` on branch `plan-0181-a-scene-advances-after-its-frames-bindings`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The shared-scene veto is pinned, and the test hatch honours it | dev | not started | |
-| 2 — Every scene advances on the values its frame bound | dev | not started | |
-| 3 — The prose follows the order | dev | not started | |
+| 1 — The shared-scene veto is pinned, and the test hatch honours it | dev | done | 00c9587 |
+| 2 — Every scene advances on the values its frame bound | dev | done | b4d2c15 |
+| 3 — The prose follows the order | dev | done | 5b93cd6 |
 
 ### Notes
 
+- Phase 2: both behavioural tests (`a_fresh_emitter_integrates_its_bound_spin_on_its_first_frame`,
+  `a_fresh_collage_builds_its_bound_canvas_once_on_its_first_frame`, in `core/src/render/tests.rs`)
+  failed on the unmoved tree: the emitter integrated `0` against `K * dt = 0.05416667`, and the
+  collage's frame-1 canvas was generated from seed `0` rather than `4242`. They reach the concrete
+  scene through a test-only forwarding `Scene` wrapper swapped into the renderer's roster.
+- Phase 2: `cargo nextest run --workspace` after the move was green with no bless: no golden,
+  inside or outside the emitter/collage set, left its tolerance.
+- Phase 3 deviation: also rewrote the comment in `WarpMeshScene::update`
+  (`core/src/render/scenes/warp_mesh/mod.rs`), which said `advance` runs before the frame's
+  `set_param` calls. The file is not in the phase's list; the done-when grep over
+  `core/src/render/scenes` required it. The failing-frame assertion message in
+  `a_degenerate_frame_delta_cannot_reach_a_scene` still says "a longer first frame" while the
+  stretched frame is the second; the phase is comments-only, so it was left.
+
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`**
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** no
+- **Plan header `Closes:`** design-backlog 0191; design-backlog 0142 (falsified)
+- **What shipped:** fix (render evaluation order), plus tests and comments
+- **Operator docs touched:** none
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 - 135 reductions hold across 58 live entries, 12 unprobeable; 0191 and 0142 left in place
+- **Full suite:** `cargo nextest run --workspace --no-fail-fast` (under the suite lock) at 5b93cd6's tree - exit 0, 1936 passed, 6 skipped
+- **Outstanding `human` phases:** none
+
+## Close review
+
+> The conductor-run close review (ADR-0205), round 1, 2026-09-15, written in a fresh session given
+> the plan and the lane. There were no earlier rounds, so no finding was resolved by a fix round.
+
+**Verdict: Plan 0181 landed as written; no blockers, no majors, three minors (one fixed at the close)
+and one nit.** The reorder is exactly the two-function move the plan specified, the population table
+holds against the tree, both behavioural tests assert the done-when's claims exactly, and the
+shared-scene veto is pinned for every `SystemKind` and honoured by the test hatch. What did not fully
+land is Phase 3's intent: two comments outside its file list still state the retired order as fact.
+
+Lane: `C:\Users\Igor Konovalov\WORK\rlx-plan-0181`, branch
+`plan-0181-a-scene-advances-after-its-frames-bindings`. Phase commits `00c9587` (1), `b4d2c15` (2),
+`5b93cd6` (3), log close block `d78df81`, all on `538f736`.
+
+### Findings
+
+**minor**
+
+1. **`core/src/render/scenes/particles/mod.rs:1706-1708` states the retired order as a fact.** The
+   comment reads "the renderer calls `advance` before it routes this frame's bindings, so `self.spin`
+   is last frame's value there and this frame's here". Since `b4d2c15` that is false. Phase 3 exists
+   to rewrite exactly this class of comment; this one escaped because it says "last frame's" and the
+   done-when grep keyed on "set yet|previous frame's", and because the plan's own file list omitted
+   the file. It is the attractor's copy of the ADR-0135 convention the plan retires, so it is the
+   comment a scene author is most likely to read. **Fix:** say what `WarpMeshScene::update`'s
+   rewritten comment says - the phase steps in `update` against this frame's bound `spin`, and
+   `advance` only stores `dt`, so the scene has one integration site. **Open.**
+
+2. **`core/src/render/scenes/cellular/tests.rs:71-72` claims to drive "the renderer's per-frame
+   order - `set_time`, `advance`, `reset_params`, `set_param`, `update`, `render`"**, and
+   `Driver::frame` (lines 125-135) calls them in that order. The renderer's order is now
+   `reset_params`, `set_param`, `set_time`, `advance`, `update`. Results are unaffected for
+   `cellular`, which only stores `dt` in `advance`; but the doc claims fidelity to the renderer, and a
+   copy of this driver for a scene that reads a parameter in `advance` (emitter, collage) would test
+   the order no shipped build runs. **Fix:** move the two calls below the parameter loop, or drop the
+   claim. **Open.**
+
+3. **`docs/on-device-validation.md:209-212` asked a tester to watch for the defect this plan proved
+   unreachable.** The cellular item said a same-system dissolve "steps twice per frame for the
+   dissolve's duration (design-backlog 0142)" and that the automaton "briefly runs at double speed".
+   Every same-system dissolve freezes (ADR-0198), so the tester would be looking for something no
+   build can show. **Fixed in the close commit:** the item now asks whether the frozen outgoing frame
+   reads as a defect.
+
+**nit**
+
+4. **`core/src/render/tests.rs:2360`, the assertion message in
+   `a_degenerate_frame_delta_cannot_reach_a_scene`, says "a longer first frame"** while the stretched
+   delta is the second (`&[dt, dt * 3.0, dt, dt]`). Disclosed in the log and left because Phase 3 was
+   comments-only. **Fix:** "a longer second frame". **Open.**
+
+### Lens 1 - alignment
+
+- **Phases.** All three landed as specified, one commit each. The single deviation (the
+  `warp_mesh/mod.rs` comment rewrite, outside the file list) is disclosed and correct.
+- **Owner tags.** Every phase carries `**Owner skill:** dev`. In vocabulary.
+- **The log is shorter than the phases section**, and carries the lane, the commit map and the close
+  triggers.
+- **Phase 1 tests, read.** `dissolve_mode_freezes_a_shared_scene_pair_and_an_unresolvable_one` now
+  builds a same-system pair for every entry of `SystemKind::ALL` (not a literal list) and asserts both
+  `pair_shares_resources` and `Mode::Freeze` for each. The veto input is asserted beside the mode,
+  which is the right call: a headless renderer's missing headroom freezes every pair, so the mode
+  alone could not distinguish the two reasons.
+  `a_forced_dual_live_dissolve_keeps_a_shared_scene_pair_frozen` checks `is_dual_live()` is false
+  before every captured dissolve frame of a `fragment_field` pair until the transition ends, then
+  forces an independent pair and asserts it goes dual-live after its opening frame. Matches both
+  done-when bullets.
+- **Phase 1 code.** `pair_shares_resources` is extracted from `dissolve_mode` unchanged (an
+  unresolvable preset still reads as shared), and `begin_transition_forced` (still `#[cfg(test)]`)
+  replaces a requested mode with `Freeze` when the pair shares. The existing `dissolve_at` tests and
+  the layered-pair test are untouched and pass.
+- **Phase 2 tests, read.** `a_fresh_emitter_integrates_its_bound_spin_on_its_first_frame` binds
+  `spin = 3.25`, asserts it differs from the declared default, and asserts
+  `spin_integral == K * FALLBACK_DT` exactly. That exactness is sound: `EmitterScene::advance` is
+  `spin_integral += finite(spin, DEFAULT_SPIN) * dt` from `0.0`, and `capture_frame` steps by
+  `FALLBACK_DT`. `a_fresh_collage_builds_its_bound_canvas_once_on_its_first_frame` binds
+  `seed = 4242`, reads `built_recipe()` after frames 1 and 2, asserts frame 1's seed is the bound one
+  and frame 2's recipe is identical, so `rebuild` (which regenerates only on a recipe change)
+  generated once. It reads the recipe, not pixels, as the done-when asks. Both reach the concrete
+  scene through a test-only forwarding `Observed<T>` wrapper swapped into the roster slot, plus
+  `#[cfg(test)]` accessors on the concrete types; no `Scene` trait method was added (ADR-0002 held).
+  The log records both failing on the unmoved tree with the observed values; the review did not
+  re-run that negative.
+- **Phase 2 code.** `evaluate_preset` and `evaluate_layer` both move `set_time` + `advance` to
+  directly above `update`, after the binding walk, the overrides, the `[per_vertex]` table and (in
+  the layer) the `mix` binding. `side.chain.set_dt` and both `reset_params` stay put. No early return
+  lies between the old and new position, so no path now skips `advance`. `LatchBank::advance` is
+  untouched.
+- **Population table, re-derived from the tree.** Every `Scene::advance` in
+  `core/src/render/scenes` either stores `dt` (`cellular`, `swarm`, `warp_mesh`, `fragment_field`,
+  `parametric`, `spectrum`), drains a parameter-free `FixedStep` (`particles`,
+  `reaction_diffusion`), or is one of the two named scenes (`emitter`, `shape_collage`). No
+  `set_param` reads `self.time` (every read is in `update`), so moving `set_time` below the bindings
+  cannot change a stored value either.
+- **Bless discipline.** No golden left its tolerance, inside the permitted set or outside it. The
+  plan allowed three baselines to move and required none to; that is consistent with a one-frame
+  shift on a 120-frame capture.
+
+### Lens 2 - layering, real-time safety, contracts
+
+No platform or audio-source type entered `core/`; no `extern "C"` change; no OSC address or event
+change. The only non-test addition is `pair_shares_resources` (`pub(super)`), a pure read of the
+roster. `evaluate.rs` gained no `unwrap`/`expect`; the new `expect`s are all in `#[cfg(test)]` code.
+
+### Lens 3 - docs and bookkeeping
+
+- No operator-facing behaviour changed (no flag, key, default, param or count). The one reader
+  document the plan made stale is `docs/on-device-validation.md` (finding 3), found by grepping
+  `docs/` for backlog 0142 and 0191. `docs/presets.md` does not describe the per-frame call order.
+- **ADR-0198 accepted with a dated `Outcome`**: its Negative consequences predicted that the
+  `emitter` and `shape_collage` goldens would move, and none did.
+- **Backlog 0191** is discharged and archived. **Backlog 0142** is archived as falsified; its
+  `unprobeable:` bullet retires with the body.
+- Version: **patch** (a fix-only plan), 0.123.1 to 0.123.2, with the studio's two copies.
+- No `presets/` file touched. The curation grep for ADR-0198, ADR-0135, Plan 0181 and backlog
+  0142/0191 over `presets/*.toml` finds nothing, so no preset dodges the one-frame lag.
+
+### Lens 4 - correctness and determinism
+
+The change is an ordering inside a pure evaluation; no wall-clock read or unseeded randomness was
+added. The case the tests do not build is **a switch onto a scene that last ran a different preset**
+(a warm scene, whose previous-frame values are another preset's rather than the defaults). Both new
+tests use a freshly built scene. That is sufficient: after the reorder nothing `advance` reads can
+come from a previous frame, whatever that frame held, so the warm case is the same code path with
+different stale values that are never read.
+
+The emitter's exact `f32` equality is a property (one product of the same two values added to
+`0.0`), not a measurement.
+
+### Lens 5 - design integrity
+
+The reorder removes a trait-order trap rather than guarding it, which is ADR-0198's decision, and the
+`Scene::advance` doc now states the contract (after `reset_params`, every binding, the overrides, the
+per-vertex table and `set_time`, immediately before `update`). The veto stays the single guarantee
+that one scene object is evaluated at most once per frame, and the test hatch can no longer
+contradict it. The `Scene` seam did not widen.
+
+### Gate
+
+Run by the review, not taken from the log:
+
+- `cargo nextest run --workspace --no-fail-fast` under the suite lock: **exit 0, 1936 passed
+  (3 slow), 6 skipped, 624.9 s.** It matches the log's `**Full suite:**` bullet. `main`'s one new
+  commit (`3db17e2`, `docs/design-backlog.md` only) was merged during the run; it touches no Rust and
+  no file a test reads, so the Rust tree the suite ran is the merged tree's.
+- `cargo doc --workspace --no-deps` with rustdoc warnings denied: clean.
+- `cargo fmt --all -- --check`: clean. `cargo clippy --workspace --all-targets -- -D warnings`: clean.
+- `node scripts/check-comment-hygiene.mjs`: OK. `node scripts/check-backlog-claims.mjs`: OK, 137
+  reductions across 59 live entries, 12 unprobeable.
 
 ## Followups (after this lands)
+
+- The two stale comments and the assertion message above (close-review findings 1, 2 and 4) are
+  comment-only `dev` edits.

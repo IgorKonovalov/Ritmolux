@@ -1,12 +1,14 @@
 # 0182 — The report hears a counter
 
-> **Status:** approved (2026-09-14)
+> **Status:** done 2026-09-15. Phases `5e97086`, `162ae7f`; conductor close review round 1:
+> no blockers, no majors, three minors (one fixed at the close). Full `nextest --workspace`,
+> `cargo doc`, `fmt` and `clippy` re-run green by the review. Version 0.124.0 (minor).
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`
-> **Related ADRs:** [0196](../adrs/0196-the-report-hears-the-musical-clock-in-a-column-of-its-own.md) (proposed),
-> [0134](../adrs/0134-motion-is-two-readings-and-anchoring-is-why-neither-can-be-a-threshold.md),
-> [0042](../adrs/0042-reachability-measured-on-the-expression-tree.md),
-> [0109](../adrs/0109-the-beat-clock-counts-onsets-not-beats.md)
+> **Related ADRs:** [0196](../../adrs/0196-the-report-hears-the-musical-clock-in-a-column-of-its-own.md) (accepted, Outcome),
+> [0134](../../adrs/0134-motion-is-two-readings-and-anchoring-is-why-neither-can-be-a-threshold.md),
+> [0042](../../adrs/0042-reachability-measured-on-the-expression-tree.md),
+> [0109](../../adrs/0109-the-beat-clock-counts-onsets-not-beats.md)
 > **Closes:** design-backlog 0192
 
 ## TL;DR
@@ -219,24 +221,151 @@ fn clock_stimulus() -> Vec<AnalysisFrame> {
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(`main` directly, or the worktree path plus its branch)_
+**Lane:** `C:\Users\Igor Konovalov\WORK\rlx-plan-0182` on branch `plan-0182-the-report-hears-a-counter`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The clock stimulus and the `count` reading | dev | not started | |
-| 2 — The reader says what `count` is | dev | not started | |
+| 1 — The clock stimulus and the `count` reading | dev | done | 5e97086 |
+| 2 — The reader says what `count` is | dev | done | 162ae7f |
 
 ### Notes
 
+- **Phase 1, measurements.** Debug `shot` binaries, before and after, run back to back on the
+  reference machine. `shot` makes the wgpu default adapter request (no `--gpu`); the machine's Dx12
+  roster is AMD Radeon(TM) Graphics (integrated) and NVIDIA GeForce RTX 3080 Laptop GPU (discrete),
+  and nothing `shot` prints says which of the two it took.
+  - `shot --presets presets --report` wall time: **163.4 s before, 203.6 s after** (112 presets).
+  - `--report --json` over `presets/`: 112 `count` objects removed from the after output, and the
+    result is byte-identical to the before output.
+  - `--report family=shape_field`, after (before rows were the same without the `count` cell):
+    `Path Lion       0.167  0.000  0.009  0.000  0.191  0.169  0.000 0.0050+  0.774 0.0895    9+   28+`
+    `Path Maple      0.175  0.000  0.016  0.000  0.169  0.180  0.000 0.0072+  0.854 0.2166   14+   16+`
+  - Clock fixtures (`the_count_column_hears_a_counter_and_reads_exactly_zero_without_one`):
+    still `0`, `beat_index` hue `0.06380889`, `bar`-held hue `0.048871923`.
+- **Phase 1, deviation.** `count.mean` is written with Rust's shortest round-trip float formatting,
+  not through `num`'s four places, so an exact zero reads `0` in the JSON (`0.0000` otherwise).
+- **Phase 1, beyond the file list's wording.** The main table's prose gains a `count` line beside
+  `drive`'s. In `shot_cli.rs`, the transient test's parser comment that described `geom` as the
+  table's trailing column was rewritten.
+- **Phase 2, beyond the named sections.** In `docs/capturing.md` the settled-measurement sentence
+  under the column table now excepts `count`, and the `--report --json` schema paragraph gains
+  `count` and a paragraph on its object. `docs/testing.md` is untouched: its stimulus table lists
+  the preset gates' stimuli, not `--report`'s. The sample block's two rows are copied from the
+  Phase 1 after-run, so `Shatter`'s `rate` reads `0.0358+` where the old sample read `0.0357+`; the
+  `geom` sample rows are from the same run.
+- **Risks, backlog 0192's probe.** The plan expected it to go red on delivery. It did not:
+  `check-backlog-claims.mjs` exits 0, because `clock_stimulus` sets the field in struct shorthand
+  (`beat_index,`), so `report.rs` still contains no `beat_index:`.
+
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`**
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** no
+- **Plan header `Closes:`** design-backlog 0192
+- **What shipped:** feature (`shot --report` `count` column and `--json` `count` object)
+- **Operator docs touched:** `docs/capturing.md`
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 (133 reductions hold, 57 live
+  entries, 11 unprobeable)
+- **Full suite:** `cargo nextest run --workspace` (under the conductor suite lock), exit 0, 1940
+  passed, 6 skipped
+- **Outstanding `human` phases:** none
+
+## Close review
+
+> The conductor-run close review (ADR-0205), round 1, 2026-09-15, written in a fresh session given
+> the plan and the lane. There were no earlier rounds, so no finding was resolved by a fix round.
+
+**Verdict: Plan 0182 landed cleanly; no blockers, no majors, three minors.** One is fixed in the
+close commit and two stay open.
+
+Lane: `C:\Users\Igor Konovalov\WORK\rlx-plan-0182`, branch `plan-0182-the-report-hears-a-counter`.
+Phase commits `5e97086` (1), `162ae7f` (2), log close block `cce5867`, all on `7417dfb`. `main` had
+not moved past it, so `git merge main` was a no-op and the review's gate is the close's gate.
+
+### What was checked, and what it showed
+
+**Lens 1, alignment with the plan and ADR-0196.**
+
+- **Phases and log.** Both phases landed, each as its own commit with a single `dev` tag. The log is
+  shorter than the phases section and discloses its three deviations.
+- **Full suite (re-run, not trusted).** `cargo nextest run --workspace` under the suite lock:
+  **1940 passed, 6 skipped**, 624 s, matching the log. `cargo fmt --check`,
+  `cargo clippy --workspace --all-targets -D warnings` and
+  `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` are clean.
+- **Stimulus.** `clock_stimulus` matches ADR-0196 Decision 1 and the plan's data shape.
+  `the_clock_stimulus_moves_the_clock_and_nothing_else` destructures `AnalysisFrame` exhaustively,
+  compares every non-clock field bitwise against `Default`, and asserts `beat == stepped`, 9 beats,
+  the bar trio against `beat_index`, and `bar_index` values `[0, 1, 2]` with edges at 20 and 40.
+- **Reading.** `mean_aligned_diff` is frame-aligned, and its unit test checks an exact zero and an
+  arithmetic value. Both captures go through `capture_preset_over`, which runs `reset_for_capture`
+  and advances the same `FALLBACK_DT`. They run after every existing column's captures, whose calls
+  and order are unchanged.
+- **GPU claims (re-run).** The shot_cli clock test ran rather than skipping and printed
+  `still 0, counted 0.06380889, held 0.048871923`, identical to the log. The still twin is asserted
+  bitwise `0.0` and textually `"0"`, and the other two `> 0`.
+- **Motivating presets (re-run).** `shot --presets presets --report family=shape_field` prints
+  `Path Lion` `count 0.191` and `Path Maple` `count 0.169`. Both rows are byte-identical to the log's
+  quotes, with `onset 0.000` and `mid 0.000` unchanged beside them.
+- **No existing number moves.** Not re-run, because it needs a before binary. The claim is
+  consistent with the diff, which changes no existing stimulus, capture call, depth or statistic.
+- **Cost.** 163.4 s to 203.6 s (+25 %), under the doubling stop.
+- **Width and `geom`.** The widest row is 2 + 14 + 7x7 + 8 + 2x7 + 2x6 = 99. The width test now
+  counts 8 table lines and requires the `count` table among them. The geometry test asserts the
+  main header ends at `fall`, the `["preset", "geom"]` block header, an aligned row, and `-` for an
+  undrawn preset in a line family.
+- **JSON.** Key order, the schedule, balanced braces and an exact `0` are pinned. `f32` `Display`
+  never emits an exponent, so the full-precision mean stays valid JSON.
+- **Phase 2.** `docs/capturing.md` carries the `count` row with its three required claims, the
+  sample and `geom` block, and a corrected `### Held bindings`. `check-reader-prose`,
+  `check-doc-links`, `toc.mjs --check` and `check-comment-hygiene` exit 0.
+
+**Lens 2, layering and real-time safety.** `core/` is untouched, and no `Scene`, C ABI or control
+protocol surface moved. The work is confined to the offline report. In `core/src/render`, only the
+hold edges in `roster.rs` read the clock fields, so no scene reacts to the clock outside a binding.
+The exact zero has no scene-internal exception.
+
+**Lens 3, docs and bookkeeping.** `docs/capturing.md` is swept. `docs/testing.md` is correctly
+untouched, because its stimulus table is the preset gates'. The walkthrough is excluded by the plan.
+Owed at close: ADR-0196 accepted with an Outcome, backlog 0192 archived, and a minor version bump
+for the new report column and JSON key.
+
+**Lens 4, correctness and determinism.** Every new numeric assertion is exact by construction or a
+strict `> 0` property, and none is a frozen measurement. The stimulus is a pure function of
+constants.
+
+**Lens 5, design integrity.** The change adds one stimulus builder, one statistic helper, one field
+and two renderer edits, each beside its siblings. No seam widened.
+
+### Findings
+
+**blocker:** none. **major:** none.
+
+**minor**
+
+1. **`.claude/skills/preset-author/references/render-loop.md:170-171` prints the old table.**
+   - **What:** its "real row" sample still carries `geom` as the trailing column and has no
+     `count`, and the prose above it says a `geom` column appears for line families.
+   - **Why it matters:** the content lane reads this page as the table's shape.
+   - **Fix:** the sample shows the new layout, and step 7 gains the plan's `count` clause.
+   - **Open.** The conductor session's permissions deny edits under `.claude/`, so this is the
+     owner's, or a human-started session's, together with the followup below.
+2. **`standalone/src/shot/report.rs:110` mirrors core's crate-private `scenes::FALLBACK_DT` as
+   `CAPTURE_DT`, and nothing holds the two equal.**
+   - **Why it matters:** if `FALLBACK_DT` moves, the stimulus's `time_since_beat` stops being the
+     seconds the capture renders. The blast radius is one envelope's reading in `count`.
+   - **Fix:** replace the mirror if `FALLBACK_DT` ever becomes reachable from `standalone`.
+   - **Open.**
+3. **ADR-0196's Neutral consequence predicted backlog 0192's probe would go red on delivery. It did
+   not.**
+   - **What:** the stimulus sets `beat_index` in struct shorthand, so the probe's absence of
+     `beat_index:` held on the fixed tree.
+   - **Fix:** accept ADR-0196 with a dated Outcome, and archive backlog 0192 so the probe retires.
+   - **Fixed at the close.**
+
+### Close notes
+
+- **Preset curation (step 3b):** not triggered. No `.toml` moved, and no shipped preset names
+  ADR-0196, Plan 0182 or backlog 0192.
+- **Backlog:** 0192 archived as discharged. `check-backlog-claims.mjs` is green before and after.
 
 ## Followups (after this lands)
 

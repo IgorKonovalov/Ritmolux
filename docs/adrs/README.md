@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0206.** *(0200 is reserved for [Plan 0186](../plans/0186-the-flatness-gate-tells-a-figure-from-its-ground.md) Phase 2, which writes it whichever way its stop gate falls.)* *(0120 was reserved for
+**Next free number: 0210.** *(0200 is reserved for [Plan 0186](../plans/0186-the-flatness-gate-tells-a-figure-from-its-ground.md) Phase 2, which writes it whichever way its stop gate falls.)* *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -46,7 +46,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0023](0023-golden-drift-guard-uses-frozen-fixtures.md) | The golden drift guard renders frozen per-system fixtures, not shipped presets | accepted |
 | [0024](0024-cross-preset-transitions.md) | Cross-preset transitions: a two-input blend stage over the engine composite, adaptive dual-live/freeze, engine-default policy | accepted |
 | [0025](0025-foobar-component-version-single-sourced.md) | Single-source the foobar component version from the workspace version (generated header) | accepted |
-| [0026](0026-full-composite-coverage-fullscreen-scenes.md) | Full composite coverage: background + view transform for the fullscreen/accumulating scenes (reaction-diffusion, attractor) | accepted |
+| [0026](0026-full-composite-coverage-fullscreen-scenes.md) | Full composite coverage: background + view transform for the fullscreen/accumulating scenes (reaction-diffusion, attractor) | accepted; extended by 0201 |
 | [0027](0027-scene-rotation-constant-default-calmer-cadence.md) | Scene rotation: hold one scene by default, calmer cadence, softened drop bias | accepted |
 | [0028](0028-final-stage-ink-tone-remap.md) | Final-stage duotone "ink" tone-remap (paper/ink), generalizing invert | accepted |
 | [0029](0029-parametric-curve-shape-params.md) | Enrich the Maurer curve family via named shape params (radial offset + phase), not new families or a superformula | accepted |
@@ -105,7 +105,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0082](0082-the-downbeat-gate-holds-and-the-estimator-is-diagnosed-first.md) | The downbeat gate holds, and the estimator is diagnosed before it is tuned | accepted (Plan 0068; Outcome) |
 | [0083](0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md) | In-frame geometry is measured at the line renderer's draw seam | accepted (Plan 0069; Outcome) |
 | [0084](0084-a-particle-marks-silhouette-is-a-signed-distance-function.md) | A particle mark's silhouette is a signed-distance function | accepted 2026-08-05 (Plan 0070; Outcome) |
-| [0085](0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md) | How much a scene occludes the backdrop is one number, at one seam | accepted 2026-08-09 (Plan 0071; Outcome) |
+| [0085](0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md) | How much a scene occludes the backdrop is one number, at one seam | accepted 2026-08-09 (Plan 0071; Outcome); extended by 0201 |
 | [0086](0086-the-backdrop-colours-through-the-preset-palette.md) | The backdrop colours through the preset's palette | accepted (Outcome) |
 | [0087](0087-the-ifs-particle-carries-its-age-and-its-last-map.md) | The IFS particle carries its age and its last map, and respawns onto the attractor | accepted 2026-08-06 (Plan 0073; Outcome) |
 | [0088](0088-the-ifs-colours-by-distance-from-its-own-skeleton.md) | The IFS colours by distance from its own skeleton, and the age channel is retired | accepted 2026-08-08 (Plan 0074; Outcome) |
@@ -217,13 +217,17 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0193](0193-a-test-that-reads-the-clock-runs-alone.md) | A test that reads the clock runs alone, and the lint exemption that marks it is what selects it | accepted 2026-09-14 (Plan 0174), Outcome; extends 0173; extended by 0205 |
 | [0194](0194-a-family-dependent-range-travels-in-the-schema-and-the-player-reports-the-family.md) | A family-dependent range travels in the schema, and the player reports the family | proposed (Plan 0179), extends 0180 |
 | [0195](0195-a-low-density-is-a-trace-count-and-the-law-scales-only-a-cloud.md) | A low `density` is a trace count, and the density law scales only a cloud | proposed (Plan 0183), amends 0140 |
-| [0196](0196-the-report-hears-the-musical-clock-in-a-column-of-its-own.md) | The report hears the musical clock in a column of its own, and every existing column keeps its stimulus | proposed (Plan 0182), supplements 0134 |
+| [0196](0196-the-report-hears-the-musical-clock-in-a-column-of-its-own.md) | The report hears the musical clock in a column of its own, and every existing column keeps its stimulus | accepted 2026-09-15 (Plan 0182; Outcome), supplements 0134 |
 | [0197](0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md) | The band contour can be a hard ink, and the warp field can be coloured by its own level | proposed (Plan 0184), supplements 0133 |
-| [0198](0198-a-scene-advances-after-its-frames-bindings.md) | A scene advances after its frame's bindings, and a shared scene is never evaluated twice in a frame | proposed (Plan 0181), extends 0135 |
+| [0198](0198-a-scene-advances-after-its-frames-bindings.md) | A scene advances after its frame's bindings, and a shared scene is never evaluated twice in a frame | accepted 2026-09-15 (Plan 0181), Outcome; extends 0135 |
 | [0199](0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md) | A converted waveform draws the released source's figure at the scale its host renders, from a stereo pair the analyzer already receives | proposed (Plan 0180), extends 0139 |
-| [0201](0201-a-fullscreen-scene-presents-premultiplied-over-the-backdrop.md) | A fullscreen scene presents premultiplied over the backdrop, and the chain's occlude value is the only switch | proposed (Plan 0185), extends 0026 |
+| [0201](0201-a-fullscreen-scene-presents-premultiplied-over-the-backdrop.md) | A fullscreen scene presents premultiplied over the backdrop, and the chain's occlude value is the only switch | accepted 2026-09-15 (Plan 0185), extends 0026, 0085 |
 | [0202](0202-a-written-count-of-the-systems-is-refused-by-a-gate.md) | A written-out count of the systems is refused by a gate, and the threshold is five | proposed (Plan 0178), extends 0168 |
 | [0203](0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md) | A release tag is annotated, and what gets checked is whether origin has it | accepted 2026-09-14 (Plan 0176), extends 0038 |
 | [0204](0204-a-cheap-integration-test-shares-one-binary-and-a-test-that-needs-its-own-stays-its-own.md) | A cheap integration test shares one binary per package, and a test that needs its own binary keeps one | proposed (Plan 0177), extends 0156 |
 | [0205](0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md) | An approved plan runs under a conductor, and every judgement it cannot make parks the plan | accepted 2026-09-14 (Plan 0187), Outcome; supersedes 0188 in part |
+| [0206](0206-a-promoted-backlog-entry-leaves-the-live-file.md) | A promoted backlog entry leaves the live file, and the ledger lives in the archive | accepted 2026-09-15, amends 0108, 0116 |
+| [0207](0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md) | A suite run the conductor observed green is not run again on the same tree | proposed (Plan 0189), amends 0205, 0156 |
+| [0208](0208-a-patch-cli-update-runs-with-a-warning-and-every-session-proves-the-hooks-ran.md) | A patch CLI update runs with a warning, and every session proves the hooks ran | proposed (Plan 0189), amends 0205 |
+| [0209](0209-a-conductor-close-repairs-the-prose-and-comments-its-findings-name.md) | A conductor close repairs the prose and comments its findings name | proposed (Plan 0189), amends 0205 |
 <!-- roster:end -->

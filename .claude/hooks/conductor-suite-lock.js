@@ -10,18 +10,26 @@
 // The command is split into simple commands by the same reader block-push-and-history-rewrite.js
 // uses, so `echo cargo test` passes and `cd x && cargo nextest run` does not. The wrapper is
 // recognised by the script name and the lock name: a run under any other lock is still denied.
-// Wired up in .claude/settings.json under hooks.PreToolUse with matcher "Bash|PowerShell".
+// `cargo nextest list` runs no test, so it needs no lock and passes bare; the wrapper runs a wrapped
+// one without taking the lock. Wired up in .claude/settings.json under hooks.PreToolUse with
+// matcher "Bash|PowerShell".
+//
+// It is also the conductor's proof that project hooks run at all (ADR-0208): when RLX_CONDUCTOR=1
+// and RLX_HOOK_LOG names a file, every call appends one JSON line to it, whatever the decision. A
+// conductor-run session that made a shell call and left no line is parked `cli_contract`. The append
+// never changes the decision and never fails the hook.
 
-const { readFileSync } = require("fs");
+const { appendFileSync, readFileSync } = require("fs");
 const { simpleCommands } = require("./block-push-and-history-rewrite.js");
 
 const SUITE = /^cargo(?:\.exe)?(?:\s+\+\S+)?(?:\s+llvm-cov)?\s+(nextest|test)\b/;
+const LIST = /^cargo(?:\.exe)?(?:\s+\+\S+)?\s+nextest\s+list\b/;
 const WRAPPER = /^node(?:\.exe)?\s+(?:"[^"]*with-lock\.mjs"|'[^']*with-lock\.mjs'|\S*with-lock\.mjs)\s+(\S+)\s+--\s+([\s\S]*)$/;
 
 function offending(seg) {
   const w = seg.match(WRAPPER);
-  if (w) return w[1] !== "suite" && SUITE.test(w[2].trim()) ? seg : null;
-  return SUITE.test(seg) ? seg : null;
+  if (w) return w[1] !== "suite" && SUITE.test(w[2].trim()) && !LIST.test(w[2].trim()) ? seg : null;
+  return SUITE.test(seg) && !LIST.test(seg) ? seg : null;
 }
 
 function decide(cmd, env) {
@@ -35,6 +43,14 @@ if (require.main === module) {
   const input = JSON.parse(readFileSync(0, "utf8") || "{}");
   const cmd = (input.tool_input && input.tool_input.command) || "";
   const hit = decide(cmd, process.env);
+  if (process.env.RLX_CONDUCTOR === "1" && process.env.RLX_HOOK_LOG) {
+    try {
+      appendFileSync(
+        process.env.RLX_HOOK_LOG,
+        JSON.stringify({ hook: "conductor-suite-lock", tool: input.tool_name || null, decision: hit ? "deny" : "allow", at: new Date().toISOString() }) + "\n",
+      );
+    } catch {}
+  }
   if (!hit) {
     process.stdout.write("{}");
     process.exit(0);

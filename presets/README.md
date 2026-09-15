@@ -2934,8 +2934,9 @@ black away from the horizon. You do not need a lit ground to hang a galaxy on.
 **The band is additive over the ground and under the scene.** It adds light rather than replacing
 it, which is what unresolved starlight is — so it brightens whatever the ramp already painted rather
 than covering it, and the scene then draws over both. A fullscreen or opaque scene therefore hides
-the band exactly as it hides the ramp, and **`fragment_field` hides it completely**. A galaxy under
-a fragment-field preset is not a dim galaxy, it is an absent one.
+the band exactly as it hides the ramp, and at the default `occlude = 1` **`fragment_field` hides it
+completely**. A galaxy under a fragment-field preset is not a dim galaxy, it is an absent one, unless
+the preset lowers [`occlude`](#backdrop-occlusion--occlude).
 
 **The band shares your `[palette]` with the ground *and* the scene *and* any `[layer]`, and that is
 the one real authoring constraint this creates.** There is no second palette to reach for —
@@ -3007,15 +3008,19 @@ Three things to weigh before setting it to `0`:
 0.0, over backdrops at 0.35 and 0.60, judged in motion. The verdict was that at
 shipped brightnesses the difference is almost negligible — which is the same fact
 the ceiling above states from the other side, since the ceiling binds only where
-the figure is *dim*. No shipped preset binds `occlude` today.
+the figure is *dim*. A few shipped presets bind it: `attractor_lorenzknot`,
+`lsystem_icecrystal`, `spectrum_radialbloom` and `swarm_murmuration` lower it, and
+`fragment_etchingplate` and `shape_strataheart` state the default `1.0`.
 
 **The additive families are already unoccluded when no post stage is active.**
 The swarm, line and emitter scenes blend colour `One`/`One`, so with an empty
 chain their backdrop survives in full whatever `occlude` says — there is no
 occlusion at that seam for it to scale. It reaches them through the chain's last
 stage instead, which every shipped preset in those families has. The scenes that
-present premultiplied over the backdrop (reaction-diffusion, attractor, fragment
-field) consume it directly on the empty-chain path.
+present premultiplied over the backdrop (reaction-diffusion, cellular, attractor,
+warp mesh, and the four fullscreen fields: fragment field, analytic field, shape
+field, shape collage) consume it directly on the empty-chain path, so on them
+`occlude = 0` lets the sky through with or without a post stage.
 
 ### Geometry mirror (line systems) — `mirror_order`, `mirror_reflect`
 
