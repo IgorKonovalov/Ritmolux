@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0177 - The test tree stops touching the machine and stops costing its disk](#0177---the-test-tree-stops-touching-the-machine-and-stops-costing-its-disk)
   - [0175 - An eased value arrives at its target](#0175---an-eased-value-arrives-at-its-target)
   - [0188 - The conductor survives its first run](#0188---the-conductor-survives-its-first-run)
   - [0182 - The report hears a counter](#0182---the-report-hears-a-counter)
@@ -216,6 +217,40 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0177 - The test tree stops touching the machine and stops costing its disk](done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md)
+
+- closed 2026-09-15 by a conductor-run review (ADR-0205), round 1. Eight `dev` phases and one
+`studio-builder` phase on the lane `plan-0177-the-test-tree-stops-costing-disk-and-touching-the-machine`:
+  - `feff21c` (1): every spawned player and `shot` gets a scratch data root through
+    `standalone/tests/common/mod.rs`, held by a hygiene guard.
+  - `3510ab9` (2): no test string literal names `target` as a path segment.
+  - `11636f2` (3): the horizon test compares the ground before the rows.
+  - `375f275` (4): what grows in `target/` is measured. The verdict was bounded.
+  - `d9aee86` (5): `scripts/prune-target.mjs`.
+  - `227bb8d` (6): the Disk section in `docs/developing.md`.
+  - `7b4a66c` (7): a scoped `cargo doc -p rlx-core --features text` hook step, adopted.
+  - `9b04453` (8): ADR-0204's fold, 66 integration test binaries to 30.
+  - `4656040` (9): the studio tests ask cargo where the player is, and a lint rule rejects
+    `join(.., 'target')`.
+
+Review: **no blockers, no majors, four minors, two nits.** Version: **0.125.0** (minor). ADR-0204
+accepted with an Outcome. Backlog 0161, 0179, 0181, 0182, 0183, 0184 and 0213 archived as closed.
+The review's full suite was the `0177-pre-review` ledger record for tree `18f2dd5`: 1945 passed, 6
+skipped.
+
+**Fixed at the close, all prose or comment text (`dea0bdd`):**
+- `docs/testing.md` called `preset`'s allocation counter process-global.
+- The log outweighed the phases section.
+- The hook's rustdoc comment copied `ci.yml`'s timings.
+- The `preview.rs` feature-gated link went unrouted, and is now a plan followup.
+
+**Left open, both code:**
+- The scratch data roots under `CARGO_TARGET_TMPDIR/data-root/` are never removed.
+- `prune-target.mjs`'s live set leaves out the hook's rustdoc step.
+
+**Preset curation:** only README test-path citations moved and no `.toml`, so there is nothing to
+curate.
 
 ### [0175 - An eased value arrives at its target](done/0175-an-eased-value-arrives.md)
 

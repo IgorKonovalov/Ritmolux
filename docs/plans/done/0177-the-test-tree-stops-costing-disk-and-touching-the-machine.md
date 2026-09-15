@@ -1,13 +1,16 @@
 # 0177 — The test tree stops touching the machine and stops costing its disk
 
-> **Status:** in-progress
+> **Status:** done (2026-09-15) — phases `feff21c`, `3510ab9`, `11636f2`, `375f275`, `d9aee86`,
+> `227bb8d`, `7b4a66c`, `9b04453`, `4656040`; conductor-run Mode 4 review round 1, no blockers, no
+> majors, four minors and two nits, two minors and both nits repaired at the close; full suite green
+> on the ledger, `cargo doc -D warnings` clean. ADR-0204 accepted with an Outcome. Version 0.125.0.
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`, `studio-builder`
-> **Related ADRs:** [0204](../adrs/0204-a-cheap-integration-test-shares-one-binary-and-a-test-that-needs-its-own-stays-its-own.md) (proposed, this plan),
-> [0193](../adrs/0193-a-test-that-reads-the-clock-runs-alone.md), [0156](../adrs/0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md),
-> [0147](../adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md), [0033](../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md)
+> **Related ADRs:** [0204](../../adrs/0204-a-cheap-integration-test-shares-one-binary-and-a-test-that-needs-its-own-stays-its-own.md) (accepted, this plan),
+> [0193](../../adrs/0193-a-test-that-reads-the-clock-runs-alone.md), [0156](../../adrs/0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md),
+> [0147](../../adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md), [0033](../../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md)
 > **Closes:** design-backlog 0181, 0161, 0213, 0179, 0183, 0184, 0182
-> **Sequenced after:** [Plan 0174](done/0174-the-clock-reading-tests-run-alone.md) closes. That plan owns
+> **Sequenced after:** [Plan 0174](0174-the-clock-reading-tests-run-alone.md) closes. That plan owns
 > `.config/nextest.toml`, is editing `standalone/tests/stream_show.rs` and `control_loopback.rs` in the
 > main checkout right now, and its Phase 3 adds the `hygiene.rs` guard this plan extends.
 
@@ -531,6 +534,95 @@ flowchart LR
   `cargo nextest run -p standalone`, 411 passed; Phase 8 `cargo nextest run --workspace -P fast`,
   1647 passed, 304 skipped.
 - **Outstanding `human` phases:** none.
+
+## Close review
+
+> Conductor-run Mode 4 review (ADR-0205), round 1, 2026-09-15. No earlier rounds, so no fix-round
+> findings to record.
+
+**Verdict: Plan 0177 landed as planned. No blockers, no majors, four minors, two nits.** All nine
+phases are in the lane (`feff21c` through `4656040`, close block `25cabb9`). Each done-when opened
+is backed by the tree: the spawn guard, the target-literal guard, the suite clock guard, the ground
+assertion, the prune script, the rustdoc hook step, the fold and the studio helper. The log discloses
+every deviation, and each has a reason that was checked: the `string_literals` scanner,
+`--features text`, path citations beyond `--test`, and the helper under `electron/`.
+
+### Evidence
+
+- **Full suite (lens 1).** `node ...\with-lock.mjs suite -- cargo nextest run --workspace` printed
+  `with-lock: skipped cargo nextest run --workspace: tree 18f2dd5 is green in the suite ledger, run
+  by gate 0177-pre-review at 2026-09-15T20:21:30.710Z: 1945 tests run: 1945 passed (6 slow), 6
+  skipped`. `git rev-parse --short HEAD^{tree}` on the lane tip `25cabb9` is `18f2dd5`, so the record
+  covers this tree. 1945 matches the log's post-fold default listing.
+- **Assertions read.**
+  - `hygiene::every_spawned_workspace_binary_gets_a_scratch_data_root` scans every `.rs` under
+    `standalone/tests/` except `common/mod.rs`.
+  - `the_spawn_guard_names_a_bare_spawn_and_ignores_prose` pins `file:line` on the seeded
+    `stream_pipe` `run` helper.
+  - `no_test_source_names_the_target_directory` has a scan-count floor, and its negative control
+    uses `frame_tap`'s prose literal.
+  - The suite clock check requires both `suite/main.rs` files to be reached.
+  - `shot_cli::a_horizon_is_reproducible_...` compares `ground_of(first)` with `ground_of(long)`
+    before the prefix, with the ground-change message.
+  - The studio lint rule catches both `join` and `path.join`.
+- **Fold.** `.config/nextest.toml` is untouched. No `binary()` selector anywhere names a folded
+  target. A grep for `--test <folded name>` over the live docs, skills, hook, workflows and scripts
+  returns only the plan itself and a conductor test fixture string.
+- **Layering and ABI (lenses 2 and 5).** `core/src`, `standalone/src`, `core-cabi` and `milkconv`
+  change in comments and in two emitted test-path strings only. No ABI, protocol or `Scene` change.
+
+### Findings
+
+#### minor
+
+1. **The scratch data roots are never removed, and they accumulate on every run.**
+   `standalone/tests/common/mod.rs:62`. `scratch_data_root()` creates
+   `CARGO_TARGET_TMPDIR/data-root/<pid>-<n>` for every spawn. Nextest gives each test a new pid, and
+   nothing deletes the directory afterwards. Every full run therefore leaves one new directory per
+   spawn under `target/tmp/`, holding whatever the child wrote there: a config, a diagnostics log,
+   seeded presets. This is a new unbounded growth, small per run, from a plan whose purpose is
+   bounding `target/`. The Disk section does not name it, and `prune-target.mjs` reads only `deps/`.
+   Suggested fix: key the root by test name and remove it before creation, as
+   `stream_show::scratch` already does. The alternative is a `Drop` guard that removes it. Code, so
+   left open.
+2. **`prune-target.mjs`'s live set leaves out the rustdoc step that Phase 7 adopted into the hook.**
+   `scripts/prune-target.mjs:78`. `LOOP` holds the three commands of Phase 5. The hook now also runs
+   `cargo doc -p rlx-core --no-deps --features text`, and that is a narrowed `-p` invocation. The
+   Disk section says a narrowed `-p` build writes its own dependency generations. Those generations
+   read as dead to `--apply`, so the next push rebuilds them. `--verify-fresh` cannot see this
+   because it runs the same three commands. The cost is a rebuild, never a wrong build. Suggested
+   fix: add the hook's doc step to `LOOP`, in the script and in the Disk section's prose. Code, so
+   left open.
+3. **`docs/testing.md` said `preset`'s zero-allocation counter is process-global, and the fold's own
+   rule contradicts it.** `docs/testing.md:46`. The caveat said the count is "only reliable under
+   nextest", because a concurrent test's allocations "bleed into the count". The counter in
+   `core/tests/suite/preset.rs` is thread-local, and its doc comment says it holds under both
+   runners. That matters more now that `preset` shares the `suite` binary. Read as written, the
+   caveat would make the fold break `cargo test` under ADR-0204's rule 3. **Repaired at the close**
+   (`dea0bdd`).
+4. **The implementation log was longer than the phases section**: 14,404 bytes against 13,448.
+   **Repaired at the close** (`dea0bdd`): the notes that became history are condensed, and no
+   measurement is dropped.
+
+#### nit
+
+1. **The rustdoc comment in the hook repeated the measured figures that `ci.yml` carries.**
+   `.githooks/pre-push:223`. A second copy of the timings is the one that drifts. **Repaired at the
+   close** (`dea0bdd`): the comment keeps the mechanism and points at the timings.
+2. **The broken intra-doc link the log found was never routed.**
+   `core/src/render/preview.rs:10` links `super::aux_target`, which exists only with `text`, and
+   `## Followups` was empty. **Repaired at the close** (`dea0bdd`): it is recorded under
+   `## Followups`.
+
+### Close notes
+
+- **Backlog:** 0161, 0179, 0181, 0182, 0183, 0184 and 0213 carry their `CLOSED` marker, and each
+  row moved from `### Promoted` to `### Closed`. `node scripts/check-backlog-claims.mjs` exits 0:
+  47 reductions across 23 live entries.
+- **Preset curation:** only three README test-path citations changed, and no `.toml`. No shipped
+  preset names Plan 0177, ADR-0204 or any of the seven entries. Nothing to curate.
+- **ADR-0204** accepted with an `Outcome`: the fold held, and the engine-edit loop was not slower.
+- **Version:** 0.125.0 (minor). The plan adds a maintenance tool, a hook step and three guards.
 
 ## Followups (after this lands)
 

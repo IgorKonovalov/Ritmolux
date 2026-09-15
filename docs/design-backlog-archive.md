@@ -299,14 +299,8 @@ live entry citing this one.
 | 0146 | `warp_mesh` colours its light at deposit time, so the palette cannot band the field | [Plan 0184](plans/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 2 + ADR-0197. **Promoted** |
 | 0157 | The fixed telemetry set omits the bar grid the engine already computes | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0158 | The tempo octave is unsettled by design, and the rig saw the fold run the other way | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
-| 0161 | Committed scripts and tests resolve cargo output under `<repo>/target` | [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phases 2, 9. **Promoted** |
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
 | 0172 | The seeded preset directory is never pruned, so a roster drifts from the shipped set | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phases 1-2. **Promoted** |
-| 0179 | `cargo doc` is the one CI gate no local step mirrors | [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 7. **Promoted** |
-| 0181 | Running the test suite migrates the developer's real `%APPDATA%` | [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 1. **Promoted** |
-| 0182 | Thirty-seven of the forty-six test targets could share one binary | [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 8 + ADR-0204. **Promoted** |
-| 0183 | Nothing bounds the incremental cache | [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phases 4, 6. **Promoted** |
-| 0184 | Cargo never collects an old artifact generation, and stable has no GC | [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 5. **Promoted** |
 | 0185 | The `--help` banner still calls the application `ritmolux` | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 3. **Promoted** |
 | 0186 | The density law scales a low-`density` preset's trace count on a large display | [Plan 0183](plans/0183-a-low-density-is-a-trace-count.md) + ADR-0195. **Promoted** |
 | 0198 | `deposit_arms` tears along the branch cut at a fractional value | [Plan 0179](plans/0179-a-parameters-range-belongs-to-its-family.md) Phase 1. **Promoted** |
@@ -314,7 +308,6 @@ live entry citing this one.
 | 0204 | The studio's sliders read one range per parameter, not per curve family | [Plan 0179](plans/0179-a-parameters-range-belongs-to-its-family.md) + ADR-0194. **Promoted** |
 | 0207 | The cap-recovery line says "geometry" for three contexts that are not geometry | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 3. **Promoted** |
 | 0208 | A system count written into prose goes stale on the next system | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 4 + ADR-0202. **Promoted** |
-| 0213 | The horizon's length-independence test never compares the ground | [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 3. **Promoted** |
 | 0214 | A converted comp shader and per-vertex program read other coordinates than the source | [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) Phases 1-3. **Promoted** |
 | 0215 | The seam on two MilkDrop 1.x presets is unexplained | [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) Phases 1, 4. **Promoted** |
 | 0216 | The converted waveform follows neither reference | [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) Phases 5-6 + ADR-0199. **Promoted** |
@@ -562,6 +555,13 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0218 | A `[smoothing]`-eased value never reaches a whole-number target | [Plan 0175](plans/done/0175-an-eased-value-arrives.md) Phases 1-2. A no-progress snap; the `N.5` offsets stay. **Closed 2026-09-15** |
 | 0212 | Three frame-delta guards check only the sign, so the one-policy gate cannot see them | [Plan 0175](plans/done/0175-an-eased-value-arrives.md) Phase 3. All three deleted, none allowlisted. **Closed 2026-09-15** |
 | 0160 | The test suite re-created a `target/` inside the worktree that no redirect reaches | [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phase 8; the redirect itself went with ADR-0147. See 0161. **Closed 2026-09-15** |
+| 0161 | Committed scripts and tests resolve cargo output under `<repo>/target` | [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phases 2, 9. A hygiene guard and a studio lint rule. **Closed 2026-09-15** |
+| 0179 | `cargo doc` is the one CI gate no local step mirrors | [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 7. A scoped rustdoc step joined the hook. **Closed 2026-09-15** |
+| 0181 | Running the test suite migrates the developer's real `%APPDATA%` | [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 1. One spawn helper, held by a guard. **Closed 2026-09-15** |
+| 0182 | Thirty-seven of the forty-six test targets could share one binary | [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 8 + ADR-0204. 66 test binaries to 30. **Closed 2026-09-15** |
+| 0183 | Nothing bounds the incremental cache | [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phases 4, 6. Measured bounded; the delete is documented. **Closed 2026-09-15** |
+| 0184 | Cargo never collects an old artifact generation, and stable has no GC | [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 5. `scripts/prune-target.mjs`. **Closed 2026-09-15** |
+| 0213 | The horizon's length-independence test never compares the ground | [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 3. **Closed 2026-09-15** |
 <!-- roster:end -->
 
 ---
@@ -12096,7 +12096,7 @@ has to be re-stated, since it is the part that is wrong independently of the pat
 - **Verified 2026-09-01** - and no longer builds that path off the repo root: `absent: let dir = repo_root\(\) in: standalone/tests/shot_cli.rs`
 - **Verified 2026-08-29** - the sibling that was always correct still is: `present: current_exe in: standalone/tests/shot_cli.rs`
 
-- **Updated 2026-09-14** - this entry's own claim was delivered by Plan 0136 Phase 8, and the class survives in `standalone/tests/stream_show.rs`'s `scratch()`, which 0161 now carries; [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) closes both.
+- **Updated 2026-09-14** - this entry's own claim was delivered by Plan 0136 Phase 8, and the class survives in `standalone/tests/stream_show.rs`'s `scratch()`, which 0161 now carries; [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) closes both.
 
 **CLOSED 2026-09-15** — delivered by [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phase 8, which roots
 `shot_cli.rs`'s `scratch()` at `env!("CARGO_TARGET_TMPDIR")`; ADR-0147 had already retired the redirect the
@@ -12176,9 +12176,15 @@ looking.
 - **Verified 2026-08-29** - the two render scripts still assume the old layout: `unprobeable: renders/ is gitignored, so both scripts exist on the authoring machine and in no checkout - probing them passes here and breaks every fresh clone`
 - **Verified 2026-08-29** - the script the plan actually fixed no longer does: `absent: Join-Path \$repo "target in: plugin-foobar/build.ps1`
 
-- **Promoted 2026-09-14** to [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phases 2 and 9. **The "no committed violator" line above is false**: `standalone/tests/stream_show.rs` still builds `CARGO_MANIFEST_DIR/../target`, and four studio tests join `ROOT/target`. The plan adds guards in `core/tests/hygiene.rs` and the studio's eslint config so the rule stops depending on a sweep.
+- **Promoted 2026-09-14** to [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phases 2 and 9. **The "no committed violator" line above is false**: `standalone/tests/stream_show.rs` still builds `CARGO_MANIFEST_DIR/../target`, and four studio tests join `ROOT/target`. The plan adds guards in `core/tests/hygiene.rs` and the studio's eslint config so the rule stops depending on a sweep.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+**CLOSED 2026-09-15** — [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phases 2 and 9. `standalone/tests/stream_show.rs`'s `scratch()`
+roots at `CARGO_TARGET_TMPDIR`, and `hygiene::no_test_source_names_the_target_directory` fails on a
+string literal under any workspace member's `tests/` that has `target` as a whole path segment. The
+four studio tests find the player through `studio/electron/testing/player.ts`, which asks
+`cargo metadata`, and `studio/eslint.config.mjs` rejects a `'target'` literal passed to `join`.
 
 
 ---
@@ -12377,9 +12383,16 @@ A third option worth naming only to reject: adding `#[allow(rustdoc::private_int
 the module level. It would have made this specific failure impossible and would also have made the
 next real broken link invisible.
 
-- **Promoted 2026-09-14** to [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 7: a scoped `cargo doc -p rlx-core` joins the hook only if it catches Plan 0137's class within the clippy step's cost; the close-ceremony gate line lands with the architect at approval.
+- **Promoted 2026-09-14** to [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 7: a scoped `cargo doc -p rlx-core` joins the hook only if it catches Plan 0137's class within the clippy step's cost; the close-ceremony gate line lands with the architect at approval.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+**CLOSED 2026-09-15** — [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 7. `.githooks/pre-push` runs
+`cargo doc -p rlx-core --no-deps --features text` under `RUSTDOCFLAGS=-D warnings` after clippy. It
+failed on a public item linking a private one, and on one warm engine edit it cost 4.5-5.9 s against
+clippy's 6.3-7.8 s. `--features text` is there because `core/src/render/preview.rs` links a
+feature-gated item, which the plan records as a followup. `standalone`'s public surface is still
+documented in CI only.
 
 
 ---
@@ -12438,9 +12451,16 @@ same one-line fix in the helper covers it.
 - **Verified 2026-09-14** — while the loop they reach now opens the per-user log:
   `present: DiagLog::new\(crate::cli::resolve_log_path\(\)\) in: standalone/src/stream.rs`
 
-- **Promoted 2026-09-14** to [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 1: every spawned binary gets a scratch data root through one helper, held by a `hygiene.rs` guard. The re-derivation found `stream_split` and `shot_cli` reach the real root too. [Plan 0120](plans/0120-the-standalone-ships-on-ubuntu.md) Phase 2 carries the Linux arm.
+- **Promoted 2026-09-14** to [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 1: every spawned binary gets a scratch data root through one helper, held by a `hygiene.rs` guard. The re-derivation found `stream_split` and `shot_cli` reach the real root too. [Plan 0120](plans/0120-the-standalone-ships-on-ubuntu.md) Phase 2 carries the Linux arm.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+**CLOSED 2026-09-15** — [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 1. Every spawn of the player or the `shot`
+example under `standalone/tests/` goes through `standalone/tests/common/mod.rs`, which points
+`APPDATA`, `HOME` and `XDG_DATA_HOME` at a scratch directory, and
+`hygiene::every_spawned_workspace_binary_gets_a_scratch_data_root` holds every spawn to it. A full
+`cargo nextest run -p standalone` left `%APPDATA%\Ritmolux` byte-identical. The scratch roots are
+not removed after a run; the close review left that open as a minor.
 
 
 ---
@@ -12482,9 +12502,16 @@ Plan 0153 takes the per-binary payload down from 40.5 MB to 15.0 MB, so the valu
 falls with it — 36 x 15 MB rather than 36 x 40 MB. It composes rather than competes: the two
 multiply out to the same `.pdb` line item shrinking on both axes.
 
-- **Promoted 2026-09-14** to [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 8 and [ADR-0204](adrs/0204-a-cheap-integration-test-shares-one-binary-and-a-test-that-needs-its-own-stays-its-own.md): a partial merge, re-derived at HEAD after Plan 0174 closes. The 37-of-46 count above is stale; the plan's own derivation is the live one.
+- **Promoted 2026-09-14** to [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 8 and [ADR-0204](adrs/0204-a-cheap-integration-test-shares-one-binary-and-a-test-that-needs-its-own-stays-its-own.md): a partial merge, re-derived at HEAD after Plan 0174 closes. The 37-of-46 count above is stale; the plan's own derivation is the live one.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+**CLOSED 2026-09-15** — [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 8 +
+[ADR-0204](adrs/0204-a-cheap-integration-test-shares-one-binary-and-a-test-that-needs-its-own-stays-its-own.md).
+33 core and 5 standalone files fold into one `tests/suite/` binary per package. The workspace's
+integration test binaries went from 66 to 30, and one generation's `.exe` + `.pdb` from 1789.6 MB to
+843.8 MB. The engine-edit `--no-run` loop was not slower, and the test lists before and after
+differed only by the one negative control the phase added.
 
 
 ---
@@ -12523,9 +12550,15 @@ Note that [ADR-0147](adrs/0147-the-shared-artifact-store-is-revoked-and-the-link
 names disk as a live cost with *"discipline and not a gate"* as its only defence; this entry is that
 cost measured inside one checkout rather than across lanes.
 
-- **Promoted 2026-09-14** to [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phases 4 and 6: measure crate-hash churn per tool first, then document a bound or prune.
+- **Promoted 2026-09-14** to [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phases 4 and 6: measure crate-hash churn per tool first, then document a bound or prune.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+**CLOSED 2026-09-15** — [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phases 4 and 6. Measured 2026-09-15: the everyday loop
+creates no new crate-hash directory on an edit or a revert, and the bytes settle at two sessions per
+directory (3.59 GB, flat over four rounds). What adds directories is a new unit: a feature set, a
+narrowed `-p` build, a toolchain change. Nothing cargo reports maps a directory to a unit, so
+`docs/developing.md`'s Disk section documents the delete rather than a prune arm.
 
 
 ---
@@ -12565,9 +12598,15 @@ to `rlx_*`; no `Cargo.toml` in the workspace names `lmv` any more. A rename orph
 under the old name permanently, and nothing surfaces that. Worth one line in the rename checklist,
 wherever the next one is recorded.
 
-- **Promoted 2026-09-14** to [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 5: a prune script in `scripts/` whose live set is what cargo's JSON reports, rather than `cargo-sweep` or an mtime rule.
+- **Promoted 2026-09-14** to [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 5: a prune script in `scripts/` whose live set is what cargo's JSON reports, rather than `cargo-sweep` or an mtime rule.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+**CLOSED 2026-09-15** — [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 5. `scripts/prune-target.mjs` keeps every
+`deps/` file whose metadata hash cargo's JSON reports for the everyday loop, and deletes the rest.
+On the Phase 4 lane it deleted 24 files (184.0 MB), and `--verify-fresh` straight after found 637 of
+637 artifacts fresh. Its live set does not include the hook's rustdoc step; the close review left
+that open as a minor.
 
 
 ---
@@ -13030,9 +13069,13 @@ a message that names a ground change, and restate the doc in the conditional for
 **Low.** Green and deterministic today. The cost is a misdirected diagnosis on the day a fixture's
 ground moves.
 
-- **Promoted 2026-09-14** to [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 3: the horizon test compares the two runs' `ground` before the rows.
+- **Promoted 2026-09-14** to [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 3: the horizon test compares the two runs' `ground` before the rows.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+**CLOSED 2026-09-15** — [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 3. The test asserts the short and long runs'
+`"ground":[..]` equal, with a ground-change message, before the prefix comparison of the rows. A
+hand-edited ground failed at that assertion first.
 
 
 ---

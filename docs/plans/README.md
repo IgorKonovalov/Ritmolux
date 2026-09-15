@@ -46,7 +46,6 @@ place. The plan file carries the real link.
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. **Runs after 0180**, which re-draws the waveform its wash is measured on. The verdict decides whether backlog 0109 is buyable. Needs the reference rig. |
 | [0160](0160-the-silhouettes-preconditions-stop-being-silent.md) | The silhouette's preconditions stop being silent | approved | dev, human | ADR-0179: four silent `[path]` preconditions. **Amended 2026-09-14:** optional Phase 1b folds in backlog 0217 (arity probe re-prices a polyline). Phase 2 is prose. |
 | [0166](0166-the-basics-read-in-russian.md) | The basics read in Russian | approved | dev, human | ADR-0185: five docs gain a stamped `.ru.md`. **Phase 3 is a `human` review that blocks publication.** Amended 2026-09-14: `pages.yml` depth, gate-count prose collides with 0178. |
-| [0177](0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) | The test tree stops touching the machine and stops costing its disk | approved | dev, studio-builder | ADR-0204 (proposed). Keep 0174's run-alone binaries as their own targets. Phase 4 measures target/ growth before the prune and fold. |
 | [0178](0178-what-the-operator-reads-is-true.md) | What the operator reads is true | approved | dev, human | Backlog 0172, 0185, 0207, 0208 + ADR-0202 (proposed): drift line, `--list-presets`, banner, recovery line, count gate. **Lands after 0176 and 0166.** Phase 5 `human` settles 0203. |
 | [0179](0179-a-parameters-range-belongs-to-its-family.md) | A parameter's range belongs to its family | approved | dev, studio-builder | ADR-0194: the schema carries per-family ranges, `preset` reports the family; backlog 0198 `deposit_arms` goes Structural. Phase 4's wait on 0174 is discharged. |
 | [0180](0180-the-converted-picture-follows-the-source.md) | The converted picture follows the source | in-progress | dev | ADR-0199 (proposed). Backlog 0214-0216. Phases 1-2 on its branch; parked at 3, **amended on the branch 2026-09-15**: source-space warp chain for converted presets only. **Runs before 0142.** |
@@ -278,7 +277,7 @@ re-checked against the tree and none was withdrawn; each carries a dated `Amende
 naming what moved. The order:
 
 - **Delivery and infrastructure lane.** [0174] closed first, then [0176] (both 2026-09-14), which
-  discharges [0103] Phase 5's wait on a tag that reliably reaches origin. Then [0177], which re-derives its mergeable set from 0174's final run-alone filter. [0178] edits the same gate-count
+  discharges [0103] Phase 5's wait on a tag that reliably reaches origin. [0177] closed 2026-09-15, its fold re-derived from 0174's final run-alone filter. [0178] edits the same gate-count
   prose as [0166] Phase 1 and [0176]; whichever lands second rebases onto the others.
 - **Engine lane.** [0181], [0185] and then [0175] closed 2026-09-15, and none moved a golden.
   [0180] parked `plan_wrong` on 2026-09-14 and was amended on its lane branch 2026-09-15; resuming it
@@ -297,7 +296,7 @@ naming what moved. The order:
   of the diffusion `quality` profile.
 
 [0176]: done/0176-a-release-tag-reaches-origin.md
-[0177]: 0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md
+[0177]: done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md
 [0178]: 0178-what-the-operator-reads-is-true.md
 [0179]: 0179-a-parameters-range-belongs-to-its-family.md
 [0180]: 0180-the-converted-picture-follows-the-source.md
@@ -843,6 +842,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0177 — The test tree stops costing disk](done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) — closed 2026-09-15. Review: **no blockers, no majors, four minors, two nits.** Version: **0.125.0**. ADR-0204 accepted, Outcome. Archived 7. [Write-up](README-archive.md).
 - [0175 — An eased value arrives at its target](done/0175-an-eased-value-arrives.md) — closed 2026-09-15. Review: **no blockers, no majors, one minor, one nit (both fixed).** Version: **0.124.2**. No ADR paired. Archived 0212, 0218. [Write-up](README-archive.md).
 - [0188 — The conductor survives its first run](done/0188-the-conductor-survives-its-first-run.md) — closed 2026-09-15. Review: **no blockers, no majors, one minor.** Version: **0.124.1**. ADR-0205 Outcome (the pilot). [Write-up](README-archive.md).
 - [0182 — The report hears a counter](done/0182-the-report-hears-a-counter.md) — closed 2026-09-15. Review: **no blockers, no majors, three minors.** Version: **0.124.0**. ADR-0196 accepted (Outcome). Archived 0192. [Write-up](README-archive.md).
