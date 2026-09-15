@@ -11,7 +11,7 @@
 // inbox gains an entry, and the lane moves to the next queued plan whose `after` list has merged.
 // The repository, not the session, is the evidence at every step (close.mjs).
 
-import { closeSync, existsSync, fstatSync, openSync, readSync } from "node:fs";
+import { closeSync, existsSync, fstatSync, mkdirSync, openSync, readSync } from "node:fs";
 import { join, relative } from "node:path";
 
 import { verifyClose, verifyFix, verifyImplement } from "./close.mjs";
@@ -180,7 +180,8 @@ export function pickNext(ctx, lane) {
 export async function runLanes(ctx) {
   const lanes = ctx.lanes ?? Object.keys(ctx.queue.lanes);
   ctx.held ??= new Map();
-  const run = { started: now(), ended: null, lanes };
+  // `cli` is preflight's reading of `claude --version`, carrying its warning for an unverified patch.
+  const run = { started: now(), ended: null, lanes, ...(ctx.cli ? { cli: ctx.cli } : {}) };
   ctx.state.runs.push(run);
   ctx.run = run;
   save(ctx);
@@ -275,6 +276,8 @@ async function session(ctx, rec, kind, { owner, prompt, vars, budget, addDirs = 
   save(ctx);
   event(ctx, `${kind}-step`, { plan: rec.plan, label });
   live(ctx, rec.plan, stepStartBody({ label, kind, owner, phases: info.phases, round: info.round }));
+  // The hook appends to a file in this directory; the file itself must not exist until a hook ran.
+  mkdirSync(join(ctx.stateDir, "hooks"), { recursive: true });
   const reader = streamReader({ readOutput: ctx.readOutput ?? readTail, shared: (ctx.liveShared ??= {}) });
   const watch = watchCommits(ctx, rec, rec.plan);
   const t0 = Date.now();
@@ -289,6 +292,8 @@ async function session(ctx, rec, kind, { owner, prompt, vars, budget, addDirs = 
     model: ctx.local.model?.[kind],
     addDirs: [...addDirs, ...(ctx.queue.plans[rec.plan]?.add_dirs ?? []).map((d) => join(ctx.repo, d))],
     transcriptPath: join(paths.transcripts, `${label}.jsonl`),
+    skill: owner,
+    hookLog: join(ctx.stateDir, "hooks", `${label}.log`),
     env: {
       RLX_LOCK_LOG: paths.lockLog,
       RLX_SUITE_LEDGER: suiteLedger(ctx),

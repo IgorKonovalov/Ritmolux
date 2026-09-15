@@ -161,6 +161,10 @@ export function renderDigest(state, { repo, stateDir }) {
     // Needs you
     const needs = [];
     const minorsMerged = [];
+    // A run carries its own CLI reading, so the line stops appearing on the first run whose version is listed.
+    if (run.cli?.warning) {
+      needs.push(`- **claude ${run.cli.version} is not a verified CLI version** - the run went ahead with a warning (ADR-0208): ${run.cli.warning}.`);
+    }
     for (const rec of plans) {
       for (const p of rec.parks.filter((x) => inRun(x.at))) {
         const current = rec.status === "parked" && rec.park?.at === p.at;

@@ -13,8 +13,13 @@
 // `cargo nextest list` runs no test, so it needs no lock and passes bare; the wrapper runs a wrapped
 // one without taking the lock. Wired up in .claude/settings.json under hooks.PreToolUse with
 // matcher "Bash|PowerShell".
+//
+// It is also the conductor's proof that project hooks run at all (ADR-0208): when RLX_CONDUCTOR=1
+// and RLX_HOOK_LOG names a file, every call appends one JSON line to it, whatever the decision. A
+// conductor-run session that made a shell call and left no line is parked `cli_contract`. The append
+// never changes the decision and never fails the hook.
 
-const { readFileSync } = require("fs");
+const { appendFileSync, readFileSync } = require("fs");
 const { simpleCommands } = require("./block-push-and-history-rewrite.js");
 
 const SUITE = /^cargo(?:\.exe)?(?:\s+\+\S+)?(?:\s+llvm-cov)?\s+(nextest|test)\b/;
@@ -38,6 +43,14 @@ if (require.main === module) {
   const input = JSON.parse(readFileSync(0, "utf8") || "{}");
   const cmd = (input.tool_input && input.tool_input.command) || "";
   const hit = decide(cmd, process.env);
+  if (process.env.RLX_CONDUCTOR === "1" && process.env.RLX_HOOK_LOG) {
+    try {
+      appendFileSync(
+        process.env.RLX_HOOK_LOG,
+        JSON.stringify({ hook: "conductor-suite-lock", tool: input.tool_name || null, decision: hit ? "deny" : "allow", at: new Date().toISOString() }) + "\n",
+      );
+    } catch {}
+  }
   if (!hit) {
     process.stdout.write("{}");
     process.exit(0);

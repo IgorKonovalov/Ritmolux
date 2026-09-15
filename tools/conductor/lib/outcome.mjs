@@ -18,11 +18,26 @@ export const IMPLEMENTER_PARK_REASONS = new Set([
 ]);
 export const REVIEW_PARK_REASONS = new Set(["merge_conflict", "check_red", "plan_wrong"]);
 
-/** Parses a stream-json transcript into the facts the conductor keeps. */
+/**
+ * The park the conductor itself gives a session whose CLI broke the headless contract (ADR-0208): it
+ * made a shell call and the project hooks left no log line, or its system/init did not list the skill
+ * its prompt invoked. No session may claim it in its own outcome.
+ */
+export const CLI_CONTRACT = "cli_contract";
+
+const SHELL_TOOLS = new Set(["Bash", "PowerShell"]);
+
+/**
+ * Parses a stream-json transcript into the facts the conductor keeps, including the two the CLI
+ * contract check reads: `init` ({ skills } from system/init, or null when there was none) and
+ * `shellCalls`, the count of Bash and PowerShell tool uses.
+ */
 export function readResult(transcript) {
   let result = null;
   let sessionId = null;
   let rateLimit = null;
+  let init = null;
+  let shellCalls = 0;
   for (const line of transcript.split("\n")) {
     if (!line.trim()) continue;
     let e;
@@ -32,11 +47,17 @@ export function readResult(transcript) {
       continue;
     }
     if (e.session_id && !sessionId) sessionId = e.session_id;
+    if (e.type === "system" && e.subtype === "init" && !init) init = { skills: Array.isArray(e.skills) ? e.skills : null };
+    if (e.type === "assistant" && Array.isArray(e.message?.content)) {
+      shellCalls += e.message.content.filter((c) => c?.type === "tool_use" && SHELL_TOOLS.has(c.name)).length;
+    }
     if (e.type === "rate_limit_event") rateLimit = e.rate_limit_info ?? null;
     if (e.type === "result") result = e;
   }
-  if (!result) return { present: false, sessionId, rateLimit };
+  if (!result) return { present: false, sessionId, rateLimit, init, shellCalls };
   return {
+    init,
+    shellCalls,
     present: true,
     sessionId: result.session_id ?? sessionId,
     subtype: result.subtype ?? null,

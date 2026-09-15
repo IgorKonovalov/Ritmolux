@@ -413,8 +413,8 @@ illustrative: the run terminal
 | 2 — The digest reports what the operator spends, holds and still owes | dev | done | `57942b5` |
 | 3 — Listing tests takes no lock | dev | done | `570400f` |
 | 4 — A green suite is not run again on the same tree | dev | done | `cfb1f1d` |
-| 5 — The conductor-mode close orders its work so the gate runs once, and repairs prose findings | dev | committed with this row | |
-| 6 — A patch CLI update warns, and every session proves its hooks ran | dev | not started | |
+| 5 — The conductor-mode close orders its work so the gate runs once, and repairs prose findings | dev | done | `be1ca2b` |
+| 6 — A patch CLI update warns, and every session proves its hooks ran | dev | committed with this row | |
 | 7 — The pilot's leftovers, under the new rule | dev | not started | |
 | 8 — A run, watched | human | not started | |
 
@@ -446,5 +446,14 @@ illustrative: the run terminal
   "no full suite at the last run" rule is written into both skills, not only `dev`'s.
 - Phase 5 extends `test/lane-scenario.mjs` (`closeRepair`, `ledgerFlow`). Its fake sessions call
   `runWrapped` in-process, with cargo stood in for by a green `Summary`.
+- Phase 6 also edits `tools/conductor/test/queue.test.mjs`, which is not in its file list. Its
+  refusal case used `2.1.999`, which is now a warning, so it now derives the next minor from
+  `VERIFIED_CLI`. The contract check lives in `lib/step.mjs` (`contractProblem`), and
+  `readResult` in `lib/outcome.mjs` reads `init` and `shellCalls` from the transcript. A patch below
+  a listed version (`2.1.271` against `2.1.272` alone) is refused. The CLI warning shows in **Needs
+  you** of the run that recorded it, not only the newest run's.
+- Followup noticed, not acted on: `CLAUDE.md`'s `tools/conductor/` entry still says the conductor
+  "refuses a CLI version spike/README.md did not verify". Under ADR-0208 a patch above a verified
+  version runs with a warning.
 
 ### Close triggers

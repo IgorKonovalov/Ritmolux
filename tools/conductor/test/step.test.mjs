@@ -179,6 +179,40 @@ test("the last outcome block wins, and verdict counts must agree with the findin
   assert.match(parseOutcome(outcomeBlock(closedWithMajor)).error, /closed carries blockers or majors/);
 });
 
+const SHELL_CALL = { type: "assistant", message: { content: [{ type: "tool_use", id: "toolu_s1", name: "Bash", input: { command: "git status" } }] } };
+
+test("a session that makes a shell call and writes no hook log parks cli_contract before its outcome is read", async () => {
+  const dir = tmp();
+  const hookLog = join(dir, "hooks", "0101-01-implement.log");
+  const { r } = await step({ text: outcomeBlock(DONE), stream: [SHELL_CALL], hooks: false }, { hookLog, skill: "dev" });
+  assert.equal(r.status, "parked");
+  assert.equal(r.reason, "cli_contract");
+  assert.match(r.detail, /made 1 shell call\(s\) and the project hooks wrote nothing/);
+  assert.equal(r.outcome, undefined, "no outcome was accepted");
+});
+
+test("a session whose init lists no invoked skill parks cli_contract", async () => {
+  const { r } = await step({ text: outcomeBlock(DONE), skills: ["architect", "preset-author"] }, { hookLog: join(tmp(), "h.log"), skill: "dev" });
+  assert.equal(r.status, "parked");
+  assert.equal(r.reason, "cli_contract");
+  assert.match(r.detail, /system\/init does not list the skill dev/);
+
+  const none = await step({ text: outcomeBlock(DONE), skills: null }, { skill: "dev" });
+  assert.equal(none.r.reason, "cli_contract");
+  assert.match(none.r.detail, /no skills list/);
+});
+
+test("a session that makes no shell call is not parked for the hook log, and one whose hooks ran passes", async () => {
+  const quiet = await step({ text: outcomeBlock(DONE) }, { hookLog: join(tmp(), "never-written.log"), skill: "dev" });
+  assert.equal(quiet.r.status, "ok", quiet.r.detail);
+
+  const hookLog = join(tmp(), "ran.log");
+  const ran = await step({ text: outcomeBlock(DONE), stream: [SHELL_CALL] }, { hookLog, skill: "dev" });
+  assert.equal(ran.r.status, "ok", ran.r.detail);
+  assert.equal(ran.calls[0].env.RLX_HOOK_LOG, hookLog, "the session is handed the step's hook log");
+  assert.equal(readFileSync(hookLog, "utf8").trim().split("\n").length, 1);
+});
+
 test("a prompt template refuses an unfilled variable", () => {
   assert.equal(renderPrompt("plan {{plan}}", { plan: "0101" }), "plan 0101");
   assert.throws(() => renderPrompt("plan {{plan}} {{phases}}", { plan: "0101" }), /\{\{phases\}\} has no value/);

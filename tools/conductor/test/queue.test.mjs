@@ -106,13 +106,15 @@ test("preflight refuses to start without local.json", () => {
 });
 
 test("preflight refuses a claude --version it has not been verified on", () => {
-  const p = scratchTool({ local: LOCAL, version: "2.1.999 (Claude Code)" });
+  // A minor above every verified version: never a patch update. Built from the live VERIFIED_CLI,
+  // so a legitimately verified version may be added without editing this test.
+  const [major, minor] = VERIFIED_CLI.at(-1).split(".").map(Number);
+  const unverified = `${major}.${minor + 1}.0`;
+  const p = scratchTool({ local: LOCAL, version: `${unverified} (Claude Code)` });
   const r = preflight(p, { claude: FAKE });
   assert.equal(r.errors.length, 1);
-  // The refusal names the live VERIFIED_CLI, so a legitimately verified version may be added
-  // without editing this test. Pinning the list here reds the suite on every bump instead.
-  assert.match(r.errors[0], /^claude 2\.1\.999 is not a verified CLI version /);
-  assert.ok(r.errors[0].includes(`(verified: ${VERIFIED_CLI.join(", ")})`));
+  assert.ok(r.errors[0].startsWith(`claude ${unverified} is not a verified CLI version (verified: ${VERIFIED_CLI.join(", ")})`), r.errors[0]);
+  assert.deepEqual(r.warnings, []);
 });
 
 test("preflight passes on the verified version with local.json and a valid queue", () => {

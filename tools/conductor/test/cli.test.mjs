@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { main, paths } from "../conductor.mjs";
+import { VERIFIED_CLI, cliVerdict, main, paths } from "../conductor.mjs";
 import { resumeCommand } from "../lib/inbox.mjs";
 import { loadState, statePaths } from "../lib/state.mjs";
 import { FAKE, TEST_DIR, TOOL_DIR, tmp, writePlan } from "./helpers.mjs";
@@ -287,6 +287,51 @@ test("status, resume, park and abort each run on a checkout with no state/", asy
   const abort = await fresh("abort");
   assert.equal(abort.code, 0, abort.err.join("\n"));
   assert.deepEqual(abort.out, ["conductor: not running"]);
+});
+
+test("a patch above a verified version warns; another minor or major is refused; a verified one is silent", () => {
+  // Every version below is derived from this list, never written out, so the test states the rule
+  // rather than one release's numbers.
+  const VERIFIED = ["2.1.272"];
+  const [major, minor, patch] = VERIFIED[0].split(".").map(Number);
+  const unlisted = (v) => `claude ${v} is not a verified CLI version (verified: ${VERIFIED.join(", ")})`;
+
+  const higherPatch = `${major}.${minor}.${patch + 8}`;
+  const warned = cliVerdict(higherPatch, VERIFIED);
+  assert.deepEqual(Object.keys(warned), ["warning"]);
+  assert.ok(warned.warning.startsWith(`${unlisted(higherPatch)}; a patch update of a verified version runs with this warning (ADR-0208)`), warned.warning);
+
+  for (const refused of [`${major}.${minor + 1}.0`, `${major + 1}.${minor}.${patch}`, `${major}.${minor}.${patch - 1}`]) {
+    const v = cliVerdict(refused, VERIFIED);
+    assert.deepEqual(Object.keys(v), ["error"], refused);
+    assert.ok(v.error.startsWith(`${unlisted(refused)}; re-run tools/conductor/spike/probe.mjs`), v.error);
+  }
+  assert.deepEqual(cliVerdict(VERIFIED[0], VERIFIED), {});
+});
+
+test("run on a patch above the verified CLI prints the warning, records it on the run, and the digest carries it", async () => {
+  const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] });
+  const top = VERIFIED_CLI.map((v) => v.split(".").map(Number)).sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]).at(-1);
+  const version = `${top[0]}.${top[1]}.${top[2] + 1}`;
+  process.env.FAKE_CLAUDE_VERSION = `${version} (Claude Code)`;
+  try {
+    const r = await cli("run");
+    assert.equal(r.code, 0, r.err.join("\n"));
+    const { warning } = cliVerdict(version);
+    assert.deepEqual(r.err, [`conductor: warning: ${warning}`]);
+    const state = loadState(p.stateDir);
+    assert.deepEqual(state.runs.at(-1).cli, { version, warning });
+    assert.equal(state.plans["0101"].status, "merged", JSON.stringify(state.plans["0101"].park));
+    assert.ok(readFileSync(p.digest, "utf8").includes(`- **claude ${version} is not a verified CLI version** - the run went ahead with a warning (ADR-0208): ${warning}.`));
+
+    // The next run on a verified version carries no warning in its own section.
+    process.env.FAKE_CLAUDE_VERSION = `${VERIFIED_CLI[0]} (Claude Code)`;
+    await cli("run");
+    const newest = readFileSync(p.digest, "utf8").split(/^## Run /m)[1];
+    assert.ok(!newest.includes("is not a verified CLI version"), newest);
+  } finally {
+    process.env.FAKE_CLAUDE_VERSION = "2.1.270 (Claude Code)";
+  }
 });
 
 test("unknown commands and malformed plan numbers are usage errors", async () => {

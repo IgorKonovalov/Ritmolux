@@ -33,9 +33,29 @@ import { activeChildren, killTree } from "./lib/step.mjs";
 export const TOOL_DIR = dirname(fileURLToPath(import.meta.url));
 export const REPO = resolve(TOOL_DIR, "..", "..");
 
-// The CLI versions tools/conductor/spike/README.md's evidence table was produced on. A version not
-// listed here is refused; re-running the spike probe is how one is added.
+// The CLI versions tools/conductor/spike/README.md's evidence table was produced on. Re-running the
+// spike probe is how one is added. An unlisted version at a higher patch of a listed major.minor runs
+// with a warning; any other unlisted version is refused (ADR-0208).
 export const VERIFIED_CLI = ["2.1.270", "2.1.272"];
+
+/**
+ * What preflight makes of `claude --version`: {} for a listed version, { warning } for one sharing
+ * major and minor with a listed version at a lower patch, { error } for anything else.
+ */
+export function cliVerdict(version, verified = VERIFIED_CLI) {
+  if (verified.includes(version)) return {};
+  const unlisted = `claude ${version} is not a verified CLI version (verified: ${verified.join(", ")})`;
+  const clear = "re-run tools/conductor/spike/probe.mjs and record the evidence before adding it";
+  const [major, minor, patch] = version.split(".").map(Number);
+  const lowerPatch = verified.some((v) => {
+    const [a, b, c] = v.split(".").map(Number);
+    return a === major && b === minor && c < patch;
+  });
+  if (lowerPatch) {
+    return { warning: `${unlisted}; a patch update of a verified version runs with this warning (ADR-0208) - ${clear}` };
+  }
+  return { error: `${unlisted}; ${clear}` };
+}
 
 export function paths({ repo = REPO, toolDir = TOOL_DIR } = {}) {
   return {
@@ -61,26 +81,29 @@ export function claudeVersion(claude) {
 }
 
 /**
- * Everything that must hold before a run starts. Returns { errors, local, queue, state, claude }.
+ * Everything that must hold before a run starts. Returns
+ * { errors, warnings, local, queue, state, claude, cli: { version, warning } | null }.
  * `claude` overrides local.json's command vector (tests pass the fake).
  */
 export function preflight(p = paths(), { claude } = {}) {
   const errors = [];
+  const warnings = [];
   const { errors: localErrors, local } = loadLocal(p.local);
   errors.push(...localErrors);
   const command = claude ?? local?.claude ?? ["claude"];
   const v = claudeVersion(command);
+  let cli = null;
   if (v.error) errors.push(v.error);
-  else if (!VERIFIED_CLI.includes(v.version)) {
-    errors.push(
-      `claude ${v.version} is not a verified CLI version (verified: ${VERIFIED_CLI.join(", ")}); ` +
-        `re-run tools/conductor/spike/probe.mjs and record the evidence before adding it`,
-    );
+  else {
+    const verdict = cliVerdict(v.version);
+    if (verdict.error) errors.push(verdict.error);
+    if (verdict.warning) warnings.push(verdict.warning);
+    cli = { version: v.version, warning: verdict.warning ?? null };
   }
   const state = loadState(p.stateDir);
   const queue = loadQueue(p.queue, p.repo, ...stateSets(state));
   errors.push(...queue.errors);
-  return { errors, local, queue, state, claude: command };
+  return { errors, warnings, local, queue, state, claude: command, cli };
 }
 
 const pidFile = (p) => join(p.stateDir, "conductor.pid");
@@ -130,6 +153,7 @@ async function cmdRun(args, o) {
     for (const e of errors) o.err(`conductor: ${e}`);
     return 1;
   }
+  for (const w of pf.warnings) o.err(`conductor: warning: ${w}`);
 
   const state = pf.state;
   const recovered = recoverInterrupted(p.stateDir, state);
@@ -160,6 +184,7 @@ async function cmdRun(args, o) {
     settingsFile: p.settings,
     withLockPath: p.withLock,
     claude: pf.claude,
+    cli: pf.cli,
     local: pf.local,
     queue: pf.queue,
     state,
@@ -349,7 +374,8 @@ function cmdCheck(args, o) {
     for (const e of r.errors) o.err(`conductor: ${e}`);
     return 1;
   }
-  o.log("conductor: preflight OK");
+  for (const w of r.warnings) o.err(`conductor: warning: ${w}`);
+  o.log(r.warnings.length ? "conductor: preflight OK, with a warning" : "conductor: preflight OK");
   return 0;
 }
 

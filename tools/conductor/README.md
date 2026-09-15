@@ -38,7 +38,8 @@ The decision and its rejected alternatives are ADR-0205. The plan that built it 
    ```
 3. **Run the preflight:** `node tools/conductor/conductor.mjs check`. It refuses when `local.json` is
    missing, when `queue.json` names a plan that is not approved or depends on a plan it cannot reach,
-   or when `claude --version` is not a version the conductor was verified on.
+   or when `claude --version` is not a version the conductor was verified on and not a patch above one.
+   A patch above one passes with a warning.
 4. **Leave the main checkout alone while a run is live.** Work in a lane of your own. A fast-forward
    refuses a dirty main checkout, so work in progress there parks every close.
 
@@ -135,6 +136,7 @@ once, whatever `state/conductor.json` says.
 | `gate_red` | Read the gate log. Fix the defect in the lane. The conductor never retries a red. |
 | `review_failed` | Read the last review under `state/reviews/`. Resuming grants two fresh fix rounds. |
 | `disagreement` | A session's claim and `git` differ. Read the detail and the transcript before trusting the lane. |
+| `cli_contract` | The CLI ran a session without the project hooks, or without loading the skill it invoked. Read the detail and the transcript, then verify the CLI version before resuming (`## When the CLI updates`). |
 | `budget`, `api`, `no_outcome`, `bad_outcome` | Raise the budget in `local.json`, or wait out a usage limit. Resuming re-runs the step from what the plan log and `git` show. |
 | `merge_conflict`, `merge_failed`, `main_dirty` | Resolve it in the lane, or clean the main checkout. A resumed plan goes straight back to the fast-forward. |
 
@@ -198,8 +200,24 @@ probe before the review is not a defect yet. `post-close` still parks a close th
 
 ## When the CLI updates
 
-The conductor refuses a `claude --version` not listed in `VERIFIED_CLI` in `conductor.mjs`. To
-verify a new version:
+`VERIFIED_CLI` in `conductor.mjs` lists the `claude --version`s the evidence in `spike/README.md` was
+produced on (ADR-0208).
+
+- **A higher patch of a listed major.minor runs, with a warning.** `run` and `check` print it, the run
+  records it as `cli`, and that run's **Needs you** in the digest carries it. The line stops appearing
+  on the first run whose version is listed. This CLI numbers nearly every release as a patch, so in
+  practice most updates land here.
+- **Any other unlisted version is refused**, as before: a new minor or major, or a lower patch.
+
+**Every session proves the project hooks ran in it, whatever the version.** The conductor hands each
+step a hook log, `state/hooks/<step>.log`. `.claude/hooks/conductor-suite-lock.js` appends one line to it
+per shell call. When a session ends, before its outcome is read, two things must hold. If its
+transcript holds a `Bash` or `PowerShell` call, the hook log must be non-empty. The stream's
+`system/init` must list the skill the prompt invoked. Either failure parks the plan `cli_contract`.
+It proves that one hook ran, not that every one did, and a session with no shell call cannot be
+checked.
+
+To verify a new version, and clear the warning:
 
 1. Run `node tools/conductor/spike/probe.mjs` (two short sessions on `--model haiku`).
 2. Compare its output with the evidence table in `spike/README.md`.
