@@ -137,6 +137,7 @@ What it runs, stopping at the first failure and naming the step that failed:
 | Release tag (self-test) | `node scripts/check-release-tag.mjs --self-test` |
 | Format | `cargo fmt --all --check` |
 | Lint | `cargo clippy --workspace --all-targets -- -D warnings` |
+| Rustdoc | `cargo doc -p rlx-core --no-deps --features text` under `RUSTDOCFLAGS=-D warnings` |
 | Tests | `cargo nextest run --workspace -P fast` (narrowed — see below) |
 
 The Node steps come first because they are the cheapest (tens of milliseconds
@@ -185,6 +186,11 @@ authority, so the narrowing is never silent, and **CI runs
 all of them regardless** — though since [ADR-0073](adrs/0073-the-windows-ci-critical-path.md)
 it runs those nine in the `coverage` job alone rather than in two Windows jobs, so
 the promise is now underwritten by one job instead of a redundancy between two.
+
+The **rustdoc step** fails a broken or private intra-doc link in `rlx-core` before CI's
+`cargo doc --workspace` job does. It is scoped to that one crate because that is what fits: on one
+warm engine edit it cost 4.5-5.9 s against 6.3-7.8 s for the lint step on the same edit
+(2026-09-15, reference machine). `standalone`'s public items are documented in CI only.
 
 `cargo deny`, doctests, Miri, and the coverage job are deliberately *not* in the
 hook — they push it into minutes, and a gate that hurts gets disabled

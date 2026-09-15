@@ -114,8 +114,13 @@ jobs:
       # cfg(test) items and redundant explicit targets. This is what turns that
       # exemption from a claim into a property.
       #
-      # NOT in the pre-push hook: that budget is ~28 s and a full cargo doc does
-      # not fit. Deliberate, not an oversight.
+      # The pre-push hook runs a SCOPED step, `cargo doc -p rlx-core --no-deps
+      # --features text` under the same flags, not this one. Measured warm on the
+      # development machine on one edit to core/src/render/metrics.rs (Plan 0177
+      # Phase 7): 4.5-5.9 s, against 6.3-7.8 s for the hook's clippy step on the
+      # same edit, and it fails on a public item linking a private one. What it
+      # does NOT cover is `standalone`'s public surface (and `milkconv`'s and
+      # `rlx-core-cabi`'s); this job is the only place those are documented.
       - run: cargo doc --workspace --no-deps
         env:
           RUSTDOCFLAGS: -D warnings

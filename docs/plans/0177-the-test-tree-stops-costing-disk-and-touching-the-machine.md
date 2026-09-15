@@ -379,8 +379,8 @@ flowchart LR
 | 3 — The horizon test reads the ground before the rows | dev | done | 11636f2 |
 | 4 — Measure what grows in `target/` | dev | done | 375f275 |
 | 5 — `prune-target.mjs` deletes what cargo no longer reports | dev | done | d9aee86 |
-| 6 — The incremental cache has a documented bound | dev | done | committed with this row |
-| 7 — A scoped `cargo doc` earns a hook step, or is rejected | dev | not started | |
+| 6 — The incremental cache has a documented bound | dev | done | 227bb8d |
+| 7 — A scoped `cargo doc` earns a hook step, or is rejected | dev | done | committed with this row |
 | 8 — The cheap tests share one binary per package | dev | not started | |
 | 9 — The studio tests ask cargo where the player is | studio-builder | not started | |
 
@@ -448,6 +448,20 @@ flowchart LR
   binary's source is the unhashed `deps/ritmolux.exe`. An unmatched report stops the script.
 - **Phase 6.** No script arm: Phase 4 found no mapping. The Disk section documents the delete, with
   Phase 4's figures, the machine and the date.
+- **Phase 7, deviation: the adopted step is `cargo doc -p rlx-core --no-deps --features text`.** The
+  command the phase names exits 101 **on the unmodified tree**: `core/src/render/preview.rs:10` links
+  `super::aux_target`, which exists only with the `text` feature, and `-p rlx-core` alone leaves it
+  off while the workspace build turns it on. `text` is rlx-core's only feature.
+- **Phase 7, coverage (in-tree, restored after, not a scratch copy).** A `/// See [`STRUCT_GRID`].`
+  line on the public `frame_diff` made both commands fail with
+  `public documentation for frame_diff links to private item STRUCT_GRID`.
+- **Phase 7, cost.** Warm, same session, the `STRUCT_GRID` one-line edit applied and reverted over
+  three rounds, clippy then doc each round. With `--features text`: clippy 6.35 / 6.56 / 7.82 s, doc
+  4.47 / 5.95 / 5.49 s (all exit 0). Without it: clippy 6.34 / 6.38 / 6.34 s, doc 3.16 / 3.13 / 3.15 s
+  (every doc run exit 101). Verdict: adopted, after `clippy` in `.githooks/pre-push`.
+- **Followup noticed, not acted on:** the `preview.rs` link above is broken in every build without
+  `text` (the core test suite and the plugin's), and CI's `cargo doc --workspace` cannot see it
+  because feature unification turns `text` on.
 
 ### Close triggers
 
