@@ -15,6 +15,13 @@
 >
 > Only the rulings are new design. The rest are corrections.
 
+> **Amended 2026-09-15** after Phase 3 parked `plan_wrong`. The `shader.rs` ruling covered `dt = 0`
+> and missed that the `1e-6` floor also turned a **NaN** `dt` into a finite decay, which
+> `the_pure_half_is_total_on_degenerate_input` sweeps. The ruling stands: the floor is deleted. What
+> changes is the test, which stops sweeping a frame delta at all, for the reason it already gives for
+> not sweeping `decay`. Phase 3 gains `shader_tests.rs` and `roster.rs` in its files, and one
+> done-when for each.
+
 ## TL;DR
 
 `Easing::step` is a one-pole ease with no end state. In f32 it stops moving short of its target and
@@ -118,10 +125,27 @@ answers differently. One ruling each:
 |---|---|---|---|
 | `Easing::step`, `core/src/preset/schema/easing.rs` | `dt <= 0.0` in the pass-through condition, returning `raw` | **Delete the `dt` term.** The `tau` terms stay. State the precondition in the doc: `dt` is finite and positive, as `Scene::advance` states it | It is a policy, and a snap is the odd answer. Without it the arithmetic answers, and consistently with Phase 1's snap: `dt = 0` gives `alpha = 0`, and the snap's `alpha > 0` guard makes that **hold**, not snap. A non-finite `dt` outside the precondition poisons one frame, and the existing non-finite-`held` guard returns `raw` on the next. `Easing` is public, and no caller passes a degenerate `dt` today |
 | the latch countdown, `core/src/render/evaluate.rs` | `state.hold_left - dt.max(0.0)` | **Delete the `.max(0.0)` on `dt`.** The outer `.max(0.0)` on `hold_left` stays | Inert. With `dt > 0`, `dt.max(0.0)` is `dt` |
-| the MilkDrop decay, `core/src/render/scenes/warp_mesh/shader.rs` | `decay_per_second.max(0.0).powf(dt.max(1e-6))` | **Delete the `.max(1e-6)` on `dt`.** The `.max(0.0)` on the rate stays | The floor only matters at `dt = 0`, where `0^0 = 1` would stop a zero-rate field from decaying. The seam makes `dt = 0` unreachable, and for every positive `dt`, `0^dt` is already `0` |
+| the MilkDrop decay, `core/src/render/scenes/warp_mesh/shader.rs` | `decay_per_second.max(0.0).powf(dt.max(1e-6))` | **Delete the `.max(1e-6)` on `dt`.** The `.max(0.0)` on the rate stays | The floor only matters at `dt = 0`, where `0^0 = 1` would stop a zero-rate field from decaying, and at a NaN `dt`, which it turns into a finite factor. The seam makes both unreachable, and for every positive `dt`, `0^dt` is already `0` |
 
 None of the three is kept, so the widened hygiene pattern below needs **no** new allowlist entry.
 The test names a guard only if a future reader adds one back.
+
+**The totality test stops sweeping the frame delta (amended 2026-09-15).**
+`the_pure_half_is_total_on_degenerate_input` in `core/src/render/scenes/warp_mesh/shader_tests.rs`
+sweeps `"a zero dt"` and `"a NaN dt"` through `fill_uniform`. The only caller is `encode.rs`, which
+passes the scene's `self.dt`, and `advance` sets that from the sanitized delta. So both cases are
+outside `fill_uniform`'s precondition, just as a non-finite `decay` is. The test already skips `decay`
+for that reason: *"what is swept is what the scene hands over"*. Both `dt` cases are removed, and a
+sentence beside the `decay` one says that `dt` arrives through `sanitize_frame_dt`, finite and
+positive (ADR-0191). The totality claim still covers everything a preset or a target size can hand
+the function: size, aspect and decay.
+
+Rejected: **keeping the floor, with a `DT_GUARD_ALLOWED` entry.** That allowlist exists for a `dt`
+that is not a frame delta (the tier governor's samples). This one is a frame delta, so an entry would
+bring back the second policy that ADR-0191 retired, for the sake of a test case no caller can reach.
+Also rejected: **keeping `"a zero dt"` because it still passes.** A sweep case that is outside the
+precondition teaches the next reader that the function promises something about that input. It does
+not.
 
 ## Architecture diagram
 
@@ -218,8 +242,10 @@ flowchart LR
   and its failure message so both cover sign checks as well as finiteness. Update `Easing::step`'s doc to state the precondition. Replace the
   `dt <= 0` sentence in any comment that described the removed pass-through.
 - **Files touched:** `core/src/preset/schema/easing.rs`, `core/src/render/evaluate.rs`,
-  `core/src/render/scenes/warp_mesh/shader.rs`, `core/tests/hygiene.rs`, and the easing unit tests in
-  `core/src/preset/schema/tests.rs`.
+  `core/src/render/scenes/warp_mesh/shader.rs`, `core/src/render/scenes/warp_mesh/shader_tests.rs`
+  (the two `dt` sweep cases, per the amended ruling above), `core/src/render/roster.rs`
+  (`ParamSmoother::smooth`'s doc, which repeats the "non-positive `dt` passes `raw` through" sentence),
+  `core/tests/hygiene.rs`, and the easing unit tests in `core/src/preset/schema/tests.rs`.
 - **Done when:**
   - **The widened predicate bites.** Before the three deletions, with the new predicate in place,
     the test fails and names exactly the three sites in the ruling table. Record that output in the
@@ -230,6 +256,11 @@ flowchart LR
   - `grep -rnE "\bdt\.(max|min|clamp)\(|\bdt\s*(<|<=|>|>=)\s*0" core/src` matches exactly one line,
     `sanitize_frame_dt`'s `if dt.is_finite() && dt > 0.0 {` in `core/src/render/mod.rs`. On
     2026-09-14 it matches that line and the three being deleted.
+  - `the_pure_half_is_total_on_degenerate_input` sweeps six cases and no `dt` case. Every assertion in
+    its loop is unchanged, and its comment names `sanitize_frame_dt` as the reason `dt` is not swept.
+  - ``grep -rn "non-positive `dt`" core/src`` returns nothing. On 2026-09-15 it matches
+    `easing.rs` (`Easing::step`'s doc) and `roster.rs` (`ParamSmoother::smooth`'s doc). Each is
+    reworded to state the precondition.
   - `cargo nextest run --workspace` moves no golden. All three sites are unreachable with a
     delta at or below zero, so every captured frame computes the same numbers. A moved baseline is a
     stop.
