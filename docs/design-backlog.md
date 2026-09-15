@@ -77,6 +77,9 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0220 — a headless walk of the system roster stalls at `emitter`: the ping sent with the ask is answered and the preset never reaches the screen](#0220--a-headless-walk-of-the-system-roster-stalls-at-emitter-the-ping-sent-with-the-ask-is-answered-and-the-preset-never-reaches-the-screen)
 - [0221 — the run-alone override costs `-P fast` 165 s, twice its tests' serial time, because each of its 18 testcases drains the machine separately](#0221--the-run-alone-override-costs--p-fast-165-s-twice-its-tests-serial-time-because-each-of-its-18-testcases-drains-the-machine-separately)
 - [0222 — the digest reports a run in dollars, and the subscription operator's constraint is the usage window, which is recorded and never shown](#0222--the-digest-reports-a-run-in-dollars-and-the-subscription-operators-constraint-is-the-usage-window-which-is-recorded-and-never-shown)
+- [0223 — the gate is a third of a conductor run's wall clock, because the full workspace suite runs twice per plan on trees that already passed it](#0223--the-gate-is-a-third-of-a-conductor-runs-wall-clock-because-the-full-workspace-suite-runs-twice-per-plan-on-trees-that-already-passed-it)
+- [0224 — a CLI update refuses the whole conductor, and the only way through is a probe run and a hand edit to a source constant](#0224--a-cli-update-refuses-the-whole-conductor-and-the-only-way-through-is-a-probe-run-and-a-hand-edit-to-a-source-constant)
+- [0225 — a review finding under `.claude/` was left open for a restriction that is written nowhere, and may not exist](#0225--a-review-finding-under-claude-was-left-open-for-a-restriction-that-is-written-nowhere-and-may-not-exist)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -3931,3 +3934,125 @@ something finally does.
 
 **Medium.** Nothing is wrong and nothing is blocked. It is a report answering a question its one
 reader does not have, while holding the answer to the one they do.
+
+
+## 0223 — the gate is a third of a conductor run's wall clock, because the full workspace suite runs twice per plan on trees that already passed it
+
+Lane a's 2026-09-15 run merged three plans in **217 min** of wall clock. Only **145 min** of that was
+model sessions. The other **72 min** was the gate: five inter-step gaps of 11-14 min each, plus a
+12 min tail after the last review. Measured from `state/conductor.json` step timestamps, the gaps
+line up one-for-one with gate runs and nothing else.
+
+`lib/gate.mjs` `defaultGate()` is 20 commands. Fifteen are node scripts that finish in under a
+second between them. The cost is the last four: `cargo fmt`, `cargo clippy --workspace
+--all-targets`, `cargo nextest run --workspace` (1933 tests) and `cargo doc --workspace`. That set
+runs **twice per plan** — once at `pre-review` (`lib/lane.mjs`) and once at `post-close`
+(`lib/merge.mjs`) — so six full-workspace passes carried this run, on top of whatever the implement
+and review sessions ran inside themselves. Plan 0187 left "the four-runs-of-the-suite count per
+close" as an open minor; this is that minor with a wall-clock figure attached.
+
+The suite is not obviously redundant — `pre-review` reads the implement session's tree and
+`post-close` reads the close commit, which is a different tree — but nothing checks whether the tree
+changed in a way the suite could notice. A close commit is usually plan markdown, a version bump and
+a `git mv`.
+
+Shapes, none measured:
+
+- **Skip a gate command when the tree it would read is one it already passed.** Record the tree hash
+  a green gate ran on; at the next stage, skip the commands whose inputs are unchanged. `cargo doc`
+  and `nextest` on a docs-only close commit is the clearest waste.
+- **Run the four heavy commands concurrently** rather than in series. They contend on one `target/`,
+  so this may buy nothing or may serialize anyway on cargo's own lock; it needs measuring before it
+  is designed.
+- **Narrow `post-close` to what a close can break.** A close moves a plan file, edits indices and
+  bumps a version — which is what the node scripts and `check-release-tag.mjs` already cover.
+- **Do nothing.** 72 min of unattended machine time costs no human attention, and the gate is what
+  makes an unattended merge to `main` defensible at all. The cost is real only if a run is waited on.
+
+Suite-lock wait was 15 min of the 72 with a single lane, which is the first evidence about what a
+second lane would cost: ADR-0205's Outcome reconsiders lane b and `max_open_worktrees` together, and
+lane b doubles contention on exactly this lock.
+
+- **Raised:** 2026-09-15, by the operator after the Plan 0188 Phase 5 pilot. **Owner if taken:**
+  `architect` (a skip rule is an argument about what a gate is evidence of), then `dev`.
+- **Verified 2026-09-15** — the gate runs the whole workspace suite:
+  `present: cargo nextest in: tools/conductor/lib/gate.mjs`
+- **Verified 2026-09-15** — and runs again on the tree the close produced:
+  `present: runGate\("post-close"\) in: tools/conductor/lib/merge.mjs`
+
+### Priority
+
+**Medium.** Nothing is wrong and nothing is blocked; a third of the run re-proves a green tree. It
+matters when a run is being waited on, and it is the first number lane b's design needs.
+
+## 0224 — a CLI update refuses the whole conductor, and the only way through is a probe run and a hand edit to a source constant
+
+`conductor.mjs` `VERIFIED_CLI` lists the `claude --version` values `spike/README.md`'s evidence table
+was produced on, and `preflight` refuses anything else. On 2026-09-15 the installed CLI had moved
+`2.1.270` to `2.1.272` on its own, and `run --lane a` stopped before opening a lane:
+
+    claude 2.1.272 is not a verified CLI version (verified: 2.1.270); re-run
+    tools/conductor/spike/probe.mjs and record the evidence before adding it
+
+The guard is right and should stay — the conductor is built on observed headless behaviour, and a
+silent CLI change is exactly what would invalidate it. The friction is the clearing procedure: run
+the probe (two haiku sessions, $0.15, about 3 min), read its JSON against a prose table by eye, edit
+a constant, commit. No lane can do it, it blocks every queued plan until a human does, and an
+auto-updating CLI means it recurs on no schedule anyone controls.
+
+Two things made it sharper than it needed to be:
+
+- **The probe reports raw JSON and the table is prose**, so the comparison is a human reading twelve
+  rows. `probe.mjs --analyze <dir>` re-reads a run without spending, but it prints, it does not
+  compare. A `--compare` against a recorded baseline would make the mechanical half mechanical and
+  leave the judgement where it belongs.
+- **The version-refusal test pinned the verified list** in its expected message, so the suite went
+  red on exactly the legitimate bump the guard exists to permit. Fixed in `3381990`; the shape is
+  worth remembering, because a test asserting a constant's value fails on every intended change to it.
+
+Not in scope here: whether the guard should warn and continue on a patch-level move rather than
+refuse. That is ADR-0205's call and it is a real tradeoff, since a patch release is exactly where a
+silent stream-format change arrives — one did, see entry 0222.
+
+- **Raised:** 2026-09-15, by the operator during Plan 0188 Phase 5, after it blocked that run.
+  **Owner if taken:** `architect` for the refuse-vs-warn question, then `dev` for `--compare`.
+- **Verified 2026-09-15** — the guard is a hand-maintained constant in source:
+  `present: VERIFIED_CLI = \[ in: tools/conductor/conductor.mjs`
+
+### Priority
+
+**Low.** One interruption per CLI update and nothing else, and the guard earns that. Revisit if
+updates land often enough that the interruption stops being rare.
+
+## 0225 — a review finding under `.claude/` was left open for a restriction that is written nowhere, and may not exist
+
+Plan 0182's round-1 review recorded a minor at
+`.claude/skills/preset-author/references/render-loop.md:170` — the report sample no longer matches
+the columns the plan shipped — and left it open with the reason *"open because this session may not
+edit .claude/"*.
+
+Checked against the tree the same day: `tools/conductor/settings.conductor.json` allows `Edit` and
+`Write` with no path restriction and denies nothing under `.claude/`, and `.claude/skills/dev/SKILL.md`
+states no prohibition on editing it. No permission rule and no skill rule stopped that edit.
+
+The likely real constraint is ownership rather than capability — a `dev`-lane close editing another
+lane's skill material — which is a defensible judgement and a different thing from "may not". Either
+way the effect is a finding no lane will fix, recorded in a form that reads as a hard limit, on a
+document that is now wrong about the tool it describes. The class matters more than the instance:
+`.claude/skills/` carries the working instructions of all four lanes, every lane can read it, and
+which lane may correct another's reference material is not written down.
+
+Shapes: say in the skills who owns `.claude/skills/<lane>/` and who may correct it; or let a close
+repair a reference document it falsified and say so; or confirm the prohibition and give the reviewer
+a route that is not "leave it open" — a `preset-author` follow-up, or a backlog entry raised by the
+close itself.
+
+- **Raised:** 2026-09-15, by the operator after the Plan 0188 Phase 5 pilot. **Owner if taken:**
+  `architect`. The stale line in `render-loop.md` is still there and this entry does not fix it.
+- **Verified 2026-09-15** — the conductor's permission set says nothing about `.claude/`:
+  `absent: \.claude in: tools/conductor/settings.conductor.json`
+
+### Priority
+
+**Low.** One stale sample line today. What is worth keeping is the unwritten ownership rule behind
+it, which will produce the same open finding again.
