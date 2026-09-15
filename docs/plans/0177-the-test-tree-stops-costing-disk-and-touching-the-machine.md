@@ -382,7 +382,7 @@ flowchart LR
 | 6 — The incremental cache has a documented bound | dev | done | 227bb8d |
 | 7 — A scoped `cargo doc` earns a hook step, or is rejected | dev | done | 7b4a66c |
 | 8 — The cheap tests share one binary per package | dev | done | 9b04453 |
-| 9 — The studio tests ask cargo where the player is | studio-builder | done | committed with this row |
+| 9 — The studio tests ask cargo where the player is | studio-builder | done | 4656040 |
 
 ### Notes
 
@@ -510,36 +510,38 @@ flowchart LR
 - **Followup noticed, not acted on:** `docs/testing.md`'s caveat says `preset`'s zero-allocation
   assertion counts through a process-global hook and needs nextest; the counter in `preset.rs` is
   per-thread and says it holds under both runners.
-- **Phase 9, deviation: the helper is `studio/electron/testing/player.ts`, not under `shared/`.**
-  `tsconfig.renderer.json` type-checks every file in `shared/` without Node's types. It exports
-  `builtPlayer()`, answering a path or a `missing` reason; the cargo call carries
-  `RUSTUP_AUTO_INSTALL=0`, which the plan does not state, and any failed `cargo metadata` reads as a
-  `missing` reason rather than a throw.
-- **Phase 9, additions the plan does not state.** The lint rule also rejects the member-call shape
-  (`path.join(.., 'target')`). `templates.test.ts` removes its `mkdtempSync` directory through
-  `onTestFinished`, so a skip removes it too. The `core/tests/preset_schema.rs` comments in
-  `fields.test.ts` and `grammar.test.ts` now name `core/tests/suite/`.
-- **Phase 9, lint seed.** A file holding `join(ROOT, 'target', 'debug', name)`,
-  `path.join(ROOT, 'target')` and `join(ROOT, 'docs', 'specs')` failed `npm run lint` with two
-  `no-restricted-syntax` errors, lines 6 and 7; the file was removed and lint exits 0 on the tree.
-- **Phase 9, normal checkout.** `fields` and `grammar` report their source as this lane's
-  `target\debug\ritmolux.exe`; `templates` and `windowless` spawned it (5.0 s, 9.2 s), no skip notice.
-- **Phase 9, done-when met differently: the four test files were not re-run under
-  `CARGO_TARGET_DIR`.** This session could not set an environment variable on a command. Instead a
-  scratch vitest file (removed, not committed) set it in-process to a temp directory holding a copy of
-  the debug player and re-imported the helper: it answered the copy's path, whose `--schema` parsed
-  (14 systems); an empty redirect answered `no built ritmolux in <dir>`; an empty `PATH` answered
-  `cargo is not on PATH, ...`.
-- **Phase 9, gate.** `npm run typecheck` and `npm run lint` exit 0; `npm test` 29 files, 264 passed.
+- **Phase 9, deviation: the helper is `studio/electron/testing/player.ts`**, because
+  `tsconfig.renderer.json` checks `shared/` without Node's types. Unstated in the plan: its cargo call
+  sets `RUSTUP_AUTO_INSTALL=0` and a failed `cargo metadata` is a skip reason, not a throw; the lint
+  rule also rejects `path.join(.., 'target')`; `templates.test.ts` removes its temp directory through
+  `onTestFinished`; `fields`/`grammar` comments now cite `core/tests/suite/preset_schema.rs`.
+- **Phase 9, checks.** A seeded `join(ROOT, 'target', 'debug', name)` and `path.join(ROOT, 'target')`
+  failed lint (two `no-restricted-syntax` errors; `join(ROOT, 'docs', 'specs')` beside them did not).
+  On the lane, `fields`/`grammar` read `target\debug\ritmolux.exe` and `templates`/`windowless`
+  spawned it, no skip. Gate: typecheck and lint exit 0, vitest 29 files, 264 passed.
+- **Phase 9, done-when met differently: the four files were not re-run under `CARGO_TARGET_DIR`**
+  (this session could not set a variable on a command). A removed scratch vitest file set it
+  in-process to a temp copy of the debug player: the helper answered the copy, whose `--schema` parsed;
+  an empty redirect and an empty `PATH` each answered a skip reason.
 
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`**
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** `presets/README.md`, `presets/pending/README.md`,
+  `presets/proposed/README.md` (test-path citations); no `.toml`.
+- **Plan header `Closes:`** design-backlog 0181, 0161, 0213, 0179, 0183, 0184, 0182.
+- **What shipped:** in `core/src`, `standalone/src`, `core-cabi`, `milkconv` and `packaging/`, only
+  comments and two emitted strings changed, each a test path gaining `suite/`: the `.taplo.toml`
+  header `export.rs` generates, and the saturation note in `standalone/src/shot/report.rs`. The rest
+  is tests, `scripts/prune-target.mjs`, the `.githooks/pre-push` rustdoc step, a `ci.yml` comment,
+  docs and the studio's test helper and lint rule.
+- **Operator docs touched:** `docs/capturing.md`, `docs/configuration.md`, `docs/developing.md`,
+  `docs/testing.md`, `docs/presets.md`, `docs/preset-palettes.md`, `docs/preset-tuning-walkthrough.md`,
+  `docs/specs/0002-ring-determinism.md`, `docs/specs/README.md`, `docs/plans/README.md`, `CLAUDE.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, 47 reductions across 23 live
+  entries, 2 unprobeable; advisories name 0219 and 0220 among 30 moved probe paths.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). Earlier runs: Phase 1
+  `cargo nextest run -p standalone`, 411 passed; Phase 8 `cargo nextest run --workspace -P fast`,
+  1647 passed, 304 skipped.
+- **Outstanding `human` phases:** none.
 
 ## Followups (after this lands)
