@@ -261,7 +261,7 @@ flowchart TB
 |---|---|---|---|
 | 1 — The shared-scene veto is pinned, and the test hatch honours it | dev | done | 00c9587 |
 | 2 — Every scene advances on the values its frame bound | dev | done | b4d2c15 |
-| 3 — The prose follows the order | dev | done | committed with this row |
+| 3 — The prose follows the order | dev | done | 5b93cd6 |
 
 ### Notes
 
@@ -281,12 +281,12 @@ flowchart TB
 
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`**
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** no
+- **Plan header `Closes:`** design-backlog 0191; design-backlog 0142 (falsified)
+- **What shipped:** fix (render evaluation order), plus tests and comments
+- **Operator docs touched:** none
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 - 135 reductions hold across 58 live entries, 12 unprobeable; 0191 and 0142 left in place
+- **Full suite:** `cargo nextest run --workspace --no-fail-fast` (under the suite lock) at 5b93cd6's tree - exit 0, 1936 passed, 6 skipped
+- **Outstanding `human` phases:** none
 
 ## Followups (after this lands)
