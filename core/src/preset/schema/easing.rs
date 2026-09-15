@@ -54,9 +54,16 @@ impl Easing {
     /// while the input is still rising. That is the envelope-follower convention,
     /// and it is what keeps the behavior stable under a noisy input.
     ///
-    /// A selected constant of `<= 0` (the default) or non-finite, or a
-    /// non-positive `dt`, passes `raw` through unchanged. Total and
-    /// allocation-free — it runs per element per frame.
+    /// **`dt` is finite and positive**, as `Scene::advance` states it: the
+    /// renderer's `sanitize_frame_dt` is the only answer to a degenerate frame
+    /// delta (ADR-0191), and nothing here second-guesses it. Outside that
+    /// precondition the arithmetic answers: `dt = 0` gives `alpha = 0`, which
+    /// holds `held`, and a non-finite `dt` poisons one frame that the
+    /// non-finite-`held` guard below turns back into `raw` on the next.
+    ///
+    /// A selected constant of `<= 0` (the default) or non-finite passes `raw`
+    /// through unchanged. Total and allocation-free — it runs per element per
+    /// frame.
     ///
     /// **A non-finite `held` or `raw` also passes `raw` through** — a snap,
     /// which is what a smoother with no valid state should do (Plan 0038
@@ -101,7 +108,7 @@ impl Easing {
         } else {
             self.release
         };
-        if tau <= 0.0 || !tau.is_finite() || dt <= 0.0 {
+        if tau <= 0.0 || !tau.is_finite() {
             return raw;
         }
         // alpha = 1 - exp(-dt/tau): the fraction of the gap closed this frame,

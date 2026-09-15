@@ -320,7 +320,7 @@ flowchart LR
 |---|---|---|---|
 | 1 — The ease snaps at its fixed point | dev | done | 26ce31f |
 | 2 — The reader and the five presets say what is true | dev | done | bfd2d55 |
-| 3 — Nothing below the seam keeps a frame-delta policy | dev | parked, nothing committed | |
+| 3 — Nothing below the seam keeps a frame-delta policy | dev | done | committed with this row |
 
 ### Notes
 
@@ -333,21 +333,21 @@ flowchart LR
   golden moved.
 - Phase 2: `golden`, `sanity`, `preset` and `preset_schema` passed (236 passed, 2 skipped) with no
   re-bless.
-- **Phase 3 parked (plan_wrong).** The ruling on `shader.rs` covers `dt = 0` only. The `.max(1e-6)`
-  floor also turns a NaN `dt` into a finite decay, and
-  `render::scenes::warp_mesh::shader::tests::the_pure_half_is_total_on_degenerate_input` sweeps
-  `("a NaN dt", ...)` and asserts every uniform lane is finite. With the three deletions applied it
-  failed: `a NaN dt: lane 28 came back NaN`. The fix needs an edit to
-  `core/src/render/scenes/warp_mesh/shader_tests.rs`, which is outside the phase's files, and it
-  drops a totality claim that test makes. That is architect's call. The Phase 3 edits were reverted
-  and nothing from Phase 3 is committed.
-- Phase 3, for the resume: with the widened predicate in place and before the deletions, the hygiene
-  test failed listing exactly `preset/schema/easing.rs: if tau <= 0.0 || !tau.is_finite() || dt <= 0.0 {`,
-  `render/evaluate.rs: state.hold_left = (state.hold_left - dt.max(0.0)).max(0.0);`,
-  `render/scenes/warp_mesh/shader.rs: decay_per_second.max(0.0).powf(dt.max(1e-6)),` beside the
-  allowed `render/mod.rs` guard. After the deletions it passed. The existing `Easing`, `ParamSmoother`
-  and latch tests stayed green. `core/src/render/roster.rs` (`ParamSmoother::smooth`'s doc) also
-  carries the "non-positive `dt` passes `raw` through" sentence the phase asks to replace.
+- Phase 3 first parked `plan_wrong` (dbfb3a2): with the `shader.rs` floor deleted,
+  `the_pure_half_is_total_on_degenerate_input` failed on `a NaN dt: lane 28 came back NaN`. It
+  resumed on the 2026-09-15 amendment (ddac772).
+- Phase 3, the predicate biting: with the widened predicate and before the deletions, the hygiene
+  test failed `left: 4, right: 1`, listing `core/src/preset/schema/easing.rs: if tau <= 0.0 || !tau.is_finite() || dt <= 0.0 {`,
+  `core/src/render/evaluate.rs: state.hold_left = (state.hold_left - dt.max(0.0)).max(0.0);`,
+  `core/src/render/mod.rs: if dt.is_finite() && dt > 0.0 {` and
+  `core/src/render/scenes/warp_mesh/shader.rs: decay_per_second.max(0.0).powf(dt.max(1e-6)),`.
+  After the deletions it passed with `DT_GUARD_ALLOWED` unchanged.
+- Phase 3: the predicate matches `dt <op> 0` in that operand order only (any right operand whose
+  text starts with `0`, so `dt > 0.5` counts too); `0.0 < dt` is named under the test's
+  "What it cannot see". `fill_uniform`'s doc in `shader.rs` gained a sentence stating `dt`'s
+  precondition, which the phase did not ask for.
+- Phase 3: `cargo nextest run --workspace -P fast` under the suite lock, 1649 passed, 304 skipped.
+  The full run, which carries the golden check, is the conductor's pre-review gate.
 
 ### Close triggers
 

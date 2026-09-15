@@ -957,3 +957,12 @@ fn a_zero_alpha_ease_holds_instead_of_snapping() {
         );
     }
 }
+
+/// **A zero step holds.** `dt` is finite and positive by precondition, and
+/// outside it the arithmetic answers: `dt = 0` gives `alpha = 0`, which the
+/// snap's guard holds rather than snapping to `raw`.
+#[test]
+fn a_zero_step_holds() {
+    let next = Easing::symmetric(0.1).step(1.0, 2.0, 0.0);
+    assert_eq!(next.to_bits(), 1.0_f32.to_bits(), "moved to {next}");
+}

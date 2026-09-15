@@ -12,7 +12,7 @@
 //! (e) The component size cap in `packaging/foobar/build-component.ps1` is the
 //!     one `docs/nfr.md` §4 states (ADR-0159). Two copies of a number is the
 //!     shape this repository keeps finding rot in.
-//! (f) A frame delta is checked for finiteness in exactly one place in
+//! (f) A frame delta is checked for finiteness or sign in exactly one place in
 //!     `core/src/`, `sanitize_frame_dt` (ADR-0191).
 //! (g) Every integration test exempted from `clippy::disallowed_methods` is
 //!     scheduled alone by `.config/nextest.toml`, or listed with a reason, and
@@ -831,11 +831,11 @@ fn the_component_size_cap_agrees_between_the_recipe_and_the_nfr() {
 // (f) One stall policy (ADR-0191)
 // ---------------------------------------------------------------------------
 
-/// The one finiteness guard on a frame delta the engine keeps: the line in
+/// The one guard on a frame delta the engine keeps: the line in
 /// `sanitize_frame_dt`, as `(path under core/src/, trimmed source line)`.
 const DT_GUARD: (&str, &str) = ("render/mod.rs", "if dt.is_finite() && dt > 0.0 {");
 
-/// Finiteness checks on a variable named `dt` that are **not** a frame delta
+/// Finiteness or sign checks on a variable named `dt` that are **not** a frame delta
 /// being guarded, each with the reason it is not. An entry is
 /// `(path under core/src/, trimmed source line, reason)`. Every entry must still
 /// match a line in the tree, so a stale one fails rather than silently widening
@@ -851,22 +851,27 @@ const DT_GUARD_ALLOWED: &[(&str, &str, &str)] = &[(
 /// **A frame delta is checked in exactly one place** (ADR-0191).
 ///
 /// Every `Renderer` entry that takes a caller's delta runs it through
-/// `sanitize_frame_dt`, which substitutes one nominal step. A second guard below
-/// that — keep the previous value, hold, freeze, run nothing — is unreachable on
-/// the frame path and is also a second answer to the same question, which the
-/// next reader cannot tell is deliberate. The population was enumerated by hand
-/// three times and was short each time; this counts it instead.
+/// `sanitize_frame_dt`, which substitutes one nominal step, so what reaches the
+/// frame path is finite and positive. A second guard below that — keep the
+/// previous value, hold, freeze, pass through, floor, run nothing — is
+/// unreachable on the frame path and is also a second answer to the same
+/// question, which the next reader cannot tell is deliberate. The population was
+/// enumerated by hand three times and was short each time; this counts it
+/// instead.
 ///
-/// It matches `dt.is_finite()` or `is_finite(dt)` on a variable or field named
-/// exactly `dt`, which covers either operand order and a negated check, across
-/// every non-test `.rs` under `core/src/`. Line comments are stripped first, so
-/// prose describing the guard does not count.
+/// It matches, on a variable or field named exactly `dt`, a finiteness check
+/// (`dt.is_finite()` or `is_finite(dt)`, which covers a negated check) and a sign
+/// or size check (`dt` compared against `0` with `<`, `<=`, `>` or `>=`, or
+/// `dt.max(`, `dt.min(`, `dt.clamp(`), across every non-test `.rs` under
+/// `core/src/`. Line comments are stripped first, so prose describing the guard
+/// does not count.
 ///
 /// # What it cannot see
 ///
-/// A guard spelled another way (`dt.is_nan()`, a check on a renamed local) and,
-/// above all, an entry point that forgets to call `sanitize_frame_dt`. The
-/// function's doc and the `Renderer` doc are what stand there.
+/// A guard spelled another way (`dt.is_nan()`, `0.0 < dt`, a check on a renamed
+/// local) and, above all, an entry point that forgets to call
+/// `sanitize_frame_dt`. The function's doc and the `Renderer` doc are what stand
+/// there.
 #[test]
 fn a_frame_delta_is_checked_for_finiteness_in_exactly_one_place() {
     let src = core_src();
@@ -920,11 +925,11 @@ fn a_frame_delta_is_checked_for_finiteness_in_exactly_one_place() {
     assert_eq!(
         guards.len(),
         1,
-        "a frame delta is checked for finiteness in more than one place, and only \
+        "a frame delta is checked for finiteness or sign in more than one place, and only \
          `sanitize_frame_dt` may:\n  {}\n\
-         Every renderer entry already replaces a degenerate delta with one nominal step \
-         (ADR-0191), so a guard below it is a second policy. Delete it; if this `dt` is \
-         not a frame delta, add it to DT_GUARD_ALLOWED with the reason.",
+         Every renderer entry already replaces a non-finite or non-positive delta with one \
+         nominal step (ADR-0191), so a guard below it is a second policy. Delete it; if this \
+         `dt` is not a frame delta, add it to DT_GUARD_ALLOWED with the reason.",
         guards
             .iter()
             .map(|(p, l)| format!("core/src/{p}: {l}"))
@@ -933,7 +938,9 @@ fn a_frame_delta_is_checked_for_finiteness_in_exactly_one_place() {
     );
 }
 
-/// Whether `line` checks the finiteness of something named exactly `dt`.
+/// Whether `line` checks the finiteness, sign or size of something named
+/// exactly `dt`: `dt.is_finite()`, `is_finite(dt)`, `dt` compared against `0`
+/// with `<`, `<=`, `>` or `>=`, or `dt.max(`, `dt.min(`, `dt.clamp(`.
 fn checks_dt_finiteness(line: &str) -> bool {
     let is_ident = |c: char| c.is_alphanumeric() || c == '_';
     let method = "dt.is_finite()";
@@ -945,7 +952,40 @@ fn checks_dt_finiteness(line: &str) -> bool {
         }
         from = at + method.len();
     }
-    line.contains("is_finite(dt)")
+    if line.contains("is_finite(dt)") {
+        return true;
+    }
+
+    // Every standalone `dt`, neither the tail nor the head of a longer
+    // identifier, so `frame_dt` and `dt_seconds` stay out. A field (`self.dt`)
+    // counts: `.` is not an identifier character.
+    let mut from = 0;
+    while let Some(rel) = line[from..].find("dt") {
+        let at = from + rel;
+        from = at + 2;
+        let rest = &line[at + 2..];
+        if line[..at].chars().next_back().is_some_and(is_ident)
+            || rest.chars().next().is_some_and(is_ident)
+        {
+            continue;
+        }
+        if [".max(", ".min(", ".clamp("]
+            .iter()
+            .any(|m| rest.starts_with(m))
+        {
+            return true;
+        }
+        let rest = rest.trim_start();
+        let operand = ["<=", ">=", "<", ">"]
+            .iter()
+            .find_map(|op| rest.strip_prefix(op));
+        if operand
+            .is_some_and(|o| !o.starts_with(['<', '>', '=']) && o.trim_start().starts_with('0'))
+        {
+            return true;
+        }
+    }
+    false
 }
 
 // ---------------------------------------------------------------------------
