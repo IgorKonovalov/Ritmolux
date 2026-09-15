@@ -16,25 +16,13 @@
  */
 import { spawn } from 'node:child_process'
 import { execFileSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
 import { frameBytes, playerEventSchema, type HealthEvent, type StreamEvent } from '@shared/protocol'
 
+import { builtPlayer } from '../testing/player'
 import { playerArgs } from './supervisor'
-
-const ROOT = join(__dirname, '..', '..', '..')
-
-function builtPlayer(): string | undefined {
-  const name = process.platform === 'win32' ? 'ritmolux.exe' : 'ritmolux'
-  for (const profile of ['release', 'debug']) {
-    const candidate = join(ROOT, 'target', profile, name)
-    if (existsSync(candidate)) return candidate
-  }
-  return undefined
-}
 
 /**
  * The window handle the OS has for `pid`, or `undefined` where the question
@@ -119,11 +107,11 @@ async function windowlessRun(player: string): Promise<Run> {
 describe('a windowless player', () => {
   it('opens no window and still fills the pipe', async () => {
     const player = builtPlayer()
-    if (player === undefined) {
-      console.warn('skipped: no built ritmolux in target/')
+    if (player.path === undefined) {
+      console.warn(`skipped: ${player.missing}`)
       return
     }
-    const run = await windowlessRun(player)
+    const run = await windowlessRun(player.path)
     if (
       run.stderr.includes('no audio capture device is available') ||
       (run.stderr.includes('--stream: ') && run.stderr.includes('adapter'))

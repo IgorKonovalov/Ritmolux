@@ -381,8 +381,8 @@ flowchart LR
 | 5 — `prune-target.mjs` deletes what cargo no longer reports | dev | done | d9aee86 |
 | 6 — The incremental cache has a documented bound | dev | done | 227bb8d |
 | 7 — A scoped `cargo doc` earns a hook step, or is rejected | dev | done | 7b4a66c |
-| 8 — The cheap tests share one binary per package | dev | done | committed with this row |
-| 9 — The studio tests ask cargo where the player is | studio-builder | not started | |
+| 8 — The cheap tests share one binary per package | dev | done | 9b04453 |
+| 9 — The studio tests ask cargo where the player is | studio-builder | done | committed with this row |
 
 ### Notes
 
@@ -510,6 +510,27 @@ flowchart LR
 - **Followup noticed, not acted on:** `docs/testing.md`'s caveat says `preset`'s zero-allocation
   assertion counts through a process-global hook and needs nextest; the counter in `preset.rs` is
   per-thread and says it holds under both runners.
+- **Phase 9, deviation: the helper is `studio/electron/testing/player.ts`, not under `shared/`.**
+  `tsconfig.renderer.json` type-checks every file in `shared/` without Node's types. It exports
+  `builtPlayer()`, answering a path or a `missing` reason; the cargo call carries
+  `RUSTUP_AUTO_INSTALL=0`, which the plan does not state, and any failed `cargo metadata` reads as a
+  `missing` reason rather than a throw.
+- **Phase 9, additions the plan does not state.** The lint rule also rejects the member-call shape
+  (`path.join(.., 'target')`). `templates.test.ts` removes its `mkdtempSync` directory through
+  `onTestFinished`, so a skip removes it too. The `core/tests/preset_schema.rs` comments in
+  `fields.test.ts` and `grammar.test.ts` now name `core/tests/suite/`.
+- **Phase 9, lint seed.** A file holding `join(ROOT, 'target', 'debug', name)`,
+  `path.join(ROOT, 'target')` and `join(ROOT, 'docs', 'specs')` failed `npm run lint` with two
+  `no-restricted-syntax` errors, lines 6 and 7; the file was removed and lint exits 0 on the tree.
+- **Phase 9, normal checkout.** `fields` and `grammar` report their source as this lane's
+  `target\debug\ritmolux.exe`; `templates` and `windowless` spawned it (5.0 s, 9.2 s), no skip notice.
+- **Phase 9, done-when met differently: the four test files were not re-run under
+  `CARGO_TARGET_DIR`.** This session could not set an environment variable on a command. Instead a
+  scratch vitest file (removed, not committed) set it in-process to a temp directory holding a copy of
+  the debug player and re-imported the helper: it answered the copy's path, whose `--schema` parsed
+  (14 systems); an empty redirect answered `no built ritmolux in <dir>`; an empty `PATH` answered
+  `cargo is not on PATH, ...`.
+- **Phase 9, gate.** `npm run typecheck` and `npm run lint` exit 0; `npm test` 29 files, 264 passed.
 
 ### Close triggers
 

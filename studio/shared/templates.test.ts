@@ -15,32 +15,23 @@
  * built one.
  */
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, onTestFinished } from 'vitest'
 
 import { parseSchemaDocument } from '../electron/player/schema'
+import { builtPlayer } from '../electron/testing/player'
 import type { SchemaDocument } from './schema'
 import { canTemplate, fileNameFor, presetPath, structuralTables, templateFor } from './templates'
 
-const ROOT = join(__dirname, '..', '..')
-
-/** The built player, in either profile, or `undefined` on a fresh clone. */
-function builtPlayer(): string | undefined {
-  const name = process.platform === 'win32' ? 'ritmolux.exe' : 'ritmolux'
-  for (const profile of ['release', 'debug']) {
-    const candidate = join(ROOT, 'target', profile, name)
-    if (existsSync(candidate)) return candidate
-  }
-  return undefined
-}
+const player = builtPlayer()
 
 /** The schema the built player prints, or `undefined` when there is none. */
 function liveSchema(): SchemaDocument | undefined {
-  const player = builtPlayer()
-  if (player === undefined) return undefined
-  return parseSchemaDocument(execFileSync(player, ['--schema'], { encoding: 'utf8' }))
+  if (player.path === undefined) return undefined
+  return parseSchemaDocument(execFileSync(player.path, ['--schema'], { encoding: 'utf8' }))
 }
 
 const schema = liveSchema()
@@ -48,7 +39,7 @@ const schema = liveSchema()
 describe('a template', () => {
   it('needs a built player to be judged against, and says so when there is none', () => {
     if (schema === undefined) {
-      console.warn('skipped: no built ritmolux in target/, so no schema to template from')
+      console.warn(`skipped: ${player.missing}, so no schema to template from`)
     }
     expect(true).toBe(true)
   })
@@ -98,14 +89,14 @@ describe('a template', () => {
  */
 describe('every template, through the player', () => {
   it('loads with no error and no warning', () => {
-    const player = builtPlayer()
-    if (player === undefined || schema === undefined) {
-      console.warn('skipped: no built ritmolux in target/')
+    if (player.path === undefined || schema === undefined) {
+      console.warn(`skipped: ${player.missing}`)
       return
     }
-    const dir = join(ROOT, 'target', 'tests', 'studio-templates')
-    rmSync(dir, { recursive: true, force: true })
-    mkdirSync(dir, { recursive: true })
+    const dir = mkdtempSync(join(tmpdir(), 'rlx-studio-templates-'))
+    // Registered before the first early return, so a skip or a failed
+    // assertion removes the directory too.
+    onTestFinished(() => rmSync(dir, { recursive: true, force: true }))
 
     const expected: string[] = []
     for (const roster of schema.systems) {
@@ -121,7 +112,7 @@ describe('every template, through the player', () => {
     // `spawnSync` rather than `execFileSync`: the events are on standard
     // error, and the sync exec helpers hand back standard output.
     const run = spawnSync(
-      player,
+      player.path,
       ['--stream', '--sink', 'stdout', '--events', '--frames', '1', '--size', '160x90'],
       {
         // The per-user roots are cleared so the child cannot reach the
@@ -151,7 +142,5 @@ describe('every template, through the player', () => {
     const roster = lines.find((line) => line.includes('"ev":"roster"'))
     expect(roster, `the run reported no roster:\n${stderr}`).toBeDefined()
     for (const name of expected) expect(roster).toContain(name)
-
-    rmSync(dir, { recursive: true, force: true })
   }, 300_000)
 })
