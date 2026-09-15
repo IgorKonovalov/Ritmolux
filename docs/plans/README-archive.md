@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0175 - An eased value arrives at its target](#0175---an-eased-value-arrives-at-its-target)
   - [0188 - The conductor survives its first run](#0188---the-conductor-survives-its-first-run)
   - [0182 - The report hears a counter](#0182---the-report-hears-a-counter)
   - [0181 - A scene advances after its frame's bindings](#0181---a-scene-advances-after-its-frames-bindings)
@@ -187,6 +188,7 @@ hand-edited.
   - [0002 — Rust enforcement tooling](#0002--rust-enforcement-tooling)
   - [0001 — Core + standalone MVP, then foobar parity](#0001--core--standalone-mvp-then-foobar-parity)
 - [Prior sequencing notes (superseded)](#prior-sequencing-notes-superseded)
+  - [Moved 2026-09-15 from `README.md` — the engine-lane opening that resumed 0175 first, spent](#moved-2026-09-15-from-readmemd--the-engine-lane-opening-that-resumed-0175-first-spent)
   - [Moved 2026-09-15 from `README.md` — the opening of the engine-lane bullet, spent](#moved-2026-09-15-from-readmemd--the-opening-of-the-engine-lane-bullet-spent)
   - [Moved 2026-09-14 from `README.md` — the two-lane note for 0170-0173, spent](#moved-2026-09-14-from-readmemd--the-two-lane-note-for-0170-0173-spent)
   - [Moved 2026-09-11 from `README.md` — the note that 0167 does not close, spent](#moved-2026-09-11-from-readmemd--the-note-that-0167-does-not-close-spent)
@@ -214,6 +216,28 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0175 - An eased value arrives at its target](done/0175-an-eased-value-arrives.md)
+
+- closed 2026-09-15 by a conductor-run review (ADR-0205), round 1. Three `dev` phases on the lane
+`plan-0175-an-eased-value-arrives`: `26ce31f` (1, `Easing::step` returns `raw` on the first frame a
+step makes no progress while `alpha > 0`, pinned by bit-exact arrival at tau 0.1 s / 60 Hz and tau
+2 s / 144 Hz, a zero-`alpha` hold, a near-unit-`alpha` containment test and an `lsystem` capture that
+draws generation 2 once settled), `bfd2d55` (2, `presets/README.md` and the five L-system comments
+give the real reason for `N.5`) and `b46e50f` (3, the three sign guards below `sanitize_frame_dt`
+deleted and the hygiene predicate widened to sign spellings). Phase 3 first parked `plan_wrong`
+(`dbfb3a2`): deleting the warp floor turned the totality test's NaN `dt` case red, and the amendment
+`ddac772` took both `dt` cases out of that sweep. Review: **no blockers, no majors, one minor, one
+nit.** Version: **0.124.2** (patch, a fix-only plan). No ADR paired. Backlog 0212 and 0218 archived
+as closed. The review's full suite was the `0175-pre-review` ledger record for tree `467b142`: 1947
+passed, 6 skipped. `cargo doc` with warnings denied, exit 0. No golden moved.
+
+**Fixed at the close, both prose:** `presets/README.md`'s new paragraph said a transient floored step
+draws generation 4 once the onset has gone, when it never draws; the hygiene predicate's doc said
+`dt` compared against `0` where it matches any `0`-led literal.
+
+**Preset curation:** only comment text moved, in five L-system presets, and their `N.5` offsets stay
+by the plan's ruling. No shipped preset names Plan 0175 or backlog 0212/0218.
 
 ### [0188 - The conductor survives its first run](done/0188-the-conductor-survives-its-first-run.md)
 
@@ -8591,16 +8615,25 @@ uncovered (its C side remains the Plan 0001 Phase-6 smoke program's job, per ADR
 
 ## Prior sequencing notes (superseded)
 
+### Moved 2026-09-15 from `README.md` — the engine-lane opening that resumed 0175 first, spent
+
+Spent when [Plan 0175](done/0175-an-eased-value-arrives.md) closed on 2026-09-15. The bullet's
+remainder (0180 before 0142, then the rest) stays live in `README.md`. Kept verbatim, except that
+`[0180]` is written inline, because this file already defines that label as ADR-0180:
+
+> - **Engine lane.** [0181] and [0185] closed 2026-09-15, both ahead of [0175], and neither moved a
+>   golden. [0175] and [0180](0180-the-converted-picture-follows-the-source.md) both parked `plan_wrong` on 2026-09-14 and were amended on their lane branches 2026-09-15; resuming them is next, 0175 first. 0175 touches `LatchBank::advance`, which 0181 left alone.
+
 ### Moved 2026-09-15 from `README.md` — the opening of the engine-lane bullet, spent
 
 Spent when [Plan 0181](done/0181-a-scene-advances-after-its-frames-bindings.md) closed on
-2026-09-15, run by the conductor ahead of [Plan 0175](0175-an-eased-value-arrives.md). The bullet's
+2026-09-15, run by the conductor ahead of [Plan 0175](done/0175-an-eased-value-arrives.md). The bullet's
 remainder (0180 before 0142, then the rest) stays live in `README.md`. Kept verbatim:
 
 > - **Engine lane.** [0175], then [0181]. [0185] closed 2026-09-15 ahead of it and moved no golden,
 >   so 0181's bless set stays the emitter and collage baselines.
 
-[0175]: 0175-an-eased-value-arrives.md
+[0175]: done/0175-an-eased-value-arrives.md
 [0181]: done/0181-a-scene-advances-after-its-frames-bindings.md
 [0185]: done/0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage.md
 

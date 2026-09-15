@@ -1,9 +1,11 @@
 # 0175 — An eased value arrives at its target
 
-> **Status:** in-progress
+> **Status:** done (2026-09-15) — phases `26ce31f`, `bfd2d55`, `b46e50f`; conductor-run Mode 4
+> review round 1, no blockers, no majors, one minor and one nit, both repaired at the close; full
+> suite green on the ledger, `cargo doc -D warnings` clean, no golden moved. Version 0.124.2.
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`
-> **Related ADRs:** [0019](../adrs/0019-eased-parameters.md), [0035](../adrs/0035-asymmetric-attack-release-easing.md)
+> **Related ADRs:** [0019](../../adrs/0019-eased-parameters.md), [0035](../../adrs/0035-asymmetric-attack-release-easing.md)
 > **Closes:** design-backlog 0218, design-backlog 0212
 
 > **Amended 2026-09-14** after a validity sweep. The changes:
@@ -361,5 +363,114 @@ flowchart LR
   entries, 2 unprobeable; neither 0212 nor 0218 is a live entry.
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
 - **Outstanding `human` phases:** none.
+
+## Close review
+
+Conductor-run Mode 4 review (ADR-0205), round 1, written by a fresh session given the plan and the
+lane. Earlier rounds: none, so no finding was resolved by a fix round.
+
+**Verdict: Plan 0175 landed as planned; no blockers, no majors, one minor and one nit, both prose a
+close may repair.**
+
+Reviewed at `0e3b4ae` (tree `467b142`) against base `fb2a9b3`. Phases: 1 `26ce31f`, 2 `bfd2d55`, 3
+`b46e50f` (after the `plan_wrong` park `dbfb3a2` and the amendment `ddac772`).
+
+### Evidence
+
+- **Full suite.** `node ...\with-lock.mjs suite -- cargo nextest run --workspace` printed
+  `with-lock: skipped cargo nextest run --workspace: tree 467b142 is green in the suite ledger, run by
+  gate 0175-pre-review at 2026-09-15T17:08:23.175Z: 1947 tests run: 1947 passed (5 slow), 6 skipped`.
+  `git rev-parse HEAD^{tree}` is `467b142`, so the record is for the reviewed tree. No golden was
+  re-blessed anywhere on the branch (no `core/tests/golden/` path in the diff).
+- **`RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`**: exit 0.
+- **Phase 3 grep** `\bdt\.(max|min|clamp)\(|\bdt\s*(<|<=|>|>=)\s*0` over `core/src`: exactly one line,
+  `core/src/render/mod.rs:189 if dt.is_finite() && dt > 0.0 {`.
+- **``non-positive `dt` `` over `core/src`**: nothing.
+- **Phase 2 grep** `never reaches\|never reach a whole` over `presets/lsystem_*.toml`: nothing.
+
+### Lens 1 — alignment
+
+Every phase carries a single in-vocabulary `**Owner skill:** dev`. The log is present, shorter than
+the phases section, and its phase-to-commit map matches `git log`.
+
+Tests read against the done-whens:
+
+- `core/src/preset/schema/tests.rs`: `frames_to_arrive` asserts every frame inside `[min, max]` of
+  the travel and monotone in the travel direction, and returns the frame the value became
+  bit-exactly the target. The fast ease (`symmetric(0.1)`, 60 Hz, 120 frames), the slow ease
+  (`symmetric(2.0)`, 144 Hz, 4000 frames) and the release side (both, `2.0 -> 1.0`) each assert
+  arrival. The near-unit-`alpha` test runs the three named pairs at `symmetric(0.001)`, `dt = 1/60`
+  and asserts containment; no clamp was needed, as the log says. `symmetric(1.0e9)` holds bit-exactly
+  `1.0` for 1000 frames. `symmetric(0.1).step(1.0, 2.0, 0.0)` holds bit-exactly `1.0`. All are
+  properties of IEEE f32 arithmetic with slack against the platform `exp` (89 -> 120, 3130 -> 4000),
+  not frozen measurements.
+- `core/src/render/scenes/lines/tests.rs::an_eased_visible_depth_draws_the_generation_it_settles_on`:
+  captures the eased preset and an unsmoothed twin on separate headless renderers, asserts the two
+  generations differ (non-vacuity), that the eased settled frame is not generation 1, and that it is
+  byte-identical to generation 2. Same run, same adapter, bit-exact `2.0` truncates to the same
+  count, so the equality is a property. 180 held frames at `FALLBACK_DT` against an arrival near 89.
+- `shader_tests.rs::the_pure_half_is_total_on_degenerate_input`: six cases, no `dt` case, loop
+  assertions unchanged, the comment names `sanitize_frame_dt` and ADR-0191.
+- `core/tests/hygiene.rs`: name kept, doc and failure message cover sign checks, `DT_GUARD` and
+  `DT_GUARD_ALLOWED` unchanged; the log records the pre-deletion failure naming the three sites plus
+  the seam's own line (`left: 4, right: 1`).
+
+Nothing was added without a note: `fill_uniform`'s extra precondition sentence is disclosed in the
+log.
+
+### Lens 2 — layering and real-time safety
+
+Core-only, no platform types, no ABI or protocol change. `Easing::step` stays allocation-free and
+panic-free; the snap is one comparison. The three deletions remove second policies below the
+seam ADR-0191 set, and `Scene::advance`'s doc already states the precondition the new docs cite.
+
+### Lens 3 — docs and bookkeeping
+
+`presets/README.md`'s `[smoothing]` section and the five L-system comments are swept. No other reader
+doc, skill reference or preset claims the ease never arrives (grep over `docs/*.md`, `.claude/**`,
+`presets/`). No `ParamSpec` doc moved, so neither the params reference nor the schemas regenerate.
+Owed at the close: status and move to `done/`, both plans indexes, the `CLOSED` markers and ledger
+rows for backlog 0212 and 0218, and a **patch** bump (fix-only).
+
+### Lens 4 — correctness and determinism
+
+The snap's termination and no-overshoot argument is sound under round-to-nearest, and the
+near-unit-`alpha` pairs probe the one place the exact-subtraction assumption can fail. Outside the
+precondition the arithmetic answers as the doc says: `dt = 0` holds, a NaN `dt` poisons one frame
+that the non-finite-`held` guard returns to `raw`. The warp decay at `dt > 0` is `0^dt = 0` for a zero
+rate, as before.
+
+### Lens 5 — design integrity
+
+No seam widened; no consumer changed; the fix sits in the one function every smoother calls, so all
+three truncating consumers are fixed without touching a scene.
+
+### Findings
+
+**minor**
+
+1. **`presets/README.md:3820`** — the new paragraph says
+   `visible_depth = "3 + floor(clamp(onset * 2, 0, 1))"` under a short constant "draws generation 4
+   only once the onset has long gone". On a transient the target is back at 3 before the ease
+   arrives, so generation 4 never draws at all; the sentence reads as a delayed draw. Why it matters:
+   this is the reference the content lane authors against, and the plan's point is that the step is
+   lost, not late. Fix: say generation 4 draws only if the onset is held until the ease arrives, and
+   on a transient it never draws. **Fixed at the close in `436e7b6`.**
+
+**nit**
+
+2. **`core/tests/hygiene.rs:864`** (and the predicate's own doc at `:943`) — the doc says the
+   predicate matches `dt` "compared against `0`", but it matches any right operand whose text starts
+   with `0`, so `dt > 0.5` counts too. The log discloses this; the comment does not. Fix: say
+   "compared against a literal starting with `0` (`0.0`, and `0.5` too)". **Fixed at the close in
+   `2740349`.**
+
+### Close notes
+
+- **Preset curation (3b):** the plan touched only comment text in five L-system presets; no content
+  landed and no value moved, so the set is unchanged. The plan fixed an engine defect the five
+  presets dodge, and their `N.5` offsets stay deliberately, per the plan's own ruling (still needed
+  for transient steps). No other preset header cites backlog 0218 or 0212.
+- **Version:** patch, 0.124.2.
 
 ## Followups (after this lands)
