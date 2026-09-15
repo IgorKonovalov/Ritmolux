@@ -158,7 +158,8 @@ an inbox entry, not a park: close the shell, then `git worktree remove`, `git wo
 - **The hooks.** `.claude/hooks/block-push-and-history-rewrite.js` denies `git push`,
   `reset --hard`, `rebase`, `commit --amend` and `filter-branch` in every session, human-started
   ones included. `.claude/hooks/conductor-suite-lock.js` denies any `nextest` or `cargo test` a
-  conductor session runs outside the lock.
+  conductor session runs outside the lock, except `cargo nextest list`, which runs no test and
+  takes no lock even when wrapped.
 - **The locks.** `with-lock.mjs` holds two machine-wide locks. The **suite** lock stops two lanes
   running the GPU suites at once. The **close** lock runs from before a review until `main` has
   fast-forwarded, so a version bump and its tag always land on the `main` they were computed against.

@@ -82,6 +82,9 @@ const SUITE_DENIED_UNDER_CONDUCTOR = [
   "cd core && cargo nextest run",
   "cargo llvm-cov nextest --workspace",
   "node tools/conductor/with-lock.mjs close -- cargo nextest run --workspace",
+  "cargo nextest run -p rlx-core",
+  "cargo nextest list --workspace && cargo nextest run",
+  "cargo nextest list -p rlx-core; cargo test -p rlx-core",
 ];
 
 const SUITE_ALLOWED_UNDER_CONDUCTOR = [
@@ -91,6 +94,9 @@ const SUITE_ALLOWED_UNDER_CONDUCTOR = [
   "cargo fmt --all --check",
   "echo cargo test",
   'git commit -m "test(core): cargo nextest run is green"',
+  "cargo nextest list -p rlx-core",
+  "cargo nextest list --workspace",
+  "node tools/conductor/with-lock.mjs suite -- cargo nextest list -p rlx-core",
 ];
 
 for (const command of SUITE_DENIED_UNDER_CONDUCTOR) {

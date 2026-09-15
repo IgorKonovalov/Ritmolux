@@ -10,18 +10,21 @@
 // The command is split into simple commands by the same reader block-push-and-history-rewrite.js
 // uses, so `echo cargo test` passes and `cd x && cargo nextest run` does not. The wrapper is
 // recognised by the script name and the lock name: a run under any other lock is still denied.
-// Wired up in .claude/settings.json under hooks.PreToolUse with matcher "Bash|PowerShell".
+// `cargo nextest list` runs no test, so it needs no lock and passes bare; the wrapper runs a wrapped
+// one without taking the lock. Wired up in .claude/settings.json under hooks.PreToolUse with
+// matcher "Bash|PowerShell".
 
 const { readFileSync } = require("fs");
 const { simpleCommands } = require("./block-push-and-history-rewrite.js");
 
 const SUITE = /^cargo(?:\.exe)?(?:\s+\+\S+)?(?:\s+llvm-cov)?\s+(nextest|test)\b/;
+const LIST = /^cargo(?:\.exe)?(?:\s+\+\S+)?\s+nextest\s+list\b/;
 const WRAPPER = /^node(?:\.exe)?\s+(?:"[^"]*with-lock\.mjs"|'[^']*with-lock\.mjs'|\S*with-lock\.mjs)\s+(\S+)\s+--\s+([\s\S]*)$/;
 
 function offending(seg) {
   const w = seg.match(WRAPPER);
-  if (w) return w[1] !== "suite" && SUITE.test(w[2].trim()) ? seg : null;
-  return SUITE.test(seg) ? seg : null;
+  if (w) return w[1] !== "suite" && SUITE.test(w[2].trim()) && !LIST.test(w[2].trim()) ? seg : null;
+  return SUITE.test(seg) && !LIST.test(seg) ? seg : null;
 }
 
 function decide(cmd, env) {

@@ -9,7 +9,7 @@ import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { acquire, holder, pidAlive } from "../with-lock.mjs";
+import { acquire, holder, isTestListing, pidAlive } from "../with-lock.mjs";
 
 const WITH_LOCK = resolve(dirname(fileURLToPath(import.meta.url)), "..", "with-lock.mjs");
 
@@ -85,6 +85,33 @@ test("a lock whose holder is alive is not taken over", async () => {
   await waiting;
   assert.ok(second.waitedMs >= 250);
   second.release();
+});
+
+test("only `cargo nextest list` is a listing", () => {
+  assert.equal(isTestListing("cargo", ["nextest", "list", "-p", "rlx-core"]), true);
+  assert.equal(isTestListing("cargo.exe", ["+nightly", "nextest", "list"]), true);
+  assert.equal(isTestListing("C:/Users/x/.cargo/bin/cargo.exe", ["nextest", "list", "--workspace"]), true);
+  assert.equal(isTestListing("cargo", ["nextest", "run", "-p", "rlx-core"]), false);
+  assert.equal(isTestListing("cargo", ["test", "list"]), false);
+  assert.equal(isTestListing("node", ["nextest", "list"]), false);
+});
+
+test("a wrapped list whose lock is held by another process starts at once, and logs no lock entry", async () => {
+  const dir = freshDir();
+  const logFile = join(dir, "locks.jsonl");
+  const held = await acquire("suite", { dir, pollMs: 25 });
+  try {
+    const t0 = Date.now();
+    // Whether or not nextest is installed here, the point is that the command ran without waiting.
+    const r = await run(["suite", "--", "cargo", "nextest", "list", "--help"], { RLX_LOCK_DIR: dir, RLX_LOCK_LOG: logFile, RLX_LOCK_POLL_MS: "25" });
+    assert.ok(Date.now() - t0 < 30_000, "did not wait for the held lock");
+    assert.doesNotMatch(r.stderr, /waiting for "suite"/);
+    assert.doesNotMatch(r.stderr, /with-lock: "suite" waited/);
+    assert.equal(existsSync(logFile), false, "no lock log entry");
+    assert.equal(holder("suite", dir).token, held.token, "the holder still holds it");
+  } finally {
+    held.release();
+  }
 });
 
 test("the wrapper exits with the command's exit code and logs the run", async () => {

@@ -410,8 +410,8 @@ illustrative: the run terminal
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The run can be watched | dev | done | `f7ee284` |
-| 2 — The digest reports what the operator spends, holds and still owes | dev | committed with this row | |
-| 3 — Listing tests takes no lock | dev | not started | |
+| 2 — The digest reports what the operator spends, holds and still owes | dev | done | `57942b5` |
+| 3 — Listing tests takes no lock | dev | committed with this row | |
 | 4 — A green suite is not run again on the same tree | dev | not started | |
 | 5 — The conductor-mode close orders its work so the gate runs once, and repairs prose findings | dev | not started | |
 | 6 — A patch CLI update warns, and every session proves its hooks ran | dev | not started | |
@@ -428,5 +428,7 @@ illustrative: the run terminal
 - Phase 2 also edits `tools/conductor/README.md` (`## What to read afterwards`, the digest bullets),
   which is not in its file list, so the operator guide describes the digest it now renders.
 - Phase 2 renders **Still parked from an earlier run** as a `####` heading under **Needs you**.
+- Phase 3 also edits one clause of `tools/conductor/README.md` (`## How it stays safe`), which is not
+  in its file list. The wrapper lets a listing through under any lock name, not only `suite`.
 
 ### Close triggers
