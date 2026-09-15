@@ -320,7 +320,7 @@ flowchart LR
 |---|---|---|---|
 | 1 — The ease snaps at its fixed point | dev | done | 26ce31f |
 | 2 — The reader and the five presets say what is true | dev | done | bfd2d55 |
-| 3 — Nothing below the seam keeps a frame-delta policy | dev | done | committed with this row |
+| 3 — Nothing below the seam keeps a frame-delta policy | dev | done | b46e50f |
 
 ### Notes
 
@@ -351,12 +351,15 @@ flowchart LR
 
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`**
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** yes, bfd2d55: comment text in `lsystem_bower`, `lsystem_coral`,
+  `lsystem_icecrystal`, `lsystem_rime`, `lsystem_vellum`, and one paragraph in `presets/README.md`.
+- **Plan header `Closes:`** design-backlog 0218 (Phases 1-2), design-backlog 0212 (Phase 3). Both
+  already sit in `docs/design-backlog-archive.md` marked **Promoted** to this plan.
+- **What shipped:** fix-only.
+- **Operator docs touched:** `presets/README.md` (`[smoothing]` section, hand-written part).
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, 47 reductions across 23 live
+  entries, 2 unprobeable; neither 0212 nor 0218 is a live entry.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
+- **Outstanding `human` phases:** none.
 
 ## Followups (after this lands)
