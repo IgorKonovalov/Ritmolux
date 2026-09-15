@@ -755,15 +755,31 @@ fn samples_array(json: &str) -> &str {
     &tail[..=end]
 }
 
+/// The `ground` a horizon report measured its rows against, verbatim: the
+/// `"ground":[r,g,b]` field.
+fn ground_of(json: &str) -> &str {
+    let start = json
+        .find("\"ground\":[")
+        .unwrap_or_else(|| panic!("no ground in:\n{json}"));
+    let tail = &json[start..];
+    let end = tail
+        .find(']')
+        .unwrap_or_else(|| panic!("unterminated ground in:\n{json}"));
+    &tail[..=end]
+}
+
 /// **Both determinism properties, on rendered pixels rather than on
 /// arithmetic** (Plan 0085 Phase 1's done-when).
 ///
 /// A drift verdict recorded in a world's header is worth nothing unless the same
 /// world at the same horizon produces the same rows — that is the first claim.
 /// The second is subtler and is what lets a ten-minute run be read against a
-/// two-minute one: the statistics at interval *k* must not depend on how far the
-/// run was asked to go. Both are asserted on the JSON text, so a difference in
-/// any digit of any row fails.
+/// two-minute one: the statistics at interval *k* do not depend on how far the
+/// run was asked to go, **while the two runs name the same ground**. The ground
+/// is pooled over every row of a run, so a longer run can move it and with it
+/// every row; the grounds are therefore compared first, so a ground change is
+/// reported as one rather than as a statistics change. Both are asserted on the
+/// JSON text, so a difference in any digit of any row fails.
 #[test]
 fn a_horizon_is_reproducible_and_does_not_depend_on_its_own_length() {
     let subject = fixture("horizon", "subject.toml", HORIZON_SUBJECT_SRC);
@@ -812,6 +828,15 @@ fn a_horizon_is_reproducible_and_does_not_depend_on_its_own_length() {
     let long = horizon("0.1");
     assert!(long.status.success(), "the long run failed");
     let long = stdout(&long);
+    // The ruler before the rows: every row is measured against the run's pooled
+    // ground, so rows compared across two grounds say nothing about the rows.
+    assert_eq!(
+        ground_of(&first),
+        ground_of(&long),
+        "the longer horizon measured its rows against a different ground, so its rows \
+         cannot be compared with the short run's; this is a ground change, not a \
+         statistics change"
+    );
     let (short_rows, long_rows) = (samples_array(&first), samples_array(&long));
     assert!(
         long_rows.len() > short_rows.len(),

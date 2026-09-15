@@ -375,8 +375,8 @@ flowchart LR
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The spawned player gets a scratch data root | dev | done | feff21c |
-| 2 — No test source names the target directory | dev | done | committed with this row |
-| 3 — The horizon test reads the ground before the rows | dev | not started | |
+| 2 — No test source names the target directory | dev | done | 3510ab9 |
+| 3 — The horizon test reads the ground before the rows | dev | done | committed with this row |
 | 4 — Measure what grows in `target/` | dev | not started | |
 | 5 — `prune-target.mjs` deletes what cargo no longer reports | dev | not started | |
 | 6 — The incremental cache has a documented bound | dev | not started | |
@@ -401,6 +401,9 @@ flowchart LR
   strings and char literals in one pass instead. `hygiene.rs` spells the segment `tar\x67et` in its
   own seeds and in the matcher, because the guard scans that file too.
 - **Phase 2.** `check-backlog-claims.mjs` exits 0.
+- **Phase 3, hand check.** With the long run's JSON rewritten to `"ground":[250,1,250]` the test
+  failed at the new assertion, `left: "\"ground\":[0,0,0]"`, `right: "\"ground\":[250,1,250]"`, with
+  the ground-change message; the rewrite was removed and `shot_cli` ran 28 passed, 0 skipped.
 
 ### Close triggers
 
