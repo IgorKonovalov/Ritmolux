@@ -504,6 +504,9 @@ flowchart LR
   `--test preset` (should read `--test suite preset_schema::` and `--test suite preset::`), and
   `.claude/skills/architect/SKILL.md:308,429` still name `core/tests/preset_schema.rs` and
   `core/tests/hygiene.rs`. The session's file edits under `.claude/` were refused.
+  Repaired by the owner in the lane after the park: the four citations now name `--test suite
+  preset_schema::`, `--test suite preset::` and `core/tests/suite/`. `project-context.md:201` still
+  names `core/tests/preset.rs`, deliberately: it describes a retired instruction as it was written.
 - **Followup noticed, not acted on:** `docs/testing.md`'s caveat says `preset`'s zero-allocation
   assertion counts through a process-global hook and needs nextest; the counter in `preset.rs` is
   per-thread and says it holds under both runners.
