@@ -42,7 +42,6 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0219 — a `ctl/preset` datagram on loopback never reached the listener's queue, in 3 of 79 loaded runs, and nothing counted it](#0219--a-ctlpreset-datagram-on-loopback-never-reached-the-listeners-queue-in-3-of-79-loaded-runs-and-nothing-counted-it)
 - [0220 — a headless walk of the system roster stalls at `emitter`: the ping sent with the ask is answered and the preset never reaches the screen](#0220--a-headless-walk-of-the-system-roster-stalls-at-emitter-the-ping-sent-with-the-ask-is-answered-and-the-preset-never-reaches-the-screen)
 - [0221 — the run-alone override costs `-P fast` 165 s, twice its tests' serial time, because each of its 18 testcases drains the machine separately](#0221--the-run-alone-override-costs--p-fast-165-s-twice-its-tests-serial-time-because-each-of-its-18-testcases-drains-the-machine-separately)
-- [0226 — the worktree cap counts lanes that no longer exist, so removing a parked lane by hand starves the next run](#0226--the-worktree-cap-counts-lanes-that-no-longer-exist-so-removing-a-parked-lane-by-hand-starves-the-next-run)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -1672,47 +1671,3 @@ first.
 
 **Medium.** No test is wrong. The cost is 165 s on every push, and a gate that hurts gets bypassed
 (ADR-0033 Alternative F).
-
-## 0226 — the worktree cap counts lanes that no longer exist, so removing a parked lane by hand starves the next run
-
-`lib/lane.mjs` `openWorktreeCount` is `Object.values(state.plans).filter((r) => r.worktree &&
-!r.laneRemoved).length`. It reads the record and never asks the filesystem. `runPlan` does ask —
-`if (!rec.worktree || !existsSync(rec.worktree))` reopens the lane from its branch — so the two
-disagree about what an open lane is.
-
-The gap opens whenever a worktree goes away without the conductor doing it. Removing a **parked**
-lane is the ordinary case: the conductor only sets `laneRemoved` after a close it performed
-(`lane.mjs`, `if (c.ok) rec.laneRemoved = true`), and ADR-0053 tells the owner to remove a finished
-lane by hand because the disk cost is severe. On 2026-09-15 the owner removed both parked lanes
-(5.8 GB and 5.3 GB); `openWorktreeCount` still read **2 of `max_open_worktrees` 3**, against zero
-worktrees on disk. The next `run` would have stopped a second plan at a cap that nothing was
-holding — and since Plan 0188 Phase 4 that stop is now *reported*, correctly, with a reason that
-would have been false.
-
-It is a stale record rather than a wrong rule: the operator repair is to set `laneRemoved: true`
-on those plans in `state/conductor.json`, which is what was done, and `runPlan` sets it back to
-`false` when it reopens the lane. Nothing was lost, and the count now reads 0.
-
-Shapes, none decided:
-
-- **Give `openWorktreeCount` the same `existsSync` test `runPlan` already applies**, so one
-  definition of an open lane serves both. Cheapest, and it makes the record self-healing.
-- **Reconcile at preflight** — `check` and `run` clear `laneRemoved` for any recorded worktree that
-  is gone, and say how many they cleared, so the repair is not a hand edit to runtime state.
-- **A `conductor.mjs remove NNNN`** that removes the worktree and updates the record together, so
-  the ordinary operation does not go through `git` behind the conductor's back.
-
-Worth deciding with [backlog 0223](design-backlog-archive.md) (promoted to Plan 0189) and ADR-0205's lane-b arithmetic, since all three are about what
-the cap is for.
-
-- **Raised:** 2026-09-15, by the operator after removing both parked lanes at the close of Plan 0188.
-  **Owner if taken:** `architect` (the cap's definition), then `dev`.
-- **Verified 2026-09-15** — the cap counts the record and never the filesystem:
-  `present: filter\(\(r\) => r.worktree && !r.laneRemoved\) in: tools/conductor/lib/lane.mjs`
-- **Verified 2026-09-15** — and the run path does test the filesystem:
-  `present: !existsSync\(rec.worktree\) in: tools/conductor/lib/lane.mjs`
-
-### Priority
-
-**Medium.** It does not corrupt anything and the repair is one field, but it makes a cap stop report
-a reason that is not true — and Plan 0188 Phase 4 exists to make exactly that report trustworthy.

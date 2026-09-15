@@ -7,9 +7,15 @@
 > [0207](../adrs/0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md) (proposed),
 > [0208](../adrs/0208-a-patch-cli-update-runs-with-a-warning-and-every-session-proves-the-hooks-ran.md) (proposed),
 > [0209](../adrs/0209-a-conductor-close-repairs-the-prose-and-comments-its-findings-name.md) (proposed)
-> **Closes:** design-backlog 0222, 0223, 0224, 0225
+> **Closes:** design-backlog 0222, 0223, 0224, 0225, 0226
 > **Built by:** human-started `dev` sessions, not the conductor. A conductor editing its own code
 > while it runs is circular, and 0187 and 0188 were built the same way.
+
+> **Amended 2026-09-15, before any phase started:** backlog 0226 is folded into Phase 1. A lane is
+> open when its worktree exists on disk, and one predicate answers that for the cap, the standing-park
+> line and the digest's **Still parked** line. Phase 1's standing-park line and Phase 2's **Still
+> parked** line each name a worktree. Without the predicate, both would report one the owner already
+> removed, and that is exactly the false report 0226 describes.
 
 ## TL;DR
 
@@ -51,6 +57,10 @@ fronts.
   per ADR-0208).
 - **Findings nobody fixes** (backlog 0225; owner's call: the close repairs the prose and comment
   ones, per ADR-0209).
+- **The worktree cap counts lanes that no longer exist** (backlog 0226). `openWorktreeCount` reads
+  the record's `worktree && !laneRemoved`, while `runPlan` asks `existsSync`. The owner removed both
+  parked lanes by hand, as ADR-0053 says to. The cap still read 2 of 3, and a hand edit to
+  `state/conductor.json` was the only repair.
 
 ## Decision
 
@@ -63,7 +73,16 @@ fronts.
 - ADR-0207's suite ledger, and the conductor-mode reordering that makes identical trees happen;
 - ADR-0208's patch warning and hook tripwire;
 - ADR-0209's close repairs;
-- the pilot's four leftover prose findings, repaired under the new rule.
+- the pilot's four leftover prose findings, repaired under the new rule;
+- one definition of an open lane, read from the filesystem (backlog 0226).
+
+On 0226 we rejected two of its shapes. **Reconciling `laneRemoved` at preflight** leaves the record
+wrong between runs, so `status` and a regenerated digest would still name a removed worktree. It
+also makes preflight a second writer of runtime state. **A `conductor.mjs remove NNNN` command** is
+worth having, but ADR-0053 tells the owner to use `git worktree remove`, and the cap must still be
+right after that ordinary operation. The filesystem test is the cap's own purpose written down:
+ADR-0205 calls the cap the disk bound, and a removed worktree holds no disk. No ADR, because nothing
+else is traded.
 
 Rejected during the interview:
 
@@ -124,16 +143,22 @@ flowchart LR
   - **Denials:** a `system/permission_denied` event as a line naming the tool and the head of the
     command.
   - **Standing parks:** at run start, one line per plan still parked, with its age and the worktree
-    it holds.
+    it holds. For a plan whose worktree is gone, the line names the branch that `resume` reopens it
+    from instead.
+  - **What an open lane is (backlog 0226):** one exported predicate in `lib/lane.mjs`, true when the
+    record names a worktree **and** that directory exists. `openWorktreeCount`, the cap stop's list
+    of holding plans, `runPlan`'s reopen test and the standing-park line all call it. `laneRemoved`
+    stays in the record as history, and nothing that counts lanes reads it.
 - **Files touched:** `tools/conductor/lib/live.mjs` (new: stream-event and gate-event to line,
   pure), `lib/step.mjs` (split stdout chunks into lines and hand each parsed event to an
   `onStreamEvent` callback; the transcript append is unchanged), `lib/lane.mjs` (commit and phase
-  polling during a session, standing parks at start), `lib/gate.mjs` (per-command start and end
-  callbacks, per-command duration kept on `rec.gates[].commands`), `with-lock.mjs` (prints its wait
-  and hold on stderr at exit), `conductor.mjs` (wire it, and append to `live.log`),
-  `test/live.test.mjs` (new), `test/fake-claude.mjs` (emit tool-use, tool-result, task-notification,
-  rate-limit and permission-denied events), `README.md` (`## What to read afterwards`, and what the
-  run terminal shows).
+  polling during a session, standing parks at start, the open-lane predicate), `lib/gate.mjs`
+  (per-command start and end callbacks, per-command duration kept on `rec.gates[].commands`),
+  `with-lock.mjs` (prints its wait and hold on stderr at exit), `conductor.mjs` (wire it, and append
+  to `live.log`), `test/live.test.mjs` (new), `test/lane.test.mjs` (the cap cases),
+  `test/fake-claude.mjs` (emit tool-use, tool-result, task-notification, rate-limit and
+  permission-denied events), `README.md` (`## What to read afterwards`, what the run terminal shows,
+  and one sentence under the `max_open_worktrees` paragraph saying the cap counts worktrees on disk).
 - **Done when:**
   - A `lane-scenario` run against the fake CLI prints, in order, a start line, a commit line naming
     the sha the fake committed, a phase-done line, a tests end line carrying the fake's nextest
@@ -145,6 +170,13 @@ flowchart LR
     `unifiedWindows.{five_hour,seven_day}` and 2.1.270's top-level `rateLimitType` + `utilization`.
   - A malformed or unknown stream line prints nothing and does not throw.
   - Every line is ASCII. The run terminal is a Windows console.
+  - **The cap counts what is on disk.** A state with three parked plans, `laneRemoved: false` on all
+    three and `max_open_worktrees` 3, whose worktree directories were deleted by the test, opens the
+    next queued plan. The same state with the three directories present stops at the cap and names
+    all three. The existing cap tests build real directories for the lanes they count, instead of
+    relying on the record.
+  - A standing-park line for a plan whose worktree is gone names its branch and no worktree path.
+  - `grep -n "laneRemoved" tools/conductor/lib/lane.mjs` matches only writes, never a filter.
 
 ### Phase 2 — The digest reports what the operator spends, holds and still owes
 - **Owner skill:** dev
@@ -156,7 +188,8 @@ flowchart LR
   - Each closed plan's line reports **active time** (the sum of its steps and gates in this run)
     beside **wall time within this run**, never a span across a park.
   - The newest run's **Needs you** gains **Still parked from an earlier run**: each current park
-    whose `at` predates the run, with its age, reason, worktree and resume command.
+    whose `at` predates the run, with its age, reason, worktree and resume command. The worktree is
+    named through Phase 1's open-lane predicate, so a removed one reads as its branch.
   - Every park from a session carries that session's last usage reading.
   - "merged with N minors" becomes a list of the findings still open, each with its `file:line`. It
     counts every minor and nit until Phase 5 adds `fixed_in`.
@@ -364,7 +397,10 @@ illustrative: the run terminal
   test driver runs the retired order). ADR-0209 gives them no route. If the owner wants one, each
   becomes a backlog entry.
 - **No resolution for 0175 and 0180.** Both parked `plan_wrong` on real defects in their plans.
-  Phase 2 makes them visible; amending those plans is separate `architect` work.
+  Phase 2 makes them visible. Their plans were amended on their lane branches on 2026-09-15 in a
+  separate `architect` session, and resuming them is the owner's.
+- **No `conductor.mjs remove` command** (backlog 0226's third shape). If the owner wants one, it is a
+  new entry.
 - **No `watch` command and no second terminal.**
 
 ## Implementation log
