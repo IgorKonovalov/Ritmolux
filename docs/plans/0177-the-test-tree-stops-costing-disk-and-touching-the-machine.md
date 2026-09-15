@@ -376,8 +376,8 @@ flowchart LR
 |---|---|---|---|
 | 1 — The spawned player gets a scratch data root | dev | done | feff21c |
 | 2 — No test source names the target directory | dev | done | 3510ab9 |
-| 3 — The horizon test reads the ground before the rows | dev | done | committed with this row |
-| 4 — Measure what grows in `target/` | dev | not started | |
+| 3 — The horizon test reads the ground before the rows | dev | done | 11636f2 |
+| 4 — Measure what grows in `target/` | dev | done | committed with this row |
 | 5 — `prune-target.mjs` deletes what cargo no longer reports | dev | not started | |
 | 6 — The incremental cache has a documented bound | dev | not started | |
 | 7 — A scoped `cargo doc` earns a hook step, or is rejected | dev | not started | |
@@ -404,6 +404,35 @@ flowchart LR
 - **Phase 3, hand check.** With the long run's JSON rewritten to `"ground":[250,1,250]` the test
   failed at the new assertion, `left: "\"ground\":[0,0,0]"`, `right: "\"ground\":[250,1,250]"`, with
   the ground-change message; the rewrite was removed and `shot_cli` ran 28 passed, 0 skipped.
+- **Phase 4, table.** This lane, 2026-09-15, Windows reference machine. `inc` = crate-hash
+  directories in `target/debug/incremental/`; the edit is `STRUCT_GRID: usize = 32` -> `16 + 16`
+  in `core/src/render/metrics.rs`. Row 0 is the three commands on a lane whose earlier phases had
+  run only `-p standalone`, `-p rlx-core --test hygiene` and clippy.
+
+  | step | tool | s | inc dirs (new) | inc GB | deps files | deps GB |
+  |---|---|---|---|---|---|---|
+  | 0 | build / clippy / nextest | 3.4 / 0.6 / 44.2 | 111 (3) / 111 (0) / 171 (60) | 1.14 / 1.14 / 1.95 | 918 / 918 / 1098 | 1.62 / 1.62 / 3.38 |
+  | a | build / clippy / nextest | 0.3 / 0.5 / 1.4 | 171 (0) each | 1.95 | 1098 | 3.38 |
+  | b | build / clippy / nextest | 6.0 / 13.3 / 33.0 | 171 (0) each | 2.20 / 2.68 / 3.62 | 1098 | 3.38 |
+  | c | build / clippy / nextest | 4.1 / 7.6 / 67.4 | 171 (0) each | 3.61 / 3.61 / 3.59 | 1098 | 3.38 |
+
+  The `incremental/` bytes grow inside existing directories: every crate-hash directory held at most
+  two session directories after (b), and three further edit/revert cycles of clippy then build left
+  171 directories, 332 sessions, at most 2 per directory and 3.593 GB, flat. An edit that keeps a
+  unit's metadata hash rewrites its `deps/` files in place, so (b) and (c) left the `deps/` count
+  at 1098.
+- **Phase 4, retained `deps/` generations.** Grouping `deps/` names by stem with the hash removed
+  gives 330 stems with two hashes, every one a check-versus-build or lib-versus-test pair, so a name
+  count is not a generation count. Counted instead against the loop's reported live set (the Phase 5
+  script's dry run on this checkout): 24 files, 184.0 MB, a second `rlx_core`, `wgpu`, `wgpu_core`,
+  `wgpu_hal`, `windows`, `gpu_allocator` and `hygiene` generation left by the narrowed `-p` runs.
+  No `lmv_*` file exists in this lane.
+- **Phase 4, incremental mapping.** No sound mapping: a crate-hash directory is named
+  `<crate>-<base-36 id>` (`rlx_core-05p4fmhnlotwc`), `deps/` carries the 16-hex metadata hash
+  (`librlx_core-347eded4b592ce55.rlib`), and no field of a `compiler-artifact` message names the
+  former.
+- **Phase 4, verdict: bounded.** (a) created no crate-hash directory, and (b) and (c) created none
+  per tool.
 
 ### Close triggers
 
