@@ -46,6 +46,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0223 — the gate is a third of a conductor run's wall clock, because the full workspace suite runs twice per plan on trees that already passed it](#0223--the-gate-is-a-third-of-a-conductor-runs-wall-clock-because-the-full-workspace-suite-runs-twice-per-plan-on-trees-that-already-passed-it)
 - [0224 — a CLI update refuses the whole conductor, and the only way through is a probe run and a hand edit to a source constant](#0224--a-cli-update-refuses-the-whole-conductor-and-the-only-way-through-is-a-probe-run-and-a-hand-edit-to-a-source-constant)
 - [0225 — a review finding under `.claude/` was left open for a restriction that is written nowhere, and may not exist](#0225--a-review-finding-under-claude-was-left-open-for-a-restriction-that-is-written-nowhere-and-may-not-exist)
+- [0226 — the worktree cap counts lanes that no longer exist, so removing a parked lane by hand starves the next run](#0226--the-worktree-cap-counts-lanes-that-no-longer-exist-so-removing-a-parked-lane-by-hand-starves-the-next-run)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -1841,3 +1842,47 @@ close itself.
 
 **Low.** One stale sample line today. What is worth keeping is the unwritten ownership rule behind
 it, which will produce the same open finding again.
+
+## 0226 — the worktree cap counts lanes that no longer exist, so removing a parked lane by hand starves the next run
+
+`lib/lane.mjs` `openWorktreeCount` is `Object.values(state.plans).filter((r) => r.worktree &&
+!r.laneRemoved).length`. It reads the record and never asks the filesystem. `runPlan` does ask —
+`if (!rec.worktree || !existsSync(rec.worktree))` reopens the lane from its branch — so the two
+disagree about what an open lane is.
+
+The gap opens whenever a worktree goes away without the conductor doing it. Removing a **parked**
+lane is the ordinary case: the conductor only sets `laneRemoved` after a close it performed
+(`lane.mjs`, `if (c.ok) rec.laneRemoved = true`), and ADR-0053 tells the owner to remove a finished
+lane by hand because the disk cost is severe. On 2026-09-15 the owner removed both parked lanes
+(5.8 GB and 5.3 GB); `openWorktreeCount` still read **2 of `max_open_worktrees` 3**, against zero
+worktrees on disk. The next `run` would have stopped a second plan at a cap that nothing was
+holding — and since Plan 0188 Phase 4 that stop is now *reported*, correctly, with a reason that
+would have been false.
+
+It is a stale record rather than a wrong rule: the operator repair is to set `laneRemoved: true`
+on those plans in `state/conductor.json`, which is what was done, and `runPlan` sets it back to
+`false` when it reopens the lane. Nothing was lost, and the count now reads 0.
+
+Shapes, none decided:
+
+- **Give `openWorktreeCount` the same `existsSync` test `runPlan` already applies**, so one
+  definition of an open lane serves both. Cheapest, and it makes the record self-healing.
+- **Reconcile at preflight** — `check` and `run` clear `laneRemoved` for any recorded worktree that
+  is gone, and say how many they cleared, so the repair is not a hand edit to runtime state.
+- **A `conductor.mjs remove NNNN`** that removes the worktree and updates the record together, so
+  the ordinary operation does not go through `git` behind the conductor's back.
+
+Worth deciding with backlog 0223 and ADR-0205's lane-b arithmetic, since all three are about what
+the cap is for.
+
+- **Raised:** 2026-09-15, by the operator after removing both parked lanes at the close of Plan 0188.
+  **Owner if taken:** `architect` (the cap's definition), then `dev`.
+- **Verified 2026-09-15** — the cap counts the record and never the filesystem:
+  `present: filter\(\(r\) => r.worktree && !r.laneRemoved\) in: tools/conductor/lib/lane.mjs`
+- **Verified 2026-09-15** — and the run path does test the filesystem:
+  `present: !existsSync\(rec.worktree\) in: tools/conductor/lib/lane.mjs`
+
+### Priority
+
+**Medium.** It does not corrupt anything and the repair is one field, but it makes a cap stop report
+a reason that is not true — and Plan 0188 Phase 4 exists to make exactly that report trustworthy.
