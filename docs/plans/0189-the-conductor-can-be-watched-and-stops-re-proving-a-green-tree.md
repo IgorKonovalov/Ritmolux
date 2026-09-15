@@ -416,7 +416,7 @@ illustrative: the run terminal
 | 5 — The conductor-mode close orders its work so the gate runs once, and repairs prose findings | dev | done | `be1ca2b` |
 | 6 — A patch CLI update warns, and every session proves its hooks ran | dev | done | `9ef5cdb` |
 | 7 — The pilot's leftovers, under the new rule | dev | done | `e8d33df` |
-| 8 — A run, watched | human | not started | |
+| 8 — A run, watched | human | done | committed with this row |
 
 ### Notes
 
@@ -466,6 +466,59 @@ illustrative: the run terminal
   implementer run commits its close block "full suite under the suite lock included". Phase 5
   changed that rule in both implementer skills and in `prompts/implement.md`, but not in this guide.
 - Followup noticed, not acted on: ADR-0207, ADR-0208 and ADR-0209 still read `Status: proposed`.
+- **Phase 8, the runs.** Four `run`s on 2026-09-15 with the Phase 1-7 code, lane a, from one
+  terminal: 16:40 (0175 Phase 3 and its review; its record keeps `ended: null` because the owner
+  restarted for the watched run), 18:05 (0177 Phase 8), 21:10 (0175's merge gate, 0177 Phase 9) and
+  21:43 (both merges). Merged: 0175 at `18d9ea3` (`v0.124.2`) and 0177 at `da663b6` (`v0.125.0`).
+  0185, 0181 and 0182 had merged in the 09:32 run. 0180 stayed parked `plan_wrong` throughout.
+- **Phase 8, watched (the owner's verdict).** The live output told the owner what was happening
+  without opening a transcript, mostly. The one ask is **how long each phase and each test run
+  took**. A `tests` line prints `ran 5m41s`, but `phase N done` carries no elapsed time, so a
+  28-minute phase reads the same as a 2-minute one (backlog 0233). Every park was diagnosed from
+  `live.log`, the digest and `state/gates/`, except 0175's `no_outcome`, whose cause was only in the
+  transcript's last lines.
+- **Phase 8, full suites per merged plan** (`state/suite-ledger.jsonl`; `locks.jsonl` agrees):
+
+  | plan | executed | skipped | runs, minutes |
+  |---|---|---|---|
+  | 0175 | 4, plus 1 by hand outside the ledger | 1 | pre-review 11.2, post-close 10.8 (red), post-close 11.4, remerge 12.3; hand 12.7 |
+  | 0177 | 2 | 2 | pre-review 10.9, the review's close tip 13.6; skipped by the review at pre-review's tree and by `post-close` |
+
+  Digest gate minutes: the 21:43 run 39 (full suite 35 over 3 runs, 2 skipped), the 21:10 run 12, the
+  18:05 run under 1, the 16:40 run 12. The review's own 13.6-minute run is a session's, not a gate's,
+  so no digest line counts it.
+- **Phase 8, 0177 met the bound; 0175 did not, and each extra run has a cause.** 0175 took no fix
+  round, but its `main` moved, so the bound does not strictly apply. The causes are the finding:
+  1. `gate 0175-pre-review` on `467b142`. Expected.
+  2. The review's lens-1 run was skipped from the ledger, as designed. It then ran the close tip's
+     suite in the background and ended its turn. The headless process exited, the run died, and the
+     plan parked `no_outcome` with the close committed and no tag (backlog 0228).
+  3. The owner's hand gate on `05d1639` went through `with-lock` without `RLX_SUITE_LEDGER`, so it
+     left no record and the next gate repeated it (backlog 0232).
+  4. `gate 0175-post-close` on `05d1639` went red on
+     `control_loopback a_preset_datagram_selects_by_name` (backlog 0219), and parked `gate_red`.
+  5. The same gate after `resume`, green.
+  6. `gate 0175-remerge` on `499f9cb`: `main` had moved by `08c37a7`, a conductor fix committed
+     between the park and the resume.
+
+  On 2026-09-15 0175 spent 24 minutes in sessions (Phase 3 15.7, review 8.0) and 58 in full suites.
+  0177 spent 64 minutes in sessions that finished (Phase 8 28.3, Phase 9 9.2, review 26.0), plus a
+  48.6-minute session the owner's restart interrupted, and 24.5 in full suites (backlog 0227).
+- **Phase 8, 0175's close was finished by hand.** `resume` would have re-run the review on a plan
+  already under `done/` on the branch (backlog 0229). The owner gated the tip, wrote `v0.124.2`, ran
+  `check-release-tag.mjs`, and set `closed` and the round-1 verdict in `state/conductor.json`, so the
+  resume went straight to the fast-forward.
+- **Phase 8, 0177's two parks were not its code.** `check_red` at Phase 8: its done-when greps
+  `.claude/skills/`, and the headless session's edits there were refused (backlog 0230). The owner
+  committed the citations as `f0cf263`. `gate_red` after Phase 9: `studio typecheck exited -4058` in
+  0 s. The gate's `.cmd` shell retry was settled by the failed spawn's own `close`, a path no earlier
+  lane reached because none had `studio/node_modules`. Fixed on `main` as `08c37a7`, with a Windows
+  test in `gate.test.mjs` and in `with-lock.test.mjs`. 0177's review backgrounded its close-tip suite
+  too (its `Monitor` was refused) but held its turn until the run ended, and closed.
+- **Phase 8, where a suite's minutes go** (`0175-remerge-18-cargo_nextest.log`: 737 s wall, 1947
+  tests, 7378 test-seconds over 73 binaries): `reactivity` 1566 s, `animation` 1291 s and `sanity`
+  1099 s, the three per-preset suites and 54 % together; core unit tests 1065 s; `distinctness`
+  299 s; `reaction_diffusion_contract` alone 216 s.
 
 ### Close triggers
 
@@ -483,4 +536,4 @@ illustrative: the run terminal
 - Full suite: `cargo nextest run --workspace` exited 0, with `1940 tests run: 1940 passed (3 slow),
   6 skipped`, on `e8d33df`. The conductor's own suite, `node --test "tools/conductor/test/*.test.mjs"`,
   passes 177 of 177.
-- `human` phases remaining: Phase 8 (a run, watched).
+- `human` phases remaining: none. Phase 8 ran on 2026-09-15; see its notes above.
