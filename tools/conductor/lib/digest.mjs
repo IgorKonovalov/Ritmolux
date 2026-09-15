@@ -12,11 +12,12 @@
 // belongs to the latest run that had started by the event's timestamp.
 
 import { existsSync, readFileSync } from "node:fs";
-import { relative } from "node:path";
+import { join, relative } from "node:path";
 
 import { tagObjectType } from "./git.mjs";
 import { dirtyText, resumeCommand } from "./inbox.mjs";
 import { laneOpen } from "./lane.mjs";
+import { readLedger } from "./ledger.mjs";
 import { usageReading } from "./live.mjs";
 import { findPlan, readPlanFile } from "./plan.mjs";
 import { statePaths, totalSpend, writeAtomic } from "./state.mjs";
@@ -102,12 +103,13 @@ function planTitle(repo, plan) {
 
 function findingLine(f, resolvedIn) {
   const where = f.line ? `${f.file}:${f.line}` : f.file;
-  return `  - ${f.severity} \`${where}\` ${f.what}${resolvedIn ? ` - resolved in \`${short(resolvedIn)}\`` : ""}`;
+  const fixed = resolvedIn ? ` - resolved in \`${short(resolvedIn)}\`` : f.fixed_in ? ` - repaired by the close in \`${short(f.fixed_in)}\`` : "";
+  return `  - ${f.severity} \`${where}\` ${f.what}${fixed}`;
 }
 
-/** The minors and nits the closing verdict merged with: the findings nobody has acted on. */
+/** The minors and nits the closing verdict merged with that its close did not repair (ADR-0209). */
 function openFindings(rec) {
-  return (rec.verdicts.at(-1)?.findings ?? []).filter((f) => f.severity === "minor" || f.severity === "nit");
+  return (rec.verdicts.at(-1)?.findings ?? []).filter((f) => (f.severity === "minor" || f.severity === "nit") && !f.fixed_in);
 }
 
 /**
@@ -146,6 +148,7 @@ function closedFindings(rec) {
 export function renderDigest(state, { repo, stateDir }) {
   const runs = state.runs ?? [];
   const lockLog = readLockLog(stateDir);
+  const ledger = readLedger(join(stateDir, "suite-ledger.jsonl"));
   const plans = Object.values(state.plans).sort((a, b) => a.plan.localeCompare(b.plan));
   const out = ["# Conductor digest", "", "Generated from `tools/conductor/state/` and git after every step. Newest run first.", ""];
   if (runs.length === 0) out.push("No run has started yet.", "");
@@ -298,19 +301,19 @@ export function renderDigest(state, { repo, stateDir }) {
     let suiteMs = 0;
     let otherMs = 0;
     let suiteRuns = 0;
-    let suiteSkips = 0;
     for (const rec of plans) {
       for (const g of (rec.gates ?? []).filter((x) => inRun(x.at))) {
         for (const c of g.commands ?? []) {
           if (!isSuite(c)) otherMs += c.ms ?? 0;
-          else if (c.skipped) suiteSkips += 1;
-          else {
+          else if (!c.skipped) {
             suiteMs += c.ms ?? 0;
             suiteRuns += 1;
           }
         }
       }
     }
+    // Every skip, the gate's and a session's alike, is a line in the suite ledger.
+    const suiteSkips = ledger.filter((e) => e.skip && inRun(e.at)).length;
     out.push(
       `- gate: ${duration(suiteMs + otherMs)}; full suite ${duration(suiteMs)} over ${suiteRuns} run${suiteRuns === 1 ? "" : "s"}, ` +
         `everything else ${duration(otherMs)}; ${suiteSkips} suite run${suiteSkips === 1 ? "" : "s"} skipped.`,

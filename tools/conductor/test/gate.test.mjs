@@ -59,7 +59,12 @@ test("two gate runs on one clean tree run the suite once, and the second records
   assert.equal(s.skipped.length, 1);
   assert.equal(s.skipped[0].by, "gate 0101-pre-review");
   assert.equal(s.skipped[0].summary, "3 tests run: 3 passed, 1 skipped");
-  assert.equal(readLedger(s.ledger).length, 1, "a skip writes no record");
+  const [run, skip] = readLedger(s.ledger);
+  assert.equal(run.by, "gate 0101-pre-review");
+  assert.deepEqual({ ...skip, at: null }, { tree: run.tree, cmd: "cargo nextest run --workspace", skip: true, by: "gate 0101-post-close", at: null, green: { by: run.by, at: run.at } });
+  const third = await s.gate("remerge");
+  assert.equal(third.commands[0].skipped, true, "a skip line is never what a lookup relies on");
+  assert.equal(s.runs(), 1);
 });
 
 test("a one-byte change to a tracked doc makes the next gate run the suite", async () => {

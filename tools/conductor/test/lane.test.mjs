@@ -11,6 +11,7 @@ import { test } from "node:test";
 import { writeDigest } from "../lib/digest.mjs";
 import { git, resolveCommit, tagObjectType } from "../lib/git.mjs";
 import { runLanes } from "../lib/lane.mjs";
+import { readLedger } from "../lib/ledger.mjs";
 import { findPlan, readPlanFile } from "../lib/plan.mjs";
 import { validateQueue } from "../lib/queue.mjs";
 import { loadState, statePaths } from "../lib/state.mjs";
@@ -562,6 +563,62 @@ test("a probe the close leaves red parks gate_red at post-close and main does no
   assert.match(rec.park.detail, /after the close: check-backlog-claims\.mjs/);
   assert.deepEqual(rec.gates.map((g) => [g.label, g.ok]), [["pre-review", true], ["post-close", false]]);
   assert.equal(resolveCommit("main", repo), mainBefore, "main did not move");
+});
+
+test("a close that repairs one minor and leaves one open shows exactly the open one in Needs you", async () => {
+  const { ctx, digest } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] }, spec: { "0101": { closeRepair: "ok" } } });
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  const repaired = rec.verdicts.at(-1).findings.find((f) => f.fixed_in);
+  assert.ok(repaired, "the verdict kept fixed_in");
+  const needs = digest("### Needs you");
+  assert.deepEqual(
+    needs.split("\n").filter((l) => l.trim()),
+    ["- **0101 merged with 1 open finding**:", "  - minor `phase-0101-1.txt:2` a duplicated constant, left open"],
+  );
+  assert.ok(digest("### Closed").includes(`  - minor \`phase-0101-1.txt:1\` a comment the plan made false - repaired by the close in \`${repaired.fixed_in.slice(0, 7)}\``));
+});
+
+test("a fixed_in commit that does not change the finding's file parks as a disagreement", async () => {
+  const { ctx, repo } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] }, spec: { "0101": { closeRepair: "wrongFile" } } });
+  const mainBefore = resolveCommit("main", repo);
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "parked");
+  assert.equal(rec.park.reason, "disagreement");
+  assert.match(rec.park.detail, /finding 0 is fixed_in [0-9a-f]{7}, which does not change phase-0101-1\.txt/);
+  assert.equal(resolveCommit("main", repo), mainBefore);
+});
+
+test("a fixed_in commit that is not on the branch parks as a disagreement", async () => {
+  const { ctx } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] }, spec: { "0101": { closeRepair: "offBranch" } } });
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "parked");
+  assert.equal(rec.park.reason, "disagreement");
+  assert.match(rec.park.detail, /finding 0 is fixed_in [0-9a-f]{40}, which is not on the branch/);
+});
+
+test("with no fix round and an unmoved main, a plan executes the full suite twice and skips it twice", async () => {
+  const { ctx, digest } = scratch({ plans: [{ number: "0101", phases: [dev("1"), dev("2")] }], lanes: { a: ["0101"] }, spec: { "0101": { ledgerFlow: true } } });
+  ctx.gate = [{ name: "cargo nextest", cmd: [process.execPath, "-e", "console.log('     Summary [   1.000s] 3 tests run: 3 passed')"], lock: "suite", ledger: true }];
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  assert.equal(rec.fixRounds, 0);
+  assert.deepEqual(rec.gates.map((g) => g.label), ["pre-review", "post-close"]);
+
+  const ledger = readLedger(join(ctx.stateDir, "suite-ledger.jsonl"));
+  const executed = ledger.filter((e) => !e.skip);
+  const skipped = ledger.filter((e) => e.skip);
+  assert.deepEqual(executed.map((e) => e.by), ["gate 0101-pre-review", "0101-02-review"], "pre-review and the close's gate");
+  assert.deepEqual(skipped.map((e) => [e.by, e.green.by]), [
+    ["0101-02-review", "gate 0101-pre-review"],
+    ["gate 0101-post-close", "0101-02-review"],
+  ]);
+  assert.deepEqual(rec.gates[1].commands.map((c) => c.skipped), [true]);
+  assert.match(digest("### Totals"), /; 2 suite runs skipped\.$/m);
 });
 
 test("a red conductor gate parks before any review", async () => {

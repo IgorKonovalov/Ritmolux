@@ -1,11 +1,13 @@
 // The suite ledger, tools/conductor/state/suite-ledger.jsonl (ADR-0207): one JSON line per run of
 // exactly `cargo nextest run --workspace` that conductor code observed, keyed by the tree it ran on.
 //
-//   { tree, cmd, exit, summary, by, at, ms }
+//   { tree, cmd, exit, summary, by, at, ms }                     a run
+//   { tree, cmd, skip: true, by, at, green: { by, at } }         a skip, and the run it relied on
 //
 // A run is recorded only when the worktree was clean both when it started and when it ended, so the
-// tree hash names exactly what was tested. A lookup skips only when the newest record for that tree
-// has exit 0: a red run is recorded, and a tree whose latest run was red is never skipped on.
+// tree hash names exactly what was tested. A lookup skips only when the newest run recorded for that
+// tree has exit 0: a red run is recorded, and a tree whose latest run was red is never skipped on.
+// Skip lines are the record of what was not re-run; a lookup never reads them.
 //
 // Two writers and two readers: the conductor's gate, and the suite wrapper in a conductor-run session
 // (RLX_SUITE_LEDGER names the file). Nothing else reads or writes it.
@@ -55,7 +57,7 @@ export function readLedger(path) {
 export function greenRecord(path, tree) {
   if (!tree) return null;
   const latest = readLedger(path)
-    .filter((e) => e.tree === tree && e.cmd === SUITE_COMMAND)
+    .filter((e) => e.tree === tree && e.cmd === SUITE_COMMAND && !e.skip)
     .at(-1);
   return latest && latest.exit === 0 ? latest : null;
 }
@@ -63,6 +65,12 @@ export function greenRecord(path, tree) {
 export function appendRecord(path, { tree, exit, summary, by, ms, at = new Date().toISOString() }) {
   mkdirSync(dirname(path), { recursive: true });
   appendFileSync(path, JSON.stringify({ tree, cmd: SUITE_COMMAND, exit, summary: summary ?? null, by, at, ms }) + "\n");
+}
+
+/** Records that `by` skipped a full suite on `green.tree`, relying on `green`. */
+export function appendSkip(path, { green, by, at = new Date().toISOString() }) {
+  mkdirSync(dirname(path), { recursive: true });
+  appendFileSync(path, JSON.stringify({ tree: green.tree, cmd: SUITE_COMMAND, skip: true, by, at, green: { by: green.by, at: green.at } }) + "\n");
 }
 
 /** nextest's last `Summary` line after its bracketed time, e.g. `1940 tests run: 1940 passed, 6 skipped`. */

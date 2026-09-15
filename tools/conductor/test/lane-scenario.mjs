@@ -14,6 +14,11 @@
 // the plan's own delivery turns red; the close session removes it, as a close archives the entry,
 // unless `probeStaysRed`.
 //
+// `closeRepair` makes a clean review close with two minors, one repaired by a close commit and marked
+// `fixed_in`, one left open; "wrongFile" repairs a different file, "offBranch" names a commit on no
+// branch. `ledgerFlow` makes the review run its full suite through the wrapper before closing, and the
+// close run the gate's suite through it after the bump and before the tag.
+//
 // `stream` is a list of events the implement session emits (see fake-claude.mjs). `awaitLive` makes
 // the implement session, after each commit, wait until the file FAKE_LIVE_FILE names holds a line
 // naming that commit: proof the conductor printed it while the session was still running.
@@ -24,6 +29,8 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { runWrapped } from "../with-lock.mjs";
+
 const block = (o) => "Session finished.\n\n```rlx-outcome\n" + JSON.stringify(o) + "\n```\n";
 
 export default async ({ cwd, vars, env }) => {
@@ -33,6 +40,13 @@ export default async ({ cwd, vars, env }) => {
   const mode = vars.mode;
   const git = (...a) => execFileSync("git", a, { cwd, encoding: "utf8" }).trim();
   const log = (e) => appendFileSync(env.FAKE_EVENTS, JSON.stringify({ t: Date.now(), plan, event: e }) + "\n");
+  // A full workspace suite through the real wrapper, with cargo stood in for by a green Summary.
+  const suite = () =>
+    runWrapped(["suite", "--", "cargo", "nextest", "run", "--workspace"], {
+      env,
+      cwd,
+      run: async () => ({ code: 0, output: "     Summary [   1.000s] 3 tests run: 3 passed\n" }),
+    });
   log(`${mode}-start`);
   if (ps.delayMs?.[mode]) await new Promise((r) => setTimeout(r, ps.delayMs[mode]));
   try {
@@ -103,6 +117,14 @@ export default async ({ cwd, vars, env }) => {
         kind === "clean"
           ? Array.from({ length: ps.minors ?? 0 }, (_, i) => ({ severity: "minor", file: `phase-${plan}-1.txt`, line: i + 1, what: `minor finding ${i + 1}` }))
           : [{ severity: kind, file: `phase-${plan}-1.txt`, line: 1, what: `${kind} finding in round ${round}` }];
+      if (kind === "clean" && ps.closeRepair) {
+        findings.push(
+          { severity: "minor", file: `phase-${plan}-1.txt`, line: 1, what: "a comment the plan made false" },
+          { severity: "minor", file: `phase-${plan}-1.txt`, line: 2, what: "a duplicated constant, left open" },
+        );
+      }
+      // Mode 4's full suite, through the wrapper as the architect skill's conductor mode says.
+      if (ps.ledgerFlow) await suite();
       writeFileSync(reviewPath, `# Review of ${plan}, round ${round}\n\n${findings.map((f) => `- ${f.severity}: ${f.what}`).join("\n")}\n`);
       const verdict = {
         round,
@@ -114,6 +136,19 @@ export default async ({ cwd, vars, env }) => {
       };
       if (kind !== "clean") return { text: block({ kind: "verdict", plan, ...verdict }), costUsd: 2 };
 
+      // The close's order: repairs, merge main, bookkeeping and bump, the whole gate, the tag.
+      if (ps.closeRepair) {
+        const repaired = findings.find((f) => f.what === "a comment the plan made false");
+        if (ps.closeRepair === "offBranch") {
+          repaired.fixed_in = git("commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", "docs: a repair on no branch");
+        } else {
+          const file = ps.closeRepair === "wrongFile" ? "README.md" : repaired.file;
+          writeFileSync(join(cwd, file), `${readFileSync(join(cwd, file), "utf8")}repaired\n`);
+          git("add", file);
+          git("commit", "-q", "-m", "docs: the close repairs a finding");
+          repaired.fixed_in = git("rev-parse", "--short=7", "HEAD");
+        }
+      }
       git("merge", "-q", "--no-edit", "main");
       mkdirSync(join(plansDir, "done"), { recursive: true });
       git("mv", `docs/plans/${planName}`, `docs/plans/done/${planName}`);
@@ -129,6 +164,7 @@ export default async ({ cwd, vars, env }) => {
       git("add", "VERSION", `docs/plans/done/${planName}`);
       if (existsSync(join(cwd, "PROBE_RED")) && !ps.probeStaysRed) git("rm", "-q", "PROBE_RED");
       git("commit", "-q", "-m", `chore: Release ${version}`);
+      if (ps.ledgerFlow) await suite();
       if (ps.lightweightTag) git("tag", `v${version}`);
       else git("tag", "-a", `v${version}`, "-m", `chore: Release v${version}`);
       return { text: block({ kind: "closed", plan, version, tag: `v${version}`, verdict }), costUsd: 3 };

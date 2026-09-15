@@ -36,7 +36,7 @@ import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { appendRecord, cleanTree, greenRecord, isFullSuite, skipNotice, summaryLine } from "./lib/ledger.mjs";
+import { appendRecord, appendSkip, cleanTree, greenRecord, isFullSuite, skipNotice, summaryLine } from "./lib/ledger.mjs";
 
 const GUARD_STALE_MS = 10_000;
 
@@ -233,6 +233,7 @@ export async function runWrapped(argv, { env = process.env, cwd = process.cwd(),
   if (suite) {
     const green = greenRecord(ledger, cleanTree(cwd));
     if (green) {
+      appendSkip(ledger, { green, by: env.RLX_SUITE_LEDGER_BY || "a session" });
       process.stdout.write(`with-lock: ${skipNotice(green)}\n`);
       return 0;
     }

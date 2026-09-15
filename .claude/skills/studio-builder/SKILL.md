@@ -207,8 +207,9 @@ mode. Where this section and the rest of the skill disagree, this section wins, 
 - **Every `cargo nextest` / `cargo test`** — the version test after a sync, a player-side check — runs as
   `node <path from RLX-CONDUCTOR-SUITE-LOCK> suite -- cargo ...`. A hook denies the bare form.
 - **On the plan's last implementer run**, write the `## Implementation log` close block the way `dev`'s
-  Step 4 does (`.claude/skills/dev/references/close-ceremony-prompt.md` is the field guide), the full
-  suite under the lock, committed — and print the outcome instead of asking for a fresh `/architect`.
+  Step 4 does (`.claude/skills/dev/references/close-ceremony-prompt.md` is the field guide), committed,
+  **without running the full workspace suite**: its `Full suite:` bullet reads *owed to the conductor's
+  pre-review gate (ADR-0207)*. Then print the outcome instead of asking for a fresh `/architect`.
 - **`fix` mode**: fix every `blocker` and `major` the named review lists, one `fix(studio): …` commit
   per finding, one `### Notes` line each; park with `plan_wrong` on a finding you judge wrong.
 

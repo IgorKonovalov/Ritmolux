@@ -69,7 +69,12 @@ function isShaList(v) {
   return Array.isArray(v) && v.every((s) => typeof s === "string" && /^[0-9a-f]{7,40}$/.test(s));
 }
 
-function validateVerdict(v, where) {
+/**
+ * A verdict's counts and findings. Only a closed verdict's findings may carry `fixed_in`: the commit
+ * in which the close repaired a minor or nit whose repair cannot change what any program does
+ * (ADR-0209). Whether that commit is on the branch and touches the finding's file is close.mjs's check.
+ */
+function validateVerdict(v, where, { fixedIn = false } = {}) {
   if (!v || typeof v !== "object") return `${where} is not an object`;
   for (const k of ["blockers", "majors", "minors"]) {
     if (!Number.isInteger(v[k]) || v[k] < 0) return `${where}.${k} is not a count`;
@@ -81,6 +86,11 @@ function validateVerdict(v, where) {
     if (typeof f.file !== "string") return `${where}.findings[${i}].file missing`;
     if (!(f.line === null || Number.isInteger(f.line))) return `${where}.findings[${i}].line invalid`;
     if (typeof f.what !== "string" || !f.what) return `${where}.findings[${i}].what missing`;
+    if (f.fixed_in !== undefined) {
+      if (!fixedIn) return `${where}.findings[${i}].fixed_in is only allowed on a closed verdict`;
+      if (!isShaList([f.fixed_in])) return `${where}.findings[${i}].fixed_in is not a SHA`;
+      if (f.severity !== "minor" && f.severity !== "nit") return `${where}.findings[${i}].fixed_in is on a ${f.severity}`;
+    }
   }
   const count = (s) => v.findings.filter((f) => f.severity === s).length;
   if (count("blocker") !== v.blockers || count("major") !== v.majors || count("minor") !== v.minors) {
@@ -118,7 +128,7 @@ function validate(o) {
       if (!(o.tag === null || /^v\d+\.\d+\.\d+$/.test(String(o.tag)))) return "closed.tag invalid";
       if ((o.version === null) !== (o.tag === null)) return "closed.version and closed.tag disagree";
       if (o.verdict?.blockers > 0 || o.verdict?.majors > 0) return "closed carries blockers or majors";
-      return validateVerdict(o.verdict, "closed.verdict");
+      return validateVerdict(o.verdict, "closed.verdict", { fixedIn: true });
     default:
       return `unknown outcome kind "${o.kind}"`;
   }

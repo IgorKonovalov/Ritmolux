@@ -412,8 +412,8 @@ illustrative: the run terminal
 | 1 — The run can be watched | dev | done | `f7ee284` |
 | 2 — The digest reports what the operator spends, holds and still owes | dev | done | `57942b5` |
 | 3 — Listing tests takes no lock | dev | done | `570400f` |
-| 4 — A green suite is not run again on the same tree | dev | committed with this row | |
-| 5 — The conductor-mode close orders its work so the gate runs once, and repairs prose findings | dev | not started | |
+| 4 — A green suite is not run again on the same tree | dev | done | `cfb1f1d` |
+| 5 — The conductor-mode close orders its work so the gate runs once, and repairs prose findings | dev | committed with this row | |
 | 6 — A patch CLI update warns, and every session proves its hooks ran | dev | not started | |
 | 7 — The pilot's leftovers, under the new rule | dev | not started | |
 | 8 — A run, watched | human | not started | |
@@ -436,5 +436,15 @@ illustrative: the run terminal
   stands in for spawning cargo. Phase 4 also touches `lib/live.mjs` (a session's skip notice prints
   as a `skipped` line) and `lib/digest.mjs` (a step marked `suite` counts as the full suite), neither
   in its file list. A wrapped full suite skips without taking the lock.
+- Phase 5 makes a skip a line in the suite ledger: `{tree, cmd, skip: true, by, at, green}`, written by
+  the gate and the wrapper, and never read by a lookup. Phase 4 had kept a skip only in the gate's
+  command record, which could not give the done-when's count of skips "in the ledger". This touches
+  `lib/ledger.mjs`, `lib/gate.mjs`, `with-lock.mjs` and the Phase 4 tests, none in Phase 5's file list.
+  The digest's skipped count now reads the ledger, so it counts a session's skips as well as the gate's.
+- Phase 5 also edits `.claude/skills/studio-builder/SKILL.md` (conductor mode, last implementer run),
+  which is not in its file list. `prompts/implement.md` is shared by both implementer lanes, so the
+  "no full suite at the last run" rule is written into both skills, not only `dev`'s.
+- Phase 5 extends `test/lane-scenario.mjs` (`closeRepair`, `ledgerFlow`). Its fake sessions call
+  `runWrapped` in-process, with cargo stood in for by a green `Summary`.
 
 ### Close triggers

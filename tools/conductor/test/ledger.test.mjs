@@ -7,7 +7,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { appendRecord, cleanTree, greenRecord, isFullSuite, readLedger, SUITE_COMMAND, skipNotice, summaryLine, treeOf } from "../lib/ledger.mjs";
+import { appendRecord, appendSkip, cleanTree, greenRecord, isFullSuite, readLedger, SUITE_COMMAND, skipNotice, summaryLine, treeOf } from "../lib/ledger.mjs";
 import { defaultGate } from "../lib/gate.mjs";
 import { tmp } from "./helpers.mjs";
 
@@ -44,10 +44,14 @@ test("a lookup skips only on the newest record for that tree, and only when it i
   assert.equal(greenRecord(file, "t1").by, "gate 0101-pre-review");
   assert.equal(greenRecord(file, "t2"), null);
   assert.equal(greenRecord(file, null), null, "no tree (a dirty worktree) never skips");
+  appendSkip(file, { green: greenRecord(file, "t1"), by: "gate 0101-post-close" });
+  assert.equal(greenRecord(file, "t1").by, "gate 0101-pre-review", "a skip line is not a run");
   appendRecord(file, { tree: "t1", exit: 100, summary: "3 tests run: 2 passed, 1 failed", by: "0101-03-review", ms: 10 });
   assert.equal(greenRecord(file, "t1"), null, "a later red on the same tree is never skipped on");
+  appendSkip(file, { green: { tree: "t1", by: "x", at: "y" }, by: "stray" });
+  assert.equal(greenRecord(file, "t1"), null, "a skip after the red does not revive the green");
   writeFileSync(file, "not json\n", { flag: "a" });
-  assert.equal(readLedger(file).length, 2, "a torn line is ignored");
+  assert.equal(readLedger(file).length, 4, "a torn line is ignored");
   assert.match(skipNotice(readLedger(file)[0]), /^skipped cargo nextest run --workspace: tree t1 is green in the suite ledger, run by gate 0101-pre-review at \S+: 3 tests run: 3 passed$/);
 });
 

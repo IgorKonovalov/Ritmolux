@@ -18,7 +18,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { appendRecord, cleanTree, greenRecord, summaryLine } from "./ledger.mjs";
+import { appendRecord, appendSkip, cleanTree, greenRecord, summaryLine } from "./ledger.mjs";
 import { SUITE, withLock } from "./locks.mjs";
 
 /**
@@ -124,6 +124,7 @@ export async function runGate({
     if (suite) {
       const green = greenRecord(ledger, cleanTree(cwd));
       if (green) {
+        appendSkip(ledger, { green, by: `gate ${label}` });
         timed.push({ name: c.name, code: 0, ms: 0, suite: true, skipped: true, by: green.by });
         onCommandSkipped?.(c, green);
         continue;

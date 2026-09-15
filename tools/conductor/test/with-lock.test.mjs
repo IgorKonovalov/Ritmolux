@@ -168,7 +168,9 @@ test("a wrapped full suite with RLX_SUITE_LEDGER records its run, and skips the 
     second.out,
     `with-lock: skipped cargo nextest run --workspace: tree ${rec.tree.slice(0, 7)} is green in the suite ledger, run by 0101-03-review at ${rec.at}: 5 tests run: 5 passed\n`,
   );
-  assert.equal(readLedger(s.ledger).length, 1);
+  const lines = readLedger(s.ledger);
+  assert.equal(lines.length, 2);
+  assert.deepEqual({ ...lines[1], at: null }, { tree: rec.tree, cmd: "cargo nextest run --workspace", skip: true, by: "0101-04-review", at: null, green: { by: rec.by, at: rec.at } });
 });
 
 test("any other argument vector neither skips nor records", async () => {
