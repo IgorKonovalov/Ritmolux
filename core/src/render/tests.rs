@@ -2347,15 +2347,13 @@ fn a_degenerate_frame_delta_cannot_reach_a_scene() {
         // reset away the accumulation — would satisfy every assertion in the
         // loop that follows by rendering one unchanging picture.
         //
-        // **The stretched frame is the second one, and it has to be.**
-        // `evaluate_preset` advances the scene before it applies the preset's
-        // bindings, so on the first frame every rate is still at the scene's own
-        // default — zero, for the collage's `drift` and `spin`. A rate that
-        // integrates turns that first frame's elapsed time into no motion at
-        // all, so stretching it would be unobservable for a reason that has
-        // nothing to do with the seam. The *bad* delta below stays on the first
-        // frame, where it belongs: `0.0 * NaN` is `NaN`, so a degenerate first
-        // frame poisons an accumulator whatever rate is multiplying it.
+        // **What the stretched frame needs is a clean delta the scene integrates
+        // at its bound, non-zero rate**, so the extra elapsed time becomes motion
+        // the final frame still shows. Every frame qualifies, because a scene
+        // advances after its frame's bindings; the second is used so the stretch
+        // never shares a frame with the *bad* delta below. That one stays on the
+        // first frame: `0.0 * NaN` is `NaN`, so a degenerate first frame poisons
+        // an accumulator whatever rate is multiplying it.
         let stretched = seam_run(&mut renderer, name, &[dt, dt * 3.0, dt, dt]);
         assert_ne!(
             stretched.rgba, clean.rgba,

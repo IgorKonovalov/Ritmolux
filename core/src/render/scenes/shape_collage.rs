@@ -1714,6 +1714,10 @@ impl Scene for ShapeCollageScene {
 
     /// Advance the canvas by `dt` real seconds (ADR-0012).
     ///
+    /// `advance` runs after this frame's bindings (ADR-0198), so the rebuild
+    /// generates the recipe this frame bound and the step integrates this
+    /// frame's `drift`, `spin` and `density`, and reads its `recompose` edge.
+    ///
     /// **The whole of this scene's animation hangs off this argument** — the
     /// recomposition edge, the crossfade, the density fades, and every element's
     /// drift, spin and pump. Nothing here reads a clock or assumes a frame rate,

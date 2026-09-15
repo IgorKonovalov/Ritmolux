@@ -1171,7 +1171,8 @@ impl Scene for EmitterScene {
         self.time = time;
     }
 
-    /// Advance the spin integral by `dt` real seconds.
+    /// Advance the spin integral by `dt` real seconds, at the `spin` this frame
+    /// bound — `advance` runs after the frame's bindings (ADR-0198).
     ///
     /// The rest of this scene is a closed form in scene time and needs no step;
     /// a rate is the one thing that cannot be, because its own value moves

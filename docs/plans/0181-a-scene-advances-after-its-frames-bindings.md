@@ -260,8 +260,8 @@ flowchart TB
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The shared-scene veto is pinned, and the test hatch honours it | dev | done | 00c9587 |
-| 2 — Every scene advances on the values its frame bound | dev | done | committed with this row |
-| 3 — The prose follows the order | dev | not started | |
+| 2 — Every scene advances on the values its frame bound | dev | done | b4d2c15 |
+| 3 — The prose follows the order | dev | done | committed with this row |
 
 ### Notes
 
@@ -272,6 +272,12 @@ flowchart TB
   scene through a test-only forwarding `Scene` wrapper swapped into the renderer's roster.
 - Phase 2: `cargo nextest run --workspace` after the move was green with no bless: no golden,
   inside or outside the emitter/collage set, left its tolerance.
+- Phase 3 deviation: also rewrote the comment in `WarpMeshScene::update`
+  (`core/src/render/scenes/warp_mesh/mod.rs`), which said `advance` runs before the frame's
+  `set_param` calls. The file is not in the phase's list; the done-when grep over
+  `core/src/render/scenes` required it. The failing-frame assertion message in
+  `a_degenerate_frame_delta_cannot_reach_a_scene` still says "a longer first frame" while the
+  stretched frame is the second; the phase is comments-only, so it was left.
 
 ### Close triggers
 

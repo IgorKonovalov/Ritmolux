@@ -244,8 +244,8 @@ pub struct FragmentFieldScene {
     /// Shared scene clock (seconds), set by the renderer each frame.
     time: f32,
     /// This frame's elapsed real time, stored by `advance` and consumed by
-    /// `update` — the split ADR-0132 requires, since `advance` runs before this
-    /// frame's parameter values land.
+    /// `update`, where the phases step against this frame's bound rates
+    /// (ADR-0132).
     dt: f32,
     /// The integrated fold and field phases ([`Phase`]). **These are the scene's
     /// only state**: everything else here is derived from `time` and the
@@ -423,8 +423,8 @@ impl Scene for FragmentFieldScene {
     }
 
     fn advance(&mut self, dt: f32) {
-        // Stored, not integrated: the rates this frame will use have not been
-        // set yet (ADR-0132).
+        // Stored, not integrated: `update` steps both phases, so the scene has
+        // one integration site (ADR-0132).
         self.dt = dt;
     }
 

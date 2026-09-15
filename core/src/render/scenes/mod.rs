@@ -275,13 +275,15 @@ pub fn family_params(label: &str) -> &'static [FamilyParam] {
 /// golden baseline moves. Folding a `0.18` in would sum `0.18 · dt` instead and
 /// drift in the last bits of every capture.
 ///
-/// # It steps in `update`, never in `advance`
+/// # It steps where this frame's rate has landed
 ///
-/// The per-frame order is `set_time` → `advance` → `reset_params` → `set_param`
-/// → `update` (`core/src/render/mod.rs`), so a scene stores the `dt` that
-/// [`Scene::advance`] hands it and integrates in [`Scene::update`], where *this*
-/// frame's rate has landed. Integrating in `advance` would use the previous
-/// frame's.
+/// The per-frame order is `reset_params` → `set_param` → `set_time` → `advance`
+/// → `update` (`core/src/render/evaluate.rs`), so by the time either
+/// [`Scene::advance`] or [`Scene::update`] runs, *this* frame's rate is the one
+/// the scene holds. A scene may step a phase in either; the roster's rate
+/// scenes store the `dt` `advance` hands them and step in `update`. The trap is
+/// the sequence itself: moving `advance` back ahead of the bindings would make a
+/// step taken there integrate the last frame's rate.
 ///
 /// The type is arithmetic with no device in it, which is what keeps every rate
 /// in the engine testable on the CPU without rendering anything.

@@ -980,9 +980,8 @@ impl Scene for WarpMeshScene {
     }
 
     fn update(&mut self, frame: &AnalysisFrame) {
-        // The warp phase integrates here rather than in `advance`, because
-        // `advance` runs before this frame's `set_param` calls and would
-        // therefore use the previous frame's rate (ADR-0132).
+        // Both phases step here, against this frame's bound rates, and `advance`
+        // only stores `dt`, so the scene has one integration site (ADR-0132).
         self.warp_phase.step(self.warp_speed, self.dt);
         self.deposit_phase.step(self.deposit_spin, self.dt);
         // Kept for `render`, which drives the per-vertex program and is the only
