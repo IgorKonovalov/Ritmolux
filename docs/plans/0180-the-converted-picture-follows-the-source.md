@@ -10,6 +10,19 @@
 > **Closes:** design-backlog 0214, 0215, 0216
 > **Runs before:** [Plan 0142](0142-the-milkdrop-import-earns-its-verdict.md), all of it (see Decision)
 
+> **Amended 2026-09-15** after Phase 3 parked `plan_wrong`. The changes:
+> - **Phase 3 is re-specified.** `vs_main` serves native and converted presets alike, so Phase 1's
+>   four differing stages move into the source's space **for converted presets only**, selected by a
+>   flag in the warp uniform's free `misc3.y` lane (see `### The warp chain's space`). Native presets
+>   keep today's expressions.
+> - **The bless rule gains a restore step.** A bless on the reference machine rewrites eight
+>   baselines through encoder noise. The phase restores every baseline it does not name, which
+>   conductor sessions may do since `856d5cb`.
+> - **Phase 6 follows Phase 1's table where it corrected the plan.** Modes 1 and 5 read `time` as
+>   well as mode 0. Modes 2 and 3 share one geometry. `SmoothWave` is part of every built-in figure.
+> - Phase 1's local copy at `bee728e` is accepted as the read of `d4c843a`, on the line-for-line
+>   match its note records. Nothing downstream re-reads it.
+
 ## TL;DR
 
 Plan 0173 read MilkDrop 2's released source (`xeiraex/milkdrop2` at `d4c843a`) for two facts and
@@ -113,6 +126,22 @@ may move, and only in the phase that names them.** Each phase that blesses:
 stop. `RLX_BLESS` rewrites every baseline the run renders, so a bless that sweeps a native baseline
 along is the failure this rule exists for.
 
+**The restore step (amended 2026-09-15).** `scenes_match_golden_baselines` is one test that renders
+every fixture, so no filter narrows a bless to one file. Phase 2 measured the cost on the reference
+machine: the bless rewrote eight baselines it had no cause to move, all at mean `≤ 0.0013` and
+outlier `≤ 2`. That is encoder and rasterizer noise, far inside the gate's `0.02` tolerance. So a
+blessing phase:
+
+1. runs the golden binary **without** `RLX_BLESS` first, and records each baseline's mean and outlier;
+2. blesses;
+3. runs `git restore core/tests/golden/<file>` on every baseline the phase does not name;
+4. runs the golden binary without `RLX_BLESS` again, which must pass;
+5. confirms `git status --short core/tests/golden/` lists only the named files.
+
+An unnamed baseline that fails step 4 is a stop. The log sets step 1's readings for the unnamed
+baselines beside Phase 2's. Those readings are measurements on the reference machine, not a threshold
+(ADR-0071), and they are there so the review can see whether a native baseline rose.
+
 ## Architecture diagram
 
 ```mermaid
@@ -126,7 +155,7 @@ flowchart LR
     end
     subgraph core["core/"]
         AN["dsp::Analyzer<br/>+ L/R pair, Phase 5"] --> DRAW["warp_mesh/draw.rs<br/>eight figures, Phase 6"]
-        RV["milk::run_vertex<br/>x/y corrected, Phase 3"] --> VS["warp_mesh vs_main<br/>uv chain, Phase 3 if read differs"]
+        RV["milk::run_vertex<br/>x/y corrected, Phase 3"] --> VS["warp_mesh vs_main<br/>source-space chain when misc3.y set, Phase 3"]
     end
     SRC --> EMIT
     SRC --> RV
@@ -208,18 +237,63 @@ flowchart LR
   - The warp stage's emitted epilogue text is byte-identical to before the phase.
   - Of the golden baselines, only `warp_mesh_shader.png` moves, blessed and named.
 
+### The warp chain's space (amended 2026-09-15)
+
+Phase 1 found four stages that differ from the source: the `sx`/`sy` centre, the procedural warp's
+amplitude, the rotation centre, and `dx`/`dy`. Each is off by `1/A` on the shorter axis. `vs_main` is
+the only warp vertex stage. A native preset without a warp shader uses it through the built-in
+pipeline, and a converted warp shader reuses it too (`encode.rs`). The native fixture `warp_mesh.toml`
+and three shipped presets bind these stages, and their vocabulary is documented in raw uv. So the
+source's space applies to converted presets alone:
+
+- **The signal is a flag in `WarpUniform.misc3.y`**, which is unused today. `upload_uniforms` in
+  `warp_mesh/encode.rs` writes `1.0` when the scene holds a MilkDrop runtime (`scene.milk.is_some()`)
+  and `0.0` otherwise, and the shader's `Warp` struct comment names the lane.
+- **The aspect pair is derived in the shader** from `misc.x`, the render target's aspect (ADR-0037):
+  the longer axis is `1` and the shorter is `short / long`, the construction Phase 1 recorded at
+  `plugin.cpp` l.2027-2028. Nothing new is uploaded for it.
+- **The converted chain** maps the destination uv into corrected space, `(uv - 0.5) * A + 0.5`. It
+  runs zoom, stretch, warp, rotation and translation there. Zoom and rotation need no aspect factor,
+  because corrected space is already isotropic. It then maps back with `(p - 0.5) / A + 0.5`,
+  following l.1877-1916. The warp's sinusoid phases still read raw clip `x`/`y`, as the source's do.
+- **The native chain's expressions stay textually unchanged**, and the stage picks one result with the
+  flag, for example with `select`. A native preset therefore computes exactly the numbers it computes
+  today.
+
+Rejected:
+
+- **One chain for both.** It changes what `cx`/`cy`, `dx`/`dy` and `warp` mean for a native preset at
+  every non-square target. It also moves `warp_mesh.png` and the three `composite_warp_*.png`, and
+  changes `warp_smoke`, `warp_sirocco` and `warp_cauldron` as shipped. This plan rules out a change to
+  the native vocabulary.
+- **Remapping CPU-side in `milk/mod.rs`.** It can move the centres and `dx`/`dy`, but not the
+  procedural warp's per-axis amplitude, which is applied inside `vs_main`. One stage would stay in the
+  wrong space, and the chain would be split across two files.
+- **Per-vertex values in the vertex's spare `t2` lanes.** `A` is one value per frame. Writing it into
+  every vertex spends lanes a later per-vertex output may need, and it carries nothing a uniform
+  cannot.
+- **A second pipeline with its own vertex stage for converted presets.** The two stage orders exist
+  either way. That option puts them in two shader modules instead of side by side in one function,
+  and it adds a pipeline choice at bundle load, all to avoid one uniform read.
+
 ### Phase 3 — The per-vertex program gets the source's `x`/`y`, and the warp chain its space
 - **Owner skill:** dev
 - **What:** `MilkRuntime::run_vertex` hands the program `x`/`y` aspect-corrected as the source does,
-  from the render target's aspect (ADR-0037). If Phase 1's sentence named a warp-chain stage that
-  differs, `vs_main` applies that stage in the source's space too.
-- **Files touched:** `core/src/milk/mod.rs` (`run_vertex` and its doc); if Phase 1 named a stage,
-  `core/src/render/scenes/warp_mesh/shaders.rs` and its tests; tests in `core/src/milk/tests.rs`;
-  `core/tests/golden/warp_mesh_milk.png`, plus `warp_mesh_stroke.png` or `warp_mesh_shader.png` only
-  if a warp-chain stage changed.
+  from the render target's aspect (ADR-0037). `vs_main` runs the four stages Phase 1 named in the
+  source's space for converted presets, as `### The warp chain's space` above specifies. Native
+  presets are unchanged.
+- **Files touched:** `core/src/milk/mod.rs` (`run_vertex` and its doc); tests in
+  `core/src/milk/tests.rs`; `core/src/render/scenes/warp_mesh/shaders.rs` (`vs_main`, and the `Warp`
+  struct's lane comment); `core/src/render/scenes/warp_mesh/encode.rs` (`upload_uniforms`, the flag);
+  the warp-chain tests in `core/src/render/scenes/warp_mesh/tests.rs`; the converted baselines
+  `warp_mesh_milk.png`, `warp_mesh_stroke.png` and `warp_mesh_shader.png`, each only if it moves.
 - **Notes for the implementer:**
   - `rad` and `ang` already match the source (Plan 0173). Leave them unchanged, and leave their test
     unchanged.
+  - **Read the golden binary between the two halves**, without blessing. Make the inputs change
+    first and record each converted baseline's mean and outlier. Then make the chain change and record
+    them again. The phase is still one commit. The two readings are what let the log name each moved
+    baseline's cause, as the Decision asks.
   - `run_vertex`'s doc explains why a converted preset's `rad` differs from the native one. Add `x`/`y`
     to that explanation in the same register.
   - **Only converted presets reach `run_vertex`.** The native `[per_vertex]` vocabulary reads
@@ -227,8 +301,11 @@ flowchart LR
   - `warp_mesh_milk` reads `x`, so its baseline moves. The two `milk_wash` fixtures read only `rad`
     and `time` from the per-vertex register set, so their probe readings should not move from the
     inputs change. If they do, that is a finding for the log.
-  - If a warp-chain stage changes, every converted baseline may move. Name each move against the
-    stage that caused it.
+  - The chain change can move every converted baseline and the `milk_wash` probe's readings, since
+    both fixtures run the warp. Name each move against the half that caused it, and record the probe's
+    new table in the log without editing its dated history.
+  - **Test at a non-square target.** At a square target `A = (1, 1)` and the two chains agree, so a
+    test there cannot tell which chain ran. That agreement is itself worth one assertion.
 - **Done when:**
   - At a 16:9 target, the per-vertex program reads:
     - `x = 0` at the left edge, `1` at the right, `0.5` at the centre;
@@ -236,9 +313,19 @@ flowchart LR
       increasing downward.
   - At a square target it reads `0..1` on both axes. At a portrait 9:16 target the roles swap: `x`
     spans `0.5 ± 0.28125` and `y` spans `0..1`.
-  - Each warp-chain stage Phase 1 named has a test asserting the source's construction for that
-    stage, or the log records that Phase 1 named none.
-  - Only the baselines this phase names move.
+  - Each of the four stages has a test on a **converted** scene at a 16:9 target, asserting the
+    source's construction through whatever seam the warp-mesh tests already use to observe where a
+    vertex samples from:
+    - a `dy` alone moves the sampled uv by `dy / 0.5625` on y, and a `dx` alone by `dx` on x;
+    - a `sy` stretch about `cy = 0.7` holds raw `v = 0.5 + 0.2 / 0.5625 ≈ 0.8556` fixed. The same
+      holds for rotation about that centre;
+    - the procedural warp's y displacement is `1 / 0.5625` times the native chain's for the same
+      `warp`, and its x displacement is equal.
+  - At a square target a converted and a native scene with the same outputs sample the same uv, within
+    float rounding.
+  - The native flag is `0.0`: a native scene's uploaded `misc3.y` is asserted, and `warp_mesh.png`
+    and the three `composite_warp_*.png` pass without a bless.
+  - Only converted baselines move, each named with its cause, under the Decision's restore step.
 
 ### Phase 4 — The seam is found
 - **Owner skill:** dev
@@ -258,6 +345,9 @@ flowchart LR
     - **Right edge (`+x`):** means a mirror somewhere between the uv `run_vertex` is given and the
       mesh position it lands on. Find it and repair it.
     - **Anything else:** a finding. Record the ray and what was ruled out, and stop the branch.
+    - **Both horizontal rays**, as Phase 1 saw on *Songflower*: judge each ray on its own branch. A
+      hard colour step on one ray and a thin dark line on the other are different symptoms, and one
+      cause need not explain both.
   - **Never smooth the wrap.** Presets use the cut deliberately.
   - The test's **assertions** are about the native `vertex_position` and stay true. Only its doc
     changes: it states the native convention and nothing about MilkDrop or the reference (ADR-0071).
@@ -322,19 +412,28 @@ flowchart LR
     mode 6, a full-scale 200 Hz sine at `fWaveScale = 1`, Plan 0127, `0.316` frame heights
     peak-to-peak. Its derivation is `((0.316 - 0.0019) / 2) / 0.125 ≈ 1.256`. It multiplies the
     sample term only, never a base radius, separation or extent.
-  - **Mode 0 turns at `time * 0.2`**, per the source. That takes `time` back into `draw.rs` for
-    mode 0 alone. `build`'s doc already anticipates this: *"a future mode that legitimately animates
-    would rename it back, and would owe that test a reason"*. So `_time` becomes `time`. The
+  - **Modes 0, 1 and 5 read `time`**, per Phase 1's table (amended 2026-09-15; the plan first said
+    mode 0 alone). Mode 0's angle adds `time * 0.2` (l.2886-2925), mode 1's adds `time * 2.3`
+    (l.2942), and mode 5 turns by `time * 0.3` (l.3085-3086). That takes `time` back into `draw.rs`
+    for those three modes. `build`'s doc already anticipates this: *"a future mode that legitimately
+    animates would rename it back, and would owe that test a reason"*. So `_time` becomes `time`. The
     time-independence claim, and `draw_layer.rs`'s check that calls `build` at two separated times,
-    narrow to every mode but 0, with the source line as the reason. The mode-6/7 "no time term"
-    comment stays, because the source has none there.
+    narrow to modes 2, 3, 4, 6 and 7, with the three source lines as the reason. The mode-6/7 "no time
+    term" comment stays, because the source has none there.
+  - **`SmoothWave` is part of every built-in figure** (amended 2026-09-15). Phase 1 recorded it at
+    l.2549-2577, applied once after construction to every mode (l.3319-3335), and separately to each
+    side of mode 7's break. It inserts a midpoint between each pair of points, so `n` points become
+    `2n - 1` and every original point keeps its position at an even index. Custom waves are outside
+    this plan's figure contract, which covers the eight built-in modes (backlog 0216), so they are not
+    smoothed here. The close may raise a backlog entry for them.
   - **Every comment that describes a mode's figure cites the source** by file, function and line at
     `d4c843a`, and no comment attributes a figure to "the reference" (ADR-0071; backlog 0216 names
     this prose error).
   - **`every_wave_mode_builds_a_different_figure` holds this engine to eight distinct figures, and the
-    source is now the contract.** If Phase 1 found two modes whose source figures coincide, that
-    test's claim is retired for that pair, with a comment naming the source lines. Distinctness is not
-    worth an invented difference.
+    source is now the contract.** Phase 1 found that modes 2 and 3 coincide: mode 3 is mode 2's
+    geometry line for line, and the two differ only in alpha (l.2977-3004, alpha at l.2982-2991). The
+    test's claim is retired for that pair, with a comment naming those lines. Distinctness is not worth
+    an invented difference. Per-mode alpha is not in this plan.
   - Mode 6's per-unit-sample offset becomes `0.125 * k ≈ 0.157` frame heights, up from `0.15`. Plan
     0127's objection (the corpus's `p90` touching the frame edge) is answered: the source does not
     clamp either (archived 0120).
@@ -344,15 +443,19 @@ flowchart LR
 - **Done when:**
   - `draw_layer.rs` asserts, for each mode, the construction Phase 1's table records, as geometry and
     not from a capture:
-    - **Mode 6** at `wave_scale = 1` on a full-scale trace draws peak-to-peak `2 * 0.125 * k` frame
-      heights plus the stroke width as the geometry builds it. On `k`'s own derivation that is Plan
-      0127's host reading, `0.316`.
+    - **Mode 6** at `wave_scale = 1` on a full-scale trace, measured over the figure's original points
+      (the even indices `SmoothWave` keeps), draws peak-to-peak `2 * 0.125 * k` frame heights plus the
+      stroke width as the geometry builds it. On `k`'s own derivation that is Plan 0127's host
+      reading, `0.316`.
     - **Mode 0**'s radius is the source's base at a zero sample and changes by `k` times the source's
       coefficient per unit sample. At two times a quarter turn apart, the figure has turned by `0.2`
-      rad/s times their difference.
+      rad/s times their difference. Modes 1 and 5 turn at `2.3` and `0.3` rad/s by the same check.
+    - Every built-in figure of `n` constructed points has `2n - 1` points, and its even-indexed points
+      are the constructed ones.
   - With Phase 5's pair: a left-only trace in modes 2-3 collapses to a line along one axis, and a pair
-    whose channels differ draws a figure with nonzero enclosed area. If Phase 5 stopped: the mono
-    stand-in draws a closed loop in modes 1-3, and the log records the stand-in.
+    whose channels differ draws a figure with nonzero enclosed area. If Phase 5 stopped: in modes 2-3
+    the mono stand-in, on a sine whose half-period does not divide 32 samples, draws a figure with
+    nonzero extent on both axes, and the log records the stand-in.
   - A custom wave whose per-point program plots `value1` against `value2` draws a non-degenerate
     figure from a pair whose channels differ.
   - Only converted baselines move, each named. `warp_mesh.png` and `composite_warp_*.png` are
@@ -385,9 +488,13 @@ pub fn run_wave_point(&mut self, index: usize, sample: f32, left: f32, right: f3
   every mode shares, and names that as an inference. The confirmation is a unit-scale mode-0 capture
   in Plan 0142 Phase 4's rig session. If it disagrees, ADR-0199 gets an `Outcome` and a per-mode
   factor becomes a follow-up, not a silent re-tune.
-- **The warp-chain read may find more than inputs.** If `dx`/`dy`'s magnitude or a stretch's centre
-  differs, every converted preset moves at once. Phase 3 then carries a larger re-bless than its
-  title suggests. The per-stage test requirement is what keeps that honest.
+- **The warp-chain read found more than inputs** (Phase 1). Every converted preset that binds a
+  stretch centre, `dx`/`dy`, a rotation centre or `warp` moves at a non-square target, so Phase 3
+  carries a larger re-bless than its title suggests. The per-stage tests and the readings taken between
+  its two halves are what keep that honest. A native preset moves nothing, by the flag's construction.
+- **The flag is a per-scene switch between two copies of a stage order.** A later edit to one chain's
+  order that misses the other lets the two drift apart. The square-target agreement test is the
+  tripwire for that.
 - **Phase 4 may find neither ray.** The branch for that is a recorded finding and a stop, not a
   speculative repair, and the entry stays live with a dated update.
 - **Phase 5's cost is on the render thread's analysis path.** It is not the audio callback, but it
