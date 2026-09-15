@@ -208,7 +208,7 @@ until it merges. Run it as a human-started `dev` lane.
 | 2 — A backlog probe is judged by the close, not parked before it | dev | done | `24300e7` |
 | 3 — A park leaves a lane that can be resumed | dev | done | `856d5cb` |
 | 4 — A lane that stops says why | dev | done | `f15ce4a` |
-| 5 — The pilot, resumed | human | not started | |
+| 5 — The pilot, resumed | human | done | run 2026-09-15, no commit of its own |
 
 ### Notes
 
@@ -231,4 +231,6 @@ until it merges. Run it as a human-started `dev` lane.
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0
 - **Full suite:** `cargo nextest run --workspace`, exit 0 - 1933 tests run: 1933 passed (7 slow),
   6 skipped. Conductor tests: `node --test "tools/conductor/test/*.test.mjs"`, 124 pass, 0 fail.
-- **Outstanding `human` phases:** Phase 5 - the pilot, resumed
+- **Outstanding `human` phases:** none. Phase 5 ran 2026-09-15: 3 merged (0185 `v0.123.1`, 0181
+  `v0.123.2`, 0182 `v0.124.0`), 0 parked, 3 h 38 min, $55.33, zero fix rounds. Recorded in ADR-0205's
+  Outcome. The owner's push decision is theirs and is not a phase.

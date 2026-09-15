@@ -246,3 +246,73 @@ judgement.
   would have opened nothing more. Lane b is reconsidered only after a conductor-run plan has merged
   end to end, and only together with the cap. Two lanes of parks need either a higher cap or fewer
   parks, and this run showed neither.
+
+**2026-09-15, the pilot: lane a, 09:32 to 13:10.** Recorded from the digest, `state/conductor.json`
+and `state/locks.jsonl`. **Not by a fresh session** — Plan 0188 Phase 5 asks for one, and this was
+written by the session that operated the run, on the owner's instruction. What follows is observed
+record and two sequencing judgements; it is not a review of anything that session wrote, and the
+three plans' own closes were run by the conductor as separate processes, as the Decision requires.
+
+- **What ran.** Queue `a: 0175, 0185, 0181, 0180, 0182`, `max_open_worktrees = 3`, one lane.
+  Result: **3 h 38 min, 3 merged, 0 parked, $55.33 notional.** 0185 closed at `v0.123.1` (merge
+  `538f736`, $16.23 including the prior run's implement), 0181 at `v0.123.2` (`7417dfb`, $22.02),
+  0182 at `v0.124.0` (`c116c80`, $20.79). **Zero fix rounds**: every plan passed review round 1 with
+  no blocker and no major. 0175 and 0180 stayed parked from the previous run and were not resumed.
+- **The path the Decision describes has now run end to end.** Everything the 2026-09-14 entry
+  recorded as never observed live has been observed: the review session and its `--add-dir`, the
+  close, the close lock, the close-tip gate this ADR's first Outcome added, the version bump with
+  the studio's two copies following it, the annotated tag, the fast-forward, the worktree removal
+  and the branch delete. The fix that no one had reviewed is the gate that passed three closes.
+- **One of Plan 0188's four fixes was proven live; three were not exercised.** Fix 2 is proven:
+  0185's `pre-review` had gone red on a backlog probe on 2026-09-14 and went green here, with
+  `check-backlog-claims.mjs` running at `post-close` instead and passing. The other three were not
+  reached — no run started on a missing `state/`, no plan parked, and no lane hit the worktree cap,
+  because closing lanes freed slots as fast as new ones opened. They are committed and unit-tested,
+  and this run is not evidence for them.
+- **The clearing procedure for a CLI update is a new cost, paid before the run started.** The
+  installed CLI had moved `2.1.270` to `2.1.272` on its own and `preflight` refused to open a lane.
+  Clearing it took a probe run ($0.15, two haiku sessions), a reading of its JSON against
+  `spike/README.md`'s prose table, an edit to `VERIFIED_CLI` and a commit (`3381990`) — none of which
+  a lane can do. The guard behaved correctly and should stay. Captured as backlog 0224.
+- **The gate is a third of the wall clock, and the suite is most of it.** 145 min of the 218 was
+  model sessions; the other 72 min was conductor gate runs, in five inter-step gaps of 11-14 min
+  plus a 12 min tail. Measured separately from `locks.jsonl`: **a full `cargo nextest run
+  --workspace` holds the suite lock for 10.4 to 11.0 min**, and seven of them ran inside this run,
+  plus two `-P fast` runs at 7.4 and 8.1 min — about 90 min of suite time in total, some inside
+  session steps and some in the conductor's own gates. `defaultGate()`'s heavy commands run twice
+  per plan, at `pre-review` and again at `post-close`. Captured as backlog 0223.
+- **The digest's "Suite-lock wait 15 min" is not lane contention, and on one lane nothing contended
+  for work.** All fourteen of those minutes are **three `cargo nextest list` calls** — metadata
+  queries that execute no tests — blocked behind full suite runs at 12:16 and 12:27. Every entry
+  that actually ran tests waited 0.0 min. The lock does not distinguish listing from running.
+- **The usage reading moved, and the digest still cannot show it.** Sessions reported the owner's
+  seven-day window at 0.84-0.85 on 2026-09-14 and at **0.01** on 2026-09-15, the window having
+  rolled overnight; the digest reports dollars in both cases. Under subscription auth the dollar
+  figure is not the operator's constraint. Captured as backlog 0222, which also records that
+  `rate_limit_info.utilization` moved under `unifiedWindows.seven_day` between the two CLI versions.
+- **A review finding was left open for a rule that does not exist.** 0182's review recorded a minor
+  under `.claude/skills/preset-author/references/` and left it open because *"this session may not
+  edit .claude/"*; `settings.conductor.json` denies nothing there and the `dev` skill prohibits
+  nothing. The real constraint is probably lane ownership, which is written down nowhere. Captured
+  as backlog 0225.
+- **Seven minors and three nits were left open across the three closes**, none of them blocking.
+  Four are comments describing an order Plan 0181 retired. One is a duplicated constant with no gate
+  holding it equal to the private one it mirrors (`standalone/src/shot/report.rs:110`).
+- **Plan 0187 Phase 6 is discharged on the condition that failed, and two owner statements remain.**
+  Its done-when asked for two plans closed on `main` with annotated tags, worktrees and branches
+  gone, and no owner action between `run` and the second merge. Three plans met it. What is not yet
+  on the record is the owner's own reading — whether the digest alone told them what happened — and
+  the push, which is theirs and had not been made when this was written. Those are the same two
+  items Plan 0188 Phase 5's done-when names.
+- **Lane b stays off, and the cap stays at 3 — now for a measured reason.** The suite lock is
+  machine-wide and a full suite run is ~10.7 min; seven ran here. Two lanes cannot overlap any of
+  that, so a second lane can only overlap the ~128 min that is not suite-locked, and it would queue
+  behind lane a for the rest. The cap was never the binding constraint this run: two parked lanes
+  held two of the three slots throughout and the lane still never wanted a second slot, because a
+  lane is serial by construction — one plan was active at every moment. **Raising the cap buys
+  nothing without a second lane, and a second lane buys much less than 2x while doubling worktree
+  disk** ([ADR-0053](0053-plan-lanes-run-in-git-worktrees.md)'s severe and recurring cost, live
+  again since [ADR-0147](0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md)).
+  Revisit only after backlog 0223: if the gate stops re-running a suite over a tree it already
+  passed, the serialized fraction falls and the arithmetic changes. Until then this is a decision
+  against parallelism on measured grounds, not a deferral for want of evidence.
