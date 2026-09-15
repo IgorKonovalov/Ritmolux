@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0207.** *(0200 is reserved for [Plan 0186](../plans/0186-the-flatness-gate-tells-a-figure-from-its-ground.md) Phase 2, which writes it whichever way its stop gate falls.)* *(0120 was reserved for
+**Next free number: 0210.** *(0200 is reserved for [Plan 0186](../plans/0186-the-flatness-gate-tells-a-figure-from-its-ground.md) Phase 2, which writes it whichever way its stop gate falls.)* *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -227,4 +227,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0204](0204-a-cheap-integration-test-shares-one-binary-and-a-test-that-needs-its-own-stays-its-own.md) | A cheap integration test shares one binary per package, and a test that needs its own binary keeps one | proposed (Plan 0177), extends 0156 |
 | [0205](0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md) | An approved plan runs under a conductor, and every judgement it cannot make parks the plan | accepted 2026-09-14 (Plan 0187), Outcome; supersedes 0188 in part |
 | [0206](0206-a-promoted-backlog-entry-leaves-the-live-file.md) | A promoted backlog entry leaves the live file, and the ledger lives in the archive | accepted 2026-09-15, amends 0108, 0116 |
+| [0207](0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md) | A suite run the conductor observed green is not run again on the same tree | proposed (Plan 0189), amends 0205, 0156 |
+| [0208](0208-a-patch-cli-update-runs-with-a-warning-and-every-session-proves-the-hooks-ran.md) | A patch CLI update runs with a warning, and every session proves the hooks ran | proposed (Plan 0189), amends 0205 |
+| [0209](0209-a-conductor-close-repairs-the-prose-and-comments-its-findings-name.md) | A conductor close repairs the prose and comments its findings name | proposed (Plan 0189), amends 0205 |
 <!-- roster:end -->
