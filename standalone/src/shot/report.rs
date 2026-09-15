@@ -357,7 +357,7 @@ fn build_family_report(
 
         // The in-frame geometry diagnostic rides the fully-driven capture the
         // coverage column already takes, scoped to exactly that capture — it is
-        // asserted byte-inert (`core/tests/geometry_extent.rs`), so the only
+        // asserted byte-inert (`core/tests/suite/geometry_extent.rs`), so the only
         // cost is a CPU loop over the segment list. `take_draw_extent` yields
         // the last drawn frame's measurement, and nothing at all for a preset
         // that drew through no line renderer — which is how the non-line
@@ -847,7 +847,7 @@ fn write_holds(out: &mut String, fam: &FamilyReport) {
 /// library trips over two hundred of them and every one only narrows a
 /// parameter's real range. A saturated one is a binding that has stopped
 /// reading the audio at all, it is a HARD failure in
-/// `core/tests/saturation.rs`, and there should be **none** here. A list that is
+/// `core/tests/suite/saturation.rs`, and there should be **none** here. A list that is
 /// ever long is a library-wide event, not a table to skim.
 fn write_saturation(out: &mut String, fam: &FamilyReport) {
     let saturated: Vec<(&str, &GateReport)> = fam
@@ -871,7 +871,7 @@ fn write_saturation(out: &mut String, fam: &FamilyReport) {
     let _ = writeln!(
         out,
         "  a clamp pinned at its bound is a gain, not a limit: divide it until the \
-         bound is reached only on peaks. `core/tests/saturation.rs` fails on these \
+         bound is reached only on peaks. `core/tests/suite/saturation.rs` fails on these \
          unless the preset declares an [occupancy] exemption"
     );
     for (name, gate) in &saturated {
@@ -1200,7 +1200,7 @@ fn is_dead_gate(gate: &GateReport) -> bool {
 }
 
 /// Whether this flag is a `clamp()` that spent the run pinned at its upper
-/// bound (ADR-0062) — the finding `core/tests/saturation.rs` gates on.
+/// bound (ADR-0062) — the finding `core/tests/suite/saturation.rs` gates on.
 fn is_saturated(gate: &GateReport) -> bool {
     matches!(gate.flag.kind, GateKind::Saturated { .. })
 }

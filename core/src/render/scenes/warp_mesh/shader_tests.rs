@@ -11,7 +11,7 @@
 //! produces a rotation, so the rows are orthonormal to `f32`).
 //!
 //! The GPU half — `MilkShaderResources::build`, the bind groups, the blur chain
-//! — is `core/tests/warp_mesh.rs`'s, driven by the shader-carrying fixture
+//! — is `core/tests/suite/warp_mesh.rs`'s, driven by the shader-carrying fixture
 //! Phase 2 writes.
 
 // Test asserts panic on failure; allowed here over the module's hot-path pragma.

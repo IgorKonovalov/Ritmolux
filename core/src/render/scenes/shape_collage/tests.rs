@@ -239,7 +239,7 @@ fn a_thousand_recompositions_never_reallocate() {
 /// Global allocator that counts allocation calls **per thread**, so the test
 /// below can assert that a region on this thread performs no heap allocation
 /// while the rest of the binary allocates freely in parallel. Lifted verbatim
-/// in shape from `core/tests/preset.rs`, which needs the same thing for the
+/// in shape from `core/tests/suite/preset.rs`, which needs the same thing for the
 /// expression evaluator; the reasoning for the thread-local counter is there.
 ///
 /// It is a `System` pass-through, so nothing about how this crate's tests
@@ -260,7 +260,7 @@ fn a_thousand_recompositions_never_reallocate() {
 /// whole interface, and a test in another module reaches it through
 /// `crate::render::scenes::shape_collage::tests`. If a third caller appears,
 /// that is the signal to hoist both into a shared test-support module; two is
-/// not yet worth the move. `core/tests/preset.rs` has its own copy and does not
+/// not yet worth the move. `core/tests/suite/preset.rs` has its own copy and does not
 /// collide, because an integration test is its own binary.
 struct CountingAlloc;
 

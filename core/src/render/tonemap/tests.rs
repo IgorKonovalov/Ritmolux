@@ -104,7 +104,7 @@ fn the_roll_off_preserves_channel_ratios() {
 
 /// The fixture both GPU assertions run on: a dense additive rose whose
 /// strokes cross each other everywhere. Shared with
-/// `core/tests/composite.rs`, which pins the same figure to a baseline — one
+/// `core/tests/suite/composite.rs`, which pins the same figure to a baseline — one
 /// definition, two guards.
 const OVERLAP_FIXTURE: &str = include_str!("../../../tests/fixtures/composite_overlap.toml");
 

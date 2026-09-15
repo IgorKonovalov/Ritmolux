@@ -297,7 +297,7 @@ pub const TRAP_RADIUS_LIMIT: f32 = 256.0;
 
 /// The parameter names this scene consumes — the vocabulary a preset binding is
 /// checked against at load (ADR-0020). **Keep in sync with `set_param` below**;
-/// `declared_params_match_set_param` in `core/tests/preset.rs` fails if the two
+/// `declared_params_match_set_param` in `core/tests/suite/preset.rs` fails if the two
 /// drift, and [`FAMILY_PARAMS`] says which family reads each family-bound one.
 pub const PARAMS: &[ParamSpec] = &[
     ParamSpec {

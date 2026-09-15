@@ -260,7 +260,7 @@ transient probe reads back a 48-frame (0.8 s) window, and a release constant lon
 does not settle inside it; the marker says the number is short, without saying by how much. On top of
 that the probe measures the *frame*, not the parameter, so a fragment field's own fold motion is
 mixed into every reading. So `4+` is evidence the easing is doing something and is not a measurement
-of how much. Easing is *proven* in `core/tests/easing.rs` against fixtures built for the purpose;
+of how much. Easing is *proven* in `core/tests/suite/easing.rs` against fixtures built for the purpose;
 everything here is a preset-shaped approximation of that, and
 [`docs/capturing.md`](capturing.md#what-the-transient-columns-cannot-see) is honest about it at
 length.

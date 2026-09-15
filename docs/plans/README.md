@@ -540,8 +540,8 @@ Kept here after [0053]'s close because it is not that plan's property — it app
 that could move a render. **Do not `git diff` the committed baselines.** On this box **eight
 baselines drift from their committed bytes under `RLX_BLESS`** (`composite_bloom`, `composite_kaleido`,
 `composite_overlap`, `composite_trails`, `line_joint_zigzag`, `lsystem`, `parametric_curve`,
-`star_pattern`), so a naive diff convicts eight files the change never touched. Bless every binary
-in scope (`--test golden --test composite --test line_joints --test attractor_trails`) and compare
+`star_pattern`), so a naive diff convicts eight files the change never touched. Bless every scope
+(`--test golden`, then `--test suite -- composite:: line_joints:: attractor_trails::`) and compare
 **bless-to-bless**, then `git checkout -- core/tests/golden`.
 
 [0053]'s close used a tighter form of this than the clean-`main` control it was handed, and it is

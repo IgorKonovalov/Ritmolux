@@ -166,7 +166,7 @@ const DUAL_LIVE_BUDGET_MS: f32 = 18.0;
 /// composite's per-second decay, the transition's step, the MilkDrop runtime's
 /// envelopes, the cellular generation clock, the now-playing banner. A second
 /// finiteness guard on a `dt` anywhere in `core/src/` fails
-/// `core/tests/hygiene.rs`, because a second guard is a second policy.
+/// `core/tests/suite/hygiene.rs`, because a second guard is a second policy.
 ///
 /// **Every `Renderer` entry that takes a caller's `dt` calls this as its first
 /// statement** and hands its result — never the raw value — to the scene clock,

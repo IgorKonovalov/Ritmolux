@@ -2,7 +2,7 @@
 //! (Plan 0100 Phase 2's done-when).
 //!
 //! `core/tests/fixtures/warp_mesh_milk.toml` carries a converted preset's
-//! bytecode as assembly text, and `core/tests/warp_mesh.rs` renders it. Neither
+//! bytecode as assembly text, and `core/tests/suite/warp_mesh.rs` renders it. Neither
 //! of those can compile EEL2 — that is this crate's half — so without this file
 //! the fixture's stated source and its actual bytecode would be two things that
 //! agree today and nothing ties them.

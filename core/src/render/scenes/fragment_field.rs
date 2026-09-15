@@ -352,7 +352,7 @@ impl FragmentFieldScene {
 /// The parameter names this scene consumes — the vocabulary a preset binding
 /// is checked against at load, so a typo is warned about instead of silently
 /// doing nothing (ADR-0020). **Keep in sync with `set_param` below**; the
-/// `declared_params_match_set_param` guard in `core/tests/preset.rs` fails if
+/// `declared_params_match_set_param` guard in `core/tests/suite/preset.rs` fails if
 /// the two drift.
 pub const PARAMS: &[ParamSpec] = &[
     ParamSpec {

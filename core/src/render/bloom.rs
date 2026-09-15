@@ -102,7 +102,7 @@
 //! covering it are the same picture, so no fixture here can see that
 //! defect. `a_backdrop_under_an_active_halo_only_ever_adds_light` below
 //! is the guard that does, the same shape as
-//! `core/tests/kaleidoscope.rs`'s for the fold; **it reads the linear
+//! `core/tests/suite/kaleidoscope.rs`'s for the fold; **it reads the linear
 //! composite rather than a capture**, and its docs say why a
 //! display-byte version of the same assertion cannot be written.
 //!

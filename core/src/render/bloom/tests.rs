@@ -74,7 +74,7 @@ fn the_rich_tier_runs_a_deeper_pyramid_than_the_floor() {
 /// `bloom_radius` moves the halo's energy outward monotonically, and stays
 /// inside the band where the up-chain's sum converges. The **pixel-level**
 /// consequence — the halo actually sits further out — is
-/// `core/tests/bloom.rs`; this pins the arithmetic behind it.
+/// `core/tests/suite/bloom.rs`; this pins the arithmetic behind it.
 #[test]
 fn scatter_rises_with_the_radius_and_stays_below_one() {
     let mut last = -1.0;
@@ -119,7 +119,7 @@ fn the_pyramid_sum_matches_the_series_it_normalizes() {
 // -----------------------------------------------------------------------
 
 /// The fixture, shared with `composite.rs`'s blessed baseline and
-/// `core/tests/bloom.rs`: a small bright core on black, over range by design.
+/// `core/tests/suite/bloom.rs`: a small bright core on black, over range by design.
 /// Its `bg_bright` line is stripped and rewritten per capture — the whole
 /// point here is the value it does *not* ship.
 const BACKDROP_FIXTURE: &str = include_str!("../../../tests/fixtures/composite_bloom.toml");
@@ -166,7 +166,7 @@ fn half_slack(value: f32) -> f32 {
 /// the defect is unmasked — the same fixture reads a worst deficit of
 /// **0.3125** linear on the unclamped shader against **0.0000** on the fixed
 /// one. That readback is `pub(crate)`, which is why this test is here rather
-/// than beside the stage's other pixel properties in `core/tests/bloom.rs`.
+/// than beside the stage's other pixel properties in `core/tests/suite/bloom.rs`.
 ///
 /// # Why it needed writing at all
 ///
@@ -174,7 +174,7 @@ fn half_slack(value: f32) -> f32 {
 /// call (see the fixture's own comment), and it is also why the one stage in
 /// the chain that can exceed alpha 1 had no lit-backdrop test. On black,
 /// subtracting the backdrop and covering it are the same picture. Same shape
-/// as the guard `core/tests/kaleidoscope.rs` installed for the fold, and the
+/// as the guard `core/tests/suite/kaleidoscope.rs` installed for the fold, and the
 /// blind spot ADR-0055's Negative section names outright.
 #[test]
 fn a_backdrop_under_an_active_halo_only_ever_adds_light() {

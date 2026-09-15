@@ -8,7 +8,7 @@
 //! coverage gap Plan 0061 Phase 4b left open when it scoped that test down).
 //!
 //! Everything here is GPU-free. The one function that needs a device -
-//! `build_family_report` - stays covered by `standalone/tests/shot_cli.rs`.
+//! `build_family_report` - stays covered by `standalone/tests/suite/shot_cli.rs`.
 
 // Tests index, expect and panic freely; this is not the render path.
 #![allow(clippy::expect_used, clippy::indexing_slicing, clippy::panic)]

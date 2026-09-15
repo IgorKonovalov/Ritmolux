@@ -9,7 +9,7 @@
 //! zero yields `0`, `log(0)` yields `0`, an out-of-range `megabuf` index reads
 //! `0` and writes nowhere, an unbalanced pop reads `0`, and every loop is bounded
 //! by [`Budget::loops`]. `unwrap`/`expect`/`panic`/`indexing` are denied on
-//! this path by the Plan 0002 pragma below, and `core/tests/hygiene.rs` scans
+//! this path by the Plan 0002 pragma below, and `core/tests/suite/hygiene.rs` scans
 //! this directory so the denial is enforced rather than intended.
 //!
 //! **Allocation-free per frame.** Everything a run needs — the operand stack, the

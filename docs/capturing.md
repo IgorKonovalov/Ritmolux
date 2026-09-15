@@ -255,7 +255,7 @@ covered. A world with two equal grounds, a duotone, gets one of them; the header
 line is how you see which.
 
 Two properties hold and are asserted rather than assumed
-(`standalone/tests/shot_cli.rs`): the same world at the same horizon produces
+(`standalone/tests/suite/shot_cli.rs`): the same world at the same horizon produces
 **identical** rows across runs, and a row at interval *k* does not depend on how
 far the run was asked to go **as long as the two runs name the same ground** — so
 a two-minute run and a ten-minute run agree on every row they share when their
@@ -305,7 +305,7 @@ under load, and different every run. Nothing in this path races a display — `d
 is injected ([ADR-0013](adrs/0013-c-abi-v4-render-dt.md)), the DSP is a pure function of its input window
 ([NFR §6](nfr.md#6-determinism)), and the grammar's randomness is pinned
 ([ADR-0051](adrs/0051-seeded-grammar-randomness-with-per-run-opt-in.md)). Two runs of the same command produce **byte-identical** streams, and
-that is asserted in `standalone/tests/shot_cli.rs` rather than inferred.
+that is asserted in `standalone/tests/suite/shot_cli.rs` rather than inferred.
 
 **A render draws the attractor denser than a window does, deliberately**
 ([ADR-0140](adrs/0140-a-sample-budget-is-a-density-against-the-render-target.md)).
@@ -442,7 +442,7 @@ other two `unknown`, so the loss is in the encoder wrapper. Setting them on x264
 directly lands all four, and the flags stay beside it — they carry the same
 values and are what a build that honours them reads. Nothing about the encoded
 picture changes; this is metadata. `the_four_colour_tags_survive_into_the_container`
-in `standalone/tests/shot_cli.rs` reads them back off a produced file wherever
+in `standalone/tests/suite/shot_cli.rs` reads them back off a produced file wherever
 `ffmpeg` and a GPU are both present, so the claim above is checked rather than
 asserted.
 
@@ -451,7 +451,7 @@ stderr is drained on a thread — echoed line by line as it arrives, and kept �
 if it exits non-zero `shot` exits non-zero quoting its last words. Writing into a
 full pipe blocks until the encoder drains it, which *is* the backpressure
 handling: nothing is buffered on this side of it. Both halves are asserted in
-`standalone/tests/shot_cli.rs`, the second against a stand-in encoder that dies
+`standalone/tests/suite/shot_cli.rs`, the second against a stand-in encoder that dies
 on its first argument.
 
 **`ffmpeg` is a prerequisite, and its absence is a named error naming the flag** —
@@ -911,7 +911,7 @@ reads `26 / 31` where a purpose-built near-linear fixture at a 0.5 s release rea
 
 **Read the columns as evidence, not as a verdict.** A wide `fall / rise` gap is
 good evidence the easing is working. A narrow one is not evidence it is broken.
-The place easing is proven is `core/tests/easing.rs`, against fixtures built to
+The place easing is proven is `core/tests/suite/easing.rs`, against fixtures built to
 have a near-linear response precisely so the measurement is of the easing and not
 of a scene; everything else is a preset-shaped approximation of that.
 
@@ -1127,7 +1127,7 @@ unlike the rest of the reachability block they are backed by a gate.
 
 #### Saturation: a HARD gate on clamp occupancy
 
-`core/tests/saturation.rs` runs the same walk over the embedded set and **fails
+`core/tests/suite/saturation.rs` runs the same walk over the embedded set and **fails
 the build** on any `clamp()` whose occupancy reaches the threshold. It is the one
 part of the reachability block that is not advisory, and the reason is the one
 [Plan 0048](plans/done/0048-analysis-v2-and-the-retune.md) Phase 7 supplies: for the whole window between [ADR-0049](adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md) landing and the

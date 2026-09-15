@@ -21,7 +21,7 @@
 //! platform code, which is exactly what `core` may not hold, and `core` cannot
 //! dev-depend on the standalone without a cycle. Plan 0115 Phase 2's file list
 //! put it in `core/tests/`; the byte-identity half is there
-//! (`core/tests/frame_tap.rs`) and this half is here, so the helper is reused
+//! (`core/tests/suite/frame_tap.rs`) and this half is here, so the helper is reused
 //! rather than written a second time.
 //!
 //! Software adapter (`prefer_software`) so it runs wherever `shot`'s

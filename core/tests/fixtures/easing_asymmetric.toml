@@ -1,7 +1,7 @@
 # EASING PROBE FIXTURE - do not tune; this is a baseline, not a look.
 # Plan 0037 Phase 1. Its twin is easing_scalar.toml: the two carry the SAME
 # `[curve]` family and the SAME `[params]` bindings, differing only in their
-# `name` and their `[smoothing]` table. core/tests/easing.rs asserts that, because
+# `name` and their `[smoothing]` table. core/tests/suite/easing.rs asserts that, because
 # the probe's whole claim is that the table is the only thing that differs.
 #
 # WHY IT LOOKS LIKE THIS. The probe measures the FRAME, not the parameter

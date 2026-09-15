@@ -1,8 +1,9 @@
 //! The helpers every GPU integration test in `core/tests/` opens with.
 //!
 //! `core/tests/common/` is a directory, not a top-level `.rs`, so cargo does not
-//! compile it as its own test binary; each test file pulls it in with
-//! `mod common;` and it is rebuilt into that binary. Nothing here is public API
+//! compile it as its own test binary; each top-level test file pulls it in with
+//! `mod common;`, `tests/suite/main.rs` with a `#[path]` to this file, and it is
+//! rebuilt into each of those binaries. Nothing here is public API
 //! — `rlx-core` must not grow a test-support surface to serve its own tests.
 //!
 //! **The skip is the point.** A runner with no GPU adapter at all — macOS has no

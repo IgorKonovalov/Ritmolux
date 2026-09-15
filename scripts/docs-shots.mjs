@@ -86,7 +86,7 @@ import { relative, resolve, sep } from "node:path";
 ///
 /// The gallery holds exactly one entry per system name in `SystemKind::from_name`
 /// and is filed under that name. That correspondence is asserted in
-/// `core/tests/hygiene.rs`, not here — see the block below the manifest.
+/// `core/tests/suite/hygiene.rs`, not here — see the block below the manifest.
 ///
 /// **EVERY FAMILY NOW SHIPS SEVERAL PRESETS, so every slot below is a choice.**
 /// Nine were judged at the Plan 0088 close (Phase 7) and carry the verdict where
@@ -111,7 +111,7 @@ import { relative, resolve, sep } from "node:path";
 //
 // THE LIST IS SPELLED OUT rather than globbed from presets/, and that is the
 // whole mechanism. A glob could never report a preset with no card, because a
-// preset with no card would simply not be in it. `core/tests/hygiene.rs`,
+// preset with no card would simply not be in it. `core/tests/suite/hygiene.rs`,
 // `every_shipped_preset_has_a_gallery_card`, reads the names below and the
 // contents of presets/ and fails when they disagree in either direction --
 // the same shape as `every_system_has_a_gallery_image` above it.
@@ -319,7 +319,7 @@ const IMAGES = [
   // preset draws them yet, so each renders a teaching preset from
   // docs/examples/curves/ - the guide prints the file name under the picture,
   // and the file is the whole recipe. Filed OUTSIDE docs/images/gallery/, whose
-  // flat stems `core/tests/hygiene.rs` reads as system names.
+  // flat stems `core/tests/suite/hygiene.rs` reads as system names.
   ...["lissajous", "hypotrochoid", "superformula", "harmonograph"].map((family) => ({
     out: `docs/images/curves/${family}.png`,
     presetFile: `docs/examples/curves/${family}.toml`,
@@ -592,7 +592,7 @@ IMAGES.forEach(check);
 
 // ---------------------------------------------------------------------------
 // THE GALLERY-vs-`SystemKind` CROSS-CHECK IS NOT HERE. It lives in
-// core/tests/hygiene.rs, `every_system_has_a_gallery_image`.
+// core/tests/suite/hygiene.rs, `every_system_has_a_gallery_image`.
 //
 // It used to run at the top of this file, and it was doing exactly what its
 // comment said: `SystemKind::from_name` is the source of truth for what a system

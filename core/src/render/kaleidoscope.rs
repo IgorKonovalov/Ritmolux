@@ -63,7 +63,7 @@
 //! that is safe **only** because a `MirrorRepeat` sampler defines the
 //! read. Wired to the `ClampToEdge` sampler it is design-backlog 0010
 //! under a new name, unguarded by the disc assertion (which `tile` is
-//! supposed to break) — see `core/tests/kaleidoscope.rs`, where the
+//! supposed to break) — see `core/tests/suite/kaleidoscope.rs`, where the
 //! guard that does catch it is the ray-variance property.
 //!
 //! `squash` is **not** the identity inside the disc the way a clamp is: `tanh(m) <
@@ -487,7 +487,7 @@ fn fold_inner(inner: f32) -> f32 {
 /// asserted arithmetically rather than argued — that `falloff` and `squash` never
 /// reconstruct a coordinate outside the source, and that `tile` is the one arm
 /// that does. The two are kept identical by inspection. The *pixel-level* guards
-/// on the shader itself live in `core/tests/kaleidoscope.rs`, which is where
+/// on the shader itself live in `core/tests/suite/kaleidoscope.rs`, which is where
 /// `tile`'s real safety property is asserted: this function cannot see which
 /// sampler an arm reads through, and for `tile` the sampler is the whole
 /// guarantee.
@@ -1193,7 +1193,7 @@ mod tests {
     /// The uniform never carries a fractional wedge count, whatever a preset (or
     /// the smoothing that eases between two ladder steps) hands the stage. The
     /// pixel-level consequence — no tear across the -x ray — is
-    /// `core/tests/kaleidoscope.rs`; this pins the arithmetic that guarantees it.
+    /// `core/tests/suite/kaleidoscope.rs`; this pins the arithmetic that guarantees it.
     #[test]
     fn fold_order_is_always_integral() {
         for &raw in &[2.0f32, 2.4, 6.0, 12.5, 12.4999, 13.5, 30.7, 47.999] {
@@ -1324,7 +1324,7 @@ mod tests {
         // the DEFAULT, so this is the arm every unbound fold-bearing preset takes.
         // Its safety is the MirrorRepeat sampler, which this function cannot see;
         // the guard that can is the ray-variance property in
-        // `core/tests/kaleidoscope.rs`.
+        // `core/tests/suite/kaleidoscope.rs`.
         let corner = corner_m(ASPECT_16_9);
         assert!(
             edge_sample_radius(DEFAULT_EDGE, corner) > 1.0,

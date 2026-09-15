@@ -1659,7 +1659,7 @@ fn a_forced_dual_live_dissolve_keeps_a_shared_scene_pair_frozen() {
 
 // --- Plan 0023 Phase 4: the adaptive dual-live upgrade -------------------
 //
-// These live inside the crate rather than in `tests/transition.rs` because a
+// These live inside the crate rather than in `tests/suite/transition.rs` because a
 // headless capture cannot reach the dual-live path from outside: diagnostics
 // are off, so the governor has no frame-time evidence and correctly answers
 // `Freeze` every time. `begin_transition_forced` is the crate-private,

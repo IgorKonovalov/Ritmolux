@@ -35,7 +35,7 @@
 #    accumulation saturates instead, and the frame reads as soft blobs whose
 #    brightness depends on exactly how many frames were rendered.
 #
-# The bindings are lightly audio-bound rather than constant: `core/tests/warp_mesh.rs`
+# The bindings are lightly audio-bound rather than constant: `core/tests/suite/warp_mesh.rs`
 # holds this same fixture to the sanity, animation and reactivity measurements
 # (Plan 0100 Phase 1's done-when), and a fixture bound to nothing cannot pass
 # reactivity. They are shallow enough that the golden capture's frame - which
@@ -43,7 +43,7 @@
 #
 # Adapter-compared before blessing (the ADR-0058 standing rule; this scene adds
 # three bind-group layouts, so the rule is live rather than ceremonial). The
-# numbers are in `core/tests/warp_mesh.rs`'s `the_adapters_agree_on_the_warp_mesh`.
+# numbers are in `core/tests/suite/warp_mesh.rs`'s `the_adapters_agree_on_the_warp_mesh`.
 system = "warp_mesh"
 name   = "fixture_warp_mesh"
 

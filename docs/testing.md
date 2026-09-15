@@ -31,6 +31,16 @@ cargo nextest run -p rlx-core     # what CI runs (per-test process isolation)
 cargo test -p rlx-core            # single binaries only — see the two caveats below
 ```
 
+**Most of these files share one test binary** ([ADR-0204](adrs/0204-a-cheap-integration-test-shares-one-binary-and-a-test-that-needs-its-own-stays-its-own.md)).
+`core/tests/suite/` and `standalone/tests/suite/` each hold the files that need no binary of their
+own, as modules of a `main.rs`, so a test's name carries its file: `easing::…`, and
+`cargo nextest run -p rlx-core --test suite easing::` runs one file's tests. A file stays a
+top-level `tests/*.rs` when a `binary()` selector in `.config/nextest.toml` names it (the GPU
+suites below that `-P fast` excludes, and the clock-reading tests scheduled alone), when it reads
+the clock, or when it reads a process-level quantity such as its own memory. The rule for which is
+which lives in `core/tests/suite/main.rs`, and `hygiene.rs` fails on a clock exemption inside
+either `suite/`.
+
 > **Use `nextest` for the whole suite**, for two independent reasons.
 >
 > `preset`'s zero-allocation assertion
@@ -41,7 +51,7 @@ cargo test -p rlx-core            # single binaries only — see the two caveats
 > And **stock `cargo test` runs a binary's tests as threads in one process, which
 > the GPU tests do not survive.** Several of them build and drop a `Renderer` (and
 > so a wgpu device) concurrently, and the driver aborts the process with
-> `STATUS_ACCESS_VIOLATION` — `--test transition` every run on WARP, `--lib`
+> `STATUS_ACCESS_VIOLATION` — `transition`'s tests every run on WARP, `--lib`
 > intermittently at teardown, `--lib render::post` since Plan 0035. **This is a
 > runner artifact, not a failing test**: the same binaries pass in full under
 > `cargo nextest run`, which gives each test its own process. If a `cargo test`
@@ -96,8 +106,8 @@ Individual tests (add `-- --nocapture` to see the printed diagnostics):
 | `bloom` | HARD (relative) | the bloom stage's behaviour, beside its baseline rather than in it: halo **energy** rises with `bloom_amount`, halo **extent** rises with `bloom_radius`, the rich tier's deeper pyramid reaches further than the floor's, and the halo is **round**. Captured at **256x256** — square, and load-bearing: the roundness guard is what catches a separable kernel whose two passes step in different units, and it reads 1.001 today against 7.05 under the defect it was written for. No magic numbers: every assertion compares two captures of one fixture differing in one bound param |
 | `reaction_diffusion` | HARD | the first stateful-feedback scene: seed reproducibility, regime response ([ADR-0012](adrs/0012-stateful-feedback-render-system.md)) |
 | `attractor` | HARD | the first compute-particle scene: seed reproducibility + beat perturbation ([ADR-0015](adrs/0015-gpu-compute-particle-idiom.md)) |
-| `line_joints` | HARD (+ tolerance) | a **flagged joint stops leaving a hole** in the stroke ([ADR-0041](adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)): against a purpose-built zigzag `polyline`, a vertex is not a local luminance minimum relative to the segment interiors either side of it. Threshold-free, and captured at **512x512** because the wedge it measures is a fraction of a stroke-width across. The same capture is then pinned to a committed baseline (Plan 0040), since the reported defect had no pixel guard anywhere; the relative claim runs **first, even under `RLX_BLESS`**, so the notch cannot be blessed back in. Bless with `--test line_joints`, which cannot reach the golden roster |
-| `attractor_trails` | HARD (tolerance) | the attractor with the engine `trails` stage bound — the attractor's four pipelines and the stage's two in **one command buffer**, which is the densest pipeline coexistence any shipped preset produces and the thing [ADR-0058](adrs/0058-bind-group-layout-collisions-carry-evidence.md)'s hazard keys on. `attractor.toml` binds no trails and every `composite_*` fixture is a line scene, so nothing pinned it before Plan 0053. Captured at **160x100** (a non-square, per ADR-0037) and, like every baseline here, blessed on WARP — so it is **coverage, not evidence of correctness**; ADR-0058's hardware-vs-WARP comparison is the check and this is the drift guard. Its own binary so `RLX_BLESS=1 … --test attractor_trails` can reach nothing else. A second, GPU-free test asserts the fixture still puts *both* accumulations live (`trails` > `fade`, `spin` non-zero), since at or below the scene's own tail the stage is a bit-for-bit passthrough |
+| `line_joints` | HARD (+ tolerance) | a **flagged joint stops leaving a hole** in the stroke ([ADR-0041](adrs/0041-line-joins-are-per-endpoint-on-the-segment-instance.md)): against a purpose-built zigzag `polyline`, a vertex is not a local luminance minimum relative to the segment interiors either side of it. Threshold-free, and captured at **512x512** because the wedge it measures is a fraction of a stroke-width across. The same capture is then pinned to a committed baseline (Plan 0040), since the reported defect had no pixel guard anywhere; the relative claim runs **first, even under `RLX_BLESS`**, so the notch cannot be blessed back in. Bless with `--test suite line_joints::`, which cannot reach the golden roster |
+| `attractor_trails` | HARD (tolerance) | the attractor with the engine `trails` stage bound — the attractor's four pipelines and the stage's two in **one command buffer**, which is the densest pipeline coexistence any shipped preset produces and the thing [ADR-0058](adrs/0058-bind-group-layout-collisions-carry-evidence.md)'s hazard keys on. `attractor.toml` binds no trails and every `composite_*` fixture is a line scene, so nothing pinned it before Plan 0053. Captured at **160x100** (a non-square, per ADR-0037) and, like every baseline here, blessed on WARP — so it is **coverage, not evidence of correctness**; ADR-0058's hardware-vs-WARP comparison is the check and this is the drift guard. Its own module, so `RLX_BLESS=1 … --test suite attractor_trails::` can reach nothing else. A second, GPU-free test asserts the fixture still puts *both* accumulations live (`trails` > `fade`, `spin` non-zero), since at or below the scene's own tail the stage is a bit-for-bit passthrough |
 | `ink` | HARD | the final tone-remap **inverts** tone, and `ink_amount = 0` is byte-identical to an unbound frame ([ADR-0028](adrs/0028-final-stage-ink-tone-remap.md)) |
 | `geometry_extent` | HARD | the **in-frame geometry fraction**, for the four line families *only* ([ADR-0083](adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md)): that the diagnostic is **byte-identical** to having it off, and that each of the two frozen over-scaled configurations measures below the shipped preset it was recovered from. **Neither engine-wide nor a threshold** — read the section below before using its numbers |
 | lit-backdrop guards (**in-crate**, `--lib`) | HARD (exact) | one per **draw seam**, three of them: `swarm.rs`'s `a_lit_backdrop_survives_where_the_swarm_drew_nothing`, `lines/renderer.rs`'s `a_lit_backdrop_survives_where_the_strokes_drew_nothing`, and `emitter.rs`'s `a_lit_backdrop_survives_where_the_emitter_drew_nothing` ([ADR-0056](adrs/0056-additive-scenes-emit-premultiplied-alpha.md)). Each captures `swarm_lit_backdrop.toml` / `lines_lit_backdrop.toml` / `emitter_lit_backdrop.toml` three ways — lit backdrop, black backdrop, backdrop with the scene contributing nothing — and asserts that wherever the scene wrote no light the backdrop arrives **intact**. Bound **0** rather than a tolerance, because it reads the linear composite; see the section below. The swarm's and the lines' take a **fourth** capture at zero emitted light (Plan 0053 Phase 4), which turns the frame into a direct readout of alpha and widens the line guard's reach from 15 channels to the whole stroke footprint |
@@ -240,7 +250,7 @@ nothing at all, so they are fed as warm-up and never rasterized.
 **Copying it carries one consequence that is easy to miss** (Plan 0084 Phase 4,
 2026-08-13). Skipping the warm-up renders is safe for the *analyzer* — analysis
 is a pure function of its window and the render pass never touches it, which
-`core/tests/capture_advance.rs` asserts bit-for-bit — but it is **not** a no-op
+`core/tests/suite/capture_advance.rs` asserts bit-for-bit — but it is **not** a no-op
 for the scene. A scene that integrates on the GPU (trails, particles,
 reaction-diffusion) now meets the measured window `WARMUP_HOPS` steps colder
 than it would have, because those hops used to double as the scene warm-up.
@@ -260,16 +270,17 @@ change:
 
 ```bash
 RLX_BLESS=1 cargo test -p rlx-core --test golden
-RLX_BLESS=1 cargo test -p rlx-core --test composite     # the post-stage baselines
-RLX_BLESS=1 cargo test -p rlx-core --test line_joints   # the joined-polyline baseline
+RLX_BLESS=1 cargo test -p rlx-core --test suite composite::     # the post-stage baselines
+RLX_BLESS=1 cargo test -p rlx-core --test suite line_joints::   # the joined-polyline baseline
 ```
 
 Only the first of those owns the per-`SystemKind` roster. Every
 `composite_*.png` belongs to the `composite` test and `line_joint_zigzag.png` to
-`line_joints`; blessing by binary is what keeps the scopes from rewriting each
-other. `line_joints` additionally refuses to bless at all while its
+`line_joints`; blessing by binary, and inside the `suite` binary by module name, is
+what keeps the scopes from rewriting each other. **A bless of `--test suite` with no
+module filter rewrites every baseline in that binary at once.** `line_joints` additionally refuses to bless at all while its
 local-minimum claim is failing, so a reopened notch cannot be baselined in.
-`core/tests/feedback.rs` is deliberately absent from that list: it pins no
+`core/tests/suite/feedback.rs` is deliberately absent from that list: it pins no
 baseline at all — see
 [Asserting that something *moved*](#asserting-that-something-moved--the-feedback-fixtures-plan-0046).
 
@@ -522,7 +533,7 @@ directly rather than trusting a baseline to notice.
 last time, which is the opposite question. When the thing under test is a motion —
 ADR-0048's transformed feedback, where an accumulation is resampled through an
 affine every frame — the guard has to compare **frames of one run against each
-other**, and `core/tests/feedback.rs` is where that shape lives. The next author of
+other**, and `core/tests/suite/feedback.rs` is where that shape lives. The next author of
 a motion test should copy its habits rather than reinvent them.
 
 **Make the figure static, so the only thing that can move is the thing under

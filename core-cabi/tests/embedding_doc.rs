@@ -9,7 +9,7 @@
 //! grepped here.
 //!
 //! The document is the copy and the header is the authority, the same direction
-//! `core/tests/preset.rs` holds the parameter roster in. A function renamed in
+//! `core/tests/suite/preset.rs` holds the parameter roster in. A function renamed in
 //! the header fails here rather than in a reader's compiler.
 //!
 //! This is text analysis, not linkage. It builds nothing, opens no window and

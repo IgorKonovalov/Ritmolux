@@ -79,7 +79,7 @@ presets/             # The curated preset library (*.toml) — build.rs globs an
     │                #   a subdirectory is skipped by construction. See its own README.
     └── schema/      #   GENERATED editor JSON Schemas, one per system, beside the generic
                      #   preset.schema.json; the root .taplo.toml (also generated) picks one by
-                     #   filename family (ADR-0190). Never hand-edited: core/tests/preset_schema.rs
+                     #   filename family (ADR-0190). Never hand-edited: core/tests/suite/preset_schema.rs
                      #   holds them to the engine, RLX_UPDATE_PRESET_SCHEMA=1 rewrites them.
 tools/
 ├── sd-filter/       # Python sidecar for the diffusion-filter pass (ADR-0122). Not a cargo crate,
@@ -255,7 +255,7 @@ rebuild**. That buys the line numbers back at the price of a full rebuild of the
 commit the deletion.
 
 Why the line is there: MSVC emits a separate `.pdb` per linked target and packs no split debuginfo,
-so the dependency graph's line tables are duplicated into every one of the workspace's 46 test
+so the dependency graph's line tables are duplicated into every one of the workspace's test
 binaries — 25.5 MB per binary, measured, which the setting stops emitting. ADR-0165.
 
 ## How we work (canonical workflow)

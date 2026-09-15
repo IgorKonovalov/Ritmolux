@@ -380,8 +380,8 @@ flowchart LR
 | 4 — Measure what grows in `target/` | dev | done | 375f275 |
 | 5 — `prune-target.mjs` deletes what cargo no longer reports | dev | done | d9aee86 |
 | 6 — The incremental cache has a documented bound | dev | done | 227bb8d |
-| 7 — A scoped `cargo doc` earns a hook step, or is rejected | dev | done | committed with this row |
-| 8 — The cheap tests share one binary per package | dev | not started | |
+| 7 — A scoped `cargo doc` earns a hook step, or is rejected | dev | done | 7b4a66c |
+| 8 — The cheap tests share one binary per package | dev | done | committed with this row |
 | 9 — The studio tests ask cargo where the player is | studio-builder | not started | |
 
 ### Notes
@@ -462,6 +462,51 @@ flowchart LR
 - **Followup noticed, not acted on:** the `preview.rs` link above is broken in every build without
   `text` (the core test suite and the plugin's), and CI's `cargo doc --workspace` cannot see it
   because feature unification turns `text` on.
+- **Phase 8, kept set as re-derived.** Rule 1: the nine `default-filter` suites, the five `_cost`
+  probes, `dsp`, `help_cli`, `stream_pipe`. Rule 2 (the `disallowed_methods` grep): those plus
+  `stream_show` and `control_loopback`. Rule 3: `console_preview_memory`, `frame_tap_memory`.
+  `preset.rs`'s allocation counter is per-thread and no test writes the `RLX_*` variables other
+  files read, so neither kept a file out. 33 core and 5 standalone files folded, the ADR's set.
+- **Phase 8, listings.** Normalized to `package | kind | binary | test`, a `suite` test re-keyed to
+  its module: default 1944 -> 1945 tests, `-P fast` 1646 -> 1647, the run-alone override's filter
+  18 -> 18. Each of the first two diffs is one line,
+  `hygiene::the_suite_clock_check_names_an_exemption_and_ignores_prose`, the negative control this
+  phase adds for step 3; the override's diff is empty.
+- **Phase 8, `override` is a keyword.** It is declared `mod r#override;`, so its tests list as
+  `r#override::...`.
+- **Phase 8, timing.** `cargo nextest run --workspace -P fast --no-run`, warm, back to back in one
+  session, the `STRUCT_GRID` edit applied and reverted twice. Cargo's `Finished` / the lock's wall
+  time, seconds:
+
+  | | edit | revert | edit | revert |
+  |---|---|---|---|---|
+  | before | 34.9 / 51.5 | 11.6 / 28.2 | 44.2 / 60.5 | 39.7 / 60.7 |
+  | after | 16.5 / 25.6 | 29.2 / 37.5 | 8.0 / 16.1 | 38.9 / 46.9 |
+
+  Per-file edit (`easing.rs`, `SIZE = 96` -> `48 + 48` and back): before 1.06 / 2.4 and 1.02 / 2.4,
+  after 1.66 / 2.6 and 1.66 / 2.6; an assertion-message edit after the fold, 1.80 / 2.8 and
+  1.70 / 2.7. The fold was kept.
+- **Phase 8, gate.** `cargo nextest run --workspace -P fast --no-fail-fast` on the folded tree:
+  1647 passed, 304 skipped, exit 0. The Node gates, `fmt --check` and workspace clippy are green.
+- **Phase 8, binaries and bytes.** Integration test binaries (workspace, so core-cabi's 2 and
+  milkconv's 5 included) 66 -> 30; their `.exe` plus `.pdb`, one generation, 1789.6 MB -> 843.8 MB.
+- **Phase 8, deviation: path citations rewritten too.** Beyond `--test`, every
+  `core/tests/<folded>.rs` and `standalone/tests/<folded>.rs` in live source comments, docs,
+  fixture headers, `.taplo.toml` and its generator in `export.rs` now names `tests/suite/`, and the
+  module headers that said a folded file is its own binary (`attractor_trails`, `composite`,
+  `layer`, `line_joints`, `bloom`, `kaleidoscope`, `feedback`, `geometry_extent`, `cellular`,
+  `analytic_field`, `core/tests/fixtures/README.md`) now say file, module filter or process.
+  `docs/plans/README.md`'s baseline-drift control was rewritten as well. Left as written: ADRs,
+  other plans, `docs/design-backlog.md`, the archives, and the comments in `studio/shared/
+  fields.test.ts` and `grammar.test.ts` naming `core/tests/preset_schema.rs`.
+- **Phase 8, unmet done-when: the skills grep is not empty.**
+  `.claude/skills/dev/references/project-context.md:163-164` still cite `--test preset_schema` and
+  `--test preset` (should read `--test suite preset_schema::` and `--test suite preset::`), and
+  `.claude/skills/architect/SKILL.md:308,429` still name `core/tests/preset_schema.rs` and
+  `core/tests/hygiene.rs`. The session's file edits under `.claude/` were refused.
+- **Followup noticed, not acted on:** `docs/testing.md`'s caveat says `preset`'s zero-allocation
+  assertion counts through a process-global hook and needs nextest; the counter in `preset.rs` is
+  per-thread and says it holds under both runners.
 
 ### Close triggers
 

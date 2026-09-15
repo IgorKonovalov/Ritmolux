@@ -926,7 +926,7 @@ impl DrawExtent {
 // from, instead of reaching five modules deep into a scene's renderer.
 thread_local! {
     /// Whether `draw` measures. **Off in the shipped render path** — that is the
-    /// whole of the switch, and `core/tests/geometry_extent.rs` asserts "off"
+    /// whole of the switch, and `core/tests/suite/geometry_extent.rs` asserts "off"
     /// means byte-identical output.
     static EXTENT_ON: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     /// The most recent measured draw, if any.
@@ -963,7 +963,7 @@ pub fn take_draw_extent() -> Option<DrawExtent> {
 /// Whether the in-frame geometry diagnostic is measuring on this thread.
 ///
 /// Read once per `LineRenderer::draw`. Off in every shipped frame, which is what
-/// `core/tests/geometry_extent.rs` asserts by comparing output with the switch
+/// `core/tests/suite/geometry_extent.rs` asserts by comparing output with the switch
 /// off against the committed goldens.
 pub fn extent_diagnostic_on() -> bool {
     EXTENT_ON.with(std::cell::Cell::get)

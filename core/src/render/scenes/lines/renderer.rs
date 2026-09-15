@@ -816,7 +816,7 @@ pub struct LineRenderer {
     /// and that is not a micro-optimization. Building a pipeline the scene never
     /// binds still allocates on the device, and on the WARP software adapter a
     /// changed allocation order changes what a later pass resolves to — the
-    /// hazard `core/tests/composite.rs`'s header records and the golden suite
+    /// hazard `core/tests/suite/composite.rs`'s header records and the golden suite
     /// captures on. Building this for the nine line scenes that do not use it
     /// moved five composite baselines while changing nothing a driver would
     /// render differently.

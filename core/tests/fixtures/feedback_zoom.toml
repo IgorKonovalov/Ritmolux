@@ -1,4 +1,4 @@
-# FEEDBACK FIXTURE - do not tune; the motion guards in core/tests/feedback.rs
+# FEEDBACK FIXTURE - do not tune; the motion guards in core/tests/suite/feedback.rs
 # read it. Plan 0046 Phase 1.
 #
 # `feedback_still.toml` under a pure RADIAL feedback: `fb_zoom > 1` pushes the

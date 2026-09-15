@@ -46,7 +46,7 @@
 //! out relative to the app without the app being washed out too.
 //!
 //! That is a property, so it is asserted rather than claimed here:
-//! `standalone/tests/shot_cli.rs`'s
+//! `standalone/tests/suite/shot_cli.rs`'s
 //! `a_rendered_frame_is_byte_identical_to_the_png_the_app_writes` renders the
 //! same instant twice — once through here, once through `shot --frame-at` — and
 //! compares the bytes exactly. It is exact because a tolerance would pass with
@@ -638,7 +638,7 @@ impl Encoder {
 /// block follows): the absolute numbers are a property of the box's GPU driver
 /// stack — a ~327 MB vendor floor on the reference machine (NFR §12) — and do
 /// not travel. The growth does, which is why that is what
-/// `standalone/tests/shot_cli.rs` puts a ceiling on.
+/// `standalone/tests/suite/shot_cli.rs` puts a ceiling on.
 #[derive(Debug, Default, Clone)]
 pub struct ResidentSet {
     /// Every sample, in bytes, in order. Empty where the OS query is

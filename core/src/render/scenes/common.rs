@@ -157,7 +157,7 @@ pub(crate) const fn zoom(default: f32) -> ParamSpec {
 /// keeps its `match` — it runs once per bound param per frame and a linear scan
 /// of a slice is the wrong shape for that — so this is a second statement of the
 /// vocabulary, and `each_block_answers_exactly_its_roster` below is what holds
-/// the two together. The source-text scan in `core/tests/preset.rs` carries a
+/// the two together. The source-text scan in `core/tests/suite/preset.rs` carries a
 /// third copy, because that is an integration test and this module is
 /// `pub(crate)`.
 #[cfg(test)]
@@ -298,7 +298,7 @@ mod tests {
 
     /// **Each block answers exactly its roster** — no more, no less.
     ///
-    /// `core/tests/preset.rs`'s drift guard cannot see these eight names: it reads
+    /// `core/tests/suite/preset.rs`'s drift guard cannot see these eight names: it reads
     /// `set_param`'s match arms out of the source text, and every scene
     /// *delegates* them here rather than matching them. That is the right
     /// factoring — one implementation of what `saturation` means — and this is

@@ -34,7 +34,7 @@ statements + scenarios); CLAUDE.md is orientation. They must not drift apart.
 
 `player-schema.json` beside them is **not a spec**. It is the document `ritmolux --schema` prints,
 committed so the studio's tests have one to read where no player is built, and generated rather than
-authored: `core/tests/preset_schema.rs` fails when it drifts from the engine, and
+authored: `core/tests/suite/preset_schema.rs` fails when it drifts from the engine, and
 `RLX_UPDATE_PRESET_SCHEMA=1` rewrites it. Never hand-edit it.
 
 ## Posture: minimal and lazy (no gate, no ritual yet)

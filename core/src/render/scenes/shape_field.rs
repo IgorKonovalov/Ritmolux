@@ -1104,7 +1104,7 @@ pub(crate) fn coord(distance: f32, gamma: f32, color_span: f32, color_center: f3
 
 /// The parameter names this scene consumes — the vocabulary a preset binding is
 /// checked against at load (ADR-0020). **Keep in sync with `set_param` below**;
-/// `declared_params_match_set_param` in `core/tests/preset.rs` fails if the two
+/// `declared_params_match_set_param` in `core/tests/suite/preset.rs` fails if the two
 /// drift.
 pub const PARAMS: &[ParamSpec] = &[
     crate::render::scenes::marks::SHAPE,

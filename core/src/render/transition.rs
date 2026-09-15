@@ -610,7 +610,7 @@ impl Pipeline {
         // on the device — diverges, and only on WARP.
         //
         // This mattered nowhere in the suite because no capture test runs a
-        // dissolve between two `trails`-binding presets; `core/tests/transition.rs`
+        // dissolve between two `trails`-binding presets; `core/tests/suite/transition.rs`
         // uses flat static pairs.
         let bind_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("blend-bind-layout"),

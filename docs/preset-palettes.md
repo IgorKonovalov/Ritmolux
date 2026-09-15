@@ -999,7 +999,7 @@ what you think can darken.
 > is wrong and this table is the correction. The claim was that a particle's
 > alpha *is* its brightness; in fact `swarm.rs` emits `vec4(color * g, g)` where
 > `g` is the mark's **geometric** falloff and is independent of its colour, and
-> `layer_blend.rs` un-premultiplies before taking the mode. `core/tests/layer.rs`
+> `layer_blend.rs` un-premultiplies before taking the mode. `core/tests/suite/layer.rs`
 > carries the measurement.
 
 ### The light ground must come from the chain, never from `bg_*`

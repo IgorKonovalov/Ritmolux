@@ -19,7 +19,7 @@
 #   1. A BORDER-FILLING SOURCE. `fragment_field` paints the frame's border with
 #      high-frequency content, so there is something out past `r_max` for a
 #      treatment to act on. This is the same reason
-#      core/tests/kaleidoscope.rs reaches for `fragment_field` rather than a line
+#      core/tests/suite/kaleidoscope.rs reaches for `fragment_field` rather than a line
 #      figure for its out-of-disc guards, and it is stated there too.
 #
 #   2. A NON-DEFAULT TREATMENT. `kaleido_edge = 2` is `squash`, which compresses
@@ -41,7 +41,7 @@
 # working rather than a smear. `tanh` saturates, so every large radius maps to
 # nearly the same sample radius. Phase 3 measured the consequence: `squash` reads
 # an out/in radial-structure ratio of 0.10 against a deliberately mis-wired
-# `tile`'s 0.06, which is why the anti-smear guard in core/tests/kaleidoscope.rs
+# `tile`'s 0.06, which is why the anti-smear guard in core/tests/suite/kaleidoscope.rs
 # is scoped to `tile` alone. If this baseline ever drifts toward *more* radial
 # structure out past the disc, the radius map is what changed.
 system = "fragment_field"

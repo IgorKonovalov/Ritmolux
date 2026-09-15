@@ -105,12 +105,13 @@ three line-scene PNGs it rewrote (`lsystem`, `parametric_curve`,
 baselines, i.e. WARP's own rasterization noise) were restored before committing.
 Check `git status` after any bless here and do the same.
 
-## `attractor_trails.toml` has its own test binary, and that is the point of it
+## `attractor_trails.toml` has its own test file, and that is the point of it
 
 Plan 0053 Phase 1, [ADR-0058](../../../docs/adrs/0058-bind-group-layout-collisions-carry-evidence.md).
-It belongs to `core/tests/attractor_trails.rs` and to nothing else, so
-`RLX_BLESS=1 cargo test -p rlx-core --test attractor_trails` rewrites **one**
-file. That is deliberate: `RLX_BLESS` is not scoped to a fixture, so adding this
+It belongs to `core/tests/suite/attractor_trails.rs` and to nothing else, so
+`RLX_BLESS=1 cargo test -p rlx-core --test suite attractor_trails::` rewrites **one**
+file. Drop the `attractor_trails::` filter and the bless reaches every baseline test
+in the `suite` binary. That is deliberate: `RLX_BLESS` is not scoped to a fixture, so adding this
 to `golden.rs`'s `EXTRA_FIXTURES` would have meant rewriting all 12 of that
 binary's baselines to add one — and three of them (`lsystem`, `parametric_curve`,
 `star_pattern`) re-encode differently on this repository's dev box from a clean
@@ -122,8 +123,9 @@ tree, so the diff would name files the change never touched. Same posture
 the attractor, putting that scene's four pipelines and the stage's two in one
 command buffer. `attractor.toml` binds no trails and every `composite_*` fixture
 is a line scene, so the densest coexistence any shipped preset creates was pinned
-by nothing. Its own binary also keeps those six pipelines off the devices the
-other two capture binaries build, which is the rule `composite.rs` states.
+by nothing. Its own test also keeps those six pipelines off the devices the other
+capture tests build, because nextest runs each test in a process of its own, which
+is the rule `composite.rs` states.
 
 It is **coverage, not evidence of correctness** — the baseline is blessed on WARP
 like every other one here, so if this configuration aliases, the PNG is a picture
@@ -138,7 +140,7 @@ binary asserts the relation rather than trusting it.
 
 `composite_trails.toml` and `composite_kaleido.toml` are **not** part of the
 per-`SystemKind` roster and `golden.rs` never reads them. They belong to
-`core/tests/composite.rs` (Plan 0035 Phase 2), and they exist because **no
+`core/tests/suite/composite.rs` (Plan 0035 Phase 2), and they exist because **no
 fixture bound `trails` or `kaleido_*`** — so the entire post-composite path was
 covered by no capture in the suite, which is how a defect that stretched the
 whole frame shipped green (ADR-0037).
@@ -187,7 +189,7 @@ eyeball before committing.
 
 ## The `easing_*` fixtures are a third guard, and pin no pixels
 
-`easing_scalar.toml` and `easing_asymmetric.toml` belong to `core/tests/easing.rs`
+`easing_scalar.toml` and `easing_asymmetric.toml` belong to `core/tests/suite/easing.rs`
 (Plan 0037 Phase 1, ADR-0039), the transient probe. They are **twins**: the same
 `[curve]` family and the same `[params]` bindings, differing only in their `name`
 and their `[smoothing]` table — one scalar, one an `{ attack, release }` pair. The
@@ -208,14 +210,14 @@ composite stage). Read them before editing either file.
 
 ## `line_joint_zigzag.toml` is a fourth guard, and it pins pixels *as well*
 
-It belongs to `core/tests/line_joints.rs` (Plan 0039 Phase 2, ADR-0041), which
+It belongs to `core/tests/suite/line_joints.rs` (Plan 0039 Phase 2, ADR-0041), which
 asserts that a flagged joint stops leaving a hole in the stroke — a *relative*
 property: a vertex is not a local luminance minimum against the segment interiors
 either side of it.
 
 **Since Plan 0040 Phase 1 it also carries a committed baseline**,
 `golden/line_joint_zigzag.png`, blessed with
-`RLX_BLESS=1 cargo test -p rlx-core --test line_joints`. It exists because the
+`RLX_BLESS=1 cargo test -p rlx-core --test suite line_joints::`. It exists because the
 defect that motivated ADR-0041 — the polyline's notch — was pinned by no pixels
 anywhere: `spectrum.toml` below takes the default `bars` layout, and
 `spectrum_ridge` is a shipped preset guarded behaviorally. A shader edit could
@@ -230,7 +232,7 @@ only says "something moved"; the relative claim fails loudly and says why.
 The pin lives here rather than in the `golden.rs` roster because that roster is
 one fixture per `SystemKind` (enforced by `systems_rosters_every_variant`) and a
 second `spectrum` entry would break the invariant ADR-0023 rests on. Blessing by
-`--test line_joints` therefore rewrites this one PNG and **cannot** reach the
+`--test suite line_joints::` therefore rewrites this one PNG and **cannot** reach the
 roster — verified, not assumed.
 
 It is captured at **512x512**, not the golden roster's 128. The feature under
@@ -327,7 +329,7 @@ is 33 frames, comfortably inside the silent tail.
 ## The `*_over_scaled.toml` pair is a seventh guard, and neither file is a preset
 
 `spectrum_comb_over_scaled.toml` and `spectrum_corona_over_scaled.toml` belong to
-`core/tests/geometry_extent.rs` (Plan 0069 Phase 3,
+`core/tests/suite/geometry_extent.rs` (Plan 0069 Phase 3,
 [ADR-0083](../../../docs/adrs/0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md)).
 They pin no pixels, have no baselines, and `RLX_BLESS` does not touch them.
 
@@ -356,8 +358,8 @@ records the arithmetic that makes it wrong.
 ## The `feedback_*` / `composite_warp_*` / `attractor_fb_*` families pin a *motion*
 
 Eleven files, Plan 0046 / [ADR-0048](../../../docs/adrs/0048-transformed-feedback.md),
-belonging to `core/tests/feedback.rs` and (for the three `composite_warp_*`) to
-`core/tests/composite.rs` as well. What they exist to test is that an accumulation
+belonging to `core/tests/suite/feedback.rs` and (for the three `composite_warp_*`) to
+`core/tests/suite/composite.rs` as well. What they exist to test is that an accumulation
 **moves** — which is the one thing a baseline cannot say, since a baseline asks
 whether a picture is the picture it was last time.
 

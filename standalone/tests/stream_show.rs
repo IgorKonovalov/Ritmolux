@@ -553,7 +553,7 @@ fn a_headless_run_with_no_per_user_directory_keeps_the_embedded_set() {
 // ---------------------------------------------------------------------------
 
 /// What a system needs beyond its key before it will load — the same two
-/// exceptions `core/tests/preset.rs` names, which is where the claim that these
+/// exceptions `core/tests/suite/preset.rs` names, which is where the claim that these
 /// are the only two is asserted.
 fn extras(kind: SystemKind) -> &'static str {
     match kind {

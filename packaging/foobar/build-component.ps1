@@ -41,7 +41,7 @@ $ErrorActionPreference = "Stop"
 # threshold, and NEVER fatal - the seven checks below are properties of a
 # correct artifact, and a release must not fail on a byte count.
 #
-# core/tests/hygiene.rs asserts both figures against NFR section 4, because two
+# core/tests/suite/hygiene.rs asserts both figures against NFR section 4, because two
 # copies of a number is the shape this repository keeps finding rot in. Change
 # one and that test names the other.
 $ComponentCapBytes = 12582912

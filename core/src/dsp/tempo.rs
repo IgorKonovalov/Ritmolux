@@ -178,7 +178,7 @@ impl TempoTracker {
     /// **This does not settle the octave, and it is not trying to** (Plan 0095
     /// Phase 1). The probe measured both directions of the ambiguity on
     /// synthesized clips with known truth — the numbers below are what
-    /// `the_octave_ambiguity_is_one_sided` prints, in `core/tests/tempo_probe.rs`,
+    /// `the_octave_ambiguity_is_one_sided` prints, in `core/tests/suite/tempo_probe.rs`,
     /// which is where to re-read them rather than trusting this comment: a clean
     /// click train's correlation at *twice* the winning lag reads 80.0-88.5 % of
     /// the peak — a plain property of any periodic signal — against 75.2-90.7 %

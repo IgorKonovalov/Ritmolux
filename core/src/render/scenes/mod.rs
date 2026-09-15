@@ -129,7 +129,7 @@ pub struct ParamSpec {
     /// Whether the value carries an integer meaning (ADR-0180 rule 2).
     ///
     /// Read back out with [`kind_of`], and enforced by
-    /// `declared_params_match_set_param` in `core/tests/preset.rs`, which
+    /// `declared_params_match_set_param` in `core/tests/suite/preset.rs`, which
     /// compares this against a hand-kept roster — a field nothing checks is a
     /// field that drifts.
     pub kind: ParamKind,

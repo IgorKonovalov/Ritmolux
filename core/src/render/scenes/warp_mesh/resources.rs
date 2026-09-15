@@ -7,7 +7,7 @@
 //! and they are called in the order the objects were created when it was one:
 //! a resource created earlier or later changes what a later pass resolves to on
 //! the DX12 WARP software adapter (ADR-0058, and the hazard
-//! `core/tests/composite.rs` records). Moving a creation between stages is a
+//! `core/tests/suite/composite.rs` records). Moving a creation between stages is a
 //! pixel change, not a tidy. The converted-shader surface is built last for the
 //! same reason: a native preset's allocation sequence has to stay what it was.
 

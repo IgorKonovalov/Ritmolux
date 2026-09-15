@@ -44,7 +44,7 @@ pub struct AudioCapture {
     /// One published [`AnalysisFrame`] per hop, in hop order. Independent of
     /// whether the hop was rendered — which is the property that makes feeding
     /// warm-up hops without pixels safe, and is asserted rather than argued
-    /// (`core/tests/capture_advance.rs`).
+    /// (`core/tests/suite/capture_advance.rs`).
     pub analysis: Vec<AnalysisFrame>,
     /// How many frames were rasterized. Zero when every hop is a warm-up hop.
     pub rendered: usize,
@@ -79,7 +79,7 @@ impl Renderer {
         // clear, same draw, same `copy_texture_to_texture`. That is what lets
         // the intermediate's one real claim — that a frame routed through it is
         // byte-identical to one drawn straight at the target — be asserted with
-        // no window, in `core/tests/console_preview.rs`.
+        // no window, in `core/tests/suite/console_preview.rs`.
         let preview = self.preview.take();
         capture::record_clear(&mut encoder, preview.as_ref().map_or(&view, |p| &p.view));
         let _ = self.draw_frame(
@@ -98,7 +98,7 @@ impl Renderer {
         // intermediate, which is this path as much as the present path: the two
         // record the same clear, draw and copy, and stating the rule once is
         // what lets the readback's own claims be asserted with no window
-        // (`core/tests/console_preview.rs`). It changes nothing about the image
+        // (`core/tests/suite/console_preview.rs`). It changes nothing about the image
         // returned below — it is an extra copy out of the intermediate, not a
         // change to what was drawn into it.
         let recorded = self.step_preview_readback(&mut encoder);
@@ -250,7 +250,7 @@ impl Renderer {
     /// Frame numbering matches [`capture_audio`](Self::capture_audio): frame 0
     /// is the first advanced frame, so `at_frames = [n - 1]` returns exactly what
     /// `capture_preset(name, frame, n)` returns — asserted in
-    /// `core/tests/capture_advance.rs` rather than argued, because it is the
+    /// `core/tests/suite/capture_advance.rs` rather than argued, because it is the
     /// property that lets a horizon's rows be compared with every other capture
     /// this repo takes.
     ///
@@ -689,7 +689,7 @@ impl Renderer {
     /// per launch here exactly as it does in the window. Both salts are equal for
     /// every preset that declares anything else, which is why a tapped frame and
     /// a [`capture_frame`](Self::capture_frame) of the same preset at the same
-    /// clock are still byte-identical (`core/tests/frame_tap.rs`).
+    /// clock are still byte-identical (`core/tests/suite/frame_tap.rs`).
     ///
     /// **Blocks on the readback**, as every path through
     /// `capture::read_back` does. That is what bounds a

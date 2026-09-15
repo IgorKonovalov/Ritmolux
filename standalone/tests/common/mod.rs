@@ -1,8 +1,8 @@
 //! The one constructor for a spawned workspace binary in `standalone/tests/`.
 //!
 //! `standalone/tests/common/` is a directory, not a top-level `.rs`, so cargo
-//! does not compile it as its own test binary; each test file pulls it in with
-//! `mod common;`.
+//! does not compile it as its own test binary; each top-level test file pulls it
+//! in with `mod common;`, and `tests/suite/main.rs` with a `#[path]` to this file.
 //!
 //! **Every command handed out here has its own per-user data root.** The player
 //! and `shot` resolve that root from `APPDATA` on Windows, `HOME` on macOS and
@@ -14,7 +14,7 @@
 //! directory under `CARGO_TARGET_TMPDIR`, and the caller adds arguments, the
 //! working directory and pipes.
 //!
-//! `core/tests/hygiene.rs` fails on a file under `standalone/tests/` other than
+//! `core/tests/suite/hygiene.rs` fails on a file under `standalone/tests/` other than
 //! this one that names the player's `CARGO_BIN_EXE_` variable or `shot_bin`, so a
 //! spawn written beside this module is refused rather than reviewed for.
 //!

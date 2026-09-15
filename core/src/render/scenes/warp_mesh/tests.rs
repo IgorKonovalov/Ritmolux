@@ -8,7 +8,7 @@
 //! answers it exactly; comparing eight captures answers a weaker version of it
 //! through a rasterizer, a blend and a tonemap, at a hundred times the cost. The
 //! one thing geometry cannot see — that the new draw seam does not eat a lit
-//! backdrop — is a capture, and it lives in `core/tests/warp_mesh.rs` with the
+//! backdrop — is a capture, and it lives in `core/tests/suite/warp_mesh.rs` with the
 //! other GPU work.
 
 // Test asserts panic on failure; allowed here over the module's pragma.

@@ -11,7 +11,7 @@
 //! It walks the same [`ParamSpec`] declarations the generated block in
 //! `presets/README.md` is rendered from (ADR-0170) — the same rosters, in the
 //! same order — so the published table and this document cannot disagree about a
-//! name, a default or a range. `core/tests/preset.rs` renders both from one walk
+//! name, a default or a range. `core/tests/suite/preset.rs` renders both from one walk
 //! and asserts they agree.
 //!
 //! ## The structural half is declared beside its serde struct
@@ -563,7 +563,7 @@ pub fn hash_str(text: &str) -> u64 {
 /// **A second rendering of the declarations [`document`] prints**, not a second
 /// copy of them: the structural half walks [`TABLES`], the parameter half walks
 /// [`SystemKind::param_specs`] and [`GLOBAL_PARAMS`], and neither writes a name
-/// or a roster of its own. `core/tests/preset_schema.rs` holds the committed file
+/// or a roster of its own. `core/tests/suite/preset_schema.rs` holds the committed file
 /// to this function and validates the whole preset corpus against the *same*
 /// declarations — so the file, the editor and the loader cannot disagree about
 /// what a preset may contain.
@@ -860,7 +860,7 @@ fn push_toml_globs(out: &mut String, key: &str, globs: impl Iterator<Item = Stri
 /// The comment block `.taplo.toml` opens with. Written out rather than
 /// rendered, because nothing in it is a declaration the engine owns.
 const TAPLO_HEADER: &str = "\
-# GENERATED - do not edit. core/tests/preset_schema.rs fails if this file, the
+# GENERATED - do not edit. core/tests/suite/preset_schema.rs fails if this file, the
 # generic schema or any per-system schema is stale. Regenerate all of them with
 #
 #   RLX_UPDATE_PRESET_SCHEMA=1 cargo nextest run -p rlx-core the_generated_editor_files_are_current
@@ -1036,7 +1036,7 @@ pub enum ParamSurface {
 /// **The membership test this renders is the loader's**, read off the same two
 /// rosters `is_known_param` and `compile_bindings` consult — so a key the editor
 /// underlines is exactly a key the loader would warn about, and a key it accepts
-/// is one the loader reads. `core/tests/preset_schema.rs` validates against this
+/// is one the loader reads. `core/tests/suite/preset_schema.rs` validates against this
 /// same function, which is what makes the committed JSON and the corpus check one
 /// model rather than two.
 ///

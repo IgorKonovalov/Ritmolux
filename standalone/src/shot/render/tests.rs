@@ -487,7 +487,7 @@ fn the_generated_ffmpeg_command_carries_its_inputs_mapping_and_colour() {
     // These assert the *command line*, which is all this pure function can be
     // held to, and asserting only this is what let two of the four tags be
     // dropped between here and the file. `the_four_colour_tags_survive_into_the
-    // _container` in `standalone/tests/shot_cli.rs` is the assertion on the
+    // _container` in `standalone/tests/suite/shot_cli.rs` is the assertion on the
     // artifact, and it is the one that convicts.
     for tag in [
         "-color_range pc",

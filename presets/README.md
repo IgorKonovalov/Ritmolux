@@ -309,7 +309,7 @@ in
   ceiling at `C / G`; if that is below the typical level, the term is a constant
   no matter how reactive it reads. Phase 7 found **263 of 332** clamped band terms
   in that state at once. **This one is now checked** — `--report`'s `occ` column
-  names the binding and `core/tests/saturation.rs` fails the build on it (Plan
+  names the binding and `core/tests/suite/saturation.rs` fails the build on it (Plan
   0056 / [ADR-0062](../docs/adrs/0062-clamp-occupancy-is-the-saturation-instrument.md),
   and the `[occupancy]` table [below](#a-clamp-is-a-limit-not-a-gain--the-occupancy-table)).
   Do the division while composing anyway: the gate fires at occupancy `0.9`, so a
@@ -419,7 +419,7 @@ here is the **definition**, and the essay is the **discussion**.
 
 <!-- params:begin -->
 <!-- GENERATED - do not edit between the markers. Rewrite it with:
-     RLX_UPDATE_PARAM_REFERENCE=1 cargo test -p rlx-core --test preset \
+     RLX_UPDATE_PARAM_REFERENCE=1 cargo test -p rlx-core --test suite \
        the_parameter_reference_block_is_current
      The declarations it is generated from live beside each scene's own `set_param`. -->
 
@@ -3962,7 +3962,7 @@ does not bind is a warning, like an inert `[occupancy] exempt` entry.
 
 ## A clamp is a limit, not a gain — the `[occupancy]` table
 
-`core/tests/saturation.rs` is a **HARD gate**: it walks every shipped preset's
+`core/tests/suite/saturation.rs` is a **HARD gate**: it walks every shipped preset's
 expressions over 12 s of `dynamic:110` and fails the build on any `clamp()` whose
 inner value sits **at** its upper bound for 90 % or more of the hops
 ([ADR-0062](../docs/adrs/0062-clamp-occupancy-is-the-saturation-instrument.md)).
