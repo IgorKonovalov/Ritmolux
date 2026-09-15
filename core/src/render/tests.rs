@@ -1542,6 +1542,119 @@ fn dissolve_mode_freezes_a_shared_scene_pair_and_an_unresolvable_one() {
         "independent scenes still need frame-time evidence, which a headless \
          capture never has"
     );
+    assert!(
+        !renderer.pair_shares_resources(2, 3),
+        "a line scene and a field hold independent state, so only headroom froze them"
+    );
+
+    // Every system, not one sample of it. The roster holds one scene object per
+    // `SystemKind`, so a same-system pair evaluated dual-live would advance and
+    // bind that one object twice in a frame; the veto is what keeps it evaluated
+    // once. `SystemKind::ALL` rather than a literal list, so a system added
+    // later is held to it by being added. The veto input is asserted beside the
+    // mode because a headless renderer's missing headroom freezes every pair, and
+    // the mode alone could not tell the two reasons apart.
+    let pairs: Vec<Preset> = SystemKind::ALL
+        .iter()
+        .flat_map(|kind| {
+            ["A", "B"].map(|side| {
+                of(
+                    &format!("{}{side}", kind.as_str()),
+                    &format!(
+                        "system = \"{}\"\n{}",
+                        kind.as_str(),
+                        bare_system_extras(*kind)
+                    ),
+                )
+            })
+        })
+        .collect();
+    renderer.set_presets(pairs);
+    for (i, kind) in SystemKind::ALL.iter().enumerate() {
+        let (a, b) = (2 * i, 2 * i + 1);
+        assert!(
+            renderer.pair_shares_resources(a, b),
+            "two `{}` presets are one scene object and must read as shared",
+            kind.as_str()
+        );
+        assert_eq!(
+            renderer.dissolve_mode(a, b),
+            Mode::Freeze,
+            "two `{}` presets must dissolve frozen",
+            kind.as_str()
+        );
+    }
+}
+
+/// Whatever structural table a bare `system = "<key>"` preset needs to load:
+/// the two generator-driven line systems refuse to build without one.
+fn bare_system_extras(kind: SystemKind) -> &'static str {
+    match kind {
+        SystemKind::StarPattern => "[generator]\ntiling = \"8\"\n",
+        SystemKind::LSystem => {
+            "[generator]\naxiom = \"F\"\nrules = { F = \"F[+F]F\" }\nangle_deg = 22\nmax_depth = 3\n"
+        }
+        _ => "",
+    }
+}
+
+/// **The test hatch honours the veto.** `begin_transition_forced` bypasses the
+/// governor's headroom half so a headless test can reach the dual-live render
+/// path, but a same-system pair must stay frozen through every dissolve frame:
+/// the governor never builds that frame, so a test that did would be observing a
+/// defect no shipped build can have. An independent pair still goes dual-live
+/// once its opening frame is captured.
+#[test]
+fn a_forced_dual_live_dissolve_keeps_a_shared_scene_pair_frozen() {
+    let Some(mut renderer) = headless_or_skip(HeadlessOptions {
+        width: 48,
+        height: 48,
+        prefer_software: true,
+    }) else {
+        return;
+    };
+    let field = |name: &str| {
+        Preset::from_toml_str(&format!("system = \"fragment_field\"\nname = \"{name}\""))
+            .expect("hand-written field preset is valid")
+    };
+    renderer.set_presets(vec![field("FieldA"), field("FieldB"), preset("Swarm")]);
+    renderer.select_preset_now(0);
+    let stimulus = AnalysisFrame::default();
+    renderer.capture_frame(&stimulus).expect("warm-up frame");
+
+    renderer.begin_transition_forced(1, Mode::DualLive);
+    assert!(
+        renderer.transition.is_some(),
+        "the shared pair must dissolve"
+    );
+    let mut frames = 0;
+    while renderer.transition.is_some() {
+        assert!(
+            !renderer
+                .transition
+                .as_ref()
+                .is_some_and(|tr| tr.is_dual_live()),
+            "dissolve frame {frames} of a same-system pair went dual-live"
+        );
+        renderer
+            .capture_frame(&stimulus)
+            .unwrap_or_else(|e| panic!("shared dissolve frame {frames}: {e}"));
+        frames += 1;
+        assert!(frames < 10_000, "the shared dissolve never finished");
+    }
+
+    // The roster is on FieldB now; FieldB -> Swarm is an independent pair.
+    renderer.begin_transition_forced(2, Mode::DualLive);
+    renderer
+        .capture_frame(&stimulus)
+        .expect("independent dissolve opening frame");
+    assert!(
+        renderer
+            .transition
+            .as_ref()
+            .is_some_and(|tr| tr.is_dual_live()),
+        "an independent pair forced dual-live must be dual-live after its opening frame"
+    );
 }
 
 // --- Plan 0023 Phase 4: the adaptive dual-live upgrade -------------------

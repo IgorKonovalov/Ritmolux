@@ -1,6 +1,6 @@
 # 0181 — A scene advances after its frame's bindings
 
-> **Status:** approved (2026-09-14)
+> **Status:** in-progress
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`
 > **Related ADRs:** [0198](../adrs/0198-a-scene-advances-after-its-frames-bindings.md) (proposed),
@@ -255,11 +255,11 @@ flowchart TB
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(`main` directly, or the worktree path plus its branch)_
+**Lane:** `C:\Users\Igor Konovalov\WORK\rlx-plan-0181` on branch `plan-0181-a-scene-advances-after-its-frames-bindings`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The shared-scene veto is pinned, and the test hatch honours it | dev | not started | |
+| 1 — The shared-scene veto is pinned, and the test hatch honours it | dev | done | committed with this row |
 | 2 — Every scene advances on the values its frame bound | dev | not started | |
 | 3 — The prose follows the order | dev | not started | |
 
