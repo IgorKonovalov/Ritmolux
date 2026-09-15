@@ -51,8 +51,8 @@ stops = [
 # at 1.43 (depth 5) and only a genuine peak (mid ~0.85) reaches 2.9 (depth 6).
 # The floor of 4 is deliberately not lower - depth 3 is 84 segments and reads as
 # a sketch rather than as a colony.
-# The .5 is load-bearing: the ease never reaches a whole number in f32, so a step toward N.0
-# settles at N - 0.0000002 and floors a generation low. Every crossing sits mid-glide instead.
+# The .5 is load-bearing: the scene floors this, and an eased step toward N.0 floors to N only
+# on arrival, ten-odd time constants later, long after the transient. Mid-glide crossings land.
 visible_depth = "4.5 + floor(clamp(mid * 3.41, 0, 2.9))"
 
 # The colony sways in the current. Slow and small: this is a plant rooted in the

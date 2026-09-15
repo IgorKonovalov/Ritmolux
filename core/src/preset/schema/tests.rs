@@ -851,3 +851,118 @@ fn check_table(
         }
     }
 }
+
+// -----------------------------------------------------------------------
+// `Easing::step`: how an ease ends
+// -----------------------------------------------------------------------
+
+/// Ease `from` toward `to` for up to `max_frames`, asserting every frame stays
+/// inside the travelled interval and never moves backwards. Returns the 1-based
+/// frame on which the value became bit-exactly `to`, if it did.
+fn frames_to_arrive(
+    easing: Easing,
+    from: f32,
+    to: f32,
+    dt: f32,
+    max_frames: usize,
+) -> Option<usize> {
+    let (lo, hi) = (from.min(to), from.max(to));
+    let mut held = from;
+    for frame in 1..=max_frames {
+        let next = easing.step(held, to, dt);
+        assert!(
+            (lo..=hi).contains(&next),
+            "frame {frame}: {next} left [{lo}, {hi}] easing {from} toward {to}"
+        );
+        if to > from {
+            assert!(next >= held, "frame {frame}: {next} fell below {held}");
+        } else {
+            assert!(next <= held, "frame {frame}: {next} rose above {held}");
+        }
+        held = next;
+        if held.to_bits() == to.to_bits() {
+            return Some(frame);
+        }
+    }
+    None
+}
+
+/// **An ease arrives bit-exactly at a whole-number target.** The bare one-pole
+/// at tau 0.1 s and 60 Hz stalls toward `2.0` at `1.9999996` near frame 89, and
+/// a truncating consumer draws `1` from that forever.
+#[test]
+fn a_fast_ease_arrives_bit_exactly_and_never_overshoots() {
+    let arrived = frames_to_arrive(Easing::symmetric(0.1), 1.0, 2.0, 1.0 / 60.0, 120);
+    assert!(
+        arrived.is_some(),
+        "symmetric(0.1) at 60 Hz never reached 2.0 in 120 frames"
+    );
+}
+
+/// **The slow ease is the case a fixed-distance snap threshold fails**: tau 2 s
+/// at 144 Hz stalls near frame 3130 about 144 float spacings short of `2.0`, far
+/// outside "a few ulps". The no-progress rule still fires there.
+#[test]
+fn a_slow_ease_arrives_bit_exactly_from_a_stall_far_outside_a_few_ulps() {
+    let arrived = frames_to_arrive(Easing::symmetric(2.0), 1.0, 2.0, 1.0 / 144.0, 4000);
+    assert!(
+        arrived.is_some(),
+        "symmetric(2.0) at 144 Hz never reached 2.0 in 4000 frames"
+    );
+}
+
+/// The release side ends by the same rule.
+#[test]
+fn an_ease_toward_a_lower_target_arrives_bit_exactly() {
+    for (tau, dt, frames) in [(0.1, 1.0 / 60.0, 120), (2.0, 1.0 / 144.0, 4000)] {
+        let arrived = frames_to_arrive(Easing::symmetric(tau), 2.0, 1.0, dt, frames);
+        assert!(
+            arrived.is_some(),
+            "symmetric({tau}) never released to 1.0 in {frames} frames"
+        );
+    }
+}
+
+/// **No step overshoots where `alpha` is within a spacing of 1.** The monotonic
+/// argument assumes `raw - held` is exact, which Sterbenz guarantees only for
+/// operands within a factor of two; these pairs are far apart in magnitude or
+/// straddle zero, so the subtraction rounds.
+#[test]
+fn a_near_unit_alpha_step_stays_inside_the_interval_for_distant_operands() {
+    let easing = Easing::symmetric(0.001);
+    let dt = 1.0 / 60.0;
+    for (held, raw) in [(1e-3_f32, 1e6_f32), (1e6, 1e-3), (-5.0, 3.0)] {
+        let (lo, hi) = (held.min(raw), held.max(raw));
+        let next = easing.step(held, raw, dt);
+        assert!(
+            (lo..=hi).contains(&next),
+            "{held} toward {raw} stepped to {next}, outside [{lo}, {hi}]"
+        );
+    }
+}
+
+/// **Where `alpha` rounds to zero the value holds rather than snapping.** At tau
+/// 1e9 s and 144 Hz every frame makes no progress; an unguarded snap would turn
+/// the slowest ease into an instant one.
+#[test]
+fn a_zero_alpha_ease_holds_instead_of_snapping() {
+    let easing = Easing::symmetric(1.0e9);
+    let mut held = 1.0_f32;
+    for frame in 0..1000 {
+        held = easing.step(held, 2.0, 1.0 / 144.0);
+        assert_eq!(
+            held.to_bits(),
+            1.0_f32.to_bits(),
+            "frame {frame} moved to {held}"
+        );
+    }
+}
+
+/// **A zero step holds.** `dt` is finite and positive by precondition, and
+/// outside it the arithmetic answers: `dt = 0` gives `alpha = 0`, which the
+/// snap's guard holds rather than snapping to `raw`.
+#[test]
+fn a_zero_step_holds() {
+    let next = Easing::symmetric(0.1).step(1.0, 2.0, 0.0);
+    assert_eq!(next.to_bits(), 1.0_f32.to_bits(), "moved to {next}");
+}

@@ -222,3 +222,12 @@ test("the wrapper exits with the command's exit code and logs the run", async ()
   assert.equal(entry.exit_code, 3);
   assert.equal(typeof entry.waited_ms, "number");
 });
+
+test("a .cmd shim named without its extension exits with the shim's own code, not the failed direct spawn's", { skip: process.platform !== "win32" }, async () => {
+  const dir = freshDir();
+  writeFileSync(join(dir, "rlx-shim.cmd"), "@exit /b 3\r\n");
+  const logFile = join(dir, "locks.jsonl");
+  const r = await run(["suite", "--", join(dir, "rlx-shim")], { RLX_LOCK_DIR: dir, RLX_LOCK_LOG: logFile });
+  assert.equal(r.code, 3);
+  assert.equal(JSON.parse(readFileSync(logFile, "utf8").trim()).exit_code, 3);
+});

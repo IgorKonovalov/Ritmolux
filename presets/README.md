@@ -3814,6 +3814,14 @@ A param not listed is applied instantly; `0` also means no smoothing. The smooth
 refresh rate, and it resets on a preset switch (a switch snaps to the new preset's
 first value). Validated non-negative and finite at load.
 
+An eased value reaches its target **exactly**, but only after about ten to fifteen time
+constants. That matters for a parameter the engine **floors** — `lsystem`'s `visible_depth`,
+`shape_collage`'s `count`, `parametric_curve`'s `samples`: it takes its step only on arrival, so
+`visible_depth = "3 + floor(clamp(onset * 2, 0, 1))"` under a short `[smoothing]` constant draws
+generation 4 only if the onset is held until the ease arrives. On a transient the target is back at
+3 first, and generation 4 never draws at all. A step that must land inside a transient targets
+the midpoint instead, `3.5 + floor(...)`, so the floored value crosses mid-glide.
+
 ### Snap up, glide down — the `{ attack, release }` form
 
 One constant slows the rise exactly as much as it slows the fall, so a longer

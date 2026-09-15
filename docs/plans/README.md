@@ -46,7 +46,6 @@ place. The plan file carries the real link.
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. **Runs after 0180**, which re-draws the waveform its wash is measured on. The verdict decides whether backlog 0109 is buyable. Needs the reference rig. |
 | [0160](0160-the-silhouettes-preconditions-stop-being-silent.md) | The silhouette's preconditions stop being silent | approved | dev, human | ADR-0179: four silent `[path]` preconditions. **Amended 2026-09-14:** optional Phase 1b folds in backlog 0217 (arity probe re-prices a polyline). Phase 2 is prose. |
 | [0166](0166-the-basics-read-in-russian.md) | The basics read in Russian | approved | dev, human | ADR-0185: five docs gain a stamped `.ru.md`. **Phase 3 is a `human` review that blocks publication.** Amended 2026-09-14: `pages.yml` depth, gate-count prose collides with 0178. |
-| [0175](0175-an-eased-value-arrives.md) | An eased value arrives at its target | in-progress | dev | Backlog 0218 + 0212. Phases 1-2 on its branch; parked at 3, **amended on the branch 2026-09-15**: the warp totality test stops sweeping `dt`. Next: `resume 0175`. |
 | [0177](0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) | The test tree stops touching the machine and stops costing its disk | approved | dev, studio-builder | ADR-0204 (proposed). Keep 0174's run-alone binaries as their own targets. Phase 4 measures target/ growth before the prune and fold. |
 | [0178](0178-what-the-operator-reads-is-true.md) | What the operator reads is true | approved | dev, human | Backlog 0172, 0185, 0207, 0208 + ADR-0202 (proposed): drift line, `--list-presets`, banner, recovery line, count gate. **Lands after 0176 and 0166.** Phase 5 `human` settles 0203. |
 | [0179](0179-a-parameters-range-belongs-to-its-family.md) | A parameter's range belongs to its family | approved | dev, studio-builder | ADR-0194: the schema carries per-family ranges, `preset` reports the family; backlog 0198 `deposit_arms` goes Structural. Phase 4's wait on 0174 is discharged. |
@@ -281,8 +280,9 @@ naming what moved. The order:
 - **Delivery and infrastructure lane.** [0174] closed first, then [0176] (both 2026-09-14), which
   discharges [0103] Phase 5's wait on a tag that reliably reaches origin. Then [0177], which re-derives its mergeable set from 0174's final run-alone filter. [0178] edits the same gate-count
   prose as [0166] Phase 1 and [0176]; whichever lands second rebases onto the others.
-- **Engine lane.** [0181] and [0185] closed 2026-09-15, both ahead of [0175], and neither moved a
-  golden. [0175] and [0180] both parked `plan_wrong` on 2026-09-14 and were amended on their lane branches 2026-09-15; resuming them is next, 0175 first. 0175 touches `LatchBank::advance`, which 0181 left alone. [0180] runs before [0142]: 0180 re-draws the
+- **Engine lane.** [0181], [0185] and then [0175] closed 2026-09-15, and none moved a golden.
+  [0180] parked `plan_wrong` on 2026-09-14 and was amended on its lane branch 2026-09-15; resuming it
+  is next. The opening this replaced is [in the archive](README-archive.md). [0180] runs before [0142]: 0180 re-draws the
   waveform 0142's wash is measured on and needs no rig. After those, [0184], [0183],
   [0179] (its Phase 4's wait on 0174 is discharged) and [0186], in any order that keeps each bless set clean.
   [0182] closed 2026-09-15 ahead of them; it touched only the report, so it constrains none.
@@ -308,7 +308,7 @@ naming what moved. The order:
 [0185]: done/0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage.md
 [0186]: 0186-the-flatness-gate-tells-a-figure-from-its-ground.md
 [0174]: done/0174-the-clock-reading-tests-run-alone.md
-[0175]: 0175-an-eased-value-arrives.md
+[0175]: done/0175-an-eased-value-arrives.md
 [0120]: 0120-the-standalone-ships-on-ubuntu.md
 [0166]: 0166-the-basics-read-in-russian.md
 
@@ -843,6 +843,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0175 — An eased value arrives at its target](done/0175-an-eased-value-arrives.md) — closed 2026-09-15. Review: **no blockers, no majors, one minor, one nit (both fixed).** Version: **0.124.2**. No ADR paired. Archived 0212, 0218. [Write-up](README-archive.md).
 - [0188 — The conductor survives its first run](done/0188-the-conductor-survives-its-first-run.md) — closed 2026-09-15. Review: **no blockers, no majors, one minor.** Version: **0.124.1**. ADR-0205 Outcome (the pilot). [Write-up](README-archive.md).
 - [0182 — The report hears a counter](done/0182-the-report-hears-a-counter.md) — closed 2026-09-15. Review: **no blockers, no majors, three minors.** Version: **0.124.0**. ADR-0196 accepted (Outcome). Archived 0192. [Write-up](README-archive.md).
 - [0181 — A scene advances after its frame's bindings](done/0181-a-scene-advances-after-its-frames-bindings.md) — closed 2026-09-15. Review: **no blockers, no majors, three minors, one nit.** Version: **0.123.2**. ADR-0198 accepted (Outcome). Archived 0142, 0191. [Write-up](README-archive.md).

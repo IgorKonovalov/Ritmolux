@@ -160,3 +160,12 @@ test("a step whose onlyIfCommand does not run is skipped, and one whose command 
   assert.equal(g.ok, true);
   assert.deepEqual(g.ran, ["present tool"]);
 });
+
+test("a .cmd shim named without its extension reports the shim's own exit code and output, not the failed direct spawn's", { skip: process.platform !== "win32" }, async () => {
+  const dir = tmp();
+  writeFileSync(join(dir, "rlx-shim.cmd"), "@echo shim ran\r\n@exit /b 3\r\n");
+  const g = await runGate({ cwd: dir, logDir: tmp(), label: "shim", commands: [{ name: "shim", cmd: [join(dir, "rlx-shim")] }] });
+  assert.equal(g.ok, false);
+  assert.equal(g.failed.code, 3);
+  assert.match(readFileSync(g.failed.log, "utf8"), /shim ran/);
+});

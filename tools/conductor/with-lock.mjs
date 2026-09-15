@@ -185,15 +185,24 @@ function spawnRun(command, args, { capture = false } = {}) {
       const forward = (sig) => child.kill(sig);
       process.on("SIGINT", forward);
       process.on("SIGTERM", forward);
+      // Node emits `close` (code -4058 on Windows) after `error` for a child that never started, so a
+      // child handed to the shell retry must not finish the run: the retried child does.
+      let retried = false;
       child.on("error", (e) => {
         // A .cmd shim (npm, npx) is not spawnable without a shell on Windows.
-        if (e.code === "ENOENT" && !shell && process.platform === "win32") start(true);
-        else {
+        if (e.code === "ENOENT" && !shell && process.platform === "win32") {
+          retried = true;
+          process.off("SIGINT", forward);
+          process.off("SIGTERM", forward);
+          start(true);
+        } else {
           process.stderr.write(`with-lock: ${e.message}\n`);
           finish(127);
         }
       });
-      child.on("close", (code, signal) => finish(code ?? (signal ? 1 : 0)));
+      child.on("close", (code, signal) => {
+        if (!retried) finish(code ?? (signal ? 1 : 0));
+      });
     };
     start(false);
   });

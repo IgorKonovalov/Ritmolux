@@ -136,7 +136,7 @@ impl LatchBank {
             // than to what was left. `dt` is the injected real frame time
             // (ADR-0014), which is the whole of `hold` being a duration rather
             // than a frame count.
-            state.hold_left = (state.hold_left - dt.max(0.0)).max(0.0);
+            state.hold_left = (state.hold_left - dt).max(0.0);
 
             let arm_now = latch.arm.eval(&vars) > LATCH_TRUE;
             let fire_now = latch.fire.eval(&vars) > LATCH_TRUE;

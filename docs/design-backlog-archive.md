@@ -314,13 +314,11 @@ live entry citing this one.
 | 0204 | The studio's sliders read one range per parameter, not per curve family | [Plan 0179](plans/0179-a-parameters-range-belongs-to-its-family.md) + ADR-0194. **Promoted** |
 | 0207 | The cap-recovery line says "geometry" for three contexts that are not geometry | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 3. **Promoted** |
 | 0208 | A system count written into prose goes stale on the next system | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 4 + ADR-0202. **Promoted** |
-| 0212 | Three frame-delta guards check only the sign, so the one-policy gate cannot see them | [Plan 0175](plans/0175-an-eased-value-arrives.md) Phase 3. **Promoted** |
 | 0213 | The horizon's length-independence test never compares the ground | [Plan 0177](plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 3. **Promoted** |
 | 0214 | A converted comp shader and per-vertex program read other coordinates than the source | [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) Phases 1-3. **Promoted** |
 | 0215 | The seam on two MilkDrop 1.x presets is unexplained | [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) Phases 1, 4. **Promoted** |
 | 0216 | The converted waveform follows neither reference | [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) Phases 5-6 + ADR-0199. **Promoted** |
 | 0217 | `path_cost`'s arity probe prices an arc chain, not the polyline its header reports | [Plan 0160](plans/0160-the-silhouettes-preconditions-stop-being-silent.md) Phase 1b. **Promoted** |
-| 0218 | A `[smoothing]`-eased value never reaches a whole-number target | [Plan 0175](plans/0175-an-eased-value-arrives.md) Phases 1-2. **Promoted** |
 | 0222 | The conductor digest reports dollars, and the operator's constraint is the usage window | [Plan 0189](plans/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) Phase 2. **Promoted** |
 | 0223 | The gate is a third of a conductor run, re-running the suite on trees that passed it | [Plan 0189](plans/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) Phases 3-5 + ADR-0207. **Promoted** |
 | 0224 | A CLI update refuses the whole conductor until a probe and a hand edit | [Plan 0189](plans/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) Phase 6 + ADR-0208. **Promoted** |
@@ -561,6 +559,8 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0142 | A same-system dissolve runs `Scene::update` twice in one frame | [ADR-0198](adrs/0198-a-scene-advances-after-its-frames-bindings.md) + [Plan 0181](plans/done/0181-a-scene-advances-after-its-frames-bindings.md) Phase 1. Falsified: every such dissolve freezes. **Closed 2026-09-15** |
 | 0191 | `evaluate_preset` advances the scene before it applies the preset's bindings | [ADR-0198](adrs/0198-a-scene-advances-after-its-frames-bindings.md) + [Plan 0181](plans/done/0181-a-scene-advances-after-its-frames-bindings.md) Phase 2. No golden moved. **Closed 2026-09-15** |
 | 0192 | `--report` cannot see a `beat_index`-driven response, so a musical preset measures as inert | [ADR-0196](adrs/0196-the-report-hears-the-musical-clock-in-a-column-of-its-own.md) + [Plan 0182](plans/done/0182-the-report-hears-a-counter.md). A `count` column. **Closed 2026-09-15** |
+| 0218 | A `[smoothing]`-eased value never reaches a whole-number target | [Plan 0175](plans/done/0175-an-eased-value-arrives.md) Phases 1-2. A no-progress snap; the `N.5` offsets stay. **Closed 2026-09-15** |
+| 0212 | Three frame-delta guards check only the sign, so the one-policy gate cannot see them | [Plan 0175](plans/done/0175-an-eased-value-arrives.md) Phase 3. All three deleted, none allowlisted. **Closed 2026-09-15** |
 | 0160 | The test suite re-created a `target/` inside the worktree that no redirect reaches | [Plan 0136](plans/done/0136-the-gates-can-convict.md) Phase 8; the redirect itself went with ADR-0147. See 0161. **Closed 2026-09-15** |
 <!-- roster:end -->
 
@@ -12986,9 +12986,17 @@ kept ones do not use, with an allowlist entry for each kept one.
 **Low.** Unreachable, nothing renders wrong, and bounded to three lines and one test pattern. It is
 filed because ADR-0191's Decision says "only answer" and the tree has three more.
 
-- **Promoted 2026-09-14** into [Plan 0175](plans/0175-an-eased-value-arrives.md) Phase 3: all three guards are deleted (`Easing::step` then holds on `dt = 0` rather than snapping), and the hygiene predicate widens to the sign spellings. The four probes above go red on delivery.
+- **Promoted 2026-09-14** into [Plan 0175](plans/done/0175-an-eased-value-arrives.md) Phase 3: all three guards are deleted (`Easing::step` then holds on `dt = 0` rather than snapping), and the hygiene predicate widens to the sign spellings. The four probes above go red on delivery.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0175](plans/0175-an-eased-value-arrives.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0175](plans/done/0175-an-eased-value-arrives.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+**CLOSED 2026-09-15** — [Plan 0175](plans/done/0175-an-eased-value-arrives.md) Phase 3. All three guards
+were deleted and none kept, so `DT_GUARD_ALLOWED` did not grow. `Easing::step` holds on `dt = 0`,
+the latch countdown subtracts `dt` bare, and the warp decay raises the rate to `dt` with no floor.
+The hygiene predicate now also matches `dt` compared against a `0`-led literal and `dt.max(`,
+`dt.min(`, `dt.clamp(`; before the deletions it named the three sites and the seam's own line. The
+floor's deletion also took the `a zero dt` and `a NaN dt` cases out of the warp totality test, which
+had been sweeping a delta outside `fill_uniform`'s precondition.
 
 
 ---
@@ -13239,7 +13247,7 @@ snap is the cheaper and the more general of the two. **Unaudited:** whether any 
 
 - **Raised:** 2026-09-14, by `preset-author` while repairing `lsystem_icecrystal`. **Owner if
   taken:** `architect` for the snap-or-warn choice, then `dev`.
-- **Planned 2026-09-14** as [Plan 0175](plans/0175-an-eased-value-arrives.md): snap, no warning.
+- **Planned 2026-09-14** as [Plan 0175](plans/done/0175-an-eased-value-arrives.md): snap, no warning.
   Two corrections to the text above. The stall gap is `ulp / (2 * alpha)`, about 144 ulps at tau 2 s
   and 144 Hz, so "within a few ulps" is the wrong test and "no progress" is the right one. And the
   snap does not make `N + floor(...)` work on a transient, so the `N.5` offsets stay. The audit found
@@ -13256,7 +13264,15 @@ snap is the cheaper and the more general of the two. **Unaudited:** whether any 
 **Low.** Nothing renders broken once a preset carries the half offset, and all five shipped ones
 do. What is wrong is that the natural binding silently loses its top step.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0175](plans/0175-an-eased-value-arrives.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0175](plans/done/0175-an-eased-value-arrives.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+**CLOSED 2026-09-15** — [Plan 0175](plans/done/0175-an-eased-value-arrives.md) Phases 1-2.
+`Easing::step` returns `raw` on the first frame a step makes no progress while `alpha > 0`, so every
+ease arrives bit-exactly: tau 0.1 s at 60 Hz within 120 frames, tau 2 s at 144 Hz within 4000, and
+`alpha = 0` holds. An eased `visible_depth` stepping 1 to 2 now draws generation 2. No golden moved.
+The five L-system presets keep their `N.5` offsets, because arrival takes ten to fifteen time
+constants and outlasts a transient; their comments give that reason now. The first probe above stays
+green, as the plan predicted, because the one-pole expression survives the fix.
 
 ## 0222 — the digest reports a run in dollars, and the subscription operator's constraint is the usage window, which is recorded and never shown
 

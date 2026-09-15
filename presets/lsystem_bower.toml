@@ -49,8 +49,8 @@ stops = [
 # cap is 1.4, so a real-music onset mean of ~0.20 sits at 0.47 - depth 3, closed
 # - and a genuine hit at 0.43 crosses 1.0 into depth 4. The asymmetric ease
 # below is what makes it a gesture rather than a flicker.
-# The .5 is load-bearing: the ease never reaches a whole number in f32, so a step toward N.0
-# settles at N - 0.0000002 and floors a generation low. Every crossing sits mid-glide instead.
+# The .5 is load-bearing: the scene floors this, and an eased step toward N.0 floors to N only
+# on arrival, ten-odd time constants later, long after the transient. Mid-glide crossings land.
 visible_depth = "3.5 + floor(clamp(onset * 2.33, 0, 1.4))"
 
 # The rosette turns, slowly, and leans into the low end. `mirror_order` folds in

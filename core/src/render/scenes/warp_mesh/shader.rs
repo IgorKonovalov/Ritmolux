@@ -102,7 +102,9 @@ pub(super) struct MilkUniform {
 ///
 /// `decay` is the scene's per-second value; it is converted to *this frame's*
 /// factor here (`^dt`), so a shader's `ret *= decay` fades at the authored rate
-/// on any refresh — ADR-0019 applied to a shader input.
+/// on any refresh — ADR-0019 applied to a shader input. `dt` is the scene's
+/// frame delta, finite and positive once `sanitize_frame_dt` has run
+/// (ADR-0191), so a zero rate is `0^dt = 0` and fades in one frame.
 ///
 /// `quantize_steps` rides the free `misc.w` lane to the emitted warp epilogue's
 /// `rlx_quantize` call (ADR-0118). It is a **runtime** input rather than a baked
@@ -154,7 +156,7 @@ pub(super) fn fill_uniform(
         rand_frame: runtime.rand_frame(),
         rand_preset: runtime.rand_preset(),
         misc: [
-            decay_per_second.max(0.0).powf(dt.max(1e-6)),
+            decay_per_second.max(0.0).powf(dt),
             brightness,
             occlude,
             quantize_steps,

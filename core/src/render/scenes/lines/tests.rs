@@ -467,3 +467,117 @@ fn every_sub_floor_thickness_renders_identically_and_a_useful_one_does_not() {
          reaching the stroke, and the equality above proves nothing"
     );
 }
+
+// -----------------------------------------------------------------------
+// An eased `visible_depth` draws the generation it arrives at
+// -----------------------------------------------------------------------
+
+/// Silent frames before the step, so the eased value starts settled at `1`.
+const DEPTH_PRE: usize = 12;
+/// Frames held on the step: 3 s, thirty time constants at tau 0.1 s, against an
+/// arrival near frame 89.
+const DEPTH_HELD: usize = 180;
+
+/// A branching `lsystem` whose `visible_depth` steps from `1` to `2` when bass
+/// comes up, eased at `tau` when one is given. Everything else is frozen, so
+/// the drawn generation is the only thing the picture carries.
+fn stepped_depth_preset(tau: Option<f32>) -> String {
+    let smoothing = tau.map_or(String::new(), |tau| {
+        format!("[smoothing]\nvisible_depth = {tau}\n")
+    });
+    format!(
+        r#"
+system = "lsystem"
+name   = "stepped_depth"
+
+[generator]
+axiom     = "F"
+rules     = {{ F = "F[+F]F[-F]F" }}
+angle_deg = 25
+max_depth = 3
+
+[params]
+visible_depth = "1 + floor(clamp(bass * 2, 0, 1))"
+rotation      = "0"
+hue           = "0.55"
+thickness     = "1.8"
+brightness    = "0.9"
+draw_progress = "1"
+
+{smoothing}"#
+    )
+}
+
+/// Capture every frame of that preset across silence then a held bass step,
+/// on its own headless renderer (see [`capture_at_thickness`] on why one per call).
+fn capture_stepped_depth(tau: Option<f32>) -> Option<Vec<crate::render::CaptureImage>> {
+    use crate::dsp::AnalysisFrame;
+    use crate::preset::Preset;
+    use crate::render::context::RenderError;
+    use crate::render::{HeadlessOptions, Renderer};
+
+    let mut renderer = match Renderer::new_headless(HeadlessOptions {
+        width: 128,
+        height: 128,
+        prefer_software: true,
+    }) {
+        Ok(renderer) => renderer,
+        Err(RenderError::RequestAdapter(_)) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return None;
+        }
+        Err(e) => panic!("headless renderer build failed: {e}"),
+    };
+    let preset = Preset::from_toml_str(&stepped_depth_preset(tau))
+        .expect("the stepped-depth fixture parses");
+    let name = preset.name.clone();
+    renderer.set_presets(vec![preset]);
+
+    let loud = AnalysisFrame {
+        bass: 1.0,
+        ..Default::default()
+    };
+    let mut stimulus = vec![AnalysisFrame::default(); DEPTH_PRE];
+    stimulus.extend(std::iter::repeat_n(loud, DEPTH_HELD));
+    Some(
+        renderer
+            .capture_preset_over(&name, &stimulus)
+            .expect("capture the stepped-depth fixture"),
+    )
+}
+
+/// **An eased `visible_depth` stepping from `1` to `2` draws generation 2 once
+/// the ease has settled.** The scene truncates the value, so an ease that
+/// stalled a few float spacings short of `2.0` would draw generation 1 for as
+/// long as the step was held.
+#[test]
+fn an_eased_visible_depth_draws_the_generation_it_settles_on() {
+    let Some(eased) = capture_stepped_depth(Some(0.1)) else {
+        return;
+    };
+    let Some(instant) = capture_stepped_depth(None) else {
+        return;
+    };
+    let depth_one = &instant[DEPTH_PRE - 1];
+    let depth_two = &instant[DEPTH_PRE + DEPTH_HELD - 1];
+
+    // Byte comparisons through `assert!` rather than `assert_eq!`, so a failure
+    // names the generation instead of printing 65k bytes of pixels.
+    //
+    // Non-vacuity: the two generations must draw different pictures, or the
+    // equality below is two identical figures agreeing.
+    assert!(
+        depth_one.rgba != depth_two.rgba,
+        "generations 1 and 2 drew the same picture, so this proves nothing"
+    );
+
+    let settled = &eased[DEPTH_PRE + DEPTH_HELD - 1];
+    assert!(
+        settled.rgba != depth_one.rgba,
+        "the eased depth still draws generation 1 after thirty time constants"
+    );
+    assert!(
+        settled.rgba == depth_two.rgba,
+        "the eased depth settled on a picture that is neither generation"
+    );
+}
