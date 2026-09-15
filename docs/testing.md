@@ -28,7 +28,7 @@ they hold on any GPU; the exceptions say so below. Run the whole suite:
 
 ```bash
 cargo nextest run -p rlx-core     # what CI runs (per-test process isolation)
-cargo test -p rlx-core            # single binaries only — see the two caveats below
+cargo test -p rlx-core            # single binaries only — see the caveat below
 ```
 
 **Most of these files share one test binary** ([ADR-0204](adrs/0204-a-cheap-integration-test-shares-one-binary-and-a-test-that-needs-its-own-stays-its-own.md)).
@@ -41,14 +41,12 @@ the clock, or when it reads a process-level quantity such as its own memory. The
 which lives in `core/tests/suite/main.rs`, and `hygiene.rs` fails on a clock exemption inside
 either `suite/`.
 
-> **Use `nextest` for the whole suite**, for two independent reasons.
+> **Use `nextest` for the whole suite.** `preset`'s zero-allocation assertion is
+> not the reason: its allocator hook counts **per thread**, so a concurrently-running
+> test's allocations never reach the count, under either runner and inside the shared
+> `suite` binary alike.
 >
-> `preset`'s zero-allocation assertion
-> counts allocations through a process-global allocator hook, so it is only
-> reliable under nextest's per-test process isolation — under stock `cargo test`
-> a concurrently-running test's allocations bleed into the count.
->
-> And **stock `cargo test` runs a binary's tests as threads in one process, which
+> The reason is that **stock `cargo test` runs a binary's tests as threads in one process, which
 > the GPU tests do not survive.** Several of them build and drop a `Renderer` (and
 > so a wgpu device) concurrently, and the driver aborts the process with
 > `STATUS_ACCESS_VIOLATION` — `transition`'s tests every run on WARP, `--lib`

@@ -221,10 +221,10 @@ run_step "cargo fmt --all --check" cargo fmt --all --check
 run_step "cargo clippy --workspace --all-targets -- -D warnings" cargo clippy --workspace --all-targets -- -D warnings
 
 # rustdoc over the engine's public surface, so a broken or private intra-doc link
-# fails here rather than in CI's `cargo doc --workspace` job. Scoped to rlx-core by
-# measurement (Plan 0177 Phase 7): on one warm edit to core/src/render/metrics.rs it
-# cost 4.5-5.9 s against clippy's 6.3-7.8 s on the same edit, and it fails on a
-# public item linking a private one. `--features text` documents the rlx-core the
+# fails here rather than in CI's `cargo doc --workspace` job. Scoped to rlx-core so a
+# warm engine edit costs no more here than the clippy step above (the timings are in
+# Plan 0177 Phase 7 and the ci.yml comment), and it still fails on a public item
+# linking a private one. `--features text` documents the rlx-core the
 # workspace builds: the standalone turns that feature on, and without it a link to
 # the feature-gated `aux_target` does not resolve. `standalone`'s public items are
 # NOT covered here; CI's job is the only place they are documented.

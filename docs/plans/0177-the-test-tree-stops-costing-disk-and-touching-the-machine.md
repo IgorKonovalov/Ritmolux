@@ -389,11 +389,9 @@ flowchart LR
 - **Phase 1, data root.** `%APPDATA%\Ritmolux` (158 entries) listed with size and mtime before and
   after `cargo nextest run -p standalone --no-fail-fast` (411 passed, 0 skipped): the two listings
   are byte-identical, so the diff is empty. No `shot_cli` case needed `--presets presets` added.
-- **Phase 1, helper shape.** `common` exposes `player()`, `player_with_data_root(root)`, `shot()` and
-  `shot_executable()`. `stream_show` spawns through `player_with_data_root`, passing an empty path
-  where it tests the unresolved data root, as it did before. `shot_executable()` exists because
-  `an_encoder_that_dies_reports_the_encoders_own_failure` hands the example's path to `shot` as its
-  stand-in encoder.
+- **Phase 1, helper shape.** `common` exposes `player()`, `player_with_data_root(root)` (an empty
+  root is `stream_show`'s unresolved case), `shot()` and `shot_executable()`, the last for the test
+  that hands `shot` its own path as a stand-in encoder.
 - **Phase 2, deviation: comments are not stripped with `strip_line_comments`.** It cuts a line at a
   `//` inside a string literal (`"//"` in `show_is_the_only_owner.rs`, `preset.rs`, milkconv's
   `conformance.rs` and `hygiene.rs` itself), which flips which side of a quote the literal scan is
@@ -427,27 +425,23 @@ flowchart LR
   script's dry run on this checkout): 24 files, 184.0 MB, a second `rlx_core`, `wgpu`, `wgpu_core`,
   `wgpu_hal`, `windows`, `gpu_allocator` and `hygiene` generation left by the narrowed `-p` runs.
   No `lmv_*` file exists in this lane.
-- **Phase 4, incremental mapping.** No sound mapping: a crate-hash directory is named
-  `<crate>-<base-36 id>` (`rlx_core-05p4fmhnlotwc`), `deps/` carries the 16-hex metadata hash
-  (`librlx_core-347eded4b592ce55.rlib`), and no field of a `compiler-artifact` message names the
-  former.
+- **Phase 4, incremental mapping.** None: a crate-hash directory is `<crate>-<base-36 id>`,
+  `deps/` carries the 16-hex metadata hash, and no `compiler-artifact` field names the former.
 - **Phase 4, verdict: bounded.** (a) created no crate-hash directory, and (b) and (c) created none
   per tool.
 - **Phase 5.** `--apply` on the Phase 4 checkout: `deps/` 1098 files, 3226.1 MB before; 24 files,
   184.0 MB deleted (the 24 Phase 4 counted); 1074 files, 3042.1 MB after. `--verify-fresh` straight
   after: 637 of 637 artifacts fresh. nextest's `--cargo-message-format json` forwards the artifact
   messages, so the `cargo test` fallback in Risks was not needed.
-- **Phase 5, redirect check (by hand).** Run with `CARGO_TARGET_DIR=C:/Users/IGORKO~1/WORK/rlx-plan-0177/target`
-  (the same directory under its 8.3 spelling, so nothing rebuilt): the script read
-  `C:\Users\IGORKO~1\...\target\debug\deps` from `cargo metadata`, matched all 637 reported
-  artifacts, and found 0 files to delete. A redirect to a physically different directory was not
-  tried, because it costs a cold build of the workspace into it.
+- **Phase 5, redirect check (by hand).** `CARGO_TARGET_DIR` set to this lane's `target` under its
+  8.3 spelling: the script read that `deps` from `cargo metadata`, matched all 637 artifacts, found
+  0 to delete. A physically different directory was not tried (a cold build).
 - **Phase 5, matching rule the plan did not state.** A `deps/` file is live when its 16-hex metadata
   hash is the hash of a reported file, so a live `.exe` keeps its `.pdb` and `.d`. A reported file
   outside `deps/` is matched to its `deps/` source by hard-link identity, else by content; on MSVC a
   binary's source is the unhashed `deps/ritmolux.exe`. An unmatched report stops the script.
-- **Phase 6.** No script arm: Phase 4 found no mapping. The Disk section documents the delete, with
-  Phase 4's figures, the machine and the date.
+- **Phase 6.** No script arm (no mapping). The Disk section documents the delete with Phase 4's
+  figures, machine and date.
 - **Phase 7, deviation: the adopted step is `cargo doc -p rlx-core --no-deps --features text`.** The
   command the phase names exits 101 **on the unmodified tree**: `core/src/render/preview.rs:10` links
   `super::aux_target`, which exists only with the `text` feature, and `-p rlx-core` alone leaves it
@@ -472,8 +466,7 @@ flowchart LR
   18 -> 18. Each of the first two diffs is one line,
   `hygiene::the_suite_clock_check_names_an_exemption_and_ignores_prose`, the negative control this
   phase adds for step 3; the override's diff is empty.
-- **Phase 8, `override` is a keyword.** It is declared `mod r#override;`, so its tests list as
-  `r#override::...`.
+- **Phase 8.** `override` is a keyword: `mod r#override;`, tests list as `r#override::...`.
 - **Phase 8, timing.** `cargo nextest run --workspace -P fast --no-run`, warm, back to back in one
   session, the `STRUCT_GRID` edit applied and reverted twice. Cargo's `Finished` / the lock's wall
   time, seconds:
@@ -499,17 +492,12 @@ flowchart LR
   `docs/plans/README.md`'s baseline-drift control was rewritten as well. Left as written: ADRs,
   other plans, `docs/design-backlog.md`, the archives, and the comments in `studio/shared/
   fields.test.ts` and `grammar.test.ts` naming `core/tests/preset_schema.rs`.
-- **Phase 8, unmet done-when: the skills grep is not empty.**
-  `.claude/skills/dev/references/project-context.md:163-164` still cite `--test preset_schema` and
-  `--test preset` (should read `--test suite preset_schema::` and `--test suite preset::`), and
-  `.claude/skills/architect/SKILL.md:308,429` still name `core/tests/preset_schema.rs` and
-  `core/tests/hygiene.rs`. The session's file edits under `.claude/` were refused.
-  Repaired by the owner in the lane after the park: the four citations now name `--test suite
-  preset_schema::`, `--test suite preset::` and `core/tests/suite/`. `project-context.md:201` still
-  names `core/tests/preset.rs`, deliberately: it describes a retired instruction as it was written.
-- **Followup noticed, not acted on:** `docs/testing.md`'s caveat says `preset`'s zero-allocation
-  assertion counts through a process-global hook and needs nextest; the counter in `preset.rs` is
-  per-thread and says it holds under both runners.
+- **Phase 8, the skills grep.** The session's edits under `.claude/` were refused, leaving four
+  citations in `dev/references/project-context.md` and `architect/SKILL.md`; the owner repaired
+  them in the lane after the park (`f0cf263`). `project-context.md:201` keeps
+  `core/tests/preset.rs`: it describes a retired instruction as written.
+- **Followup noticed, not acted on:** `docs/testing.md` calls `preset`'s allocation counter
+  process-global; `preset.rs`'s is per-thread.
 - **Phase 9, deviation: the helper is `studio/electron/testing/player.ts`**, because
   `tsconfig.renderer.json` checks `shared/` without Node's types. Unstated in the plan: its cargo call
   sets `RUSTUP_AUTO_INSTALL=0` and a failed `cargo metadata` is a skip reason, not a throw; the lint
@@ -545,3 +533,8 @@ flowchart LR
 - **Outstanding `human` phases:** none.
 
 ## Followups (after this lands)
+
+- **`core/src/render/preview.rs:10` links `super::aux_target`, which exists only with rlx-core's
+  `text` feature.** Every build without it (the core test suite's, the plugin's) carries a broken
+  intra-doc link, and CI's `cargo doc --workspace` cannot see it because feature unification turns
+  `text` on. The hook's rustdoc step passes `--features text` for the same reason. Found in Phase 7.
