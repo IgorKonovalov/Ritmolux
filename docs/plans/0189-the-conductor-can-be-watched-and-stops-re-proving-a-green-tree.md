@@ -415,7 +415,7 @@ illustrative: the run terminal
 | 4 — A green suite is not run again on the same tree | dev | done | `cfb1f1d` |
 | 5 — The conductor-mode close orders its work so the gate runs once, and repairs prose findings | dev | done | `be1ca2b` |
 | 6 — A patch CLI update warns, and every session proves its hooks ran | dev | done | `9ef5cdb` |
-| 7 — The pilot's leftovers, under the new rule | dev | committed with this row | |
+| 7 — The pilot's leftovers, under the new rule | dev | done | `e8d33df` |
 | 8 — A run, watched | human | not started | |
 
 ### Notes
@@ -461,5 +461,26 @@ illustrative: the run terminal
 - Followup noticed, not acted on: `CLAUDE.md`'s `tools/conductor/` entry still says the conductor
   "refuses a CLI version spike/README.md did not verify". Under ADR-0208 a patch above a verified
   version runs with a warning.
+- Followup noticed, not acted on: `.claude/skills/dev/references/close-ceremony-prompt.md`
+  (`### In conductor mode, the outcome block replaces the pointer`) still says the last conductor
+  implementer run commits its close block "full suite under the suite lock included". Phase 5
+  changed that rule in both implementer skills and in `prompts/implement.md`, but not in this guide.
+- Followup noticed, not acted on: ADR-0207, ADR-0208 and ADR-0209 still read `Status: proposed`.
 
 ### Close triggers
+
+- `presets/` touched: no.
+- `Closes:` design-backlog 0222, 0223, 0224, 0225, 0226. All five are already under
+  `docs/design-backlog-archive.md`, marked promoted to this plan.
+- Shipped: a feature, in `tools/conductor/` and `.claude/hooks/conductor-suite-lock.js`. Rust changes
+  are comment and assertion-message text only, in `core/src/render/scenes/particles/mod.rs`,
+  `core/src/render/tests.rs` and `core/src/render/scenes/fragment_field.rs`.
+- Operator docs moved: `tools/conductor/README.md`; `.claude/skills/architect/SKILL.md`,
+  `.claude/skills/dev/SKILL.md` and `.claude/skills/studio-builder/SKILL.md` (their conductor-mode
+  sections); `.claude/skills/preset-author/references/render-loop.md`; `tools/conductor/prompts/implement.md`
+  and `tools/conductor/prompts/review.md`. Nothing under `docs/` except this plan.
+- `node scripts/check-backlog-claims.mjs`: exit 0.
+- Full suite: `cargo nextest run --workspace` exited 0, with `1940 tests run: 1940 passed (3 slow),
+  6 skipped`, on `e8d33df`. The conductor's own suite, `node --test "tools/conductor/test/*.test.mjs"`,
+  passes 177 of 177.
+- `human` phases remaining: Phase 8 (a run, watched).
