@@ -42,6 +42,14 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0219 — a `ctl/preset` datagram on loopback never reached the listener's queue, in 3 of 79 loaded runs, and nothing counted it](#0219--a-ctlpreset-datagram-on-loopback-never-reached-the-listeners-queue-in-3-of-79-loaded-runs-and-nothing-counted-it)
 - [0220 — a headless walk of the system roster stalls at `emitter`: the ping sent with the ask is answered and the preset never reaches the screen](#0220--a-headless-walk-of-the-system-roster-stalls-at-emitter-the-ping-sent-with-the-ask-is-answered-and-the-preset-never-reaches-the-screen)
 - [0221 — the run-alone override costs `-P fast` 165 s, twice its tests' serial time, because each of its 18 testcases drains the machine separately](#0221--the-run-alone-override-costs--p-fast-165-s-twice-its-tests-serial-time-because-each-of-its-18-testcases-drains-the-machine-separately)
+- [Entries 0227-0233 — from the Plan 0189 Phase 8 watched runs (2026-09-15)](#entries-0227-0233--from-the-plan-0189-phase-8-watched-runs-2026-09-15)
+- [0227 — a plan pays an 11-minute full suite for every distinct tree it gates, and a close's tree differs from the reviewed one only in prose, a version and a merge](#0227--a-plan-pays-an-11-minute-full-suite-for-every-distinct-tree-it-gates-and-a-closes-tree-differs-from-the-reviewed-one-only-in-prose-a-version-and-a-merge)
+- [0228 — a headless session that starts work in the background and ends its turn loses that work, and the plan parks `no_outcome` after its close was committed](#0228--a-headless-session-that-starts-work-in-the-background-and-ends-its-turn-loses-that-work-and-the-plan-parks-no_outcome-after-its-close-was-committed)
+- [0229 — `resume` has no path for a close that landed without an outcome, so it would re-run the review on a plan already under `done/`](#0229--resume-has-no-path-for-a-close-that-landed-without-an-outcome-so-it-would-re-run-the-review-on-a-plan-already-under-done)
+- [0230 — a headless session cannot edit `.claude/`, and ADR-0209 tells a close it may](#0230--a-headless-session-cannot-edit-claude-and-adr-0209-tells-a-close-it-may)
+- [0231 — the session allowlist matches a command's first word, so ordinary compound commands a phase needs are refused](#0231--the-session-allowlist-matches-a-commands-first-word-so-ordinary-compound-commands-a-phase-needs-are-refused)
+- [0232 — a suite run by hand through `with-lock` is not recorded, so the next gate repeats it](#0232--a-suite-run-by-hand-through-with-lock-is-not-recorded-so-the-next-gate-repeats-it)
+- [0233 — the run terminal says a phase is done but not how long it took](#0233--the-run-terminal-says-a-phase-is-done-but-not-how-long-it-took)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -1567,6 +1575,12 @@ renderer after binding the listener and before sending. That is an observation, 
 Those two gaps are the first thing to close. The studio drives the player through this listener,
 and a lost `ctl/preset` there shows up as a click that does nothing.
 
+**Seen again 2026-09-15**, in a conductor gate with no other lane running: `gate 0175-post-close`
+on tree `05d1639` failed `a_preset_datagram_selects_by_name` (1696 passed, 1 failed, exit 100). A
+hand run on the same tree 20 minutes earlier and the same gate after `resume` both passed. That is one
+red in about five full suites that day, and it cost a park, a resume and an 11.4-minute re-run. The
+gate does not retry (ADR-0193), so while this entry is open every full suite carries that chance.
+
 - **Raised:** 2026-09-14, by `dev` during the ADR-0193 diagnosis. **Owner if taken:** `dev`; making
   the swallowed receive error observable comes before any fix.
 - **Verified 2026-09-14** — a receive error is swallowed without a count:
@@ -1671,3 +1685,226 @@ first.
 
 **Medium.** No test is wrong. The cost is 165 s on every push, and a gate that hurts gets bypassed
 (ADR-0033 Alternative F).
+
+---
+
+## Entries 0227-0233 — from the Plan 0189 Phase 8 watched runs (2026-09-15)
+
+Raised by the owner and a human-started session watching four conductor runs that merged 0175 and
+carried 0177 to its close. The owner's complaint was speed; 0227 is that, and the rest are what
+cost the runs their parks.
+
+## 0227 — a plan pays an 11-minute full suite for every distinct tree it gates, and a close's tree differs from the reviewed one only in prose, a version and a merge
+
+`runGate` looks the ledger up by the worktree's whole tree (`greenRecord(ledger, cleanTree(cwd))`,
+ADR-0207). Every commit changes the tree, so every stage whose tree moved runs the full workspace
+suite again: 737-767 s each on the reference machine on 2026-09-15.
+
+A clean plan with no fix round runs it at least twice, and what separates the two trees is rarely
+code:
+
+- `pre-review` gates the implementer's tip.
+- The close tip adds the close's prose repairs, the plan's move to `done/`, the indexes, the version
+  bump in `Cargo.toml`/`Cargo.lock` and the studio's two copies, and `git merge main`. `main` itself
+  is a tree some earlier gate already passed.
+- `remerge` runs a third time whenever `main` moved after the close, even by a commit that touches
+  only `tools/conductor/`.
+
+Measured on 0175: 24 min of sessions against 58 min of full suites (pre-review 11.2, post-close red
+10.8, post-close 11.4, remerge 12.3), plus a 12.7-min hand run. 0177, which met ADR-0207's bound of
+two: 64 min of finished sessions against 24.5 min of full suites (pre-review 10.9, the close tip
+13.6). With lane b off (ADR-0205 `Outcome`),
+every one of those minutes also blocks the next plan in the queue.
+
+Where a suite's 737 s go (`0175-remerge-18-cargo_nextest.log`, 7378 test-seconds over 73 binaries):
+the three per-preset suites `reactivity` 1566 s, `animation` 1291 s and `sanity` 1099 s, 54 % together
+and growing with every shipped preset; core unit tests 1065 s; `distinctness` 299 s;
+`reaction_diffusion_contract` alone 216 s. Backlog 0221 is the run-alone override's share.
+
+The hazard any shape must answer: "only prose changed" is not the same as "no test reads it".
+`hygiene.rs` scans docs, `preset.rs` checks the generated block in `presets/README.md`, and the
+version bump reaches every crate that reads `CARGO_PKG_VERSION`.
+
+Shapes, none decided:
+
+- **Key a skip on the code-reachable part of the tree**: a green record for tree A also serves tree
+  B when `git diff A B` touches only paths on a declared list no test reads. The list is the whole
+  risk, and a gate would have to hold it.
+- **Tier the close tip**: the full suite once at `pre-review`, and `-P fast` plus the doc and Node
+  gates on the close tip and a remerge, with the full suite owed again only when the diff since the
+  green tree touches a `.rs`, a `.wgsl`, a preset or `Cargo.lock` beyond the version line.
+- **Make the suite cheaper instead**: the per-preset suites share one headless renderer per binary,
+  or sample the library at the gate and cover it whole nightly.
+- **Operator rule, costless today**: nothing is committed to `main` while a closed plan waits for its
+  fast-forward. A tools-only commit cost 0175 its 12.3-min remerge.
+
+- **Raised:** 2026-09-15, by the owner ("we are extremely slow") during Plan 0189 Phase 8.
+  **Owner if taken:** `architect` (what a green record may serve), then `dev`.
+- **Verified 2026-09-15** — the ledger is keyed by the whole tree:
+  `present: greenRecord\(ledger, cleanTree\(cwd\)\) in: tools/conductor/lib/gate.mjs`
+
+### Priority
+
+**High.** It is the largest single term in a plan's wall clock, and the owner's standing complaint.
+
+## 0228 — a headless session that starts work in the background and ends its turn loses that work, and the plan parks `no_outcome` after its close was committed
+
+0175's round-1 review (`0175-03-review`) ran the close tip's suite with `run_in_background`, armed a
+`Monitor` on its output, and ended its turn with "Still compiling; I'll be notified when it exits."
+In `claude -p` nothing re-invokes a session: the process exited, the background task was killed
+(`task_updated status: killed` in the transcript), and no `rlx-outcome` block was printed. By then
+the close had committed its repairs, the `done/` move, the bump to 0.124.2 and the studio sync; the
+gate on the tip, the tag and `check-release-tag.mjs` never ran.
+
+0177's review did the same at 22:33 the same evening (`tests nextest run --workspace started`, then
+`denied Monitor`). It held its turn until the 13.6-minute run ended and closed, so whether a session
+survives depends on what it does while it waits. It is the model's habit for a long command, not a
+one-off.
+
+Shapes, none decided:
+
+- **Say it in the prompts and the conductor-mode sections**: never `run_in_background`, never
+  `Monitor`; a long command runs in the foreground with a timeout.
+- **Deny it**: `settings.conductor.json` denies `Monitor`, and a hook refuses `run_in_background`.
+- **Detect it**: a session whose result ends while a background task was started and not finished
+  parks with a reason that names it, not the generic `no_outcome`.
+
+- **Raised:** 2026-09-15, from 0175's `no_outcome` park during Plan 0189 Phase 8.
+  **Owner if taken:** `dev` (prompts, settings), `architect` (the conductor-mode wording).
+- **Verified 2026-09-15** — no prompt says a session must not background a command:
+  `absent: background in: tools/conductor/prompts/review.md`
+
+### Priority
+
+**High.** It parks a plan after its riskiest step, and recovery needs the next entry's hand edit.
+
+## 0229 — `resume` has no path for a close that landed without an outcome, so it would re-run the review on a plan already under `done/`
+
+`runPlan` decides whether to review from `rec.closed` alone (`while (!rec.closed)`, then the review
+loop). A `no_outcome` or `bad_outcome` park after a close leaves `rec.closed` null, so `resume`
+starts round 1 again on a branch whose plan is already `Status: done` in `done/`, with a `## Close
+review` and a bumped version. Nothing in `prompts/review.md` covers that state; the likely result
+is a second close and a second bump.
+
+On 2026-09-15 the owner finished 0175's close by hand (gate on the tip, annotated `v0.124.2`,
+`check-release-tag.mjs`) and wrote `closed` and the round-1 verdict into `state/conductor.json`. The
+auto-mode classifier in the helping session refused that edit twice, and `resume` once, even with
+the owner's approval, so the owner ran `resume` themselves.
+
+Shapes, none decided:
+
+- **`resume` reads the branch**: plan under `done/` with a `## Close review`, and an annotated tag on
+  the tip or a version above `main`'s, becomes a "close found, verify it" step running `verifyClose`
+  and the post-close gate, never a review.
+- **A `conductor.mjs adopt-close NNNN`** that runs `verifyClose` on the lane as it stands and records
+  `closed` from the plan's own `## Close review`, so the repair is not a hand edit to runtime state.
+
+- **Raised:** 2026-09-15, during Plan 0189 Phase 8. **Owner if taken:** `architect`, then `dev`.
+- **Verified 2026-09-15** — the review is skipped on the record alone:
+  `present: while \(!rec\.closed\) in: tools/conductor/lib/lane.mjs`
+
+### Priority
+
+**Medium.** Rare once 0228 is fixed, but every occurrence is a hand edit to state today.
+
+## 0230 — a headless session cannot edit `.claude/`, and ADR-0209 tells a close it may
+
+The CLI refuses a `claude -p` session's `Edit` and `Write` under `.claude/` although
+`settings.conductor.json` allows both tools. Seen three times: 0182's close left
+`render-loop.md:170` open, 0177 Phase 8 parked `check_red` because its own done-when greps
+`.claude/skills/` (`denied Edit: ...\.claude\skills...`, twice, 20:21), and the owner committed the
+fix as `f0cf263`.
+
+ADR-0209 took backlog 0225's "restriction written nowhere" to be about ownership and wrote that a
+close may repair "Markdown prose anywhere in the repository, every file under `.claude/skills/`
+included". The restriction is the CLI's protection of its own configuration directory, so that rule
+is unreachable as written, and so is any plan phase whose files include `.claude/`.
+
+Shapes, none decided:
+
+- **Find the CLI's switch**, if one exists for a project's `.claude/skills/`, and record it in
+  `spike/README.md` with the CLI version it was verified on.
+- **Route it**: a phase or finding that needs `.claude/` parks `human_phase`-like with the exact
+  edit, instead of `check_red` after the rest of the phase ran.
+- **Amend ADR-0209** to except `.claude/` and name who repairs it.
+
+- **Raised:** 2026-09-15, from 0177's `check_red` park during Plan 0189 Phase 8.
+  **Owner if taken:** `architect` (ADR-0209), then `dev`.
+- **Verified 2026-09-15** — the skill grants what the CLI refuses:
+  `present: repository, every file under in: .claude/skills/architect/SKILL.md`
+
+### Priority
+
+**Medium.** One park and one open finding so far; every plan that renames a test or a flag hits it.
+
+## 0231 — the session allowlist matches a command's first word, so ordinary compound commands a phase needs are refused
+
+`settings.conductor.json` allows `PowerShell(npm *)`, `Bash(node *)`, `Bash(cargo *)` and so on, and
+the CLI matches the command as written. 0177's Phase 8 and 9 sessions were refused, among others:
+`cd studio; npm run typecheck ...`, `$env:ELECTRON_SKIP_BINARY_DOWNLOAD = '1'; npm --prefix ...`,
+`New-Item -ItemType Directory -Force target/p8`, `mkdir -p target/p8 && node ...`,
+`Remove-Item studio/shared/seed-target.ts`, `git clean -f -- studio/shared/seed-target.ts`, a
+`$env:CARGO_TARGET_DIR = ...` prefix, and `cat` on a state file. Phase 9 could not delete the
+lint-bite seed it had written (it removed it another way) and could not re-run its tests under
+`CARGO_TARGET_DIR` as its done-when names, so it recorded "met differently". 0180's session could
+not `git checkout` goldens a bless had re-encoded, and parked with a dirty tree.
+
+Shapes, none decided:
+
+- **Widen the allowlist for the scratch operations** a phase routinely does inside its own lane
+  (`Remove-Item`/`rm` under the lane, `New-Item`/`mkdir`, `git clean` of a named path), each with a
+  test in `settings.test.mjs` as `git restore` has.
+- **Say the shape in the prompts**: one command per call, no `cd`, `npm --prefix` not `cd studio`,
+  environment through the tool rather than an assignment prefix.
+- **Give the done-whens a form the allowlist can run**, e.g. an env var set by a wrapper script.
+
+- **Raised:** 2026-09-15, during Plan 0189 Phase 8. **Owner if taken:** `dev`.
+- **Verified 2026-09-15** — deleting a file is not allowed to a session:
+  `absent: Remove-Item in: tools/conductor/settings.conductor.json`
+
+### Priority
+
+**Medium.** Each refusal costs turns and, twice now, a done-when met "differently".
+
+## 0232 — a suite run by hand through `with-lock` is not recorded, so the next gate repeats it
+
+`with-lock.mjs` reads and writes the ledger only when `RLX_SUITE_LEDGER` is set, and nothing tells
+an operator to set it. On 2026-09-15 the owner's hand gate on 0175's close tip ran
+`with-lock.mjs suite -- cargo nextest run --workspace` green in 12.7 min; the conductor's
+`post-close` gate on the same tree 20 minutes later ran it again.
+
+Shapes, none decided:
+
+- **Default the ledger** to `state/suite-ledger.jsonl` when `with-lock` runs from inside this
+  repository, and record the writer as `hand`.
+- **Document the variable** in the README's `## Acting on a park`, beside the resume table.
+
+- **Raised:** 2026-09-15, during Plan 0189 Phase 8. **Owner if taken:** `dev`.
+- **Verified 2026-09-15** — the ledger is opt-in by environment:
+  `present: const ledger = env\.RLX_SUITE_LEDGER; in: tools/conductor/with-lock.mjs`
+
+### Priority
+
+**Low.** 12 minutes each time, and only on a hand repair.
+
+## 0233 — the run terminal says a phase is done but not how long it took
+
+`live.mjs` prints `  phase  N done` with no elapsed time, and `implement-NN end` prints the session's
+total. Watching Plan 0189 Phase 8, the owner could not tell a 28-minute phase from a 2-minute one
+without subtracting timestamps, and asked for durations on phases and on test runs. `tests` lines
+already print `ran 5m41s`; `gate` lines print `ok 11m21s`.
+
+Shapes, none decided:
+
+- **`phase N done, 12m` measured from the previous phase line** (or the session start), and the same
+  on `commit` lines.
+- **A per-plan timing block in the digest**: sessions, gates and parks idle, each in minutes, which is
+  the table Plan 0189 Phase 8 had to build by hand from `conductor.json` and the ledger.
+
+- **Raised:** 2026-09-15, by the owner during Plan 0189 Phase 8. **Owner if taken:** `dev`.
+- **Verified 2026-09-15** — the phase line carries no duration:
+  `present: phase  \$\{id\} done in: tools/conductor/lib/live.mjs`
+
+### Priority
+
+**Low.** A display gap, but it is what makes 0227 visible while a run is going.
