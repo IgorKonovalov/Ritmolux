@@ -56,6 +56,9 @@ export function laneOpen(rec) {
   return Boolean(rec?.worktree) && existsSync(rec.worktree);
 }
 
+/** The suite ledger (ADR-0207): the gate reads and writes it, and every session's wrapper is handed it. */
+const suiteLedger = (ctx) => join(ctx.stateDir, "suite-ledger.jsonl");
+
 /** Emits one run-terminal line; a display that throws never stops a lane. */
 function live(ctx, plan, body) {
   if (!ctx.live) return;
@@ -286,7 +289,12 @@ async function session(ctx, rec, kind, { owner, prompt, vars, budget, addDirs = 
     model: ctx.local.model?.[kind],
     addDirs: [...addDirs, ...(ctx.queue.plans[rec.plan]?.add_dirs ?? []).map((d) => join(ctx.repo, d))],
     transcriptPath: join(paths.transcripts, `${label}.jsonl`),
-    env: { RLX_LOCK_LOG: paths.lockLog, ...(ctx.lockDir ? { RLX_LOCK_DIR: ctx.lockDir } : {}) },
+    env: {
+      RLX_LOCK_LOG: paths.lockLog,
+      RLX_SUITE_LEDGER: suiteLedger(ctx),
+      RLX_SUITE_LEDGER_BY: label,
+      ...(ctx.lockDir ? { RLX_LOCK_DIR: ctx.lockDir } : {}),
+    },
     expectPlan: rec.plan,
   });
   watch.stop();
@@ -311,6 +319,8 @@ async function gate(ctx, rec, label) {
     onLockWait: (name, ms) => recordWait(rec, name, ms),
     onCommandStart: (c) => show(lines.start(c)),
     onCommandEnd: (c, r) => show(lines.end(c, r)),
+    ledger: suiteLedger(ctx),
+    onCommandSkipped: (c, record) => show(lines.skipped(c, `tree ${record.tree.slice(0, 7)} green by ${record.by} at ${record.at}`)),
   });
   show(lines.finish(g, Date.now() - t0));
   rec.gates ??= [];

@@ -58,7 +58,7 @@ function usageLine(r) {
 }
 
 const gateMs = (g) => (g.commands ?? []).reduce((t, c) => t + (c.ms ?? 0), 0);
-const isSuite = (c) => c.name === "cargo nextest";
+const isSuite = (c) => c.suite === true || c.name === "cargo nextest";
 
 /**
  * The step a park came out of: the last step that ended by the park, started in the same run, with

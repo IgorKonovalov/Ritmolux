@@ -411,8 +411,8 @@ illustrative: the run terminal
 |---|---|---|---|
 | 1 — The run can be watched | dev | done | `f7ee284` |
 | 2 — The digest reports what the operator spends, holds and still owes | dev | done | `57942b5` |
-| 3 — Listing tests takes no lock | dev | committed with this row | |
-| 4 — A green suite is not run again on the same tree | dev | not started | |
+| 3 — Listing tests takes no lock | dev | done | `570400f` |
+| 4 — A green suite is not run again on the same tree | dev | committed with this row | |
 | 5 — The conductor-mode close orders its work so the gate runs once, and repairs prose findings | dev | not started | |
 | 6 — A patch CLI update warns, and every session proves its hooks ran | dev | not started | |
 | 7 — The pilot's leftovers, under the new rule | dev | not started | |
@@ -430,5 +430,11 @@ illustrative: the run terminal
 - Phase 2 renders **Still parked from an earlier run** as a `####` heading under **Needs you**.
 - Phase 3 also edits one clause of `tools/conductor/README.md` (`## How it stays safe`), which is not
   in its file list. The wrapper lets a listing through under any lock name, not only `suite`.
+- Phase 4 marks the gate's suite step with `ledger: true` rather than matching its argument vector,
+  and a test holds the one marked step to exactly `cargo nextest run --workspace`. The wrapper's ledger
+  path is exercised in-process through an exported `runWrapped(argv, { env, cwd, run })`, where `run`
+  stands in for spawning cargo. Phase 4 also touches `lib/live.mjs` (a session's skip notice prints
+  as a `skipped` line) and `lib/digest.mjs` (a step marked `suite` counts as the full suite), neither
+  in its file list. A wrapped full suite skips without taking the lock.
 
 ### Close triggers

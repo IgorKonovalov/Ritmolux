@@ -158,6 +158,8 @@ function countsText(c) {
 
 /** The body of a finished test or check call. */
 function callEndBody(call, { ok, code, output, elapsedMs }) {
+  const skip = String(output ?? "").match(/with-lock: skipped [^:]+: (tree \S+) is green in the suite ledger, run by (.+?) at (\S+):/);
+  if (skip) return `  tests  ${call.what} skipped: ${skip[1]} green by ${skip[2]} at ${skip[3]}`;
   const lock = lockTimes(output);
   const ran = shortDuration(lock ? lock.heldMs : elapsedMs);
   const wait = lock ? `lock wait ${shortDuration(lock.waitedMs)}, ` : "";

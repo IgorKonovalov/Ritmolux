@@ -180,6 +180,18 @@ strength, plus `cargo doc` and these tests. They run in order and stop at the fi
 | `post-close` | on the close tip, before `main` moves | every command |
 | `remerge` | after the automatic re-merge of a moved `main` | every command |
 
+**A full suite the conductor saw pass is not run again on the same tree** (ADR-0207).
+`state/suite-ledger.jsonl` gets one line per run of exactly `cargo nextest run --workspace` that
+conductor code observed: the tree (`HEAD^{tree}`), the exit code, nextest's `Summary` line, who ran
+it and when. A run is recorded only when the worktree was clean when it started and when it ended.
+Two writers use it. The gate looks the worktree's tree up before its suite step and skips on a green
+record. `with-lock.mjs` does the same for a session's run, because the conductor hands every session
+the ledger in `RLX_SUITE_LEDGER`. A skip prints the record it relied on, in the run terminal and in
+the session's own output, and the digest counts it. The match is the tree and nothing else: any
+change to a tracked file, a doc included, is a new tree. A red run is recorded and never skipped on.
+Any other argument vector, such as `--no-fail-fast` or `-P fast`, neither skips nor records.
+Outside the conductor the variable is unset and the wrapper never reads the ledger.
+
 **The backlog probes wait for the close.** A plan can deliver exactly what a live entry's probe says
 is missing, and turn that probe red. Archiving the entry is the close's job (ADR-0108), so a red
 probe before the review is not a defect yet. `post-close` still parks a close that left one red.
