@@ -1,12 +1,15 @@
 # 0188 — The conductor survives its first run
 
-> **Status:** in-progress
+> **Status:** done 2026-09-15. Phases `a676f13` (1), `24300e7` (2), `856d5cb` (3), `f15ce4a` (4);
+> Phase 5 ran the pilot on 2026-09-15 - 3 merged, 0 parked, 3 h 38 min. Mode 4 round 1: **no
+> blockers, no majors, one minor.** Full suite 1940/1940, `cargo doc` clean. ADR-0205 carries the
+> pilot's Outcome.
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`, `human`
-> **Related ADRs:** [0205](../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md) (the Outcome's first-live-run entry is this plan's source),
-> [0108](../adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md),
-> [0053](../adrs/0053-plan-lanes-run-in-git-worktrees.md)
-> **Related plans:** [0187](done/0187-the-conductor-runs-the-lanes.md) (Phase 6, the pilot, is carried here)
+> **Related ADRs:** [0205](../../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md) (the Outcome's first-live-run entry is this plan's source),
+> [0108](../../adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md),
+> [0053](../../adrs/0053-plan-lanes-run-in-git-worktrees.md)
+> **Related plans:** [0187](0187-the-conductor-runs-the-lanes.md) (Phase 6, the pilot, is carried here)
 > **Closes:** none
 
 ## TL;DR
@@ -234,3 +237,47 @@ until it merges. Run it as a human-started `dev` lane.
 - **Outstanding `human` phases:** none. Phase 5 ran 2026-09-15: 3 merged (0185 `v0.123.1`, 0181
   `v0.123.2`, 0182 `v0.124.0`), 0 parked, 3 h 38 min, $55.33, zero fix rounds. Recorded in ADR-0205's
   Outcome. The owner's push decision is theirs and is not a phase.
+
+## Close review
+
+**2026-09-15, Mode 4, round 1. No blockers, no majors, one minor.** Scope: the four phase commits
+`a676f13`, `24300e7`, `856d5cb`, `f15ce4a`. **Not a fresh session** — this review was written by the
+session that ran Phase 5, on the owner's instruction, and that session also committed `3381990`
+(the CLI verification) into the same subtree. `3381990` is not part of this plan and is not reviewed
+here. Phases 1-4 were committed before that session began.
+
+**Alignment.** Every phase's file list matches its commit. One deviation, disclosed in the log:
+Phase 4's output test is in `cli.test.mjs`, which that phase's file list does not name. Every test
+the plan named exists and asserts what the done-when claims, in several cases more:
+`gate.test.mjs` holds the non-probe commands identical at all four stages by `deepEqual`, so a step
+dropped alongside the probe fails; the two Phase 2 scenarios cover both the merge and the
+`gate_red` park, the latter asserting `main` is unmoved by `resolveCommit` before and after;
+`settings.test.mjs` rejects the *class* of allowlist entry that would reach `git checkout` or
+`git stash` by wildcard, not only the literal ones; Phase 4's scenario `deepEqual`s the whole stop
+record and `notStarted` list and is paired with a negative case asserting no **Not started**
+section on a clean run.
+
+**Layering.** Node only, entirely under `tools/conductor/`. No Rust, no C++, no `core/`, no C ABI,
+no control protocol. The real-time, source-agnostic and GPU rules are not reachable from this diff.
+All four `laneLoop` exit paths call `recordNotStarted`; parked plans are excluded by status, so they
+do not double-report beside their own **Needs you** line. `post-close` reaches `gateForStage`
+through the same `gate()` closure as every other stage, so the `afterClose` step cannot be bypassed
+on the path that matters.
+
+**Correctness.** `dirtyPaths` handles `--porcelain -z`'s two-token rename and copy entries.
+`parkStillTrue` applies the dirty refusal before every reason-specific branch, which is the
+done-when. `park()` records dirty paths and never reverts them, which is the right call and is
+commented as such.
+
+**Suite.** `cargo nextest run --workspace`: **1940 tests run, 1940 passed, 6 skipped**, 725 s,
+exit 0. `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`: exit 0.
+
+**minor — `tools/conductor/README.md`, the per-stage gate table.** It restates `defaultGate()`'s
+command sets in prose and nothing holds the two together; `gate.test.mjs` pins the code only. Left
+open: the same shape as the `presets/README.md` drift Plan 0185's review found, and worth a general
+answer rather than one more hand-checked table.
+
+**Three of the four fixes were not exercised live.** Phase 2's is proven — the gate that parked
+0185 on 2026-09-14 passed it on 2026-09-15. No run started on a missing `state/`, nothing parked,
+and no lane hit the worktree cap during the pilot, so Phases 1, 3 and 4 rest on their unit tests
+against a fake CLI. Recorded in ADR-0205's Outcome.

@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0188 - The conductor survives its first run](#0188---the-conductor-survives-its-first-run)
   - [0182 - The report hears a counter](#0182---the-report-hears-a-counter)
   - [0181 - A scene advances after its frame's bindings](#0181---a-scene-advances-after-its-frames-bindings)
   - [0185 - A fullscreen field lets the sky through with no post stage](#0185---a-fullscreen-field-lets-the-sky-through-with-no-post-stage)
@@ -213,6 +214,58 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0188 - The conductor survives its first run](done/0188-the-conductor-survives-its-first-run.md)
+
+- closed 2026-09-15. Four `dev` phases on `main` directly, no lane: `a676f13` (1, `cmdRun` creates
+`state/` before writing its pid file, and the CLI fixture stops creating it), `24300e7` (2,
+`check-backlog-claims.mjs` becomes an `afterClose` step, so `gateForStage` drops it from
+`pre-review` and `fix-N` and keeps it at `post-close` and `remerge`), `856d5cb` (3, the allowlist
+gains `git restore` and still refuses `checkout` and `stash`; a park records the dirty paths capped
+at ten plus a count, and `parkStillTrue` refuses `resume` on a dirty worktree whatever the park
+reason) and `f15ce4a` (4, a lane stopping at the worktree cap records the stop in the run and every
+queued plan it did not open, with a reason; `cmdRun` wires the event hook to its output). Phase 5,
+`human`, was the pilot itself and produced no commit. Review: **no blockers, no majors, one minor.**
+Version: **0.124.1** (patch, a fix-only plan). ADR-0205 gained a second Outcome recording the pilot.
+The review's gate: `cargo nextest run --workspace` 1940 passed, 6 skipped, 725 s; `cargo doc` with
+warnings denied, exit 0.
+
+**The pilot (Phase 5), 2026-09-15 09:32 to 13:10.** Lane a merged **0185, 0181 and 0182** — 3 h
+38 min, **3 merged, 0 parked, $55.33 notional, zero fix rounds**, every plan passing review round 1.
+Tags `v0.123.1`, `v0.123.2`, `v0.124.0`. Every step ADR-0205's first Outcome recorded as never
+observed live has now run: the review session, the close, the close lock, the close-tip gate, the
+version bump with the studio's two copies, the annotated tag, the fast-forward, the worktree removal.
+0175 and 0180 stayed parked from 2026-09-14, both `plan_wrong`, and were not resumed.
+
+**What the pilot did not prove.** Only Phase 2's fix was exercised: 0185's `pre-review` had gone red
+on a backlog probe on 2026-09-14 and went green here. No run started on a missing `state/`, nothing
+parked, and no lane reached the worktree cap, so Phases 1, 3 and 4 rest on their unit tests against
+a fake CLI. Phase 3's refusal would have caught 0180's dirty lane; the owner cleaned it by hand
+before `resume` was called, so the guard never fired.
+
+**Measured at the close, and new.** A full `cargo nextest run --workspace` holds the machine-wide
+suite lock for 10.4 to 11.0 min and seven ran during the pilot; the conductor's own gate accounted
+for 72 of the run's 218 min, in five inter-step gaps plus a tail. The digest's "Suite-lock wait
+15 min" is three `cargo nextest list` calls blocked behind full runs, not lane contention. On that
+arithmetic **lane b stays off and `max_open_worktrees` stays at 3** — two lanes cannot overlap any
+suite time, and the cap was never the binding constraint, since a lane is serial by construction and
+never wanted a second slot. Recorded in ADR-0205's Outcome; raised as backlog 0223.
+
+**Also raised by the pilot:** backlog 0222 (the digest reports dollars, and a subscription
+operator's constraint is the usage window, which is recorded and never shown), 0224 (a CLI update
+refuses the whole conductor, and clearing it is a probe run and a hand edit to a source constant —
+`2.1.270` to `2.1.272` blocked this run until `3381990`) and 0225 (a review finding under `.claude/`
+left open for a restriction that is written nowhere and may not exist).
+
+**Open, one:** `tools/conductor/README.md`'s per-stage gate table restates `defaultGate()` in prose
+and nothing holds the two together.
+
+**Preset curation:** no `.toml` moved, and no shipped preset names ADR-0205 or Plan 0188.
+
+**Review caveat, on the record.** The Mode 4 review was not written by a fresh session: it was
+written by the session that ran Phase 5, on the owner's instruction, and that session had also
+committed `3381990` into the same subtree. `3381990` is not part of the plan and was not reviewed.
+Phases 1-4 were committed before that session began.
 
 ### [0182 - The report hears a counter](done/0182-the-report-hears-a-counter.md)
 

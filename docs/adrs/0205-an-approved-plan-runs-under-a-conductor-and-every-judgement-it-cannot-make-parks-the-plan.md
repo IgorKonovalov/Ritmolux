@@ -238,7 +238,7 @@ judgement.
   the dollars. Noted here, not acted on.
 - **Plan 0187 Phase 6 does not hold.** Its done-when asked for two plans closed on `main` with no owner
   action. Zero closed, and the path that turns a plan into a merged commit has never run. The pilot is
-  still owed. [Plan 0188](../plans/0188-the-conductor-survives-its-first-run.md) fixes the four
+  still owed. [Plan 0188](../plans/done/0188-the-conductor-survives-its-first-run.md) fixes the four
   defects and carries the pilot as its closing `human` phase: resume 0185, then 0181 behind it.
 - **Lane b stays off.** Nothing a second lane adds has been seen on one lane: the close lock ordering
   two closes, two gates queued on the suite lock, a close tip holding two lanes' code. The worktree

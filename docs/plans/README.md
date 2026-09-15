@@ -54,7 +54,6 @@ place. The plan file carries the real link.
 | [0183](0183-a-low-density-is-a-trace-count.md) | A low density is a trace count | approved | dev, human | ADR-0195 (proposed): a trace (density <= 0.08) draws the tier anchor's count at every size; clouds keep ADR-0140. **No golden moves.** Phase 3 is a `human` look gate at 1080p Rich. |
 | [0184](0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) | Limited ink: a contour that is an ink, and a warp field that bands | approved | dev, human | ADR-0197 (proposed): hard ink contours on six scenes; `warp_mesh` bands by level. **Phase 2 stops if level outgrows `color_span`.** Phase 4: look gate. |
 | [0186](0186-the-flatness-gate-tells-a-figure-from-its-ground.md) | The flatness gate tells a figure from its ground | approved | dev, human | Backlog 0128: five figure/ground candidates vs two blot anchors at 96 and 192 px. **Phase 2 is a human gate that writes ADR-0200**; a negative result is a valid end. |
-| [0188](0188-the-conductor-survives-its-first-run.md) | The conductor survives its first run | approved | dev, human | ADR-0205 Outcome: four defects from lane a's first run. **Human-started, not queued; no `conductor run` until it merges.** Phase 5 is 0187's owed pilot (0185 then 0181). |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
@@ -843,6 +842,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0188 — The conductor survives its first run](done/0188-the-conductor-survives-its-first-run.md) — closed 2026-09-15. Review: **no blockers, no majors, one minor.** Version: **0.124.1**. ADR-0205 Outcome (the pilot). [Write-up](README-archive.md).
 - [0182 — The report hears a counter](done/0182-the-report-hears-a-counter.md) — closed 2026-09-15. Review: **no blockers, no majors, three minors.** Version: **0.124.0**. ADR-0196 accepted (Outcome). Archived 0192. [Write-up](README-archive.md).
 - [0181 — A scene advances after its frame's bindings](done/0181-a-scene-advances-after-its-frames-bindings.md) — closed 2026-09-15. Review: **no blockers, no majors, three minors, one nit.** Version: **0.123.2**. ADR-0198 accepted (Outcome). Archived 0142, 0191. [Write-up](README-archive.md).
 - [0185 — A fullscreen field lets the sky through with no post stage](done/0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage.md) — closed 2026-09-15. Review: **no blockers, no majors, one minor, one nit.** Version: **0.123.1**. ADR-0201 accepted. Archived 0206. [Write-up](README-archive.md).
