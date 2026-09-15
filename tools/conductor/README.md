@@ -57,10 +57,19 @@ All of them run from the main checkout.
 
 Ctrl+C on `run` does the same as `abort`.
 
+`run` prints one line per event as it happens: a lane opening, a step starting, a park, a close, a
+fast-forward. **A lane stops when opening its next plan would exceed `max_open_worktrees`**, and says
+so, naming the plans that hold the worktrees. That cap is the disk bound, not a queue: the lane does
+not wait for a slot. Remove a finished lane or settle a parked one, then `run` again.
+
 ## What to read afterwards
 
 - **`tools/conductor/digest.md`** is the morning-after record, newest run first:
-  - **Needs you:** every park with its resume command, then every merge that carried minors.
+  - **Needs you:** every park with its resume command, every lane that stopped at the worktree cap,
+    then every merge that carried minors.
+  - **Not started:** each queued plan the run did not open, with why: `worktree cap`, `--once`, or
+    `after NNNN (parked)` naming the plan it waits on and that plan's status. Left out when the run
+    opened everything it could.
   - **Closed:** each merged plan's tag, merge commit, fix rounds, wall time and spend, and every
     review finding exactly as the reviewer emitted it.
   - **Failed and parked:** gate reds with the failing tests, disagreements, spend-cap hits, session
@@ -87,6 +96,13 @@ Ctrl+C on `run` does the same as `abort`.
 | `budget`, `api`, `no_outcome`, `bad_outcome` | Raise the budget in `local.json`, or wait out a usage limit. Resuming re-runs the step from what the plan log and `git` show. |
 | `merge_conflict`, `merge_failed`, `main_dirty` | Resolve it in the lane, or clean the main checkout. A resumed plan goes straight back to the fast-forward. |
 
+**Whatever the reason, `resume` refuses a lane whose worktree is dirty.** A session is told to leave
+the tree clean and may run `git restore` to do it, but a park does not prove that it did. The park
+records the dirty paths: the first 10 and a count of the rest, in `conductor.json`, the inbox entry
+and the digest's **Needs you** line. The conductor never reverts them, because they may be the
+evidence you need, such as the goldens a test run re-encoded. Read them, then commit them or
+`git restore` them in the lane, and resume.
+
 A merged plan whose worktree could not be removed (Windows refuses while any shell sits inside it) is
 an inbox entry, not a park: close the shell, then `git worktree remove`, `git worktree prune` and
 `git branch -d`.
@@ -107,6 +123,23 @@ an inbox entry, not a park: close the shell, then `git worktree remove`, `git wo
 - **The checks.** The conductor believes the repository, not the session. A claimed commit must
   exist and be new, the plan's log rows must match, the tree must be clean, and a close must leave
   the plan under `done/` with a `## Close review` and an annotated tag on the branch tip.
+
+## The gate
+
+The conductor runs its own gate in the worktree and ignores any session's claim that the checks
+passed. The commands are `defaultGate()` in `lib/gate.mjs`: the pre-push hook's list at full
+strength, plus `cargo doc` and these tests. They run in order and stop at the first red.
+
+| Stage | When | Runs |
+|---|---|---|
+| `pre-review` | after the last implementer run, before the review | every command except `check-backlog-claims.mjs` |
+| `fix-N` | after fix round N, before the re-review | every command except `check-backlog-claims.mjs` |
+| `post-close` | on the close tip, before `main` moves | every command |
+| `remerge` | after the automatic re-merge of a moved `main` | every command |
+
+**The backlog probes wait for the close.** A plan can deliver exactly what a live entry's probe says
+is missing, and turn that probe red. Archiving the entry is the close's job (ADR-0108), so a red
+probe before the review is not a defect yet. `post-close` still parks a close that left one red.
 
 ## When the CLI updates
 

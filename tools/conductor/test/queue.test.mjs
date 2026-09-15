@@ -5,7 +5,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { paths, preflight } from "../conductor.mjs";
+import { VERIFIED_CLI, paths, preflight } from "../conductor.mjs";
 import { loadLocal, validateQueue } from "../lib/queue.mjs";
 import { FAKE, tmp, writePlan } from "./helpers.mjs";
 
@@ -109,7 +109,10 @@ test("preflight refuses a claude --version it has not been verified on", () => {
   const p = scratchTool({ local: LOCAL, version: "2.1.999 (Claude Code)" });
   const r = preflight(p, { claude: FAKE });
   assert.equal(r.errors.length, 1);
-  assert.match(r.errors[0], /claude 2\.1\.999 is not a verified CLI version \(verified: 2\.1\.270\)/);
+  // The refusal names the live VERIFIED_CLI, so a legitimately verified version may be added
+  // without editing this test. Pinning the list here reds the suite on every bump instead.
+  assert.match(r.errors[0], /^claude 2\.1\.999 is not a verified CLI version /);
+  assert.ok(r.errors[0].includes(`(verified: ${VERIFIED_CLI.join(", ")})`));
 });
 
 test("preflight passes on the verified version with local.json and a valid queue", () => {

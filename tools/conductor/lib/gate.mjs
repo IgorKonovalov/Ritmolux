@@ -1,5 +1,9 @@
-// The conductor's own gate, run in a worktree after the implementer runs and after every fix round
-// and re-merge. It does not trust any session's claim that the checks passed.
+// The conductor's own gate, run in a worktree after the implementer runs, after every fix round, on
+// the close tip and after a re-merge. It does not trust any session's claim that the checks passed.
+//
+// Which commands run depends on the stage (`gateForStage`). A step marked `afterClose` runs only on a
+// tree a close produced: the backlog probes, whose red is a judgement ADR-0108 gives to the architect's
+// close, which may archive the very entry an implement commit delivered.
 //
 // Commands run in order and stop at the first failure. Each one's output is kept under
 // state/gates/. `nextest` runs under the machine-wide suite lock. The gate never retries a red: a
@@ -23,7 +27,7 @@ export function defaultGate() {
     node("check-doc-links.mjs"),
     node("check-index-rows.mjs"),
     node("check-index-rows.mjs", "--self-test"),
-    node("check-backlog-claims.mjs"),
+    { ...node("check-backlog-claims.mjs"), afterClose: true },
     node("check-filter-figures.mjs"),
     node("check-comment-hygiene.mjs"),
     node("toc.mjs", "--check"),
@@ -41,6 +45,14 @@ export function defaultGate() {
     { name: "cargo nextest", cmd: ["cargo", "nextest", "run", "--workspace"], lock: SUITE },
     { name: "cargo doc", cmd: ["cargo", "doc", "--workspace", "--no-deps"], env: { RUSTDOCFLAGS: "-D warnings" } },
   ];
+}
+
+/** The stages whose tree a close produced. Every other stage is `pre-review` or `fix-N`. */
+export const AFTER_CLOSE_STAGES = new Set(["post-close", "remerge"]);
+
+/** The commands the gate runs at `stage`: `afterClose` steps drop out before a close. */
+export function gateForStage(stage, commands = defaultGate()) {
+  return AFTER_CLOSE_STAGES.has(stage) ? commands : commands.filter((c) => !c.afterClose);
 }
 
 function runCommand(cmd, cwd, env) {

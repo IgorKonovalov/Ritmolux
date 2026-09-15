@@ -15,14 +15,14 @@
 // tools/conductor/digest.md, both gitignored. tools/conductor/README.md is the operator guide.
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { pidAlive } from "./with-lock.mjs";
 import { writeDigest } from "./lib/digest.mjs";
 import { currentBranch, isClean } from "./lib/git.mjs";
-import { appendPark } from "./lib/inbox.mjs";
+import { appendPark, dirtyText, dirtyWorktree } from "./lib/inbox.mjs";
 import { runLanes } from "./lib/lane.mjs";
 import { findPlan, nextStep, readPlanFile } from "./lib/plan.mjs";
 import { loadLocal, loadQueue, stateSets } from "./lib/queue.mjs";
@@ -34,7 +34,7 @@ export const REPO = resolve(TOOL_DIR, "..", "..");
 
 // The CLI versions tools/conductor/spike/README.md's evidence table was produced on. A version not
 // listed here is refused; re-running the spike probe is how one is added.
-export const VERIFIED_CLI = ["2.1.270"];
+export const VERIFIED_CLI = ["2.1.270", "2.1.272"];
 
 export function paths({ repo = REPO, toolDir = TOOL_DIR } = {}) {
   return {
@@ -94,6 +94,28 @@ function regenerate(p, state) {
   writeDigest(p.digest, state, { repo: p.repo, stateDir: p.stateDir });
 }
 
+/** The line `run` prints for a lane event as it happens, or null for one it does not print. */
+export function eventLine(name, d) {
+  switch (name) {
+    case "worktree-cap":
+      return `conductor: lane ${d.lane} stopped at the worktree cap (max_open_worktrees ${d.max}, held by ${d.holding.join(", ")}); ${d.plan} not started`;
+    case "lane-open":
+      return `conductor: ${d.plan} opened its lane at ${d.worktree}`;
+    case "implement-step":
+    case "review-step":
+    case "fix-step":
+      return `conductor: ${d.plan} step ${d.label} started`;
+    case "park":
+      return `conductor: ${d.plan} parked (${d.reason})`;
+    case "closed":
+      return `conductor: ${d.plan} closed${d.tag ? `, tag ${d.tag}` : ""}`;
+    case "ff":
+      return `conductor: ${d.plan} fast-forwarded main to ${d.head.slice(0, 7)}`;
+    default:
+      return null;
+  }
+}
+
 const minutes = (iso) => (iso ? `${Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000))} min` : "?");
 const isPlan = (s) => /^\d{4}$/.test(s ?? "");
 
@@ -115,6 +137,8 @@ async function cmdRun(args, o) {
   const state = pf.state;
   const recovered = recoverInterrupted(p.stateDir, state);
   if (recovered) o.log(`conductor: ${recovered} step(s) were in flight when the last run stopped; they will run again`);
+  // A clean checkout has no state/ yet: nothing before this line writes into it.
+  mkdirSync(p.stateDir, { recursive: true });
   writeFileSync(pidFile(p), String(process.pid));
 
   const ctx = {
@@ -135,6 +159,10 @@ async function cmdRun(args, o) {
     once: args.includes("--once"),
     lanes: lane ? [lane] : undefined,
     onChange: () => regenerate(p, state),
+    events: (name, data) => {
+      const line = eventLine(name, data);
+      if (line) o.log(line);
+    },
   };
 
   const interrupt = () => {
@@ -199,6 +227,9 @@ function cmdStatus(args, o) {
 /** Why a park still holds, or null when the owner has acted on it. */
 function parkStillTrue(p, rec) {
   const { reason, phase } = rec.park;
+  // Whatever the reason, no new session starts on a tree the last one left dirty.
+  const dirty = dirtyWorktree(rec.worktree);
+  if (dirty) return `the worktree ${rec.worktree} has uncommitted changes: ${dirtyText(dirty)}; commit them, or \`git restore\` them there, first`;
   if (reason === "human_phase") {
     const where = rec.worktree && existsSync(rec.worktree) ? rec.worktree : p.repo;
     const found = findPlan(where, rec.plan);
@@ -266,8 +297,10 @@ function cmdPark(args, o) {
   }
   rec.status = "parked";
   rec.park = { reason: "owner", detail: "parked by the owner", phase: null, read: null, worktree: rec.worktree, at: new Date().toISOString() };
+  const dirty = dirtyWorktree(rec.worktree);
+  if (dirty) rec.park.dirty = dirty;
   rec.parks.push(rec.park);
-  appendPark(statePaths(p.stateDir).inbox, { plan, reason: "owner", detail: "parked by the owner", worktree: rec.worktree });
+  appendPark(statePaths(p.stateDir).inbox, { plan, reason: "owner", detail: "parked by the owner", worktree: rec.worktree, dirty });
   saveState(p.stateDir, state);
   regenerate(p, state);
   o.log(`conductor: plan ${plan} parked; \`resume ${plan}\` queues it again`);

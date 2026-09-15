@@ -141,6 +141,34 @@ test("a plan spanning two runs counts each lock wait in the run it happened in, 
   assert.match(runLines[1], /Suite-lock wait 20 min; close-lock wait < 1 min\.$/, "the earlier run keeps only its own");
 });
 
+test("a run's cap stop and its not-started plans render from state alone, byte for byte on regeneration", () => {
+  const { repo, head } = repoWithTag();
+  const stateDir = tmp("rlx-digest-state-");
+  const state = sampleState(repo, head, stateDir);
+  const run = state.runs[0];
+  run.stops = [{ lane: "a", reason: "worktree_cap", plan: "0181", holding: ["0175", "0180", "0185"], max: 3, at: "2026-09-15T03:06:00.000Z" }];
+  run.notStarted = [
+    { plan: "0181", lane: "a", reason: "worktree cap" },
+    { plan: "0182", lane: "a", reason: "after 0180 (parked)" },
+  ];
+  const path = join(tmp("rlx-digest-out-"), "digest.md");
+  const first = writeDigest(path, state, { repo, stateDir });
+  rmSync(path);
+  assert.equal(writeDigest(path, state, { repo, stateDir }), first);
+
+  const lines = first.split("\n");
+  assert.ok(lines.includes("- **Lane a stopped at the worktree cap** (`max_open_worktrees` 3): 0181 was not opened. Worktrees held by 0175, 0180, 0185."), first);
+  const start = lines.indexOf("### Not started");
+  assert.ok(start > lines.indexOf("### Needs you") && start < lines.indexOf("### Closed"), first);
+  assert.deepEqual(lines.slice(start + 1, start + 5), ["", "- **0181** (lane a): worktree cap", "- **0182** (lane a): after 0180 (parked)", ""]);
+  assert.match(first, /### Needs you\n\n- \*\*Lane a stopped/);
+
+  // The same run with nothing left unopened has no Not started section.
+  run.stops = [];
+  run.notStarted = [];
+  assert.ok(!renderDigest(state, { repo, stateDir }).includes("### Not started"));
+});
+
 test("newest run first, and a run with nothing in it says so", () => {
   const state = {
     version: 1,

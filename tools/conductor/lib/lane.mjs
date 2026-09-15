@@ -16,9 +16,9 @@ import { join, relative } from "node:path";
 
 import { verifyClose, verifyFix, verifyImplement } from "./close.mjs";
 import { removeLane, laneNames, openLane } from "./cleanup.mjs";
-import { runGate } from "./gate.mjs";
+import { defaultGate, gateForStage, runGate } from "./gate.mjs";
 import { head, resolveCommit } from "./git.mjs";
-import { appendCleanupFailure, appendPark } from "./inbox.mjs";
+import { appendCleanupFailure, appendPark, dirtyWorktree } from "./inbox.mjs";
 import { CLOSE, take } from "./locks.mjs";
 import { fastForwardMain } from "./merge.mjs";
 import { findPlan, nextStep, rangeLabel, readPlanFile } from "./plan.mjs";
@@ -99,36 +99,66 @@ export async function runLanes(ctx) {
   }
 }
 
+/**
+ * Records in the run every plan of `lane` still queued when the lane stops, with why it did not
+ * start: the first unmerged plan it waits on and that plan's status, or else `stopped` — the lane's
+ * own reason for stopping (`worktree cap`, `--once`, `stopped`).
+ */
+function recordNotStarted(ctx, lane, stopped) {
+  ctx.run.notStarted ??= [];
+  for (const plan of ctx.queue.lanes[lane] ?? []) {
+    if (merged(ctx, plan) || (ctx.state.plans[plan]?.status ?? "queued") !== "queued") continue;
+    const dep = (ctx.queue.plans[plan]?.after ?? []).find((d) => !merged(ctx, d));
+    const reason = dep ? `after ${dep} (${ctx.state.plans[dep]?.status ?? "queued"})` : stopped;
+    ctx.run.notStarted.push({ plan, lane, reason });
+  }
+}
+
 async function laneLoop(ctx, lane) {
   for (;;) {
-    if (ctx.stopRequested?.()) return;
+    if (ctx.stopRequested?.()) return recordNotStarted(ctx, lane, "stopped");
     const pick = pickNext(ctx, lane);
     if (pick.plan) {
       const rec = ctx.state.plans[pick.plan];
       const hasLane = rec?.worktree && !rec.laneRemoved;
       if (!hasLane && openWorktreeCount(ctx.state) >= ctx.local.max_open_worktrees) {
-        event(ctx, "worktree-cap", { lane, plan: pick.plan });
+        // The cap is the disk bound (ADR-0205), so the lane stops rather than waiting; the stop is a
+        // fact in the run record, for the digest and the run's output.
+        const holding = Object.values(ctx.state.plans)
+          .filter((r) => r.worktree && !r.laneRemoved)
+          .map((r) => r.plan)
+          .sort();
+        const stop = { lane, reason: "worktree_cap", plan: pick.plan, holding, max: ctx.local.max_open_worktrees, at: now() };
+        ctx.run.stops ??= [];
+        ctx.run.stops.push(stop);
+        recordNotStarted(ctx, lane, "worktree cap");
+        save(ctx);
+        event(ctx, "worktree-cap", stop);
         return;
       }
       await runPlan(ctx, lane, pick.plan);
-      if (ctx.once) return;
+      if (ctx.once) return recordNotStarted(ctx, lane, "--once");
       continue;
     }
     if (pick.wait) {
       await sleep(ctx.pollMs ?? 5000);
       continue;
     }
-    return;
+    return recordNotStarted(ctx, lane, "stopped");
   }
 }
 
 function park(ctx, rec, { reason, detail, phase = null, read = null }) {
   rec.status = "parked";
   rec.park = { reason, detail, phase, read, worktree: rec.worktree, at: now() };
+  // No session is trusted to have left the tree clean. The paths are recorded and never reverted:
+  // they may be the evidence the owner needs.
+  const dirty = dirtyWorktree(rec.worktree);
+  if (dirty) rec.park.dirty = dirty;
   rec.parks.push(rec.park);
   rec.ended = now();
   if (ctx.state.lanes[rec.lane]) ctx.state.lanes[rec.lane] = { plan: null, step: null };
-  appendPark(statePaths(ctx.stateDir).inbox, { plan: rec.plan, reason, detail, read, worktree: rec.worktree });
+  appendPark(statePaths(ctx.stateDir).inbox, { plan: rec.plan, reason, detail, read, worktree: rec.worktree, dirty });
   event(ctx, "park", { plan: rec.plan, reason });
   save(ctx);
   return rec;
@@ -169,7 +199,7 @@ async function session(ctx, rec, kind, { owner, prompt, vars, budget, addDirs = 
 async function gate(ctx, rec, label) {
   const g = await runGate({
     cwd: rec.worktree,
-    commands: ctx.gate,
+    commands: gateForStage(label, ctx.gate ?? defaultGate()),
     logDir: join(ctx.stateDir, "gates"),
     label: `${rec.plan}-${label}`,
     lockDir: ctx.lockDir,
