@@ -224,7 +224,7 @@ fn clock_stimulus() -> Vec<AnalysisFrame> {
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The clock stimulus and the `count` reading | dev | done | 5e97086 |
-| 2 — The reader says what `count` is | dev | done | committed with this row |
+| 2 — The reader says what `count` is | dev | done | 162ae7f |
 
 ### Notes
 
@@ -251,16 +251,21 @@ fn clock_stimulus() -> Vec<AnalysisFrame> {
   the preset gates' stimuli, not `--report`'s. The sample block's two rows are copied from the
   Phase 1 after-run, so `Shatter`'s `rate` reads `0.0358+` where the old sample read `0.0357+`; the
   `geom` sample rows are from the same run.
+- **Risks, backlog 0192's probe.** The plan expected it to go red on delivery. It did not:
+  `check-backlog-claims.mjs` exits 0, because `clock_stimulus` sets the field in struct shorthand
+  (`beat_index,`), so `report.rs` still contains no `beat_index:`.
 
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`**
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** no
+- **Plan header `Closes:`** design-backlog 0192
+- **What shipped:** feature (`shot --report` `count` column and `--json` `count` object)
+- **Operator docs touched:** `docs/capturing.md`
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 (133 reductions hold, 57 live
+  entries, 11 unprobeable)
+- **Full suite:** `cargo nextest run --workspace` (under the conductor suite lock), exit 0, 1940
+  passed, 6 skipped
+- **Outstanding `human` phases:** none
 
 ## Followups (after this lands)
 
