@@ -79,6 +79,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0219 — a `ctl/preset` datagram on loopback never reached the listener's queue, in 3 of 79 loaded runs, and nothing counted it](#0219--a-ctlpreset-datagram-on-loopback-never-reached-the-listeners-queue-in-3-of-79-loaded-runs-and-nothing-counted-it)
 - [0220 — a headless walk of the system roster stalls at `emitter`: the ping sent with the ask is answered and the preset never reaches the screen](#0220--a-headless-walk-of-the-system-roster-stalls-at-emitter-the-ping-sent-with-the-ask-is-answered-and-the-preset-never-reaches-the-screen)
 - [0221 — the run-alone override costs `-P fast` 165 s, twice its tests' serial time, because each of its 18 testcases drains the machine separately](#0221--the-run-alone-override-costs--p-fast-165-s-twice-its-tests-serial-time-because-each-of-its-18-testcases-drains-the-machine-separately)
+- [0222 — the digest reports a run in dollars, and the subscription operator's constraint is the usage window, which is recorded and never shown](#0222--the-digest-reports-a-run-in-dollars-and-the-subscription-operators-constraint-is-the-usage-window-which-is-recorded-and-never-shown)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -4093,3 +4094,49 @@ first.
 
 **Medium.** No test is wrong. The cost is 165 s on every push, and a gate that hurts gets bypassed
 (ADR-0033 Alternative F).
+
+
+## 0222 — the digest reports a run in dollars, and the subscription operator's constraint is the usage window, which is recorded and never shown
+
+`tools/conductor/lib/digest.mjs` ends every run with a Totals line reading `N merged, N parked,
+$X`. Under subscription auth the dollar figure is an internal accounting number the operator cannot
+spend down or top up: what decides whether a run can start, and whether it will finish, is the
+five-hour and seven-day usage windows and when they reset. Those are recorded already —
+`lib/outcome.mjs` keeps each session's `rate_limit_info` wholesale and `lib/step.mjs` stores it on
+the step — so the digest omits a reading it is already holding.
+
+It cost something once. The 2026-09-14 run opened at **0.84** of the seven-day window and spent
+three sessions into it, ending at **0.85** with every session reporting `allowed_warning`. Nothing
+in the digest said so; the operator read `$25.18`. A run that crosses the limit mid-lane parks a
+plan holding a worktree, and the reading that would have predicted it was in `state/conductor.json`
+the whole time. By contrast the 2026-09-15 run read **0.01** on a rolled window, which is the other
+thing the number tells you and the digest equally cannot.
+
+Shapes, none decided:
+
+- **Two lines in Totals** — latest seven-day utilization and its reset time, per run. Cheapest, and
+  it keeps the digest's "regenerated from state and git" property, since both come from state.
+- **A reading in the park record** when a park is usage-shaped, so the inbox says wait rather than
+  read a transcript.
+- **Nothing, and say why.** ADR-0205 has the conductor record usage and not act on it. Displaying
+  is not acting, but the boundary deserves a sentence rather than an assumption.
+
+The recorded shape moved between CLI versions and a consumer must know it: on 2.1.270
+`rate_limit_info.utilization` carried the seven-day figure at the top level; on 2.1.272 that key is
+absent and the value lives under `unifiedWindows.seven_day.utilization`. Nothing broke, because no
+conductor code reads the field — which is exactly what makes it easy to read the wrong one when
+something finally does.
+
+- **Raised:** 2026-09-15, by the operator during Plan 0188 Phase 5. **Owner if taken:** `architect`
+  for the ADR-0205 sentence, then `dev`. Plan 0188's Risks already carries this as an open question
+  (*"the sessions reported the owner's seven-day usage at 0.84-0.85, and the digest shows only
+  dollars"*), so Phase 5's report is where it gets answered.
+- **Verified 2026-09-15** — the digest names no usage reading at all:
+  `absent: utilization|rateLimit|seven_day in: tools/conductor/lib/digest.mjs`
+- **Verified 2026-09-15** — the reading is captured and kept whole:
+  `present: rate_limit_event in: tools/conductor/lib/outcome.mjs`
+
+### Priority
+
+**Medium.** Nothing is wrong and nothing is blocked. It is a report answering a question its one
+reader does not have, while holding the answer to the one they do.
