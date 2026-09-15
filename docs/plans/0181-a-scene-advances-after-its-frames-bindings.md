@@ -259,11 +259,19 @@ flowchart TB
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The shared-scene veto is pinned, and the test hatch honours it | dev | done | committed with this row |
-| 2 — Every scene advances on the values its frame bound | dev | not started | |
+| 1 — The shared-scene veto is pinned, and the test hatch honours it | dev | done | 00c9587 |
+| 2 — Every scene advances on the values its frame bound | dev | done | committed with this row |
 | 3 — The prose follows the order | dev | not started | |
 
 ### Notes
+
+- Phase 2: both behavioural tests (`a_fresh_emitter_integrates_its_bound_spin_on_its_first_frame`,
+  `a_fresh_collage_builds_its_bound_canvas_once_on_its_first_frame`, in `core/src/render/tests.rs`)
+  failed on the unmoved tree: the emitter integrated `0` against `K * dt = 0.05416667`, and the
+  collage's frame-1 canvas was generated from seed `0` rather than `4242`. They reach the concrete
+  scene through a test-only forwarding `Scene` wrapper swapped into the renderer's roster.
+- Phase 2: `cargo nextest run --workspace` after the move was green with no bless: no golden,
+  inside or outside the emitter/collage set, left its tolerance.
 
 ### Close triggers
 

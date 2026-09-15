@@ -2832,3 +2832,195 @@ fn a_format_with_no_name_is_refused_rather_than_guessed() {
     );
     assert_eq!(renderer.preview_readback_size(), None);
 }
+
+// ---------------------------------------------------------------------------
+// A scene advances on the values its own frame bound (ADR-0198)
+// ---------------------------------------------------------------------------
+
+/// A roster scene that forwards every call to a concrete scene the test still
+/// holds, so a value the `Scene` trait cannot report is readable after the
+/// renderer has driven that scene through its real evaluation path.
+///
+/// `mirror_overflow` and `feedback_field` hand out a borrow a `RefCell` cannot
+/// outlive, so they keep the trait's `None`; neither scene observed here has
+/// either.
+struct Observed<T>(std::rc::Rc<std::cell::RefCell<T>>);
+
+impl<T: super::scenes::Scene> super::scenes::Scene for Observed<T> {
+    fn name(&self) -> &'static str {
+        self.0.borrow().name()
+    }
+    fn update(&mut self, frame: &AnalysisFrame) {
+        self.0.borrow_mut().update(frame);
+    }
+    fn render(
+        &mut self,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        aspect: f32,
+    ) {
+        self.0.borrow_mut().render(queue, encoder, view, aspect);
+    }
+    fn set_target_size(&mut self, width: u32, height: u32) {
+        self.0.borrow_mut().set_target_size(width, height);
+    }
+    fn set_occlude(&mut self, occlude: f32) {
+        self.0.borrow_mut().set_occlude(occlude);
+    }
+    fn advance(&mut self, dt: f32) {
+        self.0.borrow_mut().advance(dt);
+    }
+    fn set_time(&mut self, time: f32) {
+        self.0.borrow_mut().set_time(time);
+    }
+    fn reset_params(&mut self) {
+        self.0.borrow_mut().reset_params();
+    }
+    fn set_param(&mut self, name: &str, value: f32) {
+        self.0.borrow_mut().set_param(name, value);
+    }
+    fn set_param_series(&mut self, name: &str, values: &[f32]) {
+        self.0.borrow_mut().set_param_series(name, values);
+    }
+    fn set_per_vertex(&mut self, name: &str, values: &[f32]) {
+        self.0.borrow_mut().set_per_vertex(name, values);
+    }
+    fn configure(
+        &mut self,
+        cfg: &super::scenes::GeneratorConfig,
+    ) -> Option<super::scenes::lines::CapOverflow> {
+        self.0.borrow_mut().configure(cfg)
+    }
+    fn set_palette(&mut self, palette: &super::palette::Palette) {
+        self.0.borrow_mut().set_palette(palette);
+    }
+    fn set_feedback(&mut self, cfg: super::feedback::FeedbackConfig) {
+        self.0.borrow_mut().set_feedback(cfg);
+    }
+    fn sample_budget(&self) -> Option<u32> {
+        self.0.borrow().sample_budget()
+    }
+}
+
+/// Put `scene` in the roster slot for `kind`, on a renderer whose preset 0 is
+/// of that system, and hand it that preset as a fresh switch would. Returns the
+/// handle the test reads the scene through.
+fn observe<T: super::scenes::Scene + 'static>(
+    renderer: &mut Renderer,
+    kind: SystemKind,
+    scene: T,
+) -> std::rc::Rc<std::cell::RefCell<T>> {
+    let shared = std::rc::Rc::new(std::cell::RefCell::new(scene));
+    let slot = renderer
+        .scenes
+        .iter_mut()
+        .find(|(k, _)| *k == kind)
+        .expect("the roster holds every system");
+    slot.1 = Box::new(Observed(std::rc::Rc::clone(&shared)));
+    renderer.select_preset_now(0);
+    renderer.time = 0.0;
+    renderer.configure_active_scene();
+    shared
+}
+
+/// **The switch frame integrates the bound rate.** A fresh emitter preset
+/// binding `spin = K` has integrated exactly `K * dt` after its first frame, not
+/// the scene's default rate: the scene advances after this frame's bindings, so
+/// the rate it integrates is the one this frame bound.
+///
+/// Exact, not a tolerance: the accumulator starts at `0.0`, and one add of one
+/// product of the same two `f32` values is that product.
+#[test]
+fn a_fresh_emitter_integrates_its_bound_spin_on_its_first_frame() {
+    const K: f32 = 3.25;
+    let Some(mut renderer) = headless_or_skip(HeadlessOptions {
+        width: 48,
+        height: 48,
+        prefer_software: true,
+    }) else {
+        return;
+    };
+    let default = super::scenes::default_of(super::scenes::emitter::PARAMS, "spin");
+    assert_ne!(K, default, "the probe rate must differ from the default");
+    let bound = Preset::from_toml_str(&format!(
+        "system = \"emitter\"\nname = \"SpinK\"\n[params]\nspin = \"{K}\"\n"
+    ))
+    .expect("valid spin-bound emitter preset");
+    renderer.set_presets(vec![bound]);
+    let emitter = super::scenes::emitter::EmitterScene::new(
+        &renderer.ctx.device,
+        super::COMPOSITE_FORMAT,
+        renderer.tier.emitter_objects,
+    );
+    let emitter = observe(&mut renderer, SystemKind::Emitter, emitter);
+
+    renderer
+        .capture_frame(&AnalysisFrame::default())
+        .expect("first emitter frame");
+    let dt = super::scenes::FALLBACK_DT;
+    let integral = emitter.borrow().spin_integral();
+    assert_eq!(
+        integral,
+        K * dt,
+        "the first frame integrated {integral} rather than the bound rate (the \
+         default would give {})",
+        default * dt
+    );
+}
+
+/// **The switch frame builds the bound canvas.** A fresh collage preset binding
+/// a non-default `seed` generates its canvas from that seed on its first frame,
+/// and the second frame regenerates nothing: `rebuild` generates only when the
+/// recipe moves, so an identical recipe across both frames is one generation.
+///
+/// Read off the recipe rather than the pixels, because the defect is which
+/// parameters a generation read, and two canvases can look alike.
+#[test]
+fn a_fresh_collage_builds_its_bound_canvas_once_on_its_first_frame() {
+    const SEED: f32 = 4242.0;
+    let Some(mut renderer) = headless_or_skip(HeadlessOptions {
+        width: 48,
+        height: 48,
+        prefer_software: true,
+    }) else {
+        return;
+    };
+    let default = super::scenes::default_of(super::scenes::shape_collage::PARAMS, "seed");
+    assert_ne!(SEED, default, "the probe seed must differ from the default");
+    let bound = Preset::from_toml_str(&format!(
+        "system = \"shape_collage\"\nname = \"SeedK\"\n[params]\nseed = \"{SEED}\"\n"
+    ))
+    .expect("valid seed-bound collage preset");
+    renderer.set_presets(vec![bound]);
+    let collage = super::scenes::shape_collage::ShapeCollageScene::new(
+        &renderer.ctx.device,
+        super::COMPOSITE_FORMAT,
+        renderer.tier.collage_elements,
+    );
+    let collage = observe(&mut renderer, SystemKind::ShapeCollage, collage);
+
+    let stimulus = AnalysisFrame::default();
+    renderer
+        .capture_frame(&stimulus)
+        .expect("first collage frame");
+    let first = collage
+        .borrow()
+        .built_recipe()
+        .expect("the first frame builds a canvas");
+    renderer
+        .capture_frame(&stimulus)
+        .expect("second collage frame");
+    let second = collage.borrow().built_recipe();
+
+    assert_eq!(
+        first.seed, SEED as u64,
+        "frame 1 generated the canvas from seed {} rather than the bound one",
+        first.seed
+    );
+    assert_eq!(
+        second,
+        Some(first),
+        "frame 2 regenerated the canvas, so frame 1 did not build the bound recipe"
+    );
+}

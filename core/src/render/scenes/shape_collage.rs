@@ -1326,6 +1326,13 @@ impl ShapeCollageScene {
         self.recompose_count
     }
 
+    /// The recipe the live canvas was last generated from, or `None` before the
+    /// first build. [`Self::rebuild`] regenerates only when this would change.
+    #[cfg(test)]
+    pub(crate) fn built_recipe(&self) -> Option<layout::Recipe> {
+        self.built
+    }
+
     /// Install an element array of the test's own, in painter order, in place of
     /// the authored canvas. See [`Self::specs_override`] for why this exists.
     #[cfg(test)]

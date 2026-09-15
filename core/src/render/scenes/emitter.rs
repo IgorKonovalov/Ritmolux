@@ -1147,6 +1147,13 @@ impl EmitterScene {
             spin_integral: self.spin_integral,
         }
     }
+
+    /// The integrated `spin` so far, for asserting which frame's bound rate
+    /// [`Scene::advance`] integrated.
+    #[cfg(test)]
+    pub(crate) fn spin_integral(&self) -> f32 {
+        self.spin_integral
+    }
 }
 
 /// `value`, or `fallback` when a binding produced something that is not a

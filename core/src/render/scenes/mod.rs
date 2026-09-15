@@ -691,6 +691,13 @@ pub(crate) trait Scene {
     /// scales its motion by `dt`, so both look identical over wall-clock time on
     /// any refresh rate. Stateless, purely `time`-driven scenes ignore it.
     ///
+    /// **Called after this frame's parameters are applied** — after
+    /// [`reset_params`](Self::reset_params), every binding, the live overrides
+    /// and the per-vertex table, and after [`set_time`](Self::set_time) —
+    /// and immediately before [`update`](Self::update). A value a scene reads
+    /// here is the one this frame bound, so a rate may be integrated in
+    /// `advance` or in `update` and both are correct (ADR-0198).
+    ///
     /// **`dt` is finite and strictly positive.** The renderer guarantees it,
     /// substituting [`FALLBACK_DT`] for a degenerate delta before this is called
     /// (ADR-0152), so an implementor may store it, integrate it, or divide by it
