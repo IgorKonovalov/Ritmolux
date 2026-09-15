@@ -223,8 +223,8 @@ fn clock_stimulus() -> Vec<AnalysisFrame> {
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The clock stimulus and the `count` reading | dev | done | committed with this row |
-| 2 — The reader says what `count` is | dev | not started | |
+| 1 — The clock stimulus and the `count` reading | dev | done | 5e97086 |
+| 2 — The reader says what `count` is | dev | done | committed with this row |
 
 ### Notes
 
@@ -245,6 +245,12 @@ fn clock_stimulus() -> Vec<AnalysisFrame> {
 - **Phase 1, beyond the file list's wording.** The main table's prose gains a `count` line beside
   `drive`'s. In `shot_cli.rs`, the transient test's parser comment that described `geom` as the
   table's trailing column was rewritten.
+- **Phase 2, beyond the named sections.** In `docs/capturing.md` the settled-measurement sentence
+  under the column table now excepts `count`, and the `--report --json` schema paragraph gains
+  `count` and a paragraph on its object. `docs/testing.md` is untouched: its stimulus table lists
+  the preset gates' stimuli, not `--report`'s. The sample block's two rows are copied from the
+  Phase 1 after-run, so `Shatter`'s `rate` reads `0.0358+` where the old sample read `0.0357+`; the
+  `geom` sample rows are from the same run.
 
 ### Close triggers
 
