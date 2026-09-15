@@ -2,8 +2,10 @@
 //
 // Generated from state/ and git only — never written by hand, never inside a worktree — so
 // deleting it and regenerating from the same state yields the same bytes. It carries no generation
-// timestamp for that reason. Newest run first; each run's section is Needs you, Not started (only
-// when a queued plan was not opened), Closed, Failed and parked, Totals.
+// timestamp for that reason. Newest run first; each run's section is Needs you, Still parked from
+// an earlier run (the newest run only, and only when one is), Not started (only when a queued plan
+// was not opened), Closed, Failed and parked, Totals. Time is always time within one run: a plan's
+// active time is its steps' and gates' own durations, never a span across a park.
 //
 // A finding line copies the verdict outcome the reviewer emitted — severity, file:line, what — and
 // nothing else; the digest never summarizes review prose. An event (a step, a park, a merge)
@@ -14,6 +16,8 @@ import { relative } from "node:path";
 
 import { tagObjectType } from "./git.mjs";
 import { dirtyText, resumeCommand } from "./inbox.mjs";
+import { laneOpen } from "./lane.mjs";
+import { usageReading } from "./live.mjs";
 import { findPlan, readPlanFile } from "./plan.mjs";
 import { statePaths, totalSpend, writeAtomic } from "./state.mjs";
 
@@ -33,6 +37,39 @@ export function duration(ms) {
 }
 
 const span = (a, b) => (a && b ? duration(Date.parse(b) - Date.parse(a)) : "?");
+
+/** A step's two usage readings: the ones endStep kept, or the raw event an older record carried. */
+function stepUsage(s) {
+  return {
+    first: s.usage?.first ?? usageReading(s.result?.rateLimitFirst ?? null),
+    last: s.usage?.last ?? usageReading(s.result?.rateLimit ?? null),
+  };
+}
+
+const resetStamp = (epochSeconds) => (typeof epochSeconds === "number" ? stamp(new Date(epochSeconds * 1000).toISOString()).slice(5) : "?");
+
+/** `5h 0.27 (resets 09-15 14:30); 7d 0.02 (resets 09-22 16:00)`, in UTC like every digest stamp. */
+function usageLine(r) {
+  const parts = [];
+  if (r.five) parts.push(`5h ${r.five.utilization.toFixed(2)} (resets ${resetStamp(r.five.resetsAt)})`);
+  if (r.seven) parts.push(`7d ${r.seven.utilization.toFixed(2)} (resets ${resetStamp(r.seven.resetsAt)})`);
+  if (r.status && r.status !== "allowed") parts.push(r.status);
+  return parts.join("; ");
+}
+
+const gateMs = (g) => (g.commands ?? []).reduce((t, c) => t + (c.ms ?? 0), 0);
+const isSuite = (c) => c.name === "cargo nextest";
+
+/**
+ * The step a park came out of: the last step that ended by the park, started in the same run, with
+ * no gate between its end and the park. Null for a park no session produced (a gate, a merge, a lane).
+ */
+function parkSession(rec, p, sameRun) {
+  const step = [...rec.steps].reverse().find((s) => s.ended && s.ended <= p.at);
+  if (!step || !sameRun(step.started)) return null;
+  if ((rec.gates ?? []).some((g) => g.at > step.ended && g.at <= p.at)) return null;
+  return step;
+}
 
 function runOf(runs, iso) {
   if (!iso) return -1;
@@ -68,6 +105,33 @@ function findingLine(f, resolvedIn) {
   return `  - ${f.severity} \`${where}\` ${f.what}${resolvedIn ? ` - resolved in \`${short(resolvedIn)}\`` : ""}`;
 }
 
+/** The minors and nits the closing verdict merged with: the findings nobody has acted on. */
+function openFindings(rec) {
+  return (rec.verdicts.at(-1)?.findings ?? []).filter((f) => f.severity === "minor" || f.severity === "nit");
+}
+
+/**
+ * A plan's time in one run. `active` is the sum of its steps' and gates' own durations there;
+ * `wall` runs from its first step or gate in the run to its merge, so a night spent parked before
+ * the run is never counted.
+ */
+function timeInRun(rec, run, inRun) {
+  let active = 0;
+  const starts = [];
+  for (const s of rec.steps.filter((x) => inRun(x.started) && x.ended)) {
+    active += Date.parse(s.ended) - Date.parse(s.started);
+    starts.push(Date.parse(s.started));
+  }
+  for (const g of (rec.gates ?? []).filter((x) => inRun(x.at))) {
+    const ms = gateMs(g);
+    active += ms;
+    starts.push(Date.parse(g.at) - ms);
+  }
+  const end = Date.parse(rec.merge?.at ?? rec.ended ?? run.ended);
+  const start = starts.length ? Math.min(...starts) : Date.parse(run.started);
+  return { active, wall: end - start };
+}
+
 function closedFindings(rec) {
   const lines = [];
   for (const v of rec.verdicts) {
@@ -98,10 +162,12 @@ export function renderDigest(state, { repo, stateDir }) {
       for (const p of rec.parks.filter((x) => inRun(x.at))) {
         const current = rec.status === "parked" && rec.park?.at === p.at;
         const where = p.phase ? ` at Phase ${p.phase}` : "";
+        const usage = parkSession(rec, p, inRun) ? stepUsage(parkSession(rec, p, inRun)).last : null;
         needs.push(
           `- **${rec.plan} parked**${where} (\`${p.reason}\`)${current ? "" : " - since resumed"}. ${p.detail}. ` +
             `Read: ${p.read ?? "the plan"}. Holds \`${p.worktree ?? "no worktree"}\`.` +
-            (p.dirty ? ` Left dirty: ${dirtyText(p.dirty)}.` : ""),
+            (p.dirty ? ` Left dirty: ${dirtyText(p.dirty)}.` : "") +
+            (usage ? ` Usage at park: ${usageLine(usage)}.` : ""),
         );
         if (current) needs.push(`  Resume: \`${resumeCommand(rec.plan)}\``);
       }
@@ -109,8 +175,11 @@ export function renderDigest(state, { repo, stateDir }) {
         if (rec.cleanup && !rec.cleanup.ok) {
           needs.push(`- **${rec.plan} merged, lane not removed**: ${rec.cleanup.detail}. Holds \`${rec.worktree}\`.`);
         }
-        const minors = rec.verdicts.at(-1)?.minors ?? 0;
-        if (minors > 0) minorsMerged.push(`- **${rec.plan} merged with ${minors} minor${minors === 1 ? "" : "s"}** - see Closed.`);
+        const open = openFindings(rec);
+        if (open.length > 0) {
+          minorsMerged.push(`- **${rec.plan} merged with ${open.length} open finding${open.length === 1 ? "" : "s"}**:`);
+          for (const f of open) minorsMerged.push(`  - ${f.severity} \`${f.line ? `${f.file}:${f.line}` : f.file}\` ${f.what}`);
+        }
       }
     }
     for (const s of run.stops ?? []) {
@@ -119,10 +188,24 @@ export function renderDigest(state, { repo, stateDir }) {
           `Worktrees held by ${s.holding.join(", ")}.`,
       );
     }
+    // Only the newest run lists what an earlier run left parked: an older section is history.
+    const standing = [];
+    if (i === runs.length - 1) {
+      for (const rec of plans) {
+        if (rec.status !== "parked" || !rec.park?.at || runOf(runs, rec.park.at) >= i) continue;
+        const p = rec.park;
+        const holds = laneOpen(rec) ? `Holds \`${rec.worktree}\`.` : `Worktree removed; \`resume\` reopens it from branch \`${rec.branch ?? "?"}\`.`;
+        standing.push(
+          `- **${rec.plan}** (\`${p.reason}\`) parked ${stamp(p.at)}, ${span(p.at, run.started)} before this run. ${p.detail}. ${holds}`,
+          `  Resume: \`${resumeCommand(rec.plan)}\``,
+        );
+      }
+    }
     out.push("### Needs you", "");
-    if (needs.length + minorsMerged.length === 0) out.push("- nothing: no park, and every merge was clean.");
+    if (needs.length + minorsMerged.length + standing.length === 0) out.push("- nothing: no park, and every merge was clean.");
     else out.push(...needs, ...minorsMerged);
     out.push("");
+    if (standing.length) out.push("#### Still parked from an earlier run", "", ...standing, "");
 
     // Not started: left out when the run opened every queued plan it could.
     if (run.notStarted?.length) {
@@ -139,9 +222,10 @@ export function renderDigest(state, { repo, stateDir }) {
       const { title, rel } = planTitle(repo, rec.plan);
       const tag = rec.closed?.tag;
       const tagText = tag ? `${rec.closed.version}, tag \`${tag}\` ${tagObjectType(tag, repo) === "tag" ? "annotated" : "NOT annotated"}` : "no version, tag none";
+      const { active, wall } = timeInRun(rec, run, inRun);
       out.push(
         `- **${rec.plan} - ${title}** - ${tagText}, merge \`${short(rec.merge.head)}\`${rec.merge.remerged ? " (after one re-merge)" : ""}, ` +
-          `${rec.fixRounds} fix round${rec.fixRounds === 1 ? "" : "s"}, ${span(rec.started, rec.ended)}, ${usd(totalSpend(rec))}. ` +
+          `${rec.fixRounds} fix round${rec.fixRounds === 1 ? "" : "s"}, active ${duration(active)}, wall ${duration(wall)} in this run, ${usd(totalSpend(rec))}. ` +
           `Review: \`${rel ?? rec.plan}\` \`## Close review\`.`,
       );
       out.push(...closedFindings(rec));
@@ -201,6 +285,35 @@ export function renderDigest(state, { repo, stateDir }) {
     out.push(
       `- run: ${runMerged} merged, ${runParked} parked, ${run.ended ? span(run.started, run.ended) : "still running"}, ${usd(runSpend)}. ` +
         `Suite-lock wait ${duration(suiteWait)}; close-lock wait ${duration(closeWait)}.`,
+    );
+
+    const readings = plans
+      .flatMap((r) => r.steps.filter((s) => inRun(s.started)))
+      .sort((a, b) => a.started.localeCompare(b.started))
+      .map(stepUsage);
+    const firstUsage = readings.map((u) => u.first ?? u.last).find(Boolean);
+    const lastUsage = [...readings].reverse().map((u) => u.last ?? u.first).find(Boolean);
+    out.push(firstUsage ? `- usage at run start: ${usageLine(firstUsage)}. At run end: ${usageLine(lastUsage)}.` : "- usage: no reading in this run.");
+
+    let suiteMs = 0;
+    let otherMs = 0;
+    let suiteRuns = 0;
+    let suiteSkips = 0;
+    for (const rec of plans) {
+      for (const g of (rec.gates ?? []).filter((x) => inRun(x.at))) {
+        for (const c of g.commands ?? []) {
+          if (!isSuite(c)) otherMs += c.ms ?? 0;
+          else if (c.skipped) suiteSkips += 1;
+          else {
+            suiteMs += c.ms ?? 0;
+            suiteRuns += 1;
+          }
+        }
+      }
+    }
+    out.push(
+      `- gate: ${duration(suiteMs + otherMs)}; full suite ${duration(suiteMs)} over ${suiteRuns} run${suiteRuns === 1 ? "" : "s"}, ` +
+        `everything else ${duration(otherMs)}; ${suiteSkips} suite run${suiteSkips === 1 ? "" : "s"} skipped.`,
     );
     out.push("");
   }

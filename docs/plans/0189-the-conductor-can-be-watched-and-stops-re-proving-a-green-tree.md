@@ -409,8 +409,8 @@ illustrative: the run terminal
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The run can be watched | dev | committed with this row | |
-| 2 — The digest reports what the operator spends, holds and still owes | dev | not started | |
+| 1 — The run can be watched | dev | done | `f7ee284` |
+| 2 — The digest reports what the operator spends, holds and still owes | dev | committed with this row | |
 | 3 — Listing tests takes no lock | dev | not started | |
 | 4 — A green suite is not run again on the same tree | dev | not started | |
 | 5 — The conductor-mode close orders its work so the gate runs once, and repairs prose findings | dev | not started | |
@@ -425,5 +425,8 @@ illustrative: the run terminal
   line is printed.
 - Phase 1 removes the `conductor: NNNN step LABEL started` event line. The live start line replaces
   it.
+- Phase 2 also edits `tools/conductor/README.md` (`## What to read afterwards`, the digest bullets),
+  which is not in its file list, so the operator guide describes the digest it now renders.
+- Phase 2 renders **Still parked from an earlier run** as a `####` heading under **Needs you**.
 
 ### Close triggers

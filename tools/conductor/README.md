@@ -98,16 +98,22 @@ once, whatever `state/conductor.json` says.
 ## What to read afterwards
 
 - **`tools/conductor/digest.md`** is the morning-after record, newest run first:
-  - **Needs you:** every park with its resume command, every lane that stopped at the worktree cap,
-    then every merge that carried minors.
+  - **Needs you:** every park with its resume command and the usage reading its session ended on,
+    every lane that stopped at the worktree cap, then every merge's open findings with their
+    `file:line`. The newest run adds **Still parked from an earlier run**: each plan still parked
+    from before it, with its age, the worktree it holds (or the branch `resume` reopens it from) and
+    its resume command.
   - **Not started:** each queued plan the run did not open, with why: `worktree cap`, `--once`, or
     `after NNNN (parked)` naming the plan it waits on and that plan's status. Left out when the run
     opened everything it could.
-  - **Closed:** each merged plan's tag, merge commit, fix rounds, wall time and spend, and every
-    review finding exactly as the reviewer emitted it.
+  - **Closed:** each merged plan's tag, merge commit, fix rounds, active time (its steps and gates)
+    and wall time within the run it merged in, spend, and every review finding exactly as the
+    reviewer emitted it.
   - **Failed and parked:** gate reds with the failing tests, disagreements, spend-cap hits, session
     errors.
-  - **Totals:** merged and parked counts, spend, and time spent waiting on each lock.
+  - **Totals:** merged and parked counts, spend, time spent waiting on each lock, the 5-hour and
+    7-day usage windows at run start and run end, and gate minutes split into the full suite and
+    everything else, with the count of suite runs skipped.
 
   It is gitignored and regenerated from `state/` and `git` after every step, so deleting it loses
   nothing.
