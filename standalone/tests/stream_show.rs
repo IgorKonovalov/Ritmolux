@@ -92,11 +92,13 @@ fn unrunnable(stderr: &str) -> Option<&'static str> {
     None
 }
 
-/// A directory this test owns, under the workspace's own target dir so a runner
-/// cleans it up with everything else.
+/// A directory this test owns, under `CARGO_TARGET_TMPDIR`: the scratch directory
+/// cargo sets inside the target directory it is actually building into, wherever
+/// `CARGO_TARGET_DIR` or `build.target-dir` put that, so a runner cleans it up
+/// with everything else.
 fn scratch(tag: &str) -> PathBuf {
-    let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../target/tests/stream-show")
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR"))
+        .join("stream-show")
         .join(tag);
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).expect("create the scratch preset directory");

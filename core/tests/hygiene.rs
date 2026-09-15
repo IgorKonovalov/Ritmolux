@@ -20,6 +20,9 @@
 //! (h) Every spawn of the player or the `shot` example under `standalone/tests/`
 //!     goes through `standalone/tests/common/mod.rs`, which gives the child a
 //!     scratch per-user data root.
+//! (i) No string literal in a workspace member's `tests/` names `target` as a
+//!     path segment: a test asks cargo where the target directory is
+//!     (`CARGO_TARGET_TMPDIR`) rather than building the path from the source tree.
 
 use std::path::{Path, PathBuf};
 
@@ -1278,8 +1281,8 @@ fn clock_exemption(rel: String, binary: String, text: &str) -> Option<ClockExemp
     any.then_some(found)
 }
 
-/// Every workspace member's direct `tests/*.rs` file, as `(rel, binary, text)`.
-fn integration_test_files(root: &Path) -> Vec<(String, String, String)> {
+/// The workspace members the root manifest lists, as directory names.
+fn workspace_members(root: &Path) -> Vec<String> {
     let manifest =
         std::fs::read_to_string(root.join("Cargo.toml")).expect("read the workspace manifest");
     let members = manifest
@@ -1287,13 +1290,19 @@ fn integration_test_files(root: &Path) -> Vec<(String, String, String)> {
         .find_map(|line| line.trim().strip_prefix("members = ["))
         .and_then(|rest| rest.strip_suffix(']'))
         .expect("the workspace manifest lists `members = [...]` on one line");
-    let mut files = Vec::new();
-    for member in members
+    members
         .split(',')
         .map(|m| m.trim().trim_matches('"'))
         .filter(|m| !m.is_empty())
-    {
-        let dir = root.join(member).join("tests");
+        .map(str::to_owned)
+        .collect()
+}
+
+/// Every workspace member's direct `tests/*.rs` file, as `(rel, binary, text)`.
+fn integration_test_files(root: &Path) -> Vec<(String, String, String)> {
+    let mut files = Vec::new();
+    for member in workspace_members(root) {
+        let dir = root.join(&member).join("tests");
         let Ok(entries) = std::fs::read_dir(&dir) else {
             continue;
         };
@@ -1629,4 +1638,229 @@ fn the_spawn_guard_names_a_bare_spawn_and_ignores_prose() {
         spawn_sites("standalone/tests/help_cli.rs", prose).is_empty(),
         "a comment naming the variable is not a spawn"
     );
+}
+
+// ---------------------------------------------------------------------------
+// (i) No test source names the target directory
+// ---------------------------------------------------------------------------
+
+/// Every string literal in `text` outside a comment, as `(line, source text)`,
+/// with the line counted from 1 at the literal's opening quote.
+///
+/// The source text is what sits between the quotes, escapes unprocessed. Reads
+/// `//` and nested `/* */` comments, `"..."` strings with `\` escapes, raw
+/// strings `r"..."` / `r#"..."#`, and character literals, so a `'"'` or a `"//"`
+/// cannot flip which side of a quote the scan is on. `strip_line_comments` is
+/// not used here for exactly that reason: it cuts a line at a `//` inside a
+/// string. A lifetime (`'a`) is stepped over as code.
+fn string_literals(text: &str) -> Vec<(usize, String)> {
+    let chars: Vec<char> = text.chars().collect();
+    let is_ident = |c: char| c.is_alphanumeric() || c == '_';
+    let mut out = Vec::new();
+    let mut line = 1;
+    let mut i = 0;
+    while i < chars.len() {
+        let c = chars[i];
+        let next = chars.get(i + 1).copied();
+        if c == '\n' {
+            line += 1;
+            i += 1;
+        } else if c == '/' && next == Some('/') {
+            while i < chars.len() && chars[i] != '\n' {
+                i += 1;
+            }
+        } else if c == '/' && next == Some('*') {
+            let mut depth = 0;
+            while i < chars.len() {
+                if chars[i] == '/' && chars.get(i + 1) == Some(&'*') {
+                    depth += 1;
+                    i += 2;
+                } else if chars[i] == '*' && chars.get(i + 1) == Some(&'/') {
+                    depth -= 1;
+                    i += 2;
+                    if depth == 0 {
+                        break;
+                    }
+                } else {
+                    if chars[i] == '\n' {
+                        line += 1;
+                    }
+                    i += 1;
+                }
+            }
+        } else if c == 'r'
+            && matches!(next, Some('"') | Some('#'))
+            && !(i > 0 && is_ident(chars[i - 1]) && chars[i - 1] != 'b')
+        {
+            let hashes = chars[i + 1..].iter().take_while(|&&h| h == '#').count();
+            if chars.get(i + 1 + hashes) != Some(&'"') {
+                i += 1;
+                continue;
+            }
+            let start_line = line;
+            let mut j = i + 2 + hashes;
+            let mut body = String::new();
+            while j < chars.len() {
+                if chars[j] == '"'
+                    && chars[j + 1..]
+                        .iter()
+                        .take(hashes)
+                        .filter(|&&h| h == '#')
+                        .count()
+                        == hashes
+                {
+                    break;
+                }
+                if chars[j] == '\n' {
+                    line += 1;
+                }
+                body.push(chars[j]);
+                j += 1;
+            }
+            out.push((start_line, body));
+            i = j + 1 + hashes;
+        } else if c == '"' {
+            let start_line = line;
+            let mut j = i + 1;
+            let mut body = String::new();
+            while j < chars.len() && chars[j] != '"' {
+                if chars[j] == '\\' && j + 1 < chars.len() {
+                    body.push(chars[j]);
+                    j += 1;
+                }
+                if chars[j] == '\n' {
+                    line += 1;
+                }
+                body.push(chars[j]);
+                j += 1;
+            }
+            out.push((start_line, body));
+            i = j + 1;
+        } else if c == '\'' {
+            // `'\''`, `'\n'`, `'\u{..}'`: skip to the closing quote. `'x'`: three
+            // characters. Anything else is a lifetime or a label.
+            if next == Some('\\') {
+                let mut j = i + 3;
+                while j < chars.len() && chars[j] != '\'' {
+                    j += 1;
+                }
+                i = j + 1;
+            } else if chars.get(i + 2) == Some(&'\'') {
+                i += 3;
+            } else {
+                i += 1;
+            }
+        } else {
+            i += 1;
+        }
+    }
+    out
+}
+
+/// Whether a literal's source text has `target` as a whole path segment: bounded
+/// on both sides by `/`, `\` or the end of the literal.
+fn names_target_segment(literal: &str) -> bool {
+    // Escaped for the reason `the_target_literal_guard_reads_literals_not_prose`
+    // gives: this file is one of the sources the guard scans.
+    literal
+        .split(['/', '\\'])
+        .any(|segment| segment == "tar\x67et")
+}
+
+/// Every literal in `text` that names `target` as a path segment, as
+/// `<rel>:<line>: "<literal>"`.
+fn target_literals(rel: &str, text: &str) -> Vec<String> {
+    string_literals(text)
+        .into_iter()
+        .filter(|(_, literal)| names_target_segment(literal))
+        .map(|(line, literal)| format!("{rel}:{line}: \"{literal}\""))
+        .collect()
+}
+
+/// **No test source builds a path into the target directory by name.**
+///
+/// A test that writes under `<manifest>/../target/...` names the *source* tree's
+/// sibling, which is the target directory only while nobody redirects it:
+/// `CARGO_TARGET_DIR` or `build.target-dir` moves the build and leaves the test
+/// writing into the worktree. `CARGO_TARGET_TMPDIR` is cargo's own answer, and
+/// a binary beside the test is found from `current_exe`. So every string literal
+/// in every workspace member's `tests/` tree is held to not spelling the segment.
+///
+/// # What it cannot see
+///
+/// A segment assembled at runtime (`format!("{}get", "tar")`), and a path read
+/// from anywhere but a literal. It is a tripwire for the natural spelling, not a
+/// proof no test reaches the directory.
+#[test]
+fn no_test_source_names_the_target_directory() {
+    let root = workspace_root();
+    let mut scanned = 0usize;
+    let mut hits = Vec::new();
+    for member in workspace_members(&root) {
+        let dir = root.join(&member).join("tests");
+        if !dir.is_dir() {
+            continue;
+        }
+        for file in rs_files_under(&dir) {
+            let rel = file
+                .strip_prefix(&root)
+                .expect("scanned file is under the workspace root")
+                .to_string_lossy()
+                .replace('\\', "/");
+            let text = std::fs::read_to_string(&file)
+                .unwrap_or_else(|e| panic!("read {}: {e}", file.display()));
+            scanned += 1;
+            hits.extend(target_literals(&rel, &text));
+        }
+    }
+    assert!(
+        scanned > 40,
+        "scanned only {scanned} test sources; the member walk has broken, not the tree"
+    );
+    assert!(
+        hits.is_empty(),
+        "a test source names the target directory in a string literal:\n  {}\n\
+         Root scratch files at `env!(\"CARGO_TARGET_TMPDIR\")`, and find a built binary from \
+         `std::env::current_exe()`, so the path follows wherever cargo is building.",
+        hits.join("\n  ")
+    );
+}
+
+/// The target-literal guard fires on the spelling it exists for and on nothing
+/// that is only prose.
+#[test]
+fn the_target_literal_guard_reads_literals_not_prose() {
+    // `tar\x67et` is `target`: spelled with an escape so this file's own source
+    // does not carry the segment the guard above scans every test source for.
+    let old_scratch = "    let dir = Path::new(env!(\"CARGO_MANIFEST_DIR\"))\n\
+                       \x20       .join(\"../tar\x67et/tests/stream-show\")\n\
+                       \x20       .join(tag);\n";
+    assert_eq!(
+        target_literals("standalone/tests/stream_show.rs", old_scratch),
+        vec!["standalone/tests/stream_show.rs:2: \"../tar\x67et/tests/stream-show\"".to_owned()]
+    );
+
+    for prose in [
+        "    \"the tap sizes itself to the renderer's configured target\"\n",
+        "// .join(\"../tar\x67et/tests\") in a comment is not a literal\n",
+        "let quote = '\"'; let url = \"https://example/\"; // tar\x67et/x\n",
+        "let t = \"tar\x67ets/x\"; let u = \"retar\x67et\";\n",
+    ] {
+        assert!(
+            target_literals("prose.rs", prose).is_empty(),
+            "the guard fired on prose, not a path: {prose}"
+        );
+    }
+
+    // A raw string and a Windows-separated path are read as literals too.
+    for path in [
+        "let p = r#\"..\\tar\x67et\\debug\"#;\n",
+        "let p = \"tar\x67et\";\n",
+    ] {
+        assert_eq!(
+            target_literals("path.rs", path).len(),
+            1,
+            "the guard missed the segment in: {path}"
+        );
+    }
 }

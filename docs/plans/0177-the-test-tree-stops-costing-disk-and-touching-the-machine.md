@@ -374,8 +374,8 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The spawned player gets a scratch data root | dev | done | committed with this row |
-| 2 — No test source names the target directory | dev | not started | |
+| 1 — The spawned player gets a scratch data root | dev | done | feff21c |
+| 2 — No test source names the target directory | dev | done | committed with this row |
 | 3 — The horizon test reads the ground before the rows | dev | not started | |
 | 4 — Measure what grows in `target/` | dev | not started | |
 | 5 — `prune-target.mjs` deletes what cargo no longer reports | dev | not started | |
@@ -394,6 +394,13 @@ flowchart LR
   where it tests the unresolved data root, as it did before. `shot_executable()` exists because
   `an_encoder_that_dies_reports_the_encoders_own_failure` hands the example's path to `shot` as its
   stand-in encoder.
+- **Phase 2, deviation: comments are not stripped with `strip_line_comments`.** It cuts a line at a
+  `//` inside a string literal (`"//"` in `show_is_the_only_owner.rs`, `preset.rs`, milkconv's
+  `conformance.rs` and `hygiene.rs` itself), which flips which side of a quote the literal scan is
+  on for the rest of the file. `string_literals` in `hygiene.rs` reads `//`, `/* */`, strings, raw
+  strings and char literals in one pass instead. `hygiene.rs` spells the segment `tar\x67et` in its
+  own seeds and in the matcher, because the guard scans that file too.
+- **Phase 2.** `check-backlog-claims.mjs` exits 0.
 
 ### Close triggers
 
