@@ -206,6 +206,31 @@ cargo check -p standalone --features spout
 
 Bypass once with `git push --no-verify`.
 
+## Disk
+
+Every worktree builds into its own `target/`, and cargo collects nothing in it on its own.
+
+**`target/debug/deps/` keeps every generation of every unit.** A dependency bump, a feature flip,
+or a narrowed `cargo nextest run -p <crate>` whose feature set differs from the workspace build
+writes a second `rlx_core`, `wgpu` and `windows` beside the first, and nothing collects the old one.
+`scripts/prune-target.mjs` deletes what the everyday loop no longer uses:
+
+```sh
+node scripts/prune-target.mjs                 # dry run: what would go, and the bytes
+node scripts/prune-target.mjs --apply         # delete it
+node scripts/prune-target.mjs --verify-fresh  # every artifact the loop reports is still fresh
+```
+
+The live set is **what cargo reports**: the script runs `cargo build --workspace`,
+`cargo clippy --workspace --all-targets` and `cargo nextest run --workspace -P fast --no-run` with
+JSON messages, and keeps every file one of them names. So the three have to be green, and no other
+cargo process may run in the same checkout while it does. Deleting something the loop needed costs a
+rebuild, never a wrong build: cargo sees a missing output as dirty. The target directory comes from
+`cargo metadata`, so a `CARGO_TARGET_DIR` redirect is followed.
+
+Run it when the disk is short, and after anything that changes many units at once: a toolchain or
+dependency bump, or a session of narrowed `-p` runs.
+
 ## Running approved plans under the conductor
 
 `tools/conductor/` runs approved plans to a merged `main` with nobody at the keyboard. It works in up

@@ -194,6 +194,10 @@ scripts/             # Repo maintenance. Ten Node gates. EIGHT run by pre-push a
                      #   output lands under target/ uncommitted. They are here so that "every
                      #   .mjs is wired into pre-push or CI" reads as a rule with five named
                      #   exceptions rather than as a claim that is simply false.
+                     #   A MAINTENANCE TOOL, the third kind: prune-target.mjs deletes what the
+                     #   everyday loop's cargo JSON no longer reports from <target>/debug/deps/
+                     #   (dry run by default, --apply, --verify-fresh). A person runs it when
+                     #   the disk fills; it judges no build (docs/developing.md "Disk").
 ```
 
 ## Machine setup: the linker override (opt-in, and inert if skipped)

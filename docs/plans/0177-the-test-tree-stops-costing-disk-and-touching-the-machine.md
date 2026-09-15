@@ -377,8 +377,8 @@ flowchart LR
 | 1 — The spawned player gets a scratch data root | dev | done | feff21c |
 | 2 — No test source names the target directory | dev | done | 3510ab9 |
 | 3 — The horizon test reads the ground before the rows | dev | done | 11636f2 |
-| 4 — Measure what grows in `target/` | dev | done | committed with this row |
-| 5 — `prune-target.mjs` deletes what cargo no longer reports | dev | not started | |
+| 4 — Measure what grows in `target/` | dev | done | 375f275 |
+| 5 — `prune-target.mjs` deletes what cargo no longer reports | dev | done | committed with this row |
 | 6 — The incremental cache has a documented bound | dev | not started | |
 | 7 — A scoped `cargo doc` earns a hook step, or is rejected | dev | not started | |
 | 8 — The cheap tests share one binary per package | dev | not started | |
@@ -433,6 +433,19 @@ flowchart LR
   former.
 - **Phase 4, verdict: bounded.** (a) created no crate-hash directory, and (b) and (c) created none
   per tool.
+- **Phase 5.** `--apply` on the Phase 4 checkout: `deps/` 1098 files, 3226.1 MB before; 24 files,
+  184.0 MB deleted (the 24 Phase 4 counted); 1074 files, 3042.1 MB after. `--verify-fresh` straight
+  after: 637 of 637 artifacts fresh. nextest's `--cargo-message-format json` forwards the artifact
+  messages, so the `cargo test` fallback in Risks was not needed.
+- **Phase 5, redirect check (by hand).** Run with `CARGO_TARGET_DIR=C:/Users/IGORKO~1/WORK/rlx-plan-0177/target`
+  (the same directory under its 8.3 spelling, so nothing rebuilt): the script read
+  `C:\Users\IGORKO~1\...\target\debug\deps` from `cargo metadata`, matched all 637 reported
+  artifacts, and found 0 files to delete. A redirect to a physically different directory was not
+  tried, because it costs a cold build of the workspace into it.
+- **Phase 5, matching rule the plan did not state.** A `deps/` file is live when its 16-hex metadata
+  hash is the hash of a reported file, so a live `.exe` keeps its `.pdb` and `.d`. A reported file
+  outside `deps/` is matched to its `deps/` source by hard-link identity, else by content; on MSVC a
+  binary's source is the unhashed `deps/ritmolux.exe`. An unmatched report stops the script.
 
 ### Close triggers
 
