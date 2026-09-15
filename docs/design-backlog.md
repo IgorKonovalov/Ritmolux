@@ -67,7 +67,6 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0198 — `deposit_arms` tears along the branch cut at a fractional value, and nothing rounds it](#0198--deposit_arms-tears-along-the-branch-cut-at-a-fractional-value-and-nothing-rounds-it)
 - [0203 — the smoke run captured from a microphone while the default is loopback, and nobody established why](#0203--the-smoke-run-captured-from-a-microphone-while-the-default-is-loopback-and-nobody-established-why)
 - [0204 — the studio's sliders read one range per parameter, so a curve family's own range is unreachable from them](#0204--the-studios-sliders-read-one-range-per-parameter-so-a-curve-familys-own-range-is-unreachable-from-them)
-- [0206 — with no post stage active a fullscreen field's REPLACE blend overwrites the backdrop, so `occlude = 0` lets nothing through](#0206--with-no-post-stage-active-a-fullscreen-fields-replace-blend-overwrites-the-backdrop-so-occlude--0-lets-nothing-through)
 - [0207 — the cap-recovery line says "geometry is back within the segment cap" for every context, and three of the five are not geometry](#0207--the-cap-recovery-line-says-geometry-is-back-within-the-segment-cap-for-every-context-and-three-of-the-five-are-not-geometry)
 - [0208 — a system count written into prose goes stale on the next system, and fourteen places have now carried one](#0208--a-system-count-written-into-prose-goes-stale-on-the-next-system-and-fourteen-places-have-now-carried-one)
 - [0212 — three frame-delta guards below the entries check only the sign, so the one-policy gate cannot see them and each keeps an answer of its own](#0212--three-frame-delta-guards-below-the-entries-check-only-the-sign-so-the-one-policy-gate-cannot-see-them-and-each-keeps-an-answer-of-its-own)
@@ -360,6 +359,7 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0205 | A windowless player reports `0.0 fps` and writes no diagnostics rows | [Plan 0172](plans/done/0172-the-studios-readings-become-true.md) Phase 1. One clock on both live paths. See 0181. **Closed 2026-09-14** |
 | 0209 | The studio's schema walks pass in CI by walking nothing | [Plan 0172](plans/done/0172-the-studios-readings-become-true.md) Phases 2 and 4. A committed snapshot, held by a Rust test. **Closed 2026-09-14** |
 | 0196 | Most `v*` tags produce no Release run, and the named cause cannot explain nineteen | [ADR-0203](adrs/0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md) + [Plan 0176](plans/done/0176-a-release-tag-reaches-origin.md). Never pushed, not suppressed. **Closed 2026-09-14** |
+| 0206 | With no post stage a fullscreen field overwrites the sky, so `occlude = 0` does nothing | [ADR-0201](adrs/0201-a-fullscreen-scene-presents-premultiplied-over-the-backdrop.md) + [Plan 0185](plans/done/0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage.md). Four scenes. **Closed 2026-09-15** |
 <!-- roster:end -->
 
 ## Open entries
@@ -3590,45 +3590,6 @@ cover both.
 well as by slider; it becomes worth taking when the first such preset is curated into the set.
 
 - **Promoted 2026-09-14** to [Plan 0179](plans/0179-a-parameters-range-belongs-to-its-family.md) and [ADR-0194](adrs/0194-a-family-dependent-range-travels-in-the-schema-and-the-player-reports-the-family.md): the schema carries a per-family range (the attractor's `a`..`d` included), the `preset` event reports the family, and the studio's slider reads the family's range. `SCHEMA_VERSION` does not move - the field is additive.
-
-## 0206 — with no post stage active a fullscreen field's REPLACE blend overwrites the backdrop, so `occlude = 0` lets nothing through
-
-`fragment_field`'s shader comment promises that *"at 0 the sky adds through an opaque field"*, and
-on the path an author is most likely to try first — a preset with no `[post]` stage — it does not.
-The field draws with a REPLACE blend straight onto the composite, so whatever the backdrop wrote is
-gone before `occlude` is read; the parameter reaches the alpha channel and the alpha channel reaches
-nothing. With a stage active the promise holds, which is why this survived: every test and every
-shipped preset that exercises `occlude` has a stage in the chain.
-
-`analytic_field` mirrors the behaviour exactly, and deliberately —
-`occlude_behaves_as_it_does_on_fragment_field` pins the two together on both paths so that a repair
-of one cannot silently diverge from the other. That test is the carrier for the parity, not for the
-correctness: it asserts the two agree, including where they are both wrong.
-
-The size is an authoring dead end rather than a wrong picture. An author reading
-[`docs/presets.md`](presets.md) sets `occlude = 0` to let a `bg_*` sky through, sees no change, and
-has no way to learn that a `[post]` stage is the undeclared precondition. The fix is a decision
-about what a fullscreen scene's blend should be when nothing downstream will composite it, which is
-a chain question rather than a scene one — and it must move both systems at once, or the parity test
-is the thing that goes red.
-
-- **Raised:** 2026-09-11, at [Plan 0163](plans/done/0163-the-analytic-field.md)'s close review; the
-  finding is the implementing lane's, from its Phase 1 notes. **Owner if taken:** `architect` for
-  where the blend is decided, then `dev`.
-- **Verified 2026-09-11** — the parameter exists and is read on both systems:
-  `present: occlude in: core/src/render/scenes/fragment_field.rs`
-- **Verified 2026-09-11** — and the two are pinned to each other, wrong path included:
-  `present: occlude_behaves_as_it_does_on_fragment_field in: core/tests/analytic_field.rs`
-
-### Priority
-
-**Low.** Two workarounds exist and both are one line — add any `[post]` stage, or paint the ground
-from the chain rather than from `bg_*`, which 0069 already recommends for a different reason. What
-it costs is a parameter that reads as broken on the simplest preset an author can write.
-
-- **Promoted 2026-09-14** to [Plan 0185](plans/0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage.md) and [ADR-0201](adrs/0201-a-fullscreen-scene-presents-premultiplied-over-the-backdrop.md), **widened from two scenes to four**: `shape_field` and `shape_collage` share the same REPLACE present. No shipped preset moves.
-
----
 
 ## 0207 — the cap-recovery line says "geometry is back within the segment cap" for every context, and three of the five are not geometry
 

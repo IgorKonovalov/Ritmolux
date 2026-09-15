@@ -220,6 +220,7 @@ accepted cost" are different documents and only one of them is honest.
 - [0205 — a windowless player reports `0.0 fps` and writes no diagnostics rows, while rendering normally](#0205--a-windowless-player-reports-00-fps-and-writes-no-diagnostics-rows-while-rendering-normally)
 - [0209 — the studio's schema walks pass in CI by walking nothing, because the CI job builds no player](#0209--the-studios-schema-walks-pass-in-ci-by-walking-nothing-because-the-ci-job-builds-no-player)
 - [0196 — most `v*` tags produce no Release run at all, and the cause Plan 0165 named cannot explain nineteen of them](#0196--most-v-tags-produce-no-release-run-at-all-and-the-cause-plan-0165-named-cannot-explain-nineteen-of-them)
+- [0206 — with no post stage active a fullscreen field's REPLACE blend overwrites the backdrop, so `occlude = 0` lets nothing through](#0206--with-no-post-stage-active-a-fullscreen-fields-replace-blend-overwrites-the-backdrop-so-occlude--0-lets-nothing-through)
 <!-- toc:end -->
 
 ## 0001 — reaction_diffusion reaches only 2 of the 5 Plan-0018 composite levers
@@ -10512,3 +10513,51 @@ history, and CI's `links` job asks `origin` for it on every push to `main`. The 
 were pushed as tags with both workflows disabled, and `v0.123.0` alone was published, five assets.
 The older window's tags are on `origin` and stay unpublished, as the plan decided. The
 `unprobeable:` bullet retires with this body; the two string probes still pass.
+
+---
+
+## 0206 — with no post stage active a fullscreen field's REPLACE blend overwrites the backdrop, so `occlude = 0` lets nothing through
+
+`fragment_field`'s shader comment promises that *"at 0 the sky adds through an opaque field"*, and
+on the path an author is most likely to try first — a preset with no `[post]` stage — it does not.
+The field draws with a REPLACE blend straight onto the composite, so whatever the backdrop wrote is
+gone before `occlude` is read; the parameter reaches the alpha channel and the alpha channel reaches
+nothing. With a stage active the promise holds, which is why this survived: every test and every
+shipped preset that exercises `occlude` has a stage in the chain.
+
+`analytic_field` mirrors the behaviour exactly, and deliberately —
+`occlude_behaves_as_it_does_on_fragment_field` pins the two together on both paths so that a repair
+of one cannot silently diverge from the other. That test is the carrier for the parity, not for the
+correctness: it asserts the two agree, including where they are both wrong.
+
+The size is an authoring dead end rather than a wrong picture. An author reading
+[`docs/presets.md`](presets.md) sets `occlude = 0` to let a `bg_*` sky through, sees no change, and
+has no way to learn that a `[post]` stage is the undeclared precondition. The fix is a decision
+about what a fullscreen scene's blend should be when nothing downstream will composite it, which is
+a chain question rather than a scene one — and it must move both systems at once, or the parity test
+is the thing that goes red.
+
+- **Raised:** 2026-09-11, at [Plan 0163](plans/done/0163-the-analytic-field.md)'s close review; the
+  finding is the implementing lane's, from its Phase 1 notes. **Owner if taken:** `architect` for
+  where the blend is decided, then `dev`.
+- **Verified 2026-09-11** — the parameter exists and is read on both systems:
+  `present: occlude in: core/src/render/scenes/fragment_field.rs`
+- **Verified 2026-09-11** — and the two are pinned to each other, wrong path included:
+  `present: occlude_behaves_as_it_does_on_fragment_field in: core/tests/analytic_field.rs`
+
+### Priority
+
+**Low.** Two workarounds exist and both are one line — add any `[post]` stage, or paint the ground
+from the chain rather than from `bg_*`, which 0069 already recommends for a different reason. What
+it costs is a parameter that reads as broken on the simplest preset an author can write.
+
+- **Promoted 2026-09-14** to [Plan 0185](plans/done/0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage.md) and [ADR-0201](adrs/0201-a-fullscreen-scene-presents-premultiplied-over-the-backdrop.md), **widened from two scenes to four**: `shape_field` and `shape_collage` share the same REPLACE present. No shipped preset moves.
+
+**CLOSED 2026-09-15** — [ADR-0201](adrs/0201-a-fullscreen-scene-presents-premultiplied-over-the-backdrop.md) + [Plan 0185](plans/done/0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage.md).
+The fix was not a chain question after all: the chain already hands a scene a literal `occlude = 1`
+whenever a stage owns the seam, so the four fullscreen fields (`fragment_field`, `analytic_field`,
+`shape_field`, `shape_collage`) now present with `PREMULTIPLIED_ALPHA_BLENDING`, which is exactly a
+replace at alpha 1 and lets the sky through below it. No golden moved. The parity test named in the
+second probe is gone: `occlude_lets_the_sky_through_on_every_fullscreen_field` asserts on all four
+systems and both paths that `occlude = 1` covers and `occlude = 0` adds, and it fails on all four
+no-stage readings with the old blend. That probe retires with this body; the first still passes.

@@ -55,7 +55,6 @@ place. The plan file carries the real link.
 | [0182](0182-the-report-hears-a-counter.md) | The report hears a counter | approved | dev | Backlog 0192 + ADR-0196 (proposed): a `count` column read off a fast synthetic clock at silence. No existing column moves. **Phase 1 stops if report wall time doubles.** |
 | [0183](0183-a-low-density-is-a-trace-count.md) | A low density is a trace count | approved | dev, human | ADR-0195 (proposed): a trace (density <= 0.08) draws the tier anchor's count at every size; clouds keep ADR-0140. **No golden moves.** Phase 3 is a `human` look gate at 1080p Rich. |
 | [0184](0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) | Limited ink: a contour that is an ink, and a warp field that bands | approved | dev, human | ADR-0197 (proposed): hard ink contours on six scenes; `warp_mesh` bands by level. **Phase 2 stops if level outgrows `color_span`.** Phase 4: look gate. |
-| [0185](0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage.md) | A fullscreen field lets the sky through with no post stage | approved | dev | ADR-0201: four fields present premultiplied, not two. **No golden may move** (exact at occlude 1). Core-only, orderable against any lane. |
 | [0186](0186-the-flatness-gate-tells-a-figure-from-its-ground.md) | The flatness gate tells a figure from its ground | approved | dev, human | Backlog 0128: five figure/ground candidates vs two blot anchors at 96 and 192 px. **Phase 2 is a human gate that writes ADR-0200**; a negative result is a valid end. |
 | [0188](0188-the-conductor-survives-its-first-run.md) | The conductor survives its first run | approved | dev, human | ADR-0205 Outcome: four defects from lane a's first run. **Human-started, not queued; no `conductor run` until it merges.** Phase 5 is 0187's owed pilot (0185 then 0181). |
 <!-- roster:end -->
@@ -284,8 +283,8 @@ naming what moved. The order:
 - **Delivery and infrastructure lane.** [0174] closed first, then [0176] (both 2026-09-14), which
   discharges [0103] Phase 5's wait on a tag that reliably reaches origin. Then [0177], which re-derives its mergeable set from 0174's final run-alone filter. [0178] edits the same gate-count
   prose as [0166] Phase 1 and [0176]; whichever lands second rebases onto the others.
-- **Engine lane.** [0175], then [0185] before [0181] - 0185 moves no golden, which keeps 0181's
-  bless set to the emitter and collage baselines. Then [0180] before [0142]: 0180 re-draws the
+- **Engine lane.** [0175], then [0181]. [0185] closed 2026-09-15 ahead of it and moved no golden,
+  so 0181's bless set stays the emitter and collage baselines. Then [0180] before [0142]: 0180 re-draws the
   waveform 0142's wash is measured on and needs no rig. After those, [0184], [0183], [0182],
   [0179] (its Phase 4's wait on 0174 is discharged) and [0186], in any order that keeps each bless set clean.
 - **Still gated on a human, unchanged:** [0120] Phase 1, [0133] Phase 9, [0166] Phase 3, and
@@ -307,7 +306,7 @@ naming what moved. The order:
 [0182]: 0182-the-report-hears-a-counter.md
 [0183]: 0183-a-low-density-is-a-trace-count.md
 [0184]: 0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md
-[0185]: 0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage.md
+[0185]: done/0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage.md
 [0186]: 0186-the-flatness-gate-tells-a-figure-from-its-ground.md
 [0174]: done/0174-the-clock-reading-tests-run-alone.md
 [0175]: 0175-an-eased-value-arrives.md
@@ -845,6 +844,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0185 — A fullscreen field lets the sky through with no post stage](done/0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage.md) — closed 2026-09-15. Review: **no blockers, no majors, one minor, one nit.** Version: **0.123.1**. ADR-0201 accepted. Archived 0206. [Write-up](README-archive.md).
 - [0187 — The conductor runs the lanes](done/0187-the-conductor-runs-the-lanes.md) — closed 2026-09-14 **without Phase 6 (owner call)**. Review: **no blockers, one major (fixed at close), four minors.** Version: none (tooling). ADR-0205 accepted (Outcome). [Write-up](README-archive.md).
 - [0176 — A release tag reaches origin](done/0176-a-release-tag-reaches-origin.md) — closed 2026-09-14. Review: **no blockers, no majors, three minors, two nits.** Version: none (tooling). ADR-0203 accepted. Archived backlog 0196. [Write-up](README-archive.md).
 - [0174 — The clock-reading tests run alone](done/0174-the-clock-reading-tests-run-alone.md) — closed 2026-09-14. Review: **no blockers, no majors, three minors, one nit.** Version: none (test-only). ADR-0193 accepted (Outcome). Filed 0221. [Write-up](README-archive.md).

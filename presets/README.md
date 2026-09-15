@@ -3008,7 +3008,9 @@ Three things to weigh before setting it to `0`:
 0.0, over backdrops at 0.35 and 0.60, judged in motion. The verdict was that at
 shipped brightnesses the difference is almost negligible — which is the same fact
 the ceiling above states from the other side, since the ceiling binds only where
-the figure is *dim*. No shipped preset binds `occlude` today.
+the figure is *dim*. A few shipped presets bind it: `attractor_lorenzknot`,
+`lsystem_icecrystal`, `spectrum_radialbloom` and `swarm_murmuration` lower it, and
+`fragment_etchingplate` and `shape_strataheart` state the default `1.0`.
 
 **The additive families are already unoccluded when no post stage is active.**
 The swarm, line and emitter scenes blend colour `One`/`One`, so with an empty

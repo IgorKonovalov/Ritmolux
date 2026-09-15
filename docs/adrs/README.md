@@ -46,7 +46,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0023](0023-golden-drift-guard-uses-frozen-fixtures.md) | The golden drift guard renders frozen per-system fixtures, not shipped presets | accepted |
 | [0024](0024-cross-preset-transitions.md) | Cross-preset transitions: a two-input blend stage over the engine composite, adaptive dual-live/freeze, engine-default policy | accepted |
 | [0025](0025-foobar-component-version-single-sourced.md) | Single-source the foobar component version from the workspace version (generated header) | accepted |
-| [0026](0026-full-composite-coverage-fullscreen-scenes.md) | Full composite coverage: background + view transform for the fullscreen/accumulating scenes (reaction-diffusion, attractor) | accepted |
+| [0026](0026-full-composite-coverage-fullscreen-scenes.md) | Full composite coverage: background + view transform for the fullscreen/accumulating scenes (reaction-diffusion, attractor) | accepted; extended by 0201 |
 | [0027](0027-scene-rotation-constant-default-calmer-cadence.md) | Scene rotation: hold one scene by default, calmer cadence, softened drop bias | accepted |
 | [0028](0028-final-stage-ink-tone-remap.md) | Final-stage duotone "ink" tone-remap (paper/ink), generalizing invert | accepted |
 | [0029](0029-parametric-curve-shape-params.md) | Enrich the Maurer curve family via named shape params (radial offset + phase), not new families or a superformula | accepted |
@@ -105,7 +105,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0082](0082-the-downbeat-gate-holds-and-the-estimator-is-diagnosed-first.md) | The downbeat gate holds, and the estimator is diagnosed before it is tuned | accepted (Plan 0068; Outcome) |
 | [0083](0083-in-frame-geometry-is-measured-at-the-line-renderers-draw-seam.md) | In-frame geometry is measured at the line renderer's draw seam | accepted (Plan 0069; Outcome) |
 | [0084](0084-a-particle-marks-silhouette-is-a-signed-distance-function.md) | A particle mark's silhouette is a signed-distance function | accepted 2026-08-05 (Plan 0070; Outcome) |
-| [0085](0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md) | How much a scene occludes the backdrop is one number, at one seam | accepted 2026-08-09 (Plan 0071; Outcome) |
+| [0085](0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md) | How much a scene occludes the backdrop is one number, at one seam | accepted 2026-08-09 (Plan 0071; Outcome); extended by 0201 |
 | [0086](0086-the-backdrop-colours-through-the-preset-palette.md) | The backdrop colours through the preset's palette | accepted (Outcome) |
 | [0087](0087-the-ifs-particle-carries-its-age-and-its-last-map.md) | The IFS particle carries its age and its last map, and respawns onto the attractor | accepted 2026-08-06 (Plan 0073; Outcome) |
 | [0088](0088-the-ifs-colours-by-distance-from-its-own-skeleton.md) | The IFS colours by distance from its own skeleton, and the age channel is retired | accepted 2026-08-08 (Plan 0074; Outcome) |
@@ -221,7 +221,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0197](0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md) | The band contour can be a hard ink, and the warp field can be coloured by its own level | proposed (Plan 0184), supplements 0133 |
 | [0198](0198-a-scene-advances-after-its-frames-bindings.md) | A scene advances after its frame's bindings, and a shared scene is never evaluated twice in a frame | proposed (Plan 0181), extends 0135 |
 | [0199](0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md) | A converted waveform draws the released source's figure at the scale its host renders, from a stereo pair the analyzer already receives | proposed (Plan 0180), extends 0139 |
-| [0201](0201-a-fullscreen-scene-presents-premultiplied-over-the-backdrop.md) | A fullscreen scene presents premultiplied over the backdrop, and the chain's occlude value is the only switch | proposed (Plan 0185), extends 0026 |
+| [0201](0201-a-fullscreen-scene-presents-premultiplied-over-the-backdrop.md) | A fullscreen scene presents premultiplied over the backdrop, and the chain's occlude value is the only switch | accepted 2026-09-15 (Plan 0185), extends 0026, 0085 |
 | [0202](0202-a-written-count-of-the-systems-is-refused-by-a-gate.md) | A written-out count of the systems is refused by a gate, and the threshold is five | proposed (Plan 0178), extends 0168 |
 | [0203](0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md) | A release tag is annotated, and what gets checked is whether origin has it | accepted 2026-09-14 (Plan 0176), extends 0038 |
 | [0204](0204-a-cheap-integration-test-shares-one-binary-and-a-test-that-needs-its-own-stays-its-own.md) | A cheap integration test shares one binary per package, and a test that needs its own binary keeps one | proposed (Plan 0177), extends 0156 |

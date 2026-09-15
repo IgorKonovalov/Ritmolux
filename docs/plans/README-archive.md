@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0185 - A fullscreen field lets the sky through with no post stage](#0185---a-fullscreen-field-lets-the-sky-through-with-no-post-stage)
   - [0187 - The conductor runs the lanes](#0187---the-conductor-runs-the-lanes)
   - [0176 - A release tag reaches origin](#0176---a-release-tag-reaches-origin)
   - [0174 - The clock-reading tests run alone](#0174---the-clock-reading-tests-run-alone)
@@ -209,6 +210,26 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0185 - A fullscreen field lets the sky through with no post stage](done/0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage.md)
+
+- closed 2026-09-15, the first plan closed by a conductor-run review (ADR-0205). Two `dev` phases
+on the lane `plan-0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage`: `87dee5a` (1,
+`fragment_field`, `analytic_field`, `shape_field` and `shape_collage` present with
+`PREMULTIPLIED_ALPHA_BLENDING`, and one test asserts on all four and both paths that `occlude = 1`
+covers and `occlude = 0` adds) and `2e4fe7a` (2, `presets/README.md` prose). Review, round 1:
+**no blockers, no majors, one minor, one nit.** Version: **0.123.1** (patch, a fix-only plan).
+ADR-0201 accepted. Backlog 0206 archived. The review's gate on the lane before the merge:
+`cargo nextest run --workspace` 1933 passed, 6 skipped, 629.8 s, no baseline changed; `cargo doc`
+with warnings denied clean. The same gate ran again on the tree with `main` merged in.
+
+**The minor, fixed at the close:** `presets/README.md` said no shipped preset binds `occlude`, and
+six do. **The nit, open:** `fragment_field.rs`'s shader comment still opens "Alpha 1.0:" over a line
+that returns `occlude`.
+
+**Preset curation:** no `.toml` moved, and no shipped preset names ADR-0201, Plan 0185 or backlog
+0206 as a workaround. The two presets on affected scenes that bind `occlude` bind `1.0`, which
+renders exactly as before.
 
 ### [0187 - The conductor runs the lanes](done/0187-the-conductor-runs-the-lanes.md)
 

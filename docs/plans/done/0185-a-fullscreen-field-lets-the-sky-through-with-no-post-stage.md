@@ -1,11 +1,14 @@
 # 0185 — A fullscreen field lets the sky through with no post stage
 
-> **Status:** in-progress
+> **Status:** done 2026-09-15. Phases `87dee5a` (1) and `2e4fe7a` (2). Conductor-run Mode 4, round 1:
+> **no blockers, no majors, one minor (fixed at the close), one nit.** Verified by the review: the full
+> workspace suite (1933 passed, 6 skipped, no baseline changed) and `cargo doc` with warnings denied,
+> before and after merging `main`. Version 0.123.1.
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`
-> **Related ADRs:** [0201](../adrs/0201-a-fullscreen-scene-presents-premultiplied-over-the-backdrop.md) (proposed),
-> [0026](../adrs/0026-full-composite-coverage-fullscreen-scenes.md), [0056](../adrs/0056-additive-scenes-emit-premultiplied-alpha.md),
-> [0085](../adrs/0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md)
+> **Related ADRs:** [0201](../../adrs/0201-a-fullscreen-scene-presents-premultiplied-over-the-backdrop.md) (accepted),
+> [0026](../../adrs/0026-full-composite-coverage-fullscreen-scenes.md), [0056](../../adrs/0056-additive-scenes-emit-premultiplied-alpha.md),
+> [0085](../../adrs/0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md)
 > **Closes:** design-backlog 0206
 
 ## TL;DR
@@ -209,5 +212,124 @@ flowchart LR
   both phases committed, exit 0: 1933 passed (4 slow), 6 skipped; `git status` showed no changed
   baseline after it.
 - **Outstanding `human` phases:** none.
+
+## Close review
+
+Conductor-run Mode 4 (ADR-0205), round 1, 2026-09-15, in the lane at `b5fbb7b`, then closed on the
+branch after `git merge main`. Recorded here in full because no reader was in the room.
+
+**Earlier rounds:** none. This was the first round, so no finding was raised and resolved by a fix
+round.
+
+**Verdict: Plan 0185 landed cleanly. No blockers, no majors, one minor, one nit.**
+
+The range reviewed is `505c6a2..b5fbb7b`: `87dee5a` (Phase 1), `2e4fe7a` (Phase 2) and `b5fbb7b`
+(the log's close block).
+
+### Lens 1: alignment with the plan and ADR-0201
+
+- **Both phases carry one in-vocabulary owner tag** (`dev`). The log is present, names the lane,
+  maps each phase to its commit, and is shorter than `## Implementation phases`.
+- **Phase 1 did what it says.** The four constructors named in the plan's table
+  (`fragment_field.rs:329`, `analytic_field/mod.rs:570`, `shape_field.rs:864`,
+  `shape_collage.rs:1074`) now build with `PREMULTIPLIED_ALPHA_BLENDING`. Each scene's shader returns
+  `occlude` as its alpha (`fragment_field` `params.d.y`, `analytic_field` `params.c.y` packed from
+  `self.occlude` at `mod.rs:710`, `shape_field` and `shape_collage` `params.d.x`). No other change to
+  `composite_into`, the chain or the `Scene` trait.
+- **The four is the whole set.** Every scene that implements `set_occlude` was checked:
+  `reaction_diffusion.rs:622`, `cellular/mod.rs:891`, `particles/resources.rs:584` (the attractor)
+  and `warp_mesh/resources.rs:446,552` already present premultiplied, and the remaining `REPLACE`
+  constants under `core/src/render/scenes/` are internal simulation or decay passes, not presents.
+- **The test was read, not trusted.** `occlude_lets_the_sky_through_on_every_fullscreen_field`
+  (`core/tests/analytic_field.rs:314`) runs all four systems on both paths (`trails` bound, and no
+  stage) through the unchanged `occlude_reading` helper, and asserts outright `moved < 0.05` at
+  `occlude = 1` and `raised > 0.3` at `occlude = 0` for every one of the eight readings, collecting
+  failures so a red run names every system. That is the done-when's wording exactly. The old parity
+  assertion, which held both systems to each other including on the broken path, is gone. The
+  test's doc states the property (the seam belongs to the scene with no stage and to the chain with
+  one; `occlude` means the same on both) and no longer says the fields replace. The log records the
+  bite: with the four blends put back to `REPLACE` the no-stage path reads `(0.0, 0.0)` on all four.
+- **Byte-identical at `occlude = 1`.** The plan's arithmetic holds for any target format, not only
+  `Rgba16Float`: a source alpha of exactly `1.0` (also exactly representable in unorm) gives a
+  destination factor of exactly zero. The full suite below moved no golden and left no changed
+  baseline in `git status`.
+- **Phase 2** touched `presets/README.md` only; the log says `docs/preset-palettes.md` and
+  `docs/presets.md` needed nothing, and on reading them that is right. Their `[layer]` coverage
+  tables describe a layer slot, which the chain composites, and are unaffected.
+- **ADR-0201 was not reversed or falsified** by the implementation. It is accepted at this close
+  with no `Outcome`.
+- **Full suite, run by this review:** see the gate section below.
+
+### Lens 2: layering, coupling, real-time safety
+
+Nothing to report. The change is four blend constants, two doc comments and one test. No platform
+type, no audio-path code, no C ABI or control-protocol change, no new `unwrap` on a render path.
+
+### Lens 3: doc freshness and bookkeeping
+
+- `Scene::set_occlude`'s doc (`core/src/render/scenes/mod.rs:657`) now lists the scenes that
+  present premultiplied correctly and states the formula.
+- `presets/README.md`'s empty-chain paragraph names all eight premultiplied scenes and says
+  `occlude = 0` lets the sky through with or without a post stage; the curved-band essay is qualified
+  to the default `occlude = 1`.
+- The generated params reference and `presets/schema/` were not regenerated, as the plan required.
+- Backlog 0206's `present:` probe for the old test name is red, which the plan's Risks predicted as
+  delivery. The entry is archived at this close.
+- A version bump is owed: the plan fixed an engine defect with a visible effect on a preset surface.
+
+### Lens 4: correctness and determinism
+
+- The destination alpha on the direct path now reads the composited value instead of `occlude`. The
+  log reports that the capture metrics ignore alpha and that no capture or stream path reads it; the
+  tonemap passes it through to an opaque swap chain. No finding.
+- The test renders at 64x64. A blend factor is independent of target size and aspect, so the
+  development configuration hides nothing here.
+- No new numeric threshold: the test reuses the helper's `0.05` and `0.3`, which are dimensionless
+  fractions of the frame rather than frozen measurements.
+
+### Lens 5: design integrity
+
+The decision stays where ADR-0201 put it: the chain's routing is expressed as the `occlude` value it
+hands the scene, and no new method reached the `Scene` trait. No finding.
+
+### Findings
+
+**minor**
+
+1. **`presets/README.md:3011` still says "No shipped preset binds `occlude` today."** Six do
+   (`attractor_lorenzknot`, `fragment_etchingplate`, `lsystem_icecrystal`, `shape_strataheart`,
+   `spectrum_radialbloom`, `swarm_murmuration`), as the plan's own Context counts. The sentence sits
+   in the section Phase 2 edited and predates this plan; `dev` noticed it and left it, correctly, as
+   outside the phase's scope. A reader told that no preset uses the knob has no example to open.
+   Fix: correct the sentence in the close commit's operator-doc sweep. **Fixed at this close.**
+
+**nit**
+
+1. **`core/src/render/scenes/fragment_field.rs:218` opens the shader's alpha comment with "Alpha
+   1.0:"** while the line returns `params.d.y`, which is `occlude`. The rest of the comment says so,
+   and since this plan the scene's blend reads that alpha, so the lead-in now contradicts the
+   behaviour the plan made real. Fix: drop "1.0" the next time `dev` is in the file; not worth a
+   code commit from a docs close.
+
+### Gate
+
+- **On the lane as the implementer left it (`b5fbb7b`):** `cargo nextest run --workspace
+  --no-fail-fast` under the suite lock, **1933 passed (4 slow), 6 skipped, 629.8 s**, exit 0,
+  matching the log's `**Full suite:**` bullet; `git status` clean after it, so no baseline was
+  rewritten. `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` clean. `cargo fmt --check`
+  clean. `check-doc-links`, `check-comment-hygiene` and `check-reader-prose` exit 0.
+  `check-backlog-claims` exits 1 on exactly the one probe the plan predicts (0206's old test name).
+- **After `git merge main`** (`main` at `3381990`; the merge brings conductor tooling and docs only,
+  no Rust and no presets): `cargo fmt --check` and `cargo clippy --workspace --all-targets -- -D
+  warnings` clean; `cargo nextest run --workspace --no-fail-fast` under the suite lock **1933
+  passed (4 slow), 6 skipped, 654.2 s**, exit 0; `cargo doc` with warnings denied clean.
+
+### Close bookkeeping
+
+ADR-0201 accepted and both indexes refreshed; backlog 0206 archived with a ledger row, and
+`check-backlog-claims` exits 0 after it. Preset curation: no `.toml` moved, and no shipped preset
+names ADR-0201, Plan 0185 or backlog 0206 as a workaround. Version 0.123.1 (patch), with the studio's
+two copies following it. The studio's `version.test.ts` was not run: this worktree has no
+`studio/node_modules`.
 
 ## Followups (after this lands)
