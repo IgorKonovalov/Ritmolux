@@ -378,8 +378,8 @@ flowchart LR
 | 2 — No test source names the target directory | dev | done | 3510ab9 |
 | 3 — The horizon test reads the ground before the rows | dev | done | 11636f2 |
 | 4 — Measure what grows in `target/` | dev | done | 375f275 |
-| 5 — `prune-target.mjs` deletes what cargo no longer reports | dev | done | committed with this row |
-| 6 — The incremental cache has a documented bound | dev | not started | |
+| 5 — `prune-target.mjs` deletes what cargo no longer reports | dev | done | d9aee86 |
+| 6 — The incremental cache has a documented bound | dev | done | committed with this row |
 | 7 — A scoped `cargo doc` earns a hook step, or is rejected | dev | not started | |
 | 8 — The cheap tests share one binary per package | dev | not started | |
 | 9 — The studio tests ask cargo where the player is | studio-builder | not started | |
@@ -446,6 +446,8 @@ flowchart LR
   hash is the hash of a reported file, so a live `.exe` keeps its `.pdb` and `.d`. A reported file
   outside `deps/` is matched to its `deps/` source by hard-link identity, else by content; on MSVC a
   binary's source is the unhashed `deps/ritmolux.exe`. An unmatched report stops the script.
+- **Phase 6.** No script arm: Phase 4 found no mapping. The Disk section documents the delete, with
+  Phase 4's figures, the machine and the date.
 
 ### Close triggers
 

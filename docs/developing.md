@@ -231,6 +231,26 @@ rebuild, never a wrong build: cargo sees a missing output as dirty. The target d
 Run it when the disk is short, and after anything that changes many units at once: a toolchain or
 dependency bump, or a session of narrowed `-p` runs.
 
+**`target/debug/incremental/` holds one directory per compiled unit, and up to two sessions in
+each.** Measured on the reference machine on 2026-09-15, in a lane built by the three commands
+above: 171 unit directories and 1.95 GB. One edit to `core/src/render/metrics.rs` and the three
+commands again took it to 3.62 GB with no new directory, because each rebuilt unit now kept its
+previous session beside the new one. Three more edit-and-revert rounds left it at 3.59 GB, still
+171 directories and never more than two sessions in one. So the loop alone does not grow it without
+bound. What adds directories is a **new unit**: a different feature set, a narrowed `-p` build, a
+dependency or toolchain change, each of which leaves the old unit's directory behind.
+
+`prune-target.mjs` does not touch this directory, because nothing cargo reports names which unit a
+directory belongs to. Delete it instead, when it has grown past what the loop above needs:
+
+```sh
+rm -rf target/debug/incremental                           # sh
+Remove-Item -Recurse -Force target\debug\incremental      # PowerShell
+```
+
+That costs one non-incremental rebuild of the workspace crates on the next build, and nothing else:
+dependencies are never built incrementally, and no output outside that directory depends on it.
+
 ## Running approved plans under the conductor
 
 `tools/conductor/` runs approved plans to a merged `main` with nobody at the keyboard. It works in up
