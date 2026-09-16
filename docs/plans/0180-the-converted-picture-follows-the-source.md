@@ -973,30 +973,37 @@ the stroke it exists for.
 
 **The seam re-render**, at 1920x1080 under Phase 4's own invocations, all under `target/plan0180/`,
 uncommitted: `p7-songflower.png` (`--signal click:120 --frame-at 360`) and `p7-chasers.png`
-(`--set bass=0.6,mid=0.5,treb=0.45 --frames 300`). Peak mean row-to-row `|drgb|` in rows 520..560
-over Phase 4's own bands, 0-255 byte scale — **no hard edge along `+x` in either render**:
+(`--set bass=0.6,mid=0.5,treb=0.45 --frames 300`). Peak mean row-to-row `|drgb|` in rows 520..560,
+0-255 byte scale — **no hard edge along `+x` in either render**:
 
-| preset | band | as converted (P4 tree) | P4's hand `deposit = 0` | this tree, converter-bound |
-|---|---|---|---|---|
-| *Songflower* | `x 960..1200` | `9.0` r542 | `1.6` r541 | **`0.9`** r542 |
-| *chasers* | `x 200..760` / `1150..1700` | `14.8` r537 / `13.2` r539 | `1.3` r523 / `1.4` r524 | **`1.3`** r523 / **`1.4`** r524 |
+| preset | band | as converted (P4 tree) | P4's hand `deposit = 0` | this tree, unbound | this tree, bound |
+|---|---|---|---|---|---|
+| *Songflower* | `x 0..960` | `11.8` r541 | `0.8` r542 | `11.5` r541 | **`1.1`** r542 |
+| *Songflower* | `x 960..1920` | `4.7` r542 | `1.0` r541 | `0.7` r538 | **`0.8`** r542 |
+| *chasers* | `x 200..760` | `14.8` r537 | `1.3` r523 | — | **`1.3`** r523 |
+| *chasers* | `x 1150..1700` | `13.2` r539 | `1.4` r524 | — | **`1.4`** r524 |
 
-*chasers* reproduces Phase 4's hand-made arm to every figure printed, which is the cleanest evidence
-that the converter's binding and that hand edit do the same thing.
+Each preset's bound render reproduces Phase 4's hand-made `deposit = 0` arm to within a few tenths,
+and *chasers* to every figure printed. That is the evidence that the converter's binding and that
+hand edit do the same thing.
 
-**Two findings against the phase's expectation.**
+**Read the band before reading the table.** *Songflower* sets `echo_orient = 1`, so the **displayed**
+frame is the field mirrored in x and the field's `+x` ray lands in the display's **left** half. The
+edge is therefore in `x 0..960`, and the `x 960..1200` band Phase 4's note quotes is the half the
+ray does not reach. Measured on the wrong half first, this phase briefly recorded that the arms no
+longer separated and blamed Phase 6's mode-5 rebuild; the pictures falsified that, and the row above
+is the corrected reading. The mistake was the band, not the tree.
 
-- **This statistic is not Phase 4's.** Re-run on Phase 4's own committed render it reads `9.0` where
-  that phase recorded `107.2`, so only the within-table comparisons are meaningful. Phase 4's script
-  was not kept; this one is the band's per-channel `|delta|` meaned over 3 channels.
-- **On *Songflower* the arms no longer separate, and Phase 6 is why.** Stripping the binding back out
-  of this tree (`p7-songflower-nodep.png`) reads `1.2` at row 542 against the bound render's `0.9`,
-  where on Phase 4's tree that pair read `9.0` against `1.6`. The row-542 *step* was mostly the old
-  mode-5 waveform, a full-width midline figure Phase 6 replaced with the source's product figure
-  about the centre. The deposit's light is still removed and by a lot — the band's mean value goes
-  `44` unbound to `4` bound, and the two frames differ at mean `|d|` `43.2`, max `173` at (625, 546).
-  So on this preset the render shows the edge absent but does not by itself attribute that to the
-  binding; *chasers* and the rendered test do.
+**One finding stands about the statistic itself.** It is not Phase 4's: re-run on that phase's own
+committed render it reads `11.8` where the phase recorded `107.2`, so the absolute figures are not
+comparable across phases and only the within-table columns are. Phase 4's script was not kept; this
+one is the band's per-channel `|delta|` meaned over 3 channels.
+
+**What the repaired picture still carries.** `p7-songflower.png` keeps a **hairline** along the
+midline, one row deep, with the colour continuous across it — Phase 1's description of the `+x` ray
+exactly. It is the branch cut interpolated across one mesh cell, which Phase 4 recorded as
+authored-against and which this plan forbids smoothing. The whole-frame difference between the two
+arms is mean `|d|` `43.2`, max `173` at (625, 546).
 
 **The tests.** `milkconv/tests/deposit.rs`, a new file — `draw_layer.rs` has no renderer and
 `warp_geometry.rs`'s header is a geometry hunt.
