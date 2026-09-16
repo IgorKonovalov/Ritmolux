@@ -179,7 +179,11 @@ test("Cargo.toml and Cargo.lock are served for a version line and nothing else",
   assert.deepEqual(locked.paths, ["Cargo.lock"]);
   assert.equal(servesDiff(locked.paths, locked.dir, locked.a, locked.b), false, "a checksum is not a version line");
 
-  // A two-part requirement under a dependency table is the trap the three-part pattern closes.
+  // An added dependency table is refused by its own header line, not by the version pattern: the
+  // pattern matches any three-part `version = "x.y.z"` at column 0, wherever it sits, so a
+  // requirement already written in table form and edited in place would be served. Nothing in the
+  // repository is written that way, and a registry bump re-arms the suite through Cargo.lock's
+  // checksum in any case.
   const table = cargoCase({ "Cargo.toml": `${CARGO_TOML("0.124.0")}\n[workspace.dependencies.naga]\nversion = "0.20.1"\n` });
   assert.equal(servesDiff(table.paths, table.dir, table.a, table.b), false, "an added dependency table carries added lines");
 

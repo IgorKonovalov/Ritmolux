@@ -189,12 +189,12 @@ flowchart TD
 
 ### Notes
 
-- Phase 3 touched two files past its list, both in `2204110`: `lib/lane.mjs`, which wires the gate's
+- Phase 3 touched three files past its list, all in `2204110`: `lib/lane.mjs`, which wires the gate's
   served callback into the run terminal — without it the phase's first done-when has nothing to
-  assert — and `test/lane-scenario.mjs`, which gained the `servedClose` spec flag that the same
-  done-when's "lane scenario whose close tip is a served tree" needs. The lane scratch repository
-  also gained a tracked `Cargo.toml`, since a version-line bump needs a file already in the green
-  tree.
+  assert — `test/lane-scenario.mjs`, which gained the `servedClose` spec flag that the same
+  done-when's "lane scenario whose close tip is a served tree" needs, and `test/lane.test.mjs`, which
+  holds that scenario's assertions. The lane scratch repository also gained a tracked `Cargo.toml`,
+  since a version-line bump needs a file already in the green tree.
 - Phase 2's last done-when asks that the suite lock be asserted "from the lock log". The gate takes
   its locks through `lib/locks.mjs`, which writes no log — `RLX_LOCK_LOG` is written only by
   `with-lock.mjs`'s command wrapper, which the gate does not use. Asserted instead from the lock
