@@ -46,6 +46,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0227 — a plan pays an 11-minute full suite for every distinct tree it gates, and a close's tree differs from the reviewed one only in prose, a version and a merge](#0227--a-plan-pays-an-11-minute-full-suite-for-every-distinct-tree-it-gates-and-a-closes-tree-differs-from-the-reviewed-one-only-in-prose-a-version-and-a-merge)
 - [0236 — the `.claude/` park reads a phase's declared `Files touched`, and Plan 0190's own Phase 9 declared its three `.claude/` files in prose](#0236--the-claude-park-reads-a-phases-declared-files-touched-and-plan-0190s-own-phase-9-declared-its-three-claude-files-in-prose)
 - [0237 — the session allowlist bounds a deletion by four literal path shapes, so a path the shell expands escapes the lane](#0237--the-session-allowlist-bounds-a-deletion-by-four-literal-path-shapes-so-a-path-the-shell-expands-escapes-the-lane)
+- [0238 — the parameter slider is drawn from the schema and armed by the preset read, so a release between the two is discarded in silence](#0238--the-parameter-slider-is-drawn-from-the-schema-and-armed-by-the-preset-read-so-a-release-between-the-two-is-discarded-in-silence)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -1836,3 +1837,76 @@ Shapes, none decided:
 **Medium.** Nothing has triggered it and no session has reason to write one, but it is the one rule
 in that file whose stated bound — *"a path that leaves the lane is refused, whatever it is for"* — is
 not the bound the rules actually enforce, and the README repeats the claim.
+
+---
+
+## 0238 — the parameter slider is drawn from the schema and armed by the preset read, so a release between the two is discarded in silence
+
+CI run 35065148120, the `studio` job of the `v0.123.2` tag build, failed one test out of 264 while
+every other job in the run was green:
+
+```
+FAIL renderer/views/Editor.test.tsx > a gesture against a preset the session has not forked
+     > 'a parameter release' writes nothing until the copy is named
+TestingLibraryElementError: Unable to find a label with the text of: save a copy as   1083ms
+```
+
+The `1083ms` is the reading, not the noise. Testing Library's `findBy*` default timeout is 1000 ms
+and `studio/vitest.config.ts` sets no override, so the assertion did not run slow — it ran to the
+end of its window against a prompt that was never going to appear. The gesture was **dropped**.
+
+Two async loads arm one control, and nothing couples them:
+
+- The rows of `ParamPanel` come from the **schema** — `rostersFor(schema.document, system)` at
+  `studio/renderer/views/Editor.tsx:260`, iterated at `ParamPanel.tsx:41`. The `warp` slider is on
+  screen, and drag-responsive, as soon as `getSchema` resolves.
+- `writable` is `text !== undefined && dir !== null`
+  (`studio/renderer/hooks/useActivePreset.ts:266`), and `text` arrives only when `preset.read`
+  resolves — a **separate** promise, started by a different effect.
+- The release handler is `if (writable) onCommit(spec.name, value)`
+  (`studio/renderer/components/ParamRow.tsx:97`). No `disabled`, no read-only arm, no notice.
+
+So between the two resolutions the studio draws a live slider that throws away what is done with it.
+The test loses this race because `await screen.findByLabelText('warp')` waits on the *schema* label
+and nothing else, and it is the first of the five `it.each` gestures for the same reason: the other
+four `await tab(...)` or wait on a CodeMirror document first, which hands the pending read extra
+ticks.
+
+**Reproduced deliberately**: the test file copied, a 30 ms `setTimeout` added to the fake's
+`preset.read`, identical failure at 1055 ms. The copy was deleted; nothing in the tree records it.
+
+The three implicated files are byte-identical between `v0.123.2` and `main`, so this is live — the
+three other tag builds that started in the same minute won the race.
+
+Two shapes, and the entry carries both because they answer different questions:
+
+- **The test** — wait on something that proves the *preset* loaded before firing the gesture: the
+  `warp` slider carrying the file's own `0.4` rather than the spec default, or the `/presets/ink.toml`
+  path the same file already waits on elsewhere. Cheap, and it makes the suite honest about what it
+  is timing. It does **not** fix the studio.
+- **The product** — do not render an interactive control while `writable` is false. A slider that
+  moves, sends `ctl/param`, and then discards the release is the studio disagreeing with itself
+  about what it just did, which is the same objection `ParamRow`'s own header already raises against
+  a slider reporting a value the engine would round away. A human is unlikely to out-race a local
+  file read, so the cost is a rare lost gesture rather than a wrong one — but the window is real and
+  nothing marks it.
+
+- **Raised:** 2026-09-16, from CI triage of run 35065148120. **Owner if taken:** `studio-builder`.
+- **Verified 2026-09-16** — the rows are schema-driven, so the slider does not wait on the preset:
+  `present: rostersFor\(schema\.document in: studio/renderer/views/Editor.tsx`
+- **Verified 2026-09-16** — and the arm does wait on it:
+  `present: writable: text !== undefined && dir !== null in: studio/renderer/hooks/useActivePreset.ts`
+- **Verified 2026-09-16** — the release is gated with no other outcome:
+  `present: if \(writable\) onCommit in: studio/renderer/components/ParamRow.tsx`
+- **Verified 2026-09-16** — and nothing in the row disables or marks the control meanwhile:
+  `absent: disabled in: studio/renderer/components/ParamRow.tsx`
+- **Verified 2026-09-16** — the 1000 ms default stands, so the failure window is the default one
+  and raising it would hide this rather than fix it:
+  `absent: Timeout in: studio/vitest.config.ts`
+
+### Priority
+
+**Medium.** The defect costs a rare dropped gesture; the flake costs a red `main` on a tag build for
+a reason that reads as infrastructure and is not. Nothing else in the suite waits on a
+schema-rendered control to prove a preset-backed one is armed, so the blast radius is this one file
+— but it will fire again, and the next reader will spend the triage again.
