@@ -23,6 +23,7 @@ import {
   usageReading,
   usageText,
 } from "../lib/live.mjs";
+import { servedNotice } from "../lib/ledger.mjs";
 import { lineReader } from "../lib/step.mjs";
 import { FAKE, TEST_DIR, TOOL_DIR, tmp, writePlan } from "./helpers.mjs";
 
@@ -230,6 +231,28 @@ test("the gate prints node checks as one line and each cargo command's start and
   const red = gateReader({ stage: "fix-1" });
   assert.deepEqual(red.end(node, { code: 1, ms: 2000, output: "" }), ["  gate   check-doc-links.mjs FAILED (exit 1) 2s"]);
   assert.deepEqual(red.finish({ ok: false, failed: { name: "check-doc-links.mjs" } }, 2000), ["gate fix-1  red at check-doc-links.mjs, 2s"]);
+});
+
+// ADR-0211's three states are three different lines: a skip names the record and runs nothing, a
+// served step names the tier and the tree it leaned on and then runs, a full run says neither.
+test("the gate's suite line says which tier ran and which record it leaned on", () => {
+  const g = gateReader({ stage: "post-close" });
+  const nextest = { name: "cargo nextest", cmd: ["cargo", "nextest", "run", "--workspace"] };
+  const notice = servedNotice({
+    record: { tree: "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b", by: "gate 0191-pre-review", at: "2026-09-16T01:00:00.000Z" },
+    paths: ["docs/plans/done/0191-a.md", "docs/plans/README.md"],
+  });
+  assert.deepEqual(g.served(nextest, notice), [
+    "  gate   cargo nextest served -P fast: tree 1a2b3c4 green by gate 0191-pre-review at 2026-09-16T01:00:00.000Z, 2 served paths",
+  ]);
+  assert.deepEqual(g.start(nextest), ["  gate   cargo nextest running"], "a served step still runs");
+  assert.deepEqual(g.end(nextest, { code: 0, ms: 200_000, output: "     Summary [ 200.000s] 1200 tests run: 1200 passed\n" }), [
+    "  gate   cargo nextest ok 3m20s (1200 passed, 0 failed)",
+  ]);
+  assert.deepEqual(g.skipped(nextest, "tree 1a2b3c4 green by gate 0191-pre-review at 2026-09-16T01:00:00.000Z"), [
+    "  gate   cargo nextest skipped: tree 1a2b3c4 green by gate 0191-pre-review at 2026-09-16T01:00:00.000Z",
+  ]);
+  for (const l of [...g.served(nextest, notice), ...g.skipped(nextest, notice)]) assert.match(l, /^[\x20-\x7e]*$/, `ASCII: ${l}`);
 });
 
 test("the parsers read nextest, cargo test and the wrapper's exit line", () => {

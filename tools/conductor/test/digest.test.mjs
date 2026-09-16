@@ -318,10 +318,29 @@ test("the newest run lists the plans an earlier run left parked, and the earlier
 
   // Totals: the run's first and last usage reading, and gate minutes split by the suite.
   assert.match(newest, /^- usage at run start: 5h 0\.02 \(resets [^)]+\); 7d 0\.00 \(resets [^)]+\)\. At run end: 5h 0\.08 \(resets [^)]+\); 7d 0\.01 \(resets [^)]+\)\.$/m);
-  assert.match(newest, /^- gate: 23 min; full suite 21 min over 2 runs, everything else 2 min; 0 suite runs skipped\.$/m);
+  assert.match(newest, /^- gate: 23 min; full suite 21 min over 2 runs, served -P fast none, everything else 2 min; 0 suite runs skipped\.$/m);
 
   // And the whole digest regenerates byte for byte.
   assert.equal(renderDigest(state, { repo, stateDir }), text);
+});
+
+// ADR-0211: a served run is a `-P fast` run in the full suite's place, so counting it with the full
+// ones would report a saving as a cost.
+test("Totals counts a served suite run apart from a full one, and the digest still regenerates byte for byte", () => {
+  const { repo, head } = repoWithTag();
+  const stateDir = tmp("rlx-digest-state-");
+  const state = pilotState(repo, head, stateDir);
+  // The close tip was served: `-P fast` ran for 4 minutes where the full suite ran 11.
+  const postClose = state.plans["0185"].gates.find((g) => g.label === "post-close");
+  postClose.commands = [{ name: "cargo nextest", code: 0, ms: 4 * 60000, suite: true, served: true, by: "gate pre-review" }];
+  const text = renderDigest(state, { repo, stateDir });
+  const newest = text.split(/^## Run /m)[1];
+  assert.match(newest, /^- gate: 16 min; full suite 10 min over 1 run, served -P fast 4 min over 1 run, everything else 2 min; 0 suite runs skipped\.$/m);
+  assert.equal(renderDigest(state, { repo, stateDir }), text);
+
+  // A skipped suite step is still neither: it is counted as a skip and costs no minutes.
+  postClose.commands = [{ name: "cargo nextest", code: 0, ms: 0, suite: true, skipped: true, by: "gate pre-review" }];
+  assert.match(renderDigest(state, { repo, stateDir }), /^- gate: 12 min; full suite 10 min over 1 run, served -P fast none, everything else 2 min; 0 suite runs skipped\.$/m);
 });
 
 test("newest run first, and a run with nothing in it says so", () => {

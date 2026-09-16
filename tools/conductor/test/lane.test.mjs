@@ -35,8 +35,10 @@ export function scratch({ plans, lanes, after = {}, spec = {}, local = {} }) {
   sh(["config", "core.autocrlf", "false"], repo);
   writeFileSync(join(repo, "VERSION"), "0.1.0\n");
   writeFileSync(join(repo, "README.md"), "scratch\n");
+  // Where a `servedClose` puts its bump, as the real close puts it: a version line and nothing else.
+  writeFileSync(join(repo, "Cargo.toml"), '[workspace.package]\nversion = "0.1.0"\nedition = "2021"\n');
   for (const p of plans) writePlan(repo, p);
-  sh(["add", "VERSION", "README.md", "docs"], repo);
+  sh(["add", "VERSION", "README.md", "Cargo.toml", "docs"], repo);
   sh(["commit", "-q", "-m", "init"], repo);
   sh(["tag", "-a", "v0.1.0", "-m", "init"], repo);
 
@@ -619,6 +621,48 @@ test("with no fix round and an unmoved main, a plan executes the full suite twic
   ]);
   assert.deepEqual(rec.gates[1].commands.map((c) => c.skipped), [true]);
   assert.match(digest("### Totals"), /; 2 suite runs skipped\.$/m);
+});
+
+// ADR-0211: the close tip differs from the reviewed tree only in prose, a version line and a merge,
+// so its gate runs `-P fast` in the full suite's place — and says so on its own run-terminal line.
+test("a close tip whose diff is served runs -P fast, and the run terminal names the tier and the tree", async () => {
+  const { ctx, digest } = scratch({ plans: [{ number: "0101", phases: [dev("1"), dev("2")] }], lanes: { a: ["0101"] }, spec: { "0101": { servedClose: true } } });
+  // A script file, not `node -e`: node parses a trailing `-P` after `-e <code>` as its own option.
+  const script = join(tmp("rlx-lane-suite-"), "suite.cjs");
+  writeFileSync(script, "console.log('     Summary [   1.000s] 3 tests run: 3 passed');\n");
+  ctx.gate = [{ name: "cargo nextest", cmd: [process.execPath, script], lock: "suite", ledger: true }];
+  const out = [];
+  ctx.live = (l) => out.push(l);
+  await runLanes(ctx);
+
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  assert.deepEqual(rec.gates.map((g) => g.label), ["pre-review", "post-close"]);
+  assert.deepEqual(rec.gates[0].commands.map((c) => [c.suite, c.served ?? false, c.skipped ?? false]), [[true, false, false]]);
+  assert.deepEqual(rec.gates[1].commands.map((c) => [c.suite, c.served ?? false, c.skipped ?? false]), [[true, true, false]]);
+
+  const ledger = readLedger(join(ctx.stateDir, "suite-ledger.jsonl"));
+  assert.deepEqual(ledger.map((e) => [e.by, e.served ?? false]), [
+    ["gate 0101-pre-review", false],
+    ["gate 0101-post-close", true],
+  ]);
+  assert.equal(ledger[1].green.tree, ledger[0].tree, "the served line names the tree it leaned on");
+  // The close's own diff: the plan's move under docs/, and the version line.
+  assert.deepEqual([...ledger[1].diff].sort(), ["Cargo.toml", "docs/plans/0101-fixture.md", "docs/plans/done/0101-fixture.md"]);
+
+  const served = out.filter((l) => l.includes("served -P fast"));
+  assert.equal(served.length, 1, out.join("\n"));
+  assert.match(
+    served[0],
+    new RegExp(`^\\d\\d:\\d\\d 0101   gate   cargo nextest served -P fast: tree ${ledger[0].tree.slice(0, 7)} green by gate 0101-pre-review at \\S+, 3 served paths$`),
+  );
+  // It is printed while the gate is still running, before that gate's own verdict line. Whether a
+  // `running` line follows is the reader's own business, pinned in live.test.mjs against a real
+  // cargo vector; the stand-in here is not one.
+  assert.ok(out.indexOf(served[0]) < out.findIndex((l) => /gate post-close  green/.test(l)), out.join("\n"));
+  for (const l of out) assert.match(l, /^[\x20-\x7e]*$/, `ASCII: ${l}`);
+
+  assert.match(digest("### Totals"), /full suite .+ over 1 run, served -P fast .+ over 1 run, everything else /);
 });
 
 test("a red conductor gate parks before any review", async () => {

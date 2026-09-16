@@ -14,6 +14,9 @@
 // the plan's own delivery turns red; the close session removes it, as a close archives the entry,
 // unless `probeStaysRed`.
 //
+// `servedClose` makes the close put its version bump in Cargo.toml's version line instead of VERSION,
+// so the close tip's whole diff from the reviewed tree is paths ADR-0211 serves.
+//
 // `closeRepair` makes a clean review close with two minors, one repaired by a close commit and marked
 // `fixed_in`, one left open; "wrongFile" repairs a different file, "offBranch" names a commit on no
 // branch. `ledgerFlow` makes the review run its full suite through the wrapper before closing, and the
@@ -172,8 +175,16 @@ export default async ({ cwd, vars, env }) => {
       writeFileSync(donePath, text);
       const [maj, min, pat] = readFileSync(join(cwd, "VERSION"), "utf8").trim().split(".").map(Number);
       const version = `${maj}.${min}.${pat + 1}`;
-      writeFileSync(join(cwd, "VERSION"), `${version}\n`);
-      git("add", "VERSION", `docs/plans/done/${planName}`);
+      if (ps.servedClose) {
+        // A close whose whole diff from the reviewed tree is served paths: the plan's move under
+        // docs/ and a version line in Cargo.toml, with the untracked VERSION left alone.
+        const toml = join(cwd, "Cargo.toml");
+        writeFileSync(toml, readFileSync(toml, "utf8").replace(/^version = ".*"$/m, `version = "${version}"`));
+        git("add", "Cargo.toml", `docs/plans/done/${planName}`);
+      } else {
+        writeFileSync(join(cwd, "VERSION"), `${version}\n`);
+        git("add", "VERSION", `docs/plans/done/${planName}`);
+      }
       if (existsSync(join(cwd, "PROBE_RED")) && !ps.probeStaysRed) git("rm", "-q", "PROBE_RED");
       git("commit", "-q", "-m", `chore: Release ${version}`);
       if (ps.ledgerFlow) await suite();

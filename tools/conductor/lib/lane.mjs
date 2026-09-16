@@ -19,6 +19,7 @@ import { removeLane, laneNames, openLane } from "./cleanup.mjs";
 import { defaultGate, gateForStage, runGate } from "./gate.mjs";
 import { git, head, resolveCommit } from "./git.mjs";
 import { appendCleanupFailure, appendPark, dirtyWorktree } from "./inbox.mjs";
+import { servedNotice } from "./ledger.mjs";
 import {
   gateReader,
   liveLine,
@@ -327,6 +328,7 @@ async function gate(ctx, rec, label) {
     onCommandEnd: (c, r) => show(lines.end(c, r)),
     ledger: suiteLedger(ctx),
     onCommandSkipped: (c, record) => show(lines.skipped(c, `tree ${record.tree.slice(0, 7)} green by ${record.by} at ${record.at}`)),
+    onCommandServed: (c, serving) => show(lines.served(c, servedNotice(serving))),
   });
   show(lines.finish(g, Date.now() - t0));
   rec.gates ??= [];

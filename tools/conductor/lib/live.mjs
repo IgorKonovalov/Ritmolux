@@ -356,6 +356,11 @@ export function gateReader({ stage }) {
     skipped(c, why) {
       return [...(isCargo(c) ? flush() : []), `  gate   ${c.name} skipped: ${why}`];
     },
+    // A served step does run, so this line precedes its own `running` line rather than replacing it:
+    // it says which tier is about to run and which tree's record bought the narrowing (ADR-0211).
+    served(c, why) {
+      return [...(isCargo(c) ? flush() : []), `  gate   ${c.name} served -P fast: ${why}`];
+    },
     end(c, { code, ms, output }) {
       if (!isCargo(c)) {
         checks += 1;

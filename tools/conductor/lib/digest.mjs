@@ -309,14 +309,22 @@ export function renderDigest(state, { repo, stateDir }) {
     const lastUsage = [...readings].reverse().map((u) => u.last ?? u.first).find(Boolean);
     out.push(firstUsage ? `- usage at run start: ${usageLine(firstUsage)}. At run end: ${usageLine(lastUsage)}.` : "- usage: no reading in this run.");
 
+    // The suite's three tiers are counted apart, so what ADR-0211 saved is a number here rather
+    // than something inferred from the wall clock: `served` ran `-P fast` in the full suite's place.
     let suiteMs = 0;
     let otherMs = 0;
     let suiteRuns = 0;
+    let servedMs = 0;
+    let servedRuns = 0;
     for (const rec of plans) {
       for (const g of (rec.gates ?? []).filter((x) => inRun(x.at))) {
         for (const c of g.commands ?? []) {
           if (!isSuite(c)) otherMs += c.ms ?? 0;
-          else if (!c.skipped) {
+          else if (c.skipped) continue;
+          else if (c.served) {
+            servedMs += c.ms ?? 0;
+            servedRuns += 1;
+          } else {
             suiteMs += c.ms ?? 0;
             suiteRuns += 1;
           }
@@ -325,9 +333,11 @@ export function renderDigest(state, { repo, stateDir }) {
     }
     // Every skip, the gate's and a session's alike, is a line in the suite ledger.
     const suiteSkips = ledger.filter((e) => e.skip && inRun(e.at)).length;
+    const times = (n) => `${n} run${n === 1 ? "" : "s"}`;
     out.push(
-      `- gate: ${duration(suiteMs + otherMs)}; full suite ${duration(suiteMs)} over ${suiteRuns} run${suiteRuns === 1 ? "" : "s"}, ` +
-        `everything else ${duration(otherMs)}; ${suiteSkips} suite run${suiteSkips === 1 ? "" : "s"} skipped.`,
+      `- gate: ${duration(suiteMs + otherMs + servedMs)}; full suite ${duration(suiteMs)} over ${times(suiteRuns)}, ` +
+        `served -P fast ${servedRuns ? `${duration(servedMs)} over ${times(servedRuns)}` : "none"}, ` +
+        `everything else ${duration(otherMs)}; ${suiteSkips} suite ${suiteSkips === 1 ? "run" : "runs"} skipped.`,
     );
     out.push("");
   }

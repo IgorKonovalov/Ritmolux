@@ -184,8 +184,8 @@ flowchart TD
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The ledger can serve a green record forward | dev | done | `55b1520` |
-| 2 — The gate's suite step is a three-state tier | dev | committed with this row |  |
-| 3 — The report says which tier ran, and why | dev | not started |  |
+| 2 — The gate's suite step is a three-state tier | dev | done | `19ef1d6` |
+| 3 — The report says which tier ran, and why | dev | committed with this row |  |
 
 ### Notes
 

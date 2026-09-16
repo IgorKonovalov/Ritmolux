@@ -215,6 +215,28 @@ an inbox entry, not a park: close the shell, then `git worktree remove`, `git wo
   parks the plan `lost_background` before its outcome is read. The detector reads a result-text shape
   the CLI owns, so a reworded message would stop it seeing a start — which is why the other two
   layers exist.
+- **The suite's three tiers never skip a test outright** (ADR-0211). The gate's suite step is
+  `skipped` when a green record names **this exact tree** and nothing runs; `served` when a green
+  record names some other tree and every path between the two is on a declared list, and then
+  `cargo nextest run --workspace -P fast` runs in the full suite's place; `ran` otherwise, the full
+  suite. **The only question the tier ever answers is *full suite or `-P fast`*, and `-P fast` is
+  what CI runs on every push** — `hygiene.rs`, `preset.rs`, every `CARGO_PKG_VERSION` reader and
+  ADR-0157's 24-preset sample are inside it. What a served tree trades away is the nine deferred GPU
+  suites' sweep, on a diff that cannot reach them.
+- **The served list is an allowlist, and the direction is the safety surface.** `SERVED_PATHS` in
+  `lib/ledger.mjs` is the list: `docs/`, `.claude/`, `tools/`, `site/`, `studio/`, `packaging/`,
+  `renders/`, any `*.md`, and `Cargo.toml` / `Cargo.lock` when their whole diff is a
+  `version = "x.y.z"` line. A path is served only by being **named**; everything unlisted — every
+  `.rs`, every `.wgsl`, `presets/*.toml`, `core/tests/goldens/`, `.config/nextest.toml`,
+  `.github/` — falls through to the full suite by omission. Written the other way round, a path type
+  nobody thought of would be under-gated silently; an allowlist that forgets a path is merely slow.
+  The diff is measured **against the green tree**, not against the stage's own commits, so a
+  `git merge main` that brought in another lane's render change re-arms the suite by construction.
+- **A served run never becomes a green record.** Its ledger line carries `served: true` and a `cmd`
+  that is not the one the key names, so neither lookup can read it back: the next stage leans on the
+  full-suite record again, and one `-P fast` never chains off another. The run terminal prints a
+  served step's own line naming the tier and the tree it leaned on, and the digest's Totals counts
+  served runs apart from full ones.
 - **The locks.** `with-lock.mjs` holds two machine-wide locks. The **suite** lock stops two lanes
   running the GPU suites at once. The **close** lock runs from before a review until `main` has
   fast-forwarded, so a version bump and its tag always land on the `main` they were computed against.
@@ -232,12 +254,17 @@ there rather than from a copy here, which would drift. The commands run in order
 first red. The gate runs at four stages: `pre-review` after the last implementer run, `fix-N` after
 each fix round, `post-close` on the tip a close produced before `main` moves, and `remerge` after the
 automatic re-merge of a moved `main`. Only the last two run a step marked `afterClose`. **A full
-workspace suite the conductor saw pass is not run again on the same tree** (ADR-0207).
+workspace suite the conductor saw pass is not run again on the same tree** (ADR-0207), and **a tree
+a green record serves runs `-P fast` in its place rather than the full suite** (ADR-0211 — the three
+tiers, and the list they rest on, are in *How it stays safe* above).
 `state/suite-ledger.jsonl` holds one line per suite run that conductor code observed, keyed by
 `HEAD^{tree}` and written only when the worktree was clean at both ends, plus one line per skip
-naming the run it relied on. The gate and `with-lock.mjs` both consult it: every session is handed
+naming the run it relied on and one per served run naming the tree it leaned on and the diff that
+served. The gate and `with-lock.mjs` both consult it: every session is handed
 the ledger in `RLX_SUITE_LEDGER`. They skip on a green record for the exact tree and print that
-record, and the digest counts every skip. Any change to a tracked file, a doc included, is a new
+record, and the digest counts every skip. **Only the gate serves a record forward**: a session's
+wrapped suite keeps the exact-tree lookup, so the lanes' `## Conductor mode` instructions stay true
+as written. Any change to a tracked file, a doc included, is a new
 tree. A red run is recorded and never skipped on. Any argument vector other than the ledger's own
 (`SUITE_COMMAND` in `lib/ledger.mjs`) neither skips nor records, and outside the conductor the
 wrapper never reads the ledger.
