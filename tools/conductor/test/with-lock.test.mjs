@@ -3,14 +3,14 @@
 
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { readLedger } from "../lib/ledger.mjs";
-import { acquire, holder, isTestListing, pidAlive, runWrapped } from "../with-lock.mjs";
+import { acquire, holder, isTestListing, pidAlive, runWrapped, suiteLedger } from "../with-lock.mjs";
 
 const WITH_LOCK = resolve(dirname(fileURLToPath(import.meta.url)), "..", "with-lock.mjs");
 
@@ -184,10 +184,11 @@ test("any other argument vector neither skips nor records", async () => {
   assert.equal(readLedger(s.ledger).length, 1, "neither recorded");
 });
 
-test("without RLX_SUITE_LEDGER the wrapper neither reads nor writes a ledger, and its output is the command's own", async () => {
+test("outside this repository the wrapper neither reads nor writes a ledger, and its output is the command's own", async () => {
   const s = wrapperScratch();
   const { RLX_SUITE_LEDGER, ...env } = s.env;
-  // A ledger that records this tree green: without the variable the wrapper never looks at it.
+  // A ledger that records this tree green: with no variable and a scratch repository that is not the
+  // one this script lives in, the wrapper never looks at it.
   const tree = spawnSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: s.repo, encoding: "utf8" }).stdout.trim();
   writeFileSync(RLX_SUITE_LEDGER, JSON.stringify({ tree, cmd: "cargo nextest run --workspace", exit: 0, summary: "x", by: "gate", at: "2026-09-15T00:00:00Z", ms: 1 }) + "\n");
   for (let i = 0; i < 2; i++) await quietly(() => runWrapped(SUITE_ARGV, { env, cwd: s.repo, run: s.run }));
@@ -230,4 +231,92 @@ test("a .cmd shim named without its extension exits with the shim's own code, no
   const r = await run(["suite", "--", join(dir, "rlx-shim")], { RLX_LOCK_DIR: dir, RLX_LOCK_LOG: logFile });
   assert.equal(r.code, 3);
   assert.equal(JSON.parse(readFileSync(logFile, "utf8").trim()).exit_code, 3);
+});
+
+// Backlog 0232: a suite an operator ran by hand through the wrapper left no ledger record, so the
+// conductor's next gate on the same tree ran it again — 12.7 minutes, twice, on 2026-09-15.
+
+/**
+ * A scratch repository standing in for this one: the wrapper's own directory is inside it, and
+ * `state/` is gitignored there as it is here — otherwise the ledger the wrapper writes would itself
+ * dirty the tree and stop the next lookup ever matching.
+ */
+function handScratch() {
+  const s = wrapperScratch();
+  const selfDir = join(s.repo, "tools", "conductor");
+  mkdirSync(selfDir, { recursive: true });
+  writeFileSync(join(s.repo, ".gitignore"), "tools/conductor/state/\n");
+  const sh = (...a) => assert.equal(spawnSync("git", a, { cwd: s.repo, encoding: "utf8" }).status, 0, a.join(" "));
+  sh("add", ".gitignore");
+  sh("commit", "-q", "-m", "chore: ignore the conductor's runtime state");
+  const { RLX_SUITE_LEDGER, RLX_SUITE_LEDGER_BY, ...env } = s.env;
+  return { ...s, selfDir, env, ledger: join(selfDir, "state", "suite-ledger.jsonl") };
+}
+
+test("a full suite run by hand from the repository records itself as hand, and the next run on that tree skips", async () => {
+  const s = handScratch();
+  const first = await quietly(() => runWrapped(SUITE_ARGV, { env: s.env, cwd: s.repo, run: s.run, selfDir: s.selfDir }));
+  assert.equal(first.value, 0);
+  const [rec] = readLedger(s.ledger);
+  assert.equal(rec.by, "hand", "the writer says a person ran it");
+  assert.equal(rec.exit, 0);
+  assert.equal(rec.summary, "5 tests run: 5 passed");
+
+  // What the conductor's gate does next on the same tree: it finds the record and names it.
+  const second = await quietly(() => runWrapped(SUITE_ARGV, { env: { ...s.env, RLX_SUITE_LEDGER: s.ledger, RLX_SUITE_LEDGER_BY: "gate 0101-pre-review" }, cwd: s.repo, run: s.run }));
+  assert.equal(second.value, 0);
+  assert.equal(s.calls.length, 1, "the gate did not run it again");
+  assert.match(second.out, /is green in the suite ledger, run by hand at /);
+  assert.equal(readLedger(s.ledger).at(-1).green.by, "hand");
+});
+
+test("a hand run in a worktree of the repository records into the same ledger", async () => {
+  const s = handScratch();
+  // A lane is a worktree: `git rev-parse --git-common-dir` is the main checkout's either way.
+  const lane = join(freshDir(), "rlx-plan-0190");
+  assert.equal(spawnSync("git", ["worktree", "add", "-q", "-b", "plan-0190", lane], { cwd: s.repo, encoding: "utf8" }).status, 0);
+  const r = await quietly(() => runWrapped(SUITE_ARGV, { env: s.env, cwd: lane, run: s.run, selfDir: s.selfDir }));
+  assert.equal(r.value, 0);
+  assert.deepEqual(readLedger(s.ledger).map((e) => e.by), ["hand"]);
+});
+
+test("a hand run that starts or ends dirty records nothing", async () => {
+  const s = handScratch();
+  writeFileSync(join(s.repo, "b.txt"), "untracked\n");
+  await quietly(() => runWrapped(SUITE_ARGV, { env: s.env, cwd: s.repo, run: s.run, selfDir: s.selfDir }));
+  assert.equal(s.calls.length, 1, "it still ran");
+  assert.deepEqual(readLedger(s.ledger), [], "dirty at both ends: nothing recorded");
+
+  rmSync(join(s.repo, "b.txt"));
+  const dirtying = async (command, args, opts) => {
+    const out = await s.run(command, args, opts);
+    writeFileSync(join(s.repo, "c.txt"), "the run left this\n");
+    return out;
+  };
+  await quietly(() => runWrapped(SUITE_ARGV, { env: s.env, cwd: s.repo, run: dirtying, selfDir: s.selfDir }));
+  assert.deepEqual(readLedger(s.ledger), [], "clean at the start, dirty at the end: nothing recorded");
+});
+
+test("an explicit RLX_SUITE_LEDGER still selects that file, and a run outside any repository selects none", async () => {
+  const s = handScratch();
+  const explicit = join(freshDir(), "elsewhere.jsonl");
+  await quietly(() => runWrapped(SUITE_ARGV, { env: { ...s.env, RLX_SUITE_LEDGER: explicit, RLX_SUITE_LEDGER_BY: "0101-03-review" }, cwd: s.repo, run: s.run, selfDir: s.selfDir }));
+  assert.deepEqual(readLedger(explicit).map((e) => e.by), ["0101-03-review"]);
+  assert.deepEqual(readLedger(s.ledger), [], "the default was not written");
+
+  // Not a repository at all, and a different repository: neither is this one's evidence.
+  const nowhere = freshDir();
+  await quietly(() => runWrapped(SUITE_ARGV, { env: s.env, cwd: nowhere, run: s.run, selfDir: s.selfDir }));
+  const other = wrapperScratch();
+  await quietly(() => runWrapped(SUITE_ARGV, { env: s.env, cwd: other.repo, run: s.run, selfDir: s.selfDir }));
+  assert.deepEqual(readLedger(s.ledger), []);
+  assert.equal(s.calls.length, 3, "all three ran, none recorded");
+});
+
+test("suiteLedger is what decides, and says so for each case", () => {
+  const s = handScratch();
+  assert.deepEqual(suiteLedger(s.repo, { RLX_SUITE_LEDGER: "x.jsonl", RLX_SUITE_LEDGER_BY: "0101-02-review" }, s.selfDir), { path: "x.jsonl", by: "0101-02-review" });
+  assert.deepEqual(suiteLedger(s.repo, { RLX_SUITE_LEDGER: "x.jsonl" }, s.selfDir), { path: "x.jsonl", by: "a session" });
+  assert.deepEqual(suiteLedger(s.repo, {}, s.selfDir), { path: s.ledger, by: "hand" });
+  assert.equal(suiteLedger(freshDir(), {}, s.selfDir), null);
 });

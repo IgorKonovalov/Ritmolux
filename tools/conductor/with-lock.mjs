@@ -28,17 +28,56 @@ import {
   linkSync,
   mkdirSync,
   readFileSync,
+  realpathSync,
   statSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { git } from "./lib/git.mjs";
 import { appendRecord, appendSkip, cleanTree, greenRecord, isFullSuite, skipNotice, summaryLine } from "./lib/ledger.mjs";
 
 const GUARD_STALE_MS = 10_000;
+const SELF_DIR = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * The common git directory of the repository `dir` sits in, as one canonical absolute path, or null
+ * when it is in none. A worktree and its main checkout share one common directory, which is what
+ * makes a hand run in a lane record into the same ledger the conductor reads.
+ *
+ * Trap: the two sides of the comparison reach this from different roots — one from a cwd, one from
+ * this script's own path — and on Windows either may carry an 8.3 short component or a different
+ * case. `realpathSync.native` is what makes them the same string.
+ */
+function gitCommonDir(dir) {
+  const r = git(["rev-parse", "--git-common-dir"], dir);
+  if (r.code !== 0 || !r.stdout) return null;
+  try {
+    const real = realpathSync.native(resolve(dir, r.stdout));
+    return process.platform === "win32" ? real.toLowerCase() : real;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Where a wrapped full suite records what it saw and who it records as, or null for neither.
+ *
+ * `RLX_SUITE_LEDGER` wins: the conductor hands every session its own path and step label. Otherwise a
+ * run from inside this repository — the main checkout or any of its worktrees — records into
+ * `state/suite-ledger.jsonl` beside this script, as `hand`, so a gate an operator runs by hand counts
+ * and the next gate on that tree does not repeat it (ADR-0207). A run anywhere else records nothing:
+ * the wrapper is a general-purpose lock, and a suite on another repository's tree is not this one's
+ * evidence.
+ */
+export function suiteLedger(cwd, env, selfDir = SELF_DIR) {
+  if (env.RLX_SUITE_LEDGER) return { path: env.RLX_SUITE_LEDGER, by: env.RLX_SUITE_LEDGER_BY || "a session" };
+  const here = gitCommonDir(cwd);
+  return here && here === gitCommonDir(selfDir) ? { path: join(selfDir, "state", "suite-ledger.jsonl"), by: "hand" } : null;
+}
 
 export function lockDir(env = process.env) {
   return env.RLX_LOCK_DIR || join(tmpdir(), "rlx-conductor-locks");
@@ -220,13 +259,13 @@ export function isTestListing(command, args) {
  * `run(command, args, { capture })` stands in for spawning the command and resolves to
  * { code, output }.
  *
- * With RLX_SUITE_LEDGER set, a run of exactly `cargo nextest run --workspace` consults the suite
- * ledger (ADR-0207, lib/ledger.mjs): on a clean tree the ledger records green it prints one notice
- * naming the record and exits 0 without running, and otherwise it runs, recording the run when the
- * worktree was clean at both ends, under RLX_SUITE_LEDGER_BY as its writer. Any other argument
- * vector, and any run without the variable, neither skips nor records.
+ * A run of exactly `cargo nextest run --workspace` consults the suite ledger `suiteLedger` picks
+ * (ADR-0207, lib/ledger.mjs): on a clean tree the ledger records green it prints one notice naming
+ * the record and exits 0 without running, and otherwise it runs, recording the run when the worktree
+ * was clean at both ends. Any other argument vector, and any run with no ledger to consult, neither
+ * skips nor records.
  */
-export async function runWrapped(argv, { env = process.env, cwd = process.cwd(), run = spawnRun } = {}) {
+export async function runWrapped(argv, { env = process.env, cwd = process.cwd(), run = spawnRun, selfDir = SELF_DIR } = {}) {
   const sep = argv.indexOf("--");
   if (sep !== 1 || argv.length < 3) {
     process.stderr.write("usage: node with-lock.mjs <name> -- <command> [args...]\n");
@@ -237,12 +276,12 @@ export async function runWrapped(argv, { env = process.env, cwd = process.cwd(),
   // A listing starts at once, takes no lock and writes no lock log entry.
   if (isTestListing(command, args)) return (await run(command, args, { capture: false })).code;
 
-  const ledger = env.RLX_SUITE_LEDGER;
+  const ledger = suiteLedger(cwd, env, selfDir);
   const suite = Boolean(ledger) && isFullSuite(command, args);
   if (suite) {
-    const green = greenRecord(ledger, cleanTree(cwd));
+    const green = greenRecord(ledger.path, cleanTree(cwd));
     if (green) {
-      appendSkip(ledger, { green, by: env.RLX_SUITE_LEDGER_BY || "a session" });
+      appendSkip(ledger.path, { green, by: ledger.by });
       process.stdout.write(`with-lock: ${skipNotice(green)}\n`);
       return 0;
     }
@@ -263,7 +302,7 @@ export async function runWrapped(argv, { env = process.env, cwd = process.cwd(),
   lock.release();
   const heldMs = Date.now() - lock.acquiredAt;
   if (suite && startTree && cleanTree(cwd) === startTree) {
-    appendRecord(ledger, { tree: startTree, exit: code, summary: summaryLine(output), by: env.RLX_SUITE_LEDGER_BY || "a session", ms: heldMs });
+    appendRecord(ledger.path, { tree: startTree, exit: code, summary: summaryLine(output), by: ledger.by, ms: heldMs });
   }
   // Read back by the run terminal's stream reader (lib/live.mjs lockTimes); keep the shape.
   process.stderr.write(`with-lock: "${name}" waited ${(lock.waitedMs / 1000).toFixed(1)}s, held ${(heldMs / 1000).toFixed(1)}s\n`);

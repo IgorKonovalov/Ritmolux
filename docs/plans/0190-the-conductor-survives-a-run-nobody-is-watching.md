@@ -347,8 +347,8 @@ flowchart TD
 |---|---|---|---|
 | 1 — A session cannot lose its work in the background | dev | done | `a927fa5` |
 | 2 — The allowlist runs the commands a phase ordinarily needs | dev | done | `16f4219` |
-| 3 — A close that landed without an outcome is adopted | dev | done | committed with this row |
-| 4 — A suite run by hand counts | dev | not started | |
+| 3 — A close that landed without an outcome is adopted | dev | done | `ae3cc20` |
+| 4 — A suite run by hand counts | dev | done | committed with this row |
 | 5 — Time and spend are reported at one scope | dev | not started | |
 | 6 — The ASCII guarantee is asserted against input that could break it | dev | not started | |
 | 7 — The probe asks whether a headless session may edit `.claude/` | dev | not started | |

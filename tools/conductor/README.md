@@ -142,6 +142,15 @@ once, whatever `state/conductor.json` says.
 | `budget`, `api`, `no_outcome`, `bad_outcome` | Raise the budget in `local.json`, or wait out a usage limit. Resuming re-runs the step from what the plan log and `git` show. |
 | `merge_conflict`, `merge_failed`, `main_dirty` | Resolve it in the lane, or clean the main checkout. A resumed plan goes straight back to the fast-forward. |
 
+**A suite you run by hand counts.** Run one through the wrapper —
+`node tools/conductor/with-lock.mjs suite -- cargo nextest run --workspace` — and, because the
+wrapper can see it is running inside this repository or one of its worktrees, it records the result in
+`state/suite-ledger.jsonl` as `hand`. The conductor's next gate on that same tree finds the record,
+prints it and does not run the suite again (ADR-0207). The clean-at-both-ends rule is the same as for
+a session's run: a tree that was dirty when the suite started or when it finished records nothing,
+because the tree hash would not name what was tested. `RLX_SUITE_LEDGER` still overrides the choice,
+and a wrapped run in any other repository records nothing.
+
 **A close that landed without an outcome is adopted, never reviewed a second time.** A review session
 commits its repairs, its `done/` move, its version bump and its tag before it prints anything, so a
 session that dies after that leaves the branch closed and the record open. Before a run reviews
