@@ -47,6 +47,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0237 — the session allowlist bounds a deletion by four literal path shapes, so a path the shell expands escapes the lane](#0237--the-session-allowlist-bounds-a-deletion-by-four-literal-path-shapes-so-a-path-the-shell-expands-escapes-the-lane)
 - [0239 — three per-preset suites are 54 % of the workspace suite and grow with every shipped preset, because each rebuilds its own headless renderer](#0239--three-per-preset-suites-are-54--of-the-workspace-suite-and-grow-with-every-shipped-preset-because-each-rebuilds-its-own-headless-renderer)
 - [0240 — a merged plan never leaves `queue.json`, and the exemption that tolerates it is keyed on a gitignored file](#0240--a-merged-plan-never-leaves-queuejson-and-the-exemption-that-tolerates-it-is-keyed-on-a-gitignored-file)
+- [0241 — the session allowlist is asserted against a model of the CLI's matcher, and the first unattended run falsified the model on a case it asserts](#0241--the-session-allowlist-is-asserted-against-a-model-of-the-clis-matcher-and-the-first-unattended-run-falsified-the-model-on-a-case-it-asserts)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -1906,3 +1907,79 @@ Shapes, none decided, and the tension is real:
 preflight names the plan and refuses, which is recoverable in one edit. It is filed because the
 reason it has never fired is that the queue was pruned by hand twice, and nothing records that as
 something anyone must keep doing.
+
+## 0241 — the session allowlist is asserted against a model of the CLI's matcher, and the first unattended run falsified the model on a case it asserts
+
+`test/settings.test.mjs` decides every case through a `decide()` it implements itself, and says so in
+its own header: *"`decide` below models the CLI's documented rule matching … It is a model of the
+CLI, not the CLI: it pins what this file means, and a CLI that changed its matcher would not turn it
+red."* One clause of that model is that **a compound command is split at `&&`, `||`, `;`, `|`, `&`
+and newlines and every part must be allowed on its own**, from which two cases follow:
+
+```js
+{ tool: "PowerShell", command: "cd studio; npm run typecheck", allowed: false, why: "`cd` is not a command a session may run" },
+{ tool: "Bash",       command: "cd studio && npm run typecheck", allowed: false, why: "same, in the other shell" },
+```
+
+**Step `0191-01-implement`, 2026-09-16, falsified that.** Under `settings.conductor.json` exactly as
+the conductor passes it, on CLI 2.1.273, these **ran**:
+
+```
+RAN     cd "C:/.../rlx-plan-0191" && node --test tools/conductor/test/ledger.test.mjs
+RAN     cd "C:/.../rlx-plan-0191" && git status --porcelain
+RAN     cd "C:/.../rlx-plan-0191" && rm argvcheck.cjs && git status --porcelain
+DENIED  cd /tmp && printf "..." > argvcheck.cjs && node argvcheck.cjs -P fast
+DENIED  cd "C:/.../rlx-plan-0191" && node --test ... | sed -n '/not ok 16/,/^  \.\.\./p' | head -40
+```
+
+26 of that step's 36 shell calls carried a `cd`, and **4 were denied**. Under the model all 26 should
+have been: `cd` matches no allow rule. The CLI is evidently doing something the model does not
+describe — the denials correlate with `/tmp` (a path outside the lane) and with `sed` / `head` (verbs
+on no rule), not with `cd` itself. **What the real rule is has not been established**, and this entry
+does not guess.
+
+Two consequences, and the second is the one that matters:
+
+- **Plan 0190 Phase 2's prompt half is not working, and now we know why.** `prompts/implement.md` says
+  *"Shell calls run one command per call … No `cd`"*. The session ignored it 26 times in one step
+  because ignoring it **works** — nothing teaches otherwise. Compound rates across the 15 recorded
+  sessions run 12 % (`0182-01`) to 89 % (`0177-04`), and 0191's 81 % sits inside that spread rather
+  than below it, so the rule moved nothing measurable. One post-rule session is not a trend; it is
+  enough to say the rule is not self-enforcing.
+- **The same model backs the safety claims.** `README.md`'s *"a path that leaves the lane is refused,
+  whatever it is for"*, and every `rm`/`Remove-Item` deny case, are asserted through `decide()` and
+  not against the CLI. A model already known to be wrong about one compound shape is a weak floor
+  under *"a deletion whose path leaves the worktree is refused"*. This is a different gap from
+  backlog 0237, which is about shell **expansion**; this one is about whether
+  the matcher splits compounds at all. **Neither is measured.**
+
+Shapes, none decided:
+
+- **Probe the matcher.** `spike/probe.mjs` already runs sessions under `settings.conductor.json` and
+  records what the CLI did; a session that attempts a fixed list of compound and escaping shapes
+  turns `decide()` from a model into a transcript. This is the one that answers the question rather
+  than working around it, and it is the same evidence discipline ADR-0208 applies to the version
+  table.
+- **Assert the deny half only, and assert it hard.** Keep `decide()` for the allow cases, where being
+  wrong costs a refused command, and move every negative case behind a probe, where being wrong costs
+  a deleted directory.
+- **Stop saying it in the prompt and let the allowlist be the whole contract.** If `cd <lane> && …`
+  is in fact safe, the prompt rule is noise the session correctly ignores; drop it and keep the
+  bound where it is enforced.
+
+- **Raised:** 2026-09-16, from the first unattended two-lane run, by reading `0191-01-implement`'s
+  transcript after the phase landed. **Owner if taken:** `architect` (what the negative cases must be
+  asserted against), then `dev`.
+- **Verified 2026-09-16** — the model asserts the shape production ran:
+  `present: cd studio && npm run typecheck in: tools/conductor/test/settings.test.mjs`
+- **Verified 2026-09-16** — and says of itself that it is not the CLI:
+  `present: It is a model of the CLI, not in: tools/conductor/test/settings.test.mjs`
+- **Verified 2026-09-16** — the prompt rule the sessions do not follow:
+  `present: one command per call in: tools/conductor/prompts/implement.md`
+
+### Priority
+
+**Medium**, and it would be Low but for the second consequence. Nothing has gone wrong: the denials
+cost turns, the sessions recovered, all three phases of 0191 committed. It is filed because the
+negative cases are the ones worth being right about, and the run just demonstrated that the thing
+asserting them can be wrong about a case it states outright.
