@@ -129,7 +129,7 @@ pub struct ParamSpec {
     /// Whether the value carries an integer meaning (ADR-0180 rule 2).
     ///
     /// Read back out with [`kind_of`], and enforced by
-    /// `declared_params_match_set_param` in `core/tests/preset.rs`, which
+    /// `declared_params_match_set_param` in `core/tests/suite/preset.rs`, which
     /// compares this against a hand-kept roster — a field nothing checks is a
     /// field that drifts.
     pub kind: ParamKind,
@@ -245,6 +245,7 @@ pub fn family_params(label: &str) -> &'static [FamilyParam] {
         "parametric_curve" => lines::parametric::FAMILY_PARAMS,
         "analytic_field" => analytic_field::FAMILY_PARAMS,
         "cellular" => cellular::FAMILY_PARAMS,
+        "attractor" => particles::FAMILY_PARAMS,
         _ => &[],
     }
 }
@@ -275,13 +276,15 @@ pub fn family_params(label: &str) -> &'static [FamilyParam] {
 /// golden baseline moves. Folding a `0.18` in would sum `0.18 · dt` instead and
 /// drift in the last bits of every capture.
 ///
-/// # It steps in `update`, never in `advance`
+/// # It steps where this frame's rate has landed
 ///
-/// The per-frame order is `set_time` → `advance` → `reset_params` → `set_param`
-/// → `update` (`core/src/render/mod.rs`), so a scene stores the `dt` that
-/// [`Scene::advance`] hands it and integrates in [`Scene::update`], where *this*
-/// frame's rate has landed. Integrating in `advance` would use the previous
-/// frame's.
+/// The per-frame order is `reset_params` → `set_param` → `set_time` → `advance`
+/// → `update` (`core/src/render/evaluate.rs`), so by the time either
+/// [`Scene::advance`] or [`Scene::update`] runs, *this* frame's rate is the one
+/// the scene holds. A scene may step a phase in either; the roster's rate
+/// scenes store the `dt` `advance` hands them and step in `update`. The trap is
+/// the sequence itself: moving `advance` back ahead of the bindings would make a
+/// step taken there integrate the last frame's rate.
 ///
 /// The type is arithmetic with no device in it, which is what keeps every rate
 /// in the engine testable on the CPU without rendering anything.
@@ -655,8 +658,12 @@ pub(crate) trait Scene {
     /// the seam instead — a scene must never apply this twice.
     ///
     /// Only a scene that **presents premultiplied over the backdrop** (ADR-0026 —
-    /// the reaction-diffusion, attractor and fragment-field presents) has anything
-    /// to do here. The additive families draw through
+    /// the reaction-diffusion, cellular, attractor and warp-mesh presents, and the
+    /// fragment-field, analytic-field, shape-field and shape-collage fullscreen
+    /// fields) has anything to do here. Such a scene writes `occlude` into its
+    /// alpha and its present pipeline blends `PREMULTIPLIED_ALPHA_BLENDING`, so
+    /// the backdrop resolves as `scene + bg * (1 - occlude)`; at the literal `1.0`
+    /// that blend is exactly a replace. The additive families draw through
     /// [`gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE`](crate::render::gpu::ADDITIVE_LIGHT_SATURATING_COVERAGE),
     /// whose colour destination factor is `One`: with no stage active their light
     /// already adds to the backdrop rather than replacing it, so there is no
@@ -686,6 +693,13 @@ pub(crate) trait Scene {
     /// fixed-timestep accumulator here and a CPU-integrated scene (the swarm)
     /// scales its motion by `dt`, so both look identical over wall-clock time on
     /// any refresh rate. Stateless, purely `time`-driven scenes ignore it.
+    ///
+    /// **Called after this frame's parameters are applied** — after
+    /// [`reset_params`](Self::reset_params), every binding, the live overrides
+    /// and the per-vertex table, and after [`set_time`](Self::set_time) —
+    /// and immediately before [`update`](Self::update). A value a scene reads
+    /// here is the one this frame bound, so a rate may be integrated in
+    /// `advance` or in `update` and both are correct (ADR-0198).
     ///
     /// **`dt` is finite and strictly positive.** The renderer guarantees it,
     /// substituting [`FALLBACK_DT`] for a degenerate delta before this is called

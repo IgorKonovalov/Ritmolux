@@ -162,7 +162,7 @@ pub(crate) const DEFAULT_FB_CENTER: f32 = 0.5;
 /// Both sinks declare these names in their own `PARAMS` — the trails stage as
 /// part of the composite's global vocabulary, the attractor as part of its
 /// system's — because each has a `set_param` match that must be checkable against
-/// its own list (`core/tests/preset.rs`'s drift guard reads the source text). This
+/// its own list (`core/tests/suite/preset.rs`'s drift guard reads the source text). This
 /// const is what those two lists are checked *against*, so "one vocabulary" is a
 /// test rather than a comment.
 pub(crate) const PARAMS: &[&str] = &[
@@ -515,7 +515,7 @@ mod tests {
     /// Both sinks declare **exactly** the shared `fb_*` vocabulary — no more, no
     /// less.
     ///
-    /// `core/tests/preset.rs`'s drift guard cannot see these names: it reads
+    /// `core/tests/suite/preset.rs`'s drift guard cannot see these names: it reads
     /// `set_param`'s match arms out of the source text, and both sinks *delegate*
     /// the seven to [`Transform::set_param`] rather than matching them. That is the
     /// right factoring — one implementation of what `fb_dx` means — and this is

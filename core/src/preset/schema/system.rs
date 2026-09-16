@@ -63,7 +63,7 @@ pub enum SystemKind {
 /// match over the enum, which fails the build when a variant has no entry.
 ///
 /// The param lists themselves live beside each scene's own `set_param` match
-/// (`declared_params_match_set_param` in `core/tests/preset.rs` guards that
+/// (`declared_params_match_set_param` in `core/tests/suite/preset.rs` guards that
 /// pair); this is where they are gathered for the loader's typo check
 /// (ADR-0020). They do **not** include the global compositing params, which any
 /// preset may bind whatever its system -- [`is_known_param`] unions those in.

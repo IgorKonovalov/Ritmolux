@@ -1,4 +1,4 @@
-# FEEDBACK FIXTURE - do not tune; the second-sink guards in core/tests/feedback.rs
+# FEEDBACK FIXTURE - do not tune; the second-sink guards in core/tests/suite/feedback.rs
 # read it. Plan 0046 Phase 3, ADR-0048.
 #
 # BOTH SINKS AT ONCE, from one binding. The attractor owns an accumulation and so

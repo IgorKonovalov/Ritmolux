@@ -298,14 +298,30 @@ implementer run.
 - **Never ask a question.** Nobody is there. Everything that would stop a human-started session —
   "When the plan is wrong", a `human` phase inside the range, a stop condition the plan states, a
   question only the owner can answer, a check you cannot make green inside the phase — ends this one
-  with a `parked` outcome naming it. Commit finished work first and leave the tree clean. A park is
+  with a `parked` outcome naming it. Commit finished work first and leave the tree clean: put back a
+  file the session did not mean to change, such as a golden a test run re-encoded, with
+  `git restore <path>` (`git checkout` and `git stash` are refused). `resume` refuses a dirty lane. A park is
   the correct result, not a failure; working around the plan is the failure.
 - **Every `cargo nextest` or `cargo test` runs through the suite lock**:
   `node <path from RLX-CONDUCTOR-SUITE-LOCK> suite -- cargo nextest run ...`. A hook denies the bare
   form in this mode.
-- **On the last implementer run**, do Step 4 — full suite under the lock, the close block committed —
-  and then print the outcome block **instead of** the three-line pointer. The conductor starts the
-  review.
+- **Never attempt an `Edit` or a `Write` under `.claude/`.** The CLI denies one to a headless session
+  whatever `settings.conductor.json` allows — measured on 2.1.273, every spelling, while a read is
+  allowed and a write elsewhere in the worktree succeeds ([ADR-0210](../../../docs/adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md)).
+  A phase whose `Files touched` names such a path never reaches you: the conductor parks the plan in
+  front of it, with the edit as the detail, and it is the owner's. If a phase turns out to need one
+  anyway, park `plan_wrong` naming the file and the edit rather than writing it some other way.
+- **Never start a command in the background, and never arm a `Monitor`.** Nothing re-invokes a
+  headless session: backgrounding a long command and ending the turn kills it and loses its result,
+  after the commits already made have landed. A long command runs in the **foreground** and the
+  session's own timeout is what bounds it. A hook denies `run_in_background`, `settings.conductor.json`
+  denies `Monitor`, and a background command still unfinished when the session ends parks the plan
+  `lost_background` whatever the outcome claims.
+- **On the last implementer run**, do Step 4 **without its step 0**: do not run the full workspace
+  suite. The conductor's `pre-review` gate runs it next on the same code, and a red there parks the
+  plan as `gate_red` (ADR-0207). Commit the close block, with its `Full suite:` bullet reading
+  *owed to the conductor's pre-review gate (ADR-0207)*. Then print the outcome block **instead of**
+  the three-line pointer. The conductor starts the review.
 
 **`fix`** — the prompt names the plan, the round, the review file and its numbered findings.
 

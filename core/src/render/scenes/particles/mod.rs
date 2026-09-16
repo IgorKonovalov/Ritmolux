@@ -68,7 +68,7 @@ mod shaders;
 // `family::` segment. Everything else is `pub(super)` in its new file: exactly
 // the visibility it had as a private member of this module, not `pub(crate)`,
 // which would widen it.
-pub use family::{AttractorFamily, Basis};
+pub use family::{AttractorFamily, Basis, FAMILY_PARAMS};
 
 use encode::*;
 use family::*;
@@ -85,7 +85,7 @@ use super::{Phase, Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
 use crate::render::feedback::{self, FeedbackConfig, PingPongField};
 use crate::render::palette::{self, Palette};
-use crate::render::scenes::{ParamKind, ParamSpec, default_of};
+use crate::render::scenes::{FamilyParam, FamilyRange, ParamKind, ParamSpec, default_of};
 
 /// Compute workgroup size (1D). 64 is a safe, portable default across DX12/Metal.
 const WORKGROUP: u32 = 64;
@@ -1703,11 +1703,11 @@ impl Scene for AttractorScene {
             self.d = d;
         }
 
-        // Integrate the spin. **Here and not in `advance`**: the renderer calls
-        // `advance` before it routes this frame's bindings, so `self.spin` is
-        // last frame's value there and this frame's here. `self.dt` is the real
-        // elapsed seconds `advance` recorded, so the phase stays a pure function
-        // of the injected `dt` sequence.
+        // Integrate the spin. The renderer routes this frame's bindings before it
+        // calls `advance` and then this `update` (ADR-0198), so `self.spin` is this
+        // frame's value here. `self.dt` is the real elapsed seconds `advance`
+        // recorded, so the phase stays a pure function of the injected `dt`
+        // sequence.
         self.spin_time.step(self.spin, self.dt);
 
         // Rising-edge detect on `reseed` (a beat/onset expression): **disturb** the

@@ -1,8 +1,8 @@
 # ADR-0201 — A fullscreen scene presents premultiplied over the backdrop, and the chain's occlude value is the only switch
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-15
 > **Date:** 2026-09-14
-> **Related plan(s):** [0185](../plans/0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage.md)
+> **Related plan(s):** [0185](../plans/done/0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage.md)
 > **Extends:** [0026](0026-full-composite-coverage-fullscreen-scenes.md) (full composite coverage for
 > fullscreen scenes), [0085](0085-how-much-a-scene-occludes-the-backdrop-is-one-number.md) (how much a
 > scene occludes the backdrop is one number)

@@ -56,7 +56,7 @@
 //! [`schema::Preset`](super::schema::Preset)); this module only mixes it in.
 
 // Hot-path panic-denial pragma: `eval` runs per parameter per frame. This file
-// is a named target in the hygiene guard's scan (tests/hygiene.rs), so the
+// is a named target in the hygiene guard's scan (tests/suite/hygiene.rs), so the
 // pragma is enforced here even though the rest of preset/ is load-time only.
 #![deny(
     clippy::unwrap_used,
@@ -1917,7 +1917,7 @@ mod tests {
 
     /// The slot-base constants are the one place this module trades a name for a
     /// number, so they get the assertion. Inline rather than in
-    /// `core/tests/preset.rs` because both constants are private — and they
+    /// `core/tests/suite/preset.rs` because both constants are private — and they
     /// should stay private, which makes this the only place the claim is
     /// checkable.
     ///

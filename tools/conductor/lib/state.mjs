@@ -9,6 +9,8 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
+import { usageReading } from "./live.mjs";
+
 export function emptyState() {
   return { version: 1, runs: [], lanes: {}, plans: {} };
 }
@@ -75,9 +77,14 @@ export function startStep(stateDir, state, plan, step) {
   return entry;
 }
 
+/**
+ * Records a step's end. `entry.usage` keeps the session's first and last usage reading, each
+ * { status, five, seven } in the one shape usageReading reads out of either CLI shape, or null.
+ */
 export function endStep(stateDir, state, entry, result) {
   entry.ended = new Date().toISOString();
   entry.result = result;
+  entry.usage = { first: usageReading(result?.rateLimitFirst ?? null), last: usageReading(result?.rateLimit ?? null) };
   saveState(stateDir, state);
 }
 

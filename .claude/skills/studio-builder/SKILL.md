@@ -201,12 +201,27 @@ mode. Where this section and the rest of the skill disagree, this section wins, 
 - **Never invoke `dev` (or any skill) through the Skill tool.** The conductor starts the next run.
 - **Never ask a question.** A wrong plan, a `human` phase in the range, a stop condition the plan
   states, a question only the owner can answer, or a check you cannot make green inside the phase ends
-  the session with a `parked` outcome. Commit finished work first; leave the tree clean.
+  the session with a `parked` outcome. Commit finished work first; leave the tree clean, putting back a
+  file the session did not mean to change with `git restore <path>` (`git checkout` and `git stash` are
+  refused). `resume` refuses a dirty lane.
 - **Every `cargo nextest` / `cargo test`** — the version test after a sync, a player-side check — runs as
   `node <path from RLX-CONDUCTOR-SUITE-LOCK> suite -- cargo ...`. A hook denies the bare form.
+- **Never attempt an `Edit` or a `Write` under `.claude/`.** The CLI denies one to a headless session
+  whatever `settings.conductor.json` allows — measured on 2.1.273, every spelling, while a read is
+  allowed and a write elsewhere in the worktree succeeds ([ADR-0210](../../../docs/adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md)).
+  A phase whose `Files touched` names such a path never reaches you: the conductor parks the plan in
+  front of it, and it is the owner's. If a phase turns out to need one, park `plan_wrong` naming the
+  file and the edit.
+- **Never start a command in the background, and never arm a `Monitor`.** Nothing re-invokes a headless
+  session: backgrounding a long command — an `npm run build`, a suite — and ending the turn kills it and
+  loses its result, after the commits already made have landed. It runs in the **foreground**, bounded by
+  the session's own timeout. A hook denies `run_in_background`, `settings.conductor.json` denies
+  `Monitor`, and a background command unfinished at the end parks the plan `lost_background` whatever the
+  outcome claims.
 - **On the plan's last implementer run**, write the `## Implementation log` close block the way `dev`'s
-  Step 4 does (`.claude/skills/dev/references/close-ceremony-prompt.md` is the field guide), the full
-  suite under the lock, committed — and print the outcome instead of asking for a fresh `/architect`.
+  Step 4 does (`.claude/skills/dev/references/close-ceremony-prompt.md` is the field guide), committed,
+  **without running the full workspace suite**: its `Full suite:` bullet reads *owed to the conductor's
+  pre-review gate (ADR-0207)*. Then print the outcome instead of asking for a fresh `/architect`.
 - **`fix` mode**: fix every `blocker` and `major` the named review lists, one `fix(studio): …` commit
   per finding, one `### Notes` line each; park with `plan_wrong` on a finding you judge wrong.
 

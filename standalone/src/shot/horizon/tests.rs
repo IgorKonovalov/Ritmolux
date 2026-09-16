@@ -41,7 +41,7 @@ fn sample(frame: u32, coverage: f32, peak_to_mean: f32, motion: Option<f32>) -> 
 /// This is one of the two determinism claims Plan 0085 Phase 1 asserts rather
 /// than assumes, and it is the half that can be settled without a GPU — the
 /// other (the same request rendering the same pixels twice) lives in
-/// `standalone/tests/shot_cli.rs`.
+/// `standalone/tests/suite/shot_cli.rs`.
 #[test]
 fn a_rows_frame_index_does_not_depend_on_the_horizon_requested() {
     let short = sample_frames(2.0, 30.0).expect("a 2-minute horizon");

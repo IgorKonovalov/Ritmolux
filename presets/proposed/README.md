@@ -42,7 +42,7 @@ $env:RLX_PRESET_DIR = "./presets/proposed"; cargo run -p standalone --release
 ## The three verdicts
 
 - **Keep** — `git mv` it into `presets/`. That move is a `dev` act, not an author one, and it owes
-  two things `pending/README.md` spells out and `core/tests/hygiene.rs` refuses a push without: a
+  two things `pending/README.md` spells out and `core/tests/suite/hygiene.rs` refuses a push without: a
   gallery card in `scripts/docs-shots.mjs` plus its committed render, and a filename in the shipped
   `<system>_<look>.toml` form. Files here are already named that way, so a keeper needs no rename.
 - **Tune** — leave it here and route it back to `preset-author`.

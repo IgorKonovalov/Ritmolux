@@ -103,10 +103,12 @@ Next: start a fresh session and run `/architect close plan 0001`
 
 A session the conductor started (`RLX-CONDUCTOR-MODE: implement` in its system prompt, ADR-0205) has
 nobody to hand a pointer to — the conductor starts the review as its own process. So the last
-implementer run of a conductor-run plan writes and commits the close block exactly as above, full
-suite under the suite lock included, and then prints its `rlx-outcome` block **in place of** the three
-lines. Everything this guide says about the log's content is unchanged: the reviewer that reads it is
-still fresh, which is the whole reason the log stays thin.
+implementer run of a conductor-run plan writes and commits the close block exactly as above, and then
+prints its `rlx-outcome` block **in place of** the three lines. **It does not run the full workspace
+suite**: the conductor's `pre-review` gate runs it next on the same tree, so the `Full suite:` bullet
+reads *owed to the conductor's pre-review gate (ADR-0207)*. Everything this guide says about the log's
+content is unchanged: the reviewer that reads it is still fresh, which is the whole reason the log
+stays thin.
 
 ## What NOT to include
 

@@ -1,0 +1,632 @@
+# 0177 — The test tree stops touching the machine and stops costing its disk
+
+> **Status:** done (2026-09-15) — phases `feff21c`, `3510ab9`, `11636f2`, `375f275`, `d9aee86`,
+> `227bb8d`, `7b4a66c`, `9b04453`, `4656040`; conductor-run Mode 4 review round 1, no blockers, no
+> majors, four minors and two nits, two minors and both nits repaired at the close; full suite green
+> on the ledger, `cargo doc -D warnings` clean. ADR-0204 accepted with an Outcome. Version 0.125.0.
+> **Created:** 2026-09-14
+> **Owner skill(s):** `dev`, `studio-builder`
+> **Related ADRs:** [0204](../../adrs/0204-a-cheap-integration-test-shares-one-binary-and-a-test-that-needs-its-own-stays-its-own.md) (accepted, this plan),
+> [0193](../../adrs/0193-a-test-that-reads-the-clock-runs-alone.md), [0156](../../adrs/0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md),
+> [0147](../../adrs/0147-the-shared-artifact-store-is-revoked-and-the-linker-stays.md), [0033](../../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md)
+> **Closes:** design-backlog 0181, 0161, 0213, 0179, 0183, 0184, 0182
+> **Sequenced after:** [Plan 0174](0174-the-clock-reading-tests-run-alone.md) closes. That plan owns
+> `.config/nextest.toml`, is editing `standalone/tests/stream_show.rs` and `control_loopback.rs` in the
+> main checkout right now, and its Phase 3 adds the `hygiene.rs` guard this plan extends.
+
+## TL;DR
+
+The test suite reaches outside the repository and fills the disk it runs on. This plan fixes both
+halves, and each fix carries a guard so the rule stops depending on someone sweeping for it.
+
+- **The machine half.** Four subprocess test files hand the spawned player the developer's real
+  per-user data root: `help_cli`, `stream_pipe`, `stream_split` and `shot_cli`. Between them they
+  migrate the operator's app directory and append to its `diagnostics.log`. They also read its
+  `config.toml` and preset directory as test input, and bind whatever `[control]` port that config
+  names. One source file still builds a cargo
+  output path from the source tree, and four studio tests do the same.
+- **The disk half.** The incremental cache and `deps/` both grow without bound (backlog 0183, 0184),
+  and cargo links 59 test binaries where 23 would do (backlog 0182).
+
+Also in scope: one test that compares rows without checking the ruler they were measured against
+(backlog 0213), and the one CI gate with no local counterpart, `cargo doc` (backlog 0179).
+
+## Context & problem
+
+Seven backlog entries, all filed by close reviews, one family: **a test or a build step that is
+correct on the machine that wrote it and says nothing about any other.**
+
+**The data root, re-derived for this plan, is wider than backlog 0181 says.** `run()` in
+`standalone/src/run.rs` answers `--help`, `--schema` and `--check` before `migrate_app_dir()`, so
+those spawns are clean. Every other spawn gets past that point, and the data root comes from
+`standalone::preset_data_root()` (`standalone/src/lib.rs`): `%APPDATA%` on Windows,
+`$HOME/Library/Application Support` on macOS, `$XDG_DATA_HOME` or `~/.local/share` elsewhere.
+
+| file | spawn | reaches |
+|---|---|---|
+| `help_cli.rs` | `--preset <unknown>` (two cases) | migration, `config.toml` and its `[control]` bind, the preset directory's names |
+| `stream_split.rs` | `--preset __no_such_preset_0158__` (every case) | the same as `help_cli` |
+| `stream_pipe.rs` | `--stream --sink stdout ...` (three cases) | migration, `config.toml` and its `[control]` bind, `diagnostics.log` |
+| `shot_cli.rs` | the `shot` example, in every case without `--presets`/`--preset-file` | the operator's preset directory as test input |
+| `stream_show.rs` | already isolated: sets `APPDATA`, `HOME`, `XDG_DATA_HOME` | nothing |
+
+`stream_split` and `shot_cli` are new here. The migration is what backlog 0181 filed, but reading
+the operator's `config.toml` is the sharper problem. `run()` binds `config.control` before it refuses
+an unknown `--preset` (`standalone/src/run.rs`, `bind_control` ahead of `startup_preset_names`), so
+the developer's `config.toml` changes what these tests do, and nobody reading the tests can see it.
+
+**The target directory.** `standalone/tests/stream_show.rs` `scratch()` builds
+`CARGO_MANIFEST_DIR/../target/tests/stream-show`, the exact defect backlog 0160 repaired in
+`shot_cli.rs` (Plan 0136 Phase 8). Backlog 0161's own text claims no committed violator remains, and
+that claim is false. On the studio side, `windowless.test.ts`, `templates.test.ts`, `fields.test.ts`
+and `grammar.test.ts` each carry a copy of `join(ROOT, 'target', profile, name)`, and
+`templates.test.ts` also writes scratch files under `ROOT/target/tests/`. Since ADR-0147 all of
+these resolve correctly **by coincidence**. The rule, *"Never hardcode `<repo>/target` in a script
+or a test"* (`.claude/skills/dev/references/project-context.md`), has no carrier.
+
+**The disk.** Backlog 0183 found 8.2 GB across 509 incremental crate-hash directories in one day and
+could not say whether that is per tool or per invocation. Backlog 0184 found 13 GB of retained
+`deps/` generations under a pinned stable toolchain that has no `cargo clean --gc`. Backlog 0182
+priced the per-file links. ADR-0204 records why only a partial fold is available and which files
+stay out.
+
+**Two smaller entries.**
+- Backlog 0213: `a_horizon_is_reproducible_and_does_not_depend_on_its_own_length` never compares the
+  two runs' `ground`, which the horizon report writes as `"ground":[r,g,b]`
+  (`standalone/src/shot/horizon.rs`).
+- Backlog 0179: `cargo doc --workspace --no-deps` under `RUSTDOCFLAGS: -D warnings` runs in CI
+  (`.github/workflows/ci.yml`) and nowhere locally. The comment there excludes it from the hook
+  against a "~28 s" budget. That figure is stale: Plan 0174 Phase 1 measured the hook's `-P fast`
+  step alone at 398.2 s.
+
+## Decision
+
+Nine phases in two runs: eight `dev` phases, then one `studio-builder` phase. Each defect is fixed
+where it lives, and each rule gains a guard in a suite its own lane already runs.
+
+- **Data-root isolation is one helper, and a guard holds every spawn to it.** `standalone/tests/common/mod.rs`
+  hands out a `Command` whose `APPDATA`, `HOME` and `XDG_DATA_HOME` all point at a per-call scratch
+  directory under `CARGO_TARGET_TMPDIR`. `stream_show` already sets those three. A new
+  `core/tests/hygiene.rs` check fails when any file under `standalone/tests/` builds a `Command` for
+  `CARGO_BIN_EXE_ritmolux` or the `shot` example outside that helper. We rejected per-file `.env()`
+  calls (backlog 0181's proposal): that is the state `stream_show` already had, and it did not stop
+  `stream_split` and `stream_pipe` from being written without it.
+- **The target rule is carried by two guards in the two lanes' own suites.**
+  - Rust: `hygiene.rs` fails on a string literal in any workspace `tests/` source that has `target` as
+    a whole path segment. On 2026-09-14 the only such literal is `stream_show.rs`'s. Every other
+    `target` inside a test string is prose ("the renderer's configured target").
+  - Studio: an `eslint` `no-restricted-syntax` rule in `studio/eslint.config.mjs` rejects a `'target'`
+    literal passed to `join`.
+
+  We rejected a new Node gate: `hygiene.rs` already reads files outside `core/` (checks (d) and (e)),
+  and a studio rule belongs in the lint the studio lane already runs. We rejected
+  `check-comment-hygiene.mjs`, which reads comments and must stay blind to code.
+- **Disk is measured, then pruned, then folded, in that order**, because each step's measurement is
+  the baseline for the next. The prune is a script, `scripts/prune-target.mjs`. Its live set is
+  **what cargo itself reports**: the everyday loop's commands run with `--message-format=json`, and
+  every `compiler-artifact` `filenames` entry, fresh or not, is live. Anything in `deps/` not in that
+  set goes. We rejected `cargo-sweep`: it is a tool install, and its age heuristic would not see the
+  orphaned `lmv_*` class that backlog 0184 names. We rejected an mtime rule because a fresh unit is
+  not rewritten, so its mtime is old. We rejected unpinning the toolchain for `-Zgc`.
+- **`cargo doc` gets a close-ceremony line now, and a hook step only if it earns one.** The ceremony
+  line is architect-owned skill text. The architect lands it when approving this plan, so it is not a
+  phase. Phase 7 measures a scoped hook step against a rule stated as a same-kind comparison.
+
+## Architecture diagram
+
+```mermaid
+flowchart LR
+    subgraph tests["standalone/tests + studio tests"]
+        H[common::player] -->|APPDATA HOME XDG_DATA_HOME| S[(scratch under CARGO_TARGET_TMPDIR)]
+        T[scratch paths] --> S
+    end
+    subgraph guards["guards"]
+        G1["hygiene.rs: every spawn via common::player"]
+        G2["hygiene.rs: no 'target' path literal in tests/"]
+        G3["eslint: no join(.., 'target', ..)"]
+    end
+    subgraph disk["target/"]
+        M[Phase 4 churn + generations measured] --> P["prune-target.mjs: live set = cargo JSON"]
+        P --> F["Phase 8: tests/suite fold (ADR-0204)"]
+    end
+    G1 -.-> H
+    G2 -.-> T
+    G3 -.-> T
+```
+
+## Implementation phases
+
+### Phase 1 — The spawned player gets a scratch data root
+
+- **Owner skill:** dev
+- **What:** `standalone/tests/common/mod.rs` provides the one constructor for a spawned
+  workspace binary. It sets `APPDATA`, `HOME` and `XDG_DATA_HOME` to a fresh per-call directory under
+  `CARGO_TARGET_TMPDIR`, and the caller adds args, `current_dir` and pipes. `help_cli`,
+  `stream_split`, `stream_pipe`, `shot_cli` and `stream_show` spawn through it; `stream_show` drops
+  its own three `.env()` calls. `configuration_doc` and `preset_check` spawn only pre-migration queries
+  but go through the helper too, so the guard has no exemption list. `shot_cli.rs`'s `shot_bin()` locator moves into
+  the helper beside it. `hygiene.rs` gains the check that no file under `standalone/tests/` other
+  than `common/mod.rs` names `CARGO_BIN_EXE_ritmolux` or `shot_bin`.
+  The module allows dead code, as `core/tests/common/mod.rs` does, because not every file uses every
+  helper and `-D warnings` would otherwise fail the build.
+- **Files touched:** `standalone/tests/common/mod.rs` (new); `standalone/tests/{help_cli,stream_split,stream_pipe,shot_cli,stream_show,configuration_doc,preset_check}.rs`;
+  `core/tests/hygiene.rs` (a new check after Plan 0174's (g)).
+- **Done when:**
+  - On a machine whose real data root holds a `Ritmolux/` directory, a full `cargo nextest run -p standalone`
+    leaves that directory's contents and mtimes unchanged: no migration, no new seeded file, no
+    `diagnostics.log` row. Checked by listing the directory with mtimes before and after the run, and
+    recorded in the log as the two listings' diff (empty).
+  - The guard fails on a seeded copy of today's `stream_pipe.rs` `run` helper (a bare
+    `Command::new(env!("CARGO_BIN_EXE_ritmolux"))`), and names the file and line. The negative control
+    runs inside the test against an in-memory string, the way (c) and (f) already test themselves.
+  - Every standalone test's assertions are unchanged. No test relaxes a `contains` or deletes a case
+    to pass under the scratch root. A `shot_cli` case that depended on the operator's preset directory
+    is a finding for the log, and the fix is an explicit `--presets presets`, not an exemption.
+
+### Phase 2 — No test source names the target directory
+
+- **Owner skill:** dev
+- **What:** `stream_show.rs` `scratch()` roots at `env!("CARGO_TARGET_TMPDIR")`, and its doc comment is
+  re-stated to describe that directory. `hygiene.rs` gains the check that no string literal in a
+  workspace `*/tests/**/*.rs` has `target` as a whole path segment. Comments are stripped first, with
+  the existing `strip_line_comments`.
+- **Files touched:** `standalone/tests/stream_show.rs`; `core/tests/hygiene.rs`.
+- **Done when:**
+  - The guard fails on the pre-phase text of `stream_show.rs` line `.join("../target/tests/stream-show")`
+    (seeded as a string in the test) and passes on the tree.
+  - It does not fire on any of the prose literals that contain the word, for example `frame_tap.rs`'s
+    "the tap sizes itself to the renderer's configured target". The test asserts one of them as a
+    negative control.
+  - `node scripts/check-backlog-claims.mjs` exits 0. Backlog 0161's probes check `bundle.sh` and
+    `build.ps1`, which this phase leaves alone. The entry's "no committed violator" sentence is false
+    until this phase lands and true after it, which the close records by archiving the entry.
+
+### Phase 3 — The horizon test reads the ground before the rows
+
+- **Owner skill:** dev
+- **What:** In `a_horizon_is_reproducible_and_does_not_depend_on_its_own_length`, the short and long
+  runs' `"ground":[..]` values are asserted equal before the prefix comparison. The failure message
+  names a ground change, not a statistics change. The doc comment restates the second property in
+  `docs/capturing.md`'s conditional form: "while the two runs name the same ground".
+- **Files touched:** `standalone/tests/shot_cli.rs` (a `ground_of(json)` helper beside `samples_array`).
+- **Done when:** the test still passes on the tree. Swapping the long run's ground literal in a copy
+  of its JSON makes the new assertion fail with the ground message before the rows are compared; this
+  is checked once by hand and recorded in the log, not committed as a test.
+
+### Phase 4 — Measure what grows in `target/`
+
+- **Owner skill:** dev
+- **What:** A measurement, recorded in the log, that decides Phase 6's shape. Start on a checkout
+  whose `target/` has just been built by the three everyday commands (`cargo build --workspace`,
+  `cargo clippy --workspace --all-targets -- -D warnings`, `cargo nextest run --workspace -P fast --no-run`).
+  Count `target/debug/incremental/` crate-hash directories and `target/debug/deps/` files and bytes
+  after each of:
+  - (a) the same three commands again, with no edit;
+  - (b) a one-line edit to `core/src/render/metrics.rs`, then the three commands;
+  - (c) the same edit reverted, then the three commands.
+
+  Also record which retained `deps/` stems exceed one generation, and whether an `incremental/`
+  directory name can be matched to a live unit in cargo's JSON (see Phase 5).
+- **Files touched:** none (the log only).
+- **Done when:** the log carries the table and one verdict. **Bounded:** (a) creates no new crate-hash
+  directory, and (b) and (c) create at most one per crate the edit dirtied, per tool. **Unbounded:**
+  otherwise. On "bounded", Phase 6 documents a periodic delete. On "unbounded", the plan does **not**
+  chase the fingerprint defect. Phase 6 still ships the delete, and the defect becomes a new backlog
+  entry that cites this table.
+
+### Phase 5 — `prune-target.mjs` deletes what cargo no longer reports
+
+- **Owner skill:** dev
+- **What:**
+  - **Target directory.** `scripts/prune-target.mjs` resolves the target directory through
+    `cargo metadata --format-version 1 --no-deps`'s `target_directory`. That is the rule Phase 2
+    guards, and `packaging/macos/bundle.sh` and `packaging/studio/build-studio.ps1` already follow it.
+  - **Live set.** It runs the everyday loop's three commands with `--message-format=json` (nextest:
+    `--no-run --cargo-message-format json`). The live set is every `filenames` entry of every
+    `compiler-artifact` message, fresh or not.
+  - **Output.** Without `--apply` it prints what it would delete from `<target>/debug/deps/` and the
+    bytes involved; with `--apply` it deletes them. `incremental/` is handled as Phase 4's verdict
+    directs.
+  - **Documentation.** The script's header states that it needs no other cargo process running in the
+    same checkout, and that deleting a live artifact costs a rebuild, never correctness, because
+    cargo's fingerprint sees a missing output as dirty.
+- **Files touched:** `scripts/prune-target.mjs` (new; a maintenance tool, neither a gate nor a
+  renderer); `docs/developing.md` (a short "Disk" section: what grows, the command, how often);
+  `CLAUDE.md` (the `scripts/` block, which lists gates and five named renderer exceptions, gains this
+  third kind).
+- **Done when:**
+  - Immediately after `--apply`, re-running the same three commands reports **every**
+    `compiler-artifact` as `"fresh": true`. The prune removed nothing the loop needs, and this is the
+    property that makes the live set correct.
+  - Run on the Phase 4 checkout, it removes every retained generation Phase 4 counted, plus any
+    `lmv_*` orphan. The log records bytes before and after.
+  - It resolves a `CARGO_TARGET_DIR`-redirected build correctly, checked once by hand and recorded.
+
+### Phase 6 — The incremental cache has a documented bound
+
+- **Owner skill:** dev
+- **What:** Whatever Phase 4 decided for `incremental/`. At minimum, `docs/developing.md`'s Disk
+  section names the directory, the measured growth, and the delete that bounds it: removing
+  `target/debug/incremental` costs one non-incremental rebuild and nothing else. If Phase 4 found a
+  sound mapping from a crate-hash directory to a live unit, `prune-target.mjs` prunes unmapped
+  directories as well, under the same freshness done-when as Phase 5.
+- **Files touched:** `docs/developing.md`; optionally `scripts/prune-target.mjs`.
+- **Done when:** the Disk section's figures are Phase 4's and name the machine and date. If the script
+  gained the arm, Phase 5's freshness property holds with it enabled.
+
+### Phase 7 — A scoped `cargo doc` earns a hook step, or is rejected with its measurement
+
+- **Owner skill:** dev
+- **What:** Measure `cargo doc -p rlx-core --no-deps` under `RUSTDOCFLAGS=-D warnings`:
+  1. **Coverage.** In a scratch copy, make a private item that a public item's intra-doc link names,
+     which is Plan 0137's class. Confirm the scoped command fails on it.
+  2. **Cost.** Time the scoped command and the hook's own `clippy` step on the same one-line
+     `core/src/render/metrics.rs` edit, in the same session, warm.
+
+  **Adopt** the step into `.githooks/pre-push`, after `clippy`, if and only if (1) holds **and** its
+  warm one-edit cost does not exceed the `clippy` step's on the same edit. Both numbers are seconds
+  of a gate step on one machine in one session. Otherwise **reject**. Either way, the `ci.yml` comment
+  that cites "~28 s" is re-stated with the measured figures.
+- **Files touched:** `.githooks/pre-push` (if adopted); `.github/workflows/ci.yml` (the comment);
+  `docs/developing.md` (the hook's step table, if adopted).
+- **Done when:** the log carries both timings and the verdict. If adopted, the hook's step table in
+  `docs/developing.md` lists the step. `standalone`'s public surface is named in the ci.yml comment as
+  what a `-p rlx-core` step does not cover.
+
+### Phase 8 — The cheap tests share one binary per package
+
+- **Owner skill:** dev
+- **What:** ADR-0204's fold.
+  1. **Re-derive the kept set at this phase** from `.config/nextest.toml` (every `binary()` in
+     `default-filter` and in every override), a grep for `clippy::disallowed_methods` in `*/tests/*.rs`,
+     and the process-level rule. Do not copy it from the ADR: Plan 0174's verdict may have moved
+     `stream_show` and `control_loopback` into the override by then.
+  2. **Fold** every other file into `core/tests/suite/` and `standalone/tests/suite/` as modules of a
+     `main.rs`, with `common` reached by `#[path]`. Use `git mv`, so history follows the file.
+  3. **Widen** ADR-0193's `hygiene.rs` guard: a `clippy::disallowed_methods` exemption anywhere under a
+     `tests/suite/` fails.
+  4. **Rewrite** every live citation of a folded target. That means `--test <name>` in `docs/`,
+     `.claude/skills/`, `.githooks/`, `.github/`, and in assertion messages and module headers inside
+     both crates; closed plans stay as written.
+- **Files touched:** `core/tests/**`, `standalone/tests/**` (moves); `core/tests/hygiene.rs`;
+  `docs/testing.md`; `docs/developing.md`; `CLAUDE.md` (the "46 test binaries" count in the
+  debug-info section, made count-free); every citing file the grep finds.
+- **Done when:**
+  - **The same tests run.** `cargo nextest list --workspace` names the same set of test functions
+    before and after, once the module prefix and binary name are stripped. So does
+    `cargo nextest list --workspace -P fast`: the fast tier selects exactly what it selected before.
+    Both diffs are empty.
+  - **ADR-0193's override selects the same tests**, by the same list comparison restricted to that
+    override's filter.
+  - **The engine-edit loop is not slower.** `cargo nextest run --workspace -P fast --no-run` after
+    the one-line `metrics.rs` edit takes no longer after the fold than before, measured back to back
+    in one session. The per-file-edit case (touching one folded test file) is measured and reported,
+    not gated: ADR-0204 names it as the price. **If the engine-edit case is slower, revert the fold
+    in this phase** and record both measurements for ADR-0204's `Outcome`.
+  - The log records test-binary counts before and after, and `deps/` `.exe`/`.pdb` bytes for one
+    generation before and after.
+  - `grep -rn -- "--test <folded name>"` over the live docs, skills, hook, workflows and both crates
+    returns nothing for any folded target.
+
+### Phase 9 — The studio tests ask cargo where the player is
+
+- **Owner skill:** studio-builder
+- **What:** One test-only helper resolves the built player: `CARGO_TARGET_DIR` if set, else
+  `cargo metadata --format-version 1 --no-deps`'s `target_directory`, cached for the run, then
+  `release` before `debug`. When cargo is not on `PATH` it skips with a notice, in ADR-0016's shape,
+  as these tests already do when there is no build. The four duplicated `builtPlayer`/`schemaDocument`
+  lookups use it. `templates.test.ts`'s scratch directory moves to `mkdtempSync` under `os.tmpdir()`.
+  `studio/eslint.config.mjs` gains a `no-restricted-syntax` rule rejecting a `'target'` literal
+  argument to `join`.
+- **Files touched:** a helper beside the tests (for example `studio/shared/testing/player.ts`);
+  `studio/electron/player/windowless.test.ts`; `studio/shared/{templates,fields,grammar}.test.ts`;
+  `studio/eslint.config.mjs`.
+- **Done when:** the studio's lint fails on a seeded `join(ROOT, 'target', 'debug', name)` and passes
+  on the tree. The four tests find the player on a normal checkout, and find it under
+  `CARGO_TARGET_DIR` pointed at a copied build, checked once by hand and recorded. The studio's
+  typecheck, lint and vitest run pass.
+
+## Risks & open questions
+
+- **Plan 0174 moves the ground under Phases 1, 2 and 8.** It is live in `stream_show.rs` and
+  `control_loopback.rs`, owns `.config/nextest.toml`, and adds `hygiene.rs` check (g). This plan
+  starts only after 0174 closes, and Phase 8 re-derives its set for exactly this reason. If 0174's
+  diagnosis files a control-path backlog entry and leaves `stream_show` on the guard's exemption list,
+  ADR-0204's rule 2 still keeps it separate.
+- **The scratch data root could change a test's meaning, not just its side effects.** A
+  `stream_split` or `stream_pipe` case that silently relied on a seeded preset directory would now see
+  an empty one. The case must be made explicit rather than exempted from the helper. CI already runs
+  with an empty data root, so CI is the evidence that no case needs the operator's.
+- **`HOME` pointed at a scratch directory on macOS** also moves anything else the child reads from
+  `HOME`. `stream_show` already does this on the macOS CI arm without incident, which is the precedent.
+- **The hook is already slow.** Plan 0174 Phase 1 took `-P fast` from 244.5 s to 398.2 s. Phase 7's
+  rule does not reach for the hook's total budget, because that budget is no longer the ~28 s the
+  comment says. It asks only that a doc step cost no more than the lint step beside it.
+- **`--message-format=json` on nextest.** The flag spelling (`--cargo-message-format`) is from
+  nextest's documentation, not tried here. If nextest does not forward artifact messages, the script
+  runs `cargo test --workspace --no-run --message-format=json` for that leg, which builds the same test
+  units.
+- **The fold's module prefix can break an anchored name filter.** None exists at HEAD, and the list
+  comparison in Phase 8's done-when is what catches one.
+
+## What this plan does NOT do
+
+- **It does not add the Linux data-root arm to anything.** The helper sets `XDG_DATA_HOME` because
+  `preset_data_root` reads it. Plan 0120 carries the Linux capture and packaging, and its own test
+  isolation on `ubuntu-latest`.
+- **It does not isolate the studio's spawned players' data root.** `windowless.test.ts` and
+  `templates.test.ts` already clear it (backlog 0181's 2026-09-14 update). Phase 9 changes only how
+  they find the binary.
+- **It does not chase an incremental-fingerprint defect** if Phase 4 finds one. That becomes a new
+  backlog entry.
+- **It does not add `cargo doc` to `dev`'s per-phase gate**, and it does not document `standalone`.
+- **It does not unpin the toolchain, adopt `cargo-sweep`, or set `CARGO_INCREMENTAL=0`** anywhere.
+- **It does not touch the two archived `renders/` scripts** from backlog 0161. They are gitignored
+  and exist in no checkout.
+- **It does not fold the nine GPU suites, the cost probes or any clock reader** (ADR-0204 rules 1-3).
+
+## Implementation log
+
+> Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
+> last one. **The phases above are the contract; everything here is what happened.**
+> **Observations, never conclusions:** this says where to look, architect decides how it went.
+> No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
+> an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
+
+**Lane:** `C:\Users\Igor Konovalov\WORK\rlx-plan-0177`, branch `plan-0177-the-test-tree-stops-costing-disk-and-touching-the-machine` (conductor run)
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — The spawned player gets a scratch data root | dev | done | feff21c |
+| 2 — No test source names the target directory | dev | done | 3510ab9 |
+| 3 — The horizon test reads the ground before the rows | dev | done | 11636f2 |
+| 4 — Measure what grows in `target/` | dev | done | 375f275 |
+| 5 — `prune-target.mjs` deletes what cargo no longer reports | dev | done | d9aee86 |
+| 6 — The incremental cache has a documented bound | dev | done | 227bb8d |
+| 7 — A scoped `cargo doc` earns a hook step, or is rejected | dev | done | 7b4a66c |
+| 8 — The cheap tests share one binary per package | dev | done | 9b04453 |
+| 9 — The studio tests ask cargo where the player is | studio-builder | done | 4656040 |
+
+### Notes
+
+- **Phase 1, data root.** `%APPDATA%\Ritmolux` (158 entries) listed with size and mtime before and
+  after `cargo nextest run -p standalone --no-fail-fast` (411 passed, 0 skipped): the two listings
+  are byte-identical, so the diff is empty. No `shot_cli` case needed `--presets presets` added.
+- **Phase 1, helper shape.** `common` exposes `player()`, `player_with_data_root(root)` (an empty
+  root is `stream_show`'s unresolved case), `shot()` and `shot_executable()`, the last for the test
+  that hands `shot` its own path as a stand-in encoder.
+- **Phase 2, deviation: comments are not stripped with `strip_line_comments`.** It cuts a line at a
+  `//` inside a string literal (`"//"` in `show_is_the_only_owner.rs`, `preset.rs`, milkconv's
+  `conformance.rs` and `hygiene.rs` itself), which flips which side of a quote the literal scan is
+  on for the rest of the file. `string_literals` in `hygiene.rs` reads `//`, `/* */`, strings, raw
+  strings and char literals in one pass instead. `hygiene.rs` spells the segment `tar\x67et` in its
+  own seeds and in the matcher, because the guard scans that file too.
+- **Phase 2.** `check-backlog-claims.mjs` exits 0.
+- **Phase 3, hand check.** With the long run's JSON rewritten to `"ground":[250,1,250]` the test
+  failed at the new assertion, `left: "\"ground\":[0,0,0]"`, `right: "\"ground\":[250,1,250]"`, with
+  the ground-change message; the rewrite was removed and `shot_cli` ran 28 passed, 0 skipped.
+- **Phase 4, table.** This lane, 2026-09-15, Windows reference machine. `inc` = crate-hash
+  directories in `target/debug/incremental/`; the edit is `STRUCT_GRID: usize = 32` -> `16 + 16`
+  in `core/src/render/metrics.rs`. Row 0 is the three commands on a lane whose earlier phases had
+  run only `-p standalone`, `-p rlx-core --test hygiene` and clippy.
+
+  | step | tool | s | inc dirs (new) | inc GB | deps files | deps GB |
+  |---|---|---|---|---|---|---|
+  | 0 | build / clippy / nextest | 3.4 / 0.6 / 44.2 | 111 (3) / 111 (0) / 171 (60) | 1.14 / 1.14 / 1.95 | 918 / 918 / 1098 | 1.62 / 1.62 / 3.38 |
+  | a | build / clippy / nextest | 0.3 / 0.5 / 1.4 | 171 (0) each | 1.95 | 1098 | 3.38 |
+  | b | build / clippy / nextest | 6.0 / 13.3 / 33.0 | 171 (0) each | 2.20 / 2.68 / 3.62 | 1098 | 3.38 |
+  | c | build / clippy / nextest | 4.1 / 7.6 / 67.4 | 171 (0) each | 3.61 / 3.61 / 3.59 | 1098 | 3.38 |
+
+  The `incremental/` bytes grow inside existing directories: every crate-hash directory held at most
+  two session directories after (b), and three further edit/revert cycles of clippy then build left
+  171 directories, 332 sessions, at most 2 per directory and 3.593 GB, flat. An edit that keeps a
+  unit's metadata hash rewrites its `deps/` files in place, so (b) and (c) left the `deps/` count
+  at 1098.
+- **Phase 4, retained `deps/` generations.** Grouping `deps/` names by stem with the hash removed
+  gives 330 stems with two hashes, every one a check-versus-build or lib-versus-test pair, so a name
+  count is not a generation count. Counted instead against the loop's reported live set (the Phase 5
+  script's dry run on this checkout): 24 files, 184.0 MB, a second `rlx_core`, `wgpu`, `wgpu_core`,
+  `wgpu_hal`, `windows`, `gpu_allocator` and `hygiene` generation left by the narrowed `-p` runs.
+  No `lmv_*` file exists in this lane.
+- **Phase 4, incremental mapping.** None: a crate-hash directory is `<crate>-<base-36 id>`,
+  `deps/` carries the 16-hex metadata hash, and no `compiler-artifact` field names the former.
+- **Phase 4, verdict: bounded.** (a) created no crate-hash directory, and (b) and (c) created none
+  per tool.
+- **Phase 5.** `--apply` on the Phase 4 checkout: `deps/` 1098 files, 3226.1 MB before; 24 files,
+  184.0 MB deleted (the 24 Phase 4 counted); 1074 files, 3042.1 MB after. `--verify-fresh` straight
+  after: 637 of 637 artifacts fresh. nextest's `--cargo-message-format json` forwards the artifact
+  messages, so the `cargo test` fallback in Risks was not needed.
+- **Phase 5, redirect check (by hand).** `CARGO_TARGET_DIR` set to this lane's `target` under its
+  8.3 spelling: the script read that `deps` from `cargo metadata`, matched all 637 artifacts, found
+  0 to delete. A physically different directory was not tried (a cold build).
+- **Phase 5, matching rule the plan did not state.** A `deps/` file is live when its 16-hex metadata
+  hash is the hash of a reported file, so a live `.exe` keeps its `.pdb` and `.d`. A reported file
+  outside `deps/` is matched to its `deps/` source by hard-link identity, else by content; on MSVC a
+  binary's source is the unhashed `deps/ritmolux.exe`. An unmatched report stops the script.
+- **Phase 6.** No script arm (no mapping). The Disk section documents the delete with Phase 4's
+  figures, machine and date.
+- **Phase 7, deviation: the adopted step is `cargo doc -p rlx-core --no-deps --features text`.** The
+  command the phase names exits 101 **on the unmodified tree**: `core/src/render/preview.rs:10` links
+  `super::aux_target`, which exists only with the `text` feature, and `-p rlx-core` alone leaves it
+  off while the workspace build turns it on. `text` is rlx-core's only feature.
+- **Phase 7, coverage (in-tree, restored after, not a scratch copy).** A `/// See [`STRUCT_GRID`].`
+  line on the public `frame_diff` made both commands fail with
+  `public documentation for frame_diff links to private item STRUCT_GRID`.
+- **Phase 7, cost.** Warm, same session, the `STRUCT_GRID` one-line edit applied and reverted over
+  three rounds, clippy then doc each round. With `--features text`: clippy 6.35 / 6.56 / 7.82 s, doc
+  4.47 / 5.95 / 5.49 s (all exit 0). Without it: clippy 6.34 / 6.38 / 6.34 s, doc 3.16 / 3.13 / 3.15 s
+  (every doc run exit 101). Verdict: adopted, after `clippy` in `.githooks/pre-push`.
+- **Followup noticed, not acted on:** the `preview.rs` link above is broken in every build without
+  `text` (the core test suite and the plugin's), and CI's `cargo doc --workspace` cannot see it
+  because feature unification turns `text` on.
+- **Phase 8, kept set as re-derived.** Rule 1: the nine `default-filter` suites, the five `_cost`
+  probes, `dsp`, `help_cli`, `stream_pipe`. Rule 2 (the `disallowed_methods` grep): those plus
+  `stream_show` and `control_loopback`. Rule 3: `console_preview_memory`, `frame_tap_memory`.
+  `preset.rs`'s allocation counter is per-thread and no test writes the `RLX_*` variables other
+  files read, so neither kept a file out. 33 core and 5 standalone files folded, the ADR's set.
+- **Phase 8, listings.** Normalized to `package | kind | binary | test`, a `suite` test re-keyed to
+  its module: default 1944 -> 1945 tests, `-P fast` 1646 -> 1647, the run-alone override's filter
+  18 -> 18. Each of the first two diffs is one line,
+  `hygiene::the_suite_clock_check_names_an_exemption_and_ignores_prose`, the negative control this
+  phase adds for step 3; the override's diff is empty.
+- **Phase 8.** `override` is a keyword: `mod r#override;`, tests list as `r#override::...`.
+- **Phase 8, timing.** `cargo nextest run --workspace -P fast --no-run`, warm, back to back in one
+  session, the `STRUCT_GRID` edit applied and reverted twice. Cargo's `Finished` / the lock's wall
+  time, seconds:
+
+  | | edit | revert | edit | revert |
+  |---|---|---|---|---|
+  | before | 34.9 / 51.5 | 11.6 / 28.2 | 44.2 / 60.5 | 39.7 / 60.7 |
+  | after | 16.5 / 25.6 | 29.2 / 37.5 | 8.0 / 16.1 | 38.9 / 46.9 |
+
+  Per-file edit (`easing.rs`, `SIZE = 96` -> `48 + 48` and back): before 1.06 / 2.4 and 1.02 / 2.4,
+  after 1.66 / 2.6 and 1.66 / 2.6; an assertion-message edit after the fold, 1.80 / 2.8 and
+  1.70 / 2.7. The fold was kept.
+- **Phase 8, gate.** `cargo nextest run --workspace -P fast --no-fail-fast` on the folded tree:
+  1647 passed, 304 skipped, exit 0. The Node gates, `fmt --check` and workspace clippy are green.
+- **Phase 8, binaries and bytes.** Integration test binaries (workspace, so core-cabi's 2 and
+  milkconv's 5 included) 66 -> 30; their `.exe` plus `.pdb`, one generation, 1789.6 MB -> 843.8 MB.
+- **Phase 8, deviation: path citations rewritten too.** Beyond `--test`, every
+  `core/tests/<folded>.rs` and `standalone/tests/<folded>.rs` in live source comments, docs,
+  fixture headers, `.taplo.toml` and its generator in `export.rs` now names `tests/suite/`, and the
+  module headers that said a folded file is its own binary (`attractor_trails`, `composite`,
+  `layer`, `line_joints`, `bloom`, `kaleidoscope`, `feedback`, `geometry_extent`, `cellular`,
+  `analytic_field`, `core/tests/fixtures/README.md`) now say file, module filter or process.
+  `docs/plans/README.md`'s baseline-drift control was rewritten as well. Left as written: ADRs,
+  other plans, `docs/design-backlog.md`, the archives, and the comments in `studio/shared/
+  fields.test.ts` and `grammar.test.ts` naming `core/tests/preset_schema.rs`.
+- **Phase 8, the skills grep.** The session's edits under `.claude/` were refused, leaving four
+  citations in `dev/references/project-context.md` and `architect/SKILL.md`; the owner repaired
+  them in the lane after the park (`f0cf263`). `project-context.md:201` keeps
+  `core/tests/preset.rs`: it describes a retired instruction as written.
+- **Followup noticed, not acted on:** `docs/testing.md` calls `preset`'s allocation counter
+  process-global; `preset.rs`'s is per-thread.
+- **Phase 9, deviation: the helper is `studio/electron/testing/player.ts`**, because
+  `tsconfig.renderer.json` checks `shared/` without Node's types. Unstated in the plan: its cargo call
+  sets `RUSTUP_AUTO_INSTALL=0` and a failed `cargo metadata` is a skip reason, not a throw; the lint
+  rule also rejects `path.join(.., 'target')`; `templates.test.ts` removes its temp directory through
+  `onTestFinished`; `fields`/`grammar` comments now cite `core/tests/suite/preset_schema.rs`.
+- **Phase 9, checks.** A seeded `join(ROOT, 'target', 'debug', name)` and `path.join(ROOT, 'target')`
+  failed lint (two `no-restricted-syntax` errors; `join(ROOT, 'docs', 'specs')` beside them did not).
+  On the lane, `fields`/`grammar` read `target\debug\ritmolux.exe` and `templates`/`windowless`
+  spawned it, no skip. Gate: typecheck and lint exit 0, vitest 29 files, 264 passed.
+- **Phase 9, done-when met differently: the four files were not re-run under `CARGO_TARGET_DIR`**
+  (this session could not set a variable on a command). A removed scratch vitest file set it
+  in-process to a temp copy of the debug player: the helper answered the copy, whose `--schema` parsed;
+  an empty redirect and an empty `PATH` each answered a skip reason.
+
+### Close triggers
+
+- **`presets/` touched:** `presets/README.md`, `presets/pending/README.md`,
+  `presets/proposed/README.md` (test-path citations); no `.toml`.
+- **Plan header `Closes:`** design-backlog 0181, 0161, 0213, 0179, 0183, 0184, 0182.
+- **What shipped:** in `core/src`, `standalone/src`, `core-cabi`, `milkconv` and `packaging/`, only
+  comments and two emitted strings changed, each a test path gaining `suite/`: the `.taplo.toml`
+  header `export.rs` generates, and the saturation note in `standalone/src/shot/report.rs`. The rest
+  is tests, `scripts/prune-target.mjs`, the `.githooks/pre-push` rustdoc step, a `ci.yml` comment,
+  docs and the studio's test helper and lint rule.
+- **Operator docs touched:** `docs/capturing.md`, `docs/configuration.md`, `docs/developing.md`,
+  `docs/testing.md`, `docs/presets.md`, `docs/preset-palettes.md`, `docs/preset-tuning-walkthrough.md`,
+  `docs/specs/0002-ring-determinism.md`, `docs/specs/README.md`, `docs/plans/README.md`, `CLAUDE.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0, 47 reductions across 23 live
+  entries, 2 unprobeable; advisories name 0219 and 0220 among 30 moved probe paths.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). Earlier runs: Phase 1
+  `cargo nextest run -p standalone`, 411 passed; Phase 8 `cargo nextest run --workspace -P fast`,
+  1647 passed, 304 skipped.
+- **Outstanding `human` phases:** none.
+
+## Close review
+
+> Conductor-run Mode 4 review (ADR-0205), round 1, 2026-09-15. No earlier rounds, so no fix-round
+> findings to record.
+
+**Verdict: Plan 0177 landed as planned. No blockers, no majors, four minors, two nits.** All nine
+phases are in the lane (`feff21c` through `4656040`, close block `25cabb9`). Each done-when opened
+is backed by the tree: the spawn guard, the target-literal guard, the suite clock guard, the ground
+assertion, the prune script, the rustdoc hook step, the fold and the studio helper. The log discloses
+every deviation, and each has a reason that was checked: the `string_literals` scanner,
+`--features text`, path citations beyond `--test`, and the helper under `electron/`.
+
+### Evidence
+
+- **Full suite (lens 1).** `node ...\with-lock.mjs suite -- cargo nextest run --workspace` printed
+  `with-lock: skipped cargo nextest run --workspace: tree 18f2dd5 is green in the suite ledger, run
+  by gate 0177-pre-review at 2026-09-15T20:21:30.710Z: 1945 tests run: 1945 passed (6 slow), 6
+  skipped`. `git rev-parse --short HEAD^{tree}` on the lane tip `25cabb9` is `18f2dd5`, so the record
+  covers this tree. 1945 matches the log's post-fold default listing.
+- **Assertions read.**
+  - `hygiene::every_spawned_workspace_binary_gets_a_scratch_data_root` scans every `.rs` under
+    `standalone/tests/` except `common/mod.rs`.
+  - `the_spawn_guard_names_a_bare_spawn_and_ignores_prose` pins `file:line` on the seeded
+    `stream_pipe` `run` helper.
+  - `no_test_source_names_the_target_directory` has a scan-count floor, and its negative control
+    uses `frame_tap`'s prose literal.
+  - The suite clock check requires both `suite/main.rs` files to be reached.
+  - `shot_cli::a_horizon_is_reproducible_...` compares `ground_of(first)` with `ground_of(long)`
+    before the prefix, with the ground-change message.
+  - The studio lint rule catches both `join` and `path.join`.
+- **Fold.** `.config/nextest.toml` is untouched. No `binary()` selector anywhere names a folded
+  target. A grep for `--test <folded name>` over the live docs, skills, hook, workflows and scripts
+  returns only the plan itself and a conductor test fixture string.
+- **Layering and ABI (lenses 2 and 5).** `core/src`, `standalone/src`, `core-cabi` and `milkconv`
+  change in comments and in two emitted test-path strings only. No ABI, protocol or `Scene` change.
+
+### Findings
+
+#### minor
+
+1. **The scratch data roots are never removed, and they accumulate on every run.**
+   `standalone/tests/common/mod.rs:62`. `scratch_data_root()` creates
+   `CARGO_TARGET_TMPDIR/data-root/<pid>-<n>` for every spawn. Nextest gives each test a new pid, and
+   nothing deletes the directory afterwards. Every full run therefore leaves one new directory per
+   spawn under `target/tmp/`, holding whatever the child wrote there: a config, a diagnostics log,
+   seeded presets. This is a new unbounded growth, small per run, from a plan whose purpose is
+   bounding `target/`. The Disk section does not name it, and `prune-target.mjs` reads only `deps/`.
+   Suggested fix: key the root by test name and remove it before creation, as
+   `stream_show::scratch` already does. The alternative is a `Drop` guard that removes it. Code, so
+   left open.
+2. **`prune-target.mjs`'s live set leaves out the rustdoc step that Phase 7 adopted into the hook.**
+   `scripts/prune-target.mjs:78`. `LOOP` holds the three commands of Phase 5. The hook now also runs
+   `cargo doc -p rlx-core --no-deps --features text`, and that is a narrowed `-p` invocation. The
+   Disk section says a narrowed `-p` build writes its own dependency generations. Those generations
+   read as dead to `--apply`, so the next push rebuilds them. `--verify-fresh` cannot see this
+   because it runs the same three commands. The cost is a rebuild, never a wrong build. Suggested
+   fix: add the hook's doc step to `LOOP`, in the script and in the Disk section's prose. Code, so
+   left open.
+3. **`docs/testing.md` said `preset`'s zero-allocation counter is process-global, and the fold's own
+   rule contradicts it.** `docs/testing.md:46`. The caveat said the count is "only reliable under
+   nextest", because a concurrent test's allocations "bleed into the count". The counter in
+   `core/tests/suite/preset.rs` is thread-local, and its doc comment says it holds under both
+   runners. That matters more now that `preset` shares the `suite` binary. Read as written, the
+   caveat would make the fold break `cargo test` under ADR-0204's rule 3. **Repaired at the close**
+   (`dea0bdd`).
+4. **The implementation log was longer than the phases section**: 14,404 bytes against 13,448.
+   **Repaired at the close** (`dea0bdd`): the notes that became history are condensed, and no
+   measurement is dropped.
+
+#### nit
+
+1. **The rustdoc comment in the hook repeated the measured figures that `ci.yml` carries.**
+   `.githooks/pre-push:223`. A second copy of the timings is the one that drifts. **Repaired at the
+   close** (`dea0bdd`): the comment keeps the mechanism and points at the timings.
+2. **The broken intra-doc link the log found was never routed.**
+   `core/src/render/preview.rs:10` links `super::aux_target`, which exists only with `text`, and
+   `## Followups` was empty. **Repaired at the close** (`dea0bdd`): it is recorded under
+   `## Followups`.
+
+### Close notes
+
+- **Backlog:** 0161, 0179, 0181, 0182, 0183, 0184 and 0213 carry their `CLOSED` marker, and each
+  row moved from `### Promoted` to `### Closed`. `node scripts/check-backlog-claims.mjs` exits 0:
+  47 reductions across 23 live entries.
+- **Preset curation:** only three README test-path citations changed, and no `.toml`. No shipped
+  preset names Plan 0177, ADR-0204 or any of the seven entries. Nothing to curate.
+- **ADR-0204** accepted with an `Outcome`: the fold held, and the engine-edit loop was not slower.
+- **Version:** 0.125.0 (minor). The plan adds a maintenance tool, a hook step and three guards.
+
+## Followups (after this lands)
+
+- **`core/src/render/preview.rs:10` links `super::aux_target`, which exists only with rlx-core's
+  `text` feature.** Every build without it (the core test suite's, the plugin's) carries a broken
+  intra-doc link, and CI's `cargo doc --workspace` cannot see it because feature unification turns
+  `text` on. The hook's rustdoc step passes `--features text` for the same reason. Found in Phase 7.

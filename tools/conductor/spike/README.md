@@ -12,9 +12,60 @@ version this table was not produced on; re-running the probe is how a new versio
 - **Run:** `node tools/conductor/spike/probe.mjs --model haiku`; raw output under
   `target/conductor-spike/<stamp>/` (never committed)
 
+## Re-verified on 2.1.272
+
+- **Date:** 2026-09-15
+- **CLI:** `claude --version` -> `2.1.272 (Claude Code)`
+- **Run:** `node tools/conductor/spike/probe.mjs --model haiku`; $0.098 (session A) + $0.053 (session B)
+
+Every row of the table below was re-observed and holds unchanged: the skill loads, the deny hook
+reaches the session as a readable tool error, an allowed `Bash` runs and a disallowed one is denied
+without stalling, `Edit`/`Write` land, the `result` event carries the same fields, the budget stop is
+still exit 1 with `error_max_budget_usd` after one turn, and `git worktree remove` leaves no handle.
+
+**One count in the table is no longer this repository's.** The deny-hook row says four
+`PreToolUse:Bash` hooks run per Bash call. Six ran: `.claude/settings.json` has gained
+`block-push-and-history-rewrite.js` and `conductor-suite-lock.js`, so it is four project hooks plus
+the user-level one plus the `--settings` one. That is this repository changing, not the CLI, and the
+hooks compose the same way - the `--settings` hook adds to the project's rather than replacing them.
+
+**Not re-observed:** the probe records `result.keys` but not the values of `terminal_reason`,
+`apiKeySource` or `permission_denials`. Those three readings are carried over from 2.1.270.
+
+## Re-verified on 2.1.273
+
+- **Date:** 2026-09-16
+- **CLI:** `claude --version` -> `2.1.273 (Claude Code)`
+- **Run:** `node tools/conductor/spike/probe.mjs --model haiku --sessions a,b`; $0.090 (session A, 8
+  turns, 37.4 s) + $0.055 (session B). Raw output under `target/conductor-spike/<stamp>/`.
+
+Every row of the table below was re-observed and holds unchanged. Session A: the `dev` skill loads
+(`slash_commands_has_dev: true`), `system/hook_started` and `hook_response` bracket every `Bash`
+call, the hook process saw `RLX_CONDUCTOR=1` and the run's own `RLX_PROBE_TOKEN` on all four, the
+denied `node -e` produced a `system/permission_denied` with no stall, and `Write` then `Read` then
+`Edit` all landed on the same file (`probe-out.txt` read back `beta`). `result/success`, exit 0.
+Session B still ends exit 1 with `error_max_budget_usd` after one turn. `git worktree remove`
+returned 0 with empty stderr and the directory was gone: no handle left.
+
+**The `result` event gained five keys and lost none**, which is the one thing that moved. New on
+2.1.273: `fast_mode_state`, `fast_mode_disabled_reason`, `subagent_stats`, `queued_turn_count`,
+`result_index`. **Every field the conductor actually reads is still there** — `result`,
+`session_id`, `subtype`, `total_cost_usd`, `is_error`, `num_turns`, `errors`, `stop_reason`,
+`terminal_reason`, `permission_denials` — checked against `lib/outcome.mjs`'s readers one by one.
+`errors` appears on the budget stop and not on the success, and `result` the other way round, which
+is the same split 2.1.270 recorded.
+
+**Sessions C and D were not re-run here because they were already run on this version**: the
+`.claude/` section below *is* the 2.1.273 reading, taken the same day. Between that section and this
+one, all four sessions have now been observed on 2.1.273.
+
+**Not re-observed**, unchanged from the 2.1.272 note: the probe records `result.keys` but not the
+values of `terminal_reason`, `apiKeySource` or `permission_denials`. Those three readings are still
+carried over from 2.1.270.
+
 ## What the probe does
 
-Two sessions, both `claude -p "/dev implement plan 9999"` with the worktree as cwd, and with
+Four sessions. Two of them, A and B, are `claude -p "/dev implement plan 9999"` with the worktree as cwd, and with
 `--output-format stream-json --verbose --include-hook-events --permission-mode dontAsk --settings
 <file>` and `RLX_CONDUCTOR=1` plus a random `RLX_PROBE_TOKEN` in the child's environment. The
 settings file allows `Read Glob Grep Edit Write Skill`, `Bash(cargo --version)`, `Bash(git add *)` and
@@ -25,8 +76,12 @@ environment it sees. `fixture-plan.md` is copied into the worktree as
 - **Session A** (clean run) adds `--append-system-prompt-file` carrying a marker token and an ordered
   list of eight steps, and `--max-budget-usd 0.50`.
 - **Session B** (budget stop) has no appended prompt and `--max-budget-usd 0.0001`.
+- **Sessions C and D** ask the `.claude/` question below. They invoke no skill — their steps are the
+  `-p` prompt itself, because under `/dev` the session obeyed that skill's restate-and-wait instead —
+  and they use no probe hook. C runs under `tools/conductor/settings.conductor.json` as the conductor
+  passes it; D runs under a generated file that additionally names `.claude/` paths.
 
-After both exit, the parent runs `git worktree remove --force` on the worktree and deletes the branch.
+After all four exit, the parent runs `git worktree remove --force` on the worktree and deletes the branch.
 
 ## Evidence
 
@@ -43,6 +98,48 @@ After both exit, the parent runs `git worktree remove --force` on the worktree a
 | `--append-system-prompt-file` content is visible to the skill | The flag is accepted although `--help` lists only `--append-system-prompt`. The session reported the marker it carried: *"RLX-PROBE-MARKER value: `kestrel-4417`"*, and followed its step list in place of the `/dev` skill's restate-and-wait. |
 | An environment variable set by the parent is visible to hooks | The probe hook recorded, for all four Bash calls, `{"RLX_CONDUCTOR":"1","RLX_PROBE_TOKEN":"c746df622c6e",…}` — the token matches the one the parent generated for this run. |
 | On Windows, after the child exits, `git worktree remove` on its cwd succeeds | `git worktree remove --force …\rlx-probe-0187` → exit 0, empty stderr; the directory no longer exists; `git branch -D` succeeded. No handle was left. |
+
+## May a headless session edit `.claude/`? Observed on 2.1.273
+
+- **Date:** 2026-09-16
+- **CLI:** `claude --version` → `2.1.273 (Claude Code)`
+- **Model:** `--model haiku`
+- **Run:** `node tools/conductor/spike/probe.mjs --model haiku --sessions c` then `--sessions d`;
+  $0.065 and $0.056. Raw output under `target/conductor-spike/<stamp>/` (never committed).
+- **Subject:** `.claude/skills/probe-scratch/NOTES.md` inside the probe worktree, holding the word
+  `alpha`, created by the probe before the session. Paths given to the session **absolute**.
+
+Backlog 0230 recorded that the CLI refuses a `claude -p` session's `Edit` under `.claude/` although
+`settings.conductor.json` allows the tool, and ADR-0209 grants a close every file under
+`.claude/skills/`. Two sessions, differing only in the settings in force:
+
+| Tool call attempted | Under `settings.conductor.json` (session C) | Under settings naming `.claude/` (session D) |
+|---|---|---|
+| `Read <worktree>/.claude/skills/probe-scratch/NOTES.md` | **allowed** — returned the file | **allowed** |
+| `Edit` that same file, `alpha` → `beta` | **denied** — *"Permission to use Edit has been denied because Claude Code is running in don't ask mode."* | **denied**, same text |
+| `Write <worktree>/.claude/skills/probe-scratch/NEW.md` | **denied**, same text | **denied**, same text |
+| `Write <worktree>/probe-control.txt` — the control, same worktree, same turn, outside `.claude/` | **allowed** — *"File created successfully at: …\rlx-probe-0187\probe-control.txt"* | **allowed** |
+
+Read back from the parent after both sessions exited: `NOTES.md` still holds `alpha`, `NEW.md` does
+not exist, `probe-control.txt` holds `delta`. Neither session touched anything under `.claude/`.
+
+**Which settings were in force.** Session C ran under `tools/conductor/settings.conductor.json`
+exactly as the conductor passes it, which allows the bare tools `Edit` and `Write`. Session D ran
+under a generated file allowing, in addition, `Edit(.claude/**)`, `Write(.claude/**)`,
+`Edit(//.claude/**)`, `Write(//.claude/**)` and the same two spelled with the worktree's absolute
+path. Both sessions used `--permission-mode dontAsk`. **No spelling reached it.**
+
+**So it is a CLI restriction, not a configuration gap** — on 2.1.273, by the settings surface probed.
+A write under a project's `.claude/` is refused whatever the allowlist says, while a read is not, and
+a write anywhere else in the same worktree is not. Anything that would add a setting to this table has
+to come from a later CLI, and re-running the probe is how that gets noticed.
+
+**One thing that is not a CLI rule.** In an earlier run the session was given the path *relative*
+(`.claude/skills/probe-scratch/NOTES.md`) and expanded it itself to
+`C:\Users\<user>\.claude\skills\…`, the user's own configuration directory, so the tool answered
+*"File does not exist"*. That is the model choosing a path, not the CLI resolving one: step 5 of
+session C reads the same relative path and the tool resolves it against the worktree and returns the
+file. Give `.claude/` paths absolute when it matters.
 
 ## Also observed, and relevant to the conductor
 

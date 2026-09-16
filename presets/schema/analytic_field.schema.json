@@ -750,62 +750,62 @@
     "param.mode_n": {
       "type": "string",
       "description": "The plate's first mode number: how many nodal lines cross one axis. Equal to `mode_m`, the two waves cancel and the plate is blank.",
-      "markdownDescription": "The plate's first mode number: how many nodal lines cross one axis. Equal to `mode_m`, the two waves cancel and the plate is blank.\n\n- default `3.0`\n- typical range `1.0` to `16.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "The plate's first mode number: how many nodal lines cross one axis. Equal to `mode_m`, the two waves cancel and the plate is blank.\n\n- default `3.0`\n- typical range depends on the family: `chladni` `1.0` to `16.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `escape_time` — the parameter is not read there at all\n- structural parameter\n\nThe value is an expression, always quoted."
     },
     "param.mode_m": {
       "type": "string",
       "description": "The plate's second mode number: how many nodal lines cross the other axis.",
-      "markdownDescription": "The plate's second mode number: how many nodal lines cross the other axis.\n\n- default `5.0`\n- typical range `1.0` to `16.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "The plate's second mode number: how many nodal lines cross the other axis.\n\n- default `5.0`\n- typical range depends on the family: `chladni` `1.0` to `16.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `escape_time` — the parameter is not read there at all\n- structural parameter\n\nThe value is an expression, always quoted."
     },
     "param.line_width": {
       "type": "string",
       "description": "How wide a band around the nodal lines lights, in plate units (the plate is 2 across); 0 is a one-pixel line.",
-      "markdownDescription": "How wide a band around the nodal lines lights, in plate units (the plate is 2 across); 0 is a one-pixel line.\n\n- default `0.04`\n- typical range `0.0` to `0.3` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How wide a band around the nodal lines lights, in plate units (the plate is 2 across); 0 is a one-pixel line.\n\n- default `0.04`\n- typical range depends on the family: `chladni` `0.0` to `0.3` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `escape_time` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.plate_mix": {
       "type": "string",
       "description": "Blends from the nodal lines alone toward the whole signed wave, which reads as a standing wave rather than as sand.",
-      "markdownDescription": "Blends from the nodal lines alone toward the whole signed wave, which reads as a standing wave rather than as sand.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "Blends from the nodal lines alone toward the whole signed wave, which reads as a standing wave rather than as sand.\n\n- default `0.0`\n- typical range depends on the family: `chladni` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `escape_time` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.iterations": {
       "type": "string",
       "description": "How many steps an orbit is followed before it is called part of the set; more resolves finer boundary detail. Capped by the quality tier.",
-      "markdownDescription": "How many steps an orbit is followed before it is called part of the set; more resolves finer boundary detail. Capped by the quality tier.\n\n- default `64.0`\n- typical range `1.0` to `512.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How many steps an orbit is followed before it is called part of the set; more resolves finer boundary detail. Capped by the quality tier.\n\n- default `64.0`\n- typical range depends on the family: `escape_time` `1.0` to `512.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `chladni` — the parameter is not read there at all\n- structural parameter\n\nThe value is an expression, always quoted."
     },
     "param.c_re": {
       "type": "string",
       "description": "The real part of the Julia constant: the lever that reshapes the set, from one connected piece to dust. Inert on the `mandelbrot` map.",
-      "markdownDescription": "The real part of the Julia constant: the lever that reshapes the set, from one connected piece to dust. Inert on the `mandelbrot` map.\n\n- default `-0.8`\n- typical range `-1.5` to `0.5` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "The real part of the Julia constant: the lever that reshapes the set, from one connected piece to dust. Inert on the `mandelbrot` map.\n\n- default `-0.8`\n- typical range depends on the family: `escape_time` `-1.5` to `0.5` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `chladni` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.c_im": {
       "type": "string",
       "description": "The imaginary part of the Julia constant. Inert on the `mandelbrot` map.",
-      "markdownDescription": "The imaginary part of the Julia constant. Inert on the `mandelbrot` map.\n\n- default `0.156`\n- typical range `-1.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "The imaginary part of the Julia constant. Inert on the `mandelbrot` map.\n\n- default `0.156`\n- typical range depends on the family: `escape_time` `-1.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `chladni` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.escape_radius": {
       "type": "string",
       "description": "How far an orbit must travel to count as escaped; larger smooths the colour bands' spacing.",
-      "markdownDescription": "How far an orbit must travel to count as escaped; larger smooths the colour bands' spacing.\n\n- default `16.0`\n- typical range `2.0` to `256.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How far an orbit must travel to count as escaped; larger smooths the colour bands' spacing.\n\n- default `16.0`\n- typical range depends on the family: `escape_time` `2.0` to `256.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `chladni` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.power": {
       "type": "string",
       "description": "The exponent in z -> z^power + c: 2 is the classic set, higher whole powers add lobes, and a fractional power tears along the negative real axis.",
-      "markdownDescription": "The exponent in z -> z^power + c: 2 is the classic set, higher whole powers add lobes, and a fractional power tears along the negative real axis.\n\n- default `2.0`\n- typical range `1.5` to `8.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "The exponent in z -> z^power + c: 2 is the classic set, higher whole powers add lobes, and a fractional power tears along the negative real axis.\n\n- default `2.0`\n- typical range depends on the family: `escape_time` `1.5` to `8.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `chladni` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.interior": {
       "type": "string",
       "description": "How much light the set itself emits; 0 is the textbook black interior.",
-      "markdownDescription": "How much light the set itself emits; 0 is the textbook black interior.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How much light the set itself emits; 0 is the textbook black interior.\n\n- default `0.0`\n- typical range depends on the family: `escape_time` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `chladni` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.trap_radius": {
       "type": "string",
       "description": "How far the orbit trap sits from the origin — the circle's radius, the line's offset, the point's and the cross's distance. Inert with no `trap`.",
-      "markdownDescription": "How far the orbit trap sits from the origin — the circle's radius, the line's offset, the point's and the cross's distance. Inert with no `trap`.\n\n- default `0.5`\n- typical range `0.0` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How far the orbit trap sits from the origin — the circle's radius, the line's offset, the point's and the cross's distance. Inert with no `trap`.\n\n- default `0.5`\n- typical range depends on the family: `escape_time` `0.0` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `chladni` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.trap_rotate": {
       "type": "string",
       "description": "Turns the orbit trap about the origin, in whole turns. Inert on a `circle` and with no `trap`.",
-      "markdownDescription": "Turns the orbit trap about the origin, in whole turns. Inert on a `circle` and with no `trap`.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "Turns the orbit trap about the origin, in whole turns. Inert on a `circle` and with no `trap`.\n\n- default `0.0`\n- typical range depends on the family: `escape_time` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `chladni` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.color_span.analytic_field": {
       "type": "string",

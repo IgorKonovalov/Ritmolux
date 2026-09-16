@@ -160,8 +160,8 @@ declaration moves without them. Regenerate — never hand-edit — in the same p
 
 | You changed | Regenerate with | What it rewrites |
 |-------------|-----------------|------------------|
-| A `ParamSpec`, a structural table's declaration, or a `SystemKind` | `RLX_UPDATE_PRESET_SCHEMA=1 cargo nextest run -p rlx-core --test preset_schema` | `presets/schema/*.schema.json`, `presets/preset.schema.json`, `.taplo.toml` (ADR-0190) |
-| A `ParamSpec` (name, default, range, doc) | `RLX_UPDATE_PARAM_REFERENCE=1 cargo nextest run -p rlx-core --test preset` | the generated params block in `presets/README.md` (ADR-0170) |
+| A `ParamSpec`, a structural table's declaration, or a `SystemKind` | `RLX_UPDATE_PRESET_SCHEMA=1 cargo nextest run -p rlx-core --test suite preset_schema::` | `presets/schema/*.schema.json`, `presets/preset.schema.json`, `.taplo.toml` (ADR-0190) |
+| A `ParamSpec` (name, default, range, doc) | `RLX_UPDATE_PARAM_REFERENCE=1 cargo nextest run -p rlx-core --test suite preset::` | the generated params block in `presets/README.md` (ADR-0170) |
 | A render change that moves a golden on purpose | `RLX_BLESS=1 cargo nextest run -p rlx-core --test golden` | the golden baselines |
 
 A preset file an engine change forces you to edit is checked in one process start with no GPU:

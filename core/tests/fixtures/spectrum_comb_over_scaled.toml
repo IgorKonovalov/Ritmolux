@@ -3,7 +3,7 @@
 # `spectrum_comb` exactly as it shipped over-scaled, recovered from
 # `git show 2efb80e^:presets/spectrum_comb.toml`: every table and every binding
 # byte-for-byte, comments stripped and the `name` suffixed so the report reads
-# clearly. It belongs to `core/tests/geometry_extent.rs` (Plan 0069 Phase 3,
+# clearly. It belongs to `core/tests/suite/geometry_extent.rs` (Plan 0069 Phase 3,
 # ADR-0083) as the non-vacuity fixture for the in-frame geometry gate.
 #
 # `scale = 3.80` is the whole of it. Tuned before ADR-0049 normalized the bands

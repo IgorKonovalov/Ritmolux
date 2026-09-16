@@ -1,4 +1,4 @@
-# TEST FIXTURE - do not tune. `core/tests/line_joints.rs` reads the joint
+# TEST FIXTURE - do not tune. `core/tests/suite/line_joints.rs` reads the joint
 # positions back out of these exact numbers, so every value here is load-bearing
 # geometry rather than a look. Pins no pixels and is never blessed.
 #

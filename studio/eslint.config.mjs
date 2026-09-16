@@ -24,6 +24,24 @@ const NODE_ONLY = [
   'node:*',
 ]
 
+/**
+ * A cargo output path is asked of cargo, never built from the source tree.
+ *
+ * `join(ROOT, 'target', ...)` is right only while the target directory happens
+ * to sit beside the workspace manifest; `CARGO_TARGET_DIR` or a `[build]
+ * target-dir` moves it and the path silently names nothing. The tests that need
+ * the built player go through `electron/testing/player.ts`. Both call shapes are
+ * caught: a bare `join` and a member call such as `path.join`.
+ */
+const NO_TARGET_JOIN = [
+  "CallExpression[callee.name='join'] > Literal.arguments[value='target']",
+  "CallExpression[callee.property.name='join'] > Literal.arguments[value='target']",
+].map((selector) => ({
+  selector,
+  message:
+    "Never join 'target' onto a path: ask cargo for the target directory (electron/testing/player.ts).",
+}))
+
 export default [
   { ignores: ['dist/**', 'release/**', 'node_modules/**', '*.config.ts', 'scripts/**'] },
   js.configs.recommended,
@@ -39,6 +57,7 @@ export default [
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/consistent-type-imports': ['error', { prefer: 'type-imports' }],
       'no-undef': 'off',
+      'no-restricted-syntax': ['error', ...NO_TARGET_JOIN],
     },
   },
   {

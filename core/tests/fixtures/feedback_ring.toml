@@ -1,4 +1,4 @@
-# FEEDBACK FIXTURE - do not tune; the SHEAR guard in core/tests/feedback.rs reads
+# FEEDBACK FIXTURE - do not tune; the SHEAR guard in core/tests/suite/feedback.rs reads
 # it. Plan 0046 Phase 1.
 #
 # The rotation, spun fast enough and held long enough that the accumulated arc

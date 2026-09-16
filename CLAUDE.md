@@ -79,7 +79,7 @@ presets/             # The curated preset library (*.toml) — build.rs globs an
     │                #   a subdirectory is skipped by construction. See its own README.
     └── schema/      #   GENERATED editor JSON Schemas, one per system, beside the generic
                      #   preset.schema.json; the root .taplo.toml (also generated) picks one by
-                     #   filename family (ADR-0190). Never hand-edited: core/tests/preset_schema.rs
+                     #   filename family (ADR-0190). Never hand-edited: core/tests/suite/preset_schema.rs
                      #   holds them to the engine, RLX_UPDATE_PRESET_SCHEMA=1 rewrites them.
 tools/
 ├── sd-filter/       # Python sidecar for the diffusion-filter pass (ADR-0122). Not a cargo crate,
@@ -90,8 +90,9 @@ tools/
                      #   lanes to a fast-forwarded main, and never pushes. Neither a gate nor a
                      #   renderer - a program that starts other programs and spends money - so it
                      #   refuses to start without the gitignored local.json of spend caps, and
-                     #   refuses a CLI version spike/README.md did not verify. Runtime record in
-                     #   state/ and digest.md, both gitignored; its README is the operator guide.
+                     #   refuses a CLI version spike/README.md did not verify - except a patch above
+                     #   a verified one, which runs with a warning (ADR-0208). Runtime record in
+                     #   state/, live.log and digest.md, all gitignored; README is the operator guide.
 site/                # The documentation front end (ADR-0154): an
                      #   Astro Starlight site publishing the READER-FACING subset of docs/ with real
                      #   search, live at igorkonovalov.github.io/Ritmolux/. One of the repository's
@@ -157,8 +158,9 @@ docs/                # Full one-line-per-doc map: README.md "Repository layout".
                      #   CLONE — nothing runs until `git config core.hooksPath .githooks`, and the
                      #   studio step skips itself again on a clone with no studio/node_modules.
                      #   See README + ADR-0033.
-scripts/             # Repo maintenance. Ten Node gates. EIGHT run by pre-push and by the CI
-                     #   `links` job; the other TWO run in neither, because they need a BUILT site -
+scripts/             # Repo maintenance. The Node gates, and a count of them is deliberately not
+                     #   written here - every one below runs by pre-push and by the CI `links` job
+                     #   EXCEPT the two site gates, which need a BUILT site and so run in neither -
                      #   they live in .github/workflows/pages.yml. check-site-links.mjs asserts that
                      #   no site-relative href in site/dist/ ends in .md, that every one resolves to
                      #   a built file, and that every off-site href is absolute https (ADR-0154);
@@ -166,7 +168,7 @@ scripts/             # Repo maintenance. Ten Node gates. EIGHT run by pre-push a
                      #   from the menu rather than only by search, and that no route the splitter
                      #   produced exceeds 30,000 bytes of source (ADR-0166) - a route over that means
                      #   ADR-0166's arithmetic needs redoing, never that the constant needs raising.
-                     #   Of the eight, the first three, toc.mjs and check-release-tag.mjs also run
+                     #   Of the pre-push set, the first three, toc.mjs and check-release-tag.mjs also run
                      #   in the close ceremony, because a close is what breaks them. check-doc-links.mjs asserts
                      #   every relative markdown link resolves (moving a plan to plans/done/ breaks
                      #   links in both directions, and rejects a design-backlog fragment outright
@@ -185,7 +187,11 @@ scripts/             # Repo maintenance. Ten Node gates. EIGHT run by pre-push a
                      #   ANNOTATED `v` tag - offline at pre-push (exists, annotated, on HEAD's
                      #   history), `--remote` in CI on a push to main (origin advertises it), and
                      #   at the close after the tag is written, with `--stranded` listing any older
-                     #   tag origin lacks (ADR-0203).
+                     #   tag origin lacks (ADR-0203); check-translations.mjs reads every `.ru.md`
+                     #   translation's `translated-from: <sha>` stamp - a MISSING or malformed one
+                     #   is an exit code, a source that has MOVED past its stamp is an advisory row
+                     #   and never one, because no machine here can read the prose either way
+                     #   (ADR-0185).
                      #   scripts/fixtures/ holds their seeded bite checks.
                      #   RENDERERS, NOT GATES: docs-shots.mjs (regenerates docs/images/),
                      #   tuple-sheets.mjs + tuple-paths.mjs (attractor roster/walk contact
@@ -194,6 +200,10 @@ scripts/             # Repo maintenance. Ten Node gates. EIGHT run by pre-push a
                      #   output lands under target/ uncommitted. They are here so that "every
                      #   .mjs is wired into pre-push or CI" reads as a rule with five named
                      #   exceptions rather than as a claim that is simply false.
+                     #   A MAINTENANCE TOOL, the third kind: prune-target.mjs deletes what the
+                     #   everyday loop's cargo JSON no longer reports from <target>/debug/deps/
+                     #   (dry run by default, --apply, --verify-fresh). A person runs it when
+                     #   the disk fills; it judges no build (docs/developing.md "Disk").
 ```
 
 ## Machine setup: the linker override (opt-in, and inert if skipped)
@@ -251,7 +261,7 @@ rebuild**. That buys the line numbers back at the price of a full rebuild of the
 commit the deletion.
 
 Why the line is there: MSVC emits a separate `.pdb` per linked target and packs no split debuginfo,
-so the dependency graph's line tables are duplicated into every one of the workspace's 46 test
+so the dependency graph's line tables are duplicated into every one of the workspace's test
 binaries — 25.5 MB per binary, measured, which the setting stops emitting. ADR-0165.
 
 ## How we work (canonical workflow)

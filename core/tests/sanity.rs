@@ -469,7 +469,7 @@ fn coverage_floor(system: SystemKind) -> f32 {
         // rather than resolved: the structural argument it rests on is the one
         // Phase 3 falsified — a fullscreen field scores 1.0 because `coverage`
         // was reading the ground it paints — and the number is duplicated in
-        // `core/tests/warp_mesh.rs`, which that phase is not scoped to touch and
+        // `core/tests/suite/warp_mesh.rs`, which that phase is not scoped to touch and
         // which asserts the two match. The first `warp_mesh` preset re-derives
         // both together.
         SystemKind::WarpMesh => 0.50,

@@ -4,13 +4,42 @@
 //
 //   { "plans": { "0101": { "reviews": ["major", "clean"], "bogusCommit": true, "lightweightTag": true,
 //                          "noCloseReview": true, "budget": "implement", "minors": 1, "numericThrough": true,
-//                          "delayMs": { "review": 400 } } } }
+//                          "delayMs": { "review": 400 }, "breaksProbe": true, "probeStaysRed": true,
+//                          "dirtyPark": { "untracked": 13 } } } }
+//
+// `dirtyPark` makes the implement session rewrite the tracked VERSION, write `untracked` new files,
+// and park with them all left in the worktree.
+//
+// `breaksProbe` commits PROBE_RED with the first implemented phase, standing in for a backlog probe
+// the plan's own delivery turns red; the close session removes it, as a close archives the entry,
+// unless `probeStaysRed`.
+//
+// `servedClose` makes the close put its version bump in Cargo.toml's version line instead of VERSION,
+// so the close tip's whole diff from the reviewed tree is paths ADR-0211 serves.
+//
+// `closeRepair` makes a clean review close with two minors, one repaired by a close commit and marked
+// `fixed_in`, one left open; "wrongFile" repairs a different file, "offBranch" names a commit on no
+// branch. `ledgerFlow` makes the review run its full suite through the wrapper before closing, and the
+// close run the gate's suite through it after the bump and before the tag.
+//
+// `loseOutcome` names a mode whose session does all of its work and then prints no outcome block, as
+// 0175's round-1 review did: it committed its repairs, its `done/` move, its bump and its tag, then
+// backgrounded the suite and ended its turn. `dirtyClose` leaves an untracked file behind with it.
+//
+// `phaseDelayMs` makes every phase after the first wait that long before it commits, so the run
+// terminal's phase lines carry durations that differ.
+//
+// `stream` is a list of events the implement session emits (see fake-claude.mjs). `awaitLive` makes
+// the implement session, after each commit, wait until the file FAKE_LIVE_FILE names holds a line
+// naming that commit: proof the conductor printed it while the session was still running.
 //
 // Every session appends `<mode>-start` and `<mode>-end` to FAKE_EVENTS with a timestamp.
 
 import { execFileSync } from "node:child_process";
-import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
+import { runWrapped } from "../with-lock.mjs";
 
 const block = (o) => "Session finished.\n\n```rlx-outcome\n" + JSON.stringify(o) + "\n```\n";
 
@@ -21,6 +50,13 @@ export default async ({ cwd, vars, env }) => {
   const mode = vars.mode;
   const git = (...a) => execFileSync("git", a, { cwd, encoding: "utf8" }).trim();
   const log = (e) => appendFileSync(env.FAKE_EVENTS, JSON.stringify({ t: Date.now(), plan, event: e }) + "\n");
+  // A full workspace suite through the real wrapper, with cargo stood in for by a green Summary.
+  const suite = () =>
+    runWrapped(["suite", "--", "cargo", "nextest", "run", "--workspace"], {
+      env,
+      cwd,
+      run: async () => ({ code: 0, output: "     Summary [   1.000s] 3 tests run: 3 passed\n" }),
+    });
   log(`${mode}-start`);
   if (ps.delayMs?.[mode]) await new Promise((r) => setTimeout(r, ps.delayMs[mode]));
   try {
@@ -29,6 +65,14 @@ export default async ({ cwd, vars, env }) => {
     const plansDir = join(cwd, "docs", "plans");
     const planName = readdirSync(plansDir).find((f) => f.startsWith(`${plan}-`));
     const planPath = join(plansDir, planName ?? "missing");
+
+    if (mode === "implement" && ps.dirtyPark) {
+      // A session whose test run rewrote a tracked file and blessed new ones, and which parks
+      // without putting them back.
+      writeFileSync(join(cwd, "VERSION"), "rewritten by a test run\n");
+      for (let i = 1; i <= (ps.dirtyPark.untracked ?? 0); i++) writeFileSync(join(cwd, `bless-${String(i).padStart(2, "0")}.png`), "png\n");
+      return { text: block({ kind: "parked", plan, reason: "check_red", detail: "a golden drifted and cannot be made green inside the phase" }), costUsd: 1 };
+    }
 
     if (mode === "implement") {
       let text = readFileSync(planPath, "utf8");
@@ -44,14 +88,30 @@ export default async ({ cwd, vars, env }) => {
         }
         text = text.replace(new RegExp(`^(\\| ${id} — [^|]*\\|[^|]*\\|) [^|]* \\|[^|]*\\|$`, "m"), "$1 committed with this row |  |");
         writeFileSync(planPath, text);
+        // A phase that takes measurably longer than the one before it, for the run terminal's clock.
+        if (ps.phaseDelayMs && commits.length) await new Promise((r) => setTimeout(r, ps.phaseDelayMs));
         writeFileSync(join(cwd, `phase-${plan}-${id}.txt`), `phase ${id} of ${plan}\n`);
         git("add", `phase-${plan}-${id}.txt`, `docs/plans/${planName}`);
-        git("commit", "-q", "-m", `feat: plan ${plan} phase ${id}`);
-        commits.push(git("rev-parse", "--short", "HEAD"));
+        if (ps.breaksProbe && commits.length === 0 && !existsSync(join(cwd, "PROBE_RED"))) {
+          writeFileSync(join(cwd, "PROBE_RED"), `plan ${plan} delivered what the probe asserts is missing\n`);
+          git("add", "PROBE_RED");
+        }
+        // A real commit subject is where the non-ASCII actually comes from: this repository's own log
+        // carries em dashes, and a preset name can carry a curly quote. The run terminal is a Windows
+        // console, so `ascii()` has to transform this before it is printed (backlog 0235).
+        git("commit", "-q", "-m", `feat: plan ${plan} phase ${id} — an “eased” value │ arrives`);
+        commits.push(git("rev-parse", "--short=7", "HEAD"));
+        if (ps.awaitLive) {
+          const want = `commit ${commits.at(-1)}`;
+          const until = Date.now() + 20_000;
+          while (Date.now() < until && !(existsSync(env.FAKE_LIVE_FILE) && readFileSync(env.FAKE_LIVE_FILE, "utf8").includes(want))) {
+            await new Promise((r) => setTimeout(r, 25));
+          }
+        }
       }
       const claimed = ps.bogusCommit ? [...commits, "deadbee"] : commits;
       const through = ps.numericThrough ? Number(ids.at(-1)) : ids.at(-1);
-      return { text: block({ kind: "phases_done", plan, through, commits: claimed }), costUsd: 1 };
+      return { text: block({ kind: "phases_done", plan, through, commits: claimed }), costUsd: ps.implementCost ?? 1, numTurns: ps.numTurns, stream: ps.stream };
     }
 
     if (mode === "fix") {
@@ -72,6 +132,14 @@ export default async ({ cwd, vars, env }) => {
         kind === "clean"
           ? Array.from({ length: ps.minors ?? 0 }, (_, i) => ({ severity: "minor", file: `phase-${plan}-1.txt`, line: i + 1, what: `minor finding ${i + 1}` }))
           : [{ severity: kind, file: `phase-${plan}-1.txt`, line: 1, what: `${kind} finding in round ${round}` }];
+      if (kind === "clean" && ps.closeRepair) {
+        findings.push(
+          { severity: "minor", file: `phase-${plan}-1.txt`, line: 1, what: "a comment the plan made false" },
+          { severity: "minor", file: `phase-${plan}-1.txt`, line: 2, what: "a duplicated constant, left open" },
+        );
+      }
+      // Mode 4's full suite, through the wrapper as the architect skill's conductor mode says.
+      if (ps.ledgerFlow) await suite();
       writeFileSync(reviewPath, `# Review of ${plan}, round ${round}\n\n${findings.map((f) => `- ${f.severity}: ${f.what}`).join("\n")}\n`);
       const verdict = {
         round,
@@ -83,6 +151,19 @@ export default async ({ cwd, vars, env }) => {
       };
       if (kind !== "clean") return { text: block({ kind: "verdict", plan, ...verdict }), costUsd: 2 };
 
+      // The close's order: repairs, merge main, bookkeeping and bump, the whole gate, the tag.
+      if (ps.closeRepair) {
+        const repaired = findings.find((f) => f.what === "a comment the plan made false");
+        if (ps.closeRepair === "offBranch") {
+          repaired.fixed_in = git("commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", "docs: a repair on no branch");
+        } else {
+          const file = ps.closeRepair === "wrongFile" ? "README.md" : repaired.file;
+          writeFileSync(join(cwd, file), `${readFileSync(join(cwd, file), "utf8")}repaired\n`);
+          git("add", file);
+          git("commit", "-q", "-m", "docs: the close repairs a finding");
+          repaired.fixed_in = git("rev-parse", "--short=7", "HEAD");
+        }
+      }
       git("merge", "-q", "--no-edit", "main");
       mkdirSync(join(plansDir, "done"), { recursive: true });
       git("mv", `docs/plans/${planName}`, `docs/plans/done/${planName}`);
@@ -94,11 +175,25 @@ export default async ({ cwd, vars, env }) => {
       writeFileSync(donePath, text);
       const [maj, min, pat] = readFileSync(join(cwd, "VERSION"), "utf8").trim().split(".").map(Number);
       const version = `${maj}.${min}.${pat + 1}`;
-      writeFileSync(join(cwd, "VERSION"), `${version}\n`);
-      git("add", "VERSION", `docs/plans/done/${planName}`);
+      if (ps.servedClose) {
+        // A close whose whole diff from the reviewed tree is served paths: the plan's move under
+        // docs/ and a version line in Cargo.toml, with the untracked VERSION left alone.
+        const toml = join(cwd, "Cargo.toml");
+        writeFileSync(toml, readFileSync(toml, "utf8").replace(/^version = ".*"$/m, `version = "${version}"`));
+        git("add", "Cargo.toml", `docs/plans/done/${planName}`);
+      } else {
+        writeFileSync(join(cwd, "VERSION"), `${version}\n`);
+        git("add", "VERSION", `docs/plans/done/${planName}`);
+      }
+      if (existsSync(join(cwd, "PROBE_RED")) && !ps.probeStaysRed) git("rm", "-q", "PROBE_RED");
       git("commit", "-q", "-m", `chore: Release ${version}`);
+      if (ps.ledgerFlow) await suite();
       if (ps.lightweightTag) git("tag", `v${version}`);
       else git("tag", "-a", `v${version}`, "-m", `chore: Release v${version}`);
+      if (ps.loseOutcome === "review") {
+        if (ps.dirtyClose) writeFileSync(join(cwd, "suite-output.log"), "still compiling\n");
+        return { text: "Still compiling; I'll be notified when the suite exits.", costUsd: 3 };
+      }
       return { text: block({ kind: "closed", plan, version, tag: `v${version}`, verdict }), costUsd: 3 };
     }
     return { text: "unknown mode" };

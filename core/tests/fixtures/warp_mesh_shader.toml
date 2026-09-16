@@ -9,7 +9,7 @@
 #
 # THE SHADERS ARE GENERATED, NOT TRANSCRIBED. Each begins with exactly
 # `milk::shader::fragment_prelude(g)` at its own group - `WARP_GROUP` for the
-# warp module, `COMP_GROUP` for the comp one - and `core/tests/warp_mesh.rs`'s
+# warp module, `COMP_GROUP` for the comp one - and `core/tests/suite/warp_mesh.rs`'s
 # `the_fixture_shaders_begin_with_the_prelude` asserts that byte for byte. That
 # is `milkconv/tests/fixture.rs`'s discipline applied to WGSL: the prelude is
 # ~2 KB of generated text that ADR-0118 changed this month, so a verbatim copy

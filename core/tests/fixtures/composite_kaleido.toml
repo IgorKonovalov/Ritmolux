@@ -27,7 +27,7 @@
 # disc clamp (no falloff) at mean 0.0189 - green, at 94% of the drift budget,
 # announcing nothing. The falloff is what lets this fixture see its own fix. It is
 # still not the direct guard 0010 asked for: that is
-# core/tests/kaleidoscope.rs::the_falloff_treatment_paints_nothing_outside_its_disc
+# core/tests/suite/kaleidoscope.rs::the_falloff_treatment_paints_nothing_outside_its_disc
 # (renamed from `the_fold_paints_nothing_outside_its_disc` at Plan 0055 Phase 3 -
 # see the ADR-0061 note below), which asserts the out-of-disc statistic on a
 # border-filling fixture at a PORTRAIT aspect, and which fails on the pre-fix
@@ -76,7 +76,7 @@
 # outward produces empty content. Measured rather than argued - the fixture
 # rendered at 160x100 with `kaleido_edge` pinned to 0 and to 1 gives md5-IDENTICAL
 # PNGs, and the drift against the untouched baseline is mean 0.0000 / outlier 1.
-# It is the same fact core/tests/kaleidoscope.rs states when it explains why a
+# It is the same fact core/tests/suite/kaleidoscope.rs states when it explains why a
 # centred line figure cannot serve as ITS border-filling fixture.
 #
 # So this baseline is blind to the edge treatment by construction, and that is now

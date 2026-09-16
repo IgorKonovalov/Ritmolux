@@ -656,7 +656,7 @@ pub struct Background {
 /// vocabulary these are **global** — every preset may bind them whatever its
 /// system — so the loader's typo check unions them in (ADR-0020).
 /// **Keep in sync with `set_param` below**; the
-/// `declared_params_match_set_param` guard in `core/tests/preset.rs` fails if
+/// `declared_params_match_set_param` guard in `core/tests/suite/preset.rs` fails if
 /// the two drift.
 pub const PARAMS: &[ParamSpec] = &[
     ParamSpec {

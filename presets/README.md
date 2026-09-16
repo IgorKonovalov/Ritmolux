@@ -309,7 +309,7 @@ in
   ceiling at `C / G`; if that is below the typical level, the term is a constant
   no matter how reactive it reads. Phase 7 found **263 of 332** clamped band terms
   in that state at once. **This one is now checked** — `--report`'s `occ` column
-  names the binding and `core/tests/saturation.rs` fails the build on it (Plan
+  names the binding and `core/tests/suite/saturation.rs` fails the build on it (Plan
   0056 / [ADR-0062](../docs/adrs/0062-clamp-occupancy-is-the-saturation-instrument.md),
   and the `[occupancy]` table [below](#a-clamp-is-a-limit-not-a-gain--the-occupancy-table)).
   Do the division while composing anyway: the gate fires at occupancy `0.9`, so a
@@ -419,7 +419,7 @@ here is the **definition**, and the essay is the **discussion**.
 
 <!-- params:begin -->
 <!-- GENERATED - do not edit between the markers. Rewrite it with:
-     RLX_UPDATE_PARAM_REFERENCE=1 cargo test -p rlx-core --test preset \
+     RLX_UPDATE_PARAM_REFERENCE=1 cargo test -p rlx-core --test suite \
        the_parameter_reference_block_is_current
      The declarations it is generated from live beside each scene's own `set_param`. -->
 
@@ -640,10 +640,10 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
-| `a` | `0` |  | First of the four family coefficients; what it means depends on the attractor family the tuple picked. |
-| `b` | `0` |  | Second family coefficient - see the roster's attractor essay for what each family does with it. |
-| `c` | `0` |  | Third family coefficient, and on the IFS figures it means nothing at all. |
-| `d` | `0` |  | Fourth family coefficient; like the other three it is inert on the IFS figures. |
+| `a` | `0` | `de_jong` `-3` – `3`; `clifford` `-2` – `2`; `thomas` `0` – `0.25`; `lorenz` `5` – `20`; inert on `fern`, `tree`, `dragon`, `sierpinski`, `spiral` | First of the four family coefficients; what it means depends on the attractor family the tuple picked. |
+| `b` | `0` | `de_jong` `-3` – `3`; `clifford` `-2` – `2`; `lorenz` `20` – `130`; inert on `thomas`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` | Second family coefficient - see the roster's attractor essay for what each family does with it. |
+| `c` | `0` | `de_jong` `-3` – `3`; `clifford` `-2` – `2`; `lorenz` `0.5` – `4.5`; inert on `thomas`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` | Third family coefficient, and on the IFS figures it means nothing at all. |
+| `d` | `0` | `de_jong` `-3` – `3`; `clifford` `-2` – `2`; inert on `thomas`, `lorenz`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` | Fourth family coefficient; like the other three it is inert on the IFS figures. |
 | `size` | `1` | `0` – `4` | Size of each particle's deposit into the accumulation. |
 | `hue` | `0` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. |
 | `brightness` | `1` | `0` – `2` | The scene's overall light level, multiplying what it draws before the composite. |
@@ -794,6 +794,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
+| `deposit_arms` | `0` | `0` – `16` | How many arms the ring is broken into, as a whole number of arms; 0 leaves it whole. |
 | `echo_orient` | `0` | `0` – `3` | Which way the echoed copy is flipped before it is blended. |
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
 
@@ -818,7 +819,6 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | `deposit_y` | `0.5` | `0` – `1` | Vertical position of the deposited figure, in uv. |
 | `deposit_radius` | `0.45` | `0` – `1` | Radius of the deposited ring. |
 | `deposit_width` | `0.11` | `0` – `0.5` | How thick that ring is; narrow reads as a wire, wide as a disc. |
-| `deposit_arms` | `0` | `0` – `16` | How many arms the ring is broken into, as a real angular frequency; 0 leaves it whole. |
 | `deposit_twist` | `0` | `-2` – `2` | Sweeps the arms into a spiral rather than leaving them radial. |
 | `deposit_spin` | `0` | `-2` – `2` | Turns per second the deposited figure rotates by. |
 | `gamma` | `1` | `0.25` – `4` | Shapes the field's tone curve on its way out; below 1 lifts the mid tones. |
@@ -2934,8 +2934,9 @@ black away from the horizon. You do not need a lit ground to hang a galaxy on.
 **The band is additive over the ground and under the scene.** It adds light rather than replacing
 it, which is what unresolved starlight is — so it brightens whatever the ramp already painted rather
 than covering it, and the scene then draws over both. A fullscreen or opaque scene therefore hides
-the band exactly as it hides the ramp, and **`fragment_field` hides it completely**. A galaxy under
-a fragment-field preset is not a dim galaxy, it is an absent one.
+the band exactly as it hides the ramp, and at the default `occlude = 1` **`fragment_field` hides it
+completely**. A galaxy under a fragment-field preset is not a dim galaxy, it is an absent one, unless
+the preset lowers [`occlude`](#backdrop-occlusion--occlude).
 
 **The band shares your `[palette]` with the ground *and* the scene *and* any `[layer]`, and that is
 the one real authoring constraint this creates.** There is no second palette to reach for —
@@ -3007,15 +3008,19 @@ Three things to weigh before setting it to `0`:
 0.0, over backdrops at 0.35 and 0.60, judged in motion. The verdict was that at
 shipped brightnesses the difference is almost negligible — which is the same fact
 the ceiling above states from the other side, since the ceiling binds only where
-the figure is *dim*. No shipped preset binds `occlude` today.
+the figure is *dim*. A few shipped presets bind it: `attractor_lorenzknot`,
+`lsystem_icecrystal`, `spectrum_radialbloom` and `swarm_murmuration` lower it, and
+`fragment_etchingplate` and `shape_strataheart` state the default `1.0`.
 
 **The additive families are already unoccluded when no post stage is active.**
 The swarm, line and emitter scenes blend colour `One`/`One`, so with an empty
 chain their backdrop survives in full whatever `occlude` says — there is no
 occlusion at that seam for it to scale. It reaches them through the chain's last
 stage instead, which every shipped preset in those families has. The scenes that
-present premultiplied over the backdrop (reaction-diffusion, attractor, fragment
-field) consume it directly on the empty-chain path.
+present premultiplied over the backdrop (reaction-diffusion, cellular, attractor,
+warp mesh, and the four fullscreen fields: fragment field, analytic field, shape
+field, shape collage) consume it directly on the empty-chain path, so on them
+`occlude = 0` lets the sky through with or without a post stage.
 
 ### Geometry mirror (line systems) — `mirror_order`, `mirror_reflect`
 
@@ -3809,6 +3814,14 @@ A param not listed is applied instantly; `0` also means no smoothing. The smooth
 refresh rate, and it resets on a preset switch (a switch snaps to the new preset's
 first value). Validated non-negative and finite at load.
 
+An eased value reaches its target **exactly**, but only after about ten to fifteen time
+constants. That matters for a parameter the engine **floors** — `lsystem`'s `visible_depth`,
+`shape_collage`'s `count`, `parametric_curve`'s `samples`: it takes its step only on arrival, so
+`visible_depth = "3 + floor(clamp(onset * 2, 0, 1))"` under a short `[smoothing]` constant draws
+generation 4 only if the onset is held until the ease arrives. On a transient the target is back at
+3 first, and generation 4 never draws at all. A step that must land inside a transient targets
+the midpoint instead, `3.5 + floor(...)`, so the floored value crosses mid-glide.
+
 ### Snap up, glide down — the `{ attack, release }` form
 
 One constant slows the rise exactly as much as it slows the fall, so a longer
@@ -3957,7 +3970,7 @@ does not bind is a warning, like an inert `[occupancy] exempt` entry.
 
 ## A clamp is a limit, not a gain — the `[occupancy]` table
 
-`core/tests/saturation.rs` is a **HARD gate**: it walks every shipped preset's
+`core/tests/suite/saturation.rs` is a **HARD gate**: it walks every shipped preset's
 expressions over 12 s of `dynamic:110` and fails the build on any `clamp()` whose
 inner value sits **at** its upper bound for 90 % or more of the hops
 ([ADR-0062](../docs/adrs/0062-clamp-occupancy-is-the-saturation-instrument.md)).

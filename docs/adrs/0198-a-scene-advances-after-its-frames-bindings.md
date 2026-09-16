@@ -1,8 +1,8 @@
 # ADR-0198 — A scene advances after its frame's bindings, and a shared scene is never evaluated twice in a frame
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-15 (Plan 0181), with an Outcome
 > **Date:** 2026-09-14
-> **Related plan(s):** [0181](../plans/0181-a-scene-advances-after-its-frames-bindings.md)
+> **Related plan(s):** [0181](../plans/done/0181-a-scene-advances-after-its-frames-bindings.md)
 > **Extends:** [0135](0135-every-scene-rate-integrates-through-one-shared-phase.md) (every scene rate
 > integrates through one shared `Phase`), [0024](0024-cross-preset-transitions.md) (cross-preset
 > transitions and the dual-live governor)
@@ -95,3 +95,22 @@ text rule like that approximates what the reorder guarantees by construction.
 **Rejected because it is two orders chosen by a frame flag**: two answers to one question, the
 pattern ADR-0191 retired for the frame delta. It also leaves the one-frame lag in the steady state,
 where `shape_collage`'s recomposition edge still fires a frame late.
+
+## Outcome (2026-09-15, at Plan 0181's close)
+
+The Decision landed as written. `evaluate_preset` and `evaluate_layer` in
+`core/src/render/evaluate.rs` call `set_time` and `advance` directly above `update`, after the
+bindings, the overrides and the per-vertex table, and `Scene::advance`'s doc states that order.
+`begin_transition_forced` keeps `Freeze` for a pair `scenes::shares_resources` reports as shared, and
+the governor test asserts `Mode::Freeze` for a same-system pair of every `SystemKind`. Two tests pin
+the switch frame: a fresh `emitter` integrates exactly its bound `spin` times `dt`, and a fresh
+`shape_collage` generates its bound canvas once, on frame 1.
+
+**One Negative consequence did not happen.** No golden moved: the full workspace suite passed with no
+bless, the `emitter` and `shape_collage` baselines included. A one-frame shift in a rate, and a
+recomposition one frame earlier, stayed inside each baseline's tolerance on a 120-frame capture.
+Renders compared across the change still differ, as the Negative says; the goldens cannot see it.
+
+Two comments outside the plan's sweep still stated the old order at the close: the attractor's spin
+comment in `particles/mod.rs` and the `cellular` test driver's doc. Both are recorded as open findings
+in Plan 0181's close review.

@@ -11,7 +11,7 @@
 //! produces a rotation, so the rows are orthonormal to `f32`).
 //!
 //! The GPU half — `MilkShaderResources::build`, the bind groups, the blur chain
-//! — is `core/tests/warp_mesh.rs`'s, driven by the shader-carrying fixture
+//! — is `core/tests/suite/warp_mesh.rs`'s, driven by the shader-carrying fixture
 //! Phase 2 writes.
 
 // Test asserts panic on failure; allowed here over the module's hot-path pragma.
@@ -349,7 +349,10 @@ fn the_pure_half_is_total_on_degenerate_input() {
     // `decay` is deliberately not swept past zero: it reaches here from
     // `FrameOutputs::decay`, which is a saturated `per_second_factor` and so is
     // finite by construction. What is swept is what the *scene* hands over.
-    let cases: [DegenerateCase; 8] = [
+    // `dt` is not swept either: the scene's delta arrives through
+    // `sanitize_frame_dt`, finite and positive (ADR-0191), so a zero or NaN
+    // `dt` is outside what this function is ever handed.
+    let cases: [DegenerateCase; 6] = [
         ("a zero size", (0, 0), 1.0, 1.0 / 60.0, 0.98),
         ("a zero aspect", (64, 64), 0.0, 1.0 / 60.0, 0.98),
         ("a negative aspect", (64, 64), -2.0, 1.0 / 60.0, 0.98),
@@ -361,8 +364,6 @@ fn the_pure_half_is_total_on_degenerate_input() {
             1.0 / 60.0,
             0.98,
         ),
-        ("a zero dt", (64, 64), 1.0, 0.0, 0.98),
-        ("a NaN dt", (64, 64), 1.0, f32::NAN, 0.98),
         ("a negative decay", (64, 64), 1.0, 1.0 / 60.0, -1.0),
     ];
     for (what, size, aspect, dt, decay) in cases {

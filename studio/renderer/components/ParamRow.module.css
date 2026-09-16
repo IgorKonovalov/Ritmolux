@@ -19,7 +19,8 @@
   accent-color: var(--accent);
 }
 
-.slider:disabled {
+.slider:disabled,
+.field:disabled {
   opacity: 0.4;
 }
 
@@ -46,6 +47,16 @@
   font-size: 0.65rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+/* A parameter the family on screen does not read: its binding, and no control. */
+.inert {
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* An unbounded parameter: a field, not a slider. */

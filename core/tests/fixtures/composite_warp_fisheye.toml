@@ -6,7 +6,7 @@
 # files differ in exactly one structural key each, so the three warp baselines are
 # a controlled comparison against each other and against the un-warped original.
 # If the `[feedback] warp` selector were ignored, all three would render the same
-# picture, and `each_warp_kind_bends_the_past_its_own_way` in core/tests/feedback.rs
+# picture, and `each_warp_kind_bends_the_past_its_own_way` in core/tests/suite/feedback.rs
 # is what says so out loud.
 #
 # `fisheye` magnifies radially with the square of the radius, so the centre barely

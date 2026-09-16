@@ -1577,7 +1577,7 @@ fn states_and_threshold_are_structural_and_hold_cleanly() {
 /// **Identical seed and identical frames yield an identical field after 1,000
 /// generations**, for every family — state and age, every texel, read off the
 /// field rather than off a picture of it, with reseeds on a beat pattern and a
-/// generation rate that moves. The integration twin in `core/tests/cellular.rs`
+/// generation rate that moves. The integration twin in `core/tests/suite/cellular.rs`
 /// makes the same claim through the whole renderer.
 #[test]
 fn the_field_is_identical_after_a_thousand_generations_for_every_family() {

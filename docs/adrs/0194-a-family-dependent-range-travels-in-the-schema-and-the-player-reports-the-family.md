@@ -1,8 +1,8 @@
 # ADR-0194 — A family-dependent range travels in the schema, and the player reports the family
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-16 ([Plan 0179](../plans/done/0179-a-parameters-range-belongs-to-its-family.md))
 > **Date:** 2026-09-14
-> **Related plan(s):** [0179](../plans/0179-a-parameters-range-belongs-to-its-family.md)
+> **Related plan(s):** [0179](../plans/done/0179-a-parameters-range-belongs-to-its-family.md)
 > **Extends:** [0180](0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md)
 > (rule 4: the reference names the family each parameter reads on),
 > [0184](0184-the-player-reports-what-it-loaded-and-the-studio-re-derives-nothing.md) (every fact

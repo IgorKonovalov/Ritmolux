@@ -114,8 +114,13 @@ jobs:
       # cfg(test) items and redundant explicit targets. This is what turns that
       # exemption from a claim into a property.
       #
-      # NOT in the pre-push hook: that budget is ~28 s and a full cargo doc does
-      # not fit. Deliberate, not an oversight.
+      # The pre-push hook runs a SCOPED step, `cargo doc -p rlx-core --no-deps
+      # --features text` under the same flags, not this one. Measured warm on the
+      # development machine on one edit to core/src/render/metrics.rs (Plan 0177
+      # Phase 7): 4.5-5.9 s, against 6.3-7.8 s for the hook's clippy step on the
+      # same edit, and it fails on a public item linking a private one. What it
+      # does NOT cover is `standalone`'s public surface (and `milkconv`'s and
+      # `rlx-core-cabi`'s); this job is the only place those are documented.
       - run: cargo doc --workspace --no-deps
         env:
           RUSTDOCFLAGS: -D warnings
@@ -264,6 +269,23 @@ jobs:
       - run: node scripts/check-release-tag.mjs --self-test
       - if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: node scripts/check-release-tag.mjs --remote
+      # And the ninth (ADR-0185): every `.ru.md` translation opens with a
+      # `translated-from: <sha>` stamp naming the commit its source was
+      # translated from. A translation is the one second copy here that no
+      # machine can check - nothing can tell whether the Russian still says what
+      # the English now says - so the gate splits: a missing or malformed stamp
+      # is this exit code, and a source that has moved past its stamp is an
+      # advisory row that never touches it.
+      # The plain run cannot distinguish a clean tree from a detector that
+      # stopped matching, since both report `0 stamped translation(s)`, so
+      # --self-test is where the assertion lives: the four hard-failure shapes,
+      # both stamp widths, and the shallow-clone withholding against a real
+      # --depth 1 clone. THIS CHECKOUT IS SHALLOW, which is exactly the trap -
+      # `git log -1` returns the tip for every path here, so the advisory half
+      # withholds itself and says so rather than reporting every translation as
+      # stale. The pre-push hook is where that half is read.
+      - run: node scripts/check-translations.mjs
+      - run: node scripts/check-translations.mjs --self-test
       # The conductor's own suite (ADR-0205): the queue and plan readers, the lane
       # state machine against throwaway git repositories, the digest, the operator
       # commands, the two PreToolUse hooks' bite checks and the machine-wide lock.

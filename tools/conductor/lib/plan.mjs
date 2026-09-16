@@ -49,14 +49,30 @@ export function parsePlan(raw) {
   const phases = section(text, "## Implementation phases");
   if (!phases) plan.errors.push("no ## Implementation phases section");
   let current = null;
+  // `Files touched` wraps across lines; every continuation until the next bullet belongs to it.
+  let collecting = false;
   for (const line of phases?.lines ?? []) {
     const h = line.match(/^### Phase (\d+[a-z]?) [—–-] (.+)$/);
     if (h) {
-      current = { id: h[1], title: h[2].trim(), owner: null, stopCondition: null };
+      current = { id: h[1], title: h[2].trim(), owner: null, stopCondition: null, filesText: "" };
       plan.phases.push(current);
+      collecting = false;
       continue;
     }
     if (!current) continue;
+    const files = line.match(/^- \*\*Files touched:\*\*\s*(.*)$/);
+    if (files) {
+      current.filesText = files[1];
+      collecting = true;
+      continue;
+    }
+    if (collecting) {
+      if (/^\s*- \*\*/.test(line) || !line.trim()) collecting = false;
+      else {
+        current.filesText += ` ${line.trim()}`;
+        continue;
+      }
+    }
     const owner = line.match(/^- \*\*Owner skill:\*\*\s*`?([\w-]+)`?\s*$/);
     if (owner) {
       if (current.owner) plan.errors.push(`Phase ${current.id} carries two owner tags`);
@@ -113,18 +129,41 @@ export function runs(plan) {
 }
 
 /**
+ * The `.claude/` paths a phase's `Files touched` declares, deduplicated. The CLI refuses a headless
+ * session an `Edit` or `Write` under a project's `.claude/` whatever the allowlist says (ADR-0210,
+ * measured in tools/conductor/spike/README.md), so a phase that names one is the owner's and the lane
+ * stops in front of it.
+ */
+export function claudePaths(phase) {
+  return [...new Set([...String(phase?.filesText ?? "").matchAll(/\.claude\/[A-Za-z0-9_.*/-]+/g)].map((m) => m[0].replace(/[.,;]$/, "")))];
+}
+
+/**
  * The next thing the plan needs, from the first run holding a phase the log does not mark done:
- * `implement` over that run's pending phases, `human` to park at, or `review` once every phase is
- * done. `lastRun` is true when no implementer run follows it.
+ * `implement` over that run's pending phases, `human` to park at, `claude_dir` for a phase no
+ * headless session can do, or `review` once every phase is done. `lastRun` is true when no
+ * implementer run follows it.
+ *
+ * A `.claude/` phase stops the run **in front of** itself: the pending phases before it are still a
+ * step, and the phase after them is where the lane parks. Running the whole range and failing inside
+ * it is what ADR-0210 replaces — the park carries the edit, not a red done-when.
  */
 export function nextStep(plan) {
   const done = donePhases(plan);
   const all = runs(plan);
+  const byId = new Map(plan.phases.map((p) => [p.id, p]));
   for (const [i, run] of all.entries()) {
     const pending = run.phases.filter((id) => !done.has(id));
     if (pending.length === 0) continue;
     if (run.owner === "human") return { kind: "human", owner: "human", phases: pending };
     const lastRun = !all.slice(i + 1).some((r) => IMPLEMENTERS.has(r.owner));
+    const blockedAt = pending.findIndex((id) => claudePaths(byId.get(id)).length > 0);
+    if (blockedAt === 0) {
+      return { kind: "claude_dir", owner: run.owner, phases: [pending[0]], paths: claudePaths(byId.get(pending[0])) };
+    }
+    // Truncated: the `.claude/` phase still follows, so this is not the plan's last implementer run
+    // however the runs after it look.
+    if (blockedAt > 0) return { kind: "implement", owner: run.owner, phases: pending.slice(0, blockedAt), lastRun: false };
     return { kind: "implement", owner: run.owner, phases: pending, lastRun };
   }
   return { kind: "review" };

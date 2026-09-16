@@ -1297,7 +1297,7 @@ The same traversal also records **occupancy** — the fraction of
 hops a `clamp()` spends *at* its upper bound — which is the mirror of the
 `ceils` finding and the more serious of the two
 ([ADR-0062](adrs/0062-clamp-occupancy-is-the-saturation-instrument.md)).
-`--report`'s `occ` column names the binding, and `core/tests/saturation.rs` is a
+`--report`'s `occ` column names the binding, and `core/tests/suite/saturation.rs` is a
 **HARD** gate at occupancy `0.9`; a clamp that is genuinely meant to pin declares
 `[occupancy] exempt = [...]`, which silences the gate and not the diagnostic. The
 arithmetic is still worth doing while you compose, because the gate is deliberately
@@ -1788,7 +1788,7 @@ for `shot`'s equivalent `--presets` / `--preset-file` flags.
 
 **Adding a parameter to a system** touches the scene's `set_param` match, the
 `PARAMS` const beside it (the two are guarded against drift by
-`declared_params_match_set_param` in `core/tests/preset.rs`), and the table in
+`declared_params_match_set_param` in `core/tests/suite/preset.rs`), and the table in
 [`presets/README.md`](../presets/README.md).
 
 **Adding an expression variable, function, or operator** touches
@@ -1804,8 +1804,8 @@ quietly widening the vocabulary here.
 edit: it is generated from the same declarations the parser reads, and a test
 diffs it against them in both directions. What a new name owes there is one
 regeneration. The document is also committed, as `docs/specs/player-schema.json`,
-for the studio's tests to read, and `core/tests/preset_schema.rs` fails until
-`RLX_UPDATE_PRESET_SCHEMA=1 cargo nextest run -p rlx-core --test preset_schema`
+for the studio's tests to read, and `core/tests/suite/preset_schema.rs` fails until
+`RLX_UPDATE_PRESET_SCHEMA=1 cargo nextest run -p rlx-core --test suite preset_schema::`
 rewrites it ([Developing](developing.md) has the whole set that command covers).
 
 > **Format stability:** the app is pre-1.0 and in active development, so the

@@ -326,7 +326,7 @@ pub struct Preset {
     ///
     /// A safety rail exists to bind at peak, and the saturation gate would
     /// otherwise convict it of the defect it was written to prevent. The
-    /// exemption silences `core/tests/saturation.rs`, and **only** that: the
+    /// exemption silences `core/tests/suite/saturation.rs`, and **only** that: the
     /// binding still appears in `--report`'s `occ` count and `SAT` lines,
     /// because an exemption is a place to hide and the one mitigation available
     /// is that it stays visible.
@@ -346,7 +346,7 @@ pub struct Preset {
     /// either never sample a newly landed preset or make the same tree gate
     /// differently on different commits.
     ///
-    /// A floor is enforced in `core/tests/preset.rs`: every family carries at
+    /// A floor is enforced in `core/tests/suite/preset.rs`: every family carries at
     /// least two. That catches a sample decayed to nothing; it cannot catch two
     /// representatives that have stopped representing a family that grew around
     /// them, which is a curation duty with no gate behind it.

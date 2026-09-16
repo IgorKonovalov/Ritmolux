@@ -9,7 +9,7 @@ subdirectory is skipped by construction. Files here are version-controlled, revi
 and reach neither the binary nor the behavioral suite.
 
 **Shipping one is a `git mv` into `presets/`** — plus **two things the move does not do for you**,
-both of which `core/tests/hygiene.rs` refuses a push over:
+both of which `core/tests/suite/hygiene.rs` refuses a push over:
 
 - **A gallery card.** Add the name to `CARDS` in `scripts/docs-shots.mjs` and commit a render at
   `docs/images/gallery/presets/<name>.png`. `every_shipped_preset_has_a_gallery_card` holds the two

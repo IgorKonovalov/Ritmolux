@@ -96,14 +96,38 @@ interface Write {
   how: 'write' | 'create'
 }
 
+type ReadResult =
+  | { ok: false; reason: string }
+  | { ok: true; value: { path: string; text: string } }
+
 interface Fake {
   files: Map<string, string>
   writes: Write[]
+  /** Resolve every read this fake is holding. Inert unless `holdReads` was set. */
+  releaseReads: () => void
 }
 
-/** A filesystem the writes land in, so byte equality can be asserted on it. */
-function install(seed: Record<string, string> = { [SOURCE]: INK }): Fake {
-  const fake: Fake = { files: new Map(Object.entries(seed)), writes: [] }
+/**
+ * A filesystem the writes land in, so byte equality can be asserted on it.
+ *
+ * `holdReads` keeps every `preset.read` pending until the test lets it go, which
+ * is the window the editor renders a schema-generated control in before it knows
+ * the document. Nothing else can reach that window: both loads resolve in the
+ * same microtask drain otherwise, and which of the two lands first is then a
+ * scheduling detail rather than something a test can state.
+ */
+function install(
+  seed: Record<string, string> = { [SOURCE]: INK },
+  { holdReads = false }: { holdReads?: boolean } = {},
+): Fake {
+  const held: (() => void)[] = []
+  const fake: Fake = {
+    files: new Map(Object.entries(seed)),
+    writes: [],
+    releaseReads: () => {
+      for (const resolve of held.splice(0)) resolve()
+    },
+  }
   const api = {
     app: {
       getSchema: () => Promise.resolve({ ok: true as const, document: SCHEMA }),
@@ -112,11 +136,12 @@ function install(seed: Record<string, string> = { [SOURCE]: INK }): Fake {
     preset: {
       read: (path: string) => {
         const text = fake.files.get(path)
-        return Promise.resolve(
+        const result: ReadResult =
           text === undefined
-            ? { ok: false as const, reason: 'no such file' }
-            : { ok: true as const, value: { path, text } },
-        )
+            ? { ok: false, reason: 'no such file' }
+            : { ok: true, value: { path, text } }
+        if (!holdReads) return Promise.resolve(result)
+        return new Promise<ReadResult>((resolve) => held.push(() => resolve(result)))
       },
       write: (path: string, text: string) => {
         fake.writes.push({ path, text, how: 'write' })
@@ -141,6 +166,7 @@ function editor(overrides: Partial<EditorProps> = {}) {
   const onProblem = vi.fn()
   const props: EditorProps = {
     system: 'attractor',
+    family: null,
     file: SOURCE,
     reloads: 0,
     problems: [],
@@ -159,6 +185,20 @@ function editor(overrides: Partial<EditorProps> = {}) {
 
 async function tab(name: string): Promise<void> {
   fireEvent.click(await screen.findByRole('tab', { name }))
+}
+
+/**
+ * Wait until the preset file is under the editor, which is what arms a gesture.
+ *
+ * Two independent loads meet here. The parameter rows are generated from the
+ * schema, so the slider is on screen and drag-responsive as soon as the schema
+ * arrives; `writable` waits on the separate `preset.read`, and a release fired
+ * between the two is discarded in silence. Waiting on the control therefore
+ * times the wrong load. The path renders only once that read landed, so it is
+ * the honest precondition (backlog 0238).
+ */
+async function presetLoaded(): Promise<void> {
+  await screen.findByText(SOURCE)
 }
 
 /** Type a name into the held prompt and save it. */
@@ -227,6 +267,7 @@ describe('a gesture against a preset the session has not forked', () => {
   it.each(GESTURES)('$name writes nothing until the copy is named', async ({ run, mark }) => {
     const fake = install()
     editor()
+    await presetLoaded()
     await run()
 
     // The whole assertion the smoke run's four modified files exist for.
@@ -244,10 +285,39 @@ describe('a gesture against a preset the session has not forked', () => {
   })
 })
 
+describe('a gesture made before the preset file has arrived', () => {
+  it('finds an inert control rather than one that discards it', async () => {
+    const fake = install(undefined, { holdReads: true })
+    editor()
+
+    // The rows are generated from the schema, so the slider is on screen well
+    // before the document behind it is. It must not accept a gesture there: the
+    // value it is showing is the engine default, and `writable` is still false,
+    // so the release would be dropped with nothing said (backlog 0238).
+    const early = (await screen.findByLabelText('warp')) as HTMLInputElement
+    expect(early.disabled).toBe(true)
+
+    fireEvent.change(early, { target: { value: '0.9' } })
+    fireEvent.pointerUp(early)
+    expect(screen.queryByLabelText('save a copy as')).toBeNull()
+    expect(fake.writes).toHaveLength(0)
+
+    // And the same control is live the moment the read lands.
+    fake.releaseReads()
+    await presetLoaded()
+    const armed = (await screen.findByLabelText('warp')) as HTMLInputElement
+    expect(armed.disabled).toBe(false)
+    fireEvent.change(armed, { target: { value: '0.9' } })
+    fireEvent.pointerUp(armed)
+    await screen.findByLabelText('save a copy as')
+  })
+})
+
 describe('the preset that was forked from', () => {
   it('is byte-identical after a whole editing session against the fork', async () => {
     const fake = install()
     const { rerender } = editor()
+    await presetLoaded()
 
     const slider = await screen.findByLabelText('warp')
     fireEvent.change(slider, { target: { value: '0.9' } })
@@ -278,6 +348,7 @@ describe('a preset change between the gesture and the answer', () => {
   it('cannot redirect the write', async () => {
     const fake = install({ [SOURCE]: INK, [OTHER]: DUST })
     const { rerender } = editor()
+    await presetLoaded()
 
     const slider = await screen.findByLabelText('warp')
     fireEvent.change(slider, { target: { value: '0.9' } })
@@ -322,6 +393,7 @@ describe('the prompt itself', () => {
   it('writes nothing when it is cancelled, and drops the edits it held', async () => {
     const fake = install()
     editor()
+    await presetLoaded()
 
     const slider = await screen.findByLabelText('warp')
     fireEvent.change(slider, { target: { value: '0.9' } })
@@ -336,6 +408,7 @@ describe('the prompt itself', () => {
   it('stays up when the name is already taken', async () => {
     const fake = install({ [SOURCE]: INK, [FORK]: DUST })
     const { onProblem } = editor()
+    await presetLoaded()
 
     const slider = await screen.findByLabelText('warp')
     fireEvent.change(slider, { target: { value: '0.9' } })

@@ -13,6 +13,13 @@
  * release writes the file. So the picture follows the finger and the disk sees
  * one write per gesture.
  *
+ * **What the family reads decides the ends.** A family-bearing system declares
+ * where each parameter reads per family (ADR-0194), so the slider's ends are the
+ * entry for the family on screen rather than the one pair that has to cover all
+ * of them: a hypotrochoid's `n` reaches its negative half, and a Lissajous `d`
+ * stops at 12 instead of 360. A family that does not read the parameter at all
+ * gets no control, only what the file binds.
+ *
  * **What the value means decides the control.** The engine rounds a
  * `structural` parameter once before the scene sees it (ADR-0180 rule 2), so
  * offering it a continuous slider would show travel that changes nothing: three
@@ -23,13 +30,19 @@
  */
 import { useEffect, useState } from 'react'
 
-import type { ParamSpec } from '@shared/schema'
+import { rangeFor, type ParamSpec } from '@shared/schema'
 import type { Binding } from '@shared/toml'
 
 import styles from './ParamRow.module.css'
 
 export interface ParamRowProps {
   spec: ParamSpec
+  /**
+   * The family the preset on screen draws, as the player reported it. `null` or
+   * `undefined` takes the parameter's single declared range, which is what every
+   * row did before the schema carried a per-family one.
+   */
+  family: string | null | undefined
   /** The preset's own binding, or `undefined` when it does not bind this. */
   binding: Binding | undefined
   /**
@@ -38,6 +51,17 @@ export interface ParamRowProps {
    * nothing, which is what an embedded preset can honestly offer.
    */
   writable: boolean
+  /**
+   * False until the preset document is known — while its file is being read,
+   * and when there is none to read.
+   *
+   * Distinct from `writable`, which says where a release *lands*. Without a
+   * document there is nothing to land in and nothing to move away from: the row
+   * is showing the engine's default rather than this preset's value, so a drag
+   * would report a number the preset does not hold and the release would be
+   * discarded in silence. The control is inert instead (backlog 0238).
+   */
+  hasDocument: boolean
   onDrag: (name: string, value: number) => void
   onCommit: (name: string, value: number) => void
 }
@@ -61,11 +85,14 @@ function quantize(spec: ParamSpec, value: number): number {
 
 export function ParamRow({
   spec,
+  family,
   binding,
   writable,
+  hasDocument,
   onDrag,
   onCommit,
 }: ParamRowProps): JSX.Element {
+  const { range, inert } = rangeFor(spec, family)
   const bound = quantize(spec, binding?.kind === 'const' ? binding.value : spec.default)
   const [value, setValue] = useState(bound)
 
@@ -93,11 +120,30 @@ export function ParamRow({
     )
   }
 
+  // The family on screen does not read this one, so there is no travel to offer:
+  // a control here would move a number the scene's arithmetic never looks at.
+  // The binding stays visible because the file may still carry one — a preset
+  // written for another family, or one about to be switched back — and the group
+  // this row sits in names the family it is inert on.
+  if (inert) {
+    return (
+      <div className={styles.row} title={spec.doc}>
+        <span className={styles.name}>{spec.name}</span>
+        <span className={styles.inert}>{binding === undefined ? '' : String(binding.value)}</span>
+        <span className={styles.note}>not read here</span>
+      </div>
+    )
+  }
+
+  // `hasDocument` gates both halves of the gesture, because without one there is
+  // nothing to move away from and nothing for a release to land in. `disabled`
+  // below states that in the DOM; these guards hold it whatever dispatched the
+  // event.
   const commit = (): void => {
-    if (writable) onCommit(spec.name, value)
+    if (hasDocument && writable) onCommit(spec.name, value)
   }
   const move = (raw: number): void => {
-    if (!Number.isFinite(raw)) return
+    if (!hasDocument || !Number.isFinite(raw)) return
     const next = quantize(spec, raw)
     setValue(next)
     onDrag(spec.name, next)
@@ -105,10 +151,11 @@ export function ParamRow({
   const id = `param-${spec.name}`
 
   // No declared bounds, so no slider: a range control needs two ends, and
-  // inventing them would offer travel the engine never promised. Thirty-one
-  // parameters are in this arm, the pan offsets among them.
-  const unbounded = spec.range === null
-  const [lo, hi] = spec.range ?? [0, 1]
+  // inventing them would offer travel the engine never promised. The pan offsets
+  // are in this arm; the attractor's coefficients used to be, and are not once
+  // the family on screen declares ends for them.
+  const unbounded = range === null
+  const [lo, hi] = range ?? [0, 1]
   // A whole step for a structural parameter, and a two-hundredth of the range
   // for a modal one — fine enough to read as continuous, coarse enough that one
   // gesture is tens of datagrams rather than hundreds.
@@ -127,6 +174,7 @@ export function ParamRow({
           ? { step: spec.kind === 'structural' ? 1 : 'any' }
           : { min: lo, max: hi, step })}
         value={value}
+        disabled={!hasDocument}
         onChange={(event) => move(event.currentTarget.valueAsNumber)}
         // A gesture ends with a pointer release, a key release or the control
         // losing focus; each is one write and none of them fires per step.

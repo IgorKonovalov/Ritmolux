@@ -215,11 +215,14 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     col = col * (glow * (1.0 - 0.25 * r));
     col = col + vec3<f32>(flash * 0.12);
 
-    // Alpha 1.0: this field covers every pixel, which is the coverage it honestly
-    // has (ADR-0056). `occlude` scales how much of that the backdrop underneath
-    // resolves against (ADR-0085) — at 0 the sky adds through an opaque field.
-    // Reached only when no post stage is active; the chain owns the seam otherwise
-    // and the renderer hands a literal 1.0 here.
+    // Alpha is `occlude` (`params.d.y`). The field covers every pixel, which is the
+    // coverage it honestly has (ADR-0056), and `occlude` scales how much backdrop
+    // survives underneath it (ADR-0085): the fold resolves `field + bg * (1 -
+    // occlude)`, so at 1 the field replaces the backdrop and at 0 the backdrop adds
+    // through at full strength. The renderer hands a value other than a literal 1.0
+    // only when the scene draws straight onto the destination — with a post stage
+    // routed, or the `over` junction live, the scene renders into a scratch and the
+    // chain's last fold owns the seam instead.
     return vec4<f32>(col, params.d.y);
 }
 "#;
@@ -244,8 +247,8 @@ pub struct FragmentFieldScene {
     /// Shared scene clock (seconds), set by the renderer each frame.
     time: f32,
     /// This frame's elapsed real time, stored by `advance` and consumed by
-    /// `update` — the split ADR-0132 requires, since `advance` runs before this
-    /// frame's parameter values land.
+    /// `update`, where the phases step against this frame's bound rates
+    /// (ADR-0132).
     dt: f32,
     /// The integrated fold and field phases ([`Phase`]). **These are the scene's
     /// only state**: everything else here is derived from `time` and the
@@ -326,7 +329,7 @@ impl FragmentFieldScene {
                 uniform_bg,
                 Some(lut_bg),
                 surface_format,
-                wgpu::BlendState::REPLACE,
+                wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING,
                 "fragment-field",
             ),
             time: 0.0,
@@ -351,7 +354,7 @@ impl FragmentFieldScene {
 /// The parameter names this scene consumes — the vocabulary a preset binding
 /// is checked against at load, so a typo is warned about instead of silently
 /// doing nothing (ADR-0020). **Keep in sync with `set_param` below**; the
-/// `declared_params_match_set_param` guard in `core/tests/preset.rs` fails if
+/// `declared_params_match_set_param` guard in `core/tests/suite/preset.rs` fails if
 /// the two drift.
 pub const PARAMS: &[ParamSpec] = &[
     ParamSpec {
@@ -423,8 +426,8 @@ impl Scene for FragmentFieldScene {
     }
 
     fn advance(&mut self, dt: f32) {
-        // Stored, not integrated: the rates this frame will use have not been
-        // set yet (ADR-0132).
+        // Stored, not integrated: `update` steps both phases, so the scene has
+        // one integration site (ADR-0132).
         self.dt = dt;
     }
 
@@ -512,8 +515,10 @@ impl Scene for FragmentFieldScene {
         };
         self.gpu.write_uniform(queue, &params);
 
-        // Load over the engine backdrop (ADR-0018); this fullscreen field is
-        // opaque, so it covers the backdrop as before.
+        // Load over the engine backdrop (ADR-0018). The present blends
+        // premultiplied-OVER with alpha `occlude`, so the backdrop resolves as
+        // `field + bg * (1 - occlude)`: covered at 1 (exactly a replace), added
+        // to at 0.
         self.gpu
             .draw(encoder, "fragment-field-pass", view, wgpu::LoadOp::Load);
     }

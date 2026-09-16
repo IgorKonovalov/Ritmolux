@@ -10,7 +10,7 @@
 //!
 //! The reference for "`bg_bright` was driven to 0.8" is a second renderer whose
 //! preset binds `bg_bright = "0.8"`, and the comparison is byte identity —
-//! `core/tests/override.rs`'s method, for its reason.
+//! `core/tests/suite/override.rs`'s method, for its reason.
 //!
 //! What this file cannot reach is the transport verbs: those resolve a
 //! `ConsoleAction` and land on the shell's director and settings menu, which

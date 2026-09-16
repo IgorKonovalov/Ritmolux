@@ -166,7 +166,7 @@ const DUAL_LIVE_BUDGET_MS: f32 = 18.0;
 /// composite's per-second decay, the transition's step, the MilkDrop runtime's
 /// envelopes, the cellular generation clock, the now-playing banner. A second
 /// finiteness guard on a `dt` anywhere in `core/src/` fails
-/// `core/tests/hygiene.rs`, because a second guard is a second policy.
+/// `core/tests/suite/hygiene.rs`, because a second guard is a second policy.
 ///
 /// **Every `Renderer` entry that takes a caller's `dt` calls this as its first
 /// statement** and hands its result — never the raw value — to the scene clock,
@@ -1122,6 +1122,39 @@ impl Renderer {
             .active_preset()
             .map(|p| p.system.as_str())
             .unwrap_or("")
+    }
+
+    /// The **family** the active preset draws, spelled exactly as a preset
+    /// writes it and as the schema document's `families[].family` spells it —
+    /// `"lissajous"`, `"thomas"`, `"chladni"`, `"life_like"` (ADR-0194 point 3).
+    ///
+    /// `None` for a system whose parameters read the same on every family it
+    /// draws, which is every system [`family_params`](scenes::family_params)
+    /// answers nothing for. A consumer that gets `None` has no family to key a
+    /// range on and falls back to the parameter's single declared `range`.
+    ///
+    /// **It is the value `Scene::configure` received**, out of the loaded
+    /// preset's structural config, rather than a second reading of the scene's
+    /// own state. So a `parametric_curve` preset that declares no `[curve]`
+    /// table answers `None`: nothing configured the scene, and what it draws is
+    /// whatever the last configured preset left it on — a fact about that hole
+    /// rather than about this accessor, and reporting a guess would paper over
+    /// it. Every other family-bearing system builds its config unconditionally.
+    pub fn active_family_key(&self) -> Option<&'static str> {
+        use scenes::GeneratorConfig;
+        match self.roster.active_preset()?.config.as_ref()? {
+            GeneratorConfig::Curve { family } => Some(family.as_str()),
+            GeneratorConfig::Particles { family, .. } => Some(family.as_str()),
+            GeneratorConfig::Field(config) => Some(config.family.as_str()),
+            GeneratorConfig::Cellular(config) => Some(config.family.as_str()),
+            // Exhaustive rather than a wildcard, so a system that grows a family
+            // has to answer here as well as in `family_params`.
+            GeneratorConfig::LSystem { .. }
+            | GeneratorConfig::Star { .. }
+            | GeneratorConfig::Spectrum { .. }
+            | GeneratorConfig::WarpMesh { .. }
+            | GeneratorConfig::Path { .. } => None,
+        }
     }
 
     /// The file the active preset was read from, or `None` when it came from

@@ -2348,47 +2348,47 @@
     "param.n": {
       "type": "string",
       "description": "The figure's first number, read as a real value per family: the rose's petal number, the Lissajous and harmonograph x frequency, the hypotrochoid's signed radius ratio.",
-      "markdownDescription": "The figure's first number, read as a real value per family: the rose's petal number, the Lissajous and harmonograph x frequency, the hypotrochoid's signed radius ratio.\n\n- default `6.0`\n- typical range `1.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "The figure's first number, read as a real value per family: the rose's petal number, the Lissajous and harmonograph x frequency, the hypotrochoid's signed radius ratio.\n\n- default `6.0`\n- typical range depends on the family: `maurer_rose` `1.0` to `24.0`, `lissajous` `1.0` to `12.0`, `hypotrochoid` `-8.0` to `8.0`, `harmonograph` `1.0` to `12.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `superformula` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.d.parametric_curve": {
       "type": "string",
       "description": "The figure's second number, per family: the rose's sampling step in degrees, the Lissajous and harmonograph y frequency, the hypotrochoid's cusp count, the superformula's lobe skew.",
-      "markdownDescription": "The figure's second number, per family: the rose's sampling step in degrees, the Lissajous and harmonograph y frequency, the hypotrochoid's cusp count, the superformula's lobe skew.\n\n- default `71.0`\n- typical range `1.0` to `360.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "The figure's second number, per family: the rose's sampling step in degrees, the Lissajous and harmonograph y frequency, the hypotrochoid's cusp count, the superformula's lobe skew.\n\n- default `71.0`\n- typical range depends on the family: `maurer_rose` `1.0` to `360.0`, `lissajous` `1.0` to `12.0`, `hypotrochoid` `1.0` to `24.0`, `superformula` `0.25` to `4.0`, `harmonograph` `1.0` to `12.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.phase": {
       "type": "string",
       "description": "Offsets where the figure starts: inside the rose's sine, between the Lissajous and harmonograph axes, and at the hypotrochoid's pen.",
-      "markdownDescription": "Offsets where the figure starts: inside the rose's sine, between the Lissajous and harmonograph axes, and at the hypotrochoid's pen.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "Offsets where the figure starts: inside the rose's sine, between the Lissajous and harmonograph axes, and at the hypotrochoid's pen.\n\n- default `0.0`\n- typical range depends on the family: `maurer_rose` `0.0` to `1.0`, `lissajous` `0.0` to `1.0`, `hypotrochoid` `0.0` to `1.0`, `harmonograph` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `superformula` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.radial_offset": {
       "type": "string",
       "description": "Pushes every point out from the centre, opening the figure into a ring.",
-      "markdownDescription": "Pushes every point out from the centre, opening the figure into a ring.\n\n- default `0.0`\n- typical range `-1.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "Pushes every point out from the centre, opening the figure into a ring.\n\n- default `0.0`\n- typical range depends on the family: `maurer_rose` `-1.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.pen": {
       "type": "string",
       "description": "How far the tracing point sits from the rolling circle's centre, in rolling radii: 1 draws cusps, less rounds them off, more throws them into loops.",
-      "markdownDescription": "How far the tracing point sits from the rolling circle's centre, in rolling radii: 1 draws cusps, less rounds them off, more throws them into loops.\n\n- default `1.0`\n- typical range `0.0` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How far the tracing point sits from the rolling circle's centre, in rolling radii: 1 draws cusps, less rounds them off, more throws them into loops.\n\n- default `1.0`\n- typical range depends on the family: `hypotrochoid` `0.0` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `maurer_rose`, `lissajous`, `superformula`, `harmonograph` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.sym": {
       "type": "string",
       "description": "How many lobes the figure repeats around its centre, as a whole number.",
-      "markdownDescription": "How many lobes the figure repeats around its centre, as a whole number.\n\n- default `5.0`\n- typical range `1.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How many lobes the figure repeats around its centre, as a whole number.\n\n- default `5.0`\n- typical range depends on the family: `superformula` `1.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `harmonograph` — the parameter is not read there at all\n- structural parameter\n\nThe value is an expression, always quoted."
     },
     "param.sharpness": {
       "type": "string",
       "description": "How pointed the lobes are: low draws a spiky star, high rounds the figure toward a circle.",
-      "markdownDescription": "How pointed the lobes are: low draws a spiky star, high rounds the figure toward a circle.\n\n- default `1.0`\n- typical range `0.1` to `20.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How pointed the lobes are: low draws a spiky star, high rounds the figure toward a circle.\n\n- default `1.0`\n- typical range depends on the family: `superformula` `0.1` to `20.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `harmonograph` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.lobe": {
       "type": "string",
       "description": "How the lobes swell between their tips: low pinches them thin, high fills them into a polygon.",
-      "markdownDescription": "How the lobes swell between their tips: low pinches them thin, high fills them into a polygon.\n\n- default `1.0`\n- typical range `0.1` to `10.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How the lobes swell between their tips: low pinches them thin, high fills them into a polygon.\n\n- default `1.0`\n- typical range depends on the family: `superformula` `0.1` to `10.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `harmonograph` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.decay.parametric_curve": {
       "type": "string",
       "description": "How fast the pendulums die away along the trace: 0 closes the figure, more spirals it inward.",
-      "markdownDescription": "How fast the pendulums die away along the trace: 0 closes the figure, more spirals it inward.\n\n- default `0.1`\n- typical range `0.0` to `0.5` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How fast the pendulums die away along the trace: 0 closes the figure, more spirals it inward.\n\n- default `0.1`\n- typical range depends on the family: `harmonograph` `0.0` to `0.5` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.samples": {
       "type": "string",
@@ -2558,22 +2558,22 @@
     "param.a": {
       "type": "string",
       "description": "First of the four family coefficients; what it means depends on the attractor family the tuple picked.",
-      "markdownDescription": "First of the four family coefficients; what it means depends on the attractor family the tuple picked.\n\n- default `0.0`\n- no typical range declared\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "First of the four family coefficients; what it means depends on the attractor family the tuple picked.\n\n- default `0.0`\n- typical range depends on the family: `de_jong` `-3.0` to `3.0`, `clifford` `-2.0` to `2.0`, `thomas` `0.0` to `0.25`, `lorenz` `5.0` to `20.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `fern`, `tree`, `dragon`, `sierpinski`, `spiral` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.b": {
       "type": "string",
       "description": "Second family coefficient - see the roster's attractor essay for what each family does with it.",
-      "markdownDescription": "Second family coefficient - see the roster's attractor essay for what each family does with it.\n\n- default `0.0`\n- no typical range declared\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "Second family coefficient - see the roster's attractor essay for what each family does with it.\n\n- default `0.0`\n- typical range depends on the family: `de_jong` `-3.0` to `3.0`, `clifford` `-2.0` to `2.0`, `lorenz` `20.0` to `130.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `thomas`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.c": {
       "type": "string",
       "description": "Third family coefficient, and on the IFS figures it means nothing at all.",
-      "markdownDescription": "Third family coefficient, and on the IFS figures it means nothing at all.\n\n- default `0.0`\n- no typical range declared\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "Third family coefficient, and on the IFS figures it means nothing at all.\n\n- default `0.0`\n- typical range depends on the family: `de_jong` `-3.0` to `3.0`, `clifford` `-2.0` to `2.0`, `lorenz` `0.5` to `4.5` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `thomas`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.d.attractor": {
       "type": "string",
       "description": "Fourth family coefficient; like the other three it is inert on the IFS figures.",
-      "markdownDescription": "Fourth family coefficient; like the other three it is inert on the IFS figures.\n\n- default `0.0`\n- no typical range declared\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "Fourth family coefficient; like the other three it is inert on the IFS figures.\n\n- default `0.0`\n- typical range depends on the family: `de_jong` `-3.0` to `3.0`, `clifford` `-2.0` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `thomas`, `lorenz`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.tuple": {
       "type": "string",
@@ -2962,8 +2962,8 @@
     },
     "param.deposit_arms": {
       "type": "string",
-      "description": "How many arms the ring is broken into, as a real angular frequency; 0 leaves it whole.",
-      "markdownDescription": "How many arms the ring is broken into, as a real angular frequency; 0 leaves it whole.\n\n- default `0.0`\n- typical range `0.0` to `16.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "description": "How many arms the ring is broken into, as a whole number of arms; 0 leaves it whole.",
+      "markdownDescription": "How many arms the ring is broken into, as a whole number of arms; 0 leaves it whole.\n\n- default `0.0`\n- typical range `0.0` to `16.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
     },
     "param.deposit_twist": {
       "type": "string",
@@ -3128,62 +3128,62 @@
     "param.mode_n": {
       "type": "string",
       "description": "The plate's first mode number: how many nodal lines cross one axis. Equal to `mode_m`, the two waves cancel and the plate is blank.",
-      "markdownDescription": "The plate's first mode number: how many nodal lines cross one axis. Equal to `mode_m`, the two waves cancel and the plate is blank.\n\n- default `3.0`\n- typical range `1.0` to `16.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "The plate's first mode number: how many nodal lines cross one axis. Equal to `mode_m`, the two waves cancel and the plate is blank.\n\n- default `3.0`\n- typical range depends on the family: `chladni` `1.0` to `16.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `escape_time` — the parameter is not read there at all\n- structural parameter\n\nThe value is an expression, always quoted."
     },
     "param.mode_m": {
       "type": "string",
       "description": "The plate's second mode number: how many nodal lines cross the other axis.",
-      "markdownDescription": "The plate's second mode number: how many nodal lines cross the other axis.\n\n- default `5.0`\n- typical range `1.0` to `16.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "The plate's second mode number: how many nodal lines cross the other axis.\n\n- default `5.0`\n- typical range depends on the family: `chladni` `1.0` to `16.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `escape_time` — the parameter is not read there at all\n- structural parameter\n\nThe value is an expression, always quoted."
     },
     "param.line_width": {
       "type": "string",
       "description": "How wide a band around the nodal lines lights, in plate units (the plate is 2 across); 0 is a one-pixel line.",
-      "markdownDescription": "How wide a band around the nodal lines lights, in plate units (the plate is 2 across); 0 is a one-pixel line.\n\n- default `0.04`\n- typical range `0.0` to `0.3` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How wide a band around the nodal lines lights, in plate units (the plate is 2 across); 0 is a one-pixel line.\n\n- default `0.04`\n- typical range depends on the family: `chladni` `0.0` to `0.3` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `escape_time` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.plate_mix": {
       "type": "string",
       "description": "Blends from the nodal lines alone toward the whole signed wave, which reads as a standing wave rather than as sand.",
-      "markdownDescription": "Blends from the nodal lines alone toward the whole signed wave, which reads as a standing wave rather than as sand.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "Blends from the nodal lines alone toward the whole signed wave, which reads as a standing wave rather than as sand.\n\n- default `0.0`\n- typical range depends on the family: `chladni` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `escape_time` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.iterations": {
       "type": "string",
       "description": "How many steps an orbit is followed before it is called part of the set; more resolves finer boundary detail. Capped by the quality tier.",
-      "markdownDescription": "How many steps an orbit is followed before it is called part of the set; more resolves finer boundary detail. Capped by the quality tier.\n\n- default `64.0`\n- typical range `1.0` to `512.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How many steps an orbit is followed before it is called part of the set; more resolves finer boundary detail. Capped by the quality tier.\n\n- default `64.0`\n- typical range depends on the family: `escape_time` `1.0` to `512.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `chladni` — the parameter is not read there at all\n- structural parameter\n\nThe value is an expression, always quoted."
     },
     "param.c_re": {
       "type": "string",
       "description": "The real part of the Julia constant: the lever that reshapes the set, from one connected piece to dust. Inert on the `mandelbrot` map.",
-      "markdownDescription": "The real part of the Julia constant: the lever that reshapes the set, from one connected piece to dust. Inert on the `mandelbrot` map.\n\n- default `-0.8`\n- typical range `-1.5` to `0.5` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "The real part of the Julia constant: the lever that reshapes the set, from one connected piece to dust. Inert on the `mandelbrot` map.\n\n- default `-0.8`\n- typical range depends on the family: `escape_time` `-1.5` to `0.5` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `chladni` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.c_im": {
       "type": "string",
       "description": "The imaginary part of the Julia constant. Inert on the `mandelbrot` map.",
-      "markdownDescription": "The imaginary part of the Julia constant. Inert on the `mandelbrot` map.\n\n- default `0.156`\n- typical range `-1.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "The imaginary part of the Julia constant. Inert on the `mandelbrot` map.\n\n- default `0.156`\n- typical range depends on the family: `escape_time` `-1.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `chladni` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.escape_radius": {
       "type": "string",
       "description": "How far an orbit must travel to count as escaped; larger smooths the colour bands' spacing.",
-      "markdownDescription": "How far an orbit must travel to count as escaped; larger smooths the colour bands' spacing.\n\n- default `16.0`\n- typical range `2.0` to `256.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How far an orbit must travel to count as escaped; larger smooths the colour bands' spacing.\n\n- default `16.0`\n- typical range depends on the family: `escape_time` `2.0` to `256.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `chladni` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.power": {
       "type": "string",
       "description": "The exponent in z -> z^power + c: 2 is the classic set, higher whole powers add lobes, and a fractional power tears along the negative real axis.",
-      "markdownDescription": "The exponent in z -> z^power + c: 2 is the classic set, higher whole powers add lobes, and a fractional power tears along the negative real axis.\n\n- default `2.0`\n- typical range `1.5` to `8.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "The exponent in z -> z^power + c: 2 is the classic set, higher whole powers add lobes, and a fractional power tears along the negative real axis.\n\n- default `2.0`\n- typical range depends on the family: `escape_time` `1.5` to `8.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `chladni` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.interior": {
       "type": "string",
       "description": "How much light the set itself emits; 0 is the textbook black interior.",
-      "markdownDescription": "How much light the set itself emits; 0 is the textbook black interior.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How much light the set itself emits; 0 is the textbook black interior.\n\n- default `0.0`\n- typical range depends on the family: `escape_time` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `chladni` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.trap_radius": {
       "type": "string",
       "description": "How far the orbit trap sits from the origin — the circle's radius, the line's offset, the point's and the cross's distance. Inert with no `trap`.",
-      "markdownDescription": "How far the orbit trap sits from the origin — the circle's radius, the line's offset, the point's and the cross's distance. Inert with no `trap`.\n\n- default `0.5`\n- typical range `0.0` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How far the orbit trap sits from the origin — the circle's radius, the line's offset, the point's and the cross's distance. Inert with no `trap`.\n\n- default `0.5`\n- typical range depends on the family: `escape_time` `0.0` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `chladni` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.trap_rotate": {
       "type": "string",
       "description": "Turns the orbit trap about the origin, in whole turns. Inert on a `circle` and with no `trap`.",
-      "markdownDescription": "Turns the orbit trap about the origin, in whole turns. Inert on a `circle` and with no `trap`.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "Turns the orbit trap about the origin, in whole turns. Inert on a `circle` and with no `trap`.\n\n- default `0.0`\n- typical range depends on the family: `escape_time` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `chladni` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.color_span.analytic_field": {
       "type": "string",
@@ -3198,47 +3198,47 @@
     "param.birth": {
       "type": "string",
       "description": "Which live-neighbour counts bring a dead cell to life, as a bitmask over the counts 0-8: bit k set means k neighbours give birth. 8 (bit 3) is Conway's.",
-      "markdownDescription": "Which live-neighbour counts bring a dead cell to life, as a bitmask over the counts 0-8: bit k set means k neighbours give birth. 8 (bit 3) is Conway's.\n\n- default `8.0`\n- typical range `0.0` to `511.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "Which live-neighbour counts bring a dead cell to life, as a bitmask over the counts 0-8: bit k set means k neighbours give birth. 8 (bit 3) is Conway's.\n\n- default `8.0`\n- typical range depends on the family: `life_like` `0.0` to `511.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `larger_than_life`, `cyclic` — the parameter is not read there at all\n- structural parameter\n\nThe value is an expression, always quoted."
     },
     "param.survive": {
       "type": "string",
       "description": "Which live-neighbour counts keep a live cell alive, as a bitmask over the counts 0-8. 12 (bits 2 and 3) is Conway's.",
-      "markdownDescription": "Which live-neighbour counts keep a live cell alive, as a bitmask over the counts 0-8. 12 (bits 2 and 3) is Conway's.\n\n- default `12.0`\n- typical range `0.0` to `511.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "Which live-neighbour counts keep a live cell alive, as a bitmask over the counts 0-8. 12 (bits 2 and 3) is Conway's.\n\n- default `12.0`\n- typical range depends on the family: `life_like` `0.0` to `511.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `larger_than_life`, `cyclic` — the parameter is not read there at all\n- structural parameter\n\nThe value is an expression, always quoted."
     },
     "param.radius.cellular": {
       "type": "string",
       "description": "How far the neighbourhood reaches, in cells: a square of side 2 x radius + 1 about each cell. Capped by the quality tier.",
-      "markdownDescription": "How far the neighbourhood reaches, in cells: a square of side 2 x radius + 1 about each cell. Capped by the quality tier.\n\n- default `5.0`\n- typical range `1.0` to `10.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How far the neighbourhood reaches, in cells: a square of side 2 x radius + 1 about each cell. Capped by the quality tier.\n\n- default `5.0`\n- typical range depends on the family: `larger_than_life` `1.0` to `10.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `life_like`, `cyclic` — the parameter is not read there at all\n- structural parameter\n\nThe value is an expression, always quoted."
     },
     "param.birth_lo": {
       "type": "string",
       "description": "The least filled fraction of its neighbourhood at which a dead cell is born.",
-      "markdownDescription": "The least filled fraction of its neighbourhood at which a dead cell is born.\n\n- default `0.28`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "The least filled fraction of its neighbourhood at which a dead cell is born.\n\n- default `0.28`\n- typical range depends on the family: `larger_than_life` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `life_like`, `cyclic` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.birth_hi": {
       "type": "string",
       "description": "The most filled fraction of its neighbourhood at which a dead cell is born.",
-      "markdownDescription": "The most filled fraction of its neighbourhood at which a dead cell is born.\n\n- default `0.385`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "The most filled fraction of its neighbourhood at which a dead cell is born.\n\n- default `0.385`\n- typical range depends on the family: `larger_than_life` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `life_like`, `cyclic` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.survive_lo": {
       "type": "string",
       "description": "The least filled fraction of its neighbourhood at which a live cell survives.",
-      "markdownDescription": "The least filled fraction of its neighbourhood at which a live cell survives.\n\n- default `0.26`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "The least filled fraction of its neighbourhood at which a live cell survives.\n\n- default `0.26`\n- typical range depends on the family: `larger_than_life` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `life_like`, `cyclic` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.survive_hi": {
       "type": "string",
       "description": "The most filled fraction of its neighbourhood at which a live cell survives.",
-      "markdownDescription": "The most filled fraction of its neighbourhood at which a live cell survives.\n\n- default `0.47`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "The most filled fraction of its neighbourhood at which a live cell survives.\n\n- default `0.47`\n- typical range depends on the family: `larger_than_life` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `life_like`, `cyclic` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.states": {
       "type": "string",
       "description": "How many colours the cycle holds; each cell advances to the next one round it.",
-      "markdownDescription": "How many colours the cycle holds; each cell advances to the next one round it.\n\n- default `3.0`\n- typical range `2.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How many colours the cycle holds; each cell advances to the next one round it.\n\n- default `3.0`\n- typical range depends on the family: `cyclic` `2.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `life_like`, `larger_than_life` — the parameter is not read there at all\n- structural parameter\n\nThe value is an expression, always quoted."
     },
     "param.threshold": {
       "type": "string",
       "description": "How many of its eight neighbours must already hold the next colour before a cell advances to it.",
-      "markdownDescription": "How many of its eight neighbours must already hold the next colour before a cell advances to it.\n\n- default `3.0`\n- typical range `1.0` to `8.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How many of its eight neighbours must already hold the next colour before a cell advances to it.\n\n- default `3.0`\n- typical range depends on the family: `cyclic` `1.0` to `8.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `life_like`, `larger_than_life` — the parameter is not read there at all\n- structural parameter\n\nThe value is an expression, always quoted."
     },
     "param.step_rate": {
       "type": "string",
@@ -3253,12 +3253,12 @@
     "param.trail": {
       "type": "string",
       "description": "How many generations a dead cell keeps glowing, fading as it goes; 0 draws only the live cells.",
-      "markdownDescription": "How many generations a dead cell keeps glowing, fading as it goes; 0 draws only the live cells.\n\n- default `12.0`\n- typical range `0.0` to `64.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How many generations a dead cell keeps glowing, fading as it goes; 0 draws only the live cells.\n\n- default `12.0`\n- typical range depends on the family: `life_like` `0.0` to `64.0`, `larger_than_life` `0.0` to `64.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `cyclic` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.age_tint": {
       "type": "string",
       "description": "How far along the palette a dead cell's glow travels as it fades; 0 keeps the wake the live cells' colour.",
-      "markdownDescription": "How far along the palette a dead cell's glow travels as it fades; 0 keeps the wake the live cells' colour.\n\n- default `0.35`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How far along the palette a dead cell's glow travels as it fades; 0 keeps the wake the live cells' colour.\n\n- default `0.35`\n- typical range depends on the family: `life_like` `0.0` to `1.0`, `larger_than_life` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `cyclic` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.bg_hue": {
       "type": "string",

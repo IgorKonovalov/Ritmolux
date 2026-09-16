@@ -179,6 +179,112 @@ test("the last outcome block wins, and verdict counts must agree with the findin
   assert.match(parseOutcome(outcomeBlock(closedWithMajor)).error, /closed carries blockers or majors/);
 });
 
+const SHELL_CALL = { type: "assistant", message: { content: [{ type: "tool_use", id: "toolu_s1", name: "Bash", input: { command: "git status" } }] } };
+
+test("a session that makes a shell call and writes no hook log parks cli_contract before its outcome is read", async () => {
+  const dir = tmp();
+  const hookLog = join(dir, "hooks", "0101-01-implement.log");
+  const { r } = await step({ text: outcomeBlock(DONE), stream: [SHELL_CALL], hooks: false }, { hookLog, skill: "dev" });
+  assert.equal(r.status, "parked");
+  assert.equal(r.reason, "cli_contract");
+  assert.match(r.detail, /made 1 shell call\(s\) and the project hooks wrote nothing/);
+  assert.equal(r.outcome, undefined, "no outcome was accepted");
+});
+
+test("a session whose init lists no invoked skill parks cli_contract", async () => {
+  const { r } = await step({ text: outcomeBlock(DONE), skills: ["architect", "preset-author"] }, { hookLog: join(tmp(), "h.log"), skill: "dev" });
+  assert.equal(r.status, "parked");
+  assert.equal(r.reason, "cli_contract");
+  assert.match(r.detail, /system\/init does not list the skill dev/);
+
+  const none = await step({ text: outcomeBlock(DONE), skills: null }, { skill: "dev" });
+  assert.equal(none.r.reason, "cli_contract");
+  assert.match(none.r.detail, /no skills list/);
+});
+
+test("a session that makes no shell call is not parked for the hook log, and one whose hooks ran passes", async () => {
+  const quiet = await step({ text: outcomeBlock(DONE) }, { hookLog: join(tmp(), "never-written.log"), skill: "dev" });
+  assert.equal(quiet.r.status, "ok", quiet.r.detail);
+
+  const hookLog = join(tmp(), "ran.log");
+  const ran = await step({ text: outcomeBlock(DONE), stream: [SHELL_CALL] }, { hookLog, skill: "dev" });
+  assert.equal(ran.r.status, "ok", ran.r.detail);
+  assert.equal(ran.calls[0].env.RLX_HOOK_LOG, hookLog, "the session is handed the step's hook log");
+  assert.equal(readFileSync(hookLog, "utf8").trim().split("\n").length, 1);
+});
+
+// A session that backgrounds a command and ends its turn loses that work: the process exits and the
+// task is killed. The park must name it rather than read as the generic `no_outcome`.
+
+const bgUse = (id, command) => ({
+  type: "assistant",
+  message: { content: [{ type: "tool_use", id, name: "Bash", input: { command, run_in_background: true } }] },
+});
+const bgStarted = (id) => ({
+  type: "user",
+  message: { content: [{ type: "tool_result", tool_use_id: id, content: `Command running in background with ID: ${id}` }] },
+});
+const notified = (id) => ({ type: "system", subtype: "task_notification", tool_use_id: id, status: "completed", summary: "Bash (exit code 0)" });
+
+test("a session holding an unfinished background command parks lost_background, whatever it claims", async () => {
+  const { r } = await step({
+    text: outcomeBlock(DONE),
+    stream: [bgUse("toolu_bg1", "cargo nextest run --workspace"), bgStarted("toolu_bg1")],
+  });
+  assert.equal(r.status, "parked");
+  assert.equal(r.reason, "lost_background");
+  assert.match(r.detail, /cargo nextest run --workspace/);
+  assert.equal(r.outcome, undefined, "no outcome was accepted");
+});
+
+test("a background command whose completion notification arrived is not a lost one", async () => {
+  const { r } = await step({
+    text: outcomeBlock(DONE),
+    stream: [bgUse("toolu_bg2", "cargo nextest run --workspace"), bgStarted("toolu_bg2"), notified("toolu_bg2")],
+  });
+  assert.equal(r.status, "ok", r.detail);
+  assert.deepEqual(r.outcome, DONE);
+});
+
+test("a session that starts nothing in the background is untouched, and a refused start is not a lost one", async () => {
+  const none = await step({ text: outcomeBlock(DONE) });
+  assert.equal(none.r.status, "ok");
+  assert.deepEqual(none.r.outcome, DONE);
+
+  // What the hook produces: the call is denied, so no command ever ran.
+  const denied = await step({
+    text: outcomeBlock(DONE),
+    stream: [
+      bgUse("toolu_bg3", "cargo nextest run --workspace"),
+      { type: "system", subtype: "permission_denied", tool_use_id: "toolu_bg3", tool_name: "Bash" },
+    ],
+  });
+  assert.equal(denied.r.status, "ok", denied.r.detail);
+
+  // And the same call refused as an error result rather than a permission event.
+  const errored = await step({
+    text: outcomeBlock(DONE),
+    stream: [
+      bgUse("toolu_bg4", "cargo nextest run --workspace"),
+      { type: "user", message: { content: [{ type: "tool_result", tool_use_id: "toolu_bg4", is_error: true, content: "Permission denied" }] } },
+    ],
+  });
+  assert.equal(errored.r.status, "ok", errored.r.detail);
+});
+
+test("the CLI's other background result shape is read as a start too", async () => {
+  const { r } = await step({
+    text: outcomeBlock(DONE),
+    stream: [
+      { type: "assistant", message: { content: [{ type: "tool_use", id: "toolu_bg5", name: "Bash", input: { command: "cargo doc" } }] } },
+      { type: "user", message: { content: [{ type: "tool_result", tool_use_id: "toolu_bg5", content: "Command moved to the background (ID: toolu_bg5)" }] } },
+    ],
+  });
+  assert.equal(r.status, "parked");
+  assert.equal(r.reason, "lost_background");
+  assert.match(r.detail, /cargo doc/);
+});
+
 test("a prompt template refuses an unfilled variable", () => {
   assert.equal(renderPrompt("plan {{plan}}", { plan: "0101" }), "plan 0101");
   assert.throws(() => renderPrompt("plan {{plan}} {{phases}}", { plan: "0101" }), /\{\{phases\}\} has no value/);

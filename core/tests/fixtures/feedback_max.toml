@@ -1,4 +1,4 @@
-# FEEDBACK FIXTURE - do not tune; the deposit guards in core/tests/feedback.rs
+# FEEDBACK FIXTURE - do not tune; the deposit guards in core/tests/suite/feedback.rs
 # read it. Plan 0046 Phase 2, ADR-0048.
 #
 # A dense STATIC rose under the `max` deposit, at the MAX_FADE ceiling. Its

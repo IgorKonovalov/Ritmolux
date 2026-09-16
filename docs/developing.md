@@ -55,14 +55,14 @@ file that would lose completion.
 
 All sixteen files — the generic schema, the fourteen per-system schemas and `.taplo.toml` itself — are
 **generated** from the engine's own `ParamSpec`, `TableDesc` and `SystemKind` declarations, and
-`core/tests/preset_schema.rs` fails if any of them is stale or `presets/schema/` holds a file no
+`core/tests/suite/preset_schema.rs` fails if any of them is stale or `presets/schema/` holds a file no
 system renders. The same test file holds a seventeenth file from the same export to it:
 `docs/specs/player-schema.json`, the document `ritmolux --schema` prints, which the studio's schema
 walks read when no player is built. One command regenerates all of them, and removes a schema left
 behind by a system that no longer exists:
 
 ```sh
-RLX_UPDATE_PRESET_SCHEMA=1 cargo nextest run -p rlx-core --test preset_schema
+RLX_UPDATE_PRESET_SCHEMA=1 cargo nextest run -p rlx-core --test suite preset_schema::
 ```
 
 **Turn format-on-save off for TOML.** The extension ships a formatter, and this project does not
@@ -135,8 +135,11 @@ What it runs, stopping at the first failure and naming the step that failed:
 | Reader prose | `node scripts/check-reader-prose.mjs` |
 | Release tag | `node scripts/check-release-tag.mjs` |
 | Release tag (self-test) | `node scripts/check-release-tag.mjs --self-test` |
+| Translations | `node scripts/check-translations.mjs` |
+| Translations (self-test) | `node scripts/check-translations.mjs --self-test` |
 | Format | `cargo fmt --all --check` |
 | Lint | `cargo clippy --workspace --all-targets -- -D warnings` |
+| Rustdoc | `cargo doc -p rlx-core --no-deps --features text` under `RUSTDOCFLAGS=-D warnings` |
 | Tests | `cargo nextest run --workspace -P fast` (narrowed — see below) |
 
 The Node steps come first because they are the cheapest (tens of milliseconds
@@ -153,12 +156,21 @@ every citation in a reader document must sit inside a link
 ([ADR-0168](adrs/0168-the-reader-documents-address-a-reader-and-the-record-stays-a-link.md)),
 every generated contents block must still match the headings beneath it
 ([ADR-0163](adrs/0163-a-long-document-carries-a-generated-contents-block.md)),
-and the version root `Cargo.toml` declares must carry an annotated tag on `HEAD`'s
+the version root `Cargo.toml` declares must carry an annotated tag on `HEAD`'s
 history, because `git push --follow-tags` never sends a lightweight one
-([ADR-0203](adrs/0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md)).
-The three that could go green on a rule that had quietly stopped working — a roster
+([ADR-0203](adrs/0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md)),
+and every `.ru.md` translation must open with the `translated-from: <sha>` stamp
+naming the commit its source was translated from
+([ADR-0185](adrs/0185-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md)).
+The four that could go green on a rule that had quietly stopped working — a roster
 detector matching nothing, an anchor rule that is merely plausible, a tag-type check
-that no longer looks — carry a `--self-test` beside their check.
+that no longer looks, a stamp reader that finds no translations at all — carry a
+`--self-test` beside their check.
+**A translation that has drifted is never a failure.** The stamp check reports a
+source that has moved as an advisory row and exits 0: nothing mechanical can judge
+whether the Russian still says what the English now says, and hard-failing would
+make that slice a hostage of every hotkey edit. A **missing or malformed** stamp is
+the exit code, because that much is mechanical.
 **The release-tag step refuses a push, not only a release:** from the moment a close
 moves the version, every push fails until that version's tag is annotated. CI's
 `links` job cannot read local tags, so it runs the same script with `--remote` on a
@@ -172,8 +184,8 @@ skip and are not bypassable.
 machine; `fmt` and `clippy` add under two seconds between them). About 165 s of that is idle.
 Every test that asserts on wall-clock time runs **alone**: nextest waits for the running tests to
 drain, runs it, and starts nothing beside it. So you will see the run pause on those tests.
-`.config/nextest.toml` names them, and a guard in `core/tests/hygiene.rs` holds that list to the tests that
-read the clock
+`.config/nextest.toml` names them, and a guard in `core/tests/suite/hygiene.rs` holds that list to
+the tests that read the clock
 ([ADR-0193](adrs/0193-a-test-that-reads-the-clock-runs-alone.md)). The hook excludes the nine
 GPU-heavy suites that iterate every shipped preset or scene through a real
 adapter. **Which nine is not written here** — since
@@ -185,6 +197,11 @@ authority, so the narrowing is never silent, and **CI runs
 all of them regardless** — though since [ADR-0073](adrs/0073-the-windows-ci-critical-path.md)
 it runs those nine in the `coverage` job alone rather than in two Windows jobs, so
 the promise is now underwritten by one job instead of a redundancy between two.
+
+The **rustdoc step** fails a broken or private intra-doc link in `rlx-core` before CI's
+`cargo doc --workspace` job does. It is scoped to that one crate because that is what fits: on one
+warm engine edit it cost 4.5-5.9 s against 6.3-7.8 s for the lint step on the same edit
+(2026-09-15, reference machine). `standalone`'s public items are documented in CI only.
 
 `cargo deny`, doctests, Miri, and the coverage job are deliberately *not* in the
 hook — they push it into minutes, and a gate that hurts gets disabled
@@ -205,6 +222,51 @@ cargo check -p standalone --features spout
 ```
 
 Bypass once with `git push --no-verify`.
+
+## Disk
+
+Every worktree builds into its own `target/`, and cargo collects nothing in it on its own.
+
+**`target/debug/deps/` keeps every generation of every unit.** A dependency bump, a feature flip,
+or a narrowed `cargo nextest run -p <crate>` whose feature set differs from the workspace build
+writes a second `rlx_core`, `wgpu` and `windows` beside the first, and nothing collects the old one.
+`scripts/prune-target.mjs` deletes what the everyday loop no longer uses:
+
+```sh
+node scripts/prune-target.mjs                 # dry run: what would go, and the bytes
+node scripts/prune-target.mjs --apply         # delete it
+node scripts/prune-target.mjs --verify-fresh  # every artifact the loop reports is still fresh
+```
+
+The live set is **what cargo reports**: the script runs `cargo build --workspace`,
+`cargo clippy --workspace --all-targets` and `cargo nextest run --workspace -P fast --no-run` with
+JSON messages, and keeps every file one of them names. So the three have to be green, and no other
+cargo process may run in the same checkout while it does. Deleting something the loop needed costs a
+rebuild, never a wrong build: cargo sees a missing output as dirty. The target directory comes from
+`cargo metadata`, so a `CARGO_TARGET_DIR` redirect is followed.
+
+Run it when the disk is short, and after anything that changes many units at once: a toolchain or
+dependency bump, or a session of narrowed `-p` runs.
+
+**`target/debug/incremental/` holds one directory per compiled unit, and up to two sessions in
+each.** Measured on the reference machine on 2026-09-15, in a lane built by the three commands
+above: 171 unit directories and 1.95 GB. One edit to `core/src/render/metrics.rs` and the three
+commands again took it to 3.62 GB with no new directory, because each rebuilt unit now kept its
+previous session beside the new one. Three more edit-and-revert rounds left it at 3.59 GB, still
+171 directories and never more than two sessions in one. So the loop alone does not grow it without
+bound. What adds directories is a **new unit**: a different feature set, a narrowed `-p` build, a
+dependency or toolchain change, each of which leaves the old unit's directory behind.
+
+`prune-target.mjs` does not touch this directory, because nothing cargo reports names which unit a
+directory belongs to. Delete it instead, when it has grown past what the loop above needs:
+
+```sh
+rm -rf target/debug/incremental                           # sh
+Remove-Item -Recurse -Force target\debug\incremental      # PowerShell
+```
+
+That costs one non-incremental rebuild of the workspace crates on the next build, and nothing else:
+dependencies are never built incrementally, and no output outside that directory depends on it.
 
 ## Running approved plans under the conductor
 
@@ -236,8 +298,20 @@ node tools/conductor/conductor.mjs status         # what each lane is doing, and
 
 Every other seam stays exactly as the skills describe it.
 
+**Watch it from the terminal that started it.** `run` prints one line per milestone as it happens: a
+step starting and ending with its duration, spend and turn count, each commit that lands in the
+worktree, each phase whose log row flips to done, each test and gate command with its counts and lock
+wait, the 5-hour and 7-day usage readings, and every command a permission rule denied. The same lines
+go to `tools/conductor/state/live.log`, under one header per run, for a run you did not watch.
+
 **Next morning, read `tools/conductor/digest.md`.** It lists what needs you first: each park with its
-resume command, and each merge that carried minors.
+resume command and the usage reading its session ended on, then every merge's still-open findings
+with their `file:line`. The newest run also lists what an earlier run left parked, with its age and
+the worktree it holds — or the branch `resume` reopens it from, when you have already removed that
+worktree. Totals carry the usage windows at run start and run end, and gate minutes split into the
+full workspace suite and everything else, with the count of suite runs skipped because the conductor
+had already seen that exact tree pass
+([ADR-0207](adrs/0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md)).
 
 The operator guide — every command, what to do about each kind of park, and how to verify a new CLI
 version — is [`tools/conductor/README.md`](../tools/conductor/README.md). Its tests need no network

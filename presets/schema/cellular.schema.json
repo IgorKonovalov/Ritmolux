@@ -749,47 +749,47 @@
     "param.birth": {
       "type": "string",
       "description": "Which live-neighbour counts bring a dead cell to life, as a bitmask over the counts 0-8: bit k set means k neighbours give birth. 8 (bit 3) is Conway's.",
-      "markdownDescription": "Which live-neighbour counts bring a dead cell to life, as a bitmask over the counts 0-8: bit k set means k neighbours give birth. 8 (bit 3) is Conway's.\n\n- default `8.0`\n- typical range `0.0` to `511.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "Which live-neighbour counts bring a dead cell to life, as a bitmask over the counts 0-8: bit k set means k neighbours give birth. 8 (bit 3) is Conway's.\n\n- default `8.0`\n- typical range depends on the family: `life_like` `0.0` to `511.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `larger_than_life`, `cyclic` — the parameter is not read there at all\n- structural parameter\n\nThe value is an expression, always quoted."
     },
     "param.survive": {
       "type": "string",
       "description": "Which live-neighbour counts keep a live cell alive, as a bitmask over the counts 0-8. 12 (bits 2 and 3) is Conway's.",
-      "markdownDescription": "Which live-neighbour counts keep a live cell alive, as a bitmask over the counts 0-8. 12 (bits 2 and 3) is Conway's.\n\n- default `12.0`\n- typical range `0.0` to `511.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "Which live-neighbour counts keep a live cell alive, as a bitmask over the counts 0-8. 12 (bits 2 and 3) is Conway's.\n\n- default `12.0`\n- typical range depends on the family: `life_like` `0.0` to `511.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `larger_than_life`, `cyclic` — the parameter is not read there at all\n- structural parameter\n\nThe value is an expression, always quoted."
     },
     "param.radius.cellular": {
       "type": "string",
       "description": "How far the neighbourhood reaches, in cells: a square of side 2 x radius + 1 about each cell. Capped by the quality tier.",
-      "markdownDescription": "How far the neighbourhood reaches, in cells: a square of side 2 x radius + 1 about each cell. Capped by the quality tier.\n\n- default `5.0`\n- typical range `1.0` to `10.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How far the neighbourhood reaches, in cells: a square of side 2 x radius + 1 about each cell. Capped by the quality tier.\n\n- default `5.0`\n- typical range depends on the family: `larger_than_life` `1.0` to `10.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `life_like`, `cyclic` — the parameter is not read there at all\n- structural parameter\n\nThe value is an expression, always quoted."
     },
     "param.birth_lo": {
       "type": "string",
       "description": "The least filled fraction of its neighbourhood at which a dead cell is born.",
-      "markdownDescription": "The least filled fraction of its neighbourhood at which a dead cell is born.\n\n- default `0.28`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "The least filled fraction of its neighbourhood at which a dead cell is born.\n\n- default `0.28`\n- typical range depends on the family: `larger_than_life` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `life_like`, `cyclic` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.birth_hi": {
       "type": "string",
       "description": "The most filled fraction of its neighbourhood at which a dead cell is born.",
-      "markdownDescription": "The most filled fraction of its neighbourhood at which a dead cell is born.\n\n- default `0.385`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "The most filled fraction of its neighbourhood at which a dead cell is born.\n\n- default `0.385`\n- typical range depends on the family: `larger_than_life` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `life_like`, `cyclic` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.survive_lo": {
       "type": "string",
       "description": "The least filled fraction of its neighbourhood at which a live cell survives.",
-      "markdownDescription": "The least filled fraction of its neighbourhood at which a live cell survives.\n\n- default `0.26`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "The least filled fraction of its neighbourhood at which a live cell survives.\n\n- default `0.26`\n- typical range depends on the family: `larger_than_life` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `life_like`, `cyclic` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.survive_hi": {
       "type": "string",
       "description": "The most filled fraction of its neighbourhood at which a live cell survives.",
-      "markdownDescription": "The most filled fraction of its neighbourhood at which a live cell survives.\n\n- default `0.47`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "The most filled fraction of its neighbourhood at which a live cell survives.\n\n- default `0.47`\n- typical range depends on the family: `larger_than_life` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `life_like`, `cyclic` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.states": {
       "type": "string",
       "description": "How many colours the cycle holds; each cell advances to the next one round it.",
-      "markdownDescription": "How many colours the cycle holds; each cell advances to the next one round it.\n\n- default `3.0`\n- typical range `2.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How many colours the cycle holds; each cell advances to the next one round it.\n\n- default `3.0`\n- typical range depends on the family: `cyclic` `2.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `life_like`, `larger_than_life` — the parameter is not read there at all\n- structural parameter\n\nThe value is an expression, always quoted."
     },
     "param.threshold": {
       "type": "string",
       "description": "How many of its eight neighbours must already hold the next colour before a cell advances to it.",
-      "markdownDescription": "How many of its eight neighbours must already hold the next colour before a cell advances to it.\n\n- default `3.0`\n- typical range `1.0` to `8.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How many of its eight neighbours must already hold the next colour before a cell advances to it.\n\n- default `3.0`\n- typical range depends on the family: `cyclic` `1.0` to `8.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `life_like`, `larger_than_life` — the parameter is not read there at all\n- structural parameter\n\nThe value is an expression, always quoted."
     },
     "param.step_rate": {
       "type": "string",
@@ -804,12 +804,12 @@
     "param.trail": {
       "type": "string",
       "description": "How many generations a dead cell keeps glowing, fading as it goes; 0 draws only the live cells.",
-      "markdownDescription": "How many generations a dead cell keeps glowing, fading as it goes; 0 draws only the live cells.\n\n- default `12.0`\n- typical range `0.0` to `64.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How many generations a dead cell keeps glowing, fading as it goes; 0 draws only the live cells.\n\n- default `12.0`\n- typical range depends on the family: `life_like` `0.0` to `64.0`, `larger_than_life` `0.0` to `64.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `cyclic` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.age_tint": {
       "type": "string",
       "description": "How far along the palette a dead cell's glow travels as it fades; 0 keeps the wake the live cells' colour.",
-      "markdownDescription": "How far along the palette a dead cell's glow travels as it fades; 0 keeps the wake the live cells' colour.\n\n- default `0.35`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How far along the palette a dead cell's glow travels as it fades; 0 keeps the wake the live cells' colour.\n\n- default `0.35`\n- typical range depends on the family: `life_like` `0.0` to `1.0`, `larger_than_life` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `cyclic` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.bg_hue": {
       "type": "string",

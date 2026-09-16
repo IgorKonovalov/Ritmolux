@@ -329,8 +329,9 @@ impl ParamSmoother {
     /// Smooth `raw` for binding `index` toward its previous value over `dt`
     /// seconds, using whichever of `tau`'s two constants the direction of travel
     /// selects (ADR-0035). A selected constant of `<= 0` (the default) or
-    /// non-finite, or a non-positive `dt`, passes `raw` through unchanged. The
-    /// first frame after a reset seeds the state with `raw` (a snap).
+    /// non-finite passes `raw` through unchanged. `dt` is finite and positive,
+    /// the frame delta `sanitize_frame_dt` hands over (ADR-0191). The first
+    /// frame after a reset seeds the state with `raw` (a snap).
     pub(super) fn smooth(&mut self, index: usize, raw: f32, tau: Easing, dt: f32) -> f32 {
         if self.last.len() <= index {
             self.last.resize(index + 1, None);

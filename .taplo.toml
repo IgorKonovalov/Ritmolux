@@ -1,4 +1,4 @@
-# GENERATED - do not edit. core/tests/preset_schema.rs fails if this file, the
+# GENERATED - do not edit. core/tests/suite/preset_schema.rs fails if this file, the
 # generic schema or any per-system schema is stale. Regenerate all of them with
 #
 #   RLX_UPDATE_PRESET_SCHEMA=1 cargo nextest run -p rlx-core the_generated_editor_files_are_current

@@ -131,6 +131,7 @@ export function App(): JSX.Element {
           <Preview stream={player.stream} onStats={onStats} />
           <Editor
             system={player.preset?.system}
+            family={player.preset?.family}
             file={player.preset?.file}
             reloads={player.reloads}
             problems={player.problems}

@@ -8,7 +8,7 @@
 //! coverage gap Plan 0061 Phase 4b left open when it scoped that test down).
 //!
 //! Everything here is GPU-free. The one function that needs a device -
-//! `build_family_report` - stays covered by `standalone/tests/shot_cli.rs`.
+//! `build_family_report` - stays covered by `standalone/tests/suite/shot_cli.rs`.
 
 // Tests index, expect and panic freely; this is not the render path.
 #![allow(clippy::expect_used, clippy::indexing_slicing, clippy::panic)]
@@ -37,6 +37,7 @@ fn preset_report(name: &str, gates: Vec<GateReport>) -> PresetReport {
         reactivity_footprint: [0.9375, 0.4688, 0.2344, 0.1172],
         animation: 0.75,
         drive: 0.625,
+        count: 0.0417,
         rate: 0.0123,
         coverage: 0.5,
         level: 0.1234,
@@ -345,6 +346,44 @@ fn the_geometry_column_appears_only_for_families_with_a_line_seam() {
     assert!(
         out.contains("in-frame geometry fraction"),
         "the column explains itself:\n{out}"
+    );
+    // In a block of its own: the main table's header ends at `fall`, and the
+    // block's header names only the preset and the fraction.
+    let headers: Vec<&str> = out
+        .lines()
+        .filter(|l| l.trim_start().starts_with("preset "))
+        .collect();
+    assert!(
+        headers
+            .iter()
+            .any(|h| h.ends_with("fall") && !h.contains("geom")),
+        "the main table no longer carries geom:\n{out}"
+    );
+    assert!(
+        headers
+            .iter()
+            .any(|h| h.split_whitespace().collect::<Vec<_>>() == ["preset", "geom"]),
+        "geom prints as a one-column block:\n{out}"
+    );
+    let geom_row = format!("  {:<w$} 0.3492\n", "rosette", w = NAME_WIDTH);
+    assert!(
+        out.contains(&geom_row),
+        "the block's row lines up under its header:\n{out}"
+    );
+
+    // Inside a line family, a preset that drew no segment prints a placeholder
+    // rather than dropping its row.
+    let mut measured = preset_report("rosette", vec![]);
+    measured.geometry = Some(0.25);
+    let mixed = fam(
+        SystemKind::StarPattern,
+        vec![measured, preset_report("undrawn", vec![])],
+    );
+    let out = text_report("src", &[mixed], Tier::Floor);
+    let placeholder = format!("  {:<w$}      -\n", "undrawn", w = NAME_WIDTH);
+    assert!(
+        out.contains(&placeholder),
+        "an unmeasured preset in a line family prints `-`:\n{out}"
     );
 
     // A family with no line seam: no header, no placeholder, no explainer.
@@ -661,10 +700,10 @@ fn the_level_column_prints_per_preset_and_reaches_the_json() {
     );
 }
 
-/// The widest possible row — a line family, so the `geom` column is present too
-/// — still fits a 100-column terminal with both new columns in place. The
-/// content lane reads this table many times a session, and a wrapped row stops
-/// lining up with its header.
+/// The widest possible row still fits a 100-column terminal, with `count` in the
+/// main table and a line family's `geom` in its own block. The content lane reads
+/// this table many times a session, and a wrapped row stops lining up with its
+/// header.
 #[test]
 fn no_report_table_line_wraps_at_a_hundred_columns() {
     let mut line_preset = preset_report("Star Mandala Bordered", vec![]);
@@ -689,8 +728,12 @@ fn no_report_table_line_wraps_at_a_hundred_columns() {
         .collect();
     assert_eq!(
         table.len(),
-        6,
-        "all three tables carry a header and this preset's row:\n{out}"
+        8,
+        "all four tables carry a header and this preset's row:\n{out}"
+    );
+    assert!(
+        table.iter().any(|l| l.contains("count")),
+        "the widest table measured is the one carrying count:\n{out}"
     );
     for line in table {
         assert!(
@@ -756,6 +799,230 @@ fn fit_name_keeps_short_names_whole_and_elides_the_middle_of_long_ones() {
     assert!(long.contains('~'), "the elision is marked: {long:?}");
     assert!(long.starts_with("Star Ma"), "the head survives: {long:?}");
     assert!(long.ends_with("rdered"), "the tail survives: {long:?}");
+}
+
+/// The `count` stimulus moves the musical clock and nothing else (ADR-0196).
+///
+/// Every other field is checked against [`AnalysisFrame::default`] one by one,
+/// through an exhaustive destructure, so a field added to the frame later fails
+/// to compile here rather than slipping past as an unchecked stimulus change.
+/// The clock itself: `beat` fires on exactly the frames where `beat_index`
+/// steps, nine times in 48 frames, and the bar trio follows the counter.
+#[test]
+fn the_clock_stimulus_moves_the_clock_and_nothing_else() {
+    let frames = clock_stimulus();
+    assert_eq!(frames.len(), 48, "the stimulus is REPORT_FRAMES_LATE long");
+    let rest = AnalysisFrame::default();
+
+    let mut beats = 0;
+    let mut bar_indices = Vec::new();
+    let mut previous_index = None;
+    for (i, frame) in frames.iter().enumerate() {
+        let AnalysisFrame {
+            spectrum,
+            waveform,
+            waveform_gain,
+            onset,
+            beat,
+            bass,
+            mid,
+            treb,
+            bass_raw,
+            mid_raw,
+            treb_raw,
+            onset_raw,
+            bpm,
+            bar,
+            beat_index,
+            time_since_beat,
+            beat_in_bar,
+            bar_index,
+            bar_phase,
+            downbeat_confidence,
+            downbeat_locked,
+            novelty,
+        } = *frame;
+
+        // Everything that is not the clock stays at rest.
+        assert!(
+            spectrum
+                .iter()
+                .zip(rest.spectrum.iter())
+                .all(|(a, b)| a.to_bits() == b.to_bits()),
+            "frame {i}: the band array moved"
+        );
+        assert!(
+            waveform
+                .iter()
+                .zip(rest.waveform.iter())
+                .all(|(a, b)| a.to_bits() == b.to_bits()),
+            "frame {i}: the waveform moved"
+        );
+        for (field, got, want) in [
+            ("waveform_gain", waveform_gain, rest.waveform_gain),
+            ("onset", onset, rest.onset),
+            ("bass", bass, rest.bass),
+            ("mid", mid, rest.mid),
+            ("treb", treb, rest.treb),
+            ("bass_raw", bass_raw, rest.bass_raw),
+            ("mid_raw", mid_raw, rest.mid_raw),
+            ("treb_raw", treb_raw, rest.treb_raw),
+            ("onset_raw", onset_raw, rest.onset_raw),
+            ("bpm", bpm, rest.bpm),
+            (
+                "downbeat_confidence",
+                downbeat_confidence,
+                rest.downbeat_confidence,
+            ),
+            ("novelty", novelty, rest.novelty),
+        ] {
+            assert_eq!(
+                got.to_bits(),
+                want.to_bits(),
+                "frame {i}: `{field}` is {got}, not its default {want}"
+            );
+        }
+        assert_eq!(
+            downbeat_locked, rest.downbeat_locked,
+            "frame {i}: downbeat_locked moved"
+        );
+
+        // The clock: the event fires exactly where the counter steps.
+        let stepped = previous_index.is_some_and(|p| p != beat_index);
+        assert_eq!(
+            beat, stepped,
+            "frame {i}: beat is {beat} but beat_index {beat_index} stepped={stepped}"
+        );
+        if beat {
+            beats += 1;
+            assert_eq!(
+                time_since_beat, 0.0,
+                "frame {i}: a beat frame is 0 s since the beat"
+            );
+        }
+        assert_eq!(beat_in_bar, beat_index % 4, "frame {i}");
+        assert_eq!(bar_index, beat_index / 4, "frame {i}");
+        assert!((0.0..1.0).contains(&bar), "frame {i}: beat phase {bar}");
+        assert!(
+            (0.0..1.0).contains(&bar_phase),
+            "frame {i}: bar phase {bar_phase}"
+        );
+        if bar_indices.last() != Some(&bar_index) {
+            bar_indices.push(bar_index);
+        }
+        previous_index = Some(beat_index);
+    }
+    assert_eq!(beats, 9, "nine beats in 48 frames at five frames a beat");
+    assert_eq!(bar_indices, [0, 1, 2], "two bar edges, three bars");
+    // The edges land where ADR-0196 says: bars step at frames 20 and 40.
+    assert_eq!(frames[19].bar_index, 0);
+    assert_eq!(frames[20].bar_index, 1);
+    assert_eq!(frames[40].bar_index, 2);
+}
+
+/// The `count` statistic compares frame *i* with frame *i*, so identical
+/// sequences read exactly zero and a difference confined to a few depths still
+/// reads — the aliasing a single sampled depth would suffer (ADR-0196).
+#[test]
+fn the_count_reading_is_the_mean_of_frame_aligned_differences() {
+    let silent: Vec<CaptureImage> = (0..8).map(|_| flat(40)).collect();
+    assert_eq!(
+        mean_aligned_diff(&silent, &silent.clone()),
+        0.0,
+        "identical sequences read exactly zero"
+    );
+
+    // Only frames 2 and 3 differ, by 51 levels each: the mean over eight pairs
+    // is 2 * (51 / 255) / 8, and the last frame alone would have read zero.
+    let mut counted = silent.clone();
+    counted[2] = flat(91);
+    counted[3] = flat(91);
+    let expected = 2.0 * (51.0 / 255.0) / 8.0;
+    assert!(
+        (mean_aligned_diff(&counted, &silent) - expected).abs() < 1e-6,
+        "got {}, want {expected}",
+        mean_aligned_diff(&counted, &silent)
+    );
+
+    assert_eq!(mean_aligned_diff(&[], &[]), 0.0);
+}
+
+/// `count` prints in the main table immediately after `onset`, and reaches
+/// `--json` after `drive` carrying its schedule (ADR-0196).
+#[test]
+fn the_count_column_follows_onset_and_carries_its_schedule_in_the_json() {
+    let fam = || FamilyReport {
+        system: SystemKind::Swarm,
+        presets: vec![preset_report("ticker", vec![])],
+        pixel: vec![vec![0.0]],
+        shape: vec![vec![0.0]],
+        near_dups: Vec::new(),
+    };
+    let out = text_report("src", &[fam()], Tier::Floor);
+    let header: Vec<&str> = out
+        .lines()
+        .find(|l| l.trim_start().starts_with("preset ") && l.contains("drive"))
+        .unwrap_or_else(|| panic!("no main table header:\n{out}"))
+        .split_whitespace()
+        .collect();
+    let at = |name: &str| {
+        header
+            .iter()
+            .position(|c| *c == name)
+            .unwrap_or_else(|| panic!("no `{name}` in {header:?}"))
+    };
+    assert_eq!(
+        at("count"),
+        at("onset") + 1,
+        "count follows onset: {header:?}"
+    );
+    let row: Vec<&str> = out
+        .lines()
+        .find(|l| l.trim_start().starts_with("ticker"))
+        .unwrap_or_else(|| panic!("no row:\n{out}"))
+        .split_whitespace()
+        .collect();
+    assert_eq!(row.len(), header.len(), "one cell per header column");
+    assert_eq!(row[at("count")], "0.042", "the count cell:\n{out}");
+    assert!(
+        out.contains("count is the musical clock"),
+        "the column explains itself beside drive:\n{out}"
+    );
+
+    let json = render_json("src", &[fam()], Tier::Floor);
+    assert!(
+        json.contains(
+            "\"drive\":0.6250,\"count\":{\"mean\":0.0417,\"frames\":48,\"frames_per_beat\":5},"
+        ),
+        "count follows drive with its schedule: {json}"
+    );
+    assert!(
+        json.contains(
+            "\"reactivity\":{\"bass\":0.5000,\"mid\":0.2500,\"treb\":0.1250,\"onset\":0.0625}"
+        ),
+        "the reactivity object keeps its four keys: {json}"
+    );
+    assert_eq!(
+        json.matches('{').count(),
+        json.matches('}').count(),
+        "braces balance with the new key: {json}"
+    );
+
+    // An exact zero is written as one, not rounded to four places.
+    let mut still = preset_report("still", vec![]);
+    still.count = 0.0;
+    let json = render_json(
+        "src",
+        &[FamilyReport {
+            system: SystemKind::Swarm,
+            presets: vec![still],
+            pixel: vec![vec![0.0]],
+            shape: vec![vec![0.0]],
+            near_dups: Vec::new(),
+        }],
+        Tier::Floor,
+    );
+    assert!(json.contains("\"count\":{\"mean\":0,"), "{json}");
 }
 
 /// The whole shipped library fits into distinct row labels. This is the claim

@@ -5,7 +5,7 @@
  * The walk runs over the document the **built player** prints, so a table, a
  * kind or a map element added to the engine reaches this test without an edit.
  * With no built player — CI's studio job builds none — it reads the committed
- * `docs/specs/player-schema.json`, which `core/tests/preset_schema.rs` holds
+ * `docs/specs/player-schema.json`, which `core/tests/suite/preset_schema.rs` holds
  * byte-equal to what `ritmolux --schema` prints. **It never skips**: a missing
  * snapshot fails the file, because a walk over nothing passes every assertion.
  * There is deliberately **no hand-kept fallback roster**: a list of kinds
@@ -23,6 +23,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { parseSchemaDocument } from '../electron/player/schema'
+import { builtPlayer } from '../electron/testing/player'
 import { editorForKind, literalFor, mapElementEditor } from './fields'
 import type { SchemaDocument, TableKey } from './schema'
 import { structuralTables } from './templates'
@@ -32,16 +33,13 @@ const SNAPSHOT = join(ROOT, 'docs', 'specs', 'player-schema.json')
 
 /** The built player's document, else the committed snapshot; throws with neither. */
 function schemaDocument(): { document: SchemaDocument; source: string } {
-  const name = process.platform === 'win32' ? 'ritmolux.exe' : 'ritmolux'
-  for (const profile of ['release', 'debug']) {
-    const candidate = join(ROOT, 'target', profile, name)
-    if (existsSync(candidate)) {
-      const text = execFileSync(candidate, ['--schema'], { encoding: 'utf8' })
-      return { document: parseSchemaDocument(text), source: candidate }
-    }
+  const player = builtPlayer()
+  if (player.path !== undefined) {
+    const text = execFileSync(player.path, ['--schema'], { encoding: 'utf8' })
+    return { document: parseSchemaDocument(text), source: player.path }
   }
   if (!existsSync(SNAPSHOT)) {
-    throw new Error(`no built ritmolux in target/ and no schema snapshot at ${SNAPSHOT}`)
+    throw new Error(`${player.missing}, and no schema snapshot at ${SNAPSHOT}`)
   }
   return { document: parseSchemaDocument(readFileSync(SNAPSHOT, 'utf8')), source: SNAPSHOT }
 }

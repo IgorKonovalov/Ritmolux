@@ -610,7 +610,7 @@ impl Pipeline {
         // on the device — diverges, and only on WARP.
         //
         // This mattered nowhere in the suite because no capture test runs a
-        // dissolve between two `trails`-binding presets; `core/tests/transition.rs`
+        // dissolve between two `trails`-binding presets; `core/tests/suite/transition.rs`
         // uses flat static pairs.
         let bind_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("blend-bind-layout"),
@@ -794,6 +794,21 @@ impl Renderer {
     /// itself is the pure [`transition::dual_live_eligible`]; this only gathers its
     /// two inputs.
     pub(super) fn dissolve_mode(&self, from: usize, to: usize) -> Mode {
+        if transition::dual_live_eligible(
+            self.pair_shares_resources(from, to),
+            self.diag.stats().frame_ms_avg(),
+            DUAL_LIVE_BUDGET_MS,
+        ) {
+            Mode::DualLive
+        } else {
+            Mode::Freeze
+        }
+    }
+
+    /// Whether the roster presets at `from` and `to` draw through scene objects
+    /// that share mutable state, so one frame must not evaluate or render both —
+    /// the veto half of [`dissolve_mode`](Self::dissolve_mode).
+    pub(super) fn pair_shares_resources(&self, from: usize, to: usize) -> bool {
         let systems = (
             self.roster.presets.get(from).map(|p| p.system),
             self.roster.presets.get(to).map(|p| p.system),
@@ -813,28 +828,39 @@ impl Renderer {
         // budget half is no different: layered content simply
         // weighs more per frame, so the governor's latch freezes it more often
         // — ADR-0090's accepted Negative, not a special case here.
-        let shares = match systems {
+        match systems {
             (Some(a), Some(b)) => scenes::shares_resources(a, b),
             // A preset we cannot even resolve is not a pair we will render twice.
             _ => true,
-        };
-        if transition::dual_live_eligible(
-            shares,
-            self.diag.stats().frame_ms_avg(),
-            DUAL_LIVE_BUDGET_MS,
-        ) {
-            Mode::DualLive
-        } else {
-            Mode::Freeze
         }
     }
 
-    /// Start a dissolve to `to` at a forced fidelity, bypassing the governor.
-    /// **Test-only** — see [`Transition::set_mode`] for why the GPU dual-live path
-    /// is otherwise unreachable from a headless test. No frontend calls this.
+    /// Start a dissolve to `to` at a forced fidelity, bypassing the governor's
+    /// **headroom** half only. **Test-only** — see [`Transition::set_mode`] for why
+    /// the GPU dual-live path is otherwise unreachable from a headless test. No
+    /// frontend calls this.
+    ///
+    /// The shared-resources veto still holds: a pair whose scenes share state keeps
+    /// `Mode::Freeze` whatever `mode` asks for. The governor never runs such a pair
+    /// dual-live, because both sides would advance and bind one scene object in
+    /// one frame and encode its uniforms twice into one submission — so a test that
+    /// built that frame would observe a defect no shipped build can have
+    /// (ADR-0198).
     #[cfg(test)]
     pub(super) fn begin_transition_forced(&mut self, to: usize, mode: Mode) {
         self.begin_transition(to);
+        let Some((from, to)) = self
+            .transition
+            .as_ref()
+            .map(|tr| (tr.outgoing_index(), tr.incoming_index()))
+        else {
+            return;
+        };
+        let mode = if self.pair_shares_resources(from, to) {
+            Mode::Freeze
+        } else {
+            mode
+        };
         if let Some(tr) = self.transition.as_mut() {
             tr.set_mode(mode);
         }

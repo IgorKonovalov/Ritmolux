@@ -1321,7 +1321,7 @@ fn an_authored_contour_draws_a_figure_the_roster_cannot_select() {
 /// exactly the failure the contour test alone cannot see.
 ///
 /// **The frame's own orientation is not assumed here, it is established
-/// elsewhere**: `core/tests/backdrop_ramp.rs` and `lines/renderer/tests.rs` both
+/// elsewhere**: `core/tests/suite/backdrop_ramp.rs` and `lines/renderer/tests.rs` both
 /// record that image row 0 is NDC y = +1. So the engine's largest y is the
 /// image's TOP row.
 ///

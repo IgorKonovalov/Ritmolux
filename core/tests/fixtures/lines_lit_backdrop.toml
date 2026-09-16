@@ -13,7 +13,7 @@
 # widths (2 to 3) that rim is close to a hairline and a capture at those widths
 # CANNOT DISCRIMINATE THE FIX. `thickness = 9` is what makes the defect
 # measurable; "simplifying" it back to a shipped width retires this test
-# silently while leaving it green. Same trap `core/tests/kaleidoscope.rs`
+# silently while leaving it green. Same trap `core/tests/suite/kaleidoscope.rs`
 # documents about its non-zero `kaleido_angle`.
 #
 # `softness = 1.0` IS PINNED AND IS NOT THE SHIPPED DEFAULT (Plan 0114). Since

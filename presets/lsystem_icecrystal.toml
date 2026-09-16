@@ -16,10 +16,10 @@
 # `visible_depth` IS A GENERATION NUMBER, NOT A FRACTION. The engine draws
 # `floor(visible_depth)`, counted from 1 and capped at `max_depth` - a value below
 # 2 is generation 1, and nothing between whole numbers is drawn. The binding
-# targets 1.5 and 2.5 rather than 1 and 2 because it is smoothed: a one-pole ease
-# approaches its target and in f32 never reaches it, so a step smoothed toward 2.0
-# settles at 1.9999 and floors to 1 forever. The half offset puts every crossing
-# mid-glide.
+# targets 1.5 and 2.5 rather than 1 and 2 because it is smoothed: an eased value
+# reaches its target only after ten to fifteen time constants, so a step smoothed
+# toward 2.0 floors to 1 until it has fully arrived, and a mid swell is over long
+# before that. The half offset puts every crossing mid-glide.
 #
 # WHAT TO LOOK AT WHEN JUDGING: the frost. At rest the crystal is its armature;
 # a mid above ~0.56 should fill it in, and it should empty again. Second:

@@ -31,7 +31,7 @@
 //! `capture.rs`'s `read_back` waits indefinitely, deliberately: a headless loop
 //! outruns the GPU and the wait is what paces it. That is the correct policy
 //! there and the wrong one here, and the two are not merged for exactly that
-//! reason — `core/tests/console_preview.rs` holds `render/` to no indefinite
+//! reason — `core/tests/suite/console_preview.rs` holds `render/` to no indefinite
 //! wait outside the two capture files.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2; render/ is scanned by the

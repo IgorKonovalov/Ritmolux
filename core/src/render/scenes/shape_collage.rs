@@ -1071,7 +1071,7 @@ impl ShapeCollageScene {
                 bind_group,
                 None,
                 surface_format,
-                wgpu::BlendState::REPLACE,
+                wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING,
                 "shape-collage",
             ),
             elements: Vec::with_capacity(2 * cap),
@@ -1326,6 +1326,13 @@ impl ShapeCollageScene {
         self.recompose_count
     }
 
+    /// The recipe the live canvas was last generated from, or `None` before the
+    /// first build. [`Self::rebuild`] regenerates only when this would change.
+    #[cfg(test)]
+    pub(crate) fn built_recipe(&self) -> Option<layout::Recipe> {
+        self.built
+    }
+
     /// Install an element array of the test's own, in painter order, in place of
     /// the authored canvas. See [`Self::specs_override`] for why this exists.
     #[cfg(test)]
@@ -1484,7 +1491,7 @@ fn applied_edge_softness(softness: f32) -> f32 {
 
 /// The parameter names this scene consumes — the vocabulary a preset binding is
 /// checked against at load (ADR-0020). **Keep in sync with `set_param` below**;
-/// `declared_params_match_set_param` in `core/tests/preset.rs` fails if the two
+/// `declared_params_match_set_param` in `core/tests/suite/preset.rs` fails if the two
 /// drift.
 pub const PARAMS: &[ParamSpec] = &[
     ParamSpec {
@@ -1706,6 +1713,10 @@ impl Scene for ShapeCollageScene {
     }
 
     /// Advance the canvas by `dt` real seconds (ADR-0012).
+    ///
+    /// `advance` runs after this frame's bindings (ADR-0198), so the rebuild
+    /// generates the recipe this frame bound and the step integrates this
+    /// frame's `drift`, `spin` and `density`, and reads its `recompose` edge.
     ///
     /// **The whole of this scene's animation hangs off this argument** — the
     /// recomposition edge, the crossfade, the density fades, and every element's

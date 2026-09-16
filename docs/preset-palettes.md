@@ -720,7 +720,7 @@ know exactly what you traded.
    These are **outside** it. `swarm`, `attractor` and `emitter` are a different
    renderer with nothing equivalent sitting in it. `warp_mesh` colours its light
    at deposit time, so the palette never bands the accumulated field at all
-   ([backlog 0146](design-backlog.md)).
+   ([backlog 0146](design-backlog-archive.md)).
 3. **A coordinate that lands inside a plateau, not on its edge** — see the LUT
    entry in the table below, which is the one leak that is about *your* numbers
    rather than about a stage you can switch off.
@@ -742,7 +742,7 @@ palette's literal RGB, and they will still read as a limited-ink print.
 | kaleidoscope | resampling through the fold, with **linear** filtering, so a texel straddling two plateaus comes back as their average | bind no `kaleido_*` (the stage is inactive without a fold, a radial term or a tile) |
 | bloom | a blurred bright-pass added back over the frame — a blur is a mixer by definition | `bloom_amount = "0"` (the default) |
 | the internal post grid | **any** active post stage routes the frame through a capped internal grid and presents it with a linear stretch, so the resample mixes neighbours even where the stage itself would not | the same switches as the three stages above: with none active there is no internal grid and no resample |
-| `palette_contour` | a soft scalar darken toward black at each band edge — it has no ink of its own, which is exactly [backlog 0140](design-backlog.md)'s subject. Measured there: `shape_contourmono` goes from 9 distinct colours to 684 | `palette_contour = "0"` (the default) |
+| `palette_contour` | a soft scalar darken toward black at each band edge — it has no ink of its own, which is exactly [backlog 0140](design-backlog-archive.md)'s subject. Measured there: `shape_contourmono` goes from 9 distinct colours to 684 | `palette_contour = "0"` (the default) |
 | the A/B palette crossfade | `palette_mix` between two palettes samples a value in neither of them | declare no `[palette_b]`, or pin `palette_mix` to exactly `0` or `1` |
 | the duotone ink pass | every pixel lerped along the paper→ink axis by its luminance, which is a continuum by construction | `ink_amount = "0"` (the default; the pass is not even built) |
 | an `over` layer join | the layer is blended into the main scene's composite at `mix`, through `add`, `screen`, `multiply` or `overlay` — **every one of the four is a mixer**, and there is no replacing blend | use `join = "under"` instead, where the layer draws into the *same scene target* through the same seam and stays in the class if it too draws opaque; or declare no `[layer]` |
@@ -999,7 +999,7 @@ what you think can darken.
 > is wrong and this table is the correction. The claim was that a particle's
 > alpha *is* its brightness; in fact `swarm.rs` emits `vec4(color * g, g)` where
 > `g` is the mark's **geometric** falloff and is independent of its colour, and
-> `layer_blend.rs` un-premultiplies before taking the mode. `core/tests/layer.rs`
+> `layer_blend.rs` un-premultiplies before taking the mode. `core/tests/suite/layer.rs`
 > carries the measurement.
 
 ### The light ground must come from the chain, never from `bg_*`

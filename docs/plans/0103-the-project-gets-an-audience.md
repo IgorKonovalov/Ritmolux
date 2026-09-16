@@ -86,8 +86,8 @@ first because every later phase increases the number of people who meet the defe
 ### Phase 1 — the component survives a stranger's first five minutes
 
 - **Owner skill:** dev
-- **What:** Fix [design-backlog 0102](../design-backlog.md) — the panel attaches its wgpu surface
-  before it has a real client rect — and [design-backlog 0103](../design-backlog.md) — the panel's
+- **What:** Fix [design-backlog 0102](../design-backlog-archive.md) — the panel attaches its wgpu surface
+  before it has a real client rect — and [design-backlog 0103](../design-backlog-archive.md) — the panel's
   `WM_CONTEXTMENU` shadows foobar2000's layout-edit menu, so it cannot be removed by the documented
   route. Both pre-date this plan. Since Plan 0126 Phase 8 (`1779520`) split the shim, the surface
   lifetime lives in `plugin-foobar/viz_session.cpp` (`VizSession::ensure_handle`, the

@@ -351,7 +351,7 @@ Every key at its default. `display_name` in `[output]` and `[console]` is absent
 its default and the file format has no spelling for one.
 
 <!-- The block below is round-tripped through the config type by
-     `standalone/tests/configuration_doc.rs`; a value edited here without the code
+     `standalone/tests/suite/configuration_doc.rs`; a value edited here without the code
      moving fails that test. -->
 
 ```toml

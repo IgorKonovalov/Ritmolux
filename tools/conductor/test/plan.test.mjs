@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { donePhases, findPlan, nextStep, parsePlan, rangeLabel, readPlanFile, runs } from "../lib/plan.mjs";
+import { claudePaths, donePhases, findPlan, nextStep, parsePlan, rangeLabel, readPlanFile, runs } from "../lib/plan.mjs";
 import { REPO, planText } from "./helpers.mjs";
 
 test("Plan 0187 reads as six dev phases, 4b included, then a human pilot", () => {
@@ -72,4 +72,60 @@ test("a missing or foreign owner tag is a plan error", () => {
 test("range labels", () => {
   assert.equal(rangeLabel(["4b"]), "4b");
   assert.equal(rangeLabel(["1", "2", "3"]), "1-3");
+});
+
+// ADR-0210: the CLI refuses a headless session an Edit or Write under a project's `.claude/`, so a
+// phase that declares one is the owner's and the lane has to stop in front of it rather than hand it
+// to a session and read a failed done-when afterwards.
+
+const CLAUDE_PLAN = {
+  number: "0102",
+  phases: [
+    { id: "1", owner: "dev" },
+    { id: "2", owner: "dev", files: "`.claude/hooks/no-background.js`, `.claude/settings.json` (register it)" },
+    { id: "3", owner: "dev" },
+  ],
+};
+
+test("a phase's Files touched is read, and the `.claude/` paths in it are picked out", () => {
+  const plan = parsePlan(planText(CLAUDE_PLAN));
+  assert.deepEqual(claudePaths(plan.phases[0]), [], "a phase naming no such path declares none");
+  assert.deepEqual(claudePaths(plan.phases[1]), [".claude/hooks/no-background.js", ".claude/settings.json"]);
+
+  // The real shape: `Files touched` wraps across lines and the list continues on them.
+  const wrapped = parsePlan(
+    planText({ number: "0103", phases: [{ id: "1", owner: "dev" }] }).replace(
+      "- **Files touched:** `phase-1.txt`",
+      "- **Files touched:** `tools/conductor/prompts/implement.md`,\n  `.claude/skills/dev/SKILL.md`, `lib/step.mjs`,\n  `.claude/skills/architect/SKILL.md`",
+    ),
+  );
+  assert.deepEqual(claudePaths(wrapped.phases[0]), [".claude/skills/dev/SKILL.md", ".claude/skills/architect/SKILL.md"]);
+
+  // The next bullet ends the list: a `.claude/` path in a Done when is not a declared file.
+  const inDoneWhen = parsePlan(
+    planText({ number: "0104", phases: [{ id: "1", owner: "dev" }] }).replace(
+      "- **Done when:** the file exists.",
+      "- **Done when:** `grep -rn x .claude/skills/` matches only prohibitions.",
+    ),
+  );
+  assert.deepEqual(claudePaths(inDoneWhen.phases[0]), []);
+});
+
+test("the lane stops in front of a `.claude/` phase, and the phases before it in the run still run", () => {
+  const fresh = parsePlan(planText(CLAUDE_PLAN));
+  // Phase 1 is handed over on its own, truncated before Phase 2 — and it is not the last run, because
+  // Phase 2 and Phase 3 are still to come.
+  assert.deepEqual(nextStep(fresh), { kind: "implement", owner: "dev", phases: ["1"], lastRun: false });
+
+  const atClaude = parsePlan(planText({ ...CLAUDE_PLAN, rows: { 1: { state: "done", commit: "abc1234" } } }));
+  assert.deepEqual(nextStep(atClaude), {
+    kind: "claude_dir",
+    owner: "dev",
+    phases: ["2"],
+    paths: [".claude/hooks/no-background.js", ".claude/settings.json"],
+  });
+
+  // Once the owner has done it and marked the row, the rest of the run is an ordinary step again.
+  const afterClaude = parsePlan(planText({ ...CLAUDE_PLAN, rows: { 1: { state: "done" }, 2: { state: "done" } } }));
+  assert.deepEqual(nextStep(afterClaude), { kind: "implement", owner: "dev", phases: ["3"], lastRun: true });
 });

@@ -1,8 +1,8 @@
 # ADR-0204 — A cheap integration test shares one binary per package, and a test that needs its own binary keeps one
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-15 (Plan 0177), with an Outcome
 > **Date:** 2026-09-14
-> **Related plan(s):** [0177](../plans/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md)
+> **Related plan(s):** [0177](../plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md)
 > **Extends:** [0156](0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md)
 > (the per-phase gate is scoped), [0193](0193-a-test-that-reads-the-clock-runs-alone.md)
 > (a test that reads the clock runs alone), [0165](0165-dependencies-compile-without-debug-info-and-one-line-buys-it-back.md)
@@ -109,3 +109,20 @@ That is a silent loss of coverage, where the chosen layout costs at worst one ex
 ADR-0165 already cut the dominant `.pdb` payload by 63 %. Rejected **provisionally**, and the plan
 can reverse this: if the measured engine-edit loop is not faster after the fold, Plan 0177's merge
 phase reverts it, and this ADR is accepted with an `Outcome` that records the measurement.
+
+## Outcome (2026-09-15, Plan 0177 close)
+
+**The fold held, and the set this ADR derived is the set that folded.** Plan 0177 Phase 8
+re-derived it after Plan 0174 closed and got the same result: 33 core and 5 standalone files fold,
+and `stream_show` and `control_loopback` stay out under rule 2. The workspace's integration test
+binaries went from 66 to 30. That count includes `rlx-core-cabi`'s 2 and `milkconv`'s 5, so it is
+the 59-to-23 above. One generation's `.exe` + `.pdb` went from 1789.6 MB to 843.8 MB.
+
+**The engine-edit loop was not slower.** It was measured on the reference machine, warm, back to
+back in one session, as `cargo nextest run --workspace -P fast --no-run` on a one-line
+`core/src/render/metrics.rs` edit applied and reverted twice. Cargo's `Finished` times were 34.9,
+11.6, 44.2 and 39.7 s before the fold, and 16.5, 29.2, 8.0 and 38.9 s after. **The price named under
+Negative is real and small:** a one-file edit to a folded test went from about 1.0 s to about 1.7 s.
+The test lists before and after matched once the module prefix was stripped, apart from the one
+negative control the phase added. The run-alone override's selection matched exactly. The tables
+are in the plan's log.

@@ -1,6 +1,6 @@
 # 0166 — The basics read in Russian
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-10
 > **Owner skill(s):** `dev`, `human`
 > **Related ADRs:** [0185](../adrs/0185-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md)
@@ -233,17 +233,47 @@ const state = !stamped ? 'FAIL' : current.startsWith(stamped) ? 'current' : 'sta
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `plan-0166-the-basics-read-in-russian`, worktree `C:\Users\Igor Konovalov\WORK\rlx-plan-0166`
+(conductor, ADR-0205).
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The stamp, the gate, and the banner | `dev` | not started | |
-| 2 — The five translations, drafted and unpublished | `dev` | not started | |
+| 1 — The stamp, the gate, and the banner | `dev` | done | `645e84ec` |
+| 2 — The five translations, drafted and unpublished | `dev` | done | committed with this row |
 | 3 — Owner review of the Russian prose | `human` | not started | |
 | 4 — Publish: the map, the menu, the banner in place | `dev` | not started | |
 | 5 — The foobar component zip ships the Russian install file | `dev` | not started | |
 
 ### Notes
+
+- **Phase 1 touched three files beyond its `Files touched` list**, each because the phase falsified
+  something already written in it — the phase's own instruction was to grep for the counts rather
+  than trust the list. `scripts/fixtures/README.md` (a section for the new seeded trees, and its
+  opening *"Eight checkers"*); `docs/developing.md` (the table of *every step the pre-push gate
+  runs*, which the new gate's two invocations would otherwise have left incomplete);
+  `docs/nfr.md` (*"the seven Node doc gates"* / *"Seven gates but nine invocations"*, already stale
+  by one before this phase and stale by two after it). All three are now count-free.
+- **ADR-0185 says the close ceremony prints the drifted translations, and this plan does not wire
+  that.** The close ceremony lives under `.claude/skills/architect/`, which no phase of this plan
+  lists and which a conductor-run session cannot write to (ADR-0210). The gate prints the advisory
+  at pre-push and in CI; the close reading is unimplemented.
+- **The three packaging translations open with a setext heading, not the `# ` Phase 2's done-when
+  names.** Their English twins write the title over a rule of `=`, because those files ship as
+  `.txt` inside a release zip where a `#` is literal noise, and Phase 5 puts the Russian one in the
+  same zip beside the English one. The two `docs/` translations do use `# `, which is what their
+  sources use. `titleFromLeadingHeading` in `site/src/content.config.ts` already accepts both forms,
+  and `PUBLISHED` declares the title regardless.
+- **The mermaid labels in `how-it-works.ru.md` are translated; every node id, arrow and quote is
+  byte-identical to the source.** No build has rendered them — nothing in this lane can, and until
+  Phase 4 adds the file to `PUBLISHED` nothing reads it at all — so a fence that does not parse
+  would surface as a red Pages build in Phase 4 rather than here. A reviewer wanting that risk gone
+  before then can diff the two fences: only text inside `[...]` and `|"..."|` differs.
+- **The site build was not run in the lane** — this worktree has no `site/node_modules`, and
+  installing one is a network install rather than a phase check. The banner plugin is covered
+  instead by `check-translations.mjs --self-test`, which imports it and exercises all four of its
+  behaviours against a throwaway repository; a real Astro build of it first happens in the Pages
+  workflow. Until Phase 4 the plugin is a no-op on every page, because nothing it triggers on is in
+  `PUBLISHED`.
 
 ### Close triggers
 

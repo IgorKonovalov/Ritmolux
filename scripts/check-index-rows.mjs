@@ -2,7 +2,7 @@
 // Assert that every row inside a marked roster region is a pointer, not an abstract.
 //
 // Rationale: three files in docs/ are rosters — adrs/README.md, plans/README.md's
-// `## Recently closed`, and the `## Closed entries` ledger in design-backlog.md.
+// `## Recently closed`, and the `## The ledger` tables in design-backlog-archive.md.
 // Each exists so a session can find the right document without opening a hundred
 // of them. All three grew rows that summarize the document they point at:
 // docs/adrs/README.md reached 188,820 bytes, 16 % of the ADR corpus it indexes,
@@ -377,7 +377,7 @@ function measure(root) {
 // nothing in the green fixture has ever reached that formatting, so it is
 // asserted by SHAPE rather than by an exit code — "exits non-zero" is also what
 // a crash and a thrown ENOENT look like.
-const ROSTERS = ["docs/adrs/README.md", "docs/plans/README.md", "docs/design-backlog.md"];
+const ROSTERS = ["docs/adrs/README.md", "docs/plans/README.md", "docs/design-backlog-archive.md"];
 const ROSTER_ROW_FLOOR = 20;
 const REPO_ROW_FLOOR = 100;
 const REPORT_SHAPE = /^[\w./-]+\.md:\d+ {2}\d+ bytes \(cap \d+\)$/;

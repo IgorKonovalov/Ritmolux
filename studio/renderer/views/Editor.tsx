@@ -45,6 +45,12 @@ import styles from './Editor.module.css'
 
 export interface EditorProps {
   system: string | undefined
+  /**
+   * The family the preset on screen draws, `null` for a system that has none,
+   * and `undefined` until a preset is reported. The parameter panel's ends come
+   * from it (ADR-0194); nothing else here branches on it.
+   */
+  family: string | null | undefined
   /** The player's own path for the preset on screen; `null` for the embedded set. */
   file: string | null | undefined
   /** Rises on every reload, so the file is re-read after a save. */
@@ -80,6 +86,7 @@ function rootMaps(document: SchemaDocument): TableKey[] {
 
 export function Editor({
   system,
+  family,
   file,
   reloads,
   problems,
@@ -258,8 +265,10 @@ export function Editor({
       {tab === 'parameters' && (
         <ParamPanel
           rosters={rostersFor(schema.document, system)}
+          family={family}
           bindings={preset.bindings}
           writable={writable}
+          hasDocument={text !== undefined}
           onDrag={onDrag}
           onCommit={onCommit}
         />
