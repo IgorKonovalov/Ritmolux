@@ -1,6 +1,6 @@
 # 0191 — A green tree is not tested four times
 
-> **Status:** approved (2026-09-16)
+> **Status:** in-progress (2026-09-16)
 > **Created:** 2026-09-16
 > **Owner skill(s):** dev
 > **Related ADRs:** [0211](../adrs/0211-a-green-suite-record-serves-a-later-tree-when-no-deferred-suite-can-read-the-diff.md) (proposed),
@@ -171,3 +171,30 @@ flowchart TD
   diff.
 - **It does not touch `-P fast`'s own membership.** ADR-0156 and ADR-0157 define that set in
   `.config/nextest.toml`, and this plan reads it rather than editing it.
+
+## Implementation log
+
+> Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
+> last one. **The phases above are the contract; everything here is what happened.**
+> **Observations, never conclusions:** this says where to look, architect decides how it went.
+
+**Lane:** `C:\Users\Igor Konovalov\WORK\rlx-plan-0191` on branch
+`plan-0191-a-green-tree-is-not-tested-four-times`
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — The ledger can serve a green record forward | dev | committed with this row |  |
+| 2 — The gate's suite step is a three-state tier | dev | not started |  |
+| 3 — The report says which tier ran, and why | dev | not started |  |
+
+### Notes
+
+### Close triggers
+
+- **`presets/` touched:**
+- **Plan header `Closes:`**
+- **What shipped:**
+- **Operator docs touched:**
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
+- **Full suite:**
+- **Outstanding `human` phases:**
