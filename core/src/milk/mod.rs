@@ -781,9 +781,11 @@ impl MilkRuntime {
     /// which is the reference's own convention — and return its nine outputs,
     /// converted like the per-frame ones.
     ///
-    /// `rad` and `ang` are computed here rather than taken, and deliberately:
-    /// **MilkDrop normalizes them differently from this engine's native
-    /// `[per_vertex]` vocabulary**, and a converted preset has to get MilkDrop's.
+    /// `x` and `y` are aspect-corrected here rather than passed through, and
+    /// `rad` and `ang` are computed rather than taken — all three deliberately:
+    /// **MilkDrop normalizes the whole per-vertex input set differently from this
+    /// engine's native `[per_vertex]` vocabulary**, and a converted preset has to
+    /// get MilkDrop's.
     /// The reference takes `rad = |(x_ndc * aspectx, y_ndc * aspecty)|` with the
     /// *longer* axis scaled to 1, so `rad` reaches `1.0` at the middle of the
     /// left and right edges of a wide frame; the native `rad`
@@ -792,6 +794,17 @@ impl MilkRuntime {
     /// the aspect, which on a 16:9 display is 1.78 — enough that a preset written
     /// as `zoom = 1 + rad * 0.1` would be most of a stop out. `ang` is the
     /// reference's `atan2` in `-pi..pi`, not the native `0..tau`.
+    ///
+    /// `x` and `y` are the same correction applied to the uv itself: the
+    /// reference hands the program `x * 0.5 * aspectx + 0.5` and
+    /// `y * -0.5 * aspecty + 0.5` off the clip position, so on a 16:9 frame `x`
+    /// still spans `0..1` and `y` spans only `0.5 +/- 0.28125` — the shorter axis
+    /// is compressed, and the pair is the frame's shape rather than its extent.
+    /// The native vocabulary's `vertex_position` spans `0..1` on both axes, so a
+    /// converted preset reading `y` through that would drive its stretch or its
+    /// translation 1.78 times too far. The same corrected space is where the warp
+    /// chain's middle stages run (ADR-0212), which is what keeps the program's
+    /// inputs and the transform they feed in one set of units.
     ///
     /// Restores the per-frame register state first, so a write inside the program
     /// does not leak into the next vertex — MilkDrop's semantics, and the reason
@@ -809,6 +822,10 @@ impl MilkRuntime {
         let (px, py) = (nx * ax, ny * ay);
         let rad = (px * px + py * py).sqrt();
         let ang = py.atan2(px);
+        // Back to a 0..1-centred uv from the corrected clip pair, y down —
+        // `px * 0.5 + 0.5` and `-py * 0.5 + 0.5` are the reference's own two
+        // expressions with the `aspect` factor already in `px`/`py`.
+        let (sx, sy) = (px * 0.5 + 0.5, 0.5 - py * 0.5);
         for (value, index) in self
             .snapshot
             .iter()
@@ -817,10 +834,10 @@ impl MilkRuntime {
             self.state.set(*index, *value);
         }
         if let Some(index) = self.vertex_inputs.x {
-            self.state.set(index, x);
+            self.state.set(index, sx);
         }
         if let Some(index) = self.vertex_inputs.y {
-            self.state.set(index, y);
+            self.state.set(index, sy);
         }
         if let Some(index) = self.vertex_inputs.rad {
             self.state.set(index, rad);

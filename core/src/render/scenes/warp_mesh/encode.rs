@@ -45,10 +45,19 @@ pub(super) fn ensure_resources(
         .shader_spec
         .as_ref()
         .map_or(0, shader::ShaderSpec::key);
+    // Whether this preset draws with the converted vertex module (ADR-0212).
+    // **Not the same question as `shader_spec`**: a converted bundle carrying no
+    // WGSL has no spec and still runs MilkDrop's corrected-space chain, so a
+    // switch between two shader-less presets of different kinds leaves
+    // `shader_key` at 0 and would otherwise keep the wrong pipeline.
+    let converted = scene.milk.is_some();
     let stale = match scene.res.as_ref() {
         None => true,
         Some(res) => {
-            res.size != size || res.mesh != scene.state.mesh || res.shader_key != shader_key
+            res.size != size
+                || res.mesh != scene.state.mesh
+                || res.shader_key != shader_key
+                || res.warp_pipeline_converted.is_some() != converted
         }
     };
     if stale {
@@ -61,6 +70,7 @@ pub(super) fn ensure_resources(
             scene.max_segments,
             scene.shader_spec.as_ref(),
             shader_key,
+            converted,
         );
         // A fresh pair's textures are empty and hold the default palette;
         // hand it the one the scene is actually carrying.
@@ -248,6 +258,21 @@ pub(super) fn upload_uniforms(
     }
 }
 
+/// The built-in warp pipeline this preset draws with: the converted-vertex twin
+/// when the scene carries a MilkDrop runtime, the native one otherwise
+/// (ADR-0212).
+///
+/// **This is the seam the choice is made at**, and the two pipelines are built
+/// from genuinely different WGSL — the converted one runs the stretch centre, the
+/// procedural warp's amplitude, the rotation centre and the translation in
+/// MilkDrop's aspect-corrected space. Collapsing them back to one pipeline is a
+/// picture change at every non-square target, not a tidy.
+pub(super) fn builtin_warp_pipeline(res: &Resources) -> &wgpu::RenderPipeline {
+    res.warp_pipeline_converted
+        .as_ref()
+        .unwrap_or(&res.warp_pipeline)
+}
+
 pub(super) fn encode_warp(res: &Resources, encoder: &mut wgpu::CommandEncoder) {
     // --- warp: the past, resampled through the mesh, into the write half ---
     let warp_bg = if res.field.reading_a() {
@@ -285,7 +310,7 @@ pub(super) fn encode_warp(res: &Resources, encoder: &mut wgpu::CommandEncoder) {
                 pass.set_bind_group(1, milk_bg, &[]);
             }
             None => {
-                pass.set_pipeline(&res.warp_pipeline);
+                pass.set_pipeline(builtin_warp_pipeline(res));
                 pass.set_bind_group(0, warp_bg, &[]);
             }
         }

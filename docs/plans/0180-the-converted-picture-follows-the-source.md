@@ -564,7 +564,7 @@ pub fn run_wave_point(&mut self, index: usize, sample: f32, left: f32, right: f3
 |---|---|---|---|
 | 1 — Read the rest of the source, and render the seam | dev | done | `725c8d5` |
 | 2 — The comp stage gets the source's polar pair | dev | done | `707a0bb` |
-| 3 — The per-vertex program gets the source's `x`/`y` | dev | parked, not started | |
+| 3 — The per-vertex program gets the source's `x`/`y` | dev | done | committed with this row |
 | 4 — The seam is found | dev | not started | |
 | 5 — The analyzer publishes a left/right pair | dev | not started | |
 | 6 — The waveform draws the source's eight figures | dev | not started | |
@@ -640,6 +640,74 @@ matter per fragment.
   (`p1-chasers-set.png`): **a straight edge on the midline in both halves**, left `x ≈ 200-760` and
   right `x ≈ 1150-1700`, mirrored by the preset's fold, so its ray cannot be read from either half
   alone on this frame.
+
+### Phase 3 — the two readings, and what did not move
+
+**The two readings, taken between the halves without blessing** (WARP, 128x128, the `golden` binary
+alone). The inputs change alone, then the inputs change plus the chain change:
+
+| baseline | after the inputs change | after the chain change |
+|---|---|---|
+| `warp_mesh` (native) | mean `0.0002`, outlier 2 | mean `0.0002`, outlier 2 |
+| `warp_mesh_milk` | mean `0.0002`, outlier 2 | mean `0.0002`, outlier 2 |
+| `warp_mesh_shader` | mean `0.0000`, outlier 0 | mean `0.0000`, outlier 0 |
+| `warp_mesh_stroke` | mean `0.0003`, outlier 2 | mean `0.0003`, outlier 2 |
+
+**No baseline moved, converted or native, so nothing was blessed and the restore step did not run.**
+The cause is one the plan did not anticipate: `core/tests/golden.rs` renders every fixture at
+`SIZE = 128` on both axes. At a square target MilkDrop's aspect pair is `(1, 1)`, so the per-vertex
+`x`/`y` correction and all four chain stages are the identity — the same agreement
+`at_a_square_target_the_two_warp_chains_agree` asserts. The plan's expectation that
+`warp_mesh_milk.png` moves because it reads `x` holds only at a non-square target, which no golden
+fixture is rendered at.
+
+**The `milk_wash` probe** (`the_wash_bisect_reports_every_seam`) reads on this machine's hardware
+adapter, at `SIZE = 128` square for the same reason:
+
+```text
+[wash] seam          fog tunnel     blur mix 3     ratio
+[wash] A field         0.29717061    0.02016482    14.737
+[wash] B present*      0.52156097    0.08846003     5.896
+[wash] E display       0.74375457    0.25213975     2.950
+```
+
+**Deviation from the amended phase, in how ADR-0212's mechanism is built.** The ADR says the two
+variants are built by substituting a prelude, with the four differing stages calling
+`to_space`/`from_space` in a chain whose text is shared — and it also says the native variant's text
+is byte-identical to today's. Those two cannot both hold: adding call sites to the shared chain
+changes the text the native module is built from, and the done-when asks that byte-identity be
+asserted directly on that string. What landed keeps the second: `WARP_SHADER` is **not edited**, and
+`warp_module_source(WarpSpace::Native)` is the quantizer and that constant verbatim, which
+`the_native_warp_module_is_built_from_the_unchanged_source` asserts. The converted variant is the
+same constant with a prelude prepended and four anchor lines rewritten
+(`shaders.rs`'s `WARP_ANCHORS`), so the stage order still has one copy.
+`the_converted_warp_variant_edits_four_anchors` holds each anchor to exactly one match, which is the
+tripwire ADR-0212 asks for in place of the one a `to_space` call site would have been.
+
+Two consequences of that shape worth naming:
+
+- The rotation's two aspect factors are **removed** for the converted variant rather than wrapped.
+  The corrected space is already isotropic on screen and the native pair is what puts the raw-uv
+  chain there, so keeping both would rotate in a sheared space. Phase 1's table reads "the rotation
+  agrees; its centre differs", and this is what makes that true on both paths.
+- Stage 1 (zoom) is left in raw uv, ahead of the mapping, where the plan's
+  `### The warp chain's space` lists it inside. A zoom is a uniform scale about the frame centre and
+  the map is diagonal about the same centre, so the two commute and the arithmetic is the same;
+  `a_converted_translation_runs_in_the_sources_space` and the square-target agreement both cover it.
+
+**Where the four stages are asserted.** `core/src/render/scenes/warp_mesh/tests.rs` gains a probe
+that paints the past with its own uv and reads back the uv each texel sampled, so a stage is
+observed rather than inferred. Each stage test runs at 128x72 and at 128x96 — `1/A` is `1.778` and
+`1.333` there — and at both, against a native scene as well as a converted one. Checked by mutation:
+dropping the `to_space` rewrite reddens the stretch and rotation tests, dropping the `from_space`
+rewrite reddens the translation and warp tests.
+
+**`Resources::build` takes a `converted` flag rather than deriving it from `shader_spec`.** A
+converted bundle carrying no WGSL has no spec, so `shader_key` stays `0` across a switch between two
+such presets and the staleness check would have kept the wrong pipeline;
+`ensure_resources` compares `res.warp_pipeline_converted.is_some()` against `scene.milk.is_some()`
+instead, and `a_converted_preset_and_a_native_one_draw_from_different_warp_pipelines` switches a
+scene native → converted → native to exercise it.
 
 ### Notes
 

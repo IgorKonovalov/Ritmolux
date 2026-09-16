@@ -203,6 +203,105 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 }
 "#;
 
+/// Which coordinate space a warp vertex stage runs its middle stages in.
+///
+/// Two modules are built from the one [`WARP_SHADER`] above, and a preset draws
+/// with the one its own kind picks (ADR-0212). The split is a *module* rather
+/// than a uniform branch so that the native variant's WGSL is the unchanged
+/// source text: nothing about the native picture is then a question about what a
+/// backend's compiler did with a branch.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(super) enum WarpSpace {
+    /// Raw uv. The whole native `[per_vertex]` vocabulary — `cx`/`cy`,
+    /// `dx`/`dy`, `warp` — is documented in it.
+    Native,
+    /// MilkDrop's aspect-corrected space for stages 2-5, which is where the
+    /// source applies the stretch centre, the procedural warp's amplitude, the
+    /// rotation centre and the translation.
+    Converted,
+}
+
+/// The four places [`WARP_SHADER`]'s stage chain differs between the two spaces,
+/// as the exact source text each one matches.
+///
+/// **Each must occur exactly once in [`WARP_SHADER`]**, which
+/// `the_converted_warp_variant_edits_four_anchors` asserts — that is what turns a
+/// later edit to the chain from a silently native-convention converted preset
+/// into a red test.
+pub(super) const WARP_ANCHORS: [&str; 4] = [
+    "    p = (p - ctr) / vec2<f32>(sx, sy) + ctr;\n",
+    "    q.x = q.x * aspect;\n",
+    "    q.x = q.x / aspect;\n",
+    "    out.src = q + ctr - d;\n",
+];
+
+/// The converted variant's prelude: the space itself.
+const CONVERTED_PRELUDE: &str = r#"
+// MilkDrop's aspect-corrected space, the one a CONVERTED preset's middle warp
+// stages run in (ADR-0212).
+//
+// The pair is the longer axis at 1 and the shorter at `short / long`, built here
+// from the RENDER TARGET's aspect (ADR-0037) — never the mesh grid's, whose own
+// shape is a resolution.
+fn rlx_aspect_pair(aspect: f32) -> vec2<f32> {
+    return select(vec2<f32>(aspect, 1.0), vec2<f32>(1.0, 1.0 / aspect), aspect >= 1.0);
+}
+
+// `(uv - 0.5) * A + 0.5` and its inverse. The source maps into this space before
+// the uv chain and undoes it after, so `cx`/`cy`, `dx`/`dy` and the procedural
+// warp's amplitude are all expressed in it — which is why each differs from the
+// raw-uv reading by `1/A` on the shorter axis, 1.78 on y at 16:9.
+fn rlx_to_space(p: vec2<f32>, aspect: f32) -> vec2<f32> {
+    return (p - vec2<f32>(0.5)) * rlx_aspect_pair(aspect) + vec2<f32>(0.5);
+}
+
+fn rlx_from_space(p: vec2<f32>, aspect: f32) -> vec2<f32> {
+    return (p - vec2<f32>(0.5)) / rlx_aspect_pair(aspect) + vec2<f32>(0.5);
+}
+"#;
+
+/// The warp module's WGSL for `space`.
+///
+/// `Native` is [`WARP_SHADER`] verbatim — **the source text is not edited for
+/// either variant**, so the native pipeline is built from exactly the string it
+/// was built from before the converted one existed. `Converted` prepends
+/// [`CONVERTED_PRELUDE`] and rewrites the four [`WARP_ANCHORS`]:
+///
+/// - stage 2 enters the corrected space, and stages 2-5 stay in it. Stage 1 is
+///   left behind in raw uv on purpose: a zoom is a uniform scale about the frame
+///   centre, and a uniform scale commutes with the diagonal map, so the two
+///   readings are the same arithmetic.
+/// - the rotation drops its two aspect factors, because the corrected space is
+///   already isotropic on screen and the native pair is what puts it there.
+/// - `out.src` maps back.
+pub(super) fn warp_shader(space: WarpSpace) -> std::borrow::Cow<'static, str> {
+    match space {
+        WarpSpace::Native => std::borrow::Cow::Borrowed(WARP_SHADER),
+        WarpSpace::Converted => {
+            let mut chain =
+                String::with_capacity(WARP_SHADER.len() + CONVERTED_PRELUDE.len() + 512);
+            chain.push_str(CONVERTED_PRELUDE);
+            chain.push_str(
+                &WARP_SHADER
+                    .replace(
+                        WARP_ANCHORS[0],
+                        concat!(
+                            "    p = rlx_to_space(p, aspect);\n",
+                            "    p = (p - ctr) / vec2<f32>(sx, sy) + ctr;\n",
+                        ),
+                    )
+                    .replace(WARP_ANCHORS[1], "")
+                    .replace(WARP_ANCHORS[2], "")
+                    .replace(
+                        WARP_ANCHORS[3],
+                        "    out.src = rlx_from_space(q + ctr - d, aspect);\n",
+                    ),
+            );
+            std::borrow::Cow::Owned(chain)
+        }
+    }
+}
+
 /// The deposit pass: this frame's light, laid onto the warped past.
 pub(super) const DEPOSIT_SHADER: &str = r#"
 struct Deposit {

@@ -605,6 +605,89 @@ fn the_q_bridge_carries_per_frame_into_every_vertex() {
     assert!(c > a, "a larger `x` must give a larger zoom: {c} vs {a}");
 }
 
+/// **`x` and `y` reach the program aspect-corrected, in the source's own units.**
+///
+/// The reference builds the per-vertex pair from the clip position as
+/// `x * 0.5 * aspectx + 0.5` and `y * -0.5 * aspecty + 0.5`, with the pair being
+/// the longer axis at 1 and the shorter at `short / long`. So the LONGER axis
+/// spans the full `0..1` and the shorter one is compressed about `0.5` — the
+/// frame's shape, carried in the inputs, which is what the warp chain's own
+/// corrected space then agrees with (ADR-0212).
+///
+/// Asserted as the property over three aspects rather than as three frozen
+/// numbers on one (ADR-0071): the roles of the two axes swap between landscape
+/// and portrait, and a correction applied to the wrong axis passes at 16:9 while
+/// mirroring every portrait preset.
+#[test]
+fn the_per_vertex_program_reads_the_sources_aspect_corrected_x_and_y() {
+    // per_vertex: cx = x; cy = y. `cx`/`cy` are positions rather than rates, so
+    // they come back out of `convert_outputs` untouched — the two outputs that
+    // can carry an input verbatim.
+    let bundle = MilkBundle::from_assembly(
+        None,
+        None,
+        Some(".regs cx cy x y\n.code\nload 2\nstore 0\npop\nload 3\nstore 1\npop\n"),
+    )
+    .expect("the passthrough bundle decodes");
+    let mut runtime = MilkRuntime::new(bundle, 0);
+    let frame = crate::dsp::AnalysisFrame::default();
+
+    // `run_frame` is what records the aspect `run_vertex` corrects with.
+    let read = |runtime: &mut MilkRuntime, aspect: f32, x: f32, y: f32| -> (f32, f32) {
+        runtime.run_frame(&frame, 0.0, 1.0 / 60.0, (4, 4), aspect);
+        let out = runtime.run_vertex(x, y);
+        (out[2], out[3])
+    };
+
+    // 16:9. The shorter axis is y, so it is compressed to `0.5 +/- 0.28125`
+    // (half of 9/16) while x keeps the full span.
+    let wide = 16.0 / 9.0;
+    let (x_left, y_top) = read(&mut runtime, wide, 0.0, 0.0);
+    let (x_mid, y_mid) = read(&mut runtime, wide, 0.5, 0.5);
+    let (x_right, y_bottom) = read(&mut runtime, wide, 1.0, 1.0);
+    for (got, want, what) in [
+        (x_left, 0.0, "x at the left edge"),
+        (x_mid, 0.5, "x at the centre"),
+        (x_right, 1.0, "x at the right edge"),
+        (y_top, 0.21875, "y at the top edge"),
+        (y_mid, 0.5, "y at the centre"),
+        (y_bottom, 0.78125, "y at the bottom edge"),
+    ] {
+        assert!(
+            (got - want).abs() < 1e-5,
+            "16:9 {what}: got {got}, want {want}"
+        );
+    }
+    assert!(
+        y_bottom > y_top,
+        "y increases DOWNWARD, as the reference's own uv does: {y_top} then {y_bottom}"
+    );
+
+    // Square: the pair is (1, 1) and both axes span the full range, which is why
+    // a test at one square target cannot see this correction at all.
+    let (x_left, y_top) = read(&mut runtime, 1.0, 0.0, 0.0);
+    let (x_right, y_bottom) = read(&mut runtime, 1.0, 1.0, 1.0);
+    for (got, want) in [(x_left, 0.0), (x_right, 1.0), (y_top, 0.0), (y_bottom, 1.0)] {
+        assert!((got - want).abs() < 1e-5, "square: got {got}, want {want}");
+    }
+
+    // 9:16 portrait: the roles swap. x is now the compressed axis.
+    let tall = 9.0 / 16.0;
+    let (x_left, y_top) = read(&mut runtime, tall, 0.0, 0.0);
+    let (x_right, y_bottom) = read(&mut runtime, tall, 1.0, 1.0);
+    for (got, want, what) in [
+        (x_left, 0.21875, "x at the left edge"),
+        (x_right, 0.78125, "x at the right edge"),
+        (y_top, 0.0, "y at the top edge"),
+        (y_bottom, 1.0, "y at the bottom edge"),
+    ] {
+        assert!(
+            (got - want).abs() < 1e-5,
+            "9:16 {what}: got {got}, want {want}"
+        );
+    }
+}
+
 /// **The rate conversion**, the most consequential translation the
 /// converter does: MilkDrop's per-frame factors and rates become this
 /// engine's per-second, so a converted preset moves at the speed its

@@ -38,6 +38,16 @@ pub(super) struct Resources {
     /// rebuilt (ADR-0030: compare against what you already built).
     pub(super) size: (u32, u32),
     pub(super) warp_pipeline: wgpu::RenderPipeline,
+    /// The same warp pass built from the **converted** vertex module (ADR-0212),
+    /// present only for a preset that carries a MilkDrop runtime.
+    ///
+    /// `None` for a native preset, and nothing is created for one — which is what
+    /// keeps the allocation sequence a native preset builds byte-for-byte what it
+    /// was before this existed (the module docs' creation-order hazard, ADR-0058).
+    /// A converted bundle needs it whether or not it also carries a custom warp
+    /// *fragment* shader: `ShaderSpec::warp` is an `Option`, and a bundle without
+    /// one draws through the built-in pass.
+    pub(super) warp_pipeline_converted: Option<wgpu::RenderPipeline>,
     pub(super) deposit_pipeline: wgpu::RenderPipeline,
     pub(super) present_pipeline: wgpu::RenderPipeline,
     pub(super) warp_uniform: wgpu::Buffer,
@@ -150,9 +160,7 @@ fn build_common(device: &wgpu::Device, size: (u32, u32)) -> Common {
         // converted shader's own epilogue calls the same text out of
         // `milk::shader::QUANTIZE_WGSL`, and a transfer function that exists
         // in two places drifts (ADR-0118).
-        source: wgpu::ShaderSource::Wgsl(
-            format!("{}{}", crate::milk::shader::QUANTIZE_WGSL, WARP_SHADER).into(),
-        ),
+        source: wgpu::ShaderSource::Wgsl(warp_module_source(WarpSpace::Native).into()),
     });
     let deposit_shader = gpu::fullscreen_shader(
         device,
@@ -208,6 +216,70 @@ fn build_common(device: &wgpu::Device, size: (u32, u32)) -> Common {
         present_uniform,
         sampler,
     }
+}
+
+/// The full WGSL one warp module is built from: the shared quantizer, then the
+/// stage chain in `space`'s variant.
+///
+/// One function so the two modules cannot differ in anything but the variant —
+/// and so `the_native_warp_module_is_built_from_the_unchanged_source` has a
+/// single string to assert on.
+pub(super) fn warp_module_source(space: WarpSpace) -> String {
+    format!(
+        "{}{}",
+        crate::milk::shader::QUANTIZE_WGSL,
+        warp_shader(space)
+    )
+}
+
+/// The converted twin of [`build_warp`]'s pipeline: the same bind-group layout,
+/// the same vertex layout, the same fragment stage — the other vertex module.
+///
+/// Built only for a converted preset, and after every native object, so a native
+/// preset creates nothing here (the `warp_pipeline_converted` field's note).
+fn build_converted_warp(
+    device: &wgpu::Device,
+    warp_layout: &wgpu::BindGroupLayout,
+) -> (wgpu::ShaderModule, wgpu::RenderPipeline) {
+    let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+        label: Some("warp-mesh-warp-shader-converted"),
+        source: wgpu::ShaderSource::Wgsl(warp_module_source(WarpSpace::Converted).into()),
+    });
+    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: Some("warp-mesh-warp-converted-pipeline-layout"),
+        bind_group_layouts: &[Some(warp_layout)],
+        immediate_size: 0,
+    });
+    let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some("warp-mesh-warp-converted-pipeline"),
+        layout: Some(&pipeline_layout),
+        vertex: wgpu::VertexState {
+            module: &module,
+            entry_point: Some("vs_main"),
+            compilation_options: Default::default(),
+            buffers: &[Some(wgpu::VertexBufferLayout {
+                array_stride: std::mem::size_of::<Vertex>() as u64,
+                step_mode: wgpu::VertexStepMode::Vertex,
+                attributes: &VERTEX_ATTRS,
+            })],
+        },
+        fragment: Some(wgpu::FragmentState {
+            module: &module,
+            entry_point: Some("fs_main"),
+            compilation_options: Default::default(),
+            targets: &[Some(wgpu::ColorTargetState {
+                format: FIELD_FORMAT,
+                blend: Some(wgpu::BlendState::REPLACE),
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+        }),
+        primitive: wgpu::PrimitiveState::default(),
+        depth_stencil: None,
+        multisample: wgpu::MultisampleState::default(),
+        multiview_mask: None,
+        cache: None,
+    });
+    (module, pipeline)
 }
 
 fn build_warp(device: &wgpu::Device, common: &Common) -> WarpParts {
@@ -580,6 +652,7 @@ impl Resources {
         max_segments: usize,
         shader_spec: Option<&shader::ShaderSpec>,
         shader_key: u64,
+        converted: bool,
     ) -> Self {
         let common = build_common(device, size);
         let warp = build_warp(device, &common);
@@ -621,9 +694,23 @@ impl Resources {
             shape_capacity,
         } = draw;
 
+        // The converted vertex module and its pipeline (ADR-0212), only for a
+        // preset that carries a MilkDrop runtime. Built after every native
+        // object for the same reason the shader surface below is: a native
+        // preset's allocation sequence has to stay what it was.
+        let converted_warp = converted.then(|| build_converted_warp(device, &warp_layout));
+        let (converted_warp_shader, warp_pipeline_converted) = match converted_warp {
+            Some((module, pipeline)) => (Some(module), Some(pipeline)),
+            None => (None, None),
+        };
+
         // The converted-shader surface, only when this preset carries WGSL
         // (Plan 0100 Phase 6). Built after everything above so the allocation
         // sequence up to here is byte-for-byte what a native preset builds.
+        //
+        // **Its custom warp pipeline reuses the vertex module just built**: a
+        // bundle carrying WGSL is a converted preset by construction, so its
+        // mesh transform is the corrected-space one either way.
         let milk_shaders = shader_spec.map(|spec| {
             shader::MilkShaderResources::build(
                 device,
@@ -632,7 +719,7 @@ impl Resources {
                 &field,
                 size,
                 surface_format,
-                &warp_shader,
+                converted_warp_shader.as_ref().unwrap_or(&warp_shader),
                 &warp_layout,
             )
         });
@@ -655,6 +742,7 @@ impl Resources {
             field,
             size,
             warp_pipeline,
+            warp_pipeline_converted,
             deposit_pipeline,
             present_pipeline,
             warp_uniform,

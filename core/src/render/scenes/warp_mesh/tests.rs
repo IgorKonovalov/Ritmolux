@@ -1662,3 +1662,719 @@ fn a_warp_speed_change_bends_the_phase_instead_of_teleporting_it() {
         "the multiply's one-frame jump at this elapsed time was {teleport} s"
     );
 }
+
+// ---------------------------------------------------------------------------
+// The warp chain's two spaces (ADR-0212)
+// ---------------------------------------------------------------------------
+
+/// The grid the space probes run on. The chain is evaluated per vertex and
+/// interpolated across each cell, so a fine grid keeps the procedural warp's
+/// sinusoids resolved — and both variants of a comparison run on the same one,
+/// which is what makes the interpolation common to the pair rather than a term
+/// in the difference.
+const SPACE_MESH: (u32, u32) = (48, 48);
+
+/// The fragment that paints the past with its own uv before a probe's frame.
+///
+/// `r = u`, `g = v`, `a = 1`. The warp pass multiplies everything it samples by
+/// one per-fragment factor (`decay^dt * inside * darken_center`), so dividing the
+/// two colour channels by the alpha recovers the sampled uv **exactly**, with
+/// that factor cancelling rather than having to be neutralized.
+const SPACE_GRADIENT_FS: &str = r#"
+@fragment
+fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
+    return vec4<f32>(in.uv.x, in.uv.y, 0.0, 1.0);
+}
+"#;
+
+/// Where the warp pass sampled from, per texel of one rendered frame.
+struct SpaceProbe {
+    w: u32,
+    h: u32,
+    /// The uv each destination texel read, or `None` where the read fell outside
+    /// the field and the transparent-border policy (ADR-0048) contributed
+    /// nothing — which is indistinguishable from a sample at uv `(0, 0)` in the
+    /// colour alone, and is what the alpha is read for.
+    src: Vec<Option<[f32; 2]>>,
+}
+
+impl SpaceProbe {
+    /// This texel's destination uv — the centre, which is what the fragment
+    /// stage interpolated `uv` to.
+    fn dest(&self, x: u32, y: u32) -> [f32; 2] {
+        [
+            (x as f32 + 0.5) / self.w as f32,
+            (y as f32 + 0.5) / self.h as f32,
+        ]
+    }
+
+    /// One texel's sampled uv, by destination texel.
+    fn at(&self, x: u32, y: u32) -> Option<[f32; 2]> {
+        self.src[(y * self.w + x) as usize]
+    }
+
+    /// `(dest.v, f(dest, src))` down one column, for the texels whose read landed
+    /// in the field. The column is the one nearest `u`, and the outer `margin` of
+    /// rows is dropped: a stage that moves a sample off the field leaves a `None`
+    /// there, and an edge row is where that happens first.
+    fn column(
+        &self,
+        u: f32,
+        margin: u32,
+        f: impl Fn([f32; 2], [f32; 2]) -> f32,
+    ) -> Vec<(f32, f32)> {
+        let x = ((u * self.w as f32) as u32).min(self.w - 1);
+        (margin..self.h.saturating_sub(margin))
+            .filter_map(|y| {
+                let src = self.at(x, y)?;
+                let dest = self.dest(x, y);
+                Some((dest[1], f(dest, src)))
+            })
+            .collect()
+    }
+}
+
+/// The root of an affine function sampled at `(x, y)` pairs, by least squares.
+///
+/// Every stage but the procedural warp is affine in uv, so the samples lie on a
+/// line and its root is the quantity under test — a stretch's or a rotation's
+/// fixed point. Fitting rather than reading one texel is what keeps the answer
+/// off the grid the probe happened to be rendered at.
+fn affine_root(samples: &[(f32, f32)]) -> f32 {
+    assert!(
+        samples.len() > 8,
+        "an affine fit needs samples, got {}",
+        samples.len()
+    );
+    let n = samples.len() as f64;
+    let sx: f64 = samples.iter().map(|(x, _)| f64::from(*x)).sum();
+    let sy: f64 = samples.iter().map(|(_, y)| f64::from(*y)).sum();
+    let sxx: f64 = samples
+        .iter()
+        .map(|(x, _)| f64::from(*x) * f64::from(*x))
+        .sum();
+    let sxy: f64 = samples
+        .iter()
+        .map(|(x, y)| f64::from(*x) * f64::from(*y))
+        .sum();
+    let m = (n * sxy - sx * sy) / (n * sxx - sx * sx);
+    assert!(
+        m.abs() > 1e-6,
+        "the fit has no slope to take a root of: {m}"
+    );
+    let b = (sy - m * sx) / n;
+    (-b / m) as f32
+}
+
+/// MilkDrop's aspect pair for a target of this shape: the longer axis 1, the
+/// shorter `short / long`. The prediction side of every assertion below, written
+/// out here rather than taken from the shader so the two are independent.
+fn aspect_pair(w: u32, h: u32) -> [f32; 2] {
+    let aspect = w as f32 / h as f32;
+    if aspect >= 1.0 {
+        [1.0, 1.0 / aspect]
+    } else {
+        [aspect, 1.0]
+    }
+}
+
+/// The params every probe starts from: nothing moves, nothing is deposited, and
+/// the warp pass's own attenuations are off, so the frame is the mesh transform
+/// and nothing else.
+fn space_identity() -> Vec<(&'static str, f32)> {
+    vec![
+        ("zoom", 1.0),
+        ("rot", 0.0),
+        ("cx", 0.5),
+        ("cy", 0.5),
+        ("dx", 0.0),
+        ("dy", 0.0),
+        ("sx", 1.0),
+        ("sy", 1.0),
+        ("warp", 0.0),
+        ("deposit", 0.0),
+        ("decay", 1.0),
+        ("wrap", 0.0),
+        ("darken_center", 0.0),
+    ]
+}
+
+/// [`space_identity`] with `overrides` applied on top.
+fn space_params(overrides: &[(&'static str, f32)]) -> Vec<(&'static str, f32)> {
+    let mut params = space_identity();
+    for (name, value) in overrides {
+        match params.iter_mut().find(|(n, _)| n == name) {
+            Some(slot) => slot.1 = *value,
+            None => params.push((name, *value)),
+        }
+    }
+    params
+}
+
+/// Render one frame per entry in `sets` and read back where each one's warp pass
+/// sampled from.
+///
+/// `converted` decides the whole question the probe exists for: a scene carrying
+/// a MilkDrop runtime draws through the converted vertex module (ADR-0212), and
+/// one without draws through the native one. Everything else about the two runs
+/// is identical, **including the order of the frames** — the procedural warp's
+/// phase advances per frame, so two runs can only be compared set for set.
+///
+/// `None` means no adapter on this runner (ADR-0016).
+fn warp_space_probes(
+    converted: bool,
+    size: (u32, u32),
+    sets: &[Vec<(&'static str, f32)>],
+) -> Option<Vec<SpaceProbe>> {
+    use crate::render::capture;
+    use crate::render::context::{RenderContext, RenderError};
+
+    let (w, h) = size;
+    let aspect = w as f32 / h as f32;
+    let ctx = match RenderContext::new_headless(w, h, true) {
+        Ok(ctx) => ctx,
+        Err(RenderError::RequestAdapter(_)) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return None;
+        }
+        Err(e) => panic!("headless context build failed: {e}"),
+    };
+
+    let milk = converted.then(|| {
+        let mut bundle = crate::milk::MilkBundle::from_assembly(None, None, None)
+            .expect("an empty bundle assembles");
+        // The feedback quantizer off, so the warp fragment's epilogue is an exact
+        // identity and the uv a texel carries is the one it sampled.
+        bundle.quantize_steps = 0.0;
+        Box::new(bundle)
+    });
+    let mut scene = WarpMeshScene::new(
+        &ctx.device,
+        crate::render::COMPOSITE_FORMAT,
+        SPACE_MESH,
+        TierConfig::FLOOR.max_segments,
+    );
+    scene.configure(&super::super::GeneratorConfig::WarpMesh {
+        mesh: SPACE_MESH,
+        milk,
+        salt: 0,
+    });
+
+    let (_target, view) =
+        capture::create_target(&ctx.device, crate::render::COMPOSITE_FORMAT, w, h);
+    let (readback, padded_bpr) = capture::create_linear_readback(&ctx.device, w, h);
+
+    // The gradient pass: no bindings at all, so its layout is empty.
+    let gradient_shader = gpu::fullscreen_shader(
+        &ctx.device,
+        "warp-space-gradient-shader",
+        gpu::FULLSCREEN_VS_UV_FLIPPED,
+        SPACE_GRADIENT_FS,
+    );
+    let gradient_layout = ctx
+        .device
+        .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("warp-space-gradient-layout"),
+            bind_group_layouts: &[],
+            immediate_size: 0,
+        });
+    let gradient_pipeline = ctx
+        .device
+        .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("warp-space-gradient-pipeline"),
+            layout: Some(&gradient_layout),
+            vertex: wgpu::VertexState {
+                module: &gradient_shader,
+                entry_point: Some("vs_main"),
+                compilation_options: Default::default(),
+                buffers: &[],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &gradient_shader,
+                entry_point: Some("fs_main"),
+                compilation_options: Default::default(),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: FIELD_FORMAT,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+            }),
+            primitive: wgpu::PrimitiveState::default(),
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState::default(),
+            multiview_mask: None,
+            cache: None,
+        });
+
+    let analysis = AnalysisFrame::default();
+    let dt = FIELD_DT;
+    let mut frame_index = 0u32;
+    let draw = |scene: &mut WarpMeshScene, params: &[(&'static str, f32)], index: &mut u32| {
+        scene.set_target_size(w, h);
+        scene.set_time(*index as f32 * dt);
+        scene.advance(dt);
+        scene.update(&analysis);
+        // **After `update`, not before.** A converted preset's per-frame program
+        // — even an empty one — rewrites the whole transform and the composite
+        // roster from the bundle's outputs, so anything set earlier is gone by
+        // the time the mesh is assembled.
+        for (name, value) in params {
+            assert!(
+                declares(PARAMS, name),
+                "the probe set an unknown param `{name}`"
+            );
+            scene.set_param(name, *value);
+        }
+        // The draw layer would lay a waveform over the very texels being read
+        // back, and it is not what this probe is about.
+        scene.draw = None;
+        *index += 1;
+    };
+
+    // One frame to build the resources, at the first set's params so nothing
+    // about the sequence differs between the two variants.
+    let first = sets.first().cloned().unwrap_or_else(space_identity);
+    draw(&mut scene, &first, &mut frame_index);
+    let mut encoder = ctx
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("warp-space-build"),
+        });
+    capture::record_clear(&mut encoder, &view);
+    scene.render(&ctx.queue, &mut encoder, &view, aspect);
+    ctx.queue.submit(std::iter::once(encoder.finish()));
+
+    let mut out = Vec::with_capacity(sets.len());
+    for params in sets {
+        // Paint the past, then warp it: the read half is what the next warp pass
+        // binds, so the gradient goes there rather than into the write half.
+        let mut encoder = ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("warp-space-paint"),
+            });
+        {
+            let res = scene
+                .res
+                .as_ref()
+                .expect("the first render built the resources");
+            let target = if res.field.reading_a() {
+                res.field.view_a()
+            } else {
+                res.field.view_b()
+            };
+            let mut pass = gpu::color_pass(
+                &mut encoder,
+                "warp-space-gradient-pass",
+                target,
+                wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+            );
+            pass.set_pipeline(&gradient_pipeline);
+            pass.draw(0..3, 0..1);
+        }
+        ctx.queue.submit(std::iter::once(encoder.finish()));
+
+        draw(&mut scene, params, &mut frame_index);
+        let mut encoder = ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("warp-space-read"),
+            });
+        capture::record_clear(&mut encoder, &view);
+        scene.render(&ctx.queue, &mut encoder, &view, aspect);
+        let field = scene
+            .res
+            .as_ref()
+            .expect("the resources survive a frame")
+            .field
+            .read_texture()
+            .clone();
+        capture::record_copy(&mut encoder, &field, &readback, padded_bpr, w, h);
+        ctx.queue.submit(std::iter::once(encoder.finish()));
+
+        let texels = capture::read_back_linear(&ctx.device, &readback, w, h, padded_bpr)
+            .expect("the field reads back");
+        let src = texels
+            .chunks_exact(4)
+            .map(|rgba| {
+                let a = rgba[3];
+                (a > 1e-3).then(|| [rgba[0] / a, rgba[1] / a])
+            })
+            .collect();
+        out.push(SpaceProbe { w, h, src });
+    }
+    Some(out)
+}
+
+/// The two target shapes every stage below is asserted at.
+///
+/// **One of them is not a redundant second reading.** The correction is `1/A` on
+/// the shorter axis — 1.778 at 16:9 and 1.333 at 4:3 — so a stage that was
+/// written without it reads 1.0 at both and passes neither, while a stage that
+/// hard-coded one frame's factor passes one and fails the other. That is the
+/// tripwire ADR-0212 owes for the stage somebody adds to the chain later.
+const SPACE_TARGETS: [(u32, u32); 2] = [(128, 72), (128, 96)];
+
+/// How many texels of the frame's border every reading drops. A stage that moves
+/// a sample off the field leaves nothing to read there (ADR-0048), and the edge
+/// is where that happens first.
+const SPACE_MARGIN: u32 = 12;
+
+/// The mean displacement between two probes' sampled uv, over the interior.
+fn mean_shift(base: &SpaceProbe, probe: &SpaceProbe, margin: u32) -> [f32; 2] {
+    let mut sum = [0f64; 2];
+    let mut n = 0u32;
+    for y in margin..base.h - margin {
+        for x in margin..base.w - margin {
+            let (Some(b), Some(p)) = (base.at(x, y), probe.at(x, y)) else {
+                continue;
+            };
+            sum[0] += f64::from(p[0] - b[0]);
+            sum[1] += f64::from(p[1] - b[1]);
+            n += 1;
+        }
+    }
+    assert!(n > 100, "too few readable texels to average: {n}");
+    [
+        (sum[0] / f64::from(n)) as f32,
+        (sum[1] / f64::from(n)) as f32,
+    ]
+}
+
+/// The root-mean-square displacement between two probes, per axis — the
+/// statistic for a stage whose displacement has no mean, which the procedural
+/// warp's four sinusoids do not.
+fn rms_shift(base: &SpaceProbe, probe: &SpaceProbe, margin: u32) -> [f32; 2] {
+    let mut sum = [0f64; 2];
+    let mut n = 0u32;
+    for y in margin..base.h - margin {
+        for x in margin..base.w - margin {
+            let (Some(b), Some(p)) = (base.at(x, y), probe.at(x, y)) else {
+                continue;
+            };
+            sum[0] += f64::from((p[0] - b[0]) * (p[0] - b[0]));
+            sum[1] += f64::from((p[1] - b[1]) * (p[1] - b[1]));
+            n += 1;
+        }
+    }
+    assert!(n > 100, "too few readable texels to average: {n}");
+    [
+        (sum[0] / f64::from(n)).sqrt() as f32,
+        (sum[1] / f64::from(n)).sqrt() as f32,
+    ]
+}
+
+/// **A converted preset's `dx`/`dy` translate in the source's space.**
+///
+/// `CPlugin::ComputeGridAlphaValues` subtracts the pair inside the
+/// aspect-corrected space and undoes the correction afterwards, so the uv a
+/// vertex ends up sampling moves by `d / A` — on a 16:9 frame that is `dy` times
+/// 1.778 on y and `dx` unchanged on x. The native vocabulary translates in raw
+/// uv and moves by `d` on both, which is what a `[per_vertex]` `dx` binding has
+/// always meant.
+///
+/// `dx`/`dy` are rates (ADR-0019), so the frame's own shift is `value * dt`.
+#[test]
+fn a_converted_translation_runs_in_the_sources_space() {
+    let step = 6.0;
+    let sets = vec![
+        space_identity(),
+        space_params(&[("dx", step)]),
+        space_params(&[("dy", step)]),
+    ];
+    for (w, h) in SPACE_TARGETS {
+        let a = aspect_pair(w, h);
+        let shift = step * FIELD_DT;
+        for (converted, want_x, want_y) in
+            [(false, shift, shift), (true, shift / a[0], shift / a[1])]
+        {
+            let Some(probes) = warp_space_probes(converted, (w, h), &sets) else {
+                return;
+            };
+            let dx = mean_shift(&probes[0], &probes[1], SPACE_MARGIN);
+            let dy = mean_shift(&probes[0], &probes[2], SPACE_MARGIN);
+            // A destination vertex asks where its content came from, so a
+            // positive `dx` moves the sampled uv the other way.
+            for (got, want, what) in [
+                (-dx[0], want_x, "dx on x"),
+                (dx[1], 0.0, "dx on y"),
+                (dy[0], 0.0, "dy on x"),
+                (-dy[1], want_y, "dy on y"),
+            ] {
+                assert!(
+                    (got - want).abs() < 2e-3,
+                    "{w}x{h} converted={converted} {what}: got {got}, want {want}"
+                );
+            }
+        }
+    }
+}
+
+/// **A converted preset's stretch holds the source's centre fixed.**
+///
+/// `sx`/`sy` are applied about `(cx, cy)` **in the corrected space**, so the raw
+/// uv the stretch leaves alone is `0.5 + (cy - 0.5) / A` — `0.8556` for
+/// `cy = 0.7` at 16:9, against the native chain's plain `0.7`. Read as the fixed
+/// point of the affine map the stage produces rather than as one texel's value,
+/// so the answer does not depend on the grid the probe rendered at.
+#[test]
+fn a_converted_stretch_holds_the_sources_centre_fixed() {
+    let centre = 0.7;
+    let sets = vec![space_params(&[("cy", centre), ("sy", 16.0)])];
+    for (w, h) in SPACE_TARGETS {
+        let a = aspect_pair(w, h);
+        for (converted, want) in [(false, centre), (true, 0.5 + (centre - 0.5) / a[1])] {
+            let Some(probes) = warp_space_probes(converted, (w, h), &sets) else {
+                return;
+            };
+            let root =
+                affine_root(&probes[0].column(0.5, SPACE_MARGIN, |dest, src| src[1] - dest[1]));
+            assert!(
+                (root - want).abs() < 6e-3,
+                "{w}x{h} converted={converted}: the stretch held {root} fixed, want {want}"
+            );
+        }
+    }
+}
+
+/// **A converted preset's rotation turns about the source's centre.**
+///
+/// The rotation *angle* already agrees — the native chain scales x by the aspect
+/// around it, which makes it a screen rotation, and the corrected space is
+/// screen-isotropic already, so the two differ by a uniform scale and a rotation
+/// does not care. What differs is the centre, exactly as the stretch's does.
+///
+/// Read down the column through `cx`, where the rotation's x displacement is
+/// proportional to the distance from the centre row and crosses zero at it.
+#[test]
+fn a_converted_rotation_turns_about_the_sources_centre() {
+    let centre = 0.7;
+    let sets = vec![space_params(&[("cy", centre), ("rot", 6.0)])];
+    for (w, h) in SPACE_TARGETS {
+        let a = aspect_pair(w, h);
+        for (converted, want) in [(false, centre), (true, 0.5 + (centre - 0.5) / a[1])] {
+            let Some(probes) = warp_space_probes(converted, (w, h), &sets) else {
+                return;
+            };
+            let root =
+                affine_root(&probes[0].column(0.5, SPACE_MARGIN, |dest, src| src[0] - dest[0]));
+            assert!(
+                (root - want).abs() < 6e-3,
+                "{w}x{h} converted={converted}: the rotation turned about {root}, want {want}"
+            );
+        }
+    }
+}
+
+/// **A converted preset's procedural warp has the source's per-axis amplitude.**
+///
+/// The four sinusoids are added inside the corrected space, so mapping back
+/// divides the displacement by `A` per axis: the y excursion is 1.778 times the
+/// native chain's at 16:9 and the x excursion is the same. The *phases* still
+/// read raw clip x and y, as the source's do, so the figure is the same figure —
+/// only its reach across the shorter axis changes.
+///
+/// The displacement has no mean (it is a sum of sinusoids over the frame), so the
+/// statistic is an RMS, and the assertion is on the ratio between the two chains
+/// rather than on an absolute excursion.
+#[test]
+fn a_converted_procedural_warp_has_the_sources_per_axis_amplitude() {
+    let sets = vec![space_identity(), space_params(&[("warp", 300.0)])];
+    for (w, h) in SPACE_TARGETS {
+        let a = aspect_pair(w, h);
+        let mut reach = Vec::new();
+        for converted in [false, true] {
+            let Some(probes) = warp_space_probes(converted, (w, h), &sets) else {
+                return;
+            };
+            reach.push(rms_shift(&probes[0], &probes[1], SPACE_MARGIN));
+        }
+        // Not vacuous: the native excursion has to be far above the field's own
+        // half-float resolution for a ratio taken against it to mean anything.
+        assert!(
+            reach[0][0] > 5e-3 && reach[0][1] > 5e-3,
+            "{w}x{h}: the native warp barely moved anything: {:?}",
+            reach[0]
+        );
+        for (axis, want) in [(0usize, 1.0 / a[0]), (1, 1.0 / a[1])] {
+            let ratio = reach[1][axis] / reach[0][axis];
+            assert!(
+                (ratio - want).abs() < 0.03,
+                "{w}x{h} axis {axis}: converted/native warp reach was {ratio}, want {want}"
+            );
+        }
+    }
+}
+
+/// **At a square target the two chains are one chain.**
+///
+/// `A` is `(1, 1)` there, so every correction above is the identity — which is
+/// why none of the tests above could be run at one target and why the golden
+/// baselines, rendered at 128x128, cannot see this change at all. Asserted rather
+/// than left implicit: it is the agreement that says the converted chain is the
+/// native one plus a space, and not a second stage order that has drifted.
+#[test]
+fn at_a_square_target_the_two_warp_chains_agree() {
+    let sets = vec![space_params(&[
+        ("cx", 0.42),
+        ("cy", 0.7),
+        ("dx", 3.0),
+        ("dy", -2.0),
+        ("sx", 4.0),
+        ("sy", 8.0),
+        ("rot", 6.0),
+        ("warp", 300.0),
+        ("zoom", 1.4),
+    ])];
+    let mut probes = Vec::new();
+    for converted in [false, true] {
+        let Some(p) = warp_space_probes(converted, (128, 128), &sets) else {
+            return;
+        };
+        probes.push(p);
+    }
+    let drift = rms_shift(&probes[0][0], &probes[1][0], SPACE_MARGIN);
+    assert!(
+        drift[0] < 1e-3 && drift[1] < 1e-3,
+        "the two chains disagreed at a square target by {drift:?}"
+    );
+}
+
+/// **The native warp module is built from the unchanged source text.**
+///
+/// This is what makes "no native golden moves" a property of the construction
+/// rather than a measurement to repeat per adapter (ADR-0212): the native
+/// pipeline compiles the same string it compiled before the converted variant
+/// existed, so no backend's compiler is being asked a new question.
+#[test]
+fn the_native_warp_module_is_built_from_the_unchanged_source() {
+    let native = warp_module_source(WarpSpace::Native);
+    assert_eq!(
+        native,
+        format!("{}{}", crate::milk::shader::QUANTIZE_WGSL, WARP_SHADER),
+        "the native module must be the quantizer and the stage chain, verbatim"
+    );
+    for name in ["rlx_to_space", "rlx_from_space", "rlx_aspect_pair"] {
+        assert!(
+            !native.contains(name),
+            "the native variant must not mention `{name}`"
+        );
+    }
+    let converted = warp_module_source(WarpSpace::Converted);
+    for name in ["rlx_to_space", "rlx_from_space", "rlx_aspect_pair"] {
+        assert!(
+            converted.contains(name),
+            "the converted variant must define and call `{name}`"
+        );
+    }
+}
+
+/// **The converted variant is the one source with four edits, and each of them
+/// matches exactly once.**
+///
+/// The two variants share one copy of MilkDrop's stage order, which is the thing
+/// most worth not duplicating. The cost is that the converted variant is built by
+/// rewriting four lines of it, and a later edit to one of those lines would
+/// silently leave the converted chain in raw uv. This is the tripwire for that:
+/// an anchor that stops matching is a red test rather than a wrong picture.
+#[test]
+fn the_converted_warp_variant_edits_four_anchors() {
+    for anchor in WARP_ANCHORS {
+        assert_eq!(
+            WARP_SHADER.matches(anchor).count(),
+            1,
+            "the anchor `{}` must occur exactly once in the stage chain",
+            anchor.trim()
+        );
+    }
+    let converted = warp_module_source(WarpSpace::Converted);
+    // The rotation's two aspect factors are gone: corrected space is already
+    // isotropic on screen, and applying them there would rotate in a sheared one.
+    for anchor in [WARP_ANCHORS[1], WARP_ANCHORS[2]] {
+        assert!(
+            !converted.contains(anchor),
+            "the converted variant still carries `{}`",
+            anchor.trim()
+        );
+    }
+    assert!(
+        converted.contains("    p = rlx_to_space(p, aspect);\n"),
+        "the converted variant must enter the corrected space before the stretch"
+    );
+    assert!(
+        converted.contains("    out.src = rlx_from_space(q + ctr - d, aspect);\n"),
+        "the converted variant must leave the corrected space at `out.src`"
+    );
+}
+
+/// **A converted preset and a native one draw from different warp pipelines**,
+/// asserted at the seam [`encode::builtin_warp_pipeline`] chooses at.
+///
+/// A future edit that collapses the two back into one is then a red test rather
+/// than a converted picture that is silently in the wrong space at every
+/// non-square target.
+#[test]
+fn a_converted_preset_and_a_native_one_draw_from_different_warp_pipelines() {
+    use crate::render::capture;
+    use crate::render::context::{RenderContext, RenderError};
+
+    let ctx = match RenderContext::new_headless(64, 64, true) {
+        Ok(ctx) => ctx,
+        Err(RenderError::RequestAdapter(_)) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return;
+        }
+        Err(e) => panic!("headless context build failed: {e}"),
+    };
+    let (_target, view) =
+        capture::create_target(&ctx.device, crate::render::COMPOSITE_FORMAT, 64, 64);
+
+    // One scene, switched from native to converted and back, so the staleness
+    // check is exercised too: neither preset carries WGSL, so `shader_key` stays
+    // 0 through both switches and the kind is the only thing that changed.
+    let mut scene = WarpMeshScene::new(
+        &ctx.device,
+        crate::render::COMPOSITE_FORMAT,
+        SPACE_MESH,
+        TierConfig::FLOOR.max_segments,
+    );
+    let frame = AnalysisFrame::default();
+    let render_as = |scene: &mut WarpMeshScene, converted: bool| -> bool {
+        let milk = converted.then(|| {
+            Box::new(
+                crate::milk::MilkBundle::from_assembly(None, None, None)
+                    .expect("an empty bundle assembles"),
+            )
+        });
+        scene.configure(&super::super::GeneratorConfig::WarpMesh {
+            mesh: SPACE_MESH,
+            milk,
+            salt: 0,
+        });
+        scene.set_target_size(64, 64);
+        scene.advance(FIELD_DT);
+        scene.update(&frame);
+        let mut encoder = ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("warp-pipeline-choice"),
+            });
+        scene.render(&ctx.queue, &mut encoder, &view, 1.0);
+        ctx.queue.submit(std::iter::once(encoder.finish()));
+        let res = scene.res.as_ref().expect("the render built the resources");
+        std::ptr::eq(encode::builtin_warp_pipeline(res), &res.warp_pipeline)
+    };
+
+    assert!(
+        render_as(&mut scene, false),
+        "a native preset must draw through the native warp pipeline"
+    );
+    assert!(
+        !render_as(&mut scene, true),
+        "a converted preset must draw through the converted warp pipeline"
+    );
+    assert!(
+        render_as(&mut scene, false),
+        "switching back to a native preset must rebuild onto the native pipeline"
+    );
+}
