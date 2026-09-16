@@ -185,16 +185,43 @@ flowchart TD
 |---|---|---|---|
 | 1 — The ledger can serve a green record forward | dev | done | `55b1520` |
 | 2 — The gate's suite step is a three-state tier | dev | done | `19ef1d6` |
-| 3 — The report says which tier ran, and why | dev | committed with this row |  |
+| 3 — The report says which tier ran, and why | dev | done | `2204110` |
 
 ### Notes
 
+- Phase 3 touched two files past its list, both in `2204110`: `lib/lane.mjs`, which wires the gate's
+  served callback into the run terminal — without it the phase's first done-when has nothing to
+  assert — and `test/lane-scenario.mjs`, which gained the `servedClose` spec flag that the same
+  done-when's "lane scenario whose close tip is a served tree" needs. The lane scratch repository
+  also gained a tracked `Cargo.toml`, since a version-line bump needs a file already in the green
+  tree.
+- Phase 2's last done-when asks that the suite lock be asserted "from the lock log". The gate takes
+  its locks through `lib/locks.mjs`, which writes no log — `RLX_LOCK_LOG` is written only by
+  `with-lock.mjs`'s command wrapper, which the gate does not use. Asserted instead from the lock
+  **file**: the served stand-in reads `<lockDir>/suite.lock` while it runs and records the holder's
+  `what`, so the assertion is that the lock was held during the served run (`19ef1d6`,
+  `test/gate.test.mjs`).
+- Phase 2 retargeted the existing test "a one-byte change to a tracked doc makes the next gate run
+  the suite" to a tracked `.rs` file, and renamed it accordingly: under ADR-0211 a one-byte change to
+  a doc is exactly the served case, so the test as written asserted the behaviour this plan replaces.
+- The version-line rule matches a **three-part** semver, so `version = "0.20"` under a dependency
+  table is not one. ADR-0211 writes the rule as `version = "x.y.z"`; a two-part requirement matching
+  it would have served a dependency bump.
+
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`**
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** no
+- **Plan header `Closes:`** design-backlog 0227, the skip half only (the cheaper-suite half is
+  backlog 0239, and this plan does not touch it)
+- **What shipped:** no shipped artifact changed — every file is under `tools/conductor/` plus this
+  plan; a behaviour change to the conductor's own gate
+- **Operator docs touched:** `tools/conductor/README.md` (*How it stays safe*, three new bullets, and
+  *The gate*). No row of Mode 4's operator-doc sweep table outside it; no generated file regenerated
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — 53 stated reductions hold
+  across 26 live entries, 2 unprobeable (0069, 0079); 30 advisory moved-path notices, which the
+  script excludes from its exit code
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). Run instead:
+  `node --test tools/conductor/test/*.test.mjs` — exit 0, 323 tests, 323 pass, 0 fail — plus
+  `check-doc-links.mjs`, `toc.mjs --check`, `check-index-rows.mjs`, `check-comment-hygiene.mjs`
+  and `check-reader-prose.mjs`, all exit 0. No Rust, C++ or preset file is touched by any phase
+- **Outstanding `human` phases:** none
