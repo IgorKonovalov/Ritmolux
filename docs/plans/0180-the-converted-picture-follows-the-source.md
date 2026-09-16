@@ -23,6 +23,28 @@
 > - Phase 1's local copy at `bee728e` is accepted as the read of `d4c843a`, on the line-for-line
 >   match its note records. Nothing downstream re-reads it.
 
+> **Amended 2026-09-16, at the close review, which added Phase 7 and did not close the plan.**
+> Phase 4 found that `milkconv` emits a `[params]` comment saying the scene's deposit stays off and
+> never emits the key, so `DEFAULT_DEPOSIT = 1.6` draws a ring into every converted preset. It
+> recorded the finding and held the one-line repair back, on the ground that the light is a term in
+> the settled field level [Plan 0142](0142-the-milkdrop-import-earns-its-verdict.md) Phase 2
+> measures. **The close reverses that call**, for three reasons it had evidence for and the phase
+> did not:
+> - **The sequencing argument runs the other way.** Plan 0142 has not measured anything. Its Phase 2
+>   arithmetic is `source / (1 - decay)`, and this is an unintended term in `source` — so the repair
+>   before it measures is the whole reason this plan runs first, not a reason to defer.
+> - **It is the dominant visible defect on much of the corpus, not a seam.** Rendered at 1920x1080
+>   against `--signal click:120 --frame-at 240`, adding `deposit = "0.0"` takes
+>   *Aderrasi - See* from near-uniform white to a black field with its figure legible, and
+>   *Escher's Tunnel Mix* from a grey haze to actual black. *Bow To Gravity* is unchanged by it —
+>   that residue is backlog 0113 proper and stays Plan 0142's.
+> - **It moves no golden.** `warp_mesh_milk.toml` and `warp_mesh_shader.toml` bind `deposit = "6.5"`
+>   explicitly, and `warp_mesh_stroke.toml`'s `[params]` table is empty.
+>
+> No ADR: the decision this restores is already recorded on `convert::deposit_block` and at
+> `warp_mesh/mod.rs`'s `update`. Both describe a tree that does not exist, and Phase 7 makes the
+> tree match them rather than deciding anything new.
+
 ## TL;DR
 
 Plan 0173 read MilkDrop 2's released source (`xeiraex/milkdrop2` at `d4c843a`) for two facts and
@@ -496,6 +518,57 @@ Rejected:
     `node scripts/toc.mjs --check` exit 0.
   - `cargo nextest run --workspace` passes at the last phase, with the counts in the close triggers.
 
+### Phase 7 — The converted preset stops drawing a light nobody asked for
+- **Owner skill:** dev
+- **What:** `milkconv` emits `deposit = "0.0"`, so the comment it already writes becomes true. The
+  two other comments asserting the same thing from the other side are corrected, and
+  `warp_mesh_stroke.toml` — the fixture that stands for a converted preset — binds the deposit it
+  was silently inheriting.
+- **Files touched:** `milkconv/src/convert.rs` (the `[params]` emission and `deposit_block`'s doc);
+  a test beside the converter's existing ones; `core/src/render/scenes/warp_mesh/mod.rs` (the
+  comment in `update`); `core/tests/fixtures/warp_mesh_stroke.toml`;
+  `core/tests/golden/warp_mesh_stroke.png`; `docs/milkdrop-conversion.md` (the note Phase 6 added).
+- **Notes for the implementer:**
+  - **The repair is the emission, not a force-off in the scene.** `warp_mesh/mod.rs`'s `update`
+    gives the right reason for not forcing it there — a hand-written bundle may legitimately use the
+    deposit as its light source, and `warp_mesh_milk.toml` does. That reasoning stands; what is
+    wrong is only its second half, which asserts the converter already emits none.
+  - **Three comments claim this and none of it is true.** `milkconv/src/convert.rs`'s `[params]`
+    comment, `deposit_block`'s doc (*"The scene turns the deposit off for the whole of a bundle's
+    life"*), and `warp_mesh/mod.rs`'s `update` (*"the converter emits no deposit bindings for
+    exactly that reason, so it already gets none"*). Each points at one of the others. After this
+    phase the first is true and the other two say what actually holds — and `warp_mesh_stroke.toml`
+    carries a fourth copy in its own header.
+  - **`warp_mesh_stroke.png` moves, and that is the point.** Its `[params]` table is empty, so it
+    renders with `DEFAULT_DEPOSIT` and its picture is dominated by the ring rather than by its
+    stroke. That is why Phase 6 saw it hold still through a mode-2 rebuild that changed the figure
+    from a full-width scope to an x-y one — a result that phase recorded and could not explain.
+    Binding `deposit = "0.0"` makes the fixture a converted preset as the converter now emits one,
+    and makes the baseline guard the waveform it is named for.
+  - **The two other converted baselines must not move.** Both bind `deposit = "6.5"` explicitly, so
+    this change cannot reach them. If either moves, that is a finding and a stop — it would mean the
+    emission is reaching a fixture that sets its own value.
+  - The Decision's bless discipline and its restore step apply unchanged.
+- **Done when:**
+  - A converted `[params]` block carries `deposit = "0.0"`, asserted by a test on the emitter's
+    output rather than on a rendered frame.
+  - A converted bundle carrying no `[params]` override renders with **zero** deposited light: with
+    the draw layer silenced, the field after any number of frames is everywhere zero. The same
+    assertion on the tree before this phase fails.
+  - `grep -n "the scene's own deposit stays off\|it already gets none\|turns the deposit off" milkconv/src core/src core/tests/fixtures`
+    returns only lines that are true of this tree.
+  - `warp_mesh_stroke.toml` binds `deposit = "0.0"`, and **`warp_mesh_stroke.png` is the only
+    baseline that moves**, blessed and named. `warp_mesh_milk.png`, `warp_mesh_shader.png`,
+    `warp_mesh.png` and the three `composite_warp_*.png` pass without a bless.
+  - Both Phase 4 seam presets re-render at 1920x1080 under that phase's own invocation with **no
+    hard edge along the `+x` ray**, and the log names the render paths. Phase 4 measured the edge it
+    is judging against; this is that measurement repeated, not a fresh statistic.
+  - `docs/milkdrop-conversion.md`'s deposit note states what the converter now does. It keeps
+    naming Phase 4 as where the defect was found, because a reader who saw the old pictures needs
+    that.
+  - `cargo nextest run --workspace` passes, and `node scripts/check-doc-links.mjs`,
+    `node scripts/check-reader-prose.mjs` and `node scripts/toc.mjs --check` exit 0.
+
 ## Data shapes
 
 ```rust
@@ -543,6 +616,10 @@ pub fn run_wave_point(&mut self, index: usize, sample: f32, left: f32, right: f3
 ## What this plan does NOT do
 
 - **It does not touch the wash (backlog 0113).** Plan 0142 owns it, and runs after this plan.
+  Phase 7 is not an exception: it removes a source term the converter never meant to emit, which is
+  a conversion defect rather than a property of the feedback loop. What the field settles at once
+  that term is gone stays 0142's question, and *Bow To Gravity* is the evidence that a residue
+  remains after the removal.
 - **It does not change the conversion rate or reach.** Backlog 0108 and 0109 are unchanged.
 - **It does not widen the C ABI, the ring, or anything on the audio thread.** ADR-0199's hard stop
   makes that a stop condition rather than a risk.
