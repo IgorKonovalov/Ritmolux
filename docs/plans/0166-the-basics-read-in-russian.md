@@ -240,11 +240,34 @@ const state = !stamped ? 'FAIL' : current.startsWith(stamped) ? 'current' : 'sta
 |---|---|---|---|
 | 1 — The stamp, the gate, and the banner | `dev` | done | `645e84ec` |
 | 2 — The five translations, drafted and unpublished | `dev` | done | committed with this row |
-| 3 — Owner review of the Russian prose | `human` | not started | |
+| 3 — Owner review of the Russian prose | `human` | done | `40c1ed39` + `79976978` |
 | 4 — Publish: the map, the menu, the banner in place | `dev` | not started | |
 | 5 — The foobar component zip ships the Russian install file | `dev` | not started | |
 
 ### Notes
+
+- **Phase 3 ran 2026-09-16 and passed, with corrections.** The owner read the five and named the
+  defect class in two examples of its own — *«Визуальная случайность есть — брызги частиц… явно
+  засеяна… один в один»* and *«между звуком, вышедшим из колонок, и фигурой, сдвинувшейся на
+  экране»*. Both are English syntax wearing Russian words, and the class ran through all five.
+  **44 corrections** landed in `40c1ed39` (how-it-works, 13) and `79976978` (the other four, 31),
+  the register confirmed by the owner on the first file before the rest were touched.
+- **Two of the 44 were mistranslations, not awkwardness**, which is the reason this phase blocks
+  Phase 4 rather than being a polish pass: *"The cost is honest and unpaid-for"* had become «Цена
+  честная и не оплачена», which in Russian says the bill is outstanding; and *"Neither of those
+  **facts** reaches the engine"* had lost the word *facts*, so it read as though the samples never
+  arrive. A third, in the macOS note, told the reader a missed permission prompt lives in System
+  Settings, where the *permission* lives and the prompt does not.
+- **Every stamp is unchanged, which is the phase's own done-when.** No English source moved, so only
+  the Russian prose changed and `node scripts/check-translations.mjs` stays green at five stamped
+  translations. Word counts held at ~88 % of English across all five before and after, so the pass
+  neither padded nor compressed.
+- **One convention was left alone deliberately and is still open**: a link whose target is an
+  untranslated document keeps its English title (`[Configuration]`, `[Ring determinism]`) while links
+  to translated concepts are in Russian. It reads as deliberate signposting — the reader is told they
+  are about to land in English — and Phase 4 is where it becomes visible, so it is worth one decision
+  there rather than a silent edit here.
+
 
 - **Phase 1 touched three files beyond its `Files touched` list**, each because the phase falsified
   something already written in it — the phase's own instruction was to grep for the counts rather
