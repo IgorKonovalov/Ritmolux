@@ -68,7 +68,7 @@ mod shaders;
 // `family::` segment. Everything else is `pub(super)` in its new file: exactly
 // the visibility it had as a private member of this module, not `pub(crate)`,
 // which would widen it.
-pub use family::{AttractorFamily, Basis};
+pub use family::{AttractorFamily, Basis, FAMILY_PARAMS};
 
 use encode::*;
 use family::*;
@@ -85,7 +85,7 @@ use super::{Phase, Scene, SeededRng};
 use crate::dsp::AnalysisFrame;
 use crate::render::feedback::{self, FeedbackConfig, PingPongField};
 use crate::render::palette::{self, Palette};
-use crate::render::scenes::{ParamKind, ParamSpec, default_of};
+use crate::render::scenes::{FamilyParam, FamilyRange, ParamKind, ParamSpec, default_of};
 
 /// Compute workgroup size (1D). 64 is a safe, portable default across DX12/Metal.
 const WORKGROUP: u32 = 64;

@@ -3920,48 +3920,55 @@ fn the_published_reference_and_the_exported_schema_agree() {
             ex_value, pub_value,
             "`{ex_name}`: the schema says default {ex_default}, the reference says {pub_default}"
         );
-        // A `null` range in the document is a blank cell in the reference: both
-        // say "unbounded, or world-space, and inventing a number would be a
-        // claim nothing holds".
+        let numbers: Vec<f32> = ex_range
+            .trim_matches(['[', ']'])
+            .split(',')
+            .filter_map(|n| n.parse().ok())
+            .collect();
+        let bounds = |segment: &str| -> Vec<f32> {
+            segment
+                .split('–')
+                .filter_map(|n| n.trim().rsplit('`').nth(1)?.parse().ok())
+                .collect()
+        };
+        // A family-dependent parameter's cell is one `family` `lo` – `hi` per
+        // reading family, then one trailing `inert on …` naming the rest
+        // (ADR-0180 rule 4). A row that is inert on every family but one has
+        // only the `inert on` half, so the two are recognised separately.
+        let per_family: Vec<Vec<f32>> = pub_range
+            .split("; ")
+            .filter(|segment| segment.contains('–') && segment.matches('`').count() == 6)
+            .map(bounds)
+            .collect();
+        let family_cell = !per_family.is_empty() || pub_range.starts_with("inert on ");
         let unbounded = ex_range == "null";
-        assert_eq!(
-            unbounded,
-            pub_range.is_empty(),
-            "`{ex_name}`: the schema says range {ex_range}, the reference cell \
-             is `{pub_range}` — one of them claims a bound the other does not"
-        );
-        if !unbounded {
-            let numbers: Vec<f32> = ex_range
-                .trim_matches(['[', ']'])
-                .split(',')
-                .filter_map(|n| n.parse().ok())
-                .collect();
-            let bounds = |segment: &str| -> Vec<f32> {
-                segment
-                    .split('–')
-                    .filter_map(|n| n.trim().rsplit('`').nth(1)?.parse().ok())
-                    .collect()
-            };
-            // A family-dependent parameter's cell is one `family` `lo` – `hi`
-            // per reading family (ADR-0180 rule 4). The schema keeps one pair,
-            // and it must be a range some family in the cell reads.
-            let per_family: Vec<Vec<f32>> = pub_range
-                .split("; ")
-                .filter(|segment| segment.contains('–') && segment.matches('`').count() == 6)
-                .map(bounds)
-                .collect();
-            if per_family.is_empty() {
+        if family_cell {
+            // The document keeps at most one pair per parameter, and a
+            // family-dependent one may keep none: the attractor's coefficients
+            // declare `range: None` because one pair for four maps at different
+            // scales would be a claim nothing holds. What is asserted is that a
+            // pair it *does* keep is a range some family in the cell reads.
+            assert!(
+                unbounded || per_family.contains(&numbers),
+                "`{ex_name}`: the schema's range {ex_range} is no family's range \
+                 in the reference cell {pub_range}"
+            );
+        } else {
+            // A `null` range in the document is a blank cell in the reference:
+            // both say "unbounded, or world-space, and inventing a number would
+            // be a claim nothing holds".
+            assert_eq!(
+                unbounded,
+                pub_range.is_empty(),
+                "`{ex_name}`: the schema says range {ex_range}, the reference cell \
+                 is `{pub_range}` — one of them claims a bound the other does not"
+            );
+            if !unbounded {
                 assert_eq!(
                     numbers,
                     bounds(pub_range),
                     "`{ex_name}`: the schema says range {ex_range}, the reference \
                      says {pub_range}"
-                );
-            } else {
-                assert!(
-                    per_family.contains(&numbers),
-                    "`{ex_name}`: the schema's range {ex_range} is no family's range \
-                     in the reference cell {pub_range}"
                 );
             }
         }

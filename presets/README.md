@@ -640,10 +640,10 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
-| `a` | `0` |  | First of the four family coefficients; what it means depends on the attractor family the tuple picked. |
-| `b` | `0` |  | Second family coefficient - see the roster's attractor essay for what each family does with it. |
-| `c` | `0` |  | Third family coefficient, and on the IFS figures it means nothing at all. |
-| `d` | `0` |  | Fourth family coefficient; like the other three it is inert on the IFS figures. |
+| `a` | `0` | `de_jong` `-3` – `3`; `clifford` `-2` – `2`; `thomas` `0` – `0.25`; `lorenz` `5` – `20`; inert on `fern`, `tree`, `dragon`, `sierpinski`, `spiral` | First of the four family coefficients; what it means depends on the attractor family the tuple picked. |
+| `b` | `0` | `de_jong` `-3` – `3`; `clifford` `-2` – `2`; `lorenz` `20` – `130`; inert on `thomas`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` | Second family coefficient - see the roster's attractor essay for what each family does with it. |
+| `c` | `0` | `de_jong` `-3` – `3`; `clifford` `-2` – `2`; `lorenz` `0.5` – `4.5`; inert on `thomas`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` | Third family coefficient, and on the IFS figures it means nothing at all. |
+| `d` | `0` | `de_jong` `-3` – `3`; `clifford` `-2` – `2`; inert on `thomas`, `lorenz`, `fern`, `tree`, `dragon`, `sierpinski`, `spiral` | Fourth family coefficient; like the other three it is inert on the IFS figures. |
 | `size` | `1` | `0` – `4` | Size of each particle's deposit into the accumulation. |
 | `hue` | `0` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. |
 | `brightness` | `1` | `0` – `2` | The scene's overall light level, multiplying what it draws before the composite. |

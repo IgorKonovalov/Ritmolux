@@ -332,6 +332,105 @@ impl AttractorFamily {
     }
 }
 
+/// One row of [`FAMILY_PARAMS`]: four map cells in [`AttractorFamily::MAPS`]'s
+/// order — De Jong, Clifford, Thomas, Lorenz — then one inert cell per
+/// [`IfsFigure::ALL`] entry, in that roster's order. Together that is the
+/// `[particles] family` vocabulary, in the order the schema export writes it.
+///
+/// **The IFS cells are written here rather than passed in**, because they are
+/// not a per-parameter judgement: an IFS's shape lives in its affine table,
+/// [`extra_tuples`](AttractorFamily::extra_tuples) is empty for it and
+/// [`default_coeffs`](AttractorFamily::default_coeffs) is four zeros, so `a`..`d`
+/// are inert on every figure. A sixth figure joining the roster fails
+/// `the_family_table_is_the_roster_and_its_inert_cells_are_inert` rather than
+/// silently acquiring a cell here.
+macro_rules! per_family {
+    ($name:literal: $de_jong:expr, $clifford:expr, $thomas:expr, $lorenz:expr $(,)?) => {
+        FamilyParam {
+            name: $name,
+            ranges: &[
+                FamilyRange {
+                    family: "de_jong",
+                    range: $de_jong,
+                },
+                FamilyRange {
+                    family: "clifford",
+                    range: $clifford,
+                },
+                FamilyRange {
+                    family: "thomas",
+                    range: $thomas,
+                },
+                FamilyRange {
+                    family: "lorenz",
+                    range: $lorenz,
+                },
+                FamilyRange {
+                    family: "fern",
+                    range: None,
+                },
+                FamilyRange {
+                    family: "tree",
+                    range: None,
+                },
+                FamilyRange {
+                    family: "dragon",
+                    range: None,
+                },
+                FamilyRange {
+                    family: "sierpinski",
+                    range: None,
+                },
+                FamilyRange {
+                    family: "spiral",
+                    range: None,
+                },
+            ],
+        }
+    };
+}
+
+/// Every coefficient whose meaning — and so whose reading range — depends on the
+/// attractor family (ADR-0180 rule 4, ADR-0194 point 2). It is what the
+/// generated reference prints in place of the blank cell [`PARAMS`]'s
+/// `range: None` leaves, and what gives a studio four sliders where it has four
+/// number fields.
+///
+/// **Inertness is what the map arithmetic reads**, and it is held against the
+/// WGSL in [`STEP_SHADER`](super::STEP_SHADER) rather than against
+/// [`step_once`]'s mirror alone: De Jong and Clifford read all four, Thomas
+/// reads `a` — its dissipation — alone, Lorenz reads `a`, `b` and `c` (sigma,
+/// rho, beta) and never `d`, and every IFS figure reads none of them.
+///
+/// **A reading cell's bounds are the hull of that family's own tuple roster**,
+/// [`extra_tuples`](AttractorFamily::extra_tuples) plus the canonical
+/// [`default_coeffs`](AttractorFamily::default_coeffs), rounded outward to a
+/// readable slider end. The hulls those rosters measure, which the test holds
+/// every declared cell to contain:
+///
+/// | family | `a` | `b` | `c` | `d` |
+/// |---|---|---|---|---|
+/// | `de_jong` | -2.7 .. 2.1 | -2.53 .. 1.902 | -1.81 .. 2.4 | -2.2 .. 2 |
+/// | `clifford` | -1.9 .. 1.9 | -2 .. 1.8 | -1.9 .. 1.9 | -1.9 .. 1.6 |
+/// | `thomas` | 0.03 .. 0.22 | | | |
+/// | `lorenz` | 10 .. 16 | 24.4 .. 126.52 | 1 .. 4 | |
+///
+/// **A hull is not a map of chaos.** Outside it are coefficients nobody
+/// measured, not coefficients that fail; the bound is a slider's travel and a
+/// guide, and an author who wants a figure past it types the number
+/// (ADR-0194's second Negative). Thomas's low end is widened to zero rather
+/// than to the roster's `0.03` because zero is the undamped limit of its own
+/// parameter and reads as one end of the sweep.
+pub const FAMILY_PARAMS: &[FamilyParam] = &[
+    per_family!("a":
+        Some([-3.0, 3.0]), Some([-2.0, 2.0]), Some([0.0, 0.25]), Some([5.0, 20.0])),
+    per_family!("b":
+        Some([-3.0, 3.0]), Some([-2.0, 2.0]), None, Some([20.0, 130.0])),
+    per_family!("c":
+        Some([-3.0, 3.0]), Some([-2.0, 2.0]), None, Some([0.5, 4.5])),
+    per_family!("d": Some([-3.0, 3.0]), Some([-2.0, 2.0]), None, None),
+];
+
 /// One roster entry's framing (ADR-0093): where the figure is and how big, as
 /// the two constants the render path needs.
 ///
