@@ -369,10 +369,11 @@ pub(super) fn encode_draw_layer(
             geometry,
             milk.as_mut(),
             &out,
-            &frame.waveform,
+            &frame.waveform_pair,
             time,
             dt,
             aspect,
+            res.size.0,
         );
     } else {
         geometry.clear();

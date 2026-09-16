@@ -179,29 +179,55 @@ const DOT_LENGTH: f32 = 0.0015;
 ///
 /// `runtime` is `None` for a hand-authored `warp_mesh` preset, which draws no
 /// MilkDrop layer at all — so this whole file costs a native preset one branch.
-/// **`_time` is read by nothing here, and that is the contract** (Plan 0109
-/// Phase 2): every figure this layer builds is a pure function of the trace and
-/// the frame outputs. The parameter stays in the signature because the scene has
-/// the value and because time-independence is a claim worth being able to *test*
-/// — `draw_layer.rs` calls this twice at well-separated times and compares the
-/// geometry. A future mode that legitimately animates would rename it back, and
-/// would owe that test a reason.
+/// **`time` is read by exactly three of the eight `wave_mode` figures**, and by
+/// nothing else in this file: mode 0 turns at `0.2` rad/s (`milkdropfs.cpp`
+/// l.2886-2925), mode 1 at `2.3` (l.2942) and mode 5 at `0.3` (l.3085-3086).
+/// Every other figure is a pure function of the trace and the frame outputs, and
+/// that narrowed claim is what `draw_layer.rs` tests — by calling this twice at
+/// well-separated times for a mode with no time term, and by asserting each
+/// turning mode comes back after exactly one turn at its own rate.
+#[allow(clippy::too_many_arguments)]
 pub fn build(
     geometry: &mut DrawGeometry,
     runtime: Option<&mut MilkRuntime>,
     out: &FrameOutputs,
-    waveform: &[f32; WAVE_SAMPLES],
-    _time: f32,
+    pair: &[[f32; WAVE_SAMPLES]; 2],
+    time: f32,
     dt: f32,
     aspect: f32,
+    target_width: u32,
 ) {
     geometry.clear();
     let Some(runtime) = runtime else {
         return;
     };
     let exposure = Exposure::new(dt);
-    waveform_figure(geometry, out, waveform, exposure, aspect);
-    custom_waves(geometry, runtime, waveform, exposure, aspect);
+    // The two traces, smoothed and scaled **once**, the way the source builds
+    // `fWaveL`/`fWaveR` before any figure reads them (`milkdropfs.cpp`
+    // l.933-942): a one-pole run along the trace at `wave_smoothing`, then
+    // `wave_scale`. Every mode and every custom wave indexes these.
+    let smooth = out.wave_smoothing.clamp(0.0, 0.99);
+    let scale = out.wave_scale;
+    let mut traces = [[0.0f32; WAVE_SAMPLES]; 2];
+    for (dst, src) in traces.iter_mut().zip(pair.iter()) {
+        let mut held = 0.0f32;
+        for (slot, raw) in dst.iter_mut().zip(src.iter()) {
+            held = held * smooth + raw * (1.0 - smooth);
+            *slot = held * scale;
+        }
+    }
+    let [left, right] = &traces;
+    waveform_figure(
+        geometry,
+        out,
+        left,
+        right,
+        time,
+        exposure,
+        aspect,
+        target_width,
+    );
+    custom_waves(geometry, runtime, left, right, exposure, aspect);
     custom_shapes(geometry, runtime, exposure, aspect);
     // The two borders and the motion-vector grid are **always** alpha-blended in
     // the reference — neither has an additive flag to read — so they go to the
@@ -439,27 +465,132 @@ fn dots(geometry: &mut DrawGeometry, points: &[Point], width: f32, additive: boo
 /// How many `wave_mode` figures there are — MilkDrop's own eight.
 pub const WAVE_MODES: u32 = 8;
 
-/// The built-in waveform: MilkDrop's eight `wave_mode` figures over the audio
-/// trace.
+/// The factor between the source's sample term and what the host people run
+/// actually draws.
 ///
-/// Each mode is the reference's own construction, and the eight are **pairwise
-/// distinct figures** — a circle, a pair of rings, a scope, a Lissajous, a
-/// mirrored pair, an angled line and its double — which is what Phase 4's
-/// done-when asks and what
-/// [`every_wave_mode_builds_a_different_figure`](super::tests) holds them to.
+/// `foo_vis_milk2` 0.2.0.0, `wave_mode = 6`, a full-scale 200 Hz sine at
+/// `fWaveScale = 1`, captured by Plan 0127: the trace measured **0.316 frame
+/// heights peak to peak**, over a stroke whose own width read `0.0019`. The
+/// source's mode-6 coefficient is `0.25` clip along the line's normal, which is
+/// `0.125` frame heights per unit sample, so the factor is
+/// `((0.316 - 0.0019) / 2) / 0.125`.
 ///
-/// Two pairs had to be separated to get there, and both for the same reason: the
-/// reference tells 0 from 1, and 6 from 7, using the **second audio channel**,
-/// and this engine's analysis is mono by construction. Where the reference would
-/// draw two diverging traces, this draws the one trace at the separation the
-/// reference's own parameters name — the same figure with the channel difference
-/// removed rather than an invented eighth mode. See each arm.
+/// **It multiplies the sample term and nothing else** — never a base radius, a
+/// separation or an extent (ADR-0199). It is measured on one mode and inferred
+/// for the other seven, on the argument that the host's gap is in the sample path
+/// every mode shares; the confirmation is a unit-scale mode-0 capture that
+/// Plan 0142's rig session owes.
+const HOST_SAMPLE_FACTOR: f32 = 1.256;
+
+/// A whole turn, **as the source writes it** (`milkdropfs.cpp` l.2886-2948):
+/// `6.28`, not `TAU`.
+///
+/// The difference is 0.05 % of a turn over the 239 steps modes 0 and 1 lay down,
+/// so the last point falls a fifth of a step short of the first. Mode 0's
+/// cosine blend is what closes that join, and writing `TAU` here would move every
+/// converted circle by that fifth of a step for no reason but tidiness.
+#[allow(
+    clippy::approx_constant,
+    reason = "the source writes 6.28 and the truncation is the behaviour, not a typo for TAU"
+)]
+const SOURCE_TURN: f32 = 6.28;
+
+/// The largest figure the source builds, in constructed points: modes 2, 3, 4
+/// and 5 at 480. [`smooth_wave`] turns `n` of them into `2n - 1`.
+const MAX_WAVE_POINTS: usize = 480;
+/// See [`MAX_WAVE_POINTS`].
+const MAX_SMOOTHED_POINTS: usize = 2 * MAX_WAVE_POINTS - 1;
+
+/// `CPlugin::DrawWave`'s `SmoothWave` (`milkdropfs.cpp` l.2549-2577), applied to
+/// every built-in figure once it is constructed (l.3319-3335) and to each side of
+/// mode 7's break separately.
+///
+/// It inserts one point between each consecutive pair, at
+/// `(-0.15 v[i-1] + 1.15 v[i] + 1.15 v[i+1] - 0.15 v[i+2]) / 2` with the indices
+/// clamped at the ends, so `n` points become `2n - 1` and **every original point
+/// keeps its position, at an even index**. That last property is what lets a test
+/// read the figure the mode built rather than the curve through it.
+///
+/// The interpolation is affine in the points, so running it in uv rather than in
+/// the line renderer's world space is the same arithmetic — `uv_to_world` is
+/// itself affine.
+fn smooth_wave(src: &[[f32; 2]], dst: &mut [[f32; 2]; MAX_SMOOTHED_POINTS]) -> usize {
+    if src.len() < 2 {
+        for (slot, point) in dst.iter_mut().zip(src) {
+            *slot = *point;
+        }
+        return src.len();
+    }
+    let at = |i: isize| -> [f32; 2] {
+        let clamped = i.clamp(0, src.len() as isize - 1) as usize;
+        src.get(clamped).copied().unwrap_or([0.0; 2])
+    };
+    let mut used = 0usize;
+    for i in 0..src.len() {
+        if let Some(slot) = dst.get_mut(used) {
+            *slot = at(i as isize);
+        }
+        used += 1;
+        if i + 1 == src.len() {
+            break;
+        }
+        let (a, b, c, d) = (
+            at(i as isize - 1),
+            at(i as isize),
+            at(i as isize + 1),
+            at(i as isize + 2),
+        );
+        if let Some(slot) = dst.get_mut(used) {
+            *slot = [
+                (-0.15 * a[0] + 1.15 * b[0] + 1.15 * c[0] - 0.15 * d[0]) * 0.5,
+                (-0.15 * a[1] + 1.15 * b[1] + 1.15 * c[1] - 0.15 * d[1]) * 0.5,
+            ];
+        }
+        used += 1;
+    }
+    used.min(MAX_SMOOTHED_POINTS)
+}
+
+/// The source's `wave_mystery` fold, `milkdropfs.cpp` l.2869-2877 — **modes 0, 1
+/// and 4 only**, which is why it is a function rather than applied to the output
+/// on the way in. Modes 6 and 7 read the value unfolded, and the rest ignore it.
+fn fold_mystery(m: f32) -> f32 {
+    if !m.is_finite() {
+        return 0.0;
+    }
+    m - 2.0 * ((m + 1.0) * 0.5).floor()
+}
+
+/// The built-in waveform: MilkDrop's eight `wave_mode` figures, each built the
+/// way `CPlugin::DrawWave` builds it (`milkdropfs.cpp` l.2765-3259).
+///
+/// # The two coordinate conventions, and which modes use which
+///
+/// The source works in a clip space where `-1..1` is the whole frame on **both**
+/// axes. Modes 0, 1, 2, 3 and 5 multiply their x offset by `m_fAspectY` and their
+/// y offset by `m_fAspectX` before placing it, which puts those figures in
+/// shorter-axis units and makes a circle round; modes 4, 6 and 7 apply no aspect
+/// term at all, so their extents are the frame's own. Both are reproduced here,
+/// and [`uv_to_world`] supplies the one conversion out (ADR-0037).
+///
+/// # What the eight figures are
+///
+/// Modes 2 and 3 are **the same geometry, line for line** (l.2950-2976 against
+/// l.2977-3004) and differ only in the alpha they draw at (l.2982-2991), which
+/// this file does not carry. That is the source's own design and not a gap here.
+///
+/// Modes 1, 2, 3, 5 and 7 read **both** channels of the analyzer's pair; modes 0
+/// and 6 read one.
+#[allow(clippy::too_many_arguments)]
 fn waveform_figure(
     geometry: &mut DrawGeometry,
     out: &FrameOutputs,
-    waveform: &[f32; WAVE_SAMPLES],
+    left: &[f32; WAVE_SAMPLES],
+    right: &[f32; WAVE_SAMPLES],
+    time: f32,
     exposure: Exposure,
     aspect: f32,
+    target_width: u32,
 ) {
     let additive = out.wave_additive >= 0.5;
     let colour = light(
@@ -474,207 +605,236 @@ fn waveform_figure(
     if colour.is_dark() {
         return;
     }
-    let width = if out.wave_thick >= 0.5 { THICK } else { THIN };
-    // Read once and passed to every [`emit_trace`] below: the modes that draw in
-    // two passes have to make the same choice in both, and reading the flag at
-    // each site is how one of them came to be a stroke where the other was beads.
+    let stroke = if out.wave_thick >= 0.5 { THICK } else { THIN };
+    // Read once and passed to every emit below: the mode that draws in two passes
+    // has to make the same choice in both, and reading the flag at each site is
+    // how one of them came to be a stroke where the other was beads.
     let use_dots = out.wave_usedots >= 0.5;
-    let scale = out.wave_scale;
-    let mystery = out.wave_mystery;
     let (cx, cy) = (out.wave_x, out.wave_y);
-    // `wave_smoothing` is a running average along the trace, exactly as the
-    // reference's `fWaveSmoothing` is: 0 is the raw samples and 1 is a straight
-    // line.
-    let smooth = out.wave_smoothing.clamp(0.0, 0.99);
-
-    // How many points this mode draws, and the sampled trace it draws them from.
+    let mystery = out.wave_mystery;
+    let folded = fold_mystery(mystery);
     let mode = (out.wave_mode.max(0.0) as u32) % WAVE_MODES;
-    let count: usize = match mode {
-        // The two "spectrum"-ish modes draw a coarser figure, as the reference
-        // does — a 512-point circle at 480 px is denser than the frame.
-        3 | 4 => 128,
-        _ => 256,
+
+    // The sample term, with the host factor on it and nothing else (ADR-0199).
+    let l = |i: usize| left.get(i).copied().unwrap_or(0.0) * HOST_SAMPLE_FACTOR;
+    let r = |i: usize| right.get(i).copied().unwrap_or(0.0) * HOST_SAMPLE_FACTOR;
+
+    // Clip to uv. `centred` carries the aspect pair and the preset's centre;
+    // `plain` is the frame's own clip space, which modes 4, 6 and 7 place in.
+    let (ax, ay) = if aspect >= 1.0 {
+        (1.0, 1.0 / aspect)
+    } else {
+        (aspect, 1.0)
     };
+    let centred = |px: f32, py: f32| [cx + 0.5 * px * ay, cy - 0.5 * py * ax];
+    let plain = |px: f32, py: f32| [0.5 + 0.5 * px, 0.5 - 0.5 * py];
 
-    let mut trace = [0.0f32; 256];
-    let mut held = 0.0f32;
-    for (i, slot) in trace.iter_mut().enumerate().take(count) {
-        let source = waveform
-            .get(i * WAVE_SAMPLES / count.max(1))
-            .copied()
-            .unwrap_or(0.0);
-        held = held * smooth + source * (1.0 - smooth);
-        *slot = held * scale;
-    }
-    let sample = |i: usize| trace.get(i).copied().unwrap_or(0.0);
-
-    let mut points: [Point; 256] = [([0.0; 2], colour); 256];
-    let mut used = 0usize;
-    let mut closed = false;
-    let push = |uv: (f32, f32), points: &mut [Point; 256], used: &mut usize| {
-        if let Some(slot) = points.get_mut(*used) {
-            slot.0 = uv_to_world(uv.0, uv.1, aspect);
-            *used += 1;
+    let mut pts = [[0.0f32; 2]; MAX_WAVE_POINTS];
+    let mut n = 0usize;
+    let push = |p: [f32; 2], pts: &mut [[f32; 2]; MAX_WAVE_POINTS], n: &mut usize| {
+        if let Some(slot) = pts.get_mut(*n) {
+            *slot = p;
+            *n += 1;
         }
     };
+    // `min(480, texW/3)` and `min(240, texW/3)`: the source refuses to lay more
+    // points than a third of the frame's pixels across (l.3005-3065, l.3100-3244).
+    let thirds = (target_width / 3).max(2) as usize;
 
     match mode {
-        // 0 — a circle whose radius breathes with the trace. MilkDrop's first
-        // mode and the one most presets use.
+        // 0 — a circle of radius 0.5 clip, breathing with the right channel, and
+        // turning at 0.2 rad/s (l.2886-2925). The first 24 points cosine-blend to
+        // the sample 240 further along, which is what closes the loop without a
+        // step across the join.
         0 => {
-            closed = true;
-            let base = 0.2 + 0.1 * mystery;
+            let count = 240usize;
             for i in 0..count {
-                let t = i as f32 / count as f32 * std::f32::consts::TAU;
-                let r = base + sample(i) * 0.1;
-                push(
-                    (cx + r * t.cos() / aspect.max(0.1), cy + r * t.sin()),
-                    &mut points,
-                    &mut used,
-                );
+                let ang = i as f32 / (count - 1) as f32 * SOURCE_TURN + time * 0.2;
+                let blend = 24usize;
+                let s = if i < blend {
+                    let mix = 0.5 - 0.5 * (i as f32 / blend as f32 * std::f32::consts::PI).cos();
+                    r(i + 360) * (1.0 - mix) + r(i + 120) * mix
+                } else {
+                    r(i + 120)
+                };
+                let rad = 0.5 + 0.4 * s + folded;
+                push(centred(rad * ang.cos(), rad * ang.sin()), &mut pts, &mut n);
             }
         }
-        // 1 — the reference's **second** circular mode, which draws the left and
-        // right channels as two rings whose separation is `wave_mystery`. This
-        // engine's analysis is mono (see `MilkRuntime::run_wave_point`), so the
-        // two rings carry the same trace and only the separation tells them
-        // apart — which is the reference's own figure with the channel
-        // difference removed, and is what keeps mode 1 from being mode 0.
+        // 1 — a polar figure: the right channel drives the radius and the left
+        // the angle, turning at 2.3 rad/s (l.2927-2948). Open, unlike mode 0.
         1 => {
-            closed = true;
-            let base = 0.2 + 0.1 * mystery;
-            let separation = 0.04 + 0.06 * mystery.abs();
-            for ring in [separation, -separation] {
-                used = 0;
-                for i in 0..count {
-                    let t = i as f32 / count as f32 * std::f32::consts::TAU;
-                    let r = base + ring + sample(i) * 0.1;
-                    push(
-                        (cx + r * t.cos() / aspect.max(0.1), cy + r * t.sin()),
-                        &mut points,
-                        &mut used,
-                    );
-                }
-                // The outer ring closes here; the inner one falls through to the
-                // shared emit below, so both are stroked exactly once.
-                if ring > 0.0 {
-                    let built = points.get(..used).unwrap_or(&[]);
-                    emit_trace(geometry, built, width, true, additive, use_dots);
-                }
-            }
-        }
-        // 2 — a horizontal line across the frame, the classic scope.
-        2 => {
+            let count = 240usize;
             for i in 0..count {
-                let u = i as f32 / (count - 1).max(1) as f32;
-                push((u, cy + sample(i) * 0.15), &mut points, &mut used);
+                let rad = 0.53 + 0.43 * r(i) + folded;
+                let ang =
+                    i as f32 / (count - 1) as f32 * SOURCE_TURN + 1.57 * l(i + 32) + time * 2.3;
+                push(centred(rad * ang.cos(), rad * ang.sin()), &mut pts, &mut n);
             }
         }
-        // 3 — the same line, vertical.
-        3 => {
+        // 2 and 3 — the x-y scope, right against left at a 32-sample offset
+        // (l.2950-3004). One construction: the two modes differ in alpha alone.
+        2 | 3 => {
+            let count = 480usize;
             for i in 0..count {
-                let v = i as f32 / (count - 1).max(1) as f32;
-                push((cx + sample(i) * 0.15, v), &mut points, &mut used);
+                push(centred(r(i), l(i + 32)), &mut pts, &mut n);
             }
         }
-        // 4 — a Lissajous-style figure: the trace against itself, offset. In
-        // MilkDrop this is the left channel against the right; this engine's
-        // analysis is mono, so the offset stands in for the channel difference
-        // and the figure is a leaning loop rather than a blob (see
-        // `MilkRuntime::run_wave_point`).
+        // 4 — a horizontal sweep whose y comes from the left channel and whose x
+        // is nudged by the right, then run through the source's momentum filter
+        // (l.3005-3065). `wave_mystery` sets how much of each point's step
+        // carries into the next.
         4 => {
-            let lag = 8usize;
+            let count = 480usize.min(thirds);
+            let offset = (480 - count) / 2;
+            let w1 = 0.45 + 0.5 * (folded * 0.5 + 0.5);
+            let w2 = 1.0 - w1;
+            let mut dx = [0.0f32; MAX_WAVE_POINTS];
+            let mut dy = [0.0f32; MAX_WAVE_POINTS];
             for i in 0..count {
-                push(
-                    (
-                        cx + sample(i) * 0.2 / aspect.max(0.1),
-                        cy + sample((i + lag) % count) * 0.2,
-                    ),
-                    &mut points,
-                    &mut used,
-                );
+                if let (Some(sx), Some(sy)) = (dx.get_mut(i), dy.get_mut(i)) {
+                    *sx = 0.44 * r(i + 25 + offset);
+                    *sy = 0.47 * l(i + offset);
+                }
             }
-        }
-        // 5 — a double horizontal line, mirrored about `wave_y`.
-        5 => {
-            for i in 0..count {
-                let u = i as f32 / (count - 1).max(1) as f32;
-                let s = sample(i).abs() * 0.15;
-                push((u, cy + s), &mut points, &mut used);
-            }
-            emit_trace(
-                geometry,
-                points.get(..used).unwrap_or(&[]),
-                width,
-                false,
-                additive,
-                use_dots,
-            );
-            used = 0;
-            for i in 0..count {
-                let u = i as f32 / (count - 1).max(1) as f32;
-                let s = sample(i).abs() * 0.15;
-                push((u, cy - s), &mut points, &mut used);
-            }
-        }
-        // 6 — a line at an angle set by `wave_mystery`, which is what the
-        // reference uses it for here, and 7 — the reference's **double** line, the
-        // same figure offset to both sides along its own normal. That is exactly
-        // the relationship mode 5 has to mode 2, so the pair is consistent with
-        // the pair above it rather than being two names for one figure.
-        6 | 7 => {
-            // **No `time` term here, deliberately** (Plan 0109 Phase 2,
-            // design-backlog 0115). A `time * 0.05` addend turns the figure a
-            // full turn every ~126 s, so a trace authored horizontal would be
-            // horizontal only at the instants
-            // `mystery * PI + time * 0.05` happened to be a multiple of `pi`.
-            // Plan 0108 Phase 4 named it a suspect and deliberately left it in,
-            // because removing it moves every mode-6 and mode-7 preset and
-            // because whether the reference's line drifts is a question about
-            // the reference. Plan 0108 Phase 6 asked it: *Blur Mix 3*'s traces
-            // stay horizontal in `foo_vis_milk2` and drew one steep diagonal
-            // here. So the angle is what the sentence above always said it was —
-            // `wave_mystery` alone — and this file is now a pure function of the
-            // trace and the outputs, with no use of `time` anywhere in it.
-            let angle = mystery * std::f32::consts::PI;
-            let (s, c) = angle.sin_cos();
-            let offsets: &[f32] = if mode == 7 { &[0.03, -0.03] } else { &[0.0] };
-            for (index, offset) in offsets.iter().enumerate() {
-                used = 0;
-                for i in 0..count {
-                    let t = i as f32 / (count - 1).max(1) as f32 - 0.5;
-                    let n = sample(i) * 0.15 + offset;
-                    // Built in uv and stretched by the target on the way out, so
-                    // `t` spans the frame's **width**: `uv_to_world` is the only
-                    // aspect term, exactly as this module's one-conversion rule
-                    // says. Dividing x by the aspect here would cancel that
-                    // multiply and normalize the trace to the frame's *height*
-                    // instead, which is 56 % of the width at 16:9 and full width
-                    // only on a square target (design-backlog 0122).
-                    //
-                    // A rotated trace therefore picks up the target's shape in
-                    // its amplitude — a uv-space construction is stretched, which
-                    // is what the reference does and not a defect to correct. At
-                    // `wave_mystery = 0` the amplitude is pure y and aspect-free.
-                    push(
-                        (cx + t * c - n * s, cy + t * s + n * c),
-                        &mut points,
-                        &mut used,
+            for series in [&mut dx, &mut dy] {
+                for i in 2..count {
+                    let (a, b) = (
+                        series.get(i - 1).copied().unwrap_or(0.0),
+                        series.get(i - 2).copied().unwrap_or(0.0),
                     );
-                }
-                // All but the last pass emit here; the last falls through to the
-                // shared emit below.
-                if index + 1 < offsets.len() {
-                    let built = points.get(..used).unwrap_or(&[]);
-                    emit_trace(geometry, built, width, false, additive, use_dots);
+                    if let Some(slot) = series.get_mut(i) {
+                        *slot = *slot * w2 + w1 * (2.0 * a - b);
+                    }
                 }
             }
+            for i in 0..count {
+                let along = -1.0 + 2.0 * i as f32 / count.max(2) as f32;
+                let px = along + (cx * 2.0 - 1.0) + dx.get(i).copied().unwrap_or(0.0);
+                let py = (cy * 2.0 - 1.0) + dy.get(i).copied().unwrap_or(0.0);
+                push(plain(px, py), &mut pts, &mut n);
+            }
+        }
+        // 5 — the source's product figure, the two channels multiplied into each
+        // other and the whole thing turned at 0.3 rad/s (l.3067-3098).
+        5 => {
+            let count = 480usize;
+            let (s, c) = (time * 0.3).sin_cos();
+            for i in 0..count {
+                let x0 = r(i) * l(i + 32) + l(i) * r(i + 32);
+                let y0 = r(i) * r(i) - l(i + 32) * l(i + 32);
+                push(centred(x0 * c - y0 * s, x0 * s + y0 * c), &mut pts, &mut n);
+            }
+        }
+        // 6 and 7 — a line at an angle `wave_mystery` sets, run across the frame
+        // and clipped to just outside it, with the left channel displacing it
+        // along its own normal (l.3100-3244). Mode 7 draws the same line twice,
+        // one channel each, pushed apart by `wave_y` squared; the two sides are a
+        // break in the figure rather than one polyline, so they are emitted and
+        // smoothed separately.
+        //
+        // **`wave_mystery` is read unfolded here** and `wave_x` slides the line
+        // along its NORMAL rather than along itself, which is the source's own
+        // use of the two and not a transcription slip.
+        6 | 7 => {
+            let count = 240usize.min(thirds);
+            let ang = 1.57 * mystery;
+            let (sa, ca) = ang.sin_cos();
+            let dir = [ca, sa];
+            let nrm = [-sa, ca];
+            let slide = cx * 2.0 - 1.0;
+            let (t0, t1) = clip_to_frame(dir, [nrm[0] * slide, nrm[1] * slide]);
+            let sep = cy * cy;
+            let sides: &[(f32, bool)] = if mode == 7 {
+                &[(sep, true), (-sep, false)]
+            } else {
+                &[(0.0, true)]
+            };
+            let mut smoothed = [[0.0f32; 2]; MAX_SMOOTHED_POINTS];
+            for (index, (offset, from_left)) in sides.iter().enumerate() {
+                n = 0;
+                for i in 0..count {
+                    let t = t0 + (t1 - t0) * i as f32 / (count - 1).max(1) as f32;
+                    let sample = if *from_left { l(i + 120) } else { r(i + 120) };
+                    let d = 0.25 * sample + offset;
+                    let px = dir[0] * t + nrm[0] * (slide + d);
+                    let py = dir[1] * t + nrm[1] * (slide + d);
+                    push(plain(px, py), &mut pts, &mut n);
+                }
+                let built = smooth_wave(pts.get(..n).unwrap_or(&[]), &mut smoothed);
+                emit_uv(
+                    geometry,
+                    smoothed.get(..built).unwrap_or(&[]),
+                    colour,
+                    stroke,
+                    false,
+                    additive,
+                    use_dots,
+                    aspect,
+                );
+                let _ = index;
+            }
+            return;
         }
         _ => {}
     }
 
-    let built = points.get(..used).unwrap_or(&[]);
-    emit_trace(geometry, built, width, closed, additive, use_dots);
+    let mut smoothed = [[0.0f32; 2]; MAX_SMOOTHED_POINTS];
+    let built = smooth_wave(pts.get(..n).unwrap_or(&[]), &mut smoothed);
+    emit_uv(
+        geometry,
+        smoothed.get(..built).unwrap_or(&[]),
+        colour,
+        stroke,
+        false,
+        additive,
+        use_dots,
+        aspect,
+    );
+}
+
+/// Where a line through `offset` in direction `dir` enters and leaves the source's
+/// `+/-1.1` clip box (`milkdropfs.cpp` l.3100-3244) — slightly outside the frame,
+/// so a rotated trace runs past the corners rather than stopping short of them.
+///
+/// Returns the parameter range along `dir`, clamped to the source's own
+/// `-3..3` extent when the line is axis-parallel and one axis never bounds it.
+fn clip_to_frame(dir: [f32; 2], offset: [f32; 2]) -> (f32, f32) {
+    const EDGE: f32 = 1.1;
+    const REACH: f32 = 3.0;
+    let (mut lo, mut hi) = (-REACH, REACH);
+    for axis in 0..2 {
+        let (d, o) = (
+            dir.get(axis).copied().unwrap_or(0.0),
+            offset.get(axis).copied().unwrap_or(0.0),
+        );
+        if d.abs() < 1e-6 {
+            continue;
+        }
+        let (a, b) = ((-EDGE - o) / d, (EDGE - o) / d);
+        lo = lo.max(a.min(b));
+        hi = hi.min(a.max(b));
+    }
+    if hi <= lo { (-REACH, REACH) } else { (lo, hi) }
+}
+
+/// Convert a figure built in uv into the line renderer's world space and emit it.
+#[allow(clippy::too_many_arguments)]
+fn emit_uv(
+    geometry: &mut DrawGeometry,
+    uv: &[[f32; 2]],
+    colour: Light,
+    width: f32,
+    closed: bool,
+    additive: bool,
+    use_dots: bool,
+    aspect: f32,
+) {
+    let mut points: Vec<Point> = Vec::with_capacity(uv.len());
+    for p in uv {
+        points.push((uv_to_world(p[0], p[1], aspect), colour));
+    }
+    emit_trace(geometry, &points, width, closed, additive, use_dots);
 }
 
 /// The preset's custom waves, each a polyline or a scatter from its own
@@ -682,7 +842,8 @@ fn waveform_figure(
 fn custom_waves(
     geometry: &mut DrawGeometry,
     runtime: &mut MilkRuntime,
-    waveform: &[f32; WAVE_SAMPLES],
+    left: &[f32; WAVE_SAMPLES],
+    right: &[f32; WAVE_SAMPLES],
     exposure: Exposure,
     aspect: f32,
 ) {
@@ -697,12 +858,15 @@ fn custom_waves(
         let mut points: Vec<Point> = Vec::with_capacity(count);
         for i in 0..count {
             let t = i as f32 / (count - 1).max(1) as f32;
-            // The audio at this point along the wave — MilkDrop's `value1`.
-            let value = waveform
-                .get(((t * (WAVE_SAMPLES - 1) as f32) as usize).min(WAVE_SAMPLES - 1))
-                .copied()
-                .unwrap_or(0.0);
-            let Some(point) = runtime.run_wave_point(index, t, value, value) else {
+            // The audio at this point along the wave — MilkDrop's `value1` and
+            // `value2`, which are its left and right channels and are two
+            // different numbers on a stereo stream (ADR-0199). A per-point
+            // program that plots one against the other draws the figure its
+            // author saw rather than a diagonal line.
+            let at = ((t * (WAVE_SAMPLES - 1) as f32) as usize).min(WAVE_SAMPLES - 1);
+            let value1 = left.get(at).copied().unwrap_or(0.0);
+            let value2 = right.get(at).copied().unwrap_or(0.0);
+            let Some(point) = runtime.run_wave_point(index, t, value1, value2) else {
                 break;
             };
             points.push((

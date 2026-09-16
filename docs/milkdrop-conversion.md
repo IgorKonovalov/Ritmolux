@@ -47,18 +47,29 @@ not know".
 | the per-frame and per-vertex programs, whole | disk textures — deliberately out of scope, and priced at 19 % of the corpus. **Since Phase 6 this is a conversion *failure***: the shader that samples one is rejected by name rather than silently rendered without it |
 | **the `warp` and `comp` HLSL blocks, translated to WGSL** (Phase 6) — the ~30 intrinsics, swizzles, `if`, bounded loops, `#define`s, helper functions, the noise samplers, `GetBlur1..3`, the `q`/roam/rand/`rot_*` input surface | HLSL arrays, computed `#if` conditions, structs — each a named rejection, together well under 2 % of the corpus |
 | `zoom` `rot` `cx` `cy` `dx` `dy` `sx` `sy` `warp` `zoomexp` | a custom shape’s `textured` flag — the previous frame as a fill, which needs a stage this engine has not got |
-| `decay` `gamma` `wrap` `darken_center` `brighten` `darken` `solarize` `invert`, and **the video echo** `echo_zoom` / `echo_alpha` / `echo_orient` (Plan 0109) — a bundle emitted before that plan carries no register for them and must be re-converted | the second audio channel, because this engine’s analysis is mono by construction |
-| the waveform's eight `wave_mode` figures and their whole `wave_*` roster | |
+| `decay` `gamma` `wrap` `darken_center` `brighten` `darken` `solarize` `invert`, and **the video echo** `echo_zoom` / `echo_alpha` / `echo_orient` (Plan 0109) — a bundle emitted before that plan carries no register for them and must be re-converted | a custom wave's `SmoothWave` pass — the built-in figures are smoothed as the source smooths them, a custom wave's points are drawn as its program placed them |
+| **both audio channels** ([ADR-0199](adrs/0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md)) — the analyzer publishes a levelled left/right pair, so the five `wave_mode` figures built from two channels are built from two, and a custom wave's `value1` and `value2` are the two the author meant | |
+| the waveform's eight `wave_mode` figures, each the source's own construction and drawn at the scale the host people run draws it, and their whole `wave_*` roster | |
 | up to four custom waves and four custom shapes, each with its own programs | |
 | the inner and outer borders, and the motion-vector grid | |
 | the initial conditions, re-applied at the top of every frame | |
 | `q1`–`q32`, `t1`–`t8`, `megabuf`, `gmegabuf` | |
 
-**A converted preset draws its own light and the scene's deposit stays off.**
-MilkDrop's light source *is* the waveform, and up to Phase 3 the converter emitted
-a stand-in ring in its place so there was something for the mesh to move. That
-stand-in is gone: the frames further down this section that share a radial-arm
-character are from that era and are labelled as such.
+**A converted preset draws its own light.** MilkDrop's light source *is* the
+waveform, and up to Phase 3 the converter emitted a stand-in ring in its place so
+there was something for the mesh to move. That stand-in is gone: the frames
+further down this section that share a radial-arm character are from that era and
+are labelled as such.
+
+> **The scene's own deposit is not off, though the converter's `[params]` comment
+> says it is.** A conversion emits no `deposit` binding, so the `warp_mesh`
+> scene's default of `1.6` stands and a ring of light is laid into the field of
+> every converted preset — with a hard colour step along one horizontal ray, which
+> is the seam two of the corpus's presets were reported for. Found and measured by
+> [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) Phase 4 and
+> deliberately left in place: that light is a term in the settled field level
+> [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md) measures, and it
+> is that plan's to move.
 
 ### Rates are converted, and that is why a preset moves at the right speed
 

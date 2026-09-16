@@ -117,7 +117,7 @@ fn a_converted_shape_survives_the_bundle_round_trip() {
 #[test]
 fn a_custom_shape_honours_its_per_point_program() {
     let mut runtime = MilkRuntime::new(bundle(), 0);
-    let waveform = [0.0f32; WAVE_SAMPLES];
+    let waveform = [[0.0f32; WAVE_SAMPLES]; 2];
     let mut geometry = draw::DrawGeometry::default();
     // `wave_a = 0` and no motion vectors, so every triangle below is the shape's.
     let out = FrameOutputs {
@@ -135,6 +135,7 @@ fn a_custom_shape_honours_its_per_point_program() {
         0.0,
         1.0 / 30.0,
         16.0 / 9.0,
+        DRAW_WIDTH,
     );
 
     // Seven sides, three instances, three vertices per fan triangle.
@@ -209,11 +210,27 @@ fn a_custom_shape_honours_its_per_point_program() {
 // The waveform draw layer (Plan 0108 Phase 4, design-backlog 0107)
 // ---------------------------------------------------------------------------
 
-/// A waveform with structure in it, so no mode collapses to a straight line.
-fn trace() -> [f32; WAVE_SAMPLES] {
-    std::array::from_fn(|i| {
-        (i as f32 / WAVE_SAMPLES as f32 * std::f32::consts::TAU * 3.0).sin() * 0.7
-    })
+/// A waveform pair with structure in it, so no mode collapses to a straight line
+/// and the modes that plot one channel against the other draw a figure with area.
+fn trace() -> [[f32; WAVE_SAMPLES]; 2] {
+    [
+        std::array::from_fn(|i| {
+            (i as f32 / WAVE_SAMPLES as f32 * std::f32::consts::TAU * 3.0).sin() * 0.7
+        }),
+        std::array::from_fn(|i| {
+            (i as f32 / WAVE_SAMPLES as f32 * std::f32::consts::TAU * 5.0).sin() * 0.7
+        }),
+    ]
+}
+
+/// The target width every draw-layer probe builds at. Wide enough that the
+/// source's `min(n, texW / 3)` point counts are the full `480` and `240`.
+const DRAW_WIDTH: u32 = 1920;
+
+/// The same trace on both channels — the mono stand-in, for the probes that are
+/// about something other than the channel difference.
+fn mono_pair(trace: [f32; WAVE_SAMPLES]) -> [[f32; WAVE_SAMPLES]; 2] {
+    [trace, trace]
 }
 
 /// The waveform alone: every other producer silenced, so the geometry under test
@@ -245,6 +262,7 @@ fn waveform_geometry(mode: f32, use_dots: f32) -> draw::DrawGeometry {
         0.0,
         1.0 / 30.0,
         16.0 / 9.0,
+        DRAW_WIDTH,
     );
     geometry
 }
@@ -568,8 +586,10 @@ fn the_dotted_trace_reaches_the_screen_at_every_resolution() {
         .join("core/tests/fixtures/scratch-0108/wave-dots.milk");
     let text = std::fs::read_to_string(&path)
         .unwrap_or_else(|e| panic!("the Phase 4 fixture must be readable at {path:?}: {e}"));
+    let pair = trace();
     let frame = rlx_core::dsp::AnalysisFrame {
-        waveform: trace(),
+        waveform: pair[0],
+        waveform_pair: pair,
         ..Default::default()
     };
 
@@ -654,10 +674,11 @@ fn a_non_additive_shape_lands_in_the_over_half() {
             ib_a: 0.0,
             ..Default::default()
         },
-        &[0.0f32; WAVE_SAMPLES],
+        &[[0.0f32; WAVE_SAMPLES]; 2],
         0.0,
         1.0 / 30.0,
         16.0 / 9.0,
+        DRAW_WIDTH,
     );
     assert!(!geometry.triangles.is_empty(), "the shape drew nothing");
     assert_eq!(
@@ -701,7 +722,7 @@ fn wave_outputs(mystery: f32) -> FrameOutputs {
 }
 
 /// Build the draw layer at `time` and hand back the segments it emitted.
-fn segments_at(time: f32, mystery: f32, waveform: &[f32; WAVE_SAMPLES]) -> Vec<[f32; 4]> {
+fn segments_at(time: f32, mystery: f32, waveform: &[[f32; WAVE_SAMPLES]; 2]) -> Vec<[f32; 4]> {
     let mut runtime = MilkRuntime::new(bundle(), 0);
     let mut geometry = draw::DrawGeometry::default();
     draw::build(
@@ -712,6 +733,7 @@ fn segments_at(time: f32, mystery: f32, waveform: &[f32; WAVE_SAMPLES]) -> Vec<[
         time,
         1.0 / 30.0,
         16.0 / 9.0,
+        DRAW_WIDTH,
     );
     geometry
         .segments
@@ -726,11 +748,15 @@ fn segments_at(time: f32, mystery: f32, waveform: &[f32; WAVE_SAMPLES]) -> Vec<[
 /// # The defect
 ///
 /// The arm computed its angle as `mystery * PI + time * 0.05`, a full turn every
-/// ~126 s. `time` was the only reading of the clock in the whole draw layer, it
-/// contradicted the arm's own comment, and it meant *a trace authored horizontal
-/// was horizontal only at instants*. Plan 0108 Phase 4 named it and left it in
-/// because the question — does the reference's line drift? — is about the
-/// reference; Phase 6 of that plan put the two side by side and answered no.
+/// ~126 s. It contradicted the arm's own comment, and it meant *a trace authored
+/// horizontal was horizontal only at instants*. Plan 0108 Phase 4 named it and
+/// left it in because the question — does the reference's line drift? — is about
+/// the reference; Phase 6 of that plan put the two side by side and answered no.
+///
+/// The source has no time term in modes 6 and 7, and that is why this test is
+/// about those two. Modes 0, 1 and 5 do have one, and
+/// [`modes_one_and_five_turn_at_the_sources_rates`] is where those rates are
+/// held.
 ///
 /// # The three claims
 ///
@@ -742,7 +768,7 @@ fn segments_at(time: f32, mystery: f32, waveform: &[f32; WAVE_SAMPLES]) -> Vec<[
 /// ignored its angle entirely would pass the first two.
 #[test]
 fn a_mode_six_figure_is_oriented_by_mystery_alone() {
-    let waveform = ramp_waveform();
+    let waveform = mono_pair(ramp_waveform());
     let early = segments_at(0.0, 0.0, &waveform);
     let late = segments_at(61.0, 0.0, &waveform);
     assert!(
@@ -759,7 +785,7 @@ fn a_mode_six_figure_is_oriented_by_mystery_alone() {
     // Horizontal means horizontal: a flat trace at `mystery = 0` lies on one
     // line. The endpoints carry the waveform's own excursion, so the trace is
     // flattened for this arm rather than the tolerance being widened.
-    let flat = segments_at(0.0, 0.0, &[0.0f32; WAVE_SAMPLES]);
+    let flat = segments_at(0.0, 0.0, &[[0.0f32; WAVE_SAMPLES]; 2]);
     let height = flat.first().map_or(0.0, |s| s[1]);
     for (i, s) in flat.iter().enumerate() {
         assert!(
@@ -785,5 +811,453 @@ fn a_mode_six_figure_is_oriented_by_mystery_alone() {
         "`wave_mystery = 0.5` built the same geometry as `0`, so the figure is \
          not oriented by mystery either — the term was not removed, the whole \
          angle was"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// The eight built-in figures follow the source (Plan 0180 Phase 6, ADR-0199)
+// ---------------------------------------------------------------------------
+
+/// The factor between the source's sample term and what `foo_vis_milk2` draws,
+/// restated here so the assertions below and `draw.rs`'s constant have to agree
+/// by arithmetic rather than by both being edited together.
+///
+/// Its derivation is Plan 0127's mode-6 capture: `0.316` frame heights peak to
+/// peak over a `0.0019` stroke, against the source's `0.125` frame heights per
+/// unit sample.
+const HOST_FACTOR: f32 = ((0.316 - 0.0019) / 2.0) / 0.125;
+
+/// Every producer but the waveform silenced, at a given mode and scale.
+fn figure_outputs(mode: f32, scale: f32, mystery: f32) -> FrameOutputs {
+    FrameOutputs {
+        wave_a: 1.0,
+        wave_mode: mode,
+        wave_scale: scale,
+        wave_mystery: mystery,
+        // A running average along the trace would flatten exactly the excursion
+        // the amplitude assertions measure.
+        wave_smoothing: 0.0,
+        mv_a: 0.0,
+        ob_a: 0.0,
+        ib_a: 0.0,
+        ..Default::default()
+    }
+}
+
+/// The waveform layer for one set of outputs, at `time`, over `pair`.
+fn figure_at(out: &FrameOutputs, pair: &[[f32; WAVE_SAMPLES]; 2], time: f32) -> draw::DrawGeometry {
+    let mut runtime = MilkRuntime::new(
+        MilkBundle::from_assembly(None, None, None).expect("the empty bundle decodes"),
+        0,
+    );
+    let mut geometry = draw::DrawGeometry::default();
+    draw::build(
+        &mut geometry,
+        Some(&mut runtime),
+        out,
+        pair,
+        time,
+        1.0 / 30.0,
+        16.0 / 9.0,
+        DRAW_WIDTH,
+    );
+    geometry
+}
+
+/// A square wave at the given half-period, so the trace reaches `+/-1` and holds
+/// there — the excursion assertions want full scale at the points they read, not
+/// a sine that happens to be near a zero crossing.
+fn square(half_period: usize) -> [f32; WAVE_SAMPLES] {
+    std::array::from_fn(|i| {
+        if (i / half_period.max(1)).is_multiple_of(2) {
+            1.0
+        } else {
+            -1.0
+        }
+    })
+}
+
+/// The figure's own constructed points, recovered from the emitted segments.
+///
+/// [`smooth_wave`](rlx_core::render::scenes::warp_mesh::draw) keeps every
+/// constructed point at an **even** index of the smoothed run, so reading the
+/// even ones is reading the figure the mode built rather than the curve through
+/// it. The segment list is that run as consecutive pairs, so its `a` endpoints
+/// are the run minus its last point and the final `b` closes it.
+fn smoothed_run(geometry: &draw::DrawGeometry) -> Vec<[f32; 2]> {
+    let mut points: Vec<[f32; 2]> = geometry.segments.iter().map(|s| s.a).collect();
+    if let Some(last) = geometry.segments.last() {
+        points.push(last.b);
+    }
+    points
+}
+
+/// How far a figure departs from a straight line: the smaller principal spread of
+/// its points, in world units.
+///
+/// Exactly `0` for any set of points on a line, whatever the line's slope, and it
+/// grows with the figure's thinnest width. **Enclosed area would not do**: a
+/// Lissajous of two odd harmonics is symmetric about both axes, so its signed
+/// area is zero while the figure is plainly two-dimensional.
+fn cross_line_spread(points: &[[f32; 2]]) -> f64 {
+    let n = points.len() as f64;
+    if n < 3.0 {
+        return 0.0;
+    }
+    let (mut mx, mut my) = (0.0f64, 0.0f64);
+    for p in points {
+        mx += f64::from(p[0]);
+        my += f64::from(p[1]);
+    }
+    mx /= n;
+    my /= n;
+    let (mut sxx, mut sxy, mut syy) = (0.0f64, 0.0f64, 0.0f64);
+    for p in points {
+        let (dx, dy) = (f64::from(p[0]) - mx, f64::from(p[1]) - my);
+        sxx += dx * dx;
+        sxy += dx * dy;
+        syy += dy * dy;
+    }
+    let (sxx, sxy, syy) = (sxx / n, sxy / n, syy / n);
+    let mean = (sxx + syy) * 0.5;
+    let gap = (((sxx - syy) * 0.5).powi(2) + sxy * sxy).sqrt();
+    (mean - gap).max(0.0).sqrt()
+}
+
+/// **Mode 6 draws the host's amplitude** — ADR-0199's one measured mode, and the
+/// only place `k` is a reading rather than an inference.
+///
+/// At `wave_scale = 1` on a full-scale trace the source's `0.25` clip along the
+/// line's normal is `0.125` frame heights per unit sample, so the figure spans
+/// `2 * 0.125 * k` frame heights peak to peak — which on `k`'s own derivation is
+/// Plan 0127's host reading of `0.316`, less the stroke width the host's own
+/// capture included.
+///
+/// Measured over the **even** indices, which are the points mode 6 constructed:
+/// `SmoothWave`'s inserted midpoints undershoot a square wave's corners, so
+/// including them would read the smoother rather than the figure. World y is in
+/// half-frame-heights, hence the `0.5`.
+#[test]
+fn mode_six_draws_the_hosts_peak_to_peak_amplitude() {
+    let trace = square(64);
+    let geometry = figure_at(&figure_outputs(6.0, 1.0, 0.0), &[trace, trace], 0.0);
+    let run = smoothed_run(&geometry);
+    assert!(run.len() > 16, "mode 6 drew {} points", run.len());
+
+    let constructed: Vec<f32> = run.iter().step_by(2).map(|p| p[1]).collect();
+    let lo = constructed.iter().copied().fold(f32::INFINITY, f32::min);
+    let hi = constructed
+        .iter()
+        .copied()
+        .fold(f32::NEG_INFINITY, f32::max);
+    let frame_heights = (hi - lo) * 0.5;
+    let want = 2.0 * 0.125 * HOST_FACTOR;
+    assert!(
+        (frame_heights - want).abs() < 0.005,
+        "mode 6 spans {frame_heights:.4} frame heights peak to peak, want {want:.4}"
+    );
+}
+
+/// **Mode 0's radius is the source's, and the figure turns at the source's
+/// rate** — `milkdropfs.cpp` l.2886-2925.
+///
+/// Three claims, each of them arithmetic rather than a capture:
+///
+/// - at a **zero** sample the radius is the source's base `0.5` clip, which is
+///   `0.25` frame heights;
+/// - it changes by `k` times the source's `0.4` clip per unit sample;
+/// - between two times it has turned by `0.2` rad times their difference.
+#[test]
+fn mode_zero_has_the_sources_radius_and_turn_rate() {
+    let silent = [0.0f32; WAVE_SAMPLES];
+    let radius = |pair: &[[f32; WAVE_SAMPLES]; 2]| -> f32 {
+        let geometry = figure_at(&figure_outputs(0.0, 1.0, 0.0), pair, 0.0);
+        let run = smoothed_run(&geometry);
+        // World y is in half-frame-heights and carries no aspect term, so the
+        // circle's vertical extent is twice its radius in those units.
+        let ys: Vec<f32> = run.iter().map(|p| p[1]).collect();
+        let lo = ys.iter().copied().fold(f32::INFINITY, f32::min);
+        let hi = ys.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        (hi - lo) * 0.5
+    };
+
+    // The source's base: 0.5 clip is 0.25 frame heights, and the circle's height
+    // is twice that.
+    let base = radius(&[silent, silent]);
+    assert!(
+        (base - 0.5).abs() < 0.01,
+        "a silent mode-0 circle has height {base:.4} frame heights, want 0.5"
+    );
+
+    // One unit of sample: the trace held at +1 on the channel mode 0 reads.
+    let full = [1.0f32; WAVE_SAMPLES];
+    let driven = radius(&[silent, full]);
+    let per_unit = (driven - base) / 2.0;
+    let want = 0.4 * 0.5 * HOST_FACTOR;
+    assert!(
+        (per_unit - want).abs() < 0.01,
+        "mode 0's radius moved {per_unit:.4} frame heights per unit sample, \
+         want {want:.4}"
+    );
+
+    // And the turn. A quarter turn at 0.2 rad/s is 7.854 s.
+    let turn_of = |time: f32| -> f32 {
+        let geometry = figure_at(&figure_outputs(0.0, 1.0, 0.0), &[silent, full], time);
+        let first = smoothed_run(&geometry).first().copied().unwrap_or([0.0; 2]);
+        // Back out of world space: x carries the aspect, y does not.
+        (first[1]).atan2(first[0] / (16.0 / 9.0))
+    };
+    let dt = std::f32::consts::FRAC_PI_2 / 0.2;
+    let moved = turn_of(dt) - turn_of(0.0);
+    let wrapped = moved.rem_euclid(std::f32::consts::TAU);
+    assert!(
+        (wrapped - std::f32::consts::FRAC_PI_2).abs() < 0.02,
+        "mode 0 turned {wrapped:.4} rad over {dt:.3} s, want a quarter turn at \
+         0.2 rad/s"
+    );
+}
+
+/// **Modes 1 and 5 turn at the source's own rates** — `2.3` rad/s (l.2942) and
+/// `0.3` rad/s (l.3085-3086).
+///
+/// Read as "the same figure, rotated": the geometry a mode builds at `t = 0` is
+/// the geometry it builds one full turn later, and is **not** the geometry at
+/// half a turn. That is the rate stated without having to pick a point out of a
+/// figure whose shape is the audio's.
+#[test]
+fn modes_one_and_five_turn_at_the_sources_rates() {
+    let pair = trace();
+    for (mode, rate) in [(1.0f32, 2.3f32), (5.0, 0.3)] {
+        let out = figure_outputs(mode, 1.0, 0.0);
+        let points = |time: f32| -> Vec<[f32; 2]> { smoothed_run(&figure_at(&out, &pair, time)) };
+        let turn = std::f32::consts::TAU / rate;
+        let at_zero = points(0.0);
+        assert!(!at_zero.is_empty(), "mode {mode} drew nothing");
+
+        let worst = |a: &[[f32; 2]], b: &[[f32; 2]]| -> f32 {
+            a.iter().zip(b).fold(0.0f32, |m, (p, q)| {
+                m.max((p[0] - q[0]).abs().max((p[1] - q[1]).abs()))
+            })
+        };
+        let full = worst(&at_zero, &points(turn));
+        let half = worst(&at_zero, &points(turn * 0.5));
+        assert!(
+            full < 5e-3,
+            "mode {mode} did not come back after one turn at {rate} rad/s: {full}"
+        );
+        assert!(
+            half > 0.05,
+            "mode {mode} is unchanged after half a turn at {rate} rad/s, so the \
+             rate is not observable here: {half}"
+        );
+    }
+}
+
+/// **`SmoothWave` runs on every built-in figure**, `milkdropfs.cpp` l.2549-2577
+/// applied at l.3319-3335.
+///
+/// It inserts one point between each pair, so `n` constructed points become
+/// `2n - 1` and **every original keeps its position at an even index**. Both
+/// halves are asserted: the count, and that the even indices are the figure the
+/// mode built — read by rebuilding the midpoints from the even run and finding
+/// them at the odd ones.
+#[test]
+fn every_built_in_figure_is_smoothed_and_keeps_its_constructed_points() {
+    let pair = trace();
+    for mode in 0..8u32 {
+        let out = figure_outputs(mode as f32, 1.0, 0.25);
+        let geometry = figure_at(&out, &pair, 0.0);
+        let run = smoothed_run(&geometry);
+        assert!(run.len() > 8, "mode {mode} drew {} points", run.len());
+        // Mode 7 is two strokes of equal length emitted one after the other, so
+        // its segment list is two polylines and each is reconstructed on its own.
+        let sides = if mode == 7 { 2usize } else { 1 };
+        let per_stroke = geometry.segments.len() / sides;
+        let stroke: Vec<[f32; 2]> = geometry
+            .segments
+            .get(..per_stroke)
+            .unwrap_or(&[])
+            .iter()
+            .map(|s| s.a)
+            .chain(geometry.segments.get(per_stroke - 1).map(|s| s.b))
+            .collect();
+        let per_side = stroke.len();
+        assert_eq!(
+            per_side % 2,
+            1,
+            "mode {mode}: a smoothed figure has an ODD point count (2n - 1), got \
+             {per_side} per side of {sides}"
+        );
+
+        let side = stroke.as_slice();
+        let constructed: Vec<[f32; 2]> = side.iter().step_by(2).copied().collect();
+        assert_eq!(
+            constructed.len() * 2 - 1,
+            per_side,
+            "mode {mode}: {} constructed points must smooth to {per_side}",
+            constructed.len()
+        );
+        let at = |i: isize| -> [f32; 2] {
+            let c = i.clamp(0, constructed.len() as isize - 1) as usize;
+            constructed.get(c).copied().unwrap_or([0.0; 2])
+        };
+        for i in 0..constructed.len().saturating_sub(1) {
+            let (a, b, c, d) = (
+                at(i as isize - 1),
+                at(i as isize),
+                at(i as isize + 1),
+                at(i as isize + 2),
+            );
+            let want = [
+                (-0.15 * a[0] + 1.15 * b[0] + 1.15 * c[0] - 0.15 * d[0]) * 0.5,
+                (-0.15 * a[1] + 1.15 * b[1] + 1.15 * c[1] - 0.15 * d[1]) * 0.5,
+            ];
+            let got = side.get(2 * i + 1).copied().unwrap_or([0.0; 2]);
+            assert!(
+                (got[0] - want[0]).abs() < 1e-4 && (got[1] - want[1]).abs() < 1e-4,
+                "mode {mode}: the point between constructed {i} and {} is \
+                 {got:?}, not the source's midpoint {want:?}",
+                i + 1
+            );
+        }
+    }
+}
+
+/// **The two-channel modes read two channels** — the half of ADR-0199 the
+/// analyzer's pair exists for.
+///
+/// A left-only trace collapses modes 2 and 3 to a line along one axis, because
+/// their x comes from the right channel and their y from the left — that arm is
+/// the one that cannot pass without two channels reaching the figure.
+///
+/// The other arm is that a real pair draws a figure with width. **One trace in
+/// both slots would also draw one**, and that is not a flaw in the test: the
+/// source reads the two channels at a 32-sample offset from each other
+/// (`milkdropfs.cpp` l.2950-2976), so even one trace against a delayed copy of
+/// itself is a figure. The channel difference shows in the left-only arm.
+#[test]
+fn the_two_channel_modes_read_both_channels() {
+    let tone = square(64);
+    let silent = [0.0f32; WAVE_SAMPLES];
+    for mode in [2.0f32, 3.0] {
+        let out = figure_outputs(mode, 1.0, 0.0);
+
+        let left_only = smoothed_run(&figure_at(&out, &[tone, silent], 0.0));
+        let xs = left_only.iter().map(|p| p[0]);
+        let span_x =
+            xs.clone().fold(f32::NEG_INFINITY, f32::max) - xs.fold(f32::INFINITY, f32::min);
+        let ys = left_only.iter().map(|p| p[1]);
+        let span_y =
+            ys.clone().fold(f32::NEG_INFINITY, f32::max) - ys.fold(f32::INFINITY, f32::min);
+        assert!(
+            span_x < 1e-4 && span_y > 0.1,
+            "mode {mode} on a left-only trace must collapse to a vertical line, \
+             got {span_x:.4} by {span_y:.4}"
+        );
+
+        // A pair that differs draws a figure that is not a line.
+        let pair = trace();
+        let run = smoothed_run(&figure_at(&out, &pair, 0.0));
+        let spread = cross_line_spread(&run);
+        assert!(
+            spread > 0.02,
+            "mode {mode} on a pair whose channels differ has cross-line spread \
+             {spread:.6}, so it is still drawing one trace against itself"
+        );
+    }
+}
+
+/// A custom wave that plots MilkDrop's `value1` against `value2` — the Lissajous
+/// idiom, and the one figure a mono analysis could never draw.
+const LISSAJOUS_PRESET: &str = "\
+[preset00]
+fRating=3.000
+nMotionVectorsX=0.000
+nMotionVectorsY=0.000
+fWaveAlpha=0.000
+wavecode_0_enabled=1
+wavecode_0_samples=64
+wavecode_0_bUseDots=0
+wavecode_0_bDrawThick=0
+wavecode_0_bAdditive=1
+wavecode_0_a=1.000
+wave_0_per_point1=x = 0.5 + value1 * 0.3;
+wave_0_per_point2=y = 0.5 + value2 * 0.3;
+";
+
+/// **A custom wave plotting `value1` against `value2` draws a real figure.**
+///
+/// This is the fidelity loss ADR-0199 exists to close, read from the other end:
+/// while both registers carried the same number, the idiom drew a diagonal line
+/// through the origin and nothing else. With the analyzer's pair behind them, two
+/// channels at different frequencies enclose area.
+///
+/// Asserted as [`cross_line_spread`] rather than as a shape: it is exactly zero
+/// for any set of points on a line, whatever the line's slope, so it separates
+/// the two cases without asserting what the figure looks like.
+#[test]
+fn a_custom_wave_plots_one_channel_against_the_other() {
+    let file = milkconv::milk::parse(LISSAJOUS_PRESET).expect("the fixture parses");
+    let converted = milkconv::convert::convert(&file, "lissajous_fixture").expect("it converts");
+    let preset = Preset::from_toml_str(&converted.toml)
+        .unwrap_or_else(|e| panic!("the emitted bundle must load back: {e}"));
+    let bundle = match preset.config {
+        Some(GeneratorConfig::WarpMesh {
+            milk: Some(milk), ..
+        }) => *milk,
+        other => panic!("the converted preset must carry a bundle, got {other:?}"),
+    };
+    assert_eq!(bundle.waves.len(), 1, "the one enabled wave must survive");
+
+    let spread = |pair: &[[f32; WAVE_SAMPLES]; 2]| -> f64 {
+        let mut runtime = MilkRuntime::new(bundle.clone(), 0);
+        let mut geometry = draw::DrawGeometry::default();
+        draw::build(
+            &mut geometry,
+            Some(&mut runtime),
+            &FrameOutputs {
+                // The built-in figure off, so every segment is the custom wave's.
+                wave_a: 0.0,
+                // The trace reaches the per-point program through the same
+                // smoothed, scaled pair the built-in figures read, so the
+                // default 0.75 running average would flatten the very channel
+                // difference this is about.
+                wave_smoothing: 0.0,
+                wave_scale: 1.0,
+                mv_a: 0.0,
+                ob_a: 0.0,
+                ib_a: 0.0,
+                ..Default::default()
+            },
+            pair,
+            0.0,
+            1.0 / 30.0,
+            16.0 / 9.0,
+            DRAW_WIDTH,
+        );
+        assert!(
+            !geometry.segments.is_empty(),
+            "the custom wave drew nothing, so nothing here is a test of it"
+        );
+        let points: Vec<[f32; 2]> = geometry
+            .segments
+            .iter()
+            .map(|s| s.a)
+            .chain(geometry.segments.last().map(|s| s.b))
+            .collect();
+        cross_line_spread(&points)
+    };
+
+    let mono = trace()[0];
+    let degenerate = spread(&[mono, mono]);
+    assert!(
+        degenerate < 1e-4,
+        "one trace in both slots must still draw a line: {degenerate:.6}"
+    );
+    let real = spread(&trace());
+    assert!(
+        real > 0.05,
+        "a pair whose channels differ must draw a figure with width, got \
+         {real:.6} against the mono stand-in's {degenerate:.6}"
     );
 }

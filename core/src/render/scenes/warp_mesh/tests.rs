@@ -368,11 +368,23 @@ fn bare_runtime() -> crate::milk::MilkRuntime {
 
 /// A waveform trace with structure in it — a sine, so every `wave_mode` has
 /// something to shape and none of them collapses to a straight line.
-fn trace() -> [f32; crate::dsp::WAVE_SAMPLES] {
-    std::array::from_fn(|i| {
-        (i as f32 / crate::dsp::WAVE_SAMPLES as f32 * std::f32::consts::TAU * 3.0).sin()
-    })
+fn trace() -> [[f32; crate::dsp::WAVE_SAMPLES]; 2] {
+    [
+        std::array::from_fn(|i| {
+            (i as f32 / crate::dsp::WAVE_SAMPLES as f32 * std::f32::consts::TAU * 3.0).sin()
+        }),
+        // A different frequency on the second channel, so the modes that plot one
+        // against the other draw a figure with area rather than a diagonal line.
+        std::array::from_fn(|i| {
+            (i as f32 / crate::dsp::WAVE_SAMPLES as f32 * std::f32::consts::TAU * 5.0).sin()
+        }),
+    ]
 }
+
+/// The target width the draw-layer probes build at. Wide enough that the source's
+/// `min(n, texW/3)` point counts are the full `480` and `240` rather than a
+/// width-dependent number.
+const DRAW_WIDTH: u32 = 1920;
 
 /// The outputs a preset that draws only its waveform leaves — everything else
 /// off, so each test isolates the producer it is about.
@@ -391,27 +403,28 @@ fn waveform_only() -> crate::milk::outputs::FrameOutputs {
     }
 }
 
-/// **Each of the eight `wave_mode` figures is a different figure** — Phase 4's
-/// first done-when.
+/// **Every `wave_mode` figure is a different figure, except the one pair the
+/// source itself draws twice.**
 ///
 /// Compared as geometry: two modes are distinguishable when the point sets they
-/// build differ, and `WAVE_MODES` of them must be pairwise distinct. Asserting
-/// *pairwise* rather than "all eight differ from mode 0" is the whole content —
-/// the reference's modes 6 and 7 share a construction and modes 0 and 1 do too,
-/// so a lazier check passes while two modes render identically.
+/// build differ. Asserting *pairwise* rather than "all seven differ from mode 0"
+/// is the whole content — a lazier check passes while two modes render
+/// identically.
+///
+/// **Modes 2 and 3 are exempt, and that exemption is the source's.**
+/// `CPlugin::DrawWave` builds mode 3's geometry line for line as mode 2's
+/// (`milkdropfs.cpp` l.2977-3004 against l.2950-2976); the two differ in the
+/// alpha they draw at (l.2982-2991) and in nothing else. Distinctness there would
+/// have to be invented, and per-mode alpha is not in this file. Every other pair
+/// still has to differ.
 ///
 /// The comparison is on the endpoints alone. Colour and width are the same for
 /// every mode under one set of outputs, so including them would let a mode pass
-/// by being differently *coloured*, which is not what the done-when asks.
+/// by being differently *coloured*.
 ///
-/// **Modes 6 and 7 are built at a non-zero `wave_mystery`, and that is not a
-/// concession to make the test pass.** Their construction is *a line at an angle
-/// `wave_mystery` sets*; at angle zero mode 6 is a full-width horizontal trace,
-/// which is what mode 2 is by definition — the two coincide exactly, and
-/// [`mode_6_at_zero_mystery_is_the_mode_2_scope`] pins that rather than leaving
-/// it implicit. Each mode is therefore built with the parameter that makes it
-/// its own figure, which is what "distinct figures" has to mean when no aspect
-/// divide separates this pair (design-backlog 0122).
+/// **Modes 6 and 7 are built at a non-zero `wave_mystery`** because their
+/// construction is *a line at an angle `wave_mystery` sets*, so that is the
+/// parameter that makes each of them its own figure.
 #[test]
 fn every_wave_mode_builds_a_different_figure() {
     let out = waveform_only();
@@ -437,6 +450,7 @@ fn every_wave_mode_builds_a_different_figure() {
             0.0,
             1.0 / 60.0,
             16.0 / 9.0,
+            DRAW_WIDTH,
         );
         assert!(
             !geometry.segments.is_empty(),
@@ -448,31 +462,35 @@ fn every_wave_mode_builds_a_different_figure() {
 
     for (i, (mode_a, a)) in figures.iter().enumerate() {
         for (mode_b, b) in figures.iter().skip(i + 1) {
+            if (*mode_a, *mode_b) == (2, 3) {
+                assert_eq!(
+                    a, b,
+                    "modes 2 and 3 are one construction in the source, so they must \
+                     stay one here rather than drifting apart"
+                );
+                continue;
+            }
             assert_ne!(
                 a, b,
                 "wave_mode {mode_a} and wave_mode {mode_b} build the same figure; \
-                 the eight modes must be distinguishable (Plan 0100 Phase 4)"
+                 every pair but 2/3 must be distinguishable"
             );
         }
     }
 }
 
-/// **At `wave_mystery = 0`, mode 6 IS mode 2** — the same full-width horizontal
-/// trace, point for point.
+/// **At `wave_mystery = 0` mode 6 is a horizontal line, and mode 2 is not.**
 ///
-/// Mode 6 is a line at an angle `wave_mystery` sets, and mode 2 is the
-/// horizontal scope; at angle zero those are one figure, and both are built in
-/// uv across the frame's full width. The engine told them apart until
-/// design-backlog 0122 was fixed, but only because mode 6's x was compressed by
-/// `1/aspect` — a defect, so the separation it bought was not a property to
-/// keep.
-///
-/// Pinned because it is the reason
-/// [`every_wave_mode_builds_a_different_figure`] gives modes 6 and 7 their own
-/// angle: a future change that separates this pair again should have to say so
-/// here, rather than quietly restoring an aspect term.
+/// The two coincided while mode 2 was a horizontal scope of this engine's own.
+/// In the source they are unrelated: mode 2 is an **x-y scope** of the right
+/// channel against the left at a 32-sample offset (`milkdropfs.cpp` l.2950-2976),
+/// and mode 6 is a straight line at `1.57 * wave_mystery` with the left channel
+/// displacing it along its normal (l.3100-3244). At zero mystery that line is
+/// horizontal, which is what this pins — a mode 6 that stopped being straight
+/// there would be a transcription slip, and a mode 2 that became a line again
+/// would be this engine inventing a figure.
 #[test]
-fn mode_6_at_zero_mystery_is_the_mode_2_scope() {
+fn mode_6_at_zero_mystery_is_a_straight_line_and_mode_2_is_a_scope() {
     let waveform = trace();
     let mut runtime = bare_runtime();
     let figure = |mode: f32, runtime: &mut crate::milk::MilkRuntime| {
@@ -490,41 +508,66 @@ fn mode_6_at_zero_mystery_is_the_mode_2_scope() {
             0.0,
             1.0 / 60.0,
             16.0 / 9.0,
+            DRAW_WIDTH,
         );
         geometry
             .segments
             .iter()
-            .map(|s| s.a)
+            .flat_map(|s| [s.a, s.b])
             .collect::<Vec<[f32; 2]>>()
     };
+    // The x span against the y span: a horizontal line is all x and almost no y,
+    // and a scope of two different tones fills both.
+    let extent = |points: &[[f32; 2]]| -> (f32, f32) {
+        let mut lo = [f32::INFINITY; 2];
+        let mut hi = [f32::NEG_INFINITY; 2];
+        for p in points {
+            for axis in 0..2 {
+                lo[axis] = lo[axis].min(p[axis]);
+                hi[axis] = hi[axis].max(p[axis]);
+            }
+        }
+        (hi[0] - lo[0], hi[1] - lo[1])
+    };
+
+    let line = figure(6.0, &mut runtime);
+    assert!(!line.is_empty(), "mode 6 drew nothing");
+    let (lx, ly) = extent(&line);
+    // Wide against tall: the line runs the frame's whole width while its only
+    // vertical extent is the sample displacement along its normal.
+    assert!(
+        lx > 3.0 && lx / ly > 5.0,
+        "mode 6 at zero mystery must be a straight line across the frame, got \
+         {lx:.3} wide by {ly:.3} tall"
+    );
+
     let scope = figure(2.0, &mut runtime);
-    let angled = figure(6.0, &mut runtime);
     assert!(!scope.is_empty(), "mode 2 drew nothing");
-    assert_eq!(
-        scope, angled,
-        "mode 6 at zero mystery must be the mode-2 scope; if these differ, an \
-         aspect term has come back into one of them"
+    let (sx, sy) = extent(&scope);
+    assert!(
+        sy > 0.5 && sx < lx,
+        "mode 2 must be a scope with real extent on both axes, got {sx:.3} by {sy:.3}"
     );
 }
 
-/// **A mode-6 trace spans the frame's full width, at every aspect.**
+/// **A mode-6 trace spans the frame's full width and a little past it, at every
+/// aspect.**
 ///
-/// Modes 6 and 7 lay their points on `t = i/(count-1) - 0.5` in uv, and
-/// [`draw::uv_to_world`] supplies the one aspect term on the way out — so the
-/// world-space length is `2 * aspect`, which is the frame's own width. A second
-/// aspect term at the point would cancel that multiply and leave the length at a
-/// constant `2.0`: the trace would be normalized to the frame's **height**,
-/// covering `1/aspect` of its width — `0.5625` at 16:9, the "roughly the middle
-/// 57 %" a look gate reported against a reference that draws these full-width
-/// (design-backlog 0122).
+/// Modes 6 and 7 run their line from `-3` to `+3` clip along itself and clip it
+/// to `+/-1.1` on each axis (`milkdropfs.cpp` l.3100-3244), with **no aspect term
+/// at either end** — so a horizontal one covers `2.2` clip, and
+/// [`draw::uv_to_world`] supplies the one conversion out, giving `2.2 * aspect`
+/// in world units. An aspect term at the point would cancel that multiply and
+/// leave the length at a constant: the trace would be normalized to the frame's
+/// **height**, covering `1/aspect` of its width — `0.5625` at 16:9, the "roughly
+/// the middle 57 %" a look gate reported (design-backlog 0122).
 ///
 /// On a square target the two readings coincide, which is why nothing caught the
 /// cancelling pair at aspect 1 — the same coincidence ADR-0037 exists for, one
 /// level down. Hence a **property over three aspects** rather than one frozen
 /// number (ADR-0071).
 ///
-/// It is independent of `wave_scale`, which scales only the amplitude term, so a
-/// corrected scale constant neither fixes nor breaks this.
+/// It is independent of `wave_scale`, which scales only the sample term.
 #[test]
 fn a_straight_wave_trace_spans_the_full_width_at_every_aspect() {
     let waveform = trace();
@@ -547,6 +590,7 @@ fn a_straight_wave_trace_spans_the_full_width_at_every_aspect() {
             0.0,
             1.0 / 60.0,
             aspect,
+            DRAW_WIDTH,
         );
         // Both endpoints of every segment: `a` alone misses the trace's final
         // vertex and shortens the span by one fencepost.
@@ -561,18 +605,19 @@ fn a_straight_wave_trace_spans_the_full_width_at_every_aspect() {
         let span = hi - lo;
         // The property, stated directly: the length tracks the target's shape,
         // because `uv_to_world`'s multiply is the only aspect term.
+        let want = 2.2 * aspect;
         assert!(
-            (span - 2.0 * aspect).abs() < 0.02,
+            (span - want).abs() < 0.02,
             "at aspect {aspect} a horizontal mode-6 trace has world length \
-             {span:.4}; it must be the frame's own width, {:.4}",
-            2.0 * aspect
+             {span:.4}; the source's clip box makes it {want:.4}"
         );
-        // ...and the consequence, in the units the defect was reported in.
+        // ...and the consequence, in the units the defect was reported in: it
+        // covers the whole frame width and then some, at every aspect.
         let fraction = span / (2.0 * aspect);
         assert!(
-            (fraction - 1.0).abs() < 0.01,
+            fraction > 1.0,
             "at aspect {aspect} the trace covers {fraction:.4} of the frame width; \
-             the reference draws these full-width at every aspect"
+             the source draws these past both edges at every aspect"
         );
     }
 }
@@ -607,6 +652,7 @@ fn an_unrotated_traces_amplitude_is_the_same_at_every_aspect() {
             0.0,
             1.0 / 60.0,
             aspect,
+            DRAW_WIDTH,
         );
         let ys: Vec<f32> = geometry
             .segments
@@ -655,6 +701,7 @@ fn borders_and_motion_vectors_each_draw_their_own_figure() {
             0.0,
             1.0 / 60.0,
             16.0 / 9.0,
+            DRAW_WIDTH,
         );
         geometry.segments.len()
     };
@@ -745,6 +792,7 @@ fn the_blend_partition_separates_the_two_seams() {
         0.0,
         1.0 / 60.0,
         16.0 / 9.0,
+        DRAW_WIDTH,
     );
     assert_eq!(
         geometry.segments_additive, 0,
@@ -767,6 +815,7 @@ fn the_blend_partition_separates_the_two_seams() {
         0.0,
         1.0 / 60.0,
         16.0 / 9.0,
+        DRAW_WIDTH,
     );
     let border_and_grid = 4 + 4 * 3;
     assert_eq!(
@@ -832,6 +881,7 @@ fn the_over_blend_alpha_is_frame_rate_independent() {
             0.0,
             dt,
             16.0 / 9.0,
+            DRAW_WIDTH,
         );
         geometry.segments.first().map(|s| s.alpha).unwrap_or(0.0)
     };

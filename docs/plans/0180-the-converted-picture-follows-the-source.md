@@ -566,8 +566,8 @@ pub fn run_wave_point(&mut self, index: usize, sample: f32, left: f32, right: f3
 | 2 — The comp stage gets the source's polar pair | dev | done | `707a0bb` |
 | 3 — The per-vertex program gets the source's `x`/`y` | dev | done | `0d7266a` |
 | 4 — The seam is found | dev | done | `1fc0dfa` |
-| 5 — The analyzer publishes a left/right pair | dev | done | committed with this row |
-| 6 — The waveform draws the source's eight figures | dev | not started | |
+| 5 — The analyzer publishes a left/right pair | dev | done | `5092b62` |
+| 6 — The waveform draws the source's eight figures | dev | done | committed with this row |
 
 ### Phase 1 — the source read
 
@@ -834,6 +834,82 @@ and `core/tests/suite/preset.rs`'s frame literal).
 **A finding for the plan's `k`, not acted on here.** `waveform_pair_gain` is a second divisor with
 its own history, so on a panned signal the pair and the mono trace are levelled differently.
 Phase 6's `k` is derived against the mono trace's scale.
+
+### Phase 6 — the eight figures
+
+**The bless, under the Decision's restore step.** Before it, with the figures already rebuilt, the
+golden run read:
+
+| baseline | mean | outlier |
+|---|---|---|
+| `warp_mesh_milk` | `0.0811` | 230 |
+| `warp_mesh` (native) | `0.0002` | 2 |
+| `warp_mesh_shader` | `0.0000` | 1 |
+| `warp_mesh_stroke` | `0.0003` | 2 |
+| `composite_warp_fisheye`, `_ripple`, `_swirl` | `0.0000` | 0 |
+| `backdrop_band`, `backdrop_ramp` | `0.0005` | 2 |
+| `shape_collage`, `shape_field` | `0.0007` | 1 |
+| `shape_collage_roster` | `0.0013` | 1 |
+
+`RLX_BLESS=1` rewrote 28 baselines; `git restore` put back the eight it had no cause to move; the
+unblessed run then passed with `warp_mesh_milk` at `0.0000` / 0 and every other reading where it was.
+`git status --short core/tests/golden/` lists `warp_mesh_milk.png` and nothing else.
+
+**`warp_mesh_stroke` draws a built-in figure and did not move**, which is worth naming rather than
+leaving as a green line: its bundle sets `wave_mode = 2`, and mode 2 went from a full-width horizontal
+scope to the source's x-y figure about the centre. The reading says no pixel of that baseline moved by
+more than 2 codes, so whatever the fixture's waveform contributes is below the guard's resolution
+there. Not chased further.
+
+**Where Phase 1's table is not complete, and what I did instead.** Two details the table records by
+name but not by expression:
+
+- **The `wave_mystery` fold** (l.2869-2877, modes 0, 1 and 4). The table says "folded into `-1..1`",
+  so `fold_mystery` wraps with `m - 2 * floor((m + 1) / 2)`. A *clamp* would read the same for every
+  value the corpus writes and differently outside `-3..3`.
+- **Mode 4's momentum** (`v = v*w2 + w1*(2v[i-1] - v[i-2])`). The table does not say which series `v`
+  is, so it is applied to **both** the x and the y sample offsets, in place, after they are built.
+
+**`k` is one constant, `HOST_SAMPLE_FACTOR = 1.256`,** multiplying the sample term and nothing else.
+Mode 5's figure is a **product of two samples**, so it carries the factor twice — which is what
+"one factor on the sample term" gives when the term is quadratic, and is stated here rather than
+discovered. Modes 2 and 3 coincide line for line, so
+`every_wave_mode_builds_a_different_figure` now asserts those two are **equal** and every other pair
+distinct, with the source lines named.
+
+**Two tests changed their claim, both because the source disagrees with what they pinned.**
+
+- `mode_6_at_zero_mystery_is_the_mode_2_scope` is retired. It held that the two coincide at zero
+  mystery, which was true while mode 2 was a horizontal scope of this engine's own; in the source they
+  are unrelated. Replaced by `mode_6_at_zero_mystery_is_a_straight_line_and_mode_2_is_a_scope`, which
+  pins the same tripwire (an aspect term coming back into mode 6) from the property that still holds.
+- `a_straight_wave_trace_spans_the_full_width_at_every_aspect` now reads `2.2 * aspect` rather than
+  `2 * aspect`: the source runs the line `-3..3` along itself and clips it to `+/-1.1` on each axis, so
+  it runs past both edges. The design-backlog 0122 property it exists for — the length tracks the
+  target's shape — is unchanged.
+
+**Deviations from the phase's file list.**
+
+- `core/src/render/scenes/warp_mesh/encode.rs` gained one argument at the `draw::build` call site.
+  The source's point counts for modes 4, 6 and 7 are `min(n, texW / 3)`, so the figure needs the
+  target's width; `encode_draw_layer` passes `res.size.0`.
+- `docs/milkdrop-conversion.md` gained **one correction outside the two sentences the phase names**:
+  its *"the scene's deposit stays off"* claim is what Phase 4 measured and found false, and leaving a
+  reader document asserting it seemed worse than the edit. The note says what is actually true, names
+  Phase 4 and says the repair is Plan 0142's.
+- `core/src/render/scenes/warp_mesh/draw.rs`'s `build` doc and
+  `milkconv/tests/draw_layer.rs`'s `a_mode_six_figure_is_oriented_by_mystery_alone` doc both claimed
+  the draw layer reads no clock at all. Narrowed to modes 2, 3, 4, 6 and 7, with the three source
+  lines that put `time` back.
+
+**What custom waves did and did not get.** `value1` and `value2` are now the pair's two channels, read
+from the same smoothed, `wave_scale`d traces the built-in figures read — so a per-point program
+plotting one against the other draws a figure with width rather than a diagonal. They are **not**
+smoothed by `SmoothWave` and they do **not** carry `k`, both per the phase's note that a custom wave is
+outside the figure contract.
+
+**The gates.** `node scripts/check-reader-prose.mjs`, `node scripts/check-doc-links.mjs` and
+`node scripts/toc.mjs --check` all exit 0.
 
 ### Notes
 
