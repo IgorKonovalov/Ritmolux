@@ -260,6 +260,7 @@ export function Editor({
           rosters={rostersFor(schema.document, system)}
           bindings={preset.bindings}
           writable={writable}
+          hasDocument={text !== undefined}
           onDrag={onDrag}
           onCommit={onCommit}
         />

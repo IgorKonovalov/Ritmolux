@@ -96,14 +96,38 @@ interface Write {
   how: 'write' | 'create'
 }
 
+type ReadResult =
+  | { ok: false; reason: string }
+  | { ok: true; value: { path: string; text: string } }
+
 interface Fake {
   files: Map<string, string>
   writes: Write[]
+  /** Resolve every read this fake is holding. Inert unless `holdReads` was set. */
+  releaseReads: () => void
 }
 
-/** A filesystem the writes land in, so byte equality can be asserted on it. */
-function install(seed: Record<string, string> = { [SOURCE]: INK }): Fake {
-  const fake: Fake = { files: new Map(Object.entries(seed)), writes: [] }
+/**
+ * A filesystem the writes land in, so byte equality can be asserted on it.
+ *
+ * `holdReads` keeps every `preset.read` pending until the test lets it go, which
+ * is the window the editor renders a schema-generated control in before it knows
+ * the document. Nothing else can reach that window: both loads resolve in the
+ * same microtask drain otherwise, and which of the two lands first is then a
+ * scheduling detail rather than something a test can state.
+ */
+function install(
+  seed: Record<string, string> = { [SOURCE]: INK },
+  { holdReads = false }: { holdReads?: boolean } = {},
+): Fake {
+  const held: (() => void)[] = []
+  const fake: Fake = {
+    files: new Map(Object.entries(seed)),
+    writes: [],
+    releaseReads: () => {
+      for (const resolve of held.splice(0)) resolve()
+    },
+  }
   const api = {
     app: {
       getSchema: () => Promise.resolve({ ok: true as const, document: SCHEMA }),
@@ -112,11 +136,12 @@ function install(seed: Record<string, string> = { [SOURCE]: INK }): Fake {
     preset: {
       read: (path: string) => {
         const text = fake.files.get(path)
-        return Promise.resolve(
+        const result: ReadResult =
           text === undefined
-            ? { ok: false as const, reason: 'no such file' }
-            : { ok: true as const, value: { path, text } },
-        )
+            ? { ok: false, reason: 'no such file' }
+            : { ok: true, value: { path, text } }
+        if (!holdReads) return Promise.resolve(result)
+        return new Promise<ReadResult>((resolve) => held.push(() => resolve(result)))
       },
       write: (path: string, text: string) => {
         fake.writes.push({ path, text, how: 'write' })
@@ -256,6 +281,34 @@ describe('a gesture against a preset the session has not forked', () => {
     // one name.
     expect(fake.writes[0].text).toContain('name   = "ink copy"')
     expect(fake.files.get(SOURCE)).toBe(INK)
+  })
+})
+
+describe('a gesture made before the preset file has arrived', () => {
+  it('finds an inert control rather than one that discards it', async () => {
+    const fake = install(undefined, { holdReads: true })
+    editor()
+
+    // The rows are generated from the schema, so the slider is on screen well
+    // before the document behind it is. It must not accept a gesture there: the
+    // value it is showing is the engine default, and `writable` is still false,
+    // so the release would be dropped with nothing said (backlog 0238).
+    const early = (await screen.findByLabelText('warp')) as HTMLInputElement
+    expect(early.disabled).toBe(true)
+
+    fireEvent.change(early, { target: { value: '0.9' } })
+    fireEvent.pointerUp(early)
+    expect(screen.queryByLabelText('save a copy as')).toBeNull()
+    expect(fake.writes).toHaveLength(0)
+
+    // And the same control is live the moment the read lands.
+    fake.releaseReads()
+    await presetLoaded()
+    const armed = (await screen.findByLabelText('warp')) as HTMLInputElement
+    expect(armed.disabled).toBe(false)
+    fireEvent.change(armed, { target: { value: '0.9' } })
+    fireEvent.pointerUp(armed)
+    await screen.findByLabelText('save a copy as')
   })
 })
 

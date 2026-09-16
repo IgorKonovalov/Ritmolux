@@ -20,6 +20,8 @@ export interface ParamPanelProps {
   rosters: ParamRoster[]
   bindings: Binding[]
   writable: boolean
+  /** False while the preset document is unknown — see `ParamRow`. */
+  hasDocument: boolean
   onDrag: (name: string, value: number) => void
   onCommit: (name: string, value: number) => void
 }
@@ -28,6 +30,7 @@ export function ParamPanel({
   rosters,
   bindings,
   writable,
+  hasDocument,
   onDrag,
   onCommit,
 }: ParamPanelProps): JSX.Element {
@@ -44,6 +47,7 @@ export function ParamPanel({
               spec={spec}
               binding={bound.get(spec.name)}
               writable={writable}
+              hasDocument={hasDocument}
               onDrag={onDrag}
               onCommit={onCommit}
             />

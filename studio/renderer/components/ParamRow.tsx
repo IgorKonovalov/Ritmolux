@@ -38,6 +38,17 @@ export interface ParamRowProps {
    * nothing, which is what an embedded preset can honestly offer.
    */
   writable: boolean
+  /**
+   * False until the preset document is known — while its file is being read,
+   * and when there is none to read.
+   *
+   * Distinct from `writable`, which says where a release *lands*. Without a
+   * document there is nothing to land in and nothing to move away from: the row
+   * is showing the engine's default rather than this preset's value, so a drag
+   * would report a number the preset does not hold and the release would be
+   * discarded in silence. The control is inert instead (backlog 0238).
+   */
+  hasDocument: boolean
   onDrag: (name: string, value: number) => void
   onCommit: (name: string, value: number) => void
 }
@@ -63,6 +74,7 @@ export function ParamRow({
   spec,
   binding,
   writable,
+  hasDocument,
   onDrag,
   onCommit,
 }: ParamRowProps): JSX.Element {
@@ -93,11 +105,15 @@ export function ParamRow({
     )
   }
 
+  // `hasDocument` gates both halves of the gesture, because without one there is
+  // nothing to move away from and nothing for a release to land in. `disabled`
+  // below states that in the DOM; these guards hold it whatever dispatched the
+  // event.
   const commit = (): void => {
-    if (writable) onCommit(spec.name, value)
+    if (hasDocument && writable) onCommit(spec.name, value)
   }
   const move = (raw: number): void => {
-    if (!Number.isFinite(raw)) return
+    if (!hasDocument || !Number.isFinite(raw)) return
     const next = quantize(spec, raw)
     setValue(next)
     onDrag(spec.name, next)
@@ -127,6 +143,7 @@ export function ParamRow({
           ? { step: spec.kind === 'structural' ? 1 : 'any' }
           : { min: lo, max: hi, step })}
         value={value}
+        disabled={!hasDocument}
         onChange={(event) => move(event.currentTarget.valueAsNumber)}
         // A gesture ends with a pointer release, a key release or the control
         // losing focus; each is one write and none of them fires per step.

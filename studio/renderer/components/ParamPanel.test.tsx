@@ -48,6 +48,7 @@ function panel(overrides: Partial<Parameters<typeof ParamPanel>[0]> = {}) {
       rosters={ROSTERS}
       bindings={BINDINGS}
       writable
+      hasDocument
       onDrag={onDrag}
       onCommit={onCommit}
       {...overrides}
@@ -93,6 +94,22 @@ describe('a drag', () => {
     // that is the honest offer — a disabled slider would say the parameter
     // cannot move, which is false.
     expect(onDrag).toHaveBeenCalledWith('warp', 1.1)
+    expect(onCommit).not.toHaveBeenCalled()
+  })
+
+  it('is inert while the preset document is still unknown', () => {
+    const { onDrag, onCommit } = panel({ hasDocument: false })
+    const slider = screen.getByLabelText('warp')
+
+    // Not the same state as the row above. There the preset is known and has
+    // nowhere to be written; here it is not known at all, so the row is showing
+    // the engine default rather than this preset's value. Dragging would report
+    // a number the preset does not hold, and the release would be discarded.
+    expect((slider as HTMLInputElement).disabled).toBe(true)
+
+    fireEvent.change(slider, { target: { value: '1.1' } })
+    fireEvent.pointerUp(slider)
+    expect(onDrag).not.toHaveBeenCalled()
     expect(onCommit).not.toHaveBeenCalled()
   })
 })

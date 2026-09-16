@@ -19,7 +19,8 @@
   accent-color: var(--accent);
 }
 
-.slider:disabled {
+.slider:disabled,
+.field:disabled {
   opacity: 0.4;
 }
 
