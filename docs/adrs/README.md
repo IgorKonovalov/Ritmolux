@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0212.** *(0200 is reserved for [Plan 0186](../plans/0186-the-flatness-gate-tells-a-figure-from-its-ground.md) Phase 2, which writes it whichever way its stop gate falls.)* *(0120 was reserved for
+**Next free number: 0213.** *(0200 is reserved for [Plan 0186](../plans/0186-the-flatness-gate-tells-a-figure-from-its-ground.md) Phase 2, which writes it whichever way its stop gate falls.)* *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -232,4 +232,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0209](0209-a-conductor-close-repairs-the-prose-and-comments-its-findings-name.md) | A conductor close repairs the prose and comments its findings name | accepted 2026-09-16 (Plan 0189), amends 0205, Outcome; superseded in part by 0210 |
 | [0210](0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md) | A `.claude/` repair is the owner's, and a session that needs one parks with the edit | accepted 2026-09-16 (Plan 0190), supersedes 0209 in part |
 | [0211](0211-a-green-suite-record-serves-a-later-tree-when-no-deferred-suite-can-read-the-diff.md) | A green suite record serves a later tree when no deferred suite can read the diff | accepted 2026-09-16 (Plan 0191), amends 0207 |
+| [0212](0212-a-converted-preset-gets-its-own-vertex-module-and-the-pipeline-is-chosen-not-branched.md) | A converted preset gets its own vertex module, and the pipeline is chosen rather than branched | proposed (Plan 0180) |
 <!-- roster:end -->

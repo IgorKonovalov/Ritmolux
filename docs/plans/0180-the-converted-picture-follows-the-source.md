@@ -279,15 +279,39 @@ Rejected:
 ### Phase 3 — The per-vertex program gets the source's `x`/`y`, and the warp chain its space
 - **Owner skill:** dev
 - **What:** `MilkRuntime::run_vertex` hands the program `x`/`y` aspect-corrected as the source does,
-  from the render target's aspect (ADR-0037). `vs_main` runs the four stages Phase 1 named in the
-  source's space for converted presets, as `### The warp chain's space` above specifies. Native
-  presets are unchanged.
-- **Files touched:** `core/src/milk/mod.rs` (`run_vertex` and its doc); tests in
-  `core/src/milk/tests.rs`; `core/src/render/scenes/warp_mesh/shaders.rs` (`vs_main`, and the `Warp`
-  struct's lane comment); `core/src/render/scenes/warp_mesh/encode.rs` (`upload_uniforms`, the flag);
+  from the render target's aspect (ADR-0037). The four stages Phase 1 named run in the source's space
+  for converted presets, as `### The warp chain's space` above specifies. Native presets are
+  unchanged.
+- **Amended 2026-09-16 — how a converted preset gets different arithmetic is
+  [ADR-0212](../adrs/0212-a-converted-preset-gets-its-own-vertex-module-and-the-pipeline-is-chosen-not-branched.md),
+  and it is not the uniform flag this phase first assumed.** The phase parked `plan_wrong` before
+  writing code because `vs_main` is one stage for native and converted presets alike, so editing it
+  moves `warp_mesh.png` and changes the native vocabulary — both of which this plan rules out. The
+  decision: **one source with two preludes, two modules, and the pipeline chosen per preset.**
+  `WARP_SHADER` keeps its single copy of the stage chain; the four differing stages call
+  `to_space(p, aspect)` / `from_space(p, aspect)`, the identity in the native prelude and the aspect
+  correction in the converted one. `Resources` gains a converted twin of `warp_pipeline` (a converted
+  bundle with no warp shader uses the built-in one), and `MilkShaderResources::build` is handed the
+  other module through the `warp_vs` parameter it already takes. **Nothing branches inside the
+  per-vertex path, and the native variant's WGSL text is byte-identical to today's** — which is what
+  makes "no native golden moves" a property of the construction rather than a measurement to repeat
+  per adapter.
+- **Files touched (amended 2026-09-16 for ADR-0212):** `core/src/milk/mod.rs` (`run_vertex` and its
+  doc); tests in `core/src/milk/tests.rs`; `core/src/render/scenes/warp_mesh/shaders.rs`
+  (`WARP_SHADER`'s two preludes and the stages that call them);
+  `core/src/render/scenes/warp_mesh/resources.rs` (the second module and the converted pipeline);
+  `core/src/render/scenes/warp_mesh/shader.rs` (the `warp_vs` argument at the converted call site);
+  `core/src/render/scenes/warp_mesh/encode.rs` (choosing the pipeline, **not** uploading a flag);
   the warp-chain tests in `core/src/render/scenes/warp_mesh/tests.rs`; the converted baselines
   `warp_mesh_milk.png`, `warp_mesh_stroke.png` and `warp_mesh_shader.png`, each only if it moves.
 - **Notes for the implementer:**
+  - **The park's other two items are already discharged, so ADR-0212 is the last of it.** Phase 6's
+    `time` claim was corrected on 2026-09-15 — modes 0, 1 and 5 all read it, and the phase says so.
+    And the restore this session could not run is available again: `git restore <path>` and
+    `git checkout -- <path>` were added to the conductor's allowlist by
+    [Plan 0190](done/0190-the-conductor-survives-a-run-nobody-is-watching.md) Phase 2, which is what
+    the bless rule needs to put a re-encoded baseline back. ADR-0212 also removes the native half of
+    that problem outright: no native baseline is blessed, because none moves.
   - `rad` and `ang` already match the source (Plan 0173). Leave them unchanged, and leave their test
     unchanged.
   - **Read the golden binary between the two halves**, without blessing. Make the inputs change
@@ -323,8 +347,16 @@ Rejected:
       `warp`, and its x displacement is equal.
   - At a square target a converted and a native scene with the same outputs sample the same uv, within
     float rounding.
-  - The native flag is `0.0`: a native scene's uploaded `misc3.y` is asserted, and `warp_mesh.png`
-    and the three `composite_warp_*.png` pass without a bless.
+  - **The native variant's WGSL is byte-identical to the source before this phase**, asserted
+    directly on the string the native module is built from — which is what makes the next bullet
+    structural rather than a measurement. `warp_mesh.png` and the three `composite_warp_*.png` pass
+    without a bless.
+  - A converted scene and a native scene with the same outputs are built from **different** pipelines,
+    asserted at the seam `encode_warp` chooses at, so a future edit that collapses them back to one is
+    a red test rather than a silently wrong picture.
+  - **A stage added to the chain later cannot silently get the native convention on both paths**: the
+    converted scene is rendered at 16:9 and at 4:3 and the four corrected stages are asserted to move
+    with aspect, which a stage written without `to_space`/`from_space` would fail.
   - Only converted baselines move, each named with its cause, under the Decision's restore step.
 
 ### Phase 4 — The seam is found
