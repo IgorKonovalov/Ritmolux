@@ -304,7 +304,7 @@ flowchart LR
 | 2 — The attractor's coefficients join the family table | dev | done | a53adfa |
 | 3 — The schema document carries each family's range | dev | done | d56c35a |
 | 4 — The player reports the family on screen | dev | done | d351ac5 |
-| 5 — The studio's slider reads the family's range | studio-builder | done | committed with this row |
+| 5 — The studio's slider reads the family's range | studio-builder | done | 1732077 |
 
 ### Notes
 
