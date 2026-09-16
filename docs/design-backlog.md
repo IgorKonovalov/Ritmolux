@@ -48,6 +48,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0239 — three per-preset suites are 54 % of the workspace suite and grow with every shipped preset, because each rebuilds its own headless renderer](#0239--three-per-preset-suites-are-54--of-the-workspace-suite-and-grow-with-every-shipped-preset-because-each-rebuilds-its-own-headless-renderer)
 - [0240 — a merged plan never leaves `queue.json`, and the exemption that tolerates it is keyed on a gitignored file](#0240--a-merged-plan-never-leaves-queuejson-and-the-exemption-that-tolerates-it-is-keyed-on-a-gitignored-file)
 - [0241 — the session allowlist is asserted against a model of the CLI's matcher, and the first unattended run falsified the model on a case it asserts](#0241--the-session-allowlist-is-asserted-against-a-model-of-the-clis-matcher-and-the-first-unattended-run-falsified-the-model-on-a-case-it-asserts)
+- [0242 — the conductor's gate skips a check whose precondition a lane never has, and says nothing, while the pre-push hook doing the identical skip prints a notice](#0242--the-conductors-gate-skips-a-check-whose-precondition-a-lane-never-has-and-says-nothing-while-the-pre-push-hook-doing-the-identical-skip-prints-a-notice)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -1983,3 +1984,74 @@ Shapes, none decided:
 cost turns, the sessions recovered, all three phases of 0191 committed. It is filed because the
 negative cases are the ones worth being right about, and the run just demonstrated that the thing
 asserting them can be wrong about a case it states outright.
+
+## 0242 — the conductor's gate skips a check whose precondition a lane never has, and says nothing, while the pre-push hook doing the identical skip prints a notice
+
+`defaultGate()` guards the three studio steps on a path:
+
+```js
+{ name: "studio typecheck", cmd: ["npm", "--prefix", "studio", "run", "typecheck"], onlyIf: "studio/node_modules" },
+{ name: "studio lint",      cmd: [...], onlyIf: "studio/node_modules" },
+{ name: "studio test",      cmd: [...], onlyIf: "studio/node_modules" },
+```
+
+`studio/node_modules/` is gitignored (`.gitignore:115`), so **`git worktree add` never creates it and
+no lane ever has one.** Verified on the live `plan-0191` lane on 2026-09-16: the directory does not
+exist. Every conductor lane therefore runs the gate with all three studio checks skipped, always.
+
+**And the skip leaves no trace.** `runGate` drops the step with a bare `continue` before anything is
+recorded — it is not in `ran`, not in `timed`, and reaches neither `onCommandSkipped` nor the run
+terminal. The only signal is the step count in `gate <stage> checks ok (16, 1m41s)`, and a reader
+would need to know that 19 was the number to expect.
+
+**The repository already solved this one layer up.** `.githooks/pre-push:209-214` guards on the same
+directory and, when it is absent, prints:
+
+```
+pre-push: skipping the studio's typecheck, lint and tests (no studio/node_modules; run: npm --prefix studio ci)
+```
+
+That is [ADR-0016](adrs/0016-gpu-tests-opt-in-ci-scope.md)'s shape — skip, but say so, and name the
+command that would un-skip it. The gate does the same skip and does not.
+
+**Why it matters now rather than in the abstract.**
+[Plan 0179](plans/0179-a-parameters-range-belongs-to-its-family.md) is next in lane `b` after 0191,
+and its Phase 5 is the first `studio-builder` phase ever handed to the conductor. As things stand it
+would run four `dev` phases, hand Phase 5 a session that edits `studio/`, and gate that work with
+**zero** studio checks — typecheck, lint and test all skipped, silently, at both `pre-review` and
+`post-close`. CI has a studio job and would convict after the push, which is the position the
+conductor exists to get ahead of.
+
+`onlyIfCommand` is the same class: the sd-filter step skips when `python3` is not on PATH, equally
+silently. It happens to run on this machine (3.11.9), so only the studio half is live today.
+
+Shapes, none decided:
+
+- **Report the skip, as the hook does.** The cheapest, and it makes the hole visible without deciding
+  anything: one `onCommandSkipped`-style line naming the step and the command that would enable it.
+  It does not make the check run.
+- **Install the lane's dependencies when it opens.** `openLane` runs `npm --prefix <lane>/studio ci`
+  when `studio/` is in the plan's declared files. Makes the check real; costs an install per lane and
+  puts an npm dependency inside worktree creation.
+- **Make it a precondition rather than a guard.** A plan whose phases touch `studio/` fails the
+  preflight unless its lane can run the studio checks — the same shape as the `.claude/` park
+  ([ADR-0210](adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md)),
+  refusing before the work rather than skipping after it.
+
+- **Raised:** 2026-09-16, reading what lane `b` would do after 0191 closes. **Owner if taken:**
+  `architect` (whether a missing precondition is a skip or a refusal), then `dev`.
+- **Verified 2026-09-16** — the gate guards the studio steps on a gitignored path:
+  `present: onlyIf: "studio/node_modules" in: tools/conductor/lib/gate.mjs`
+- **Verified 2026-09-16** — and drops the step before anything records it:
+  `present: if \(c\.onlyIf && !existsSync\(join\(cwd, c\.onlyIf\)\)\) continue; in: tools/conductor/lib/gate.mjs`
+- **Verified 2026-09-16** — while the hook doing the identical skip announces it:
+  `present: skipping the studio's typecheck, lint and tests in: .githooks/pre-push`
+- **Verified 2026-09-16** — the precondition a lane cannot inherit:
+  `present: studio/node_modules/ in: .gitignore`
+
+### Priority
+
+**Medium-high, and time-bounded.** It is inert for a plan that does not touch `studio/`, which is
+every plan the conductor has run so far. 0179 is the first that does, and it is next in the queue —
+so the cheap mitigation (`npm --prefix <lane>/studio ci` once the lane opens) is worth doing by hand
+before this is decided properly.
