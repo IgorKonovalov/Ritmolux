@@ -908,7 +908,9 @@ it and the rest of this skill disagree, it wins for that session only.
    you** like any other open finding. Because you have read the file and composed the fix, write that
    finding so it **names the replacement text** — the owner applies a repair rather than re-deriving
    one. A phase whose files include such a path never reaches a session at all: the conductor parks
-   the plan in front of it. Mark each repaired finding in the `closed` outcome with `"fixed_in": "<sha>"`, the repairing
+   the plan in front of it.
+
+   **Mark each repaired finding in the `closed` outcome with `"fixed_in": "<sha>"`,** the repairing
    commit. The conductor checks that the commit is on the branch and changes that finding's file, and
    parks on disagreement. **A close may correct a fact in any lane's skill material that its plan made
    false, and never changes a rule.** A sample output, a column list, a flag spelling or a count under
