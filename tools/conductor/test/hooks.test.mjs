@@ -14,18 +14,24 @@ import { fileURLToPath } from "node:url";
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const PUSH_HOOK = join(REPO, ".claude", "hooks", "block-push-and-history-rewrite.js");
 const SUITE_HOOK = join(REPO, ".claude", "hooks", "conductor-suite-lock.js");
+const BACKGROUND_HOOK = join(REPO, ".claude", "hooks", "conductor-no-background.js");
 
-function decision(hook, command, env = {}) {
+/** Runs a hook the way the harness does — a child process fed the tool-call JSON on stdin. */
+function decideCall(hook, call, env = {}) {
   const base = { ...process.env };
   delete base.RLX_CONDUCTOR;
   const r = spawnSync(process.execPath, [hook], {
-    input: JSON.stringify({ tool_name: "Bash", tool_input: { command } }),
+    input: JSON.stringify(call),
     env: { ...base, ...env },
     encoding: "utf8",
   });
   assert.equal(r.status, 0, `hook exited ${r.status}: ${r.stderr}`);
   const out = JSON.parse(r.stdout);
   return out.hookSpecificOutput?.permissionDecision ?? "allow";
+}
+
+function decision(hook, command, env = {}) {
+  return decideCall(hook, { tool_name: "Bash", tool_input: { command } }, env);
 }
 
 const PUSH_DENIED = [
@@ -115,6 +121,51 @@ for (const command of SUITE_ALLOWED_UNDER_CONDUCTOR) {
     assert.equal(decision(SUITE_HOOK, command, CONDUCTOR), "allow");
   });
 }
+
+// A conductor session that backgrounds a command and ends its turn loses that work: nothing
+// re-invokes a headless session. The hook is the layer that refuses it before it starts.
+
+const BACKGROUND_CALLS = [
+  { tool_name: "Bash", tool_input: { command: "cargo nextest run --workspace", run_in_background: true } },
+  { tool_name: "PowerShell", tool_input: { command: "npm --prefix studio run build", run_in_background: true } },
+  // The CLI accepts the string form of the flag as well as the boolean.
+  { tool_name: "Bash", tool_input: { command: "node scripts/toc.mjs", run_in_background: "true" } },
+];
+
+const FOREGROUND_CALLS = [
+  { tool_name: "Bash", tool_input: { command: "cargo nextest run --workspace" } },
+  { tool_name: "Bash", tool_input: { command: "cargo nextest run --workspace", run_in_background: false } },
+  { tool_name: "PowerShell", tool_input: { command: "git status" } },
+  // The words in a commit message are not a request to background anything.
+  { tool_name: "Bash", tool_input: { command: 'git commit -m "docs: never run_in_background in a session"' } },
+];
+
+for (const call of BACKGROUND_CALLS) {
+  test(`background hook denies under RLX_CONDUCTOR=1: ${JSON.stringify(call.tool_input.command)}`, () => {
+    assert.equal(decideCall(BACKGROUND_HOOK, call, CONDUCTOR), "deny");
+  });
+  test(`background hook allows it outside the conductor: ${JSON.stringify(call.tool_input.command)}`, () => {
+    assert.equal(decideCall(BACKGROUND_HOOK, call), "allow");
+  });
+}
+
+for (const call of FOREGROUND_CALLS) {
+  test(`background hook allows the foreground call: ${JSON.stringify(call.tool_input.command)}`, () => {
+    assert.equal(decideCall(BACKGROUND_HOOK, call, CONDUCTOR), "allow");
+  });
+}
+
+test("the background hook's denial says why, so the session runs it in the foreground instead", () => {
+  const r = spawnSync(process.execPath, [BACKGROUND_HOOK], {
+    input: JSON.stringify(BACKGROUND_CALLS[0]),
+    env: { ...process.env, ...CONDUCTOR },
+    encoding: "utf8",
+  });
+  const reason = JSON.parse(r.stdout).hookSpecificOutput.permissionDecisionReason;
+  assert.match(reason, /cargo nextest run --workspace/);
+  assert.match(reason, /foreground/);
+  assert.match(reason, /ADR-0205/);
+});
 
 test("the suite hook logs every call to RLX_HOOK_LOG under the conductor, whatever it decides, and nothing outside it", () => {
   const dir = mkdtempSync(join(tmpdir(), "rlx-hooklog-"));

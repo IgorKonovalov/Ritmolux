@@ -910,6 +910,13 @@ it and the rest of this skill disagree, it wins for that session only.
    6 and 7 of the sequence are the conductor's; step 5 is the owner's.
 6. **Park rather than improvise** when the merge conflicts, the gate goes red, or the plan turns out
    wrong — a `parked` outcome with reason `merge_conflict`, `check_red` or `plan_wrong`.
+7. **Never start a command in the background, and never arm a `Monitor`.** Nothing re-invokes a
+   headless session: backgrounding the full suite and ending the turn kills it and loses its result —
+   and by then the close has already committed its repairs, its `done/` move and its version bump, so
+   the plan parks with the tag and `check-release-tag.mjs` still owed. **The suite runs in the
+   foreground and you wait for it**, bounded by the session's own timeout. A hook denies
+   `run_in_background`, `settings.conductor.json` denies `Monitor`, and a background command still
+   unfinished when the session ends parks the plan `lost_background` whatever the outcome claims.
 
 **The last thing you print is one fenced `rlx-outcome` block** holding one JSON object, in the shapes
 the prompt shows: `verdict` (the counts, the review path, and `findings` — **every** finding of the

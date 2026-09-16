@@ -15,6 +15,11 @@ follow it; where it and the rest of the skill disagree, conductor mode wins.
 - Do not restate the plan, do not wait, do not ask. Do not invoke any other skill through the Skill
   tool: the conductor starts the next run itself.
 - Run every `cargo nextest` / `cargo test` as `node "{{with_lock}}" suite -- cargo nextest ...`.
+- **Never start a command in the background and never arm a `Monitor`.** Nothing re-invokes this
+  session: backgrounding a command and ending your turn kills that command and loses its result,
+  after the commits you already made have landed. A long command runs in the foreground, and this
+  session's own timeout is what bounds it. A hook denies `run_in_background`, the settings deny
+  `Monitor`, and a background command left unfinished at the end parks the plan whatever you claim.
 - If the last-run line says `yes`, finish with the close block of the `## Implementation log`,
   committed, and print the outcome instead of the pointer. Do not run the full workspace suite: the
   conductor's `pre-review` gate runs it next on the same tree, so the close block's `Full suite:`

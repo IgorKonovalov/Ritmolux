@@ -206,6 +206,12 @@ mode. Where this section and the rest of the skill disagree, this section wins, 
   refused). `resume` refuses a dirty lane.
 - **Every `cargo nextest` / `cargo test`** — the version test after a sync, a player-side check — runs as
   `node <path from RLX-CONDUCTOR-SUITE-LOCK> suite -- cargo ...`. A hook denies the bare form.
+- **Never start a command in the background, and never arm a `Monitor`.** Nothing re-invokes a headless
+  session: backgrounding a long command — an `npm run build`, a suite — and ending the turn kills it and
+  loses its result, after the commits already made have landed. It runs in the **foreground**, bounded by
+  the session's own timeout. A hook denies `run_in_background`, `settings.conductor.json` denies
+  `Monitor`, and a background command unfinished at the end parks the plan `lost_background` whatever the
+  outcome claims.
 - **On the plan's last implementer run**, write the `## Implementation log` close block the way `dev`'s
   Step 4 does (`.claude/skills/dev/references/close-ceremony-prompt.md` is the field guide), committed,
   **without running the full workspace suite**: its `Full suite:` bullet reads *owed to the conductor's

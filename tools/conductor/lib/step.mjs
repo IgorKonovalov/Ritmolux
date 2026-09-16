@@ -7,6 +7,7 @@
 //   cli_contract    a shell call with no hook log line, or an init not listing the invoked skill
 //   budget          the result event's subtype is error_max_budget_usd
 //   api             no result event, or an error result that is not the budget
+//   lost_background a background command started and still unfinished at the result
 //   no_outcome      a clean result with no rlx-outcome block
 //   bad_outcome     an rlx-outcome block that fails validation, or names another plan
 //   <session's own> the outcome is kind "parked"
@@ -16,7 +17,7 @@ import { appendFileSync, mkdirSync, readFileSync, statSync, writeFileSync } from
 import { dirname } from "node:path";
 import { StringDecoder } from "node:string_decoder";
 
-import { CLI_CONTRACT, parseOutcome, readResult } from "./outcome.mjs";
+import { CLI_CONTRACT, LOST_BACKGROUND, parseOutcome, readResult } from "./outcome.mjs";
 
 /** Sessions currently running in this process, so an interrupt can end them rather than orphan them. */
 export const activeChildren = new Set();
@@ -219,6 +220,16 @@ export function runStep(opts) {
         return park("budget", `spend cap hit: ${r.errors.join("; ") || "error_max_budget_usd"}`);
       }
       if (r.isError) return park("api", `session ended in error (${r.subtype}): ${r.errors.join("; ")}`);
+      // Before any outcome is read: a session that backgrounded a command and reached its result
+      // without that command finishing lost the work, whatever it went on to claim.
+      if (r.backgroundOutstanding.length > 0) {
+        const named = r.backgroundOutstanding.map((b) => `"${b.command}"`).join(", ");
+        return park(
+          LOST_BACKGROUND,
+          `the session started ${r.backgroundOutstanding.length} command(s) in the background and ended ` +
+            `with them unfinished, so the work was killed with the session: ${named}`,
+        );
+      }
       const parsed = parseOutcome(r.text);
       if (!parsed.ok) {
         return park(parsed.error === "no rlx-outcome block" ? "no_outcome" : "bad_outcome", parsed.error);

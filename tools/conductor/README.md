@@ -137,6 +137,7 @@ once, whatever `state/conductor.json` says.
 | `review_failed` | Read the last review under `state/reviews/`. Resuming grants two fresh fix rounds. |
 | `disagreement` | A session's claim and `git` differ. Read the detail and the transcript before trusting the lane. |
 | `cli_contract` | The CLI ran a session without the project hooks, or without loading the skill it invoked. Read the detail and the transcript, then verify the CLI version before resuming (`## When the CLI updates`). |
+| `lost_background` | The session started a command in the background and ended with it unfinished, so that work was killed with the session. Its commits are still in the lane. Read the detail for the command, check what the lane actually contains, then resume: the step runs again from what the plan log and `git` show. |
 | `budget`, `api`, `no_outcome`, `bad_outcome` | Raise the budget in `local.json`, or wait out a usage limit. Resuming re-runs the step from what the plan log and `git` show. |
 | `merge_conflict`, `merge_failed`, `main_dirty` | Resolve it in the lane, or clean the main checkout. A resumed plan goes straight back to the fast-forward. |
 
@@ -161,7 +162,16 @@ an inbox entry, not a park: close the shell, then `git worktree remove`, `git wo
   `reset --hard`, `rebase`, `commit --amend` and `filter-branch` in every session, human-started
   ones included. `.claude/hooks/conductor-suite-lock.js` denies any `nextest` or `cargo test` a
   conductor session runs outside the lock, except `cargo nextest list`, which runs no test and
-  takes no lock even when wrapped.
+  takes no lock even when wrapped. `.claude/hooks/conductor-no-background.js` denies
+  `run_in_background` on a shell call.
+- **No session works in the background.** Nothing re-invokes a `claude -p` session: one that starts
+  a long command in the background and ends its turn exits, the command is killed, and the result is
+  lost — after the commits it already made have landed. Three layers, none sufficient alone: the
+  `prompts/` and each skill's `## Conductor mode` say so, the hook above and the settings' `Monitor`
+  denial refuse it, and a session that reaches its result with a background command still unfinished
+  parks the plan `lost_background` before its outcome is read. The detector reads a result-text shape
+  the CLI owns, so a reworded message would stop it seeing a start — which is why the other two
+  layers exist.
 - **The locks.** `with-lock.mjs` holds two machine-wide locks. The **suite** lock stops two lanes
   running the GPU suites at once. The **close** lock runs from before a review until `main` has
   fast-forwarded, so a version bump and its tag always land on the `main` they were computed against.

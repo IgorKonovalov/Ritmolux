@@ -305,6 +305,12 @@ implementer run.
 - **Every `cargo nextest` or `cargo test` runs through the suite lock**:
   `node <path from RLX-CONDUCTOR-SUITE-LOCK> suite -- cargo nextest run ...`. A hook denies the bare
   form in this mode.
+- **Never start a command in the background, and never arm a `Monitor`.** Nothing re-invokes a
+  headless session: backgrounding a long command and ending the turn kills it and loses its result,
+  after the commits already made have landed. A long command runs in the **foreground** and the
+  session's own timeout is what bounds it. A hook denies `run_in_background`, `settings.conductor.json`
+  denies `Monitor`, and a background command still unfinished when the session ends parks the plan
+  `lost_background` whatever the outcome claims.
 - **On the last implementer run**, do Step 4 **without its step 0**: do not run the full workspace
   suite. The conductor's `pre-review` gate runs it next on the same code, and a red there parks the
   plan as `gate_red` (ADR-0207). Commit the close block, with its `Full suite:` bullet reading

@@ -36,6 +36,12 @@ implementer wrote except what is in the repository. Earlier rounds of this revie
    and the owner the third.
 4. If the merge conflicts or the gate goes red during the close, park; do not work around it.
 
+**Never start a command in the background and never arm a `Monitor`.** Nothing re-invokes this
+session: backgrounding the suite and ending your turn kills it and loses its result, after your close
+commits have landed. The full suite runs in the foreground and you wait for it; this session's own
+timeout is what bounds it. A hook denies `run_in_background`, the settings deny `Monitor`, and a
+background command left unfinished at the end parks the plan whatever you claim.
+
 The last thing you print is exactly one fenced block tagged `rlx-outcome` holding one JSON object.
 `findings` lists every finding of this round, in order, whatever its severity.
 

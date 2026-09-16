@@ -1,6 +1,6 @@
 # 0190 — The conductor survives a run nobody is watching
 
-> **Status:** draft
+> **Status:** in-progress
 > **Created:** 2026-09-16
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0205](../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md),
@@ -335,3 +335,27 @@ flowchart TD
   was deleted on 2026-09-16 (`86497d4`, recoverable from reflog), and `run`'s own terminal plus
   `state/live.log` remain the answer.
 - **No unattended run as a phase.** See the last risk above.
+
+## Implementation log
+
+> Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
+> last one. **The phases above are the contract; everything here is what happened.**
+
+**Lane:** `main` directly (per the header's *Built by*: human-started `dev` sessions).
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — A session cannot lose its work in the background | dev | done | committed with this row |
+| 2 — The allowlist runs the commands a phase ordinarily needs | dev | not started | |
+| 3 — A close that landed without an outcome is adopted | dev | not started | |
+| 4 — A suite run by hand counts | dev | not started | |
+| 5 — Time and spend are reported at one scope | dev | not started | |
+| 6 — The ASCII guarantee is asserted against input that could break it | dev | not started | |
+| 7 — The probe asks whether a headless session may edit `.claude/` | dev | not started | |
+| 8 — Stop gate: what the probe found | human | not started | |
+| 9 — `.claude/` resolves the way Phase 8 chose | dev | not started | |
+
+### Notes
+
+### Close triggers
+

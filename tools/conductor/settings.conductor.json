@@ -51,6 +51,7 @@
       "PowerShell(git rev-parse *)"
     ],
     "deny": [
+      "Monitor",
       "Bash(git push *)",
       "Bash(git push)",
       "PowerShell(git push *)",
