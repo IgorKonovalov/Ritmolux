@@ -52,7 +52,7 @@ place. The plan file carries the real link.
 | [0183](0183-a-low-density-is-a-trace-count.md) | A low density is a trace count | approved | dev, human | ADR-0195 (proposed): a trace (density <= 0.08) draws the tier anchor's count at every size; clouds keep ADR-0140. **No golden moves.** Phase 3 is a `human` look gate at 1080p Rich. |
 | [0184](0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) | Limited ink: a contour that is an ink, and a warp field that bands | approved | dev, human | ADR-0197 (proposed): hard ink contours on six scenes; `warp_mesh` bands by level. **Phase 2 stops if level outgrows `color_span`.** Phase 4: look gate. |
 | [0186](0186-the-flatness-gate-tells-a-figure-from-its-ground.md) | The flatness gate tells a figure from its ground | approved | dev, human | Backlog 0128: five figure/ground candidates vs two blot anchors at 96 and 192 px. **Phase 2 is a human gate that writes ADR-0200**; a negative result is a valid end. |
-| [0190](0190-the-conductor-survives-a-run-nobody-is-watching.md) | The conductor survives a run nobody is watching | draft | dev, human | Backlog 0228-0235: lost background work, the allowlist, adopt-close, hand suite runs, one scope of time and spend. **Phase 8 is a `human` gate on a probe.** |
+| [0190](0190-the-conductor-survives-a-run-nobody-is-watching.md) | The conductor survives a run nobody is watching | in-progress | dev, human | Backlog 0228-0235: lost background work, the allowlist, adopt-close, hand suite runs, one scope of time and spend. **Phase 8 is a `human` gate on a probe.** |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
