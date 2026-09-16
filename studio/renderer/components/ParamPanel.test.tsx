@@ -11,8 +11,12 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { ParamRoster } from '@shared/schema'
+import { rostersFor, schemaDocumentSchema, type ParamRoster } from '@shared/schema'
 import type { Binding } from '@shared/toml'
+
+// The engine's own committed document, imported rather than read: the renderer
+// never imports Node, and that rule holds for a renderer test too.
+import PLAYER_SCHEMA from '../../../docs/specs/player-schema.json'
 
 import { ParamPanel } from './ParamPanel'
 
@@ -46,6 +50,7 @@ function panel(overrides: Partial<Parameters<typeof ParamPanel>[0]> = {}) {
   render(
     <ParamPanel
       rosters={ROSTERS}
+      family={null}
       bindings={BINDINGS}
       writable
       hasDocument
@@ -190,5 +195,100 @@ describe('what the kind decides', () => {
       bindings: [{ kind: 'const', name: 'mirror_order', value: 5.7, line: 7, quote: '"' }],
     })
     expect(screen.getByLabelText('mirror_order')).toHaveProperty('value', '6')
+  })
+})
+
+/**
+ * A slider's ends come from the family on screen (Plan 0179 Phase 5).
+ *
+ * Against the **engine's own committed document**, not a fixture: the ranges
+ * asserted below are declarations `FAMILY_PARAMS` makes, and a hand-written copy
+ * of them here would pass while the panel showed something else. The join is the
+ * point of ADR-0194 — `families` is static and travels in the schema, `family`
+ * is a fact about what the player loaded and arrives on the `preset` event, and
+ * a wrong slider is what either one alone produces.
+ */
+describe('what the family on screen decides', () => {
+  const DOCUMENT = schemaDocumentSchema.parse(PLAYER_SCHEMA)
+
+  function real(system: string, family: string | null, overrides = {}) {
+    return panel({ rosters: rostersFor(DOCUMENT, system), family, bindings: [], ...overrides })
+  }
+
+  /** The names in the trailing group, which the heading names the family of. */
+  function notRead(family: string): string[] {
+    const heading = screen.getByRole('heading', { name: `not read on ${family}` })
+    const group = heading.parentElement
+    if (group === null) throw new Error('the inert heading has no group')
+    return [...group.querySelectorAll('span')]
+      .map((span) => span.textContent ?? '')
+      .filter((text) => text !== '' && text !== 'not read here')
+  }
+
+  it('reaches the negative half of a hypotrochoid, which the single range cannot', () => {
+    real('parametric_curve', 'hypotrochoid')
+    const n = screen.getByLabelText('n') as HTMLInputElement
+    expect(n.min).toBe('-8')
+    expect(n.max).toBe('8')
+  })
+
+  it('stops a Lissajous d at the twelve it reads, not the three hundred it does not', () => {
+    real('parametric_curve', 'lissajous')
+    expect((screen.getByLabelText('d') as HTMLInputElement).max).toBe('12')
+  })
+
+  it('groups a parameter the family never reads instead of offering it travel', () => {
+    real('parametric_curve', 'superformula')
+    expect(notRead('superformula')).toContain('n')
+    expect(screen.queryByLabelText('n')).toBeNull()
+  })
+
+  it('still shows the binding of a row the family does not read', () => {
+    // Not hidden, because the file may carry one: a preset written for another
+    // family keeps its value, and switching back makes it live again.
+    real('parametric_curve', 'superformula', {
+      bindings: [{ kind: 'const', name: 'n', value: 5, line: 4, quote: '"' }],
+    })
+    expect(notRead('superformula')).toContain('5')
+  })
+
+  it('gives the attractor coefficients Thomas reads a slider and groups the other three', () => {
+    // The clearest case in the engine: all four declare `range: null`, so before
+    // the family was known every one of them was a bare number field whatever
+    // was drawn. Thomas reads `a` alone.
+    real('attractor', 'thomas')
+    const a = screen.getByLabelText('a') as HTMLInputElement
+    expect(a.type).toBe('range')
+    expect([a.min, a.max]).toEqual(['0', '0.25'])
+    expect(notRead('thomas')).toEqual(expect.arrayContaining(['b', 'c', 'd']))
+  })
+
+  it('gives all four a slider on a family that reads all four', () => {
+    real('attractor', 'de_jong')
+    for (const name of ['a', 'b', 'c', 'd']) {
+      const input = screen.getByLabelText(name) as HTMLInputElement
+      expect([name, input.type, input.min, input.max]).toEqual([name, 'range', '-3', '3'])
+    }
+    expect(screen.queryByRole('heading', { name: /^not read on / })).toBeNull()
+  })
+
+  it('falls back to the single range when the player reports no family', () => {
+    real('parametric_curve', null)
+    const n = screen.getByLabelText('n') as HTMLInputElement
+    expect([n.min, n.max]).toEqual(['1', '24'])
+    expect(screen.queryByRole('heading', { name: /^not read on / })).toBeNull()
+  })
+
+  it('falls back to the single range when the document declares no families', () => {
+    // A player older than ADR-0194 prints `range` alone. Naming a family it never
+    // reported must not empty the panel or invent an end.
+    const stripped: ParamRoster[] = rostersFor(DOCUMENT, 'parametric_curve').map((roster) => ({
+      ...roster,
+      params: roster.params.map((spec) => ({ ...spec, families: undefined })),
+    }))
+    panel({ rosters: stripped, family: 'hypotrochoid', bindings: [] })
+    const n = screen.getByLabelText('n') as HTMLInputElement
+    expect([n.min, n.max]).toEqual(['1', '24'])
+    expect(screen.queryByRole('heading', { name: /^not read on / })).toBeNull()
   })
 })

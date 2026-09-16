@@ -57,6 +57,19 @@ export const presetSchema = z.object({
   system: z.string(),
   /** Absolute, or `null` for a preset from the embedded set, which has none. */
   file: z.string().nullable(),
+  /**
+   * The family this preset draws, spelled as the schema document's
+   * `families[].family` spells it, or `null` for a system whose parameters read
+   * the same whatever family is on screen (ADR-0194).
+   *
+   * The one **optional** field on this union, against the file's rule above, and
+   * for the reason that rule exists: it is additive under the same `v`, so a
+   * line without the key is a valid `preset`. Refusing one would cost the studio
+   * every fact about the preset on screen — its system, its file — over a field
+   * whose absence `rangeFor` already answers by falling back to the single
+   * declared range.
+   */
+  family: z.string().nullable().optional(),
 })
 
 export const rosterSchema = z.object({

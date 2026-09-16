@@ -303,8 +303,8 @@ flowchart LR
 | 1 — `deposit_arms` is a whole number of arms | dev | done | 12dda4b |
 | 2 — The attractor's coefficients join the family table | dev | done | a53adfa |
 | 3 — The schema document carries each family's range | dev | done | d56c35a |
-| 4 — The player reports the family on screen | dev | done | committed with this row |
-| 5 — The studio's slider reads the family's range | studio-builder | not started | |
+| 4 — The player reports the family on screen | dev | done | d351ac5 |
+| 5 — The studio's slider reads the family's range | studio-builder | done | committed with this row |
 
 ### Notes
 
@@ -329,6 +329,26 @@ flowchart LR
   writes to standard error and offers nothing to read back, so a test at the `Show` seam can tell
   "emitted" from "deduplicated" only if the branch is a value. The new test asserts on that
   function; `report_active_preset` is what acts on it.
+- **Phase 5 also edited `studio/renderer/components/ParamRow.module.css`** (the inert row's own
+  class) **and `studio/renderer/views/Editor.test.tsx`** (one `family: null` in the shared props
+  builder, owed once `EditorProps` gained the prop). Neither is in the phase's file list.
+- **Phase 5's panel test reads `docs/specs/player-schema.json` as a JSON import, not through
+  `node:fs`.** `eslint.config.mjs`'s `no-restricted-imports` covers `renderer/**/*.{ts,tsx}`, which
+  includes a renderer test, so `readFileSync` — the way `shared/protocol.spec.test.ts` reaches the
+  spec — is refused there.
+- **Phase 5's refresh audit, the whole of it.** One subscription handles `preset`
+  (`usePlayerEvents`), plus `main.ts`'s `scope.file = event.file ?? undefined`, which is idempotent.
+  Downstream, the reducer replaces the `preset` object on every line, so each consumer was checked
+  for what re-runs when only `family` changed: `useActivePreset`'s read effect keys on
+  `[file, reloads]`, `Editor`'s `base` memo on `[file, system, schema, active]`, and the palette
+  draft's reset on `[text]` — none re-runs. **One found:** `useRoster`'s pending-mark clear keys on
+  `active`, so a same-name refresh does not clear it, while the hook's doc comment says the mark
+  "clears on the player's next `preset` event whatever it says". Nothing runs that should not; the
+  sentence is what no longer describes the key.
+- **The system picker's open question (`## Risks`), read from the code and not reproduced.**
+  `SystemPicker` derives `pending` from `chosen !== current` at render with no effect, so before
+  Phase 4 a reload that rewrote `system` on an unchanged preset name left `current` stale and the
+  confirm/cancel pair up after the edit had landed. With `system` in the dedup key it settles.
 - **`active_family_key` answers `None` for a `parametric_curve` preset that declares no `[curve]`
   table.** That is the plan's "the value `Scene::configure` receives, and `None` otherwise", and it
   is also the honest answer: the curve arm of `build_config` is the one family-bearing arm that may
@@ -337,12 +357,22 @@ flowchart LR
 
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`**
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** six generated files, no authored preset — `presets/README.md`,
+  `presets/preset.schema.json`, and `presets/schema/{analytic_field,attractor,cellular,
+  parametric_curve,warp_mesh}.schema.json`. All written by `RLX_UPDATE_PARAM_REFERENCE=1` /
+  `RLX_UPDATE_PRESET_SCHEMA=1`.
+- **Plan header `Closes:`** design-backlog 0204, design-backlog 0198.
+- **What shipped:** feature (a per-family slider range in the studio, the `families` schema field and
+  the `preset` event's `family`) plus one fix (`deposit_arms` is `Structural`).
+- **Operator docs touched:** `docs/specs/0003-studio-control-protocol.md` only — the `preset` row's
+  `family` field and two invariants. No `docs/*.md` reader page moved.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 1, `1 broken` —
+  `docs/design-backlog.md:1637 -> 0220 present: if name == self\.reported_preset \{ in:
+  standalone/src/show.rs` no longer matches, Phase 4 having moved that comparison into
+  `Show::preset_report`. 31 advisory moved-path notices, 2 unprobeable, no other break.
+- **Full suite:** not run here — owed to the conductor's pre-review gate (ADR-0207). No suite ran
+  under an upward override at any phase. Studio gate at the tip: `typecheck` and `lint` clean,
+  `vitest run` 274 passed / 29 files / 0 skipped, `shared/protocol.spec.test.ts` green again.
+- **Outstanding `human` phases:** none.
 
 ## Followups (after this lands)
