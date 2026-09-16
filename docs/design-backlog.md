@@ -46,6 +46,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0236 — the `.claude/` park reads a phase's declared `Files touched`, and Plan 0190's own Phase 9 declared its three `.claude/` files in prose](#0236--the-claude-park-reads-a-phases-declared-files-touched-and-plan-0190s-own-phase-9-declared-its-three-claude-files-in-prose)
 - [0237 — the session allowlist bounds a deletion by four literal path shapes, so a path the shell expands escapes the lane](#0237--the-session-allowlist-bounds-a-deletion-by-four-literal-path-shapes-so-a-path-the-shell-expands-escapes-the-lane)
 - [0239 — three per-preset suites are 54 % of the workspace suite and grow with every shipped preset, because each rebuilds its own headless renderer](#0239--three-per-preset-suites-are-54--of-the-workspace-suite-and-grow-with-every-shipped-preset-because-each-rebuilds-its-own-headless-renderer)
+- [0240 — a merged plan never leaves `queue.json`, and the exemption that tolerates it is keyed on a gitignored file](#0240--a-merged-plan-never-leaves-queuejson-and-the-exemption-that-tolerates-it-is-keyed-on-a-gitignored-file)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -1843,3 +1844,65 @@ should be re-measured rather than assumed.
 **Medium.** It is the larger number of the two halves of backlog 0227, but ADR-0211 takes the
 cheap part of that cost first, and this half needs a measurement and a testing-contract decision
 before it needs code.
+
+## 0240 — a merged plan never leaves `queue.json`, and the exemption that tolerates it is keyed on a gitignored file
+
+`queue.json` is accumulate-only. Nothing in the conductor removes a plan from a lane list, and no
+gate asks: a merged plan stays listed forever and is carried by a **special case in the validator**.
+`lib/queue.mjs` says so in its own doc comment — *"they sit under done/ and stay listed in the
+committed queue, so they are accepted there rather than rejected as closed — otherwise every run
+after the first merge would refuse to start."*
+
+Two mechanisms keep that harmless, and they do **not** agree about what they read:
+
+- `lane.mjs`'s `merged(ctx, plan)` skips a merged plan when picking the next one, and asks two
+  sources: `ctx.state.plans[plan]?.status === "merged"` **or** `findPlan(ctx.repo, plan)?.done ===
+  true`. The second needs no state — the file being under `done/` is enough.
+- `validateQueue` runs **first**, and has only the `mergedPlans` set the caller passes, which
+  `stateSets` builds out of `state/conductor.json`. It has no `done/` fallback of its own.
+
+`tools/conductor/state/` is gitignored (`.gitignore:79`), so it never travels. A clone, a wiped
+`state/`, or a second machine therefore turns every merged plan still listed into a **fatal**
+preflight error, and the run refuses to start at all rather than skipping them.
+
+Demonstrated against this repository, `0190` being closed and `0191` approved:
+
+```
+q = { lanes: { a: ['0190', '0191'] } }
+validateQueue(q, repo, new Set(['0190']), new Set(['0190']))   -> errors: []
+validateQueue(q, repo, new Set(),         new Set())           -> errors:
+  ["plan 0190: already closed (0190-...-watching.md is under docs/plans/done/)"]
+```
+
+The queue is portable only as long as a gitignored directory travels with it, which it never does.
+Today this is latent — the five plans merged before 2026-09-16 were pruned by hand when both lanes
+were filled, so the committed queue happens to hold no merged plan at all.
+
+Shapes, none decided, and the tension is real:
+
+- **Give `validateQueue` the fallback `merged()` already has.** One condition: a plan under `done/`
+  is skipped rather than fatal, whatever the state says. Makes the queue stand alone. **It also
+  loses a check** — queueing a plan that was closed by hand is a typo, and that error is what
+  catches it.
+- **Prune at the close, as a ceremony step.** No code; the architect drops merged plans from the
+  lane list beside the roster refresh. Keeps the typo check. **This project's own record argues
+  against it**: the backlog-archive step went undone through three sweeps (2026-08-04, 2026-08-13
+  and again hours later) until a carrier existed for it, which is the same shape.
+- **A `conductor.mjs prune` command** that rewrites `queue.json` from the state, so the discipline
+  has a carrier without the validator losing its check. More code than either half above.
+
+- **Raised:** 2026-09-16, by the owner asking when a plan leaves the queue, during the first
+  two-lane run. **Owner if taken:** `architect` (whether the check is worth keeping), then `dev`.
+- **Verified 2026-09-16** — the fatal path is in the validator:
+  `present: already closed \(\$\{found\.file\} in: tools/conductor/lib/queue.mjs`
+- **Verified 2026-09-16** — and the tolerant predicate the validator does not share is in the lane:
+  `present: findPlan\(ctx\.repo, plan\)\?\.done === true in: tools/conductor/lib/lane.mjs`
+- **Verified 2026-09-16** — the state the exemption rests on does not travel:
+  `present: tools/conductor/state/ in: .gitignore`
+
+### Priority
+
+**Low.** It costs nothing while `state/` is intact, and the failure is loud rather than silent: the
+preflight names the plan and refuses, which is recoverable in one edit. It is filed because the
+reason it has never fired is that the queue was pruned by hand twice, and nothing records that as
+something anyone must keep doing.
