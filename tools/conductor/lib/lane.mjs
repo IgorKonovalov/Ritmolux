@@ -14,7 +14,7 @@
 import { closeSync, existsSync, fstatSync, mkdirSync, openSync, readSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import { verifyClose, verifyFix, verifyImplement } from "./close.mjs";
+import { adoptedClose, verifyClose, verifyFix, verifyImplement } from "./close.mjs";
 import { removeLane, laneNames, openLane } from "./cleanup.mjs";
 import { defaultGate, gateForStage, runGate } from "./gate.mjs";
 import { git, head, resolveCommit } from "./git.mjs";
@@ -388,40 +388,59 @@ export async function runPlan(ctx, lane, plan) {
   const wt = rec.worktree;
   const common = { plan, lane: wt, branch: rec.branch, with_lock: ctx.withLockPath };
 
-  // Implementer runs, until the plan needs a human or a review.
-  while (!rec.closed) {
-    const file = planFileIn(wt, plan);
-    if (!file) return park(ctx, rec, { reason: "disagreement", detail: `plan ${plan} vanished from the worktree` });
-    const next = nextStep(readPlanFile(file.path));
-    if (next.kind === "human") {
-      return park(ctx, rec, {
-        reason: "human_phase",
-        phase: next.phases[0],
-        detail: `Phase ${next.phases[0]} is owned by human`,
-        read: `${file.rel} Phase ${next.phases[0]}`,
-      });
-    }
-    if (next.kind === "review") break;
-
-    const range = rangeLabel(next.phases);
-    const before = head(wt);
-    const r = await session(ctx, rec, "implement", {
-      owner: next.owner,
-      prompt: `/${next.owner} conductor implement plan ${plan} phases ${range}`,
-      vars: { ...common, plan_file: file.rel, phases: range, last_run: next.lastRun ? "yes" : "no" },
-      budget: budgets.implement,
-      info: { phases: next.phases },
-    });
-    if (r.status === "parked") {
-      return park(ctx, rec, { reason: r.reason, detail: r.detail, phase: r.outcome?.phase ?? null, read: r.transcript });
-    }
-    const problems = verifyImplement({ cwd: wt, plan, phases: next.phases, before, outcome: r.outcome });
-    if (problems.length) {
-      return park(ctx, rec, { reason: "disagreement", detail: `implement ${range}: ${problems.join("; ")}`, read: r.transcript });
+  // What the plan still needs is read from the branch, not from the record alone (backlog 0229). A
+  // review session that committed its close and then lost its outcome leaves `rec.closed` null over a
+  // branch whose plan is already under `done/`; starting round 1 there would write a second close, a
+  // second version and a second tag. That close is verified and adopted instead.
+  if (!rec.closed) {
+    const adopted = adoptedClose({ cwd: wt, plan, round: rec.verdicts.length + 1 });
+    if (adopted) {
+      const problems = verifyClose({ cwd: wt, plan, outcome: adopted });
+      if (problems.length) {
+        return park(ctx, rec, { reason: "disagreement", detail: `close found on the branch: ${problems.join("; ")}`, read: adopted.verdict.review_path });
+      }
+      rec.verdicts.push({ ...adopted.verdict });
+      rec.closed = { version: adopted.version, tag: adopted.tag, head: head(wt), at: now(), adopted: true };
+      event(ctx, "closed", { plan, tag: adopted.tag });
+      save(ctx);
     }
   }
 
   if (!rec.closed) {
+    // Implementer runs, until the plan needs a human or a review. Nothing in this loop closes the
+    // plan: a plan that arrives closed skipped the whole block.
+    for (;;) {
+      const file = planFileIn(wt, plan);
+      if (!file) return park(ctx, rec, { reason: "disagreement", detail: `plan ${plan} vanished from the worktree` });
+      const next = nextStep(readPlanFile(file.path));
+      if (next.kind === "human") {
+        return park(ctx, rec, {
+          reason: "human_phase",
+          phase: next.phases[0],
+          detail: `Phase ${next.phases[0]} is owned by human`,
+          read: `${file.rel} Phase ${next.phases[0]}`,
+        });
+      }
+      if (next.kind === "review") break;
+
+      const range = rangeLabel(next.phases);
+      const before = head(wt);
+      const r = await session(ctx, rec, "implement", {
+        owner: next.owner,
+        prompt: `/${next.owner} conductor implement plan ${plan} phases ${range}`,
+        vars: { ...common, plan_file: file.rel, phases: range, last_run: next.lastRun ? "yes" : "no" },
+        budget: budgets.implement,
+        info: { phases: next.phases },
+      });
+      if (r.status === "parked") {
+        return park(ctx, rec, { reason: r.reason, detail: r.detail, phase: r.outcome?.phase ?? null, read: r.transcript });
+      }
+      const problems = verifyImplement({ cwd: wt, plan, phases: next.phases, before, outcome: r.outcome });
+      if (problems.length) {
+        return park(ctx, rec, { reason: "disagreement", detail: `implement ${range}: ${problems.join("; ")}`, read: r.transcript });
+      }
+    }
+
     const g = await gate(ctx, rec, "pre-review");
     if (!g.ok) return park(ctx, rec, { reason: "gate_red", detail: gateDetail(g), read: g.failed.log });
 

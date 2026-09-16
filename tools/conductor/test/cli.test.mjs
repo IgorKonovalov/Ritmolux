@@ -21,7 +21,7 @@ function sh(args, cwd) {
 const dev = (id) => ({ id, owner: "dev" });
 const human = (id) => ({ id, owner: "human" });
 
-function setup(plans, lanes, { gate, maxOpenWorktrees = 3 } = {}) {
+function setup(plans, lanes, { gate, maxOpenWorktrees = 3, spec = {} } = {}) {
   const repo = tmp("rlx-cli-repo-");
   sh(["init", "-q", "-b", "main"], repo);
   for (const [k, v] of [["user.email", "t@example.invalid"], ["user.name", "T"], ["commit.gpgsign", "false"], ["tag.gpgSign", "false"], ["core.autocrlf", "false"]]) {
@@ -39,7 +39,7 @@ function setup(plans, lanes, { gate, maxOpenWorktrees = 3 } = {}) {
   const p = { ...paths({ repo, toolDir }), settings: join(TOOL_DIR, "settings.conductor.json"), prompts: join(TOOL_DIR, "prompts"), withLock: join(TOOL_DIR, "with-lock.mjs") };
 
   const specFile = join(toolDir, "spec.json");
-  writeFileSync(specFile, JSON.stringify({ plans: {} }));
+  writeFileSync(specFile, JSON.stringify({ plans: spec }));
   process.env.FAKE_CLAUDE_SCENARIO = join(TEST_DIR, "lane-scenario.mjs");
   process.env.FAKE_LANE_SPEC = specFile;
   process.env.FAKE_EVENTS = join(toolDir, "events.jsonl");
@@ -338,4 +338,50 @@ test("unknown commands and malformed plan numbers are usage errors", async () =>
   const { cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] });
   assert.equal((await cli("launch")).code, 2);
   assert.equal((await cli("resume", "175")).code, 2);
+});
+
+test("adopt-close records the close a lane already carries, and refuses a lane with none", async () => {
+  const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] }, { spec: { "0101": { loseOutcome: "review" } } });
+  await cli("run");
+  const parked = loadState(p.stateDir).plans["0101"];
+  assert.equal(parked.park.reason, "no_outcome");
+  assert.equal(parked.closed, null);
+
+  const adopt = await cli("adopt-close", "0101");
+  assert.equal(adopt.code, 0, adopt.err.join("\n"));
+  assert.match(adopt.out.join("\n"), /recorded closed, tag v0\.1\.1/);
+  assert.match(adopt.out.join("\n"), /resume 0101/);
+  const after = loadState(p.stateDir).plans["0101"];
+  assert.equal(after.closed.tag, "v0.1.1");
+  assert.equal(after.closed.adopted, true);
+  assert.equal(after.status, "parked", "adopting records the close; unparking stays the owner's `resume`");
+
+  // A second adoption has nothing to do, and the run that follows merges without a review.
+  const again = await cli("adopt-close", "0101");
+  assert.equal(again.code, 1);
+  assert.match(again.err.join("\n"), /already recorded closed/);
+  assert.equal((await cli("resume", "0101")).code, 0);
+  assert.equal((await cli("run")).code, 0);
+  const merged = loadState(p.stateDir).plans["0101"];
+  assert.equal(merged.status, "merged", JSON.stringify(merged.park));
+  assert.equal(merged.steps.filter((s) => s.kind === "review").length, 1, "no second review session ran");
+});
+
+test("adopt-close on a lane with no close review changes nothing, and a bad plan number is a usage error", async () => {
+  const { p, cli } = setup([{ number: "0101", phases: [dev("1"), human("2")] }], { a: ["0101"] });
+  await cli("run");
+  const before = readFileSync(statePaths(p.stateDir).file, "utf8");
+  assert.equal(loadState(p.stateDir).plans["0101"].park.reason, "human_phase");
+
+  const r = await cli("adopt-close", "0101");
+  assert.equal(r.code, 1);
+  assert.match(r.err.join("\n"), /no close to adopt/);
+  assert.match(r.err.join("\n"), /docs\/plans\/done\//);
+  assert.equal(readFileSync(statePaths(p.stateDir).file, "utf8"), before, "no state was written");
+
+  assert.equal((await cli("adopt-close")).code, 2);
+  assert.equal((await cli("adopt-close", "nope")).code, 2);
+  const never = await cli("adopt-close", "0199");
+  assert.equal(never.code, 1);
+  assert.match(never.err.join("\n"), /no lane on disk/);
 });

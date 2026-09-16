@@ -53,6 +53,7 @@ All of them run from the main checkout.
 | `status` | Per lane: the plan, the step, the time in it, the spend so far. Then every parked plan with its reason. Regenerates the digest and ends with its path. |
 | `resume NNNN` | Queues a parked plan again. Refused while the park's reason still holds, e.g. a `human` phase the plan's log does not yet mark done. |
 | `park NNNN` | Parks a plan that has not merged, with an inbox entry. |
+| `adopt-close NNNN` | Records the close a lane already carries, when a session committed one and then lost its outcome. Verifies the branch first and writes nothing unless it passes. |
 | `abort` | Stops a running conductor and every session under it. Steps in flight run again on the next `run`. |
 | `check` | The preflight alone. |
 
@@ -140,6 +141,17 @@ once, whatever `state/conductor.json` says.
 | `lost_background` | The session started a command in the background and ended with it unfinished, so that work was killed with the session. Its commits are still in the lane. Read the detail for the command, check what the lane actually contains, then resume: the step runs again from what the plan log and `git` show. |
 | `budget`, `api`, `no_outcome`, `bad_outcome` | Raise the budget in `local.json`, or wait out a usage limit. Resuming re-runs the step from what the plan log and `git` show. |
 | `merge_conflict`, `merge_failed`, `main_dirty` | Resolve it in the lane, or clean the main checkout. A resumed plan goes straight back to the fast-forward. |
+
+**A close that landed without an outcome is adopted, never reviewed a second time.** A review session
+commits its repairs, its `done/` move, its version bump and its tag before it prints anything, so a
+session that dies after that leaves the branch closed and the record open. Before a run reviews
+anything it asks the **branch**: a plan under `done/` with `Status: done` and a `## Close review` is a
+finished close. It is verified exactly as a session's own close is — clean tree, annotated tag on the
+tip — and then recorded, so the run goes straight to the gate on the close tip and the fast-forward.
+A branch that does not verify parks `disagreement` and names why; nothing is recorded, and no second
+version or tag is ever written. `adopt-close NNNN` does the same thing on demand, for a record that
+needs repairing outside a run: it changes nothing unless the branch verifies, and `resume` then `run`
+finishes the plan.
 
 **Whatever the reason, `resume` refuses a lane whose worktree is dirty.** A session is told to leave
 the tree clean and may run `git restore` to do it, but a park does not prove that it did. The park

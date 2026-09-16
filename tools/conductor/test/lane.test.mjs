@@ -631,3 +631,62 @@ test("a red conductor gate parks before any review", async () => {
   assert.match(rec.park.detail, /always-red exited 100 - failing: rlx-core::golden drifts/);
   assert.deepEqual(kinds(rec), ["implement:dev"]);
 });
+
+// Backlog 0229: a review that commits its close and then loses its outcome leaves the branch closed
+// and the record open. Deciding from the record alone would start round 1 again on a plan already
+// under done/, and write a second close, a second version and a second tag.
+
+test("a close that landed without an outcome is adopted on the next run, with no second review", async () => {
+  const { ctx, repo } = scratch({
+    plans: [{ number: "0101", phases: [dev("1")] }],
+    lanes: { a: ["0101"] },
+    spec: { "0101": { loseOutcome: "review" } },
+  });
+  await runLanes(ctx);
+  const parked = ctx.state.plans["0101"];
+  assert.equal(parked.park.reason, "no_outcome");
+  assert.equal(parked.closed, null, "the record did not learn about the close the branch carries");
+  const wt = parked.worktree;
+  assert.ok(readPlanFile(findPlan(wt, "0101").path).hasCloseReview, "the close itself did land");
+
+  parked.status = "queued";
+  parked.park = null;
+  await runLanes(ctx);
+
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  assert.deepEqual(kinds(rec), ["implement:dev", "review:architect"], "the second run started no session at all");
+  assert.equal(rec.closed.adopted, true);
+  assert.equal(rec.closed.tag, "v0.1.1");
+  // One version and one tag: the whole point. A second close would have bumped to 0.1.2.
+  assert.deepEqual(git(["tag", "--list", "v0.1.*"], repo).stdout.split("\n").sort(), ["v0.1.0", "v0.1.1"]);
+  assert.equal(readFileSync(join(repo, "VERSION"), "utf8"), "0.1.1\n");
+  assert.equal(tagObjectType("v0.1.1", repo), "tag");
+  assert.equal(resolveCommit("v0.1.1", repo), resolveCommit("main", repo));
+  assert.deepEqual(rec.gates.map((g) => g.label), ["pre-review", "post-close"], "the adopted tip is still gated before main moves");
+  assert.equal(findPlan(repo, "0101").done, true);
+});
+
+test("a close on the branch over a dirty tree parks disagreement and names the dirt", async () => {
+  const { ctx } = scratch({
+    plans: [{ number: "0101", phases: [dev("1")] }],
+    lanes: { a: ["0101"] },
+    spec: { "0101": { loseOutcome: "review", dirtyClose: true } },
+  });
+  await runLanes(ctx);
+  const first = ctx.state.plans["0101"];
+  assert.equal(first.park.reason, "no_outcome");
+  assert.deepEqual(first.park.dirty.paths, ["suite-output.log"]);
+
+  first.status = "queued";
+  first.park = null;
+  await runLanes(ctx);
+
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "parked");
+  assert.equal(rec.park.reason, "disagreement");
+  assert.match(rec.park.detail, /close found on the branch: .*worktree is not clean/);
+  assert.equal(rec.closed, null, "nothing was recorded from a close that does not verify");
+  assert.deepEqual(kinds(rec), ["implement:dev", "review:architect"], "and no second review ran");
+  assert.deepEqual(rec.park.dirty.paths, ["suite-output.log"]);
+});

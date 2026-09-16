@@ -19,6 +19,10 @@
 // branch. `ledgerFlow` makes the review run its full suite through the wrapper before closing, and the
 // close run the gate's suite through it after the bump and before the tag.
 //
+// `loseOutcome` names a mode whose session does all of its work and then prints no outcome block, as
+// 0175's round-1 review did: it committed its repairs, its `done/` move, its bump and its tag, then
+// backgrounded the suite and ended its turn. `dirtyClose` leaves an untracked file behind with it.
+//
 // `stream` is a list of events the implement session emits (see fake-claude.mjs). `awaitLive` makes
 // the implement session, after each commit, wait until the file FAKE_LIVE_FILE names holds a line
 // naming that commit: proof the conductor printed it while the session was still running.
@@ -167,6 +171,10 @@ export default async ({ cwd, vars, env }) => {
       if (ps.ledgerFlow) await suite();
       if (ps.lightweightTag) git("tag", `v${version}`);
       else git("tag", "-a", `v${version}`, "-m", `chore: Release v${version}`);
+      if (ps.loseOutcome === "review") {
+        if (ps.dirtyClose) writeFileSync(join(cwd, "suite-output.log"), "still compiling\n");
+        return { text: "Still compiling; I'll be notified when the suite exits.", costUsd: 3 };
+      }
       return { text: block({ kind: "closed", plan, version, tag: `v${version}`, verdict }), costUsd: 3 };
     }
     return { text: "unknown mode" };

@@ -8,6 +8,7 @@
 //   node tools/conductor/conductor.mjs status
 //   node tools/conductor/conductor.mjs resume NNNN
 //   node tools/conductor/conductor.mjs park NNNN
+//   node tools/conductor/conductor.mjs adopt-close NNNN
 //   node tools/conductor/conductor.mjs abort
 //   node tools/conductor/conductor.mjs check
 //
@@ -20,8 +21,9 @@ import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { pidAlive } from "./with-lock.mjs";
+import { adoptedClose, verifyClose } from "./lib/close.mjs";
 import { writeDigest } from "./lib/digest.mjs";
-import { currentBranch, isClean } from "./lib/git.mjs";
+import { currentBranch, head, isClean } from "./lib/git.mjs";
 import { appendPark, dirtyText, dirtyWorktree } from "./lib/inbox.mjs";
 import { runLanes } from "./lib/lane.mjs";
 import { ascii } from "./lib/live.mjs";
@@ -345,6 +347,54 @@ function cmdPark(args, o) {
   return 0;
 }
 
+/**
+ * `adopt-close NNNN`: record the close a session already committed in the lane, so the repair for a
+ * park that landed after its close is a command rather than a hand edit to state/conductor.json
+ * (backlog 0229). It runs the same check the lane does — `verifyClose` against the branch as it
+ * stands — and changes nothing unless that passes. The gate on the close tip and the fast-forward
+ * stay the conductor's: `resume` then `run` does them.
+ */
+function cmdAdoptClose(args, o) {
+  const p = o.p;
+  const [plan] = args;
+  if (!isPlan(plan)) {
+    o.err("usage: conductor.mjs adopt-close NNNN");
+    return 2;
+  }
+  if (runningPid(p)) {
+    o.err("conductor: a run is in progress; adopt-close after it ends, or `abort` it first");
+    return 1;
+  }
+  const state = loadState(p.stateDir);
+  const rec = state.plans[plan];
+  if (!rec?.worktree || !existsSync(rec.worktree)) {
+    o.err(`conductor: plan ${plan} has no lane on disk (${rec?.worktree ?? "no worktree recorded"})`);
+    return 1;
+  }
+  if (rec.closed) {
+    o.err(`conductor: plan ${plan} is already recorded closed (${rec.closed.tag ?? "no tag"}); nothing to adopt`);
+    return 1;
+  }
+  const adopted = adoptedClose({ cwd: rec.worktree, plan, round: rec.verdicts.length + 1 });
+  if (!adopted) {
+    o.err(`conductor: no close to adopt in ${rec.worktree} - plan ${plan} is not under docs/plans/done/ with Status done and a ## Close review`);
+    return 1;
+  }
+  const problems = verifyClose({ cwd: rec.worktree, plan, outcome: adopted });
+  if (problems.length) {
+    o.err(`conductor: the close in ${rec.worktree} does not verify, so nothing was recorded:`);
+    for (const problem of problems) o.err(`  - ${problem}`);
+    return 1;
+  }
+  rec.verdicts.push({ ...adopted.verdict });
+  rec.closed = { version: adopted.version, tag: adopted.tag, head: head(rec.worktree), at: new Date().toISOString(), adopted: true };
+  saveState(p.stateDir, state);
+  regenerate(p, state);
+  o.log(`conductor: plan ${plan} recorded closed${adopted.tag ? `, tag ${adopted.tag}` : " with no version"} from its ## Close review.`);
+  o.log(rec.status === "parked" ? `Run \`resume ${plan}\`, then \`run\`: the gate on the close tip and the fast-forward still owe.` : "The gate on the close tip and the fast-forward still owe; `run` does them.");
+  return 0;
+}
+
 function cmdAbort(args, o) {
   const p = o.p;
   const pid = runningPid(p);
@@ -379,7 +429,7 @@ function cmdCheck(args, o) {
   return 0;
 }
 
-const COMMANDS = { run: cmdRun, status: cmdStatus, resume: cmdResume, park: cmdPark, abort: cmdAbort, check: cmdCheck };
+const COMMANDS = { run: cmdRun, status: cmdStatus, resume: cmdResume, park: cmdPark, "adopt-close": cmdAdoptClose, abort: cmdAbort, check: cmdCheck };
 
 /** `overrides` exists for tests: { p, claude, gate, worktreeRoot, lockDir, lockPollMs, pollMs, commitPollMs, log, err, signals }. */
 export async function main(argv, overrides = {}) {
@@ -392,7 +442,7 @@ export async function main(argv, overrides = {}) {
   const [command, ...args] = argv;
   const fn = COMMANDS[command];
   if (!fn) {
-    o.err("usage: node tools/conductor/conductor.mjs run [--lane a|b] [--once] | status | resume NNNN | park NNNN | abort | check");
+    o.err("usage: node tools/conductor/conductor.mjs run [--lane a|b] [--once] | status | resume NNNN | park NNNN | adopt-close NNNN | abort | check");
     return 2;
   }
   return fn(args, o);

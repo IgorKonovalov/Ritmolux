@@ -5,6 +5,49 @@
 import { commitsBetween, git, head, isAncestor, isClean, resolveCommit, tagObjectType } from "./git.mjs";
 import { donePhases, findPlan, readPlanFile } from "./plan.mjs";
 
+/**
+ * The close a session already committed on this branch, or null: the plan under `done/` with
+ * `Status: done` and a `## Close review` section. A review session that committed its close and then
+ * lost its outcome — its turn ended on a backgrounded command, or its result was malformed — leaves
+ * exactly this. Reviewing such a branch again would write a second close, a second version and a
+ * second tag, so the lane verifies it instead (backlog 0229).
+ */
+export function closeOnBranch(cwd, plan) {
+  const found = findPlan(cwd, plan);
+  if (!found || !found.done) return null;
+  const doc = readPlanFile(found.path);
+  if (doc.statusWord !== "done" || !doc.hasCloseReview) return null;
+  return { path: found.path, doc };
+}
+
+/** The annotated `vX.Y.Z` tag on the tip, or null. A docs-only close leaves none, which is valid. */
+function tagOnTip(cwd) {
+  const r = git(["tag", "--points-at", "HEAD", "--list", "v*"], cwd);
+  if (r.code !== 0 || !r.stdout) return null;
+  return r.stdout.split("\n").map((t) => t.trim()).find((t) => /^v\d+\.\d+\.\d+$/.test(t) && tagObjectType(t, cwd) === "tag") ?? null;
+}
+
+/**
+ * The `closed` outcome a landed close would have printed, read back off the branch: the tag on the
+ * tip and the version it names, and a verdict that carries the plan's own `## Close review` as its
+ * review path. The findings list is empty because the prose is not machine-readable — what is
+ * adopted is that the close happened, never a claim about what it found.
+ *
+ * Returns null when there is no close on the branch to adopt.
+ */
+export function adoptedClose({ cwd, plan, round = 1 }) {
+  const found = closeOnBranch(cwd, plan);
+  if (!found) return null;
+  const tag = tagOnTip(cwd);
+  return {
+    kind: "closed",
+    plan,
+    version: tag ? tag.slice(1) : null,
+    tag,
+    verdict: { round, blockers: 0, majors: 0, minors: 0, review_path: found.path, findings: [] },
+  };
+}
+
 function claimedCommits(claims, made, cwd, problems) {
   const matched = new Set();
   for (const c of claims) {
