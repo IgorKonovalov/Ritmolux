@@ -1,8 +1,8 @@
 # ADR-0209 — A conductor close repairs the prose and comments its findings name
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-16 ([Plan 0189](../plans/done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md))
 > **Date:** 2026-09-15
-> **Related plan(s):** [0189](../plans/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md)
+> **Related plan(s):** [0189](../plans/done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md)
 > **Amends:** [0205](0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md)
 > (what a close does with the minors it merges)
 
@@ -79,3 +79,26 @@ morning spent on ones a close could have repaired.
 ### Alternative C — Every minor goes to a fix session before close
 Rejected. It adds a session and a gate to every plan with a minor, most plans have one, and the
 blocker-and-major threshold exists so that minors do not hold a merge.
+
+## Outcome — 2026-09-16, from Plan 0189 Phase 8 and this plan's own close
+
+**The mechanism works and one clause of the Decision is unreachable as written.** 0175's and 0177's
+closes repaired six findings between them and marked each with `fixed_in`; `verifyClose` checked
+every one against the branch and the finding's file, and the digest's **Needs you** then listed only
+what was left open. That is the Decision delivering exactly what it promised.
+
+The unreachable clause is *"Markdown prose anywhere in the repository, including every file under
+`.claude/skills/`"*. A headless `claude -p` session's `Edit` and `Write` under `.claude/` are refused
+by the CLI although `settings.conductor.json` allows both tools. Backlog 0225 read the restriction as
+one of ownership, and this ADR answered that reading; the restriction is in fact the CLI protecting
+its own configuration directory. Seen three times: 0182's close left `render-loop.md:170` open, and
+0177 Phase 8 parked `check_red` because its own done-when greps `.claude/skills/` — the owner
+committed that fix by hand as `f0cf263`. [Backlog 0230](../design-backlog.md) carries the three
+shapes, including amending this ADR to except `.claude/` and name who repairs it.
+
+**The fact-versus-rule line held on its first test, in the other direction.** This plan's own close
+found the `dev` field guide still carrying a rule Phase 5 had changed in three other places. That is
+a fact following the tree rather than a close overruling a lane's contract, and it was repaired
+(`925a599`). Two findings this close raised — a digest line and a test's fixture — fell outside the
+closed list and were filed as [backlog 0234 and 0235](../design-backlog.md) instead, which is the
+Negative *"code-shaped minors still have no route"* behaving as written.

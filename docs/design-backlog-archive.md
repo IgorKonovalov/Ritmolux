@@ -312,11 +312,6 @@ live entry citing this one.
 | 0215 | The seam on two MilkDrop 1.x presets is unexplained | [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) Phases 1, 4. **Promoted** |
 | 0216 | The converted waveform follows neither reference | [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) Phases 5-6 + ADR-0199. **Promoted** |
 | 0217 | `path_cost`'s arity probe prices an arc chain, not the polyline its header reports | [Plan 0160](plans/0160-the-silhouettes-preconditions-stop-being-silent.md) Phase 1b. **Promoted** |
-| 0222 | The conductor digest reports dollars, and the operator's constraint is the usage window | [Plan 0189](plans/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) Phase 2. **Promoted** |
-| 0223 | The gate is a third of a conductor run, re-running the suite on trees that passed it | [Plan 0189](plans/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) Phases 3-5 + ADR-0207. **Promoted** |
-| 0224 | A CLI update refuses the whole conductor until a probe and a hand edit | [Plan 0189](plans/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) Phase 6 + ADR-0208. **Promoted** |
-| 0225 | A review finding under `.claude/` was left open for a restriction written nowhere | [Plan 0189](plans/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) Phases 5, 7 + ADR-0209. **Promoted** |
-| 0226 | The worktree cap counts lanes that no longer exist | [Plan 0189](plans/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) Phase 1. **Promoted** |
 <!-- roster:end -->
 
 ### Closed
@@ -562,6 +557,11 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0183 | Nothing bounds the incremental cache | [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phases 4, 6. Measured bounded; the delete is documented. **Closed 2026-09-15** |
 | 0184 | Cargo never collects an old artifact generation, and stable has no GC | [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 5. `scripts/prune-target.mjs`. **Closed 2026-09-15** |
 | 0213 | The horizon's length-independence test never compares the ground | [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) Phase 3. **Closed 2026-09-15** |
+| 0222 | The conductor digest reports dollars, and the operator's constraint is the usage window | [Plan 0189](plans/done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) Phase 2. Usage windows at run start and end, and on every park. **Closed 2026-09-16** |
+| 0223 | The gate is a third of a conductor run, re-running the suite on trees that passed it | [Plan 0189](plans/done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) Phases 3-5 + ADR-0207. Two executed on 0177; see 0227. **Closed 2026-09-16** |
+| 0224 | A CLI update refuses the whole conductor until a probe and a hand edit | [Plan 0189](plans/done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) Phase 6 + ADR-0208. **Closed 2026-09-16** |
+| 0225 | A review finding under `.claude/` was left open for a restriction written nowhere | [Plan 0189](plans/done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) Phases 5, 7 + ADR-0209. Its diagnosis was wrong; see 0230. **Closed 2026-09-16** |
+| 0226 | The worktree cap counts lanes that no longer exist | [Plan 0189](plans/done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) Phase 1. One `laneOpen` predicate reads the filesystem. **Closed 2026-09-16** |
 <!-- roster:end -->
 
 ---
@@ -13362,7 +13362,14 @@ something finally does.
 **Medium.** Nothing is wrong and nothing is blocked. It is a report answering a question its one
 reader does not have, while holding the answer to the one they do.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0189](plans/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0189](plans/done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+**CLOSED 2026-09-16** — [Plan 0189](plans/done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) Phase 2. The digest's Totals now carry the 5-hour and 7-day
+utilization and reset time at run start and run end, taken from the first and last rate-limit reading
+of the run and read out of either recorded CLI shape; every park carries its session's last reading.
+The dollar figures stay, because the runaway cap is still denominated in them. What this entry asked
+for is answered; what it did **not** foresee is that the closed-plan bullet's own `$` is a lifetime
+sum sitting beside a run-scoped time, filed as `0234`.
 
 ## 0223 — the gate is a third of a conductor run's wall clock, because the full workspace suite runs twice per plan on trees that already passed it
 
@@ -13413,7 +13420,13 @@ lane b doubles contention on exactly this lock.
 **Medium.** Nothing is wrong and nothing is blocked; a third of the run re-proves a green tree. It
 matters when a run is being waited on, and it is the first number lane b's design needs.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0189](plans/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0189](plans/done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+**CLOSED 2026-09-16** — [Plan 0189](plans/done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) Phases 3-5 + [ADR-0207](adrs/0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md).
+`nextest list` now passes the hook bare and takes no lock, which is where 14 of the 15 reported
+suite-lock wait minutes went. The ledger keyed on `HEAD^{tree}` took 0177 to two executed full suites
+and two skips, measured. 0175 ran four, and its `main` moved twice, so the bound did not apply — the
+per-tree arithmetic that leaves is `0227`.
 
 ## 0224 — a CLI update refuses the whole conductor, and the only way through is a probe run and a hand edit to a source constant
 
@@ -13454,7 +13467,14 @@ silent stream-format change arrives — one did, see entry 0222.
 **Low.** One interruption per CLI update and nothing else, and the guard earns that. Revisit if
 updates land often enough that the interruption stops being rare.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0189](plans/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0189](plans/done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+**CLOSED 2026-09-16** — [Plan 0189](plans/done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) Phase 6 + [ADR-0208](adrs/0208-a-patch-cli-update-runs-with-a-warning-and-every-session-proves-the-hooks-ran.md).
+A version sharing major and minor with a verified entry at a higher patch now runs with a warning
+recorded on the run and shown in **Needs you** until the version is listed; anything else is still
+refused. The fail-open risk the warning buys is answered by a tripwire that parks `cli_contract` when
+a session made a shell call and the project hooks left no line. Untested against a real unlisted
+patch: all four Phase 8 runs were on `2.1.272`.
 
 ## 0225 — a review finding under `.claude/` was left open for a restriction that is written nowhere, and may not exist
 
@@ -13489,7 +13509,15 @@ close itself.
 **Low.** One stale sample line today. What is worth keeping is the unwritten ownership rule behind
 it, which will produce the same open finding again.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0189](plans/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0189](plans/done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+**CLOSED 2026-09-16** — [Plan 0189](plans/done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) Phases 5, 7 + [ADR-0209](adrs/0209-a-conductor-close-repairs-the-prose-and-comments-its-findings-name.md).
+The rule is written: a close repairs a `minor` or `nit` whose repair cannot change what any program
+does, marks it `fixed_in`, and the conductor checks that commit against the branch and the finding's
+file. Phase 7 repaired the four leftovers that prompted this entry. **This entry's own diagnosis was
+wrong on one point** — it read the restriction on `.claude/` as one of ownership, written nowhere. It
+is the CLI refusing a headless session's `Edit` under its own configuration directory, which makes
+ADR-0209's `.claude/skills/` clause unreachable as written. That correction is `0230`.
 
 ## 0226 — the worktree cap counts lanes that no longer exist, so removing a parked lane by hand starves the next run
 
@@ -13535,4 +13563,12 @@ the cap is for.
 **Medium.** It does not corrupt anything and the repair is one field, but it makes a cap stop report
 a reason that is not true — and Plan 0188 Phase 4 exists to make exactly that report trustworthy.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0189](plans/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) Phase 1 owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0189](plans/done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) Phase 1 owns the ask, and its close appends the `CLOSED` marker here.
+
+**CLOSED 2026-09-16** — [Plan 0189](plans/done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) Phase 1. `laneOpen(rec)` — the record names a worktree
+**and** that directory exists — is now the single predicate behind `openWorktreeCount`, the cap
+stop's list of holders, `runPlan`'s reopen test, the standing-park line and the digest's **Still
+parked** line. `laneRemoved` stays in the record as history and nothing reads it; the grep over
+`lib/lane.mjs` returns two writes and no filter. The cap tests build real directories for the lanes
+they count, so a regression that went back to the record would go red.
+

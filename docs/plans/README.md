@@ -52,7 +52,6 @@ place. The plan file carries the real link.
 | [0183](0183-a-low-density-is-a-trace-count.md) | A low density is a trace count | approved | dev, human | ADR-0195 (proposed): a trace (density <= 0.08) draws the tier anchor's count at every size; clouds keep ADR-0140. **No golden moves.** Phase 3 is a `human` look gate at 1080p Rich. |
 | [0184](0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) | Limited ink: a contour that is an ink, and a warp field that bands | approved | dev, human | ADR-0197 (proposed): hard ink contours on six scenes; `warp_mesh` bands by level. **Phase 2 stops if level outgrows `color_span`.** Phase 4: look gate. |
 | [0186](0186-the-flatness-gate-tells-a-figure-from-its-ground.md) | The flatness gate tells a figure from its ground | approved | dev, human | Backlog 0128: five figure/ground candidates vs two blot anchors at 96 and 192 px. **Phase 2 is a human gate that writes ADR-0200**; a negative result is a valid end. |
-| [0189](0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) | The conductor can be watched, and stops re-proving a green tree | approved | dev, human | ADR-0207-0209 (proposed); backlog 0222-0226: live log, usage, suite ledger, lane cap. **Built by human-started `dev`, not the conductor.** |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
@@ -842,6 +841,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0189 - The conductor can be watched](done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) - closed 2026-09-16. Review: **no blockers, one major, four minors, one nit.** Version: **none** (tooling). ADR-0207-0209 accepted, each Outcome. Archived 5. [Write-up](README-archive.md).
 - [0177 — The test tree stops costing disk](done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) — closed 2026-09-15. Review: **no blockers, no majors, four minors, two nits.** Version: **0.125.0**. ADR-0204 accepted, Outcome. Archived 7. [Write-up](README-archive.md).
 - [0175 — An eased value arrives at its target](done/0175-an-eased-value-arrives.md) — closed 2026-09-15. Review: **no blockers, no majors, one minor, one nit (both fixed).** Version: **0.124.2**. No ADR paired. Archived 0212, 0218. [Write-up](README-archive.md).
 - [0188 — The conductor survives its first run](done/0188-the-conductor-survives-its-first-run.md) — closed 2026-09-15. Review: **no blockers, no majors, one minor.** Version: **0.124.1**. ADR-0205 Outcome (the pilot). [Write-up](README-archive.md).

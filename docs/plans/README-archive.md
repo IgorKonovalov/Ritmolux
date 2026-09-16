@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0189 - The conductor can be watched, and stops re-proving a green tree](#0189---the-conductor-can-be-watched-and-stops-re-proving-a-green-tree)
   - [0177 - The test tree stops touching the machine and stops costing its disk](#0177---the-test-tree-stops-touching-the-machine-and-stops-costing-its-disk)
   - [0175 - An eased value arrives at its target](#0175---an-eased-value-arrives-at-its-target)
   - [0188 - The conductor survives its first run](#0188---the-conductor-survives-its-first-run)
@@ -217,6 +218,69 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0189 - The conductor can be watched, and stops re-proving a green tree](done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md)
+
+- closed 2026-09-16 by a human-started review. Seven `dev` phases and one `human` phase on `main`
+directly - a conductor editing its own code while it runs is circular, so this plan was built the way
+0187 and 0188 were:
+  - `f7ee284` (1): `lib/live.mjs`, a pure stream-event-and-gate-event to line formatter, plus a
+    polled `git log` in the worktree. One exported `laneOpen` predicate replaces every read of
+    `laneRemoved`, so the worktree cap counts directories on disk.
+  - `57942b5` (2): the digest reports usage windows, active time that never spans a park, standing
+    parks from an earlier run, and the findings still open with their `file:line`.
+  - `570400f` (3): `cargo nextest list` runs no test, so it passes the hook bare and the wrapper
+    runs it without taking the lock.
+  - `cfb1f1d` (4): `lib/ledger.mjs`, ADR-0207's suite ledger, keyed by `HEAD^{tree}` and recorded
+    only on a worktree clean at both ends.
+  - `be1ca2b` (5): the conductor-mode close reordered so the gate runs last on the tip it tags, and
+    `fixed_in` on a repaired finding, checked against the branch and the finding's file.
+  - `9ef5cdb` (6): ADR-0208's patch warning, and the hook-log and `system/init` tripwire that parks
+    `cli_contract`.
+  - `e8d33df` (7): the pilot's four prose leftovers, and the README table that restated
+    `defaultGate()`.
+  - `854ae8c` + `9966fd3` (8, `human`): the watched runs, their suite counts, and backlog 0227-0233.
+
+Review: **no blockers, one major, four minors, one nit.** Version: **none** (tooling) - nothing
+shipped changes, since `tools/conductor/` and `.claude/` never ship and the three Rust edits are
+comment and assertion-message text. That follows [0176] and [0187], the two closest precedents.
+ADR-0207, ADR-0208 and ADR-0209 accepted, each with an Outcome. Backlog 0222-0226 archived as closed.
+
+**The evidence the close leaned on was the artifacts, not the log.** `cargo nextest run --workspace`
+green on `9966fd3` (1952 passed, 6 skipped, 656 s), `cargo doc` green under `-D warnings`,
+`node --test "tools/conductor/test/*.test.mjs"` 179 of 179. And the mechanism in production:
+`state/suite-ledger.jsonl` shows 0177 executing two full suites and skipping two, each skip line
+naming the run it relied on, while `state/live.log` carries the matching
+`gate cargo nextest skipped: tree dd4c6d9 green by 0177-04-review` line.
+
+**What Phase 8 measured, and what it cost to learn.** 0177 met ADR-0207's bound of two executed
+suites; 0175 ran four, and every run above the bound has a named cause that is not the mechanism - a
+moved `main` twice, a red `control_loopback`, and a hand gate through `with-lock` without
+`RLX_SUITE_LEDGER` that left no record. The plan's own Phase 8 notes carry the per-suite breakdown:
+of 737 s wall and 7378 test-seconds over 73 binaries, `reactivity`, `animation` and `sanity` are 54 %
+together. That table is the input backlog 0227 was filed from, and the input ADR-0205's Outcome said
+it needed before reconsidering lane b.
+
+**Fixed at the close, all prose (`925a599`):**
+- `.claude/skills/dev/references/close-ceremony-prompt.md` still told a conductor implementer run to
+  include the full suite. Phase 5 changed that rule in three places and missed the field guide those
+  three point at - the one major.
+- `docs/developing.md` described the pre-Phase-2 digest and never mentioned the run terminal or
+  `state/live.log`, which is the most operator-visible thing the plan shipped.
+- `CLAUDE.md` still said the conductor refuses an unverified CLI version outright.
+- `core/src/render/scenes/fragment_field.rs` named "no post stage is active" for a condition that is
+  `scene_stage().is_some() || layer_over_active()`, and stated the fold arithmetic backwards.
+
+**Left open, both outside what ADR-0209 lets a close repair:**
+- `tools/conductor/lib/digest.mjs` puts a run-scoped `active`/`wall` beside a lifetime `totalSpend`
+  in one sentence, so the bullet contradicts Totals four lines down (backlog 0234).
+- `tools/conductor/test/live.test.mjs`'s ASCII assertion runs over a fixture with no non-ASCII input,
+  so deleting either `ascii()` call would leave the suite green (backlog 0235).
+
+**Preset curation:** no `.toml` moved and `presets/` was untouched, so there is nothing to curate.
+
+[0176]: done/0176-a-release-tag-reaches-origin.md
+[0187]: done/0187-the-conductor-runs-the-lanes.md
 
 ### [0177 - The test tree stops touching the machine and stops costing its disk](done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md)
 

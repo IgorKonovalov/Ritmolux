@@ -1,8 +1,8 @@
 # ADR-0207 — A suite run the conductor observed green is not run again on the same tree
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-16 ([Plan 0189](../plans/done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md))
 > **Date:** 2026-09-15
-> **Related plan(s):** [0189](../plans/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md)
+> **Related plan(s):** [0189](../plans/done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md)
 > **Amends:** [0205](0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md)
 > (where a conductor-run plan's full suite runs), [0156](0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md)
 > (who owes the once-per-plan run, in conductor mode only)
@@ -115,3 +115,31 @@ ADR-0205's Outcome names against lane b.
 ### Alternative D — Trust a session's `Full suite:` bullet
 Rejected. It is exactly the claim ADR-0205 refuses. The wrapper's record is different in kind: it is
 written by the process that observed the exit code, not by the model that reads it.
+
+## Outcome — 2026-09-16, from Plan 0189 Phase 8's four watched runs
+
+**The bound held on one plan of two, and every run above it has a named cause that is not the
+mechanism.** 0177 executed exactly two full suites and skipped two: `pre-review` at tree `18f2dd5`,
+the review skipping on that record, the review's own run at the close tip `dd4c6d9`, and
+`post-close` skipping on *that*. Those four lines are in `state/suite-ledger.jsonl` and `locks.jsonl`
+agrees. That is the Decision working end to end across two processes and a session, on a real plan.
+
+0175 executed four, and the Decision's own preconditions did not hold for it: `main` moved twice
+during its close, so the trees genuinely differed. The causes, in order — `pre-review`; a red
+`post-close` on `control_loopback` ([backlog 0219](../design-backlog.md)); the same gate green after
+`resume`; and a `remerge` after `main` took a conductor fix. A fifth run, by hand through
+`with-lock` without `RLX_SUITE_LEDGER`, left no record and was repeated
+([backlog 0232](../design-backlog.md)).
+
+**What the measurement changes about this ADR's Positive.** The estimate was "about half of a plan's
+suite time". 0177 spent 24.5 min in full suites against 64 min of finished sessions; the pre-ledger
+pilot's ratio was 72 min of gate against 145 min of sessions. The saving is real and roughly as
+claimed for a plan that merges cleanly. It is **not** claimed for a plan whose `main` moves, and
+[backlog 0227](../design-backlog.md) now carries that as its own ask: the key is the whole tree, and
+a close's tree differs from the reviewed one only in prose, a version and a merge.
+
+**The Negative about a close whose final gate goes red arrived on the first plan that tried it.**
+0175 parked with its close committed, its plan already under `done/` on the branch and no tag — and
+`resume` had no path back, because it would have re-run the review on a plan already closed
+([backlog 0229](../design-backlog.md)). The owner finished that close by hand. The hazard this ADR
+wrote down is the one that fired.

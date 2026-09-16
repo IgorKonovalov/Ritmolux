@@ -1,8 +1,8 @@
 # ADR-0208 — A patch CLI update runs with a warning, and every session proves the hooks ran
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-16 ([Plan 0189](../plans/done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md))
 > **Date:** 2026-09-15
-> **Related plan(s):** [0189](../plans/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md)
+> **Related plan(s):** [0189](../plans/done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md)
 > **Amends:** [0205](0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md)
 > (its Negative: "refuses one it has not been verified on")
 
@@ -79,3 +79,18 @@ per shell call.
 Removes the drift at the source. Rejected because the owner's interactive sessions share the
 installation, and pinning them to the conductor's verified version trades one interruption for a
 standing one.
+
+## Outcome — 2026-09-16, from Plan 0189's close
+
+**Neither half fired in anger, and that is the whole reading available.** Phase 8's four runs all ran
+on `2.1.272`, a listed version, so the patch warning was never printed outside its tests and no
+session parked `cli_contract`. The Decision is verified by construction — `cliVerdict` is exercised
+against a derived version table rather than literals, and the tripwire parks a fake session that
+makes a shell call and leaves no hook line — but the first real unlisted patch is still ahead.
+
+**One Negative is now measured rather than theoretical.** *"A session that makes no shell call cannot
+be checked for hooks"* stays theoretical: every session in the four runs made one. What did show up
+is the adjacent surface the tripwire does not cover — the session allowlist refused ordinary compound
+commands and a `Monitor` call across all four runs ([backlog 0231](../design-backlog.md)), visible
+only because Phase 1's denial line prints them. Hooks running is not the same as a session being able
+to work, and this ADR checks the first.

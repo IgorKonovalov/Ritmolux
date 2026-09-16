@@ -1,12 +1,19 @@
 # 0189 — The conductor can be watched, and stops re-proving a green tree
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-16. Phases 1-7 landed on `main` as `f7ee284`, `57942b5`,
+> `570400f`, `cfb1f1d`, `be1ca2b`, `9ef5cdb` and `e8d33df`, the close block as `fb2a9b3`, and the
+> `human` Phase 8 as `854ae8c` + `9966fd3`. Review: **no blockers, one major, four minors, one nit**;
+> the major and three of the minors were repaired at the close (`925a599`). Verified independently:
+> `cargo nextest run --workspace` green on `9966fd3` (1952 passed, 6 skipped), `cargo doc` green
+> under `-D warnings`, `node --test tools/conductor/test/*.test.mjs` 179/179, and the mechanism in
+> production — `state/suite-ledger.jsonl` shows 0177 executing two full suites and skipping two.
+> Version: **none** (tooling; nothing shipped changes).
 > **Created:** 2026-09-15
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0205](../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md),
-> [0207](../adrs/0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md) (proposed),
-> [0208](../adrs/0208-a-patch-cli-update-runs-with-a-warning-and-every-session-proves-the-hooks-ran.md) (proposed),
-> [0209](../adrs/0209-a-conductor-close-repairs-the-prose-and-comments-its-findings-name.md) (proposed)
+> **Related ADRs:** [0205](../../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md),
+> [0207](../../adrs/0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md) (accepted),
+> [0208](../../adrs/0208-a-patch-cli-update-runs-with-a-warning-and-every-session-proves-the-hooks-ran.md) (accepted),
+> [0209](../../adrs/0209-a-conductor-close-repairs-the-prose-and-comments-its-findings-name.md) (accepted)
 > **Closes:** design-backlog 0222, 0223, 0224, 0225, 0226
 > **Built by:** human-started `dev` sessions, not the conductor. A conductor editing its own code
 > while it runs is circular, and 0187 and 0188 were built the same way.

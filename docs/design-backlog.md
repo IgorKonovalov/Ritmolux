@@ -50,6 +50,8 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0231 — the session allowlist matches a command's first word, so ordinary compound commands a phase needs are refused](#0231--the-session-allowlist-matches-a-commands-first-word-so-ordinary-compound-commands-a-phase-needs-are-refused)
 - [0232 — a suite run by hand through `with-lock` is not recorded, so the next gate repeats it](#0232--a-suite-run-by-hand-through-with-lock-is-not-recorded-so-the-next-gate-repeats-it)
 - [0233 — the run terminal says a phase is done but not how long it took](#0233--the-run-terminal-says-a-phase-is-done-but-not-how-long-it-took)
+- [0234 — one digest line carries a run-scoped time beside a lifetime spend, and reads as neither](#0234--one-digest-line-carries-a-run-scoped-time-beside-a-lifetime-spend-and-reads-as-neither)
+- [0235 — the run terminal's ASCII guarantee is asserted over a fixture that has no non-ASCII in it](#0235--the-run-terminals-ascii-guarantee-is-asserted-over-a-fixture-that-has-no-non-ascii-in-it)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
