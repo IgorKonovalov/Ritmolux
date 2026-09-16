@@ -161,6 +161,20 @@ async function tab(name: string): Promise<void> {
   fireEvent.click(await screen.findByRole('tab', { name }))
 }
 
+/**
+ * Wait until the preset file is under the editor, which is what arms a gesture.
+ *
+ * Two independent loads meet here. The parameter rows are generated from the
+ * schema, so the slider is on screen and drag-responsive as soon as the schema
+ * arrives; `writable` waits on the separate `preset.read`, and a release fired
+ * between the two is discarded in silence. Waiting on the control therefore
+ * times the wrong load. The path renders only once that read landed, so it is
+ * the honest precondition (backlog 0238).
+ */
+async function presetLoaded(): Promise<void> {
+  await screen.findByText(SOURCE)
+}
+
 /** Type a name into the held prompt and save it. */
 async function saveAs(name: string): Promise<void> {
   const field = await screen.findByLabelText('save a copy as')
@@ -227,6 +241,7 @@ describe('a gesture against a preset the session has not forked', () => {
   it.each(GESTURES)('$name writes nothing until the copy is named', async ({ run, mark }) => {
     const fake = install()
     editor()
+    await presetLoaded()
     await run()
 
     // The whole assertion the smoke run's four modified files exist for.
@@ -248,6 +263,7 @@ describe('the preset that was forked from', () => {
   it('is byte-identical after a whole editing session against the fork', async () => {
     const fake = install()
     const { rerender } = editor()
+    await presetLoaded()
 
     const slider = await screen.findByLabelText('warp')
     fireEvent.change(slider, { target: { value: '0.9' } })
@@ -278,6 +294,7 @@ describe('a preset change between the gesture and the answer', () => {
   it('cannot redirect the write', async () => {
     const fake = install({ [SOURCE]: INK, [OTHER]: DUST })
     const { rerender } = editor()
+    await presetLoaded()
 
     const slider = await screen.findByLabelText('warp')
     fireEvent.change(slider, { target: { value: '0.9' } })
@@ -322,6 +339,7 @@ describe('the prompt itself', () => {
   it('writes nothing when it is cancelled, and drops the edits it held', async () => {
     const fake = install()
     editor()
+    await presetLoaded()
 
     const slider = await screen.findByLabelText('warp')
     fireEvent.change(slider, { target: { value: '0.9' } })
@@ -336,6 +354,7 @@ describe('the prompt itself', () => {
   it('stays up when the name is already taken', async () => {
     const fake = install({ [SOURCE]: INK, [FORK]: DUST })
     const { onProblem } = editor()
+    await presetLoaded()
 
     const slider = await screen.findByLabelText('warp')
     fireEvent.change(slider, { target: { value: '0.9' } })
