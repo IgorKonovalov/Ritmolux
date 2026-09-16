@@ -78,6 +78,14 @@ pub enum Event<'a> {
         /// offering to edit it has to be told, since "not editable" and "the
         /// write failed" are different facts.
         file: Option<&'a Path>,
+        /// The **family** it draws, spelled as a preset writes it and as the
+        /// schema document's `families[].family` spells it. `None` for a system
+        /// whose parameters read the same on every family it draws, and for a
+        /// curve preset that configured none (ADR-0194 point 3).
+        ///
+        /// A parent joins this against that document to pick a slider's ends,
+        /// and re-derives none of it from the preset file (ADR-0184).
+        family: Option<&'a str>,
     },
     /// The roster was replaced — on every reload, whatever changed.
     Roster {
@@ -210,6 +218,7 @@ impl Event<'_> {
                 index,
                 system,
                 file,
+                family,
             } => {
                 out.push_str(",\"name\":");
                 out.push_str(&json_string(name));
@@ -217,6 +226,7 @@ impl Event<'_> {
                 out.push_str(",\"system\":");
                 out.push_str(&json_string(system));
                 push_optional_path(&mut out, "file", *file);
+                push_optional_str(&mut out, "family", *family);
             }
             Event::Roster { names, dir } => {
                 out.push_str(",\"names\":[");
@@ -438,6 +448,9 @@ mod tests {
                 index: 3,
                 system: "fragment_field",
                 file: Some(Path::new("C:\\presets\\aurora.toml")),
+                // A system with no family table, which is the arm a parent
+                // falling back to the single declared range branches on.
+                family: None,
             },
             // The embedded set: a preset with no file, which is the arm a parent
             // deciding whether to offer an edit branches on.
@@ -446,6 +459,7 @@ mod tests {
                 index: 0,
                 system: "attractor",
                 file: None,
+                family: Some("clifford"),
             },
             Event::PresetError {
                 file: Path::new("C:\\presets\\aurora.toml"),
@@ -608,6 +622,43 @@ mod tests {
         );
     }
 
+    /// **The `preset` line carries the family the player drew, or `null`**
+    /// (ADR-0194 point 3) — asserted on the line the writer produces, because
+    /// that is what a parent parses.
+    ///
+    /// `null` rather than an omitted key or an empty string: "this system's
+    /// parameters read the same on every family it draws" is a fact a parent
+    /// acts on by falling back to the single declared `range`, and it is a
+    /// different fact from a family called `""`.
+    #[test]
+    fn the_preset_line_carries_the_family_or_null() {
+        let curve = Event::Preset {
+            name: "Lissajous Knot",
+            index: 12,
+            system: "parametric_curve",
+            file: None,
+            family: Some("lissajous"),
+        };
+        assert!(
+            curve.line().contains("\"family\":\"lissajous\""),
+            "a curve preset must name its family: {}",
+            curve.line()
+        );
+
+        let field = Event::Preset {
+            name: "Aurora",
+            index: 0,
+            system: "fragment_field",
+            file: None,
+            family: None,
+        };
+        assert!(
+            field.line().contains("\"family\":null"),
+            "a system with no family table must say so: {}",
+            field.line()
+        );
+    }
+
     /// A quote or a backslash in a path or a name is escaped, so one preset
     /// cannot produce a line the parent cannot parse.
     #[test]
@@ -617,6 +668,7 @@ mod tests {
             index: 0,
             system: "swarm",
             file: Some(Path::new("C:\\a \"quoted\" dir\\p.toml")),
+            family: None,
         };
         let rendered = event.line();
         assert!(

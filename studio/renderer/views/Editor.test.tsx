@@ -166,6 +166,7 @@ function editor(overrides: Partial<EditorProps> = {}) {
   const onProblem = vi.fn()
   const props: EditorProps = {
     system: 'attractor',
+    family: null,
     file: SOURCE,
     reloads: 0,
     problems: [],

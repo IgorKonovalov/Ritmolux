@@ -45,7 +45,7 @@
 // names `preset/schema/mod.rs` has in scope.
 use super::*;
 
-use crate::render::scenes::ParamSpec;
+use crate::render::scenes::{FamilyParam, ParamSpec, family_params};
 
 /// The document format's own version, carried as `v` so a consumer can refuse a
 /// shape it does not know. Independent of the workspace version and of the
@@ -407,6 +407,10 @@ fn push_names(out: &mut String, names: impl Iterator<Item = &'static str>) {
 
 /// One labelled parameter roster.
 fn push_roster(out: &mut String, label: &str, specs: &[ParamSpec]) {
+    // Keyed by the roster's own label, which is what
+    // [`family_params`](crate::render::scenes::family_params) answers to, so a
+    // parameter of the same name on another system gets no cells of this one's.
+    let families = family_params(label);
     out.push_str("{\"name\":");
     push_string(out, label);
     out.push_str(",\"params\":[");
@@ -419,16 +423,7 @@ fn push_roster(out: &mut String, label: &str, specs: &[ParamSpec]) {
         out.push_str(",\"default\":");
         push_number(out, spec.default);
         out.push_str(",\"range\":");
-        match spec.range {
-            Some([lo, hi]) => {
-                out.push('[');
-                push_number(out, lo);
-                out.push(',');
-                push_number(out, hi);
-                out.push(']');
-            }
-            None => out.push_str("null"),
-        }
+        push_range(out, spec.range);
         out.push_str(",\"doc\":");
         push_string(out, spec.doc);
         // ADR-0180 rule 4's distinction, so a studio can group its panel the
@@ -438,9 +433,46 @@ fn push_roster(out: &mut String, label: &str, specs: &[ParamSpec]) {
         // studio already compares.
         out.push_str(",\"kind\":");
         push_string(out, spec.kind.as_str());
+        // `families` is additive under exactly that reasoning (ADR-0194 point
+        // 1): one entry per family of this system, in the system's roster
+        // order, `range: null` where the family does not read the parameter at
+        // all. It is written **only** for a parameter `family_params` has a row
+        // for, so a consumer that finds no key falls back to `range` above and
+        // renders what it rendered before this field existed. Rendered from the
+        // same walk the generated reference prints its per-family cell from, so
+        // the two cannot disagree.
+        if let Some(row) = families.iter().find(|row| row.name == spec.name) {
+            out.push_str(",\"families\":[");
+            for (j, cell) in row.ranges.iter().enumerate() {
+                if j > 0 {
+                    out.push(',');
+                }
+                out.push_str("{\"family\":");
+                push_string(out, cell.family);
+                out.push_str(",\"range\":");
+                push_range(out, cell.range);
+                out.push('}');
+            }
+            out.push(']');
+        }
         out.push('}');
     }
     out.push_str("]}");
+}
+
+/// A declared range as the document writes it: `[lo, hi]`, or `null` where none
+/// is declared.
+fn push_range(out: &mut String, range: Option<[f32; 2]>) {
+    match range {
+        Some([lo, hi]) => {
+            out.push('[');
+            push_number(out, lo);
+            out.push(',');
+            push_number(out, hi);
+            out.push(']');
+        }
+        None => out.push_str("null"),
+    }
 }
 
 /// One structural table.
@@ -641,9 +673,10 @@ pub fn json_schema() -> String {
         push_separator(&mut out, &mut first);
         push_definition(&mut out, 2, table);
     }
+    let rows = family_rows();
     for (key, spec) in &definitions {
         push_separator(&mut out, &mut first);
-        push_param_definition(&mut out, 2, key, spec);
+        push_param_definition(&mut out, 2, key, spec, &rows);
     }
     out.push_str("\n  }\n}\n");
     out
@@ -751,13 +784,14 @@ pub fn system_json_schema(kind: SystemKind) -> String {
             push_definition(&mut out, 2, table);
         }
     }
+    let rows = family_rows();
     for (key, spec) in &definitions {
         if params
             .iter()
             .any(|accepted| same_declaration(accepted, spec))
         {
             push_separator(&mut out, &mut first);
-            push_param_definition(&mut out, 2, key, spec);
+            push_param_definition(&mut out, 2, key, spec, &rows);
         }
     }
     out.push_str("\n  }\n}\n");
@@ -1001,7 +1035,13 @@ fn definition_key<'k>(
 
 /// One parameter declaration as a `definitions` entry: a string, what it does,
 /// and its default, range and kind as hover prose.
-fn push_param_definition(out: &mut String, depth: usize, key: &str, spec: &ParamSpec) {
+fn push_param_definition(
+    out: &mut String,
+    depth: usize,
+    key: &str,
+    spec: &ParamSpec,
+    rows: &[(&'static ParamSpec, &'static FamilyParam)],
+) {
     let pad = "  ".repeat(depth);
     out.push_str(&format!("{pad}{}: {{\n", json_string(key)));
     out.push_str(&format!("{pad}  \"type\": \"string\",\n"));
@@ -1011,7 +1051,7 @@ fn push_param_definition(out: &mut String, depth: usize, key: &str, spec: &Param
     ));
     out.push_str(&format!(
         "{pad}  \"markdownDescription\": {}\n",
-        json_string(&markdown_for(spec))
+        json_string(&markdown_for(spec, family_row_for(rows, spec)))
     ));
     out.push_str(&format!("{pad}}}"));
 }
@@ -1146,22 +1186,95 @@ fn push_params_body(
 /// and its kind.
 ///
 /// The range is **prose here and a bound nowhere**, for the reason
-/// [`json_schema`] gives: a preset may legitimately set a value outside it.
-fn markdown_for(spec: &ParamSpec) -> String {
+/// [`json_schema`] gives: a preset may legitimately set a value outside it. That
+/// is what lets `families` be printed here with no `if`/`then` beside it
+/// (ADR-0194 point 5): a per-family constraint would have nothing to check,
+/// since every value is an expression string.
+///
+/// `families` is the row [`family_rows`] paired with this declaration, or `None`
+/// for a parameter that reads the same on every family its system draws — which
+/// is every parameter of a system with no family table at all.
+fn markdown_for(spec: &ParamSpec, families: Option<&FamilyParam>) -> String {
     let mut text = format!("{}\n\n", spec.doc);
     text.push_str(&format!("- default `{:?}`\n", spec.default));
-    match spec.range {
-        Some([lo, hi]) => text.push_str(&format!(
-            "- typical range `{lo:?}` to `{hi:?}` — a guide, not a bound: the engine \
-             neither clamps to it nor rejects a value outside it\n"
-        )),
-        None => text.push_str("- no typical range declared\n"),
+    match families {
+        Some(row) => push_family_prose(&mut text, row),
+        None => match spec.range {
+            Some([lo, hi]) => text.push_str(&format!(
+                "- typical range `{lo:?}` to `{hi:?}` — a guide, not a bound: the engine \
+                 neither clamps to it nor rejects a value outside it\n"
+            )),
+            None => text.push_str("- no typical range declared\n"),
+        },
     }
     text.push_str(&format!("- {} parameter\n", spec.kind.as_str()));
     // No system is named: one declaration is shared by every system that makes
-    // it, so a sentence naming one of them would be wrong on the others.
+    // it, so a sentence naming one of them would be wrong on the others. A
+    // family-dependent declaration is the exception and is held to belong to one
+    // roster by `every_family_row_declaration_belongs_to_one_roster`, which is
+    // what makes the families above safe to name.
     text.push_str("\nThe value is an expression, always quoted.");
     text
+}
+
+/// The per-family half of a family-dependent parameter's hover: the range on
+/// each family that reads it, then the families it is inert on — the same
+/// content the generated reference's Range cell carries, in the same order.
+fn push_family_prose(text: &mut String, row: &FamilyParam) {
+    let mut reads = Vec::new();
+    let mut inert = Vec::new();
+    for cell in row.ranges {
+        match cell.range {
+            Some([lo, hi]) => reads.push(format!("`{}` `{lo:?}` to `{hi:?}`", cell.family)),
+            None => inert.push(format!("`{}`", cell.family)),
+        }
+    }
+    if !reads.is_empty() {
+        text.push_str(&format!(
+            "- typical range depends on the family: {} — a guide, not a bound: the engine \
+             neither clamps to it nor rejects a value outside it\n",
+            reads.join(", ")
+        ));
+    }
+    if !inert.is_empty() {
+        text.push_str(&format!(
+            "- inert on {} — the parameter is not read there at all\n",
+            inert.join(", ")
+        ));
+    }
+}
+
+/// Every family-dependent parameter declaration in the engine, paired with the
+/// [`FamilyParam`] row that describes it — the lookup `markdown_for` needs,
+/// which the document does not, because `push_roster` already has the roster's
+/// label in hand and this walk does not.
+///
+/// **Keyed by declaration, because the editor schema's `definitions` are.** A
+/// family-dependent declaration shared by two systems would key one hover on the
+/// other's families; `every_family_row_declaration_belongs_to_one_roster` in
+/// `core/tests/suite/preset.rs` is what forbids that, and it fails rather than
+/// letting a wrong hover be printed.
+pub fn family_rows() -> Vec<(&'static ParamSpec, &'static FamilyParam)> {
+    let mut out = Vec::new();
+    for (label, specs) in param_rosters() {
+        let rows = family_params(label);
+        for spec in specs {
+            if let Some(row) = rows.iter().find(|row| row.name == spec.name) {
+                out.push((spec, row));
+            }
+        }
+    }
+    out
+}
+
+/// The family row describing `spec`, found by declaration.
+fn family_row_for(
+    rows: &[(&'static ParamSpec, &'static FamilyParam)],
+    spec: &ParamSpec,
+) -> Option<&'static FamilyParam> {
+    rows.iter()
+        .find(|(candidate, _)| same_declaration(candidate, spec))
+        .map(|(_, row)| *row)
 }
 
 /// One structural table as a `definitions` entry.

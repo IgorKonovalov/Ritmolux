@@ -31,11 +31,21 @@ export interface PlayerState {
   stream?: StreamEvent
   health?: HealthEvent
   /**
-   * The preset on screen, with the two facts an editor needs: the system's
-   * canonical key, and the file it was read from — `null` for the embedded set,
-   * which has none (ADR-0184).
+   * The preset on screen, with the three facts an editor needs: the system's
+   * canonical key, the family it draws, and the file it was read from — `null`
+   * for the embedded set, which has none (ADR-0184).
+   *
+   * A player that reports no family at all is folded to `null` here, which is
+   * the same answer as a system that has none: both mean "take a control's ends
+   * from the single declared range".
    */
-  preset?: { name: string; index: number; system: string; file: string | null }
+  preset?: {
+    name: string
+    index: number
+    system: string
+    file: string | null
+    family: string | null
+  }
   roster: string[]
   /** Where the watcher is looking, or `null` when nothing resolved. */
   dir: string | null
@@ -70,6 +80,7 @@ function reduce(state: PlayerState, event: PlayerEvent): PlayerState {
           index: event.index,
           system: event.system,
           file: event.file,
+          family: event.family ?? null,
         },
       }
     case 'roster':

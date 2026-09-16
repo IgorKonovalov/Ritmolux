@@ -47,7 +47,6 @@ place. The plan file carries the real link.
 | [0160](0160-the-silhouettes-preconditions-stop-being-silent.md) | The silhouette's preconditions stop being silent | approved | dev, human | ADR-0179: four silent `[path]` preconditions. **Amended 2026-09-14:** optional Phase 1b folds in backlog 0217 (arity probe re-prices a polyline). Phase 2 is prose. |
 | [0166](0166-the-basics-read-in-russian.md) | The basics read in Russian | approved | dev, human | ADR-0185: five docs gain a stamped `.ru.md`. **Phase 3 is a `human` review that blocks publication.** Amended 2026-09-14: `pages.yml` depth, gate-count prose collides with 0178. |
 | [0178](0178-what-the-operator-reads-is-true.md) | What the operator reads is true | approved | dev, human | Backlog 0172, 0185, 0207, 0208 + ADR-0202 (proposed): drift line, `--list-presets`, banner, recovery line, count gate. **Lands after 0176 and 0166.** Phase 5 `human` settles 0203. |
-| [0179](0179-a-parameters-range-belongs-to-its-family.md) | A parameter's range belongs to its family | approved | dev, studio-builder | ADR-0194: the schema carries per-family ranges, `preset` reports the family; backlog 0198 `deposit_arms` goes Structural. Phase 4's wait on 0174 is discharged. |
 | [0180](0180-the-converted-picture-follows-the-source.md) | The converted picture follows the source | in-progress | dev | ADR-0199 (proposed). Backlog 0214-0216. Phases 1-2 on its branch; parked at 3, **amended on the branch 2026-09-15**: source-space warp chain for converted presets only. **Runs before 0142.** |
 | [0183](0183-a-low-density-is-a-trace-count.md) | A low density is a trace count | approved | dev, human | ADR-0195 (proposed): a trace (density <= 0.08) draws the tier anchor's count at every size; clouds keep ADR-0140. **No golden moves.** Phase 3 is a `human` look gate at 1080p Rich. |
 | [0184](0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) | Limited ink: a contour that is an ink, and a warp field that bands | approved | dev, human | ADR-0197 (proposed): hard ink contours on six scenes; `warp_mesh` bands by level. **Phase 2 stops if level outgrows `color_span`.** Phase 4: look gate. |
@@ -312,7 +311,7 @@ naming what moved. The order:
   [0180] parked `plan_wrong` on 2026-09-14 and was amended on its lane branch 2026-09-15; resuming it
   is next. The opening this replaced is [in the archive](README-archive.md). [0180] runs before [0142]: 0180 re-draws the
   waveform 0142's wash is measured on and needs no rig. After those, [0184], [0183],
-  [0179] (its Phase 4's wait on 0174 is discharged) and [0186], in any order that keeps each bless set clean.
+  [0186], in any order that keeps each bless set clean. [0179] closed 2026-09-16.
   [0182] closed 2026-09-15 ahead of them; it touched only the report, so it constrains none.
 - **Still gated on a human, unchanged:** [0120] Phase 1, [0133] Phase 9, [0166] Phase 3, and
   [0103] Phases 4-6.
@@ -327,7 +326,7 @@ naming what moved. The order:
 [0176]: done/0176-a-release-tag-reaches-origin.md
 [0177]: done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md
 [0178]: 0178-what-the-operator-reads-is-true.md
-[0179]: 0179-a-parameters-range-belongs-to-its-family.md
+[0179]: done/0179-a-parameters-range-belongs-to-its-family.md
 [0180]: 0180-the-converted-picture-follows-the-source.md
 [0181]: done/0181-a-scene-advances-after-its-frames-bindings.md
 [0182]: done/0182-the-report-hears-a-counter.md
@@ -871,6 +870,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0179 - A parameter's range belongs to its family](done/0179-a-parameters-range-belongs-to-its-family.md) - closed 2026-09-16. Review: **no blockers, no majors, one minor, one nit.** Version: **0.126.0**. ADR-0194 accepted. Archived 0198, 0204. [Write-up](README-archive.md).
 - [0191 - A green tree is not tested four times](done/0191-a-green-tree-is-not-tested-four-times.md) - closed 2026-09-16. Review: **no blockers, no majors, one minor, two nits (both fixed).** Version: **none** (tooling). ADR-0211 accepted. Archived 0227. [Write-up](README-archive.md).
 - [0190 - The conductor survives a run nobody is watching](done/0190-the-conductor-survives-a-run-nobody-is-watching.md) - closed 2026-09-16. Review: **no blockers, no majors, two minors, one nit.** Version: **none** (tooling). ADR-0210 accepted. Archived 8. [Write-up](README-archive.md).
 - [0189 - The conductor can be watched](done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) - closed 2026-09-16. Review: **no blockers, one major, four minors, one nit.** Version: **none** (tooling). ADR-0207-0209 accepted, each Outcome. Archived 5. [Write-up](README-archive.md).

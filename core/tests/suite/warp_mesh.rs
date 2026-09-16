@@ -320,6 +320,80 @@ fn the_per_vertex_program_varies_across_the_mesh() {
     );
 }
 
+/// The `deposit_arms` binding the fixture carries, verbatim. The comment header
+/// mentions the same parameter with a single space, so the padded spelling is
+/// what makes the substitution below reach the binding and nothing else — and
+/// [`arms_variant`] asserts it occurs once rather than trusting that.
+const ARMS_BINDING: &str = "deposit_arms    = \"6\"";
+
+/// The fixture with `deposit_arms` bound to `value`, named for it so several
+/// variants share one roster.
+fn arms_variant(value: &str) -> Preset {
+    assert_eq!(
+        FIXTURE.matches(ARMS_BINDING).count(),
+        1,
+        "the fixture no longer binds `deposit_arms` as `{ARMS_BINDING}`, so this \
+         substitution reaches nothing (or reaches the comment too)"
+    );
+    let text = FIXTURE.replace(ARMS_BINDING, &format!("deposit_arms    = \"{value}\""));
+    let mut preset = Preset::from_toml_str(&text).expect("the arms variant parses");
+    preset.name = format!("arms_{value}");
+    preset
+}
+
+/// **The arm count is a whole number of arms, rounded before the scene sees it.**
+///
+/// The deposit shader multiplies the value straight into an angular phase
+/// (`arms * (ang + twist * r)`), and `ang` comes off `atan2`. At a fractional arm
+/// count the lobes therefore do not meet across that function's branch cut, and
+/// the ring is torn along `ang = ±pi`. `ParamKind::Structural` is what stops a
+/// binding — `[hold] deposit_arms = "bar"` is the obvious one — from ever
+/// presenting one.
+///
+/// Three comparisons on one adapter in one run. `2.6` against `3`, and `2.4`
+/// against `2`, must be **byte-identical**: each pair straddles nothing, because
+/// both members round to the same whole number. `3` against `2` must differ,
+/// which is the control that proves these captures see the arm count at all —
+/// without it two identical blank frames would pass.
+#[test]
+fn the_deposit_arm_count_is_rounded_before_the_scene_sees_it() {
+    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
+        return;
+    };
+    let values = ["2.6", "3", "2.4", "2"];
+    renderer.set_presets(values.iter().map(|v| arms_variant(v)).collect());
+
+    let frame = loud();
+    let mut captured = Vec::new();
+    for value in values {
+        let name = format!("arms_{value}");
+        captured.push(
+            renderer
+                .capture_preset(&name, &frame, SANITY_FRAMES)
+                .unwrap_or_else(|e| panic!("capture `{name}`: {e}")),
+        );
+    }
+    let [up, three, down, two] = <[CaptureImage; 4]>::try_from(captured)
+        .unwrap_or_else(|_| panic!("four captures, one per bound value"));
+
+    assert_ne!(
+        three.rgba, two.rgba,
+        "three arms and two arms rendered identically, so nothing below would \
+         have noticed a fractional arm count either"
+    );
+    assert_eq!(
+        up.rgba, three.rgba,
+        "`deposit_arms = 2.6` did not render as three arms - the value is \
+         reaching the deposit shader unrounded, and the ring is torn along \
+         `atan2`'s branch cut"
+    );
+    assert_eq!(
+        down.rgba, two.rgba,
+        "`deposit_arms = 2.4` did not render as two arms - the value is \
+         reaching the deposit shader unrounded"
+    );
+}
+
 /// **The three new bind-group layouts do not alias on WARP** — ADR-0058's
 /// standing rule for any plan that adds a pass, measured rather than asserted.
 ///

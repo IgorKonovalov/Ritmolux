@@ -19,6 +19,7 @@ hand-edited.
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
   - [0191 - A green tree is not tested four times](#0191---a-green-tree-is-not-tested-four-times)
+  - [0179 - A parameter's range belongs to its family](#0179---a-parameters-range-belongs-to-its-family)
   - [0190 - The conductor survives a run nobody is watching](#0190---the-conductor-survives-a-run-nobody-is-watching)
   - [0189 - The conductor can be watched, and stops re-proving a green tree](#0189---the-conductor-can-be-watched-and-stops-re-proving-a-green-tree)
   - [0177 - The test tree stops touching the machine and stops costing its disk](#0177---the-test-tree-stops-touching-the-machine-and-stops-costing-its-disk)
@@ -252,6 +253,48 @@ nine deferred binaries reads one. **The saving is still unmeasured** - the condu
 copy of `tools/conductor/`, so the tier is inert until this close fast-forwards, and ADR-0211's
 `Outcome` is owed by the first plan that runs under it. Archived backlog 0227 (skip half); 0239, the
 cheaper-suite half - 54 % of 7378 test-seconds - is untouched and live.
+
+### [0179 - A parameter's range belongs to its family](done/0179-a-parameters-range-belongs-to-its-family.md)
+
+- closed 2026-09-16, by hand, after the conductor parked it. Five phases on
+`plan-0179-a-parameters-range-belongs-to-its-family`, the first plan whose phases crossed
+`dev -> studio-builder` under the conductor:
+  - `12dda4b` (1): `deposit_arms` is `ParamKind::Structural`, so a fractional arm count is rounded
+    before the deposit shader sees it and cannot tear along `atan2`'s branch cut. Guarded by a
+    capture test whose control is asserted first, so two blank frames fail the control rather than
+    passing the rounding.
+  - `a53adfa` (2): the attractor's `a`..`d` join `FAMILY_PARAMS`, with the inert cells held against
+    the **WGSL** - the test slices `step.family`'s chain into per-family arms - and not only against
+    `step_once`'s CPU mirror, which ADR-0180's addendum calls an instrument.
+  - `d56c35a` (3): the schema document carries `families` per parameter; `SCHEMA_VERSION` stays 1
+    because the field is additive.
+  - `d351ac5` (4): the `preset` event carries `family`, and the dedup key becomes name + system +
+    family. Spec 0003 gains the field and two invariants.
+  - `1732077` (5, `studio-builder`): the slider takes its ends from the family on screen, and a
+    parameter the family never reads is grouped as inert rather than given travel it does not have.
+- **Parked `gate_red` at `pre-review`, and the park was correct.** `cargo doc` exited 101 on six
+intra-doc links: Phase 2 made `FAMILY_PARAMS` and `family_rows` public and their doc comments
+already linked private helpers, which is legal while the item is private and an error once it is
+not. `nextest` had passed 1960 tests on that same tree six seconds earlier. Repaired by de-linking
+(`2a3bc370`) rather than widening the API to satisfy a doc comment. **This is backlog 0179's class**
+- the trigger is a visibility change, not a doc edit - and the conductor's gate caught before the
+push what CI would have caught after it.
+- Review: **no blockers, no majors, one minor, one nit.** Verified independently on the merged tree:
+`cargo nextest run --workspace` green (1960 passed, 6 skipped, 649 s - eight tests more than before
+the plan), `cargo doc` green under `-D warnings`, the studio's 274 vitest tests green, every doc gate
+green.
+- **The log disclosed four deviations before the review found them**, which is what it is for: Phase
+1 also rewrote `presets/preset.schema.json`; Phase 2 also edited `core/tests/suite/preset.rs`
+(without it that commit would have been red); Phase 5 also touched `ParamRow.module.css` and
+`Editor.test.tsx`; and `protocol.spec.test.ts` was deliberately red from Phase 4 until Phase 5, as
+Phase 4's own done-when anticipated.
+- **The refresh audit found one real thing**, and it is the kind that has no test: `useRoster`'s
+pending-mark clear keys on `active`, so a same-name refresh does not clear it, while the hook's doc
+comment says the mark "clears on the player's next `preset` event whatever it says". Nothing runs
+that should not - the sentence is what stopped being true.
+- Version: **0.126.0** (minor - a feature plan). ADR-0194 accepted. Archived backlog 0198 and 0204.
+Re-pointed backlog 0220's probe, which Phase 4 falsified by moving the dedup comparison into
+`Show::preset_report`; the claim it rests on is unchanged.
 
 ### [0190 - The conductor survives a run nobody is watching](done/0190-the-conductor-survives-a-run-nobody-is-watching.md)
 

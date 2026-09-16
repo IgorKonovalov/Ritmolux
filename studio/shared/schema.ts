@@ -28,6 +28,21 @@ export const SCHEMA_VERSION = 1
 export const PARAM_KINDS = ['modal', 'structural'] as const
 export type ParamKind = (typeof PARAM_KINDS)[number]
 
+/**
+ * Where one parameter reads on one family of a family-bearing system.
+ *
+ * `family` is spelled exactly as a preset writes it in its own family table, and
+ * as the `preset` event's `family` spells it, which is what lets the two be
+ * joined by a lookup rather than by a rule (ADR-0194). `range` is `null` when
+ * that family does not read the parameter at all — the arithmetic never looks at
+ * it, so there is no travel to offer and no bounds to invent.
+ */
+export const familyRangeSchema = z.object({
+  family: z.string().min(1),
+  range: z.tuple([z.number(), z.number()]).nullable(),
+})
+export type FamilyRange = z.infer<typeof familyRangeSchema>
+
 export const paramSpecSchema = z.object({
   name: z.string().min(1),
   default: z.number(),
@@ -48,8 +63,44 @@ export const paramSpecSchema = z.object({
    * panel that would not render is a worse studio.
    */
   kind: z.enum(PARAM_KINDS).catch('modal'),
+  /**
+   * One entry per family of the system that declares this parameter, in the
+   * engine's own family-roster order — present only where the engine declares a
+   * per-family table, and absent on every parameter that reads the same
+   * whatever family is drawn.
+   *
+   * Optional because it is additive under the same `v` (ADR-0194): a document
+   * printed before the field existed carries `range` alone, and `rangeFor` below
+   * falls back to it. A parser that required the key would show no panel at all
+   * for the older document, which is the failure the additive shape was chosen
+   * to avoid.
+   */
+  families: z.array(familyRangeSchema).optional(),
 })
 export type ParamSpec = z.infer<typeof paramSpecSchema>
+
+/**
+ * The ends a parameter's control takes on the family currently drawn, and
+ * whether that family reads it at all.
+ *
+ * The join ADR-0194 exists for: `families` is a static declaration travelling in
+ * the schema document, `family` is a fact about what the player loaded arriving
+ * on the `preset` event, and neither is useful alone. Everything missing —
+ * no `families`, no reported family, a family with no entry — falls back to the
+ * single declared `range`, which is what every control did before the field
+ * existed.
+ */
+export function rangeFor(
+  spec: ParamSpec,
+  family: string | null | undefined,
+): { range: [number, number] | null; inert: boolean } {
+  if (spec.families === undefined || family === null || family === undefined) {
+    return { range: spec.range, inert: false }
+  }
+  const entry = spec.families.find((candidate) => candidate.family === family)
+  if (entry === undefined) return { range: spec.range, inert: false }
+  return { range: entry.range, inert: entry.range === null }
+}
 
 /** One labelled roster: a system, or an engine stage every preset may bind. */
 export const paramRosterSchema = z.object({

@@ -2312,12 +2312,20 @@ fn declared_params_match_set_param() {
 /// `declared_params_match_set_param` above compares the engine's declarations
 /// against, and a `ParamKind` has no other enforcement available to it: it
 /// states what a value *means*, which no scan of the source can infer.
-/// Each entry names a parameter whose scene **already** clamps and rounds it
-/// before use, so the engine's own quantization composes to the identity. That
-/// is the audit's rule: a parameter is `Structural` where rounding is provably
-/// a no-op today, and `Modal` wherever the scene reads the fraction — which is
-/// why `n`, `d`, `samples`, `contour`, `count`, `seed`, `variant` and
-/// `deposit_arms` are absent despite integer-sounding names.
+///
+/// **Most entries are no-ops, and one is not.** Nearly every name below is a
+/// parameter whose scene **already** clamps and rounds it before use, so the
+/// engine's own quantization composes to the identity: marking it states an
+/// existing fact and moves no pixel. That was the audit's whole rule, and
+/// `deposit_arms` is the entry that breaks it — it is marked to **remove** a
+/// defect rather than to record an absence of one. The deposit shader reads it
+/// raw and multiplies it into an angular phase, so a fractional value tears the
+/// ring along `atan2`'s branch cut; rounding it here is what makes a bound arm
+/// count step by whole arms (backlog 0198). So the rule this roster is kept to
+/// now reads: a parameter is `Structural` where its value carries an integer
+/// meaning, and `Modal` wherever the scene reads the fraction on purpose —
+/// which is why `n`, `d`, `samples`, `contour`, `count`, `seed` and `variant`
+/// are absent despite integer-sounding names.
 const STRUCTURAL: &[(&str, &str)] = &[
     // `mark_shape` / `mark_points`: clamp then round, CPU-side, because a
     // fractional point count tears the angle fold along `atan2`'s branch cut.
@@ -2336,6 +2344,10 @@ const STRUCTURAL: &[(&str, &str)] = &[
     ("shape_collage", "roster"),
     // `echo_orientation`: rounds, then wraps modulo the four flips.
     ("warp_mesh", "echo_orient"),
+    // The one entry that is not already a no-op (see the header): the deposit
+    // shader multiplies the raw value into an angular phase, so a fraction tears
+    // the ring along the branch cut. The engine's round is the fix.
+    ("warp_mesh", "deposit_arms"),
     // `MirrorSpec::from_params`: rounds then clamps, on every line scene.
     ("parametric_curve", "mirror_order"),
     // `Gielis::of`: rounds then clamps the superformula's symmetry number.
@@ -3843,8 +3855,12 @@ fn schema_param_rows(doc: &str) -> Vec<(String, String, String)> {
             continue;
         };
         let row = (name.to_owned(), default.to_owned(), range.to_owned());
-        // The `}` is what stops a doc line containing the phrase from counting.
-        if tail.contains("\"kind\":\"structural\"}") {
+        // What follows `kind` is what stops a doc line containing the phrase
+        // from counting: either the parameter object closes, or its `families`
+        // array opens (ADR-0194 point 1) and nothing else may.
+        if tail.contains("\"kind\":\"structural\"}")
+            || tail.contains("\"kind\":\"structural\",\"families\":[")
+        {
             structural.push(row);
         } else {
             modal.push(row);
@@ -3908,48 +3924,55 @@ fn the_published_reference_and_the_exported_schema_agree() {
             ex_value, pub_value,
             "`{ex_name}`: the schema says default {ex_default}, the reference says {pub_default}"
         );
-        // A `null` range in the document is a blank cell in the reference: both
-        // say "unbounded, or world-space, and inventing a number would be a
-        // claim nothing holds".
+        let numbers: Vec<f32> = ex_range
+            .trim_matches(['[', ']'])
+            .split(',')
+            .filter_map(|n| n.parse().ok())
+            .collect();
+        let bounds = |segment: &str| -> Vec<f32> {
+            segment
+                .split('–')
+                .filter_map(|n| n.trim().rsplit('`').nth(1)?.parse().ok())
+                .collect()
+        };
+        // A family-dependent parameter's cell is one `family` `lo` – `hi` per
+        // reading family, then one trailing `inert on …` naming the rest
+        // (ADR-0180 rule 4). A row that is inert on every family but one has
+        // only the `inert on` half, so the two are recognised separately.
+        let per_family: Vec<Vec<f32>> = pub_range
+            .split("; ")
+            .filter(|segment| segment.contains('–') && segment.matches('`').count() == 6)
+            .map(bounds)
+            .collect();
+        let family_cell = !per_family.is_empty() || pub_range.starts_with("inert on ");
         let unbounded = ex_range == "null";
-        assert_eq!(
-            unbounded,
-            pub_range.is_empty(),
-            "`{ex_name}`: the schema says range {ex_range}, the reference cell \
-             is `{pub_range}` — one of them claims a bound the other does not"
-        );
-        if !unbounded {
-            let numbers: Vec<f32> = ex_range
-                .trim_matches(['[', ']'])
-                .split(',')
-                .filter_map(|n| n.parse().ok())
-                .collect();
-            let bounds = |segment: &str| -> Vec<f32> {
-                segment
-                    .split('–')
-                    .filter_map(|n| n.trim().rsplit('`').nth(1)?.parse().ok())
-                    .collect()
-            };
-            // A family-dependent parameter's cell is one `family` `lo` – `hi`
-            // per reading family (ADR-0180 rule 4). The schema keeps one pair,
-            // and it must be a range some family in the cell reads.
-            let per_family: Vec<Vec<f32>> = pub_range
-                .split("; ")
-                .filter(|segment| segment.contains('–') && segment.matches('`').count() == 6)
-                .map(bounds)
-                .collect();
-            if per_family.is_empty() {
+        if family_cell {
+            // The document keeps at most one pair per parameter, and a
+            // family-dependent one may keep none: the attractor's coefficients
+            // declare `range: None` because one pair for four maps at different
+            // scales would be a claim nothing holds. What is asserted is that a
+            // pair it *does* keep is a range some family in the cell reads.
+            assert!(
+                unbounded || per_family.contains(&numbers),
+                "`{ex_name}`: the schema's range {ex_range} is no family's range \
+                 in the reference cell {pub_range}"
+            );
+        } else {
+            // A `null` range in the document is a blank cell in the reference:
+            // both say "unbounded, or world-space, and inventing a number would
+            // be a claim nothing holds".
+            assert_eq!(
+                unbounded,
+                pub_range.is_empty(),
+                "`{ex_name}`: the schema says range {ex_range}, the reference cell \
+                 is `{pub_range}` — one of them claims a bound the other does not"
+            );
+            if !unbounded {
                 assert_eq!(
                     numbers,
                     bounds(pub_range),
                     "`{ex_name}`: the schema says range {ex_range}, the reference \
                      says {pub_range}"
-                );
-            } else {
-                assert!(
-                    per_family.contains(&numbers),
-                    "`{ex_name}`: the schema's range {ex_range} is no family's range \
-                     in the reference cell {pub_range}"
                 );
             }
         }
@@ -3957,6 +3980,291 @@ fn the_published_reference_and_the_exported_schema_agree() {
     assert!(
         !exported.is_empty(),
         "the schema carried no parameters at all, so this comparison is vacuous"
+    );
+}
+
+/// One family-dependent parameter's cells, as `(roster label, parameter,
+/// [(family, range)])` — `None` being a family that does not read it.
+type FamilyCells = (String, String, Vec<(String, Option<[f32; 2]>)>);
+
+/// The `families` arrays the exported document carries, in document order.
+///
+/// A scan for [`schema_param_rows`]'s reason and by its shape. Two brackets tell
+/// the array's end from an entry's: an entry closes `]}` (its range array, then
+/// itself) and the array closes `}]` (the last entry, then itself), so `}]` is
+/// unambiguous.
+fn schema_family_rows(doc: &str) -> Vec<FamilyCells> {
+    let mut out = Vec::new();
+    let mut roster = String::new();
+    for chunk in doc.split("{\"name\":\"").skip(1) {
+        let Some((name, rest)) = chunk.split_once("\",") else {
+            continue;
+        };
+        if rest.starts_with("\"params\":") {
+            roster = name.to_owned();
+            continue;
+        }
+        let Some((_, after)) = rest.split_once(",\"families\":[") else {
+            continue;
+        };
+        let Some((body, _)) = after.split_once("}]") else {
+            panic!("`{name}`'s families array is never closed");
+        };
+        let mut cells = Vec::new();
+        for entry in body.split("{\"family\":\"").skip(1) {
+            let Some((family, tail)) = entry.split_once("\",\"range\":") else {
+                panic!("`{name}` carries a families entry with no range");
+            };
+            let text = tail.trim_end_matches(',').trim_end_matches('}');
+            let range = if text == "null" {
+                None
+            } else {
+                let pair: Vec<f32> = text
+                    .trim_matches(['[', ']'])
+                    .split(',')
+                    .filter_map(|n| n.parse().ok())
+                    .collect();
+                let (Some(lo), Some(hi)) = (pair.first(), pair.get(1)) else {
+                    panic!("`{name}` on `{family}` carries the range `{text}`")
+                };
+                Some([*lo, *hi])
+            };
+            cells.push((family.to_owned(), range));
+        }
+        out.push((roster.clone(), name.to_owned(), cells));
+    }
+    out
+}
+
+/// The same thing, read back out of the generated reference's Range cells.
+///
+/// The reference prints the reading families first and the inert ones after, in
+/// one trailing `inert on …`, so the cells come back in a different order from
+/// the document's — which is why the comparison below is made as a mapping and
+/// not as a list.
+fn reference_family_cells() -> Vec<FamilyCells> {
+    let mut out = Vec::new();
+    let mut roster = String::new();
+    for line in render_parameter_reference().lines() {
+        if let Some(rest) = line.strip_prefix("### ") {
+            roster = rest.rsplit('`').nth(1).unwrap_or_default().to_owned();
+            continue;
+        }
+        let cells: Vec<&str> = line.split('|').map(str::trim).collect();
+        let (Some(name), Some(range)) = (cells.get(1), cells.get(3)) else {
+            continue;
+        };
+        let Some(name) = name.strip_prefix('`').and_then(|n| n.strip_suffix('`')) else {
+            continue; // the header row and its rule
+        };
+        // Backticked tokens, which is what both halves of a family cell are
+        // made of: `family` `lo` – `hi`, and `family` alone after `inert on`.
+        fn quoted(segment: &str) -> Vec<&str> {
+            segment.split('`').skip(1).step_by(2).collect()
+        }
+        let mut parsed = Vec::new();
+        for segment in range.split("; ") {
+            if let Some(list) = segment.strip_prefix("inert on ") {
+                parsed.extend(quoted(list).into_iter().map(|f| (f.to_owned(), None)));
+                continue;
+            }
+            let tokens = quoted(segment);
+            let (Some(family), Some(lo), Some(hi)) = (tokens.first(), tokens.get(1), tokens.get(2))
+            else {
+                continue; // a plain `lo` – `hi` cell, or an empty one
+            };
+            let (Ok(lo), Ok(hi)) = (lo.parse::<f32>(), hi.parse::<f32>()) else {
+                continue;
+            };
+            parsed.push(((*family).to_owned(), Some([lo, hi])));
+        }
+        if !parsed.is_empty() {
+            out.push((roster.clone(), name.to_owned(), parsed));
+        }
+    }
+    out
+}
+
+/// The published reference and the exported document carry the **same** family
+/// cells — the `range` parity above, asked of ADR-0194's additive field.
+///
+/// Both are rendered from one `FAMILY_PARAMS` walk, reached through
+/// `render::scenes::family_params` under the roster's own label, so this asserts
+/// that the two *renderings* of that walk did not diverge. Editing one cell's
+/// range moves both, and a cell that reached only one of them fails here.
+#[test]
+fn the_family_cells_agree_between_the_reference_and_the_schema() {
+    let document = rlx_core::preset::export::document();
+    // Sorted by `(roster, parameter)`, because the document keeps declaration
+    // order and the reference prints each roster's structural parameters before
+    // its modal ones (ADR-0180 rule 4). Neither order is the other's, and
+    // neither is what this test is about.
+    let key = |(roster, name, _): &FamilyCells| (roster.clone(), name.clone());
+    let mut exported = schema_family_rows(&document);
+    let mut published = reference_family_cells();
+    exported.sort_by_key(key);
+    published.sort_by_key(key);
+
+    assert!(
+        exported.len() > 30,
+        "only {} parameter(s) carry family cells in the document — the walk has \
+         stopped finding the tables rather than the tables having shrunk",
+        exported.len()
+    );
+    assert_eq!(
+        exported.len(),
+        published.len(),
+        "the document carries family cells for {} parameter(s) and the reference \
+         for {} — one of the two renderings dropped or invented a row",
+        exported.len(),
+        published.len()
+    );
+    // Sorted by family, because the reference groups the reading families
+    // before the inert ones and the document keeps the roster's own order.
+    let keyed = |cells: &[(String, Option<[f32; 2]>)]| {
+        let mut sorted = cells.to_vec();
+        sorted.sort_by(|a, b| a.0.cmp(&b.0));
+        sorted
+    };
+    for ((ex_roster, ex_name, ex_cells), (pub_roster, pub_name, pub_cells)) in
+        exported.iter().zip(&published)
+    {
+        assert_eq!(
+            (ex_roster, ex_name),
+            (pub_roster, pub_name),
+            "the two renderings disagree on which parameter carries family cells"
+        );
+        assert_eq!(
+            keyed(ex_cells),
+            keyed(pub_cells),
+            "`{ex_roster}` `{ex_name}`: the document and the reference disagree \
+             about what each family reads"
+        );
+    }
+}
+
+/// The document's `families` say what ADR-0194 point 1 promises: one entry per
+/// family, in the system's own roster order, `null` where the family does not
+/// read the parameter — and **no key at all** on a parameter with no row.
+///
+/// The families are compared against `Roster::values()`, the closed set the
+/// loader accepts, rather than against the table the document was rendered from,
+/// so an entry naming a family no preset may write fails here.
+#[test]
+fn the_schema_families_name_each_systems_roster_in_order() {
+    use rlx_core::preset::export::{self, Roster};
+
+    let document = export::document();
+    let rows = schema_family_rows(&document);
+    let cells = |roster: &str, param: &str| -> Vec<(String, Option<[f32; 2]>)> {
+        rows.iter()
+            .find(|(r, p, _)| r == roster && p == param)
+            .map(|(_, _, cells)| cells.clone())
+            .unwrap_or_else(|| panic!("`{roster}` `{param}` carries no families"))
+    };
+    let names = |cells: &[(String, Option<[f32; 2]>)]| -> Vec<String> {
+        cells.iter().map(|(family, _)| family.clone()).collect()
+    };
+
+    let n = cells("parametric_curve", "n");
+    assert_eq!(names(&n), Roster::CurveFamily.values(), "`n`'s families");
+    assert_eq!(
+        n.iter()
+            .find(|(family, _)| family == "hypotrochoid")
+            .map(|(_, range)| *range),
+        Some(Some([-8.0, 8.0])),
+        "`n` reads -8..8 on a hypotrochoid, which is the half of that family a \
+         single range cannot reach"
+    );
+    assert_eq!(
+        n.iter()
+            .find(|(family, _)| family == "superformula")
+            .map(|(_, range)| *range),
+        Some(None),
+        "`n` is inert on a superformula"
+    );
+    assert_eq!(
+        cells("parametric_curve", "d")
+            .iter()
+            .find(|(family, _)| family == "lissajous")
+            .map(|(_, range)| *range),
+        Some(Some([1.0, 12.0])),
+        "`d` reads 1..12 on a Lissajous, which is 3% of the single range it \
+         declares"
+    );
+
+    let b = cells("attractor", "b");
+    assert_eq!(
+        names(&b),
+        Roster::AttractorFamily.values(),
+        "`b`'s families"
+    );
+    assert_eq!(
+        b.iter()
+            .find(|(family, _)| family == "thomas")
+            .map(|(_, range)| *range),
+        Some(None),
+        "Thomas reads its dissipation in `a` and nothing else"
+    );
+
+    assert!(
+        !rows
+            .iter()
+            .any(|(roster, param, _)| roster == "parametric_curve" && param == "samples"),
+        "`samples` reads the same on every curve family, so it must carry no \
+         `families` key at all — a consumer falls back to `range`"
+    );
+}
+
+/// Every family row's declaration is made by **exactly one** parameter roster.
+///
+/// The editor schema writes one `definitions` entry per distinct declaration and
+/// every system accepting it `$ref`s that entry, so a family-dependent
+/// declaration shared by two systems would print one system's families on the
+/// other's hover. That is a wrong sentence in a tooltip, which nothing else in
+/// this suite would catch — so the case stops here rather than shipping.
+#[test]
+fn every_family_row_declaration_belongs_to_one_roster() {
+    use rlx_core::preset::export;
+    use rlx_core::render::scenes::ParamSpec;
+
+    // `export`'s own notion of "the same declaration", restated because it is
+    // private there: the same name saying the same thing about the same default.
+    fn same(a: &ParamSpec, b: &ParamSpec) -> bool {
+        let bits = |range: Option<[f32; 2]>| range.map(|[lo, hi]| (lo.to_bits(), hi.to_bits()));
+        a.name == b.name
+            && a.doc == b.doc
+            && a.default.to_bits() == b.default.to_bits()
+            && bits(a.range) == bits(b.range)
+            && a.kind == b.kind
+    }
+
+    let rows = export::family_rows();
+    assert!(
+        rows.len() > 30,
+        "only {} family row(s) found — the walk has stopped reaching the tables",
+        rows.len()
+    );
+    let rosters = export::param_rosters();
+    let mut findings = Vec::new();
+    for (spec, _) in &rows {
+        let owners: Vec<&str> = rosters
+            .iter()
+            .filter(|(_, specs)| specs.iter().any(|candidate| same(candidate, spec)))
+            .map(|(label, _)| *label)
+            .collect();
+        if owners.len() != 1 {
+            findings.push(format!("  `{}` is declared by {owners:?}", spec.name));
+        }
+    }
+    assert!(
+        findings.is_empty(),
+        "{} family-dependent declaration(s) are shared across rosters:\n{}\n\
+         Give the sharing systems their own `ParamSpec` — a different doc line is \
+         enough — or the editor schema will name one system's families on the \
+         other's parameter.",
+        findings.len(),
+        findings.join("\n"),
     );
 }
 

@@ -3210,6 +3210,197 @@ fn the_ode_substeps_agree_between_rust_and_wgsl() {
 }
 
 // -----------------------------------------------------------------------
+// The family table (ADR-0180 rule 4 / ADR-0194 point 2)
+// -----------------------------------------------------------------------
+
+/// Every `[particles] family` a preset may name, in the order the schema export
+/// writes them: the four maps, then the IFS figures.
+fn attractor_family_names() -> Vec<&'static str> {
+    AttractorFamily::MAPS
+        .iter()
+        .map(|f| f.as_str())
+        .chain(IfsFigure::ALL.iter().map(|f| f.name()))
+        .collect()
+}
+
+/// The body of one family's arm of `STEP_SHADER`, comments stripped.
+///
+/// Comments are stripped because English prose is full of the word "a", and the
+/// scan below asks which of `a`..`d` an arm *mentions*.
+fn step_arm(open: &str, close: &str) -> String {
+    let body = super::STEP_SHADER
+        .split_once(open)
+        .unwrap_or_else(|| panic!("the step shader opens an arm with `{open}`"))
+        .1
+        .split_once(close)
+        .unwrap_or_else(|| panic!("the step shader closes that arm with `{close}`"))
+        .0;
+    body.lines()
+        .map(|line| line.split_once("//").map_or(line, |(code, _)| code))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Whether `code` uses `name` as an identifier of its own — not as a suffix of
+/// `dp`, not as a field of `m.x`.
+fn mentions(code: &str, name: &str) -> bool {
+    let ident = |c: char| c.is_alphanumeric() || c == '_';
+    code.match_indices(name).any(|(at, _)| {
+        let before = code[..at].chars().next_back();
+        let after = code[at + name.len()..].chars().next();
+        !before.is_some_and(|c| ident(c) || c == '.') && !after.is_some_and(ident)
+    })
+}
+
+/// [`family::FAMILY_PARAMS`] is a statement about the engine, so it is held to
+/// the engine: each row names a declared parameter once, lists **every**
+/// attractor family by the name a preset writes and in the export's roster
+/// order, and declares on each reading family a range that contains every
+/// coefficient of that family's own tuple roster — the canonical entry and every
+/// extra.
+///
+/// And each inert cell is inert, asserted twice over. Once against the **WGSL**,
+/// which is the source and the only reading that can be wrong in a way the CPU
+/// mirror would agree with: each map's arm is lifted out of `STEP_SHADER` and
+/// asked which of `a`..`d` it mentions. Once against [`family::step_once`], by
+/// moving the coefficient and finding the step's output unmoved.
+///
+/// **The IFS figures are exempt from both of those**, and their cells are
+/// asserted `None` outright instead. `step_once` has no IFS arithmetic at all
+/// and the shader's IFS arm reads the resolved affine table rather than the
+/// coefficients, so "moving `a` changed nothing" would hold there for a reason
+/// that has nothing to do with this row — a check that cannot fail is not
+/// evidence.
+#[test]
+fn the_family_table_is_the_roster_and_its_inert_cells_are_inert() {
+    let families = attractor_family_names();
+    let mut seen = Vec::new();
+    for row in family::FAMILY_PARAMS {
+        assert!(!seen.contains(&row.name), "`{}` has two rows", row.name);
+        seen.push(row.name);
+        let spec = super::PARAMS
+            .iter()
+            .find(|spec| spec.name == row.name)
+            .unwrap_or_else(|| panic!("`{}` is not a declared parameter", row.name));
+        assert_eq!(
+            spec.range, None,
+            "`{}` must keep `range: None` — one pair for four maps at different \
+             scales is a claim nothing holds",
+            row.name
+        );
+        let listed: Vec<&str> = row.ranges.iter().map(|r| r.family).collect();
+        assert_eq!(listed, families, "`{}` must list every family", row.name);
+    }
+    assert_eq!(
+        crate::render::scenes::family_params("attractor"),
+        family::FAMILY_PARAMS,
+        "the reference must reach this table under the system's own label"
+    );
+
+    // Each map arm of the WGSL, and the Lorenz `else` that closes the chain.
+    let arms = [
+        (
+            AttractorFamily::DeJong,
+            step_arm(
+                "if (step.family == 0u) {",
+                "} else if (step.family == 1u) {",
+            ),
+        ),
+        (
+            AttractorFamily::Clifford,
+            step_arm(
+                "if (step.family == 1u) {",
+                "} else if (step.family == 4u) {",
+            ),
+        ),
+        (
+            AttractorFamily::Thomas,
+            step_arm("if (step.family == 2u) {", "} else {"),
+        ),
+        // The chain's only bare `else`, and so the only arm with no selector of
+        // its own to name.
+        (
+            AttractorFamily::Lorenz,
+            step_arm("} else {", "particles[i].prev = origin;"),
+        ),
+    ];
+
+    let mut inert_checked = 0;
+    for (index, row) in family::FAMILY_PARAMS.iter().enumerate() {
+        for (cell, family) in row.ranges.iter().zip(AttractorFamily::MAPS) {
+            let reads = cell.range.is_some();
+            // The shader, which is the source.
+            let arm = &arms
+                .iter()
+                .find(|(f, _)| *f == family)
+                .unwrap_or_else(|| panic!("no shader arm for {family:?}"))
+                .1;
+            assert_eq!(
+                mentions(arm, row.name),
+                reads,
+                "`{}` on {family:?}: the table says reads={reads}, the WGSL arm \
+                 says otherwise",
+                row.name
+            );
+
+            // The CPU mirror, moved.
+            let coeffs = family.default_coeffs();
+            let mut moved = coeffs;
+            let Some(slot) = moved.get_mut(index) else {
+                panic!("`{}` is row {index}, past the four coefficients", row.name)
+            };
+            *slot += 0.37;
+            let from = [0.5, 0.7, 0.3];
+            let before = family::step_once(family, coeffs, from);
+            let after = family::step_once(family, moved, from);
+            if reads {
+                assert_ne!(
+                    before, after,
+                    "`{}` did not move the {} it reads on",
+                    row.name, cell.family
+                );
+            } else {
+                assert_eq!(
+                    before, after,
+                    "`{}` moved the {} it is inert on",
+                    row.name, cell.family
+                );
+                inert_checked += 1;
+            }
+
+            // Every curated coefficient sits inside the declared bound.
+            if let Some([lo, hi]) = cell.range {
+                let tuples = std::iter::once(coeffs).chain(family.extra_tuples().iter().copied());
+                for tuple in tuples {
+                    let Some(value) = tuple.get(index).copied() else {
+                        panic!("a tuple with fewer than four coefficients")
+                    };
+                    assert!(
+                        (lo..=hi).contains(&value),
+                        "`{}` on {}: the roster carries {value}, outside the \
+                         declared {lo}..{hi}",
+                        row.name,
+                        cell.family
+                    );
+                }
+            }
+        }
+        // The IFS tail, which is a claim rather than a measurement.
+        for cell in row.ranges.iter().skip(AttractorFamily::MAPS.len()) {
+            assert_eq!(
+                cell.range, None,
+                "`{}` on the {} figure: an IFS's shape lives in its affine table, \
+                 so no coefficient reads there",
+                row.name, cell.family
+            );
+        }
+    }
+    // Thomas is inert on three, Lorenz on one: four cells, and a count that
+    // fails if an arm stopped being read rather than passing vacuously.
+    assert_eq!(inert_checked, 4, "the map families carry four inert cells");
+}
+
+// -----------------------------------------------------------------------
 // The tuple walk (Plan 0079 Phase 5 / ADR-0093)
 // -----------------------------------------------------------------------
 

@@ -513,9 +513,9 @@ pub const PARAMS: &[ParamSpec] = &[
         name: "deposit_arms",
         default: 0.0,
         range: Some([0.0, 16.0]),
-        doc: "How many arms the ring is broken into, as a real angular frequency; 0 leaves it \
+        doc: "How many arms the ring is broken into, as a whole number of arms; 0 leaves it \
                whole.",
-        kind: ParamKind::Modal,
+        kind: ParamKind::Structural,
     },
     ParamSpec {
         name: "deposit_twist",
