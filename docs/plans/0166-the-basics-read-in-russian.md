@@ -241,10 +241,30 @@ const state = !stamped ? 'FAIL' : current.startsWith(stamped) ? 'current' : 'sta
 | 1 — The stamp, the gate, and the banner | `dev` | done | `645e84ec` |
 | 2 — The five translations, drafted and unpublished | `dev` | done | committed with this row |
 | 3 — Owner review of the Russian prose | `human` | done | `40c1ed39` + `79976978` |
-| 4 — Publish: the map, the menu, the banner in place | `dev` | not started | |
+| 4 — Publish: the map, the menu, the banner in place | `dev` | done | committed with this row |
 | 5 — The foobar component zip ships the Russian install file | `dev` | not started | |
 
 ### Notes
+
+- **Phase 4's cross-link is a remark plugin in `astro.config.mjs`, not an edit to ten documents.**
+  The phase's done-when asks each page to link its twin, and its Files-touched names only the three
+  config files — so the link is derived from the sibling pair on disk (`<name>.md` /
+  `<name>.ru.md`) by `translationCrossLink`, which sits beside `stripLeadingHeading` in that same
+  file. A translation added to `PUBLISHED` later gets its link with no edit. Its position in the
+  remark chain is load-bearing on both sides: after `translationBanner`, which has already removed
+  the stamp that would otherwise be the first node, and before `stripLeadingHeading`, which removes
+  the `# ` heading it inserts after.
+- **`REPO_ROOT` was used rather than exporting `sourceOf`.** `rewrite-links.mjs` has a private
+  `sourceOf`; the cross-link needs the same repo-relative path, and `REPO_ROOT` is already exported,
+  so the derivation is four lines in the config instead of a widened module API.
+- **Only the two reader documents joined `READER_DOCS`**, not all five. ADR-0168's rule is about
+  prose a reader meets, and the three installer notes carry no Plan/ADR citations — the same reason
+  their English twins are not in that list either.
+- **Astro's content cache had to be cleared to see a plugin fix.** A wrong `BASE` in the cross-link
+  survived a rebuild because `site/.astro` held the rendered entry; `rm -rf site/.astro
+  site/node_modules/.astro` is what made the rebuild honest. Worth knowing before trusting a green
+  build after a remark-plugin edit.
+
 
 - **Phase 3 ran 2026-09-16 and passed, with corrections.** The owner read the five and named the
   defect class in two examples of its own — *«Визуальная случайность есть — брызги частиц… явно

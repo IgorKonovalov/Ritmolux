@@ -90,6 +90,19 @@ export const PUBLISHED = {
     route: 'install/foobar',
     title: 'Install the foobar2000 component',
   },
+  // Русский (ADR-0185). A translation is published like any other source: it is
+  // the `.ru.md` sibling that makes it one, and this map decides only whether it
+  // is served. Titles are in Russian because the only reader of a Russian page is
+  // a Russian reader, and a menu that names them in English would be a menu in
+  // two languages.
+  'docs/how-it-works.ru.md': { route: 'ru/how-it-works', title: 'Как это устроено' },
+  'docs/running.ru.md': { route: 'ru/running', title: 'Как пользоваться приложением' },
+  'packaging/windows/READ-ME-FIRST.ru.md': { route: 'ru/install-windows', title: 'Установка на Windows' },
+  'packaging/macos/READ-ME-FIRST.ru.md': { route: 'ru/install-macos', title: 'Установка на macOS' },
+  'packaging/foobar/READ-ME-FIRST.ru.md': {
+    route: 'ru/install-foobar',
+    title: 'Установка компонента foobar2000',
+  },
 };
 
 /**

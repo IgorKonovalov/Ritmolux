@@ -9,7 +9,7 @@ import { SKIP, visit } from 'unist-util-visit';
 import { rewriteLinks } from './src/plugins/rewrite-links.mjs';
 import { stripProvenance } from './src/plugins/strip-provenance.mjs';
 import { translationBanner } from './src/plugins/translation-banner.mjs';
-import { PUBLISHED } from './src/plugins/rewrite-links.mjs';
+import { PUBLISHED, REPO_ROOT } from './src/plugins/rewrite-links.mjs';
 import { sidebarGroup } from './src/plugins/split-document.mjs';
 
 /**
@@ -144,6 +144,47 @@ function stripLeadingHeading() {
 }
 
 /**
+ * Links a translated page to its English twin and each twin back to it.
+ *
+ * The pair is a sibling pair on disk - `<name>.md` and `<name>.ru.md` - so the
+ * twin is derived rather than listed, and a translation added to `PUBLISHED`
+ * gets its link with no edit here. A page whose twin is not published gets
+ * nothing, which is what keeps this inert for the other thirty sources.
+ *
+ * It runs AFTER `translationBanner` and BEFORE `stripLeadingHeading`, and the
+ * order is load-bearing on both sides: the banner has already removed the stamp
+ * that would otherwise be the first node, and the strip has not yet removed the
+ * `# ` heading this inserts after. Inserting in front of that heading would
+ * leave it second and unstripped, and the page would show its title twice - the
+ * same trap the banner documents.
+ */
+function translationCrossLink() {
+  return (tree, file) => {
+    if (!file?.path) return;
+    const source = path.relative(REPO_ROOT, path.resolve(file.path)).split(path.sep).join('/');
+    if (!(source in PUBLISHED)) return;
+    const ru = source.endsWith('.ru.md');
+    const twin = ru ? source.slice(0, -'.ru.md'.length) + '.md' : source.slice(0, -'.md'.length) + '.ru.md';
+    const entry = PUBLISHED[twin];
+    if (entry === undefined) return;
+
+    const label = ru ? 'In English' : 'Читать по-русски';
+    const at = tree.children[0]?.type === 'heading' && tree.children[0].depth === 1 ? 1 : 0;
+    tree.children.splice(at, 0, {
+      type: 'paragraph',
+      children: [
+        {
+          type: 'link',
+          url: `${BASE}${entry.route}/`,
+          title: entry.title,
+          children: [{ type: 'text', value: label }],
+        },
+      ],
+    });
+  };
+}
+
+/**
  * One sidebar entry per published document: a plain link while the document is
  * small, and a collapsed group of its routes once it is large enough to split.
  *
@@ -231,6 +272,7 @@ export default defineConfig({
   markdown: {
     remarkPlugins: [
       translationBanner,
+      translationCrossLink,
       stripLeadingHeading,
       substituteVersion,
       stripProvenance,
@@ -334,6 +376,16 @@ export default defineConfig({
             doc('docs/releasing.md'),
             doc('docs/on-device-validation.md'),
             doc('docs/diffusion-filter.md'),
+          ],
+        },
+              {
+          label: 'Русский',
+          items: [
+            doc('docs/how-it-works.ru.md'),
+            doc('docs/running.ru.md'),
+            doc('packaging/windows/READ-ME-FIRST.ru.md'),
+            doc('packaging/macos/READ-ME-FIRST.ru.md'),
+            doc('packaging/foobar/READ-ME-FIRST.ru.md'),
           ],
         },
       ],

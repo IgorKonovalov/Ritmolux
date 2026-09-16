@@ -112,6 +112,12 @@ const READER_DOCS = [
   "docs/embedding.md",
   "docs/specs/0001-c-abi.md",
   "docs/specs/0002-ring-determinism.md",
+  // The Russian pages (ADR-0185). A translation publishes, so ADR-0168's rule
+  // reaches it: a citation is a link there for the same reason it is one in the
+  // English twin. Only the translations that publish are listed; the rule is
+  // about what a reader meets on the site, not about every file on disk.
+  "docs/how-it-works.ru.md",
+  "docs/running.ru.md",
 ];
 
 /**
