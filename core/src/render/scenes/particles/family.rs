@@ -397,14 +397,14 @@ macro_rules! per_family {
 /// number fields.
 ///
 /// **Inertness is what the map arithmetic reads**, and it is held against the
-/// WGSL in [`STEP_SHADER`](super::STEP_SHADER) rather than against
-/// [`step_once`]'s mirror alone: De Jong and Clifford read all four, Thomas
+/// WGSL in `STEP_SHADER` rather than against
+/// `step_once`'s mirror alone: De Jong and Clifford read all four, Thomas
 /// reads `a` — its dissipation — alone, Lorenz reads `a`, `b` and `c` (sigma,
 /// rho, beta) and never `d`, and every IFS figure reads none of them.
 ///
 /// **A reading cell's bounds are the hull of that family's own tuple roster**,
-/// [`extra_tuples`](AttractorFamily::extra_tuples) plus the canonical
-/// [`default_coeffs`](AttractorFamily::default_coeffs), rounded outward to a
+/// `AttractorFamily::extra_tuples` plus the canonical
+/// `AttractorFamily::default_coeffs`, rounded outward to a
 /// readable slider end. The hulls those rosters measure, which the test holds
 /// every declared cell to contain:
 ///

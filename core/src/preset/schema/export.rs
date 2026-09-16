@@ -1245,8 +1245,8 @@ fn push_family_prose(text: &mut String, row: &FamilyParam) {
 }
 
 /// Every family-dependent parameter declaration in the engine, paired with the
-/// [`FamilyParam`] row that describes it — the lookup [`markdown_for`] needs,
-/// which the document does not, because [`push_roster`] already has the roster's
+/// [`FamilyParam`] row that describes it — the lookup `markdown_for` needs,
+/// which the document does not, because `push_roster` already has the roster's
 /// label in hand and this walk does not.
 ///
 /// **Keyed by declaration, because the editor schema's `definitions` are.** A
