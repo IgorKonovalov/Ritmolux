@@ -273,6 +273,8 @@ accepted cost" are different documents and only one of them is honest.
 - [0233 — the run terminal says a phase is done but not how long it took](#0233--the-run-terminal-says-a-phase-is-done-but-not-how-long-it-took)
 - [0234 — one digest line carries a run-scoped time beside a lifetime spend, and reads as neither](#0234--one-digest-line-carries-a-run-scoped-time-beside-a-lifetime-spend-and-reads-as-neither)
 - [0235 — the run terminal's ASCII guarantee is asserted over a fixture that has no non-ASCII in it](#0235--the-run-terminals-ascii-guarantee-is-asserted-over-a-fixture-that-has-no-non-ascii-in-it)
+- [0227 — a plan pays an 11-minute full suite for every distinct tree it gates, and a close's tree differs from the reviewed one only in prose, a version and a merge](#0227--a-plan-pays-an-11-minute-full-suite-for-every-distinct-tree-it-gates-and-a-closes-tree-differs-from-the-reviewed-one-only-in-prose-a-version-and-a-merge)
+- [0238 — the parameter slider is drawn from the schema and armed by the preset read, so a release between the two is discarded in silence](#0238--the-parameter-slider-is-drawn-from-the-schema-and-armed-by-the-preset-read-so-a-release-between-the-two-is-discarded-in-silence)
 <!-- toc:end -->
 
 ## The ledger
@@ -320,6 +322,7 @@ live entry citing this one.
 | 0215 | The seam on two MilkDrop 1.x presets is unexplained | [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) Phases 1, 4. **Promoted** |
 | 0216 | The converted waveform follows neither reference | [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) Phases 5-6 + ADR-0199. **Promoted** |
 | 0217 | `path_cost`'s arity probe prices an arc chain, not the polyline its header reports | [Plan 0160](plans/0160-the-silhouettes-preconditions-stop-being-silent.md) Phase 1b. **Promoted** |
+| 0227 | A plan pays an 11-minute full suite for every distinct tree it gates | [Plan 0191](plans/0191-a-green-tree-is-not-tested-four-times.md) + [ADR-0211](adrs/0211-a-green-suite-record-serves-a-later-tree-when-no-deferred-suite-can-read-the-diff.md). Skip half only; the cheaper-suite half is 0239. **Promoted** |
 <!-- roster:end -->
 
 ### Closed
@@ -578,6 +581,7 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0233 | The run terminal says a phase is done but not how long it took | [Plan 0190](plans/done/0190-the-conductor-survives-a-run-nobody-is-watching.md) Phase 5. Commit and phase lines carry the span since the previous phase. **Closed 2026-09-16** |
 | 0234 | One digest line carries a run-scoped time beside a lifetime spend | [Plan 0190](plans/done/0190-the-conductor-survives-a-run-nobody-is-watching.md) Phase 5. Both are named, and the per-run one is what Totals sums. **Closed 2026-09-16** |
 | 0235 | The run terminal's ASCII guarantee is asserted over a fixture with no non-ASCII in it | [Plan 0190](plans/done/0190-the-conductor-survives-a-run-nobody-is-watching.md) Phase 6. Both `ascii()` calls armed separately, each demonstrated red. **Closed 2026-09-16** |
+| 0238 | The parameter slider is drawn from the schema and armed by the preset read, so a release between the two is discarded | `70e0a19` (test) + `39a6589` (product). Gated on `hasDocument`, not `writable`. **Closed 2026-09-16** |
 <!-- roster:end -->
 
 ---
@@ -13889,4 +13893,152 @@ armed separately: `liveLine`'s by a direct assertion in *every line is ASCII*, `
 Both removals were demonstrated red in turn and restored before the commit. **This entry's own probe
 stayed green through its delivery**: `present: feat: plan \$\{plan\} phase \$\{id\}` is a prefix of the
 new subject.
+
+## 0227 — a plan pays an 11-minute full suite for every distinct tree it gates, and a close's tree differs from the reviewed one only in prose, a version and a merge
+
+`runGate` looks the ledger up by the worktree's whole tree (`greenRecord(ledger, cleanTree(cwd))`,
+ADR-0207). Every commit changes the tree, so every stage whose tree moved runs the full workspace
+suite again: 737-767 s each on the reference machine on 2026-09-15.
+
+A clean plan with no fix round runs it at least twice, and what separates the two trees is rarely
+code:
+
+- `pre-review` gates the implementer's tip.
+- The close tip adds the close's prose repairs, the plan's move to `done/`, the indexes, the version
+  bump in `Cargo.toml`/`Cargo.lock` and the studio's two copies, and `git merge main`. `main` itself
+  is a tree some earlier gate already passed.
+- `remerge` runs a third time whenever `main` moved after the close, even by a commit that touches
+  only `tools/conductor/`.
+
+Measured on 0175: 24 min of sessions against 58 min of full suites (pre-review 11.2, post-close red
+10.8, post-close 11.4, remerge 12.3), plus a 12.7-min hand run. 0177, which met ADR-0207's bound of
+two: 64 min of finished sessions against 24.5 min of full suites (pre-review 10.9, the close tip
+13.6). With lane b off (ADR-0205 `Outcome`),
+every one of those minutes also blocks the next plan in the queue.
+
+Where a suite's 737 s go (`0175-remerge-18-cargo_nextest.log`, 7378 test-seconds over 73 binaries):
+the three per-preset suites `reactivity` 1566 s, `animation` 1291 s and `sanity` 1099 s, 54 % together
+and growing with every shipped preset; core unit tests 1065 s; `distinctness` 299 s;
+`reaction_diffusion_contract` alone 216 s. Backlog 0221 is the run-alone override's share.
+
+The hazard any shape must answer: "only prose changed" is not the same as "no test reads it".
+`hygiene.rs` scans docs, `preset.rs` checks the generated block in `presets/README.md`, and the
+version bump reaches every crate that reads `CARGO_PKG_VERSION`.
+
+Shapes, none decided:
+
+- **Key a skip on the code-reachable part of the tree**: a green record for tree A also serves tree
+  B when `git diff A B` touches only paths on a declared list no test reads. The list is the whole
+  risk, and a gate would have to hold it.
+- **Tier the close tip**: the full suite once at `pre-review`, and `-P fast` plus the doc and Node
+  gates on the close tip and a remerge, with the full suite owed again only when the diff since the
+  green tree touches a `.rs`, a `.wgsl`, a preset or `Cargo.lock` beyond the version line.
+- **Make the suite cheaper instead**: the per-preset suites share one headless renderer per binary,
+  or sample the library at the gate and cover it whole nightly.
+- **Operator rule, costless today**: nothing is committed to `main` while a closed plan waits for its
+  fast-forward. A tools-only commit cost 0175 its 12.3-min remerge.
+
+- **Raised:** 2026-09-15, by the owner ("we are extremely slow") during Plan 0189 Phase 8.
+  **Owner if taken:** `architect` (what a green record may serve), then `dev`.
+- **Verified 2026-09-15** — the ledger is keyed by the whole tree:
+  `present: greenRecord\(ledger, cleanTree\(cwd\)\) in: tools/conductor/lib/gate.mjs`
+
+### Priority
+
+**High.** It is the largest single term in a plan's wall clock, and the owner's standing complaint.
+
+- **Moved to the archive 2026-09-16 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0191](plans/0191-a-green-tree-is-not-tested-four-times.md) owns the ask, with [ADR-0211](adrs/0211-a-green-suite-record-serves-a-later-tree-when-no-deferred-suite-can-read-the-diff.md) as the decision, and its close appends the `CLOSED` marker here. **Only the skip half is promoted.** The entry's third shape - making the per-preset suites themselves cheaper, which is 54 % of the cost - is not in that plan and lives on as backlog 0239; ADR-0211 records it as its Alternative A. The entry's fourth shape, the operator rule, is **retired rather than deferred**: a tools-only commit on `main` is a served diff under ADR-0211, so the rule buys nothing.
+
+## 0238 — the parameter slider is drawn from the schema and armed by the preset read, so a release between the two is discarded in silence
+
+CI run 35065148120, the `studio` job of the `v0.123.2` tag build, failed one test out of 264 while
+every other job in the run was green:
+
+```
+FAIL renderer/views/Editor.test.tsx > a gesture against a preset the session has not forked
+     > 'a parameter release' writes nothing until the copy is named
+TestingLibraryElementError: Unable to find a label with the text of: save a copy as   1083ms
+```
+
+The `1083ms` is the reading, not the noise. Testing Library's `findBy*` default timeout is 1000 ms
+and `studio/vitest.config.ts` sets no override, so the assertion did not run slow — it ran to the
+end of its window against a prompt that was never going to appear. The gesture was **dropped**.
+
+Two async loads arm one control, and nothing couples them:
+
+- The rows of `ParamPanel` come from the **schema** — `rostersFor(schema.document, system)` at
+  `studio/renderer/views/Editor.tsx:260`, iterated at `ParamPanel.tsx:41`. The `warp` slider is on
+  screen, and drag-responsive, as soon as `getSchema` resolves.
+- `writable` is `text !== undefined && dir !== null`
+  (`studio/renderer/hooks/useActivePreset.ts:266`), and `text` arrives only when `preset.read`
+  resolves — a **separate** promise, started by a different effect.
+- The release handler is `if (writable) onCommit(spec.name, value)`
+  (`studio/renderer/components/ParamRow.tsx:97`). No `disabled`, no read-only arm, no notice.
+
+So between the two resolutions the studio draws a live slider that throws away what is done with it.
+The test loses this race because `await screen.findByLabelText('warp')` waits on the *schema* label
+and nothing else, and it is the first of the five `it.each` gestures for the same reason: the other
+four `await tab(...)` or wait on a CodeMirror document first, which hands the pending read extra
+ticks.
+
+**Reproduced deliberately**: the test file copied, a 30 ms `setTimeout` added to the fake's
+`preset.read`, identical failure at 1055 ms. The copy was deleted; nothing in the tree records it.
+
+The three implicated files are byte-identical between `v0.123.2` and `main`, so this is live — the
+three other tag builds that started in the same minute won the race.
+
+Two shapes, and the entry carries both because they answer different questions:
+
+- **The test** — wait on something that proves the *preset* loaded before firing the gesture: the
+  `warp` slider carrying the file's own `0.4` rather than the spec default, or the `/presets/ink.toml`
+  path the same file already waits on elsewhere. Cheap, and it makes the suite honest about what it
+  is timing. It does **not** fix the studio.
+- **The product** — do not render an interactive control while `writable` is false. A slider that
+  moves, sends `ctl/param`, and then discards the release is the studio disagreeing with itself
+  about what it just did, which is the same objection `ParamRow`'s own header already raises against
+  a slider reporting a value the engine would round away. A human is unlikely to out-race a local
+  file read, so the cost is a rare lost gesture rather than a wrong one — but the window is real and
+  nothing marks it.
+
+- **Raised:** 2026-09-16, from CI triage of run 35065148120. **Owner if taken:** `studio-builder`.
+- **Verified 2026-09-16** — the rows are schema-driven, so the slider does not wait on the preset:
+  `present: rostersFor\(schema\.document in: studio/renderer/views/Editor.tsx`
+- **Verified 2026-09-16** — and the arm does wait on it:
+  `present: writable: text !== undefined && dir !== null in: studio/renderer/hooks/useActivePreset.ts`
+- **Verified 2026-09-16** — the release is gated with no other outcome:
+  `present: if \(writable\) onCommit in: studio/renderer/components/ParamRow.tsx`
+- **Verified 2026-09-16** — and nothing in the row disables or marks the control meanwhile:
+  `absent: disabled in: studio/renderer/components/ParamRow.tsx`
+- **Verified 2026-09-16** — the 1000 ms default stands, so the failure window is the default one
+  and raising it would hide this rather than fix it:
+  `absent: Timeout in: studio/vitest.config.ts`
+
+### Priority
+
+**Medium.** The defect costs a rare dropped gesture; the flake costs a red `main` on a tag build for
+a reason that reads as infrastructure and is not. Nothing else in the suite waits on a
+schema-rendered control to prove a preset-backed one is armed, so the blast radius is this one file
+— but it will fire again, and the next reader will spend the triage again.
+
+**CLOSED 2026-09-16** — both halves, by two commits on `main` the same day, which is why this
+entry's own probes went red: each asserted the defect was still there.
+
+- **The test half**, `70e0a19` *"a gesture test waits for the preset, not the schema"*. `presetLoaded()`
+  now waits on `screen.findByText(SOURCE)` — the path, which renders only once `preset.read` landed —
+  instead of on the schema-drawn control, and the comment above it says why. **Five file-backed tests
+  had the shape, not the one CI caught**; the embedded case correctly does not, because its base comes
+  from the same schema promise that draws the slider. Verified against a copy with a delayed read: 7 of
+  10 failed at 30 ms before, 10 of 10 passed at 250 ms after.
+- **The product half**, `39a6589` *"a parameter row is inert until the preset document is known"*. The
+  row is gated on a new `hasDocument` and states it in the DOM with `disabled`, so the window no longer
+  offers a control that would discard the release. **Gated on `hasDocument`, deliberately not on
+  `writable`** — the entry proposed `writable`, and the commit rejected that: with no file behind the
+  preset the slider still drags, because the override moves the picture and a disabled slider would
+  claim the parameter cannot move. Those are two different facts and the `writable = false` drag is
+  tested behaviour. `ParamRow` was the only outlier; `SystemPicker`, `MapEditor` and `TableEditor`
+  already disabled on `writable`, which is why only the parameter gesture reached the discard.
+- **What outlived the entry**: a `holdReads` fixture that keeps every `preset.read` pending until the
+  test releases it, so the window is now reachable deterministically rather than by losing a race. The
+  entry's *"nothing in the tree records it"* — the reproduction was a deleted copy of the file — no
+  longer holds; `a gesture made before the preset file has arrived` is that reproduction, committed.
 

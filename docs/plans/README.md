@@ -52,7 +52,7 @@ place. The plan file carries the real link.
 | [0183](0183-a-low-density-is-a-trace-count.md) | A low density is a trace count | approved | dev, human | ADR-0195 (proposed): a trace (density <= 0.08) draws the tier anchor's count at every size; clouds keep ADR-0140. **No golden moves.** Phase 3 is a `human` look gate at 1080p Rich. |
 | [0184](0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) | Limited ink: a contour that is an ink, and a warp field that bands | approved | dev, human | ADR-0197 (proposed): hard ink contours on six scenes; `warp_mesh` bands by level. **Phase 2 stops if level outgrows `color_span`.** Phase 4: look gate. |
 | [0186](0186-the-flatness-gate-tells-a-figure-from-its-ground.md) | The flatness gate tells a figure from its ground | approved | dev, human | Backlog 0128: five figure/ground candidates vs two blot anchors at 96 and 192 px. **Phase 2 is a human gate that writes ADR-0200**; a negative result is a valid end. |
-| [0191](0191-a-green-tree-is-not-tested-four-times.md) | A green tree is not tested four times | draft | dev | ADR-0211 (proposed): a green record serves a tree whose diff is all declared paths, and `-P fast` runs in the full suite's place. Backlog 0227. **No `human` and no `.claude/` phase - conductor-runnable.** |
+| [0191](0191-a-green-tree-is-not-tested-four-times.md) | A green tree is not tested four times | approved | dev | ADR-0211: a green record serves a tree whose diff is all declared paths; `-P fast` runs in the suite's place. Backlog 0227. **No `human`, no `.claude/` - conductor-runnable.** |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
@@ -289,12 +289,16 @@ stretch:
   `queue.json` keeps its empty `b` lane and no code changed, so re-opening costs nothing; what is
   retired is the open question. The `watch` command [0189] rejected was explored on a branch and
   deleted the same day (`86497d4`, recoverable from reflog).
-- **Backlog 0227** - the full suite per distinct tree, the largest number [0189] Phase 8 produced -
-  is deliberately **not** in [0190]. Its direction is ADR-shaped and it gets its own plan.
+- **Backlog 0227 got that plan on 2026-09-16: [0191], approved, and it leads lane `b`.** ADR-0211
+  serves a green suite record forward when the diff is entirely declared paths and runs `-P fast` in
+  the full suite's place, so nothing is skipped outright. It is queued first because every plan
+  behind it is gated by what it changes. The cheaper-suite half - 54 % of the cost - is **not** in
+  it and is backlog 0239.
 
 [0189]: done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md
 [0190]: done/0190-the-conductor-survives-a-run-nobody-is-watching.md
 [0142]: 0142-the-milkdrop-import-earns-its-verdict.md
+[0191]: 0191-a-green-tree-is-not-tested-four-times.md
 
 **Added 2026-09-14 - a backlog sweep drafted [0176] through [0186] and amended all eight active
 plans; delivery and infrastructure go first, which is the user's call.** Every active plan was

@@ -1,13 +1,14 @@
 # 0191 — A green tree is not tested four times
 
-> **Status:** draft
+> **Status:** approved (2026-09-16)
 > **Created:** 2026-09-16
 > **Owner skill(s):** dev
 > **Related ADRs:** [0211](../adrs/0211-a-green-suite-record-serves-a-later-tree-when-no-deferred-suite-can-read-the-diff.md) (proposed),
 > [0207](../adrs/0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md),
 > [0156](../adrs/0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md),
 > [0157](../adrs/0157-the-preset-sweeps-split-per-preset-and-the-phase-tier-samples-a-declared-representative.md)
-> **Closes:** design-backlog 0227
+> **Closes:** design-backlog 0227 - the skip half only; the cheaper-suite half is backlog 0239.
+> Archived to the Promoted table on approval ([ADR-0206](../adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)).
 > **Runnable under the conductor:** yes, deliberately. No phase touches `.claude/`, a spec or a lane's
 > `## Conductor mode`, so nothing here parks `claude_dir` ([ADR-0210](../adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md)),
 > and no phase is owned by `human`.

@@ -42,11 +42,9 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0219 — a `ctl/preset` datagram on loopback never reached the listener's queue, in 3 of 79 loaded runs, and nothing counted it](#0219--a-ctlpreset-datagram-on-loopback-never-reached-the-listeners-queue-in-3-of-79-loaded-runs-and-nothing-counted-it)
 - [0220 — a headless walk of the system roster stalls at `emitter`: the ping sent with the ask is answered and the preset never reaches the screen](#0220--a-headless-walk-of-the-system-roster-stalls-at-emitter-the-ping-sent-with-the-ask-is-answered-and-the-preset-never-reaches-the-screen)
 - [0221 — the run-alone override costs `-P fast` 165 s, twice its tests' serial time, because each of its 18 testcases drains the machine separately](#0221--the-run-alone-override-costs--p-fast-165-s-twice-its-tests-serial-time-because-each-of-its-18-testcases-drains-the-machine-separately)
-- [Entries 0227-0233 — from the Plan 0189 Phase 8 watched runs (2026-09-15)](#entries-0227-0233--from-the-plan-0189-phase-8-watched-runs-2026-09-15)
-- [0227 — a plan pays an 11-minute full suite for every distinct tree it gates, and a close's tree differs from the reviewed one only in prose, a version and a merge](#0227--a-plan-pays-an-11-minute-full-suite-for-every-distinct-tree-it-gates-and-a-closes-tree-differs-from-the-reviewed-one-only-in-prose-a-version-and-a-merge)
+- [Entries 0227-0235 — from the Plan 0189 Phase 8 watched runs (2026-09-15), all archived](#entries-0227-0235--from-the-plan-0189-phase-8-watched-runs-2026-09-15-all-archived)
 - [0236 — the `.claude/` park reads a phase's declared `Files touched`, and Plan 0190's own Phase 9 declared its three `.claude/` files in prose](#0236--the-claude-park-reads-a-phases-declared-files-touched-and-plan-0190s-own-phase-9-declared-its-three-claude-files-in-prose)
 - [0237 — the session allowlist bounds a deletion by four literal path shapes, so a path the shell expands escapes the lane](#0237--the-session-allowlist-bounds-a-deletion-by-four-literal-path-shapes-so-a-path-the-shell-expands-escapes-the-lane)
-- [0238 — the parameter slider is drawn from the schema and armed by the preset read, so a release between the two is discarded in silence](#0238--the-parameter-slider-is-drawn-from-the-schema-and-armed-by-the-preset-read-so-a-release-between-the-two-is-discarded-in-silence)
 - [0239 — three per-preset suites are 54 % of the workspace suite and grow with every shipped preset, because each rebuilds its own headless renderer](#0239--three-per-preset-suites-are-54--of-the-workspace-suite-and-grow-with-every-shipped-preset-because-each-rebuilds-its-own-headless-renderer)
 <!-- toc:end -->
 
@@ -1686,65 +1684,17 @@ first.
 
 ---
 
-## Entries 0227-0233 — from the Plan 0189 Phase 8 watched runs (2026-09-15)
+## Entries 0227-0235 — from the Plan 0189 Phase 8 watched runs (2026-09-15), all archived
 
 Raised by the owner and a human-started session watching four conductor runs that merged 0175 and
-carried 0177 to its close. The owner's complaint was speed; 0227 is that, and the rest are what
-cost the runs their parks.
-
-## 0227 — a plan pays an 11-minute full suite for every distinct tree it gates, and a close's tree differs from the reviewed one only in prose, a version and a merge
-
-`runGate` looks the ledger up by the worktree's whole tree (`greenRecord(ledger, cleanTree(cwd))`,
-ADR-0207). Every commit changes the tree, so every stage whose tree moved runs the full workspace
-suite again: 737-767 s each on the reference machine on 2026-09-15.
-
-A clean plan with no fix round runs it at least twice, and what separates the two trees is rarely
-code:
-
-- `pre-review` gates the implementer's tip.
-- The close tip adds the close's prose repairs, the plan's move to `done/`, the indexes, the version
-  bump in `Cargo.toml`/`Cargo.lock` and the studio's two copies, and `git merge main`. `main` itself
-  is a tree some earlier gate already passed.
-- `remerge` runs a third time whenever `main` moved after the close, even by a commit that touches
-  only `tools/conductor/`.
-
-Measured on 0175: 24 min of sessions against 58 min of full suites (pre-review 11.2, post-close red
-10.8, post-close 11.4, remerge 12.3), plus a 12.7-min hand run. 0177, which met ADR-0207's bound of
-two: 64 min of finished sessions against 24.5 min of full suites (pre-review 10.9, the close tip
-13.6). With lane b off (ADR-0205 `Outcome`),
-every one of those minutes also blocks the next plan in the queue.
-
-Where a suite's 737 s go (`0175-remerge-18-cargo_nextest.log`, 7378 test-seconds over 73 binaries):
-the three per-preset suites `reactivity` 1566 s, `animation` 1291 s and `sanity` 1099 s, 54 % together
-and growing with every shipped preset; core unit tests 1065 s; `distinctness` 299 s;
-`reaction_diffusion_contract` alone 216 s. Backlog 0221 is the run-alone override's share.
-
-The hazard any shape must answer: "only prose changed" is not the same as "no test reads it".
-`hygiene.rs` scans docs, `preset.rs` checks the generated block in `presets/README.md`, and the
-version bump reaches every crate that reads `CARGO_PKG_VERSION`.
-
-Shapes, none decided:
-
-- **Key a skip on the code-reachable part of the tree**: a green record for tree A also serves tree
-  B when `git diff A B` touches only paths on a declared list no test reads. The list is the whole
-  risk, and a gate would have to hold it.
-- **Tier the close tip**: the full suite once at `pre-review`, and `-P fast` plus the doc and Node
-  gates on the close tip and a remerge, with the full suite owed again only when the diff since the
-  green tree touches a `.rs`, a `.wgsl`, a preset or `Cargo.lock` beyond the version line.
-- **Make the suite cheaper instead**: the per-preset suites share one headless renderer per binary,
-  or sample the library at the gate and cover it whole nightly.
-- **Operator rule, costless today**: nothing is committed to `main` while a closed plan waits for its
-  fast-forward. A tools-only commit cost 0175 its 12.3-min remerge.
-
-- **Raised:** 2026-09-15, by the owner ("we are extremely slow") during Plan 0189 Phase 8.
-  **Owner if taken:** `architect` (what a green record may serve), then `dev`.
-- **Verified 2026-09-15** — the ledger is keyed by the whole tree:
-  `present: greenRecord\(ledger, cleanTree\(cwd\)\) in: tools/conductor/lib/gate.mjs`
-
-### Priority
-
-**High.** It is the largest single term in a plan's wall clock, and the owner's standing complaint.
-
+carried 0177 to its close. The owner's complaint was speed; 0227 is that, and the rest are what cost
+the runs their parks. **Every one of the nine has left this file.** 0228-0235 were closed by
+[Plan 0190](plans/done/0190-the-conductor-survives-a-run-nobody-is-watching.md) on 2026-09-16, and
+0227 was promoted the same day to
+[Plan 0191](plans/0191-a-green-tree-is-not-tested-four-times.md) - its skip half only, the
+cheaper-suite half living on as 0239 below. The bodies and the verdicts are in
+[the archive](design-backlog-archive.md); this heading stays because the group is how they were
+raised and the next reader of one will look for the other eight.
 
 ## 0236 — the `.claude/` park reads a phase's declared `Files touched`, and Plan 0190's own Phase 9 declared its three `.claude/` files in prose
 
@@ -1840,77 +1790,6 @@ in that file whose stated bound — *"a path that leaves the lane is refused, wh
 not the bound the rules actually enforce, and the README repeats the claim.
 
 ---
-
-## 0238 — the parameter slider is drawn from the schema and armed by the preset read, so a release between the two is discarded in silence
-
-CI run 35065148120, the `studio` job of the `v0.123.2` tag build, failed one test out of 264 while
-every other job in the run was green:
-
-```
-FAIL renderer/views/Editor.test.tsx > a gesture against a preset the session has not forked
-     > 'a parameter release' writes nothing until the copy is named
-TestingLibraryElementError: Unable to find a label with the text of: save a copy as   1083ms
-```
-
-The `1083ms` is the reading, not the noise. Testing Library's `findBy*` default timeout is 1000 ms
-and `studio/vitest.config.ts` sets no override, so the assertion did not run slow — it ran to the
-end of its window against a prompt that was never going to appear. The gesture was **dropped**.
-
-Two async loads arm one control, and nothing couples them:
-
-- The rows of `ParamPanel` come from the **schema** — `rostersFor(schema.document, system)` at
-  `studio/renderer/views/Editor.tsx:260`, iterated at `ParamPanel.tsx:41`. The `warp` slider is on
-  screen, and drag-responsive, as soon as `getSchema` resolves.
-- `writable` is `text !== undefined && dir !== null`
-  (`studio/renderer/hooks/useActivePreset.ts:266`), and `text` arrives only when `preset.read`
-  resolves — a **separate** promise, started by a different effect.
-- The release handler is `if (writable) onCommit(spec.name, value)`
-  (`studio/renderer/components/ParamRow.tsx:97`). No `disabled`, no read-only arm, no notice.
-
-So between the two resolutions the studio draws a live slider that throws away what is done with it.
-The test loses this race because `await screen.findByLabelText('warp')` waits on the *schema* label
-and nothing else, and it is the first of the five `it.each` gestures for the same reason: the other
-four `await tab(...)` or wait on a CodeMirror document first, which hands the pending read extra
-ticks.
-
-**Reproduced deliberately**: the test file copied, a 30 ms `setTimeout` added to the fake's
-`preset.read`, identical failure at 1055 ms. The copy was deleted; nothing in the tree records it.
-
-The three implicated files are byte-identical between `v0.123.2` and `main`, so this is live — the
-three other tag builds that started in the same minute won the race.
-
-Two shapes, and the entry carries both because they answer different questions:
-
-- **The test** — wait on something that proves the *preset* loaded before firing the gesture: the
-  `warp` slider carrying the file's own `0.4` rather than the spec default, or the `/presets/ink.toml`
-  path the same file already waits on elsewhere. Cheap, and it makes the suite honest about what it
-  is timing. It does **not** fix the studio.
-- **The product** — do not render an interactive control while `writable` is false. A slider that
-  moves, sends `ctl/param`, and then discards the release is the studio disagreeing with itself
-  about what it just did, which is the same objection `ParamRow`'s own header already raises against
-  a slider reporting a value the engine would round away. A human is unlikely to out-race a local
-  file read, so the cost is a rare lost gesture rather than a wrong one — but the window is real and
-  nothing marks it.
-
-- **Raised:** 2026-09-16, from CI triage of run 35065148120. **Owner if taken:** `studio-builder`.
-- **Verified 2026-09-16** — the rows are schema-driven, so the slider does not wait on the preset:
-  `present: rostersFor\(schema\.document in: studio/renderer/views/Editor.tsx`
-- **Verified 2026-09-16** — and the arm does wait on it:
-  `present: writable: text !== undefined && dir !== null in: studio/renderer/hooks/useActivePreset.ts`
-- **Verified 2026-09-16** — the release is gated with no other outcome:
-  `present: if \(writable\) onCommit in: studio/renderer/components/ParamRow.tsx`
-- **Verified 2026-09-16** — and nothing in the row disables or marks the control meanwhile:
-  `absent: disabled in: studio/renderer/components/ParamRow.tsx`
-- **Verified 2026-09-16** — the 1000 ms default stands, so the failure window is the default one
-  and raising it would hide this rather than fix it:
-  `absent: Timeout in: studio/vitest.config.ts`
-
-### Priority
-
-**Medium.** The defect costs a rare dropped gesture; the flake costs a red `main` on a tag build for
-a reason that reads as infrastructure and is not. Nothing else in the suite waits on a
-schema-rendered control to prove a preset-backed one is armed, so the blast radius is this one file
-— but it will fire again, and the next reader will spend the triage again.
 
 ## 0239 — three per-preset suites are 54 % of the workspace suite and grow with every shipped preset, because each rebuilds its own headless renderer
 
