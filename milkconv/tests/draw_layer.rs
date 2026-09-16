@@ -321,7 +321,7 @@ fn a_waves_per_point_state_carries_to_the_next_point() {
         .expect("the wave's per-frame program runs");
 
     let ys: Vec<f32> = (0..8)
-        .filter_map(|i| runtime.run_wave_point(0, i as f32 / 7.0, 0.0))
+        .filter_map(|i| runtime.run_wave_point(0, i as f32 / 7.0, 0.0, 0.0))
         .map(|p| p.y)
         .collect();
     println!("[draw_layer] flip alternation down the trace: {ys:?}");
@@ -376,7 +376,7 @@ fn flip_frame(runtime: &mut MilkRuntime, count: usize) -> Vec<f32> {
         .run_wave_frame(0)
         .expect("the wave's per-frame program runs");
     (0..count)
-        .filter_map(|i| runtime.run_wave_point(0, i as f32 / count.max(2) as f32, 0.0))
+        .filter_map(|i| runtime.run_wave_point(0, i as f32 / count.max(2) as f32, 0.0, 0.0))
         .map(|p| p.y)
         .collect()
 }

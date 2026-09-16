@@ -702,7 +702,7 @@ fn custom_waves(
                 .get(((t * (WAVE_SAMPLES - 1) as f32) as usize).min(WAVE_SAMPLES - 1))
                 .copied()
                 .unwrap_or(0.0);
-            let Some(point) = runtime.run_wave_point(index, t, value) else {
+            let Some(point) = runtime.run_wave_point(index, t, value, value) else {
                 break;
             };
             points.push((

@@ -56,6 +56,13 @@ const _: () = assert!(
     WAVE_SAMPLES <= WINDOW_SIZE,
     "the waveform is the tail of the short analysis window and cannot be longer than it"
 );
+// The left/right pair rolls a trace-length tail forward by one hop, so a hop has
+// to fit inside a trace. Same reasoning as above: a hop longer than the trace
+// would be a slice range that does not exist rather than a shorter waveform.
+const _: () = assert!(
+    HOP_SIZE <= WAVE_SAMPLES,
+    "the waveform pair rolls by one hop and cannot roll further than its own length"
+);
 /// Second, longer FFT window feeding the bands below the crossover (~171 ms at
 /// 48 kHz). Chosen by measurement in Plan 0048 Phase 1 against one rule — 4096
 /// first, 8192 only if 4096 still leaves sub-bass bands bin-starved. Of the 20
@@ -136,6 +143,34 @@ pub struct AnalysisFrame {
     /// trace is zeroed rather than amplified — so reconstructing from a silent
     /// frame gives silence rather than noise.
     pub waveform_gain: f32,
+    /// Channels 0 and 1 of the same [`WAVE_SAMPLES`] window, in time order —
+    /// the figure a two-channel `wave_mode` draws (ADR-0199).
+    ///
+    /// **Front-left then front-right**, which is the order WASAPI loopback and
+    /// foobar's `visualisation_stream` both deliver. A layout with more than two
+    /// channels reads its first two and ignores the rest; a one-channel stream
+    /// fills both slots from channel 0, so a consumer never has to ask how many
+    /// channels there are.
+    ///
+    /// **Levelled by ONE divisor tracked over both** (ADR-0139's rule, applied to
+    /// a pair), published as [`waveform_pair_gain`](Self::waveform_pair_gain).
+    /// Two independent divisors would level a hard-panned signal's silent side up
+    /// to whatever noise is in it, and the x-y figure would lose the aspect that
+    /// says where the sound is.
+    ///
+    /// [`waveform`](Self::waveform) is **not** derived from this and is not
+    /// affected by it: the mono trace keeps its own normalizer and its own
+    /// history, so every value that reached a preset before this pair existed
+    /// still does, bit for bit.
+    pub waveform_pair: [[f32; WAVE_SAMPLES]; 2],
+    /// The divisor [`waveform_pair`](Self::waveform_pair) was levelled by —
+    /// `0.0` while the tracked peak sits under [`gain::WAVE_FLOOR`], exactly as
+    /// [`waveform_gain`](Self::waveform_gain) is.
+    ///
+    /// Its own value, not a copy of `waveform_gain`: the mono trace is the
+    /// channel average and the pair is tracked over the larger magnitude, so on a
+    /// panned signal the two divisors differ.
+    pub waveform_pair_gain: f32,
     /// Spectral-flux onset envelope, normalized against its recent peak.
     pub onset: f32,
     /// Whether a beat (onset event) fired this hop.
@@ -205,6 +240,8 @@ impl Default for AnalysisFrame {
             spectrum: [0.0; SPECTRUM_BINS],
             waveform: [0.0; WAVE_SAMPLES],
             waveform_gain: 0.0,
+            waveform_pair: [[0.0; WAVE_SAMPLES]; 2],
+            waveform_pair_gain: 0.0,
             onset: 0.0,
             beat: false,
             bass: 0.0,
@@ -315,6 +352,9 @@ pub struct Analyzer {
     treb_gain: gain::PeakNormalizer,
     onset_gain: gain::PeakNormalizer,
     wave_gain: gain::TraceNormalizer,
+    /// The pair's own normalizer, separate from `wave_gain` so the mono trace's
+    /// running peak is untouched by this existing at all.
+    pair_gain: gain::TraceNormalizer,
     window: [f32; WINDOW_SIZE],
     /// The long window feeding the sub-crossover bands (ADR-0049). Heap-held:
     /// 32 KB, and `Analyzer` is moved by value.
@@ -331,7 +371,15 @@ pub struct Analyzer {
     /// not move.
     filled: usize,
     hop: [f32; HOP_SIZE],
+    /// Channels 0 and 1 of the hop being filled, beside the mono `hop`. Two
+    /// fixed arrays rather than a per-channel `Vec`: the fill loop below runs on
+    /// the render thread's analysis path and allocates nothing.
+    hop_pair: [[f32; HOP_SIZE]; 2],
     hop_filled: usize,
+    /// The published pair's rolling tail, the two-channel counterpart of the last
+    /// [`WAVE_SAMPLES`] of `window`. Kept at trace length rather than window
+    /// length because nothing analyses it — it is published and drawn.
+    wave_pair: [[f32; WAVE_SAMPLES]; 2],
     latest: AnalysisFrame,
     /// Beats are sticky between `take_frame` calls so a beat can never fall
     /// between two render frames and vanish.
@@ -358,11 +406,14 @@ impl Analyzer {
             treb_gain: gain::PeakNormalizer::new(format.sample_rate, gain::BAND_FLOOR),
             onset_gain: gain::PeakNormalizer::new(format.sample_rate, gain::ONSET_FLOOR),
             wave_gain: gain::TraceNormalizer::new(format.sample_rate),
+            pair_gain: gain::TraceNormalizer::new(format.sample_rate),
             window: [0.0; WINDOW_SIZE],
             low_window: vec![0.0; LOW_WINDOW_SIZE],
             filled: 0,
             hop: [0.0; HOP_SIZE],
+            hop_pair: [[0.0; HOP_SIZE]; 2],
             hop_filled: 0,
+            wave_pair: [[0.0; WAVE_SAMPLES]; 2],
             latest: AnalysisFrame::default(),
             pending_beat: false,
         })
@@ -390,6 +441,13 @@ impl Analyzer {
         for frame in samples.chunks_exact(channels) {
             let mono = frame.iter().sum::<f32>() / channels as f32;
             self.hop[self.hop_filled] = mono;
+            // Front-left and front-right, in the interleaved order both intakes
+            // deliver (ADR-0199). A one-channel stream fills both slots from
+            // channel 0, so the published pair is always two traces and no
+            // consumer branches on the channel count.
+            let left = frame.first().copied().unwrap_or(mono);
+            self.hop_pair[0][self.hop_filled] = left;
+            self.hop_pair[1][self.hop_filled] = frame.get(1).copied().unwrap_or(left);
             self.hop_filled += 1;
             if self.hop_filled == HOP_SIZE {
                 self.hop_filled = 0;
@@ -397,6 +455,10 @@ impl Analyzer {
                 self.window[WINDOW_SIZE - HOP_SIZE..].copy_from_slice(&self.hop);
                 self.low_window.copy_within(HOP_SIZE.., 0);
                 self.low_window[LOW_WINDOW_SIZE - HOP_SIZE..].copy_from_slice(&self.hop);
+                for (tail, hop) in self.wave_pair.iter_mut().zip(&self.hop_pair) {
+                    tail.copy_within(HOP_SIZE.., 0);
+                    tail[WAVE_SAMPLES - HOP_SIZE..].copy_from_slice(hop);
+                }
                 self.filled = (self.filled + HOP_SIZE).min(LOW_WINDOW_SIZE);
                 if self.filled == LOW_WINDOW_SIZE {
                     let raw_spectrum = self.spectrum.analyze(&self.window, &self.low_window);
@@ -477,11 +539,18 @@ impl Analyzer {
                         waveform.copy_from_slice(tail);
                     }
                     let waveform_gain = self.wave_gain.normalize(&mut waveform);
+                    // The pair, levelled by its own normalizer so `waveform`'s
+                    // running peak is the one it always was.
+                    let mut waveform_pair = self.wave_pair;
+                    let [left, right] = &mut waveform_pair;
+                    let waveform_pair_gain = self.pair_gain.normalize_pair(left, right);
 
                     self.latest = AnalysisFrame {
                         spectrum,
                         waveform,
                         waveform_gain,
+                        waveform_pair,
+                        waveform_pair_gain,
                         onset,
                         beat,
                         bass,

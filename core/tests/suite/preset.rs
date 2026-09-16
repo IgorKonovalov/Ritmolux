@@ -580,6 +580,14 @@ fn from_frame_binds_every_analysis_variable_to_its_own_field() {
         // The trace's divisor (ADR-0139), unreachable from the grammar for the
         // same reason the trace itself is, and distinct from every value above.
         waveform_gain: 0.55,
+        // The left/right pair (ADR-0199) and its own divisor, unreachable from
+        // the grammar for the same reason, and ramped the other way so a slot
+        // crossed with `waveform` reads a distinguishable number.
+        waveform_pair: [
+            std::array::from_fn(|i| 1.0 - i as f32 / 256.0),
+            std::array::from_fn(|i| -0.5 + i as f32 / 512.0),
+        ],
+        waveform_pair_gain: 0.66,
     };
     // Not on the frame: the renderer supplies its own clock here, the probe the
     // hop position it synthesized. That is why it stays an argument.

@@ -752,16 +752,21 @@ impl MilkRuntime {
     /// (`0..1` along the wave) with `value1`/`value2` bound to the audio there,
     /// and return where it put the point.
     ///
-    /// `value1` and `value2` are MilkDrop's left and right channel samples. This
-    /// engine's analysis is **mono** by construction — the ring carries
-    /// interleaved PCM and the analyzer averages the channels before anything
-    /// else touches them (`dsp::Analyzer::push_interleaved`) — so the two are the
-    /// same number here. A preset that draws `value1` against `value2` as a
-    /// Lissajous figure therefore draws a diagonal line rather than a blob, which
-    /// is a real and stated fidelity loss rather than a bug.
-    pub fn run_wave_point(&mut self, index: usize, sample: f32, value: f32) -> Option<WavePoint> {
+    /// `left` and `right` are MilkDrop's `value1` and `value2` — channels 0 and 1
+    /// of the analyzer's levelled pair (`AnalysisFrame::waveform_pair`,
+    /// ADR-0199). They are two genuinely different numbers on a stereo stream, so
+    /// a preset that plots one against the other draws the figure its author saw
+    /// rather than the diagonal line a mono stand-in gives; on a one-channel
+    /// stream they are equal, because the pair fills both slots from channel 0.
+    pub fn run_wave_point(
+        &mut self,
+        index: usize,
+        sample: f32,
+        left: f32,
+        right: f32,
+    ) -> Option<WavePoint> {
         let element = self.waves.get_mut(index)?;
-        Some(element.run_point(sample, value))
+        Some(element.run_point(sample, left, right))
     }
 
     /// Run custom wave `index`'s per-frame program, once, before its points.
@@ -1171,15 +1176,15 @@ impl ElementRuntime {
     /// `milkconv/tests/draw_layer.rs`'s
     /// `a_waves_per_point_state_also_carries_across_the_frame_boundary`, so the
     /// behaviour cannot move without this comment moving with it.
-    fn run_point(&mut self, sample: f32, value: f32) -> WavePoint {
+    fn run_point(&mut self, sample: f32, left: f32, right: f32) -> WavePoint {
         if let Some(index) = self.inputs.sample {
             self.state.set(index, sample);
         }
         if let Some(index) = self.inputs.value1 {
-            self.state.set(index, value);
+            self.state.set(index, left);
         }
         if let Some(index) = self.inputs.value2 {
-            self.state.set(index, value);
+            self.state.set(index, right);
         }
         vm::run(&self.program.per_point, &mut self.state, Budget::VERTEX);
         self.point.read(&self.state)

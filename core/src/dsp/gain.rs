@@ -290,6 +290,44 @@ impl TraceNormalizer {
             }
         }
     }
+
+    /// The same, over **two** traces at once and with **one** divisor tracked
+    /// over the larger of their magnitudes.
+    ///
+    /// One divisor rather than two, and that is the whole reason this exists
+    /// beside [`normalize`](Self::normalize): a hard-panned signal has a silent
+    /// side, and levelling that side against its own recent peak would amplify
+    /// whatever noise is in it up to full scale. The pair would then read as two
+    /// loud channels, and an x-y figure built from them would lose the aspect
+    /// that says where the sound is.
+    pub fn normalize_pair(
+        &mut self,
+        left: &mut [f32; WAVE_SAMPLES],
+        right: &mut [f32; WAVE_SAMPLES],
+    ) -> f32 {
+        let loudest = left
+            .iter()
+            .chain(right.iter())
+            .copied()
+            .filter(|v| v.is_finite())
+            .fold(0.0f32, |m, v| m.max(v.abs()));
+        match advance(&mut self.peak, loudest, self.release, self.floor) {
+            Some(peak) => {
+                for trace in [left, right] {
+                    for sample in trace.iter_mut() {
+                        let raw = if sample.is_finite() { *sample } else { 0.0 };
+                        *sample = (raw / peak).clamp(-1.0, 1.0);
+                    }
+                }
+                peak
+            }
+            None => {
+                *left = [0.0; WAVE_SAMPLES];
+                *right = [0.0; WAVE_SAMPLES];
+                0.0
+            }
+        }
+    }
 }
 
 #[cfg(test)]

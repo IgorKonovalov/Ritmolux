@@ -822,6 +822,8 @@ fn the_clock_stimulus_moves_the_clock_and_nothing_else() {
             spectrum,
             waveform,
             waveform_gain,
+            waveform_pair,
+            waveform_pair_gain,
             onset,
             beat,
             bass,
@@ -858,8 +860,21 @@ fn the_clock_stimulus_moves_the_clock_and_nothing_else() {
                 .all(|(a, b)| a.to_bits() == b.to_bits()),
             "frame {i}: the waveform moved"
         );
+        assert!(
+            waveform_pair
+                .iter()
+                .flatten()
+                .zip(rest.waveform_pair.iter().flatten())
+                .all(|(a, b)| a.to_bits() == b.to_bits()),
+            "frame {i}: the waveform pair moved"
+        );
         for (field, got, want) in [
             ("waveform_gain", waveform_gain, rest.waveform_gain),
+            (
+                "waveform_pair_gain",
+                waveform_pair_gain,
+                rest.waveform_pair_gain,
+            ),
             ("onset", onset, rest.onset),
             ("bass", bass, rest.bass),
             ("mid", mid, rest.mid),

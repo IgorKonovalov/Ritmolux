@@ -565,8 +565,8 @@ pub fn run_wave_point(&mut self, index: usize, sample: f32, left: f32, right: f3
 | 1 — Read the rest of the source, and render the seam | dev | done | `725c8d5` |
 | 2 — The comp stage gets the source's polar pair | dev | done | `707a0bb` |
 | 3 — The per-vertex program gets the source's `x`/`y` | dev | done | `0d7266a` |
-| 4 — The seam is found | dev | done | committed with this row |
-| 5 — The analyzer publishes a left/right pair | dev | not started | |
+| 4 — The seam is found | dev | done | `1fc0dfa` |
+| 5 — The analyzer publishes a left/right pair | dev | done | committed with this row |
 | 6 — The waveform draws the source's eight figures | dev | not started | |
 
 ### Phase 1 — the source read
@@ -792,6 +792,48 @@ nothing (exit 1). Its assertions are unchanged.
 **Backlog 0215's probe does not go red, because the entry is not live.** 0214, 0215 and 0216 were all
 archived as **Promoted** when this plan was approved (`docs/design-backlog-archive.md`), so they carry
 no probe. `node scripts/check-backlog-claims.mjs` exits 0 over the 30 live entries.
+
+### Phase 5 — the pair
+
+**ADR-0199's hard stop did not fire.** `git diff --stat core-cabi/include/rlx_core.h rlx-ring/` is
+empty over the phase, spec 0002's ring invariants are unedited (only its list of published outputs
+grew), and nothing on the audio thread moved: the pair is filled in `push_interleaved`'s existing
+per-frame loop from two fixed arrays, so it allocates nothing and reads no clock, and
+`core/tests/hygiene.rs` passes.
+
+**The per-hop cost, measured on the reference machine** (`cargo nextest run -p rlx-core --release
+--test dsp -E 'test(one_hop_analyzes)' --no-capture`, 1000 hops at 48 kHz, one run each side).
+Measurements, not thresholds (ADR-0071):
+
+| | per hop | of the 10.667 ms hop |
+|---|---|---|
+| before the phase | `32.092 µs` | 0.30 % |
+| after | `34.011 µs` | 0.32 % |
+
+**The mono trace did not move**, and the evidence is the tests the plan names rather than a claim:
+`raw_levels_are_bit_identical_to_the_pre_normalization_build`,
+`the_waveform_is_the_recent_signal_levelled_rather_than_a_measurement_of_it`,
+`the_trace_is_portable_across_absolute_gain` and
+`a_quiet_passage_still_draws_a_smaller_trace_than_a_loud_one` all pass unchanged. The mechanism is a
+**second** `TraceNormalizer`: `wave_gain` keeps its own running peak and sees exactly the samples it
+saw before, and the pair is levelled by `pair_gain`.
+
+`analysis_is_deterministic` extends to the pair — both traces join the bit-compared array and
+`waveform_pair_gain` joins the scalar list, and the destructure that makes a new field fail to
+compile now names them.
+
+**Deviation: one line outside the phase's file list.** `custom_waves` in
+`warp_mesh/draw.rs` is the only caller of `run_wave_point`, so changing that signature stopped the
+crate compiling. It passes the mono value into both slots for now
+(`run_wave_point(index, t, value, value)`); Phase 6 is where the real pair reaches it. Three test
+call sites took the same one-token change (`core/src/milk/tests.rs`,
+`milkconv/tests/draw_layer.rs`), and three more had to name the new fields
+(`standalone/src/shot/report/tests.rs`'s destructure, which now asserts the pair stays at rest too,
+and `core/tests/suite/preset.rs`'s frame literal).
+
+**A finding for the plan's `k`, not acted on here.** `waveform_pair_gain` is a second divisor with
+its own history, so on a panned signal the pair and the mono trace are levelled differently.
+Phase 6's `k` is derived against the mono trace's scale.
 
 ### Notes
 

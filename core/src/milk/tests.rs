@@ -1001,7 +1001,7 @@ fn a_waves_per_point_state_carries_forward_but_not_across_waves() {
         (0..n)
             .map(|i| {
                 runtime
-                    .run_wave_point(wave, i as f32 / n as f32, 0.0)
+                    .run_wave_point(wave, i as f32 / n as f32, 0.0, 0.0)
                     .expect("the wave exists")
                     .x
             })

@@ -599,6 +599,111 @@ fn novelty_spikes_at_a_spectral_boundary() {
     );
 }
 
+/// The analyzer for a two-channel stream, the layout both intakes deliver.
+fn stereo_analyzer() -> Analyzer {
+    Analyzer::new(AudioFormat {
+        sample_rate: SR,
+        channels: 2,
+    })
+    .expect("valid format")
+}
+
+/// Interleave two mono signals of the same length into one stereo buffer.
+fn interleave(left: &[f32], right: &[f32]) -> Vec<f32> {
+    left.iter().zip(right).flat_map(|(l, r)| [*l, *r]).collect()
+}
+
+/// **The published pair is the two channels, levelled by one divisor** — ADR-0199
+/// clause 3, read at the three layouts a consumer can be handed.
+///
+/// The properties, none of them a frozen number:
+///
+/// - a **left-only** full-scale sine gives a left trace that reaches full scale
+///   and a right trace of **exactly** zero. That is the one that says there is a
+///   single divisor: two independent ones would divide the silent side by its own
+///   near-zero peak, and a dry channel would come back as noise at full scale;
+/// - **two equal channels** give two bit-identical traces, so nothing in the pair
+///   path treats the second channel differently from the first;
+/// - a **one-channel** stream gives two bit-identical traces, because the fill
+///   loop puts channel 0 in both slots rather than leaving the right one silent.
+#[test]
+fn the_waveform_pair_carries_both_channels_under_one_divisor() {
+    let len = 2 * SR as usize;
+    let loud = sine(440.0, 1.0, len);
+    let silent = vec![0.0f32; len];
+
+    let mut analyzer = stereo_analyzer();
+    analyzer.push_interleaved(&interleave(&loud, &silent));
+    let frame = analyzer.take_frame();
+    let [left, right] = frame.waveform_pair;
+    let peak = left.iter().fold(0.0f32, |m, v| m.max(v.abs()));
+    assert!(
+        peak > 0.95,
+        "the driven channel must reach full scale, got {peak}"
+    );
+    assert!(
+        right.iter().all(|v| *v == 0.0),
+        "the silent channel must stay exactly zero rather than being levelled up"
+    );
+    assert!(
+        frame.waveform_pair_gain > 0.0,
+        "a full-scale channel must publish a divisor, got {}",
+        frame.waveform_pair_gain
+    );
+
+    let mut analyzer = stereo_analyzer();
+    analyzer.push_interleaved(&interleave(&loud, &loud));
+    let [left, right] = analyzer.take_frame().waveform_pair;
+    assert!(
+        left.iter()
+            .zip(&right)
+            .all(|(a, b)| a.to_bits() == b.to_bits()),
+        "two equal channels must give two bit-identical traces"
+    );
+
+    let mut analyzer = mono_analyzer();
+    analyzer.push_interleaved(&loud);
+    let frame = analyzer.take_frame();
+    let [left, right] = frame.waveform_pair;
+    assert!(
+        left.iter()
+            .zip(&right)
+            .all(|(a, b)| a.to_bits() == b.to_bits()),
+        "a one-channel stream must fill both slots from channel 0"
+    );
+    // And that single channel is the levelled tail the mono trace is taken from,
+    // which on a one-channel stream is the same signal.
+    for (i, (pair, mono)) in left.iter().zip(&frame.waveform).enumerate() {
+        assert!(
+            (pair - mono).abs() < 1e-6,
+            "sample {i}: the pair read {pair} where the mono trace read {mono}"
+        );
+    }
+}
+
+/// **The pair is levelled over the larger channel, so a panned figure keeps its
+/// aspect.** The property the single divisor buys, stated as the ratio it holds.
+///
+/// A signal whose right channel is a quarter of its left reads back with the same
+/// quarter between the two traces' peaks. Under two divisors both would read full
+/// scale and the ratio would be 1.
+#[test]
+fn a_panned_pair_keeps_the_ratio_between_its_channels() {
+    let len = 2 * SR as usize;
+    let loud = sine(440.0, 1.0, len);
+    let quiet: Vec<f32> = loud.iter().map(|v| v * 0.25).collect();
+
+    let mut analyzer = stereo_analyzer();
+    analyzer.push_interleaved(&interleave(&loud, &quiet));
+    let [left, right] = analyzer.take_frame().waveform_pair;
+    let peak = |t: &[f32; WAVE_SAMPLES]| t.iter().fold(0.0f32, |m, v| m.max(v.abs()));
+    let ratio = peak(&right) / peak(&left);
+    assert!(
+        (ratio - 0.25).abs() < 0.02,
+        "the quiet channel read {ratio} of the loud one, want 0.25"
+    );
+}
+
 #[test]
 fn analysis_is_deterministic() {
     let signal = {
@@ -630,6 +735,8 @@ fn analysis_is_deterministic() {
                     spectrum,
                     waveform,
                     waveform_gain,
+                    waveform_pair,
+                    waveform_pair_gain,
                     onset,
                     beat,
                     bass,
@@ -654,10 +761,13 @@ fn analysis_is_deterministic() {
                     spectrum
                         .iter()
                         .chain(waveform.iter())
+                        .chain(waveform_pair[0].iter())
+                        .chain(waveform_pair[1].iter())
                         .map(|v| v.to_bits())
                         .collect(),
                     vec![
                         waveform_gain.to_bits(),
+                        waveform_pair_gain.to_bits(),
                         onset.to_bits(),
                         bass.to_bits(),
                         mid.to_bits(),
