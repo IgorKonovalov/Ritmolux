@@ -11,7 +11,9 @@
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`
 > **Related ADRs:** [0199](../../adrs/0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md)
-> (proposed, this plan), [0113](../../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md),
+> and [0212](../../adrs/0212-a-converted-preset-gets-its-own-vertex-module-and-the-pipeline-is-chosen-not-branched.md)
+> (both written for this plan, both accepted 2026-09-16 with an Outcome),
+> [0113](../../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md),
 > [0139](../../adrs/0139-the-waveform-is-levelled-at-the-analyzer-and-publishes-its-gain.md),
 > [0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
 > **Closes:** design-backlog 0214, 0215, 0216
