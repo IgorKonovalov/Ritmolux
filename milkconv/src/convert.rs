@@ -21,7 +21,7 @@
 //! MilkDrop's light source **is** the draw layer — the waveform, the custom waves
 //! and shapes, the borders and the motion vectors (`OUTPUTS`) — and all of it is
 //! converted, as are the HLSL blocks. So a converted preset draws its own light
-//! and wants none of the scene's: [`deposit_block`] binds `deposit = "0.0"`
+//! and wants none of the scene's: `deposit_block` binds `deposit = "0.0"`
 //! rather than leaving the `warp_mesh` default in force.
 
 use std::collections::BTreeSet;
