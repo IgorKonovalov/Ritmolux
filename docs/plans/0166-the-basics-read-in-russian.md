@@ -241,8 +241,8 @@ const state = !stamped ? 'FAIL' : current.startsWith(stamped) ? 'current' : 'sta
 | 1 — The stamp, the gate, and the banner | `dev` | done | `645e84ec` |
 | 2 — The five translations, drafted and unpublished | `dev` | done | committed with this row |
 | 3 — Owner review of the Russian prose | `human` | done | `40c1ed39` + `79976978` |
-| 4 — Publish: the map, the menu, the banner in place | `dev` | done | committed with this row |
-| 5 — The foobar component zip ships the Russian install file | `dev` | not started | |
+| 4 — Publish: the map, the menu, the banner in place | `dev` | done | `163cd41d` |
+| 5 — The foobar component zip ships the Russian install file | `dev` | done | committed with this row |
 
 ### Notes
 
@@ -317,6 +317,23 @@ const state = !stamped ? 'FAIL' : current.startsWith(stamped) ? 'current' : 'sta
   behaviours against a throwaway repository; a real Astro build of it first happens in the Pages
   workflow. Until Phase 4 the plugin is a no-op on every page, because nothing it triggers on is in
   `PUBLISHED`.
+
+- **Phase 5's done-when named the wrong half of the encoding trap, and the right half was live.**
+  It warns that `Set-Content` defaults to the system ANSI codepage on write. `Get-Content -Raw`
+  does the same on **read**, for any file without a BOM, and that is the one that bites: measured on
+  PowerShell 5.1.19041, `packaging/foobar/READ-ME-FIRST.ru.md` holds `D0 BA` for «к» on disk and
+  comes back out of `Get-Content -Raw` as `C3 90` — double-encoded, silently. The first
+  implementation of this phase used `Get-Content -Raw` as the English path does and produced exactly
+  that. Both sides are now `[System.IO.File]::ReadAllText(..., UTF8)` / `WriteAllText(..., UTF8)`.
+- **The English read was changed too, and it is not a present bug.** All three
+  `READ-ME-FIRST.md` are pure ASCII today, where cp1252 and UTF-8 agree, so the existing path was
+  correct; it would have broken silently on the first em dash. The SDK readme read at line 245 is
+  left alone — third-party, and its regex extracts an ASCII version string.
+- **Phase 5 was verified in isolation, not through a packaged zip.** Running `build-component.ps1`
+  needs the foobar2000 SDK and a built component, neither of which is on this machine. What was
+  measured is the transformation the phase owns: stamp stripped, both placeholders substituted, no
+  BOM, and the shipped bytes byte-identical to the source's Cyrillic. The phase's last done-when — a
+  zip opened on a clean Windows box — is **unverified here** and belongs to on-device validation.
 
 ### Close triggers
 

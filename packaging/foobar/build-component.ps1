@@ -2,8 +2,8 @@
 # (Plan 0102 Phase 2, ADR-0115).
 #
 # Produces target/dist/ritmolux-v<version>-foobar2000-component.zip,
-# whose single top-level folder holds foo_ritmolux.fb2k-component and
-# READ-ME-FIRST.txt.
+# whose single top-level folder holds foo_ritmolux.fb2k-component,
+# READ-ME-FIRST.txt and READ-ME-FIRST.ru.txt.
 #
 # This script is checked in rather than inlined into the release workflow so
 # packaging is reproducible on any Windows box, not CI-only magic - the same
@@ -321,6 +321,7 @@ $stage = Join-Path $outDir $stageName
 $zipPath = Join-Path $outDir "$stageName.zip"
 $componentPath = Join-Path $stage $ComponentName
 $readmePath = Join-Path $stage "READ-ME-FIRST.txt"
+$readmeRuPath = Join-Path $stage "READ-ME-FIRST.ru.txt"
 
 Write-Host ""
 Write-Host "build-component.ps1: version $version, SDK $RlxSdkVersion -> $stageName.zip"
@@ -347,10 +348,18 @@ New-ZipWithEntries -ZipPath $componentPath -Entries @(
 # shim, so x86 foobar2000 has no payload to find and will report the component
 # as unsupported rather than crashing. READ-ME-FIRST.txt says so.
 
-Step "stamp READ-ME-FIRST.txt"
+Step "stamp READ-ME-FIRST.txt and READ-ME-FIRST.ru.txt"
 $readmeSource = Join-Path $script:here "READ-ME-FIRST.md"
 if (-not (Test-Path $readmeSource)) { Die "missing $readmeSource" }
-$readmeText = Get-Content -Raw $readmeSource
+# ReadAllText WITH AN EXPLICIT ENCODING, not Get-Content -Raw, and the same trap
+# as the WriteAllText below: Windows PowerShell 5.1 falls back to the system ANSI
+# codepage for a file with no BOM, in BOTH directions. Reading this file that way
+# turns every UTF-8 byte pair into two cp1252 characters, and writing them back as
+# UTF-8 double-encodes them - measured on 5.1.19041: source `D0 BA` comes back out
+# as `C3 90`. The English files are pure ASCII today, where the two codepages
+# agree, so this line guards against a future em dash rather than a present bug;
+# the Russian file below would fail without it immediately.
+$readmeText = [System.IO.File]::ReadAllText($readmeSource, [System.Text.Encoding]::UTF8)
 $readmeText = $readmeText.Replace("@VERSION@", $version)
 $readmeText = $readmeText.Replace("@SDK_VERSION@", $RlxSdkVersion)
 # .txt so a double-click opens it, matching the two existing zips. Written
@@ -359,10 +368,35 @@ $readmeText = $readmeText.Replace("@SDK_VERSION@", $RlxSdkVersion)
 [System.IO.File]::WriteAllText(
     $readmePath, $readmeText, (New-Object System.Text.UTF8Encoding($false)))
 
+# The Russian twin, through the SAME substitution pass so a placeholder cannot
+# survive in one file and not the other (ADR-0185). Two differences from the
+# English one, both load-bearing:
+#
+#   - THE STAMP IS STRIPPED. `<!-- translated-from: <sha> -->` is line 1 of every
+#     translation and it is the site's, not the reader's: a tester opening this in
+#     Notepad would meet an HTML comment before the title. It goes here rather
+#     than in the source, because the source is what the site reads.
+#   - UTF-8 IS EXPLICIT ON BOTH SIDES. See the read above: 5.1 falls back to the
+#     ANSI codepage for a BOM-less file when reading as well as writing, so the
+#     pair has to be ReadAllText + WriteAllText. Either one left as a Get-Content
+#     or Set-Content mangles Cyrillic SILENTLY - the zip would look fine to this
+#     script and be unreadable to the person it is for.
+$readmeRuSource = Join-Path $script:here "READ-ME-FIRST.ru.md"
+if (-not (Test-Path $readmeRuSource)) { Die "missing $readmeRuSource" }
+$readmeRuText = [System.IO.File]::ReadAllText($readmeRuSource, [System.Text.Encoding]::UTF8)
+$readmeRuText = $readmeRuText -replace '^\s*<!--\s*translated-from:[^>]*-->
+?
+', ''
+$readmeRuText = $readmeRuText.Replace("@VERSION@", $version)
+$readmeRuText = $readmeRuText.Replace("@SDK_VERSION@", $RlxSdkVersion)
+[System.IO.File]::WriteAllText(
+    $readmeRuPath, $readmeRuText, (New-Object System.Text.UTF8Encoding($false)))
+
 Step "package $stageName.zip"
 New-ZipWithEntries -ZipPath $zipPath -Entries @(
     @{ Path = $componentPath; Entry = "$stageName/$ComponentName" },
-    @{ Path = $readmePath; Entry = "$stageName/READ-ME-FIRST.txt" }
+    @{ Path = $readmePath; Entry = "$stageName/READ-ME-FIRST.txt" },
+    @{ Path = $readmeRuPath; Entry = "$stageName/READ-ME-FIRST.ru.txt" }
 )
 
 # --- Verify -------------------------------------------------------------------
@@ -417,15 +451,15 @@ Check "declared version is $version, matching [workspace.package]"
 
 # 5. The wrapper zip's exact contents.
 $zipEntries = @(Get-ZipEntryNames -ZipPath $zipPath)
-foreach ($required in "$stageName/$ComponentName", "$stageName/READ-ME-FIRST.txt") {
+foreach ($required in "$stageName/$ComponentName", "$stageName/READ-ME-FIRST.txt", "$stageName/READ-ME-FIRST.ru.txt") {
     if ($zipEntries -notcontains $required) {
         Die "zip is missing $required (holds: $($zipEntries -join ', '))"
     }
 }
-if ($zipEntries.Count -ne 2) {
-    Die "zip should hold exactly 2 entries, holds $($zipEntries.Count): $($zipEntries -join ', ')"
+if ($zipEntries.Count -ne 3) {
+    Die "zip should hold exactly 3 entries, holds $($zipEntries.Count): $($zipEntries -join ', ')"
 }
-Check "zip top level holds $ComponentName and READ-ME-FIRST.txt"
+Check "zip top level holds $ComponentName, READ-ME-FIRST.txt and READ-ME-FIRST.ru.txt"
 
 # 6. No .md, matching the two existing zips: the recipient gets .txt so a
 #    double-click opens it.
@@ -435,11 +469,23 @@ Check "no .md in the zip"
 
 # 7. Every placeholder substituted. A READ-ME-FIRST still reading @VERSION@ is
 #    the sort of thing that ships unnoticed because nothing else reads it.
-$shipped = Get-Content -Raw $readmePath
-if ($shipped -match '@[A-Z_]+@') {
-    Die "READ-ME-FIRST.txt has an unsubstituted placeholder: $($Matches[0])"
+foreach ($pair in @(@{ Name = "READ-ME-FIRST.txt"; Path = $readmePath },
+                     @{ Name = "READ-ME-FIRST.ru.txt"; Path = $readmeRuPath })) {
+    $shipped = [System.IO.File]::ReadAllText($pair.Path, [System.Text.Encoding]::UTF8)
+    if ($shipped -match '@[A-Z_]+@') {
+        Die "$($pair.Name) has an unsubstituted placeholder: $($Matches[0])"
+    }
 }
-Check "READ-ME-FIRST.txt has no unsubstituted placeholders"
+Check "neither READ-ME-FIRST has an unsubstituted placeholder"
+
+# 8. The translation stamp is gone from the shipped Russian file. It is the
+#    site's marker; a tester meeting it in Notepad would read an HTML comment
+#    where the title should be.
+$shippedRu = [System.IO.File]::ReadAllText($readmeRuPath, [System.Text.Encoding]::UTF8)
+if ($shippedRu -match 'translated-from') {
+    Die "READ-ME-FIRST.ru.txt still carries its translated-from stamp"
+}
+Check "READ-ME-FIRST.ru.txt ships without its stamp"
 
 Write-Host ""
 Write-Host "build-component.ps1: OK -> $zipPath"
