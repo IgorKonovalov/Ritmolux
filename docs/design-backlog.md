@@ -47,6 +47,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0236 — the `.claude/` park reads a phase's declared `Files touched`, and Plan 0190's own Phase 9 declared its three `.claude/` files in prose](#0236--the-claude-park-reads-a-phases-declared-files-touched-and-plan-0190s-own-phase-9-declared-its-three-claude-files-in-prose)
 - [0237 — the session allowlist bounds a deletion by four literal path shapes, so a path the shell expands escapes the lane](#0237--the-session-allowlist-bounds-a-deletion-by-four-literal-path-shapes-so-a-path-the-shell-expands-escapes-the-lane)
 - [0238 — the parameter slider is drawn from the schema and armed by the preset read, so a release between the two is discarded in silence](#0238--the-parameter-slider-is-drawn-from-the-schema-and-armed-by-the-preset-read-so-a-release-between-the-two-is-discarded-in-silence)
+- [0239 — three per-preset suites are 54 % of the workspace suite and grow with every shipped preset, because each rebuilds its own headless renderer](#0239--three-per-preset-suites-are-54--of-the-workspace-suite-and-grow-with-every-shipped-preset-because-each-rebuilds-its-own-headless-renderer)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -1910,3 +1911,56 @@ Two shapes, and the entry carries both because they answer different questions:
 a reason that reads as infrastructure and is not. Nothing else in the suite waits on a
 schema-rendered control to prove a preset-backed one is armed, so the blast radius is this one file
 — but it will fire again, and the next reader will spend the triage again.
+
+## 0239 — three per-preset suites are 54 % of the workspace suite and grow with every shipped preset, because each rebuilds its own headless renderer
+
+[ADR-0211](adrs/0211-a-green-suite-record-serves-a-later-tree-when-no-deferred-suite-can-read-the-diff.md)
+stops a green tree being tested four times. It deliberately does not touch what one test costs, and
+records this as its Alternative A. This is that alternative.
+
+Measured from `0175-remerge-18-cargo_nextest.log` on 2026-09-15 — 7378 test-seconds over 73 binaries:
+
+| Suite | Test-seconds | Share |
+|---|---|---|
+| `reactivity` | 1566 | 21 % |
+| `animation` | 1291 | 18 % |
+| `sanity` | 1099 | 15 % |
+| core unit tests | 1065 | 14 % |
+| `distinctness` | 299 | 4 % |
+| `reaction_diffusion_contract` | 216 | 3 % |
+
+The first three are **54 % together**, and they are the three that iterate the shipped preset library
+one preset at a time ([ADR-0157](adrs/0157-the-preset-sweeps-split-per-preset-and-the-phase-tier-samples-a-declared-representative.md)
+split them per preset so a phase tier could sample them). Splitting per preset is what makes the
+per-preset cost visible, and it is also what multiplies the fixed cost: each testcase stands up its
+own adapter, device and pipeline set. **The cost therefore grows with the library**, and the library is
+the thing this project exists to grow.
+
+Shapes, none decided:
+
+- **One renderer per binary, not per testcase.** A `OnceLock`-held context the per-preset cases share,
+  so the adapter and pipeline build is paid once per binary rather than once per preset. The question
+  is whether a shared device leaks state between cases in a way a golden would catch — and whether
+  that is a property a test can assert rather than a hope.
+- **Sample at the gate, cover whole nightly.** The gate runs ADR-0157's declared representatives; a
+  scheduled run covers the library entire. Cheapest to build, and it moves a class of failure from
+  "before the merge" to "the next morning", which is the trade to argue.
+- **Retire the split.** Go back to one testcase per suite iterating the library in-process. Undoes
+  ADR-0157's sampling, which the phase tier now depends on.
+
+Note the interaction: **the cheaper this gets, the less ADR-0211 buys**, because ADR-0211's saving is
+the difference between `-P fast` and the full suite. They are not additive and the second one to land
+should be re-measured rather than assumed.
+
+- **Raised:** 2026-09-16, when ADR-0211 was written and routed this half out of Plan 0191.
+  **Owner if taken:** `architect` (a shared device is a testing-contract question), then `dev`.
+- **Verified 2026-09-16** — the three suites exist as separate per-preset binaries:
+  `present: reactivity in: .config/nextest.toml`
+- **Verified 2026-09-16** — and ADR-0211 did not touch what a test costs:
+  `absent: OnceLock in: tools/conductor/lib/gate.mjs`
+
+### Priority
+
+**Medium.** It is the larger number of the two halves of backlog 0227, but ADR-0211 takes the
+cheap part of that cost first, and this half needs a measurement and a testing-contract decision
+before it needs code.

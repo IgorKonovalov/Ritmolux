@@ -123,7 +123,7 @@ phase and therefore runnable under the conductor (ADR-0210).
 grow with every shipped preset; sharing one headless renderer per binary, or sampling at the gate and
 covering the library whole nightly, attacks the cost itself rather than routing around it. Rejected
 **here, not at all** — it is `core/tests/` work with a different blast radius and its own measurement,
-and it does not stop one unchanged tree being tested four times. It goes to its own entry.
+and it does not stop one unchanged tree being tested four times. It is backlog 0239.
 
 ### Alternative B — A declared list of paths, consulted as a denylist
 The same list written the other way round: any `.rs`, `.wgsl`, preset or `Cargo.lock` in the diff

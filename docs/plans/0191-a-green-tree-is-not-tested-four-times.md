@@ -159,8 +159,8 @@ flowchart TD
 
 - **It does not make the suite itself cheaper.** `reactivity`, `animation` and `sanity` are 54 % of
   7378 test-seconds and grow with every shipped preset; sharing one headless renderer per binary, or
-  sampling at the gate and covering the library nightly, is ADR-0211's Alternative A and goes to its
-  own entry. This plan stops a green tree being tested four times; it does not touch what one test
+  sampling at the gate and covering the library nightly, is ADR-0211's Alternative A and is
+  [backlog 0239](../design-backlog.md). This plan stops a green tree being tested four times; it does not touch what one test
   costs.
 - **It does not change what a session runs.** `with-lock.mjs` keeps ADR-0207's exact-tree lookup, so
   the `dev` and `architect` lanes' `## Conductor mode` instructions stay true as written and no
