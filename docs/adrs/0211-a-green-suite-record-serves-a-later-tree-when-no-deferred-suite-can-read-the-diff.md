@@ -1,8 +1,8 @@
 # ADR-0211 — A green suite record serves a later tree when no deferred suite can read the diff
 
-> **Status:** proposed
+> **Status:** accepted
 > **Date:** 2026-09-16
-> **Related plan(s):** [0191](../plans/0191-a-green-tree-is-not-tested-four-times.md)
+> **Related plan(s):** [0191](../plans/done/0191-a-green-tree-is-not-tested-four-times.md)
 > **Amends:** [0207](0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md)
 > (the ledger key), and rests on [0156](0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md)
 > + [0157](0157-the-preset-sweeps-split-per-preset-and-the-phase-tier-samples-a-declared-representative.md)

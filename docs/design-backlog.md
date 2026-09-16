@@ -1693,7 +1693,7 @@ carried 0177 to its close. The owner's complaint was speed; 0227 is that, and th
 the runs their parks. **Every one of the nine has left this file.** 0228-0235 were closed by
 [Plan 0190](plans/done/0190-the-conductor-survives-a-run-nobody-is-watching.md) on 2026-09-16, and
 0227 was promoted the same day to
-[Plan 0191](plans/0191-a-green-tree-is-not-tested-four-times.md) - its skip half only, the
+[Plan 0191](plans/done/0191-a-green-tree-is-not-tested-four-times.md) - its skip half only, the
 cheaper-suite half living on as 0239 below. The bodies and the verdicts are in
 [the archive](design-backlog-archive.md); this heading stays because the group is how they were
 raised and the next reader of one will look for the other eight.

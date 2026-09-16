@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0191 - A green tree is not tested four times](#0191---a-green-tree-is-not-tested-four-times)
   - [0190 - The conductor survives a run nobody is watching](#0190---the-conductor-survives-a-run-nobody-is-watching)
   - [0189 - The conductor can be watched, and stops re-proving a green tree](#0189---the-conductor-can-be-watched-and-stops-re-proving-a-green-tree)
   - [0177 - The test tree stops touching the machine and stops costing its disk](#0177---the-test-tree-stops-touching-the-machine-and-stops-costing-its-disk)
@@ -219,6 +220,38 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0191 - A green tree is not tested four times](done/0191-a-green-tree-is-not-tested-four-times.md)
+
+- closed 2026-09-16 by a conductor-run close review, round 1, the first plan run end to end under
+[ADR-0205](../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md)'s
+review-as-a-separate-process rule. Three phases in the lane `rlx-plan-0191`:
+  - `55b1520` (1): `lib/ledger.mjs` gains `SERVED_PATHS` - `docs/`, `.claude/`, `tools/`, `site/`,
+    `studio/`, `packaging/`, `renders/`, any `*.md`, and `Cargo.toml` / `Cargo.lock` when their whole
+    diff is a three-part `version = "x.y.z"` line - and `servingRecord`, a newest-first walk that
+    takes the first green record whose tree still resolves and whose diff to this tree is entirely
+    served. `greenRecord` is byte-identical, so ADR-0207's exact-tree lookup is untouched.
+  - `19ef1d6` (2): the gate's one `ledger: true` step resolves to `skipped`, `served` or `ran`. A
+    served step runs `cargo nextest run --workspace -P fast` under the same suite lock and records a
+    line carrying `served: true` and a `cmd` that is not the key's, so neither lookup can read it
+    back and one `-P fast` never chains off another.
+  - `2204110` (3): the run terminal prints the tier and the tree it leaned on before the step runs,
+    the digest counts served runs apart from full ones, and `tools/conductor/README.md` carries the
+    three states and the allowlist's direction.
+- Review: **no blockers, no majors, one minor, two nits**, both nits repaired in `0e4f6bc` by the
+close. Full-suite evidence was the ledger record for the reviewed tree itself (`904b2d8`, 1952
+passed, 6 skipped, `gate 0191-pre-review`), which is what ADR-0207 makes the close cite in place of
+a run. The minor stays open: `VERSION_LINE` matches any `version = "x.y.z"` at column 0 rather than
+only `[workspace.package]`'s, so a dependency written in table form and edited in place would be
+served - latent, since no `Cargo.toml` here uses that form and a registry bump re-arms through
+`Cargo.lock`'s checksum, and the repair is code a close may not write.
+- **What outlived the plan.** The allowlist is the whole safety surface and no test can assert what a
+suite reads at runtime; what *was* checked against the tree is that of the files under `core/tests/`
+naming a served directory, all three are in the `suite` binary, which `-P fast` runs, and none of the
+nine deferred binaries reads one. **The saving is still unmeasured** - the conductor runs `main`'s
+copy of `tools/conductor/`, so the tier is inert until this close fast-forwards, and ADR-0211's
+`Outcome` is owed by the first plan that runs under it. Archived backlog 0227 (skip half); 0239, the
+cheaper-suite half - 54 % of 7378 test-seconds - is untouched and live.
 
 ### [0190 - The conductor survives a run nobody is watching](done/0190-the-conductor-survives-a-run-nobody-is-watching.md)
 

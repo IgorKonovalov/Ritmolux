@@ -52,7 +52,6 @@ place. The plan file carries the real link.
 | [0183](0183-a-low-density-is-a-trace-count.md) | A low density is a trace count | approved | dev, human | ADR-0195 (proposed): a trace (density <= 0.08) draws the tier anchor's count at every size; clouds keep ADR-0140. **No golden moves.** Phase 3 is a `human` look gate at 1080p Rich. |
 | [0184](0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) | Limited ink: a contour that is an ink, and a warp field that bands | approved | dev, human | ADR-0197 (proposed): hard ink contours on six scenes; `warp_mesh` bands by level. **Phase 2 stops if level outgrows `color_span`.** Phase 4: look gate. |
 | [0186](0186-the-flatness-gate-tells-a-figure-from-its-ground.md) | The flatness gate tells a figure from its ground | approved | dev, human | Backlog 0128: five figure/ground candidates vs two blot anchors at 96 and 192 px. **Phase 2 is a human gate that writes ADR-0200**; a negative result is a valid end. |
-| [0191](0191-a-green-tree-is-not-tested-four-times.md) | A green tree is not tested four times | approved | dev | ADR-0211: a green record serves a tree whose diff is all declared paths; `-P fast` runs in the suite's place. Backlog 0227. **No `human`, no `.claude/` - conductor-runnable.** |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
@@ -289,16 +288,17 @@ stretch:
   `queue.json` keeps its empty `b` lane and no code changed, so re-opening costs nothing; what is
   retired is the open question. The `watch` command [0189] rejected was explored on a branch and
   deleted the same day (`86497d4`, recoverable from reflog).
-- **Backlog 0227 got that plan on 2026-09-16: [0191], approved, and it leads lane `b`.** ADR-0211
-  serves a green suite record forward when the diff is entirely declared paths and runs `-P fast` in
-  the full suite's place, so nothing is skipped outright. It is queued first because every plan
-  behind it is gated by what it changes. The cheaper-suite half - 54 % of the cost - is **not** in
-  it and is backlog 0239.
+- **Backlog 0227 got that plan on 2026-09-16 and [0191] closed the same day**, discharging the skip
+  half. ADR-0211 serves a green suite record forward when the diff is entirely declared paths and
+  runs `-P fast` in the full suite's place, so nothing is skipped outright. **It is not live until
+  this close fast-forwards**: the conductor runs `main`'s copy of `tools/conductor/`, so the first
+  measured saving - and ADR-0211's `Outcome` - comes from the first plan that runs under the merged
+  tier. The cheaper-suite half - 54 % of the cost - is **not** in it and is backlog 0239.
 
 [0189]: done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md
 [0190]: done/0190-the-conductor-survives-a-run-nobody-is-watching.md
 [0142]: 0142-the-milkdrop-import-earns-its-verdict.md
-[0191]: 0191-a-green-tree-is-not-tested-four-times.md
+[0191]: done/0191-a-green-tree-is-not-tested-four-times.md
 
 **Added 2026-09-14 - a backlog sweep drafted [0176] through [0186] and amended all eight active
 plans; delivery and infrastructure go first, which is the user's call.** Every active plan was
@@ -871,6 +871,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0191 - A green tree is not tested four times](done/0191-a-green-tree-is-not-tested-four-times.md) - closed 2026-09-16. Review: **no blockers, no majors, one minor, two nits (both fixed).** Version: **none** (tooling). ADR-0211 accepted. Archived 0227. [Write-up](README-archive.md).
 - [0190 - The conductor survives a run nobody is watching](done/0190-the-conductor-survives-a-run-nobody-is-watching.md) - closed 2026-09-16. Review: **no blockers, no majors, two minors, one nit.** Version: **none** (tooling). ADR-0210 accepted. Archived 8. [Write-up](README-archive.md).
 - [0189 - The conductor can be watched](done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) - closed 2026-09-16. Review: **no blockers, one major, four minors, one nit.** Version: **none** (tooling). ADR-0207-0209 accepted, each Outcome. Archived 5. [Write-up](README-archive.md).
 - [0177 — The test tree stops costing disk](done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) — closed 2026-09-15. Review: **no blockers, no majors, four minors, two nits.** Version: **0.125.0**. ADR-0204 accepted, Outcome. Archived 7. [Write-up](README-archive.md).
