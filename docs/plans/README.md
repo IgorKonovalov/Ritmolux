@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0190** (ADRs are a separate sequence — next free there is **0210**; 0200 is reserved for Plan 0186 Phase 2.)
+**Next free number: 0191** (ADRs are a separate sequence — next free there is **0210**; 0200 is reserved for Plan 0186 Phase 2.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -52,6 +52,7 @@ place. The plan file carries the real link.
 | [0183](0183-a-low-density-is-a-trace-count.md) | A low density is a trace count | approved | dev, human | ADR-0195 (proposed): a trace (density <= 0.08) draws the tier anchor's count at every size; clouds keep ADR-0140. **No golden moves.** Phase 3 is a `human` look gate at 1080p Rich. |
 | [0184](0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) | Limited ink: a contour that is an ink, and a warp field that bands | approved | dev, human | ADR-0197 (proposed): hard ink contours on six scenes; `warp_mesh` bands by level. **Phase 2 stops if level outgrows `color_span`.** Phase 4: look gate. |
 | [0186](0186-the-flatness-gate-tells-a-figure-from-its-ground.md) | The flatness gate tells a figure from its ground | approved | dev, human | Backlog 0128: five figure/ground candidates vs two blot anchors at 96 and 192 px. **Phase 2 is a human gate that writes ADR-0200**; a negative result is a valid end. |
+| [0190](0190-the-conductor-survives-a-run-nobody-is-watching.md) | The conductor survives a run nobody is watching | draft | dev, human | Backlog 0228-0235: lost background work, the allowlist, adopt-close, hand suite runs, one scope of time and spend. **Phase 8 is a `human` gate on a probe.** |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
@@ -269,6 +270,30 @@ sized in samples, so 21 of 64 bands are bin-starved at 96 kHz — pinned by a te
 waiting on someone reporting a mushy low end on a 96 kHz interface).
 
 ## Recommended execution sequence
+
+**Added 2026-09-16, at [0189]'s close - the conductor stands down until [0180] lands and its own
+backlog is settled, and lane b is retired as a question.** The owner's call, and it sets the next
+stretch:
+
+- **[0180] is resumed by a human-started `dev` session**, not the conductor, on its existing
+  `plan-0180-the-converted-picture-follows-the-source` branch (amended 2026-09-15, four commits ahead
+  of `main`, worktree already removed). It still runs before [0142].
+- **[0190] takes the eight run-survival entries** backlog 0228-0235, also human-started. Until it
+  lands, a conductor run can lose a session's work after its close has committed, and `resume` has no
+  path back - both seen on 0175 during [0189] Phase 8.
+- **Lane b is retired, not deferred.** [ADR-0205](../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md)'s
+  Outcome held the second lane open until the serialized suite fraction was known. [0189] measured it
+  - 0177 spent 24.5 min in full suites against 64 min of sessions - and the answer is that a second
+  lane buys nothing worth having while single-lane runs still park on their own infrastructure.
+  `queue.json` keeps its empty `b` lane and no code changed, so re-opening costs nothing; what is
+  retired is the open question. The `watch` command [0189] rejected was explored on a branch and
+  deleted the same day (`86497d4`, recoverable from reflog).
+- **Backlog 0227** - the full suite per distinct tree, the largest number [0189] Phase 8 produced -
+  is deliberately **not** in [0190]. Its direction is ADR-shaped and it gets its own plan.
+
+[0189]: done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md
+[0190]: 0190-the-conductor-survives-a-run-nobody-is-watching.md
+[0142]: 0142-the-milkdrop-import-earns-its-verdict.md
 
 **Added 2026-09-14 - a backlog sweep drafted [0176] through [0186] and amended all eight active
 plans; delivery and infrastructure go first, which is the user's call.** Every active plan was
