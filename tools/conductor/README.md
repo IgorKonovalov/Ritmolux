@@ -137,6 +137,7 @@ once, whatever `state/conductor.json` says.
 | Reason | What to do before `resume` |
 |---|---|
 | `human_phase` | Do the phase. Mark its row `done` in the plan's `## Implementation log` **in the lane** (`WORK/rlx-plan-NNNN`) and commit it there. `resume` checks the row. |
+| `claude_dir` | The same, and for the same reason: the phase declares a file under `.claude/`, which the CLI will not let a session write (ADR-0210). **Nothing was run** — the park comes before the phase. The detail names the paths. Do the phase in the lane, mark its row `done`, commit; `resume` checks the row. |
 | `stop_condition`, `plan_wrong`, `question` | Read the transcript the inbox names. Settle it in a human-started `/architect` session. |
 | `gate_red` | Read the gate log. Fix the defect in the lane. The conductor never retries a red. |
 | `review_failed` | Read the last review under `state/reviews/`. Resuming grants two fresh fix rounds. |
@@ -198,6 +199,14 @@ an inbox entry, not a park: close the shell, then `git worktree remove`, `git wo
   conductor session runs outside the lock, except `cargo nextest list`, which runs no test and
   takes no lock even when wrapped. `.claude/hooks/conductor-no-background.js` denies
   `run_in_background` on a shell call.
+- **No session writes under `.claude/`, and nothing pretends otherwise.** The CLI denies a headless
+  session an `Edit` or a `Write` there whatever the allowlist says — measured on 2.1.273 under both
+  `settings.conductor.json` and settings naming `.claude/` paths explicitly, while a read is allowed
+  and a write elsewhere in the same worktree succeeds (`spike/README.md`). So **a phase whose
+  `Files touched` names such a path parks the plan before the phase runs**, `claude_dir`, with the
+  paths as the detail; the phases before it in the same run are still handed to a session. A review
+  **finding** under `.claude/` stays open, carries no `fixed_in`, and names its replacement text in
+  the digest's **Needs you**, for the owner to apply. ADR-0210; it amends ADR-0209's repair list.
 - **No session works in the background.** Nothing re-invokes a `claude -p` session: one that starts
   a long command in the background and ends its turn exits, the command is killed, and the result is
   lost — after the commits it already made have landed. Three layers, none sufficient alone: the

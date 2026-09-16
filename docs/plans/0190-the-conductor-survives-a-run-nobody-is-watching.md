@@ -354,7 +354,7 @@ flowchart TD
 | 6 — The ASCII guarantee is asserted against input that could break it | dev | done | `ec58978` |
 | 7 — The probe asks whether a headless session may edit `.claude/` | dev | done | committed with this row |
 | 8 — Stop gate: what the probe found | human | done | committed with this row |
-| 9 — `.claude/` resolves the way Phase 8 chose | dev | not started | |
+| 9 — `.claude/` resolves the way Phase 8 chose | dev | done | committed with this row |
 
 ### Notes
 
@@ -394,9 +394,18 @@ flowchart TD
   both match the repaired lines, which now continue `, ${shortDuration(ms)}` and
   `— an “eased” value …`. The defects are fixed; the probes no longer discriminate, so those two
   entries have to be judged on their text.
-- Stopped at Phase 8. Phases 1-7 are committed; Phase 9 is undecided until Phase 8 settles, and the
-  once-per-plan full workspace suite (ADR-0156) is owed at the last phase, not here. No `.rs`, `.cpp`,
-  `.h`, `.wgsl` or `Cargo.toml` is touched by Phases 1-7.
+- Phase 8 took the **Routing** branch (ADR-0210): the probe found no switch, so `.claude/` is excepted
+  from ADR-0209's repair list, the owner holds such a repair, and a session parks in front of it.
+- Phase 9 touched four files beyond its list, all for the routing half it names: `lib/plan.mjs`, which
+  is where a phase's `Files touched` is parsed and where `nextStep` has to stop in front of a
+  `.claude/` phase; `conductor.mjs`, so `resume` holds a `claude_dir` park to the same evidence it
+  holds a `human_phase` one (the log row); `test/plan.test.mjs`, `test/lane.test.mjs`,
+  `test/cli.test.mjs` and `test/helpers.mjs` for their cases; and `tools/conductor/README.md`.
+- Phase 9 deliberately does **not** guard `verifyClose` against a `fixed_in` naming a `.claude/` file.
+  A close that claimed one would already park `disagreement`, because no commit on the branch changes
+  that file — the denial leaves no commit. The message would read *"does not change X"* rather than
+  naming the rule.
+- No `.rs`, `.cpp`, `.h`, `.wgsl` or `Cargo.toml` is touched by any phase of this plan.
 - **Phase 8 took the "no switch exists" branch.** Session D named `.claude/**` five ways, absolute
   path included, and was denied exactly as session C was, so there is nothing to configure:
   [ADR-0210](../adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md)

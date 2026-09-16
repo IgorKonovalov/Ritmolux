@@ -23,7 +23,8 @@ implementer wrote except what is in the repository. Earlier rounds of this revie
 3. Only if it carries none: close on the branch in this worktree, in this order (the conductor-mode
    order of your skill):
    1. repair every `minor` or `nit` your skill's conductor mode lets a close repair (comment text,
-      assertion or panic message text, Markdown prose), committed, and mark each with `fixed_in`;
+      assertion or panic message text, Markdown prose **except under `.claude/`**), committed, and
+      mark each with `fixed_in`;
    2. `git merge main`;
    3. the bookkeeping, the version bump and the studio sync, committed. The close commit adds a
       `## Close review` section to the plan, after `## Implementation log`: this round's review in
@@ -63,6 +64,12 @@ or, after a clean close:
 
 `fixed_in` goes only on a finding the close repaired, naming the commit that changes that finding's
 file; every other finding carries none.
+
+**Never attempt an `Edit` or a `Write` under `.claude/`.** The CLI refuses one to a headless session
+whatever the allowlist says (ADR-0210). A finding there stays **open** and carries no `fixed_in`: the
+owner applies it, reading it in the digest. Because you have read the file and composed the fix,
+write that finding's `what` so it **names the replacement text** — the owner should be applying a
+repair, not re-deriving one.
 
 or
 

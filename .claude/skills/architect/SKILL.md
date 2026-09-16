@@ -893,18 +893,30 @@ it and the rest of this skill disagree, it wins for that session only.
    5. **The annotated tag** on the branch tip.
    6. **`node scripts/check-release-tag.mjs`**.
 
-   **What a close repairs (ADR-0209).** A `minor` or `nit` whose repair cannot change what any
-   program does, and nothing else. That is a closed list: the text of a comment or doc comment in any
-   source file; the message text of an assertion or a panic; Markdown prose anywhere in the
-   repository, every file under `.claude/skills/` included, except a generated region, which is
-   repaired by regenerating it. Code, a test's logic, a constant and an instruction a skill gives stay
-   open. Mark each repaired finding in the `closed` outcome with `"fixed_in": "<sha>"`, the repairing
+   **What a close repairs (ADR-0209, amended by [ADR-0210](../../../docs/adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md)).**
+   A `minor` or `nit` whose repair cannot change what any program does, and nothing else. That is a
+   closed list: the text of a comment or doc comment in any source file; the message text of an
+   assertion or a panic; Markdown prose anywhere in the repository **except under `.claude/`**, and
+   except a generated region, which is repaired by regenerating it. Code, a test's logic, a constant
+   and an instruction a skill gives stay open.
+
+   **`.claude/` is excepted because the CLI refuses it, not because of who owns the file.** On 2.1.273
+   a headless session's `Edit` or `Write` under a project's `.claude/` is denied whatever the
+   allowlist says, in every spelling probed, while a read is allowed and a write elsewhere in the same
+   worktree succeeds (the table is in `tools/conductor/spike/README.md`). **Do not attempt one**: such
+   a finding stays open, carries no `fixed_in`, and reaches the owner through the digest's **Needs
+   you** like any other open finding. Because you have read the file and composed the fix, write that
+   finding so it **names the replacement text** — the owner applies a repair rather than re-deriving
+   one. A phase whose files include such a path never reaches a session at all: the conductor parks
+   the plan in front of it. Mark each repaired finding in the `closed` outcome with `"fixed_in": "<sha>"`, the repairing
    commit. The conductor checks that the commit is on the branch and changes that finding's file, and
    parks on disagreement. **A close may correct a fact in any lane's skill material that its plan made
    false, and never changes a rule.** A sample output, a column list, a flag spelling or a count under
    `.claude/skills/<lane>/` is a fact and follows the tree, whichever lane owns the skill. An
    instruction, meaning what a lane must or must not do, is that lane's contract: a close that thinks
-   one is wrong raises a backlog entry and leaves it. A doc-comment repair can turn `cargo doc -D
+   one is wrong raises a backlog entry and leaves it. Either way the correction under `.claude/` is
+   reported and left for the owner, per the paragraph above; ADR-0210 changed who applies it, not who
+   is responsible for it being right. A doc-comment repair can turn `cargo doc -D
    warnings` red; step 4 is what catches it.
 5. **Never fast-forward `main`, never remove the worktree or delete the branch, never push.** Steps 4,
    6 and 7 of the sequence are the conductor's; step 5 is the owner's.

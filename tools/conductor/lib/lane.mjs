@@ -30,6 +30,7 @@ import {
 } from "./live.mjs";
 import { CLOSE, take } from "./locks.mjs";
 import { fastForwardMain } from "./merge.mjs";
+import { CLAUDE_DIR } from "./outcome.mjs";
 import { donePhases, findPlan, nextStep, rangeLabel, readPlanFile } from "./plan.mjs";
 import { endStep, planRecord, saveState, startStep, statePaths } from "./state.mjs";
 import { renderPromptFile, runStep } from "./step.mjs";
@@ -418,6 +419,16 @@ export async function runPlan(ctx, lane, plan) {
           reason: "human_phase",
           phase: next.phases[0],
           detail: `Phase ${next.phases[0]} is owned by human`,
+          read: `${file.rel} Phase ${next.phases[0]}`,
+        });
+      }
+      if (next.kind === "claude_dir") {
+        return park(ctx, rec, {
+          reason: CLAUDE_DIR,
+          phase: next.phases[0],
+          detail:
+            `Phase ${next.phases[0]} edits ${next.paths.join(", ")}, and the CLI refuses a headless session ` +
+            `an edit under .claude/ whatever the allowlist says (ADR-0210). The phase is yours; nothing was run.`,
           read: `${file.rel} Phase ${next.phases[0]}`,
         });
       }

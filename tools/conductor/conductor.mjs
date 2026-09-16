@@ -27,7 +27,8 @@ import { currentBranch, head, isClean } from "./lib/git.mjs";
 import { appendPark, dirtyText, dirtyWorktree } from "./lib/inbox.mjs";
 import { runLanes } from "./lib/lane.mjs";
 import { ascii } from "./lib/live.mjs";
-import { findPlan, nextStep, readPlanFile } from "./lib/plan.mjs";
+import { CLAUDE_DIR } from "./lib/outcome.mjs";
+import { donePhases, findPlan, readPlanFile } from "./lib/plan.mjs";
 import { loadLocal, loadQueue, stateSets } from "./lib/queue.mjs";
 import { loadState, planRecord, recoverInterrupted, saveState, statePaths, totalSpend } from "./lib/state.mjs";
 import { activeChildren, killTree } from "./lib/step.mjs";
@@ -270,12 +271,14 @@ function parkStillTrue(p, rec) {
   // Whatever the reason, no new session starts on a tree the last one left dirty.
   const dirty = dirtyWorktree(rec.worktree);
   if (dirty) return `the worktree ${rec.worktree} has uncommitted changes: ${dirtyText(dirty)}; commit them, or \`git restore\` them there, first`;
-  if (reason === "human_phase") {
+  // Both of these park on a phase only the owner can do — one the plan tagged `human`, one whose
+  // files the CLI will not let a session touch (ADR-0210). Either way the lane moves on when the
+  // plan's own log says the phase is done, which is the same evidence for both.
+  if (reason === "human_phase" || reason === CLAUDE_DIR) {
     const where = rec.worktree && existsSync(rec.worktree) ? rec.worktree : p.repo;
     const found = findPlan(where, rec.plan);
     if (!found) return `plan ${rec.plan} is not in ${where}`;
-    const next = nextStep(readPlanFile(found.path));
-    if (next.kind === "human" && next.phases[0] === phase) {
+    if (!donePhases(readPlanFile(found.path)).has(phase)) {
       const rel = relative(where, found.path).replace(/\\/g, "/");
       return `Phase ${phase} is still not marked done in the ## Implementation log of ${rel} in ${where}; commit the row there first`;
     }

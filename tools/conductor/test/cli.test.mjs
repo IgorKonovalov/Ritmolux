@@ -385,3 +385,26 @@ test("adopt-close on a lane with no close review changes nothing, and a bad plan
   assert.equal(never.code, 1);
   assert.match(never.err.join("\n"), /no lane on disk/);
 });
+
+test("resume refuses a claude_dir park until the plan's log marks that phase done", async () => {
+  const claudePhase = { id: "1", owner: "dev", files: "`.claude/skills/dev/SKILL.md`" };
+  const { p, cli } = setup([{ number: "0101", phases: [claudePhase, dev("2")] }], { a: ["0101"] });
+  await cli("run");
+  const rec = loadState(p.stateDir).plans["0101"];
+  assert.equal(rec.park.reason, "claude_dir");
+  assert.match(rec.park.detail, /\.claude\/skills\/dev\/SKILL\.md/);
+
+  const refused = await cli("resume", "0101");
+  assert.equal(refused.code, 1);
+  assert.match(refused.err[0], /its park reason \(claude_dir\) still holds: Phase 1 is still not marked done/);
+  assert.equal(loadState(p.stateDir).plans["0101"].status, "parked");
+
+  // The owner makes the edit and commits the row in the lane, exactly as for a human phase.
+  const planPath = join(rec.worktree, "docs", "plans", "0101-fixture.md");
+  writeFileSync(planPath, readFileSync(planPath, "utf8").replace(/^\| 1 — Step 1 \| dev \| not started \|/m, "| 1 — Step 1 | dev | done |"));
+  sh(["commit", "-q", "-am", "docs(plans): phase 1 done by the owner"], rec.worktree);
+
+  const accepted = await cli("resume", "0101");
+  assert.equal(accepted.code, 0, accepted.err.join("\n"));
+  assert.equal(loadState(p.stateDir).plans["0101"].status, "queued");
+});

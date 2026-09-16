@@ -305,6 +305,12 @@ implementer run.
 - **Every `cargo nextest` or `cargo test` runs through the suite lock**:
   `node <path from RLX-CONDUCTOR-SUITE-LOCK> suite -- cargo nextest run ...`. A hook denies the bare
   form in this mode.
+- **Never attempt an `Edit` or a `Write` under `.claude/`.** The CLI denies one to a headless session
+  whatever `settings.conductor.json` allows — measured on 2.1.273, every spelling, while a read is
+  allowed and a write elsewhere in the worktree succeeds ([ADR-0210](../../../docs/adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md)).
+  A phase whose `Files touched` names such a path never reaches you: the conductor parks the plan in
+  front of it, with the edit as the detail, and it is the owner's. If a phase turns out to need one
+  anyway, park `plan_wrong` naming the file and the edit rather than writing it some other way.
 - **Never start a command in the background, and never arm a `Monitor`.** Nothing re-invokes a
   headless session: backgrounding a long command and ending the turn kills it and loses its result,
   after the commits already made have landed. A long command runs in the **foreground** and the

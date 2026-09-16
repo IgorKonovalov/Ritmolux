@@ -30,6 +30,12 @@ follow it; where it and the rest of the skill disagree, conductor mode wins.
   committed, and print the outcome instead of the pointer. Do not run the full workspace suite: the
   conductor's `pre-review` gate runs it next on the same tree, so the close block's `Full suite:`
   bullet reads *owed to the conductor's pre-review gate (ADR-0207)*.
+- **Never attempt an `Edit` or a `Write` under `.claude/`.** The CLI refuses one to a headless session
+  whatever the allowlist says, measured on 2.1.273 (ADR-0210): a read is allowed, a write is not, and
+  no spelling of a permission rule reaches it. The conductor parks a phase whose files include such a
+  path before the phase starts, so a range you were handed does not contain one. If you find you need
+  one anyway, park `plan_wrong` naming the exact file and the edit — do not work around it by writing
+  the file some other way.
 - Stop and park, rather than work around it, on: a `human` phase inside the range, a stop condition
   the plan states, a plan that is wrong, a question only a person can answer, or a check you cannot
   make green within the phase. Commit what is finished first; leave the tree clean.

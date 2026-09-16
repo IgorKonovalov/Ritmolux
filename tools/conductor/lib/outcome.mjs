@@ -33,6 +33,14 @@ export const CLI_CONTRACT = "cli_contract";
  */
 export const LOST_BACKGROUND = "lost_background";
 
+/**
+ * The park for a phase whose declared files include a path under `.claude/`. The CLI refuses a
+ * headless session an `Edit` or `Write` there whatever the allowlist says, so the phase is the
+ * owner's (ADR-0210); the lane parks in front of it with the edit as the detail rather than running
+ * it and failing a done-when it was never able to satisfy. No session may claim this reason.
+ */
+export const CLAUDE_DIR = "claude_dir";
+
 const SHELL_TOOLS = new Set(["Bash", "PowerShell"]);
 
 /** One line, at most 80 characters, for naming a command in a park detail. */

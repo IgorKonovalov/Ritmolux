@@ -690,3 +690,61 @@ test("a close on the branch over a dirty tree parks disagreement and names the d
   assert.deepEqual(kinds(rec), ["implement:dev", "review:architect"], "and no second review ran");
   assert.deepEqual(rec.park.dirty.paths, ["suite-output.log"]);
 });
+
+// ADR-0210: a phase whose declared files include `.claude/` parks before the phase runs, with the
+// edit as the detail. 0177 Phase 8 did the whole phase's work and then parked `check_red` on its own
+// done-when, which is the shape this replaces.
+
+const claudePhase = (id) => ({ id, owner: "dev", files: "`.claude/skills/dev/SKILL.md`" });
+
+test("a phase declaring a `.claude/` file parks before any session runs, naming the edit", async () => {
+  const { ctx } = scratch({ plans: [{ number: "0101", phases: [claudePhase("1"), dev("2")] }], lanes: { a: ["0101"] } });
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+
+  assert.equal(rec.status, "parked");
+  assert.equal(rec.park.reason, "claude_dir");
+  assert.equal(rec.park.phase, "1");
+  assert.match(rec.park.detail, /\.claude\/skills\/dev\/SKILL\.md/);
+  assert.match(rec.park.detail, /ADR-0210/);
+  assert.match(rec.park.detail, /nothing was run/);
+  assert.deepEqual(kinds(rec), [], "no session was started at all");
+  assert.notEqual(rec.park.reason, "check_red");
+  assert.deepEqual(rec.gates ?? [], [], "and no gate ran either");
+});
+
+test("the phases before a `.claude/` phase in the same run are still done, then the lane parks", async () => {
+  const { ctx } = scratch({ plans: [{ number: "0101", phases: [dev("1"), claudePhase("2"), dev("3")] }], lanes: { a: ["0101"] } });
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+
+  assert.deepEqual(kinds(rec), ["implement:dev"], "one session, for Phase 1 alone");
+  assert.deepEqual(rec.steps[0].phases, ["1"], "the range stopped in front of Phase 2");
+  assert.equal(rec.park.reason, "claude_dir");
+  assert.equal(rec.park.phase, "2");
+  // The truncated run is not the plan's last, so that session was not asked to write a close block.
+  assert.equal(readFileSync(join(ctx.stateDir, "prompts", `${rec.steps[0].label}.md`), "utf8").includes("RLX-CONDUCTOR-LAST-RUN: no"), true);
+});
+
+test("once the owner has done the `.claude/` phase and marked its row, the plan runs on to a merge", async () => {
+  const { ctx, repo } = scratch({ plans: [{ number: "0101", phases: [claudePhase("1"), dev("2")] }], lanes: { a: ["0101"] } });
+  await runLanes(ctx);
+  const parked = ctx.state.plans["0101"];
+  assert.equal(parked.park.reason, "claude_dir");
+
+  // The owner makes the edit in the lane and marks the row, as they would for a `human` phase.
+  const wt = parked.worktree;
+  const planPath = join(wt, "docs", "plans", "0101-fixture.md");
+  writeFileSync(join(wt, "phase-0101-1.txt"), "done by the owner\n");
+  writeFileSync(planPath, readFileSync(planPath, "utf8").replace(/^\| 1 — Step 1 \| dev \| not started \|/m, "| 1 — Step 1 | dev | done |"));
+  sh(["add", "phase-0101-1.txt", "docs/plans/0101-fixture.md"], wt);
+  sh(["commit", "-q", "-m", "docs(plans): phase 1 done by the owner"], wt);
+  parked.status = "queued";
+  parked.park = null;
+
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  assert.deepEqual(rec.steps.filter((s) => s.kind === "implement").map((s) => s.phases), [["2"]], "only Phase 2 was handed to a session");
+  assert.equal(readFileSync(join(repo, "phase-0101-1.txt"), "utf8"), "done by the owner\n");
+});

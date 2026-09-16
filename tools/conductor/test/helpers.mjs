@@ -17,7 +17,7 @@ export function tmp(prefix = "rlx-conductor-test-") {
 }
 
 /**
- * spec: { number, title?, status?, phases: [{ id, owner, title?, stop? }],
+ * spec: { number, title?, status?, phases: [{ id, owner, title?, stop?, files? }],
  *         rows?: { [id]: { state, commit? } }, closeReview?: string, lane? }
  */
 export function planText(spec) {
@@ -42,7 +42,7 @@ export function planText(spec) {
     lines.push(`### Phase ${p.id} — ${p.title ?? `Step ${p.id}`}`);
     lines.push(`- **Owner skill:** ${p.owner}`);
     lines.push(`- **What:** phase ${p.id}.`);
-    lines.push(`- **Files touched:** \`phase-${p.id}.txt\``);
+    lines.push(`- **Files touched:** \`phase-${p.id}.txt\`${p.files ? `, ${p.files}` : ""}`);
     lines.push(`- **Done when:** the file exists.`);
     if (p.stop) lines.push(`- **Stop condition:** ${p.stop}`);
     lines.push("");

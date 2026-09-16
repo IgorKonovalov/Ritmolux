@@ -206,6 +206,12 @@ mode. Where this section and the rest of the skill disagree, this section wins, 
   refused). `resume` refuses a dirty lane.
 - **Every `cargo nextest` / `cargo test`** — the version test after a sync, a player-side check — runs as
   `node <path from RLX-CONDUCTOR-SUITE-LOCK> suite -- cargo ...`. A hook denies the bare form.
+- **Never attempt an `Edit` or a `Write` under `.claude/`.** The CLI denies one to a headless session
+  whatever `settings.conductor.json` allows — measured on 2.1.273, every spelling, while a read is
+  allowed and a write elsewhere in the worktree succeeds ([ADR-0210](../../../docs/adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md)).
+  A phase whose `Files touched` names such a path never reaches you: the conductor parks the plan in
+  front of it, and it is the owner's. If a phase turns out to need one, park `plan_wrong` naming the
+  file and the edit.
 - **Never start a command in the background, and never arm a `Monitor`.** Nothing re-invokes a headless
   session: backgrounding a long command — an `npm run build`, a suite — and ending the turn kills it and
   loses its result, after the commits already made have landed. It runs in the **foreground**, bounded by
