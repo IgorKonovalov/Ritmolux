@@ -316,9 +316,6 @@ live entry citing this one.
 | 0203 | The smoke run captured from a microphone while the default is loopback | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 5. **Promoted** |
 | 0207 | The cap-recovery line says "geometry" for three contexts that are not geometry | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 3. **Promoted** |
 | 0208 | A system count written into prose goes stale on the next system | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 4 + ADR-0202. **Promoted** |
-| 0214 | A converted comp shader and per-vertex program read other coordinates than the source | [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) Phases 1-3. **Promoted** |
-| 0215 | The seam on two MilkDrop 1.x presets is unexplained | [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) Phases 1, 4. **Promoted** |
-| 0216 | The converted waveform follows neither reference | [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) Phases 5-6 + ADR-0199. **Promoted** |
 | 0217 | `path_cost`'s arity probe prices an arc chain, not the polyline its header reports | [Plan 0160](plans/0160-the-silhouettes-preconditions-stop-being-silent.md) Phase 1b. **Promoted** |
 <!-- roster:end -->
 
@@ -582,6 +579,9 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0238 | The parameter slider is drawn from the schema and armed by the preset read, so a release between the two is discarded | `70e0a19` (test) + `39a6589` (product). Gated on `hasDocument`, not `writable`. **Closed 2026-09-16** |
 | 0198 | `deposit_arms` tears along the branch cut at a fractional value | [Plan 0179](plans/done/0179-a-parameters-range-belongs-to-its-family.md) Phase 1. **Closed 2026-09-16** |
 | 0204 | The studio's sliders read one range per parameter, not per curve family | [Plan 0179](plans/done/0179-a-parameters-range-belongs-to-its-family.md) + ADR-0194. **Closed 2026-09-16** |
+| 0214 | A converted comp shader and per-vertex program read other coordinates than the source | [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md) Phases 1-3 + ADR-0212. **Closed 2026-09-16** |
+| 0215 | The seam on two MilkDrop 1.x presets is unexplained | [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md) Phases 1, 4, 7. Cause: the unbound scene deposit. **Closed 2026-09-16** |
+| 0216 | The converted waveform follows neither reference | [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md) Phases 5-6 + ADR-0199. Custom waves: see 0244. **Closed 2026-09-16** |
 <!-- roster:end -->
 
 ---
@@ -13170,13 +13170,28 @@ converted preset reads differently from the reference. The citations are in the 
 **Medium.** Both are silent. Every comp shader or per-vertex program that reads these inputs renders
 a transformed version of the look it was authored for, and nothing in the conversion flags it.
 
-- **Promoted 2026-09-14** to [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) Phases 1-3: read the warp uv chain, give the comp stage the source's polar pair, aspect-correct the per-vertex `x`/`y`. [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md) Phase 2 names the uv chain as a candidate cause of the wash.
+- **Promoted 2026-09-14** to [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md) Phases 1-3: read the warp uv chain, give the comp stage the source's polar pair, aspect-correct the per-vertex `x`/`y`. [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md) Phase 2 names the uv chain as a candidate cause of the wash.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+### Closed 2026-09-16 by [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md) Phases 1-3 — repaired, and **the entry understated the defect**
+
+The comp stage now builds `rad`/`ang` as `CPlugin::UvToMathSpace` does (`+y` down, `ang` in
+`0..2pi`, `rad` reading 1 at the corners), and `MilkRuntime::run_vertex` hands the program the
+source's aspect-corrected `x`/`y`. Both are asserted at named values on a real adapter.
+
+**What this entry did not know:** it framed the divergence as the program's *inputs*. Phase 1's read
+of `CPlugin::ComputeGridAlphaValues` (l.1839-1916) found the warp *chain* diverges too — the stretch
+centre, the procedural warp's amplitude, the rotation centre and the translation all run in
+MilkDrop's corrected space, each off by `1/A` on the shorter axis, 1.78 on y at 16:9. That is four
+more stages than the entry names, it parked Phase 3 as `plan_wrong`, and it is what
+[ADR-0212](adrs/0212-a-converted-preset-gets-its-own-vertex-module-and-the-pipeline-is-chosen-not-branched.md)
+exists to decide. The repair is a second vertex module chosen per preset, so no native preset moved.
+
 
 
 ---
-- **Updated 2026-09-14** - [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) Phase 1 read the warp uv chain at `xeiraex/milkdrop2` `d4c843a`. `CPlugin::ComputeGridAlphaValues` (`milkdropfs.cpp` l.1877-1916) applies zoom, `sx`/`sy`, the procedural warp, rotation and `dx`/`dy` in the aspect-corrected space and undoes it at l.1915-1916. **The divergence is not confined to the program's inputs.** `vs_main` agrees on zoom and on the rotation itself. It differs at the `sx`/`sy` and rotation centre, the warp's amplitude and `dx`/`dy`, each by `1/aspect` on the shorter axis (1.78 on y at 16:9). `CPlugin::UvToMathSpace` (l.3862-3878) reads `m_fAspectX`/`m_fAspectY` (`plugin.cpp` l.2027-2028, longer axis 1), with `u = 0` at the left edge. The plan's log holds the stage table.
+- **Updated 2026-09-14** - [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md) Phase 1 read the warp uv chain at `xeiraex/milkdrop2` `d4c843a`. `CPlugin::ComputeGridAlphaValues` (`milkdropfs.cpp` l.1877-1916) applies zoom, `sx`/`sy`, the procedural warp, rotation and `dx`/`dy` in the aspect-corrected space and undoes it at l.1915-1916. **The divergence is not confined to the program's inputs.** `vs_main` agrees on zoom and on the rotation itself. It differs at the `sx`/`sy` and rotation centre, the warp's amplitude and `dx`/`dy`, each by `1/aspect` on the shorter axis (1.78 on y at 16:9). `CPlugin::UvToMathSpace` (l.3862-3878) reads `m_fAspectX`/`m_fAspectY` (`plugin.cpp` l.2027-2028, longer axis 1), with `u = 0` at the left edge. The plan's log holds the stage table.
 
 ## 0215 — the seam Plan 0109 saw on two MilkDrop 1.x presets is unexplained, and the test doc that frames it still attributes a +x cut to MilkDrop
 
@@ -13210,9 +13225,27 @@ way.
 
 **Medium**, as 0119 was. It shows on real content, and the diagnosis it had is gone.
 
-- **Promoted 2026-09-14** to [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) Phases 1 and 4: render the seam before anything moves, then find its ray and rewrite the stale test doc. [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md) Phase 4 adds a "seam present?" column for the reference side.
+- **Promoted 2026-09-14** to [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md) Phases 1 and 4: render the seam before anything moves, then find its ray and rewrite the stale test doc. [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md) Phase 4 adds a "seam present?" column for the reference side.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+### Closed 2026-09-16 by [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md) Phases 4 and 7 — found, and **the diagnosis inverted a second time**
+
+Backlog 0119 blamed `ang`'s `+x` branch cut; [Plan 0173](plans/done/0173-the-milkdrop-geometry-reads-the-source.md)
+falsified that. This entry then recorded the seam as unexplained. Phase 4 ruled the cut out from the
+other side — **neither preset's per-vertex program names `ang` at all**, so `vertex_inputs.ang` is
+`None` for both — and ruled out a mirror between the uv the runtime is handed and the mesh position
+it lands on.
+
+**The cause was not in the geometry.** `milkconv` emitted a `[params]` comment saying the scene's
+deposit stays off and never emitted the key, so `warp_mesh`'s `DEFAULT_DEPOSIT` of `1.6` laid a
+palette-coloured ring into **every converted preset**, brightest along the `+x` ray where its angular
+term wraps. Phase 7 emits `deposit = "0.0"`. Both presets re-render with no hard edge; what survives
+on *Songflower* is a one-row hairline with colour continuous across it, which is the cut interpolated
+across one mesh cell and is authored-against.
+
+The stale test doc this entry's second half names is rewritten and attributes nothing to a reference.
+
 
 
 ---
@@ -13257,13 +13290,27 @@ ADR-0071's prose error.
 **Medium.** The waveform-led converted presets draw a different figure in most modes, not a
 mis-scaled one. That is a bigger gap than the 4.7 % this line of work started from.
 
-- **Promoted 2026-09-14** to [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) Phases 5-6 and [ADR-0199](adrs/0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md): modes draw the released source's figure at the scale `foo_vis_milk2` renders, from a left/right pair the analyzer already receives, with a hard stop back to a mono stand-in if anything below the analyzer would change.
+- **Promoted 2026-09-14** to [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md) Phases 5-6 and [ADR-0199](adrs/0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md): modes draw the released source's figure at the scale `foo_vis_milk2` renders, from a left/right pair the analyzer already receives, with a hard stop back to a mono stand-in if anything below the analyzer would change.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+### Closed 2026-09-16 by [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md) Phases 5-6 — built as specified, with one boundary left standing
+
+All eight `wave_mode` figures are `CPlugin::DrawWave`'s own constructions, each comment citing file,
+function and line; the sample term carries `HOST_SAMPLE_FACTOR = 1.256` and nothing else does; and
+the analyzer publishes a levelled left/right pair under one divisor, so the five two-channel modes
+read two channels. `rlx_core.h` and `rlx-ring/` were untouched, so ADR-0199's hard stop never fired.
+
+Three corrections this entry's table did not carry, all from Phase 1's full read: modes 1 and 5 turn
+as well as mode 0; modes 2 and 3 are one geometry differing only in alpha; and every built-in figure
+passes through `SmoothWave`.
+
+**Custom waves are outside the contract** — they read the same traces but are neither smoothed nor
+scaled by `k`, which was backlog 0216's scope and not an oversight. That question is 0244.
+
 
 
 ---
-- **Updated 2026-09-14** - [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) Phase 1 read `CPlugin::DrawWave` (`milkdropfs.cpp` l.2765-3259, `xeiraex/milkdrop2` `d4c843a`) in full, and the plan's log holds the per-mode table. It corrects the table above three ways. Mode 1 is polar: radius from `fR[i]`, angle `1.57 * fL[i+32]`, turning at `2.3` rad/s (l.2941-2942). Mode 3's geometry is mode 2's (l.2998-3003 against l.2969-2974), and the two differ in alpha only. Mode 5 turns at `0.3` rad/s (l.3085), so modes 1 and 5 read `time` as well as mode 0. Every built-in figure passes through `SmoothWave` (l.2549) once, after the y negation at l.3312.
 
 ## 0217 — `path_cost`'s arity probe draws a curved leaf, so from `samples = 32` up it prices the arc chain and not the polyline its header reports
 

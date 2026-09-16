@@ -6,7 +6,7 @@
 > **Related ADRs:** [0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)
 > (accepted — this plan appends its third `Outcome`)
 > **Closes:** design-backlog 0113, 0124. **0109 is not taken — this plan decides whether it may be.**
-> **Runs after:** [Plan 0180](0180-the-converted-picture-follows-the-source.md), all of it.
+> **Runs after:** [Plan 0180](done/0180-the-converted-picture-follows-the-source.md), all of it.
 
 > **Amended 2026-09-14**, at a validity sweep of the active roster. Edited in place:
 >
@@ -22,6 +22,28 @@
 >   for ADR-0199.
 > - **Phase 5.** Its `Outcome` names backlog 0216's residue if any remains.
 > - **Phase 6.** It re-ranks backlog 0108, whose 0106/0107 gate has expired.
+
+> **Amended 2026-09-16, at [Plan 0180](done/0180-the-converted-picture-follows-the-source.md)'s
+> close. That plan landed, and it moved this plan's measurement subject, not just its pictures.**
+> The 2026-09-14 amendment above anticipated the waveform being redrawn. Two things it did not:
+>
+> - **The deposit term is gone from both `milk_wash` fixtures.** Plan 0180 Phase 7 found that
+>   `milkconv` emitted a `[params]` comment saying the scene's deposit stayed off and never emitted
+>   the key, so `DEFAULT_DEPOSIT = 1.6` laid a ring into every converted preset; it now binds
+>   `deposit = "0.0"`, and `milk_wash_fog_tunnel.toml` and `milk_wash_blur_mix_3.toml` bind it too.
+>   **Phase 1's settled level is therefore a different number from every reading in this repository
+>   that predates 2026-09-16**, and Phase 2's `source / (1 - decay)` arithmetic is taken on a field
+>   with one fewer source term. Re-measure; cite no historical figure.
+> - **The clean control has no wash left to measure.** The bisect probe now reads
+>   `blur mix 3` at **exactly `0.00000000`** at all three seams, where it read
+>   `0.0202 / 0.0885 / 0.2521` before. *Fog Tunnel* keeps a residue (`0.1304`, down from `0.2972`),
+>   and that residue is backlog 0113 proper. A control that is exactly zero cannot bound anything by
+>   ratio, so Phase 1 may need a second control or a stated reason it does not.
+>
+> Phase 4's rig session also inherits two questions from that plan:
+> [ADR-0199](../adrs/0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md)'s
+> unit-scale mode-0 capture (its `k` is confirmed on mode 6 alone) and whether the reference shows
+> the seam at all.
 
 ## TL;DR
 

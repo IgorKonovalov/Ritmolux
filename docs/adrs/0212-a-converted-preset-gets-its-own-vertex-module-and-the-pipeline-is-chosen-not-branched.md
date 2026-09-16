@@ -1,8 +1,8 @@
 # ADR-0212 — A converted preset gets its own vertex module, and the pipeline is chosen rather than branched
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-16 (Plan 0180), with an Outcome
 > **Date:** 2026-09-16
-> **Related plan(s):** [0180](../plans/0180-the-converted-picture-follows-the-source.md) (Phase 3, which
+> **Related plan(s):** [0180](../plans/done/0180-the-converted-picture-follows-the-source.md) (Phase 3, which
 > parked `plan_wrong` on this question)
 > **Related ADRs:** [0113](0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md) (the converter),
 > [0037](0037-internal-grid-is-a-resolution-not-a-shape.md) (whose aspect a stage takes),
@@ -117,3 +117,45 @@ saying which stages are corrected where.
 A `milk_mesh` scene, separate from `warp_mesh`. Rejected as far too large for the finding: the two
 share the mesh, the ping-pong field, the deposit pass, the present and the whole resource set, and
 they differ in four lines of a coordinate convention.
+
+## Outcome — 2026-09-16, at Plan 0180's close
+
+Accepted. **The decision held; the mechanism in the Decision's first bullet did not, and could not.**
+
+**"One source, two preludes" is self-contradictory as written.** It asks for the four differing
+stages to *call* `to_space(p, aspect)` / `from_space(p, aspect)` in the shared chain, **and** for the
+native variant's text to be byte-identical to today's. Adding call sites to the shared chain changes
+the very string the native module is built from, so the two halves cannot both hold. Plan 0180
+Phase 3 kept the second, which is the one the whole ADR turns on.
+
+**What landed instead: anchor substitution.** `WARP_SHADER` is **not edited**, and
+`warp_module_source(WarpSpace::Native)` is the quantizer plus that constant verbatim — asserted
+directly by `the_native_warp_module_is_built_from_the_unchanged_source`. The converted variant is the
+same constant with `CONVERTED_PRELUDE` prepended and four anchor lines rewritten
+(`WARP_ANCHORS` in `core/src/render/scenes/warp_mesh/shaders.rs`). The stage order still has one
+copy, which is what the bullet was protecting.
+
+**The tripwire the Negative section asks for exists, in the other form.** Where the ADR expects a
+missing `to_space` call to be the tell, `the_converted_warp_variant_edits_four_anchors` holds each
+anchor to **exactly one** match in the source, so a later edit that moves or duplicates a differing
+stage is a red test rather than a silently native-convention converted preset. The rendered half is
+there too: each of the four stages is asserted at **128x72 and 128x96**, on a converted scene and a
+native one, and `at_a_square_target_the_two_warp_chains_agree` catches the two chains drifting apart.
+
+Two arithmetic details the ADR does not state and the implementation had to settle:
+
+- **The rotation's two aspect factors are removed for the converted variant, not wrapped.** Corrected
+  space is already isotropic on screen, so keeping them would rotate in a sheared one.
+- **Stage 1 (zoom) stays in raw uv, ahead of the mapping.** A uniform scale about the frame centre
+  commutes with the diagonal map about the same centre, so the two orderings are the same arithmetic.
+- **`Resources::build` takes a `converted` flag rather than deriving it from `shader_spec`.** A
+  converted bundle carrying no WGSL has no spec, so `shader_key` stays `0` across a switch between
+  two such presets and the staleness check would otherwise keep the wrong pipeline.
+
+**The Positive section's central claim held: no native golden moved, in any phase.** What the ADR
+could not foresee is that **no converted golden moved either.** Every fixture in
+`core/tests/golden.rs` renders at `SIZE = 128` **square**, where MilkDrop's aspect pair is `(1, 1)`
+and the two chains are identical by construction — the same agreement the square-target test asserts.
+So the corrected-space chain has **no pixel baseline at all**, and its only coverage is the
+non-square probes above. That is a drift-guard gap rather than a correctness one, and it is
+[backlog 0245](../design-backlog.md).

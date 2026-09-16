@@ -50,6 +50,8 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0241 — the session allowlist is asserted against a model of the CLI's matcher, and the first unattended run falsified the model on a case it asserts](#0241--the-session-allowlist-is-asserted-against-a-model-of-the-clis-matcher-and-the-first-unattended-run-falsified-the-model-on-a-case-it-asserts)
 - [0242 — the conductor's gate skips a check whose precondition a lane never has, and says nothing, while the pre-push hook doing the identical skip prints a notice](#0242--the-conductors-gate-skips-a-check-whose-precondition-a-lane-never-has-and-says-nothing-while-the-pre-push-hook-doing-the-identical-skip-prints-a-notice)
 - [0243 — the served version-line rule is anchored to a column and a basename, not to the workspace section, so a dependency table edited in place would serve a code change to `-P fast`](#0243--the-served-version-line-rule-is-anchored-to-a-column-and-a-basename-not-to-the-workspace-section-so-a-dependency-table-edited-in-place-would-serve-a-code-change-to--p-fast)
+- [0244 — a custom wave is drawn from the source's traces but is neither smoothed nor scaled like the eight built-in figures](#0244--a-custom-wave-is-drawn-from-the-sources-traces-but-is-neither-smoothed-nor-scaled-like-the-eight-built-in-figures)
+- [0245 — the converted warp space has no pixel baseline, because every golden fixture is square and the two chains are identical there](#0245--the-converted-warp-space-has-no-pixel-baseline-because-every-golden-fixture-is-square-and-the-two-chains-are-identical-there)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -2131,3 +2133,89 @@ tree, the failure is a weaker gate rather than a wrong result, and `-P fast` sti
 the first time anyone writes a dependency as a table — a normal thing to do when pinning a git
 source or adding `features` — because the rule would then quietly stop testing dependency changes on
 the GPU suites, and nothing would report it.
+
+## 0244 — a custom wave is drawn from the source's traces but is neither smoothed nor scaled like the eight built-in figures
+
+Plan 0180 Phase 6 rebuilt the eight `wave_mode` figures as `CPlugin::DrawWave` builds them: each
+passes through `SmoothWave` (`milkdropfs.cpp` l.2549-2577, applied at l.3319-3335) and each carries
+`HOST_SAMPLE_FACTOR` on its sample term ([ADR-0199](adrs/0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md)
+clause 2). **A custom wave gets neither.**
+
+It reads the same smoothed, `wave_scale`d traces the built-in figures read — `custom_waves` in
+`core/src/render/scenes/warp_mesh/draw.rs` hands `value1`/`value2` from the analyzer's levelled pair —
+so the two channels are right since that plan. What it does not get is the midpoint insertion or the
+host factor, and the source applies `SmoothWave` to a custom wave too, unless it draws dots
+(l.2722).
+
+That was **deliberate and correctly scoped**: backlog 0216's figure contract covered the eight
+built-in modes, and Plan 0180 says so in Phase 6's notes and again in its close block. So this is not
+a defect found; it is the question that scope left standing, raised so it is not lost.
+
+**What a decision needs.** Whether the figure contract reaches custom waves is a real question rather
+than an oversight, because the two cases differ: a built-in figure is the source's construction and a
+custom wave is the preset author's own per-point program, which may already place its points where it
+wants them. Smoothing it inserts points the program did not compute. The host factor is the weaker
+half of the question — it is a property of how a sample reaches the draw, which a custom wave shares.
+
+- **Raised:** 2026-09-16, at Plan 0180's close, by the plan's own **Not done here** section.
+  **Owner if taken:** `architect` to decide the contract, then `dev`.
+- **Verified 2026-09-16** — the host factor is applied in the built-in figure's sample readers and
+  nowhere else:
+  `present: HOST_SAMPLE_FACTOR in: core/src/render/scenes/warp_mesh/draw.rs`
+- **Verified 2026-09-16** — `custom_waves` passes the pair straight through with no factor and no
+  smoothing pass:
+  `present: let value1 = left\.get\(at\)\.copied\(\)\.unwrap_or\(0\.0\); in: core/src/render/scenes/warp_mesh/draw.rs`
+
+### Priority
+
+**Low.** Nothing is wrong on screen: a custom wave draws where its program puts it, which is a
+defensible reading of the reference either way. It matters only when someone compares a converted
+preset's custom wave against `foo_vis_milk2` side by side and finds it thinner or smaller — which is
+[Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md) Phase 4's session, and the reason to
+have this written down before that session runs.
+
+## 0245 — the converted warp space has no pixel baseline, because every golden fixture is square and the two chains are identical there
+
+[ADR-0212](adrs/0212-a-converted-preset-gets-its-own-vertex-module-and-the-pipeline-is-chosen-not-branched.md)
+gives a converted preset its own vertex module, and Plan 0180 Phase 3 landed the arithmetic: four
+warp stages run in MilkDrop's aspect-corrected space, each differing from the native chain by `1/A`
+on the shorter axis — **1.78 on y at 16:9**. The plan's Risks section expected "a larger re-bless than
+its title suggests".
+
+**Nothing was re-blessed. No baseline moved at all.** `core/tests/golden.rs` renders every fixture at
+`SIZE = 128` on both axes, and at a square target MilkDrop's aspect pair is `(1, 1)`, so both chains
+are the identity — the same agreement `at_a_square_target_the_two_warp_chains_agree` asserts on
+purpose. So `warp_mesh_milk.png`, `warp_mesh_shader.png` and `warp_mesh_stroke.png` are structurally
+incapable of guarding the corrected-space chain.
+
+This is a **drift-guard gap, not missing coverage.** The behaviour is asserted well: four per-stage
+tests run at 128x72 and 128x96 against a converted scene and a native one, mutation-checked, plus the
+square-target agreement test. What no baseline can catch is incidental pixel drift in the converted
+chain — the class a golden exists for, and the class ADR-0037 was written about after it shipped
+twice invisible at 16:9.
+
+Shapes, none decided:
+
+- **One converted fixture at a non-square size**, the way `attractor_trails` is captured at 160x100 in
+  its own module with its own baseline. Smallest change; adds one baseline and one bless scope.
+- **A second size for the whole golden roster.** Catches the same class everywhere rather than in one
+  fixture, at the cost of doubling the roster and every bless.
+- **Nothing, and say so.** The per-stage tests may simply be better evidence than a baseline, in which
+  case this entry closes with that reasoning recorded rather than left implicit.
+
+- **Raised:** 2026-09-16, at Plan 0180's close, by the review. **Owner if taken:** `architect` then
+  `dev`.
+- **Verified 2026-09-16** — every golden fixture is square:
+  `present: const SIZE: u32 = 128; in: core/tests/golden.rs`
+- **Verified 2026-09-16** — the converted chain exists and is selected per preset:
+  `present: warp_pipeline_converted in: core/src/render/scenes/warp_mesh/resources.rs`
+- **Verified 2026-09-16** — the non-square probes that are the only coverage:
+  `present: const SPACE_TARGETS: \[\(u32, u32\); 2\] = \[\(128, 72\), \(128, 96\)\]; in: core/src/render/scenes/warp_mesh/tests.rs`
+
+### Priority
+
+**Low.** The arithmetic is asserted directly and at two aspects, so a regression in what the chain
+computes is caught. The exposure is narrow: an incidental pixel change in a converted preset at a
+non-square target, which today means a test fixture and no shipped preset — `presets/` carries no
+`[milk]` bundle. It rises the day one ships.
+

@@ -1,8 +1,8 @@
 # ADR-0199 — A converted waveform draws the released source's figure at the scale its host renders, from a stereo pair the analyzer already receives
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-16 (Plan 0180), with an Outcome
 > **Date:** 2026-09-14
-> **Related plan(s):** [0180](../plans/0180-the-converted-picture-follows-the-source.md)
+> **Related plan(s):** [0180](../plans/done/0180-the-converted-picture-follows-the-source.md)
 > **Supplements:** [0113](0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)
 > (MilkDrop presets are translated ahead of time, with `foo_vis_milk2` as the fidelity reference)
 > **Extends:** [0139](0139-the-waveform-is-levelled-at-the-analyzer-and-publishes-its-gain.md)
@@ -167,3 +167,38 @@ could not say whether the import is worth more reach.
   copied into the repository (Plan 0100 Phase 8's provenance rule).
 - ADR-0071 governs this ADR twice: `k` is a measurement that names its capture, and `draw.rs`'s prose
   attributes a figure only to a source that was read.
+
+## Outcome — 2026-09-16, at Plan 0180's close
+
+Accepted as decided. Five things the implementation established that the body above does not say,
+recorded here rather than by editing it.
+
+- **Three modes read `time`, not one.** Clause 1 gives the turn to mode 0 alone. Plan 0180 Phase 1's
+  full read of `CPlugin::DrawWave` found mode 1 turning at `2.3` rad/s (`milkdropfs.cpp` l.2942) and
+  mode 5 at `0.3` rad/s (l.3085-3086) as well as mode 0's `0.2` (l.2886-2925). All three carry it,
+  and the draw layer's time-independence claim now names modes 2, 3, 4, 6 and 7.
+- **Modes 2 and 3 are one geometry.** They are line for line identical (l.2950-2976 against
+  l.2977-3004) and differ only in alpha (l.2982-2991), which this engine does not carry. So the
+  figure contract is seven distinct figures and one deliberate pair, and
+  `every_wave_mode_builds_a_different_figure` asserts that pair **equal** rather than inventing a
+  difference.
+- **`k` multiplies the sample term, which is quadratic in mode 5.** That mode's figure is a product
+  of two samples, so it carries the factor **twice**. That is what clause 2 gives when the term is
+  not linear, not an exception to it.
+- **The hard stop did not fire, and the cost is recorded.** `core-cabi/include/rlx_core.h` and
+  `rlx-ring/` are untouched over the plan, spec 0002's ring invariants are unedited, and the pair is
+  filled in `push_interleaved`'s existing per-frame loop from two fixed arrays. The per-hop analysis
+  cost moved from `32.092 us` to `34.011 us` on the reference machine — 0.30 % to 0.32 % of the
+  10.667 ms hop. Those are measurements on one machine (ADR-0071), not a budget.
+- **The pair carries a second divisor, and `k` was fitted against the first.** `waveform_pair_gain`
+  tracks its own running peak over the larger channel, so on a panned signal the pair and the mono
+  `waveform` are levelled differently — while `k` is derived from a capture of the mono trace's
+  scale. Nothing measured says this matters; it is stated because nothing has measured it.
+
+**Still open, and owed elsewhere.** `k` is confirmed on **mode 6 alone**. The unit-scale mode-0
+capture that would test the inference for the other seven is
+[Plan 0142](../plans/0142-the-milkdrop-import-earns-its-verdict.md) Phase 4's rig session, as is
+whether the reference shows a seam at all. And **custom waves are outside the contract**: they read
+the same smoothed, `wave_scale`d traces, but are not passed through `SmoothWave` and do not carry
+`k`, per backlog 0216's scope. Whether the eight-mode contract should reach them is
+[backlog 0244](../design-backlog.md).

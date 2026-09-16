@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0192** (ADRs are a separate sequence — next free there is **0212**; 0200 is reserved for Plan 0186 Phase 2.)
+**Next free number: 0192** (ADRs are a separate sequence — next free there is **0213**; 0200 is reserved for Plan 0186 Phase 2.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -43,11 +43,10 @@ place. The plan file carries the real link.
 | [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | approved | dev, human | Phase 1 fixes backlog 0102 + 0103 (`viz_session.cpp`, `host_window.cpp`) first. Phase 5's wait on 0176 is discharged - a tag reaches origin, and a gate reads it. Phase 4 shrinks to topics + preview. |
 | [0120](0120-the-standalone-ships-on-ubuntu.md) | The standalone ships on Ubuntu | approved | dev, human | ADR-0131 (proposed): PulseAudio capture + an `ubuntu-latest` CI arm. **Phase 1 is a `human` stop gate before `dev`.** Guard is 5 zips + 1 tarball; folds backlog 0181 (Linux arm) + 0208. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + 0174 (proposed): Art-Net verified against `rlx-artnet-sim`. **Phase 8 opens on a decision** - 0115's tap is headless-only, and a windowed resolve is an ADR. Phase 9 is the rig. |
-| [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. **Runs after 0180**, which re-draws the waveform its wash is measured on. The verdict decides whether backlog 0109 is buyable. Needs the reference rig. |
+| [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. **0180 landed and moved both ends of its chain.** Amended 2026-09-16. Needs the rig. |
 | [0160](0160-the-silhouettes-preconditions-stop-being-silent.md) | The silhouette's preconditions stop being silent | approved | dev, human | ADR-0179: four silent `[path]` preconditions. **Amended 2026-09-14:** optional Phase 1b folds in backlog 0217 (arity probe re-prices a polyline). Phase 2 is prose. |
 | [0166](0166-the-basics-read-in-russian.md) | The basics read in Russian | approved | dev, human | ADR-0185: five docs gain a stamped `.ru.md`. **Phase 3 is a `human` review that blocks publication.** Amended 2026-09-14: `pages.yml` depth, gate-count prose collides with 0178. |
 | [0178](0178-what-the-operator-reads-is-true.md) | What the operator reads is true | approved | dev, human | Backlog 0172, 0185, 0207, 0208 + ADR-0202 (proposed): drift line, `--list-presets`, banner, recovery line, count gate. **Lands after 0176 and 0166.** Phase 5 `human` settles 0203. |
-| [0180](0180-the-converted-picture-follows-the-source.md) | The converted picture follows the source | in-progress | dev | ADR-0199 + **0212** (both proposed). Backlog 0214-0216. Phases 1-2 merged to `main`; **Phase 3's park is discharged** - ADR-0212 settles how a converted preset gets its own arithmetic. |
 | [0183](0183-a-low-density-is-a-trace-count.md) | A low density is a trace count | approved | dev, human | ADR-0195 (proposed): a trace (density <= 0.08) draws the tier anchor's count at every size; clouds keep ADR-0140. **No golden moves.** Phase 3 is a `human` look gate at 1080p Rich. |
 | [0184](0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) | Limited ink: a contour that is an ink, and a warp field that bands | approved | dev, human | ADR-0197 (proposed): hard ink contours on six scenes; `warp_mesh` bands by level. **Phase 2 stops if level outgrows `color_span`.** Phase 4: look gate. |
 | [0186](0186-the-flatness-gate-tells-a-figure-from-its-ground.md) | The flatness gate tells a figure from its ground | approved | dev, human | Backlog 0128: five figure/ground candidates vs two blot anchors at 96 and 192 px. **Phase 2 is a human gate that writes ADR-0200**; a negative result is a valid end. |
@@ -269,30 +268,19 @@ waiting on someone reporting a mushy low end on a 96 kHz interface).
 
 ## Recommended execution sequence
 
-**Added 2026-09-16, at [0189]'s close - the conductor stands down until [0180] lands and its own
-backlog is settled, and lane b is retired as a question.** The owner's call, and it sets the next
-stretch:
+**Added 2026-09-16, at [0180]'s close - the conductor's stand-down is lifted and the first
+unwatched run is the owner's call.** [0180] has landed, which is the condition the 2026-09-15 note
+set; that note is [in the archive](README-archive.md). What it leaves standing:
 
-- **[0180] is resumed by a human-started `dev` session**, not the conductor, on its existing
-  `plan-0180-the-converted-picture-follows-the-source` branch (amended 2026-09-15, four commits ahead
-  of `main`, worktree already removed). It still runs before [0142].
-- **[0190] landed 2026-09-16**, human-started, taking all eight run-survival entries 0228-0235. A
-  conductor run no longer loses a session's work after its close has committed, and `resume` adopts
-  such a close instead of reviewing it again. **The conductor is still stood down until [0180]
-  lands**, and the first unwatched run is the owner's call after that.
-- **Lane b is retired, not deferred.** [ADR-0205](../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md)'s
-  Outcome held the second lane open until the serialized suite fraction was known. [0189] measured it
-  - 0177 spent 24.5 min in full suites against 64 min of sessions - and the answer is that a second
-  lane buys nothing worth having while single-lane runs still park on their own infrastructure.
-  `queue.json` keeps its empty `b` lane and no code changed, so re-opening costs nothing; what is
-  retired is the open question. The `watch` command [0189] rejected was explored on a branch and
-  deleted the same day (`86497d4`, recoverable from reflog).
-- **Backlog 0227 got that plan on 2026-09-16 and [0191] closed the same day**, discharging the skip
-  half. ADR-0211 serves a green suite record forward when the diff is entirely declared paths and
-  runs `-P fast` in the full suite's place, so nothing is skipped outright. **It is not live until
-  this close fast-forwards**: the conductor runs `main`'s copy of `tools/conductor/`, so the first
-  measured saving - and ADR-0211's `Outcome` - comes from the first plan that runs under the merged
-  tier. The cheaper-suite half - 54 % of the cost - is **not** in it and is backlog 0239.
+- **The conductor may run again.** [0191]'s served tier and [0190]'s run-survival work are on `main`
+  and inert until a run uses them, so the first plan the conductor takes is also the first
+  measurement of either - and ADR-0211's `Outcome` is owed by it.
+- **Lane b stays retired as a question**, not deferred: [0189] measured the serialized suite fraction
+  and a second lane buys nothing while single-lane runs still park on their own infrastructure.
+  `queue.json` keeps its empty `b` lane, so re-opening costs nothing.
+- **[0142] is next in the engine lane and needs a human**, which is the one thing the conductor
+  cannot supply: its Phase 4 is a rig session against `foo_vis_milk2`, and that session now also owes
+  ADR-0199's unit-scale mode-0 capture and the "does the reference seam?" reading.
 
 [0189]: done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md
 [0190]: done/0190-the-conductor-survives-a-run-nobody-is-watching.md
@@ -327,7 +315,7 @@ naming what moved. The order:
 [0177]: done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md
 [0178]: 0178-what-the-operator-reads-is-true.md
 [0179]: done/0179-a-parameters-range-belongs-to-its-family.md
-[0180]: 0180-the-converted-picture-follows-the-source.md
+[0180]: done/0180-the-converted-picture-follows-the-source.md
 [0181]: done/0181-a-scene-advances-after-its-frames-bindings.md
 [0182]: done/0182-the-report-hears-a-counter.md
 [0183]: 0183-a-low-density-is-a-trace-count.md
@@ -870,6 +858,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0180 - The converted picture follows the source](done/0180-the-converted-picture-follows-the-source.md) - closed 2026-09-16. Review: **one blocker (fixed), no majors, six minors, four nits.** Version: **0.127.0**. ADR-0199 + 0212 accepted, Outcomes. Archived 0214-0216; filed 0244-0245. [Write-up](README-archive.md).
 - [0179 - A parameter's range belongs to its family](done/0179-a-parameters-range-belongs-to-its-family.md) - closed 2026-09-16. Review: **no blockers, no majors, one minor, one nit.** Version: **0.126.0**. ADR-0194 accepted. Archived 0198, 0204. [Write-up](README-archive.md).
 - [0191 - A green tree is not tested four times](done/0191-a-green-tree-is-not-tested-four-times.md) - closed 2026-09-16. Review: **no blockers, no majors, one minor, two nits (both fixed).** Version: **none** (tooling). ADR-0211 accepted. Archived 0227. [Write-up](README-archive.md).
 - [0190 - The conductor survives a run nobody is watching](done/0190-the-conductor-survives-a-run-nobody-is-watching.md) - closed 2026-09-16. Review: **no blockers, no majors, two minors, one nit.** Version: **none** (tooling). ADR-0210 accepted. Archived 8. [Write-up](README-archive.md).

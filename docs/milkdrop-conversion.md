@@ -68,7 +68,7 @@ are labelled as such.
 > `1.6` and lay a ring of light into the field, with a hard colour step along one
 > horizontal ray where the ring's angular term wraps. That ring is what two of the
 > corpus's presets were reported for as a seam; it was found and measured by
-> [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) Phase 4,
+> [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md) Phase 4,
 > which is worth knowing if you saw those pictures before the binding existed.
 > A residue survives it on some presets, and that one is a property of the
 > feedback loop rather than of the conversion —

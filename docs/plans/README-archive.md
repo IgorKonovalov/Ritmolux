@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0180 - The converted picture follows the source](#0180---the-converted-picture-follows-the-source)
   - [0191 - A green tree is not tested four times](#0191---a-green-tree-is-not-tested-four-times)
   - [0179 - A parameter's range belongs to its family](#0179---a-parameters-range-belongs-to-its-family)
   - [0190 - The conductor survives a run nobody is watching](#0190---the-conductor-survives-a-run-nobody-is-watching)
@@ -193,6 +194,7 @@ hand-edited.
   - [0002 — Rust enforcement tooling](#0002--rust-enforcement-tooling)
   - [0001 — Core + standalone MVP, then foobar parity](#0001--core--standalone-mvp-then-foobar-parity)
 - [Prior sequencing notes (superseded)](#prior-sequencing-notes-superseded)
+  - [Moved 2026-09-16 from `README.md` — the conductor stand-down that waited on 0180, spent](#moved-2026-09-16-from-readmemd--the-conductor-stand-down-that-waited-on-0180-spent)
   - [Moved 2026-09-15 from `README.md` — the engine-lane opening that resumed 0175 first, spent](#moved-2026-09-15-from-readmemd--the-engine-lane-opening-that-resumed-0175-first-spent)
   - [Moved 2026-09-15 from `README.md` — the opening of the engine-lane bullet, spent](#moved-2026-09-15-from-readmemd--the-opening-of-the-engine-lane-bullet-spent)
   - [Moved 2026-09-14 from `README.md` — the two-lane note for 0170-0173, spent](#moved-2026-09-14-from-readmemd--the-two-lane-note-for-0170-0173-spent)
@@ -221,6 +223,44 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0180 - The converted picture follows the source](done/0180-the-converted-picture-follows-the-source.md)
+
+- closed 2026-09-16, human-started, after the conductor was stood down until this plan landed. Seven
+phases: 1-2 on `plan-0180-the-converted-picture-follows-the-source` (`725c8d5`, `707a0bb`, merged at
+`8556556`), 3-7 on `main` (`0d7266a`, `1fc0dfa`, `5092b62`, `fa99c5d`, `95f78b9`). The plan was
+amended twice mid-flight: once on 2026-09-15 after Phase 3 parked `plan_wrong`, and once at this
+close, which **added Phase 7 rather than closing**.
+- **What landed.** A converted comp shader gets `UvToMathSpace`'s polar pair; a converted per-vertex
+program gets the source's aspect-corrected `x`/`y`; four warp stages run in MilkDrop's corrected
+space through a **second vertex module chosen per preset**
+([ADR-0212](../adrs/0212-a-converted-preset-gets-its-own-vertex-module-and-the-pipeline-is-chosen-not-branched.md));
+the analyzer publishes a levelled left/right pair under one divisor
+([ADR-0199](../adrs/0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md)); all
+eight `wave_mode` figures are `DrawWave`'s own; and `milkconv` binds `deposit = "0.0"`.
+- Review: **one blocker, no majors, six minors, four nits.** The blocker was mine to find and
+`dev`'s to fix: `cargo doc --workspace` under `-D warnings` was **red on `main`** from Phase 7, which
+made the module header link the private `deposit_block` - repaired in `262a4c03`. Nothing local
+catches that class, because the pre-push doc step is scoped to `-p rlx-core` while CI runs
+`--workspace`; that is [backlog 0179](../design-backlog.md), and this is its second instance.
+Verified independently: `cargo nextest run --workspace` 1981 passed / 6 skipped in 852 s, `fmt` and
+`clippy` clean, every doc and backlog gate green.
+- **Three findings the plan reversed about itself, which is the shape of the whole plan.** Phase 1's
+read found the divergence was **not** confined to the program's inputs - four warp stages differed
+too - which parked Phase 3 and produced ADR-0212. Phase 4 ruled out its own predicted cause for the
+seam (neither preset's program even names `ang`) and found the scene deposit instead, then **held the
+repair back**; the close reversed that call and added Phase 7, on evidence the phase had not weighed.
+And `d3b3f631` retracted Phase 7's own "the arms no longer separate" as a reading taken on the half
+`echo_orient = 1` mirrors away.
+- **What outlived the plan.** `k` is confirmed on **mode 6 alone** and the other seven are an
+inference; the unit-scale mode-0 capture is [Plan 0142](0142-the-milkdrop-import-earns-its-verdict.md)
+Phase 4's rig session. That plan also had its subject moved under it - Phase 7 removed the deposit
+term from both `milk_wash` fixtures, so its clean control now reads **exactly zero** at every seam
+where Phase 3 read `0.0202 / 0.0885 / 0.2521`, and it is amended accordingly. **No golden moved in
+any phase**, native or converted, because every fixture renders square where the two chains are
+identical by construction - the converted space therefore has no pixel baseline at all
+(backlog 0245). Archived backlog 0214, 0215, 0216; filed 0244 (custom waves are outside the figure
+contract) and 0245.
 
 ### [0191 - A green tree is not tested four times](done/0191-a-green-tree-is-not-tested-four-times.md)
 
@@ -8842,6 +8882,44 @@ uncovered (its C side remains the Plan 0001 Phase-6 smoke program's job, per ADR
 
 ## Prior sequencing notes (superseded)
 
+### Moved 2026-09-16 from `README.md` — the conductor stand-down that waited on 0180, spent
+
+Spent when [Plan 0180](done/0180-the-converted-picture-follows-the-source.md) closed on 2026-09-16,
+which is the condition it set. Kept verbatim, except that `[0180]` is written inline, because this
+file already defines that label as ADR-0180:
+
+**Added 2026-09-16, at [0189]'s close - the conductor stands down until Plan 0180 lands and its own
+backlog is settled, and lane b is retired as a question.** The owner's call, and it sets the next
+stretch:
+
+- **Plan 0180 is resumed by a human-started `dev` session**, not the conductor, on its existing
+  `plan-0180-the-converted-picture-follows-the-source` branch (amended 2026-09-15, four commits ahead
+  of `main`, worktree already removed). It still runs before [0142].
+- **[0190] landed 2026-09-16**, human-started, taking all eight run-survival entries 0228-0235. A
+  conductor run no longer loses a session's work after its close has committed, and `resume` adopts
+  such a close instead of reviewing it again. **The conductor is still stood down until Plan 0180
+  lands**, and the first unwatched run is the owner's call after that.
+- **Lane b is retired, not deferred.** [ADR-0205](../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md)'s
+  Outcome held the second lane open until the serialized suite fraction was known. [0189] measured it
+  - 0177 spent 24.5 min in full suites against 64 min of sessions - and the answer is that a second
+  lane buys nothing worth having while single-lane runs still park on their own infrastructure.
+  `queue.json` keeps its empty `b` lane and no code changed, so re-opening costs nothing; what is
+  retired is the open question. The `watch` command [0189] rejected was explored on a branch and
+  deleted the same day (`86497d4`, recoverable from reflog).
+- **Backlog 0227 got that plan on 2026-09-16 and [0191] closed the same day**, discharging the skip
+  half. ADR-0211 serves a green suite record forward when the diff is entirely declared paths and
+  runs `-P fast` in the full suite's place, so nothing is skipped outright. **It is not live until
+  this close fast-forwards**: the conductor runs `main`'s copy of `tools/conductor/`, so the first
+  measured saving - and ADR-0211's `Outcome` - comes from the first plan that runs under the merged
+  tier. The cheaper-suite half - 54 % of the cost - is **not** in it and is backlog 0239.
+
+[0189]: done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md
+[0190]: done/0190-the-conductor-survives-a-run-nobody-is-watching.md
+[0142]: 0142-the-milkdrop-import-earns-its-verdict.md
+[0191]: done/0191-a-green-tree-is-not-tested-four-times.md
+
+
+
 ### Moved 2026-09-15 from `README.md` — the engine-lane opening that resumed 0175 first, spent
 
 Spent when [Plan 0175](done/0175-an-eased-value-arrives.md) closed on 2026-09-15. The bullet's
@@ -8849,7 +8927,7 @@ remainder (0180 before 0142, then the rest) stays live in `README.md`. Kept verb
 `[0180]` is written inline, because this file already defines that label as ADR-0180:
 
 > - **Engine lane.** [0181] and [0185] closed 2026-09-15, both ahead of [0175], and neither moved a
->   golden. [0175] and [0180](0180-the-converted-picture-follows-the-source.md) both parked `plan_wrong` on 2026-09-14 and were amended on their lane branches 2026-09-15; resuming them is next, 0175 first. 0175 touches `LatchBank::advance`, which 0181 left alone.
+>   golden. [0175] and [0180](done/0180-the-converted-picture-follows-the-source.md) both parked `plan_wrong` on 2026-09-14 and were amended on their lane branches 2026-09-15; resuming them is next, 0175 first. 0175 touches `LatchBank::advance`, which 0181 left alone.
 
 ### Moved 2026-09-15 from `README.md` — the opening of the engine-lane bullet, spent
 

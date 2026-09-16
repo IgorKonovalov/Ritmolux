@@ -1,14 +1,21 @@
 # 0180 — The converted picture follows the source
 
-> **Status:** in-progress (2026-09-14)
+> **Status:** done - closed 2026-09-16. Seven phases: Phases 1-2 on branch
+> `plan-0180-the-converted-picture-follows-the-source` as `725c8d5` and `707a0bb`, merged at
+> `8556556`; Phases 3-7 on `main` as `0d7266a`, `1fc0dfa`, `5092b62`, `fa99c5d` and `95f78b9`,
+> with `262a4c03` repairing the close review's one blocker. Review: **one blocker (fixed at the
+> close), no majors, six minors, four nits.** Verified independently on the closed tree:
+> `cargo nextest run --workspace` green (1981 passed, 6 skipped, 852 s), `cargo doc` green under
+> `-D warnings` after the repair, `fmt` and `clippy` clean, and every doc and backlog gate.
+> Version: **0.127.0** (minor - a feature plan).
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`
-> **Related ADRs:** [0199](../adrs/0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md)
-> (proposed, this plan), [0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md),
-> [0139](../adrs/0139-the-waveform-is-levelled-at-the-analyzer-and-publishes-its-gain.md),
-> [0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
+> **Related ADRs:** [0199](../../adrs/0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md)
+> (proposed, this plan), [0113](../../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md),
+> [0139](../../adrs/0139-the-waveform-is-levelled-at-the-analyzer-and-publishes-its-gain.md),
+> [0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
 > **Closes:** design-backlog 0214, 0215, 0216
-> **Runs before:** [Plan 0142](0142-the-milkdrop-import-earns-its-verdict.md), all of it (see Decision)
+> **Runs before:** [Plan 0142](../0142-the-milkdrop-import-earns-its-verdict.md), all of it (see Decision)
 
 > **Amended 2026-09-15** after Phase 3 parked `plan_wrong`. The changes:
 > - **Phase 3 is re-specified.** `vs_main` serves native and converted presets alike, so Phase 1's
@@ -27,7 +34,7 @@
 > Phase 4 found that `milkconv` emits a `[params]` comment saying the scene's deposit stays off and
 > never emits the key, so `DEFAULT_DEPOSIT = 1.6` draws a ring into every converted preset. It
 > recorded the finding and held the one-line repair back, on the ground that the light is a term in
-> the settled field level [Plan 0142](0142-the-milkdrop-import-earns-its-verdict.md) Phase 2
+> the settled field level [Plan 0142](../0142-the-milkdrop-import-earns-its-verdict.md) Phase 2
 > measures. **The close reverses that call**, for three reasons it had evidence for and the phase
 > did not:
 > - **The sequencing argument runs the other way.** Plan 0142 has not measured anything. Its Phase 2
@@ -70,7 +77,7 @@ its author put it.
 ## Context & problem
 
 Three entries, one commit's worth of reading, one set of converted goldens. The full source facts are
-in the archived bodies of backlog 0119 and 0120 ([archive](../design-backlog-archive.md)).
+in the archived bodies of backlog 0119 and 0120 ([archive](../../design-backlog-archive.md)).
 
 - **0214 (Medium).**
   - **The comp-stage pair:** `milkconv/src/shader/emit.rs`'s `fs_main` writes one
@@ -305,7 +312,7 @@ Rejected:
   for converted presets, as `### The warp chain's space` above specifies. Native presets are
   unchanged.
 - **Amended 2026-09-16 — how a converted preset gets different arithmetic is
-  [ADR-0212](../adrs/0212-a-converted-preset-gets-its-own-vertex-module-and-the-pipeline-is-chosen-not-branched.md),
+  [ADR-0212](../../adrs/0212-a-converted-preset-gets-its-own-vertex-module-and-the-pipeline-is-chosen-not-branched.md),
   and it is not the uniform flag this phase first assumed.** The phase parked `plan_wrong` before
   writing code because `vs_main` is one stage for native and converted presets alike, so editing it
   moves `warp_mesh.png` and changes the native vocabulary — both of which this plan rules out. The
@@ -331,7 +338,7 @@ Rejected:
     `time` claim was corrected on 2026-09-15 — modes 0, 1 and 5 all read it, and the phase says so.
     And the restore this session could not run is available again: `git restore <path>` and
     `git checkout -- <path>` were added to the conductor's allowlist by
-    [Plan 0190](done/0190-the-conductor-survives-a-run-nobody-is-watching.md) Phase 2, which is what
+    [Plan 0190](0190-the-conductor-survives-a-run-nobody-is-watching.md) Phase 2, which is what
     the bless rule needs to put a re-encoded baseline back. ADR-0212 also removes the native half of
     that problem outright: no native baseline is blessed, because none moves.
   - `rad` and `ang` already match the source (Plan 0173). Leave them unchanged, and leave their test

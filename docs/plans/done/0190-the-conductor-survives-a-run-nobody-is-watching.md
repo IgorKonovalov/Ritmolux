@@ -20,7 +20,7 @@
 > **Built by:** human-started `dev` sessions, not the conductor. The same reason as
 > [0189](0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) — a conductor
 > editing its own code while it runs is circular — and the owner's standing call that there is no
-> point running the conductor until [0180](../0180-the-converted-picture-follows-the-source.md) lands
+> point running the conductor until [0180](0180-the-converted-picture-follows-the-source.md) lands
 > and this backlog is settled.
 
 ## TL;DR
@@ -319,7 +319,7 @@ flowchart TD
   0175. The scenario tests are built from that transcript, not from a second sighting.
 - **None of this is measured against a real unattended run.** Plan 0189 Phase 8 was watched. The
   first evidence that the plan worked is a run nobody watches, which is not a phase here — it is the
-  owner's call once [0180](../0180-the-converted-picture-follows-the-source.md) has landed.
+  owner's call once [0180](0180-the-converted-picture-follows-the-source.md) has landed.
 
 ## What this plan does NOT do
 
