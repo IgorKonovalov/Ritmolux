@@ -1,16 +1,20 @@
 #!/usr/bin/env node
 // Plan 0187 Phase 1 probe: runs real headless `claude -p` sessions against a disposable
 // worktree and records what the installed CLI does, so the conductor is built on observed
-// behaviour. Spends model usage: two short sessions on the model named by --model.
+// behaviour. Spends model usage: four short sessions on the model named by --model.
 //
-//   node tools/conductor/spike/probe.mjs [--model haiku] [--sessions a,b]
+//   node tools/conductor/spike/probe.mjs [--model haiku] [--sessions a,b,c,d]
 //   node tools/conductor/spike/probe.mjs --analyze <out-dir>     (re-read a run, no spend)
 //
 // Session A is the clean run: `/dev implement plan 9999` with an appended system prompt that
 // steers the session through a fixed list of tool calls (a hook-denied one, an allowed one, a
 // permission-denied one, Write + Edit). Session B repeats the prompt under a budget far below one
-// turn's cost, to observe how a budget stop ends. After both exit, the worktree is removed from
-// the parent to observe whether the children left a handle on it.
+// turn's cost, to observe how a budget stop ends. Session C asks whether a headless session may
+// Read, Edit and Write under the project's `.claude/`, under the conductor's own settings file, with
+// a control write outside it in the same turn; Session D asks the same under settings that name
+// `.claude/` paths explicitly, which is what tells a CLI restriction from a missing grant. After all
+// four exit, the worktree is removed from the parent to observe whether the children left a handle
+// on it.
 //
 // The script is also its own PreToolUse hook (`--hook-env <file>`): the settings file it passes
 // registers `node probe.mjs --hook-env ...`, which appends the environment the hook saw to a file.
@@ -64,7 +68,7 @@ if (argv[0] === "--analyze") {
 }
 
 const model = flag("--model", "haiku");
-const sessions = flag("--sessions", "a,b").split(",");
+const sessions = flag("--sessions", "a,b,c,d").split(",");
 const stamp = new Date().toISOString().replace(/[:.]/g, "-");
 const out = join(REPO, "target", "conductor-spike", stamp);
 mkdirSync(out, { recursive: true });
@@ -154,6 +158,63 @@ End your reply with a fenced code block tagged rlx-outcome containing
 `,
 );
 
+// Session C's subject: a scratch file under `.claude/skills/` in the worktree, with known content, so
+// an Edit that lands is visible from the parent afterwards and one that is refused leaves it as it
+// was. Backlog 0230 saw the CLI refuse `Edit` under `.claude/` although settings.conductor.json
+// allows the tool, and ADR-0209 grants a close every file under `.claude/skills/`. Whether that rule
+// is reachable is a question about the CLI, so it is asked here rather than assumed either way.
+const CLAUDE_SCRATCH = join(worktree, ".claude", "skills", "probe-scratch");
+mkdirSync(CLAUDE_SCRATCH, { recursive: true });
+writeFileSync(join(CLAUDE_SCRATCH, "NOTES.md"), "# probe scratch\n\nThe word here is alpha.\n");
+
+// The steps go in session C's own `-p`, with no slash command: invoking `/dev` made the session obey
+// that skill's restate-and-wait instead, and the question here is about the CLI's file access, which
+// no skill is party to.
+// The project paths are given absolute. A relative `.claude/...` is resolved against the user's home
+// configuration directory rather than the working directory, which is a finding of its own (step 5
+// reproduces it) but not the question: the question is the project's `.claude/`, in this worktree.
+const CLAUDE_DIR_PROMPT = `Do exactly these five steps in order, using only Read, Edit and Write - never Bash or PowerShell.
+Report each one verbatim, naming the tool, the path, and the exact text of any error. If a step is
+refused, say so and go on to the next.
+
+1. Read ${CLAUDE_SCRATCH}\\NOTES.md
+2. Edit that same file, changing the word alpha to beta.
+3. Write ${CLAUDE_SCRATCH}\\NEW.md containing exactly: gamma
+4. Write ${worktree}\\probe-control.txt containing exactly: delta
+   (outside .claude/, the control: it shows whether this session could write at all)
+5. Read the relative path .claude/skills/probe-scratch/NOTES.md and report which absolute path the
+   tool says it looked at.
+
+Then end your reply with a fenced code block tagged rlx-outcome containing {"kind": "probe", "steps": 5}`;
+
+// Session D asks the same question under settings that name `.claude/` explicitly, which is what
+// separates a restriction the CLI applies to its own configuration directory from one the conductor's
+// allowlist merely fails to grant. Several spellings of the path-scoped rule are offered at once: the
+// question is whether any of them reaches, not which.
+const openSettingsPath = join(out, "settings-claude-open.json");
+writeFileSync(
+  openSettingsPath,
+  JSON.stringify(
+    {
+      permissions: {
+        allow: ["Read", "Glob", "Grep", "Edit", "Write", "Edit(.claude/**)", "Write(.claude/**)", "Edit(//.claude/**)", "Write(//.claude/**)", `Edit(${worktree}/.claude/**)`, `Write(${worktree}/.claude/**)`],
+      },
+    },
+    null,
+    2,
+  ),
+);
+
+const CLAUDE_OPEN_PROMPT = `Do exactly these three steps in order, using only Edit and Write - never Bash or PowerShell.
+Report each one verbatim, naming the tool, the path, and the exact text of any error. If a step is
+refused, say so and go on to the next.
+
+1. Edit ${CLAUDE_SCRATCH}\\NOTES.md, changing the word alpha to beta.
+2. Write ${CLAUDE_SCRATCH}\\NEW.md containing exactly: gamma
+3. Write ${worktree}\\probe-control.txt containing exactly: delta
+
+Then end your reply with a fenced code block tagged rlx-outcome containing {"kind": "probe", "steps": 3}`;
+
 const env = { ...process.env, RLX_CONDUCTOR: "1", RLX_PROBE_TOKEN: token };
 
 const common = [
@@ -180,6 +241,40 @@ const runs = {
     "0.50",
   ],
   b: ["-p", "/dev implement plan 9999", ...common, "--max-budget-usd", "0.0001"],
+  // Session C runs under the conductor's real settings file, not the probe's, because the question is
+  // what a conductor session may do. It therefore has no probe hook and no `Bash(cargo --version)`.
+  c: [
+    "-p",
+    CLAUDE_DIR_PROMPT,
+    "--model",
+    model,
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--include-hook-events",
+    "--permission-mode",
+    "dontAsk",
+    "--settings",
+    join(HERE, "..", "settings.conductor.json"),
+    "--max-budget-usd",
+    "0.50",
+  ],
+  d: [
+    "-p",
+    CLAUDE_OPEN_PROMPT,
+    "--model",
+    model,
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--include-hook-events",
+    "--permission-mode",
+    "dontAsk",
+    "--settings",
+    openSettingsPath,
+    "--max-budget-usd",
+    "0.50",
+  ],
 };
 
 const meta = {
@@ -200,6 +295,15 @@ for (const name of sessions) {
 // Observed from the parent after every child has exited: is the worktree still held?
 const probeFile = join(worktree, "probe-out.txt");
 meta.probe_out_txt = existsSync(probeFile) ? readFileSync(probeFile, "utf8") : null;
+// What session C actually left on disk, which is the evidence; what it reported is only its account.
+const readBack = (p) => (existsSync(p) ? readFileSync(p, "utf8") : null);
+meta.claude_dir = {
+  scratch: CLAUDE_SCRATCH,
+  settings: { c: join(HERE, "..", "settings.conductor.json"), d: openSettingsPath },
+  edited_notes_md: readBack(join(CLAUDE_SCRATCH, "NOTES.md")),
+  wrote_new_md: readBack(join(CLAUDE_SCRATCH, "NEW.md")),
+  control_outside_claude: readBack(join(worktree, "probe-control.txt")),
+};
 meta.worktree_remove = git(["worktree", "remove", "--force", worktree]);
 meta.worktree_exists_after_remove = existsSync(worktree);
 meta.branch_delete = git(["branch", "-D", branch]);
@@ -242,6 +346,7 @@ function analyzeRun(dir) {
     model: metaIn.model,
     token: metaIn.token,
     probe_out_txt: metaIn.probe_out_txt,
+    claude_dir: metaIn.claude_dir ?? null,
     worktree_remove: metaIn.worktree_remove,
     worktree_exists_after_remove: metaIn.worktree_exists_after_remove,
     hook_env: existsSync(join(dir, "hook-env.jsonl"))

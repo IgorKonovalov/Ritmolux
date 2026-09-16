@@ -350,8 +350,8 @@ flowchart TD
 | 3 — A close that landed without an outcome is adopted | dev | done | `ae3cc20` |
 | 4 — A suite run by hand counts | dev | done | `d663f5c` |
 | 5 — Time and spend are reported at one scope | dev | done | `21e2575` |
-| 6 — The ASCII guarantee is asserted against input that could break it | dev | done | committed with this row |
-| 7 — The probe asks whether a headless session may edit `.claude/` | dev | not started | |
+| 6 — The ASCII guarantee is asserted against input that could break it | dev | done | `ec58978` |
+| 7 — The probe asks whether a headless session may edit `.claude/` | dev | done | committed with this row |
 | 8 — Stop gate: what the probe found | human | not started | |
 | 9 — `.claude/` resolves the way Phase 8 chose | dev | not started | |
 
@@ -376,6 +376,14 @@ flowchart TD
   - `liveLine`'s call removed: `not ok 9 - every line is ASCII`.
   - `emit`'s call removed: `not ok 15 - run prints a session's milestones in order...`, on
     `ASCII: conductor: 0101 opened its lane at ...\rlx-live-lanes-<non-ASCII>\rlx-plan-0101`.
+- Phase 7 needed two probe sessions, not one, and the second is what its done-when's *"which settings
+  were in force, so a later reader can tell a CLI restriction from a configuration one"* asks for:
+  one session under `settings.conductor.json`, one under settings naming `.claude/` paths explicitly.
+  Both are in `probe.mjs` as sessions C and D, and the default `--sessions` is now `a,b,c,d`.
+- Phase 7's first attempt invoked `/dev` and the session obeyed that skill's restate-and-wait instead
+  of the probe steps, and its second gave the paths relative, which the model expanded to the user's
+  own `~/.claude/`. Neither run is the evidence; both are described in `spike/README.md`, the second
+  because it is a trap for whoever reads the row next.
 
 ### Close triggers
 
