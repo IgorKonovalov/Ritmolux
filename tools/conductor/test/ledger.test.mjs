@@ -9,13 +9,16 @@ import { test } from "node:test";
 
 import {
   appendRecord,
+  appendServed,
   appendSkip,
   cleanTree,
   diffPaths,
   greenRecord,
   isFullSuite,
   readLedger,
+  SERVED_COMMAND,
   SERVED_PATHS,
+  servedNotice,
   servesDiff,
   servingRecord,
   SUITE_COMMAND,
@@ -217,6 +220,32 @@ test("a green record for a tree this worktree cannot resolve is passed over, not
   // The unresolvable record does not stop a resolvable one behind it from serving.
   appendRecord(file, { tree: a, exit: 0, summary: "3 tests run: 3 passed", by: "gate 0101-pre-review", ms: 10 });
   assert.equal(servingRecord(file, b, dir).record.tree, a);
+});
+
+test("a served line names the tier, the tree it leaned on and the diff, and is no tree's green record", () => {
+  const { dir, commit } = treeRepo();
+  const a = commit({ "README.md": "r\n" }, "init");
+  const b = commit({ "docs/a.md": "a\n" }, "docs: one file");
+  const c = commit({ "docs/b.md": "b\n" }, "docs: another");
+  const file = join(tmp("rlx-ledger-served-"), "suite-ledger.jsonl");
+  appendServed(file, {
+    tree: b,
+    exit: 0,
+    summary: "1200 tests run: 1200 passed",
+    by: "gate 0101-pre-review",
+    ms: 200_000,
+    green: { tree: a, by: "gate 0100-post-close", at: "2026-09-16T01:00:00.000Z", exit: 0 },
+    paths: ["docs/a.md"],
+  });
+  const [line] = readLedger(file);
+  assert.equal(line.served, true);
+  assert.equal(line.cmd, SERVED_COMMAND);
+  assert.notEqual(line.cmd, SUITE_COMMAND);
+  assert.deepEqual(line.green, { tree: a, by: "gate 0100-post-close", at: "2026-09-16T01:00:00.000Z" }, "the record it leaned on, and no more of it");
+  assert.deepEqual(line.diff, ["docs/a.md"]);
+  assert.equal(greenRecord(file, b), null, "a `-P fast` pass is no tree's green record");
+  assert.equal(servingRecord(file, c, dir), null, "and it serves no later tree, so no `-P fast` chains off another");
+  assert.match(servedNotice({ record: { tree: a, by: "gate 0100-post-close", at: "2026-09-16T01:00:00.000Z" }, paths: ["docs/a.md"] }), /^tree [0-9a-f]{7} green by gate 0100-post-close at 2026-09-16T01:00:00\.000Z, 1 served path$/);
 });
 
 test("the summary is nextest's last Summary line", () => {

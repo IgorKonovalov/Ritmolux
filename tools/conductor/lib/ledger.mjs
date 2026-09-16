@@ -156,6 +156,28 @@ export function appendRecord(path, { tree, exit, summary, by, ms, at = new Date(
   appendFileSync(path, JSON.stringify({ tree, cmd: SUITE_COMMAND, exit, summary: summary ?? null, by, at, ms }) + "\n");
 }
 
+/**
+ * Records a `-P fast` run made in the full suite's place on `tree`, naming the record it leaned on
+ * and the diff that served. The line's `cmd` is `SERVED_COMMAND` and it carries `served: true`, so
+ * neither `greenRecord` nor `servingRecord` can read it back: one `-P fast` never serves another.
+ */
+export function appendServed(path, { tree, exit, summary, by, ms, green, paths, at = new Date().toISOString() }) {
+  mkdirSync(dirname(path), { recursive: true });
+  const line = {
+    tree,
+    cmd: SERVED_COMMAND,
+    served: true,
+    exit,
+    summary: summary ?? null,
+    by,
+    at,
+    ms,
+    green: { tree: green.tree, by: green.by, at: green.at },
+    diff: paths,
+  };
+  appendFileSync(path, JSON.stringify(line) + "\n");
+}
+
 /** Records that `by` skipped a full suite on `green.tree`, relying on `green`. */
 export function appendSkip(path, { green, by, at = new Date().toISOString() }) {
   mkdirSync(dirname(path), { recursive: true });
@@ -171,4 +193,10 @@ export function summaryLine(output) {
 /** The one-line notice a skip prints: the record's tree, writer, time and summary. */
 export function skipNotice(record) {
   return `skipped ${SUITE_COMMAND}: tree ${record.tree.slice(0, 7)} is green in the suite ledger, run by ${record.by} at ${record.at}: ${record.summary ?? "no summary"}`;
+}
+
+/** Why a served run is running `-P fast`: the tree it leaned on, its writer and time, and the diff's size. */
+export function servedNotice({ record, paths }) {
+  const diff = `${paths.length} served path${paths.length === 1 ? "" : "s"}`;
+  return `tree ${record.tree.slice(0, 7)} green by ${record.by} at ${record.at}, ${diff}`;
 }

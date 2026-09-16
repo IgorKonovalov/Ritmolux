@@ -9,16 +9,18 @@
 // state/gates/. `nextest` runs under the machine-wide suite lock. The gate never retries a red: a
 // flake is a defect to fix (ADR-0193), and a retry would bury it.
 //
-// A step marked `ledger` is the full workspace suite. When the gate is given a ledger file it looks
-// the worktree's tree up first and skips on a green record (ADR-0207, lib/ledger.mjs), and records
-// its own run when the worktree was clean at both ends. Only one entry may carry the mark:
-// `cargo nextest run --workspace`, the command the ledger's key names.
+// A step marked `ledger` is the full workspace suite, and it resolves to one of three states
+// (ADR-0211, lib/ledger.mjs). A green record for this exact tree `skipped`s it and nothing runs
+// (ADR-0207). Otherwise a green record for another tree whose diff is entirely served paths makes it
+// `served`: `-P fast` runs in the full suite's place, under the same lock, and its record is a
+// served line rather than a green one. Neither, and it `ran` — the full suite. Only one entry may
+// carry the mark: `cargo nextest run --workspace`, the command the ledger's key names.
 
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { appendRecord, appendSkip, cleanTree, greenRecord, summaryLine } from "./ledger.mjs";
+import { appendRecord, appendServed, appendSkip, cleanTree, greenRecord, SERVED_SUITE_ARGS, servingRecord, summaryLine } from "./ledger.mjs";
 import { SUITE, withLock } from "./locks.mjs";
 
 /**
@@ -101,13 +103,14 @@ export function failingTests(output) {
 
 /**
  * Runs the gate. Resolves to
- *   { ok, ran: [names], commands: [{ name, code, ms, suite?, skipped?, by? }],
+ *   { ok, ran: [names], commands: [{ name, code, ms, suite?, skipped?, served?, by? }],
  *     failed?: { name, code, log, tail, tests } }.
  * `onLockWait(name, ms)` reports time spent waiting on a lock. `onCommandStart(command)` and
  * `onCommandEnd(command, { code, ms, output })` bracket each command that runs; `ms` excludes the
  * lock wait. `ledger` is the suite ledger's path; without it a `ledger` step always runs and nothing
  * is recorded. `onCommandSkipped(command, record)` reports a step the ledger skipped, which is not
- * in `ran`.
+ * in `ran`; `onCommandServed(command, serving)` reports one a record served down to `-P fast`,
+ * which does run and is in `ran`.
  */
 export async function runGate({
   cwd,
@@ -121,6 +124,7 @@ export async function runGate({
   onCommandEnd,
   ledger,
   onCommandSkipped,
+  onCommandServed,
 }) {
   mkdirSync(logDir, { recursive: true });
   const ran = [];
@@ -129,15 +133,22 @@ export async function runGate({
     if (c.onlyIf && !existsSync(join(cwd, c.onlyIf))) continue;
     if (c.onlyIfCommand && spawnSync(c.onlyIfCommand[0], c.onlyIfCommand.slice(1), { cwd, stdio: "ignore" }).status !== 0) continue;
     const suite = Boolean(ledger && c.ledger);
+    let serving = null;
     if (suite) {
-      const green = greenRecord(ledger, cleanTree(cwd));
+      const tree = cleanTree(cwd);
+      const green = greenRecord(ledger, tree);
       if (green) {
         appendSkip(ledger, { green, by: `gate ${label}` });
         timed.push({ name: c.name, code: 0, ms: 0, suite: true, skipped: true, by: green.by });
         onCommandSkipped?.(c, green);
         continue;
       }
+      serving = servingRecord(ledger, tree, cwd);
+      if (serving) onCommandServed?.(c, serving);
     }
+    // A served step runs the same command with `-P fast` appended, so the vector the ledger keys is
+    // never what ran; everything downstream — the lock, the log, the failure extraction — is shared.
+    const cmd = serving ? [...c.cmd, ...SERVED_SUITE_ARGS] : c.cmd;
     let t0 = Date.now();
     let startTree = null;
     const exec = () => {
@@ -145,7 +156,7 @@ export async function runGate({
       // Read under the lock, as the run starts: the tree the record will name.
       if (suite) startTree = cleanTree(cwd);
       onCommandStart?.(c);
-      return runCommand(c.cmd, cwd, c.env ?? {});
+      return runCommand(cmd, cwd, c.env ?? {});
     };
     const r = c.lock
       ? await withLock(
@@ -158,9 +169,11 @@ export async function runGate({
     const log = join(logDir, `${label}-${String(i).padStart(2, "0")}-${c.name.replace(/[^\w.-]+/g, "_")}.log`);
     writeFileSync(log, r.output);
     ran.push(c.name);
-    timed.push({ name: c.name, code: r.code, ms, ...(suite ? { suite: true } : {}) });
+    timed.push({ name: c.name, code: r.code, ms, ...(suite ? { suite: true } : {}), ...(serving ? { served: true, by: serving.record.by } : {}) });
     if (suite && startTree && cleanTree(cwd) === startTree) {
-      appendRecord(ledger, { tree: startTree, exit: r.code, summary: summaryLine(r.output), by: `gate ${label}`, ms });
+      const record = { tree: startTree, exit: r.code, summary: summaryLine(r.output), by: `gate ${label}`, ms };
+      if (serving) appendServed(ledger, { ...record, green: serving.record, paths: serving.paths });
+      else appendRecord(ledger, record);
     }
     onCommandEnd?.(c, { code: r.code, ms, output: r.output });
     if (r.code !== 0) {
