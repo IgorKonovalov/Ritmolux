@@ -242,108 +242,63 @@ const state = !stamped ? 'FAIL' : current.startsWith(stamped) ? 'current' : 'sta
 | 2 — The five translations, drafted and unpublished | `dev` | done | committed with this row |
 | 3 — Owner review of the Russian prose | `human` | done | `40c1ed39` + `79976978` |
 | 4 — Publish: the map, the menu, the banner in place | `dev` | done | `163cd41d` |
-| 5 — The foobar component zip ships the Russian install file | `dev` | done | committed with this row |
+| 5 — The foobar component zip ships the Russian install file | `dev` | done | `60a7f26b` |
 
 ### Notes
 
+- **Phase 3 passed with 44 corrections**, `40c1ed39` (how-it-works, 13) and `79976978` (the other
+  four, 31), the register confirmed by the owner on the first file before the rest were touched. The
+  class was English syntax in Russian words. **Two were mistranslations, not awkwardness**, which is
+  why this phase gates Phase 4: *"The cost is honest and unpaid-for"* had become a sentence saying
+  the bill is outstanding, and *"Neither of those **facts** reaches the engine"* had lost *facts*, so
+  it read as though the samples never arrive. A third told the reader a missed macOS permission
+  prompt lives in System Settings, where the permission lives and the prompt does not. **No stamp
+  moved** — no English source changed.
 - **Phase 4's cross-link is a remark plugin in `astro.config.mjs`, not an edit to ten documents.**
-  The phase's done-when asks each page to link its twin, and its Files-touched names only the three
-  config files — so the link is derived from the sibling pair on disk (`<name>.md` /
-  `<name>.ru.md`) by `translationCrossLink`, which sits beside `stripLeadingHeading` in that same
-  file. A translation added to `PUBLISHED` later gets its link with no edit. Its position in the
-  remark chain is load-bearing on both sides: after `translationBanner`, which has already removed
-  the stamp that would otherwise be the first node, and before `stripLeadingHeading`, which removes
-  the `# ` heading it inserts after.
-- **`REPO_ROOT` was used rather than exporting `sourceOf`.** `rewrite-links.mjs` has a private
-  `sourceOf`; the cross-link needs the same repo-relative path, and `REPO_ROOT` is already exported,
-  so the derivation is four lines in the config instead of a widened module API.
-- **Only the two reader documents joined `READER_DOCS`**, not all five. ADR-0168's rule is about
-  prose a reader meets, and the three installer notes carry no Plan/ADR citations — the same reason
-  their English twins are not in that list either.
-- **Astro's content cache had to be cleared to see a plugin fix.** A wrong `BASE` in the cross-link
-  survived a rebuild because `site/.astro` held the rendered entry; `rm -rf site/.astro
-  site/node_modules/.astro` is what made the rebuild honest. Worth knowing before trusting a green
-  build after a remark-plugin edit.
-
-
-- **Phase 3 ran 2026-09-16 and passed, with corrections.** The owner read the five and named the
-  defect class in two examples of its own — *«Визуальная случайность есть — брызги частиц… явно
-  засеяна… один в один»* and *«между звуком, вышедшим из колонок, и фигурой, сдвинувшейся на
-  экране»*. Both are English syntax wearing Russian words, and the class ran through all five.
-  **44 corrections** landed in `40c1ed39` (how-it-works, 13) and `79976978` (the other four, 31),
-  the register confirmed by the owner on the first file before the rest were touched.
-- **Two of the 44 were mistranslations, not awkwardness**, which is the reason this phase blocks
-  Phase 4 rather than being a polish pass: *"The cost is honest and unpaid-for"* had become «Цена
-  честная и не оплачена», which in Russian says the bill is outstanding; and *"Neither of those
-  **facts** reaches the engine"* had lost the word *facts*, so it read as though the samples never
-  arrive. A third, in the macOS note, told the reader a missed permission prompt lives in System
-  Settings, where the *permission* lives and the prompt does not.
-- **Every stamp is unchanged, which is the phase's own done-when.** No English source moved, so only
-  the Russian prose changed and `node scripts/check-translations.mjs` stays green at five stamped
-  translations. Word counts held at ~88 % of English across all five before and after, so the pass
-  neither padded nor compressed.
-- **One convention was left alone deliberately and is still open**: a link whose target is an
-  untranslated document keeps its English title (`[Configuration]`, `[Ring determinism]`) while links
-  to translated concepts are in Russian. It reads as deliberate signposting — the reader is told they
-  are about to land in English — and Phase 4 is where it becomes visible, so it is worth one decision
-  there rather than a silent edit here.
-
-
-- **Phase 1 touched three files beyond its `Files touched` list**, each because the phase falsified
-  something already written in it — the phase's own instruction was to grep for the counts rather
-  than trust the list. `scripts/fixtures/README.md` (a section for the new seeded trees, and its
-  opening *"Eight checkers"*); `docs/developing.md` (the table of *every step the pre-push gate
-  runs*, which the new gate's two invocations would otherwise have left incomplete);
-  `docs/nfr.md` (*"the seven Node doc gates"* / *"Seven gates but nine invocations"*, already stale
-  by one before this phase and stale by two after it). All three are now count-free.
-- **ADR-0185 says the close ceremony prints the drifted translations, and this plan does not wire
-  that.** The close ceremony lives under `.claude/skills/architect/`, which no phase of this plan
-  lists and which a conductor-run session cannot write to (ADR-0210). The gate prints the advisory
-  at pre-push and in CI; the close reading is unimplemented.
-- **The three packaging translations open with a setext heading, not the `# ` Phase 2's done-when
-  names.** Their English twins write the title over a rule of `=`, because those files ship as
-  `.txt` inside a release zip where a `#` is literal noise, and Phase 5 puts the Russian one in the
-  same zip beside the English one. The two `docs/` translations do use `# `, which is what their
-  sources use. `titleFromLeadingHeading` in `site/src/content.config.ts` already accepts both forms,
-  and `PUBLISHED` declares the title regardless.
-- **The mermaid labels in `how-it-works.ru.md` are translated; every node id, arrow and quote is
-  byte-identical to the source.** No build has rendered them — nothing in this lane can, and until
-  Phase 4 adds the file to `PUBLISHED` nothing reads it at all — so a fence that does not parse
-  would surface as a red Pages build in Phase 4 rather than here. A reviewer wanting that risk gone
-  before then can diff the two fences: only text inside `[...]` and `|"..."|` differs.
-- **The site build was not run in the lane** — this worktree has no `site/node_modules`, and
-  installing one is a network install rather than a phase check. The banner plugin is covered
-  instead by `check-translations.mjs --self-test`, which imports it and exercises all four of its
-  behaviours against a throwaway repository; a real Astro build of it first happens in the Pages
-  workflow. Until Phase 4 the plugin is a no-op on every page, because nothing it triggers on is in
-  `PUBLISHED`.
-
-- **Phase 5's done-when named the wrong half of the encoding trap, and the right half was live.**
-  It warns that `Set-Content` defaults to the system ANSI codepage on write. `Get-Content -Raw`
-  does the same on **read**, for any file without a BOM, and that is the one that bites: measured on
-  PowerShell 5.1.19041, `packaging/foobar/READ-ME-FIRST.ru.md` holds `D0 BA` for «к» on disk and
-  comes back out of `Get-Content -Raw` as `C3 90` — double-encoded, silently. The first
-  implementation of this phase used `Get-Content -Raw` as the English path does and produced exactly
-  that. Both sides are now `[System.IO.File]::ReadAllText(..., UTF8)` / `WriteAllText(..., UTF8)`.
-- **The English read was changed too, and it is not a present bug.** All three
-  `READ-ME-FIRST.md` are pure ASCII today, where cp1252 and UTF-8 agree, so the existing path was
-  correct; it would have broken silently on the first em dash. The SDK readme read at line 245 is
-  left alone — third-party, and its regex extracts an ASCII version string.
-- **Phase 5 was verified in isolation, not through a packaged zip.** Running `build-component.ps1`
-  needs the foobar2000 SDK and a built component, neither of which is on this machine. What was
-  measured is the transformation the phase owns: stamp stripped, both placeholders substituted, no
-  BOM, and the shipped bytes byte-identical to the source's Cyrillic. The phase's last done-when — a
-  zip opened on a clean Windows box — is **unverified here** and belongs to on-device validation.
+  The done-when asks each page to link its twin; the Files-touched names only the three config
+  files. `translationCrossLink` derives the twin from the `<name>.md` / `<name>.ru.md` pair, beside
+  `stripLeadingHeading` in that file, so a later translation gets its link with no edit. Its place in
+  the chain is load-bearing both ways: after `translationBanner` (the stamp is gone) and before
+  `stripLeadingHeading` (the `# ` heading it inserts after is still there). `REPO_ROOT` is used
+  rather than exporting `rewrite-links.mjs`'s private `sourceOf`.
+- **Only the two reader documents joined `READER_DOCS`.** ADR-0168 is about prose a reader meets;
+  the three installer notes carry no citations, which is why their English twins are absent too.
+- **Astro's content cache hid a plugin fix.** A wrong `BASE` in the cross-link survived a rebuild
+  because `site/.astro` held the rendered entry. `rm -rf site/.astro site/node_modules/.astro` is
+  what made the rebuild honest — worth knowing before trusting a green build after a remark edit.
+- **Phase 5's done-when named the wrong half of the encoding trap, and the right half was live.** It
+  warns that `Set-Content` defaults to the system ANSI codepage on write. `Get-Content -Raw` does the
+  same on **read** for any BOM-less file, and that is the one that bites: on 5.1.19041,
+  `READ-ME-FIRST.ru.md` holds `D0 BA` for «к» and comes back out as `C3 90`, double-encoded and
+  silent. The first implementation used it, as the English path did. Both directions are now
+  `ReadAllText`/`WriteAllText` with an explicit UTF-8. The English reads changed too and are **not** a
+  present bug — all three `READ-ME-FIRST.md` are pure ASCII, where the codepages agree.
+- **One Phase 5 done-when is unverified here:** *a packaged zip opened on a clean Windows box*. That
+  needs the foobar2000 SDK and a built component, neither on this machine. Measured instead, in
+  isolation: stamp stripped, both placeholders substituted, no BOM, shipped Cyrillic byte-identical
+  to source. The zip itself belongs to on-device validation.
 
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** no.
+- **Plan header `Closes:`** none.
+- **What shipped:** feature. Five Russian pages on the site as one `Русский` menu group with a
+  cross-link each way, and `READ-ME-FIRST.ru.txt` inside the foobar component zip. One fix rides
+  along in Phase 5: every `READ-ME-FIRST` read in `build-component.ps1` is now explicitly UTF-8.
+- **Operator docs touched:** the five translations themselves (`docs/how-it-works.ru.md`,
+  `docs/running.ru.md`, and the three `packaging/*/READ-ME-FIRST.ru.md`), corrected in Phase 3.
+  No English reader page moved, so no English source's stamp is stale.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — 65 reductions across 30
+  live entries, 2 unprobeable, none broken.
+- **Full suite:** `node tools/conductor/with-lock.mjs suite -- cargo nextest run --workspace
+  --no-fail-fast` — **exit 0**, `Summary [809.219s] 1971 tests run: 1971 passed (8 slow), 6
+  skipped`. **Read the tree it ran on:** `0d7266af`, which is this plan's two phases *plus* Plan
+  0180 Phase 3, committed by a parallel session working in the same checkout. An earlier attempt on
+  the shared tree was **cancelled at 720/1971** by nextest's default fail-fast, on three
+  `warp_mesh::tests::a_converted_*` tests that existed only in the working tree and belonged to that
+  session mid-implementation; this run waited for it to commit. `--no-fail-fast` is deliberate — the
+  cancelled run reported three failures and said nothing about the other 1251 tests it never reached.
+- **Outstanding `human` phases:** none. Phase 3 is done (`40c1ed39` + `79976978`).
 
 ## Followups (after this lands)
 
