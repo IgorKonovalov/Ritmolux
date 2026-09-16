@@ -93,7 +93,10 @@ export default async ({ cwd, vars, env }) => {
           writeFileSync(join(cwd, "PROBE_RED"), `plan ${plan} delivered what the probe asserts is missing\n`);
           git("add", "PROBE_RED");
         }
-        git("commit", "-q", "-m", `feat: plan ${plan} phase ${id}`);
+        // A real commit subject is where the non-ASCII actually comes from: this repository's own log
+        // carries em dashes, and a preset name can carry a curly quote. The run terminal is a Windows
+        // console, so `ascii()` has to transform this before it is printed (backlog 0235).
+        git("commit", "-q", "-m", `feat: plan ${plan} phase ${id} — an “eased” value │ arrives`);
         commits.push(git("rev-parse", "--short=7", "HEAD"));
         if (ps.awaitLive) {
           const want = `commit ${commits.at(-1)}`;

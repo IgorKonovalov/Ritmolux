@@ -13,6 +13,7 @@ import {
   ascii,
   cargoCall,
   gateReader,
+  liveLine,
   lockTimes,
   phaseClock,
   standingParkBody,
@@ -158,6 +159,12 @@ test("a malformed or unknown stream line prints nothing and does not throw", () 
 test("every line is ASCII", () => {
   assert.equal(ascii("feat(core): the \u2014 dash \u2500\u2500 rule, \u201cquotes\u201d and \u00e9\u4e2d\ttab"), 'feat(core): the - dash -- rule, "quotes" and ?? tab');
   assert.match(ascii("\u2026"), /^[\x20-\x7e]*$/);
+  // Not `ascii()` in isolation but the call on the way out: every line a plan prints goes through
+  // `liveLine`, and the run terminal is a Windows console.
+  assert.equal(
+    liveLine("0182", "  commit 3f2a1bc feat: an \u201ceased\u201d value \u2014 arrives", new Date(2026, 8, 16, 10, 2)),
+    '10:02 0182   commit 3f2a1bc feat: an "eased" value - arrives',
+  );
 });
 
 // Backlog 0233: `phase N done` carried no elapsed time, so a 28-minute phase read like a 2-minute
@@ -266,7 +273,8 @@ test("run prints a session's milestones in order, the commit before the session 
     toolResult("toolu_t1", 'with-lock: "suite" waited 1.0s, held 3.0s\n     Summary [   3.000s] 12 tests run: 12 passed, 3 skipped\n'),
     usage272(0.27, 0.02),
     "{ this line is not JSON",
-    toolUse("toolu_t2", "PowerShell", "cd studio; npx vitest run"),
+    // A denied command carrying what a cargo error frame actually contains.
+    toolUse("toolu_t2", "PowerShell", "cd studio; npx vitest run ── “watch”"),
     { type: "system", subtype: "permission_denied", tool_name: "PowerShell", tool_use_id: "toolu_t2" },
   ];
   const PHASE_DELAY_MS = 3000;
@@ -282,7 +290,10 @@ test("run prints a session's milestones in order, the commit before the session 
     p,
     claude: FAKE,
     gate: [{ name: "noop", cmd: [process.execPath, "-e", "0"] }],
-    worktreeRoot: tmp("rlx-live-lanes-"),
+    // A lane path with a non-ASCII component. `conductor.mjs`'s own `emit` is the only `ascii()` a
+    // line that never passes through `liveLine` meets — a lane opening prints this path — so this is
+    // what arms the end-to-end assertion against that call being removed.
+    worktreeRoot: tmp("rlx-live-lanes-é—"),
     lockDir: tmp("rlx-live-locks-"),
     lockPollMs: 20,
     pollMs: 50,
@@ -301,11 +312,14 @@ test("run prints a session's milestones in order, the commit before the session 
   const find = (re) => out.findIndex((l) => re.test(l));
   const order = [
     find(/^\d\d:\d\d 0101 implement-01 start  phases 1-2 \(dev\)$/),
-    find(new RegExp(`^\\d\\d:\\d\\d 0101   commit ${sha} \\d+[ms]\\S* feat: plan 0101 phase 1$`)),
+    // The subject's em dash, curly quotes and box-drawing character reach the line as ASCII: the
+    // assertion below is what would go red if either `ascii()` call were removed. The sha is still
+    // matched exactly, so the ordering this list pins is unweakened.
+    find(new RegExp(`^\\d\\d:\\d\\d 0101   commit ${sha} \\d+[ms]\\S* feat: plan 0101 phase 1 - an "eased" value - arrives$`)),
     find(/^\d\d:\d\d 0101   phase  1 done, \d+[ms]\S*$/),
     find(/^\d\d:\d\d 0101   tests  nextest run -p rlx-core: 12 passed, 0 failed, 3 skipped; lock wait 1s, ran 3s$/),
     find(/^\d\d:\d\d 0101   usage  5h 0\.27 \(resets \d\d:\d\d\); 7d 0\.02 \(resets \d\d-\d\d \d\d:\d\d\)$/),
-    find(/^\d\d:\d\d 0101   denied PowerShell: cd studio; npx vitest run$/),
+    find(/^\d\d:\d\d 0101   denied PowerShell: cd studio; npx vitest run -- "watch"$/),
     find(/^\d\d:\d\d 0101 implement-01 end    phases_done, (< 1|\d+) min, \$5\.83, 64 turns$/),
   ];
   assert.ok(order.every((i) => i >= 0), `every milestone printed:\n${out.join("\n")}`);

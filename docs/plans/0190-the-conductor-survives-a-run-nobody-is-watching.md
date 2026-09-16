@@ -349,8 +349,8 @@ flowchart TD
 | 2 — The allowlist runs the commands a phase ordinarily needs | dev | done | `16f4219` |
 | 3 — A close that landed without an outcome is adopted | dev | done | `ae3cc20` |
 | 4 — A suite run by hand counts | dev | done | `d663f5c` |
-| 5 — Time and spend are reported at one scope | dev | done | committed with this row |
-| 6 — The ASCII guarantee is asserted against input that could break it | dev | not started | |
+| 5 — Time and spend are reported at one scope | dev | done | `21e2575` |
+| 6 — The ASCII guarantee is asserted against input that could break it | dev | done | committed with this row |
 | 7 — The probe asks whether a headless session may edit `.claude/` | dev | not started | |
 | 8 — Stop gate: what the probe found | human | not started | |
 | 9 — `.claude/` resolves the way Phase 8 chose | dev | not started | |
@@ -368,6 +368,14 @@ flowchart TD
   phase a longer figure. The end-to-end test asserts the phase after the sleep carries at least it and
   is the longer of the two; the reset itself is pinned in `live.test.mjs` on `phaseClock` against an
   injected clock.
+- Phase 6's two `ascii()` calls mask each other on the commit line: every line a plan prints passes
+  through `liveLine` first, so removing `conductor.mjs`'s `emit` call leaves that line ASCII anyway.
+  The two are armed separately — `liveLine` by a direct assertion in *every line is ASCII*, `emit` by
+  a lane path with a non-ASCII component, which is the only kind of line that never meets `liveLine`.
+  Removal demonstrated in turn, both red, both restored before the commit:
+  - `liveLine`'s call removed: `not ok 9 - every line is ASCII`.
+  - `emit`'s call removed: `not ok 15 - run prints a session's milestones in order...`, on
+    `ASCII: conductor: 0101 opened its lane at ...\rlx-live-lanes-<non-ASCII>\rlx-plan-0101`.
 
 ### Close triggers
 
