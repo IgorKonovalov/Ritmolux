@@ -1908,3 +1908,70 @@ Shapes, none decided:
 ### Priority
 
 **Low.** A display gap, but it is what makes 0227 visible while a run is going.
+
+## 0234 — one digest line carries a run-scoped time beside a lifetime spend, and reads as neither
+
+Plan 0189 Phase 2 made a closed plan's time run-scoped: `timeInRun` sums that plan's own steps and
+gates within the run, so a night spent parked is never counted. The `$` on the same line was left as
+`totalSpend(rec)`, which sums every step the plan ever ran, across every run. The two sit in one
+sentence:
+
+```
+- **0177 - ...** - 0.125.0, tag `v0.125.0` annotated, merge `da663b6`, 0 fix rounds,
+  active 40 min, wall 40 min in this run, $32.44.
+```
+
+Four lines below, Totals says `run: 2 merged, 0 parked, 1 h 6 min, $12.18`, computed from the steps
+that started in the run. A reader who takes the `$32.44` as in-this-run — which the clause *in this
+run* directly above it invites — reads the two figures as contradicting each other. Before Phase 2
+the bullet carried no run-scoped figure, so the lifetime spend was unambiguous; the mixing is new.
+
+Shapes, none decided:
+
+- **Report both**, `$12.18 this run, $32.44 total`, which is the only form that answers the
+  operator's question (what did tonight cost) without losing the plan's own figure.
+- **Make it run-scoped** like the time beside it, and leave the lifetime figure to `status`.
+- **Move the spend out of the bullet** into the per-plan timing block backlog 0233 sketches.
+
+- **Raised:** 2026-09-16, at Plan 0189's close review, from reading the rendered digest rather than
+  the tests. **Owner if taken:** `dev`.
+- **Verified 2026-09-16** — the closed bullet's time is run-scoped and its spend is not:
+  `present: wall \$\{duration\(wall\)\} in this run, \$\{usd\(totalSpend\(rec\)\)\} in: tools/conductor/lib/digest.mjs`
+
+### Priority
+
+**Low.** Nothing is computed wrong; both numbers are correct for what they measure. It is a report
+answering two questions in one sentence without saying which is which, which is the same defect
+[backlog 0222](design-backlog-archive.md) described one field over.
+
+## 0235 — the run terminal's ASCII guarantee is asserted over a fixture that has no non-ASCII in it
+
+Plan 0189 Phase 1's done-when is *"Every line is ASCII. The run terminal is a Windows console."* The
+property does hold — `ascii()` is applied twice, at `live.mjs` `liveLine` and again at
+`conductor.mjs`'s `emit` — and `ascii()` itself is pinned in isolation. What is not pinned is that
+anything calls it.
+
+The end-to-end assertion runs `assert.match(l, /^[\x20-\x7e]*$/)` over every line the lane scenario
+printed, but every input to those lines is already ASCII: the fake commits `feat: plan 0101 phase 1`,
+the denied command is `cd studio; npx vitest run`, and the plan fixture's em dashes never reach a
+printed line. Deleting either `ascii()` call would leave the suite green.
+
+Real commit subjects are where the non-ASCII actually comes from — this repository's own log carries
+`0175 Phase 3 parked - a NaN dt` alongside subjects with em dashes, and a preset name can carry a
+curly quote.
+
+Shapes, none decided:
+
+- **Give the fake's commit subject an em dash and a smart quote**, which arms the existing assertion
+  at one line's cost.
+- **Assert on a known-dirty input end to end**: a denial whose command carries a box-drawing
+  character, which is what a `cargo` error frame actually contains.
+
+- **Raised:** 2026-09-16, at Plan 0189's close review. **Owner if taken:** `dev`.
+- **Verified 2026-09-16** — the scenario's only commit subject is ASCII:
+  `present: feat: plan \$\{plan\} phase \$\{id\} in: tools/conductor/test/lane-scenario.mjs`
+
+### Priority
+
+**Low.** The property holds today and a break would be cosmetic on one console. It is filed because
+a done-when that cannot fail is worse than no test: it reads as coverage.

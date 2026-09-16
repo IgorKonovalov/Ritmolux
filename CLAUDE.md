@@ -90,8 +90,9 @@ tools/
                      #   lanes to a fast-forwarded main, and never pushes. Neither a gate nor a
                      #   renderer - a program that starts other programs and spends money - so it
                      #   refuses to start without the gitignored local.json of spend caps, and
-                     #   refuses a CLI version spike/README.md did not verify. Runtime record in
-                     #   state/ and digest.md, both gitignored; its README is the operator guide.
+                     #   refuses a CLI version spike/README.md did not verify - except a patch above
+                     #   a verified one, which runs with a warning (ADR-0208). Runtime record in
+                     #   state/, live.log and digest.md, all gitignored; README is the operator guide.
 site/                # The documentation front end (ADR-0154): an
                      #   Astro Starlight site publishing the READER-FACING subset of docs/ with real
                      #   search, live at igorkonovalov.github.io/Ritmolux/. One of the repository's

@@ -287,8 +287,20 @@ node tools/conductor/conductor.mjs status         # what each lane is doing, and
 
 Every other seam stays exactly as the skills describe it.
 
+**Watch it from the terminal that started it.** `run` prints one line per milestone as it happens: a
+step starting and ending with its duration, spend and turn count, each commit that lands in the
+worktree, each phase whose log row flips to done, each test and gate command with its counts and lock
+wait, the 5-hour and 7-day usage readings, and every command a permission rule denied. The same lines
+go to `tools/conductor/state/live.log`, under one header per run, for a run you did not watch.
+
 **Next morning, read `tools/conductor/digest.md`.** It lists what needs you first: each park with its
-resume command, and each merge that carried minors.
+resume command and the usage reading its session ended on, then every merge's still-open findings
+with their `file:line`. The newest run also lists what an earlier run left parked, with its age and
+the worktree it holds — or the branch `resume` reopens it from, when you have already removed that
+worktree. Totals carry the usage windows at run start and run end, and gate minutes split into the
+full workspace suite and everything else, with the count of suite runs skipped because the conductor
+had already seen that exact tree pass
+([ADR-0207](adrs/0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md)).
 
 The operator guide — every command, what to do about each kind of park, and how to verify a new CLI
 version — is [`tools/conductor/README.md`](../tools/conductor/README.md). Its tests need no network

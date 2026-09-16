@@ -216,11 +216,13 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     col = col + vec3<f32>(flash * 0.12);
 
     // Alpha is `occlude` (`params.d.y`). The field covers every pixel, which is the
-    // coverage it honestly has (ADR-0056), and `occlude` scales how much of that
-    // the backdrop underneath resolves against (ADR-0085) — at 1 it replaces the
-    // backdrop, at 0 the sky adds through an opaque field. Reached only when no
-    // post stage is active; the chain owns the seam otherwise and the renderer
-    // hands a literal 1.0 here.
+    // coverage it honestly has (ADR-0056), and `occlude` scales how much backdrop
+    // survives underneath it (ADR-0085): the fold resolves `field + bg * (1 -
+    // occlude)`, so at 1 the field replaces the backdrop and at 0 the backdrop adds
+    // through at full strength. The renderer hands a value other than a literal 1.0
+    // only when the scene draws straight onto the destination — with a post stage
+    // routed, or the `over` junction live, the scene renders into a scratch and the
+    // chain's last fold owns the seam instead.
     return vec4<f32>(col, params.d.y);
 }
 "#;
