@@ -348,8 +348,8 @@ flowchart TD
 | 1 — A session cannot lose its work in the background | dev | done | `a927fa5` |
 | 2 — The allowlist runs the commands a phase ordinarily needs | dev | done | `16f4219` |
 | 3 — A close that landed without an outcome is adopted | dev | done | `ae3cc20` |
-| 4 — A suite run by hand counts | dev | done | committed with this row |
-| 5 — Time and spend are reported at one scope | dev | not started | |
+| 4 — A suite run by hand counts | dev | done | `d663f5c` |
+| 5 — Time and spend are reported at one scope | dev | done | committed with this row |
 | 6 — The ASCII guarantee is asserted against input that could break it | dev | not started | |
 | 7 — The probe asks whether a headless session may edit `.claude/` | dev | not started | |
 | 8 — Stop gate: what the probe found | human | not started | |
@@ -360,6 +360,14 @@ flowchart TD
 - Phase 3 also touched `test/lane-scenario.mjs`, which its Files-touched list does not name: its
   first done-when asks for a lane scenario whose review commits a close and then parks without an
   outcome, and that behaviour is a fixture flag (`loseOutcome`, `dirtyClose`). Commit with the phase.
+- Phase 5 touched two files its list does not name, both for the same reason: `lib/lane.mjs`, because
+  `watchCommits` is what prints the commit and phase lines and so is where the clock has to be held,
+  and `test/lane-scenario.mjs`, for the `phaseDelayMs` its done-when's sleep needs.
+- Phase 5's end-to-end assertion is weaker than its done-when's wording. Two phases separated by a
+  sleep cannot distinguish *measured the gap* from *never reset the clock*, since both give the later
+  phase a longer figure. The end-to-end test asserts the phase after the sleep carries at least it and
+  is the longer of the two; the reset itself is pinned in `live.test.mjs` on `phaseClock` against an
+  injected clock.
 
 ### Close triggers
 

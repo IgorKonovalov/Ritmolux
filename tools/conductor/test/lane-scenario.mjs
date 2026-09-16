@@ -23,6 +23,9 @@
 // 0175's round-1 review did: it committed its repairs, its `done/` move, its bump and its tag, then
 // backgrounded the suite and ended its turn. `dirtyClose` leaves an untracked file behind with it.
 //
+// `phaseDelayMs` makes every phase after the first wait that long before it commits, so the run
+// terminal's phase lines carry durations that differ.
+//
 // `stream` is a list of events the implement session emits (see fake-claude.mjs). `awaitLive` makes
 // the implement session, after each commit, wait until the file FAKE_LIVE_FILE names holds a line
 // naming that commit: proof the conductor printed it while the session was still running.
@@ -82,6 +85,8 @@ export default async ({ cwd, vars, env }) => {
         }
         text = text.replace(new RegExp(`^(\\| ${id} — [^|]*\\|[^|]*\\|) [^|]* \\|[^|]*\\|$`, "m"), "$1 committed with this row |  |");
         writeFileSync(planPath, text);
+        // A phase that takes measurably longer than the one before it, for the run terminal's clock.
+        if (ps.phaseDelayMs && commits.length) await new Promise((r) => setTimeout(r, ps.phaseDelayMs));
         writeFileSync(join(cwd, `phase-${plan}-${id}.txt`), `phase ${id} of ${plan}\n`);
         git("add", `phase-${plan}-${id}.txt`, `docs/plans/${planName}`);
         if (ps.breaksProbe && commits.length === 0 && !existsSync(join(cwd, "PROBE_RED"))) {

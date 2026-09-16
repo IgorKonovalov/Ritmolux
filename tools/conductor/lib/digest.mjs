@@ -113,6 +113,13 @@ function openFindings(rec) {
 }
 
 /**
+ * What a plan's steps cost inside one run. `totalSpend` sums every step the plan ever ran, across
+ * every run; a bullet that carries a run-scoped time beside a lifetime `$` reads as neither, so both
+ * figures are named. Totals sums this over every plan, so the two agree by construction.
+ */
+const spendInRun = (rec, inRun) => rec.steps.filter((s) => inRun(s.started)).reduce((t, s) => t + (s.result?.spendUsd ?? 0), 0);
+
+/**
  * A plan's time in one run. `active` is the sum of its steps' and gates' own durations there;
  * `wall` runs from its first step or gate in the run to its merge, so a night spent parked before
  * the run is never counted.
@@ -232,8 +239,8 @@ export function renderDigest(state, { repo, stateDir }) {
       const { active, wall } = timeInRun(rec, run, inRun);
       out.push(
         `- **${rec.plan} - ${title}** - ${tagText}, merge \`${short(rec.merge.head)}\`${rec.merge.remerged ? " (after one re-merge)" : ""}, ` +
-          `${rec.fixRounds} fix round${rec.fixRounds === 1 ? "" : "s"}, active ${duration(active)}, wall ${duration(wall)} in this run, ${usd(totalSpend(rec))}. ` +
-          `Review: \`${rel ?? rec.plan}\` \`## Close review\`.`,
+          `${rec.fixRounds} fix round${rec.fixRounds === 1 ? "" : "s"}, active ${duration(active)}, wall ${duration(wall)} in this run, ` +
+          `${usd(spendInRun(rec, inRun))} this run, ${usd(totalSpend(rec))} total. Review: \`${rel ?? rec.plan}\` \`## Close review\`.`,
       );
       out.push(...closedFindings(rec));
     }
@@ -274,7 +281,7 @@ export function renderDigest(state, { repo, stateDir }) {
       const recs = plans.filter((r) => r.lane === lane);
       const merged = recs.filter((r) => r.status === "merged" && inRun(r.merge?.at)).length;
       const parked = recs.reduce((n, r) => n + r.parks.filter((p) => inRun(p.at)).length, 0);
-      const spend = recs.reduce((s, r) => s + r.steps.filter((x) => inRun(x.started)).reduce((t, x) => t + (x.result?.spendUsd ?? 0), 0), 0);
+      const spend = recs.reduce((s, r) => s + spendInRun(r, inRun), 0);
       runMerged += merged;
       runParked += parked;
       runSpend += spend;

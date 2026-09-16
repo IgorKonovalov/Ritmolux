@@ -64,8 +64,8 @@ under a plan number happened inside a step or a gate:
 
 ```text
 10:02 0182 implement-01 start  phases 1-3 (dev)
-10:09 0182   commit 3f2a1bc feat(shot): the report hears the musical clock in a count column
-10:09 0182   phase  1 done
+10:09 0182   commit 3f2a1bc 7m01s feat(shot): the report hears the musical clock in a count column
+10:09 0182   phase  1 done, 7m03s
 10:14 0182   tests  nextest run -p standalone: 212 passed, 0 failed; lock wait 2m10s, ran 3m02s
 10:15 0182   denied PowerShell: cd studio; npx vitest run
 10:31 0182   usage  5h 0.27 (resets 14:30); 7d 0.02 (resets 09-22 16:00)
@@ -80,7 +80,9 @@ under a plan number happened inside a step or a gate:
   CLI reports no running cost inside a session.
 - **Inside a session:** each commit as it lands, each phase its log row marks done, each `cargo
   nextest`, `cargo test`, `cargo clippy` or `cargo doc` call starting and ending with its counts or
-  failing tests, every change in the 5-hour or 7-day usage window, and every denied command.
+  failing tests, every change in the 5-hour or 7-day usage window, and every denied command. A commit
+  and a phase line carry **how long since the previous phase line**, or since the step started before
+  the first, so a 28-minute phase does not read like a 2-minute one.
 - **Gates:** one line for the node, studio and sd-filter checks, or one per failure, then each cargo
   command's start and end.
 - **At run start:** every plan still parked, with its age and the worktree it holds, or the branch
@@ -109,8 +111,10 @@ once, whatever `state/conductor.json` says.
     `after NNNN (parked)` naming the plan it waits on and that plan's status. Left out when the run
     opened everything it could.
   - **Closed:** each merged plan's tag, merge commit, fix rounds, active time (its steps and gates)
-    and wall time within the run it merged in, spend, and every review finding exactly as the
-    reviewer emitted it.
+    and wall time within the run it merged in, **both** what it spent in that run and what it has
+    spent over its whole life, and every review finding exactly as the reviewer emitted it. The two
+    `$` figures are named because a run-scoped time beside a lifetime spend reads as neither; the
+    per-run one is what Totals below sums.
   - **Failed and parked:** gate reds with the failing tests, disagreements, spend-cap hits, session
     errors.
   - **Totals:** merged and parked counts, spend, time spent waiting on each lock, the 5-hour and

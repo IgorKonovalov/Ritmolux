@@ -291,12 +291,34 @@ export function stepEndBody({ label, result, ms }) {
   return `${stepName(label)} end    ${kind}, ${minutes(ms)}, $${(result.spendUsd ?? 0).toFixed(2)}${turns}`;
 }
 
-export function commitBody(sha, subject) {
-  return `  commit ${sha.slice(0, 7)} ${head(subject, 90)}`;
+// A commit line carries its duration after the sha rather than at the end, because the subject is
+// variable-length and truncated: a trailing figure would read as part of the message.
+export function commitBody(sha, subject, ms) {
+  return `  commit ${sha.slice(0, 7)} ${shortDuration(ms)} ${head(subject, 90)}`;
 }
 
-export function phaseBody(id) {
-  return `  phase  ${id} done`;
+export function phaseBody(id, ms) {
+  return `  phase  ${id} done, ${shortDuration(ms)}`;
+}
+
+/**
+ * The clock the commit and phase lines of one step read: how long since the previous phase line, or
+ * since the step started before the first. Without it a 28-minute phase and a 2-minute one print the
+ * same line, and the only way to tell them apart is subtracting the timestamps by hand.
+ *
+ * Only a phase line moves the mark. A commit and the phase row it carries are found by the same poll,
+ * so resetting on the commit would make every phase line read as no time at all.
+ */
+export function phaseClock({ now = () => Date.now() } = {}) {
+  let since = now();
+  return {
+    commit: (sha, subject) => commitBody(sha, subject, now() - since),
+    phase(id) {
+      const body = phaseBody(id, now() - since);
+      since = now();
+      return body;
+    },
+  };
 }
 
 /** A plan still parked when a run starts: its age, and the worktree it holds or the branch `resume` reopens. */

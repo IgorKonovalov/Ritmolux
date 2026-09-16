@@ -20,10 +20,9 @@ import { defaultGate, gateForStage, runGate } from "./gate.mjs";
 import { git, head, resolveCommit } from "./git.mjs";
 import { appendCleanupFailure, appendPark, dirtyWorktree } from "./inbox.mjs";
 import {
-  commitBody,
   gateReader,
   liveLine,
-  phaseBody,
+  phaseClock,
   standingParkBody,
   stepEndBody,
   stepStartBody,
@@ -91,6 +90,7 @@ function watchCommits(ctx, rec, plan) {
   const base = head(wt);
   const seen = new Set();
   const donePrinted = new Set();
+  const clock = phaseClock();
   const doneNow = () => {
     const found = findPlan(wt, plan);
     return found ? donePhases(readPlanFile(found.path)) : new Set();
@@ -108,14 +108,14 @@ function watchCommits(ctx, rec, plan) {
       if (!sha || seen.has(sha)) continue;
       seen.add(sha);
       fresh = true;
-      live(ctx, plan, commitBody(sha, subject.join("\t")));
+      live(ctx, plan, clock.commit(sha, subject.join("\t")));
     }
     if (!fresh) return;
     try {
       for (const id of doneNow()) {
         if (donePrinted.has(id)) continue;
         donePrinted.add(id);
-        live(ctx, plan, phaseBody(id));
+        live(ctx, plan, clock.phase(id));
       }
     } catch {}
   };

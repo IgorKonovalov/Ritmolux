@@ -115,7 +115,8 @@ test("a finding line carries only what the verdict carried", () => {
     lines.includes(
       "- **0175 - An eased value arrives** - 0.124.0, tag `v0.124.0` annotated, merge `" +
         head.slice(0, 7) +
-        "`, 1 fix round, active 1 h 35 min, wall 1 h 52 min in this run, $12.30. Review: `docs/plans/done/0175-fixture.md` `## Close review`.",
+        "`, 1 fix round, active 1 h 35 min, wall 1 h 52 min in this run, $12.30 this run, $12.30 total. " +
+        "Review: `docs/plans/done/0175-fixture.md` `## Close review`.",
     ),
     text,
   );
@@ -140,6 +141,34 @@ test("a plan spanning two runs counts each lock wait in the run it happened in, 
   assert.equal(runLines.length, 2);
   assert.match(runLines[0], /Suite-lock wait 38 min; close-lock wait 6 min\.$/, "the newer run keeps only its own waits");
   assert.match(runLines[1], /Suite-lock wait 20 min; close-lock wait < 1 min\.$/, "the earlier run keeps only its own");
+});
+
+// Backlog 0234: the closed bullet's time is run-scoped and its `$` was the plan's lifetime, so the
+// two sat in one sentence and read as contradicting Totals four lines below.
+
+test("a closed plan's bullet names this run's spend and the plan's total, and this run's agrees with Totals", () => {
+  const { repo, head } = repoWithTag();
+  const stateDir = tmp("rlx-digest-state-");
+  const state = sampleState(repo, head, stateDir);
+  // The plan ran in an earlier run too, so its lifetime spend is above what tonight cost.
+  state.runs.unshift({ started: "2026-09-14T20:00:00.000Z", ended: "2026-09-14T22:00:00.000Z", lanes: ["a"] });
+  state.plans["0175"].steps.unshift({
+    kind: "implement",
+    label: "0175-00-implement",
+    started: "2026-09-14T20:05:00.000Z",
+    ended: "2026-09-14T21:00:00.000Z",
+    result: { status: "ok", spendUsd: 20.14 },
+  });
+
+  const lines = renderDigest(state, { repo, stateDir }).split("\n");
+  const bullet = lines.find((l) => l.startsWith("- **0175 - "));
+  assert.match(bullet, /\$12\.30 this run, \$32\.44 total\./, bullet);
+
+  // The figure the bullet calls "this run" is the one Totals sums, for the run the bullet is under.
+  const inThisRun = lines.filter((l) => l.startsWith("- run: "))[0];
+  assert.match(inThisRun, /\$12\.30\./, inThisRun);
+  const thisRun = [...renderDigest(state, { repo, stateDir }).matchAll(/^- \*\*0175 - .*?\$(\d+\.\d\d) this run/gm)].map((m) => Number(m[1]));
+  assert.deepEqual(thisRun, [12.3], "the plan merged in one run, and only that run lists it as closed");
 });
 
 test("a run's cap stop and its not-started plans render from state alone, byte for byte on regeneration", () => {

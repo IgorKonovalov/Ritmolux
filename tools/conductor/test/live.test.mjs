@@ -14,6 +14,7 @@ import {
   cargoCall,
   gateReader,
   lockTimes,
+  phaseClock,
   standingParkBody,
   stepEndBody,
   streamReader,
@@ -159,6 +160,26 @@ test("every line is ASCII", () => {
   assert.match(ascii("\u2026"), /^[\x20-\x7e]*$/);
 });
 
+// Backlog 0233: `phase N done` carried no elapsed time, so a 28-minute phase read like a 2-minute
+// one. This is where the clock's semantics are pinned; the end-to-end test below only proves the
+// wiring, because wall-clock timings there cannot separate "measured the gap" from "never reset".
+test("a phase line measures from the previous phase line, and only a phase line moves the mark", () => {
+  let t = 1000;
+  const clock = phaseClock({ now: () => t });
+
+  t = 1000 + 8 * 60000;
+  assert.equal(clock.commit("3f2a1bcdeadbeef", "feat(shot): the report hears the musical clock"), "  commit 3f2a1bc 8m00s feat(shot): the report hears the musical clock");
+  // The commit and the phase row it carries are found by the same poll: the phase line reads the
+  // same span, and the commit did not reset the mark.
+  assert.equal(clock.phase("1"), "  phase  1 done, 8m00s");
+
+  // The next phase is measured from that line, not from the step's start: 28 minutes, not 36.
+  t = 1000 + 36 * 60000;
+  assert.equal(clock.phase("2"), "  phase  2 done, 28m00s");
+  t = 1000 + 37 * 60000;
+  assert.equal(clock.phase("3"), "  phase  3 done, 1m00s");
+});
+
 test("the step end line carries the outcome, duration, spend and turns", () => {
   assert.equal(
     stepEndBody({ label: "0182-01-implement", result: { status: "ok", outcome: { kind: "phases_done" }, spendUsd: 5.83, numTurns: 64 }, ms: 38 * 60000 }),
@@ -229,7 +250,7 @@ test("run prints a session's milestones in order, the commit before the session 
   sh(["init", "-q", "-b", "main"], repo);
   for (const [k, v] of [["user.email", "t@example.invalid"], ["user.name", "T"], ["commit.gpgsign", "false"], ["tag.gpgSign", "false"], ["core.autocrlf", "false"]]) sh(["config", k, v], repo);
   writeFileSync(join(repo, "VERSION"), "0.1.0\n");
-  writePlan(repo, { number: "0101", phases: [{ id: "1", owner: "dev" }] });
+  writePlan(repo, { number: "0101", phases: [{ id: "1", owner: "dev" }, { id: "2", owner: "dev" }] });
   sh(["add", "VERSION", "docs"], repo);
   sh(["commit", "-q", "-m", "init"], repo);
 
@@ -248,7 +269,8 @@ test("run prints a session's milestones in order, the commit before the session 
     toolUse("toolu_t2", "PowerShell", "cd studio; npx vitest run"),
     { type: "system", subtype: "permission_denied", tool_name: "PowerShell", tool_use_id: "toolu_t2" },
   ];
-  writeFileSync(join(toolDir, "spec.json"), JSON.stringify({ plans: { "0101": { awaitLive: true, stream, implementCost: 5.83, numTurns: 64 } } }));
+  const PHASE_DELAY_MS = 3000;
+  writeFileSync(join(toolDir, "spec.json"), JSON.stringify({ plans: { "0101": { awaitLive: true, stream, implementCost: 5.83, numTurns: 64, phaseDelayMs: PHASE_DELAY_MS } } }));
   process.env.FAKE_CLAUDE_SCENARIO = join(TEST_DIR, "lane-scenario.mjs");
   process.env.FAKE_LANE_SPEC = join(toolDir, "spec.json");
   process.env.FAKE_EVENTS = join(toolDir, "events.jsonl");
@@ -278,9 +300,9 @@ test("run prints a session's milestones in order, the commit before the session 
   const sha = sh(["log", "--format=%H", "-1", "--grep", "phase 1", "main"], repo).slice(0, 7);
   const find = (re) => out.findIndex((l) => re.test(l));
   const order = [
-    find(/^\d\d:\d\d 0101 implement-01 start  phases 1 \(dev\)$/),
-    find(new RegExp(`^\\d\\d:\\d\\d 0101   commit ${sha} feat: plan 0101 phase 1$`)),
-    find(/^\d\d:\d\d 0101   phase  1 done$/),
+    find(/^\d\d:\d\d 0101 implement-01 start  phases 1-2 \(dev\)$/),
+    find(new RegExp(`^\\d\\d:\\d\\d 0101   commit ${sha} \\d+[ms]\\S* feat: plan 0101 phase 1$`)),
+    find(/^\d\d:\d\d 0101   phase  1 done, \d+[ms]\S*$/),
     find(/^\d\d:\d\d 0101   tests  nextest run -p rlx-core: 12 passed, 0 failed, 3 skipped; lock wait 1s, ran 3s$/),
     find(/^\d\d:\d\d 0101   usage  5h 0\.27 \(resets \d\d:\d\d\); 7d 0\.02 \(resets \d\d-\d\d \d\d:\d\d\)$/),
     find(/^\d\d:\d\d 0101   denied PowerShell: cd studio; npx vitest run$/),
@@ -289,6 +311,18 @@ test("run prints a session's milestones in order, the commit before the session 
   assert.ok(order.every((i) => i >= 0), `every milestone printed:\n${out.join("\n")}`);
   assert.deepEqual([...order].sort((a, b) => a - b), order, `in order:\n${out.join("\n")}`);
   assert.equal(new Set(out.filter((l) => /\bcommit\b/.test(l) && l.includes(sha))).size, 1, "the commit is printed once");
+
+  // The phase lines carry real durations, and the phase the fake slept through says so. What the
+  // clock measures is pinned above; this is the wiring.
+  const seconds = (id) => {
+    const line = out.find((l) => new RegExp(`  phase  ${id} done, `).test(l));
+    assert.ok(line, `phase ${id} printed:\n${out.join("\n")}`);
+    const m = line.match(/done, (?:(\d+)m)?(\d+)s$/);
+    assert.ok(m, `a duration on: ${line}`);
+    return Number(m[1] ?? 0) * 60 + Number(m[2]);
+  };
+  assert.ok(seconds("2") >= PHASE_DELAY_MS / 1000, `phase 2 took at least the sleep, got ${seconds("2")}s`);
+  assert.ok(seconds("1") < seconds("2"), `phase 1 (${seconds("1")}s) is the shorter of the two`);
   for (const l of out) assert.match(l, /^[\x20-\x7e]*$/, `ASCII: ${l}`);
 
   // live.log holds exactly the lines run printed while the lanes ran, under a run header.
