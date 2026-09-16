@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0191** (ADRs are a separate sequence — next free there is **0211**; 0200 is reserved for Plan 0186 Phase 2.)
+**Next free number: 0192** (ADRs are a separate sequence — next free there is **0212**; 0200 is reserved for Plan 0186 Phase 2.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -52,6 +52,7 @@ place. The plan file carries the real link.
 | [0183](0183-a-low-density-is-a-trace-count.md) | A low density is a trace count | approved | dev, human | ADR-0195 (proposed): a trace (density <= 0.08) draws the tier anchor's count at every size; clouds keep ADR-0140. **No golden moves.** Phase 3 is a `human` look gate at 1080p Rich. |
 | [0184](0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) | Limited ink: a contour that is an ink, and a warp field that bands | approved | dev, human | ADR-0197 (proposed): hard ink contours on six scenes; `warp_mesh` bands by level. **Phase 2 stops if level outgrows `color_span`.** Phase 4: look gate. |
 | [0186](0186-the-flatness-gate-tells-a-figure-from-its-ground.md) | The flatness gate tells a figure from its ground | approved | dev, human | Backlog 0128: five figure/ground candidates vs two blot anchors at 96 and 192 px. **Phase 2 is a human gate that writes ADR-0200**; a negative result is a valid end. |
+| [0191](0191-a-green-tree-is-not-tested-four-times.md) | A green tree is not tested four times | draft | dev | ADR-0211 (proposed): a green record serves a tree whose diff is all declared paths, and `-P fast` runs in the full suite's place. Backlog 0227. **No `human` and no `.claude/` phase - conductor-runnable.** |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
