@@ -65,10 +65,16 @@ pub(crate) struct Show {
     /// is bound at all.
     control: Option<Control>,
 
-    /// The preset name last reported through the event stream, so `preset` is
-    /// emitted on a **change** rather than every frame. Empty until the first
-    /// frame reports one.
-    reported_preset: String,
+    /// What the last `preset` event said — name, system key and family — so the
+    /// event is emitted on a **change** rather than every frame. `None` until
+    /// the first frame reports one.
+    ///
+    /// **All three, not the name alone** (ADR-0194 point 4). A reload rewrites a
+    /// preset in place, so a file whose `[curve] family` or whose `system` was
+    /// edited comes back under the name it already had; keyed on the name that
+    /// is not a change, and a parent keeps drawing a panel for the system it was
+    /// last told about.
+    reported_preset: Option<(String, &'static str, Option<&'static str>)>,
 
     /// When the next `health` event is due. The stream's own cadence, not the
     /// diagnostics log's: that one writes a file an operator reads afterwards
@@ -105,7 +111,7 @@ impl Show {
             director: Director::from_config(rotate),
             events,
             control,
-            reported_preset: String::new(),
+            reported_preset: None,
             // Due one interval from now, not immediately: the diagnostics window
             // is empty before the first frame, so a reading taken at startup is
             // a row of zeros — which a parent cannot tell from a player that has
@@ -182,14 +188,21 @@ impl Show {
     /// dissolves, so a site announcing its own would name the incoming preset a
     /// frame before it was drawn, and every announcement would be one more
     /// chance to disagree about that.
+    ///
+    /// **A reload that edits the on-screen preset's system or family re-reports
+    /// it under the same name** (ADR-0194 point 4), so a parent receives a
+    /// `preset` naming the preset it already shows. That is a refresh, and spec
+    /// 0003 says so; a parent that resets transient state on every `preset` now
+    /// resets on a family edit too. A reload that changes none of the three
+    /// still emits nothing.
     pub(crate) fn report_active_preset(&mut self, renderer: &Renderer) {
+        let Some(report) = self.preset_report(renderer) else {
+            return;
+        };
         let Some(events) = self.events.as_mut() else {
             return;
         };
-        let name = renderer.preset_name();
-        if name == self.reported_preset {
-            return;
-        }
+        let (name, system, family) = &report;
         let index = renderer
             .preset_names()
             .position(|candidate| candidate == name)
@@ -197,14 +210,36 @@ impl Show {
         events.emit(&Event::Preset {
             name,
             index,
-            // The schema's key, never the scene's display name: the two coincide
-            // on the four one-word systems and differ on every other, so a
-            // parent resolving a parameter roster from the display name finds
-            // nothing for most of them.
-            system: renderer.active_system_key(),
+            system,
             file: renderer.active_preset_source(),
+            family: *family,
         });
-        self.reported_preset = name.to_owned();
+        self.reported_preset = Some(report);
+    }
+
+    /// What the on-screen preset is, or `None` because it is already what the
+    /// last `preset` event said.
+    ///
+    /// **Separated from the emission so the decision can be asserted**:
+    /// [`Events`] writes to standard error and offers nothing to read back, so a
+    /// test at this seam can observe which of the two branches was taken only if
+    /// the branch is a value.
+    fn preset_report(
+        &self,
+        renderer: &Renderer,
+    ) -> Option<(String, &'static str, Option<&'static str>)> {
+        let name = renderer.preset_name();
+        // The schema's key, never the scene's display name: the two coincide on
+        // the four one-word systems and differ on every other, so a parent
+        // resolving a parameter roster from the display name finds nothing for
+        // most of them.
+        let system = renderer.active_system_key();
+        let family = renderer.active_family_key();
+        let unchanged = self
+            .reported_preset
+            .as_ref()
+            .is_some_and(|(seen, was, drew)| seen == name && *was == system && *drew == family);
+        (!unchanged).then(|| (name.to_owned(), system, family))
     }
 
     /// Emit a `health` event once a second while frames are being drawn.
@@ -311,5 +346,100 @@ impl Show {
             }
         }
         applied.switched
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use rlx_core::preset::Preset;
+    use rlx_core::render::{HeadlessOptions, Renderer};
+
+    /// The `[curve]` preset the reload cases rewrite: one name, one family, so
+    /// what changes between two loads is exactly the family.
+    const NAME: &str = "family report fixture";
+
+    fn curve(family: &str) -> Preset {
+        let text = format!(
+            "system = \"parametric_curve\"\nname = \"{NAME}\"\n\n[curve]\nfamily = \"{family}\"\n"
+        );
+        Preset::from_toml_str(&text).expect("the fixture parses")
+    }
+
+    /// A `Show` with no directory, no watcher, no listener and no sink — every
+    /// field this seam does not read, so the test is about the deduplication and
+    /// nothing else. Built by literal rather than through `Show::start`, which
+    /// resolves and seeds the real per-user preset directory.
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "`Instant::now` fills two deadline fields this seam never reads"
+    )]
+    fn show() -> Show {
+        let now = Instant::now();
+        Show {
+            dir: PathBuf::new(),
+            sig: None,
+            last_poll: now,
+            director: Director::from_config(&config::Rotate::default()),
+            events: None,
+            control: None,
+            reported_preset: None,
+            next_health: now + HEALTH_INTERVAL,
+        }
+    }
+
+    /// **A reload that rewrites the on-screen preset's family re-reports it**
+    /// under the same name, and one that rewrites nothing reports nothing
+    /// (ADR-0194 point 4).
+    ///
+    /// Under name-only deduplication the first of those was silent, and a parent
+    /// went on drawing a slider whose ends belong to the family it was last told
+    /// about. Asserted through `preset_report`, which is the decision
+    /// `report_active_preset` acts on.
+    #[test]
+    fn a_reloaded_family_is_reported_again_and_an_unchanged_one_is_not() {
+        let Ok(mut renderer) = Renderer::new_headless(HeadlessOptions {
+            width: 64,
+            height: 48,
+            prefer_software: true,
+        }) else {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return;
+        };
+        let mut show = show();
+
+        renderer.set_presets(vec![curve("lissajous")]);
+        let first = show
+            .preset_report(&renderer)
+            .expect("the first frame reports the preset it drew");
+        assert_eq!(
+            first,
+            (NAME.to_owned(), "parametric_curve", Some("lissajous")),
+            "the first report names the preset, its system key and its family"
+        );
+        show.reported_preset = Some(first);
+
+        // The reload a hot-reload watcher performs: same file, same name, a
+        // rewritten `[curve] family`.
+        renderer.set_presets(vec![curve("hypotrochoid")]);
+        let second = show
+            .preset_report(&renderer)
+            .expect("a rewritten family is a change, whatever the name says");
+        assert_eq!(
+            second,
+            (NAME.to_owned(), "parametric_curve", Some("hypotrochoid")),
+            "the second report names the same preset and the new family"
+        );
+        show.reported_preset = Some(second);
+
+        // And a reload that rewrote neither of the three.
+        renderer.set_presets(vec![curve("hypotrochoid")]);
+        assert_eq!(
+            show.preset_report(&renderer),
+            None,
+            "a reload that changed neither the name, the system nor the family \
+             must report nothing — this stream is a change feed"
+        );
     }
 }

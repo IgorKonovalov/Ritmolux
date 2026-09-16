@@ -46,7 +46,7 @@ Adding an event or a field is additive under the same `v`; changing or removing 
 | `ev` | Fields | When |
 |------|--------|------|
 | `hello` | `version`, `schema`, `control` | Once, before the first frame of any run |
-| `preset` | `name`, `index`, `system`, `file` | The preset **on screen** changed |
+| `preset` | `name`, `index`, `system`, `file`, `family` | The preset **on screen** changed |
 | `roster` | `names`, `dir` | Every preset reload |
 | `preset_error` | `file`, `message`, `line`, `col`, `param` | A preset failed to load |
 | `preset_warning` | `file`, `message`, `param` | A preset loaded with a non-fatal problem; `param` labels the binding it is about as `preset_error`'s does, or is `null` ([ADR-0192](../adrs/0192-a-preset-warning-names-its-parameter.md)) |
@@ -117,6 +117,16 @@ Adding an event or a field is additive under the same `v`; changing or removing 
   with. It is not the scene's display name, which is a different string for every system whose name
   is more than one word: a parent resolving a roster from the display name would find one for the
   four one-word systems and none for the rest. ([ADR-0184](../adrs/0184-the-player-reports-what-it-loaded-and-the-studio-re-derives-nothing.md))
+- `preset`'s `family` MUST be spelled exactly as the schema document's `families[].family` spells
+  it, which is the string a preset writes in its own family table. That is what lets a parent join
+  the two and take a slider's ends from the family on screen; a second spelling would be a lookup
+  that silently finds nothing. It is `null` for a system whose parameters read the same on every
+  family it draws. ([ADR-0194](../adrs/0194-a-family-dependent-range-travels-in-the-schema-and-the-player-reports-the-family.md))
+- `preset` MUST be re-emitted when the on-screen preset's **name, system or family** changes, not
+  only its name. A reload rewrites a preset in place, so a file whose family or system was edited
+  comes back under the name it already had. A parent that receives a `preset` naming the preset it
+  already shows treats it as a **refresh**: it is not necessarily a different preset, and anything
+  done on this event runs again. A reload that changes none of the three emits nothing. (ADR-0194)
 - **Every fact about what the player loaded travels on this stream, and a parent re-derives none of
   it.** `preset` carries the file, `roster` carries the directory, and both are **absolute**,
   because the parent that acts on them does not share the run's working directory. A parent that

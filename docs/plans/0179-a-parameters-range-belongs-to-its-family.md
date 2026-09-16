@@ -302,8 +302,8 @@ flowchart LR
 |---|---|---|---|
 | 1 — `deposit_arms` is a whole number of arms | dev | done | 12dda4b |
 | 2 — The attractor's coefficients join the family table | dev | done | a53adfa |
-| 3 — The schema document carries each family's range | dev | done | committed with this row |
-| 4 — The player reports the family on screen | dev | not started | |
+| 3 — The schema document carries each family's range | dev | done | d56c35a |
+| 4 — The player reports the family on screen | dev | done | committed with this row |
 | 5 — The studio's slider reads the family's range | studio-builder | not started | |
 
 ### Notes
@@ -321,6 +321,19 @@ flowchart LR
 - The attractor's declared cells are the tuple rosters' hulls **rounded outward** to readable slider
   ends, not the hulls themselves. The measured hulls are tabulated in `FAMILY_PARAMS`'s own doc
   comment beside the declaration.
+- **`studio/shared/protocol.spec.test.ts` is red as of Phase 4**, as the phase's own done-when
+  anticipates and Plan 0172 accepted before it. One failure, one assertion:
+  `the fields of preset: expected [ 'name', 'index', 'system', 'file' ] to deeply equal [ …, 'family' ]`.
+  Phase 5 is what makes it green; the other twelve tests in that file pass.
+- **`Show::report_active_preset`'s decision was split out into `Show::preset_report`.** `Events`
+  writes to standard error and offers nothing to read back, so a test at the `Show` seam can tell
+  "emitted" from "deduplicated" only if the branch is a value. The new test asserts on that
+  function; `report_active_preset` is what acts on it.
+- **`active_family_key` answers `None` for a `parametric_curve` preset that declares no `[curve]`
+  table.** That is the plan's "the value `Scene::configure` receives, and `None` otherwise", and it
+  is also the honest answer: the curve arm of `build_config` is the one family-bearing arm that may
+  return `None`, so nothing configured the scene and what it draws is whatever the last configured
+  preset left it on. The accessor's doc comment records that.
 
 ### Close triggers
 
