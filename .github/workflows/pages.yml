@@ -79,7 +79,18 @@ jobs:
     needs: rustdoc
     runs-on: ubuntu-latest
     steps:
+      # FULL HISTORY, and the site is wrong without it. The translation banner
+      # (ADR-0185) asks git which commit last touched a translated page's English
+      # source, and on a shallow clone `git log -1 -- <path>` returns the tip
+      # commit for EVERY path - the tip is grafted parentless and every file
+      # reads as added by it. At actions/checkout's default `fetch-depth: 1` the
+      # published site would therefore show every Russian page as out of date,
+      # to readers, permanently. The plugin carries the second guard and renders
+      # no notice at all on a shallow repository, so either one alone fails
+      # closed; this one is what makes the notice TRUE rather than absent.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

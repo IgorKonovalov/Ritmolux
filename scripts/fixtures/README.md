@@ -1,6 +1,6 @@
 # scripts/fixtures — the trees the doc checkers bite on
 
-Eight checkers in `scripts/` take an optional `root` argument so they can be run against a tree
+The checkers in `scripts/` take an optional `root` argument so they can be run against a tree
 other than this repository. This directory is that tree. `site-links/` is the one whose root is a
 BUILT SITE rather than a repository, which is why it holds HTML and everything else here holds
 markdown. Most files under it are **deliberately
@@ -10,7 +10,7 @@ are the exceptions and invert it — and `index-rows-red/` is the half that rest
 direction. See those sections below.
 
 `check-doc-links.mjs`, `check-index-rows.mjs`, `check-filter-figures.mjs`,
-`check-comment-hygiene.mjs` and `toc.mjs` skip this tree **by path** on an ordinary repo walk — `scripts/fixtures`,
+`check-comment-hygiene.mjs`, `check-translations.mjs` and `toc.mjs` skip this tree **by path** on an ordinary repo walk — `scripts/fixtures`,
 enumerated once in the script — and scans it when it **is** the root, which is the only way the
 seeded breaks below are reachable. Without that skip, this directory would red the link gate on
 every push. The skip matched the directory *name* until Plan 0094 Phase 1, which meant it also
@@ -547,3 +547,65 @@ Verified by mutation — each of these takes the run red:
 full of snake_case identifiers in headings — `reaction_diffusion`, `mirror_reflect`, `BASELINE_Y`.
 A rule that stripped `_` alongside `*` and `~` would look right on every prose heading and be wrong
 on every identifier one.
+
+## `translations/` — for `check-translations.mjs`
+
+```
+node scripts/check-translations.mjs scripts/fixtures/translations/red      # exit 1, four breaks
+node scripts/check-translations.mjs scripts/fixtures/translations/green    # exit 0, two advisory rows
+```
+
+Two trees, because this gate reports two things and only one of them is an exit code
+([ADR-0185](../../docs/adrs/0185-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md)):
+a missing or malformed stamp fails, and a source that has moved past its stamp is an advisory. They
+are siblings under `translations/` rather than one tree and one `-red` sibling, so neither root
+contains the other — the trap `index-rows-red/` and `toc-red/` both document.
+
+### `red/` — the four hard failures
+
+| File | Case | Expected |
+|------|------|----------|
+| `docs/no-stamp.ru.md` | no stamp anywhere in the file | reported at line 1 |
+| `docs/malformed.ru.md` | `<!-- translated-from: yesterday -->` | reported as malformed, at the stamp's own line |
+| `docs/late.ru.md` | a well-formed stamp on line **3** | reported — the packager strips line 1, so a stamp below it ships as raw HTML |
+| `docs/orphan.ru.md` | no `orphan.md` beside it | reported — this is what renaming the source looks like from here |
+
+The sources in that tree are the silence: four `.md` files carrying no stamp, none of them
+reported. A gate that judged `.md` rather than `.ru.md` would convict every document in the
+repository.
+
+### `green/` — the two widths, and the one silence that matters
+
+| File | Case | Expected |
+|------|------|----------|
+| `docs/handbook.ru.md` | a **40-hex** stamp naming a commit no tree holds | one advisory row, exit 0 |
+| `packaging/box/READ-ME-FIRST.ru.md` | the same, in the **7-hex** short form | a second advisory row — the comparison is a prefix test, so both widths have to be proven |
+| `docs/handbook.md` | a **source** that quotes the stamp syntax inside a fence | not reported, and not read as a translation |
+
+Both stamps name `1111111…`, which no repository can contain, so the two rows are there on any
+tree at any time rather than depending on when the fixture was last touched. `packaging/box/` is
+under `packaging/` rather than `docs/` because the slice ADR-0185 translates spans both, and it
+writes its title over a rule of `=` the way the real `READ-ME-FIRST.md` files do.
+
+### The current state cannot be seeded, so the self-test supplies the history
+
+```
+node scripts/check-translations.mjs --self-test    # expects exit 0, 12 of 12
+```
+
+A stamp reading **current** names the commit that holds it, and that sha does not exist until the
+commit does — so it cannot be written into a committed fixture. The self-test copies `green/` into
+a **throwaway repository**, asserts the two stale rows, re-stamps both translations from the shas
+that repository actually produced (the full form on one, the short form on the other), and asserts
+that the rows are gone. Three assertions ride with it:
+
+| Half | Asserts | Dies to |
+|------|---------|---------|
+| the shallow clone | a real `git clone --depth 1` of that repository reports *staleness not measured* and **no** rows, while the full clone reports one | removing the `--is-shallow-repository` guard, which makes every translation read as stale from the first run |
+| the four red breaks | the counts and each printed phrase | a crash, which also exits 1 |
+| the banner | `site/src/plugins/translation-banner.mjs` inserts a **dated** notice for a stale page, nothing for a current one, nothing at all on a shallow repository, and **throws** for a missing stamp | the two copies of the stamp rule drifting apart — that plugin lives in another project and cannot import this script |
+
+**The plain repository run asserts nothing on its own.** A detector that stopped matching reports
+`0 stamped translation(s)` and exits 0, which reads exactly like a tree whose translations are all
+well formed — backlog 0104's reduction, applied to a gate whose subject count started at zero. That
+is why both invocations are in `.githooks/pre-push` and in the CI `links` job.

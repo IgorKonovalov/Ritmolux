@@ -8,6 +8,7 @@ import rehypeMermaid from 'rehype-mermaid';
 import { SKIP, visit } from 'unist-util-visit';
 import { rewriteLinks } from './src/plugins/rewrite-links.mjs';
 import { stripProvenance } from './src/plugins/strip-provenance.mjs';
+import { translationBanner } from './src/plugins/translation-banner.mjs';
 import { PUBLISHED } from './src/plugins/rewrite-links.mjs';
 import { sidebarGroup } from './src/plugins/split-document.mjs';
 
@@ -220,11 +221,16 @@ function failOnEmptyPages() {
 export default defineConfig({
   site: 'https://igorkonovalov.github.io',
   base: BASE,
-  // `stripProvenance` runs first because everything downstream reads the
-  // headings it rewrites: rehype computes a slug from each heading, and a slug
-  // is a route name and an anchor (ADR-0166).
+  // `translationBanner` runs before `stripLeadingHeading` because it removes a
+  // translation's `translated-from` stamp, which is the document's first node -
+  // and the strip drops the opening `# ` heading only while THAT heading is
+  // first, so a page keeping its stamp would render its title twice.
+  // `stripProvenance` runs before the rewriter because everything downstream
+  // reads the headings it rewrites: rehype computes a slug from each heading,
+  // and a slug is a route name and an anchor (ADR-0166).
   markdown: {
     remarkPlugins: [
+      translationBanner,
       stripLeadingHeading,
       substituteVersion,
       stripProvenance,

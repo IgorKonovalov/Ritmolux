@@ -158,8 +158,9 @@ docs/                # Full one-line-per-doc map: README.md "Repository layout".
                      #   CLONE — nothing runs until `git config core.hooksPath .githooks`, and the
                      #   studio step skips itself again on a clone with no studio/node_modules.
                      #   See README + ADR-0033.
-scripts/             # Repo maintenance. Ten Node gates. EIGHT run by pre-push and by the CI
-                     #   `links` job; the other TWO run in neither, because they need a BUILT site -
+scripts/             # Repo maintenance. The Node gates, and a count of them is deliberately not
+                     #   written here - every one below runs by pre-push and by the CI `links` job
+                     #   EXCEPT the two site gates, which need a BUILT site and so run in neither -
                      #   they live in .github/workflows/pages.yml. check-site-links.mjs asserts that
                      #   no site-relative href in site/dist/ ends in .md, that every one resolves to
                      #   a built file, and that every off-site href is absolute https (ADR-0154);
@@ -167,7 +168,7 @@ scripts/             # Repo maintenance. Ten Node gates. EIGHT run by pre-push a
                      #   from the menu rather than only by search, and that no route the splitter
                      #   produced exceeds 30,000 bytes of source (ADR-0166) - a route over that means
                      #   ADR-0166's arithmetic needs redoing, never that the constant needs raising.
-                     #   Of the eight, the first three, toc.mjs and check-release-tag.mjs also run
+                     #   Of the pre-push set, the first three, toc.mjs and check-release-tag.mjs also run
                      #   in the close ceremony, because a close is what breaks them. check-doc-links.mjs asserts
                      #   every relative markdown link resolves (moving a plan to plans/done/ breaks
                      #   links in both directions, and rejects a design-backlog fragment outright
@@ -186,7 +187,11 @@ scripts/             # Repo maintenance. Ten Node gates. EIGHT run by pre-push a
                      #   ANNOTATED `v` tag - offline at pre-push (exists, annotated, on HEAD's
                      #   history), `--remote` in CI on a push to main (origin advertises it), and
                      #   at the close after the tag is written, with `--stranded` listing any older
-                     #   tag origin lacks (ADR-0203).
+                     #   tag origin lacks (ADR-0203); check-translations.mjs reads every `.ru.md`
+                     #   translation's `translated-from: <sha>` stamp - a MISSING or malformed one
+                     #   is an exit code, a source that has MOVED past its stamp is an advisory row
+                     #   and never one, because no machine here can read the prose either way
+                     #   (ADR-0185).
                      #   scripts/fixtures/ holds their seeded bite checks.
                      #   RENDERERS, NOT GATES: docs-shots.mjs (regenerates docs/images/),
                      #   tuple-sheets.mjs + tuple-paths.mjs (attractor roster/walk contact

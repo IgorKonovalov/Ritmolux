@@ -210,10 +210,10 @@ the decision that moved it is linked.
   **All of those carry `--workspace` since [ADR-0072](adrs/0072-the-c-abi-ships-from-its-own-crate.md)**,
   and it is load-bearing rather than stylistic: `rlx-core-cabi` is deliberately outside the workspace
   `default-members`, so the bare forms would silently stop testing and linting the C ABI entirely.
-- Plus **ten** single-runner gates: `cargo deny check` (supply chain), Miri over `rlx-ring`'s
+- Plus the single-runner gates: `cargo deny check` (supply chain), Miri over `rlx-ring`'s
   `unsafe` (UB), the coverage ratchet below, the `studio` job (the studio's typecheck, lint and
   Vitest suite — the only automated reading of `studio/`, since the pre-push hook's studio step
-  skips itself on a clone with no `studio/node_modules`), and the seven Node doc gates that share
+  skips itself on a clone with no `studio/node_modules`), and the Node doc gates that share
   the `links` job — `check-doc-links.mjs` (every relative markdown link resolves — [Plan 0061](plans/done/0061-the-build-stops-paying-for-what-it-is-not-building.md) Phase 2c),
   `check-index-rows.mjs` (every row inside a marked roster region stays a pointer under 320 bytes —
   [ADR-0116](adrs/0116-an-index-row-is-a-pointer-and-a-gate-holds-it-to-one.md)),
@@ -225,11 +225,16 @@ the decision that moved it is linked.
   [ADR-0127](adrs/0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md)),
   `toc.mjs` (every generated contents block still matches the headings beneath it —
   [ADR-0163](adrs/0163-a-long-document-carries-a-generated-contents-block.md)),
-  and `check-reader-prose.mjs` (every Plan/ADR citation in a reader document sits inside a link —
-  [ADR-0168](adrs/0168-the-reader-documents-address-a-reader-and-the-record-stays-a-link.md)). Seven gates but
-  **nine invocations** in each carrier: `check-index-rows.mjs` and `toc.mjs` each run a
-  `--self-test` beside their check, because neither a detector that has quietly stopped matching
-  nor an anchor rule that is merely plausible is visible in the check itself.
+  `check-reader-prose.mjs` (every Plan/ADR citation in a reader document sits inside a link —
+  [ADR-0168](adrs/0168-the-reader-documents-address-a-reader-and-the-record-stays-a-link.md)),
+  `check-release-tag.mjs` (the version `main` declares carries an annotated tag —
+  [ADR-0203](adrs/0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md)),
+  and `check-translations.mjs` (every `.ru.md` carries the stamp of the commit it was translated
+  from — [ADR-0185](adrs/0185-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md)).
+  **More invocations than gates**: `check-index-rows.mjs`, `toc.mjs`, `check-release-tag.mjs` and
+  `check-translations.mjs` each run a `--self-test` beside their check, because neither a detector
+  that has quietly stopped matching nor an anchor rule that is merely plausible is visible in the
+  check itself.
 - **The nine GPU-heavy suites run once per push, not twice**
   ([ADR-0073](adrs/0073-the-windows-ci-critical-path.md), [Plan 0061](plans/done/0061-the-build-stops-paying-for-what-it-is-not-building.md) Phase 2b). They render the shipped
   preset library on WARP, and until that change ran uninstrumented in `check (windows-latest)` and

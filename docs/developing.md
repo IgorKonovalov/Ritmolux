@@ -135,6 +135,8 @@ What it runs, stopping at the first failure and naming the step that failed:
 | Reader prose | `node scripts/check-reader-prose.mjs` |
 | Release tag | `node scripts/check-release-tag.mjs` |
 | Release tag (self-test) | `node scripts/check-release-tag.mjs --self-test` |
+| Translations | `node scripts/check-translations.mjs` |
+| Translations (self-test) | `node scripts/check-translations.mjs --self-test` |
 | Format | `cargo fmt --all --check` |
 | Lint | `cargo clippy --workspace --all-targets -- -D warnings` |
 | Rustdoc | `cargo doc -p rlx-core --no-deps --features text` under `RUSTDOCFLAGS=-D warnings` |
@@ -154,12 +156,21 @@ every citation in a reader document must sit inside a link
 ([ADR-0168](adrs/0168-the-reader-documents-address-a-reader-and-the-record-stays-a-link.md)),
 every generated contents block must still match the headings beneath it
 ([ADR-0163](adrs/0163-a-long-document-carries-a-generated-contents-block.md)),
-and the version root `Cargo.toml` declares must carry an annotated tag on `HEAD`'s
+the version root `Cargo.toml` declares must carry an annotated tag on `HEAD`'s
 history, because `git push --follow-tags` never sends a lightweight one
-([ADR-0203](adrs/0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md)).
-The three that could go green on a rule that had quietly stopped working — a roster
+([ADR-0203](adrs/0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md)),
+and every `.ru.md` translation must open with the `translated-from: <sha>` stamp
+naming the commit its source was translated from
+([ADR-0185](adrs/0185-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md)).
+The four that could go green on a rule that had quietly stopped working — a roster
 detector matching nothing, an anchor rule that is merely plausible, a tag-type check
-that no longer looks — carry a `--self-test` beside their check.
+that no longer looks, a stamp reader that finds no translations at all — carry a
+`--self-test` beside their check.
+**A translation that has drifted is never a failure.** The stamp check reports a
+source that has moved as an advisory row and exits 0: nothing mechanical can judge
+whether the Russian still says what the English now says, and hard-failing would
+make that slice a hostage of every hotkey edit. A **missing or malformed** stamp is
+the exit code, because that much is mechanical.
 **The release-tag step refuses a push, not only a release:** from the moment a close
 moves the version, every push fails until that version's tag is annotated. CI's
 `links` job cannot read local tags, so it runs the same script with `--remote` on a
