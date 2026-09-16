@@ -564,8 +564,8 @@ pub fn run_wave_point(&mut self, index: usize, sample: f32, left: f32, right: f3
 |---|---|---|---|
 | 1 — Read the rest of the source, and render the seam | dev | done | `725c8d5` |
 | 2 — The comp stage gets the source's polar pair | dev | done | `707a0bb` |
-| 3 — The per-vertex program gets the source's `x`/`y` | dev | done | committed with this row |
-| 4 — The seam is found | dev | not started | |
+| 3 — The per-vertex program gets the source's `x`/`y` | dev | done | `0d7266a` |
+| 4 — The seam is found | dev | done | committed with this row |
 | 5 — The analyzer publishes a left/right pair | dev | not started | |
 | 6 — The waveform draws the source's eight figures | dev | not started | |
 
@@ -708,6 +708,90 @@ such presets and the staleness check would have kept the wrong pipeline;
 `ensure_resources` compares `res.warp_pipeline_converted.is_some()` against `scene.milk.is_some()`
 instead, and `a_converted_preset_and_a_native_one_draw_from_different_warp_pipelines` switches a
 scene native → converted → native to exercise it.
+
+### Phase 4 — the seam
+
+Converted with `milkconv` and rendered by `shot` at 1920x1080, all under `target/plan0180/`,
+uncommitted. `--signal click:120 --frame-at 360` for *Songflower*, `--set bass=0.6,mid=0.5,treb=0.45
+--frames 300` for *chasers*, matching Phase 1's captures.
+
+| render | what it is |
+|---|---|
+| `p4-songflower.png` | the preset as converted |
+| `p4-songflower-nowave.png` | `wave_a` forced to `0` in the compiled per-frame program |
+| `p4-songflower-plain.png` | `wave_a` and `echo_alpha` both forced to `0` |
+| `p4-songflower-novtx.png` | the `per_vertex` block deleted |
+| `p4-songflower-nowrap.png` | `wrap` forced to `0` as well |
+| `p4-songflower-nodep.png` | `deposit = "0.0"` added to `[params]` |
+| `p4-chasers-set.png`, `p4-chasers-nodep.png` | the same last pair for *chasers* |
+
+**The ray, on this tree: `+x`, from the frame centre, for both presets.** Phases 2 and 3 neither
+moved nor removed it, which is expected — neither preset's `.regs` carries `x`, `y` or `ang`, so the
+per-vertex inputs change reaches neither, and both renders reproduce Phase 1's description.
+
+**Phase 1 read *Songflower* as seaming on both horizontal rays, and it is one ray plus one other
+producer.** The preset sets `echo_alpha = 1` and `echo_orient = 1`, so the whole displayed frame is
+the field **mirrored in x** at `echo_zoom = 1.75`. Judging the two halves separately, as the phase
+asks:
+
+- Silencing `wave_a` alone removes the seam on the display's right of centre entirely — the band
+  `x 960..1120` drops from a peak row-to-row `|drgb|` of `34.9` at row 541 to `3.5`. That half is the
+  **draw layer's waveform**: `wave_mode = 5`, `wave_y = 0.5`, `wave_a = 0.001` and `decay = 1.0`, so a
+  near-invisible full-width figure at the vertical midline accumulates over 360 frames.
+- The other half survives that, and with the echo's mirror also removed it reads as a hard edge
+  running from the frame centre to the **right** edge along `v = 0.5`, with the bright wedge below
+  it (`p4-songflower-plain.png`).
+
+**What that edge is: the scene's own deposit, which every converted preset draws.**
+`milkconv/src/convert.rs`'s `[params]` block carries the comment *"the scene's own deposit stays
+off"* and then emits only `brightness = "1.0"` — **it never emits `deposit`**, so the scene's
+`DEFAULT_DEPOSIT` of `1.6` is in force. Adding `deposit = "0.0"` to that table removes the edge from
+both presets and changes nothing else:
+
+| band | *Songflower* as converted | with `deposit = 0` |
+|---|---|---|
+| `x 960..1200` | `107.2` at row 540 | no row-540 peak (`49.6`, at the border row 1077) |
+
+| band | *chasers* as converted | with `deposit = 0` |
+|---|---|---|
+| `x 240..480` | `59.5` at row 536 | `3.3` |
+| `x 480..720` | `63.0` at row 538 | the preset's own figure at row 357 |
+| `x 1200..1440` | `45.6` at row 537 | the same figure, mirrored |
+| `x 1440..1680` | `51.0` at row 538 | `3.5` |
+
+*chasers*' per-vertex program is `zm = 1.002; sx = -zm; sy = zm` — a per-frame horizontal mirror —
+which is why one ray's edge appears in both halves and why Phase 1 could not read its ray from either
+half alone. It is the same single producer.
+
+**Ruled out for that edge, in the order the phase's branch table asks:**
+
+- **`ang`'s branch cut.** Neither preset's per-vertex program names `ang`: *Songflower*'s `.regs` end
+  `... ladder leaf rad` and *chasers*' end `... q1 zm rad`, so `MilkRuntime`'s `vertex_inputs.ang` is
+  `None` for both and no per-vertex output carries a cut. Both programs are smooth in `rad`.
+- **A mirror between the uv `run_vertex` is given and the mesh position it lands on**, which is what
+  the phase's `+x` branch predicts. There is none: `encode::prepare_mesh`, `MeshState::assemble` and
+  `build_indices` all walk `for row in 0..=my { for col in 0..=mx }` against the same running index,
+  and `vertex_position`'s y-down uv, `assemble`'s y-up clip and the warp shader's
+  `uv = 0.5 - clip.y * 0.5` agree.
+- **A converted custom shape and the motion grid.** *Songflower*'s bundle carries no shapes or waves
+  at all, and `mv_a = 0`.
+- **`wrap`.** Forcing it off changes the picture wholesale but leaves a row-540 reading.
+
+**Branch taken: a recorded finding, and a stop.** The `+x` branch's predicted cause is falsified, so
+this is the table's *"anything else"* arm. The obvious repair — emitting `deposit = "0.0"` from
+`milkconv` — is **not made here**, for one reason: the deposit is a light source in the field of every
+converted preset, so removing it changes the settled field level that Plan 0142 Phase 2 measures and
+compares against the source's equilibrium. This plan's own `What this plan does NOT do` leaves the
+wash to Plan 0142. Nothing here moves it.
+
+**The test doc.** `ang_cuts_on_plus_x_and_turns_counter_clockwise_on_screen`'s *"What this does not
+settle"* section is replaced. Nothing in it now attributes a convention to MilkDrop or to a reference,
+and `grep "MilkDrop's .atan2. has the same cut" core/src/render/scenes/warp_mesh/tests.rs` returns
+nothing (exit 1). Its assertions are unchanged.
+
+**Backlog 0215's probe does not go red, because the entry is not live.** 0214, 0215 and 0216 were all
+archived as **Promoted** when this plan was approved (`docs/design-backlog-archive.md`), so they carry
+no probe. `node scripts/check-backlog-claims.mjs` exits 0 over the 30 live entries.
 
 ### Notes
 

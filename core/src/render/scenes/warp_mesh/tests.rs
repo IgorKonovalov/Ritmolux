@@ -202,34 +202,20 @@ fn rad_and_ang_come_from_the_target_aspect_and_not_from_the_grid() {
 /// epilogue and in the draw layer, so these three agree by test rather than by
 /// coincidence.
 ///
-/// # What this does **not** settle, and why the phase stopped there
+/// # What this covers, and what it does not
 ///
-/// **Whether the reference's handedness matches.** That is the actual question
-/// behind backlog 0119: MilkDrop's `atan2` has the same cut, so presets are
-/// *authored against* a discontinuity at +x and smoothing the wrap would break
-/// every preset that uses it deliberately — but if the **handedness** differs,
-/// every angle-driven per-vertex program in the corpus runs mirrored and the
-/// visible seam is a symptom rather than the defect.
+/// It covers the **native** `[per_vertex]` vocabulary, which is the only
+/// vocabulary [`vertex_position`]'s pair reaches: a converted preset's `rad` and
+/// `ang` are built in [`MilkRuntime::run_vertex`](crate::milk::MilkRuntime::run_vertex)
+/// from a different normalization, and that function's own doc is where the
+/// converted convention is stated.
 ///
-/// Plan 0111 Phase 4 required that comparison be derived from the source format's
-/// convention or from the reference implementation, with the source named, and
-/// **never from a picture**. Neither is available here: the corpus is 10 347
-/// `.milk` files with no MilkDrop source and no authoring documentation beside
-/// them, and a corpus-wide search for a preset that states a rotation direction
-/// returns two files, both building their own Kardan rotation from `q` variables
-/// rather than reading the per-vertex `ang`. A `.milk` preset does not record the
-/// convention it was authored against.
-///
-/// So the phase changes no behaviour and does not claim the seam is
-/// authored-against either — that claim needs the half that is missing. What
-/// would settle it, in order of directness: MilkDrop 2's `milkdropfs.cpp` mesh
-/// setup, where the sign of the `y` handed to `atan2f` is one line; or the
-/// authoring documentation that shipped with MilkDrop; or one reference capture
-/// of a preset built to be handedness-revealing, which is a look-gate artifact
-/// and not a test.
-///
-/// Per ADR-0071's prose rule, nothing here attributes a convention to "MilkDrop"
-/// at all. It states this engine's, and names the question.
+/// It is not evidence about a visible seam in any rendered frame. A cut in a
+/// per-vertex output seams only where a program reads the output that carries it,
+/// and a frame can hold a hard radial edge for reasons that never touch this
+/// function — a producer whose own colour coordinate leaves its lookup's domain
+/// along one ray will draw the same picture. Attributing a seam to this cut takes
+/// the preset's own bindings, read first.
 #[test]
 fn ang_cuts_on_plus_x_and_turns_counter_clockwise_on_screen() {
     use std::f32::consts::{FRAC_PI_2, PI, TAU};
