@@ -384,6 +384,17 @@ flowchart TD
   of the probe steps, and its second gave the paths relative, which the model expanded to the user's
   own `~/.claude/`. Neither run is the evidence; both are described in `spike/README.md`, the second
   because it is a trap for whoever reads the row next.
+- **`node scripts/check-doc-links.mjs` is red on this plan's own header, and was before Phase 1.**
+  Line 12 links `[0189](0189-…md)`, but 0189 moved to `plans/done/` in `819e4f1`, before this plan was
+  drafted in `245bc83`. The fix is a `done/` prefix; the header is not `dev`'s to edit.
+- **Two of the probes this plan should have falsified still match, because each is a prefix.**
+  0233's `present: phase  \$\{id\} done` and 0235's `present: feat: plan \$\{plan\} phase \$\{id\}`
+  both match the repaired lines, which now continue `, ${shortDuration(ms)}` and
+  `— an “eased” value …`. The defects are fixed; the probes no longer discriminate, so those two
+  entries have to be judged on their text.
+- Stopped at Phase 8. Phases 1-7 are committed; Phase 9 is undecided until Phase 8 settles, and the
+  once-per-plan full workspace suite (ADR-0156) is owed at the last phase, not here. No `.rs`, `.cpp`,
+  `.h`, `.wgsl` or `Cargo.toml` is touched by Phases 1-7.
 
 ### Close triggers
 
