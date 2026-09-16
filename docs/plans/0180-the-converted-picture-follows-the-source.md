@@ -637,7 +637,7 @@ pub fn run_wave_point(&mut self, index: usize, sample: f32, left: f32, right: f3
 
 **Lane:** Phases 1-2 in `C:\Users\Igor Konovalov\WORK\rlx-plan-0180`, branch
 `plan-0180-the-converted-picture-follows-the-source`, merged at `8556556`. Phases 3-6 on `main`
-directly, in one session.
+directly, in one session. Phase 7 on `main` directly, in its own session.
 
 | phase | owner | state | commit |
 |---|---|---|---|
@@ -647,6 +647,7 @@ directly, in one session.
 | 4 — The seam is found | dev | done | `1fc0dfa` |
 | 5 — The analyzer publishes a left/right pair | dev | done | `5092b62` |
 | 6 — The waveform draws the source's eight figures | dev | done | `fa99c5d` |
+| 7 — The converted preset stops drawing a light nobody asked for | dev | done | committed with this row |
 
 ### Phase 1 — the source read
 
@@ -957,6 +958,94 @@ that a custom wave is outside the figure contract.
 
 **The gates.** `check-reader-prose.mjs`, `check-doc-links.mjs` and `toc.mjs --check` all exit 0.
 
+### Phase 7 — the deposit
+
+**The bless.** Before it, the unblessed golden run read `warp_mesh_stroke` at mean `0.1378` /
+outlier `153` — the only baseline past tolerance. `warp_mesh_milk` read `0.0000` / 0 and
+`warp_mesh_shader` `0.0000` / 1, so neither of the two that bind `deposit = "6.5"` moved, which is
+the phase's stop condition and it did not fire. `RLX_BLESS=1` rewrote eight baselines; `git restore`
+put back the seven it had no cause to move (`backdrop_band`, `backdrop_ramp`, `shape_collage`,
+`shape_collage_roster`, `shape_field`, `warp_mesh`, `warp_mesh_shader`, all at mean `≤ 0.0013` /
+outlier `≤ 2` beforehand). The unblessed run then passed with `warp_mesh_stroke` at `0.0000` / 0.
+`git status --short core/tests/golden/` lists `warp_mesh_stroke.png` and nothing else.
+`the_warp_mesh_stroke_fixture_shades_a_resolvable_stroke` still passes, so the fixture still shades
+the stroke it exists for.
+
+**The seam re-render**, at 1920x1080 under Phase 4's own invocations, all under `target/plan0180/`,
+uncommitted: `p7-songflower.png` (`--signal click:120 --frame-at 360`) and `p7-chasers.png`
+(`--set bass=0.6,mid=0.5,treb=0.45 --frames 300`). Peak mean row-to-row `|drgb|` in rows 520..560
+over Phase 4's own bands, 0-255 byte scale — **no hard edge along `+x` in either render**:
+
+| preset | band | as converted (P4 tree) | P4's hand `deposit = 0` | this tree, converter-bound |
+|---|---|---|---|---|
+| *Songflower* | `x 960..1200` | `9.0` r542 | `1.6` r541 | **`0.9`** r542 |
+| *chasers* | `x 200..760` / `1150..1700` | `14.8` r537 / `13.2` r539 | `1.3` r523 / `1.4` r524 | **`1.3`** r523 / **`1.4`** r524 |
+
+*chasers* reproduces Phase 4's hand-made arm to every figure printed, which is the cleanest evidence
+that the converter's binding and that hand edit do the same thing.
+
+**Two findings against the phase's expectation.**
+
+- **This statistic is not Phase 4's.** Re-run on Phase 4's own committed render it reads `9.0` where
+  that phase recorded `107.2`, so only the within-table comparisons are meaningful. Phase 4's script
+  was not kept; this one is the band's per-channel `|delta|` meaned over 3 channels.
+- **On *Songflower* the arms no longer separate, and Phase 6 is why.** Stripping the binding back out
+  of this tree (`p7-songflower-nodep.png`) reads `1.2` at row 542 against the bound render's `0.9`,
+  where on Phase 4's tree that pair read `9.0` against `1.6`. The row-542 *step* was mostly the old
+  mode-5 waveform, a full-width midline figure Phase 6 replaced with the source's product figure
+  about the centre. The deposit's light is still removed and by a lot — the band's mean value goes
+  `44` unbound to `4` bound, and the two frames differ at mean `|d|` `43.2`, max `173` at (625, 546).
+  So on this preset the render shows the edge absent but does not by itself attribute that to the
+  binding; *chasers* and the rendered test do.
+
+**The tests.** `milkconv/tests/deposit.rs`, a new file — `draw_layer.rs` has no renderer and
+`warp_geometry.rs`'s header is a geometry hunt.
+`a_converted_params_block_binds_the_deposit_to_zero` reads the emitted TOML;
+`a_converted_preset_with_a_silent_draw_layer_deposits_nothing` renders a fixture with every
+draw-layer light off and `fDecay=1.0` and asserts the brightest RGB byte is `0`. Checked by
+mutation: with the emission removed both go red, the second reporting `202 at (42, 59)`.
+
+**The grep** returns four lines, each now directly above a `deposit = "0.0"` binding.
+`presets/README.md`'s two claims (l.1969, l.2170) say the same thing and became true without an
+edit; they are outside the grep's paths.
+
+**Deviations from the phase's file list.**
+
+- **`core/tests/fixtures/milk_wash_fog_tunnel.toml` and `milk_wash_blur_mix_3.toml` also bind
+  `deposit = "0.0"`.** The phase names only `warp_mesh_stroke.toml`, but its grep done-when covers
+  `core/tests/fixtures`, and both carried the same false comment while inheriting `DEFAULT_DEPOSIT`.
+  Decided with the owner before any code. They are the `milk_wash` bisect probe's two subjects, so
+  its printed readings move; the probe asserts no threshold. Its new table is below.
+- **`milkconv/tests/warp_geometry.rs` — three non-vacuity floors recalibrated.** Removing the ring
+  darkened the two `scratch-0108` fixtures about fivefold, so each hunt's `control > 0.05` floor
+  stopped clearing while every contrast ratio it guards *improved*: `ang` went from `0.0086/0.1605`
+  to `0.0009/0.0305`, `sx` from `0.0047/0.1055` to `0.0024/0.0263`, and the echo's mirrored arm is
+  `0.0000` against `0.0263`. The three `0.05` literals became one `ONE_SIDED_ENOUGH = 0.015`, whose
+  doc carries the measurement and the cause. The floors were calibrated on a tree that had this
+  defect in it; the readings each test quotes in its own comment are left on the old scale and said
+  to be. Decided with the owner.
+- **`milkconv/src/convert.rs`'s module header carried a fourth false claim**, outside the two the
+  phase names: a *"What Phase 3 does not convert"* section saying the waveform and the HLSL blocks
+  are unconverted and that the converter emits a stand-in deposit. Rewritten to what the tree does.
+
+**The `milk_wash` probe's new readings** (`the_wash_bisect_reports_every_seam`, this machine's
+hardware adapter, `SIZE = 128` square), set beside Phase 3's table without editing it:
+
+```text
+[wash] seam          fog tunnel     blur mix 3     ratio
+[wash] A field         0.13043343    0.00000000       inf
+[wash] B present*      0.24317567    0.00000000       inf
+[wash] E display       0.39624831    0.00000000       inf
+```
+
+The statistic is `edge` — **background** brightness at the frame's border, not total light — so
+`0.00000000` says the clean control's background is now exactly black at every seam, where Phase 3
+read it at `0.02016482` / `0.08846003` / `0.25213975`. *Fog Tunnel* falls to `0.13043343` from
+`0.29717061` and keeps a residue, which is backlog 0113 proper and Plan 0142's. `inf` is the test's
+own divide-by-zero guard, and the test asserts no threshold, so it passes. **Plan 0142 Phase 2's
+control now has no wash left to measure**, which is the sharpest consequence of this phase for that
+plan.
+
 ### Notes
 
 - **Phase 1 read a local copy, not a checkout of `d4c843a`.** This session had no network. The copy is
@@ -1002,26 +1091,33 @@ that a custom wave is outside the figure contract.
   `docs/design-backlog-archive.md`, archived as **Promoted** when this plan was approved, so none of
   them carries a live probe and none needs moving at the close.
 - **What shipped:** a feature. A converted preset's per-vertex inputs, its warp chain's space, the
-  analyzer's left/right pair and all eight built-in waveform figures change what a converted preset
-  draws. Native presets are untouched by construction (ADR-0212) and no native baseline moved.
+  analyzer's left/right pair, all eight built-in waveform figures and the removal of the scene
+  deposit change what a converted preset draws. Native presets are untouched by construction
+  (ADR-0212) and no native baseline moved.
 - **Operator docs touched:** `docs/milkdrop-conversion.md` (the conversion table's channel and
-  waveform rows, plus a correction to its deposit claim) and `docs/specs/0002-ring-determinism.md`
-  (the pair joins the list of outputs that are a pure function of the stream).
+  waveform rows, and its deposit note, which Phase 6 corrected to what Phase 4 measured and Phase 7
+  rewrote again to what the converter now emits) and `docs/specs/0002-ring-determinism.md` (the pair
+  joins the list of outputs that are a pure function of the stream).
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — 65 stated reductions across
   30 live entries, 2 unprobeable, 31 advisory "path moved" rows. None of this plan's three entries is
   live, so the plan's expectation that 0215's probe goes red on delivery did not apply.
-- **Full suite:** `cargo nextest run --workspace`, exit 0, **1979 passed / 6 skipped** in 709 s on the
-  reference machine.
-- **Outstanding `human` phases:** none. Every phase in this plan is `dev`-owned and all six have
+- **Full suite:** re-run at Phase 7. `cargo nextest run --workspace`, exit 0, **1981 passed /
+  6 skipped** in 866 s on the reference machine. (At Phase 6 it read 1979 passed / 6 skipped in
+  709 s; the two added tests are `milkconv/tests/deposit.rs`'s.) `cargo fmt --all --check` and
+  `cargo clippy --workspace --all-targets -- -D warnings` both exit 0.
+- **Outstanding `human` phases:** none. Every phase in this plan is `dev`-owned and all seven have
   landed.
 
 ### Not done here, and named for whoever closes this
 
-- **Phase 4 found the seam and did not repair it.** The cause is `milkconv/src/convert.rs` emitting a
-  `[params]` block whose comment says the scene's deposit stays off while emitting no `deposit` key,
-  so `DEFAULT_DEPOSIT = 1.6` draws a ring into every converted preset. The one-line repair is held
-  back because that light is a term in the settled field level Plan 0142 Phase 2 measures.
 - **ADR-0199's `k` is confirmed for one mode only.** The unit-scale mode-0 capture that would confirm
   the other seven is Plan 0142 Phase 4's rig session, as is whether the reference shows the seam.
+- **Plan 0142's Phase 2 arithmetic is now taken on a field without the deposit term.** Phase 7
+  removed it from every converted preset, including that plan's two `milk_wash` fixtures, so the
+  settled level it measures is a different number from the one any earlier reading in this log
+  records. The *Bow To Gravity* residue Phase 7's amendment names is unaffected and stays
+  backlog 0113's.
+- **Custom waves are not smoothed and do not carry `k`** (Phase 6's note). Whether the eight-mode
+  figure contract should reach them is a backlog entry nobody has raised.
 
 ## Followups (after this lands)

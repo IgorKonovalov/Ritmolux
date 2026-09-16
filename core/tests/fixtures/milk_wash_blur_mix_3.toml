@@ -25,6 +25,7 @@ stops = [
 [params]
 # A converted preset draws its own light - the waveform, its custom
 # waves and shapes, the borders - so the scene's own deposit stays off.
+deposit        = "0.0"
 brightness     = "1.0"
 warp_scale     = "1.331"
 warp_speed     = "1.0"

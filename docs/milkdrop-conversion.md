@@ -61,15 +61,18 @@ there was something for the mesh to move. That stand-in is gone: the frames
 further down this section that share a radial-arm character are from that era and
 are labelled as such.
 
-> **The scene's own deposit is not off, though the converter's `[params]` comment
-> says it is.** A conversion emits no `deposit` binding, so the `warp_mesh`
-> scene's default of `1.6` stands and a ring of light is laid into the field of
-> every converted preset — with a hard colour step along one horizontal ray, which
-> is the seam two of the corpus's presets were reported for. Found and measured by
-> [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) Phase 4 and
-> deliberately left in place: that light is a term in the settled field level
-> [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md) measures, and it
-> is that plan's to move.
+> **The scene's own deposit is bound off, in the bundle rather than in the
+> engine.** A conversion writes `deposit = "0.0"` into its `[params]` table. The
+> `warp_mesh` scene does not force it — a hand-written bundle may use the deposit
+> as its light source — so an unbound conversion would take the scene's default of
+> `1.6` and lay a ring of light into the field, with a hard colour step along one
+> horizontal ray where the ring's angular term wraps. That ring is what two of the
+> corpus's presets were reported for as a seam; it was found and measured by
+> [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) Phase 4,
+> which is worth knowing if you saw those pictures before the binding existed.
+> A residue survives it on some presets, and that one is a property of the
+> feedback loop rather than of the conversion —
+> [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md) measures it.
 
 ### Rates are converted, and that is why a preset moves at the right speed
 

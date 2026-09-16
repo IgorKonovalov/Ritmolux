@@ -16,15 +16,13 @@
 //! a name neither of us has ever heard of is the preset's own scratch and is
 //! silent.
 //!
-//! # What Phase 3 does not convert
+//! # Where a converted preset's light comes from
 //!
-//! The waveform, the custom waves and shapes, the borders and the motion vectors
-//! (`OUTPUTS`) are Phase 4, and the HLSL blocks are Phase 6. A
-//! converted preset therefore has **no light source of its own**, because
-//! MilkDrop's is the waveform — so the converter emits a **stand-in deposit**,
-//! says so in the bundle's header, and Phase 4 replaces it. Without one there
-//! would be nothing on screen to judge the motion by, and judging the motion is
-//! the phase's whole done-when.
+//! MilkDrop's light source **is** the draw layer — the waveform, the custom waves
+//! and shapes, the borders and the motion vectors (`OUTPUTS`) — and all of it is
+//! converted, as are the HLSL blocks. So a converted preset draws its own light
+//! and wants none of the scene's: [`deposit_block`] binds `deposit = "0.0"`
+//! rather than leaving the `warp_mesh` default in force.
 
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
@@ -585,13 +583,17 @@ fn linear_to_srgb(v: f32) -> f32 {
     }
 }
 
-/// The palette a converted preset carries.
+/// The palette a converted preset carries, and the head of its `[params]`.
 ///
-/// **The deposit is gone as of Phase 4**: a converted preset draws its own light
-/// now — the waveform, its custom waves and shapes, the borders — so the
-/// stand-in ring Phase 3 emitted would be a second, invented figure on top of the
-/// preset's real one. The scene turns the deposit off for the whole of a bundle's
-/// life (`WarpMeshScene::update`), and this emits none.
+/// **`deposit = "0.0"` is emitted, not left to the scene's default.** A converted
+/// preset draws its own light — the waveform, its custom waves and shapes, the
+/// borders — so the scene's gaussian ring would be a second, invented figure on
+/// top of the preset's real one. The scene does **not** force it off, and
+/// `WarpMeshScene::update` gives the reason: a hand-written bundle may
+/// legitimately use the deposit as its light source. So the binding has to come
+/// from here. Unbound, the scene's `deposit` default of `1.6` stands and lays a
+/// ring into the field of every converted frame, with a hard colour step along
+/// one horizontal ray where the ring's angular term wraps (Plan 0180 Phase 4).
 ///
 /// What survives is the palette, and it is **not** what colours the draw layer:
 /// every stroke takes its colour from the preset's own `wave_r`/`_g`/`_b` and its
@@ -626,6 +628,7 @@ fn deposit_block(file: &MilkFile) -> String {
          [params]\n\
          # A converted preset draws its own light - the waveform, its custom\n\
          # waves and shapes, the borders - so the scene's own deposit stays off.\n\
+         deposit        = \"0.0\"\n\
          brightness     = \"1.0\"\n",
         hex(0.55),
         hex(1.0),

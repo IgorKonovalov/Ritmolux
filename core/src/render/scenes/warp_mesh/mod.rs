@@ -1018,14 +1018,15 @@ impl Scene for WarpMeshScene {
             self.echo_alpha = out.echo_alpha;
             self.echo_zoom = out.echo_zoom;
             self.echo_orient = out.echo_orient;
-            // **The deposit is NOT forced off here**, and that was a bug for one
-            // commit. A converted preset draws its own light — the waveform, its
-            // custom elements, its borders — and the converter emits no deposit
-            // bindings for exactly that reason, so it already gets none. Forcing
-            // it off in the scene instead would also silence a HAND-WRITTEN
-            // bundle that uses the deposit as its light source, which is a
-            // perfectly good thing for one to do and is what
-            // `core/tests/fixtures/warp_mesh_milk.toml` does.
+            // **The deposit is NOT forced off here**, and the omission is
+            // deliberate. Forcing it off for every bundle would also silence a
+            // HAND-WRITTEN one that uses the deposit as its light source, which
+            // is a perfectly good thing for one to do and is what
+            // `core/tests/fixtures/warp_mesh_milk.toml` does. A CONVERTED bundle
+            // wants none — it draws its own light from the waveform, its custom
+            // elements and its borders — so it carries an explicit
+            // `deposit = "0.0"` in its own `[params]`, written by `milkconv`.
+            // The two cases are told apart by the bundle, not by the scene.
             self.draw = Some(out);
             // A bundle's per-vertex program replaces any `[per_vertex]` table's
             // series wholesale, so the flags are cleared here and re-set in

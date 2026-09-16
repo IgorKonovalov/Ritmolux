@@ -58,6 +58,30 @@ const SIZE: u32 = 96;
 /// it several times. The mirror, if there is one, appears on the second frame.
 const FRAMES: u32 = 12;
 
+/// **How one-sided a control render must be before a mirror can be read off it
+/// by contrast** — the non-vacuity floor all three hunts below share.
+///
+/// It is a floor on an ABSOLUTE mean byte distance, so what moves it is how much
+/// light the fixture puts on screen, not what the geometry does with that light.
+/// These fixtures light themselves with **one shape and nothing else**:
+/// `fWaveAlpha`, `ob_a`, `ib_a` and the motion vectors are all zero, and a
+/// converted bundle binds `deposit = "0.0"`, so the `warp_mesh` scene adds none
+/// of its own.
+///
+/// Measured on the development box (Windows 10, DX12 WARP) at 96x96 over
+/// [`FRAMES`]: the `ang` control reads `0.0305` and the `sx` control `0.0263`,
+/// against their mirrored arms' `0.0009` and `0.0024`. `0.015` clears both
+/// controls and sits an order of magnitude above every mirrored arm.
+///
+/// **The two readings each test quotes in its own comment are on the OLD scale**,
+/// about five times larger, and are kept because the *ratios* in them are what
+/// those comments argue from. They were taken while the converter emitted no
+/// `deposit` binding at all, so the scene's default of `1.6` laid a ring of light
+/// into every converted preset and lit these fixtures along with it
+/// (Plan 0180 Phase 7). Removing that ring darkened the frame and left every
+/// contrast ratio here better than it was.
+const ONE_SIDED_ENOUGH: f32 = 0.015;
+
 fn fixture_text(relative: &str) -> String {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -248,7 +272,7 @@ fn the_ang_round_trip_reflects_about_the_horizontal_midline() {
     // Non-vacuity first: the control must be visibly one-sided, or "the round
     // trip is more symmetric than the control" compares two piles of noise.
     assert!(
-        direct > 0.05,
+        direct > ONE_SIDED_ENOUGH,
         "the CONTROL is already close to symmetric ({direct:.4}), so it cannot \
          show a mirror by contrast. The fixture's only light source is a shape \
          at y = 0.82 — if a direct `uv` sample renders symmetrically, the shape \
@@ -333,7 +357,7 @@ fn a_negative_scale_mirrors_rather_than_collapsing() {
     // Non-vacuity first: the control must be visibly one-sided, or "the negative
     // arm is more symmetric than the control" compares two piles of noise.
     assert!(
-        held > 0.05,
+        held > ONE_SIDED_ENOUGH,
         "the CONTROL is already close to symmetric ({held:.4}), so it cannot \
          show a mirror by contrast. The fixture's one shape sits at x = 0.22 — \
          if a positive `sx` renders symmetrically, the shape is not being drawn \
@@ -417,7 +441,7 @@ fn at_full_alpha_the_echo_is_the_mirror_of_the_control() {
     );
 
     assert!(
-        direct > 0.05,
+        direct > ONE_SIDED_ENOUGH,
         "the echoed frame already matches the UNMIRRORED control ({direct:.4}), \
          so the echo is not reaching the screen at all and the mirrored \
          comparison below would pass on a stage that does nothing. The \
