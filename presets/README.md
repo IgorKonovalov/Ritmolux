@@ -794,6 +794,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
+| `deposit_arms` | `0` | `0` – `16` | How many arms the ring is broken into, as a whole number of arms; 0 leaves it whole. |
 | `echo_orient` | `0` | `0` – `3` | Which way the echoed copy is flipped before it is blended. |
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
 
@@ -818,7 +819,6 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | `deposit_y` | `0.5` | `0` – `1` | Vertical position of the deposited figure, in uv. |
 | `deposit_radius` | `0.45` | `0` – `1` | Radius of the deposited ring. |
 | `deposit_width` | `0.11` | `0` – `0.5` | How thick that ring is; narrow reads as a wire, wide as a disc. |
-| `deposit_arms` | `0` | `0` – `16` | How many arms the ring is broken into, as a real angular frequency; 0 leaves it whole. |
 | `deposit_twist` | `0` | `-2` – `2` | Sweeps the arms into a spiral rather than leaving them radial. |
 | `deposit_spin` | `0` | `-2` – `2` | Turns per second the deposited figure rotates by. |
 | `gamma` | `1` | `0.25` – `4` | Shapes the field's tone curve on its way out; below 1 lifts the mid tones. |

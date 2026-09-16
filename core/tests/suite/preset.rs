@@ -2312,12 +2312,20 @@ fn declared_params_match_set_param() {
 /// `declared_params_match_set_param` above compares the engine's declarations
 /// against, and a `ParamKind` has no other enforcement available to it: it
 /// states what a value *means*, which no scan of the source can infer.
-/// Each entry names a parameter whose scene **already** clamps and rounds it
-/// before use, so the engine's own quantization composes to the identity. That
-/// is the audit's rule: a parameter is `Structural` where rounding is provably
-/// a no-op today, and `Modal` wherever the scene reads the fraction — which is
-/// why `n`, `d`, `samples`, `contour`, `count`, `seed`, `variant` and
-/// `deposit_arms` are absent despite integer-sounding names.
+///
+/// **Most entries are no-ops, and one is not.** Nearly every name below is a
+/// parameter whose scene **already** clamps and rounds it before use, so the
+/// engine's own quantization composes to the identity: marking it states an
+/// existing fact and moves no pixel. That was the audit's whole rule, and
+/// `deposit_arms` is the entry that breaks it — it is marked to **remove** a
+/// defect rather than to record an absence of one. The deposit shader reads it
+/// raw and multiplies it into an angular phase, so a fractional value tears the
+/// ring along `atan2`'s branch cut; rounding it here is what makes a bound arm
+/// count step by whole arms (backlog 0198). So the rule this roster is kept to
+/// now reads: a parameter is `Structural` where its value carries an integer
+/// meaning, and `Modal` wherever the scene reads the fraction on purpose —
+/// which is why `n`, `d`, `samples`, `contour`, `count`, `seed` and `variant`
+/// are absent despite integer-sounding names.
 const STRUCTURAL: &[(&str, &str)] = &[
     // `mark_shape` / `mark_points`: clamp then round, CPU-side, because a
     // fractional point count tears the angle fold along `atan2`'s branch cut.
@@ -2336,6 +2344,10 @@ const STRUCTURAL: &[(&str, &str)] = &[
     ("shape_collage", "roster"),
     // `echo_orientation`: rounds, then wraps modulo the four flips.
     ("warp_mesh", "echo_orient"),
+    // The one entry that is not already a no-op (see the header): the deposit
+    // shader multiplies the raw value into an angular phase, so a fraction tears
+    // the ring along the branch cut. The engine's round is the fix.
+    ("warp_mesh", "deposit_arms"),
     // `MirrorSpec::from_params`: rounds then clamps, on every line scene.
     ("parametric_curve", "mirror_order"),
     // `Gielis::of`: rounds then clamps the superformula's symmetry number.

@@ -2962,8 +2962,8 @@
     },
     "param.deposit_arms": {
       "type": "string",
-      "description": "How many arms the ring is broken into, as a real angular frequency; 0 leaves it whole.",
-      "markdownDescription": "How many arms the ring is broken into, as a real angular frequency; 0 leaves it whole.\n\n- default `0.0`\n- typical range `0.0` to `16.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "description": "How many arms the ring is broken into, as a whole number of arms; 0 leaves it whole.",
+      "markdownDescription": "How many arms the ring is broken into, as a whole number of arms; 0 leaves it whole.\n\n- default `0.0`\n- typical range `0.0` to `16.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
     },
     "param.deposit_twist": {
       "type": "string",
