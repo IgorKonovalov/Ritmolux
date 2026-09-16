@@ -32,6 +32,37 @@ hooks compose the same way - the `--settings` hook adds to the project's rather 
 **Not re-observed:** the probe records `result.keys` but not the values of `terminal_reason`,
 `apiKeySource` or `permission_denials`. Those three readings are carried over from 2.1.270.
 
+## Re-verified on 2.1.273
+
+- **Date:** 2026-09-16
+- **CLI:** `claude --version` -> `2.1.273 (Claude Code)`
+- **Run:** `node tools/conductor/spike/probe.mjs --model haiku --sessions a,b`; $0.090 (session A, 8
+  turns, 37.4 s) + $0.055 (session B). Raw output under `target/conductor-spike/<stamp>/`.
+
+Every row of the table below was re-observed and holds unchanged. Session A: the `dev` skill loads
+(`slash_commands_has_dev: true`), `system/hook_started` and `hook_response` bracket every `Bash`
+call, the hook process saw `RLX_CONDUCTOR=1` and the run's own `RLX_PROBE_TOKEN` on all four, the
+denied `node -e` produced a `system/permission_denied` with no stall, and `Write` then `Read` then
+`Edit` all landed on the same file (`probe-out.txt` read back `beta`). `result/success`, exit 0.
+Session B still ends exit 1 with `error_max_budget_usd` after one turn. `git worktree remove`
+returned 0 with empty stderr and the directory was gone: no handle left.
+
+**The `result` event gained five keys and lost none**, which is the one thing that moved. New on
+2.1.273: `fast_mode_state`, `fast_mode_disabled_reason`, `subagent_stats`, `queued_turn_count`,
+`result_index`. **Every field the conductor actually reads is still there** — `result`,
+`session_id`, `subtype`, `total_cost_usd`, `is_error`, `num_turns`, `errors`, `stop_reason`,
+`terminal_reason`, `permission_denials` — checked against `lib/outcome.mjs`'s readers one by one.
+`errors` appears on the budget stop and not on the success, and `result` the other way round, which
+is the same split 2.1.270 recorded.
+
+**Sessions C and D were not re-run here because they were already run on this version**: the
+`.claude/` section below *is* the 2.1.273 reading, taken the same day. Between that section and this
+one, all four sessions have now been observed on 2.1.273.
+
+**Not re-observed**, unchanged from the 2.1.272 note: the probe records `result.keys` but not the
+values of `terminal_reason`, `apiKeySource` or `permission_denials`. Those three readings are still
+carried over from 2.1.270.
+
 ## What the probe does
 
 Four sessions. Two of them, A and B, are `claude -p "/dev implement plan 9999"` with the worktree as cwd, and with

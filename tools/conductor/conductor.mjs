@@ -39,7 +39,7 @@ export const REPO = resolve(TOOL_DIR, "..", "..");
 // The CLI versions tools/conductor/spike/README.md's evidence table was produced on. Re-running the
 // spike probe is how one is added. An unlisted version at a higher patch of a listed major.minor runs
 // with a warning; any other unlisted version is refused (ADR-0208).
-export const VERIFIED_CLI = ["2.1.270", "2.1.272"];
+export const VERIFIED_CLI = ["2.1.270", "2.1.272", "2.1.273"];
 
 /**
  * What preflight makes of `claude --version`: {} for a listed version, { warning } for one sharing
