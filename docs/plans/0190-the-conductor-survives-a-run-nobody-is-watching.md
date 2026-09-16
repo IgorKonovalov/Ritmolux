@@ -352,9 +352,9 @@ flowchart TD
 | 4 — A suite run by hand counts | dev | done | `d663f5c` |
 | 5 — Time and spend are reported at one scope | dev | done | `21e2575` |
 | 6 — The ASCII guarantee is asserted against input that could break it | dev | done | `ec58978` |
-| 7 — The probe asks whether a headless session may edit `.claude/` | dev | done | committed with this row |
-| 8 — Stop gate: what the probe found | human | done | committed with this row |
-| 9 — `.claude/` resolves the way Phase 8 chose | dev | done | committed with this row |
+| 7 — The probe asks whether a headless session may edit `.claude/` | dev | done | `8768cbb` |
+| 8 — Stop gate: what the probe found | human | done | `8444a17` |
+| 9 — `.claude/` resolves the way Phase 8 chose | dev | done | `824537d` |
 
 ### Notes
 
@@ -414,4 +414,31 @@ flowchart TD
   routing branch.
 
 ### Close triggers
+
+- **`presets/` touched:** no.
+- **Plan header `Closes:`** design-backlog 0228, 0229, 0230, 0231, 0232, 0233, 0234, 0235.
+- **What shipped:** nothing shipped. Every change is under `tools/conductor/`, `.claude/` or
+  `docs/`; no `.rs`, `.cpp`, `.h`, `.wgsl`, `Cargo.toml`, `Cargo.lock` or `presets/` file is touched
+  by any phase. New capability inside the conductor (a `lost_background` park, an `adopt-close`
+  command, a `claude_dir` park, a `hand` ledger writer) alongside the eight defect fixes.
+- **Operator docs touched:** `tools/conductor/README.md` (commands table, run-terminal example,
+  *What to read afterwards*, *Acting on a park*, *How it stays safe*); `tools/conductor/spike/README.md`
+  (new section, *What the probe does*); `.claude/skills/dev/SKILL.md`,
+  `.claude/skills/architect/SKILL.md` and `.claude/skills/studio-builder/SKILL.md` (conductor-mode
+  sections; architect's repair list); `docs/plans/README.md` (roster row). No file under `docs/` that
+  the site publishes is touched.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** **exit 1**, six probes red — 0228,
+  0229, 0230, 0231, 0232, 0234, each falsified by the phase that delivered it. **0233 and 0235 are
+  green although both were delivered**: each probe is a prefix of a line that now continues
+  (`phase  ${id} done` → `, ${shortDuration(ms)}`; `feat: plan ${plan} phase ${id}` → an em dash and
+  the rest of the subject), so those two have to be judged on their entry text.
+- **Full suite:** `node tools/conductor/with-lock.mjs suite -- cargo nextest run --workspace` —
+  **exit 0**, `Summary [640.411s] 1952 tests run: 1952 passed (6 slow), 6 skipped`. Run on the Phase 9
+  tree before this log's own rows were written, so the delta from `824537d` is this plan file alone.
+  It recorded nothing in the suite ledger: the worktree was dirty when it started, which is the
+  clean-at-both-ends rule ADR-0207 keys on. No suite ran under an upward override at an earlier
+  phase; every phase before this one changed only `tools/conductor/` and `.claude/`, and the
+  conductor's own suite is `node --test "tools/conductor/test/*.test.mjs"` — **312 passing** at
+  `824537d`.
+- **Outstanding `human` phases:** none. Phase 8 is done (`8444a17`).
 
