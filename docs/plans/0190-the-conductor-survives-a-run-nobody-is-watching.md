@@ -6,7 +6,8 @@
 > **Related ADRs:** [0205](../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md),
 > [0207](../adrs/0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md),
 > [0208](../adrs/0208-a-patch-cli-update-runs-with-a-warning-and-every-session-proves-the-hooks-ran.md),
-> [0209](../adrs/0209-a-conductor-close-repairs-the-prose-and-comments-its-findings-name.md)
+> [0209](../adrs/0209-a-conductor-close-repairs-the-prose-and-comments-its-findings-name.md),
+> [0210](../adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md)
 > **Closes:** design-backlog 0228, 0229, 0230, 0231, 0232, 0233, 0234, 0235
 > **Built by:** human-started `dev` sessions, not the conductor. The same reason as
 > [0189](done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) — a conductor
@@ -352,7 +353,7 @@ flowchart TD
 | 5 — Time and spend are reported at one scope | dev | done | `21e2575` |
 | 6 — The ASCII guarantee is asserted against input that could break it | dev | done | `ec58978` |
 | 7 — The probe asks whether a headless session may edit `.claude/` | dev | done | committed with this row |
-| 8 — Stop gate: what the probe found | human | not started | |
+| 8 — Stop gate: what the probe found | human | done | committed with this row |
 | 9 — `.claude/` resolves the way Phase 8 chose | dev | not started | |
 
 ### Notes
@@ -396,6 +397,12 @@ flowchart TD
 - Stopped at Phase 8. Phases 1-7 are committed; Phase 9 is undecided until Phase 8 settles, and the
   once-per-plan full workspace suite (ADR-0156) is owed at the last phase, not here. No `.rs`, `.cpp`,
   `.h`, `.wgsl` or `Cargo.toml` is touched by Phases 1-7.
+- **Phase 8 took the "no switch exists" branch.** Session D named `.claude/**` five ways, absolute
+  path included, and was denied exactly as session C was, so there is nothing to configure:
+  [ADR-0210](../adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md)
+  excepts `.claude/` from ADR-0209's closed list, gives the repair to the owner through the digest's
+  **Needs you**, and parks a phase that needs such an edit before it runs. Phase 9 implements the
+  routing branch.
 
 ### Close triggers
 
