@@ -265,6 +265,14 @@ accepted cost" are different documents and only one of them is honest.
 - [0224 — a CLI update refuses the whole conductor, and the only way through is a probe run and a hand edit to a source constant](#0224--a-cli-update-refuses-the-whole-conductor-and-the-only-way-through-is-a-probe-run-and-a-hand-edit-to-a-source-constant)
 - [0225 — a review finding under `.claude/` was left open for a restriction that is written nowhere, and may not exist](#0225--a-review-finding-under-claude-was-left-open-for-a-restriction-that-is-written-nowhere-and-may-not-exist)
 - [0226 — the worktree cap counts lanes that no longer exist, so removing a parked lane by hand starves the next run](#0226--the-worktree-cap-counts-lanes-that-no-longer-exist-so-removing-a-parked-lane-by-hand-starves-the-next-run)
+- [0228 — a headless session that starts work in the background and ends its turn loses that work, and the plan parks `no_outcome` after its close was committed](#0228--a-headless-session-that-starts-work-in-the-background-and-ends-its-turn-loses-that-work-and-the-plan-parks-no_outcome-after-its-close-was-committed)
+- [0229 — `resume` has no path for a close that landed without an outcome, so it would re-run the review on a plan already under `done/`](#0229--resume-has-no-path-for-a-close-that-landed-without-an-outcome-so-it-would-re-run-the-review-on-a-plan-already-under-done)
+- [0230 — a headless session cannot edit `.claude/`, and ADR-0209 tells a close it may](#0230--a-headless-session-cannot-edit-claude-and-adr-0209-tells-a-close-it-may)
+- [0231 — the session allowlist matches a command's first word, so ordinary compound commands a phase needs are refused](#0231--the-session-allowlist-matches-a-commands-first-word-so-ordinary-compound-commands-a-phase-needs-are-refused)
+- [0232 — a suite run by hand through `with-lock` is not recorded, so the next gate repeats it](#0232--a-suite-run-by-hand-through-with-lock-is-not-recorded-so-the-next-gate-repeats-it)
+- [0233 — the run terminal says a phase is done but not how long it took](#0233--the-run-terminal-says-a-phase-is-done-but-not-how-long-it-took)
+- [0234 — one digest line carries a run-scoped time beside a lifetime spend, and reads as neither](#0234--one-digest-line-carries-a-run-scoped-time-beside-a-lifetime-spend-and-reads-as-neither)
+- [0235 — the run terminal's ASCII guarantee is asserted over a fixture that has no non-ASCII in it](#0235--the-run-terminals-ascii-guarantee-is-asserted-over-a-fixture-that-has-no-non-ascii-in-it)
 <!-- toc:end -->
 
 ## The ledger
@@ -562,6 +570,14 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0224 | A CLI update refuses the whole conductor until a probe and a hand edit | [Plan 0189](plans/done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) Phase 6 + ADR-0208. **Closed 2026-09-16** |
 | 0225 | A review finding under `.claude/` was left open for a restriction written nowhere | [Plan 0189](plans/done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) Phases 5, 7 + ADR-0209. Its diagnosis was wrong; see 0230. **Closed 2026-09-16** |
 | 0226 | The worktree cap counts lanes that no longer exist | [Plan 0189](plans/done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) Phase 1. One `laneOpen` predicate reads the filesystem. **Closed 2026-09-16** |
+| 0228 | A headless session that backgrounds work and ends its turn loses it, after its close was committed | [Plan 0190](plans/done/0190-the-conductor-survives-a-run-nobody-is-watching.md) Phase 1. Prompts, a deny hook, and a `lost_background` park. **Closed 2026-09-16** |
+| 0229 | `resume` has no path for a close that landed without an outcome | [Plan 0190](plans/done/0190-the-conductor-survives-a-run-nobody-is-watching.md) Phase 3. The branch is asked, the close adopted, `adopt-close` added. **Closed 2026-09-16** |
+| 0230 | A headless session cannot edit `.claude/`, and ADR-0209 tells a close it may | [Plan 0190](plans/done/0190-the-conductor-survives-a-run-nobody-is-watching.md) Phases 7-9 + ADR-0210. Probed on 2.1.273: no spelling reaches it. **Closed 2026-09-16** |
+| 0231 | The session allowlist refuses ordinary commands a phase needs | [Plan 0190](plans/done/0190-the-conductor-survives-a-run-nobody-is-watching.md) Phase 2. Scratch ops run, bounded by the worktree; compound shapes stay refused. **Closed 2026-09-16** |
+| 0232 | A suite run by hand through `with-lock` is not recorded, so the next gate repeats it | [Plan 0190](plans/done/0190-the-conductor-survives-a-run-nobody-is-watching.md) Phase 4. A run from inside the repository records as `hand`. **Closed 2026-09-16** |
+| 0233 | The run terminal says a phase is done but not how long it took | [Plan 0190](plans/done/0190-the-conductor-survives-a-run-nobody-is-watching.md) Phase 5. Commit and phase lines carry the span since the previous phase. **Closed 2026-09-16** |
+| 0234 | One digest line carries a run-scoped time beside a lifetime spend | [Plan 0190](plans/done/0190-the-conductor-survives-a-run-nobody-is-watching.md) Phase 5. Both are named, and the per-run one is what Totals sums. **Closed 2026-09-16** |
+| 0235 | The run terminal's ASCII guarantee is asserted over a fixture with no non-ASCII in it | [Plan 0190](plans/done/0190-the-conductor-survives-a-run-nobody-is-watching.md) Phase 6. Both `ascii()` calls armed separately, each demonstrated red. **Closed 2026-09-16** |
 <!-- roster:end -->
 
 ---
@@ -13571,4 +13587,306 @@ stop's list of holders, `runPlan`'s reopen test, the standing-park line and the 
 parked** line. `laneRemoved` stays in the record as history and nothing reads it; the grep over
 `lib/lane.mjs` returns two writes and no filter. The cap tests build real directories for the lanes
 they count, so a regression that went back to the record would go red.
+
+## 0228 — a headless session that starts work in the background and ends its turn loses that work, and the plan parks `no_outcome` after its close was committed
+
+0175's round-1 review (`0175-03-review`) ran the close tip's suite with `run_in_background`, armed a
+`Monitor` on its output, and ended its turn with "Still compiling; I'll be notified when it exits."
+In `claude -p` nothing re-invokes a session: the process exited, the background task was killed
+(`task_updated status: killed` in the transcript), and no `rlx-outcome` block was printed. By then
+the close had committed its repairs, the `done/` move, the bump to 0.124.2 and the studio sync; the
+gate on the tip, the tag and `check-release-tag.mjs` never ran.
+
+0177's review did the same at 22:33 the same evening (`tests nextest run --workspace started`, then
+`denied Monitor`). It held its turn until the 13.6-minute run ended and closed, so whether a session
+survives depends on what it does while it waits. It is the model's habit for a long command, not a
+one-off.
+
+Shapes, none decided:
+
+- **Say it in the prompts and the conductor-mode sections**: never `run_in_background`, never
+  `Monitor`; a long command runs in the foreground with a timeout.
+- **Deny it**: `settings.conductor.json` denies `Monitor`, and a hook refuses `run_in_background`.
+- **Detect it**: a session whose result ends while a background task was started and not finished
+  parks with a reason that names it, not the generic `no_outcome`.
+
+- **Raised:** 2026-09-15, from 0175's `no_outcome` park during Plan 0189 Phase 8.
+  **Owner if taken:** `dev` (prompts, settings), `architect` (the conductor-mode wording).
+- **Verified 2026-09-15** — no prompt says a session must not background a command:
+  `absent: background in: tools/conductor/prompts/review.md`
+
+### Priority
+
+**High.** It parks a plan after its riskiest step, and recovery needs the next entry's hand edit.
+
+**CLOSED 2026-09-16** — [Plan 0190](plans/done/0190-the-conductor-survives-a-run-nobody-is-watching.md) Phase 1, in the three layers the entry asked for. The
+`prompts/` and each lane's `## Conductor mode` say a conductor session never backgrounds a command
+and never arms a `Monitor`; `.claude/hooks/conductor-no-background.js` denies a `Bash` or
+`PowerShell` call carrying `run_in_background` under `RLX_CONDUCTOR=1`, and `settings.conductor.json`
+denies `Monitor`; and `readResult` counts background starts against the notifications that finished
+them, so a result reached with one outstanding parks `lost_background` **before** any outcome is
+read, naming the command. The detector reads a result-text shape the CLI owns, which is why it is the
+third layer and not the only one.
+
+## 0229 — `resume` has no path for a close that landed without an outcome, so it would re-run the review on a plan already under `done/`
+
+`runPlan` decides whether to review from `rec.closed` alone (`while (!rec.closed)`, then the review
+loop). A `no_outcome` or `bad_outcome` park after a close leaves `rec.closed` null, so `resume`
+starts round 1 again on a branch whose plan is already `Status: done` in `done/`, with a `## Close
+review` and a bumped version. Nothing in `prompts/review.md` covers that state; the likely result
+is a second close and a second bump.
+
+On 2026-09-15 the owner finished 0175's close by hand (gate on the tip, annotated `v0.124.2`,
+`check-release-tag.mjs`) and wrote `closed` and the round-1 verdict into `state/conductor.json`. The
+auto-mode classifier in the helping session refused that edit twice, and `resume` once, even with
+the owner's approval, so the owner ran `resume` themselves.
+
+Shapes, none decided:
+
+- **`resume` reads the branch**: plan under `done/` with a `## Close review`, and an annotated tag on
+  the tip or a version above `main`'s, becomes a "close found, verify it" step running `verifyClose`
+  and the post-close gate, never a review.
+- **A `conductor.mjs adopt-close NNNN`** that runs `verifyClose` on the lane as it stands and records
+  `closed` from the plan's own `## Close review`, so the repair is not a hand edit to runtime state.
+
+- **Raised:** 2026-09-15, during Plan 0189 Phase 8. **Owner if taken:** `architect`, then `dev`.
+- **Verified 2026-09-15** — the review is skipped on the record alone:
+  `present: while \(!rec\.closed\) in: tools/conductor/lib/lane.mjs`
+
+### Priority
+
+**Medium.** Rare once 0228 is fixed, but every occurrence is a hand edit to state today.
+
+**CLOSED 2026-09-16** — [Plan 0190](plans/done/0190-the-conductor-survives-a-run-nobody-is-watching.md) Phase 3. `runPlan` no longer decides from
+`rec.closed` alone: before any review round it asks the branch, and a plan under `done/` with
+`Status: done` and a `## Close review` is a finished close that is **verified and adopted**, never
+reviewed again. A branch that does not verify parks `disagreement` naming why, and writes no second
+version and no second tag. `conductor.mjs adopt-close NNNN` runs the same path on demand, so the
+repair for a record like 0175's is a command rather than a hand edit to `state/conductor.json`.
+
+## 0230 — a headless session cannot edit `.claude/`, and ADR-0209 tells a close it may
+
+The CLI refuses a `claude -p` session's `Edit` and `Write` under `.claude/` although
+`settings.conductor.json` allows both tools. Seen three times: 0182's close left
+`render-loop.md:170` open, 0177 Phase 8 parked `check_red` because its own done-when greps
+`.claude/skills/` (`denied Edit: ...\.claude\skills...`, twice, 20:21), and the owner committed the
+fix as `f0cf263`.
+
+ADR-0209 took backlog 0225's "restriction written nowhere" to be about ownership and wrote that a
+close may repair "Markdown prose anywhere in the repository, every file under `.claude/skills/`
+included". The restriction is the CLI's protection of its own configuration directory, so that rule
+is unreachable as written, and so is any plan phase whose files include `.claude/`.
+
+Shapes, none decided:
+
+- **Find the CLI's switch**, if one exists for a project's `.claude/skills/`, and record it in
+  `spike/README.md` with the CLI version it was verified on.
+- **Route it**: a phase or finding that needs `.claude/` parks `human_phase`-like with the exact
+  edit, instead of `check_red` after the rest of the phase ran.
+- **Amend ADR-0209** to except `.claude/` and name who repairs it.
+
+- **Raised:** 2026-09-15, from 0177's `check_red` park during Plan 0189 Phase 8.
+  **Owner if taken:** `architect` (ADR-0209), then `dev`.
+- **Verified 2026-09-15** — the skill grants what the CLI refuses:
+  `present: repository, every file under in: .claude/skills/architect/SKILL.md`
+
+### Priority
+
+**Medium.** One park and one open finding so far; every plan that renames a test or a flag hits it.
+
+**CLOSED 2026-09-16** — [Plan 0190](plans/done/0190-the-conductor-survives-a-run-nobody-is-watching.md) Phases 7-9 +
+[ADR-0210](adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md).
+The entry's first shape was taken literally: the probe asked the CLI instead of inferring again.
+Sessions C and D ran in one probe worktree on 2.1.273, differing only in settings — C under
+`settings.conductor.json`, D under a file additionally naming `.claude/**`, `//.claude/**` and the
+absolute spellings. `Read` allowed in both, `Edit` and `Write` **denied in both**, a `Write` outside
+`.claude/` in the same turn allowed. **No spelling reached it**, so this is the CLI protecting a
+project's configuration directory and not an allowlist gap. ADR-0210 therefore excepts `.claude/`
+from ADR-0209's repair list, gives such a finding to the owner through the digest's **Needs you**
+with the replacement text named, and parks a phase whose declared `Files touched` include such a path
+**before** the phase runs (`claude_dir`), rather than after it as `check_red`. The table is in
+`tools/conductor/spike/README.md`.
+
+## 0231 — the session allowlist matches a command's first word, so ordinary compound commands a phase needs are refused
+
+`settings.conductor.json` allows `PowerShell(npm *)`, `Bash(node *)`, `Bash(cargo *)` and so on, and
+the CLI matches the command as written. 0177's Phase 8 and 9 sessions were refused, among others:
+`cd studio; npm run typecheck ...`, `$env:ELECTRON_SKIP_BINARY_DOWNLOAD = '1'; npm --prefix ...`,
+`New-Item -ItemType Directory -Force target/p8`, `mkdir -p target/p8 && node ...`,
+`Remove-Item studio/shared/seed-target.ts`, `git clean -f -- studio/shared/seed-target.ts`, a
+`$env:CARGO_TARGET_DIR = ...` prefix, and `cat` on a state file. Phase 9 could not delete the
+lint-bite seed it had written (it removed it another way) and could not re-run its tests under
+`CARGO_TARGET_DIR` as its done-when names, so it recorded "met differently". 0180's session could
+not `git checkout` goldens a bless had re-encoded, and parked with a dirty tree.
+
+Shapes, none decided:
+
+- **Widen the allowlist for the scratch operations** a phase routinely does inside its own lane
+  (`Remove-Item`/`rm` under the lane, `New-Item`/`mkdir`, `git clean` of a named path), each with a
+  test in `settings.test.mjs` as `git restore` has.
+- **Say the shape in the prompts**: one command per call, no `cd`, `npm --prefix` not `cd studio`,
+  environment through the tool rather than an assignment prefix.
+- **Give the done-whens a form the allowlist can run**, e.g. an env var set by a wrapper script.
+
+- **Raised:** 2026-09-15, during Plan 0189 Phase 8. **Owner if taken:** `dev`.
+- **Verified 2026-09-15** — deleting a file is not allowed to a session:
+  `absent: Remove-Item in: tools/conductor/settings.conductor.json`
+
+### Priority
+
+**Medium.** Each refusal costs turns and, twice now, a done-when met "differently".
+
+**CLOSED 2026-09-16** — [Plan 0190](plans/done/0190-the-conductor-survives-a-run-nobody-is-watching.md) Phase 2, in both halves the entry asked for and
+not the third. The allowlist now runs a phase's own scratch work — making and removing a file or
+directory, `cat` / `Get-Content`, and `git clean` / `git checkout` of a path named after `--` — with
+the worktree as the bound: a deletion whose path leaves it (`..`, `~`, a leading `/`, a drive letter)
+is denied, a `git clean` with no path matches nothing, and `git checkout` reaches no branch. The
+shapes refused for their **compound** form rather than their verb — `cd studio; …`, `$env:X = '1'; …`
+— are asserted still refused, and the prompts tell a session to run one command per call and pass
+`npm --prefix` instead. `test/settings.test.mjs` models the CLI's matcher and fails on any rule added
+without a case. The entry's third shape, reshaping done-whens around the allowlist, was rejected in
+the plan: a gate that changes what a plan may promise is the wrong direction.
+
+## 0232 — a suite run by hand through `with-lock` is not recorded, so the next gate repeats it
+
+`with-lock.mjs` reads and writes the ledger only when `RLX_SUITE_LEDGER` is set, and nothing tells
+an operator to set it. On 2026-09-15 the owner's hand gate on 0175's close tip ran
+`with-lock.mjs suite -- cargo nextest run --workspace` green in 12.7 min; the conductor's
+`post-close` gate on the same tree 20 minutes later ran it again.
+
+Shapes, none decided:
+
+- **Default the ledger** to `state/suite-ledger.jsonl` when `with-lock` runs from inside this
+  repository, and record the writer as `hand`.
+- **Document the variable** in the README's `## Acting on a park`, beside the resume table.
+
+- **Raised:** 2026-09-15, during Plan 0189 Phase 8. **Owner if taken:** `dev`.
+- **Verified 2026-09-15** — the ledger is opt-in by environment:
+  `present: const ledger = env\.RLX_SUITE_LEDGER; in: tools/conductor/with-lock.mjs`
+
+### Priority
+
+**Low.** 12 minutes each time, and only on a hand repair.
+
+**CLOSED 2026-09-16** — [Plan 0190](plans/done/0190-the-conductor-survives-a-run-nobody-is-watching.md) Phase 4. `with-lock.mjs` now picks its ledger
+rather than reading one variable: `RLX_SUITE_LEDGER` still wins, and otherwise a run from inside this
+repository or any of its worktrees records into `state/suite-ledger.jsonl` as `hand`, so the next
+gate on that tree skips and names it. The two sides are compared by `git rev-parse --git-common-dir`
+through `realpathSync.native`, because a cwd and this script's own path reach it differently on
+Windows. A wrapped run in any other repository still reads and writes nothing.
+
+## 0233 — the run terminal says a phase is done but not how long it took
+
+`live.mjs` prints `  phase  N done` with no elapsed time, and `implement-NN end` prints the session's
+total. Watching Plan 0189 Phase 8, the owner could not tell a 28-minute phase from a 2-minute one
+without subtracting timestamps, and asked for durations on phases and on test runs. `tests` lines
+already print `ran 5m41s`; `gate` lines print `ok 11m21s`.
+
+Shapes, none decided:
+
+- **`phase N done, 12m` measured from the previous phase line** (or the session start), and the same
+  on `commit` lines.
+- **A per-plan timing block in the digest**: sessions, gates and parks idle, each in minutes, which is
+  the table Plan 0189 Phase 8 had to build by hand from `conductor.json` and the ledger.
+
+- **Raised:** 2026-09-15, by the owner during Plan 0189 Phase 8. **Owner if taken:** `dev`.
+- **Verified 2026-09-15** — the phase line carries no duration:
+  `present: phase  \$\{id\} done in: tools/conductor/lib/live.mjs`
+
+### Priority
+
+**Low.** A display gap, but it is what makes 0227 visible while a run is going.
+
+**CLOSED 2026-09-16** — [Plan 0190](plans/done/0190-the-conductor-survives-a-run-nobody-is-watching.md) Phase 5, in the first of the two shapes. A
+`commit` and a `phase` line each carry the time since the **previous phase line**, or since the step
+started before the first, so a 28-minute phase no longer reads like a 2-minute one. Only a phase line
+moves the mark — a commit and the phase row it carries are found by the same poll. The semantics are
+pinned in `live.test.mjs` against an injected clock; the end-to-end test proves only the wiring,
+because two phases separated by a sleep cannot distinguish *measured the gap* from *never reset*. The
+second shape, a per-plan timing block in the digest, was not taken. **This entry's own probe stayed
+green through its delivery**: `present: phase  \$\{id\} done` is a prefix of the repaired line, which
+now continues `, ${shortDuration(ms)}`.
+
+## 0234 — one digest line carries a run-scoped time beside a lifetime spend, and reads as neither
+
+Plan 0189 Phase 2 made a closed plan's time run-scoped: `timeInRun` sums that plan's own steps and
+gates within the run, so a night spent parked is never counted. The `$` on the same line was left as
+`totalSpend(rec)`, which sums every step the plan ever ran, across every run. The two sit in one
+sentence:
+
+```
+- **0177 - ...** - 0.125.0, tag `v0.125.0` annotated, merge `da663b6`, 0 fix rounds,
+  active 40 min, wall 40 min in this run, $32.44.
+```
+
+Four lines below, Totals says `run: 2 merged, 0 parked, 1 h 6 min, $12.18`, computed from the steps
+that started in the run. A reader who takes the `$32.44` as in-this-run — which the clause *in this
+run* directly above it invites — reads the two figures as contradicting each other. Before Phase 2
+the bullet carried no run-scoped figure, so the lifetime spend was unambiguous; the mixing is new.
+
+Shapes, none decided:
+
+- **Report both**, `$12.18 this run, $32.44 total`, which is the only form that answers the
+  operator's question (what did tonight cost) without losing the plan's own figure.
+- **Make it run-scoped** like the time beside it, and leave the lifetime figure to `status`.
+- **Move the spend out of the bullet** into the per-plan timing block backlog 0233 sketches.
+
+- **Raised:** 2026-09-16, at Plan 0189's close review, from reading the rendered digest rather than
+  the tests. **Owner if taken:** `dev`.
+- **Verified 2026-09-16** — the closed bullet's time is run-scoped and its spend is not:
+  `present: wall \$\{duration\(wall\)\} in this run, \$\{usd\(totalSpend\(rec\)\)\} in: tools/conductor/lib/digest.mjs`
+
+### Priority
+
+**Low.** Nothing is computed wrong; both numbers are correct for what they measure. It is a report
+answering two questions in one sentence without saying which is which, which is the same defect
+[backlog 0222](design-backlog-archive.md) described one field over.
+
+**CLOSED 2026-09-16** — [Plan 0190](plans/done/0190-the-conductor-survives-a-run-nobody-is-watching.md) Phase 5, in the first of the three shapes. A
+closed plan's digest bullet now reads `$12.18 this run, $32.44 total`, and the run-scoped figure is
+exactly what Totals sums — `spendInRun` is one function used by both, so the two agree by
+construction rather than by inspection. `digest.test.mjs` builds a plan that ran in two runs and
+asserts both figures and their agreement with Totals.
+
+## 0235 — the run terminal's ASCII guarantee is asserted over a fixture that has no non-ASCII in it
+
+Plan 0189 Phase 1's done-when is *"Every line is ASCII. The run terminal is a Windows console."* The
+property does hold — `ascii()` is applied twice, at `live.mjs` `liveLine` and again at
+`conductor.mjs`'s `emit` — and `ascii()` itself is pinned in isolation. What is not pinned is that
+anything calls it.
+
+The end-to-end assertion runs `assert.match(l, /^[\x20-\x7e]*$/)` over every line the lane scenario
+printed, but every input to those lines is already ASCII: the fake commits `feat: plan 0101 phase 1`,
+the denied command is `cd studio; npx vitest run`, and the plan fixture's em dashes never reach a
+printed line. Deleting either `ascii()` call would leave the suite green.
+
+Real commit subjects are where the non-ASCII actually comes from — this repository's own log carries
+`0175 Phase 3 parked - a NaN dt` alongside subjects with em dashes, and a preset name can carry a
+curly quote.
+
+Shapes, none decided:
+
+- **Give the fake's commit subject an em dash and a smart quote**, which arms the existing assertion
+  at one line's cost.
+- **Assert on a known-dirty input end to end**: a denial whose command carries a box-drawing
+  character, which is what a `cargo` error frame actually contains.
+
+- **Raised:** 2026-09-16, at Plan 0189's close review. **Owner if taken:** `dev`.
+- **Verified 2026-09-16** — the scenario's only commit subject is ASCII:
+  `present: feat: plan \$\{plan\} phase \$\{id\} in: tools/conductor/test/lane-scenario.mjs`
+
+### Priority
+
+**Low.** The property holds today and a break would be cosmetic on one console. It is filed because
+a done-when that cannot fail is worse than no test: it reads as coverage.
+
+**CLOSED 2026-09-16** — [Plan 0190](plans/done/0190-the-conductor-survives-a-run-nobody-is-watching.md) Phase 6. The lane scenario's commit subject is
+now `feat: plan N phase I — an "eased" value │ arrives` and its denied command carries a box-drawing
+pair, so the end-to-end ASCII assertion runs over output `ascii()` had to transform. The two calls
+mask each other on a commit line — every line a plan prints passes `liveLine` first — so they are
+armed separately: `liveLine`'s by a direct assertion in *every line is ASCII*, `conductor.mjs`'s
+`emit` by a lane path with a non-ASCII component, the only kind of line that never meets `liveLine`.
+Both removals were demonstrated red in turn and restored before the commit. **This entry's own probe
+stayed green through its delivery**: `present: feat: plan \$\{plan\} phase \$\{id\}` is a prefix of the
+new subject.
 

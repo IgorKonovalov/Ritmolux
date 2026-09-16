@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0191** (ADRs are a separate sequence — next free there is **0210**; 0200 is reserved for Plan 0186 Phase 2.)
+**Next free number: 0191** (ADRs are a separate sequence — next free there is **0211**; 0200 is reserved for Plan 0186 Phase 2.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -52,7 +52,6 @@ place. The plan file carries the real link.
 | [0183](0183-a-low-density-is-a-trace-count.md) | A low density is a trace count | approved | dev, human | ADR-0195 (proposed): a trace (density <= 0.08) draws the tier anchor's count at every size; clouds keep ADR-0140. **No golden moves.** Phase 3 is a `human` look gate at 1080p Rich. |
 | [0184](0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) | Limited ink: a contour that is an ink, and a warp field that bands | approved | dev, human | ADR-0197 (proposed): hard ink contours on six scenes; `warp_mesh` bands by level. **Phase 2 stops if level outgrows `color_span`.** Phase 4: look gate. |
 | [0186](0186-the-flatness-gate-tells-a-figure-from-its-ground.md) | The flatness gate tells a figure from its ground | approved | dev, human | Backlog 0128: five figure/ground candidates vs two blot anchors at 96 and 192 px. **Phase 2 is a human gate that writes ADR-0200**; a negative result is a valid end. |
-| [0190](0190-the-conductor-survives-a-run-nobody-is-watching.md) | The conductor survives a run nobody is watching | in-progress | dev, human | Backlog 0228-0235: lost background work, the allowlist, adopt-close, hand suite runs, one scope of time and spend. **Phase 8 is a `human` gate on a probe.** |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
@@ -278,9 +277,10 @@ stretch:
 - **[0180] is resumed by a human-started `dev` session**, not the conductor, on its existing
   `plan-0180-the-converted-picture-follows-the-source` branch (amended 2026-09-15, four commits ahead
   of `main`, worktree already removed). It still runs before [0142].
-- **[0190] takes the eight run-survival entries** backlog 0228-0235, also human-started. Until it
-  lands, a conductor run can lose a session's work after its close has committed, and `resume` has no
-  path back - both seen on 0175 during [0189] Phase 8.
+- **[0190] landed 2026-09-16**, human-started, taking all eight run-survival entries 0228-0235. A
+  conductor run no longer loses a session's work after its close has committed, and `resume` adopts
+  such a close instead of reviewing it again. **The conductor is still stood down until [0180]
+  lands**, and the first unwatched run is the owner's call after that.
 - **Lane b is retired, not deferred.** [ADR-0205](../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md)'s
   Outcome held the second lane open until the serialized suite fraction was known. [0189] measured it
   - 0177 spent 24.5 min in full suites against 64 min of sessions - and the answer is that a second
@@ -292,7 +292,7 @@ stretch:
   is deliberately **not** in [0190]. Its direction is ADR-shaped and it gets its own plan.
 
 [0189]: done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md
-[0190]: 0190-the-conductor-survives-a-run-nobody-is-watching.md
+[0190]: done/0190-the-conductor-survives-a-run-nobody-is-watching.md
 [0142]: 0142-the-milkdrop-import-earns-its-verdict.md
 
 **Added 2026-09-14 - a backlog sweep drafted [0176] through [0186] and amended all eight active
@@ -866,6 +866,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0190 - The conductor survives a run nobody is watching](done/0190-the-conductor-survives-a-run-nobody-is-watching.md) - closed 2026-09-16. Review: **no blockers, no majors, two minors, one nit.** Version: **none** (tooling). ADR-0210 accepted. Archived 8. [Write-up](README-archive.md).
 - [0189 - The conductor can be watched](done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) - closed 2026-09-16. Review: **no blockers, one major, four minors, one nit.** Version: **none** (tooling). ADR-0207-0209 accepted, each Outcome. Archived 5. [Write-up](README-archive.md).
 - [0177 — The test tree stops costing disk](done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md) — closed 2026-09-15. Review: **no blockers, no majors, four minors, two nits.** Version: **0.125.0**. ADR-0204 accepted, Outcome. Archived 7. [Write-up](README-archive.md).
 - [0175 — An eased value arrives at its target](done/0175-an-eased-value-arrives.md) — closed 2026-09-15. Review: **no blockers, no majors, one minor, one nit (both fixed).** Version: **0.124.2**. No ADR paired. Archived 0212, 0218. [Write-up](README-archive.md).

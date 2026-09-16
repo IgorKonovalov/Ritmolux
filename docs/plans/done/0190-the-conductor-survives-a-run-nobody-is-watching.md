@@ -1,18 +1,26 @@
 # 0190 — The conductor survives a run nobody is watching
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-16. Phases 1-7 landed on `main` as `a927fa5`, `16f4219`,
+> `ae3cc20`, `d663f5c`, `21e2575`, `ec58978` and `8768cbb`, the `human` Phase 8 as `8444a17`
+> (ADR-0210) with `4e82491` + `4d02312`'s repairs beside it, Phase 9 as `824537d`, and the close
+> block as `56b9077`. Review: **no blockers, no majors, two minors, one nit**; the nit was repaired at
+> the close. Verified independently: `cargo nextest run --workspace` green on the close tree,
+> `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` green,
+> `node --test "tools/conductor/test/*.test.mjs"` 312/312, and `claudePaths` run over this plan's own
+> phases — which is where minor 1 came from. Version: **none** (tooling; nothing shipped changes).
 > **Created:** 2026-09-16
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0205](../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md),
-> [0207](../adrs/0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md),
-> [0208](../adrs/0208-a-patch-cli-update-runs-with-a-warning-and-every-session-proves-the-hooks-ran.md),
-> [0209](../adrs/0209-a-conductor-close-repairs-the-prose-and-comments-its-findings-name.md),
-> [0210](../adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md)
-> **Closes:** design-backlog 0228, 0229, 0230, 0231, 0232, 0233, 0234, 0235
+> **Related ADRs:** [0205](../../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md),
+> [0207](../../adrs/0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md),
+> [0208](../../adrs/0208-a-patch-cli-update-runs-with-a-warning-and-every-session-proves-the-hooks-ran.md),
+> [0209](../../adrs/0209-a-conductor-close-repairs-the-prose-and-comments-its-findings-name.md),
+> [0210](../../adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md) (accepted)
+> **Closes:** design-backlog 0228, 0229, 0230, 0231, 0232, 0233, 0234, 0235 — all eight archived at
+> this close.
 > **Built by:** human-started `dev` sessions, not the conductor. The same reason as
-> [0189](done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) — a conductor
+> [0189](0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md) — a conductor
 > editing its own code while it runs is circular — and the owner's standing call that there is no
-> point running the conductor until [0180](0180-the-converted-picture-follows-the-source.md) lands
+> point running the conductor until [0180](../0180-the-converted-picture-follows-the-source.md) lands
 > and this backlog is settled.
 
 ## TL;DR
@@ -311,19 +319,19 @@ flowchart TD
   0175. The scenario tests are built from that transcript, not from a second sighting.
 - **None of this is measured against a real unattended run.** Plan 0189 Phase 8 was watched. The
   first evidence that the plan worked is a run nobody watches, which is not a phase here — it is the
-  owner's call once [0180](0180-the-converted-picture-follows-the-source.md) has landed.
+  owner's call once [0180](../0180-the-converted-picture-follows-the-source.md) has landed.
 
 ## What this plan does NOT do
 
 - **Backlog 0227 — the full suite per distinct tree — stays live, for its own plan.** The measurement
-  is already in hand ([ADR-0207](../adrs/0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md)'s
+  is already in hand ([ADR-0207](../../adrs/0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md)'s
   Outcome and the entry itself: 737 s per run, `reactivity`, `animation` and `sanity` 54 % of it
   together, and a close's tree differing from the reviewed one only in prose, a version and a merge).
   What is not settled is the direction — narrow the ledger key, make the close's tree equal the
   reviewed one, or split the per-preset suites — and each is ADR-shaped. Putting it here would hang a
   design question off a mechanical plan.
 - **Lane `b` stays off, and the question is retired rather than deferred.**
-  [ADR-0205](../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md)'s
+  [ADR-0205](../../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md)'s
   Outcome said a second lane would be reconsidered once the serialized suite fraction was known.
   Plan 0189 measured it — 0177 spent 24.5 min in full suites against 64 min of sessions — and the
   owner's call on 2026-09-16 is that a second lane buys nothing worth having while single-lane runs
@@ -408,7 +416,7 @@ flowchart TD
 - No `.rs`, `.cpp`, `.h`, `.wgsl` or `Cargo.toml` is touched by any phase of this plan.
 - **Phase 8 took the "no switch exists" branch.** Session D named `.claude/**` five ways, absolute
   path included, and was denied exactly as session C was, so there is nothing to configure:
-  [ADR-0210](../adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md)
+  [ADR-0210](../../adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md)
   excepts `.claude/` from ADR-0209's closed list, gives the repair to the owner through the digest's
   **Needs you**, and parks a phase that needs such an edit before it runs. Phase 9 implements the
   routing branch.

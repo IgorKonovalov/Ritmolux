@@ -1,8 +1,8 @@
 # ADR-0210 — A `.claude/` repair is the owner's, and a session that needs one parks with the edit
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-16
 > **Date:** 2026-09-16
-> **Related plan(s):** [0190](../plans/0190-the-conductor-survives-a-run-nobody-is-watching.md) (Phase 8 stop gate)
+> **Related plan(s):** [0190](../plans/done/0190-the-conductor-survives-a-run-nobody-is-watching.md) (Phase 8 stop gate)
 > **Supersedes in part:** [0209](0209-a-conductor-close-repairs-the-prose-and-comments-its-findings-name.md)
 > (the clause granting a close every file under `.claude/skills/`)
 

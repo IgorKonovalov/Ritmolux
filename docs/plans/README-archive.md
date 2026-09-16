@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0190 - The conductor survives a run nobody is watching](#0190---the-conductor-survives-a-run-nobody-is-watching)
   - [0189 - The conductor can be watched, and stops re-proving a green tree](#0189---the-conductor-can-be-watched-and-stops-re-proving-a-green-tree)
   - [0177 - The test tree stops touching the machine and stops costing its disk](#0177---the-test-tree-stops-touching-the-machine-and-stops-costing-its-disk)
   - [0175 - An eased value arrives at its target](#0175---an-eased-value-arrives-at-its-target)
@@ -218,6 +219,57 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0190 - The conductor survives a run nobody is watching](done/0190-the-conductor-survives-a-run-nobody-is-watching.md)
+
+- closed 2026-09-16 by a human-started review. Nine phases on `main` directly, for the same reason
+0187, 0188 and 0189 were built that way, plus the owner's standing call that the conductor stays
+stood down until 0180 lands:
+  - `a927fa5` (1): three layers against a session losing its own work. The prompts and all three
+    conductor-mode sections say it; `.claude/hooks/conductor-no-background.js` denies a shell call
+    carrying `run_in_background` under `RLX_CONDUCTOR=1` and the settings deny `Monitor`; and
+    `readResult` counts background starts against the notifications that finished them, so a result
+    reached with one outstanding parks `lost_background` **before** any outcome is read.
+  - `16f4219` (2): the allowlist runs a phase's own scratch work, bounded by the worktree. The
+    compound shapes (`cd studio; ...`, `$env:X = '1'; ...`) stay refused and the prompts route around
+    them with `npm --prefix`.
+  - `ae3cc20` (3): `runPlan` asks the **branch** before reviewing. A plan under `done/` with
+    `Status: done` and a `## Close review` is a finished close, verified and adopted, never reviewed
+    twice - and `adopt-close NNNN` does it on demand.
+  - `d663f5c` (4), `21e2575` (5), `ec58978` (6): a hand suite run records as `hand`; phase and commit
+    lines carry the span since the previous phase line; the ASCII guarantee runs over a fixture that
+    would break it.
+  - `8768cbb` (7) + `8444a17` (8, `human`): the probe asked the CLI instead of inferring. Sessions C
+    and D on 2.1.273, differing only in settings - `Read` allowed, `Edit` and `Write` denied in both,
+    a `Write` outside `.claude/` in the same turn allowed. **No spelling reached it.** ADR-0210 is
+    what the stop gate wrote.
+  - `824537d` (9): the routing branch. A phase whose declared `Files touched` include a `.claude/`
+    path parks `claude_dir` **before** it runs; the phases before it in the same run are still a step.
+- Review: **no blockers, no majors, two minors, one nit.** Verified independently rather than from
+the log: `cargo nextest run --workspace` green (1952 passed, 6 skipped, 677 s),
+`RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` green,
+`node --test "tools/conductor/test/*.test.mjs"` 312/312, and every doc gate.
+- **The finding the plan's own text produced.** Running `claudePaths` over Plan 0190 itself returns
+five paths for Phase 1 and **none for Phase 9**, which edited three `.claude/skills/*/SKILL.md` files
+while declaring them as *"the three conductor-mode sections"*. Under the conductor that phase would
+have run and parked `check_red` on its own done-when - the exact late failure ADR-0210 moves to the
+front. The guarantee is only as strong as a plan's prose, and no scan of the phase body would have
+caught it either. Filed as backlog 0236.
+- **The second minor.** `Bash(rm *)` is bounded by deny rules for four literal path shapes (`..`,
+`~`, a leading `/`, a drive letter), which holds for a path a session writes out and not for one the
+shell produces: `rm -rf $HOME/.cargo` is allowed. `test/settings.test.mjs` cannot see it either,
+because it models the CLI's matcher over command text - which is the level the CLI matches at. Filed
+as backlog 0237.
+- **What the close repaired.** One nit: the architect skill's conductor-mode repair list had the
+`fixed_in` instruction reflowed onto the end of the `.claude/` exception paragraph, so it read as
+belonging to it. Split back into its own paragraph.
+- **Honest in its own log, which is worth recording.** `dev` wrote that two of the probes this plan
+should have falsified stayed **green** because each is a prefix of a line that now continues - 0233's
+`phase  ${id} done` and 0235's `feat: plan ${plan} phase ${id}`. Both defects are delivered; the
+probes simply stopped discriminating. The close judged those two on their entry text instead.
+- Version: **none** (tooling). Every change is under `tools/conductor/`, `.claude/` or `docs/`; no
+`.rs`, `.cpp`, `.h`, `.wgsl`, `Cargo.toml` or `presets/` file is touched by any phase, which is the
+same call 0187 and 0189 took. ADR-0210 accepted. Archived backlog 0228-0235, all eight.
 
 ### [0189 - The conductor can be watched, and stops re-proving a green tree](done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md)
 

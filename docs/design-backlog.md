@@ -44,14 +44,8 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0221 — the run-alone override costs `-P fast` 165 s, twice its tests' serial time, because each of its 18 testcases drains the machine separately](#0221--the-run-alone-override-costs--p-fast-165-s-twice-its-tests-serial-time-because-each-of-its-18-testcases-drains-the-machine-separately)
 - [Entries 0227-0233 — from the Plan 0189 Phase 8 watched runs (2026-09-15)](#entries-0227-0233--from-the-plan-0189-phase-8-watched-runs-2026-09-15)
 - [0227 — a plan pays an 11-minute full suite for every distinct tree it gates, and a close's tree differs from the reviewed one only in prose, a version and a merge](#0227--a-plan-pays-an-11-minute-full-suite-for-every-distinct-tree-it-gates-and-a-closes-tree-differs-from-the-reviewed-one-only-in-prose-a-version-and-a-merge)
-- [0228 — a headless session that starts work in the background and ends its turn loses that work, and the plan parks `no_outcome` after its close was committed](#0228--a-headless-session-that-starts-work-in-the-background-and-ends-its-turn-loses-that-work-and-the-plan-parks-no_outcome-after-its-close-was-committed)
-- [0229 — `resume` has no path for a close that landed without an outcome, so it would re-run the review on a plan already under `done/`](#0229--resume-has-no-path-for-a-close-that-landed-without-an-outcome-so-it-would-re-run-the-review-on-a-plan-already-under-done)
-- [0230 — a headless session cannot edit `.claude/`, and ADR-0209 tells a close it may](#0230--a-headless-session-cannot-edit-claude-and-adr-0209-tells-a-close-it-may)
-- [0231 — the session allowlist matches a command's first word, so ordinary compound commands a phase needs are refused](#0231--the-session-allowlist-matches-a-commands-first-word-so-ordinary-compound-commands-a-phase-needs-are-refused)
-- [0232 — a suite run by hand through `with-lock` is not recorded, so the next gate repeats it](#0232--a-suite-run-by-hand-through-with-lock-is-not-recorded-so-the-next-gate-repeats-it)
-- [0233 — the run terminal says a phase is done but not how long it took](#0233--the-run-terminal-says-a-phase-is-done-but-not-how-long-it-took)
-- [0234 — one digest line carries a run-scoped time beside a lifetime spend, and reads as neither](#0234--one-digest-line-carries-a-run-scoped-time-beside-a-lifetime-spend-and-reads-as-neither)
-- [0235 — the run terminal's ASCII guarantee is asserted over a fixture that has no non-ASCII in it](#0235--the-run-terminals-ascii-guarantee-is-asserted-over-a-fixture-that-has-no-non-ascii-in-it)
+- [0236 — the `.claude/` park reads a phase's declared `Files touched`, and Plan 0190's own Phase 9 declared its three `.claude/` files in prose](#0236--the-claude-park-reads-a-phases-declared-files-touched-and-plan-0190s-own-phase-9-declared-its-three-claude-files-in-prose)
+- [0237 — the session allowlist bounds a deletion by four literal path shapes, so a path the shell expands escapes the lane](#0237--the-session-allowlist-bounds-a-deletion-by-four-literal-path-shapes-so-a-path-the-shell-expands-escapes-the-lane)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -1749,231 +1743,96 @@ Shapes, none decided:
 
 **High.** It is the largest single term in a plan's wall clock, and the owner's standing complaint.
 
-## 0228 — a headless session that starts work in the background and ends its turn loses that work, and the plan parks `no_outcome` after its close was committed
 
-0175's round-1 review (`0175-03-review`) ran the close tip's suite with `run_in_background`, armed a
-`Monitor` on its output, and ended its turn with "Still compiling; I'll be notified when it exits."
-In `claude -p` nothing re-invokes a session: the process exited, the background task was killed
-(`task_updated status: killed` in the transcript), and no `rlx-outcome` block was printed. By then
-the close had committed its repairs, the `done/` move, the bump to 0.124.2 and the studio sync; the
-gate on the tip, the tag and `check-release-tag.mjs` never ran.
+## 0236 — the `.claude/` park reads a phase's declared `Files touched`, and Plan 0190's own Phase 9 declared its three `.claude/` files in prose
 
-0177's review did the same at 22:33 the same evening (`tests nextest run --workspace started`, then
-`denied Monitor`). It held its turn until the 13.6-minute run ended and closed, so whether a session
-survives depends on what it does while it waits. It is the model's habit for a long command, not a
-one-off.
+[ADR-0210](adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md) parks a plan in front of a phase whose files include a path
+under `.claude/`, because the CLI refuses a headless session an `Edit` there. `claudePaths` (
+`tools/conductor/lib/plan.mjs`) implements exactly what the ADR says: it scans the phase's
+`**Files touched:**` bullet for a literal `.claude/…` path. `nextStep` parks on a non-empty result.
 
-Shapes, none decided:
-
-- **Say it in the prompts and the conductor-mode sections**: never `run_in_background`, never
-  `Monitor`; a long command runs in the foreground with a timeout.
-- **Deny it**: `settings.conductor.json` denies `Monitor`, and a hook refuses `run_in_background`.
-- **Detect it**: a session whose result ends while a background task was started and not finished
-  parks with a reason that names it, not the generic `no_outcome`.
-
-- **Raised:** 2026-09-15, from 0175's `no_outcome` park during Plan 0189 Phase 8.
-  **Owner if taken:** `dev` (prompts, settings), `architect` (the conductor-mode wording).
-- **Verified 2026-09-15** — no prompt says a session must not background a command:
-  `absent: background in: tools/conductor/prompts/review.md`
-
-### Priority
-
-**High.** It parks a plan after its riskiest step, and recovery needs the next entry's hand edit.
-
-## 0229 — `resume` has no path for a close that landed without an outcome, so it would re-run the review on a plan already under `done/`
-
-`runPlan` decides whether to review from `rec.closed` alone (`while (!rec.closed)`, then the review
-loop). A `no_outcome` or `bad_outcome` park after a close leaves `rec.closed` null, so `resume`
-starts round 1 again on a branch whose plan is already `Status: done` in `done/`, with a `## Close
-review` and a bumped version. Nothing in `prompts/review.md` covers that state; the likely result
-is a second close and a second bump.
-
-On 2026-09-15 the owner finished 0175's close by hand (gate on the tip, annotated `v0.124.2`,
-`check-release-tag.mjs`) and wrote `closed` and the round-1 verdict into `state/conductor.json`. The
-auto-mode classifier in the helping session refused that edit twice, and `resume` once, even with
-the owner's approval, so the owner ran `resume` themselves.
-
-Shapes, none decided:
-
-- **`resume` reads the branch**: plan under `done/` with a `## Close review`, and an annotated tag on
-  the tip or a version above `main`'s, becomes a "close found, verify it" step running `verifyClose`
-  and the post-close gate, never a review.
-- **A `conductor.mjs adopt-close NNNN`** that runs `verifyClose` on the lane as it stands and records
-  `closed` from the plan's own `## Close review`, so the repair is not a hand edit to runtime state.
-
-- **Raised:** 2026-09-15, during Plan 0189 Phase 8. **Owner if taken:** `architect`, then `dev`.
-- **Verified 2026-09-15** — the review is skipped on the record alone:
-  `present: while \(!rec\.closed\) in: tools/conductor/lib/lane.mjs`
-
-### Priority
-
-**Medium.** Rare once 0228 is fixed, but every occurrence is a hand edit to state today.
-
-## 0230 — a headless session cannot edit `.claude/`, and ADR-0209 tells a close it may
-
-The CLI refuses a `claude -p` session's `Edit` and `Write` under `.claude/` although
-`settings.conductor.json` allows both tools. Seen three times: 0182's close left
-`render-loop.md:170` open, 0177 Phase 8 parked `check_red` because its own done-when greps
-`.claude/skills/` (`denied Edit: ...\.claude\skills...`, twice, 20:21), and the owner committed the
-fix as `f0cf263`.
-
-ADR-0209 took backlog 0225's "restriction written nowhere" to be about ownership and wrote that a
-close may repair "Markdown prose anywhere in the repository, every file under `.claude/skills/`
-included". The restriction is the CLI's protection of its own configuration directory, so that rule
-is unreachable as written, and so is any plan phase whose files include `.claude/`.
-
-Shapes, none decided:
-
-- **Find the CLI's switch**, if one exists for a project's `.claude/skills/`, and record it in
-  `spike/README.md` with the CLI version it was verified on.
-- **Route it**: a phase or finding that needs `.claude/` parks `human_phase`-like with the exact
-  edit, instead of `check_red` after the rest of the phase ran.
-- **Amend ADR-0209** to except `.claude/` and name who repairs it.
-
-- **Raised:** 2026-09-15, from 0177's `check_red` park during Plan 0189 Phase 8.
-  **Owner if taken:** `architect` (ADR-0209), then `dev`.
-- **Verified 2026-09-15** — the skill grants what the CLI refuses:
-  `present: repository, every file under in: .claude/skills/architect/SKILL.md`
-
-### Priority
-
-**Medium.** One park and one open finding so far; every plan that renames a test or a flag hits it.
-
-## 0231 — the session allowlist matches a command's first word, so ordinary compound commands a phase needs are refused
-
-`settings.conductor.json` allows `PowerShell(npm *)`, `Bash(node *)`, `Bash(cargo *)` and so on, and
-the CLI matches the command as written. 0177's Phase 8 and 9 sessions were refused, among others:
-`cd studio; npm run typecheck ...`, `$env:ELECTRON_SKIP_BINARY_DOWNLOAD = '1'; npm --prefix ...`,
-`New-Item -ItemType Directory -Force target/p8`, `mkdir -p target/p8 && node ...`,
-`Remove-Item studio/shared/seed-target.ts`, `git clean -f -- studio/shared/seed-target.ts`, a
-`$env:CARGO_TARGET_DIR = ...` prefix, and `cat` on a state file. Phase 9 could not delete the
-lint-bite seed it had written (it removed it another way) and could not re-run its tests under
-`CARGO_TARGET_DIR` as its done-when names, so it recorded "met differently". 0180's session could
-not `git checkout` goldens a bless had re-encoded, and parked with a dirty tree.
-
-Shapes, none decided:
-
-- **Widen the allowlist for the scratch operations** a phase routinely does inside its own lane
-  (`Remove-Item`/`rm` under the lane, `New-Item`/`mkdir`, `git clean` of a named path), each with a
-  test in `settings.test.mjs` as `git restore` has.
-- **Say the shape in the prompts**: one command per call, no `cd`, `npm --prefix` not `cd studio`,
-  environment through the tool rather than an assignment prefix.
-- **Give the done-whens a form the allowlist can run**, e.g. an env var set by a wrapper script.
-
-- **Raised:** 2026-09-15, during Plan 0189 Phase 8. **Owner if taken:** `dev`.
-- **Verified 2026-09-15** — deleting a file is not allowed to a session:
-  `absent: Remove-Item in: tools/conductor/settings.conductor.json`
-
-### Priority
-
-**Medium.** Each refusal costs turns and, twice now, a done-when met "differently".
-
-## 0232 — a suite run by hand through `with-lock` is not recorded, so the next gate repeats it
-
-`with-lock.mjs` reads and writes the ledger only when `RLX_SUITE_LEDGER` is set, and nothing tells
-an operator to set it. On 2026-09-15 the owner's hand gate on 0175's close tip ran
-`with-lock.mjs suite -- cargo nextest run --workspace` green in 12.7 min; the conductor's
-`post-close` gate on the same tree 20 minutes later ran it again.
-
-Shapes, none decided:
-
-- **Default the ledger** to `state/suite-ledger.jsonl` when `with-lock` runs from inside this
-  repository, and record the writer as `hand`.
-- **Document the variable** in the README's `## Acting on a park`, beside the resume table.
-
-- **Raised:** 2026-09-15, during Plan 0189 Phase 8. **Owner if taken:** `dev`.
-- **Verified 2026-09-15** — the ledger is opt-in by environment:
-  `present: const ledger = env\.RLX_SUITE_LEDGER; in: tools/conductor/with-lock.mjs`
-
-### Priority
-
-**Low.** 12 minutes each time, and only on a hand repair.
-
-## 0233 — the run terminal says a phase is done but not how long it took
-
-`live.mjs` prints `  phase  N done` with no elapsed time, and `implement-NN end` prints the session's
-total. Watching Plan 0189 Phase 8, the owner could not tell a 28-minute phase from a 2-minute one
-without subtracting timestamps, and asked for durations on phases and on test runs. `tests` lines
-already print `ran 5m41s`; `gate` lines print `ok 11m21s`.
-
-Shapes, none decided:
-
-- **`phase N done, 12m` measured from the previous phase line** (or the session start), and the same
-  on `commit` lines.
-- **A per-plan timing block in the digest**: sessions, gates and parks idle, each in minutes, which is
-  the table Plan 0189 Phase 8 had to build by hand from `conductor.json` and the ledger.
-
-- **Raised:** 2026-09-15, by the owner during Plan 0189 Phase 8. **Owner if taken:** `dev`.
-- **Verified 2026-09-15** — the phase line carries no duration:
-  `present: phase  \$\{id\} done in: tools/conductor/lib/live.mjs`
-
-### Priority
-
-**Low.** A display gap, but it is what makes 0227 visible while a run is going.
-
-## 0234 — one digest line carries a run-scoped time beside a lifetime spend, and reads as neither
-
-Plan 0189 Phase 2 made a closed plan's time run-scoped: `timeInRun` sums that plan's own steps and
-gates within the run, so a night spent parked is never counted. The `$` on the same line was left as
-`totalSpend(rec)`, which sums every step the plan ever ran, across every run. The two sit in one
-sentence:
+The guarantee is therefore only as strong as a plan's prose, and **the plan that built the mechanism
+is itself the counterexample**. Run over
+[Plan 0190](plans/done/0190-the-conductor-survives-a-run-nobody-is-watching.md) at its close:
 
 ```
-- **0177 - ...** - 0.125.0, tag `v0.125.0` annotated, merge `da663b6`, 0 fix rounds,
-  active 40 min, wall 40 min in this run, $32.44.
+1 dev [".claude/hooks/conductor-no-background.js", ".claude/settings.json",
+       ".claude/skills/dev/SKILL.md", ".claude/skills/architect/SKILL.md",
+       ".claude/skills/studio-builder/SKILL.md"]
+9 dev []
 ```
 
-Four lines below, Totals says `run: 2 merged, 0 parked, 1 h 6 min, $12.18`, computed from the steps
-that started in the run. A reader who takes the `$32.44` as in-this-run — which the clause *in this
-run* directly above it invites — reads the two figures as contradicting each other. Before Phase 2
-the bullet carried no run-scoped figure, so the lifetime spend was unambiguous; the mixing is new.
+Phase 9 edited three `.claude/skills/*/SKILL.md` files. Its `Files touched` names them as *"`lib/lane.mjs`,
+`lib/outcome.mjs`, `prompts/*.md` and the three conductor-mode sections"* — a true sentence with no
+literal path in it. Under the conductor that phase would have been handed to a session, run, hit the
+denial, and parked `check_red` on its own done-when: precisely the late failure ADR-0210 exists to
+move to the front. A whole-body scan would not have caught it either; the paths are not written
+anywhere in the phase.
 
 Shapes, none decided:
 
-- **Report both**, `$12.18 this run, $32.44 total`, which is the only form that answers the
-  operator's question (what did tonight cost) without losing the plan's own figure.
-- **Make it run-scoped** like the time beside it, and leave the lifetime figure to `status`.
-- **Move the spend out of the bullet** into the per-plan timing block backlog 0233 sketches.
+- **A gate rather than a parser.** `check-index-rows.mjs`-style: a plan whose phase body names a
+  conductor-mode section, a skill or a hook by description, without a path in `Files touched`, is a
+  drafting error the architect fixes before approval. Cheap, and it fails at the right time.
+- **Widen the scan** to the whole phase body, which catches a `.claude/` path written in a Done-when
+  and still misses this one. Strictly weaker than the above.
+- **Accept it as bounded.** ADR-0210's Negative already says a plan that touches `.claude/` cannot
+  run under the conductor at all; the residual is only that an *undeclared* one fails late rather
+  than early, which is today's behaviour and no worse.
 
-- **Raised:** 2026-09-16, at Plan 0189's close review, from reading the rendered digest rather than
-  the tests. **Owner if taken:** `dev`.
-- **Verified 2026-09-16** — the closed bullet's time is run-scoped and its spend is not:
-  `present: wall \$\{duration\(wall\)\} in this run, \$\{usd\(totalSpend\(rec\)\)\} in: tools/conductor/lib/digest.mjs`
+- **Raised:** 2026-09-16, at Plan 0190's close review, by running `claudePaths` over that plan's own
+  phases. **Owner if taken:** `architect` (whether this is a gate or a parser), then `dev`.
+- **Verified 2026-09-16** — only the `Files touched` bullet is read:
+  `present: String\(phase\?\.filesText \?\? ""\) in: tools/conductor/lib/plan.mjs`
+- **Verified 2026-09-16** — and that bullet is the only thing `nextStep` consults for the park:
+  `present: claudePaths\(byId.get\(id\)\).length > 0 in: tools/conductor/lib/plan.mjs`
 
 ### Priority
 
-**Low.** Nothing is computed wrong; both numbers are correct for what they measure. It is a report
-answering two questions in one sentence without saying which is which, which is the same defect
-[backlog 0222](design-backlog-archive.md) described one field over.
+**Low.** It degrades to the behaviour that existed before ADR-0210 — a late park instead of an early
+one — and the conductor is stood down. It matters the first time a conductor-run plan touches a skill
+file without naming it, which is a normal thing for a plan to do.
 
-## 0235 — the run terminal's ASCII guarantee is asserted over a fixture that has no non-ASCII in it
+## 0237 — the session allowlist bounds a deletion by four literal path shapes, so a path the shell expands escapes the lane
 
-Plan 0189 Phase 1's done-when is *"Every line is ASCII. The run terminal is a Windows console."* The
-property does hold — `ascii()` is applied twice, at `live.mjs` `liveLine` and again at
-`conductor.mjs`'s `emit` — and `ascii()` itself is pinned in isolation. What is not pinned is that
-anything calls it.
+[Plan 0190](plans/done/0190-the-conductor-survives-a-run-nobody-is-watching.md) Phase 2 allowed
+`Bash(rm *)` and `PowerShell(Remove-Item *)` and bounded them with deny rules for the four ways a
+written path leaves the worktree: `..`, `~`, a leading `/`, and a drive letter (`*:/*`, `*:\*`).
+Inside the lane, a relative path with no `..` cannot escape, so the bound holds for a path a session
+*writes out*.
 
-The end-to-end assertion runs `assert.match(l, /^[\x20-\x7e]*$/)` over every line the lane scenario
-printed, but every input to those lines is already ASCII: the fake commits `feat: plan 0101 phase 1`,
-the denied command is `cd studio; npx vitest run`, and the plan fixture's em dashes never reach a
-printed line. Deleting either `ascii()` call would leave the suite green.
+It does not hold for a path the shell *produces*. None of these match a deny rule, and all are
+allowed:
 
-Real commit subjects are where the non-ASCII actually comes from — this repository's own log carries
-`0175 Phase 3 parked - a NaN dt` alongside subjects with em dashes, and a preset name can carry a
-curly quote.
+```
+rm -rf $HOME/.cargo
+rm -rf "$(git rev-parse --show-toplevel)/../rlx-plan-0180"
+Remove-Item -Recurse $env:USERPROFILE\WORK
+```
+
+`test/settings.test.mjs` cannot see this either, and says so in its own header: it models the CLI's
+rule matching over the command *text*, which is the same level the CLI matches at. The gap is not in
+the model — it is that a glob over text cannot bound a path that does not exist until the shell runs.
 
 Shapes, none decided:
 
-- **Give the fake's commit subject an em dash and a smart quote**, which arms the existing assertion
-  at one line's cost.
-- **Assert on a known-dirty input end to end**: a denial whose command carries a box-drawing
-  character, which is what a `cargo` error frame actually contains.
+- **Deny the expansion syntax**, not the path: `rm *$*`, `rm *%*`, `Remove-Item *$*`. Crude, cheap,
+  and it costs a session nothing it needs — a phase deleting its own scratch writes a literal path.
+- **Allowlist the scratch roots instead of the verb**: `Bash(rm -rf target/*)`, `Bash(rm target/*)`,
+  and nothing else. Narrower than what Phase 2 was asked for, and backlog 0231 lists deletions
+  outside `target/` (`studio/shared/seed-target.ts`).
+- **Accept it.** The lane is a worktree with nothing irreplaceable in it, a sibling lane is
+  recoverable from its branch, and the blast radius of `$HOME` is the machine rather than the repo —
+  which is exactly the argument against accepting it.
 
-- **Raised:** 2026-09-16, at Plan 0189's close review. **Owner if taken:** `dev`.
-- **Verified 2026-09-16** — the scenario's only commit subject is ASCII:
-  `present: feat: plan \$\{plan\} phase \$\{id\} in: tools/conductor/test/lane-scenario.mjs`
+- **Raised:** 2026-09-16, at Plan 0190's close review. **Owner if taken:** `dev`.
+- **Verified 2026-09-16** — the verb is allowed wholesale:
+  `present: "Bash\(rm \*\)" in: tools/conductor/settings.conductor.json`
+- **Verified 2026-09-16** — and no rule mentions an expansion:
+  `absent: HOME in: tools/conductor/settings.conductor.json`
 
 ### Priority
 
-**Low.** The property holds today and a break would be cosmetic on one console. It is filed because
-a done-when that cannot fail is worse than no test: it reads as coverage.
+**Medium.** Nothing has triggered it and no session has reason to write one, but it is the one rule
+in that file whose stated bound — *"a path that leaves the lane is refused, whatever it is for"* — is
+not the bound the rules actually enforce, and the README repeats the claim.

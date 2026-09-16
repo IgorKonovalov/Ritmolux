@@ -230,5 +230,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0207](0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md) | A suite run the conductor observed green is not run again on the same tree | accepted 2026-09-16 (Plan 0189), amends 0205, 0156, Outcome |
 | [0208](0208-a-patch-cli-update-runs-with-a-warning-and-every-session-proves-the-hooks-ran.md) | A patch CLI update runs with a warning, and every session proves the hooks ran | accepted 2026-09-16 (Plan 0189), amends 0205, Outcome |
 | [0209](0209-a-conductor-close-repairs-the-prose-and-comments-its-findings-name.md) | A conductor close repairs the prose and comments its findings name | accepted 2026-09-16 (Plan 0189), amends 0205, Outcome; superseded in part by 0210 |
-| [0210](0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md) | A `.claude/` repair is the owner's, and a session that needs one parks with the edit | proposed (Plan 0190), supersedes 0209 in part |
+| [0210](0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md) | A `.claude/` repair is the owner's, and a session that needs one parks with the edit | accepted 2026-09-16 (Plan 0190), supersedes 0209 in part |
 <!-- roster:end -->
