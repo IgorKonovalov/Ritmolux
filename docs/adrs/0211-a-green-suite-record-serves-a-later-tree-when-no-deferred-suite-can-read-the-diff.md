@@ -1,6 +1,6 @@
 # ADR-0211 — A green suite record serves a later tree when no deferred suite can read the diff
 
-> **Status:** accepted
+> **Status:** accepted 2026-09-16 ([Plan 0191](../plans/done/0191-a-green-tree-is-not-tested-four-times.md))
 > **Date:** 2026-09-16
 > **Related plan(s):** [0191](../plans/done/0191-a-green-tree-is-not-tested-four-times.md)
 > **Amends:** [0207](0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md)

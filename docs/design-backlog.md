@@ -49,6 +49,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0240 — a merged plan never leaves `queue.json`, and the exemption that tolerates it is keyed on a gitignored file](#0240--a-merged-plan-never-leaves-queuejson-and-the-exemption-that-tolerates-it-is-keyed-on-a-gitignored-file)
 - [0241 — the session allowlist is asserted against a model of the CLI's matcher, and the first unattended run falsified the model on a case it asserts](#0241--the-session-allowlist-is-asserted-against-a-model-of-the-clis-matcher-and-the-first-unattended-run-falsified-the-model-on-a-case-it-asserts)
 - [0242 — the conductor's gate skips a check whose precondition a lane never has, and says nothing, while the pre-push hook doing the identical skip prints a notice](#0242--the-conductors-gate-skips-a-check-whose-precondition-a-lane-never-has-and-says-nothing-while-the-pre-push-hook-doing-the-identical-skip-prints-a-notice)
+- [0243 — the served version-line rule is anchored to a column and a basename, not to the workspace section, so a dependency table edited in place would serve a code change to `-P fast`](#0243--the-served-version-line-rule-is-anchored-to-a-column-and-a-basename-not-to-the-workspace-section-so-a-dependency-table-edited-in-place-would-serve-a-code-change-to--p-fast)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -2055,3 +2056,74 @@ Shapes, none decided:
 every plan the conductor has run so far. 0179 is the first that does, and it is next in the queue —
 so the cheap mitigation (`npm --prefix <lane>/studio ci` once the lane opens) is worth doing by hand
 before this is decided properly.
+
+## 0243 — the served version-line rule is anchored to a column and a basename, not to the workspace section, so a dependency table edited in place would serve a code change to `-P fast`
+
+[ADR-0211](adrs/0211-a-green-suite-record-serves-a-later-tree-when-no-deferred-suite-can-read-the-diff.md)
+serves `Cargo.toml` and `Cargo.lock` forward *"only when their diff touches nothing but the version
+line — the shape a `cargo release` bump produces, and no more."* `lib/ledger.mjs` implements that as
+two anchors, and neither is the workspace section:
+
+```js
+const VERSION_LINE = /^[+-]version = "\d+\.\d+\.\d+"$/;       // column 0, any section
+...
+if (SERVED_PATHS.versionLineOnly.includes(basename(path)))     // any Cargo.toml in the tree
+  return versionLineOnly(path, cwd, a, b);
+```
+
+`versionLineOnly` diffs at `--unified=0` and serves when **every** `+`/`-` line matches. So a
+dependency written in table form and edited **in place**:
+
+```toml
+[workspace.dependencies.wgpu]
+version = "27.0.1"        # -> "27.1.0", the only changed line
+```
+
+produces a diff whose every line matches, the tree is served, and the nine deferred GPU suites do not
+run on what is a dependency change. The `basename` match widens it past the root file: **all six**
+`Cargo.toml` in this workspace are under the rule, not only `[workspace.package]`'s.
+
+**Latent today, and the entry says exactly why rather than leaving it to trust.** Verified
+2026-09-16: of the six tracked `Cargo.toml`, only the root carries a column-0 three-part
+`version = "…"` — `Cargo.toml:23`, the workspace version itself. Every member uses
+`version.workspace = true`, and no file uses the `[*.dependencies.*]` table form. Two further
+accidents stand between this and a real miss, and **neither is a guard**: a registry bump also
+rewrites `Cargo.lock`, whose `checksum = "…"` line matches nothing and re-arms the suite; and a
+two-part requirement (`version = "0.20"`) is refused by the three-part pattern, which is deliberate
+and commented.
+
+**Where it came from.** Raised as the one `minor` of
+[Plan 0191](plans/done/0191-a-green-tree-is-not-tested-four-times.md)'s conductor close review, and
+**left open there correctly** — [ADR-0209](adrs/0209-a-conductor-close-repairs-the-prose-and-comments-its-findings-name.md)
+lets a close repair prose and comments, and this repair is code. It is filed here because an open
+finding that lives only inside a closed plan's `## Close review` section has no carrier: nothing
+re-reads it, and no probe re-checks it.
+
+Shapes, none decided:
+
+- **Anchor to the section.** Track the preceding `[...]` header while walking the hunk and serve only
+  a `version` line under `[workspace.package]`. Exact, and it makes the rule say what ADR-0211's
+  prose already says.
+- **Anchor to the file and the line number.** Serve only the root `Cargo.toml`, and only the line the
+  workspace version is on. Cruder, and it breaks the day the file is re-ordered.
+- **Stop serving `Cargo.toml` at all.** A version bump then always re-arms the full suite, which
+  costs one suite per close — the exact cost ADR-0211 exists to remove, so this is the shape that
+  trades the feature away and is listed to be argued against rather than adopted quietly.
+
+- **Raised:** 2026-09-16, at Plan 0191's close, by the review; re-read and widened the same day
+  (the `basename` half is not in the review's text). **Owner if taken:** `dev`.
+- **Verified 2026-09-16** — the pattern is anchored to a column, not a section:
+  `present: const VERSION_LINE in: tools/conductor/lib/ledger.mjs`
+- **Verified 2026-09-16** — and the file test is a basename, so every crate's manifest is in scope:
+  `present: versionLineOnly\.includes\(basename\(path\)\) in: tools/conductor/lib/ledger.mjs`
+- **Verified 2026-09-16** — latency rests on no manifest using the table form, which is a fact about
+  today's tree and not a rule; this probe goes red the day one does:
+  `absent: ^\[workspace\.dependencies\. in: Cargo.toml`
+
+### Priority
+
+**Low, and it should stay Low only while the probe above is green.** Nothing can reach it in this
+tree, the failure is a weaker gate rather than a wrong result, and `-P fast` still runs. It matters
+the first time anyone writes a dependency as a table — a normal thing to do when pinning a git
+source or adding `features` — because the rule would then quietly stop testing dependency changes on
+the GPU suites, and nothing would report it.
