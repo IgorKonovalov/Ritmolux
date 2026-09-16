@@ -313,9 +313,7 @@ live entry citing this one.
 | 0172 | The seeded preset directory is never pruned, so a roster drifts from the shipped set | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phases 1-2. **Promoted** |
 | 0185 | The `--help` banner still calls the application `ritmolux` | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 3. **Promoted** |
 | 0186 | The density law scales a low-`density` preset's trace count on a large display | [Plan 0183](plans/0183-a-low-density-is-a-trace-count.md) + ADR-0195. **Promoted** |
-| 0198 | `deposit_arms` tears along the branch cut at a fractional value | [Plan 0179](plans/0179-a-parameters-range-belongs-to-its-family.md) Phase 1. **Promoted** |
 | 0203 | The smoke run captured from a microphone while the default is loopback | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 5. **Promoted** |
-| 0204 | The studio's sliders read one range per parameter, not per curve family | [Plan 0179](plans/0179-a-parameters-range-belongs-to-its-family.md) + ADR-0194. **Promoted** |
 | 0207 | The cap-recovery line says "geometry" for three contexts that are not geometry | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 3. **Promoted** |
 | 0208 | A system count written into prose goes stale on the next system | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 4 + ADR-0202. **Promoted** |
 | 0214 | A converted comp shader and per-vertex program read other coordinates than the source | [Plan 0180](plans/0180-the-converted-picture-follows-the-source.md) Phases 1-3. **Promoted** |
@@ -582,6 +580,8 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0234 | One digest line carries a run-scoped time beside a lifetime spend | [Plan 0190](plans/done/0190-the-conductor-survives-a-run-nobody-is-watching.md) Phase 5. Both are named, and the per-run one is what Totals sums. **Closed 2026-09-16** |
 | 0235 | The run terminal's ASCII guarantee is asserted over a fixture with no non-ASCII in it | [Plan 0190](plans/done/0190-the-conductor-survives-a-run-nobody-is-watching.md) Phase 6. Both `ascii()` calls armed separately, each demonstrated red. **Closed 2026-09-16** |
 | 0238 | The parameter slider is drawn from the schema and armed by the preset read, so a release between the two is discarded | `70e0a19` (test) + `39a6589` (product). Gated on `hasDocument`, not `writable`. **Closed 2026-09-16** |
+| 0198 | `deposit_arms` tears along the branch cut at a fractional value | [Plan 0179](plans/done/0179-a-parameters-range-belongs-to-its-family.md) Phase 1. **Closed 2026-09-16** |
+| 0204 | The studio's sliders read one range per parameter, not per curve family | [Plan 0179](plans/done/0179-a-parameters-range-belongs-to-its-family.md) + ADR-0194. **Closed 2026-09-16** |
 <!-- roster:end -->
 
 ---
@@ -12809,12 +12809,25 @@ after someone authors one.
 **Low.** Unreachable from the shipped library, and the fix is a one-line declaration whose cost only
 grows if a preset lands on the parameter first.
 
-- **Promoted 2026-09-14** to [Plan 0179](plans/0179-a-parameters-range-belongs-to-its-family.md) Phase 1: `deposit_arms` becomes `ParamKind::Structural`; rounding in the shader was rejected.
+- **Promoted 2026-09-14** to [Plan 0179](plans/done/0179-a-parameters-range-belongs-to-its-family.md) Phase 1: `deposit_arms` becomes `ParamKind::Structural`; rounding in the shader was rejected.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0179](plans/0179-a-parameters-range-belongs-to-its-family.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0179](plans/done/0179-a-parameters-range-belongs-to-its-family.md) owns the ask, and its close appends the `CLOSED` marker here.
 
 
 ---
+
+**CLOSED 2026-09-16** — [Plan 0179](plans/done/0179-a-parameters-range-belongs-to-its-family.md) Phase 1. `deposit_arms` is declared
+`ParamKind::Structural`, so the loader rounds it before the scene sees it and the tear along
+`atan2`'s branch cut cannot be reached from a preset. The doc line says a whole number of arms
+rather than a real angular frequency, and the generated reference, the five editor schemas and
+`presets/preset.schema.json` were regenerated from the declaration.
+
+The guard is a capture test rather than an assertion about the declaration:
+`the_deposit_arm_count_is_rounded_before_the_scene_sees_it` renders `2.6` / `3` / `2.4` / `2` in one
+run on one adapter and holds `2.6` byte-identical to `3` and `2.4` to `2`. **Its control comes
+first** — `3` against `2` must differ — so two blank frames fail on the control rather than passing
+the rounding vacuously. No golden moved: every shipped, fixture and example binding was already an
+integer, so rounding composes to the identity on all of them.
 
 ## 0203 — the smoke run captured from a microphone while the default is loopback, and nobody established why
 
@@ -12902,12 +12915,31 @@ cover both.
 **Low.** No curve preset on the new families ships yet, and the studio edits the file as text as
 well as by slider; it becomes worth taking when the first such preset is curated into the set.
 
-- **Promoted 2026-09-14** to [Plan 0179](plans/0179-a-parameters-range-belongs-to-its-family.md) and [ADR-0194](adrs/0194-a-family-dependent-range-travels-in-the-schema-and-the-player-reports-the-family.md): the schema carries a per-family range (the attractor's `a`..`d` included), the `preset` event reports the family, and the studio's slider reads the family's range. `SCHEMA_VERSION` does not move - the field is additive.
+- **Promoted 2026-09-14** to [Plan 0179](plans/done/0179-a-parameters-range-belongs-to-its-family.md) and [ADR-0194](adrs/0194-a-family-dependent-range-travels-in-the-schema-and-the-player-reports-the-family.md): the schema carries a per-family range (the attractor's `a`..`d` included), the `preset` event reports the family, and the studio's slider reads the family's range. `SCHEMA_VERSION` does not move - the field is additive.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0179](plans/0179-a-parameters-range-belongs-to-its-family.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0179](plans/done/0179-a-parameters-range-belongs-to-its-family.md) owns the ask, and its close appends the `CLOSED` marker here.
 
 
 ---
+
+**CLOSED 2026-09-16** — [Plan 0179](plans/done/0179-a-parameters-range-belongs-to-its-family.md) Phases 2-5 +
+[ADR-0194](adrs/0194-a-family-dependent-range-travels-in-the-schema-and-the-player-reports-the-family.md).
+A family-dependent parameter now carries a range per family the whole way: `FAMILY_PARAMS` in the
+engine, a `families` array in the schema document, a family cell in the generated reference, the
+family itself on the `preset` event, and a slider in the studio that takes its ends from the family
+on screen. A parameter the family never reads is grouped as inert instead of being offered travel it
+does not have, and still shows its binding if the file carries one.
+
+The hypotrochoid's `n` reaches `-8`, which the single range could not express; a Lissajous `d` stops
+at the 12 it reads rather than the 300 it does not; Thomas gives `a` a slider and groups `b`, `c`
+and `d`. **The attractor is the case that proves the point**: all four coefficients declare
+`range: null`, so before this every one of them was a bare number field whatever was drawn.
+
+**The inert cells are held against the WGSL, not only against the CPU mirror** — the test slices the
+shader's `step.family` chain into per-family arms and asserts each coefficient's mention there
+matches the table, then moves the coefficient through `step_once` and asserts the output does or
+does not change. A count (`inert_checked == 4`) fails the test if an arm stops being read rather
+than passing vacuously. Every curated tuple is asserted inside its family's declared bound.
 
 ## 0207 — the cap-recovery line says "geometry is back within the segment cap" for every context, and three of the five are not geometry
 

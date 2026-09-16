@@ -1635,8 +1635,12 @@ The earlier red run recorded in ADR-0193 stopped at ask 2 of 12, with nothing ke
 why. Whether it was the same defect is unknown.
 
 - **Raised:** 2026-09-14, by `dev` during the ADR-0193 diagnosis. **Owner if taken:** `dev`.
-- **Verified 2026-09-14** — the `preset` event fires only on a change of the name on screen:
-  `present: if name == self\.reported_preset \{ in: standalone/src/show.rs`
+- **Verified 2026-09-14, re-pointed 2026-09-16** — the `preset` event fires only on a change of what
+  is on screen. [Plan 0179](plans/done/0179-a-parameters-range-belongs-to-its-family.md) Phase 4 moved
+  the comparison into `Show::preset_report` and widened the key from the name alone to name, system
+  and family, so the probe names the new shape. **The claim this entry rests on is unchanged** — a
+  repeat of the same preset still emits nothing:
+  `present: seen == name && \*was == system && \*drew == family in: standalone/src/show.rs`
 - **Verified 2026-09-14** — the pong is emitted by the drain that applies the preset:
   `present: events\.emit\(&Event::Pong \{ nonce: \*nonce \}\); in: standalone/src/show.rs`
 - **Verified 2026-09-14** — the walk sends a ping with every ask:
@@ -2016,7 +2020,7 @@ That is [ADR-0016](adrs/0016-gpu-tests-opt-in-ci-scope.md)'s shape — skip, but
 command that would un-skip it. The gate does the same skip and does not.
 
 **Why it matters now rather than in the abstract.**
-[Plan 0179](plans/0179-a-parameters-range-belongs-to-its-family.md) is next in lane `b` after 0191,
+[Plan 0179](plans/done/0179-a-parameters-range-belongs-to-its-family.md) is next in lane `b` after 0191,
 and its Phase 5 is the first `studio-builder` phase ever handed to the conductor. As things stand it
 would run four `dev` phases, hand Phase 5 a session that edits `studio/`, and gate that work with
 **zero** studio checks — typecheck, lint and test all skipped, silently, at both `pre-review` and

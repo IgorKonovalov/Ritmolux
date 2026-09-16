@@ -1,11 +1,19 @@
 # 0179 — A parameter's range belongs to its family
 
-> **Status:** in-progress (2026-09-14)
+> **Status:** done - closed 2026-09-16. Five phases on branch
+> `plan-0179-a-parameters-range-belongs-to-its-family` as `12dda4b`, `a53adfa`, `d56c35a`,
+> `d351ac5` and `1732077`, with `2a3bc370` repairing the doc links that turned the conductor's
+> `pre-review` gate red. Review: **no blockers, no majors, one minor, one nit.** Verified
+> independently on the merged tree: `cargo nextest run --workspace` green (1960 passed, 6 skipped,
+> 649 s), `cargo doc` green under `-D warnings`, the studio's 274 vitest tests green, and every doc
+> gate. Version: **0.126.0** (minor - a feature plan).
+> **Built by:** the conductor, lanes `b`, except the doc-link repair and this close, which are the
+> owner's: the plan parked `gate_red` and was merged and closed by hand.
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`, `studio-builder`
-> **Related ADRs:** [0194](../adrs/0194-a-family-dependent-range-travels-in-the-schema-and-the-player-reports-the-family.md) (proposed),
-> [0180](../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md),
-> [0184](../adrs/0184-the-player-reports-what-it-loaded-and-the-studio-re-derives-nothing.md)
+> **Related ADRs:** [0194](../../adrs/0194-a-family-dependent-range-travels-in-the-schema-and-the-player-reports-the-family.md) (accepted),
+> [0180](../../adrs/0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md),
+> [0184](../../adrs/0184-the-player-reports-what-it-loaded-and-the-studio-re-derives-nothing.md)
 > **Closes:** design-backlog 0204, design-backlog 0198
 
 ## TL;DR
