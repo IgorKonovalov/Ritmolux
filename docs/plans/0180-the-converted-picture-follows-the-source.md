@@ -647,7 +647,7 @@ directly, in one session. Phase 7 on `main` directly, in its own session.
 | 4 — The seam is found | dev | done | `1fc0dfa` |
 | 5 — The analyzer publishes a left/right pair | dev | done | `5092b62` |
 | 6 — The waveform draws the source's eight figures | dev | done | `fa99c5d` |
-| 7 — The converted preset stops drawing a light nobody asked for | dev | done | committed with this row |
+| 7 — The converted preset stops drawing a light nobody asked for | dev | done | `95f78b9` |
 
 ### Phase 1 — the source read
 
