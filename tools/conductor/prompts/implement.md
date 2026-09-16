@@ -20,6 +20,12 @@ follow it; where it and the rest of the skill disagree, conductor mode wins.
   after the commits you already made have landed. A long command runs in the foreground, and this
   session's own timeout is what bounds it. A hook denies `run_in_background`, the settings deny
   `Monitor`, and a background command left unfinished at the end parks the plan whatever you claim.
+- **Shell calls run one command per call**, because the allowlist reads each one on its own. No `cd`:
+  run the tool from the lane root and give the path — `npm --prefix studio run typecheck`, not
+  `cd studio; npm run typecheck`. No environment set by an assignment statement ahead of a command
+  (`$env:X = '1'; ...` is a second command and is refused). `git clean` and `git checkout` name their
+  path after `--`. Making and removing a scratch file or directory inside the lane is allowed; a path
+  that leaves the lane is refused, whatever it is for.
 - If the last-run line says `yes`, finish with the close block of the `## Implementation log`,
   committed, and print the outcome instead of the pointer. Do not run the full workspace suite: the
   conductor's `pre-review` gate runs it next on the same tree, so the close block's `Full suite:`

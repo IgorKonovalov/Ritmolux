@@ -158,6 +158,15 @@ an inbox entry, not a park: close the shell, then `git worktree remove`, `git wo
   `settings.conductor.json`, with `RLX_CONDUCTOR=1` in its environment. It gets one of the
   `prompts/` templates as its appended system prompt, and that prompt is the only thing that puts a
   skill into its `## Conductor mode`.
+- **The allowlist covers a phase's own scratch work, and the lane is its bound.** Making and removing
+  a file or directory, `cat` / `Get-Content`, and `git clean` / `git checkout` of a path named after
+  `--` all run; a deletion whose path leaves the worktree — `..`, `~`, a leading `/` or a drive
+  letter — is denied, and a `git clean` with no path matches nothing. `git checkout` reaches nothing
+  but a path, because a rule without the `--` would let a session move the lane's branch, and
+  `git stash` is refused outright: that stack is shared by every worktree on the machine. The CLI
+  reads each command of a compound call on its own, so `cd studio; npm run typecheck` is refused for
+  its `cd` — the prompts tell a session to run one command per call and pass `--prefix` instead.
+  **Every rule has a case in `test/settings.test.mjs`**, which fails on a rule added without one.
 - **The hooks.** `.claude/hooks/block-push-and-history-rewrite.js` denies `git push`,
   `reset --hard`, `rebase`, `commit --amend` and `filter-branch` in every session, human-started
   ones included. `.claude/hooks/conductor-suite-lock.js` denies any `nextest` or `cargo test` a

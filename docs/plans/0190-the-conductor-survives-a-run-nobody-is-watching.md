@@ -345,8 +345,8 @@ flowchart TD
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — A session cannot lose its work in the background | dev | done | committed with this row |
-| 2 — The allowlist runs the commands a phase ordinarily needs | dev | not started | |
+| 1 — A session cannot lose its work in the background | dev | done | `a927fa5` |
+| 2 — The allowlist runs the commands a phase ordinarily needs | dev | done | committed with this row |
 | 3 — A close that landed without an outcome is adopted | dev | not started | |
 | 4 — A suite run by hand counts | dev | not started | |
 | 5 — Time and spend are reported at one scope | dev | not started | |

@@ -42,6 +42,12 @@ commits have landed. The full suite runs in the foreground and you wait for it; 
 timeout is what bounds it. A hook denies `run_in_background`, the settings deny `Monitor`, and a
 background command left unfinished at the end parks the plan whatever you claim.
 
+**Shell calls run one command per call**, because the allowlist reads each one on its own. No `cd`:
+run the tool from the lane root and give the path — `npm --prefix studio run typecheck`, not
+`cd studio; npm run typecheck`. No environment set by an assignment statement ahead of a command
+(`$env:X = '1'; ...` is a second command and is refused). `git clean` and `git checkout` name their
+path after `--`; `git restore <path>` is the ordinary way to put a file back.
+
 The last thing you print is exactly one fenced block tagged `rlx-outcome` holding one JSON object.
 `findings` lists every finding of this round, in order, whatever its severity.
 
