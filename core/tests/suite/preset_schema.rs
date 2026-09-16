@@ -109,6 +109,48 @@ fn the_player_schema_snapshot_is_current() {
     );
 }
 
+/// **A family-dependent parameter's hover names each family's own range**
+/// (ADR-0194 point 5), asserted on the committed file an editor actually reads.
+///
+/// `n`'s single declared range is `1`–`24`, and half the hypotrochoid family
+/// lives below zero. An author hovering `n` in a `curve_*.toml` has to be told
+/// `-8` to `8` there, and told that a superformula reads nothing at all — which
+/// is the whole gap backlog 0204 recorded.
+///
+/// **No `if`/`then` comes with it**, and that is asserted too: a `[params]` value
+/// is an expression string, so a per-family constraint would have nothing to
+/// check and would underline a correct preset.
+#[test]
+fn a_family_dependent_hover_names_every_familys_range() {
+    let path = repo_root().join(export::system_schema_path(SystemKind::ParametricCurve));
+    let committed =
+        std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let definition = committed
+        .split("\"param.n\": {")
+        .nth(1)
+        .unwrap_or_else(|| panic!("{} declares no `param.n`", path.display()))
+        .split_once("\n    }")
+        .unwrap_or_else(|| panic!("`param.n` is never closed"))
+        .0;
+
+    for expected in [
+        "`hypotrochoid` `-8.0` to `8.0`",
+        "`lissajous` `1.0` to `12.0`",
+        "inert on `superformula`",
+    ] {
+        assert!(
+            definition.contains(expected),
+            "`param.n`'s hover does not say {expected}:\n{definition}"
+        );
+    }
+    assert!(
+        !definition.contains("\"if\"") && !definition.contains("\"minimum\""),
+        "`param.n` grew a per-family constraint. A range is a guide and a value \
+         here is an expression string, so there is nothing for one to check \
+         (ADR-0194 point 5):\n{definition}"
+    );
+}
+
 /// **The drift check names each of the sixteen files, and an extra schema, and
 /// the regenerate command repairs every case.** Run against a scratch copy, so a
 /// check that had silently stopped comparing one of the files cannot pass

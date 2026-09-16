@@ -301,8 +301,8 @@ flowchart LR
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — `deposit_arms` is a whole number of arms | dev | done | 12dda4b |
-| 2 — The attractor's coefficients join the family table | dev | done | committed with this row |
-| 3 — The schema document carries each family's range | dev | not started | |
+| 2 — The attractor's coefficients join the family table | dev | done | a53adfa |
+| 3 — The schema document carries each family's range | dev | done | committed with this row |
 | 4 — The player reports the family on screen | dev | not started | |
 | 5 — The studio's slider reads the family's range | studio-builder | not started | |
 

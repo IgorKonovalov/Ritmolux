@@ -746,47 +746,47 @@
     "param.n": {
       "type": "string",
       "description": "The figure's first number, read as a real value per family: the rose's petal number, the Lissajous and harmonograph x frequency, the hypotrochoid's signed radius ratio.",
-      "markdownDescription": "The figure's first number, read as a real value per family: the rose's petal number, the Lissajous and harmonograph x frequency, the hypotrochoid's signed radius ratio.\n\n- default `6.0`\n- typical range `1.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "The figure's first number, read as a real value per family: the rose's petal number, the Lissajous and harmonograph x frequency, the hypotrochoid's signed radius ratio.\n\n- default `6.0`\n- typical range depends on the family: `maurer_rose` `1.0` to `24.0`, `lissajous` `1.0` to `12.0`, `hypotrochoid` `-8.0` to `8.0`, `harmonograph` `1.0` to `12.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `superformula` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.d.parametric_curve": {
       "type": "string",
       "description": "The figure's second number, per family: the rose's sampling step in degrees, the Lissajous and harmonograph y frequency, the hypotrochoid's cusp count, the superformula's lobe skew.",
-      "markdownDescription": "The figure's second number, per family: the rose's sampling step in degrees, the Lissajous and harmonograph y frequency, the hypotrochoid's cusp count, the superformula's lobe skew.\n\n- default `71.0`\n- typical range `1.0` to `360.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "The figure's second number, per family: the rose's sampling step in degrees, the Lissajous and harmonograph y frequency, the hypotrochoid's cusp count, the superformula's lobe skew.\n\n- default `71.0`\n- typical range depends on the family: `maurer_rose` `1.0` to `360.0`, `lissajous` `1.0` to `12.0`, `hypotrochoid` `1.0` to `24.0`, `superformula` `0.25` to `4.0`, `harmonograph` `1.0` to `12.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.phase": {
       "type": "string",
       "description": "Offsets where the figure starts: inside the rose's sine, between the Lissajous and harmonograph axes, and at the hypotrochoid's pen.",
-      "markdownDescription": "Offsets where the figure starts: inside the rose's sine, between the Lissajous and harmonograph axes, and at the hypotrochoid's pen.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "Offsets where the figure starts: inside the rose's sine, between the Lissajous and harmonograph axes, and at the hypotrochoid's pen.\n\n- default `0.0`\n- typical range depends on the family: `maurer_rose` `0.0` to `1.0`, `lissajous` `0.0` to `1.0`, `hypotrochoid` `0.0` to `1.0`, `harmonograph` `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `superformula` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.radial_offset": {
       "type": "string",
       "description": "Pushes every point out from the centre, opening the figure into a ring.",
-      "markdownDescription": "Pushes every point out from the centre, opening the figure into a ring.\n\n- default `0.0`\n- typical range `-1.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "Pushes every point out from the centre, opening the figure into a ring.\n\n- default `0.0`\n- typical range depends on the family: `maurer_rose` `-1.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `lissajous`, `hypotrochoid`, `superformula`, `harmonograph` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.pen": {
       "type": "string",
       "description": "How far the tracing point sits from the rolling circle's centre, in rolling radii: 1 draws cusps, less rounds them off, more throws them into loops.",
-      "markdownDescription": "How far the tracing point sits from the rolling circle's centre, in rolling radii: 1 draws cusps, less rounds them off, more throws them into loops.\n\n- default `1.0`\n- typical range `0.0` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How far the tracing point sits from the rolling circle's centre, in rolling radii: 1 draws cusps, less rounds them off, more throws them into loops.\n\n- default `1.0`\n- typical range depends on the family: `hypotrochoid` `0.0` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `maurer_rose`, `lissajous`, `superformula`, `harmonograph` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.sym": {
       "type": "string",
       "description": "How many lobes the figure repeats around its centre, as a whole number.",
-      "markdownDescription": "How many lobes the figure repeats around its centre, as a whole number.\n\n- default `5.0`\n- typical range `1.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How many lobes the figure repeats around its centre, as a whole number.\n\n- default `5.0`\n- typical range depends on the family: `superformula` `1.0` to `24.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `harmonograph` — the parameter is not read there at all\n- structural parameter\n\nThe value is an expression, always quoted."
     },
     "param.sharpness": {
       "type": "string",
       "description": "How pointed the lobes are: low draws a spiky star, high rounds the figure toward a circle.",
-      "markdownDescription": "How pointed the lobes are: low draws a spiky star, high rounds the figure toward a circle.\n\n- default `1.0`\n- typical range `0.1` to `20.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How pointed the lobes are: low draws a spiky star, high rounds the figure toward a circle.\n\n- default `1.0`\n- typical range depends on the family: `superformula` `0.1` to `20.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `harmonograph` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.lobe": {
       "type": "string",
       "description": "How the lobes swell between their tips: low pinches them thin, high fills them into a polygon.",
-      "markdownDescription": "How the lobes swell between their tips: low pinches them thin, high fills them into a polygon.\n\n- default `1.0`\n- typical range `0.1` to `10.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How the lobes swell between their tips: low pinches them thin, high fills them into a polygon.\n\n- default `1.0`\n- typical range depends on the family: `superformula` `0.1` to `10.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `harmonograph` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.decay.parametric_curve": {
       "type": "string",
       "description": "How fast the pendulums die away along the trace: 0 closes the figure, more spirals it inward.",
-      "markdownDescription": "How fast the pendulums die away along the trace: 0 closes the figure, more spirals it inward.\n\n- default `0.1`\n- typical range `0.0` to `0.5` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "How fast the pendulums die away along the trace: 0 closes the figure, more spirals it inward.\n\n- default `0.1`\n- typical range depends on the family: `harmonograph` `0.0` to `0.5` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- inert on `maurer_rose`, `lissajous`, `hypotrochoid`, `superformula` — the parameter is not read there at all\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.samples": {
       "type": "string",
