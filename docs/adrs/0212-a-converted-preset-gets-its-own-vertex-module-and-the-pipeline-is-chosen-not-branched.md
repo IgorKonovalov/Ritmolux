@@ -4,9 +4,9 @@
 > **Date:** 2026-09-16
 > **Related plan(s):** [0180](../plans/0180-the-converted-picture-follows-the-source.md) (Phase 3, which
 > parked `plan_wrong` on this question)
-> **Related ADRs:** [0113](0113-milkdrop-preset-conversion.md) (the converter),
+> **Related ADRs:** [0113](0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md) (the converter),
 > [0037](0037-internal-grid-is-a-resolution-not-a-shape.md) (whose aspect a stage takes),
-> [0132](0132-the-warp-phase-is-integrated-not-recomputed.md)
+> [0132](0132-a-rate-parameter-integrates-a-phase.md)
 
 ## Context
 
