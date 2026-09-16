@@ -558,7 +558,9 @@ pub fn run_wave_point(&mut self, index: usize, sample: f32, left: f32, right: f3
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** `C:\Users\Igor Konovalov\WORK\rlx-plan-0180`, branch `plan-0180-the-converted-picture-follows-the-source`.
+**Lane:** Phases 1-2 in `C:\Users\Igor Konovalov\WORK\rlx-plan-0180`, branch
+`plan-0180-the-converted-picture-follows-the-source`, merged at `8556556`. Phases 3-6 on `main`
+directly, in one session.
 
 | phase | owner | state | commit |
 |---|---|---|---|
@@ -567,7 +569,7 @@ pub fn run_wave_point(&mut self, index: usize, sample: f32, left: f32, right: f3
 | 3 — The per-vertex program gets the source's `x`/`y` | dev | done | `0d7266a` |
 | 4 — The seam is found | dev | done | `1fc0dfa` |
 | 5 — The analyzer publishes a left/right pair | dev | done | `5092b62` |
-| 6 — The waveform draws the source's eight figures | dev | done | committed with this row |
+| 6 — The waveform draws the source's eight figures | dev | done | `fa99c5d` |
 
 ### Phase 1 — the source read
 
@@ -671,43 +673,33 @@ adapter, at `SIZE = 128` square for the same reason:
 [wash] E display       0.74375457    0.25213975     2.950
 ```
 
-**Deviation from the amended phase, in how ADR-0212's mechanism is built.** The ADR says the two
-variants are built by substituting a prelude, with the four differing stages calling
-`to_space`/`from_space` in a chain whose text is shared — and it also says the native variant's text
-is byte-identical to today's. Those two cannot both hold: adding call sites to the shared chain
-changes the text the native module is built from, and the done-when asks that byte-identity be
-asserted directly on that string. What landed keeps the second: `WARP_SHADER` is **not edited**, and
-`warp_module_source(WarpSpace::Native)` is the quantizer and that constant verbatim, which
-`the_native_warp_module_is_built_from_the_unchanged_source` asserts. The converted variant is the
-same constant with a prelude prepended and four anchor lines rewritten
-(`shaders.rs`'s `WARP_ANCHORS`), so the stage order still has one copy.
-`the_converted_warp_variant_edits_four_anchors` holds each anchor to exactly one match, which is the
-tripwire ADR-0212 asks for in place of the one a `to_space` call site would have been.
+**Deviation from the amended phase, in how ADR-0212's mechanism is built.** The ADR says the variants
+are built by substituting a prelude, with the four differing stages calling `to_space`/`from_space` in
+a shared chain — and also that the native variant's text is byte-identical to today's. Those two
+cannot both hold: call sites added to the shared chain change the text the native module is built
+from, and the done-when asks that byte-identity be asserted on that string. What landed keeps the
+second: `WARP_SHADER` is **not edited**, and `warp_module_source(WarpSpace::Native)` is the quantizer
+and that constant verbatim, asserted by
+`the_native_warp_module_is_built_from_the_unchanged_source`. The converted variant is the same
+constant with a prelude prepended and four anchor lines rewritten (`shaders.rs`'s `WARP_ANCHORS`), so
+the stage order keeps one copy; `the_converted_warp_variant_edits_four_anchors` holds each anchor to
+exactly one match, which is the tripwire ADR-0212 asks for in place of a `to_space` call site.
 
-Two consequences of that shape worth naming:
+Two consequences of that shape: the rotation's two aspect factors are **removed** for the converted
+variant rather than wrapped (the corrected space is already isotropic on screen, so keeping both would
+rotate in a sheared one), and stage 1 (zoom) is left in raw uv ahead of the mapping, where the plan's
+`### The warp chain's space` lists it inside — a uniform scale about the frame centre commutes with a
+diagonal map about the same centre.
 
-- The rotation's two aspect factors are **removed** for the converted variant rather than wrapped.
-  The corrected space is already isotropic on screen and the native pair is what puts the raw-uv
-  chain there, so keeping both would rotate in a sheared space. Phase 1's table reads "the rotation
-  agrees; its centre differs", and this is what makes that true on both paths.
-- Stage 1 (zoom) is left in raw uv, ahead of the mapping, where the plan's
-  `### The warp chain's space` lists it inside. A zoom is a uniform scale about the frame centre and
-  the map is diagonal about the same centre, so the two commute and the arithmetic is the same;
-  `a_converted_translation_runs_in_the_sources_space` and the square-target agreement both cover it.
+**Where the four stages are asserted.** `warp_mesh/tests.rs` gains a probe that paints the past with
+its own uv and reads back the uv each texel sampled. Each stage test runs at 128x72 and at 128x96 —
+`1/A` is `1.778` and `1.333` there — against a native scene as well as a converted one. Checked by
+mutation: dropping the `to_space` rewrite reddens the stretch and rotation tests, dropping
+`from_space` reddens the translation and warp tests.
 
-**Where the four stages are asserted.** `core/src/render/scenes/warp_mesh/tests.rs` gains a probe
-that paints the past with its own uv and reads back the uv each texel sampled, so a stage is
-observed rather than inferred. Each stage test runs at 128x72 and at 128x96 — `1/A` is `1.778` and
-`1.333` there — and at both, against a native scene as well as a converted one. Checked by mutation:
-dropping the `to_space` rewrite reddens the stretch and rotation tests, dropping the `from_space`
-rewrite reddens the translation and warp tests.
-
-**`Resources::build` takes a `converted` flag rather than deriving it from `shader_spec`.** A
+**`Resources::build` takes a `converted` flag rather than deriving it from `shader_spec`**: a
 converted bundle carrying no WGSL has no spec, so `shader_key` stays `0` across a switch between two
-such presets and the staleness check would have kept the wrong pipeline;
-`ensure_resources` compares `res.warp_pipeline_converted.is_some()` against `scene.milk.is_some()`
-instead, and `a_converted_preset_and_a_native_one_draw_from_different_warp_pipelines` switches a
-scene native → converted → native to exercise it.
+such presets and the staleness check would have kept the wrong pipeline.
 
 ### Phase 4 — the seam
 
@@ -715,15 +707,10 @@ Converted with `milkconv` and rendered by `shot` at 1920x1080, all under `target
 uncommitted. `--signal click:120 --frame-at 360` for *Songflower*, `--set bass=0.6,mid=0.5,treb=0.45
 --frames 300` for *chasers*, matching Phase 1's captures.
 
-| render | what it is |
-|---|---|
-| `p4-songflower.png` | the preset as converted |
-| `p4-songflower-nowave.png` | `wave_a` forced to `0` in the compiled per-frame program |
-| `p4-songflower-plain.png` | `wave_a` and `echo_alpha` both forced to `0` |
-| `p4-songflower-novtx.png` | the `per_vertex` block deleted |
-| `p4-songflower-nowrap.png` | `wrap` forced to `0` as well |
-| `p4-songflower-nodep.png` | `deposit = "0.0"` added to `[params]` |
-| `p4-chasers-set.png`, `p4-chasers-nodep.png` | the same last pair for *chasers* |
+The renders, by what was forced off in the compiled program: `p4-songflower.png` (nothing),
+`-nowave` (`wave_a`), `-plain` (`wave_a` and `echo_alpha`), `-novtx` (the `per_vertex` block deleted),
+`-nowrap` (`wrap` as well), `-nodep` (`deposit = "0.0"` added to `[params]`), and
+`p4-chasers-set.png` / `p4-chasers-nodep.png` for the second preset.
 
 **The ray, on this tree: `+x`, from the frame centre, for both presets.** Phases 2 and 3 neither
 moved nor removed it, which is expected — neither preset's `.regs` carries `x`, `y` or `ang`, so the
@@ -734,13 +721,12 @@ producer.** The preset sets `echo_alpha = 1` and `echo_orient = 1`, so the whole
 the field **mirrored in x** at `echo_zoom = 1.75`. Judging the two halves separately, as the phase
 asks:
 
-- Silencing `wave_a` alone removes the seam on the display's right of centre entirely — the band
-  `x 960..1120` drops from a peak row-to-row `|drgb|` of `34.9` at row 541 to `3.5`. That half is the
-  **draw layer's waveform**: `wave_mode = 5`, `wave_y = 0.5`, `wave_a = 0.001` and `decay = 1.0`, so a
-  near-invisible full-width figure at the vertical midline accumulates over 360 frames.
-- The other half survives that, and with the echo's mirror also removed it reads as a hard edge
-  running from the frame centre to the **right** edge along `v = 0.5`, with the bright wedge below
-  it (`p4-songflower-plain.png`).
+- Silencing `wave_a` removes the seam on the display's right of centre entirely (band `x 960..1120`,
+  `34.9` at row 541 down to `3.5`). That half is the **draw layer's waveform**: `wave_mode = 5`,
+  `wave_y = 0.5`, `wave_a = 0.001` and `decay = 1.0`, so a near-invisible full-width figure at the
+  midline accumulates over 360 frames.
+- The other half survives that, and with the echo's mirror also removed it reads as a hard edge from
+  the frame centre to the **right** edge along `v = 0.5` (`p4-songflower-plain.png`).
 
 **What that edge is: the scene's own deposit, which every converted preset draws.**
 `milkconv/src/convert.rs`'s `[params]` block carries the comment *"the scene's own deposit stays
@@ -748,20 +734,12 @@ off"* and then emits only `brightness = "1.0"` — **it never emits `deposit`**,
 `DEFAULT_DEPOSIT` of `1.6` is in force. Adding `deposit = "0.0"` to that table removes the edge from
 both presets and changes nothing else:
 
-| band | *Songflower* as converted | with `deposit = 0` |
-|---|---|---|
-| `x 960..1200` | `107.2` at row 540 | no row-540 peak (`49.6`, at the border row 1077) |
-
-| band | *chasers* as converted | with `deposit = 0` |
-|---|---|---|
-| `x 240..480` | `59.5` at row 536 | `3.3` |
-| `x 480..720` | `63.0` at row 538 | the preset's own figure at row 357 |
-| `x 1200..1440` | `45.6` at row 537 | the same figure, mirrored |
-| `x 1440..1680` | `51.0` at row 538 | `3.5` |
-
-*chasers*' per-vertex program is `zm = 1.002; sx = -zm; sy = zm` — a per-frame horizontal mirror —
+Peak mean row-to-row `|drgb|` at the midline, as converted against `deposit = 0`: *Songflower*'s
+band `x 960..1200` goes from `107.2` at row 540 to no row-540 peak at all; *chasers*' four outer bands
+go from `59.5` / `63.0` / `45.6` / `51.0` at rows 536-538 to `3.3` / `3.5` and its own figure at row
+357. *chasers*' per-vertex program is `zm = 1.002; sx = -zm; sy = zm` — a per-frame horizontal mirror —
 which is why one ray's edge appears in both halves and why Phase 1 could not read its ray from either
-half alone. It is the same single producer.
+half alone.
 
 **Ruled out for that edge, in the order the phase's branch table asks:**
 
@@ -777,12 +755,11 @@ half alone. It is the same single producer.
   at all, and `mv_a = 0`.
 - **`wrap`.** Forcing it off changes the picture wholesale but leaves a row-540 reading.
 
-**Branch taken: a recorded finding, and a stop.** The `+x` branch's predicted cause is falsified, so
-this is the table's *"anything else"* arm. The obvious repair — emitting `deposit = "0.0"` from
-`milkconv` — is **not made here**, for one reason: the deposit is a light source in the field of every
-converted preset, so removing it changes the settled field level that Plan 0142 Phase 2 measures and
-compares against the source's equilibrium. This plan's own `What this plan does NOT do` leaves the
-wash to Plan 0142. Nothing here moves it.
+**Branch taken: a recorded finding, and a stop** — the `+x` branch's predicted cause is falsified, so
+this is the table's *"anything else"* arm. The repair, emitting `deposit = "0.0"` from `milkconv`, is
+**not made here**: that light is in the field of every converted preset, so removing it changes the
+settled level Plan 0142 Phase 2 measures, and this plan's `What this plan does NOT do` leaves the wash
+to that plan.
 
 **The test doc.** `ang_cuts_on_plus_x_and_turns_counter_clockwise_on_screen`'s *"What this does not
 settle"* section is replaced. Nothing in it now attributes a convention to MilkDrop or to a reference,
@@ -831,9 +808,9 @@ call sites took the same one-token change (`core/src/milk/tests.rs`,
 (`standalone/src/shot/report/tests.rs`'s destructure, which now asserts the pair stays at rest too,
 and `core/tests/suite/preset.rs`'s frame literal).
 
-**A finding for the plan's `k`, not acted on here.** `waveform_pair_gain` is a second divisor with
-its own history, so on a panned signal the pair and the mono trace are levelled differently.
-Phase 6's `k` is derived against the mono trace's scale.
+**A finding for the plan's `k`:** `waveform_pair_gain` is a second divisor with its own history, so
+on a panned signal the pair and the mono trace are levelled differently, and `k` is derived against
+the mono trace's scale.
 
 ### Phase 6 — the eight figures
 
@@ -856,19 +833,15 @@ unblessed run then passed with `warp_mesh_milk` at `0.0000` / 0 and every other 
 `git status --short core/tests/golden/` lists `warp_mesh_milk.png` and nothing else.
 
 **`warp_mesh_stroke` draws a built-in figure and did not move**, which is worth naming rather than
-leaving as a green line: its bundle sets `wave_mode = 2`, and mode 2 went from a full-width horizontal
-scope to the source's x-y figure about the centre. The reading says no pixel of that baseline moved by
-more than 2 codes, so whatever the fixture's waveform contributes is below the guard's resolution
-there. Not chased further.
+leaving as a green line: its bundle sets `wave_mode = 2`, which went from a full-width horizontal
+scope to the source's x-y figure about the centre, yet no pixel moved by more than 2 codes. Not chased
+further.
 
-**Where Phase 1's table is not complete, and what I did instead.** Two details the table records by
-name but not by expression:
-
-- **The `wave_mystery` fold** (l.2869-2877, modes 0, 1 and 4). The table says "folded into `-1..1`",
-  so `fold_mystery` wraps with `m - 2 * floor((m + 1) / 2)`. A *clamp* would read the same for every
-  value the corpus writes and differently outside `-3..3`.
-- **Mode 4's momentum** (`v = v*w2 + w1*(2v[i-1] - v[i-2])`). The table does not say which series `v`
-  is, so it is applied to **both** the x and the y sample offsets, in place, after they are built.
+**Two details Phase 1's table records by name but not by expression.** The `wave_mystery` fold
+(l.2869-2877, modes 0, 1 and 4) is written as a wrap, `m - 2 * floor((m + 1) / 2)`; a *clamp* would
+read the same for every value the corpus writes and differently outside `-3..3`. Mode 4's momentum
+(`v = v*w2 + w1*(2v[i-1] - v[i-2])`) does not say which series `v` is, so it is applied to **both** the
+x and the y sample offsets, in place, after they are built.
 
 **`k` is one constant, `HOST_SAMPLE_FACTOR = 1.256`,** multiplying the sample term and nothing else.
 Mode 5's figure is a **product of two samples**, so it carries the factor twice — which is what
@@ -879,14 +852,13 @@ distinct, with the source lines named.
 
 **Two tests changed their claim, both because the source disagrees with what they pinned.**
 
-- `mode_6_at_zero_mystery_is_the_mode_2_scope` is retired. It held that the two coincide at zero
-  mystery, which was true while mode 2 was a horizontal scope of this engine's own; in the source they
-  are unrelated. Replaced by `mode_6_at_zero_mystery_is_a_straight_line_and_mode_2_is_a_scope`, which
-  pins the same tripwire (an aspect term coming back into mode 6) from the property that still holds.
+- `mode_6_at_zero_mystery_is_the_mode_2_scope` is retired: it held that the two coincide, which was
+  true while mode 2 was a horizontal scope of this engine's own. Replaced by
+  `mode_6_at_zero_mystery_is_a_straight_line_and_mode_2_is_a_scope`, which pins the same tripwire (an
+  aspect term coming back into mode 6) from a property that still holds.
 - `a_straight_wave_trace_spans_the_full_width_at_every_aspect` now reads `2.2 * aspect` rather than
-  `2 * aspect`: the source runs the line `-3..3` along itself and clips it to `+/-1.1` on each axis, so
-  it runs past both edges. The design-backlog 0122 property it exists for — the length tracks the
-  target's shape — is unchanged.
+  `2 * aspect`: the source runs the line `-3..3` along itself and clips it to `+/-1.1` on each axis.
+  The design-backlog 0122 property it exists for is unchanged.
 
 **Deviations from the phase's file list.**
 
@@ -902,14 +874,11 @@ distinct, with the source lines named.
   the draw layer reads no clock at all. Narrowed to modes 2, 3, 4, 6 and 7, with the three source
   lines that put `time` back.
 
-**What custom waves did and did not get.** `value1` and `value2` are now the pair's two channels, read
-from the same smoothed, `wave_scale`d traces the built-in figures read — so a per-point program
-plotting one against the other draws a figure with width rather than a diagonal. They are **not**
-smoothed by `SmoothWave` and they do **not** carry `k`, both per the phase's note that a custom wave is
-outside the figure contract.
+**Custom waves** read `value1`/`value2` from the same smoothed, `wave_scale`d traces the built-in
+figures read. They are **not** smoothed by `SmoothWave` and do **not** carry `k`, per the phase's note
+that a custom wave is outside the figure contract.
 
-**The gates.** `node scripts/check-reader-prose.mjs`, `node scripts/check-doc-links.mjs` and
-`node scripts/toc.mjs --check` all exit 0.
+**The gates.** `check-reader-prose.mjs`, `check-doc-links.mjs` and `toc.mjs --check` all exit 0.
 
 ### Notes
 
@@ -951,12 +920,31 @@ outside the figure contract.
 
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`**
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** no.
+- **Plan header `Closes:`** design-backlog 0214, 0215 and 0216. All three are already in
+  `docs/design-backlog-archive.md`, archived as **Promoted** when this plan was approved, so none of
+  them carries a live probe and none needs moving at the close.
+- **What shipped:** a feature. A converted preset's per-vertex inputs, its warp chain's space, the
+  analyzer's left/right pair and all eight built-in waveform figures change what a converted preset
+  draws. Native presets are untouched by construction (ADR-0212) and no native baseline moved.
+- **Operator docs touched:** `docs/milkdrop-conversion.md` (the conversion table's channel and
+  waveform rows, plus a correction to its deposit claim) and `docs/specs/0002-ring-determinism.md`
+  (the pair joins the list of outputs that are a pure function of the stream).
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — 65 stated reductions across
+  30 live entries, 2 unprobeable, 31 advisory "path moved" rows. None of this plan's three entries is
+  live, so the plan's expectation that 0215's probe goes red on delivery did not apply.
+- **Full suite:** `cargo nextest run --workspace`, exit 0, **1979 passed / 6 skipped** in 709 s on the
+  reference machine.
+- **Outstanding `human` phases:** none. Every phase in this plan is `dev`-owned and all six have
+  landed.
+
+### Not done here, and named for whoever closes this
+
+- **Phase 4 found the seam and did not repair it.** The cause is `milkconv/src/convert.rs` emitting a
+  `[params]` block whose comment says the scene's deposit stays off while emitting no `deposit` key,
+  so `DEFAULT_DEPOSIT = 1.6` draws a ring into every converted preset. The one-line repair is held
+  back because that light is a term in the settled field level Plan 0142 Phase 2 measures.
+- **ADR-0199's `k` is confirmed for one mode only.** The unit-scale mode-0 capture that would confirm
+  the other seven is Plan 0142 Phase 4's rig session, as is whether the reference shows the seam.
 
 ## Followups (after this lands)
