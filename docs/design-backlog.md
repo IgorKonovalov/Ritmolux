@@ -57,6 +57,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0248 — nothing in this repo asks whether a groundless luminous field is a composition or a fill, and four shipped presets are the open cases](#0248--nothing-in-this-repo-asks-whether-a-groundless-luminous-field-is-a-composition-or-a-fill-and-four-shipped-presets-are-the-open-cases)
 - [0249 — `warp_mesh`'s `zoom` doc says the opposite of what the shader does, and four generated surfaces carry it](#0249--warp_meshs-zoom-doc-says-the-opposite-of-what-the-shader-does-and-four-generated-surfaces-carry-it)
 - [0250 — a conductor session cannot run a command that carries an environment assignment, and two documented repairs need one](#0250--a-conductor-session-cannot-run-a-command-that-carries-an-environment-assignment-and-two-documented-repairs-need-one)
+- [0251 — `warp_mesh`'s level mode draws bands but not an ink class, because coverage is a continuum nothing thresholds](#0251--warp_meshs-level-mode-draws-bands-but-not-an-ink-class-because-coverage-is-a-continuum-nothing-thresholds)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -2516,3 +2517,60 @@ Shapes, none decided:
 **Low.** It costs one parked plan and one hand resolution per occurrence, it never produces a wrong
 result, and the park names the command to run. It rises if a plan lands that regenerates a parameter
 surface per phase, because then every phase meets it.
+
+## 0251 — `warp_mesh`'s level mode draws bands but not an ink class, because coverage is a continuum nothing thresholds
+
+[ADR-0197](adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md)
+gave `warp_mesh` a second colour path — `color_source = "1"` deposits uncoloured light and the present
+pass colours the field by its own accumulated level — and it does exactly what backlog 0146 asked for
+as *structure*: the bands are the feedback loop's own decay contours, and nothing else in this engine
+makes one. **What it does not produce is a limited-ink frame**, and that is a property of the last
+line in the pass rather than of the coordinate.
+
+The present writes `ink * coverage`. `ink` is one of the palette's own values, but coverage is the
+field's alpha — a continuum — so every pixel short of full coverage is a fresh value the palette never
+named. Measured on the shipped `presets/warp_ladder.toml` at 640x360 loud: **a two-ink palette renders
+851 exact colours** with `palette_steps = "0"`. Quantizing recovers most of it, because quantizing the
+palette *coordinate* quantizes the level the coverage is computed from as well — twelve bands bring the
+same frame to **60** — and the preset ships at twelve for that reason, stating the count in its header
+instead of claiming a class it does not have.
+
+**Sixty is not two, and no switch in the engine gets there.** `palette_contour` does not help: it draws
+at a *band* edge, so at `palette_steps = "0"` there is no edge and it is inert (851 colours with the key
+at full strength and 851 without, measured both ways), and with the bands on it lands inside a black rung
+on a duotone.
+
+**The candidate the plan named, undecided.** Plan 0184 Phase 4's stop condition says that if the fringe
+reads as shading rather than as the ladder dissolving, the verdict comes back here rather than being
+tuned around — and it reads as shading. The obvious shape is a **coverage threshold in level mode**: a
+parameter above which coverage snaps to 1 and below which it snaps to 0, so the frame holds only the
+palette's inks and the paper. Everything about that is a design question and none of it is decided:
+
+- **Whether the edge then aliases**, since it would be a hard alpha cutoff with no derivative behind it —
+  the same trade the hard contour style already makes, but on a silhouette rather than a hairline.
+- **Whether it belongs to `warp_mesh` or to ADR-0138's draw seam.** ADR-0138 defines the limited-ink
+  guarantee *at the draw seam*, and this is a present-time composite; a threshold here may be a
+  `warp_mesh` parameter or may be the general repair for every scene whose output is premultiplied light.
+- **Whether a soft outer edge is worth keeping as the default.** `warp_ladder`'s header argues the fade
+  reads as the ladder running out of ink at the edge of the sheet, which is a look rather than a defect.
+  Two shipped worlds would want opposite defaults.
+
+- **Raised:** 2026-09-17, from Plan 0184 Phase 4's look gate, routed by its own stop condition and
+  recorded in ADR-0197's `Outcome`. **Owner if taken:** `architect` (an ADR) then `dev`.
+- **Verified 2026-09-17** — the present pass multiplies the ink by a continuous coverage, with nothing
+  between them:
+  `present: ink \* clamp\(c\.a, 0\.0, 1\.0\) in: core/src/render/scenes/warp_mesh/shaders.rs`
+- **Verified 2026-09-17** — and `warp_mesh` declares no parameter that touches coverage at all:
+  `absent: coverage in: core/src/render/scenes/warp_mesh/mod.rs`
+- **Verified 2026-09-17** — the shipped world states the measured count rather than an ink class:
+  `present: 851 exact colours in: presets/warp_ladder.toml`
+- **Verified 2026-09-17** — and the reader document says the same thing in its own words:
+  `present: The fringe is not two-ink in: docs/preset-palettes.md`
+
+### Priority
+
+**Low.** Nothing is broken: the mechanism does what ADR-0197 decided, the world that wanted it ships,
+and the residue is a class the frame does not join rather than a picture that is wrong. It rises if a
+second author asks `warp_mesh` for a print, or if the same question arrives from another
+premultiplied-light scene — at which point it is ADR-0138's boundary being asked to move, not this
+scene's.

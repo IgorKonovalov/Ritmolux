@@ -1,13 +1,17 @@
 # 0184 — Limited ink: a contour that is an ink, and a warp field that bands
 
-> **Status:** in-progress (2026-09-14)
+> **Status:** done (2026-09-17) — four phases landed (`277d7e1`, `80426fb`, `9627131`, `d575f65`,
+> `a31fc17`), close review round 1 **no blockers, no majors, one minor, one nit**. Verified against
+> the tree: the drift guard scans for its contour sites instead of listing them, style 0 is today's
+> arithmetic at all six, the level path bands where the deposit angle cannot, and the full workspace
+> suite is green unblessed.
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`, `human`
-> **Related ADRs:** [0197](../adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md) (proposed),
-> [0133](../adrs/0133-the-band-contour-fires-where-the-ink-changes.md),
-> [0138](../adrs/0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md),
-> [0078](../adrs/0078-banding-is-a-palette-coordinate-operation.md),
-> [0105](../adrs/0105-the-mark-roster-becomes-a-fullscreen-distance-field.md)
+> **Related ADRs:** [0197](../../adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md) (accepted),
+> [0133](../../adrs/0133-the-band-contour-fires-where-the-ink-changes.md),
+> [0138](../../adrs/0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md),
+> [0078](../../adrs/0078-banding-is-a-palette-coordinate-operation.md),
+> [0105](../../adrs/0105-the-mark-roster-becomes-a-fullscreen-distance-field.md)
 > **Closes:** design-backlog 0140, design-backlog 0146
 
 ## TL;DR
@@ -494,5 +498,268 @@ script over the whole gallery, which would have rewritten about a hundred PNGs w
   so the ADR is accepted at close **with that recorded**, per the phase's own stop condition, and the
   coverage-threshold candidate goes back to `architect` as a named finding rather than being tuned
   around.
+
+## Close review
+
+> Mode 4, conductor mode (ADR-0205), round 1, 2026-09-17. Written by a fresh session handed the plan
+> and the lane and nothing an implementer wrote. Reviewed at branch tip `b1fa0fc0`, before the close's
+> own repair, merge and bookkeeping.
+
+**Verdict: Plan 0184 landed cleanly — no blockers, no majors, one minor and one nit.** Both halves of
+ADR-0197 are in the tree, both default to the arithmetic that shipped before them, the drift guard
+now *scans* for its sites instead of listing them, and the two behavioural claims the plan could not
+assert as written are asserted in the shape that survives the 8-bit floor, with the deviation
+disclosed in the log. The full workspace suite is green on this tree.
+
+### Evidence this review ran on
+
+- **Full suite.** `node tools/conductor/with-lock.mjs suite -- cargo nextest run --workspace`
+  printed, in place of a run:
+
+  ```
+  with-lock: skipped cargo nextest run --workspace: tree 30dadcc is green in the suite
+  ledger, run by gate 0184-pre-review at 2026-09-17T15:06:08.511Z:
+  1999 tests run: 1999 passed (5 slow), 7 skipped
+  ```
+
+  That is ADR-0207's ledger record, written by the process that saw the exit code, and it is this
+  lens's full-suite evidence. `dev`'s `**Full suite:**` bullet says it is owed to the conductor's
+  `pre-review` gate; in conductor mode that is correct, not a missing run.
+- **`RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps`** — green, all six crates.
+- **`node scripts/check-doc-links.mjs`** — OK, 482 tracked files.
+- **`node scripts/check-reader-prose.mjs`** — OK, 16 documents, 0 bare citations.
+- **`node scripts/toc.mjs --check`** — OK, 7 blocks, 607 rows, current.
+- **`node scripts/check-index-rows.mjs`** — OK, 0 over cap, 0 misshaped.
+- **`node scripts/check-comment-hygiene.mjs`** — OK, 290 tracked sources, 0 escapes in use.
+- **`node scripts/check-backlog-claims.mjs`** — exit 0, 80 reductions across 34 live entries, 2
+  unprobeable, 36 advisory path-moved rows.
+- **`node scripts/check-translations.mjs`** — exit 0, 5 stamped; **the advisory is empty — no
+  translated source has moved past its stamp.** This plan touched no English source with a Russian
+  copy.
+- **The site route ceiling, priced by hand** (ADR-0166's gate needs a built site and runs only in
+  `pages.yml`, after the push). Replicating `split-document.mjs`'s chunking on the two documents this
+  plan grew: `docs/preset-palettes.md` 71,649 B → 19 routes, largest 16,947 B (`## Hard bands`);
+  `presets/README.md` 336,255 B → 69 routes, largest 22,935 B. Both are clear of the 30,000-byte
+  ceiling, so the push will not turn `pages.yml` red.
+
+### Lens 1 — alignment with the plan and ADR-0197
+
+**Phases, owners, commits.** Four phases, each with a single in-vocabulary `**Owner skill:**` tag
+(`dev` ×3, `human` ×1). All four landed, in order: Phase 1 `277d7e1` + `80426fb`, Phase 2 `9627131`,
+Phase 3 `d575f65`, Phase 4 `a31fc17`. `b014a23a` is a repair commit from an earlier attempt at this
+close that parked `merge_conflict` (the cause is now backlog 0249 and 0250); its four prose repairs
+are in the tree and were re-read here as part of the review, not taken on trust.
+
+**Phase 1, the done-when this plan exists to make un-missable.** *"The drift test names every file
+under `core/src/render/scenes/` whose source contains `fn band_contour_ink`, and no such file is
+outside its list."* — **met, and met by construction.** `core/src/render/palette.rs`'s
+`scene_files_containing` walks the directory at test time and `source_of` *panics naming the file to
+add* when the scan turns up a path `SCENE_SOURCES` has no `include_str!` for. The membership side
+cannot be satisfied by remembering, which is exactly the failure ADR-0133's Outcome recorded twice.
+The floors (`>= 6` contour carriers, `>= 7` `band_coord` carriers) catch a *removal*, and the
+`particles/shaders.rs` exclusion is asserted against the scan's own output rather than against a
+separate `contains`.
+
+**The two done-when claims that could not be asserted as written are disclosed, and the replacements
+are the stronger claims.** The log's first Notes entry says so; reading the tests confirms both
+readings:
+
+- *"the pixels a style-1 capture darkens … are a non-empty subset of the pixels the style-0 capture
+  darkens"* is false by one sliver — the soft ramp's outermost pixel darkens by less than one code
+  value, so no differential sees it, while the step paints it at full strength.
+  `a_hard_contour_draws_where_the_soft_one_does_and_barely_wider` asserts containment the other way
+  plus `hard <= 1.5 * soft` on the counts, and re-asserts ADR-0133's rule for the hard style as an
+  **exact byte identity** on a one-run palette. The bound is a dimensionless ratio of two counts of
+  the same kind (ADR-0074), argued from the fringe being a fraction of the line's width — a property,
+  not a frozen number.
+- *"changes every pixel style 0 would darken … and changes no other pixel"* is false where the ink is
+  laid over its own run, which is the property the style exists for.
+  `an_ink_contour_draws_in_the_palettes_own_colour` takes the footprint from a **style-1** capture
+  (visible against every ink) and asserts the ink capture equals a flat-ink capture of the same probe
+  **byte for byte** on it, and changes nothing outside it. The A/B half repeats it through
+  `palette_mix = 1` against a different third ink, with a guard that palette B's ink does not render
+  palette A's bytes — so the crossfade half cannot pass without moving.
+
+`a_hard_contour_adds_no_colour_the_frame_did_not_have` carries its own non-vacuity twice: the hard
+line must darken something, and the *soft* line must invent colours the contour-off frame lacks, or
+the hard line's not doing so says nothing.
+
+**The scoping done-when** is asserted in both directions
+(`the_contour_style_and_ink_are_unknown_off_the_six_scenes`): the two names warn on `attractor`
+**and** are silent on `fragment_field`, so the test cannot pass for a name the engine has never heard
+of. That is the trap `palette_contour` itself carries and the plan said the new names must not
+inherit.
+
+**Phase 2.** `color_source` is `ParamKind::Structural`, rounded by `warp_mesh/mod.rs::colour_source`
+and clamped, with the same argument `echo_orient` carries and an entry in
+`core/tests/suite/preset.rs`'s rounding roster. The deposit's level arm writes `vec3(1.0)` and the
+shared tail multiplies by `amount`, so the field receives `vec4(vec3(amount), clamp(amount, 0, 1))` —
+the plan's text exactly. The present block is inserted **after** the echo and **before**
+`brightness`/`gamma`/the composite remaps, reads `level = max(c.r, max(c.g, c.b))`, bands
+`hue + color_center + color_span * level`, samples A/B, applies `band_contour_ink` (the seventh copy,
+which Phase 1's scan picks up with no edit) and `saturation`, and writes `ink * coverage` with today's
+alpha. Every sample it adds is `textureSampleLevel`. Both branches are on a **uniform**, which is what
+keeps the `fwidth` inside `band_contour_ink` in uniform control flow.
+
+`core/tests/suite/warp_mesh.rs`'s new block is the strongest test in the plan, and its premise is
+worth naming: **in level mode the field's evolution does not depend on the palette at all**, so "this
+pixel is one of the palette's inks" is checkable *exactly* — against a capture of the same fixture
+with that ink end to end, through the tonemap and the position-dependent dither. Both
+`the_level_bands_the_field_where_the_deposit_angle_smears_it` and
+`the_echo_mixes_levels_and_the_result_is_coloured_once` rest on it, and each carries a deposit-angle
+control.
+
+**The Phase 2 non-vacuity substitution is right, and the log discloses it.** The done-when asked for
+stray non-ink pixels on the deposit-angle ray; there are none anywhere in that frame, because a purely
+radial resample of a radial sector pattern blends nothing above the 8-bit floor. What the test asserts
+instead is sharper and is backlog 0146's own sentence: the level path crosses between inks **10**
+times along a ray and the angle path **0**, *because the angle coordinate is constant along a ray*.
+The `angle_crossings == 0` assertion is a property of the coordinate's geometry, not a measurement,
+and the stray count is printed beside it.
+
+**Phase 2's stop condition did not fire, and the reading is real.** `the_level_the_field_works_at` is
+an `#[ignore]`d printed report inside the crate (the field is reachable only from a `#[cfg(test)]`
+accessor), and `the_level_probe_matches_the_ladder_fixture` parses the fixture's own bindings to hold
+the two together — which is the right repair for a probe that has to restate constants. p05 1.0859 /
+median 1.9033 / p95 3.2305, a range of 2.1445, so a full cycle fits inside `color_span = 1`.
+`core/tests/warp_level_cost.rs` is ADR-0071-shaped throughout: no threshold, the adapter and profile
+printed, a hardware-only skip with a notice, four interleaved rungs, and a non-vacuity assertion that
+it measured four different positive things. It also matches `binary(/_cost$/)`, so it inherits Plan
+0174's isolation without an edit, and it uses `mod common` rather than pasting the ADR-0016 skip.
+
+**Phase 3** met all three done-whens. The scoping table now marks exactly the six carriers, the two
+traps are stated in opposite directions (`palette_contour` inert and silent; the two new names unknown
+and warning), and the limited-ink mixer table's `palette_contour` row now names the hard styles as its
+own escape rather than only `"0"`. `docs/presets.md` was read and correctly left alone — it never
+restates the contour's colour.
+
+**Phase 4's verdicts are recorded with their measurements**, including the one that goes against the
+plan's own hope: the ladder is the op-art world backlog 0146 asked for and is **not** a limited-ink
+print (851 exact colours from two inks at `palette_steps = 0`, 60 at twelve), and ADR-0197's fringe
+question is answered *fade reads as shading*. The phase's stop condition — route it to `architect` as
+a named finding rather than tune around it — is honoured. The `CARDS`/gallery-render deviation from
+`Files touched` is disclosed, and the two cards were rendered at the manifest's own settings rather
+than by re-running the whole gallery, which is the correct call.
+
+### Lens 2 — layering, coupling, real-time safety
+
+Nothing to report. No platform or audio-source type entered `core/`; no raw GPU call escaped the wgpu
+layer; the C ABI and the control protocol are untouched in shape (`docs/specs/player-schema.json` is
+generated output and moved with the three new `ParamSpec`s, which is the schema following the engine
+rather than the protocol widening). The two new CPU-side helpers (`palette::band_contour_style`,
+`warp_mesh::colour_source`) are total pure functions with non-finite fallbacks, on the uniform-upload
+path, allocating nothing. The present bind group grew by three entries built once per
+`Resources::build`; the LUT textures are written with `queue.write_texture` into stable views, so the
+present bind group cannot go stale on a palette change, and a resize rebuilds the whole `Resources`
+including both. `min_binding_size` on the present uniform is derived from `size_of::<PresentUniform>()`,
+so the three appended `vec4`s cannot drift from the layout.
+
+### Lens 3 — docs, bookkeeping, release
+
+- **Operator docs swept correctly.** `docs/preset-palettes.md` (the parameter table, `## Hard bands`'
+  new style section with its anti-aliasing warning, the scoping table, and a new `color_source`
+  section) and `presets/README.md` (generated params block, the hand-written `warp_mesh` prose, and
+  its own hard-bands table and scoping paragraph — the latter two beyond what the plan named, and both
+  were carrying the same drift). Generated regions were regenerated, not hand-edited:
+  `presets/preset.schema.json`, seven files under `presets/schema/`, and `docs/specs/player-schema.json`
+  all move with the `ParamSpec`s, and `core/tests/suite/preset_schema.rs` is green.
+- **`.taplo.toml` correctly did not regenerate** — no new filename family.
+- **`docs/preset-guide.md`, `docs/preset-tuning-walkthrough.md`, `docs/testing.md`,
+  `docs/capturing.md`, `docs/configuration.md`, `docs/running.md`, `docs/developing.md`** — checked
+  and owed nothing. No system look changed, no harness contract moved, no flag or key moved. The site
+  gallery is globbed from `docs/images/gallery/presets/`, so `warp_ladder` joins it and its family
+  count moves without an edit.
+- **Version bump owed: `minor`.** Three new preset parameters, all defaulting to the arithmetic that
+  shipped before them. `main` moved to 0.129.0 while this lane was open, so the bump is computed
+  against that rather than against the branch's base.
+
+### Lens 4 — correctness and determinism
+
+- No `fwidth` or aspect is taken from an internal grid; the level coordinate is a scalar and the
+  contour's footprint is a screen-space derivative as it was before (ADR-0037 clean).
+- No wall-clock read entered analysis. `warp_level_cost.rs` times deliberately and says so, with the
+  `clippy::disallowed_methods` escape carrying a reason.
+- No new `unwrap`/`expect` on a hot path. Every one added is in `#[cfg(test)]` or a test binary.
+- **The numeric assertions are properties.** `hard <= 1.5 * soft` is a ratio of two like quantities
+  with a mechanism behind it; `angle_crossings == 0` is a geometric identity; every ink comparison is
+  an **exact byte equality against a capture taken in the same process at the same size**, which is
+  the strongest available form and needs no tolerance. Nothing added a frozen number asserted
+  universally, and the two frame-time tables are in the log with the adapter, driver and profile
+  named.
+- **The configuration-coincidence question.** The one place two sources could agree here is the
+  contour footprint: styles 0 and 1 share `d < w`, and on a *smooth* palette both would be visible and
+  hard to tell apart. The tests use plateau palettes with the transitions placed on band **edges**
+  (`PLATEAU_STEPS = 20` puts centres at `0.025 + 0.05k`, and `three_runs`' transitions sit at
+  `0.34/0.36` and `0.64/0.66`), which is the configuration where the two disagree — the hard line
+  resolves to one flat value and the soft one does not. That is probed, and probed in both directions.
+
+### Lens 5 — design integrity
+
+The contour stayed one function written six times, and the guard against that being a lie got strictly
+stronger. The seventh copy — the present pass's — is the first on a coordinate that is a *feedback
+level* rather than a field evaluated in closed form, and the comment says so. `color_source` is a
+branch on a uniform inside one pipeline rather than a second pipeline with a second layout, which is
+the decision that keeps `warp_mesh`'s creation order (ADR-0058's hazard) intact. No seam widened: the
+`Scene` trait, the C ABI and the OSC vocabulary are untouched.
+
+### Findings
+
+**minor — `docs/plans/done/0184-…md`, the `## Implementation log` outweighs the contract it reports
+on.** The log runs 213 lines against `## Implementation phases`' 150. Nothing gates that property,
+which is why the lens states it. **Left open deliberately, and not repaired:** the excess is almost
+entirely Phase 4's look-gate record and Phases 1-2's recorded-not-asserted measurement tables, and the
+only repair available to a close is deleting measurements the close exists to preserve. Trimming it is
+the owner's call, not a mechanical one. Recorded so the next plan's log is written shorter rather than
+this one's cut.
+
+**nit — `presets/shape_contourmono.toml`, a mechanism claim its own table contradicts.** *"Below 1.0
+it is a darkened grey, one new value per ink run it crosses."* The palette has five runs and three
+inks, and the table two lines below measures 9 → **17** at `contour 0.25` and **18** at `0.5` — eight
+and nine new values. Whatever produces them, it is not one per run, and a future author sizing
+`amount` from that sentence would predict 14. **Fixed in `a3d2be38`**: the count is dropped and the
+qualitative fact the measurements do support is kept.
+
+### Curation — the preset set
+
+**What landed earns its place.** `warp_ladder` is the sixth `warp_mesh` preset and the only one on
+`color_source = 1`; nothing in the family converges on it, because nothing else in the engine bands a
+feedback level. Its `drive` **0.560** / `rate` **0.0345** are a 5x and 10x outlier against a
+`warp_mesh` family spanning 0.058-0.117 and 0.0015-0.0032 — recorded rather than tuned away, and the
+reading is honest: its neighbours are slow fluid worlds and this one is a marching structure, which
+the report's own note says reads calmer than the number. `shape_contourmono` is a retune, not an
+addition, and it moves *toward* the brief it was written to (9 exact colours restored, the red accent
+held to one ring by rejecting style 3). Its header records the rejection as a rejected alternative
+rather than as a tuning note, which is the right shape.
+
+**What the plan made stale**, from the full grep over `presets/*.toml` for `ADR-00NN` / `Plan 00NN` /
+`design-backlog 00NN` / `backlog 00NN`:
+
+- `presets/fragment_driftmono.toml` — carried a paragraph declaring backlog 0140 open and the contour
+  *"always a darkening toward black … and always soft"*. **Already repaired** on this branch
+  (`b014a23a`); the decision to keep the contour off stands on its other half, which the same
+  paragraph states.
+- `presets/shape_contourmono.toml` — re-authored by Phase 4. **Clear.**
+- `presets/fragment_tiledmono.toml` — `palette_contour = 0` because *"its band edge is a SMOOTHSTEP"*.
+  Unaffected by the style: no ink change, no line, at any style. **Clear.**
+- `presets/shape_heartmono.toml` — *"only ADR-0133 makes that safe"*, contour on. **Clear.**
+- **One pre-existing dangling pointer, not this plan's doing and not repaired here:**
+  `presets/fragment_drostemono.toml` says *"Twenty bands in five runs, no contour - see the header"*
+  and the header says nothing about the contour. It reads on `main` exactly as it reads here. Named so
+  the next `preset-author` pass on the mono cohort has it.
+
+### Findings an earlier close attempt raised and resolved
+
+That attempt parked `merge_conflict` before writing a verdict, so its four prose repairs are recorded
+here rather than in a round of their own. All four were re-read against the tree in this round.
+
+- minor — `presets/fragment_driftmono.toml`: a paragraph declaring design-backlog 0140 still open and
+  the contour always soft and always a darkening toward black, which this plan falsified. **Fixed in
+  `b014a23a`.**
+- minor — `presets/warp_ladder.toml`: the `zoom` comment inverted the resample direction. **Fixed in
+  `b014a23a`**, and the engine-side cause is now backlog 0249.
+- minor — `presets/warp_ladder.toml`: a claim of six exact colours, contradicted twice by the same
+  header (two inks in six runs, and a shipped frame measuring 60). **Fixed in `b014a23a`.**
+- minor — `presets/shape_contourmono.toml`: a before/after sentence putting 4.57 % against 4.69 %, two
+  figures from different unrecorded stimuli. **Fixed in `b014a23a`.**
 
 ## Followups (after this lands)

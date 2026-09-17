@@ -1,8 +1,8 @@
 # ADR-0197 — The band contour can be a hard ink, and the warp field can be coloured by its own level
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-17 (Plan 0184) — with an `Outcome`
 > **Date:** 2026-09-14
-> **Related plan(s):** [0184](../plans/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md)
+> **Related plan(s):** [0184](../plans/done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md)
 > **Supplements:** [0133](0133-the-band-contour-fires-where-the-ink-changes.md) (the contour fires
 > where the ink changes), [0138](0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md)
 > (limited ink is a supported palette class), [0078](0078-banding-is-a-palette-coordinate-operation.md)
@@ -175,6 +175,36 @@ Keep the angle colour and accumulate a separate `R16Float` level alongside it, s
 once. **Rejected because it doubles the ping-pong field's memory and warp work to support a
 composition Alternative C rejects on its own terms.** An uncoloured deposit already makes the existing
 field the level.
+
+## Outcome (2026-09-17, Plan 0184's close)
+
+Accepted as written; both halves shipped and every golden held unblessed. Three of the Negative
+section's five priced risks resolved in the ADR's favour and **two did not**, which is what this
+section records rather than leaving the body to imply.
+
+- **The level's working range is adequate, measured.** `warp_mesh_ladder.toml` at 640x360 over texels
+  with coverage above one half: `max(rgb)` p05 **1.0859**, median **1.9033**, p95 **3.2305**, on an
+  AMD Radeon(TM) Graphics (Dx12, IntegratedGpu) in debug. A full palette cycle fits inside
+  `color_span = 1`, so the documented gain the Negative names was not needed and Phase 2 did not stop.
+- **The cost is small and it is not where the Negative expected it.** Same fixture at 1920x1080,
+  interleaved, best of three: the angle path 1.715 ms with the contour off and 1.778 with it on; the
+  **level path 1.695 and 1.796**. Level mode with the contour off is *cheaper* than the angle path,
+  because the deposit stops sampling the LUT.
+- **The fringe reads as shading, not as the ladder dissolving** — the question this ADR left to the
+  plan's look gate, answered against it. At `palette_steps = 0` it is not a fringe at all but the
+  whole frame: the present writes `ink * coverage`, coverage is a continuum, and a two-ink palette
+  measures **851** exact colours. `palette_steps` recovers most of it, because quantizing the palette
+  coordinate quantizes the level the coverage is computed from — the same frame at twelve bands
+  measures **60**. `presets/warp_ladder.toml` ships at twelve and states the count in its header
+  rather than claiming an ink class. **So `color_source = 1` opens `warp_mesh` to posterized and
+  op-art looks, as the Positive says, but not to a limited-ink one.** Plan 0184 Phase 4 names a
+  coverage threshold in level mode as the candidate repair; it is filed as backlog 0251 rather than
+  tuned around, which is what that phase's own stop condition asked for.
+- **A hard line's aliasing cost is real and bounded as argued.** On a quantized palette it reads as
+  the step it is; `docs/preset-palettes.md` carries the warning where the four styles are listed.
+- **The drift gap closed as a side effect, and harder than promised.** The guard does not iterate an
+  extended list — it **scans** `core/src/render/scenes/` for the function and fails naming any carrier
+  it has no `include_str!` for, so a seventh copy cannot be missed the way two were.
 
 ## Notes
 

@@ -304,8 +304,6 @@ live entry citing this one.
 | 0103 | The plugin's context menu shadows foobar's, so the panel cannot be removed from a layout | [Plan 0103](plans/0103-the-project-gets-an-audience.md) Phase 1. **Promoted** |
 | 0113 | The converted feedback field equilibrates far brighter than the reference's | [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md). **Promoted** |
 | 0124 | ADR-0113's motivating claim still reads "provisionally negative" | [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md). **Promoted** |
-| 0140 | The band contour can only be an anti-aliased grey on a hard-banded palette | [Plan 0184](plans/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 1 + ADR-0197. **Promoted** |
-| 0146 | `warp_mesh` colours its light at deposit time, so the palette cannot band the field | [Plan 0184](plans/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 2 + ADR-0197. **Promoted** |
 | 0157 | The fixed telemetry set omits the bar grid the engine already computes | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0158 | The tempo octave is unsettled by design, and the rig saw the fold run the other way | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
@@ -582,6 +580,8 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0216 | The converted waveform follows neither reference | [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md) Phases 5-6 + ADR-0199. Custom waves: see 0244. **Closed 2026-09-16** |
 | 0186 | The density law scales a low-`density` preset's trace count on a large display | [Plan 0183](plans/done/0183-a-low-density-is-a-trace-count.md) + [ADR-0195](adrs/0195-a-low-density-is-a-trace-count-and-the-law-scales-only-a-cloud.md). Band 0.08-0.16; no baseline moved. **Closed 2026-09-17** |
 | 0128 | `tonal_flatness` convicts a flat-graphic composition | [Plan 0186](plans/done/0186-the-flatness-gate-tells-a-figure-from-its-ground.md) + [ADR-0200](adrs/0200-the-flatness-conjunctions-second-term-reads-the-reference-a-role-classifier-assigns.md). Four-field residue reopened as 0248. **Closed 2026-09-17** |
+| 0140 | The band contour can only be an anti-aliased grey on a hard-banded palette | [Plan 0184](plans/done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 1 + ADR-0197. Four styles. **Closed 2026-09-17** |
+| 0146 | `warp_mesh` colours its light at deposit time, so the palette cannot band the field | [Plan 0184](plans/done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 2 + ADR-0197. Bands, not the ink class; see 0251. **Closed 2026-09-17** |
 <!-- roster:end -->
 
 ---
@@ -11936,10 +11936,23 @@ the frame — so the contour is the only source of intermediate values in the pi
 looks good, and the fix costs a parameter on a surface that was deliberately kept free of one.
 Revisit if a second limited-ink world lands on a contoured scene.
 
-- **Promoted 2026-09-14** to [Plan 0184](plans/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 1 and [ADR-0197](adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md): the contour gains a hard/soft style and an ink taken from a palette coordinate, on every scene that draws it, with the default byte-identical.
+- **Promoted 2026-09-14** to [Plan 0184](plans/done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 1 and [ADR-0197](adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md): the contour gains a hard/soft style and an ink taken from a palette coordinate, on every scene that draws it, with the default byte-identical.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0184](plans/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0184](plans/done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) owns the ask, and its close appends the `CLOSED` marker here.
 
+- **CLOSED 2026-09-17** by [Plan 0184](plans/done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md)
+  Phase 1 and [ADR-0197](adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md),
+  **fully, and the entry's own reading is the one that closes it.** `palette_contour_style` takes four
+  values on all six contour scenes — soft or hard footprint, black or an ink read at
+  `palette_contour_ink` — with style `0` the expression that shipped before it, so no golden moved.
+  The entry measured `shape_contourmono` at 9 distinct colours with the contour off and 684 at
+  `palette_contour = 1.0`; the same picture under the plan's recorded stimulus measures **677 at style
+  0 and 9 at style 1**, and `shape_contourmono` ships on style 1. Style 3, the hard ink key, also
+  measures 9 and was rendered and rejected on composition — it lays red at every run boundary, taking
+  red from 4.57 % to 11.70 % of the frame — and that rejection is in the preset's header as a rejected
+  alternative. The entry's *"revisit if a second limited-ink world lands on a contoured scene"* is
+  discharged rather than deferred. The drift guard that never opened two of the six sites now scans
+  for them.
 
 ---
 
@@ -11987,10 +12000,24 @@ small enough to fold into someone else's plan.
 cohort has four systems that do work. It rises if `warp_mesh` is wanted for a limited-ink world
 specifically, because nothing else in the engine makes a decay contour.
 
-- **Promoted 2026-09-14** to [Plan 0184](plans/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 2 and [ADR-0197](adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md): `warp_mesh` `color_source` deposits uncoloured light and colours the field by its level at present time; the two colour paths exclude each other, and the phase stops if the level outgrows `color_span`.
+- **Promoted 2026-09-14** to [Plan 0184](plans/done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 2 and [ADR-0197](adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md): `warp_mesh` `color_source` deposits uncoloured light and colours the field by its level at present time; the two colour paths exclude each other, and the phase stops if the level outgrows `color_span`.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0184](plans/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0184](plans/done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) owns the ask, and its close appends the `CLOSED` marker here.
 
+- **CLOSED 2026-09-17** by [Plan 0184](plans/done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md)
+  Phase 2 and [ADR-0197](adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md),
+  **and the half that did not arrive is named rather than glossed.** `color_source = "1"` makes the
+  deposit write uncoloured light and the present pass colour the field by `max(rgb)` of its own
+  accumulated level, after the echo, so `palette_steps` bands what the loop builds.
+  `presets/warp_ladder.toml` is the world the entry asked for and its rungs are the decay contours it
+  named: along a ray from the deposit centre the level path crosses between inks **10** times and the
+  deposit-angle path **0**, because the angle coordinate does not vary along a ray — the measured
+  form of this entry's *"smeared coloured blob with no bands at all"*.
+  **What did not arrive is the ink class.** The present writes `ink * coverage` and coverage is a
+  continuum, so two inks measure **851** exact frame colours; `palette_steps = "12"` quantizes the
+  level the coverage is computed from and brings that to **60**. The ladder is an op-art print, not a
+  limited-ink one, and the preset's header says so in its own words. The coverage threshold that would
+  close the gap is live as **0251**, which is a new question rather than an edit to this closed entry.
 
 ---
 

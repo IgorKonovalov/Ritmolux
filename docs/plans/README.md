@@ -46,7 +46,6 @@ place. The plan file carries the real link.
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. **0180 landed and moved both ends of its chain.** Amended 2026-09-16. Needs the rig. |
 | [0160](0160-the-silhouettes-preconditions-stop-being-silent.md) | The silhouette's preconditions stop being silent | approved | dev, human | ADR-0179: four silent `[path]` preconditions. **Amended 2026-09-14:** optional Phase 1b folds in backlog 0217 (arity probe re-prices a polyline). Phase 2 is prose. |
 | [0178](0178-what-the-operator-reads-is-true.md) | What the operator reads is true | approved | dev, human | Backlog 0172, 0185, 0207, 0208 + ADR-0202 (proposed): drift line, `--list-presets`, banner, recovery line, count gate. **0176 and 0166 both landed.** Phase 5 `human` settles 0203. |
-| [0184](0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) | Limited ink: a contour that is an ink, and a warp field that bands | approved | dev, human | ADR-0197 (proposed): hard ink contours on six scenes; `warp_mesh` bands by level. **Phase 2 stops if level outgrows `color_span`.** Phase 4: look gate. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
@@ -296,8 +295,11 @@ naming what moved. The order:
 - **Engine lane.** [0181], [0185] and then [0175] closed 2026-09-15, and none moved a golden.
   [0180] parked `plan_wrong` on 2026-09-14 and was amended on its lane branch 2026-09-15; resuming it
   is next. The opening this replaced is [in the archive](README-archive.md). [0180] runs before [0142]: 0180 re-draws the
-  waveform 0142's wash is measured on and needs no rig. [0186] closed 2026-09-17 having edited no
-  preset and blessed no golden, so it constrains nothing and [0184] is what is left of that pair.
+  waveform 0142's wash is measured on and needs no rig. ~~[0186] closed 2026-09-17 having edited no
+  preset and blessed no golden, so it constrains nothing and [0184] is what is left of that pair.~~ -
+  **spent 2026-09-17**, when [0184] closed behind [0186] the same day. Neither blessed a golden; 0184
+  landed two presets and re-rendered two gallery cards, which is the whole of what that pair left
+  behind.
   [0179] closed 2026-09-16 and [0183] 2026-09-17, moving no baseline.
   [0182] closed 2026-09-15 ahead of them; it touched only the report, so it constrains none.
 - **Still gated on a human:** [0120] Phase 1, [0133] Phase 9 and [0103] Phases 4-6. [0166] Phase 3
@@ -318,7 +320,7 @@ naming what moved. The order:
 [0181]: done/0181-a-scene-advances-after-its-frames-bindings.md
 [0182]: done/0182-the-report-hears-a-counter.md
 [0183]: done/0183-a-low-density-is-a-trace-count.md
-[0184]: 0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md
+[0184]: done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md
 [0185]: done/0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage.md
 [0186]: done/0186-the-flatness-gate-tells-a-figure-from-its-ground.md
 [0174]: done/0174-the-clock-reading-tests-run-alone.md
@@ -858,6 +860,7 @@ archive first.
 
 <!-- roster:begin cap=320 -->
 - [0186 - The flatness gate tells a figure from its ground](done/0186-the-flatness-gate-tells-a-figure-from-its-ground.md) - closed 2026-09-17. Review: **no blockers, no majors, three minors, one nit (all fixed).** Version: **0.129.0**. ADR-0200 accepted. Closed backlog 0128; filed 0248. [Write-up](README-archive.md).
+- [0184 - Limited ink: a contour that is an ink](done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) - closed 2026-09-17. Review: **no blockers, no majors, one minor, one nit.** Version: **0.130.0**. ADR-0197 accepted, Outcome. Closed backlog 0140, 0146; filed 0251. [Write-up](README-archive.md).
 - [0183 - A low density is a trace count](done/0183-a-low-density-is-a-trace-count.md) - closed 2026-09-17. Review: **no blockers, no majors, two minors, one nit (all fixed).** Version: **0.128.1** (patch). ADR-0195 accepted. Archived backlog 0186. [Write-up](README-archive.md).
 - [0180 - The converted picture follows the source](done/0180-the-converted-picture-follows-the-source.md) - closed 2026-09-16. Review: **one blocker (fixed), no majors, six minors, four nits.** Version: **0.127.0**. ADR-0199 + 0212 accepted, Outcomes. Archived 0214-0216; filed 0244-0245. [Write-up](README-archive.md).
 - [0179 - A parameter's range belongs to its family](done/0179-a-parameters-range-belongs-to-its-family.md) - closed 2026-09-16. Review: **no blockers, no majors, one minor, one nit.** Version: **0.126.0**. ADR-0194 accepted. Archived 0198, 0204. [Write-up](README-archive.md).
