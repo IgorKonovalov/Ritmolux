@@ -181,7 +181,7 @@ const POLAR_H: u32 = 180;
 fn capture_comp(body: &str) -> Option<rlx_core::render::CaptureImage> {
     use rlx_core::dsp::AnalysisFrame;
     use rlx_core::preset::Preset;
-    use rlx_core::render::{HeadlessOptions, Renderer};
+    use rlx_core::render::{HeadlessOptions, RenderError, Renderer};
 
     let mut renderer = match Renderer::new_headless(HeadlessOptions {
         width: POLAR_W,
@@ -189,10 +189,15 @@ fn capture_comp(body: &str) -> Option<rlx_core::render::CaptureImage> {
         prefer_software: false,
     }) {
         Ok(renderer) => renderer,
-        Err(e) => {
-            eprintln!("skipping: no adapter ({e})");
+        // ONLY a missing adapter is a skip (ADR-0016). Every other failure here
+        // is this test's own subject - an emitted module that will not build is
+        // exactly what these assertions exist to catch - so it panics rather
+        // than reporting a green run on a renderer that never started.
+        Err(RenderError::RequestAdapter(_)) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
             return None;
         }
+        Err(e) => panic!("headless renderer build failed: {e}"),
     };
     let source = format!(
         "[preset00]\n\
@@ -248,9 +253,10 @@ fn assert_lit(image: &rlx_core::render::CaptureImage, lit: &[(u32, u32, u32)], w
 ///
 /// Each body lights one channel where a value falls inside a window, so the
 /// assertion is on the emitted arithmetic and survives the sRGB target. The
-/// windows are the exact values at the edge midpoints and corners, widened by
-/// what one half-pixel moves them at this size (under `0.003` in `rad`, under
-/// `0.006` rad in `ang`):
+/// windows are the exact values at the edge midpoints and corners, widened to
+/// `0.006` in `rad` and `0.03` rad in `ang` — comfortably past the `0.003` and
+/// `0.006` one half-pixel moves them at this size, and still far inside the gap
+/// between any two of the values below:
 ///
 /// - `rad` is `1` at each corner, `1/sqrt(1 + 0.5625²) = 0.8716` at the left and
 ///   right edge midpoints and `0.5625/sqrt(1 + 0.5625²) = 0.4903` at the top and

@@ -486,9 +486,9 @@ const HOST_SAMPLE_FACTOR: f32 = 1.256;
 /// `6.28`, not `TAU`.
 ///
 /// The difference is 0.05 % of a turn over the 239 steps modes 0 and 1 lay down,
-/// so the last point falls a fifth of a step short of the first. Mode 0's
+/// so the last point falls an eighth of a step short of the first. Mode 0's
 /// cosine blend is what closes that join, and writing `TAU` here would move every
-/// converted circle by that fifth of a step for no reason but tidiness.
+/// converted circle by that eighth of a step for no reason but tidiness.
 #[allow(
     clippy::approx_constant,
     reason = "the source writes 6.28 and the truncation is the behaviour, not a typo for TAU"
@@ -751,7 +751,7 @@ fn waveform_figure(
                 &[(0.0, true)]
             };
             let mut smoothed = [[0.0f32; 2]; MAX_SMOOTHED_POINTS];
-            for (index, (offset, from_left)) in sides.iter().enumerate() {
+            for (offset, from_left) in sides {
                 n = 0;
                 for i in 0..count {
                     let t = t0 + (t1 - t0) * i as f32 / (count - 1).max(1) as f32;
@@ -772,7 +772,6 @@ fn waveform_figure(
                     use_dots,
                     aspect,
                 );
-                let _ = index;
             }
             return;
         }
