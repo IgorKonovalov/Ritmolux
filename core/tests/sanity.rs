@@ -968,6 +968,62 @@ trails     = "0.97"
     .expect("the flat fixture parses")
 }
 
+/// The **second blot anchor**: a particle cloud stacked past the additive
+/// ceiling, so its mass clips to one tone while its rim stays ragged — the decay
+/// mode ADR-0130 accepted for `boundary_density`, where [`blown_out`] is a stroke
+/// figure whose rim is a rasterized notch band.
+///
+/// `size` at the mark ceiling with `size_spread` at zero puts one wide mark of
+/// equal size under every particle, and a slow flow field over a coarse eddy
+/// holds them spread across the frame rather than gathered into filaments, so
+/// the marks overlap and stack the interior past the ceiling while the outermost
+/// ones stay separate round blots. `trails` stacks the same light a second time
+/// through the composite, and `saturation = 0` leaves the figure with no colour
+/// structure to survive the clip.
+///
+/// **Its parameters are chosen against validity conditions only**, the two
+/// [`blown_out`] is held to: against [`BLACK`] it clears its family's
+/// [`coverage_floor`], [`MIN_QUADRANTS`] and [`MIN_STRUCTURAL_SHELLS`], and its
+/// `tonal_flatness` is over [`MAX_TONAL_FLATNESS`] against both references. No
+/// parameter here is chosen against a candidate column;
+/// [`each_structure_candidate_is_tabled_against_the_library`] prints all five
+/// readings at both capture sizes so that is checkable rather than asserted.
+///
+/// Only that ignored harness reads it. A calibration anchored on one blot
+/// measures one rim shape, which is what left `boundary_floor`'s default arm
+/// resting on a rim artifact (ADR-0161).
+fn ragged_blot() -> Preset {
+    Preset::from_toml_str(
+        r##"
+system = "attractor"
+name   = "Ragged Blot"
+
+[particles]
+family = "clifford"
+
+[palette]
+stops = [
+  { at = 0.00, color = "#ffffff" },
+  { at = 1.00, color = "#ffffff" },
+]
+
+[params]
+a          = "-1.40"
+b          = "1.60"
+c          = "1.00"
+d          = "0.70"
+size       = "4"
+fade       = "0.55"
+brightness = "2"
+map_tint   = "0"
+trails     = "0"
+exposure   = "2"
+zoom       = "1.6"
+"##,
+    )
+    .expect("the ragged blot fixture parses")
+}
+
 #[test]
 fn a_frame_with_no_tonal_structure_is_reported_flat() {
     let Some(mut renderer) = common::headless(SIZE, SIZE) else {
@@ -2450,6 +2506,104 @@ fn lit_mask(img: &CaptureImage) -> Vec<bool> {
         .collect()
 }
 
+/// The complement of [`lit_mask`] — the pixels that do **not** depart from the
+/// derived ground, which is the modal band's own population.
+///
+/// On a frame drawing light onto darkness that is the empty background. On a
+/// saturated blot, whose mass *is* the frame's modal band, it is the mass; on a
+/// two-ink print it is whichever ink owns the majority, perforated by the other.
+/// The figure/ground candidates below are the ones that read this population
+/// rather than its complement.
+fn ground_mask(img: &CaptureImage) -> Vec<bool> {
+    lit_mask(img).into_iter().map(|b| !b).collect()
+}
+
+/// Perimeter over area of an **arbitrary** boolean mask, in
+/// `metrics::boundary_density`'s convention: the share of the mask's pixels with
+/// at least one 4-neighbour outside it, everything past the frame edge counting
+/// as outside.
+///
+/// `metrics::boundary_density` is this specialized to the lit mask. A mask and
+/// its complement share their interior boundary but not their reading: the frame
+/// edge is charged to whichever of the two reaches it, and the denominators
+/// differ.
+///
+/// `0.0` for an empty mask, the convention every statistic in this file uses.
+fn mask_boundary_density(mask: &[bool], w: usize, h: usize) -> f32 {
+    if w == 0 || h == 0 {
+        return 0.0;
+    }
+    let at = |x: isize, y: isize| -> bool {
+        if x < 0 || y < 0 || x >= w as isize || y >= h as isize {
+            return false;
+        }
+        mask.get(y as usize * w + x as usize)
+            .copied()
+            .unwrap_or(false)
+    };
+    let (mut inside, mut edge) = (0u64, 0u64);
+    for y in 0..h as isize {
+        for x in 0..w as isize {
+            if !at(x, y) {
+                continue;
+            }
+            inside += 1;
+            if !at(x - 1, y) || !at(x + 1, y) || !at(x, y - 1) || !at(x, y + 1) {
+                edge += 1;
+            }
+        }
+    }
+    if inside == 0 {
+        return 0.0;
+    }
+    edge as f32 / inside as f32
+}
+
+/// The sizes, in pixels, of every 4-connected component of `mask`.
+///
+/// Iterative flood fill with an explicit stack: a 96×96 frame whose mask is one
+/// piece would recurse 9216 deep. The order the sizes come back in is the raster
+/// order of each component's first pixel, so a count and a maximum over them are
+/// both deterministic.
+fn component_sizes(mask: &[bool], w: usize, h: usize) -> Vec<u64> {
+    let mut seen = vec![false; mask.len()];
+    let mut sizes: Vec<u64> = Vec::new();
+    let mut stack: Vec<usize> = Vec::new();
+    for start in 0..mask.len() {
+        if !mask[start] || seen[start] {
+            continue;
+        }
+        let mut size = 0u64;
+        seen[start] = true;
+        stack.push(start);
+        while let Some(i) = stack.pop() {
+            size += 1;
+            let (x, y) = (i % w, i / w);
+            let mut visit = |nx: usize, ny: usize| {
+                let j = ny * w + nx;
+                if mask[j] && !seen[j] {
+                    seen[j] = true;
+                    stack.push(j);
+                }
+            };
+            if x > 0 {
+                visit(x - 1, y);
+            }
+            if x + 1 < w {
+                visit(x + 1, y);
+            }
+            if y > 0 {
+                visit(x, y - 1);
+            }
+            if y + 1 < h {
+                visit(x, y + 1);
+            }
+        }
+        sizes.push(size);
+    }
+    sizes
+}
+
 /// One candidate structural statistic. **The roster is the deliverable, not a
 /// choice** — the stop condition decides, from what these print, and it can end
 /// Plan 0116.
@@ -2468,13 +2622,24 @@ struct StructureCandidate {
 /// The pixel-scale candidates are plain functions of the whole frame. The
 /// ADR-0129 candidate carries a grid size instead, because **its tile count is
 /// swept rather than chosen** — each grid in [`TILE_SWEEP`] is its own column, so
-/// the gate reads a curve and can tell a plateau from a fitted number.
+/// the gate reads a curve and can tell a plateau from a fitted number. The
+/// figure/ground classifier is a third shape again: what it prints is not a
+/// structure reading at all.
 enum Measure {
     /// Read over the whole frame — the control and the three Plan 0116 Phase 8
     /// candidates.
     Whole(fn(&CaptureImage) -> f32),
     /// [`modal_band_tile_transitions`] at this many tiles per side.
     Tiled(usize),
+    /// [`role_ratio`], a **role classifier** rather than a structure column: it
+    /// says which of the frame's two large tone populations is the figure, and
+    /// the column judged in its name is the `boundary_density` term two would
+    /// read under the role it assigns (see [`judged_column`]).
+    ///
+    /// It is the one column the *higher = more structured* rule does not apply
+    /// to — a high ratio means the modal band would itself be lit against black,
+    /// which is the blot side.
+    Role,
 }
 
 impl StructureCandidate {
@@ -2483,17 +2648,30 @@ impl StructureCandidate {
         match self.measure {
             Measure::Whole(f) => f(img),
             Measure::Tiled(tiles) => modal_band_tile_transitions(img, tiles),
+            Measure::Role => role_ratio(img),
         }
     }
 }
 
 /// Tiles per side [`modal_band_tile_transitions`] is swept over, every one of
-/// which divides the [`SIZE`] capture exactly.
+/// which divides both the [`SIZE`] and the [`BIG_SIZE`] capture exactly.
 ///
 /// Printed as five separate columns rather than reduced to one, because a
 /// verdict that flips between adjacent grids means the statistic is
 /// resolution-coupled — which is a *stop*, and only visible as a curve.
 const TILE_SWEEP: [usize; 5] = [4, 6, 8, 12, 16];
+
+/// The second capture size every row is read at, beside [`SIZE`].
+///
+/// `boundary_density` and every other perimeter-over-area column goes as ~`1/L`
+/// in the capture's linear size, so the values here are expected to be roughly
+/// half those at 96×96 and are never compared across sizes. What *is* compared
+/// is the ordering: a candidate separating the anchors at one size and not the
+/// other is resolution-coupled, and that is a stop.
+///
+/// Exactly double [`SIZE`], so every [`TILE_SWEEP`] grid still divides the frame
+/// and no tile is ragged at either size.
+const BIG_SIZE: u32 = 192;
 
 /// The control and the three Plan 0116 Phase 8 candidates, control first so
 /// every other column reads as a difference from it rather than as an absolute,
@@ -2544,6 +2722,31 @@ const STRUCTURE_CANDIDATES: &[StructureCandidate] = &[
         note: "ADR-0129: differing adjacent modal-band tiles on a 16x16 grid (6px tiles)",
         measure: Measure::Tiled(16),
     },
+    StructureCandidate {
+        name: "ground_side",
+        note: "perimeter over area of the MODAL BAND's own mask (the unlit set) instead of the lit set",
+        measure: Measure::Whole(ground_side_density),
+    },
+    StructureCandidate {
+        name: "border_ground",
+        note: "boundary_density against modal_border_band - the control for 'the ground owns the frame edge'",
+        measure: Measure::Whole(border_ground_density),
+    },
+    StructureCandidate {
+        name: "min_ground",
+        note: "the lower of boundary_density against the derived ground and against BLACK",
+        measure: Measure::Whole(min_ground_density),
+    },
+    StructureCandidate {
+        name: "role_ratio",
+        note: "coverage(BLACK) / coverage(derived) - a ROLE classifier, not a structure column: high means the modal band is figure. Judged on the boundary_density term two would read under the role it assigns",
+        measure: Measure::Role,
+    },
+    StructureCandidate {
+        name: "modal_connected",
+        note: "share of the modal band's pixels OUTSIDE its largest 4-connected component (the complement, so the column reads in the harness's direction)",
+        measure: Measure::Whole(modal_fragmentation),
+    },
 ];
 
 /// The control, inverted so it reads in the same direction as the other three:
@@ -2577,40 +2780,94 @@ fn component_density(img: &CaptureImage) -> f32 {
     if lit == 0 {
         return 0.0;
     }
-    let mut seen = vec![false; mask.len()];
-    let mut components = 0u64;
-    let mut stack: Vec<usize> = Vec::new();
-    for start in 0..mask.len() {
-        if !mask[start] || seen[start] {
-            continue;
-        }
-        components += 1;
-        seen[start] = true;
-        stack.push(start);
-        while let Some(i) = stack.pop() {
-            let (x, y) = (i % w, i / w);
-            let mut visit = |nx: usize, ny: usize| {
-                let j = ny * w + nx;
-                if mask[j] && !seen[j] {
-                    seen[j] = true;
-                    stack.push(j);
-                }
-            };
-            if x > 0 {
-                visit(x - 1, y);
-            }
-            if x + 1 < w {
-                visit(x + 1, y);
-            }
-            if y > 0 {
-                visit(x, y - 1);
-            }
-            if y + 1 < h {
-                visit(x, y + 1);
-            }
-        }
+    component_sizes(&mask, w, h).len() as f32 * 1000.0 / lit as f32
+}
+
+/// The `ground_side` column: perimeter over area of the **modal band's own
+/// mask** rather than of the lit set.
+///
+/// The lit set of a saturated blot is that blot's fringe, because the blot is its
+/// own modal band — so the shipped term reads a rim and rises as the rim
+/// smooths, backwards on the one class of frame it exists to convict (ADR-0161).
+/// This reads the other side of the same threshold: the mass itself, which
+/// carries only its rim on the boundary, against a print's paper, which is
+/// perforated by ink everywhere.
+///
+/// Its expected failure is the mirror image: a thin figure on a wide dark ground
+/// puts almost no perimeter on that ground, so such a frame would read as a blot
+/// if the conjunction could ever reach it.
+fn ground_side_density(img: &CaptureImage) -> f32 {
+    let (w, h) = (img.width as usize, img.height as usize);
+    mask_boundary_density(&ground_mask(img), w, h)
+}
+
+/// The `border_ground` column: the shipped statistic against
+/// [`modal_border_band`] instead of against the whole frame's modal band.
+///
+/// The control for *the ground is whatever owns the frame edge*. It is tabled
+/// because a blot reaching the frame edge owns that edge too, so the estimator is
+/// expected to land on the mass and leave this column reading the same fringe the
+/// shipped term does — an expectation this file checks rather than asserts.
+fn border_ground_density(img: &CaptureImage) -> f32 {
+    boundary_density(img, modal_border_band(img), EPS)
+}
+
+/// The `min_ground` column: the lower of `boundary_density` against the derived
+/// ground and against [`BLACK`].
+///
+/// The arithmetic of ADR-0161's Alternative D without its argument. Whichever
+/// reference the frame is a fringe under, the other reference reads its figure,
+/// and the lower of the two is the reading that is not a rim — so a blot is
+/// convicted under either lens. What it costs is that a frame drawing light on
+/// darkness is scored by whichever lens happens to read it lower, and both
+/// lenses are the same one there.
+fn min_ground_density(img: &CaptureImage) -> f32 {
+    boundary_density(img, ground(img), EPS).min(boundary_density(img, BLACK, EPS))
+}
+
+/// The `role_ratio` column: `coverage` against [`BLACK`] over `coverage` against
+/// the frame's derived ground.
+///
+/// Both terms are coverages of one frame, so this is a ratio of one kind of
+/// quantity rather than a portability claim about two (ADR-0074). A high value
+/// means the modal band would itself be lit against black — the majority tone is
+/// the figure, not the ground — which is the role question none of the earlier
+/// candidates asked.
+///
+/// `f32::INFINITY` when the frame does not depart from its own modal band at all,
+/// which is the maximal reading of *the modal band is the figure* and keeps the
+/// column monotone in the direction it classifies.
+fn role_ratio(img: &CaptureImage) -> f32 {
+    let derived = coverage(img, ground(img), EPS);
+    if derived <= 0.0 {
+        return f32::INFINITY;
     }
-    components as f32 * 1000.0 / lit as f32
+    coverage(img, BLACK, EPS) / derived
+}
+
+/// The `modal_connected` column: the share of the modal band's pixels sitting
+/// **outside** its largest 4-connected component.
+///
+/// The quantity the candidate is named for is the largest component's share, and
+/// this is its complement, because every column here is read as *higher = more
+/// structured* and a blot's mass is one piece. So a blot reads near `0.0` and a
+/// modal band broken into many pieces reads toward `1.0`; whether a perforated
+/// paper is one piece or many is what the column finds out.
+///
+/// `0.0` for a frame with no modal-band pixels at all, the convention the rest of
+/// the file uses for an empty population.
+fn modal_fragmentation(img: &CaptureImage) -> f32 {
+    let (w, h) = (img.width as usize, img.height as usize);
+    if w == 0 || h == 0 {
+        return 0.0;
+    }
+    let mask = ground_mask(img);
+    let total: u64 = mask.iter().filter(|&&b| b).count() as u64;
+    if total == 0 {
+        return 0.0;
+    }
+    let largest = component_sizes(&mask, w, h).into_iter().max().unwrap_or(0);
+    1.0 - largest as f32 / total as f32
 }
 
 /// Mean Sobel gradient magnitude over the **binary** lit mask, at capture
@@ -2667,7 +2924,8 @@ fn mask_sobel_density(img: &CaptureImage) -> f32 {
 /// reading is deterministic rather than iteration-order dependent.
 ///
 /// **Tile bounds are `i * w / tiles`, not `i * (w / tiles)`.** Every grid in
-/// [`TILE_SWEEP`] divides the [`SIZE`] capture exactly, so today no tile is
+/// [`TILE_SWEEP`] divides both the [`SIZE`] and the [`BIG_SIZE`] capture exactly,
+/// so today no tile is
 /// ragged; if a future capture size does not divide, the remainder is spread one
 /// pixel at a time across the grid rather than piled onto a last, wider tile.
 /// No tile is ever empty while `tiles <= min(width, height)`.
@@ -2728,14 +2986,102 @@ struct StructureRow {
     /// One value per [`STRUCTURE_CANDIDATES`] column.
     values: Vec<f32>,
     /// The frame's own `tonal_flatness`, which is **not** a candidate column:
-    /// it is the first term, and criterion 2 of ADR-0129's stop condition cannot
+    /// it is the first term, and criterion 2 of the stop condition cannot
     /// be read without it — a frame in the gap only disqualifies a candidate if
     /// the conjunction could ever reach it.
     flatness: f32,
+    /// `metrics::boundary_density` against [`BLACK`] and against the frame's own
+    /// derived ground, in that order.
+    ///
+    /// Retained rather than printed and dropped because the `role_ratio` column
+    /// is judged on **one of these two**, chosen per frame by the role the ratio
+    /// assigns it — and the cut that assigns it is not known until every row has
+    /// been read.
+    boundary_by_reference: [f32; 2],
     /// `Some(true)` = must read structureless, `Some(false)` = must read
     /// structured, `None` = shipped content, which must land outside the gap
     /// between those two.
     is_blot: Option<bool>,
+}
+
+/// One capture size's whole reading of the table.
+///
+/// Kept whole rather than reduced per size, because criterion 4 is a question
+/// about two sizes at once: whether the ordering criterion 1 asks for survives a
+/// change of resolution. Every perimeter-over-area column goes as ~`1/L`, so the
+/// *values* at [`SIZE`] and [`BIG_SIZE`] are never compared — only the ordering.
+struct SizedTable {
+    size: u32,
+    rows: Vec<StructureRow>,
+}
+
+/// One row's identity before it is captured — what [`structure_subjects`] hands
+/// the capture loop, once per capture size.
+///
+/// `system` is carried for the two blot anchors alone, whose validity conditions
+/// are per-family ([`coverage_floor`]).
+struct StructureSubject {
+    name: String,
+    system: SystemKind,
+    is_blot: Option<bool>,
+}
+
+/// The table's presets and their roles: the shipped library, the two frozen blot
+/// anchors, the frozen composition and the three frozen thin-stroke mandalas.
+///
+/// Built fresh per call because `Preset` is not `Clone` and each capture size
+/// needs its own renderer holding its own copy.
+fn structure_subjects() -> (Vec<Preset>, Vec<StructureSubject>) {
+    let (mut presets, meta) = sanity_roster();
+    let mut subjects: Vec<StructureSubject> = meta
+        .iter()
+        .map(|(name, system)| StructureSubject {
+            name: name.clone(),
+            system: *system,
+            is_blot: None,
+        })
+        .collect();
+
+    // The two blots that must read structureless. They are one defect class with
+    // two rim shapes — a stroke figure's rasterized notch band and a particle
+    // cloud's scatter — and a calibration on either alone measures the rim rather
+    // than the class (ADR-0161).
+    for blot in [blown_out(), ragged_blot()] {
+        let blot = without_backdrop(blot);
+        subjects.push(StructureSubject {
+            name: blot.name.clone(),
+            system: blot.system,
+            is_blot: Some(true),
+        });
+        presets.push(blot);
+    }
+
+    // The composition that must read structured — the preset ADR-0128 exists
+    // for, and the composition-side anchor of boundary_floor's default arm.
+    // It ships now, so `sanity_roster` carries a copy of it
+    // too; this row is the FROZEN one, and the two appearing side by side in the
+    // table is the point rather than a duplicate.
+    let held =
+        without_backdrop(Preset::from_toml_str(HELD_OUT_TOML).expect("the frozen anchor parses"));
+    subjects.push(StructureSubject {
+        name: held.name.clone(),
+        system: held.system,
+        is_blot: Some(false),
+    });
+    presets.push(held);
+
+    // Thin-stroke content, which a boundary measure must not mistake for a blot.
+    for mandala in retired_mandalas() {
+        let mandala = without_backdrop(mandala);
+        subjects.push(StructureSubject {
+            name: mandala.name.clone(),
+            system: mandala.system,
+            is_blot: None,
+        });
+        presets.push(mandala);
+    }
+
+    (presets, subjects)
 }
 
 /// Print, for the frozen blot fixture, the held-out `Tiled Rosette Mono`, the
@@ -2749,18 +3095,37 @@ struct StructureRow {
 /// **stop gate** must not be able to redden CI on its own, or the gate is
 /// decided by whichever candidate happens to be green.
 ///
-/// # The stop condition, which is mechanical
+/// # The stop condition, which is mechanical and registered before any number
 ///
-/// ADR-0129's three parts, all of which must hold for one candidate column —
-/// separation, nothing convictable in the gap, and a threshold that convicts the
-/// blot with margin. Two things the report does rather than assumes: the
-/// gap criterion is judged over the **conditional** population (frames in the
-/// gap below [`MAX_TONAL_FLATNESS`] are printed with their flatness, as reported
-/// and not disqualifying), and the third part's number is a measurement between
-/// the two frozen fixtures rather than a derived floor, so the margin and the
-/// column's legitimate spread are printed beside it. If no candidate passes all
-/// three the search stops, and the report prints that verdict per candidate
-/// rather than leaving it to be read off the rows.
+/// Four criteria, all of which must hold for one candidate column at **both**
+/// capture sizes:
+///
+/// 1. **Separation.** Both blot anchors read strictly below the frozen
+///    composition. `role_ratio` states this differently, because it classifies
+///    rather than measures — see [`judged_column`].
+/// 2. **Nothing convictable in the gap.** No library frame whose own
+///    `tonal_flatness` is over [`MAX_TONAL_FLATNESS`] reads between the higher
+///    blot and the composition. Frames in the gap *under* the ceiling are printed
+///    with their flatness and are reported rather than disqualifying: a
+///    conjunction's second term is only ever asked about frames that already
+///    failed the first (ADR-0129).
+/// 3. **The separation is wider than the defect class's own spread.** The gap
+///    from the higher blot to the composition exceeds the gap between the two
+///    blots. That compares quantities of one kind on one column at one size, and
+///    it is the property a single-anchor calibration cannot state at all.
+/// 4. **The ordering in 1 holds at [`SIZE`] and at [`BIG_SIZE`].** A verdict that
+///    flips between sizes is resolution-coupled, which is a stop.
+///
+/// The report prints all four per candidate per size and a final verdict, rather
+/// than leaving them to be read off the rows.
+///
+/// # Two blot anchors, not one
+///
+/// [`blown_out`] is a stroke figure and its rim is a rasterizer's notch band;
+/// [`ragged_blot`] is a particle cloud and its rim is scatter. A threshold
+/// measured between one blot and one composition cannot tell a property of the
+/// defect class from a property of that blot's rim, which is what ADR-0161
+/// found. Criterion 3 is what the second anchor buys.
 ///
 /// # Thin-stroke content is in the table on purpose
 ///
@@ -2772,232 +3137,439 @@ struct StructureRow {
 /// Run it with:
 ///
 /// ```text
-/// cargo nextest run -p rlx-core --test sanity --run-ignored all ///     each_structure_candidate_is_tabled_against_the_library --no-capture
+/// cargo nextest run -p rlx-core --test sanity --run-ignored all \
+///     each_structure_candidate_is_tabled_against_the_library --no-capture
 /// ```
 #[test]
 #[ignore = "measurement, not a gate: this informs a mechanical stop condition"]
 fn each_structure_candidate_is_tabled_against_the_library() {
-    let Some(mut renderer) = common::headless(SIZE, SIZE) else {
-        return;
-    };
-
-    let (mut presets, meta) = sanity_roster();
-    let mut roles: Vec<(String, Option<bool>)> =
-        meta.iter().map(|(n, _)| (n.clone(), None)).collect();
-
-    // The blot that must read structureless.
-    let blot = without_backdrop(blown_out());
-    roles.push((blot.name.clone(), Some(true)));
-    presets.push(blot);
-
-    // The composition that must read structured — the preset ADR-0128 exists
-    // for, and the composition-side anchor of boundary_floor's default arm.
-    // It ships now (Plan 0119 Phase 4), so `sanity_roster` carries a copy of it
-    // too; this row is the FROZEN one, and the two appearing side by side in the
-    // table is the point rather than a duplicate.
-    let held =
-        without_backdrop(Preset::from_toml_str(HELD_OUT_TOML).expect("the frozen anchor parses"));
-    roles.push((held.name.clone(), Some(false)));
-    presets.push(held);
-
-    // Thin-stroke content, which a boundary measure must not mistake for a blot.
-    for mandala in retired_mandalas() {
-        let mandala = without_backdrop(mandala);
-        roles.push((mandala.name.clone(), None));
-        presets.push(mandala);
-    }
-
-    renderer.set_presets(presets);
-
     println!("{}", "=".repeat(78));
     println!("candidate structural statistics, at LOUD");
     println!("{}", "=".repeat(78));
-    println!("candidates (higher = more structured, in every column):");
+    println!("candidates (higher = more structured, in every column but `role_ratio`):");
     for cand in STRUCTURE_CANDIDATES {
-        println!("  {:<13} {}", cand.name, cand.note);
+        println!("  {:<15} {}", cand.name, cand.note);
     }
-    println!("  tile sweep: {TILE_SWEEP:?} tiles per side at {SIZE}x{SIZE}, all exact divisors");
+    println!(
+        "  tile sweep: {TILE_SWEEP:?} tiles per side, all exact divisors of both capture sizes"
+    );
     println!("`flat=` is the frame's own tonal_flatness, ceiling {MAX_TONAL_FLATNESS:.2}.");
     println!("  It is term one and not a candidate: it decides whether a row reaches term");
     println!("  two at all (ADR-0129 criterion 2).");
-    println!(
-        "roles: [blot] must read lowest, [comp] must read above it, the rest must not fall \
-         between them"
-    );
-    println!("  while being flat enough for the conjunction to reach.");
+    println!("roles: the two [blot] rows must read lowest, [comp] must read above both, the rest");
+    println!("  must not fall between them while being flat enough for the conjunction to reach.");
     println!(
         "NOTE: `Sumi`, `Whorl`, `Supernova` and `Neon Tunnel` are the four groundless luminous"
     );
     println!("  fields ADR-0128 records as the same open question - read their rows deliberately.");
-    println!();
 
-    // Where the tile sweep starts, so a row prints the whole-frame candidates on
-    // one line and the curve on the next instead of one 130-column line.
+    // Where the tile sweep starts and ends, so a row prints the whole-frame
+    // candidates, the tile curve and the figure/ground candidates on three lines
+    // instead of one 200-column one.
     let tiled_from = STRUCTURE_CANDIDATES
         .iter()
         .position(|c| matches!(c.measure, Measure::Tiled(_)))
         .unwrap_or(STRUCTURE_CANDIDATES.len());
+    let tiled_to = STRUCTURE_CANDIDATES
+        .iter()
+        .rposition(|c| matches!(c.measure, Measure::Tiled(_)))
+        .map_or(tiled_from, |i| i + 1);
 
     let frame = loud();
-    let mut rows: Vec<StructureRow> = Vec::new();
-    for (name, is_blot) in &roles {
-        let img = renderer
-            .capture_preset(name, &frame, FRAMES)
-            .expect("capture preset");
-        let values: Vec<f32> = STRUCTURE_CANDIDATES.iter().map(|c| c.read(&img)).collect();
-        let flatness = tonal_flatness(&img, ground(&img), EPS);
-        let role = match is_blot {
-            Some(true) => "[blot]",
-            Some(false) => "[comp]",
-            None => "      ",
+    let mut tables: Vec<SizedTable> = Vec::new();
+    for size in [SIZE, BIG_SIZE] {
+        let Some(mut renderer) = common::headless(size, size) else {
+            return;
         };
-        let printed: Vec<String> = STRUCTURE_CANDIDATES
-            .iter()
-            .zip(values.iter())
-            .map(|(c, v)| format!("{}={v:.4}", c.name))
-            .collect();
-        println!(
-            "{role} {name:<22} flat={flatness:.4}  {}",
-            printed[..tiled_from].join("  ")
-        );
-        println!("{:30}{}", "", printed[tiled_from..].join("  "));
-        rows.push(StructureRow {
-            name: name.clone(),
-            values,
-            flatness,
-            is_blot: *is_blot,
-        });
+        let (presets, subjects) = structure_subjects();
+        renderer.set_presets(presets);
+
+        println!();
+        println!("-- capture {size}x{size} {}", "-".repeat(50));
+
+        let mut rows: Vec<StructureRow> = Vec::new();
+        for subject in &subjects {
+            let img = renderer
+                .capture_preset(&subject.name, &frame, FRAMES)
+                .expect("capture preset");
+            let values: Vec<f32> = STRUCTURE_CANDIDATES.iter().map(|c| c.read(&img)).collect();
+            let flatness = tonal_flatness(&img, ground(&img), EPS);
+            let boundary_by_reference = [
+                boundary_density(&img, BLACK, EPS),
+                boundary_density(&img, ground(&img), EPS),
+            ];
+            let role = match subject.is_blot {
+                Some(true) => "[blot]",
+                Some(false) => "[comp]",
+                None => "      ",
+            };
+            let printed: Vec<String> = STRUCTURE_CANDIDATES
+                .iter()
+                .zip(values.iter())
+                .map(|(c, v)| format!("{}={v:.4}", c.name))
+                .collect();
+            println!(
+                "{role} {:<22} flat={flatness:.4}  {}",
+                subject.name,
+                printed[..tiled_from].join("  ")
+            );
+            println!("{:30}{}", "", printed[tiled_from..tiled_to].join("  "));
+            println!("{:30}{}", "", printed[tiled_to..].join("  "));
+            if subject.is_blot == Some(true) {
+                report_anchor_validity(subject, &img);
+            }
+            rows.push(StructureRow {
+                name: subject.name.clone(),
+                values,
+                flatness,
+                boundary_by_reference,
+                is_blot: subject.is_blot,
+            });
+        }
+        tables.push(SizedTable { size, rows });
     }
 
-    report_structure_separation(&rows);
+    report_structure_separation(&tables);
 }
 
-/// Per candidate, ADR-0129's three-part stop condition — **the whole criterion**,
-/// printed rather than left to the reader.
+/// The validity conditions a blot anchor is chosen against, printed per anchor
+/// per capture size.
 ///
-/// The correction over the criterion this instrument shipped with is criterion 2:
-/// a frame between the two anchors disqualifies a candidate only if the
-/// conjunction could ever reach it, which means only if its own
-/// `tonal_flatness` is above [`MAX_TONAL_FLATNESS`]. Everything else in the gap
-/// is printed with its flatness and marked as reported, because a reading that
-/// cannot be checked is a reading that gets believed.
-fn report_structure_separation(rows: &[StructureRow]) {
-    println!();
-    println!("separation at LOUD (ADR-0129's corrected stop condition):");
+/// **These are the only conditions either fixture's parameters answer to.** A
+/// fixture tuned until a candidate column separates is a fixture that proves
+/// nothing about the candidate, so what an anchor must show is only that it is a
+/// blot at all: against [`BLACK`] it clears its family's [`coverage_floor`],
+/// [`MIN_QUADRANTS`] and [`MIN_STRUCTURAL_SHELLS`] — it is a real shape, the
+/// right size, in every quadrant — and it is over [`MAX_TONAL_FLATNESS`] against
+/// **both** references, so term one reaches it whichever lens is used.
+fn report_anchor_validity(subject: &StructureSubject, img: &CaptureImage) {
+    let floor = coverage_floor(subject.system);
+    let cov = coverage(img, BLACK, EPS);
+    let quads = quadrant_spread(img, BLACK, EPS);
+    let shells = radial_shell_occupancy(img, BLACK, EPS);
+    let flat_black = tonal_flatness(img, BLACK, EPS);
+    let flat_derived = tonal_flatness(img, ground(img), EPS);
+    let areal = cov >= floor && quads >= MIN_QUADRANTS && shells >= MIN_STRUCTURAL_SHELLS;
+    let flat = flat_black > MAX_TONAL_FLATNESS && flat_derived > MAX_TONAL_FLATNESS;
+    println!(
+        "{:30}validity vs BLACK: cov {cov:.4} (floor {floor:.2})  quads {quads}  \
+         shells {shells}/{RADIAL_SHELLS}  -> {}",
+        "",
+        if areal { "areal OK" } else { "AREAL FAILS" },
+    );
+    println!(
+        "{:30}validity flat: {flat_black:.4} vs BLACK, {flat_derived:.4} vs derived \
+         (ceiling {MAX_TONAL_FLATNESS:.2})  -> {}",
+        "",
+        if flat { "flat OK" } else { "FLATNESS FAILS" },
+    );
+}
 
-    let find = |want: bool| rows.iter().find(|r| r.is_blot == Some(want));
-    let (Some(blot), Some(comp)) = (find(true), find(false)) else {
-        println!("  the table is missing one of its two anchors — nothing to decide on");
-        return;
+/// The column a candidate is judged on at one capture size, plus whatever the
+/// candidate had to decide before that column existed.
+struct JudgedColumn {
+    /// One value per row, in the table's own order.
+    values: Vec<f32>,
+    /// `false` when the candidate's own precondition failed. Only
+    /// [`Measure::Role`] has one, and its failure **is** criterion 1 failing —
+    /// a classifier that does not classify has separated nothing.
+    precondition: bool,
+    /// Printed under criterion 1, so a cut and the roles it assigned are visible
+    /// rather than inferred back out of the values.
+    notes: Vec<String>,
+}
+
+/// What one candidate is judged on at one size.
+///
+/// Four of the five new columns and all five pre-existing ones judge themselves.
+/// `role_ratio` does not: it answers *which population is the figure*, and what
+/// the stop condition asks of it is what **term two** would then read — so its
+/// judged column is `metrics::boundary_density` against [`BLACK`] for a frame the
+/// ratio places on the blot side of the cut, and against the derived ground for
+/// every other frame.
+///
+/// **The cut is a measurement, not a constant.** It is the midpoint between the
+/// lower blot's ratio and the highest ratio among the conditional population's
+/// non-blot members, so it exists only if those two are ordered that way — and
+/// when they are not, no cut classifies the table and criterion 1 has failed
+/// before any boundary is read.
+fn judged_column(ci: usize, cand: &StructureCandidate, rows: &[StructureRow]) -> JudgedColumn {
+    let raw = |r: &StructureRow| r.values.get(ci).copied().unwrap_or(f32::NAN);
+    if !matches!(cand.measure, Measure::Role) {
+        return JudgedColumn {
+            values: rows.iter().map(raw).collect(),
+            precondition: true,
+            notes: Vec::new(),
+        };
+    }
+
+    let lower_blot = rows
+        .iter()
+        .filter(|r| r.is_blot == Some(true))
+        .map(raw)
+        .fold(f32::INFINITY, f32::min);
+    let top_other = rows
+        .iter()
+        .filter(|r| r.is_blot != Some(true) && r.flatness > MAX_TONAL_FLATNESS)
+        .map(raw)
+        .fold(f32::NEG_INFINITY, f32::max);
+    let mut notes = Vec::new();
+    if !lower_blot.is_finite() || !top_other.is_finite() {
+        notes.push(format!(
+            "no cut exists: lower blot reads {lower_blot:.4}, the conditional population's \
+             highest non-blot reads {top_other:.4}"
+        ));
+        return JudgedColumn {
+            values: vec![f32::NAN; rows.len()],
+            precondition: false,
+            notes,
+        };
+    }
+
+    let cut = (lower_blot + top_other) / 2.0;
+    notes.push(format!(
+        "cut {cut:.4}, the midpoint of the lower blot's {lower_blot:.4} and the conditional \
+         population's highest non-blot {top_other:.4}"
+    ));
+    // Both blots above the cut and every conditional non-blot member below it.
+    // The lower blot is the minimum over the blots and `top_other` the maximum
+    // over the others, so the two comparisons below are the whole condition.
+    let precondition = lower_blot > cut && top_other < cut;
+    if !precondition {
+        notes.push(
+            "the cut does not place both blots on one side and the conditional population on \
+             the other"
+                .to_string(),
+        );
+    }
+    let values: Vec<f32> = rows
+        .iter()
+        .map(|r| {
+            let on_blot_side = raw(r) >= cut;
+            r.boundary_by_reference[usize::from(!on_blot_side)]
+        })
+        .collect();
+    for r in rows.iter().filter(|r| r.is_blot.is_some()) {
+        let side = if raw(r) >= cut {
+            "figure (term two reads BLACK)"
+        } else {
+            "ground (term two reads the derived ground)"
+        };
+        notes.push(format!(
+            "{:<22} ratio {:.4} -> the modal band is {side}",
+            r.name,
+            raw(r)
+        ));
+    }
+    JudgedColumn {
+        values,
+        precondition,
+        notes,
+    }
+}
+
+/// Criteria 1 to 3 of the registered stop condition at one capture size, printed
+/// as they are read. Returns which of the three held.
+///
+/// Criterion 4 is not here: it is a question about two sizes at once and
+/// [`report_structure_separation`] asks it from these answers.
+fn judge_size(cand: &StructureCandidate, table: &SizedTable, col: &JudgedColumn) -> [bool; 3] {
+    let size = table.size;
+    let rows = &table.rows;
+    let blots: Vec<(usize, &StructureRow)> = rows
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| r.is_blot == Some(true))
+        .collect();
+    let comp = rows
+        .iter()
+        .enumerate()
+        .find(|(_, r)| r.is_blot == Some(false));
+    let (Some((comp_i, comp_row)), true) = (comp, blots.len() >= 2) else {
+        println!(
+            "      {size}x{size} (1) the table is missing an anchor: {} blot(s), \
+             {} composition(s)   -> FAILS",
+            blots.len(),
+            usize::from(comp.is_some()),
+        );
+        return [false; 3];
     };
 
-    // Criterion 2's population, printed once: the frames a second term can
-    // reach at all. ADR-0129 records this as two members, one of which is the
-    // preset the change exists to admit — if it is ever larger, the calibration
-    // stopped being a two-point one and the threshold's docstring is stale.
-    let reachable: Vec<&StructureRow> = rows
-        .iter()
-        .filter(|r| r.flatness > MAX_TONAL_FLATNESS)
-        .collect();
-    println!("  the conditional population - every frame a second term can reach at all");
-    println!("  (its own flatness is over the {MAX_TONAL_FLATNESS:.2} ceiling):");
-    for r in &reachable {
-        let role = match r.is_blot {
-            Some(true) => "[blot]",
-            Some(false) => "[comp]",
-            None => "      ",
-        };
-        println!("      {role} {:<22} flat={:.4}", r.name, r.flatness);
+    let hi = col.values[comp_i];
+    let blot_vals: Vec<f32> = blots.iter().map(|(i, _)| col.values[*i]).collect();
+    let higher = blot_vals.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+    let lower = blot_vals.iter().copied().fold(f32::INFINITY, f32::min);
+
+    // (1) Separation — both blots strictly below the composition, and whatever
+    // the candidate itself had to establish first.
+    for note in &col.notes {
+        println!("      {size}x{size} (1) {note}");
+    }
+    for ((_, r), v) in blots.iter().zip(blot_vals.iter()) {
+        println!("      {size}x{size} (1) [blot] {:<22} {v:.4}", r.name);
     }
     println!(
-        "      {} member(s). Every other frame passes term one and is never",
-        reachable.len()
+        "      {size}x{size} (1) [comp] {:<22} {hi:.4}",
+        comp_row.name
     );
-    println!("      asked the second question.");
-    println!();
-
-    for (ci, cand) in STRUCTURE_CANDIDATES.iter().enumerate() {
-        let (Some(&lo), Some(&hi)) = (blot.values.get(ci), comp.values.get(ci)) else {
-            continue;
-        };
-
-        // (1) Separation.
-        if lo >= hi {
-            println!(
-                "  {:<13} (1) NOT SEPARATED: {} reads {lo:.4}, {} reads {hi:.4}   -> FAILS",
-                cand.name, blot.name, comp.name,
-            );
-            continue;
+    let c1 = col.precondition && blot_vals.iter().all(|&v| v < hi);
+    println!(
+        "      {size}x{size} (1) {}",
+        if c1 {
+            format!(
+                "separated: the higher blot at {higher:.4} is {:.4} below",
+                hi - higher
+            )
+        } else {
+            "NOT SEPARATED".to_string()
         }
-        println!(
-            "  {:<13} (1) separated by {:.4} ({lo:.4} -> {hi:.4}), a {:.2}x margin",
-            cand.name,
-            hi - lo,
-            if lo > 0.0 { hi / lo } else { f32::INFINITY },
-        );
+    );
 
-        // (2) Nothing convictable in the gap.
-        let in_gap: Vec<&StructureRow> = rows
+    // (2) Nothing convictable in the gap.
+    let in_gap: Vec<&StructureRow> = rows
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| r.is_blot.is_none())
+        .filter(|(i, _)| col.values[*i] > higher && col.values[*i] < hi)
+        .map(|(_, r)| r)
+        .collect();
+    let convictable = in_gap
+        .iter()
+        .filter(|r| r.flatness > MAX_TONAL_FLATNESS)
+        .count();
+    println!(
+        "      {size}x{size} (2) {} frame(s) in the gap, {convictable} of them above the \
+         flatness ceiling",
+        in_gap.len(),
+    );
+    for r in &in_gap {
+        let verdict = if r.flatness > MAX_TONAL_FLATNESS {
+            "DISQUALIFYING - the conjunction reaches this frame"
+        } else {
+            "reported, not disqualifying - term one clears it"
+        };
+        let v = rows
             .iter()
-            .filter(|r| r.is_blot.is_none())
-            .filter(|r| r.values.get(ci).is_some_and(|&v| v > lo && v < hi))
-            .collect();
-        let convictable = in_gap
+            .position(|o| o.name == r.name)
+            .map_or(f32::NAN, |i| col.values[i]);
+        println!(
+            "          in the gap  {:<22} {}={v:.4}  flat={:.4}  {verdict}",
+            r.name, cand.name, r.flatness,
+        );
+    }
+    let c2 = convictable == 0;
+
+    // (3) The separation against the defect class's own spread. Both gaps are
+    // read on this column at this size, so they are quantities of one kind
+    // (ADR-0074) — which is the comparison a single-anchor calibration has no
+    // way to make at all.
+    let gap = hi - higher;
+    let spread = higher - lower;
+    let c3 = gap > spread;
+    println!(
+        "      {size}x{size} (3) blot-to-composition gap {gap:.4} against blot-to-blot \
+         spread {spread:.4}   -> {}",
+        if c3 { "wider" } else { "NOT WIDER" }
+    );
+    let legit: Vec<f32> = rows
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| r.is_blot.is_none())
+        .map(|(i, _)| col.values[i])
+        .collect();
+    let spread_lo = legit.iter().copied().fold(f32::INFINITY, f32::min);
+    let spread_hi = legit.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+    println!("          library spread on this column: {spread_lo:.4}..{spread_hi:.4}");
+
+    [c1, c2, c3]
+}
+
+/// Per candidate, the registered four-criterion stop condition at both capture
+/// sizes — **the whole criterion**, printed rather than left to the reader.
+///
+/// The conditional population is printed per size first, with every member
+/// named: criterion 2 is judged over it rather than over the whole table,
+/// because a conjunction's second term is only ever asked about frames that
+/// already failed the first (ADR-0129). Everything else in a gap is printed with
+/// its flatness and marked as reported, because a reading that cannot be checked
+/// is a reading that gets believed.
+fn report_structure_separation(tables: &[SizedTable]) {
+    println!();
+    println!("{}", "=".repeat(78));
+    println!("the registered stop condition, at LOUD");
+    println!("{}", "=".repeat(78));
+
+    for table in tables {
+        let size = table.size;
+        let reachable: Vec<&StructureRow> = table
+            .rows
             .iter()
             .filter(|r| r.flatness > MAX_TONAL_FLATNESS)
-            .count();
+            .collect();
         println!(
-            "      (2) {} frame(s) in the gap, {convictable} of them above the flatness ceiling",
-            in_gap.len(),
+            "  the conditional population at {size}x{size} - every frame a second term can \
+             reach at all"
         );
-        for r in &in_gap {
-            let verdict = if r.flatness > MAX_TONAL_FLATNESS {
-                "DISQUALIFYING - the conjunction reaches this frame"
-            } else {
-                "reported, not disqualifying - term one clears it"
+        println!("  (its own flatness is over the {MAX_TONAL_FLATNESS:.2} ceiling):");
+        for r in &reachable {
+            let role = match r.is_blot {
+                Some(true) => "[blot]",
+                Some(false) => "[comp]",
+                None => "      ",
             };
-            println!(
-                "          in the gap  {:<22} {}={:.4}  flat={:.4}  {verdict}",
-                r.name,
-                cand.name,
-                r.values.get(ci).copied().unwrap_or(f32::NAN),
-                r.flatness,
-            );
+            println!("      {role} {:<22} flat={:.4}", r.name, r.flatness);
+        }
+        println!(
+            "      {} member(s). Every other frame passes term one and is never",
+            reachable.len()
+        );
+        println!("      asked the second question.");
+    }
+
+    for (ci, cand) in STRUCTURE_CANDIDATES.iter().enumerate() {
+        println!();
+        println!("  {} {}", cand.name, "-".repeat(70 - cand.name.len()));
+        let mut failures: Vec<String> = Vec::new();
+        let mut separated: Vec<(u32, bool)> = Vec::new();
+        for table in tables {
+            let col = judged_column(ci, cand, &table.rows);
+            let held = judge_size(cand, table, &col);
+            separated.push((table.size, held[0]));
+            for (n, ok) in held.iter().enumerate() {
+                if !ok {
+                    failures.push(format!("({}) at {}x{}", n + 1, table.size, table.size));
+                }
+            }
         }
 
-        // (3) A threshold that convicts the blot, named for what it is.
-        //
-        // Half the sparsest legitimate content — the ceremony every other
-        // constant in this file follows (ADR-0071) — is not available here: the
-        // conditional population has one legitimate member and it is the preset
-        // being admitted, so deriving from it would be circular. The number is a
-        // measurement taken between the two frozen fixtures, and the spread
-        // beside it is what says whether the separation sits outside the
-        // library's own range or inside it.
-        let threshold = (lo + hi) / 2.0;
-        let legit: Vec<f32> = rows
+        // (4) The ordering criterion 1 asks for, at both sizes. A candidate that
+        // separates the anchors at one capture size and not the other is
+        // measuring the resolution rather than the picture.
+        let ordering: Vec<String> = separated
             .iter()
-            .filter(|r| r.is_blot.is_none())
-            .filter_map(|r| r.values.get(ci).copied())
+            .map(|(size, ok)| {
+                format!(
+                    "{size}x{size} {}",
+                    if *ok { "holds" } else { "does not hold" }
+                )
+            })
             .collect();
-        let spread_lo = legit.iter().copied().fold(f32::INFINITY, f32::min);
-        let spread_hi = legit.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-        println!("      (3) threshold {threshold:.4}, measured between the two frozen fixtures:");
-        println!("          {} reads {lo:.4} - CONVICTED", blot.name);
-        println!("          library spread on this column: {spread_lo:.4}..{spread_hi:.4}");
-        let superseded = spread_lo / 2.0;
-        let would = if lo < superseded {
-            "convict"
-        } else {
-            "NOT convict"
-        };
-        println!("          (superseded ceremony: half the sparsest legitimate = {superseded:.4},");
-        println!("          which would {would} the blot)");
+        println!(
+            "      (4) the criterion-1 ordering: {}",
+            ordering.join(", ")
+        );
+        if !separated.iter().all(|(_, ok)| *ok) {
+            failures.push("(4) the ordering does not hold at both sizes".to_string());
+        }
 
-        if convictable == 0 {
-            println!("      PASSES the stop condition");
+        if failures.is_empty() {
+            println!("      {} PASSES the stop condition", cand.name);
         } else {
-            println!("      FAILS the stop condition");
+            println!(
+                "      {} FAILS the stop condition: {}",
+                cand.name,
+                failures.join("; ")
+            );
         }
     }
 }

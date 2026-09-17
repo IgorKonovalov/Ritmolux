@@ -1,6 +1,6 @@
 # 0186 — The flatness gate tells a figure from its ground
 
-> **Status:** approved (2026-09-14)
+> **Status:** in-progress (2026-09-17)
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`, `human`
 > **Related ADRs:** [0161](../adrs/0161-the-blot-anchor-becomes-a-defect-record-because-term-two-reads-the-fringe.md)
@@ -284,16 +284,66 @@ flowchart TB
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(`main` directly, or the worktree path plus its branch)_
+**Lane:** `C:\Users\Igor Konovalov\WORK\rlx-plan-0186` on branch
+`plan-0186-the-flatness-gate-tells-a-figure-from-its-ground`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The figure/ground candidates join the table | dev | not started | |
+| 1 — The figure/ground candidates join the table | dev | done | committed with this row |
 | 2 — The gate | human | not started | |
 | 3 — Term two reads the figure (or the conviction retires) | dev | not started | |
 | 4 — The reader says what the gate does | dev | not started | |
 
 ### Notes
+
+**Phase 1.** The verdict lines the run printed, in the order the report prints them
+(`cargo nextest run -p rlx-core --test sanity --run-ignored all
+each_structure_candidate_is_tabled_against_the_library --no-capture`):
+
+```text
+flatness^-1 FAILS: (1) at 96x96; (3) at 96x96; (1) at 192x192; (3) at 192x192; (4)
+boundary    FAILS: (1) at 96x96; (3) at 96x96; (1) at 192x192; (3) at 192x192; (4)
+components  FAILS: (1) at 96x96; (3) at 96x96; (4)
+sobel       PASSES
+tile@4      FAILS: (1) at 96x96; (3) at 96x96; (1) at 192x192; (3) at 192x192; (4)
+tile@6      PASSES
+tile@8      FAILS: (3) at 96x96; (3) at 192x192
+tile@12     PASSES
+tile@16     PASSES
+ground_side PASSES
+border_ground FAILS: (1) at 96x96; (3) at 96x96; (1) at 192x192; (3) at 192x192; (4)
+min_ground  PASSES
+role_ratio  PASSES
+modal_connected PASSES
+```
+
+**Phase 1 deviations.**
+
+- **`modal_connected` prints the complement of the quantity the plan names.** The plan
+  defines it as the share of the modal band's pixels in its largest 4-connected
+  component *and* requires every column to print higher = more structured; those
+  two are opposite on a blot, whose mass is one piece. The column is the share
+  **outside** the largest component; the plan's quantity is `1 -` the printed value.
+  Commit as this row.
+- **`report_structure_separation`'s ADR-0129 three-part print is replaced, not
+  extended, by the four-criterion one**, since the plan registers a different
+  criterion 3 and adds a criterion 4, and the plan asks the five pre-existing columns
+  to be judged by the same four. The "superseded ceremony: half the sparsest
+  legitimate" line went with it; the library-spread line beside criterion 3 stayed.
+  Commit as this row.
+- **`component_density` now calls a shared `component_sizes` helper** rather than
+  carrying its own copy of the flood fill, because `modal_connected` needs the same
+  traversal. Same algorithm, same 4-connected mask.
+
+**The second anchor's parameters, and when they stopped moving.** `ragged_blot` went
+through five settings before it met the plan's validity conditions — a Clifford cloud
+at the deposit ceiling (`flat` vs the derived ground `0.8574`), a white-palette swarm
+(`0.1690`), the same swarm at `zoom 0.85` (`0.1692`), a white-palette Clifford at
+`zoom 1.9` (`0.8061`, then `0.8526` with `exposure`), and `zoom 1.55` (`0.8599`). Each
+was read on the validity lines alone. The sixth — `fade 0.55`, `trails 0`,
+`exposure 2`, `zoom 1.6` — is the first that clears them (`0.9451` vs `BLACK`,
+`0.9285` vs the derived ground at 96×96; `0.9462` / `0.9304` at 192×192), and **no
+parameter moved after it**: the table quoted above is that run's.
 
 ### Close triggers
 
