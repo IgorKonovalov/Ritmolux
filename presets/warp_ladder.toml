@@ -149,10 +149,15 @@ deposit = "6.5 + clamp(bass * 1.06, 0, 0.9)"
 # at this deposit rather than leaving the figure as a disc in a black field.
 decay = "0.955"
 
-# THE MARCH. Slightly below 1, so the resample reads from a little inside itself
-# and the field creeps OUTWARD. Above 1 it would tunnel inward and the ladder
-# would march into the centre and vanish, which is the same mechanism run
-# backwards and reads as a drain.
+# THE DRIFT, AND IT IS NOT WHAT MAKES THE RUNGS MARCH. The resample is the
+# INVERSE of the motion it names - a destination vertex asks where its content
+# came from - so slightly below 1 means each vertex reads the past from a little
+# OUTSIDE itself and the field's content creeps INWARD. Above 1 shrinks the
+# source window and the past appears to grow outward instead, which is what
+# `core/tests/fixtures/warp_mesh_ladder.toml` uses 1.04 for. What sends the rungs
+# OUTWARD here is `color_center` below, sliding the palette coordinate, and it
+# does that whatever the resample is doing. This value is a slow counter-drift
+# under that march, not its cause.
 zoom = "0.975"
 rot  = "0"
 
@@ -187,8 +192,11 @@ color_center = "time * 0.045 + clamp(onset * 0.25, 0, 0.15)"
 hue          = "0"
 saturation   = "1.0"
 
-# OFF - each is a gradient generator, and this world's whole claim is that it has
-# six exact colours in it. Bloom blurs precisely the hard edges the runs create;
+# OFF - each is a gradient generator, and this world's whole claim is that it
+# PRINTS rather than shades: two inks laid in six runs, sixty exact frame colours
+# where the unbanded version measures 851, and nothing in the frame that the
+# palette and the coverage quantizer did not put there. Bloom blurs precisely the
+# hard edges the runs create;
 # trails would smear one rung into the next as they travel; the echo mixes the
 # field with a scaled copy of itself, which mixes LEVELS and so would move rungs
 # rather than add colours - but it also softens where they land.

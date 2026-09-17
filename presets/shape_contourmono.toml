@@ -33,8 +33,12 @@
 # in the frame became 684, because every step of every falloff is a value the
 # palette never named. The paragraph here used to file that as feedback, and the
 # feedback was answered. `palette_contour_style = "1"` fills the same footprint
-# with a step instead of a ramp, so the frame measures 9 again, and the red's
-# pure share comes back to 4.57 % from 4.69 %.
+# with a step instead of a ramp, so the frame measures 9 again, and the red's pure
+# share comes back to 4.57 % from 4.63 %. Those two are one reading, taken
+# together on one stimulus; the 684 above is the figure this header carried from
+# the start, on a stimulus and a frame count nobody wrote down, and the same
+# picture measures 677 under the one the two shares come from. Do not put a
+# difference between numbers taken on different stimuli - re-render both.
 #
 # 1.0 AND NOT LESS, WHICH IS THE OPPOSITE OF THE USUAL ADVICE, and under the hard
 # style the reason stops being a trade. The SET of pixels the contour touches
