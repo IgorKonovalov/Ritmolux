@@ -335,7 +335,7 @@ flowchart LR
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The equilibrium instrument | dev | done | `20ba8731` |
-| 2 — Name the mechanism | dev | parked | |
+| 2 — Name the mechanism | dev | done | committed with this row |
 | 3 — Bound the equilibrium | dev | not started | |
 | 4 — The look gate | human | not started | |
 | 5 — ADR-0113's third Outcome | dev | not started | |
@@ -379,25 +379,19 @@ probe at f30, and the present-pass gain.
 - **`FieldTrace` in `warp_mesh/tests.rs` was listed under Files touched and was not changed.** It is
   the synthetic per-frame probe driven by an empty bundle, and nothing the re-taken table needed
   reached it.
-- **Phase 2 is parked: its source read is not performable from a conductor session (2026-09-17).**
-  The phase's first instruction is to read `xeiraex/milkdrop2` at `d4c843a`,
-  `vis_milk2/milkdropfs.cpp`, for the feedback loop's decay, echo and gamma, their order and their
-  domain. There is no checkout of that repository on this machine (`WORK/milkdrop-corpus/` holds
-  `.milk` presets and textures only), the repository records none of those facts — Plan 0173 read
-  the geometry and Plan 0180 the waveform and the uv chain, neither the loop — and the session
-  allowlist denies every route to fetch it: `git ls-remote`/`git clone` and the browser tool's
-  evaluation are both refused, and there is no fetch tool. Phase 2's honest stop branch ("the
-  instrument cannot see it") is a conclusion about the instrument and is not what this is, so
-  reaching it without the read would be a workaround.
-- **The park above is discharged (2026-09-17, by the owner's session).** `xeiraex/milkdrop2` is
-  cloned at `WORK/milkdrop2-src`, checked out at exactly `d4c843a` — *"Original Milkdrop 2 v2.25c
-  source code"* — with `vis_milk2/milkdropfs.cpp` present, and the lane reads it through the
-  `add_dirs` entry beside the preset corpus (`tools/conductor/queue.json`, `69b2fad8`). The source
-  read Phase 2 opens on is now performable; nothing else about the phase changed.
-- **Phase 2's `Files touched` names `docs/design-backlog.md`, and backlog 0113's body is in
-  `docs/design-backlog-archive.md`.** It moved there on 2026-09-15 on promotion (ADR-0206), the day
-  after the amendment that wrote the line. The dated update the phase owes goes to the archived
-  body.
+- **Phase 2's dated update went to `docs/design-backlog-archive.md`, not to the
+  `docs/design-backlog.md` its `Files touched` names.** Backlog 0113's body moved to the archive on
+  2026-09-15 on promotion (ADR-0206), the day after the amendment that wrote that line; the live
+  file carries no 0113 body to update. Nothing was added to the live file.
+- **Phase 2 named a mechanism, so Phase 3 runs rather than skipping to Phase 5.** The reading is
+  backlog 0113's `### Update 2026-09-17` in the archive: the reference's per-frame arithmetic with
+  file, function and line, the two terms of the divergence, the bound each puts on it, and the one
+  source-scale term the arithmetic does not settle.
+- **`git` outside the lane is denied to this session**, so the source checkout's commit was not
+  re-verified here; the read is of the tree at `WORK/milkdrop2-src`, which the owner's session
+  recorded as `d4c843a`. The rig the look gate uses is the later `foo_vis_milk2` 0.2.0.0 DX11 port
+  of the same project, and whether that port kept `D3DCOLOR_RGBA_01`'s truncation is not readable
+  from this tree.
 
 ### Close triggers
 

@@ -11516,6 +11516,105 @@ threshold here would be adapter-dependent; the probe asserts none.
 
 - **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md) owns the ask, and its close appends the `CLOSED` marker here.
 
+### Update 2026-09-17 — [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md) Phase 2 read the reference's source. **The mechanism is the decay term, and it is two divergences rather than one.**
+
+**The entry stays live until Phase 3 lands a repair.** Every earlier attempt on this defect inferred the
+reference's loop from pictures. This one reads it: `xeiraex/milkdrop2` at `d4c843a` (MilkDrop 2 v2.25c),
+checked out outside this repository. Nothing from it is copied here; every claim below cites file,
+function and line.
+
+**What the reference does per frame, for a preset with no warp shader.** All five washed pairs are
+MilkDrop 1.x files, and `state.cpp` l.1315-1328 gives a file below `MILKDROP_PRESET_VERSION` 200 a
+`nWarpPSVersionInFile` of `0`; `milkdropfs.cpp` l.946 turns that into `bNewPresetUsesWarpShader = false`,
+which selects `CPlugin::WarpedBlit_NoShaders` (l.1098). So the arithmetic below is the *whole* loop for
+them.
+
+1. **The domain is 8-bit and display-referred.** `m_lpVS[0]`/`[1]` are created at `D3DFMT_X8R8G8B8`
+   (`plugin.cpp` l.1884-1890, off `m_nTexBitsPerCh`, default `8` at l.951) — a plain UNORM, not an sRGB
+   format — and the source linearizes nowhere. Every value in the loop is a code value.
+2. **Decay is the only multiplicative term in the loop, and it is truncated to 8 bits.**
+   `WarpedBlit_NoShaders` reads `fDecay` (l.1995) and carries it as a vertex diffuse colour through
+   `D3DCOLOR_RGBA_01` (l.2007), which l.41 defines with `(int)(r*255)` — **truncation, not rounding** —
+   and the texture stage MODULATEs the sampled past by it (l.1981-1983). `fDecay = 0.98` therefore
+   reaches the hardware as **`249/255 = 0.97647059`**, never as `0.98`.
+3. **The order.** `ComputeGridAlphaValues` (l.1089) → the warp blit VS0 to VS1 (l.1092-1131) →
+   `BlurPasses` *only* when `m_nMaxPSVersion > 0` (l.1133), so an MD1 preset gets none → the shapes,
+   custom waves, waveform and borders deposit into VS1 (l.1137-1145). VS1 becomes the next frame's VS0.
+4. **Echo and gamma are outside the loop, and this engine already matches them.** The composite
+   (l.4147-4266) reads the finished VS texture and writes the back buffer: echo as
+   `lerp(base, zoomed, echo_alpha)`, gamma as `(int)(gamma-0.001)+1` additive `ONE`/`ONE` redraws.
+   Neither is fed back — which is what `PRESENT_SHADER` does here.
+
+So with `s` the per-frame deposit in code values, the reference's equilibrium is
+`c* = s / (1 - floor(fDecay*255)/255)`, and for *Fog Tunnel*'s `decay = 0.98` that is **`42.50 * s`**.
+
+**What this engine does.** `WARP_SHADER`'s `fs_main` multiplies the `Rgba16Float` field by `decay^dt` in
+**linear light** (`warp_mesh/shaders.rs`, the `faded` line) and then floors the result to 255 steps in the
+**sRGB-encoded** domain (`rlx_quantize`, `milk/shader.rs`, [ADR-0118](adrs/0118-the-milkdrop-feedback-field-quantizes-in-the-encoded-domain.md)).
+`decay` arrives from `upload_uniforms` (`warp_mesh/encode.rs`) as the converter's per-second
+`0.98^30 = 0.5455/s` raised to `dt`. Moved into the reference's own domain through the `2.2` exponent
+`warp_mesh/tests.rs` already names as `ENCODE_GAMMA`, one nominal frame of it is
+`0.98^(1/2.2) = 0.9908585`, so `c* = s / (1 - 0.9908585)` = **`109.4 * s`**.
+
+**The divergence, split into the two terms that cause it.**
+
+| term | reference | here | effect on `1/(1 - d)` |
+|---|---|---|---|
+| the truncation in `D3DCOLOR_RGBA_01` | `d = 249/255` | `d = 0.98` exact | `42.50` against `50.00` — **1.176x** |
+| the domain the decay multiplies in | encoded | linear | `50.00` against `109.4` — **2.188x** |
+| both together | | | **2.574x encoded, `8.5x` linear** |
+
+The truncation term is not a fixed 17.6 %: it grows as `fDecay` approaches 1, because a constant
+`0.5/255`-ish bite out of `d` is a growing fraction of `1 - d`. At `fDecay = 0.995` it is **1.57x** on its
+own, so the longer a preset's authored trail, the worse this engine diverges.
+
+**Why the earlier bisect missed this, and why this is not the dead third hypothesis re-run.**
+`the_decay_domain_is_not_the_wash` measures the **fade** — `d` itself — and found the quantizer's floor
+recovers most of the domain error (`0.3034` measured against `0.2007` for the reference's arithmetic and
+`0.4819` for a pure-linear multiply, over 2.650 s). **That reading stands.** The equilibrium is a
+different functional of the same `d`: `1/(1 - d)` carries `(1 - d)` in the denominator, so it *amplifies*
+exactly the difference a fade ratio compresses. Restating that measured fade as a nominal per-frame
+factor gives `0.985109` and a gain of `67.2` — still **1.58x** the reference's `42.50` encoded, `2.72x`
+linear. That is the honest **lower** bound, taken on a dim undeposited field where the floor does the
+most work; the `2.574` / `8.5x` above is the **upper** bound, and a settled wash sits at the bright end
+where the floor does the least.
+
+**Against Plan 0142 Phase 1's re-taken table.** *Fog Tunnel*'s settled field reads `0.13559` linear,
+`0.39275` encoded (code ~100). Dividing the encoded level by the two bounds puts the reference's field
+between `0.153` and `0.249` encoded — `0.019` to `0.053` linear — so this engine's field sits **2.6x to
+7.0x** too bright at the same source. The division assumes `s` is the same on both sides; the next
+paragraph is where that assumption is weakest.
+
+**One term this arithmetic does not settle, named so a repair does not silently absorb it.** A converted
+preset's light reaches the field through `warp_mesh/draw.rs`, which premultiplies the preset's
+`wave_r`/`wave_g`/`wave_b` by `Exposure::scale` and writes them into the linear field **undecoded** — so
+`0.65` is `0.65` linear here and `0.65` *encoded* there. In the encoded domain that makes this engine's
+source about `1.27x` the reference's, compounding with the table above rather than offsetting it. It is
+not measured, and a repair should be judged against the field's settled level rather than against it.
+
+**Why the clean control bounds none of this.** *Blur Mix 3* carries a warp shader, so `encode_warp` takes
+the custom-shader branch and the built-in decay fragment never runs for it. Its exact `0.00000000` at
+every seam is consistent with this mechanism and cannot test it: a repair to the built-in path must leave
+that subject bit-identical.
+
+**Two candidates ruled out rather than left open.**
+
+- **The aspect-corrected uv chain** (0214) was repaired by [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md)
+  Phases 2-3, and it is in any case absent from Phase 1's reading: `milk_wash.rs` renders at 128x128,
+  where MilkDrop's aspect pair is `(1, 1)` and every corrected stage is the identity. *Fog Tunnel*'s
+  solid tube is not the uv chain.
+- **Frame-rate accumulation** stays dead, now with the source behind it rather than only this side: the
+  reference deposits and decays once per rendered frame, and `Exposure::new(dt)` converts this engine's
+  per-frame deposit through `dt * NOMINAL_FPS`, so light per second is refresh-independent.
+
+**What a repair is.** Make the built-in warp path's decay multiply the field the way the reference's
+does — in the encoded domain, with the factor truncated to 8 bits — so that the decay and ADR-0118's
+floor act in one domain instead of two. `warp_mesh/shaders.rs`'s `faded` line and `warp_mesh/encode.rs`'s
+`decay` are the two places that can be done.
+
+- **Verified 2026-09-17** — the linear-domain multiply this update names is still the line in force:
+  `present: let faded = past_c in: core/src/render/scenes/warp_mesh/shaders.rs`
+
 
 ---
 
