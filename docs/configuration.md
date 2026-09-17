@@ -21,6 +21,7 @@ telemetry.
 | `--console` | — | Open the operator console at launch, on a display other than the show's |
 | `--list-devices` | — | Enumerate audio capture endpoints and exit (Windows-only) |
 | `--list-adapters` | — | Enumerate graphics adapters and exit, from both rosters |
+| `--list-presets` | — | List the presets this launch would load, with each file's status, and exit |
 | `--schema` | — | Print the preset schema as JSON on stdout and exit |
 | `--check` | `<path>` | Check a preset file, or a directory of them, and exit |
 | `--strict` | — | Make a `--check` warning cost the same exit code an error does. Needs `--check` |
@@ -142,6 +143,22 @@ the console is open.
 **`--list-adapters`** prints **both** rosters: the one the renderer selects through and the one the
 Spout sender selects through. They are separate enumerations and are not assumed to agree on order,
 so both are printed with their own indices.
+
+**`--list-presets`** prints one row per preset this launch would load — the display name, the file
+it came from, and how that file stands against the set this build ships — then exits without a
+window. It **reads and never writes**: it does not seed, and nothing in the preset directory is ever
+deleted, overwritten or migrated by it or by anything else.
+
+The status column has three values. **`shipped`** is a file byte-identical to the copy this build
+carries. **`differs`** is a file whose name this build ships under different bytes: your edit, or a
+copy from an older release that seeding left alone — nothing on disk records which, so the two
+cannot be told apart. **`not shipped`** is a file this build's set does not have at all, either your
+own preset or one a later release retired.
+
+A row also says when two files claim one display name. Only the first in filename order is reachable
+by name, so the second is loaded and rotated through but cannot be selected by `--preset`, by the
+studio, or by the browse overlay. The same drift is summarised in **one startup line**, printed only
+when something has drifted, so an untouched install says nothing.
 
 **`--gpu <name|index>`** works for both the window and `--stream`. **On a machine with one GPU you
 will never need it; on a hybrid laptop it is the difference between a picture and nothing.** A

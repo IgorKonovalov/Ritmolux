@@ -311,8 +311,8 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The preset directory reports its drift | dev | done | committed with this row |
-| 2 — `--list-presets` shows the set a launch would load | dev | not started | |
+| 1 — The preset directory reports its drift | dev | done | a20bc34a |
+| 2 — `--list-presets` shows the set a launch would load | dev | done | committed with this row |
 | 3 — The banner and the recovery line say what is true | dev | not started | |
 | 4 — A written count of the systems cannot land | dev | not started | |
 | 5 — The microphone capture is settled on the machine it happened on | human | not started | |
@@ -329,6 +329,11 @@ flowchart LR
   a leading `preset directory:`; `seed_preset_dir` prints that prefix. A shell diagnostic beginning
   with an interpolation fails `stream_split::no_human_diagnostic_line_can_begin_with_a_brace`, and
   the alternative was an entry in that test's `MESSAGE_PLACEHOLDERS`, outside the phase's files.
+- **Phase 2, `docs/running.md` untouched.** Phase 2 lists it conditionally ("if it describes the
+  preset directory's contents"). It does not mention presets at all.
+- **Phase 2, where the printer lives.** `list_presets_and_exit` and its two helpers are in
+  `standalone/src/run.rs`, beside `list_adapters_and_exit`, which is where the phase places the
+  dispatch; `standalone/src/preset_dir.rs` is unchanged by this phase.
 
 ### Close triggers
 
