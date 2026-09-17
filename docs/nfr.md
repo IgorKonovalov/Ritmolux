@@ -375,7 +375,10 @@ All four are v1 requirements, delivered as their own plan after the [Plan 0001](
 - Settings persistence (last scene, window size/position/mode — small config file; the quality
   tier already persists via `[quality] tier`).
 
-## 12. Runtime memory (added 2026-07-21; retargeted 2026-07-22 per [ADR-0010](adrs/0010-accept-gpu-driver-memory-floor.md))
+## 12. Runtime memory
+
+Added 2026-07-21 and retargeted 2026-07-22 per
+[ADR-0010](adrs/0010-accept-gpu-driver-memory-floor.md).
 
 "Lightweight" (NFR §4) caps *binary* size but not *working set*. The original §12 target — "well under
 ~100 MB", to be hit primarily by compiling wgpu with only the per-OS backend — was **measured and
