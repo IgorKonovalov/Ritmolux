@@ -304,7 +304,6 @@ live entry citing this one.
 | 0103 | The plugin's context menu shadows foobar's, so the panel cannot be removed from a layout | [Plan 0103](plans/0103-the-project-gets-an-audience.md) Phase 1. **Promoted** |
 | 0113 | The converted feedback field equilibrates far brighter than the reference's | [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md). **Promoted** |
 | 0124 | ADR-0113's motivating claim still reads "provisionally negative" | [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md). **Promoted** |
-| 0128 | `tonal_flatness` convicts a flat-graphic composition | [Plan 0186](plans/0186-the-flatness-gate-tells-a-figure-from-its-ground.md). Half closed by Plan 0116. **Promoted** |
 | 0140 | The band contour can only be an anti-aliased grey on a hard-banded palette | [Plan 0184](plans/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 1 + ADR-0197. **Promoted** |
 | 0146 | `warp_mesh` colours its light at deposit time, so the palette cannot band the field | [Plan 0184](plans/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 2 + ADR-0197. **Promoted** |
 | 0157 | The fixed telemetry set omits the bar grid the engine already computes | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
@@ -582,6 +581,7 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0215 | The seam on two MilkDrop 1.x presets is unexplained | [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md) Phases 1, 4, 7. Cause: the unbound scene deposit. **Closed 2026-09-16** |
 | 0216 | The converted waveform follows neither reference | [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md) Phases 5-6 + ADR-0199. Custom waves: see 0244. **Closed 2026-09-16** |
 | 0186 | The density law scales a low-`density` preset's trace count on a large display | [Plan 0183](plans/done/0183-a-low-density-is-a-trace-count.md) + [ADR-0195](adrs/0195-a-low-density-is-a-trace-count-and-the-law-scales-only-a-cloud.md). Band 0.08-0.16; no baseline moved. **Closed 2026-09-17** |
+| 0128 | `tonal_flatness` convicts a flat-graphic composition | [Plan 0186](plans/done/0186-the-flatness-gate-tells-a-figure-from-its-ground.md) + [ADR-0200](adrs/0200-the-flatness-conjunctions-second-term-reads-the-reference-a-role-classifier-assigns.md). Four-field residue reopened as 0248. **Closed 2026-09-17** |
 <!-- roster:end -->
 
 ---
@@ -11849,9 +11849,39 @@ shell-occupancy rescue, reading the tonal statistic at the quiet excitation too,
 lens, is a real decision with real alternatives and belongs in an ADR. It should land **before Plan
 0113 Phase 6**, which is where the emptying canvas arrives. Phases 3-5 are unaffected.
 
-- **Promoted 2026-09-14** to [Plan 0186](plans/0186-the-flatness-gate-tells-a-figure-from-its-ground.md): five figure/ground candidates measured against two blot anchors under a stop condition registered before any number is read; its Phase 2 human gate writes ADR-0200 whichever way it falls, and a negative result is a valid end. The composition-or-fill question for Sumi, Whorl, Supernova and Neon Tunnel is carved out and re-filed at that close if still open.
+- **Promoted 2026-09-14** to [Plan 0186](plans/done/0186-the-flatness-gate-tells-a-figure-from-its-ground.md): five figure/ground candidates measured against two blot anchors under a stop condition registered before any number is read; its Phase 2 human gate writes ADR-0200 whichever way it falls, and a negative result is a valid end. The composition-or-fill question for Sumi, Whorl, Supernova and Neon Tunnel is carved out and re-filed at that close if still open.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0186](plans/0186-the-flatness-gate-tells-a-figure-from-its-ground.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0186](plans/done/0186-the-flatness-gate-tells-a-figure-from-its-ground.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+### CLOSED 2026-09-17 by [Plan 0186](plans/done/0186-the-flatness-gate-tells-a-figure-from-its-ground.md) + [ADR-0200](adrs/0200-the-flatness-conjunctions-second-term-reads-the-reference-a-role-classifier-assigns.md) — the fringe mechanism this entry named is where the repair was found, and the carved-out half reopens as 0248
+
+**Closed on the narrow form this entry was left in**, which is the form the 2026-09-02 re-open
+states: *"a gate that can tell a deliberately flat graphic composition from a saturated blot ... Start
+from the fringe mechanism, not from ADR-0128's roster."* That instruction was followed and it was the
+right one — but the answer was not another structural statistic. It was the **reference**. A
+saturated blot is its own modal band, so term two conditioned on the derived ground was handed the
+mass's fringe; `metrics::figure_ground_ratio` classifies the modal band as figure or ground from
+`coverage(BLACK) / coverage(derived)`, and `metrics::assigned_boundary_density` reads the reference
+that role assigns. `boundary_density` itself — the statistic ADR-0130 established and this entry's
+re-open did not convict — is unchanged.
+
+Plan 0186 tabled ten candidates against **two** frozen blot anchors (a stroke figure's rasterized rim
+and a particle cloud's scatter) at two capture sizes under a four-part stop condition registered
+before any number was read. Eight passed; ADR-0200 records the choice and the four rejected
+alternatives. Both anchors are convicted again, `Tiled Rosette Mono` is admitted on its ink, and the
+constants are `boundary_floor = 0.23` and `MODAL_FIGURE_CUT = 1.17`, both at 96x96 and neither
+travelling (ADR-0071).
+
+**What is not closed, and is now its own entry.** Whether `Sumi`, `Whorl`, `Supernova` and
+`Neon Tunnel` are compositions or fills — the half the plan carved out in its
+`## What this plan does NOT do` — is **0248**, in the live file, citing this body. The archive is
+append-only and closed, so it is a new entry rather than an edit here.
+
+**And one thing this close added to the record rather than removed**: above the cut term two reads
+black over a lit mask that is the whole frame, so on a canvas that paints its own paper the statistic
+collapses to the frame's own border (`0.0412` at 96x96, for eight shipped presets). Term one is the
+whole of what holds them. That is ADR-0200's fifth Negative and is the successor of the failure this
+entry diagnosed, one class over.
 
 
 ---

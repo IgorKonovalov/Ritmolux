@@ -7,17 +7,22 @@
 # DO NOT RETUNE THIS PRESET CASUALLY. ITS FRAME IS A GATE CONSTANT.
 # ---------------------------------------------------------------------------
 #
-# `boundary_floor`'s default arm in `core/tests/sanity.rs` is 0.31, the MIDPOINT
-# of two frozen frames: the `Blown Out` blot fixture at 0.2631 and THIS PRESET at
-# 0.3602. It is a two-point measurement, not a derived floor - the conditional
-# population has two members and this is the legitimate one - so moving this
-# frame's structure moves the constant that decides what counts as a blot.
+# `boundary_floor`'s default arm in `core/tests/sanity.rs` is 0.23, the MIDPOINT
+# of two frozen frames read under the role each is assigned: the `Ragged Blot`
+# particle anchor at 0.0934 against black, and THIS PRESET at 0.3602 against its
+# own derived ground. It is a two-point measurement, not a derived floor - the
+# conditional population is small and this is the legitimate member of it - so
+# moving this frame's structure moves the constant that decides what counts as a
+# blot. The same frame is also the population end of `MODAL_FIGURE_CUT`: its
+# ratio of 1.0780 is the highest among the non-blot members the first term can
+# reach, and the 1.17 cut is the midpoint between it and the lower blot's 1.2718.
 #
 # The measured copy is therefore FROZEN INTO THE TEST as `HELD_OUT_TOML`, taken
 # at `26b20b3^`, and this shipped file is judged by the gate like any other
 # preset. The two are meant to agree. If a change here makes them disagree, that
-# is not a test to repoint - it is the default arm of `boundary_floor` re-opening,
-# and it needs re-deriving with the reason written down. See ADR-0130.
+# is not a test to repoint - it is the default arm of `boundary_floor` and the
+# `MODAL_FIGURE_CUT` cut re-opening, and both need re-deriving with the reason
+# written down. See ADR-0130 and ADR-0200.
 #
 # WHAT HELD THIS PRESET OUT, AND WHAT RELEASED IT. It sat in `presets/pending/`
 # from Plan 0113 to Plan 0119, finished and approved, blocked on one number: it
@@ -35,8 +40,11 @@
 # So the GATE changed rather than the preset. ADR-0128 decided `tonal_flatness`
 # becomes one of two terms; ADR-0130 settled the second term as `boundary_density`
 # - perimeter over lit area, whether the lit set has interior - and a preset is
-# convicted only when both fire. This one reads 0.3602 against a 0.31 floor, so
-# the structural term acquits it. Nothing in the look moved to get here.
+# convicted only when both fire. ADR-0200 then made the REFERENCE that term reads
+# a per-frame choice: a role classifier calls this frame's modal band its ground,
+# so the term reads the ink, which is what a print's structure lives in. This one
+# reads 0.3602 against a 0.23 floor, so the structural term acquits it. Nothing in
+# the look moved to get here.
 #
 # WHAT "NO SHADES" COSTS, AND HOW IT IS PAID. Three things in the chain make
 # gradients, and all three are answered here rather than only the obvious one:
