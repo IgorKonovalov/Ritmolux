@@ -11,9 +11,11 @@ use super::super::*;
 pub(in crate::preset::schema) struct RawParticles {
     /// Attractor family name (e.g. `"lorenz"`); validated at load.
     pub(in crate::preset::schema) family: String,
-    /// Fraction of the tier's particle budget to draw (ADR-0069). Optional —
-    /// absent means the whole budget, which is byte-identical to the behaviour
-    /// before the key existed.
+    /// How much of the tier's particle budget to draw (ADR-0069) — a fixed
+    /// count against the tier's anchor at or below `0.08`, a fraction of the
+    /// target-scaled budget at or above `0.16` (ADR-0195). Optional — absent
+    /// means the whole budget, which is byte-identical to the behaviour before
+    /// the key existed.
     pub(in crate::preset::schema) density: Option<f32>,
     /// The IFS figure the bindable `morph` param travels towards (ADR-0075).
     /// Optional; absent pins the figure and makes `morph` inert.

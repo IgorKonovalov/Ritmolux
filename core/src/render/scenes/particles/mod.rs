@@ -664,7 +664,9 @@ pub struct AttractorScene {
     /// how densely the figure is sampled and nothing else.
     budget: u32,
     /// How many of [`budget`](Self::budget) are actually stepped and drawn —
-    /// `round(budget * density)` (ADR-0069).
+    /// `round(effective * density)`, where the effective budget is the
+    /// [`anchor`](Self::anchor) for a trace and `budget` for a cloud
+    /// (`active_particles`, ADR-0069 + ADR-0195).
     ///
     /// **Nothing is reallocated when this moves.** The storage buffer, the seeded
     /// scatter and every bind group stay sized to `particle_count`; this only
@@ -673,8 +675,10 @@ pub struct AttractorScene {
     /// positions untouched for the life of the preset — asserted directly, since
     /// "rebuilds nothing" is otherwise a claim about code that is easy to break.
     active_count: u32,
-    /// Fraction of the tier budget the loaded preset asked for, from
-    /// `[particles] density`. Structural: set in `configure`, never per frame.
+    /// How much of the tier budget the loaded preset asked for, from
+    /// `[particles] density` — a count against the anchor at or below
+    /// [`TRACE_DENSITY`], a fraction of [`budget`](Self::budget) at or above
+    /// [`CLOUD_DENSITY`]. Structural: set in `configure`, never per frame.
     density: f32,
     /// The deterministic seeded scatter, uploaded on the first frame after a
     /// (re)build so a rebuilt scene restarts identically (capture determinism).

@@ -365,7 +365,10 @@ pub enum GeneratorConfig {
         /// is a load error rather than a silent no-op, because the author asked
         /// for something the engine cannot do.
         morph_to: Option<particles::ifs::IfsFigure>,
-        /// Fraction of the tier's particle budget actually drawn (ADR-0069),
+        /// How much of the tier's particle budget is actually drawn (ADR-0069)
+        /// — a count against the tier's anchor for a trace and a fraction of
+        /// the target-scaled budget for a cloud, the band between them resolved
+        /// by `active_particles` (ADR-0195) —
         /// validated at load into
         /// [`MIN_PARTICLE_DENSITY`](particles::MIN_PARTICLE_DENSITY)`..=1.0`.
         /// Structural, not bindable: an eased integer count would re-decide the
