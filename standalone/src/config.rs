@@ -27,8 +27,139 @@ pub struct Config {
     pub quality: Quality,
     pub hud: Hud,
     pub osc: Osc,
+    pub artnet: Artnet,
     pub control: Control,
     pub console: Console,
+}
+
+/// `[artnet]` — the Art-Net fixture output (ADR-0145).
+///
+/// **Off by default**, for `[osc]`'s reason and one stronger: this sink does not
+/// describe a show to a console, it *is* the show, and a machine that installed
+/// the app must not start driving lamps.
+///
+/// **The fixture map is data, not structure.** Which universes exist, where
+/// their datagrams go, how long each chain is and which spatial axis the
+/// universe index stands for are all keys here. A rig patched differently — a
+/// chain of two sticks rather than three, a universe index that runs across
+/// rather than up — is a config edit, never a code change. These defaults
+/// describe a **loopback receiver** rather than any real rig, so the shipped
+/// file is a usable example and not somebody else's wiring.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Artnet {
+    /// Drive the fixtures. False out of the box.
+    pub enabled: bool,
+    /// Frames per second on the wire. 0 means every rendered frame.
+    ///
+    /// 40 is what the external probes chose and roughly 32 is what they
+    /// achieved; **neither is a measurement of what the nodes prefer**, which is
+    /// a hardware question nothing here can answer. It is a key rather than a
+    /// constant for exactly that reason.
+    pub rate_hz: u32,
+    /// The flat colour every pixel holds until a look drives them.
+    ///
+    /// Mid grey rather than full white: it is unmistakable on every stick of
+    /// every chain, which is what a first power-up is asking, without driving
+    /// the whole rig at full current to ask it.
+    pub color: [u8; 3],
+    /// How a universe index becomes a spatial coordinate.
+    pub space: ArtnetSpace,
+    /// The nodes and the universes each one carries. `[[artnet.node]]` in the
+    /// file, one table per controller.
+    pub node: Vec<ArtnetNode>,
+}
+
+impl Default for Artnet {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            rate_hz: 40,
+            color: [64, 64, 64],
+            space: ArtnetSpace::default(),
+            node: vec![ArtnetNode::default()],
+        }
+    }
+}
+
+/// `[artnet.space]` — universe index to a normalized coordinate.
+///
+/// Separate from the node table because it is a claim about the *structure* the
+/// sticks are mounted on, where the node table is a claim about the wiring. The
+/// two are confirmed by different observations and are revised independently.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ArtnetSpace {
+    /// Which normalized axis the universe index drives.
+    pub universe_axis: SpaceAxis,
+    /// The universe index that reads 0.0 on that axis.
+    ///
+    /// Swapping this with `universe_max` flips the rig end for end without
+    /// touching the node table, which is the repair a mis-read patch needs.
+    pub universe_min: u16,
+    /// The universe index that reads 1.0.
+    pub universe_max: u16,
+}
+
+impl Default for ArtnetSpace {
+    fn default() -> Self {
+        Self {
+            universe_axis: SpaceAxis::Y,
+            universe_min: 0,
+            universe_max: 23,
+        }
+    }
+}
+
+/// The normalized axis a universe index stands for. Serializes as the
+/// lower-case letters the config uses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum SpaceAxis {
+    /// Universe index runs across.
+    X,
+    /// Universe index runs up — the rig this was written against.
+    #[default]
+    Y,
+}
+
+impl SpaceAxis {
+    /// The letter this axis serializes as, so the config file, the startup line
+    /// and any diagnostic all read the same string.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            SpaceAxis::X => "x",
+            SpaceAxis::Y => "y",
+        }
+    }
+}
+
+/// `[[artnet.node]]` — one controller, and the universes it carries.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ArtnetNode {
+    /// Where its datagrams go, as `host:port`. Art-Net's port is 6454.
+    pub target: String,
+    /// The inclusive universe range this node carries, `[first, last]`.
+    pub universes: [u16; 2],
+    /// Pixels in each of this node's chains.
+    ///
+    /// **170, and a shorter value is the trap this key exists to make
+    /// visible.** A universe is 512 channels, so 170 RGB pixels is the whole of
+    /// it; a node sent fewer leaves the later sticks of the chain holding their
+    /// previous frame, which presents as half the rig being broken rather than
+    /// as a short frame.
+    pub pixels: u16,
+}
+
+impl Default for ArtnetNode {
+    fn default() -> Self {
+        Self {
+            target: "127.0.0.1:6454".to_owned(),
+            universes: [0, 23],
+            pixels: 170,
+        }
+    }
 }
 
 /// `[control]` — the studio control-in listener (ADR-0176).
@@ -576,6 +707,104 @@ target = \"10.0.0.4:7700\"
         assert!(config.osc.enabled);
         assert_eq!(config.osc.target, "10.0.0.4:7700");
         assert_eq!(config.osc.rate_hz, 60, "the absent key did not default");
+    }
+
+    /// **An absent `[artnet]` section drives nothing.** Stronger than the OSC
+    /// case it mirrors: a datagram on a telemetry port is a wasted packet, and
+    /// an Art-Net datagram on a venue network is somebody's lamps.
+    #[test]
+    fn a_config_without_an_artnet_section_leaves_the_sink_off() {
+        let config: Config = toml::from_str(
+            "[output]
+fullscreen = true
+",
+        )
+        .expect("a config with no [artnet] section must still parse");
+        assert!(!config.artnet.enabled, "an absent section enabled the sink");
+        assert_eq!(config.artnet.rate_hz, 40);
+        assert_eq!(
+            config.artnet.node.len(),
+            1,
+            "the example node is the default"
+        );
+        assert_eq!(
+            config.artnet.node[0].pixels, 170,
+            "a short frame is the trap"
+        );
+    }
+
+    /// **The whole fixture map is data, so a rig patched differently is a file
+    /// edit.** Asserted by writing a map that disagrees with the default on
+    /// every claim it makes — two nodes instead of one, a narrower chain, a
+    /// reversed height axis — and reading back what was written.
+    #[test]
+    fn a_rig_patched_differently_is_described_entirely_in_the_file() {
+        let config: Config = toml::from_str(
+            "[artnet]
+enabled = true
+color = [10, 20, 30]
+
+[artnet.space]
+universe_axis = \"x\"
+universe_min = 11
+universe_max = 0
+
+[[artnet.node]]
+target = \"192.168.1.159:6454\"
+universes = [0, 5]
+pixels = 100
+
+[[artnet.node]]
+target = \"192.168.1.160:6454\"
+universes = [6, 11]
+pixels = 100
+",
+        )
+        .expect("a two-node fixture map must parse");
+        assert!(config.artnet.enabled);
+        assert_eq!(config.artnet.color, [10, 20, 30]);
+        assert_eq!(config.artnet.space.universe_axis, super::SpaceAxis::X);
+        assert_eq!(
+            (
+                config.artnet.space.universe_min,
+                config.artnet.space.universe_max
+            ),
+            (11, 0),
+            "a reversed axis is expressible, which is how a flipped rig is fixed"
+        );
+        assert_eq!(config.artnet.node.len(), 2);
+        assert_eq!(config.artnet.node[1].target, "192.168.1.160:6454");
+        assert_eq!(config.artnet.node[1].universes, [6, 11]);
+        assert_eq!(config.artnet.node[0].pixels, 100);
+        assert_eq!(
+            config.artnet.rate_hz, 40,
+            "the absent cadence key did not default"
+        );
+    }
+
+    /// The map survives the write/read `Config::save` performs, array of tables
+    /// included — otherwise an operator's rig description would not outlive a
+    /// hotkey that persists some unrelated choice.
+    #[test]
+    fn the_fixture_map_round_trips() {
+        let mut config = Config::default();
+        config.artnet.enabled = true;
+        config.artnet.color = [1, 2, 3];
+        config.artnet.node = vec![
+            super::ArtnetNode {
+                target: "10.0.0.1:6454".to_owned(),
+                universes: [0, 3],
+                pixels: 90,
+            },
+            super::ArtnetNode {
+                target: "10.0.0.2:6454".to_owned(),
+                universes: [4, 7],
+                pixels: 90,
+            },
+        ];
+        let text = toml::to_string_pretty(&config).expect("config serializes");
+        let back: Config = toml::from_str(&text).expect("its own output parses");
+        assert_eq!(back.artnet, config.artnet);
     }
 
     /// The same guarantee for the banner: the settings row is only "survives a

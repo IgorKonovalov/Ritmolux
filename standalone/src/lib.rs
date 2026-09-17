@@ -32,6 +32,11 @@ use std::path::{Path, PathBuf};
 // the sender's, each against its own roster (ADR-0146). Not feature-gated:
 // the renderer half applies with or without a video-out, and the sender half
 // takes the roster as a slice so it compiles and tests without the SDK.
+// The Art-Net fixture sink (ADR-0145). A library module for `osc`'s reason and
+// one more: `standalone/tests/artnet_loopback.rs` points it at a loopback port
+// and reads what came off the wire with `rlx-artnet-sim`, which needs the sink
+// constructible without a window.
+pub mod artnet;
 // The per-user operator config. A library module rather than a binary one so
 // `standalone/tests/` can round-trip the documented `config.toml` through the
 // very type the app deserializes - the same reason `osc` and `shot` are here.

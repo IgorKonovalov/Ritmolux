@@ -16,6 +16,7 @@ use std::time::{Duration, Instant};
 use rlx_core::audio::{AudioFormat, SampleConsumer};
 use rlx_core::dsp::Analyzer;
 use rlx_core::render::{AdapterChoice, CapOverflow, Renderer, RendererOptions, Tier};
+use standalone::artnet::ArtnetSink;
 use standalone::osc::{OscSink, Telemetry, rms_of};
 use standalone::rss;
 use winit::event_loop::ActiveEventLoop;
@@ -286,6 +287,11 @@ pub(crate) struct Diagnostics {
     /// test and no socket is bound.
     pub(crate) osc: Option<OscSink>,
 
+    /// The Art-Net fixture sink, present only when `--artnet` or
+    /// `[artnet] enabled` turned it on (ADR-0145). Absent otherwise, so the
+    /// frame path is a `None` test and no socket is bound.
+    pub(crate) artnet: Option<ArtnetSink>,
+
     /// The segment-cap truncation already announced on stderr, so
     /// [`poll_cap_overflow`](AppState::poll_cap_overflow) reports the **transition**
     /// rather than the state (Plan 0031 Phase 6).
@@ -432,6 +438,7 @@ impl AppState {
         let held_preset = app.held_preset.take();
         let input = std::mem::take(&mut app.input);
         let osc = app.osc.take();
+        let artnet = app.artnet.take();
         let size = window.inner_size();
         let pinned = adapter != AdapterChoice::Default;
         let mut renderer = Renderer::new(
@@ -568,6 +575,7 @@ impl AppState {
                 soak: soak_path.map(SoakLog::new),
                 downbeat_log: downbeat_log_path.map(DownbeatLog::new),
                 osc,
+                artnet,
                 // Seeded from what `reload_presets` already printed above, so the
                 // frame loop does not re-announce the startup preset's truncation.
                 reported_overflow: renderer_overflow,
@@ -592,6 +600,17 @@ impl AppState {
             if pinned { " (pinned by --gpu)" } else { "" }
         ));
         state
+    }
+
+    /// Send the rig black, now, whatever the sink's cadence says.
+    ///
+    /// A no-op when no sink is bound. Called on the operator's quit; the sink's
+    /// own `Drop` is what covers the paths this call does not reach, and
+    /// [`ArtnetSink::blackout`] states which those are.
+    pub(crate) fn blackout_fixtures(&mut self) {
+        if let Some(artnet) = self.diagnostics.artnet.as_mut() {
+            artnet.blackout();
+        }
     }
 
     /// Persist the current config to disk if a per-user path was resolved. A
@@ -1109,6 +1128,14 @@ impl AppState {
                     preset,
                 },
             );
+        }
+
+        // The fixtures (ADR-0145), opt-in, and before the render for the reason
+        // the telemetry is: the datagrams leave ahead of the present's vsync
+        // wait rather than behind it. A flat colour is the whole of what this
+        // sink paints until a look drives it.
+        if let Some(artnet) = self.diagnostics.artnet.as_mut() {
+            artnet.send(now, self.config.artnet.color);
         }
 
         // Queue the on-canvas text for this frame (active name + browse list).

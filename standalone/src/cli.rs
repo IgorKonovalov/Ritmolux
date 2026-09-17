@@ -153,6 +153,12 @@ pub(crate) const FLAGS: &[FlagSpec] = &[
         help: "<host:port> publish analyzer telemetry as OSC over UDP",
     },
     FlagSpec {
+        name: "--artnet",
+        takes_value: true,
+        requires: None,
+        help: "<host:port> drive the configured fixture map over Art-Net",
+    },
+    FlagSpec {
         name: "--control",
         takes_value: true,
         requires: None,
@@ -717,6 +723,58 @@ pub(crate) fn resolve_osc(flag: Option<String>, config: &config::Osc) -> Option<
     }
 }
 
+/// The `--artnet <host:port>` override, in both the spaced and the `=` spelling.
+///
+/// `Err` on the flag with nothing after it, for [`parse_osc_arg`]'s reason.
+pub(crate) fn parse_artnet_arg() -> Result<Option<String>, String> {
+    parse_artnet_arg_from(std::env::args().skip(1))
+}
+
+/// [`parse_artnet_arg`]'s rule as a pure function of the argument list.
+pub(crate) fn parse_artnet_arg_from(
+    args: impl Iterator<Item = String>,
+) -> Result<Option<String>, String> {
+    let mut args = args.peekable();
+    let mut target = None;
+    while let Some(arg) = args.next() {
+        if let Some(value) = flag_value(&arg, "--artnet", &mut args) {
+            let value = value?;
+            if value.trim().is_empty() {
+                return Err("--artnet: expected a target as host:port".to_owned());
+            }
+            target = Some(value);
+        }
+    }
+    Ok(target)
+}
+
+/// Resolve the fixture output: `--artnet` over `[artnet]`. `None` means the sink
+/// stays off and no socket is bound.
+///
+/// **The flag aims every node at one address and turns the sink on.** It is one
+/// address rather than a map because a map is not a thing anyone types: what the
+/// flag is for is pointing a rig description that already exists at a receiver
+/// that is not the rig — a simulator on loopback, or a spare node on a bench —
+/// without editing the file the show runs on. The geometry, which is the part
+/// that took an evening to establish, still comes from `config.toml`.
+pub(crate) fn resolve_artnet(
+    flag: Option<String>,
+    config: &config::Artnet,
+) -> Option<config::Artnet> {
+    match flag {
+        Some(target) => {
+            let mut resolved = config.clone();
+            resolved.enabled = true;
+            for node in &mut resolved.node {
+                node.target = target.clone();
+            }
+            Some(resolved)
+        }
+        None if config.enabled => Some(config.clone()),
+        None => None,
+    }
+}
+
 /// `--preview <sink>[@WIDTHxHEIGHT]`, validated against the one sink a windowed
 /// run offers. `None` when the flag is absent.
 ///
@@ -844,10 +902,78 @@ pub(crate) fn default_downbeat_log_path() -> PathBuf {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::{
-        FLAGS, InputSource, config, help_text, missing_companion, parse_control_arg_from,
-        parse_input_args_from, parse_osc_arg_from, resolve_control, resolve_input, resolve_osc,
-        unrecognized_flag, valued_valueless_flag,
+        FLAGS, InputSource, config, help_text, missing_companion, parse_artnet_arg_from,
+        parse_control_arg_from, parse_input_args_from, parse_osc_arg_from, resolve_artnet,
+        resolve_control, resolve_input, resolve_osc, unrecognized_flag, valued_valueless_flag,
     };
+
+    /// `--artnet` in both spellings, the mirror of `--osc`'s rule.
+    #[test]
+    fn both_artnet_flag_spellings_parse() {
+        let argv = |args: &[&str]| args.iter().map(|a| (*a).to_owned()).collect::<Vec<_>>();
+
+        assert_eq!(
+            parse_artnet_arg_from(argv(&["--artnet", "127.0.0.1:6454"]).into_iter()),
+            Ok(Some("127.0.0.1:6454".to_owned()))
+        );
+        assert_eq!(
+            parse_artnet_arg_from(argv(&["--artnet=127.0.0.1:6454"]).into_iter()),
+            Ok(Some("127.0.0.1:6454".to_owned()))
+        );
+        assert_eq!(
+            parse_artnet_arg_from(argv(&["--soak"]).into_iter()),
+            Ok(None)
+        );
+        assert!(parse_artnet_arg_from(argv(&["--artnet="]).into_iter()).is_err());
+        assert!(parse_artnet_arg_from(argv(&["--artnet"]).into_iter()).is_err());
+    }
+
+    /// **The flag re-aims every node and turns the sink on, and it leaves the
+    /// geometry alone.** That split is the whole point of the flag: the universe
+    /// ranges, the chain widths and the spatial axis are what cost an evening to
+    /// establish, and pointing them at a receiver on loopback must not require
+    /// retyping any of it.
+    #[test]
+    fn the_artnet_flag_re_aims_the_map_and_leaves_its_geometry() {
+        let off = config::Artnet::default();
+        assert!(!off.enabled, "the built-in default must be off");
+        assert_eq!(resolve_artnet(None, &off), None);
+
+        let mut rig = config::Artnet {
+            enabled: false,
+            ..config::Artnet::default()
+        };
+        rig.node = vec![
+            config::ArtnetNode {
+                target: "192.168.1.159:6454".to_owned(),
+                universes: [0, 11],
+                pixels: 170,
+            },
+            config::ArtnetNode {
+                target: "192.168.1.160:6454".to_owned(),
+                universes: [12, 23],
+                pixels: 170,
+            },
+        ];
+
+        let resolved = resolve_artnet(Some("127.0.0.1:7777".to_owned()), &rig)
+            .expect("an explicit flag did not beat `enabled = false`");
+        assert!(resolved.enabled);
+        assert_eq!(resolved.node.len(), 2);
+        for node in &resolved.node {
+            assert_eq!(node.target, "127.0.0.1:7777");
+        }
+        assert_eq!(resolved.node[0].universes, [0, 11]);
+        assert_eq!(resolved.node[1].universes, [12, 23]);
+        assert_eq!(resolved.space, rig.space, "the flag moved the structure");
+
+        rig.enabled = true;
+        assert_eq!(
+            resolve_artnet(None, &rig).map(|a| a.node[0].target.clone()),
+            Some("192.168.1.159:6454".to_owned()),
+            "with no flag the file decides"
+        );
+    }
 
     /// `--osc` in both spellings, and the empty value refused for the same
     /// reason `--device=` is: it reads as a request and names nothing.

@@ -2015,6 +2015,7 @@ dependencies = [
  "objc2-core-media",
  "objc2-foundation 0.3.2",
  "objc2-screen-capture-kit",
+ "rlx-artnet-sim",
  "rlx-core",
  "serde",
  "toml",

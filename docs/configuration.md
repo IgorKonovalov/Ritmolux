@@ -30,6 +30,7 @@ telemetry.
 | `--device` | `"<friendly name>"` | Which capture endpoint to open |
 | `--tier` | `floor` \| `rich` | Pin the quality tier instead of letting the engine pick |
 | `--osc` | `<host:port>` | Publish analyzer telemetry as OSC over UDP, and turn the sink on |
+| `--artnet` | `<host:port>` | Drive the configured fixture map over Art-Net, and turn the sink on |
 | `--control` | `<host:port>` | Listen for studio control messages as OSC over UDP, and turn the listener on |
 | `--soak` | `[path]` | Write a long-run frame-time trace; bare, a default path |
 | `--downbeat-log` | `[path]` | Write the per-beat downbeat decomposition; bare, a default path |
@@ -301,6 +302,50 @@ installed the app.
 `--osc` overrides `target` and turns the sink on, and leaves `rate_hz` to the file — the one key it
 has no spelling for.
 
+### `[artnet]`
+
+The Art-Net fixture output — the sink that drives pixel lamps directly. **Off by default**, for
+`[osc]`'s reason and one stronger: this sink does not describe a show to a console, it *is* the
+show, and a machine that installed the app must not start driving somebody's lamps.
+
+| Key | Default | What it means |
+|---|---|---|
+| `enabled` | `false` | Drive the fixtures |
+| `rate_hz` | `40` | Frames per second on the wire; `0` means every rendered frame |
+| `color` | `[64, 64, 64]` | The flat colour every pixel holds. Mid grey rather than full white: unmistakable on every stick without driving the whole rig at full current |
+
+`--artnet <host:port>` aims **every** node at one address and turns the sink on, leaving the
+geometry below untouched — which is what points a rig description that already exists at a receiver
+that is not the rig, without editing the file the show runs on.
+
+The rest of the section is the **fixture map**, and it is data rather than structure on purpose: a
+rig patched differently is a file edit, never a code change.
+
+`[artnet.space]` says what a universe index *means* on the structure the sticks are mounted on:
+
+| Key | Default | What it means |
+|---|---|---|
+| `universe_axis` | `"y"` | Which normalized axis the universe index runs along, `"x"` or `"y"` |
+| `universe_min` | `0` | The universe index that reads 0.0 on that axis |
+| `universe_max` | `23` | The universe index that reads 1.0. Swapping the two flips the rig end for end |
+
+`[[artnet.node]]` is one table per controller, and there may be as many as the rig has:
+
+| Key | Default | What it means |
+|---|---|---|
+| `target` | `"127.0.0.1:6454"` | Where this node's datagrams go, as `host:port`. Art-Net's port is 6454 |
+| `universes` | `[0, 23]` | The inclusive universe range this node carries |
+| `pixels` | `170` | Pixels in each of this node's chains, at most 170 |
+
+**`pixels` is the one key worth reading twice.** A universe is 512 channels, so 170 RGB pixels is
+the whole of it. A node sent fewer does not leave the rest of its chain dark — the later sticks keep
+holding their previous frame, which presents as half the rig being broken rather than as a short
+frame.
+
+The shipped default describes a **loopback receiver**, not anyone's wiring: one node on
+`127.0.0.1:6454` carrying all 24 universes. That is a usable example and it is what the simulator
+listens on.
+
 ### `[control]`
 
 The studio control-in listener — the socket a studio, a lighting console or a MIDI bridge drives
@@ -381,6 +426,21 @@ enabled = false
 target = "127.0.0.1:9000"
 rate_hz = 60
 
+[artnet]
+enabled = false
+rate_hz = 40
+color = [64, 64, 64]
+
+[artnet.space]
+universe_axis = "y"
+universe_min = 0
+universe_max = 23
+
+[[artnet.node]]
+target = "127.0.0.1:6454"
+universes = [0, 23]
+pixels = 170
+
 [control]
 enabled = false
 listen = "127.0.0.1:9001"
@@ -405,11 +465,13 @@ running app *for that session*.
 | Input device | `--device` | | `[input] device` | the mode's default endpoint |
 | OSC target | `--osc` | | `[osc] target` | — |
 | OSC on/off | `--osc` (on) | | `[osc] enabled` | off |
+| Art-Net node targets | `--artnet` | | `[[artnet.node]] target` | — |
+| Art-Net on/off | `--artnet` (on) | | `[artnet] enabled` | off |
 | Control address | `--control` | | `[control] listen` | — |
 | Control on/off | `--control` (on) | | `[control] enabled` | off |
 | Console on/off | `--console` (on) | | `[console] enabled` | off |
 
-`--input`, `--device`, `--osc`, `--control` and `--console` pin a **run** and never write themselves into
+`--input`, `--device`, `--osc`, `--artnet`, `--control` and `--console` pin a **run** and never write themselves into
 `config.toml`; the file is the persistent form. There is no environment variable for the input
 selection, because an input is a property of a rig and already persists to the config.
 

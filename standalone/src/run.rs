@@ -10,6 +10,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use rlx_core::render::{AdapterChoice, Tier};
+use standalone::artnet::ArtnetSink;
 use standalone::osc::OscSink;
 use standalone::{AppDirMigration, migrate_app_dir, resolve_tier, tier_env};
 use winit::application::ApplicationHandler;
@@ -21,11 +22,11 @@ use winit::window::{Fullscreen, Window, WindowId};
 use crate::app_state::{APP_TITLE, AppState, HIDDEN_TICK};
 use crate::capture_start::list_devices_and_exit;
 use crate::cli::{
-    InputSource, missing_companion, parse_check_arg, parse_console_flag, parse_control_arg,
-    parse_downbeat_log_arg, parse_events_flag, parse_input_args, parse_osc_arg, parse_preview_arg,
-    parse_soak_arg, parse_strict_flag, parse_tier_arg, print_help, resolve_config_path,
-    resolve_control, resolve_input, resolve_osc, unrecognized_flag, valued_valueless_flag,
-    windowed_flag,
+    InputSource, missing_companion, parse_artnet_arg, parse_check_arg, parse_console_flag,
+    parse_control_arg, parse_downbeat_log_arg, parse_events_flag, parse_input_args, parse_osc_arg,
+    parse_preview_arg, parse_soak_arg, parse_strict_flag, parse_tier_arg, print_help,
+    resolve_artnet, resolve_config_path, resolve_control, resolve_input, resolve_osc,
+    unrecognized_flag, valued_valueless_flag, windowed_flag,
 };
 use crate::console;
 use crate::preset_dir::startup_preset_names;
@@ -65,6 +66,12 @@ pub(crate) struct App {
     /// startup error rather than a window that opens and then reports one.
     /// `None` when the sink is off.
     pub(crate) osc: Option<OscSink>,
+    /// The Art-Net fixture sink, already bound in `main` for the telemetry
+    /// sink's reason and one stronger: a fixture map that does not resolve is
+    /// a dark rig, and finding that out after the window opens is finding it
+    /// out during the set. `None` when the sink is off, and then no socket is
+    /// bound (ADR-0145).
+    pub(crate) artnet: Option<ArtnetSink>,
     /// The studio control-in listener, already bound in `main` for the reason
     /// the telemetry sink is: an address that cannot be bound is a startup error
     /// rather than a window that opens and then reports one. `None` when nothing
@@ -219,6 +226,13 @@ impl ApplicationHandler for App {
                 // after `exit()` there is no guaranteed frame in which to take a
                 // reading, and this is the one a ten-minute show produces.
                 state.note_preview_cost("at exit");
+                // The rig goes dark here rather than only in the sink's `Drop`,
+                // because this is the moment the operator asked for and the one
+                // whose ordering is known: `Drop` runs after the event loop has
+                // returned, through however many layers still own the state.
+                // The nodes latch, so a blackout that is merely likely is a room
+                // that is merely likely to be dark (ADR-0145).
+                state.blackout_fixtures();
                 event_loop.exit();
             }
             WindowEvent::Resized(size) => {
@@ -627,6 +641,11 @@ pub fn run() {
         None => None,
     };
 
+    // The fixture output, flag over config (ADR-0145), on the same split the
+    // telemetry sink above uses: a target typed for this run is a usage error,
+    // and a stale one in `config.toml` degrades to no sink and says so.
+    let artnet = bind_artnet(&config.artnet);
+
     // The studio control-in listener, bound here for the reason the telemetry
     // sink above is, and before `hello` because `hello` reports the port.
     let control = bind_control(&config.control);
@@ -694,6 +713,7 @@ pub fn run() {
         held_preset,
         input,
         osc,
+        artnet,
         control,
         events,
         preview_pipe,
@@ -703,6 +723,50 @@ pub fn run() {
     if let Err(err) = event_loop.run_app(&mut app) {
         eprintln!("event loop error: {err}");
         std::process::exit(1);
+    }
+}
+
+/// Bind the Art-Net fixture sink (ADR-0145), flag over config.
+///
+/// The startup line names the universe count and the first node's address
+/// rather than the whole map: a map is up to 24 rows and an operator reading a
+/// console at load-in wants to know that the rig resolved, not to re-read the
+/// file they wrote.
+fn bind_artnet(config: &config::Artnet) -> Option<ArtnetSink> {
+    let artnet_flag = match parse_artnet_arg() {
+        Ok(target) => target,
+        Err(msg) => {
+            eprintln!("{msg}");
+            std::process::exit(1);
+        }
+    };
+    let from_flag = artnet_flag.is_some();
+    match resolve_artnet(artnet_flag, config) {
+        Some(resolved) => match ArtnetSink::bind(&resolved) {
+            Ok(sink) => {
+                let universes = sink.universes();
+                eprintln!(
+                    "artnet driving {} universe(s) from {} at {} Hz, universe index on {}",
+                    universes.len(),
+                    universes
+                        .first()
+                        .map(|u| u.target.to_string())
+                        .unwrap_or_default(),
+                    resolved.rate_hz,
+                    resolved.space.universe_axis.as_str(),
+                );
+                Some(sink)
+            }
+            Err(msg) if from_flag => {
+                eprintln!("{msg}");
+                std::process::exit(1);
+            }
+            Err(msg) => {
+                eprintln!("{msg}; artnet off");
+                None
+            }
+        },
+        None => None,
     }
 }
 

@@ -556,8 +556,8 @@ which nothing but the rig can answer. Phase 9 is the whole of the second half, i
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The virtual rig | dev | done | committed with this row |
-| 2 — A configured rig lights up | dev | not started | |
+| 1 — The virtual rig | dev | done | `e637ae99` |
+| 2 — A configured rig lights up | dev | done | committed with this row |
 | 3 — Folded tempo and musical beat | dev | not started | |
 | 4 — The send path, measured | dev | not started | |
 | 5 — A look is a TOML file | dev | not started | |
@@ -573,6 +573,21 @@ which nothing but the rig can answer. Phase 9 is the whole of the second half, i
   asserts crate membership. Checked in-session with
   `cargo build --message-format json | grep -c rlx-artnet-sim` → 0, and
   `cargo build -p rlx-artnet-sim` → success.
+- Phase 2 touched two files outside its list, both to keep a gate green.
+  `docs/configuration.md`: `standalone/tests/suite/configuration_doc.rs` fails on any config key or
+  flag the document does not name, so `[artnet]`, `[artnet.space]`, `[[artnet.node]]`, `--artnet`
+  and the complete-file example landed here rather than waiting for Phase 10.
+  `.config/nextest.toml`: `core/tests/suite/hygiene.rs`'s
+  `every_clock_reading_test_is_scheduled_alone` fails on an integration test carrying a
+  `clippy::disallowed_methods` exemption that the run-alone override does not name, so
+  `binary(artnet_loopback)` was added to that filter.
+- Phase 2: blackout paths actually covered are the sink's `Drop` and the explicit call at
+  `WindowEvent::CloseRequested`; both are asserted from the captured stream. A panic is covered only
+  if it unwinds to the sink's owner, which nothing here verifies; an abort, a kill and a power loss
+  are not covered at all. Stated on `ArtnetSink::blackout`.
+- Phase 2: no operator-quit hotkey exists in this shell — `Escape` never quits and
+  `WindowEvent::CloseRequested` is the operator's quit. The two exit paths the done-when names are
+  therefore that event and the sink's `Drop`.
 
 ### Close triggers
 

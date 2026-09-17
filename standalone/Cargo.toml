@@ -58,6 +58,11 @@ toml = "=1.1.3"
 # the PNG codec only; pinned exact per NFR 4 / the hygiene guard.
 [dev-dependencies]
 image = { version = "=0.25.10", default-features = false, features = ["png"] }
+# The simulated rig (ADR-0174). A dev-dependency and nothing more: the Art-Net
+# integration test points a configured sink at a loopback port and reads the
+# decoded stream, which is how the wire format is gated in CI. Nothing in the
+# shipped binary links it.
+rlx-artnet-sim = { path = "../rlx-artnet-sim" }
 
 # The Spout colour probe (Plan 0115 Phase 3). `required-features` is what keeps
 # it out of an ordinary build: without `spout` cargo skips the target entirely,

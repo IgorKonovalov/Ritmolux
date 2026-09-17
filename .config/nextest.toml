@@ -104,6 +104,13 @@ default-filter = 'not (binary(golden) + binary(attractor) + binary(reaction_diff
 # The selector is the `clippy::disallowed_methods` exemption, because the lint
 # refuses a clock read without one: every integration test file carrying it is
 # named here by binary, or by single test where the exemption is fn-level (`dsp`).
+# `artnet_loopback` is named for the mechanical reason rather than because it
+# measures anything: its clock read is the cadence argument the Art-Net sink
+# takes plus a deadline on a socket it does not schedule, and neither is an
+# assertion about wall-clock time. The filter is the exemption's default escape,
+# and taking the other one would widen `CLOCK_ALONE_EXEMPT` from "load is the
+# point" to something else.
+#
 # `stream_show` and `control_loopback` carry it and are deliberately absent:
 # under load each has reproduced a `ctl/preset` that is lost or not acted on
 # (backlog 0219, 0220), and running them alone would hide that rather than
@@ -114,5 +121,5 @@ default-filter = 'not (binary(golden) + binary(attractor) + binary(reaction_diff
 # testcase's [timestamp, timestamp + time] interval overlaps one of these by more
 # than the report's 1 ms resolution.
 [[profile.default.overrides]]
-filter = 'binary(/_cost$/) + binary(help_cli) + binary(stream_pipe) + (binary(dsp) & test(=one_hop_analyzes_well_under_the_hop_interval))'
+filter = 'binary(/_cost$/) + binary(help_cli) + binary(stream_pipe) + binary(artnet_loopback) + (binary(dsp) & test(=one_hop_analyzes_well_under_the_hop_interval))'
 threads-required = "num-test-threads"
