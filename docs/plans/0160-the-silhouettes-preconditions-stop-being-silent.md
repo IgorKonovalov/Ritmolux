@@ -288,8 +288,8 @@ flowchart TD
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The precondition is tested on the contour, not on the name | dev | done | committed with this row |
-| 1b — The arity probe prices a polyline (optional) | dev | not started | |
+| 1 — The precondition is tested on the contour, not on the name | dev | done | `8282d3a0` |
+| 1b — The arity probe prices a polyline (optional) | dev | done | committed with this row |
 | 2 — The three unhookable constraints are written down | dev | not started | |
 | 3 — The document is checked against the engine, once | human | not started | |
 
@@ -301,6 +301,12 @@ flowchart TD
   `the_tolerance_separates_the_measured_contours` alongside the lion's 0.0000. Phase 2's erosion
   paragraph cites the maple as a worked case, which is unaffected — this is about a mode that
   preset does not use.
+- **Phase 1b was taken**, so Phase 2 cites the re-taken readings. The arity table is now every row
+  on the polyline (`morph_to` identical to `d`, the route `polyline_probe` already used), measured
+  2026-09-17 on the AMD integrated adapter at 1920x1080, floor tier: **~0.095 ms per segment**,
+  42.6 % of the floor budget at 64 and 24.4 % at 32. `MAX_SAMPLES`'s doc carries the new figure with
+  its date; the ceiling's argument holds at 64, so nothing is logged for a later plan under *What
+  this plan does NOT do*'s last bullet.
 - **Phase 1 extends the verdict to a morph target**, which the plan's done-when speaks of in the
   singular ("a contour that fails the test"). Both endpoints of a `morph_to` pair are drawn, so
   either one failing takes the scaled copy away, on the scene and in the warning alike. An

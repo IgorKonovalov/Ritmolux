@@ -65,13 +65,13 @@ pub const MIN_SAMPLES: usize = 3;
 ///
 /// **The number is measured, and the measurement disagreed with ADR-0107's
 /// construction by an order of magnitude.** `core/tests/path_cost.rs` prices the
-/// contour walk at ~0.105 ms per segment at 1920x1080 on the integrated adapter
-/// `docs/nfr.md` §1's floor is calibrated against; the ADR predicted ~2 % of
-/// such a GPU at 32 segments and measured 26 %. At **64** the field alone is
-/// 46 % of the floor's 16.67 ms frame budget, which is the most that can be
-/// spent while leaving the composite chain room — so this is where the ceiling
-/// sits, and it is the same value as [`DEFAULT_SAMPLES`] because that is where
-/// the two independent answers landed.
+/// contour walk at **~0.095 ms per segment** (2026-09-17, 1920x1080, floor tier,
+/// on the integrated adapter `docs/nfr.md` §1's floor is calibrated against);
+/// the ADR predicted ~2 % of such a GPU at 32 segments and the measurement reads
+/// 24 % there. At **64** the field alone is 43 % of the floor's 16.67 ms frame
+/// budget, which is about the most that can be spent while leaving the composite
+/// chain room — so this is where the ceiling sits, and it is the same value as
+/// [`DEFAULT_SAMPLES`] because that is where the two independent answers landed.
 pub const MAX_SAMPLES: usize = 64;
 
 /// The most arc pieces a fitted contour may carry before the fit is discarded
