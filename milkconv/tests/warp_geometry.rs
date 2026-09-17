@@ -59,28 +59,43 @@ const SIZE: u32 = 96;
 const FRAMES: u32 = 12;
 
 /// **How one-sided a control render must be before a mirror can be read off it
-/// by contrast** — the non-vacuity floor all three hunts below share.
+/// by contrast** — the non-vacuity floor all three hunts below share, expressed
+/// as a multiple of [`mean_level`] rather than as an absolute distance.
 ///
-/// It is a floor on an ABSOLUTE mean byte distance, so what moves it is how much
-/// light the fixture puts on screen, not what the geometry does with that light.
+/// # Why a multiple, and why the ceiling is exactly 2
+///
+/// When a frame's light sits wholly on one side of the mirror axis, each lit
+/// pixel is differenced against a black one **and** its own black mirror is
+/// differenced against it, so the summed distance is exactly **twice** the
+/// summed light. The ratio is therefore `2.0` for a perfectly one-sided frame
+/// and falls toward `0.0` as the picture approaches its own mirror. It is
+/// **dimensionless**: an adapter that rasterizes these fixtures dimmer scales
+/// numerator and denominator together and the ratio does not move.
+///
+/// `1.0` asks that **at least half** the render's light sit where its mirror is
+/// dark, which is what "visibly one-sided" means here. All three controls read
+/// `2.000` — the ceiling — so the margin is a factor of two.
+///
 /// These fixtures light themselves with **one shape and nothing else**:
 /// `fWaveAlpha`, `ob_a`, `ib_a` and the motion vectors are all zero, and a
 /// converted bundle binds `deposit = "0.0"`, so the `warp_mesh` scene adds none
-/// of its own.
+/// of its own. That is why the light is one-sided in the first place.
 ///
-/// Measured on the development box (Windows 10, DX12 WARP) at 96x96 over
-/// [`FRAMES`]: the `ang` control reads `0.0305` and the `sx` control `0.0263`,
-/// against their mirrored arms' `0.0009` and `0.0024`. `0.015` clears both
-/// controls and sits an order of magnitude above every mirrored arm.
+/// **The two readings each test quotes in its own comment are on an older,
+/// brighter scale** — taken while the converter emitted no `deposit` binding and
+/// the scene's default of `1.6` lit these fixtures along with everything else.
+/// They are kept because the *ratios* in them are what those comments argue
+/// from, and every one of those ratios improved when the ring went.
+const ONE_SIDED_ENOUGH: f32 = 1.0;
+
+/// **The least light a control must put on screen for the ratio above to say
+/// anything** — an empty frame is trivially its own mirror.
 ///
-/// **The two readings each test quotes in its own comment are on the OLD scale**,
-/// about five times larger, and are kept because the *ratios* in them are what
-/// those comments argue from. They were taken while the converter emitted no
-/// `deposit` binding at all, so the scene's default of `1.6` laid a ring of light
-/// into every converted preset and lit these fixtures along with it
-/// (Plan 0180 Phase 7). Removing that ring darkened the frame and left every
-/// contrast ratio here better than it was.
-const ONE_SIDED_ENOUGH: f32 = 0.015;
+/// This one is absolute, and has to be: it asks whether the fixture drew at all,
+/// which no ratio can. It sits an order of magnitude below what these fixtures
+/// render (`0.0132` and `0.0152` on the development box, 96x96 over [`FRAMES`])
+/// rather than beside it, because the question is presence and not amount.
+const LIT_AT_ALL: f32 = 0.002;
 
 fn fixture_text(relative: &str) -> String {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -165,6 +180,31 @@ fn mirrored_distance(a: &CaptureImage, b: &CaptureImage, axis: Axis) -> f32 {
             };
             for c in 0..3 {
                 sum += (at(a, x, y, c) - at(b, mx, my, c)).abs();
+                n += 1;
+            }
+        }
+    }
+    if n == 0 {
+        0.0
+    } else {
+        (sum / n as f64 / 255.0) as f32
+    }
+}
+
+/// **The mean light this render actually put on screen**, on the same stored-byte
+/// `0..1` scale as [`mirrored_distance`].
+///
+/// The denominator of the non-vacuity floor below: an adapter that rasterizes
+/// these fixtures dimmer scales this and the asymmetry together, which is what
+/// makes their ratio a property rather than a reading (ADR-0071, ADR-0074).
+fn mean_level(img: &CaptureImage) -> f32 {
+    let mut sum = 0f64;
+    let mut n = 0u64;
+    for y in 0..img.height {
+        for x in 0..img.width {
+            let i = ((y * img.width.max(1) + x) * 4) as usize;
+            for c in 0..3 {
+                sum += f64::from(img.rgba.get(i + c).copied().unwrap_or(0));
                 n += 1;
             }
         }
@@ -271,12 +311,14 @@ fn the_ang_round_trip_reflects_about_the_horizontal_midline() {
 
     // Non-vacuity first: the control must be visibly one-sided, or "the round
     // trip is more symmetric than the control" compares two piles of noise.
+    let level = mean_level(&b);
     assert!(
-        direct > ONE_SIDED_ENOUGH,
-        "the CONTROL is already close to symmetric ({direct:.4}), so it cannot \
-         show a mirror by contrast. The fixture's only light source is a shape \
-         at y = 0.82 — if a direct `uv` sample renders symmetrically, the shape \
-         is not being drawn where the fixture says"
+        level > LIT_AT_ALL && direct > level * ONE_SIDED_ENOUGH,
+        "the CONTROL is already close to symmetric ({direct:.4} against its own \
+         mean level {level:.4}), so it cannot show a mirror by contrast. The \
+         fixture's only light source is a shape at y = 0.82 — if a direct `uv` \
+         sample renders symmetrically, the shape is not being drawn where the \
+         fixture says"
     );
     assert!(
         mirrored < direct * 0.25,
@@ -356,12 +398,13 @@ fn a_negative_scale_mirrors_rather_than_collapsing() {
 
     // Non-vacuity first: the control must be visibly one-sided, or "the negative
     // arm is more symmetric than the control" compares two piles of noise.
+    let level = mean_level(&b);
     assert!(
-        held > ONE_SIDED_ENOUGH,
-        "the CONTROL is already close to symmetric ({held:.4}), so it cannot \
-         show a mirror by contrast. The fixture's one shape sits at x = 0.22 — \
-         if a positive `sx` renders symmetrically, the shape is not being drawn \
-         where the fixture says"
+        level > LIT_AT_ALL && held > level * ONE_SIDED_ENOUGH,
+        "the CONTROL is already close to symmetric ({held:.4} against its own \
+         mean level {level:.4}), so it cannot show a mirror by contrast. The \
+         fixture's one shape sits at x = 0.22 — if a positive `sx` renders \
+         symmetrically, the shape is not being drawn where the fixture says"
     );
     assert!(
         flipped < held * 0.25,
@@ -440,12 +483,14 @@ fn at_full_alpha_the_echo_is_the_mirror_of_the_control() {
          {mirrored:.4}, unmirrored: {direct:.4}"
     );
 
+    let level = mean_level(&b);
     assert!(
-        direct > ONE_SIDED_ENOUGH,
-        "the echoed frame already matches the UNMIRRORED control ({direct:.4}), \
-         so the echo is not reaching the screen at all and the mirrored \
-         comparison below would pass on a stage that does nothing. The \
-         fixture's one shape sits at x = 0.22, off centre on purpose"
+        level > LIT_AT_ALL && direct > level * ONE_SIDED_ENOUGH,
+        "the echoed frame already matches the UNMIRRORED control ({direct:.4} \
+         against the control's own mean level {level:.4}), so the echo is not \
+         reaching the screen at all and the mirrored comparison below would \
+         pass on a stage that does nothing. The fixture's one shape sits at \
+         x = 0.22, off centre on purpose"
     );
     assert!(
         mirrored < direct * 0.25,
