@@ -199,6 +199,47 @@ flowchart TB
     ADR-0200: a saturated blot is then caught only as "blank", as it already is today, and the
     flatness reading becomes a report.
 
+#### The gate's outcome, recorded 2026-09-17
+
+**Continue, on `role_ratio`.** Written from the table Phase 1 printed, re-run at the gate on the
+phase's own commit; [ADR-0200](../adrs/0200-the-flatness-conjunctions-second-term-reads-the-reference-a-role-classifier-assigns.md)
+carries the full table, the choice and the four rejected candidates, and is `proposed` until this
+plan closes.
+
+**Eight of the ten candidates pass**, so the registered condition selected but did not decide:
+`role_ratio`, `min_ground`, `ground_side`, `modal_connected`, `sobel`, `tile@6`, `tile@12`,
+`tile@16`. `flatness^-1`, `boundary`, `components`, `tile@4`, `tile@8` and `border_ground` fail —
+and `border_ground` failing is the checked expectation Phase 1 tabled it for, since a blot reaches
+the frame edge.
+
+**Why `role_ratio` and not one of the other seven.** It is the only candidate that answers the
+question ADR-0161's defect actually asks. That defect is a **reference**, not a statistic: term two
+reads the derived ground, and a blot is its own modal band. `role_ratio` classifies the modal band
+as figure or ground from `coverage(BLACK) / coverage(derived)` — a ratio of one kind of quantity
+(ADR-0074) — and term two then reads the reference that role assigns, staying the statistic ADR-0130
+established. The three candidates with a wider or comparable separation were each rejected on a
+named property rather than on preference: `modal_connected` (5.7, the widest) reads `0.0000` for any
+frame whose ground is one connected piece, with three library members within 0.007 of the ragged
+blot; `min_ground` (4.2) convicts a frame unstructured against *either* reference, which hides a
+false conviction inside a true verdict; `ground_side` (3.9) measures the paper's perforation on a
+print and the mass's rim on a blot, then compares both to one floor. `sobel` and the `tile@N` family
+each replace the statistic outright and carry legitimate frames at `0.0000`.
+
+**The `boundary_floor` derivation: `0.23`, at 96x96.** The midpoint of two anchors of one kind of
+quantity, read on one column at one size — the higher blot's `0.0934` and the frozen composition's
+`0.3602`, each `boundary_density` under the role it is assigned. It sits **2.4x** above the blot and
+at **0.63x** the composition. It is a measurement and names its capture size: the statistic goes as
+~`1/L`, the same anchors at 192x192 give `0.12`, and nothing scales one into the other
+(ADR-0071). The cut is **1.17 at 96x96**, the midpoint of the lower blot's ratio `1.2718` and the
+conditional population's highest non-blot ratio `1.0780`.
+
+**What the record owes, and Phase 3 inherits.** 28 library frames read between the higher blot and
+the composition at 96x96, and **term one clears every one of them** — criterion 2 registered that in
+advance and none is above the flatness ceiling. The conjunction is load-bearing there, so a later
+loosening of `MAX_TONAL_FLATNESS` would convict them.
+
+**Phase 3 runs in its Continue form.**
+
 ### Phase 3 — Term two reads the figure (or the conviction retires)
 
 - **Owner skill:** dev
@@ -290,7 +331,7 @@ flowchart TB
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The figure/ground candidates join the table | dev | done | committed with this row |
-| 2 — The gate | human | not started | |
+| 2 — The gate | human | done | committed with this row |
 | 3 — Term two reads the figure (or the conviction retires) | dev | not started | |
 | 4 — The reader says what the gate does | dev | not started | |
 
