@@ -434,6 +434,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
+| `palette_contour_style` | `0` | `0` – `3` | Which line the contour draws: 0 a soft darkening, 1 a hard one, 2 a soft ink, 3 a hard ink. |
 
 **Modal**
 
@@ -453,6 +454,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | `saturation` | `1` | `0` – `1` | Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own. |
 | `palette_mix` | `0` | `0` – `1` | Crossfades from the preset's palette to its second one; 0 is the first, 1 the second. |
 | `palette_contour` | `0` | `0` – `1` | Draws a line at each band edge when the palette is stepped; 0 draws none. |
+| `palette_contour_ink` | `0` | `0` – `1` | Where along the palette an ink contour takes its colour; unread by the two black styles. |
 
 ### System: `swarm`
 
@@ -605,6 +607,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
+| `palette_contour_style` | `0` | `0` – `3` | Which line the contour draws: 0 a soft darkening, 1 a hard one, 2 a soft ink, 3 a hard ink. |
 
 **Modal**
 
@@ -623,6 +626,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | `saturation` | `1` | `0` – `1` | Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own. |
 | `palette_mix` | `0` | `0` – `1` | Crossfades from the preset's palette to its second one; 0 is the first, 1 the second. |
 | `palette_contour` | `0` | `0` – `1` | Draws a line at each band edge when the palette is stepped; 0 draws none. |
+| `palette_contour_ink` | `0` | `0` – `1` | Where along the palette an ink contour takes its colour; unread by the two black styles. |
 | `zoom` | `1` | `0.25` – `4` | Scales the whole scene about its centre; above 1 fills more of the frame. |
 | `pan_x` | `0` |  | Slides the whole scene sideways, in the scene's own units rather than pixels. |
 | `pan_y` | `0` |  | Slides the whole scene vertically, in the scene's own units rather than pixels. |
@@ -766,6 +770,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | `shape` | `0` | `0` – `4` | Which silhouette each mark is drawn as - a disc, a square, a star, and so on. |
 | `points` | `5` | `3` – `16` | How many points or sides the silhouette has, where the shape has a count at all. |
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
+| `palette_contour_style` | `0` | `0` – `3` | Which line the contour draws: 0 a soft darkening, 1 a hard one, 2 a soft ink, 3 a hard ink. |
 | `coord_mode` | `0` | `0` – `1` | Which coordinate frame the distance is measured in, which changes the shape's whole geometry. |
 
 **Modal**
@@ -783,6 +788,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | `saturation` | `1` | `0` – `1` | Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own. |
 | `palette_mix` | `0` | `0` – `1` | Crossfades from the preset's palette to its second one; 0 is the first, 1 the second. |
 | `palette_contour` | `0` | `0` – `1` | Draws a line at each band edge when the palette is stepped; 0 draws none. |
+| `palette_contour_ink` | `0` | `0` – `1` | Where along the palette an ink contour takes its colour; unread by the two black styles. |
 | `gamma` | `1` | `0.25` – `4` | Shapes the falloff from the shape's edge; below 1 it bites sooner. |
 | `rotation` | `0` | `0` – `6.2831855` | Turns the shape, in radians. |
 | `stroke` | `0` | `0` – `1` | Draws the outline instead of the filled figure, at this half-width; 0 fills. |
@@ -796,7 +802,9 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 |---|---|---|---|
 | `deposit_arms` | `0` | `0` – `16` | How many arms the ring is broken into, as a whole number of arms; 0 leaves it whole. |
 | `echo_orient` | `0` | `0` – `3` | Which way the echoed copy is flipped before it is blended. |
+| `color_source` | `0` | `0` – `1` | Where the field takes its colour: 0 the deposit's own angle, 1 the light it has built up. |
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
+| `palette_contour_style` | `0` | `0` – `3` | Which line the contour draws: 0 a soft darkening, 1 a hard one, 2 a soft ink, 3 a hard ink. |
 
 **Modal**
 
@@ -836,6 +844,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | `saturation` | `1` | `0` – `1` | Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own. |
 | `palette_mix` | `0` | `0` – `1` | Crossfades from the preset's palette to its second one; 0 is the first, 1 the second. |
 | `palette_contour` | `0` | `0` – `1` | Draws a line at each band edge when the palette is stepped; 0 draws none. |
+| `palette_contour_ink` | `0` | `0` – `1` | Where along the palette an ink contour takes its colour; unread by the two black styles. |
 | `brightness` | `1` | `0` – `2` | The scene's overall light level, multiplying what it draws before the composite. |
 
 ### System: `shape_collage`
@@ -883,6 +892,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | `mode_m` | `5` | `chladni` `1` – `16`; inert on `escape_time` | The plate's second mode number: how many nodal lines cross the other axis. |
 | `iterations` | `64` | `escape_time` `1` – `512`; inert on `chladni` | How many steps an orbit is followed before it is called part of the set; more resolves finer boundary detail. Capped by the quality tier. |
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
+| `palette_contour_style` | `0` | `0` – `3` | Which line the contour draws: 0 a soft darkening, 1 a hard one, 2 a soft ink, 3 a hard ink. |
 
 **Modal**
 
@@ -907,6 +917,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | `saturation` | `1` | `0` – `1` | Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own. |
 | `palette_mix` | `0` | `0` – `1` | Crossfades from the preset's palette to its second one; 0 is the first, 1 the second. |
 | `palette_contour` | `0` | `0` – `1` | Draws a line at each band edge when the palette is stepped; 0 draws none. |
+| `palette_contour_ink` | `0` | `0` – `1` | Where along the palette an ink contour takes its colour; unread by the two black styles. |
 
 ### System: `cellular`
 
@@ -920,6 +931,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | `states` | `3` | `cyclic` `2` – `24`; inert on `life_like`, `larger_than_life` | How many colours the cycle holds; each cell advances to the next one round it. |
 | `threshold` | `3` | `cyclic` `1` – `8`; inert on `life_like`, `larger_than_life` | How many of its eight neighbours must already hold the next colour before a cell advances to it. |
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
+| `palette_contour_style` | `0` | `0` – `3` | Which line the contour draws: 0 a soft darkening, 1 a hard one, 2 a soft ink, 3 a hard ink. |
 
 **Modal**
 
@@ -941,6 +953,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | `saturation` | `1` | `0` – `1` | Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own. |
 | `palette_mix` | `0` | `0` – `1` | Crossfades from the preset's palette to its second one; 0 is the first, 1 the second. |
 | `palette_contour` | `0` | `0` – `1` | Draws a line at each band edge when the palette is stepped; 0 draws none. |
+| `palette_contour_ink` | `0` | `0` – `1` | Where along the palette an ink contour takes its colour; unread by the two black styles. |
 
 ### Engine stage: `background`
 
@@ -2132,10 +2145,22 @@ instead, or ease something the expression reads.
 | `deposit_twist` | how much the arms spiral with radius. Default `0` |
 | `deposit_spin` | how fast they turn, in radians a second. **Integrates a phase** ([ADR-0132](../docs/adrs/0132-a-rate-parameter-integrates-a-phase.md)), like `warp_speed` above and for the same reason, so binding it to audio bends the arms' rotation instead of teleporting it. Default `0` |
 
-The deposit is coloured **by angle** through the shared palette, so the shared
-colour vocabulary applies as it does everywhere else: `hue`, `color_span`,
-`color_center`, `saturation`, `palette_mix`, `palette_steps`, `palette_contour`,
-and `brightness` scaling the whole present.
+**`color_source` picks which of two coordinates the palette is read at, and they
+exclude each other.** At `0` — the default — the deposit is coloured **by angle**,
+before the feedback loop, so `palette_steps` quantizes the light going *in* and the
+structure the loop builds carries no bands. At `1` the deposit writes uncoloured
+light, the field accumulates a **level**, and the present pass colours by
+`hue + color_center + color_span * level`: what `palette_steps` then draws are the
+loop's own decay contours, a ladder of concentric rungs. The level is not bounded
+by `1` and the palette is repeat-addressed, so it wraps outward rather than
+clipping; and because the present writes `ink * coverage`, the outermost rungs fade
+through intermediate values as the coverage does.
+[`docs/preset-palettes.md`](../docs/preset-palettes.md) has the section.
+
+Either way the shared colour vocabulary applies as it does everywhere else: `hue`,
+`color_span`, `color_center`, `saturation`, `palette_mix`, `palette_steps`,
+`palette_contour` with its `palette_contour_style` and `palette_contour_ink`, and
+`brightness` scaling the whole present.
 
 #### MilkDrop's composite roster
 
@@ -3835,6 +3860,8 @@ them to an existing preset is the only thing that changes it.
 |---|---|---|---|
 | `palette_steps` | `0` (off) | **`4`–`12`** | `0` = smooth, up to `64` |
 | `palette_contour` | `0` (none) | **`0`–`0.5`** | `0` = none, up to `1`. Draws **only where the two bands it separates are different colours** ([ADR-0133](../docs/adrs/0133-the-band-contour-fires-where-the-ink-changes.md)) — so it is silent inside a plateau and draws at each run boundary, which is what makes it usable on a limited-ink palette. Unchanged on a smooth one at any step count |
+| `palette_contour_style` | `0` | one of four | `0` a soft darkening toward black, `1` a hard one over the same footprint, `2` a soft line in the palette's own colour, `3` a hard one ([ADR-0197](../docs/adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md)). `0` is the arithmetic that shipped before the others existed. The hard pair is what keeps a limited-ink frame down to its own inks — and it has no anti-aliasing, so on a smooth palette it reads as jagged |
+| `palette_contour_ink` | `0` | a palette coordinate | Where styles `2` and `3` take their colour. **Absolute** — `hue` does not shift it and `color_span` does not scale it — so it names a stop, and it crossfades A/B by `palette_mix` like every other sample |
 
 Those two ranges were read off a rendered sweep rather than argued. Outside them
 nothing breaks — it just stops being the *graphic* look:
@@ -3860,9 +3887,12 @@ Three things to know before binding them:
   sit in, and those scenes take one palette sample per particle or per segment —
   the attractor's in the vertex stage, where the derivative the contour is measured
   against does not exist at all. **Banding reaches every scene; contours reach the
-  continuous-field scenes**, `fragment_field` and `reaction_diffusion`. The
-  parameter is accepted everywhere because it *is* a known name, so no
-  unknown-param warning fires; this paragraph is the warning.
+  six continuous-field scenes** — `analytic_field`, `cellular`, `fragment_field`,
+  `reaction_diffusion`, `shape_field` and `warp_mesh`. `palette_contour` is
+  accepted everywhere because it *is* a known name, so no unknown-param warning
+  fires; this paragraph is the warning. **`palette_contour_style` and
+  `palette_contour_ink` do not inherit the trap** — they are declared only by
+  those six, so binding one elsewhere warns.
 - **Banding fights bloom.** The bright pass blurs exactly the hard edges this
   creates, so a preset cannot have crisp bands and heavy `bloom_amount` at full
   strength. Pick one.

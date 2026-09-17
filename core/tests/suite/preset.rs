@@ -2082,6 +2082,8 @@ const PALETTE_BLOCK: &[&str] = &[
     "palette_mix",
     "palette_steps",
     "palette_contour",
+    "palette_contour_style",
+    "palette_contour_ink",
     "saturation",
     "hue",
     "brightness",
@@ -2352,6 +2354,10 @@ const STRUCTURAL: &[(&str, &str)] = &[
     ("shape_collage", "roster"),
     // `echo_orientation`: rounds, then wraps modulo the four flips.
     ("warp_mesh", "echo_orient"),
+    // `warp_mesh::colour_source`: rounds, on the same argument one set smaller —
+    // a selector between two whole colour paths, and half of one is not a
+    // picture (ADR-0197).
+    ("warp_mesh", "color_source"),
     // The one entry that is not already a no-op (see the header): the deposit
     // shader multiplies the raw value into an angular phase, so a fraction tears
     // the ring along the branch cut. The engine's round is the fix.
@@ -2377,6 +2383,15 @@ const STRUCTURAL: &[(&str, &str)] = &[
     ("shape_field", "palette_steps"),
     ("warp_mesh", "palette_steps"),
     ("analytic_field", "palette_steps"),
+    // `palette::band_contour_style`: clamps into `0..=3` and rounds, on the six
+    // scenes whose fragment stage carries `band_contour_ink` — a selector over
+    // four lines, so a fraction between two of them names none (ADR-0197).
+    ("fragment_field", "palette_contour_style"),
+    ("reaction_diffusion", "palette_contour_style"),
+    ("shape_field", "palette_contour_style"),
+    ("warp_mesh", "palette_contour_style"),
+    ("analytic_field", "palette_contour_style"),
+    ("cellular", "palette_contour_style"),
     // `analytic_field::applied_mode`: clamps into the plate's range and rounds,
     // because a fractional mode is not a standing wave of the plate at all.
     ("analytic_field", "mode_n"),

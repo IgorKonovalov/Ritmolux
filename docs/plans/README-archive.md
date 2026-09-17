@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0184 - Limited ink: a contour that is an ink, and a warp field that bands](#0184---limited-ink-a-contour-that-is-an-ink-and-a-warp-field-that-bands)
   - [0186 - The flatness gate tells a figure from its ground](#0186---the-flatness-gate-tells-a-figure-from-its-ground)
   - [0183 - A low density is a trace count](#0183---a-low-density-is-a-trace-count)
   - [0166 - The basics read in Russian](#0166---the-basics-read-in-russian)
@@ -226,6 +227,63 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0184 - Limited ink: a contour that is an ink, and a warp field that bands](done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md)
+
+- closed 2026-09-17, conductor-run lane `plan-0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands`
+in `WORK/rlx-plan-0184`. Four phases: `277d7e1` + `80426fb` (Phase 1, the watch then the change),
+`9627131`, `d575f65`, `a31fc17` (the `human` look gate). An earlier close attempt parked
+`merge_conflict` after repairing four prose findings (`b014a23a`); the round-1 verdict is **no
+blockers, no majors, one minor and one nit**, the nit repaired in `a3d2be38` and the minor left open
+deliberately. Version **0.130.0** (minor), ADR-0197 accepted **with an Outcome**, backlog 0140 and
+0146 both closed, and the half that did not arrive refiled as 0251.
+- **What landed.** `palette_contour_style` takes four values on all six contour scenes — soft or hard
+footprint, black or an ink read at an absolute `palette_contour_ink` coordinate — with style `0` the
+expression that shipped before it, so no golden moved. And `warp_mesh` gained `color_source`: at `1`
+the deposit writes uncoloured light and the present pass colours the field by `max(rgb)` of its own
+accumulated level, which is the only decay contour in the engine.
+- **The drift guard stopped being a list, and that is the durable half.** The test that holds the six
+WGSL copies of the contour together had silently skipped `warp_mesh` for two plans and
+`analytic_field` and `cellular` for two more, reporting green over sites it never opened — ADR-0133's
+Outcome, recurring. It now **scans** `core/src/render/scenes/` for the function and fails naming any
+carrier it has no `include_str!` for, so the membership question is answered by the filesystem rather
+than by whoever last remembered. The seventh copy, in `warp_mesh`'s present pass, was picked up
+without an edit to the test.
+- **Two done-whens were wrong and the log said so rather than satisfying them.** *"The hard line's
+pixels are a subset of the soft line's"* is false by one sliver — the soft ramp's outermost pixel
+darkens by less than one code value, so no differential sees it while the step paints it at full
+strength — and the test asserts containment the other way plus a bound. *"The ink line changes every
+pixel style 0 would darken"* is false where the ink is laid over its own run, which is the property
+the style exists for; the test asserts instead that the whole footprint **renders exactly the ink's
+own code value**, taken from a style-1 capture that is visible against every ink. Both replacements
+are stronger than what they replaced.
+- **The level mode's tests rest on one property worth remembering.** In level mode the field's
+evolution does not depend on the palette at all, so "this pixel is one of the palette's inks" is
+checkable *exactly* — against a capture of the same fixture with that ink end to end, through the
+tonemap and the position-dependent dither. That is what lets a per-pixel ink claim be made at any
+coverage with no tolerance.
+- **The plan's own non-vacuity did not exist, and the substitute is sharper.** The done-when asked for
+stray non-ink pixels on the deposit-angle path; there are none, because a purely radial resample of a
+radial sector pattern blends nothing above the 8-bit floor. What the suite asserts is backlog 0146's
+own sentence: along a ray the level path crosses between inks **10** times and the angle path **0**,
+because the angle coordinate does not vary along a ray.
+- **Phase 2's stop condition did not fire.** `max(rgb)` over the ladder fixture measures p05 1.0859,
+median 1.9033, p95 3.2305, so a full palette cycle fits inside `color_span = 1` and the documented
+gain ADR-0197 priced was not needed. The cost reading is the other surprise: level mode with the
+contour off is *cheaper* than the angle path (1.695 ms against 1.715 at 1920x1080), because the
+deposit stops sampling the LUT.
+- **What outlived the plan is a negative result, stated rather than tuned around.** The ladder is the
+op-art world backlog 0146 asked for and is **not** a limited-ink print. The present writes
+`ink * coverage`, coverage is a continuum, and two inks measure **851** exact colours;
+`palette_steps = "12"` quantizes the level the coverage is computed from and brings the same frame to
+**60**. `presets/warp_ladder.toml` ships at twelve and says so in its header instead of claiming a
+class. ADR-0197's fringe question — dissolving or shading — is answered *shading*, recorded in the
+ADR's `Outcome`, and the coverage-threshold repair is backlog 0251 rather than a quiet retune.
+- **Two presets moved.** `shape_contourmono` re-authored onto the hard black key, which restores the
+9 exact frame colours the soft line cost it, with style 3 rendered and rejected on composition (a red
+line at every run boundary takes red from 4.57 % to 11.70 %) and that rejection kept in its header.
+`presets/warp_ladder.toml` is new. Both carry gallery cards, rendered by hand at the manifest's own
+settings rather than by re-running the whole gallery.
 
 ### [0186 - The flatness gate tells a figure from its ground](done/0186-the-flatness-gate-tells-a-figure-from-its-ground.md)
 

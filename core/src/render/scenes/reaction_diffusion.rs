@@ -194,7 +194,8 @@ struct Present {
     // x: zoom, yz: pan (field-space view transform, ADR-0018), w: occlude (ADR-0085)
     c: vec4<f32>,
     // x: palette_steps (integral, quantized CPU-side), y: palette_contour
-    // (ADR-0078), zw: unused
+    // (ADR-0078), z: palette_contour_style (integral, rounded CPU-side),
+    // w: palette_contour_ink (ADR-0197)
     d: vec4<f32>,
 }
 @group(0) @binding(0) var present_field: texture_2d<f32>;
@@ -239,26 +240,36 @@ fn band_coord(t: f32, steps: f32) -> f32 {
 // no new parameter.
 //
 // The two LUTs, the sampler and `palette_mix` are EXPLICIT parameters rather
-// than module-scope globals this happens to find: all four sites name them the
+// than module-scope globals this happens to find: all six sites name them the
 // same today, so implicit capture would compile — and would silently bind the
 // shared function to whatever a future site called its textures.
 //
 // `textureSampleLevel`, not `textureSample`: the LUT has one mip, and an
 // explicit LOD keeps these reads free of the uniformity requirement that a
 // sample after a conditional return would otherwise carry.
-fn band_contour(
+//
+// **What the line is drawn in is `style`** (ADR-0197): `0` the soft darkening
+// above, `1` a hard darkening over the same footprint, `2` a soft line in the
+// palette's own colour at `ink_t` and `3` a hard one. `style` arrives rounded to
+// a whole number from the CPU (`palette::band_contour_style`), so the equality
+// comparisons below are exact. The `style < 0.5` arm is the expression that
+// shipped before the other three existed, which is what keeps every golden still.
+fn band_contour_ink(
+    col: vec3<f32>,
     t: f32,
     steps: f32,
     amount: f32,
+    style: f32,
+    ink_t: f32,
     lut_a: texture_2d<f32>,
     lut_b: texture_2d<f32>,
     lut_samp: sampler,
     mix_ab: f32,
-) -> f32 {
+) -> vec3<f32> {
     let f = t * steps;
     let w = max(fwidth(f), 1e-5);
     if (steps < 1.5 || amount <= 0.0) {
-        return 1.0;
+        return col;
     }
     let n = round(f);
     let m = clamp(mix_ab, 0.0, 1.0);
@@ -273,10 +284,21 @@ fn band_contour(
         m
     );
     if (all(abs(hi - lo) < vec3<f32>(0.5 / 255.0))) {
-        return 1.0;
+        return col;
     }
     let d = min(fract(f), 1.0 - fract(f));
-    return 1.0 - clamp(amount, 0.0, 1.0) * (1.0 - smoothstep(0.0, w, d));
+    if (style < 0.5) {
+        return col * (1.0 - clamp(amount, 0.0, 1.0) * (1.0 - smoothstep(0.0, w, d)));
+    }
+    let hard = style == 1.0 || style == 3.0;
+    let cover = select(1.0 - smoothstep(0.0, w, d), f32(d < w), hard);
+    let ink_lut = mix(
+        textureSampleLevel(lut_a, lut_samp, vec2<f32>(ink_t, 0.5), 0.0).rgb,
+        textureSampleLevel(lut_b, lut_samp, vec2<f32>(ink_t, 0.5), 0.0).rgb,
+        m
+    );
+    let ink = select(vec3<f32>(0.0), ink_lut, style >= 2.0);
+    return mix(col, ink, clamp(amount, 0.0, 1.0) * cover);
 }
 
 fn tap_v(uv: vec2<f32>) -> f32 {
@@ -397,8 +419,10 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let banded = band_coord(coord, pp.d.x);
     let ca = textureSample(lut_a, lut_samp, vec2<f32>(banded, 0.5)).rgb;
     let cb = textureSample(lut_b, lut_samp, vec2<f32>(banded, 0.5)).rgb;
-    let mixed = mix(ca, cb, clamp(palette_mix, 0.0, 1.0))
-        * band_contour(coord, pp.d.x, pp.d.y, lut_a, lut_b, lut_samp, palette_mix);
+    let mixed = band_contour_ink(
+        mix(ca, cb, clamp(palette_mix, 0.0, 1.0)),
+        coord, pp.d.x, pp.d.y, pp.d.z, pp.d.w, lut_a, lut_b, lut_samp, palette_mix
+    );
     let col = apply_saturation(mixed, saturation);
 
     // Hatch/comb: stripes along the contour tangent (perpendicular to grad),
@@ -456,7 +480,8 @@ struct PresentParams {
     b: [f32; 4],
     /// x: zoom, yz: pan (view transform, ADR-0018), w: occlude (ADR-0085).
     c: [f32; 4],
-    /// x: palette_steps, y: palette_contour (ADR-0078); zw unused.
+    /// x: palette_steps, y: palette_contour (ADR-0078), z: palette_contour_style,
+    /// w: palette_contour_ink (ADR-0197).
     d: [f32; 4],
 }
 
@@ -889,6 +914,8 @@ pub const PARAMS: &[ParamSpec] = &[
     crate::render::scenes::common::PALETTE_MIX,
     crate::render::scenes::common::PALETTE_STEPS,
     crate::render::scenes::common::PALETTE_CONTOUR,
+    crate::render::scenes::common::PALETTE_CONTOUR_STYLE,
+    crate::render::scenes::common::PALETTE_CONTOUR_INK,
     crate::render::scenes::common::zoom(DEFAULT_ZOOM),
     crate::render::scenes::common::PAN_X,
     crate::render::scenes::common::PAN_Y,
@@ -1031,8 +1058,8 @@ impl Scene for ReactionDiffusionScene {
                 d: [
                     palette::band_steps(colour.steps),
                     palette::band_contour(colour.contour),
-                    0.0,
-                    0.0,
+                    palette::band_contour_style(colour.contour_style),
+                    colour.contour_ink,
                 ],
             }),
         );

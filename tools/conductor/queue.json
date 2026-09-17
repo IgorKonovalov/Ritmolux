@@ -4,6 +4,6 @@
     "b": ["0178", "0133", "0103", "0120"]
   },
   "plans": {
-    "0142": { "add_dirs": ["../milkdrop-corpus"] }
+    "0142": { "add_dirs": ["../milkdrop-corpus", "../milkdrop2-src"] }
   }
 }

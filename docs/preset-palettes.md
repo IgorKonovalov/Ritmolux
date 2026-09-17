@@ -133,7 +133,9 @@ the audio vocabulary (`bass mid treb onset beat bar time` …) — only the grad
 | `saturation` | `1.0` | Scales chroma toward luma. `1` unchanged, `0` grayscale, `>1` oversaturated. |
 | `palette_mix`| `0.0` | A/B crossfade position (see below); `0` = palette A. |
 | `palette_steps` | `0.0` (off) | Quantizes the gradient into that many hard bands — see [Hard bands](#hard-bands--palette_steps-and-palette_contour). |
-| `palette_contour` | `0.0` (off) | Darkens a hairline at each band edge **where the ink actually changes**. **Fragment-field, reaction-diffusion, shape-field and warp-mesh only**; inert elsewhere — same section. |
+| `palette_contour` | `0.0` (off) | Draws a hairline at each band edge **where the ink actually changes**. **The six continuous-field scenes only** — `analytic_field`, `cellular`, `fragment_field`, `reaction_diffusion`, `shape_field`, `warp_mesh`; inert elsewhere, and nothing warns — same section. |
+| `palette_contour_style` | `0` | What that hairline *is*: `0` a soft darkening, `1` a hard one, `2` a soft line in the palette's own colour, `3` a hard one. Declared by the six scenes above and **unknown** anywhere else, so a typo there warns. |
+| `palette_contour_ink` | `0.0` | Where along the palette styles `2` and `3` take their colour — an absolute coordinate `hue` does not shift. Same six scenes. |
 
 `saturation` and `palette_mix` are **one binding with two consumers**: the active scene and the
 background pre-pass. You write them once and the whole frame answers — see
@@ -361,12 +363,15 @@ Two honest limits, both measured rather than estimated:
 
 ---
 
-### The warp mesh — colour by angle around the deposit
+### The warp mesh — colour by angle around the deposit, or by the field's own level
 
 | Param | Default | What it does |
 |-------|---------|--------------|
-| `color_span`   | `1.0` | How much of the gradient one full turn around the deposit centre covers. `1.0` is the whole ramp once per revolution; low values give a near-single-tone ring. |
+| `color_source` | `0` | Which coordinate the palette is read at: `0` the deposit's angle, below; `1` the field's accumulated level — [its own section](#the-warp-meshs-second-coordinate--color_source). One or the other, never both. |
+| `color_span`   | `1.0` | How much of the gradient one full turn around the deposit centre covers. `1.0` is the whole ramp once per revolution; low values give a near-single-tone ring. Under `color_source = "1"` it scales the *level* instead. |
 | `color_center` | `0.0` | Where that sweep starts in the gradient. **Cyclic**, exactly as on the field scenes — `-0.1` and `0.9` are the same place. |
+
+The rest of this section is the default, `color_source = "0"`.
 
 The deposit — the scene's light source, a gaussian ring — samples the LUT **per
 pixel in its fragment stage**, so the full surface applies here: `[palette]`,
@@ -498,6 +503,8 @@ poster or a topographic map does.
 |-------|---------|------------------|----------|
 | `palette_steps`   | `0` (off) | **`4`–`12`** | `0` = smooth, integers up to `64` |
 | `palette_contour` | `0` (off) | **`0`–`0.5`** | `0` = none, up to `1` |
+| `palette_contour_style` | `0` | one of four | `0`–`3`, rounded |
+| `palette_contour_ink` | `0` | a palette coordinate | `0`–`1` |
 
 ```toml
 [params]
@@ -505,6 +512,45 @@ palette_steps   = "6"                     # six flat bands
 palette_contour = "0.35"                  # a drawn edge between them
 color_span      = "1.4"                   # walk enough gradient that the bands differ
 ```
+
+### What the line is drawn in — `palette_contour_style` and `palette_contour_ink`
+
+The contour has four forms, and they are two independent choices packed into one
+name ([ADR-0197](adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md)):
+how the line is **filled** across its footprint, and what **colour** it is.
+
+| `palette_contour_style` | footprint | colour |
+|---|---|---|
+| `0` — the default | soft, ramped over one pixel | black, as a darkening of whatever is underneath |
+| `1` | **hard**, a step over the same footprint | black |
+| `2` | soft | the palette's own colour at `palette_contour_ink` |
+| `3` | **hard** | the palette's own colour at `palette_contour_ink` |
+
+Every style fires in exactly the same places — the rule above, unchanged. The style
+only decides what lands there, and `0` is the arithmetic that shipped before the
+other three existed, so adding the name to a preset changes nothing until you move
+it.
+
+**`palette_contour_ink` is an absolute coordinate.** It is not shifted by `hue` and
+not scaled by `color_span`: `0.955` means the colour at `0.955` of your gradient,
+which on a plateau palette is whichever run covers that position. It crossfades A/B
+by `palette_mix` like every other sample, so on a preset with a `[palette_b]` the
+key travels with the rest of the frame.
+
+**The hard styles are what a limited-ink print wants.** A soft line writes one
+intermediate value per step of its falloff, so it is the single biggest source of
+non-ink values in a frame made of flat colour — `shape_contourmono` measured at
+9 distinct colours with the contour off and **684** with the shipped soft one at
+full strength. A hard line at `palette_contour = "1"` writes one flat value, so the
+same frame measures **9** at style `1` and **9** at style `3`, and at style `3` the
+key is drawn in the palette's own red rather than in black.
+
+> [!WARNING]
+> **A hard line has no anti-aliasing, and on a smooth palette it will read as
+> jagged.** The step is the soft ramp's footprint filled to the edge rather than
+> ramped across it. On a quantized palette every band edge is already hard by
+> construction, which is the premise these two styles are for; on a continuous
+> ramp, stay at `0` or `2`.
 
 ### What it does to the coordinate
 
@@ -601,6 +647,10 @@ Two edges of the rule are worth knowing, because both will read as a surprise:
 > **`palette_contour` is inert on `attractor`, `swarm`, `emitter` and the four line
 > scenes, and nothing warns you.** The parameter is accepted there because it *is* a
 > known name, so no unknown-parameter warning fires. This section is the warning.
+>
+> **`palette_contour_style` and `palette_contour_ink` do not inherit that trap.**
+> They are declared only by the six scenes that can draw a contour, so binding one
+> anywhere else is an ordinary unknown-parameter warning at load.
 
 A contour needs a **gradient across a fragment** to sit in — its width comes from
 `fwidth`, which measures how fast a value changes between neighbouring pixels and
@@ -610,16 +660,22 @@ steep.
 
 Where the LUT is sampled decides whether that derivative exists at all:
 
-| Scene | Where it samples the LUT | `palette_steps` | `palette_contour` |
-|-------|--------------------------|-----------------|-------------------|
+The last column covers `palette_contour_style` and `palette_contour_ink` as well:
+the three names reach exactly the same six scenes, and the two new ones are simply
+unknown on the rest.
+
+| Scene | Where it samples the LUT | `palette_steps` | the three `palette_contour*` |
+|-------|--------------------------|-----------------|------------------------------|
+| `analytic_field` | per pixel, fragment stage | ✅ | ✅ |
+| `cellular` | per pixel, fragment stage | ✅ | ✅ |
 | `fragment_field` | per pixel, fragment stage | ✅ | ✅ |
 | `reaction_diffusion` | per pixel, fragment stage | ✅ | ✅ |
 | `shape_field` | per pixel, fragment stage | ✅ | ✅ |
-| `warp_mesh` (the native deposit; a `[milk]` preset draws its own colours) | per pixel, fragment stage | ✅ | ✅ |
-| `attractor` | per particle, **vertex** stage | ✅ | ❌ inert |
-| `swarm` | per particle, on the CPU | ✅ | ❌ inert |
-| `emitter` | per particle, on the CPU | ✅ | ❌ inert |
-| `spectrum`, `parametric_curve`, `lsystem`, `star_pattern` | per segment, on the CPU | ✅ | ❌ inert |
+| `warp_mesh` (the native deposit, or the present pass under `color_source = "1"`; a `[milk]` preset draws its own colours) | per pixel, fragment stage | ✅ | ✅ |
+| `attractor` | per particle, **vertex** stage | ✅ | ❌ `palette_contour` inert, the other two unknown |
+| `swarm` | per particle, on the CPU | ✅ | ❌ same |
+| `emitter` | per particle, on the CPU | ✅ | ❌ same |
+| `spectrum`, `parametric_curve`, `lsystem`, `star_pattern` | per segment, on the CPU | ✅ | ❌ same |
 
 A point sprite or a stroke segment carries **one** palette coordinate for its whole
 extent, so there is no crossing from one band to the next *within* it to draw a line
@@ -673,6 +729,60 @@ the outline's offsets and the innermost ones round off any reflex corner; under
 `"1"` they are evenly spaced as fractions of the boundary radius, so they fan out
 in proportion — further apart toward a tip, closer toward a valley — and every
 one of them is the same figure at a smaller size.
+
+### The warp mesh's second coordinate — `color_source`
+
+`shape_field`'s two coordinates are two ways of measuring the same figure.
+`warp_mesh`'s are two different *places in the frame's life*, and that is why they
+exclude each other rather than compose
+([ADR-0197](adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md)).
+
+- **`color_source = "0"`, the default**, colours at **deposit time**, by angle. The
+  warp then drags already-coloured light around, so `palette_steps` quantizes what
+  goes *into* the feedback loop and the loop's own structure — the decay, the
+  tunnelling, the drift — carries no bands at all. A twenty-band plateau palette on
+  this path renders as a smeared coloured blob.
+- **`color_source = "1"`** colours at **present time**, by the field's own level.
+  The deposit writes uncoloured light, so the field accumulates a scalar: exactly
+  the accumulated, decayed deposit at each pixel. The present pass reads that as
+
+  ```
+  hue + color_center + color_span * level
+  ```
+
+  bands it, samples the palette and applies `saturation` and the contour. What
+  `palette_steps` then draws are the **loop's own decay contours** — concentric
+  rungs where the level crosses from one band to the next, marching outward with
+  whatever the warp is doing. Nothing else in the engine makes one.
+
+The deposit's `deposit_radius`, `deposit_arms`, `deposit_twist` and
+`deposit_spin` keep shaping *where* light lands under `"1"`. They stop deciding
+its colour.
+
+Three things to know before you author on it:
+
+- **The level is not bounded by one, and the LUT wraps.** A pixel's level is the
+  sum of every deposit that reached it, decayed — on a steady central deposit it
+  sits comfortably above `1`, so at `color_span = "1"` the coordinate sweeps
+  several full cycles of the palette between the centre and the frame edge. That is
+  the ladder: the palette repeats outward rather than clipping. Lower `color_span`
+  for fewer, wider rungs; raise `deposit` or `decay` to push the level, and the
+  rung count with it.
+- **The fringe is not two-ink.** The present writes `ink * coverage`, and coverage
+  decays with the level, so the outermost rungs fade toward the backdrop through
+  intermediate values. A limited-ink guarantee holds where the field is opaque
+  ([ADR-0138](adrs/0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md)
+  is a claim about the draw seam, not about the whole frame).
+- **Anything the draw layer puts in the field counts toward the level**, because
+  the level is `max(r, g, b)` of whatever is there. No native `warp_mesh` preset
+  draws a layer, and a converted `[milk]` preset never sets `color_source` — but a
+  preset that did both would find its waveform's colour reading as level.
+
+The video echo is upstream of the level read, so it mixes **levels** and the
+result is coloured once: no blend of two inks can reach the frame from it. The
+MilkDrop composite remaps are downstream, so `brighten`'s square root and
+`solarize` do produce non-ink values. That is a choice on a flag rather than
+something the mode prevents.
 
 ### Banding fights bloom
 
@@ -750,7 +860,7 @@ palette's literal RGB, and they will still read as a limited-ink print.
 | kaleidoscope | resampling through the fold, with **linear** filtering, so a texel straddling two plateaus comes back as their average | bind no `kaleido_*` (the stage is inactive without a fold, a radial term or a tile) |
 | bloom | a blurred bright-pass added back over the frame — a blur is a mixer by definition | `bloom_amount = "0"` (the default) |
 | the internal post grid | **any** active post stage routes the frame through a capped internal grid and presents it with a linear stretch, so the resample mixes neighbours even where the stage itself would not | the same switches as the three stages above: with none active there is no internal grid and no resample |
-| `palette_contour` | a soft scalar darken toward black at each band edge — it has no ink of its own, which is exactly [backlog 0140](design-backlog-archive.md)'s subject. Measured there: `shape_contourmono` goes from 9 distinct colours to 684 | `palette_contour = "0"` (the default) |
+| `palette_contour` at its **default style** | a soft darken toward black, ramped over a pixel, so every step of the falloff is a value the palette did not name. Measured on `shape_contourmono`: 9 distinct colours in the frame becomes 684 | `palette_contour = "0"`, **or** `palette_contour_style = "1"` or `"3"` at `palette_contour = "1"`, which writes one flat value and keeps the count at 9 |
 | the A/B palette crossfade | `palette_mix` between two palettes samples a value in neither of them | declare no `[palette_b]`, or pin `palette_mix` to exactly `0` or `1` |
 | the duotone ink pass | every pixel lerped along the paper→ink axis by its luminance, which is a continuum by construction | `ink_amount = "0"` (the default; the pass is not even built) |
 | an `over` layer join | the layer is blended into the main scene's composite at `mix`, through `add`, `screen`, `multiply` or `overlay` — **every one of the four is a mixer**, and there is no replacing blend | use `join = "under"` instead, where the layer draws into the *same scene target* through the same seam and stays in the class if it too draws opaque; or declare no `[layer]` |

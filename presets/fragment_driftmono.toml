@@ -165,18 +165,20 @@ stops = [
 # were already as hard as they can be. The contoured render is not bad; it is
 # heavier, and heavier is the wrong direction for a thread pulled through ink.
 # See `shape_contourmono`'s header for the case where it IS the right direction,
-# and design-backlog 0140 for the shape that would settle it either way.
+# and design-backlog 0140 for the shape that settled it - archived, delivered.
 #
-# WHAT THAT ENTRY ASKS FOR IS STILL OPEN, AND ADR-0133 IS NOT IT. ADR-0133 with
-# Plan 0121 fixed WHICH edges the contour draws at - it samples the two band
-# centres an edge separates and stays silent when they resolve to the same ink,
-# so it fires at run boundaries rather than at every band edge. It did not touch
-# WHAT the contour draws, and that residual is 0140's subject: the return is a
-# scalar multiplied into the colour, so the line is always a darkening toward
-# black rather than an ink, and always soft. On a palette this world quantizes
-# to 20 steps there is no other source of intermediate values in the frame.
-# Neither half changes the decision here - the measurement below is about
-# fattening the black side, which a hard ink would do too.
+# WHAT THAT ENTRY ASKED FOR HAS LANDED, AND IT DOES NOT MOVE THE DECISION HERE.
+# ADR-0133 with Plan 0121 fixed WHICH edges the contour draws at - it samples the
+# two band centres an edge separates and stays silent when they resolve to the
+# same ink, so it fires at run boundaries rather than at every band edge. It did
+# not touch WHAT the contour draws, and that residual was 0140's subject.
+# ADR-0197 answered it: `palette_contour_style` takes a hard footprint instead of
+# a ramp and an ink from the palette instead of black, so the line no longer has
+# to be the only source of intermediate values in a 20-step frame, and
+# `shape_contourmono` now ships on the hard black one. That retires the
+# COLOUR-COUNT half of the case against a contour here and leaves the other half
+# exactly where it was: the measurement below is about fattening the black side,
+# and a hard ink fattens it too. Zero for the geometry, never for the arithmetic.
 palette_steps   = "20"
 palette_contour = "0"
 
