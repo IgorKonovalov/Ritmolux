@@ -330,9 +330,9 @@ loosening of `MAX_TONAL_FLATNESS` would convict them.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The figure/ground candidates join the table | dev | done | committed with this row |
-| 2 — The gate | human | done | committed with this row |
-| 3 — Term two reads the figure (or the conviction retires) | dev | not started | |
+| 1 — The figure/ground candidates join the table | dev | done | `fa5d282b` |
+| 2 — The gate | human | done | `ae8bd31d` |
+| 3 — Term two reads the figure (or the conviction retires) | dev | done | committed with this row |
 | 4 — The reader says what the gate does | dev | not started | |
 
 ### Notes
@@ -385,6 +385,43 @@ was read on the validity lines alone. The sixth — `fade 0.55`, `trails 0`,
 `exposure 2`, `zoom 1.6` — is the first that clears them (`0.9451` vs `BLACK`,
 `0.9285` vs the derived ground at 96×96; `0.9462` / `0.9304` at 192×192), and **no
 parameter moved after it**: the table quoted above is that run's.
+
+**Phase 3.** Ran in its Continue form. The statistic ships as **two** `pub`
+functions in `core/src/render/metrics.rs` rather than the one the phase names —
+`figure_ground_ratio` (the classifier) and `assigned_boundary_density` (term two,
+which calls it) — because the harness's `role_ratio` column has to read the
+production classifier the way its `boundary` column reads the production
+statistic, and that column is computed before any cut exists.
+
+The per-family under-floor count the sweep prints, re-read after the change
+against the same run before it (family order as the sweep runs them:
+analytic_field, attractor, cellular, emitter, fragment_field, lsystem,
+parametric_curve, reaction_diffusion, shape_collage, shape_field, spectrum,
+star_pattern, swarm, warp_mesh):
+
+```text
+before  9/12  14/20  0/3  0/5  10/14  2/6  2/13  0/7  0/4  6/9  0/5  0/4  0/5  5/5  = 48 of 112
+after  11/12  15/20  1/3  1/5  11/14  2/6  4/13  0/7  4/4  5/9  0/5  1/4  2/5  5/5  = 62 of 112
+```
+
+`shape_collage` moves 0/4 to 4/4, which is the largest single move and is
+structural rather than incidental: an ADR-0123 canvas paints its own paper across
+every pixel, so it sits on the figure side of the cut and term two now reads it
+areally. `boundary_floor`'s `shape_collage` arm was derived from `Suprematist`'s
+`0.2565` against the **derived** ground, so the number that arm is half of is no
+longer the number the arm is compared against. The arm is left at `0.13` — Phase 2
+recorded a derivation for the default arm only — and its doc block says so and
+names the re-derivation trigger. The family's flattest member reads `0.7239`
+against a `0.90` ceiling, so nothing there reaches term two today.
+
+**The `cargo nextest run --workspace` in Phase 3's done-when was not run**, per
+this session's conductor instruction that the pre-review gate runs it next on the
+same tree (ADR-0207). What ran instead: the whole `sanity` binary (131 passed, 2
+skipped) and `cargo nextest run --workspace -P fast` (1688 passed, 304 skipped),
+both green, plus `cargo fmt --all --check`, `cargo clippy --workspace
+--all-targets -- -D warnings` and `node scripts/check-comment-hygiene.mjs`.
+`git status` was clean of everything but the two files this phase touches, so no
+preset was edited and nothing was blessed.
 
 ### Close triggers
 

@@ -65,8 +65,9 @@ use rlx_core::{
     render::{
         CaptureImage,
         metrics::{
-            RADIAL_SHELLS, TONE_BANDS, boundary_density, coverage, modal_ground, quadrant_spread,
-            radial_shell_occupancy, tonal_flatness,
+            RADIAL_SHELLS, TONE_BANDS, assigned_boundary_density, boundary_density, coverage,
+            figure_ground_ratio, modal_ground, quadrant_spread, radial_shell_occupancy,
+            tonal_flatness,
         },
     },
 };
@@ -505,64 +506,70 @@ fn coverage_floor(system: SystemKind) -> f32 {
     }
 }
 
-/// Per-system minimum [`boundary_density`] — the **second term** of the flatness
-/// conjunction, below which a frame that is also over [`MAX_TONAL_FLATNESS`] is
-/// convicted as a blot (ADR-0130).
+/// The ratio at and above which [`figure_ground_ratio`] calls the frame's modal
+/// band its **figure**, so the second term reads [`BLACK`] rather than [`ground`]
+/// (ADR-0200).
+///
+/// # Derivation — a bound over a population, at this suite's [`SIZE`]
+///
+/// `1.17` is the midpoint of the **lower** blot anchor's `1.2718`
+/// ([`ragged_blot`]) and the **highest** ratio among the conditional population's
+/// non-blot members, `Tiled Rosette Mono`'s `1.0780`. Both are ratios of two
+/// coverages of one frame, so the midpoint compares quantities of one kind
+/// (ADR-0074), and the population end is a bound over every frame a first term
+/// can reach rather than over one fixture — which is the half that makes a
+/// two-point cut survivable where ADR-0161's was not.
+///
+/// The gap it straddles is `1.0780`..`1.2718`, a tenth wide rather than an order
+/// of magnitude, and **nothing in the table says where the next composition
+/// lands**. A frame whose two coverages are close is classified on a small
+/// difference; the blots themselves are not marginal (`Blown Out` reads `27.58`).
+///
+/// **It is areal on both sides, so unlike [`boundary_floor`] it barely moves with
+/// the capture**: the same two anchors read `27.70` and `1.2734` at 192×192,
+/// against a cut that shifts about 1 %. That is a measured near-invariance rather
+/// than a property, and a gate at another size still re-reads it.
+const MODAL_FIGURE_CUT: f32 = 1.17;
+
+/// Per-system minimum [`assigned_boundary_density`] — the **second term** of the
+/// flatness conjunction, below which a frame that is also over
+/// [`MAX_TONAL_FLATNESS`] is convicted as a blot (ADR-0130, ADR-0200).
 ///
 /// # Per system, which is a measurement and not a convenience
 ///
-/// A single global number is provably impossible on this library. The floor must
-/// sit **above** the frozen `Blown Out` blot to convict it, and **below**
-/// `Suprematist`'s `0.2565` to admit a mono conversion of an ADR-0123
-/// flat-graphic composition. When the split was forced the blot read `0.2631`,
-/// so `Suprematist` scored *under the purpose-built defect* and no such number
-/// existed. The blot reads `0.5697` now, for the reason the next section gives,
-/// which leaves no number in either direction: `Tiled Rosette Mono` — the
-/// composition this term exists to admit — reads `0.3602`, **below** the blot.
-/// The mechanism is the one [`coverage_floor`] already uses in this file.
+/// The mechanism is the one [`coverage_floor`] already uses in this file: a
+/// single global number would have to sit **above** the blot anchors to convict
+/// them and **below** the sparsest legitimate member of every family to admit it,
+/// and those two families do not agree. The arms below are what that costs.
 ///
 /// # The two arms are different kinds of number, and say so (ADR-0071)
 ///
-/// **`0.31` is a constant with no live derivation, because the lower of the two
-/// frames it was measured between never measured what this section claimed for
-/// it (ADR-0161).** It was taken as the midpoint of `0.2631` (the frozen
-/// [`blown_out`] fixture) and `0.3602` (`Tiled Rosette Mono`, measured
-/// 2026-08-26 at `8389f2a`), rounded to two places. The upper anchor is a figure
-/// perimeter and holds. **The lower one is not one.** A blot is its own modal
-/// band, so [`ground`] lands on the mass, `is_lit` is false across its interior,
-/// and the set `boundary_density` is handed is the mass's **fringe**: `0.2631`
-/// was the thickness of that fixture's rasterized notch band, a rim artifact
-/// rather than a perimeter. The two anchors are therefore not the same kind of
-/// quantity and their midpoint was never a floor. Closing those notches — a
-/// mitred corner reaches its point where a bevelled one steps — thins the fringe
-/// and takes the same frame, drawing the same figure, to `0.5697`. The value
-/// below does not move, because no number separates the two frames: the claim
-/// made for it is what changes.
-///
-/// **Both arms are measured at this suite's [`SIZE`] (96×96) capture, and both
-/// are bound to it.** `boundary_density` is perimeter over lit area, so it goes
-/// as ~`1/L` in the capture's linear size: the same frames at 192×192 read
-/// roughly half these numbers, and a floor carried across sizes convicts
-/// everything. The capture size is the one part of the configuration these
-/// numbers depend on, and no test at the size this project develops at can tell
-/// a resolution-bound constant from a resolution-free one.
+/// **`0.23` is a two-point measurement between anchors of one kind of quantity,
+/// read on one column at one size.** It is the midpoint of the **higher** blot
+/// anchor's `0.0934` ([`ragged_blot`], read against [`BLACK`], the reference
+/// [`MODAL_FIGURE_CUT`] assigns it) and `0.3602` (`Tiled Rosette Mono`, read
+/// against its own [`ground`], the reference that cut assigns *it*). Both are
+/// `boundary_density` under the role each frame is classified into, which is what
+/// makes them comparable at all — and is exactly what the superseded `0.31` was
+/// not. It sits `2.4x` above the blot and at `0.63x` the composition.
 ///
 /// It is **not** *half the sparsest legitimate content*, the ceremony every
 /// `coverage_floor` arm above follows, and the reason is structural: a
 /// conjunction's second term is only ever asked about frames that already failed
-/// the first, and conditioned that way the population has **two members** — the
-/// blot and the one preset this arm exists to admit. Half-the-sparsest would be
-/// derived from the very frame being admitted, which is circular (ADR-0129). So
-/// the arm claimed a two-point measurement and carried its risk in the open:
-/// **the first genuinely flat preset from a third family is what tests this
-/// number, and it does not exist yet.** The risk landed from the other side
-/// instead — the defect anchor moved without the defect changing — and the two
-/// tests that read this fixture carry the record of it.
+/// the first, and conditioned that way the population is small and contains the
+/// preset being admitted. Half-the-sparsest would be derived from that preset,
+/// which is circular (ADR-0129).
+///
+/// **Both arms are measured at this suite's [`SIZE`] (96×96) capture, and both
+/// are bound to it.** `boundary_density` is perimeter over lit area, so it goes
+/// as ~`1/L` in the capture's linear size: the same two anchors at 192×192 give
+/// `0.12`, and a floor carried across sizes convicts everything. The capture size
+/// is the one part of the configuration these numbers depend on, and no test at
+/// the size this project develops at can tell a resolution-bound constant from a
+/// resolution-free one.
 ///
 /// **`0.13` is the ordinary ceremony** — half the sparsest legitimate member of
-/// the family (`Suprematist`, `0.2565`, at the same 96×96 capture). It leaves `Suprematist` at `1.97x` and
-/// `On White` at `2.36x` above their own floor, so both survive a mono
-/// conversion with room.
+/// the family (`Suprematist`, `0.2565`, at the same 96×96 capture).
 ///
 /// # Why `shape_collage` earns an arm where an idiom flag would not
 ///
@@ -576,31 +583,41 @@ fn coverage_floor(system: SystemKind) -> f32 {
 /// `shape_collage` blot would not be caught at `0.13`; if that family ever gains
 /// an over-range path, this arm is re-opened with it.
 ///
+/// **The family sits on the figure side of [`MODAL_FIGURE_CUT`]**, because an
+/// ADR-0123 canvas paints its own paper across every pixel and so departs from
+/// [`BLACK`] far more than from its own modal band. `Suprematist`'s `0.2565` is a
+/// reading against the derived ground and is **not** what this arm is compared
+/// against; the arm is **unexercised**, because the family's flattest member
+/// reads `0.7239` against a `0.90` ceiling and term one never lets a second
+/// question be asked of it. It is re-derived under the role each frame is
+/// assigned on the day that changes — together with the over-range path the
+/// section above already names as the trigger.
+///
 /// # Every other family is un-derived on purpose
 ///
-/// The remaining arms take `0.31` because they have no conditional population to
+/// The remaining arms take `0.23` because they have no conditional population to
 /// derive from: nothing in them is over the flatness ceiling, so the second term
-/// has never been asked about them. **22 of the 42 shipped presets read below
+/// has never been asked about them. **62 of the 112 shipped presets read below
 /// their family's floor today and pass only because term one clears them** —
 /// the shape sweep prints that count per family on every run. Converting
 /// one to a two-ink print raises its flatness toward `1.0` and leaves its
 /// boundary alone, so **each such conversion needs its own arm with its own
-/// derivation** before it can ship. For `attractor` that is a real fork: the
-/// ceremony-derived number there is `0.0220`, `12x` below the blot and vacuous.
+/// derivation** before it can ship.
 fn boundary_floor(system: SystemKind) -> f32 {
     match system {
         // Half the sparsest legitimate member of the family (`Suprematist`,
         // 0.2565) — this file's own ceremony, on the two shipped members. The
         // family has no over-range path at all (ADR-0123 under ADR-0046's knee),
         // so the additive stack this term exists to catch cannot happen in it.
+        // The anchor predates the role classifier and the arm is unexercised;
+        // see the doc comment.
         SystemKind::ShapeCollage => 0.13,
-        // The midpoint of two frozen fixtures read at 0.2631 and 0.3602. NOT
-        // half the sparsest legitimate content — the conditional population has
-        // one legitimate member and it is the preset being admitted. The lower
-        // anchor measured a rim artifact and the same frame now reads 0.5697,
-        // above the upper one, so this number has no live derivation
-        // (ADR-0161). See the doc comment.
-        _ => 0.31,
+        // The midpoint of the higher blot anchor's 0.0934 and the frozen
+        // composition's 0.3602, each read under the role MODAL_FIGURE_CUT
+        // assigns it (ADR-0200). NOT half the sparsest legitimate content — the
+        // conditional population contains the preset being admitted. See the
+        // doc comment.
+        _ => 0.23,
     }
 }
 
@@ -761,14 +778,26 @@ fn draws_a_real_shape(family: &str) {
         let cov = coverage(&img, bg, EPS);
         let spread = quadrant_spread(&img, bg, EPS);
         let flat = tonal_flatness(&img, bg, EPS);
-        let boundary = boundary_density(&img, bg, EPS);
+        // Term two reads the reference the role classifier assigns rather than
+        // the derived ground unconditionally (ADR-0200): a frame that is its own
+        // modal band would otherwise be measured on its fringe. The ratio is
+        // printed beside the reading because the reading alone does not say which
+        // reference produced it.
+        let ratio = figure_ground_ratio(&img, EPS);
+        let boundary = assigned_boundary_density(&img, EPS, MODAL_FIGURE_CUT);
+        let role = if ratio >= MODAL_FIGURE_CUT {
+            "figure/BLACK"
+        } else {
+            "ground/derived"
+        };
         let shells = radial_shell_occupancy(&img, bg, EPS);
         let floor = coverage_floor(system);
         let b_floor = boundary_floor(system);
         println!(
             "[{}] {name:<12} coverage={cov:.4} (floor {floor:.2}) quadrants={spread} \
              flatness={flat:.4} (max {MAX_TONAL_FLATNESS:.2}) \
-             boundary={boundary:.4} (floor {b_floor:.2}) shells={shells}/{RADIAL_SHELLS}",
+             boundary={boundary:.4} (floor {b_floor:.2}) role={role} (ratio {ratio:.4}, cut \
+             {MODAL_FIGURE_CUT:.2}) shells={shells}/{RADIAL_SHELLS}",
             system_name(system),
         );
         let known_flat = KNOWN_FLAT.contains(&name);
@@ -804,17 +833,18 @@ fn draws_a_real_shape(family: &str) {
         }
         // **The conviction is a conjunction** (Plan 0119 Phase 3, ADR-0130).
         // Neither term is a verdict on its own. A two-ink print reads near 1.0
-        // on the tonal term because being flat is what that idiom *is*, and 22
-        // of the shipped presets read under their family's boundary floor and
-        // are legitimate. Only a frame that is both — one tone AND no interior
-        // — is a blot, and only that frame is failed here.
+        // on the tonal term because being flat is what that idiom *is*, and more
+        // than half the shipped presets read under their family's boundary floor
+        // and are legitimate. Only a frame that is both — one tone AND no
+        // interior — is a blot, and only that frame is failed here.
         let convicted = flat > MAX_TONAL_FLATNESS && boundary < b_floor;
         if convicted && !known_flat {
             failures.push(format!(
                 "{name} is a blot: {:.1}% of its lit pixels sit in one of {TONE_BANDS} \
                  luminance bands (max {:.0}%) AND its lit set has almost no interior \
                  (boundary {boundary:.4}, the share of lit pixels touching an unlit \
-                 neighbour, under the {b_floor:.2} floor for {}). **Both** terms fired, \
+                 neighbour, measured against the {role} reference this frame's ratio \
+                 {ratio:.4} assigns it, under the {b_floor:.2} floor for {}). **Both** terms fired, \
                  which is what separates a blot from a flat graphic. The structural term \
                  is the one to answer: the figure is a solid mass, and what it lacks is \
                  perimeter per unit lit area — open its interior with hatching, contours, \
@@ -989,9 +1019,11 @@ trails     = "0.97"
 /// [`each_structure_candidate_is_tabled_against_the_library`] prints all five
 /// readings at both capture sizes so that is checkable rather than asserted.
 ///
-/// Only that ignored harness reads it. A calibration anchored on one blot
-/// measures one rim shape, which is what left `boundary_floor`'s default arm
-/// resting on a rim artifact (ADR-0161).
+/// A calibration anchored on one blot measures one rim shape, which is what left
+/// `boundary_floor`'s default arm resting on a rim artifact (ADR-0161). This is
+/// the **higher** of the two anchors on the shipped column, so it is the one
+/// [`boundary_floor`]'s default arm is measured from, and both defect-record
+/// tests assert its conviction beside [`blown_out`]'s.
 fn ragged_blot() -> Preset {
     Preset::from_toml_str(
         r##"
@@ -1024,105 +1056,129 @@ zoom       = "1.6"
     .expect("the ragged blot fixture parses")
 }
 
+/// **Both blot anchors, read under three lenses**: the areal reference, the
+/// derived ground, and the reference the role classifier assigns — which is what
+/// the gate reads (ADR-0200).
+///
+/// The three are one demonstration rather than three checks. Against [`BLACK`] a
+/// blot passes every *areal* question — it is a real shape, the right size, in
+/// every quadrant, at every radius — so the tonal and structural questions are
+/// the only ones that can convict it. Against its own [`ground`] the structural
+/// question inverts, because a blot **is** its own modal band: `is_lit` is false
+/// across its interior and `boundary_density` is handed the mass's **fringe**,
+/// which reads *more* structured the smoother the rim gets (ADR-0161). The
+/// classifier is what chooses between them, and on these frames it chooses the
+/// areal one.
+///
+/// So the areal reading and the shipped reading coincide here **by
+/// construction**, and that agreement is the repair rather than a duplicate
+/// assertion: (1) is measured without the classifier, so a classifier that
+/// regresses shows up as a disagreement between (1) and (3) rather than as a
+/// silent acquittal.
 #[test]
 fn a_frame_with_no_tonal_structure_is_reported_flat() {
     let Some(mut renderer) = common::headless(SIZE, SIZE) else {
         return;
     };
-    renderer.set_presets(vec![without_backdrop(blown_out())]);
-    let img = renderer
-        .capture_preset("Blown Out", &loud(), FRAMES)
-        .expect("capture the flat fixture");
+    let anchors = [blown_out(), ragged_blot()];
+    let ids: Vec<(String, SystemKind)> =
+        anchors.iter().map(|p| (p.name.clone(), p.system)).collect();
+    renderer.set_presets(anchors.into_iter().map(without_backdrop).collect());
 
-    let floor = coverage_floor(SystemKind::ParametricCurve);
-    let b_floor = boundary_floor(SystemKind::ParametricCurve);
+    for (name, system) in &ids {
+        let img = renderer
+            .capture_preset(name, &loud(), FRAMES)
+            .expect("capture the flat fixture");
 
-    // (1) The purely areal lens, without `MAX_TONAL_FLATNESS`, on the same
-    // frozen fixture. This is the demonstration that lens was added for and
-    // it is kept rather than described: against a constant black reference the
-    // blot passes every areal check — full coverage, four quadrants, every
-    // radial shell — and only the tonal question convicts it.
-    let old_cov = coverage(&img, BLACK, EPS);
-    let old_spread = quadrant_spread(&img, BLACK, EPS);
-    let old_shells = radial_shell_occupancy(&img, BLACK, EPS);
-    let old_flat = tonal_flatness(&img, BLACK, EPS);
-    let old_boundary = boundary_density(&img, BLACK, EPS);
-    println!(
-        "[blown out] against BLACK: coverage={old_cov:.4} (floor {floor:.2}) \
-         quadrants={old_spread} shells={old_shells}/{RADIAL_SHELLS} flatness={old_flat:.4} \
-         boundary={old_boundary:.4} (floor {b_floor:.2})"
-    );
-    assert!(
-        old_cov >= floor && old_spread >= MIN_QUADRANTS && old_shells >= MIN_STRUCTURAL_SHELLS,
-        "the fixture must clear every areal check against black, or it proves nothing about \
-         why the tonal question was added: coverage {old_cov:.4} (floor {floor:.2}), \
-         {old_spread} quadrant(s), {old_shells}/{RADIAL_SHELLS} shells"
-    );
-    assert!(
-        old_flat > MAX_TONAL_FLATNESS,
-        "a figure stacked past the additive ceiling must read flat, got {old_flat:.4}"
-    );
-    // The structural term, pointed at the figure instead of at its fringe. A
-    // solid mass has perimeter `2/r` per unit area, which is what this reads,
-    // and it is the positive control that separates "the statistic is broken"
-    // from "the ground it is conditioned on is" — the distinction (3) below
-    // rests on. Against the derived ground the same call reads an order of
-    // magnitude higher on the same frame (ADR-0161).
-    assert!(
-        old_boundary < b_floor,
-        "the structural term must convict this blot when it is measured against the figure, \
-         or the term itself is broken rather than its conditioning: boundary \
-         {old_boundary:.4} against the {b_floor:.2} floor"
-    );
+        let floor = coverage_floor(*system);
+        let b_floor = boundary_floor(*system);
 
-    // (2) The lens as it stands now. A blot that fills the frame with one tone
-    // **is its own modal band**, so the derived ground lands on the blot itself
-    // and the lit mask is what is left over — the figure's fringe. The fixture
-    // is therefore convicted twice rather than once, which is a stronger
-    // verdict and a weaker demonstration: coverage does not score it healthy.
-    let bg = ground(&img);
-    let cov = coverage(&img, bg, EPS);
-    let spread = quadrant_spread(&img, bg, EPS);
-    let shells = radial_shell_occupancy(&img, bg, EPS);
-    let flat = tonal_flatness(&img, bg, EPS);
-    let boundary = boundary_density(&img, bg, EPS);
-    println!(
-        "[blown out] against its own ground {bg:?}: coverage={cov:.4} (floor {floor:.2}) \
-         quadrants={spread} shells={shells}/{RADIAL_SHELLS} flatness={flat:.4} \
-         boundary={boundary:.4} (floor {b_floor:.2})"
-    );
-    assert!(
-        flat > MAX_TONAL_FLATNESS,
-        "the tonal question must still convict the blot once the reference is derived \
-         from the frame, got {flat:.4}"
-    );
-    // (3) **The second term is inverted on this frame**, and that is asserted
-    // rather than deleted (ADR-0161). A blot is its own modal band, so `ground`
-    // lands on the mass, `is_lit` is false across its interior, and the set
-    // `boundary_density` is handed is the mass's **fringe**. A thinner fringe is
-    // proportionally more rim, so the smoother a blot's perimeter the more
-    // structured this term scores it — monotonically backwards on the one class
-    // of frame it exists to convict. The fixture reads over its floor while
-    // drawing the same saturated single-tone disc, so ADR-0128's conjunction
-    // acquits it and has no demonstrated true positive left. The areal control
-    // in (1) is what still convicts this frame, and term one still fires below.
-    //
-    // This is the [`KNOWN_FLAT`] shape, for the reason that list's own doc gives:
-    // an entry asserted to be STILL broken forces its own deletion on repair,
-    // where a deleted assertion leaves nothing behind at all.
-    assert!(
-        boundary >= b_floor,
-        "the blot reads under its boundary floor again (boundary {boundary:.4} against \
-         {b_floor:.2}), which means term two's ground was repaired: restore the conviction \
-         assertion here and in each_term_of_the_flatness_conjunction_is_load_bearing, \
-         re-derive the floor from what the two anchors then read, and delete this defect \
-         record rather than leaving a stale exemption behind (ADR-0161)"
-    );
-    assert!(
-        bg.iter().take(3).any(|&c| c > EPS),
-        "the fixture must be dense enough that its own tone is the modal band, or the two \
-         lenses agree and (2) tests nothing: ground {bg:?}"
-    );
+        // (1) The purely areal lens, without `MAX_TONAL_FLATNESS`. This is the
+        // demonstration that lens was added for and it is kept rather than
+        // described: against a constant black reference the blot passes every
+        // areal check — full coverage, four quadrants, every radial shell — and
+        // only the tonal and structural questions convict it.
+        let old_cov = coverage(&img, BLACK, EPS);
+        let old_spread = quadrant_spread(&img, BLACK, EPS);
+        let old_shells = radial_shell_occupancy(&img, BLACK, EPS);
+        let old_flat = tonal_flatness(&img, BLACK, EPS);
+        let old_boundary = boundary_density(&img, BLACK, EPS);
+        println!(
+            "[{name}] against BLACK: coverage={old_cov:.4} (floor {floor:.2}) \
+             quadrants={old_spread} shells={old_shells}/{RADIAL_SHELLS} flatness={old_flat:.4} \
+             boundary={old_boundary:.4} (floor {b_floor:.2})"
+        );
+        assert!(
+            old_cov >= floor && old_spread >= MIN_QUADRANTS && old_shells >= MIN_STRUCTURAL_SHELLS,
+            "{name} must clear every areal check against black, or it proves nothing about \
+             why the tonal question was added: coverage {old_cov:.4} (floor {floor:.2}), \
+             {old_spread} quadrant(s), {old_shells}/{RADIAL_SHELLS} shells"
+        );
+        assert!(
+            old_flat > MAX_TONAL_FLATNESS,
+            "a figure stacked past the additive ceiling must read flat, got {old_flat:.4}"
+        );
+        // The structural term, pointed at the figure instead of at its fringe. A
+        // solid mass has perimeter `2/r` per unit area, which is what this
+        // reads, and it is the positive control that separates "the statistic is
+        // broken" from "the reference it is handed is" — the distinction (3)
+        // rests on.
+        assert!(
+            old_boundary < b_floor,
+            "the structural term must convict {name} when it is measured against the figure, \
+             or the term itself is broken rather than its reference: boundary \
+             {old_boundary:.4} against the {b_floor:.2} floor"
+        );
+
+        // (2) The derived ground, which is what the term read unconditionally
+        // before ADR-0200 and what it still reads for every frame the classifier
+        // calls ground. On a blot it lands on the mass itself and the lit mask is
+        // what is left over, so the reading printed here is the fringe ADR-0161
+        // convicted — kept visible rather than described.
+        let bg = ground(&img);
+        let cov = coverage(&img, bg, EPS);
+        let flat = tonal_flatness(&img, bg, EPS);
+        let fringe = boundary_density(&img, bg, EPS);
+        println!(
+            "[{name}] against its own ground {bg:?}: coverage={cov:.4} (floor {floor:.2}) \
+             flatness={flat:.4} boundary={fringe:.4} (floor {b_floor:.2}) — the fringe"
+        );
+        assert!(
+            flat > MAX_TONAL_FLATNESS,
+            "the tonal question must still convict {name} once the reference is derived \
+             from the frame, got {flat:.4}"
+        );
+        assert!(
+            bg.iter().take(3).any(|&c| c > EPS),
+            "{name} must be dense enough that its own tone is the modal band, or the two \
+             lenses agree and there is no role to assign: ground {bg:?}"
+        );
+
+        // (3) **The gate's own reading.** The classifier sees a frame that
+        // departs from black almost everywhere and from its own modal band
+        // almost nowhere, calls the modal band the figure, and hands term two the
+        // areal reference — so the mass is measured instead of its rim and the
+        // conjunction convicts.
+        let ratio = figure_ground_ratio(&img, EPS);
+        let boundary = assigned_boundary_density(&img, EPS, MODAL_FIGURE_CUT);
+        println!(
+            "[{name}] as the gate reads it: ratio={ratio:.4} (cut {MODAL_FIGURE_CUT:.2}) \
+             boundary={boundary:.4} (floor {b_floor:.2})"
+        );
+        assert!(
+            ratio >= MODAL_FIGURE_CUT,
+            "{name}'s modal band must be classified as the FIGURE, or term two is handed the \
+             frame's fringe again: ratio {ratio:.4} against the {MODAL_FIGURE_CUT:.2} cut"
+        );
+        assert!(
+            boundary < b_floor,
+            "the conjunction must convict {name}: boundary {boundary:.4} against the \
+             {b_floor:.2} floor, read under the role the {MODAL_FIGURE_CUT:.2} cut assigns it. \
+             A reading over the floor means the classifier or the floor moved — re-derive \
+             both from what the two anchors and the frozen composition then read, and say \
+             in the commit which moved (ADR-0200)"
+        );
+    }
 }
 
 /// The shipped preset this file uses as the witness that **term one is
@@ -1130,10 +1186,12 @@ fn a_frame_with_no_tonal_structure_is_reported_flat() {
 /// clears, so a structure-only gate would convict legitimate content.
 ///
 /// `Sumi` is an ink wash: a fragment field with almost no perimeter per lit
-/// pixel (`0.1008` at 2026-08-26, against the `0.31` default floor) and no tonal
-/// problem at all. ADR-0130's landmine Negative names it specifically, as the
-/// most natural mono-conversion target in the library and one of the 22 presets
-/// held out of conviction by the tonal term alone.
+/// pixel (`0.1001` against the `0.23` default floor) and no tonal problem at all.
+/// Its modal band is its ground — it reads a ratio of `1.0807` against a
+/// [`MODAL_FIGURE_CUT`] of `1.17` — so term two measures its ink, and the ink is
+/// what has no perimeter. ADR-0130's landmine Negative names it specifically, as
+/// the most natural mono-conversion target in the library and one of the 62
+/// presets held out of conviction by the tonal term alone.
 ///
 /// **It is a witness, not a fixture.** If it is ever retuned above its floor or
 /// retired, the property below is still true of the library and the fix is to
@@ -1151,7 +1209,7 @@ const STRUCTURELESS_BUT_TONED: &str = "Sumi";
 /// consulted) looks exactly like a healthy library. Every other test here would
 /// stay green through it.
 ///
-/// So the three frames below are read directly, and each term is shown to change
+/// So the four frames below are read directly, and each term is shown to change
 /// a verdict on its own:
 ///
 /// 1. **Term two is load-bearing.** The held composition is *over* the tonal
@@ -1161,30 +1219,28 @@ const STRUCTURELESS_BUT_TONED: &str = "Sumi";
 /// 2. **Term one is load-bearing.** [`STRUCTURELESS_BUT_TONED`] is *under* its
 ///    boundary floor — term two alone convicts it — and clears the tonal
 ///    ceiling, so the conjunction acquits it.
-/// 3. **The conjunction convicts nothing, and that is the assertion.** The
-///    frozen blot fails term one and *passes* term two, so the gate acquits the
-///    frame it was built around.
+/// 3. **The conjunction convicts**, and it convicts the whole defect class rather
+///    than one rim shape: [`blown_out`] is a stroke figure whose rim is a
+///    rasterizer's notch band and [`ragged_blot`] is a particle cloud whose rim
+///    is scatter, and both fail both terms.
 ///
-/// # Part 3 is a defect record, and the premise it replaces was this test's own
+/// # What part 3 is a record of
 ///
-/// This test was written on the premise that the conjunction is non-vacuous —
-/// that part 3 exhibits a frame the gate convicts. **That premise is false**
-/// (ADR-0161). Term two is conditioned on [`ground`], a blot is its own modal
-/// band, and so the lit set the term measures is the mass's *fringe* rather than
-/// the mass: the smoother a blot's perimeter, the more structured it scores.
-/// Nothing in the library and no fixture in this file is convicted by the
-/// conjunction today, and `boundary_floor`'s default arm has no live derivation
-/// left.
+/// It was an **inverted** assertion for one plan (ADR-0161): term two read
+/// [`ground`] unconditionally, a blot is its own modal band, and so the lit set
+/// the term measured was the mass's *fringe* rather than the mass — the smoother
+/// a blot's perimeter, the more structured it scored. The conjunction then
+/// acquitted the frame it was built around, and this test asserted that acquittal
+/// so a repair would have to come back here.
 ///
-/// What replaces the premise is three assertions rather than one. Parts 1 and 2
-/// are untouched and still show each term changing a verdict on its own. Part 3
-/// asserts the inversion in the [`KNOWN_FLAT`] shape, so a repair to term two's
-/// ground fails this test and instructs the repairer to restore the conviction.
-/// And the blot is additionally read against [`BLACK`], where the same statistic
-/// convicts it — which is what says the statistic is sound and its conditioning
-/// is not. All three frames print that reading; only the blot asserts on it,
-/// because the other two are not blots and nothing predicts what they read
-/// against an areal reference.
+/// The repair is the role classifier (ADR-0200): the reference is chosen per
+/// frame by [`MODAL_FIGURE_CUT`], and a frame whose modal band is its own figure
+/// is measured areally. Each blot is therefore also read against [`BLACK`]
+/// directly — without the classifier — because the two agreeing is what says the
+/// statistic and its reference are both right, and the two disagreeing would
+/// localize which one moved. All four frames print that reading; only the blots
+/// assert on it, because the other two are not blots and nothing predicts what
+/// they read against an areal reference.
 #[test]
 fn each_term_of_the_flatness_conjunction_is_load_bearing() {
     let Some(mut renderer) = common::headless(SIZE, SIZE) else {
@@ -1192,9 +1248,13 @@ fn each_term_of_the_flatness_conjunction_is_load_bearing() {
     };
 
     let blot = without_backdrop(blown_out());
+    let ragged = without_backdrop(ragged_blot());
     let held =
         without_backdrop(Preset::from_toml_str(HELD_OUT_TOML).expect("the frozen anchor parses"));
-    let (blot_name, blot_system) = (blot.name.clone(), blot.system);
+    let blots = [
+        (blot.name.clone(), blot.system),
+        (ragged.name.clone(), ragged.system),
+    ];
     let (held_name, held_system) = (held.name.clone(), held.system);
 
     let witness = default_presets()
@@ -1210,85 +1270,125 @@ fn each_term_of_the_flatness_conjunction_is_load_bearing() {
         });
     let (witness_name, witness_system) = (witness.name.clone(), witness.system);
 
-    renderer.set_presets(vec![blot, held, witness]);
+    renderer.set_presets(vec![blot, ragged, held, witness]);
+
+    /// One frame's reading of both terms, plus the two numbers that say which
+    /// reference term two was handed and what the unclassified one would have
+    /// given.
+    struct Terms {
+        flat: f32,
+        boundary: f32,
+        floor: f32,
+        ratio: f32,
+        areal: f32,
+    }
 
     let frame = loud();
     let mut read = |name: &str, system: SystemKind| {
         let img = renderer
             .capture_preset(name, &frame, FRAMES)
             .expect("capture preset");
-        let bg = ground(&img);
-        let flat = tonal_flatness(&img, bg, EPS);
-        let boundary = boundary_density(&img, bg, EPS);
-        let b_floor = boundary_floor(system);
+        let flat = tonal_flatness(&img, ground(&img), EPS);
+        let ratio = figure_ground_ratio(&img, EPS);
+        let boundary = assigned_boundary_density(&img, EPS, MODAL_FIGURE_CUT);
+        let floor = boundary_floor(system);
         // The same statistic against the areal reference, printed for every row
-        // and asserted only on the blot: the two references disagree by an order
-        // of magnitude on a frame that is its own modal band, and reading both
-        // is what tells a broken statistic from a broken conditioning.
+        // and asserted only on the blots: the two references disagree by an
+        // order of magnitude on a frame that is its own modal band, and reading
+        // both is what tells a broken statistic from a broken reference.
         let areal = boundary_density(&img, BLACK, EPS);
         println!(
             "[conjunction] {name:<22} flatness={flat:.4} (max {MAX_TONAL_FLATNESS:.2}) \
-             boundary={boundary:.4} (floor {b_floor:.2}) areal_boundary={areal:.4}"
+             boundary={boundary:.4} (floor {floor:.2}) ratio={ratio:.4} \
+             (cut {MODAL_FIGURE_CUT:.2}) areal_boundary={areal:.4}"
         );
-        (flat, boundary, b_floor, areal)
+        Terms {
+            flat,
+            boundary,
+            floor,
+            ratio,
+            areal,
+        }
     };
 
-    let (blot_flat, blot_boundary, blot_floor, blot_areal) = read(&blot_name, blot_system);
-    let (held_flat, held_boundary, held_floor, ..) = read(&held_name, held_system);
-    let (wit_flat, wit_boundary, wit_floor, ..) = read(&witness_name, witness_system);
+    let blots: Vec<(String, Terms)> = blots
+        .iter()
+        .map(|(name, system)| (name.clone(), read(name, *system)))
+        .collect();
+    let held = read(&held_name, held_system);
+    let wit = read(&witness_name, witness_system);
 
     // (1) Term two is load-bearing: without it the held composition is convicted.
     assert!(
-        held_flat > MAX_TONAL_FLATNESS,
+        held.flat > MAX_TONAL_FLATNESS,
         "the held composition must still be over the tonal ceiling, or term one alone \
-         would already acquit it and term two is guarding nothing: flatness {held_flat:.4}"
+         would already acquit it and term two is guarding nothing: flatness {:.4}",
+        held.flat
     );
     assert!(
-        held_boundary >= held_floor,
+        held.ratio < MODAL_FIGURE_CUT,
+        "the held composition's modal band must be classified as the GROUND, or term two \
+         reads it areally and the preset the term exists to admit is measured as a blot: \
+         ratio {:.4} against the {MODAL_FIGURE_CUT:.2} cut",
+        held.ratio
+    );
+    assert!(
+        held.boundary >= held.floor,
         "the held composition must clear its boundary floor, or the conjunction convicts \
-         the preset it was built to admit: boundary {held_boundary:.4} against \
-         {held_floor:.2}"
+         the preset it was built to admit: boundary {:.4} against {:.2}",
+        held.boundary,
+        held.floor
     );
 
     // (2) Term one is load-bearing: without it the witness is convicted.
     assert!(
-        wit_boundary < wit_floor,
+        wit.boundary < wit.floor,
         "{witness_name} must still read under its boundary floor, or this frame no longer \
          witnesses that a structure-only gate would convict legitimate content — pick \
-         another from the list the main gate prints: boundary {wit_boundary:.4} against \
-         {wit_floor:.2}"
+         another from the list the main gate prints: boundary {:.4} against {:.2}",
+        wit.boundary,
+        wit.floor
     );
     assert!(
-        wit_flat <= MAX_TONAL_FLATNESS,
+        wit.flat <= MAX_TONAL_FLATNESS,
         "{witness_name} must clear the tonal ceiling, or it is not a witness for term one \
-         at all: flatness {wit_flat:.4}"
+         at all: flatness {:.4}",
+        wit.flat
     );
 
-    // (3) Term one still convicts the frozen blot, and term two does not —
-    // a defect record in the [`KNOWN_FLAT`] shape, per ADR-0161. The conjunction
-    // therefore acquits the frame it was built around, and nothing in this file
-    // demonstrates it is capable of a conviction.
-    assert!(
-        blot_flat > MAX_TONAL_FLATNESS,
-        "term one must still convict the frozen blot, or the conjunction has no live term \
-         left at all: flatness {blot_flat:.4} against {MAX_TONAL_FLATNESS:.2}"
-    );
-    assert!(
-        blot_boundary >= blot_floor,
-        "the frozen blot reads under its boundary floor again (boundary {blot_boundary:.4} \
-         against {blot_floor:.2}), which means term two's ground was repaired: restore the \
-         both-terms conviction here and in a_frame_with_no_tonal_structure_is_reported_flat, \
-         re-derive the floor from what the two anchors then read, and delete this defect \
-         record rather than leaving a stale exemption behind (ADR-0161)"
-    );
-    // The positive control the inverted assertion costs: pointed at the figure
-    // rather than at its fringe, the same statistic convicts this blot.
-    assert!(
-        blot_areal < blot_floor,
-        "the structural term must convict the blot when it is measured against the figure, \
-         or the term itself is broken rather than its conditioning: areal boundary \
-         {blot_areal:.4} against the {blot_floor:.2} floor"
-    );
+    // (3) Both terms convict both blot anchors. The conjunction is asserted on
+    // the defect *class* — a stroke figure's notch band and a particle cloud's
+    // scatter — because a threshold demonstrated on one rim shape is a
+    // measurement of that rim, which is what ADR-0161 found.
+    for (name, blot) in &blots {
+        assert!(
+            blot.flat > MAX_TONAL_FLATNESS,
+            "term one must convict {name}: flatness {:.4} against {MAX_TONAL_FLATNESS:.2}",
+            blot.flat
+        );
+        assert!(
+            blot.boundary < blot.floor,
+            "term two must convict {name} (boundary {:.4} against {:.2}, read under the role \
+             the {MODAL_FIGURE_CUT:.2} cut assigns it at ratio {:.4}). A reading over the \
+             floor means the classifier or the floor moved: re-derive both from what the two \
+             anchors and the frozen composition then read, and fix \
+             a_frame_with_no_tonal_structure_is_reported_flat with it (ADR-0200)",
+            blot.boundary,
+            blot.floor,
+            blot.ratio
+        );
+        // The control the classifier is judged against: pointed at the figure
+        // rather than at its fringe, the same statistic convicts this blot
+        // without consulting the cut at all.
+        assert!(
+            blot.areal < blot.floor,
+            "the structural term must convict {name} when it is measured against the figure, \
+             or the term itself is broken rather than its reference: areal boundary {:.4} \
+             against the {:.2} floor",
+            blot.areal,
+            blot.floor
+        );
+    }
 }
 
 /// **`spectrum_ridge` exactly as it shipped broken**, recovered from
@@ -2025,8 +2125,8 @@ const RGB_LEVELS: usize = 16;
 /// ADR-0126 was raised on and ADR-0128 was written about. Plan 0119 Phase 4
 /// ships it into `presets/`, and repointing an `include_str!` at the new path
 /// would be **worse than letting the move break the build**. This frame is the
-/// composition-side anchor of [`boundary_floor`]'s default arm: `0.31` is the
-/// midpoint of `0.2631` ([`blown_out`]) and this preset's `0.3602`. As ordinary
+/// composition-side anchor of [`boundary_floor`]'s default arm: `0.23` is the
+/// midpoint of `0.0934` ([`ragged_blot`]) and this preset's `0.3602`. As ordinary
 /// editable content, a routine preset tweak could move a gate constant with
 /// nothing able to notice, because the constant would still read green.
 /// ADR-0130's Decision requires **both** anchors frozen, and this is the second
@@ -2825,24 +2925,15 @@ fn min_ground_density(img: &CaptureImage) -> f32 {
     boundary_density(img, ground(img), EPS).min(boundary_density(img, BLACK, EPS))
 }
 
-/// The `role_ratio` column: `coverage` against [`BLACK`] over `coverage` against
-/// the frame's derived ground.
+/// The `role_ratio` column, reading the **production** classifier.
 ///
-/// Both terms are coverages of one frame, so this is a ratio of one kind of
-/// quantity rather than a portability claim about two (ADR-0074). A high value
-/// means the modal band would itself be lit against black — the majority tone is
-/// the figure, not the ground — which is the role question none of the earlier
-/// candidates asked.
-///
-/// `f32::INFINITY` when the frame does not depart from its own modal band at all,
-/// which is the maximal reading of *the modal band is the figure* and keeps the
-/// column monotone in the direction it classifies.
+/// It was a local helper here while it was a candidate; Phase 3 of Plan 0186
+/// moved it into `metrics::figure_ground_ratio` because it is gate behaviour now
+/// (ADR-0200). The column stays, pointed at the shipped function, for the same
+/// reason [`production_boundary_density`] does: the table the gate was chosen
+/// from stays re-runnable and cannot drift away from what the gate reads.
 fn role_ratio(img: &CaptureImage) -> f32 {
-    let derived = coverage(img, ground(img), EPS);
-    if derived <= 0.0 {
-        return f32::INFINITY;
-    }
-    coverage(img, BLACK, EPS) / derived
+    figure_ground_ratio(img, EPS)
 }
 
 /// The `modal_connected` column: the share of the modal band's pixels sitting
@@ -3089,11 +3180,29 @@ fn structure_subjects() -> (Vec<Preset>, Vec<StructureSubject>) {
 /// candidate structural statistic says — beside `tonal_flatness`, the statistic
 /// ADR-0128 proposes to add a second term to.
 ///
+/// # The gate ran, and `role_ratio` is what shipped
+///
+/// **Eight of the ten candidates passed** the condition below — `role_ratio`,
+/// `min_ground`, `ground_side`, `modal_connected`, `sobel`, `tile@6`, `tile@12`
+/// and `tile@16` — which is why this table is a *selection* and ADR-0200 is where
+/// the choice was made. `border_ground` failing is the checked expectation it was
+/// tabled for: a blot reaches the frame edge, so "the ground owns the border"
+/// finds the blot. The `role_ratio` column now reads
+/// `metrics::figure_ground_ratio` and the `boundary` column
+/// `metrics::boundary_density`, so re-running this cannot drift from what the
+/// gate reads.
+///
+/// **The seven candidates that did not ship stay as columns**, passing and
+/// failing alike. The next frame that stresses term two is judged against the
+/// same table rather than against a memory of it, and a candidate deleted on the
+/// day it lost is a candidate re-invented on the day the argument reopens.
+///
 /// # This gates nothing, and cannot
 ///
 /// It is `#[ignore]`d and contains no assertion: a report built to inform a
 /// **stop gate** must not be able to redden CI on its own, or the gate is
-/// decided by whichever candidate happens to be green.
+/// decided by whichever candidate happens to be green. What the shipped gate
+/// asserts is in `draws_a_real_shape` and the two fixtures beside it.
 ///
 /// # The stop condition, which is mechanical and registered before any number
 ///
