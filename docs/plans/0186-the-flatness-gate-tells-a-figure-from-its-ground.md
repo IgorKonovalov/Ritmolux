@@ -332,8 +332,8 @@ loosening of `MAX_TONAL_FLATNESS` would convict them.
 |---|---|---|---|
 | 1 — The figure/ground candidates join the table | dev | done | `fa5d282b` |
 | 2 — The gate | human | done | `ae8bd31d` |
-| 3 — Term two reads the figure (or the conviction retires) | dev | done | committed with this row |
-| 4 — The reader says what the gate does | dev | not started | |
+| 3 — Term two reads the figure (or the conviction retires) | dev | done | `703af6df` |
+| 4 — The reader says what the gate does | dev | done | committed with this row |
 
 ### Notes
 
@@ -422,6 +422,15 @@ both green, plus `cargo fmt --all --check`, `cargo clippy --workspace
 --all-targets -- -D warnings` and `node scripts/check-comment-hygiene.mjs`.
 `git status` was clean of everything but the two files this phase touches, so no
 preset was edited and nothing was blessed.
+
+**Phase 4.** Two blocks of `docs/testing.md` moved rather than the one the phase
+names. The `sanity` row is the one it names. The other is the page's **fifth
+caveat**, which opened *"since Plan 0119: `sanity`'s blot check convicts nothing
+in the library today"* and then priced the gate on `22 of 43` presets under their
+boundary floor, `Sumi` at `0.1008`, and a `1.37x` margin — each falsified by Phase
+3 and the first of them contradicted by the row two screens above it. It now says
+what the two frozen anchors demonstrate and carries the re-read `62 of 112`.
+No other section of the file was touched.
 
 ### Close triggers
 
