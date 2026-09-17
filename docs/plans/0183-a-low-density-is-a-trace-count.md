@@ -233,7 +233,7 @@ ceiling is below 432,000, well inside `f32`'s 2^24 integer range.
 |---|---|---|---|
 | 1 — The count resolves against the anchor for a trace | dev | done | a98773de |
 | 2 — The reader, the schema doc and the two headers | dev | done | committed with this row |
-| 3 — The look gate at the size the defect lives at | human | not started | |
+| 3 — The look gate at the size the defect lives at | human | done | this row |
 
 ### Notes
 
@@ -257,6 +257,43 @@ ceiling is below 432,000, well inside `f32`'s 2^24 integer range.
   attractor denser than a window does"* (now *"gives the attractor a larger sample budget"*), and
   the `density` row of `presets/README.md`'s `[particles]` key table, which the phase does name.
 
+### Phase 3 — the look gate
+
+Taken 2026-09-17. The captures were prepared in the `preset-author` lane and **the verdict is the
+owner's**, given on the side-by-side sheets: *"after the changes figures became more neat, I like it
+overall."* The before-tree is `main` at `0d3dd766`, this branch's parent; the after-tree is this lane
+at Phase 2. Captures landed outside the repository and nothing is committed. Per world: a still at
+`--tier rich --frames 300 --set bass=0.6,mid=0.5,treb=0.4,tempo=120` at 640x360 and at 1920x1080 (the
+live ceiling), and for the three traces a 1920x1080 `--render` of `renders/plan-0106-p7/seg09.wav` at
+`--fps 30`, read at 6 s (the offline ceiling).
+
+**The 1080p after-frame reads as the same pen drawing as the 640x360 frame in all three trace
+worlds.** What follows is the reading of the sheets the verdict was given on.
+
+- **`fragment_sumi`** (`density = 0.02`). Live, before: the strands fuse into one solid glowing
+  ribbon and the individual strokes are gone. After: the loops read open, strand by strand, as they
+  do at 640x360. Offline, before: a woolly fog carrying no readable mark. After: discrete strokes
+  with ground visible between them.
+- **`attractor_thomas`** (`density = 0.02`). Live, before: lighter and more diffuse than its own
+  640x360 frame, the rim accents washed out. After: that frame's stroke weight and dark rim accents
+  are back. Offline, before: a graphite smudge in which no single stroke can be followed. After: a
+  pen drawing.
+- **`attractor_lorenzgallery`** (`density = 0.006`, the sparsest). Live, before: the disc fills in
+  and the interior orbits wash out. After: the interior reopens with ground between the strokes, as
+  at 640x360. Offline, before: a flat filled disc. After: a legible coil.
+
+**The two cloud controls are unchanged, measured rather than judged.** `attractor_leviathan` and
+`attractor_fernmono` produce **byte-identical** 1920x1080 PNGs before and after (4,443,672 and
+607,532 bytes). So does every 640x360 frame in the set, all five worlds — the law being a no-op where
+the budget already equals the anchor.
+
+**The phase's stop condition did not fire.** No trace read thin or faint at 1080p after the fix; the
+after frames read crisper than the before frames rather than weaker.
+
+Observation, not a conclusion: at 1080p after, a stroke reads slightly more contrasted than the same
+world's 640x360 stroke. The drawn count is the anchor's at both sizes, so what differs is the pixel
+count the same marks resolve into.
+
 ### Close triggers
 
 - **`presets/` touched:** yes. `presets/README.md` (hand-written prose only, outside the generated
@@ -278,8 +315,9 @@ ceiling is below 432,000, well inside `f32`'s 2^24 integer range.
   `-p rlx-core --test golden --test sanity --test animation --test reactivity --test distinctness
   --test attractor --test ink --test suite`: 656 passed, 4 skipped, exit 0, again with nothing
   blessed.
-- **Outstanding `human` phases:** Phase 3 — the look gate at 640x360 against 1920x1080, before and
-  after, on three trace worlds plus two cloud controls. Its stop condition governs whether ADR-0195
-  is accepted at close.
+- **Outstanding `human` phases:** none. Phase 3 was taken 2026-09-17 in the `preset-author` lane and
+  its verdict is above: the three trace worlds pass, both cloud controls are byte-identical, and the
+  stop condition did not fire. Whether ADR-0195 is accepted at close is the review's call on that
+  record.
 
 ## Followups (after this lands)
