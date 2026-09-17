@@ -1082,23 +1082,12 @@ plan.
   `warp_mesh_shader.png` is committed. This session's permissions refused `git checkout`,
   `git restore` and `git stash` on the other eight, so they are left modified in the working tree
   and uncommitted. The golden run passes against either version of them.
-- **Phase 3 is parked before any code, as the plan being wrong.** Phase 1's sentence names four
-  differing stages, so Phase 3 has `vs_main` apply them in the source's space, touching
-  `warp_mesh/shaders.rs` and its tests. But `vs_main` is the one vertex stage for **native and
-  converted** presets alike (`encode.rs` `encode_warp`: a converted warp shader reuses it, and a
-  bundle without one uses the built-in pipeline). The native fixture `core/tests/fixtures/warp_mesh.toml`
-  binds `warp = "0.25"`, and `presets/warp_smoke.toml`, `warp_sirocco.toml` and `warp_cauldron.toml`
-  bind the same stages. So a change confined to `shaders.rs` moves `warp_mesh.png`, which the plan
-  makes a stop, and changes the native vocabulary, which the plan rules out. Confining the change to
-  converted presets needs a signal the shader can read. The candidates are a uniform lane filled in
-  `warp_mesh/encode.rs` `upload_uniforms` from `scene.milk.is_some()`, or per-axis values written into
-  the vertex's unused `t2` lanes by `warp_mesh/mesh.rs`. Neither file is in Phase 3's list, and the
-  choice between them is a design call. `cx`/`cy` and `dx`/`dy` alone could be remapped CPU-side in
-  `milk/mod.rs`, but the warp's per-axis amplitude cannot.
-- **Two more plan statements disagree with Phase 1's read, for the same amendment.** Phase 6's note
-  gives mode 0 alone a `time` term, but modes 1 (l.2942, `time*2.3`) and 5 (l.3085-3086, `time*0.3`)
-  have one too. Every bless on this machine also re-encodes the eight baselines named above, so
-  Phases 3, 4 and 6's bless rule cannot be met here without a restore this session could not run.
+- **Phase 3's park, and the two plan statements Phase 1's read contradicted, were resume
+  scaffolding and are not repeated here.** All three were absorbed on 2026-09-15: the park's
+  design question became [ADR-0212](../../adrs/0212-a-converted-preset-gets-its-own-vertex-module-and-the-pipeline-is-chosen-not-branched.md)
+  and Phase 3's amendment, the `time` correction became Phase 6's note, and the bless-restore
+  problem was discharged by [Plan 0190](0190-the-conductor-survives-a-run-nobody-is-watching.md)
+  Phase 2. The plan's own header amendment is the record.
 
 ### Close triggers
 
