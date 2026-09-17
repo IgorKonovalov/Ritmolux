@@ -1027,17 +1027,87 @@ fn band_contour(
     /// exists to catch drift could not have caught this one, because the site it
     /// lived at was never iterated.
     const WARP_MESH_SRC: &str = include_str!("scenes/warp_mesh/shaders.rs");
+    const ANALYTIC_FIELD_SRC: &str = include_str!("scenes/analytic_field/shader.rs");
+    const CELLULAR_SRC: &str = include_str!("scenes/cellular/shader.rs");
+
+    /// Every scene source that carries a copy of one of the two shared WGSL
+    /// functions, as `(path under `core/src/render/scenes/`, its text)`.
+    ///
+    /// The **text** side is `include_str!`, so a moved or renamed file fails to
+    /// compile here instead of silently checking nothing. The **membership** side
+    /// is checked by [`scene_files_containing`] rather than by this list, because
+    /// a list cannot see what is missing from it: `warp_mesh` was absent for two
+    /// plans and `analytic_field` and `cellular` for two more, and in each case
+    /// the drift guard reported green over a site it never opened.
+    const SCENE_SOURCES: &[(&str, &str)] = &[
+        ("analytic_field/shader.rs", ANALYTIC_FIELD_SRC),
+        ("cellular/shader.rs", CELLULAR_SRC),
+        ("fragment_field.rs", FRAGMENT_FIELD_SRC),
+        ("particles/shaders.rs", PARTICLE_SHADERS_SRC),
+        ("reaction_diffusion.rs", REACTION_DIFFUSION_SRC),
+        ("shape_field.rs", SHAPE_FIELD_SRC),
+        ("warp_mesh/shaders.rs", WARP_MESH_SRC),
+    ];
+
+    /// The `include_str!` text for a path [`scene_files_containing`] turned up, or
+    /// a failure naming the file to add.
+    fn source_of(path: &str) -> &'static str {
+        match SCENE_SOURCES.iter().find(|(name, _)| *name == path) {
+            Some((_, src)) => src,
+            None => panic!(
+                "core/src/render/scenes/{path} carries a copy of a shared WGSL \
+                 palette function and is not in SCENE_SOURCES, so the drift guard \
+                 has never looked at it. Add an `include_str!` for it."
+            ),
+        }
+    }
+
+    /// Every `.rs` file under `core/src/render/scenes/` whose text contains
+    /// `needle`, as paths relative to that directory with `/` separators.
+    ///
+    /// A directory walk rather than a hand-kept count: the question this answers
+    /// is *which sites exist*, and a constant can only answer *which sites
+    /// someone remembered*.
+    fn scene_files_containing(needle: &str) -> Vec<String> {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/render/scenes");
+        let mut found = Vec::new();
+        let mut stack = vec![root.clone()];
+        while let Some(dir) = stack.pop() {
+            for entry in std::fs::read_dir(&dir).expect("read core/src/render/scenes") {
+                let path = entry.expect("read a scenes directory entry").path();
+                if path.is_dir() {
+                    stack.push(path);
+                } else if path.extension().is_some_and(|e| e == "rs")
+                    && std::fs::read_to_string(&path)
+                        .expect("read a scene source")
+                        .contains(needle)
+                {
+                    let rel = path
+                        .strip_prefix(&root)
+                        .expect("the walk stays under the root")
+                        .to_string_lossy()
+                        .replace('\\', "/");
+                    found.push(rel);
+                }
+            }
+        }
+        found.sort();
+        found
+    }
 
     #[test]
     fn every_wgsl_sample_site_carries_the_same_banding_expression() {
-        for (name, src) in [
-            ("fragment_field.rs", FRAGMENT_FIELD_SRC),
-            ("reaction_diffusion.rs", REACTION_DIFFUSION_SRC),
-            ("particles/shaders.rs", PARTICLE_SHADERS_SRC),
-            ("shape_field.rs", SHAPE_FIELD_SRC),
-        ] {
+        let carriers = scene_files_containing("fn band_coord");
+        assert!(
+            carriers.len() >= 7,
+            "only {} scene sources carry a `band_coord` copy; the banding \
+             expression reaches every LUT sample site, so a drop here is a lost \
+             site rather than a tidy: {carriers:?}",
+            carriers.len()
+        );
+        for name in &carriers {
             assert!(
-                src.contains(BAND_COORD_WGSL),
+                source_of(name).contains(BAND_COORD_WGSL),
                 "{name}'s copy of the WGSL `band_coord` has drifted from \
                  palette.rs::band_coord — the two must stay one function written \
                  twice, not two functions that agree on some inputs"
@@ -1049,21 +1119,26 @@ fn band_contour(
     /// not merely documented: the attractor's LUT read is in the vertex stage,
     /// where `fwidth` does not exist, so a copy landing there is a compile error
     /// at best and a silent nothing at worst.
+    ///
+    /// The list of sites is **scanned, not written down**. Two earlier spellings
+    /// of this test iterated a hand-kept list and reported green over sites it had
+    /// never opened; the scan is what makes a seventh copy impossible to miss.
     #[test]
     fn the_contour_reaches_the_fragment_sites_and_not_the_vertex_one() {
-        for (name, src) in [
-            ("fragment_field.rs", FRAGMENT_FIELD_SRC),
-            ("reaction_diffusion.rs", REACTION_DIFFUSION_SRC),
-            ("shape_field.rs", SHAPE_FIELD_SRC),
-            ("warp_mesh/shaders.rs", WARP_MESH_SRC),
-        ] {
+        let carriers = scene_files_containing("fn band_contour");
+        assert!(
+            carriers.len() >= 6,
+            "only {} scene sources carry a `band_contour` copy: {carriers:?}",
+            carriers.len()
+        );
+        for name in &carriers {
             assert!(
-                src.contains(BAND_CONTOUR_WGSL),
+                source_of(name).contains(BAND_CONTOUR_WGSL),
                 "{name}'s copy of the WGSL `band_contour` has drifted"
             );
         }
         assert!(
-            !PARTICLE_SHADERS_SRC.contains("fn band_contour"),
+            !carriers.iter().any(|name| name == "particles/shaders.rs"),
             "particles/shaders.rs grew a `band_contour` — its LUT read is in the \
              VERTEX stage, which has no derivatives and no gradient across a point \
              sprite to contour (ADR-0078)"
