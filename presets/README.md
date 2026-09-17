@@ -1774,7 +1774,9 @@ those two differently would be broken.
 > - an **authored `[path]` contour that is not star-shaped about its centre** — a
 >   crescent, a figure with fins, or a silhouette whose sinuses put one lobe
 >   across the ray into the next. `presets/shape_maple.toml` is one: its four
->   deep sinuses fail the test, which is part of why it draws under `"0"`.
+>   deep sinuses put a neighbouring lobe across the ray, and it measures a worst
+>   ray gap of **0.40** against a tolerance of 0.02. It ships under `"0"`, so
+>   nothing about it moves — but write `"1"` on it and you get the warning.
 >
 > On both the scene draws the distance instead and warns at load:
 >
@@ -1782,7 +1784,7 @@ those two differently would be broken.
 > parameter 'coord_mode' is ignored on a `ring`: an annulus's centre lies in its
 > hole, so a ray from there crosses the outline twice and the scaled-copy
 > coordinate has no single value there. The figure is drawn with the distance
-> instead - a band of constant distance rather than a scaled copy of the outline
+> instead — a band of constant distance rather than a scaled copy of the outline
 > ```
 >
 > Concavity on its own is not the problem, and a check that convicted it would be

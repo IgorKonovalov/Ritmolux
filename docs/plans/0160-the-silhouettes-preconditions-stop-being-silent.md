@@ -346,8 +346,9 @@ about nothing; only the **thin** variant, whose horns wrap past its own centre, 
 Phase 1's decision to test the contour rather than the name is exactly what makes that work — an
 author who reads "a crescent" as a rule would avoid a figure the engine draws correctly.
 
-**Carried forward** to `docs/design-backlog.md`: the band-count measure, and the over-general list.
-Both are prose repairs in `presets/README.md` and neither gates anything.
+**Carried forward** to `## Followups` below — **not** to `docs/design-backlog.md`, which this plan
+did not touch: the band-count measure, and the over-general list. Both are prose repairs in
+`presets/README.md` and neither gates anything. Filing them as live backlog entries is owed and open.
 
 ### Notes
 
@@ -402,6 +403,24 @@ Both are prose repairs in `presets/README.md` and neither gates anything.
 - **Outstanding `human` phases:** none. Phase 3 was taken 2026-09-17 in the `preset-author` lane and
   its three verdicts are above: the palette rule is sufficient to author against without rendering,
   the band-count rule is not, and the warning arrives at the right moment and place. Two prose
-  findings carry forward to the backlog; it gated nothing, as written.
+  findings carry forward to `## Followups` below; it gated nothing, as written.
 
 ## Followups (after this lands)
+
+Both are Phase 3's, both are prose repairs to `presets/README.md`, and neither gates anything.
+**Neither is in `docs/design-backlog.md` yet** — filing them as live entries with the probes
+[ADR-0108](../adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md) requires is
+owed and open.
+
+- **The band count needs a measure, not three examples.** *"The thinnest feature sets the count"* is
+  the right framing and it does not convert. Its three cases — koi fins and lion tufts at two, maple
+  lobes at three — are examples, and an author drawing a figure thinner than all three (Phase 3 drew
+  a crescent whose horns taper to zero width) can only pick by analogy. The inward offset per
+  interior band is a knowable figure; one sentence stating it would let an author compare it against
+  their own thinnest feature's half-width and choose rather than guess.
+- **The list of failing figures is over-general, and the engine is the one that is right.** The
+  `coord_mode` blockquote names shape families — a crescent, a figure with fins, a silhouette with
+  deep sinuses — but membership is geometric and depends on thickness. A **thick** crescent renders
+  correctly under `"1"`, with interior contours as true scaled copies, and warns about nothing; only
+  a thin one, whose horns wrap past its own centre, trips the check. An author reading "a crescent"
+  as a rule would avoid a figure the engine draws correctly.

@@ -640,6 +640,14 @@ offsets of the outline, or `r / r_boundary(theta)` (`"1"`), whose contours are
 **scaled copies** of it. Both are `0` at the figure's centre and `1` on its
 outline, and `palette_contour` works on both.
 
+**Not every figure can take `"1"`.** The boundary radius is read along a ray from
+the figure's centre, so the mode needs a figure every such ray leaves exactly
+once — a `ring` does not, and neither does an authored `[path]` contour that
+wraps around its own centre. On those the scene draws the distance instead and
+says so at load;
+[`presets/README.md`](../presets/README.md) carries the condition and what
+qualifies.
+
 **The hairline keeps its weight across the switch, and that is worth stating
 because the arithmetic suggests otherwise.** The two fields have genuinely
 different gradients — the distance rises at `1/inradius` everywhere, while the

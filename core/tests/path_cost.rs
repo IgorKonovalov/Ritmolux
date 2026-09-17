@@ -72,7 +72,11 @@
 //! ADR-0107 recorded, as its live risk, the scenario where "Plan 0087's arcs
 //! stop being an optimisation and become the thing that makes this viable". The
 //! reading above is that scenario, and the second test here is the answer to it.
-//! Same machine and same configuration:
+//! **Taken 2026-09-09**, on the same machine and the same configuration as the
+//! table above but not on the same day — the arity table was re-taken and this
+//! one deliberately was not, because its polyline column already measured a
+//! polyline. Read the two together as two runs, which is what the slope moving
+//! 0.105 -> 0.095 between them is the size of:
 //!
 //! | figure | pieces | arcs | polyline (64 pts) | |
 //! |---|---|---|---|---|
@@ -82,8 +86,10 @@
 //!
 //! **An arc piece costs about 1.6 segments and the fit needs about four times
 //! fewer of them**, so a curved figure comes out 30 % to 72 % cheaper depending
-//! on how few pieces its curvature collapses into. Subtracting the 1.03 ms
-//! roster baseline puts a piece at ~0.17 ms against a segment's ~0.105.
+//! on how few pieces its curvature collapses into. Subtracting that run's own
+//! 1.03 ms roster baseline puts a piece at ~0.17 ms against the same run's
+//! ~0.105 ms segment — both figures are 2026-09-09's, and pairing either with
+//! the 2026-09-17 table above would be mixing two runs.
 //!
 //! That also sets the *other* ceiling: at [`MAX_ARC_PIECES`] the chain is
 //! 1.03 + 32 x 0.17 = 6.4 ms, or 38 % of the floor budget — under what the
