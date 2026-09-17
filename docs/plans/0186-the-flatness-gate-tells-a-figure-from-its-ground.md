@@ -333,7 +333,7 @@ loosening of `MAX_TONAL_FLATNESS` would convict them.
 | 1 — The figure/ground candidates join the table | dev | done | `fa5d282b` |
 | 2 — The gate | human | done | `ae8bd31d` |
 | 3 — Term two reads the figure (or the conviction retires) | dev | done | `703af6df` |
-| 4 — The reader says what the gate does | dev | done | committed with this row |
+| 4 — The reader says what the gate does | dev | done | `0c66c1d9` |
 
 ### Notes
 
@@ -434,12 +434,34 @@ No other section of the file was touched.
 
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`**
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** no. `git diff --name-only main...HEAD` over the four
+  commits lists `core/src/render/metrics.rs`, `core/tests/sanity.rs`,
+  `docs/adrs/0200-*.md`, `docs/adrs/README.md`, this plan and `docs/testing.md`.
+  No preset, no golden, no baseline.
+- **Plan header `Closes:`** design-backlog 0128, with the four-field residue
+  (`Sumi`, `Whorl`, `Supernova`, `Neon Tunnel` — composition or fill) carved out
+  by `## What this plan does NOT do`. The table prints those four rows; no
+  statistic here answers the question.
+- **What shipped:** a fix, plus two new `pub` functions.
+  `metrics::figure_ground_ratio` and `metrics::assigned_boundary_density` are
+  additions to the C-ABI-free metrics surface; nothing outside `core/tests/` calls
+  them, no rendering path changed, and no C ABI, preset key, flag or config key
+  moved. The behaviour change is in a HARD test gate: `sanity`'s blot check
+  convicts its two frozen anchors again where it convicted nothing.
+- **Operator docs touched:** `docs/testing.md` only (the `sanity` row and the
+  page's fifth caveat). No `running.md`, `configuration.md`, `capturing.md` or
+  `presets/README.md` change, and no `.ru.md` source moved.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — 80 stated
+  reductions across 34 live entries, 2 unprobeable, 34 advisory rows for probed
+  paths that moved (`core/src`, `presets/README.md` and 0242/0243/0244 among
+  them; the advisory half is not part of the exit code).
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). What this
+  session ran instead: the whole `sanity` binary (131 passed, 2 skipped), then
+  `cargo nextest run --workspace -P fast` — 1688 passed, 304 skipped, exit 0 —
+  plus `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D
+  warnings`, `check-comment-hygiene`, `check-doc-links`, `check-reader-prose`,
+  `toc --check` and `check-backlog-claims`, all green.
+- **Outstanding `human` phases:** none. Phase 2 was the only one and it is
+  recorded above, in the plan, with ADR-0200 written from its table.
 
 ## Followups (after this lands)
