@@ -323,6 +323,7 @@ not one phase. This is architectural integrity, not line-by-line style. Run five
   | `docs/releasing.md` | a release job, a zip, the version-bump procedure |
   | `docs/on-device-validation.md` | anything the on-device checklist asserts |
   | `docs/nfr.md` | a quantified budget moved |
+  | **the five `.ru.md` translations** | **anything their English source now says differently** — `docs/running.ru.md`, `docs/how-it-works.ru.md` and the three `packaging/*/READ-ME-FIRST.ru.md` are second copies of rows in this table, and step 1e's advisory is what says which one moved ([ADR-0185](../../../docs/adrs/0185-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md)). Correcting the Russian is content work; noticing it is this sweep |
 
   **Editing a reader document carries two constraints of its own.** Whether it is published is
   decided by the `PUBLISHED` map in `site/src/plugins/rewrite-links.mjs`
@@ -528,6 +529,30 @@ All architect-owned, committed to `main` by explicit path (see "Commit hygiene" 
    `docs/adrs/README.md` had reached **16 %** of the ADR corpus it indexes. If a row will not fit,
    the answer is **new arithmetic in ADR-0116** — never a raised constant, and never a row nudged
    outside the markers.
+
+1e. **Read the translation advisory** ([ADR-0185](../../../docs/adrs/0185-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md)).
+
+   ```sh
+   node scripts/check-translations.mjs   # exit 0 = every `.ru.md` carries a stamp
+   ```
+
+   **The trigger is every close, and the exit code is not what you came for.** A missing or
+   malformed `translated-from` stamp is the exit code, and pre-push and CI both already catch that
+   before you see it. What only this run surfaces is the **advisory block below the pass line**: the
+   translations whose English source has moved past the sha they were translated from. Nothing
+   anywhere goes red for that, by design — hard-failing would make the Russian slice a hostage of
+   every hotkey edit on a one-translator project — so **this print is the only carrier the drift
+   half has**, and the close is the right moment because a close is what moves an English source.
+
+   **A row is a reading, not a repair.** `git diff <stamped>..<current> -- <source>` says what
+   moved; whether the Russian still says it is a judgement no machine here makes. Correcting the
+   prose and moving the stamp in the same commit is content work — route it, do not do it. What you
+   owe is **one line in the close notes** naming the rows, or their absence. **The advisory is
+   withheld on a shallow clone** and says so, in ADR-0016's shape; you run on a full checkout, so
+   you get the real reading and CI does not.
+
+   **If the same translation is stale three closes running, that is the signal ADR-0185 named**:
+   retiring the page beats publishing a lie. That is an ADR-worthy call, not a close-time edit.
 
 2. **Accept any paired ADRs** (`proposed → accepted`) and refresh `docs/adrs/README.md`. An ADR is
    append-only *once accepted* — but if the plan's implementation falsified something the ADR

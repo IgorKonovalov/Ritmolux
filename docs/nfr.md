@@ -266,7 +266,7 @@ the decision that moved it is linked.
   is a backstop against silent erosion, not a quality measure. The Mode 4 review's
   "read the assertion body" step remains the actual quality gate.
 - **Local pre-push gate** (opt-in, per clone): `.githooks/pre-push`, enabled with
-  `git config core.hooksPath .githooks`. Runs the fast subset — the six Node doc gates, `fmt`,
+  `git config core.hooksPath .githooks`. Runs the fast subset — the Node doc gates, `fmt`,
   `clippy --workspace`, and a narrowed `nextest --workspace -P fast` — whose `fast` profile
   ([ADR-0156](adrs/0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md)) is where the excluded GPU-heavy suites are listed, and which nextest names on every
   run.
@@ -276,9 +276,10 @@ the decision that moved it is linked.
   the point where people start reaching for `--no-verify`, that is the signal to narrow it further —
   [ADR-0033](adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md)'s own argument is that a gate which hurts gets disabled.
   `cargo deny`, doctests, Miri, and coverage stay in CI. An uninstalled clone silently has no gate;
-  see the README's developer section. All six Node gates (`check-doc-links.mjs` ~50 ms,
+  see the README's developer section. Every Node gate (`check-doc-links.mjs` ~50 ms,
   `check-index-rows.mjs`, `check-backlog-claims.mjs`, `check-filter-figures.mjs`,
-  `check-comment-hygiene.mjs`, `toc.mjs`) also run as the CI `links` job
+  `check-comment-hygiene.mjs`, `toc.mjs`, `check-reader-prose.mjs`, `check-release-tag.mjs`,
+  `check-translations.mjs`) also runs as the CI `links` job
   (`ubuntu-latest`), so they are enforced for everyone rather than only where the hook is installed
   — and they skip together with a notice when `node` is absent, which is the [ADR-0016](adrs/0016-gpu-tests-opt-in-ci-scope.md)
   shape.

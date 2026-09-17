@@ -168,8 +168,10 @@ scripts/             # Repo maintenance. The Node gates, and a count of them is 
                      #   from the menu rather than only by search, and that no route the splitter
                      #   produced exceeds 30,000 bytes of source (ADR-0166) - a route over that means
                      #   ADR-0166's arithmetic needs redoing, never that the constant needs raising.
-                     #   Of the pre-push set, the first three, toc.mjs and check-release-tag.mjs also run
-                     #   in the close ceremony, because a close is what breaks them. check-doc-links.mjs asserts
+                     #   Of the pre-push set, the first three, toc.mjs, check-release-tag.mjs and
+                     #   check-translations.mjs also run in the close ceremony - the first five because a
+                     #   close is what breaks them, the last because its staleness half is an ADVISORY
+                     #   nothing else reads, and a close is where a moved English source is noticed. check-doc-links.mjs asserts
                      #   every relative markdown link resolves (moving a plan to plans/done/ breaks
                      #   links in both directions, and rejects a design-backlog fragment outright
                      #   per ADR-0149); check-index-rows.mjs holds every roster row to 320 bytes AND

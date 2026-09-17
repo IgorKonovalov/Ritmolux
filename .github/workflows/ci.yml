@@ -248,13 +248,15 @@ jobs:
       # already links, and to the shapes the corpus contains.
       - run: node scripts/toc.mjs --check
       - run: node scripts/toc.mjs --self-test
-      # And the seventh (ADR-0168): in the five documents a preset author reads,
+      # And the seventh (ADR-0168): in the documents a reader meets on the site,
       # every citation of a plan or an ADR sits inside a markdown link rather than
       # bare in a sentence. It is the exact inverse of what the comment-hygiene
       # gate above asks of a `.rs` comment, and the boundary between the two rules
-      # is the filename list inside the script. The convention alone was tried:
-      # CLAUDE.md has asked for bare-number citation throughout, and that is how
-      # those five documents accumulated 235 of them.
+      # is the filename list inside the script - which is also the only place that
+      # roster is written down, so a count of it here would be falsified by every
+      # document added. The convention alone was tried: CLAUDE.md has asked for
+      # bare-number citation throughout, and that is how those documents
+      # accumulated 235 of them.
       - run: node scripts/check-reader-prose.mjs
       # And the eighth (ADR-0203): the version main declares has an annotated
       # release tag on origin. The pre-push hook reads the same property offline,

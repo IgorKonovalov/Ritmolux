@@ -133,15 +133,16 @@ echo "pre-push: running the fast subset (doc links, backlog claims, comment hygi
 #
 # The reader-prose gate is the seventh (ADR-0168), and it runs last because it is
 # the only one whose subject is prose rather than structure. It asserts that in
-# the five documents a preset author reads, every citation of a plan or an ADR
+# the documents a reader meets on the site, every citation of a plan or an ADR
 # sits inside a markdown link rather than bare in a sentence - the exact inverse
-# of what ADR-0127 asks of a `.rs` comment, because those five address a reader
-# who wants to know what a parameter does rather than a session reconstructing
-# why a threshold exists. The boundary between the two rules is the filename list
-# inside the script. Push time is the right moment for the same reason it is for
+# of what ADR-0127 asks of a `.rs` comment, because those documents address a
+# reader who wants to know what a parameter does rather than a session
+# reconstructing why a threshold exists. The boundary between the two rules is
+# the filename list inside the script, which is also the only place its roster is
+# written down - a count of it here would be falsified by every document added. Push time is the right moment for the same reason it is for
 # the index-row gate above: the convention alone was tried, has been in CLAUDE.md
 # throughout, and is exactly how those documents accumulated 235 bare citations.
-# Same cost class again - five file reads and a regex scan of each.
+# Same cost class again - one file read per document and a regex scan of each.
 #
 # The release-tag gate is the eighth (ADR-0203), and it is the only one whose
 # subject is a git ref rather than a file. It asserts that the version the root

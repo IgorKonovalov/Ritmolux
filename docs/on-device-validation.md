@@ -493,6 +493,24 @@ or an older copy shadows the one under test and the version check means nothing.
       confirms two filed defects rather than finding new ones; anything else is new.
       _(Plan 0102 Phase 5, carried forward at that plan's close 2026-08-16.)_
 
+- [ ] **The Russian install note in the component zip is readable, and opens on its title.** The
+      whole point of the Russian slice is the install path, and the one thing that proves it is a
+      real zip on a machine that is not this one: `packaging/foobar/build-component.ps1` asserts the
+      bytes it wrote, not what a reader sees. Unzip
+      `ritmolux-v<version>-foobar2000-component.zip` and open `READ-ME-FIRST.ru.txt` **in Notepad**,
+      not in an editor that guesses encodings, then confirm
+      **(a)** the Cyrillic renders as Cyrillic and not as `Ð` pairs — Windows PowerShell 5.1 falls
+      back to the system ANSI codepage in *both* directions for a BOM-less file, which is what the
+      explicit `ReadAllText`/`WriteAllText` pair in that script exists to stop;
+      **(b)** line 1 is the title and not `<!-- translated-from: … -->` — the stamp is stripped on
+      the `.md` → `.txt` copy, and a tester meeting it would read an HTML comment first;
+      **(c)** no `@VERSION@` or `@SDK_VERSION@` survives anywhere in it.
+      **Escalation:** a failure here is a defect in the packager, not in the translation.
+      _([Plan 0166](plans/done/0166-the-basics-read-in-russian.md) Phase 5, whose last done-when
+      needs the foobar2000 SDK and a built component and so could not be read at the close.
+      Everything short of the opened zip was measured in isolation there: stamp stripped, both
+      placeholders substituted, no BOM, shipped Cyrillic byte-identical to source.)_
+
 - [ ] **Drive the component's right-click menu — the whole preset loop.** Everything a foobar user
       can reach lives on one menu since [Plan 0107](plans/done/0107-the-foobar-menu-picks-a-preset.md),
       and CI builds no C++, so this is the only place any of it is exercised. Mid-playback, in this

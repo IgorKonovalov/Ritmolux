@@ -10,8 +10,9 @@
 
 [Готовая сборка](https://github.com/IgorKonovalov/Ritmolux/releases/latest) распаковывается и
 запускается; в систему ничего не устанавливается, а файл READ-ME-FIRST в каждом архиве проводит
-через первый запуск на [Windows](../packaging/windows/READ-ME-FIRST.md),
-[macOS](../packaging/macos/READ-ME-FIRST.md) и [foobar2000](../packaging/foobar/READ-ME-FIRST.md).
+через первый запуск на [Windows](../packaging/windows/READ-ME-FIRST.ru.md),
+[macOS](../packaging/macos/READ-ME-FIRST.ru.md) и
+[foobar2000](../packaging/foobar/READ-ME-FIRST.ru.md).
 
 Из исходников нужен свежий стабильный тулчейн **Rust** (рабочее пространство на редакции 2024 —
 Rust 1.85+). Из корня репозитория:
