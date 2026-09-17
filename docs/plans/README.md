@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0192** (ADRs are a separate sequence — next free there is **0213**; 0200 is reserved for Plan 0186 Phase 2.)
+**Next free number: 0192** (ADRs are a separate sequence — next free there is **0214**; 0200 is reserved for Plan 0186 Phase 2.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)

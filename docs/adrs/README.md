@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0213.** *(0120 was reserved for
+**Next free number: 0214.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -206,7 +206,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0182](0182-a-plan-lane-may-live-inside-the-repository.md) | A plan lane may live inside the repository, and a tool that enumerates from git already knows it | accepted 2026-09-10 (Plan 0165), supplements 0053 |
 | [0183](0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md) | The studio drives one player, and the show loop is extracted so every mode runs it | accepted 2026-09-10 (Plan 0159), revises 0175; Outcome |
 | [0184](0184-the-player-reports-what-it-loaded-and-the-studio-re-derives-nothing.md) | The player reports what it loaded, and the studio re-derives nothing | accepted 2026-09-10 (Plan 0159), extends 0176 |
-| [0185](0185-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md) | The documentation translates a slice, and a stamp makes staleness visible | accepted 2026-09-17 (Plan 0166), extends 0154, 0167 |
+| [0185](0185-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md) | The documentation translates a slice, and a stamp makes staleness visible | accepted 2026-09-17 (Plan 0166), extends 0154, 0167; amended by 0213 |
 | [0186](0186-the-studios-player-mode-is-a-per-machine-setting.md) | The studio's player mode is a per-machine setting, and the windowless path is a peer | accepted 2026-09-11 (Plan 0167), amends 0183 |
 | [0187](0187-the-preview-pipe-has-a-fixed-shape-and-names-its-true-format.md) | The preview pipe has a fixed shape and names the format it actually carries | accepted 2026-09-11 (Plan 0167), revises 0176, Outcome |
 | [0188](0188-the-two-implementer-lanes-hand-off-automatically.md) | The two implementer lanes hand off to each other automatically, and every other seam stays manual | accepted 2026-09-10 (no plan), amends 0177; superseded in part by 0205 |
@@ -234,4 +234,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0210](0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md) | A `.claude/` repair is the owner's, and a session that needs one parks with the edit | accepted 2026-09-16 (Plan 0190), supersedes 0209 in part |
 | [0211](0211-a-green-suite-record-serves-a-later-tree-when-no-deferred-suite-can-read-the-diff.md) | A green suite record serves a later tree when no deferred suite can read the diff | accepted 2026-09-16 (Plan 0191), amends 0207 |
 | [0212](0212-a-converted-preset-gets-its-own-vertex-module-and-the-pipeline-is-chosen-not-branched.md) | A converted preset gets its own vertex module, and the pipeline is chosen rather than branched | accepted 2026-09-16 (Plan 0180), Outcome |
+| [0213](0213-the-russian-slice-stays-a-section-and-gets-a-header-control.md) | The Russian slice stays a section, and gets a header control | proposed, amends 0185 |
 <!-- roster:end -->
