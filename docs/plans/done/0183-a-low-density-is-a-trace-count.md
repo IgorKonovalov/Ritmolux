@@ -1,12 +1,18 @@
 # 0183 — A low density is a trace count
 
-> **Status:** in-progress (2026-09-17)
+> **Status:** done (closed 2026-09-17) — all three phases landed (`a98773de`, `887590bd`,
+> `af3055d2`), plus the close-review repairs in `cc068151`. Conductor close review round 1:
+> **no blockers, no majors, two minors and one nit**, all three repaired at the close. Verified: the
+> full suite green on the reviewed tree (1986 passed, 6 skipped, nothing blessed and no baseline
+> moved), `cargo doc --workspace` clean under `-D warnings`, and ADR-0195's four properties each
+> asserted on the value at sizes where the old law and the new one disagree. ADR-0195 accepted.
+> Version **0.128.1** (patch — a fix plan).
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`, `human`
-> **Related ADRs:** [0195](../adrs/0195-a-low-density-is-a-trace-count-and-the-law-scales-only-a-cloud.md) (proposed),
-> [0140](../adrs/0140-a-sample-budget-is-a-density-against-the-render-target.md),
-> [0069](../adrs/0069-the-attractor-trades-sample-count-for-trace-length.md),
-> [0065](../adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md)
+> **Related ADRs:** [0195](../../adrs/0195-a-low-density-is-a-trace-count-and-the-law-scales-only-a-cloud.md) (accepted),
+> [0140](../../adrs/0140-a-sample-budget-is-a-density-against-the-render-target.md),
+> [0069](../../adrs/0069-the-attractor-trades-sample-count-for-trace-length.md),
+> [0065](../../adrs/0065-the-attractor-deposit-is-normalized-by-particle-count.md)
 > **Closes:** design-backlog 0186
 
 ## TL;DR
@@ -319,5 +325,163 @@ count the same marks resolve into.
   its verdict is above: the three trace worlds pass, both cloud controls are byte-identical, and the
   stop condition did not fire. Whether ADR-0195 is accepted at close is the review's call on that
   record.
+
+## Close review
+
+> Conductor-run close review (ADR-0205), round 1, 2026-09-17. Written in a fresh session handed the
+> plan and the lane and nothing an implementer wrote. Reviewed tip `af3055d2`; the full review is
+> also at `tools/conductor/state/reviews/0183-round-1.md`, which is gitignored, so this is the
+> record. **There were no earlier rounds**, so no finding is carried here from a fix round.
+
+**Verdict: Plan 0183 landed cleanly — no blockers, no majors, two minors and one nit.** The density
+law is implemented exactly as ADR-0195 specifies, every one of the ADR's four properties is asserted
+on the value at sizes where the old law and the new one genuinely disagree, and the three findings
+are all stale doc-comment or reader prose, repaired at the close in `cc068151`.
+
+### Evidence this review ran on
+
+- **Full suite.** `with-lock.mjs suite -- cargo nextest run --workspace` printed the ledger record
+  rather than re-running (ADR-0207): *skipped — tree `230e457` is green in the suite ledger, run by
+  gate `0183-pre-review` at 2026-09-17T09:08:11.760Z: 1986 tests run: 1986 passed (7 slow), 6
+  skipped.* That record is the full-suite evidence. Nothing blessed; the diff against `main` touches
+  no baseline file at all.
+- **`cargo doc --workspace --no-deps` under `-D warnings`** — all five crates clean. It matters
+  here: the phase added a doc comment carrying an intra-doc link and a fenced block, and the
+  pre-push hook mirrors `-p rlx-core` alone.
+- `cargo fmt --all --check` and `cargo clippy --workspace --all-targets -- -D warnings`: clean.
+- `check-doc-links`, `check-index-rows`, `check-reader-prose`, `toc --check`,
+  `check-comment-hygiene`, `check-filter-figures`, `check-translations`: all exit 0.
+- `check-backlog-claims.mjs`: exit 0 — 75 stated reductions across 33 live entries, 2 unprobeable,
+  34 advisory moved-path rows; re-run after the merge from `main`, 80 across 34. Nothing this plan
+  touched convicted an entry.
+- **Translation advisory:** *no translated source has moved since its translation was stamped.* All
+  five `.ru.md` files are current. This plan edited no translated source.
+
+### Lens 1 — alignment with the plan and the ADR
+
+Every phase carries a single in-vocabulary `**Owner skill:**` tag, and all three landed. The
+`## Implementation log` is 101 lines against `## Implementation phases`' 103 — inside the rule, and
+observations rather than conclusions throughout. Two deviations are disclosed and both are the right
+call: backlog 0186's probe did not go red on delivery because the entry had already left the live
+file on promotion (ADR-0206) and the gate reads only that file; and the built-scene hook landed as
+`Scene::active_sample_count` with a sibling test rather than an extension of
+`the_render_path_resolves_a_larger_budget_than_a_window_does`, which the plan allowed and which is
+the better shape — one test pins the budget, the other pins what is drawn out of it.
+
+Every test the plan named was opened and its assertion body read. They map onto ADR-0195's four
+properties one for one, and none is tautological:
+
+- `a_trace_density_draws_the_anchor_count_at_every_target` sweeps five densities across all sixteen
+  `(tier, ceiling, size)` pairs over 640x360..3840x2160. **Its non-vacuity is checked, not claimed**:
+  the last two lines evaluate the old expression at 1920x1080 `Rich` and pin 12,000 live and 27,000
+  offline, so the 3,000 above is a change.
+- `a_cloud_density_resolves_exactly_as_the_budget_alone_does` compares against the old expression
+  **evaluated in the test**, so a later `attractor_budget` change cannot make it pass by moving both
+  sides.
+- `where_the_budget_is_the_anchor_no_density_moved` is why no baseline moves, and it is **swept, not
+  sampled** — 2,000 densities at three size/tier cases, each guarded by `assert_eq!(budget, anchor)`
+  so a constant change that breaks the premise fails loudly instead of passing vacuously.
+- `the_count_is_monotone_and_neither_boundary_is_a_step` runs the same sweep at the steepest pair the
+  shipped tiers reach, guards `budget / anchor == 18`, and asserts **continuity at the nearest
+  representable `f32` neighbour of each boundary** rather than as prose.
+- `a_trace_preset_draws_its_anchor_count_at_1080p` drives the **built scene** through the real
+  `configure` → `set_target_size` order and reads both hooks off it, which is the point: a
+  recomputation would pass with `configure` never reaching `active_count`, and `configure` is one of
+  the two call sites that had to gain the anchor.
+
+The arithmetic checks out against the tier constants (`Rich` 150,000 / 600,000 / 2,700,000; `Floor`
+50,000 / 50,000 / 900,000; `REFERENCE_PX` 230,400). The doc comment's *"8x at a 1080p `Rich` window,
+36x at a 4K `Rich` render"* is `2 * (600,000/150,000)` and `2 * (2,700,000/150,000)`, both correct
+and both agreeing with ADR-0195's Negative section.
+
+Phase 3, the `human` look gate, was taken and its verdict recorded verbatim; the stop condition did
+not fire, and the two cloud controls are recorded as **byte-identical PNGs** before and after rather
+than judged — the stronger claim, and the right one for a control. On that record **ADR-0195 is
+accepted at close.**
+
+### Lens 2 — layering, coupling, real-time safety
+
+Nothing to report. `active_particles` is a pure function of three integers and a float, called only
+from `set_target_size` and `configure`, both off the hot path. No allocation, lock, logging,
+`unwrap` or `expect` anywhere in the diff's engine code; no platform, audio-source or GPU-backend
+type enters `core/`; the C ABI and the control protocol are untouched. **The `Scene` trait gained
+`active_sample_count`, and it is not a seam widening** — `#[cfg(test)]` on both the default and the
+impl, documented with the reason, mirroring `sample_budget`'s existing shape. The item does not
+exist outside `cfg(test)`, so no shipped path can reach it.
+
+### Lens 3 — docs, bookkeeping, release
+
+The operator-doc sweep is near-complete: `presets/README.md` (blockquote, key-table row and the
+"1 000 points on one and 3 000 on the other" bullet), `docs/capturing.md` (a fourth consequence
+bullet, and its lead corrected from *"draws the attractor denser"* to *"gives the attractor a larger
+sample budget"* — the distinction the whole plan turns on), `docs/nfr.md` §1, the `KeyDesc` doc, and
+the regenerated schema files. Generated files were regenerated rather than hand-edited, and
+`preset_schema::the_player_schema_snapshot_is_current` passing in the green suite is the evidence.
+Phase 2's own grep done-when is satisfied. One reader document the file list missed is finding M2.
+
+**Preset curation (step 3b).** `presets/` was touched, comments and generated schemas only — no
+preset value moved, corroborated by the green golden/sanity/sweep run. **Nothing new landed, so
+there is nothing to judge against the shipped set.** The stale-workaround grep across
+`presets/*.toml`, read in full rather than piped, finds **no preset header dodging the defect this
+plan fixed** — no `[particles]` value anywhere is pinned to work around ADR-0140's scaling, and no
+preset header other than the two the phase corrected quotes a drawn count at all.
+
+**Version: patch.** The plan corrects the behaviour of an existing key and adds no surface.
+
+### Lens 4 — correctness and determinism
+
+`budget >= anchor` is guaranteed by `attractor_budget`'s own `clamp(anchor, ceiling.max(anchor))`,
+so `budget - anchor` cannot underflow, and the doc comment cites exactly that clamp.
+`effective * density <= budget <= 2,700,000`, well inside `f32`'s 2^24 integer range. Both outer
+arms keep today's `(n as f32 * density).round()` expression verbatim, so properties 2 and 3 are
+exact rather than within one particle — what ADR-0195's Notes section asked for. No wall-clock read,
+no unseeded randomness, no `aspect` derived from a grid.
+
+**The lens-4 question this plan is itself an instance of — what the development configuration cannot
+see — is answered rather than dodged.** Every golden is `Floor` at 128x128 and every sanity frame
+96x96, where `budget == anchor` and the law is a no-op twice over; an assertion written there would
+pass before and after and prove nothing. The new tests are deliberately written above `REFERENCE_PX`
+under both ceilings, and `TRACE_SIZES` carries a comment saying so.
+
+**Every numeric assertion added is a property, not a measurement.** 3,000, 1,000, 12,000, 27,000,
+216,000 and 432,000 are exact integer consequences of committed tier constants, reproducible on any
+machine; the one test that touches an adapter does CPU arithmetic only and skips with ADR-0016's
+printed notice where there is none.
+
+### Lens 5 — design integrity
+
+Dependencies still point inward. `active_particles` gained an argument rather than the scene gaining
+state — both call sites already held `self.anchor`, as the plan predicted. The two constants sit
+beside `MIN_PARTICLE_DENSITY` where a reader of one finds the others. No god module, no train wreck,
+no `Scene` learning about engine lifecycle or backend. The band constants are a classification of
+authored intent, and the doc comment's claim about which population gap they bracket was checked
+against `presets/*.toml`: the densest attractor trace is `attractor_thomasred` at `0.060` and the
+sparsest figure `attractor_fernmono` at `0.18`, so both ends fall in empty space.
+
+### Findings
+
+#### minor — `active_count`'s doc comment still carried the old formula
+
+`core/src/render/scenes/particles/mod.rs:667`. The field doc read *"How many of `budget` are actually
+stepped and drawn — `round(budget * density)` (ADR-0069)"*, which is false for every `density` below
+`CLOUD_DENSITY`. It sits fifteen lines above the `density` field and contradicted `active_particles`'
+own doc in the same file. **Repaired in `cc068151`**: it now names the effective budget.
+
+#### minor — the on-device checklist still said the drawn count depends on the window
+
+`docs/on-device-validation.md:373`. The `Rich` calibration item said *"the drawn count now depends on
+it, and the relief lever for an attractor miss is that ceiling rather than the anchor"*. Both halves
+are conditional on density: for a trace world the count does not depend on the window, and lowering
+the live ceiling relieves nothing there. The item asks the operator to run *"an `attractor_*`"*,
+either kind, so it could send a reading the wrong way. This reader document was not in Phase 2's file
+list. **Repaired in `cc068151`.**
+
+#### nit — three doc comments still called `density` a bare fraction of the budget
+
+`core/src/preset/schema/raw/particles.rs:14`, `core/src/render/scenes/mod.rs:368` and
+`core/src/render/scenes/particles/mod.rs:676`. The `KeyDesc` `doc` six lines below the first of them
+was corrected by Phase 2, so the file disagreed with itself. Weaker than the two above because none
+states a formula — imprecise rather than wrong — but they are the three places a reader looking for
+what the key means will land. **Repaired in `cc068151`.**
 
 ## Followups (after this lands)

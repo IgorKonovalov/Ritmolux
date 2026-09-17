@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0183 - A low density is a trace count](#0183---a-low-density-is-a-trace-count)
   - [0166 - The basics read in Russian](#0166---the-basics-read-in-russian)
   - [0180 - The converted picture follows the source](#0180---the-converted-picture-follows-the-source)
   - [0191 - A green tree is not tested four times](#0191---a-green-tree-is-not-tested-four-times)
@@ -224,6 +225,47 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0183 - A low density is a trace count](done/0183-a-low-density-is-a-trace-count.md)
+
+- closed 2026-09-17, conductor-run lane `plan-0183-a-low-density-is-a-trace-count` in
+`WORK/rlx-plan-0183`. Three phases: `a98773de`, `887590bd`, `af3055d2` (the `human` look gate). The
+close's repairs are `cc068151`. Close review round 1: **no blockers, no majors, two minors and one
+nit**, all three repaired here. Version **0.128.1** (patch), ADR-0195 accepted.
+- **What landed.** `[particles] density` at or below `0.08` now resolves the drawn count against the
+tier's *anchor* rather than against ADR-0140's target-scaled budget, so a trace world draws the
+count its author picked at every window size, live or rendered; at or above `0.16` the old law is
+untouched, and the effective budget blends linearly between the two. `active_particles` gained the
+anchor as an argument — neither call site needed new state, because `AttractorScene` already stored
+it as ADR-0140's lower clamp. The resolved *budget* never moves, so `shot --render`'s header and
+`Scene::sample_budget` are unchanged; only `active_count` does.
+- **No baseline moved, and the reason is a property rather than a run.** Every golden is `Floor` at
+128x128 and every sanity frame 96x96, where `budget == anchor` and all three arms of the formula
+coincide. The plan asserted that as its own done-when — a 2,000-point density sweep at three
+size/tier cases, each guarded by `assert_eq!(budget, anchor)` so a constant change that breaks the
+premise fails loudly instead of passing vacuously — rather than inferring it from a green suite.
+- **The invisibility is the finding's whole shape, and the tests are written against it.** The old
+law and the new one agree at every size the harness runs at; an assertion written at a golden's size
+would have passed before and after and proved nothing. The new unit tests are deliberately written
+at 640x360 through 3840x2160 under both ceilings, and `TRACE_SIZES` carries a comment saying why.
+That is ADR-0037's lesson one level up, and this plan is the second time it has been the defect.
+- **The `human` look gate was taken, and half of it is a measurement rather than a judgement.** The
+owner's verdict on the three trace worlds is recorded verbatim in the log; the two cloud controls
+(`attractor_leviathan`, `attractor_fernmono`) are recorded as **byte-identical 1920x1080 PNGs**
+before and after, which is a stronger claim than "looks the same" and the right one for a control.
+- **What outlived the plan.** `Scene::active_sample_count`, a `#[cfg(test)]` sibling of
+`sample_budget`: the pair is what lets a test say a density change moved the drawn count and left
+the allocation alone, without a shipped path ever asking a scene how many instances it will draw.
+And the band's two constants are a classification of *authored intent* — 0.08 sits a third above the
+densest shipped trace (`attractor_thomasred`, 0.060) and 0.16 below the sparsest figure
+(`attractor_fernmono`, 0.18) — so ADR-0195's own Negative section is right that a world authored
+inside the band would get the original defect back in a weaker form. Nothing is authored there yet.
+- **Three findings, all repaired.** `active_count`'s field doc still carried `round(budget *
+density)`, false below the cloud boundary and contradicting `active_particles`' own doc fifteen
+lines away; `docs/on-device-validation.md`'s `Rich` calibration item still told an operator the
+drawn count depends on the window and the live ceiling is the relief lever, both of which are now
+true only above 0.16; and three doc comments still called the key a bare "fraction of the tier's
+particle budget" while the `KeyDesc` doc six lines from one of them had been corrected.
 
 ### [0166 - The basics read in Russian](done/0166-the-basics-read-in-russian.md)
 

@@ -312,7 +312,6 @@ live entry citing this one.
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
 | 0172 | The seeded preset directory is never pruned, so a roster drifts from the shipped set | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phases 1-2. **Promoted** |
 | 0185 | The `--help` banner still calls the application `ritmolux` | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 3. **Promoted** |
-| 0186 | The density law scales a low-`density` preset's trace count on a large display | [Plan 0183](plans/0183-a-low-density-is-a-trace-count.md) + ADR-0195. **Promoted** |
 | 0203 | The smoke run captured from a microphone while the default is loopback | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 5. **Promoted** |
 | 0207 | The cap-recovery line says "geometry" for three contexts that are not geometry | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 3. **Promoted** |
 | 0208 | A system count written into prose goes stale on the next system | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 4 + ADR-0202. **Promoted** |
@@ -582,6 +581,7 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0214 | A converted comp shader and per-vertex program read other coordinates than the source | [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md) Phases 1-3 + ADR-0212. **Closed 2026-09-16** |
 | 0215 | The seam on two MilkDrop 1.x presets is unexplained | [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md) Phases 1, 4, 7. Cause: the unbound scene deposit. **Closed 2026-09-16** |
 | 0216 | The converted waveform follows neither reference | [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md) Phases 5-6 + ADR-0199. Custom waves: see 0244. **Closed 2026-09-16** |
+| 0186 | The density law scales a low-`density` preset's trace count on a large display | [Plan 0183](plans/done/0183-a-low-density-is-a-trace-count.md) + [ADR-0195](adrs/0195-a-low-density-is-a-trace-count-and-the-law-scales-only-a-cloud.md). Band 0.08-0.16; no baseline moved. **Closed 2026-09-17** |
 <!-- roster:end -->
 
 ---
@@ -12753,9 +12753,24 @@ which is exactly the sentence that is false for a trace.
 Either way the two stale headers above want a sweep, and `presets/README.md`'s note wants the trace
 half added beside the cloud half it already has.
 
-- **Promoted 2026-09-14** to [Plan 0183](plans/0183-a-low-density-is-a-trace-count.md) and [ADR-0195](adrs/0195-a-low-density-is-a-trace-count-and-the-law-scales-only-a-cloud.md): at or below density 0.08 the drawn count is the tier anchor's at every size, at or above 0.16 the law applies unchanged, and the count blends linearly between. The table above misses `attractor_lorenzknot` at 0.02.
+- **Promoted 2026-09-14** to [Plan 0183](plans/done/0183-a-low-density-is-a-trace-count.md) and [ADR-0195](adrs/0195-a-low-density-is-a-trace-count-and-the-law-scales-only-a-cloud.md): at or below density 0.08 the drawn count is the tier anchor's at every size, at or above 0.16 the law applies unchanged, and the count blends linearly between. The table above misses `attractor_lorenzknot` at 0.02.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0183](plans/0183-a-low-density-is-a-trace-count.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0183](plans/done/0183-a-low-density-is-a-trace-count.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+- **CLOSED 2026-09-17**, at [Plan 0183](plans/done/0183-a-low-density-is-a-trace-count.md)'s close.
+  `active_particles` takes the tier anchor and resolves ADR-0195's effective budget: `anchor *
+  density` at or below 0.08, the ADR-0140 budget at or above 0.16, a linear blend between. The eight
+  worlds this entry tabulated, plus `attractor_lorenzknot` at 0.02 which it missed, now draw the
+  count their author picked at every window size, live or rendered. **The entry's framing was right
+  and its arithmetic held** — nothing under verification inverted. Two halves it asked for landed as
+  asked: the two stale headers (`attractor_thomas`, `fragment_sumi`) became true rather than being
+  rewritten around a moving number, and `presets/README.md`'s note gained the trace half beside the
+  cloud half. **No golden or sanity baseline moved**, because every one is `Floor` at or under
+  `REFERENCE_PX` where the anchor *is* the budget — asserted as a swept property, not inferred from
+  a green run. The owner's look gate at 1920x1080 `Rich` confirmed the picture on all three trace
+  worlds, with two cloud controls byte-identical before and after. What the entry did not foresee is
+  in ADR-0195's Negative section: the band between the two constants is steep, and a world authored
+  inside it would get a weaker form of this defect back. Nothing is authored there.
 
 
 ---

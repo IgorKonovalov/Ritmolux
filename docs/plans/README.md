@@ -46,7 +46,6 @@ place. The plan file carries the real link.
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. **0180 landed and moved both ends of its chain.** Amended 2026-09-16. Needs the rig. |
 | [0160](0160-the-silhouettes-preconditions-stop-being-silent.md) | The silhouette's preconditions stop being silent | approved | dev, human | ADR-0179: four silent `[path]` preconditions. **Amended 2026-09-14:** optional Phase 1b folds in backlog 0217 (arity probe re-prices a polyline). Phase 2 is prose. |
 | [0178](0178-what-the-operator-reads-is-true.md) | What the operator reads is true | approved | dev, human | Backlog 0172, 0185, 0207, 0208 + ADR-0202 (proposed): drift line, `--list-presets`, banner, recovery line, count gate. **0176 and 0166 both landed.** Phase 5 `human` settles 0203. |
-| [0183](0183-a-low-density-is-a-trace-count.md) | A low density is a trace count | approved | dev, human | ADR-0195 (proposed): a trace (density <= 0.08) draws the tier anchor's count at every size; clouds keep ADR-0140. **No golden moves.** Phase 3 is a `human` look gate at 1080p Rich. |
 | [0184](0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) | Limited ink: a contour that is an ink, and a warp field that bands | approved | dev, human | ADR-0197 (proposed): hard ink contours on six scenes; `warp_mesh` bands by level. **Phase 2 stops if level outgrows `color_span`.** Phase 4: look gate. |
 | [0186](0186-the-flatness-gate-tells-a-figure-from-its-ground.md) | The flatness gate tells a figure from its ground | approved | dev, human | Backlog 0128: five figure/ground candidates vs two blot anchors at 96 and 192 px. **Phase 2 is a human gate that writes ADR-0200**; a negative result is a valid end. |
 <!-- roster:end -->
@@ -298,8 +297,9 @@ naming what moved. The order:
 - **Engine lane.** [0181], [0185] and then [0175] closed 2026-09-15, and none moved a golden.
   [0180] parked `plan_wrong` on 2026-09-14 and was amended on its lane branch 2026-09-15; resuming it
   is next. The opening this replaced is [in the archive](README-archive.md). [0180] runs before [0142]: 0180 re-draws the
-  waveform 0142's wash is measured on and needs no rig. After those, [0184], [0183],
-  [0186], in any order that keeps each bless set clean. [0179] closed 2026-09-16.
+  waveform 0142's wash is measured on and needs no rig. After those, [0184] and
+  [0186], in any order that keeps each bless set clean. [0179] closed 2026-09-16 and [0183]
+  2026-09-17, moving no baseline.
   [0182] closed 2026-09-15 ahead of them; it touched only the report, so it constrains none.
 - **Still gated on a human:** [0120] Phase 1, [0133] Phase 9 and [0103] Phases 4-6. [0166] Phase 3
   is discharged - the owner read the five translations on 2026-09-16, 44 corrections.
@@ -318,7 +318,7 @@ naming what moved. The order:
 [0180]: done/0180-the-converted-picture-follows-the-source.md
 [0181]: done/0181-a-scene-advances-after-its-frames-bindings.md
 [0182]: done/0182-the-report-hears-a-counter.md
-[0183]: 0183-a-low-density-is-a-trace-count.md
+[0183]: done/0183-a-low-density-is-a-trace-count.md
 [0184]: 0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md
 [0185]: done/0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage.md
 [0186]: 0186-the-flatness-gate-tells-a-figure-from-its-ground.md
@@ -858,6 +858,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0183 - A low density is a trace count](done/0183-a-low-density-is-a-trace-count.md) - closed 2026-09-17. Review: **no blockers, no majors, two minors, one nit (all fixed).** Version: **0.128.1** (patch). ADR-0195 accepted. Archived backlog 0186. [Write-up](README-archive.md).
 - [0180 - The converted picture follows the source](done/0180-the-converted-picture-follows-the-source.md) - closed 2026-09-16. Review: **one blocker (fixed), no majors, six minors, four nits.** Version: **0.127.0**. ADR-0199 + 0212 accepted, Outcomes. Archived 0214-0216; filed 0244-0245. [Write-up](README-archive.md).
 - [0179 - A parameter's range belongs to its family](done/0179-a-parameters-range-belongs-to-its-family.md) - closed 2026-09-16. Review: **no blockers, no majors, one minor, one nit.** Version: **0.126.0**. ADR-0194 accepted. Archived 0198, 0204. [Write-up](README-archive.md).
 - [0191 - A green tree is not tested four times](done/0191-a-green-tree-is-not-tested-four-times.md) - closed 2026-09-16. Review: **no blockers, no majors, one minor, two nits (both fixed).** Version: **none** (tooling). ADR-0211 accepted. Archived 0227. [Write-up](README-archive.md).
