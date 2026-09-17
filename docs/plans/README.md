@@ -45,8 +45,7 @@ place. The plan file carries the real link.
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + 0174 (proposed): Art-Net verified against `rlx-artnet-sim`. **Phase 8 opens on a decision** - 0115's tap is headless-only, and a windowed resolve is an ADR. Phase 9 is the rig. |
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. **0180 landed and moved both ends of its chain.** Amended 2026-09-16. Needs the rig. |
 | [0160](0160-the-silhouettes-preconditions-stop-being-silent.md) | The silhouette's preconditions stop being silent | approved | dev, human | ADR-0179: four silent `[path]` preconditions. **Amended 2026-09-14:** optional Phase 1b folds in backlog 0217 (arity probe re-prices a polyline). Phase 2 is prose. |
-| [0166](0166-the-basics-read-in-russian.md) | The basics read in Russian | approved | dev, human | ADR-0185: five docs gain a stamped `.ru.md`. **Phase 3 is a `human` review that blocks publication.** Amended 2026-09-14: `pages.yml` depth, gate-count prose collides with 0178. |
-| [0178](0178-what-the-operator-reads-is-true.md) | What the operator reads is true | approved | dev, human | Backlog 0172, 0185, 0207, 0208 + ADR-0202 (proposed): drift line, `--list-presets`, banner, recovery line, count gate. **Lands after 0176 and 0166.** Phase 5 `human` settles 0203. |
+| [0178](0178-what-the-operator-reads-is-true.md) | What the operator reads is true | approved | dev, human | Backlog 0172, 0185, 0207, 0208 + ADR-0202 (proposed): drift line, `--list-presets`, banner, recovery line, count gate. **0176 and 0166 both landed.** Phase 5 `human` settles 0203. |
 | [0183](0183-a-low-density-is-a-trace-count.md) | A low density is a trace count | approved | dev, human | ADR-0195 (proposed): a trace (density <= 0.08) draws the tier anchor's count at every size; clouds keep ADR-0140. **No golden moves.** Phase 3 is a `human` look gate at 1080p Rich. |
 | [0184](0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) | Limited ink: a contour that is an ink, and a warp field that bands | approved | dev, human | ADR-0197 (proposed): hard ink contours on six scenes; `warp_mesh` bands by level. **Phase 2 stops if level outgrows `color_span`.** Phase 4: look gate. |
 | [0186](0186-the-flatness-gate-tells-a-figure-from-its-ground.md) | The flatness gate tells a figure from its ground | approved | dev, human | Backlog 0128: five figure/ground candidates vs two blot anchors at 96 and 192 px. **Phase 2 is a human gate that writes ADR-0200**; a negative result is a valid end. |
@@ -293,16 +292,17 @@ re-checked against the tree and none was withdrawn; each carries a dated `Amende
 naming what moved. The order:
 
 - **Delivery and infrastructure lane.** [0174] closed first, then [0176] (both 2026-09-14), which
-  discharges [0103] Phase 5's wait on a tag that reliably reaches origin. [0177] closed 2026-09-15, its fold re-derived from 0174's final run-alone filter. [0178] edits the same gate-count
-  prose as [0166] Phase 1 and [0176]; whichever lands second rebases onto the others.
+  discharges [0103] Phase 5's wait on a tag that reliably reaches origin. [0177] closed 2026-09-15, its fold re-derived from 0174's final run-alone filter. [0166] closed
+  2026-09-17 and took the gate-count prose count-free, as [0176] had; [0178] rebases onto that
+  wording and restores no number.
 - **Engine lane.** [0181], [0185] and then [0175] closed 2026-09-15, and none moved a golden.
   [0180] parked `plan_wrong` on 2026-09-14 and was amended on its lane branch 2026-09-15; resuming it
   is next. The opening this replaced is [in the archive](README-archive.md). [0180] runs before [0142]: 0180 re-draws the
   waveform 0142's wash is measured on and needs no rig. After those, [0184], [0183],
   [0186], in any order that keeps each bless set clean. [0179] closed 2026-09-16.
   [0182] closed 2026-09-15 ahead of them; it touched only the report, so it constrains none.
-- **Still gated on a human, unchanged:** [0120] Phase 1, [0133] Phase 9, [0166] Phase 3, and
-  [0103] Phases 4-6.
+- **Still gated on a human:** [0120] Phase 1, [0133] Phase 9 and [0103] Phases 4-6. [0166] Phase 3
+  is discharged - the owner read the five translations on 2026-09-16, 44 corrections.
 - **All eleven approved 2026-09-14 with [0175], and [0181]'s reversal of an interview pick confirmed.** Backlog 0142's double-advance is
   unreachable - `shares_resources` answers true for any same-system pair, so every such dissolve
   freezes - and the once-per-frame guard chosen for it would guard nothing.
@@ -325,7 +325,7 @@ naming what moved. The order:
 [0174]: done/0174-the-clock-reading-tests-run-alone.md
 [0175]: done/0175-an-eased-value-arrives.md
 [0120]: 0120-the-standalone-ships-on-ubuntu.md
-[0166]: 0166-the-basics-read-in-russian.md
+[0166]: done/0166-the-basics-read-in-russian.md
 
 **Rewritten 2026-08-18, and this is the live sequence.** What it replaced — the 2026-08-16
 sequence and the prior sequence notes under it — is in
@@ -867,6 +867,7 @@ archive first.
 - [0175 — An eased value arrives at its target](done/0175-an-eased-value-arrives.md) — closed 2026-09-15. Review: **no blockers, no majors, one minor, one nit (both fixed).** Version: **0.124.2**. No ADR paired. Archived 0212, 0218. [Write-up](README-archive.md).
 - [0188 — The conductor survives its first run](done/0188-the-conductor-survives-its-first-run.md) — closed 2026-09-15. Review: **no blockers, no majors, one minor.** Version: **0.124.1**. ADR-0205 Outcome (the pilot). [Write-up](README-archive.md).
 - [0182 — The report hears a counter](done/0182-the-report-hears-a-counter.md) — closed 2026-09-15. Review: **no blockers, no majors, three minors.** Version: **0.124.0**. ADR-0196 accepted (Outcome). Archived 0192. [Write-up](README-archive.md).
+- [0166 — The basics read in Russian](done/0166-the-basics-read-in-russian.md) — closed 2026-09-17. Review: **no blockers, no majors, five minors, three nits.** Version: **0.128.0** (minor). ADR-0185 accepted. [Write-up](README-archive.md).
 - [0181 — A scene advances after its frame's bindings](done/0181-a-scene-advances-after-its-frames-bindings.md) — closed 2026-09-15. Review: **no blockers, no majors, three minors, one nit.** Version: **0.123.2**. ADR-0198 accepted (Outcome). Archived 0142, 0191. [Write-up](README-archive.md).
 - [0185 — A fullscreen field lets the sky through with no post stage](done/0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage.md) — closed 2026-09-15. Review: **no blockers, no majors, one minor, one nit.** Version: **0.123.1**. ADR-0201 accepted. Archived 0206. [Write-up](README-archive.md).
 - [0187 — The conductor runs the lanes](done/0187-the-conductor-runs-the-lanes.md) — closed 2026-09-14 **without Phase 6 (owner call)**. Review: **no blockers, one major (fixed at close), four minors.** Version: none (tooling). ADR-0205 accepted (Outcome). [Write-up](README-archive.md).

@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0166 - The basics read in Russian](#0166---the-basics-read-in-russian)
   - [0180 - The converted picture follows the source](#0180---the-converted-picture-follows-the-source)
   - [0191 - A green tree is not tested four times](#0191---a-green-tree-is-not-tested-four-times)
   - [0179 - A parameter's range belongs to its family](#0179---a-parameters-range-belongs-to-its-family)
@@ -223,6 +224,53 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0166 - The basics read in Russian](done/0166-the-basics-read-in-russian.md)
+
+- closed 2026-09-17, conductor-run lane `plan-0166-the-basics-read-in-russian` in
+`WORK/rlx-plan-0166`, merged into `main` ahead of this close. Five phases: `645e84e`, `d02a4ad`,
+`40c1ed3` + `7997697` (the `human` phase), `163cd41`, `60a7f26`. The close's five repairs are
+`8b22d99`.
+- **What landed.** Five documents - `docs/running.md`, `docs/how-it-works.md` and the three
+`packaging/*/READ-ME-FIRST.md` - gained a stamped Russian sibling, published as one `Русский` menu
+group with a cross-link each way, and `READ-ME-FIRST.ru.txt` now rides inside the foobar component
+zip. `scripts/check-translations.mjs` and `site/src/plugins/translation-banner.mjs` carry the
+staleness reading, split exactly as
+[ADR-0185](../adrs/0185-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md) argued: a
+missing or malformed `translated-from` stamp is an exit code, a source that has moved past its stamp
+is an advisory row and never one.
+- Review: **no blockers, no majors, five minors, three nits.** Four of the five minors were one
+shape - a rule or a claim with no carrier - which is what that ADR's own Alternative D rejects
+convention for, and half of its Decision had shipped as exactly that: *"the close ceremony prints
+which translations have drifted"*, wired into pre-push and CI and into no close. The architect skill
+gained step 1e and a sweep row, and `CLAUDE.md`'s close-ceremony sentence now names the gate. The
+fifth was Phase 5's unverified done-when, honestly recorded and routed to on-device validation and
+not written there; it is a checklist row now. The three nits stay open for `dev`: a `?
+` in
+`build-component.ps1`'s strip pattern that reached the file as a literal LF and is correct only
+because `.gitattributes` forces `eol=lf`, six stray spaces of indent in `astro.config.mjs`, and a
+log row reading *"committed with this row"* where `d02a4ad` belongs.
+- **The one content miss was in the page the plan exists for.** `docs/running.ru.md` translated the
+three install links as labels and left them pointing at the English `READ-ME-FIRST.md`, whose Russian
+twins Phase 4 had just published - so a Russian reader clicking through to install from
+`ru/running` landed in English. Repaired at the close. The menu path was Russian throughout, which
+is why the plan's own done-when did not see it: it asks for a cross-link per page, and every one of
+the ten was there.
+- **What the close verified rather than took on the log's word.** `cargo nextest run --workspace`
+green (1981 passed, 6 skipped, 689 s) - the log's 1971 was tree `0d7266a`, before 0180's later
+phases; `cargo doc --workspace --no-deps` green under `-D warnings`; `fmt` and `clippy` clean; the
+gate's `--self-test` 12 of 12 including the real `--depth 1` clone and the banner's four behaviours
+across the project boundary; the site built at 184 pages with both site gates green, all ten
+cross-links rendering and no stamp reaching `dist/`.
+- **Fidelity is measurable here, and it measured clean.** Every inline code span, every link target,
+every heading and both `@VERSION@` / `@SDK_VERSION@` placeholder counts are identical between each
+English page and its Russian twin - the *"the prose is translated, the interface is not"* done-when,
+checked by set comparison rather than by reading. ADR-0185 predicted `docs/running.md` would inflate
+to **~20,000 bytes**; it reached **19,958**, against a 30,000 route ceiling.
+- **What outlived the plan.** The advisory has no consumer yet: no English source in the slice has
+moved, so every close from here reads five current rows. The plan's own Followup - if a translation
+is stale three closes running, retire the page rather than publish a lie - is the thing to watch,
+and step 1e is now what surfaces it.
 
 ### [0180 - The converted picture follows the source](done/0180-the-converted-picture-follows-the-source.md)
 

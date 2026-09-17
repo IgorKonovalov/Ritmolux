@@ -1,8 +1,8 @@
 # ADR-0185 — The documentation translates a slice, and a stamp makes staleness visible
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-17
 > **Date:** 2026-09-10
-> **Related plan(s):** [0166](../plans/0166-the-basics-read-in-russian.md)
+> **Related plan(s):** [0166](../plans/done/0166-the-basics-read-in-russian.md)
 > **Extends:** [0154](0154-the-reader-facing-docs-publish-as-a-site.md) (`docs/` is the single
 > source, read in place), [0167](0167-the-site-owns-its-entrance-and-the-install-page-is-the-testers-own-file.md)
 > (the site's install page is the tester's own file)

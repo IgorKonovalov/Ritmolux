@@ -1,9 +1,17 @@
 # 0166 — The basics read in Russian
 
-> **Status:** in-progress
+> **Status:** done - closed 2026-09-17. Five phases on branch
+> `plan-0166-the-basics-read-in-russian` and then on `main`: Phase 1 `645e84e`, Phase 2 `d02a4ad`,
+> Phase 3 (`human`) `40c1ed3` + `7997697`, Phase 4 `163cd41`, Phase 5 `60a7f26`; `8b22d99` carries
+> the close review's five repairs. Review: **no blockers, no majors, five minors, three nits.**
+> Verified independently on the closed tree: `cargo nextest run --workspace` green (1981 passed,
+> 6 skipped, 689 s), `cargo doc --workspace` green under `-D warnings`, `fmt` and `clippy` clean,
+> every doc, backlog and translation gate green, the gate's own `--self-test` 12 of 12, and the
+> site built at 184 pages with `check-site-links` and `check-site-routes` both green.
+> Version: **0.128.0** (minor - a feature plan).
 > **Created:** 2026-09-10
 > **Owner skill(s):** `dev`, `human`
-> **Related ADRs:** [0185](../adrs/0185-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md)
+> **Related ADRs:** [0185](../../adrs/0185-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md)
 
 > **Amended 2026-09-14, before any phase landed (architect validity sweep).** Four changes, each made
 > in place below.
@@ -49,7 +57,7 @@ We rejected translating the whole set (arithmetic — a standing obligation the 
 itself), build-time machine translation (no reviewer, and a fluent wrong translation is invisible
 here), Starlight i18n locale routing (five pages of 164 means `/ru/` is 97 % English behind Russian
 chrome), and convention with no stamp (Plan 0061's *"One line per plan."* regrew 7.1x in eight
-days). Full reasoning in [ADR-0185](../adrs/0185-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md).
+days). Full reasoning in [ADR-0185](../../adrs/0185-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md).
 
 ## Architecture diagram
 
@@ -129,7 +137,7 @@ uses.
     from the new file's own directory.
   - Every Plan/ADR citation in `running.ru.md` and `how-it-works.ru.md` sits inside a markdown link,
     matching what `check-reader-prose.mjs` already demands of their English sources
-    ([ADR-0168](../adrs/0168-the-reader-documents-address-a-reader-and-the-record-stays-a-link.md)).
+    ([ADR-0168](../../adrs/0168-the-reader-documents-address-a-reader-and-the-record-stays-a-link.md)).
   - Identifiers, flags, config keys, hotkey names, file paths and `@VERSION@` stay verbatim: the
     prose is translated, the interface is not.
   - Nothing is in `PUBLISHED`, so the site build is byte-identical to before this phase.
