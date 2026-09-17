@@ -291,7 +291,63 @@ flowchart TD
 | 1 — The precondition is tested on the contour, not on the name | dev | done | `8282d3a0` |
 | 1b — The arity probe prices a polyline (optional) | dev | done | `2afbf736` |
 | 2 — The three unhookable constraints are written down | dev | done | `692461c5` |
-| 3 — The document is checked against the engine, once | human | not started | |
+| 3 — The document is checked against the engine, once | human | done | committed with this row |
+
+### Phase 3 — the document checked against the engine
+
+Taken 2026-09-17 in the `preset-author` lane. **The test was a use, not a read**: one figure built
+from the three written sections alone, with every choice and its predicted outcome recorded in the
+draft's header *before* the first render. The draft is `target/gate0160/shape_crescent.toml` — not
+shipped content, and nothing here lands in `presets/`.
+
+The figure is a crescent, chosen because the prose names a crescent outright as a `coord_mode = "1"`
+failure and because its horns taper to **zero width**, which is thinner than any case the prose
+measures.
+
+**Verdict on the palette configuration: the prose is sufficient, and decisively.** `palette_steps =
+"16"`, `color_span = "0.125"` (2/16) and `color_center` resting at 14/16 and stepping by
+`beat_index / 16` were all chosen by arithmetic, with no rendering. `14/16 + 2/16 = 1` is a band
+edge at every step of the travel, and the first render came back with the silhouette crisp against
+the ring family, exactly as predicted. `color_span` was left unbound and `gamma` bound, both
+straight off the two stated consequences. **Nothing here needed a render to decide.**
+
+**Verdict on the band count: the prose is not sufficient for a figure outside the measured set.**
+The rule — the thinnest feature sets the count — is right and it is the useful framing, but its
+three cases (koi fins and lion tufts at two, maple lobes at three) are **examples, not a measure**.
+A crescent's horns are thinner than all three, and nothing in the section converts "thinner than a
+koi's fin" into a number. Two was chosen by analogy, which is guessing at the same comparison the
+prose invites rather than applying anything it states; the render then showed the horn tips rounded
+off and the body intact — the predicted outcome, reached the wrong way. **What would close it is one
+sentence: the inward offset per interior band is a knowable figure, and an author who could compare
+it against their own thinnest feature's half-width would be choosing rather than guessing.**
+
+**Verdict on the warning's moment and place: both right.** `ritmolux --check --strict` reports it
+before any render, at the `coord_mode` binding's own `file:line:col`, with the mechanism and the
+fallback in the message:
+
+```text
+target/gate0160/crescent_thin.toml:48:1: warning[engine]: parameter 'coord_mode' is ignored on an
+authored contour that is not star-shaped about its centre: a ray from there crosses the outline more
+than once ... The figure is drawn with the distance instead
+```
+
+Of the three channels the amendment lists, **`--check` is the one an author building a figure
+actually meets**, and this session is the evidence: the draft was checked before every render
+because that is what the workflow says to do. A render's stderr scrolls past a build log, and the
+studio's `preset_warning` reaches only an author already in the studio. The warning needs no fourth
+channel.
+
+**A third finding, which the exercise produced rather than the gate asking for it: the prose's list
+of failing figures is over-general, and the engine is the one that is right.** The section names
+shape families — *"a crescent, a figure with fins, or a silhouette whose sinuses put one lobe across
+the ray"* — but membership is geometric and depends on thickness. The **thick** crescent drawn here
+renders correctly under `coord_mode = "1"`, with interior contours as true scaled copies, and warns
+about nothing; only the **thin** variant, whose horns wrap past its own centre, trips the check.
+Phase 1's decision to test the contour rather than the name is exactly what makes that work — an
+author who reads "a crescent" as a rule would avoid a figure the engine draws correctly.
+
+**Carried forward** to `docs/design-backlog.md`: the band-count measure, and the over-general list.
+Both are prose repairs in `presets/README.md` and neither gates anything.
 
 ### Notes
 
@@ -343,7 +399,9 @@ flowchart TD
   `cargo nextest run --workspace -P fast` after Phase 2 (1693 passed, 304 skipped). `cargo fmt --all
   --check` and `cargo clippy --workspace --all-targets -- -D warnings` are clean, as are
   `check-comment-hygiene`, `check-doc-links`, `check-reader-prose` and `toc --check`.
-- **Outstanding `human` phases:** Phase 3, in full. It is the only phase not implemented and it
-  gates nothing.
+- **Outstanding `human` phases:** none. Phase 3 was taken 2026-09-17 in the `preset-author` lane and
+  its three verdicts are above: the palette rule is sufficient to author against without rendering,
+  the band-count rule is not, and the warning arrives at the right moment and place. Two prose
+  findings carry forward to the backlog; it gated nothing, as written.
 
 ## Followups (after this lands)
