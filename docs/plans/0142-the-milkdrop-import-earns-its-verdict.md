@@ -334,8 +334,8 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The equilibrium instrument | dev | done | committed with this row |
-| 2 — Name the mechanism | dev | not started | |
+| 1 — The equilibrium instrument | dev | done | `20ba8731` |
+| 2 — Name the mechanism | dev | parked | |
 | 3 — Bound the equilibrium | dev | not started | |
 | 4 — The look gate | human | not started | |
 | 5 — ADR-0113's third Outcome | dev | not started | |
@@ -379,6 +379,20 @@ probe at f30, and the present-pass gain.
 - **`FieldTrace` in `warp_mesh/tests.rs` was listed under Files touched and was not changed.** It is
   the synthetic per-frame probe driven by an empty bundle, and nothing the re-taken table needed
   reached it.
+- **Phase 2 is parked: its source read is not performable from a conductor session (2026-09-17).**
+  The phase's first instruction is to read `xeiraex/milkdrop2` at `d4c843a`,
+  `vis_milk2/milkdropfs.cpp`, for the feedback loop's decay, echo and gamma, their order and their
+  domain. There is no checkout of that repository on this machine (`WORK/milkdrop-corpus/` holds
+  `.milk` presets and textures only), the repository records none of those facts — Plan 0173 read
+  the geometry and Plan 0180 the waveform and the uv chain, neither the loop — and the session
+  allowlist denies every route to fetch it: `git ls-remote`/`git clone` and the browser tool's
+  evaluation are both refused, and there is no fetch tool. Phase 2's honest stop branch ("the
+  instrument cannot see it") is a conclusion about the instrument and is not what this is, so
+  reaching it without the read would be a workaround.
+- **Phase 2's `Files touched` names `docs/design-backlog.md`, and backlog 0113's body is in
+  `docs/design-backlog-archive.md`.** It moved there on 2026-09-15 on promotion (ADR-0206), the day
+  after the amendment that wrote the line. The dated update the phase owes goes to the archived
+  body.
 
 ### Close triggers
 
