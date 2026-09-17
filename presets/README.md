@@ -1719,6 +1719,18 @@ sharp — so under `"0"` a nested heart keeps its bottom point and loses its top
 notch as the rings move inward, and no value of `gamma` or `palette_steps`
 recovers it. Under `"1"` the inner figures are the same figure, smaller.
 
+**How many interior bands a figure can take is set by its thinnest feature, not
+by its overall size.** Erosion eats a thin feature entirely before it has touched
+a broad one, so the band count is a question about the narrowest part of the
+silhouette and about nothing else. The cases that are measured: at three interior
+bands a koi's fins and tail were eaten and the figure read as a lumpy blob, and
+`presets/shape_lion.toml`'s mane tufts went the same way — **both settled at
+two**, and the lion's header says so. `presets/shape_maple.toml` carries **three**
+because its lobes are broad; it is not the sturdier drawing, it is the fatter one.
+Under `"1"` the question does not arise by construction: an interior contour there
+is a scaled copy, so a fin is still a fin at a smaller size rather than something
+the offset has consumed.
+
 ```toml
 [params]
 shape         = "4"        # the heart
@@ -1752,26 +1764,42 @@ rings move inward — that is the notch filling in, ring by ring — and under `
 it is `0.00000` at every ring. The `disc` is the control: an engine that drew
 those two differently would be broken.
 
-> **`coord_mode = "1"` DOES NOTHING ON A `ring`, and it tells you so.** An
-> annulus's centre lies in its **hole**, so a ray from there crosses the outline
-> twice and `r / r_boundary` has no single value. The scene draws the distance
-> instead and warns at load:
+> **`coord_mode = "1"` NEEDS A FIGURE EVERY RAY FROM ITS CENTRE LEAVES ONCE, and
+> it tells you when it has not got one.** `r / r_boundary` reads the outline's
+> radius along a ray from the figure's centre, so a ray that crosses the outline
+> more than once leaves the coordinate with no single value there. Two figures
+> fail it, and they fail it in the same way:
+>
+> - a **`ring`**, whose centre lies in its hole;
+> - an **authored `[path]` contour that is not star-shaped about its centre** — a
+>   crescent, a figure with fins, or a silhouette whose sinuses put one lobe
+>   across the ray into the next. `presets/shape_maple.toml` is one: its four
+>   deep sinuses fail the test, which is part of why it draws under `"0"`.
+>
+> On both the scene draws the distance instead and warns at load:
 >
 > ```text
 > parameter 'coord_mode' is ignored on a `ring`: an annulus's centre lies in its
 > hole, so a ray from there crosses the outline twice and the scaled-copy
-> coordinate has no single value. The figure is drawn with the distance instead.
+> coordinate has no single value there. The figure is drawn with the distance
+> instead - a band of constant distance rather than a scaled copy of the outline
 > ```
 >
-> The alternative was to define the boundary as the **outer rim**, and it was
-> rendered before being rejected: the coordinate then collapses to `length(p)`
-> and the ring comes out **byte-identical to a `disc`** — the hole simply stops
-> existing. Naming one shape and being shown another is worse than being told
-> no.
+> Concavity on its own is not the problem, and a check that convicted it would be
+> useless: a deep five-pointed star has five reflex corners and every ray from its
+> centre still leaves exactly once, so it takes `"1"` in silence. What matters is
+> whether any part of the figure hides another part from its own centre.
 >
-> The warning only fires on a `shape` that **rests** at `ring`. A binding that
-> animates through it rests nowhere, so nothing warns; the fallback still
-> applies, frame by frame.
+> The alternative on the `ring` was to define the boundary as the **outer rim**,
+> and it was rendered before being rejected: the coordinate then collapses to
+> `length(p)` and the ring comes out **byte-identical to a `disc`** — the hole
+> simply stops existing. Naming one shape and being shown another is worse than
+> being told no.
+>
+> On the roster the warning only fires on a `shape` that **rests** at `ring`. A
+> binding that animates through it rests nowhere, so nothing warns; the fallback
+> still applies, frame by frame. An authored contour cannot animate, so there the
+> warning always fires when it applies.
 
 **`rotation` turns the figure about its own centre — and `kaleido_*` is not the same thing.** The
 screen-space fold folds the *finished frame* about a screen-centred axis; it does not turn the
@@ -1898,6 +1926,54 @@ texture in a still and shimmers the moment anything moves. `d` at the corner is
 > figure's own inradius is 1. The contours *outside* every shape are exact. So
 > a many-pointed star's inner rings will not sit where an offset curve should;
 > its outer ones will.
+
+#### The outline has to land on a band edge, or the figure dissolves
+
+The one arithmetic rule the authored looks are built on, and nothing checks it
+for you. **A band edge sits at every multiple of `1 / palette_steps`, and the
+figure's outline sits at `color_center + color_span`.** Put the second exactly on
+the first and the silhouette reads crisp — the seam at the outline is a band
+boundary, so it is a hard edge. Miss it and the outline falls inside a band,
+which draws the figure in the same flat colour as the ring just outside it and
+the silhouette dissolves into the ring family around it.
+
+It is not a subtle difference. Measured over four spans on the maple: at 5 and at
+8 interior bands the leaf is simply **gone**.
+
+```toml
+[params]
+palette_steps = "16"
+color_span    = "0.1875"                            # 3/16
+color_center  = "mod(0.875 + beat_index / 16, 1)"   # 14/16, stepping by 1/16
+```
+
+Every number is a multiple of `1/16`, which is why `presets/shape_maple.toml`
+looks the way it does: `14/16 + 3/16` lands on an edge, and so does every step of
+the travel. `presets/shape_lion.toml` does the same at `14/16 + 2/16`.
+
+**Two consequences, and they are what you act on:**
+
+- **`color_span` must not be bound at all** on a figure whose edge has to stay
+  crisp. Any value between two multiples of `1 / palette_steps` walks the outline
+  off its edge, and there is no increment small enough to read as a change while
+  still landing on one.
+- **`color_center` moves in whole band steps** — `beat_index / 16` at
+  `palette_steps = 16`, not `time * 0.15`. A continuous drift blunts the figure
+  in every frame between two steps. Stepping keeps the alignment exact at all
+  times, which is why the shipped authored looks travel on `beat_index` rather
+  than on `time`.
+
+**`gamma` is the safe interior binding, and the reason is the useful part.** At
+the outline the coordinate is exactly `1`, and `1^g = 1` for any `g`, so `gamma`
+provably cannot move the outline off its band edge — it only redistributes the
+bands inside the figure. That reason is also the test for a binding you think of
+next: it is safe exactly when it leaves the coordinate at the outline equal to
+`1`, and `scale` and `pan_*` qualify because they move the figure in the frame
+rather than the coordinate on it.
+
+> **The rule is the same under both `coord_mode` values**, because the outline is
+> at coordinate `1` under both. What changes with the mode is what the interior
+> bands *are*, not where the outline sits.
 
 #### The nested figure — the worked recipe
 
@@ -4845,6 +4921,13 @@ SVG path data, parsed once at load into a closed contour, rendered as the same
 signed distance field the roster is rendered as — so an authored figure gets
 `palette_steps`, `palette_contour`, `gamma` and both `coord_mode`s for free.
 
+> **`coord_mode = "1"` has one precondition your contour may not meet**: every
+> ray from the figure's centre has to leave the outline exactly once. A crescent,
+> a figure with fins and a silhouette with deep sinuses do not, and the scene
+> draws the distance instead and warns at load — see
+> [Two coordinates](#two-coordinates--offsets-and-scaled-copies) for what
+> qualifies and what does not.
+
 | Key        | Values                | Notes                                                                                                 |
 |------------|-----------------------|-------------------------------------------------------------------------------------------------------|
 | `d`        | SVG path data         | The silhouette, as one closed contour. **Required** — the table exists to carry it.                     |
@@ -4900,17 +4983,40 @@ whether or not the figure is on screen.
 
 The number is measured rather than reasoned. At 1920x1080 on an integrated GPU —
 the class [`docs/nfr.md`](../docs/nfr.md)'s floor tier is calibrated against — the
-contour walk costs about **0.105 ms per segment**, so 64 segments is 46 % of the
-60 fps frame budget and 128 would be 87 %. A traced logo pasted at 500 points is
-refused rather than quietly decimated, because a reduced contour would draw a
-figure you did not author and never say so.
+contour walk costs about **0.095 ms per segment** (measured 2026-09-17), so 64
+segments is 43 % of the 60 fps frame budget; 128 measured 87 % on the day the
+ceiling was set. A traced logo pasted at 500 points is refused rather than
+quietly decimated, because a reduced contour would draw a figure you did not
+author and never say so.
 
-**A curved path is cheaper than that suggests**, because it is not drawn as
-segments. A contour whose outline is smooth is fitted at load to a chain of
-circular arcs, and the same figure needs four or five times fewer of them: the
-leaf above costs 4.15 ms as 16 arc pieces where its 64-point polyline costs
-7.09 ms. Nothing in the table selects this — a smooth figure gets it, a polygon
-does not need it, and a figure carrying a `morph_to` cannot use it (see below).
+**A curved path can be cheaper than that**, because it need not be drawn as
+segments: a contour is fitted at load to a chain of circular arcs, and where the
+fit is kept the leaf above costs 4.15 ms as 16 arc pieces where its 64-point
+polyline costs 7.09 ms.
+
+**But the axis is total curve detail, not smoothness, and most real silhouettes
+are outside it.** Nothing in the table selects the fit, and there is no setting
+that asks for it. The fit is measured against a lateral tolerance fixed at the
+tightest figure size an author would reach for, and then it is **discarded**
+unless it clears both of these:
+
+- **at most 32 pieces** — the chain's own bound;
+- **at most half the `samples` arity**, because an arc piece costs more per pixel
+  than a line segment, so a chain that did not collapse the count is worse than
+  the polyline it replaced. At the default `samples = 64` that means 32; at
+  `samples = 32` it means **16**.
+
+The measured figures that do fit, from `core/tests/path_cost.rs`'s arc
+comparison: a circle written as 4 cubics fits in **6** pieces, the leaf above in
+**16**, and a 4-cubic blob in **24**. That is the whole reachable band — a
+figure's *detail* at a fixed tolerance is what decides it, and a detailed contour
+is discarded however smooth every one of its curves is. A 39-vertex outline with
+every vertex smooth was discarded and rendered faceted, identically to a spiky
+maple.
+
+So: a figure of a handful of curves gets the chain, a drawn silhouette usually
+does not, and a figure carrying a `morph_to` never does (see below). If your
+authored figure reads faceted, that is the ceiling and not a setting you missed.
 
 **Set `samples` low for a polygonal figure.** A hexagon needs 6, not 64, and pays
 for what it asks.

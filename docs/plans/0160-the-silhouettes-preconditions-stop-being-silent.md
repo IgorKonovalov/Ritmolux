@@ -289,12 +289,18 @@ flowchart TD
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The precondition is tested on the contour, not on the name | dev | done | `8282d3a0` |
-| 1b — The arity probe prices a polyline (optional) | dev | done | committed with this row |
-| 2 — The three unhookable constraints are written down | dev | not started | |
+| 1b — The arity probe prices a polyline (optional) | dev | done | `2afbf736` |
+| 2 — The three unhookable constraints are written down | dev | done | committed with this row |
 | 3 — The document is checked against the engine, once | human | not started | |
 
 ### Notes
 
+- **Phase 2 also rewrote the `ring` blockquote in `presets/README.md`**, beyond the four bullets the
+  phase lists. It quoted the load warning verbatim and taught that the `ring` is *the* special case,
+  and Phase 1 changed both the message and the condition — leaving it would have been a page saying
+  the opposite of the engine. It now states the one condition, names the authored contour as the
+  other instance, and says plainly that concavity alone is not it. The `[path]` section carries a
+  one-sentence pointer at it.
 - **Phase 1, the shipped maple fails the new test.** `worst ray gap 0.4017`, against a tolerance of
   0.02 — its sinuses put a neighbouring lobe across the ray into the next one. It ships at
   `coord_mode = "0"`, so no warning fires on it and no pixel of it moves; the reading is printed by

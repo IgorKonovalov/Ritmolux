@@ -79,8 +79,13 @@ pub const MAX_SAMPLES: usize = 64;
 ///
 /// A bound on the uniform the chain rides in, and a bound on the point of doing
 /// it at all: an arc piece costs more per pixel than a line segment, so a fit
-/// that did not collapse the count is not worth evaluating. The measured counts
-/// at the tightest budget below sit at 25 and under.
+/// that did not collapse the count is not worth evaluating.
+///
+/// **The chains the scene actually draws top out at 24 pieces**, on the 4-cubic
+/// blob of `core/tests/path_cost.rs`'s arc comparison; the circle there fits in
+/// 6 and the leaf in 16. `the_arc_fit_reports_what_a_curve_costs_in_pieces`
+/// reads 25 for that same blob at this same budget because it refits the
+/// 64-point resample, where [`PathShape::from_dense`] fits the dense flatten.
 pub const MAX_ARC_PIECES: usize = 32;
 
 /// The lateral error the arc fit is held to, in the contour's own normalized
