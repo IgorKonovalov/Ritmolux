@@ -53,6 +53,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0244 — a custom wave is drawn from the source's traces but is neither smoothed nor scaled like the eight built-in figures](#0244--a-custom-wave-is-drawn-from-the-sources-traces-but-is-neither-smoothed-nor-scaled-like-the-eight-built-in-figures)
 - [0245 — the converted warp space has no pixel baseline, because every golden fixture is square and the two chains are identical there](#0245--the-converted-warp-space-has-no-pixel-baseline-because-every-golden-fixture-is-square-and-the-two-chains-are-identical-there)
 - [0246 — the local `cargo doc` mirror covers one crate of five, and the four it leaves out are still unreachable until after a push](#0246--the-local-cargo-doc-mirror-covers-one-crate-of-five-and-the-four-it-leaves-out-are-still-unreachable-until-after-a-push)
+- [0247 — a suite run by hand inside a lane records into that lane's own ledger, which is the one place no gate reads](#0247--a-suite-run-by-hand-inside-a-lane-records-into-that-lanes-own-ledger-which-is-the-one-place-no-gate-reads)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -2288,3 +2289,77 @@ Shapes, none decided:
 time was a close ceremony discovering after the fact what a hook step could have said before. It is
 not higher because the blast radius stops at CI — no user-visible behaviour is involved — and the
 repair may be a single word, which is also the reason it should not sit here long.
+
+## 0247 — a suite run by hand inside a lane records into that lane's own ledger, which is the one place no gate reads
+
+[ADR-0207](adrs/0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md)
+gave the operator an affordance and
+`tools/conductor/README.md` states it: *"A suite you run by hand counts. Run one through the wrapper
+— `node tools/conductor/with-lock.mjs suite -- cargo nextest run --workspace` — and, because the
+wrapper can see it is running inside this repository or one of its worktrees, it records the result
+in `state/suite-ledger.jsonl` as `hand`. The conductor's next gate on that same tree finds the
+record, prints it and does not run the suite again."*
+
+**The last sentence does not hold when the hand run happens in a lane, and a lane is where the
+operator is.** `suiteLedger()` resolves the destination as `join(selfDir, "state",
+"suite-ledger.jsonl")` — beside *the copy of the script that was invoked*. `tools/conductor/state/`
+is gitignored, so every worktree has its own, and `node tools/conductor/with-lock.mjs` run from
+`WORK/rlx-plan-NNNN` writes that worktree's file. The guard in front of it compares
+`gitCommonDir(cwd)` with `gitCommonDir(selfDir)`, which is the **same directory** for a checkout and
+all its worktrees — so a lane run passes the "inside this repository" test exactly as the comment
+above it intends (*"the main checkout or any of its worktrees"*), records itself `hand`, and lands
+where the conductor will never look. The conductor runs from the main checkout and reads the ledger
+beside *its* copy.
+
+**Observed 2026-09-17**, settling Plan 0178's `claude_dir` park. The wrapped
+`cargo nextest run --workspace` in `WORK/rlx-plan-0178` finished green — 1985 passed, 6 skipped, 640 s
+— and wrote `{"tree":"e6634cd2…","by":"hand",…}` into the lane's `state/suite-ledger.jsonl`. The main
+checkout's ledger has no line for that date at all, so the pre-review gate on that same tree will run
+the full suite a second time.
+
+**The cost is redundant work, never a wrong answer**, and that bound is worth stating: nothing reads
+a lane's ledger, so no run can be skipped on the strength of a record the gate cannot see. A second
+hand run in the same lane on the same tree does skip, correctly, off the lane's own file.
+
+**What makes it worth an entry rather than a note is where it fires.** The park table sends the
+operator *into the lane* for every reason it lists — `human_phase`, `claude_dir`, `gate_red`,
+`review_failed` — so the affordance works in the checkout where a repair does not happen and fails in
+the worktree where it does. Nothing is red: `test/with-lock.test.mjs` asserts the `hand` case only
+with `selfDir` and `cwd` in the same tree, which is the case that works.
+
+Shapes, none decided:
+
+- **Resolve the ledger through the common dir.** One file per repository rather than per worktree:
+  derive the main checkout from `git rev-parse --git-common-dir` and write beside it. Needs a rule for
+  a bare or relocated `.git`, and it changes where a hand run in the main checkout writes (nowhere, if
+  the derivation is right — it is already that file).
+- **Have the gate read the lane's ledger too** when it gates that lane's tree. Leaves the resolution
+  alone and puts the knowledge in one place, at the cost of a second lookup path and a second file
+  that can disagree.
+- **Sweep on `resume`.** The conductor already reads a lane at resume; folding its ledger into the
+  main one there is small and touches nothing that runs during a step.
+- **Document the override and stop promising.** `RLX_SUITE_LEDGER` already wins over the resolution,
+  so the operator can point a hand run at the main checkout's file. Weakest: it is a per-run manual
+  step, and the README sentence would have to be narrowed to the main checkout, which is the half of
+  the affordance nobody needs.
+
+- **Raised:** 2026-09-17, from the Plan 0178 Phase 4 park repair, by the owner's session.
+  **Owner if taken:** `dev`.
+- **Verified 2026-09-17** — the README makes the promise:
+  `present: A suite you run by hand counts in: tools/conductor/README.md`
+- **Verified 2026-09-17** — the destination is beside the invoked script:
+  `present: join\(selfDir, "state", "suite-ledger\.jsonl"\) in: tools/conductor/with-lock.mjs`
+- **Verified 2026-09-17** — and the comment above it means to cover a worktree:
+  `present: the main checkout or any of its worktrees in: tools/conductor/with-lock.mjs`
+- **Verified 2026-09-17** — `state/` is gitignored, so each worktree carries its own:
+  `present: tools/conductor/state/ in: .gitignore`
+- **Verified 2026-09-17** — the test's `hand` case shares one directory, so this is unasserted rather
+  than asserted-and-broken:
+  `present: suiteLedger\(s\.repo, \{\}, s\.selfDir\) in: tools/conductor/test/with-lock.test.mjs`
+
+### Priority
+
+**Low.** It costs one redundant full suite — about 11 minutes — per lane the operator repairs by
+hand, and it cannot produce a wrong skip. It is not lower because the repair is small and the
+affordance is documented as working, which is the shape that wastes someone's afternoon before they
+think to check the file it wrote.
