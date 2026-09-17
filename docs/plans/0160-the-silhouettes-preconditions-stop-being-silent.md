@@ -290,7 +290,7 @@ flowchart TD
 |---|---|---|---|
 | 1 — The precondition is tested on the contour, not on the name | dev | done | `8282d3a0` |
 | 1b — The arity probe prices a polyline (optional) | dev | done | `2afbf736` |
-| 2 — The three unhookable constraints are written down | dev | done | committed with this row |
+| 2 — The three unhookable constraints are written down | dev | done | `692461c5` |
 | 3 — The document is checked against the engine, once | human | not started | |
 
 ### Notes
@@ -320,12 +320,30 @@ flowchart TD
 
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`**
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** `presets/README.md` only. No `.toml` was added, edited, moved or removed,
+  so the embedded set is unchanged.
+- **Plan header `Closes:`** design-backlog 0217, which is already in
+  `docs/design-backlog-archive.md` marked **Promoted** to this plan's Phase 1b. Phase 1b was taken
+  (`2afbf736`), so the thing the entry asked for is done; there is no live entry to retire and
+  `docs/design-backlog.md` was not touched.
+- **What shipped:** a **fix plus docs**. Behaviour moved in two places — `coord_mode = "1"` now
+  falls back to the distance on an authored contour that is not star-shaped about its centre, and
+  the load warning fires on that condition instead of on the roster name, with a reworded message.
+  No preset in the shipped set renders differently: both `[path]` presets bind `coord_mode = "0"`.
+- **Operator docs touched:** none under `docs/`. `presets/README.md` is the only reader-facing page
+  that moved — three new prose blocks under `shape_field`/`[path]`, the rewritten `ring` blockquote,
+  and the arity figures.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — *82 stated reductions still
+  hold across all 35 live entries (3 unprobeable)*, plus the usual advisory list of moved paths,
+  which is never part of the exit code.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). What this session ran instead:
+  `cargo nextest run -p rlx-core` whole (1493 passed, 6 skipped) after Phase 1, which covers the
+  nine deferred GPU suites for the package the change lives in and is where "no golden moves" was
+  checked; `cargo nextest run -p rlx-core --test path_cost` alone for Phase 1b's re-measure; and
+  `cargo nextest run --workspace -P fast` after Phase 2 (1693 passed, 304 skipped). `cargo fmt --all
+  --check` and `cargo clippy --workspace --all-targets -- -D warnings` are clean, as are
+  `check-comment-hygiene`, `check-doc-links`, `check-reader-prose` and `toc --check`.
+- **Outstanding `human` phases:** Phase 3, in full. It is the only phase not implemented and it
+  gates nothing.
 
 ## Followups (after this lands)
