@@ -298,7 +298,7 @@ fn band_contour_ink(col: vec3<f32>, t: f32, steps: f32, amount: f32, style: f32,
 | 1 — The contour copies are all watched, then the contour learns a style and an ink | dev | done | `277d7e1` (the watch), `80426fb` (the style and ink) |
 | 2 — `warp_mesh` colours by its own level | dev | done | `9627131` |
 | 3 — The palette reader says what a contour can be and where the warp field takes its colour | dev | done | `d575f65` |
-| 4 — The look gate: a hard key on the mono print, and a ladder world | human | not started | |
+| 4 — The look gate: a hard key on the mono print, and a ladder world | human | done | committed with this row |
 
 ### Notes
 
@@ -402,9 +402,77 @@ darkening. `docs/presets.md` was read and left alone: it never restates the cont
 **Phase 3 — `docs/preset-palettes.md` carries no contents block**, so `toc.mjs` rewrote nothing for
 its two new `###` headings; `presets/README.md`'s block is `depth=3` and gained no heading.
 
+### Phase 4 — the look gate
+
+Taken 2026-09-17 in the `preset-author` lane, at 640x360 unless a line says otherwise, on the same
+adapter Phases 1 and 2 recorded. Both presets land under ADR-0081; `architect` curates the set.
+
+**`shape_contourmono` moves to `palette_contour_style = "1"` — the hard black key.** All four styles
+were rendered at the shipped `palette_contour = "1.0"` and the distinct-colour reading reproduces
+Phase 1's exactly, which is the first thing worth recording: 677 at style 0, **9** at style 1, 924 at
+style 2, **9** at style 3.
+
+- **The verdict on the key:** at style 1 it reads as a drawn ink edge. The soft style's line carried a
+  grey shoulder at every white/black boundary, which is what the world's own header objected to; the
+  step removes it, and the frame reads as a woodcut with registration rather than a softened one.
+- **Style 3 was rendered and rejected, on composition rather than on ink count.** Drawn at
+  `palette_contour_ink = "0.955"` it also measures 9 colours and it makes a striking frame, but it
+  lays a red line at every run boundary: red goes 4.57 % -> **11.70 %** of the frame and the accent
+  band stops being distinguishable from the key. Recorded in the preset's header as a rejected
+  alternative, not as a tuning note.
+- **The amount table was re-measured under the hard style**, since the shipped one was taken on the
+  soft one: 17 distinct colours at `0.25`, 18 at `0.5`, **9** at `1.0`. The argument for full strength
+  is now exact rather than a trade — at `1.0` the line's value is pure black, an ink the palette
+  already holds, so the key costs nothing.
+
+**The new world is `presets/warp_ladder.toml`, "Ladder"** — `color_source = "1"`, a centred deposit,
+six palette runs at `color_span = "0.085"`, twelve bands. Its bands **are** the decay contours
+backlog 0146 asked for, and they march outward.
+
+- **The verdict on the ladder:** the rungs read as decay contours, and the world is the op-art print
+  the entry wanted. What it is **not** is a limited-ink one, which is the finding below.
+- **ADR-0197's fringe question, answered: the fade reads as shading, not as dissolving — and at
+  `palette_steps = "0"` it is not a fringe at all but the whole frame.** The present writes
+  `ink * coverage` and coverage is a continuum, so a two-ink palette measures **851** exact colours.
+  What recovers most of it is `palette_steps`: quantizing the palette coordinate quantizes the level
+  the coverage is computed from, and the same frame at twelve bands measures **60**. The preset ships
+  at twelve for that reason, and its header states the count rather than claiming an ink class.
+  **A coverage threshold in level mode — the candidate ADR-0197 names — is the shape this points at**,
+  and it is `architect`'s to weigh, not something to tune around.
+- **`palette_contour` is inert on this world, for a mechanical reason worth recording.** It draws at a
+  *band* edge, so at `palette_steps = "0"` there is no edge to draw at: 851 colours with the key at
+  full strength and 851 without it, measured both ways. With the twelve bands on it does bite (60 ->
+  56 colours, about a tenth of the frame turning true black), and it is still off — on a duotone the
+  key falls inside the black rung it would mark. A palette's own flat runs are not band edges.
+- **The horizon was run, because the filmstrip forced the question.** Over the first seconds the
+  ladder adds rungs steadily, which looks like a world winding itself tighter. Five simulated minutes
+  at 96x96: coverage 0.408 -> 0.619 and `peak/mean` 2.467 -> 1.629, both flat to within one part in a
+  hundred across the last three rows, against a static control at `delta 0.0000, monotone 0.00`. The
+  first two minutes are the leaky integrator filling; the verdict is in the preset's header.
+- **Readings against family neighbours.** Contour Mono `drive` **0.366**, `rate` **0.0041**, in a
+  `shape_field` family spanning 0.125-0.444 and 0.0035-0.0165 — mid-family, so the key changed the
+  look without moving the behaviour. Ladder `drive` **0.560**, `rate` **0.0345**, against a
+  `warp_mesh` family spanning 0.058-0.117 and 0.0015-0.0032: a 5x and 10x outlier, recorded rather
+  than tuned away. Its neighbours are slow fluid worlds, and the report's own note applies — motion
+  inside a static repeating structure reads calmer than the number suggests.
+
+**The gate that authorizes the two presets:** `cargo nextest run -p rlx-core` through the conductor's
+lock, **1496 passed, 0 failed, 7 skipped**, nothing blessed and the worktree clean afterwards. The
+first run of it failed on one test and that is the deviation below.
+
+**Deviation from the phase's `Files touched`, disclosed:** it names the two presets and "nothing in
+engine code", but a preset that ships needs a `CARDS` entry in `scripts/docs-shots.mjs` and a
+committed render, or `hygiene::every_shipped_preset_has_a_gallery_card` fails — and it did, on the
+first run of the suite. The two cards were rendered **by hand at the manifest's own settings**
+(`--signal dynamic:110 --frame-at 300 --size 640x360 --tier rich`) rather than by re-running the
+script over the whole gallery, which would have rewritten about a hundred PNGs with rasterizer drift.
+`shape_contourmono`'s card is re-rendered because its look changed.
+
 ### Close triggers
 
-- **`presets/` touched:** yes, and **no `.toml` preset was added, removed or retuned**.
+- **`presets/` touched:** yes. Phases 1-3 touched **no** `.toml` preset; **Phase 4 adds
+  `presets/warp_ladder.toml` and re-authors `presets/shape_contourmono.toml`** onto the hard style,
+  both under ADR-0081, with two gallery cards and a `CARDS` entry beside them.
   `presets/README.md` moved three ways — its generated params block regenerated for the three new
   `ParamSpec`s, its hand-written `warp_mesh` prose, and its hand-written hard-bands section — and
   `presets/preset.schema.json` plus seven files under `presets/schema/` are regenerated output.
@@ -420,8 +488,11 @@ its two new `###` headings; `presets/README.md`'s block is `depth=3` and gained 
   `cargo nextest run --workspace -P fast` (1693 passed, 305 skipped) plus the five deferred suites
   this plan's blast radius calls for — `golden`, `sanity`, `reactivity`, `animation`, `distinctness`
   — at both Phase 1 and Phase 2, **372 passed, 3 skipped, nothing blessed** each time.
-- **Outstanding `human` phases:** Phase 4, the `preset-author` look gate — `shape_contourmono`
-  re-authored onto a contour style, and a new mono `warp_mesh` ladder world on `color_source = 1`.
-  Its two verdicts are what ADR-0197's fringe question is left to.
+- **Outstanding `human` phases:** none. Phase 4 was taken 2026-09-17 and its two verdicts are above:
+  `shape_contourmono` ships on the hard black key, the ladder world ships and is **not** a
+  limited-ink print. ADR-0197's fringe question is answered against it — the fade reads as shading —
+  so the ADR is accepted at close **with that recorded**, per the phase's own stop condition, and the
+  coverage-threshold candidate goes back to `architect` as a named finding rather than being tuned
+  around.
 
 ## Followups (after this lands)

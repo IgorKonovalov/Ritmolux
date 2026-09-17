@@ -1,0 +1,208 @@
+# Ladder - the op-art world design-backlog 0146 asked for: hard bands that are
+# the feedback field's own decay contours, marching outward. Nothing else in this
+# engine makes one. `shape_field` bands a distance, which is a closed-form
+# measurement of a figure; this bands an ACCUMULATION, so every rung is a place
+# where the light built up over the last second and a half crosses from one ink
+# to the next, and the rungs move because the field does.
+#
+# IT IS NOT A LIMITED-INK PRINT, AND THE ENTRY THAT ASKED FOR ONE SHOULD BE READ
+# WITH THAT. 0146 wanted "a mono world whose hard ink bands are the feedback
+# field's own decay contours"; the bands and the contours arrived and the ink
+# class did not. The present pass writes `ink * coverage`, and coverage is a
+# continuum, so a frame of two inks measures 851 exact colours at 640x360 loud.
+# What recovers most of it is `palette_steps`, below.
+#
+# `color_source = "1"` IS THE WHOLE WORLD (ADR-0197). At the default `"0"` this
+# scene colours its light at deposit time, by the deposit's own angle, and the
+# feedback loop then drags already-coloured pixels around - so a plateau palette
+# quantizes what goes INTO the loop and the loop's structure carries no bands at
+# all. Backlog 0146 measured that as a smeared coloured blob. Under `"1"` the
+# deposit writes uncoloured light, the field accumulates a scalar, and the PRESENT
+# pass reads that level as the palette coordinate. The bands land on the loop's
+# output, which is where the structure is.
+#
+# THE LEVEL IS NOT BOUNDED BY ONE, AND THAT IS THE MECHANISM RATHER THAN A
+# HAZARD. The LUT is repeat-addressed, so the palette simply repeats as the level
+# climbs: the rung count is the level's range across the frame, times
+# `color_span`, times the palette's run count. Plan 0184 Phase 2 measured its
+# fixture's field at p05 1.09, median 1.90, p95 3.23 - a range of about 2.1 - and
+# this world deposits far harder than that fixture, which is why its span is
+# `0.085` rather than `1`. Raising `deposit` or `decay` pushes the level, and the
+# rung count with it; `color_span` is the lever that changes the count WITHOUT
+# changing how far the light reaches.
+#
+# WHY SIX RUNS AND A SMALL SPAN, RATHER THAN TWO RUNS AND A LARGE ONE. They
+# multiply, so the same dozen rungs can come from either. Six runs at a small
+# span puts the palette in charge of the RHYTHM and the level in charge of the
+# REACH, and those are the two things the music drives separately here - bass
+# reaches, treble crowds. Two runs at a large span couples them: every change of
+# reach is also a change of rhythm, and the ladder pumps instead of marching.
+#
+# `palette_steps` IS LOAD-BEARING HERE IN A WAY IT IS NOT ANYWHERE ELSE, and it
+# took a measurement to see it. The palette's runs are already flat, so on any
+# other scene twelve bands on top of them would be redundant. On this path they
+# are not: quantizing the palette COORDINATE quantizes the level the coverage is
+# computed from as well, so the fade quantizes with it. Rendered at 640x360 loud,
+# counting exact frame colours:
+#
+#     palette_steps 0     851 distinct colours   a shaded ladder
+#     palette_steps 12     60                    a printed one   <- shipped
+#
+# Sixty is not two, and this world does not claim it is. It is the difference
+# between a photograph of a ladder and a print of one.
+#
+# NO CONTOUR, AND THE FIRST REASON IS MECHANICAL. `palette_contour` draws at a
+# BAND edge, so with `palette_steps = "0"` it has no edge to draw at and is
+# inert: the same 851 colours with the key at full strength as without it,
+# measured both ways. With the twelve bands on it does bite - 60 colours becomes
+# 56, and about a tenth of the frame turns true black where the key lands. It is
+# still off, and that is the taste half: on a duotone the key falls INSIDE the
+# black rung it would be marking, so it buys a harder edge nobody can see.
+# `shape_contourmono` wants a key because it has three inks and a white-to-red
+# seam worth registering. This world has two and no seam.
+#
+# THE FADE AT THE EDGE IS THE COVERAGE, AND IT IS AUTHORED INTO. Coverage falls
+# with the level, so the outermost rungs thin toward the backdrop rather than
+# stopping - ADR-0138's limited-ink guarantee is a claim about the draw seam, not
+# about the whole frame, and this is the other side of that. `deposit` sits high
+# enough that the flat core reaches the frame edge on the short axis, so what
+# fades is the corners: the ladder runs out of ink at the edge of the sheet
+# rather than dissolving in the middle of the picture.
+#
+# THE HORIZON WAS RUN, AND IT FOUND A WARM-UP RATHER THAN A DRIFT. The trigger
+# (ADR-0099) is met - a feedback field is an accumulation axis - and the
+# filmstrip is what forced the question: over the first seconds the ladder adds
+# rungs steadily, which looks exactly like a world winding itself tighter until
+# it moires. Five simulated minutes at 96x96, `bass=0.6,mid=0.45`, a row every
+# 30 s:
+#
+#     sim_secs    30     60     90    120    150    180    210    240    270    300
+#     coverage  0.408  0.403  0.395  0.496  0.527  0.540  0.593  0.625  0.617  0.619
+#     peak/mean 2.467  2.500  2.550  2.032  1.914  1.867  1.701  1.614  1.633  1.629
+#
+# The first two minutes are the leaky integrator filling; after that both
+# statistics are flat to within one part in a hundred across the last three rows.
+# The static control prints `delta 0.0000, monotone 0.00` on all three, which is
+# what earns this reading its meaning. The verdict: the rungs travel, the picture
+# settles, and a set that opens on this world shows it thinner for its first
+# minute than the one that has been up for five.
+system = "warp_mesh"
+name = "Ladder"
+
+[palette]
+# SIX RUNS, TWO INKS. Paper white and a warm black, alternating three times
+# across the ramp, each run flat so the LUT holds no intermediate value to be
+# sampled. The 0.02 transitions are one LUT texel wide - narrow enough to be a
+# step, wide enough that the bake does not alias them.
+#
+# The black is `#111010` rather than `#000000`: this is a print, and a printed
+# black on white paper is never the absence of light. It also keeps the fade at
+# the frame edge reading as ink thinning out rather than as the picture ending.
+stops = [
+  { at = 0.00, color = "#111010" },
+  { at = 0.15, color = "#111010" },
+  { at = 0.17, color = "#f4f2ee" },
+  { at = 0.32, color = "#f4f2ee" },
+  { at = 0.34, color = "#111010" },
+  { at = 0.49, color = "#111010" },
+  { at = 0.51, color = "#f4f2ee" },
+  { at = 0.66, color = "#f4f2ee" },
+  { at = 0.68, color = "#111010" },
+  { at = 0.83, color = "#111010" },
+  { at = 0.85, color = "#f4f2ee" },
+  { at = 1.00, color = "#f4f2ee" },
+]
+
+[params]
+# BAND MAP
+#   bass  -> `deposit` (more light, so the ladder grows a rung outward)
+#   treb  -> `color_span` (the rungs crowd together or open out)
+#   onset -> a `color_center` push (the whole ladder jumps one notch)
+#   time  -> `color_center` (the slow outward march, forever)
+#
+# NOTHING drives luminance, because there is no luminance lever here that would
+# not also destroy the ink count: the present writes the palette's own colour
+# times coverage, so a brightness term would write values between the two inks.
+# All of the music goes into the level and the coordinate - which is to say into
+# WHERE the rungs are, never into how bright they are.
+
+color_source = "1"
+
+# THE SOURCE. A small centred blob rather than the default ring: a ring puts its
+# own radius into the level field and the ladder then marches outward from a
+# circle, which reads as a ripple in a pond. A blob makes the level a single
+# monotone hill and every rung a closed contour of it.
+deposit_x      = "0.5"
+deposit_y      = "0.5"
+deposit_radius = "0.06"
+deposit_width  = "0.28"
+deposit_arms   = "0"
+# THE LIGHT. Gain sized off the cap: the clamped term reaches its ceiling at
+# C/G = 0.9/1.06 = 0.85, so a typical passage sits near half of it and a real
+# peak reaches it. The baseline is what holds the opaque core past the halfway
+# point at rest; the reactive part is what walks a rung out of the centre on a
+# loud bar.
+deposit = "6.5 + clamp(bass * 1.06, 0, 0.9)"
+# THE TAIL. A fraction surviving per second, so this sets how far the level
+# reaches before it falls below the first band edge - the ladder's length. 0.955
+# leaves a long tail, which is what carries the flat core out to the short axis
+# at this deposit rather than leaving the figure as a disc in a black field.
+decay = "0.955"
+
+# THE MARCH. Slightly below 1, so the resample reads from a little inside itself
+# and the field creeps OUTWARD. Above 1 it would tunnel inward and the ladder
+# would march into the centre and vanish, which is the same mechanism run
+# backwards and reads as a drain.
+zoom = "0.975"
+rot  = "0"
+
+# THE WOBBLE. A travelling ripple on the resample, small. This is the op-art
+# half: a perfectly concentric ladder is a target, and the eye reads a rung that
+# breathes along its length as a drawn line rather than as geometry. `warp_speed`
+# integrates a phase (ADR-0132), so it is safe against audio - but it stays
+# constant here, because the rungs already move.
+warp       = "0.16"
+warp_scale = "2.2"
+warp_speed = "0.6"
+
+# THE INK COUNT. Twelve bands, and they are not redundant beside the palette's
+# own flat runs - they are what makes this path print rather than shade. See the
+# header: quantizing the coordinate quantizes the COVERAGE with it, 851 exact
+# frame colours down to 60. `palette_contour` is off; the header says why.
+palette_steps   = "12"
+palette_contour = "0"
+
+# THE RUNG SPACING. Under `color_source = "1"` this scales the LEVEL before it
+# becomes a palette coordinate, so it is the one lever that changes how many
+# rungs fit between the centre and the edge without touching how far the light
+# reaches. The reactive part is small on purpose: treble crowding the ladder by a
+# tenth reads as the print tightening, where a large swing reads as a zoom.
+color_span   = "0.085 + clamp(treb * 0.0167, 0, 0.010)"
+# THE TRAVEL. Sliding the coordinate slides every rung together, outward,
+# forever - the wrap lands on a black-to-white run boundary, which is a hard edge
+# in a look made entirely of hard edges, so it never shows. The onset term rides
+# on top as a surge: a hit shoves the whole ladder one notch out and it relaxes
+# back through the release.
+color_center = "time * 0.045 + clamp(onset * 0.25, 0, 0.15)"
+hue          = "0"
+saturation   = "1.0"
+
+# OFF - each is a gradient generator, and this world's whole claim is that it has
+# six exact colours in it. Bloom blurs precisely the hard edges the runs create;
+# trails would smear one rung into the next as they travel; the echo mixes the
+# field with a scaled copy of itself, which mixes LEVELS and so would move rungs
+# rather than add colours - but it also softens where they land.
+bloom_amount = "0"
+trails       = "0"
+echo_alpha   = "0"
+
+[smoothing]
+# The ladder's notch arrives as a surge and relaxes - asymmetric, like every
+# onset push in the mono cohort.
+color_center = { attack = 0.09, release = 0.55 }
+# Spacing eases long: it moves every rung in the frame at once.
+color_span = 0.50
+# The light eases hardest. The level is an integrator, so an unsmoothed bass
+# transient does not flicker the picture - it walks a rung out and back, which
+# reads as the ladder pumping.
+deposit = 0.40
