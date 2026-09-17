@@ -54,6 +54,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0245 — the converted warp space has no pixel baseline, because every golden fixture is square and the two chains are identical there](#0245--the-converted-warp-space-has-no-pixel-baseline-because-every-golden-fixture-is-square-and-the-two-chains-are-identical-there)
 - [0246 — the local `cargo doc` mirror covers one crate of five, and the four it leaves out are still unreachable until after a push](#0246--the-local-cargo-doc-mirror-covers-one-crate-of-five-and-the-four-it-leaves-out-are-still-unreachable-until-after-a-push)
 - [0247 — a suite run by hand inside a lane records into that lane's own ledger, which is the one place no gate reads](#0247--a-suite-run-by-hand-inside-a-lane-records-into-that-lanes-own-ledger-which-is-the-one-place-no-gate-reads)
+- [0248 — nothing in this repo asks whether a groundless luminous field is a composition or a fill, and four shipped presets are the open cases](#0248--nothing-in-this-repo-asks-whether-a-groundless-luminous-field-is-a-composition-or-a-fill-and-four-shipped-presets-are-the-open-cases)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -2363,3 +2364,62 @@ Shapes, none decided:
 hand, and it cannot produce a wrong skip. It is not lower because the repair is small and the
 affordance is documented as working, which is the shape that wastes someone's afternoon before they
 think to check the file it wrote.
+
+---
+
+## 0248 — nothing in this repo asks whether a groundless luminous field is a composition or a fill, and four shipped presets are the open cases
+
+The surviving half of [backlog 0128](design-backlog-archive.md), carved out by
+[Plan 0186](plans/done/0186-the-flatness-gate-tells-a-figure-from-its-ground.md)'s
+`## What this plan does NOT do` and refiled here at its close, because the archive is append-only
+and closed. Read the archived body for the full history; this is the question it left standing.
+
+`Sumi`, `Whorl`, `Supernova` and `Neon Tunnel` are `fragment_field` presets that fill the frame with
+luminous tone and have no ground worth the name. The `sanity` harness marks them in its printed
+table and has done since Plan 0116 — the `NOTE` line above the candidate rows names all four — but
+**no statistic in this repository decides between the two readings**:
+
+- a **composition** that happens to cover the frame, which is legitimate content and must pass; or
+- a **fill**, a wash with no figure in it, which is the defect `sanity` exists to catch and which
+  today's conjunction cannot reach because term one clears it.
+
+Their readings at the suite's 96x96 capture, 2026-09-17, after ADR-0200:
+
+| preset | `coverage` | `tonal_flatness` (max 0.90) | term two | `role_ratio` (cut 1.17) |
+|---|---|---|---|---|
+| `Sumi` | 0.9253 | 0.2085 | 0.1001 | 1.0807 → ground |
+| `Whorl` | 0.9504 | 0.2552 | 0.1182 | 1.0522 → ground |
+| `Supernova` | 0.9934 | 0.4241 | 0.0644 | 1.0067 → ground |
+| `Neon Tunnel` | 0.9969 | 0.1690 | 0.0540 | 1.0032 → ground |
+
+All four are under the `0.23` default boundary floor and all four are far under the flatness
+ceiling, so each is among the 62 of 112 presets held out of conviction by term one alone. **Nothing
+here says whether that is correct.** The tonal term reports plenty of tonal structure, which is true
+of a beautiful wash and of a broken one alike; `coverage`, `quadrant_spread` and
+`radial_shell_occupancy` are all near-degenerate at this density, which is the failure the archived
+0128 body already diagnosed for the light-ground case.
+
+ADR-0200 did not touch this and could not: the role classifier puts all four on the *ground* side,
+which is the correct call for a luminous field and leaves term two reading their ink — where they
+genuinely have little perimeter. The missing instrument is a third question, not a different
+reference for the second.
+
+- **Raised:** 2026-09-17, at Plan 0186's close, carried over from backlog 0128's 2026-09-02 re-open.
+  **Owner if taken:** `architect` first — like its parent, this is a question about what the sanity
+  lens *means* before it is a threshold.
+- **Verified 2026-09-17** — the harness still marks the four and still asks nothing about them:
+  `present: the four groundless luminous in: core/tests/sanity.rs`
+- **Verified 2026-09-17** — the conjunction that cannot reach them:
+  `present: flat > MAX_TONAL_FLATNESS && boundary < b_floor in: core/tests/sanity.rs`
+- **Verified 2026-09-17** — and the question itself has no instrument, which is the absence of a
+  mechanism rather than a fact about the tree:
+  `unprobeable: whether Sumi, Whorl, Supernova and Neon Tunnel are compositions or fills is a
+  question no statistic in this repo asks, so there is nothing to match on`
+
+### Priority
+
+**Low, and honestly so.** All four ship, none is suspected broken, and the cost of the gap is that
+nothing would notice if one became a wash. It is not lower because it is the last live piece of a
+diagnosis three ADRs and three plans have now worked on, and because the instrument it wants — a
+statistic that reads a full frame's *internal* organization rather than its departure from a ground —
+is the one shape this line has never tabled.

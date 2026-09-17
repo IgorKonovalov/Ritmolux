@@ -1,17 +1,24 @@
 # 0186 — The flatness gate tells a figure from its ground
 
-> **Status:** in-progress (2026-09-17)
+> **Status:** done (2026-09-17) — four phases landed as `fa5d282b`, `ae8bd31d`, `703af6df`,
+> `0c66c1d9`; close review round 1 found **no blockers, no majors, three minors and one nit**, all
+> four repaired in `39ca44fa`. Verified against the finished tree: the full workspace suite green on
+> tree `d6e05e8` (1986 passed, 6 skipped) in the conductor's suite ledger, `cargo doc --workspace`
+> warning-free, both blot anchors convicted again by assertions that fail if term two regresses, the
+> frozen composition and the `Sumi` witness holding their verdicts, and the second anchor's
+> parameters unmoved after the table that chose from them (checked against `git`, not the log).
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`, `human`
-> **Related ADRs:** [0161](../adrs/0161-the-blot-anchor-becomes-a-defect-record-because-term-two-reads-the-fringe.md)
+> **Related ADRs:** [0161](../../adrs/0161-the-blot-anchor-becomes-a-defect-record-because-term-two-reads-the-fringe.md)
 > (the defect record this plan either repairs or makes permanent),
-> [0130](../adrs/0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md),
-> [0129](../adrs/0129-the-structural-term-is-measured-at-composition-scale-not-pixel-scale.md) (the
-> corrected stop condition this plan extends), [0128](../adrs/0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md),
-> [0126](../adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md),
-> [0074](../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md),
-> [0071](../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md).
-> **ADR-0200 is reserved and not yet written.** Phase 2 writes it from the table, in either outcome.
+> [0130](../../adrs/0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md),
+> [0129](../../adrs/0129-the-structural-term-is-measured-at-composition-scale-not-pixel-scale.md) (the
+> corrected stop condition this plan extends), [0128](../../adrs/0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md),
+> [0126](../../adrs/0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md),
+> [0074](../../adrs/0074-a-ratio-against-an-in-run-control-is-not-automatically-portable.md),
+> [0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md).
+> **[ADR-0200](../../adrs/0200-the-flatness-conjunctions-second-term-reads-the-reference-a-role-classifier-assigns.md)
+> was written at Phase 2's gate from the table, and accepted at this close.**
 > **Closes:** design-backlog 0128. The four-field residue is carved out; see
 > `## What this plan does NOT do`.
 
@@ -202,7 +209,7 @@ flowchart TB
 #### The gate's outcome, recorded 2026-09-17
 
 **Continue, on `role_ratio`.** Written from the table Phase 1 printed, re-run at the gate on the
-phase's own commit; [ADR-0200](../adrs/0200-the-flatness-conjunctions-second-term-reads-the-reference-a-role-classifier-assigns.md)
+phase's own commit; [ADR-0200](../../adrs/0200-the-flatness-conjunctions-second-term-reads-the-reference-a-role-classifier-assigns.md)
 carries the full table, the choice and the four rejected candidates, and is `proposed` until this
 plan closes.
 
@@ -464,4 +471,152 @@ No other section of the file was touched.
 - **Outstanding `human` phases:** none. Phase 2 was the only one and it is
   recorded above, in the plan, with ADR-0200 written from its table.
 
+## Close review
+
+> Round 1, 2026-09-17, written by a fresh conductor-started session handed the plan and the lane and
+> nothing an implementer wrote (ADR-0205). Full text; the copy under
+> `tools/conductor/state/reviews/0186-round-1.md` is gitignored runtime record.
+
+**Verdict: Plan 0186 landed cleanly — no blockers, no majors, three minors and one nit, all of them
+record rather than code.** The classifier is what the plan and ADR-0200 describe, both blot anchors
+are convicted again by assertions that fail if term two regresses, the composition and the `Sumi`
+witness keep their verdicts, and no preset was edited and no golden blessed. Every finding is a
+stale or over-broad sentence about the new behaviour, and the close repaired all four.
+
+### Evidence this review ran on
+
+| check | result |
+|---|---|
+| `... with-lock.mjs suite -- cargo nextest run --workspace` | `skipped ... tree d6e05e8 is green in the suite ledger, run by gate 0186-pre-review at 2026-09-17T11:57:39.716Z: 1986 tests run: 1986 passed (5 slow), 6 skipped` — and `git rev-parse HEAD^{tree}` was `d6e05e8`, so the ledger record is this exact tree (ADR-0207) |
+| `cargo doc --workspace --no-deps` | clean, zero rustdoc warnings on all five crates (backlog 0246's gap) |
+| `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings` | clean |
+| `check-doc-links`, `check-index-rows`, `toc --check` | OK — 483 files, 0 rows over cap, 7 blocks current |
+| `check-comment-hygiene`, `check-reader-prose` | OK — 289 sources, 0 escapes; 16 documents, 0 bare citations |
+| `check-backlog-claims` | exit 0 — 80 reductions across 34 live entries, 2 unprobeable, 34 advisory moved-path rows |
+| `check-translations` | exit 0 — 5 stamped, and **no translated source has moved** |
+| re-run of `sanity_shape_fragment_field` + `sanity_shape_shape_collage` | green, and their printed `role=` rows are the evidence behind findings 2 and 3 |
+
+### Lens 1 — alignment with the plan and the ADRs
+
+- **Every phase carries one in-vocabulary `**Owner skill:**`** — `dev`, `human`, `dev`, `dev`.
+- **The `Full suite:` bullet is correct in conductor mode**: it is owed to the `pre-review` gate, and
+  the ledger record above is that run, on this tree. Not a missing run.
+- **The log is shorter than `## Implementation phases`** (147 lines against 174), and every
+  disclosed deviation checks out against the tree: `modal_connected` printing the complement (the
+  plan's two requirements were incompatible and this is the correct resolution, and the column's own
+  `note` says so), `report_structure_separation` replaced rather than extended, `component_density`
+  sharing `component_sizes`, and Phase 3 shipping **two** `pub` functions — necessary, because the
+  harness's `role_ratio` column is computed before any cut exists and so cannot call
+  `assigned_boundary_density`.
+- **The second anchor's freeze is verified against `git`, not believed.** `Ragged Blot` enters at
+  `fa5d282b`, and `git diff fa5d282b..HEAD -- core/tests/sanity.rs` contains no line touching a
+  `[params]` key of that fixture. That is the check this plan's own Risks section asked a reviewer
+  to make.
+- **Every named test read as an assertion body.** No tautologies.
+  `a_frame_with_no_tonal_structure_is_reported_flat` loops both anchors over three lenses and
+  asserts the areal positive control, term one against the derived ground, and then the gate's own
+  reading — `ratio >= MODAL_FIGURE_CUT` **and** `boundary < b_floor`. The inverted `KNOWN_FLAT`-shaped
+  assertion ADR-0161 left is gone; these are convictions.
+  `each_term_of_the_flatness_conjunction_is_load_bearing` adds `held.ratio < MODAL_FIGURE_CUT` — the
+  assertion that the composition the term exists to admit is still classified *ground* — and asserts
+  the unclassified areal control on both blots, so a classifier that regresses shows as a
+  disagreement rather than a silent acquittal.
+- **No ADR decision was silently reversed.** ADR-0130's statistic is unchanged; the reference it is
+  handed is what moved, which is what ADR-0200 records. The harness is still `#[ignore]`d and still
+  asserts nothing.
+
+### Lens 2 — layering, coupling, real-time safety
+
+Nothing platform-specific entered `core/`; the two additions are pure functions of a `CaptureImage`.
+The audio callback, the ring and the DSP are untouched. No C ABI and no control-protocol change —
+both new functions are `pub` on the metrics surface only and nothing outside `core/tests/` calls
+them. No panic path added. No new hot-path module, so Plan 0002's `hygiene.rs` scan set needs no
+extension.
+
+### Lens 3 — docs and bookkeeping
+
+The `sanity` row names `metrics::assigned_boundary_density`, cites ADR-0200 inside a markdown link
+and carries no `0.2631`; the `62 of 112` denominator checks out against the 112 files
+`presets/*.toml` globs. The page's fifth caveat was rewritten too — disclosed as a deviation and
+right, since it opened on three figures Phase 3 falsified and contradicted the row two screens above
+it. `presets/` untouched by the phases, so curation sweep 3b's first half does not fire; its second
+half does, and found finding 1.
+
+### Lens 4 — correctness and determinism
+
+Both new functions are pure — no clock, no RNG — and `component_sizes` documents that its order is
+deterministic. `NO_GROUND` is `[0,0,0,255]`, so the record's `coverage(BLACK)` and the code's
+`coverage(img, NO_GROUND, eps)` are the same quantity. The ratio is a ratio of one kind of quantity
+(ADR-0074), which is the half ADR-0161's `0.31` could not state. Both constants name their capture
+size and forbid scaling (ADR-0071). The margins either side of the cut are about 8 % — wider than
+this file's own precedent, `MAX_TONAL_FLATNESS` ships on 1.8 % — measured at both sizes, and named in
+ADR-0200's Negatives. Not a finding.
+
+**The two-source question this configuration cannot see, asked.** `coverage(BLACK)` and
+`coverage(derived)` coincide exactly on the one class this project develops against, so no test on a
+light-on-dark frame can tell which reference the code used. Something does probe the disagreement —
+the `role_ratio` column, `report_anchor_validity`, and the per-preset `role=` print. Reading that
+print on two families is what produced findings 2 and 3.
+
+### Lens 5 — design integrity
+
+Dependency direction intact; no seam widened. `assigned_boundary_density` takes `figure_cut` as a
+parameter rather than reading a constant, keeping the derivation with the caller that owns the
+population. The harness grew a third `Measure` variant rather than special-casing one column in the
+judging loop.
+
+### Findings
+
+**minor — `presets/fragment_tiledmono.toml:10` — the "this frame is a gate constant" header named
+the constant this plan retired.** Its `DO NOT RETUNE` block still read *"`boundary_floor`'s default
+arm ... is 0.31, the MIDPOINT of two frozen frames: the `Blown Out` blot fixture at 0.2631 and THIS
+PRESET at 0.3602"*, and line 38 repeated *"0.3602 against a 0.31 floor"*. All three numbers are dead:
+ADR-0161 falsified `0.2631` as a rasterized notch band, and this plan replaced the arm with `0.23`
+from `Ragged Blot`'s `0.0934`. The header exists to stop an author retuning the frame and justifies
+that with a derivation — an author who checks it finds a floor that is not in the file, concludes the
+warning is stale in general, and moves the composition-side anchor of a live gate constant with
+nothing able to notice. The plan could not repair it: its own `## What this plan does NOT do` says it
+edits no preset. Repaired as comment text in `39ca44fa`, naming `0.23`, `0.0934`, the role each
+anchor is read under, and the `MODAL_FIGURE_CUT` population end this same frame is the anchor of. No
+parsed value moved.
+
+**minor — `docs/testing.md:99` — the `sanity` row said light-ground prints read the derived ground,
+and they do not.** It read *"Below it — every scene that draws light onto darkness, and **every print
+whose paper is its ground** — the term reads the derived ground"*. Measured on this tree, every
+light-ground frame is above the cut: `On White` 3.7509, `Nocturne` 4.0439, `Suprematist` 3.3151,
+`Collage Mono` 5.5590, `Tiled Rosette` 7.1832, `Vitrail` 1.4150, `Banded Mandala` 1.3215, `Etching
+Plate` 1.3070 — against a cut of 1.17. The classifier does not separate figure from ground; it
+separates *the modal band is near-black* from *it is not*, and the two coincide only on a dark-ground
+frame, which is where the sentence was written from. An author reading the gate's contract would
+conclude an ink-on-paper design is measured on its ink. Repaired in `39ca44fa`.
+
+**minor — `docs/adrs/0200-…` Consequences — the degenerate reading was not recorded.** Above the cut
+term two reads `boundary_density` against `BLACK`; on a frame that paints its own paper the lit mask
+is the whole frame, so the statistic collapses to the frame's own border, `(4L - 4) / L²` — `0.0412`
+at `SIZE = 96`. Seven shipped presets read exactly that and `Collage Mono` reads `0.0800`, and term
+one is the whole of what holds them (`Collage Mono` closest at `0.7239` against `0.90`). This is
+accepted behaviour, not a defect — criterion 2 registered the class in advance, nothing in it is
+convictable, the suite is green, and the human gate chose knowing the under-floor count moved
+`48 → 62`. What was missing is that the record never said it, and it is the mirror of the defect the
+plan repaired: ADR-0161 convicted the term for reading a rasterizer's rim instead of the picture, and
+on this class the successor reads a frame border instead of the picture. Added as a Negative in
+`39ca44fa`, before the ADR was accepted.
+
+**nit — `docs/adrs/0200-…` — "skips elsewhere in ADR-0016's shape" described a skip that does not
+exist.** The floor is compared only inside `core/tests/sanity.rs`, whose capture is the constant
+`SIZE`; there is no other size to run at and no notice is printed anywhere. ADR-0071 is satisfied by
+the constant naming its size, which it does. Reworded in `39ca44fa`.
+
+### Curation verdict (step 3b)
+
+No preset content landed, so nothing to judge for duplication. The stale-workaround sweep —
+`grep -rn "ADR-00NN\|Plan 00NN\|design-backlog 00NN\|backlog 00NN" presets/*.toml`, read whole —
+returned exactly one file, `fragment_tiledmono.toml`, and it is finding 1. Every other live mention
+of the retired `0.31`/`0.2631` pair is inside an append-only ADR or the archives, where it is the
+record and stays.
+
 ## Followups (after this lands)
+
+- **The four-field residue of backlog 0128** — whether `Sumi`, `Whorl`, `Supernova` and `Neon Tunnel`
+  are compositions or fills — is carved out by `## What this plan does NOT do` and is still open. It
+  is filed as a new live backlog entry citing the archived 0128 body, per this close.

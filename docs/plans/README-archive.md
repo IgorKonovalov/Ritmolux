@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0186 - The flatness gate tells a figure from its ground](#0186---the-flatness-gate-tells-a-figure-from-its-ground)
   - [0183 - A low density is a trace count](#0183---a-low-density-is-a-trace-count)
   - [0166 - The basics read in Russian](#0166---the-basics-read-in-russian)
   - [0180 - The converted picture follows the source](#0180---the-converted-picture-follows-the-source)
@@ -225,6 +226,61 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0186 - The flatness gate tells a figure from its ground](done/0186-the-flatness-gate-tells-a-figure-from-its-ground.md)
+
+- closed 2026-09-17, conductor-run lane `plan-0186-the-flatness-gate-tells-a-figure-from-its-ground`
+in `WORK/rlx-plan-0186`. Four phases: `fa5d282b`, `ae8bd31d` (the `human` gate), `703af6df`,
+`0c66c1d9`. The close's repairs are `39ca44fa`. Close review round 1: **no blockers, no majors, three
+minors and one nit**, all four repaired here. Version **0.129.0** (minor), ADR-0200 accepted, backlog
+0128 closed and its residue refiled as 0248.
+- **What landed.** The `sanity` blot check convicts again. Since ADR-0161 it convicted nothing, not
+even the frozen fixture it was built around, and the cause was the *reference* rather than the
+statistic: `boundary_density` read the frame's derived ground, a saturated blot **is** its own modal
+band, and the term was therefore handed the mass's fringe — which reads *more* structured the
+smoother the rim gets. `metrics::figure_ground_ratio` classifies the modal band as figure or ground
+from `coverage(BLACK) / coverage(derived)`, and `metrics::assigned_boundary_density` reads the
+reference that role assigns. `boundary_density` itself is untouched, so everything ADR-0130
+established about it carries over.
+- **The plan measured before it decided, and that is the whole method.** ADR-0126, 0128 and 0129 each
+named a mechanism before measuring it and each was falsified or superseded by the next phase; this
+plan registered a four-part stop condition in its own text before any number was read, added a
+**second** blot anchor with a ragged rim (frozen against validity conditions only), tabled ten
+candidates and read every column at 96x96 **and** 192x192. The second anchor is what buys criterion 3
+— that the blot-to-composition gap exceeds the two blots' own spread — which a single-anchor
+calibration cannot state at all, and which is exactly the property ADR-0161's `0.31` lacked.
+- **Eight of the ten candidates passed, so the condition selected but did not decide.** `role_ratio`
+was chosen over `min_ground` (4.2), `ground_side` (3.9), `modal_connected` (5.7, the widest) and the
+`sobel`/`tile@N` family because it is the only one that answers the question the defect asked: the
+others replace the statistic, while this one names the choice of reference and makes it. Each
+rejection is recorded against a named property rather than a preference — `modal_connected` reads
+`0.0000` for any frame whose ground is one piece, `min_ground` hides a false conviction inside a true
+verdict, `ground_side` compares a paper's perforation and a mass's rim against one floor.
+- **`boundary_floor` is `0.23` and `MODAL_FIGURE_CUT` is `1.17`, both at 96x96 and neither
+travelling.** The floor is the midpoint of the higher blot's `0.0934` and the frozen composition's
+`0.3602`, each read under the role it is assigned — the first time those two anchors have been
+commensurable, which is what the superseded `0.31` was not. The cut's population end is a bound over
+every frame term one can reach rather than one fixture. Both name their capture size and forbid
+scaling; the same anchors at 192x192 give `0.12` (ADR-0071).
+- **No preset was edited and no golden blessed**, and the metric renders no pixel, so a moved golden
+would have been a finding rather than a bless. The two defect-record tests flip from ADR-0161's
+inverted assertions back to convictions, each blot asserted under three lenses so that a classifier
+that regresses shows as a *disagreement* between the areal control and the gate's own reading rather
+than as a silent acquittal.
+- **What the close added to the record rather than removed.** Term two now reads black for any frame
+holding almost no near-black pixel — which is right for a blot, and degenerate for a canvas that
+paints its own paper: the lit mask is the whole frame and the statistic collapses to the frame's own
+border, `0.0412` at 96x96, for eight shipped presets. Term one is the whole of what holds them, the
+under-floor count moved `48 → 62` of 112, and none of the 62 is above the flatness ceiling. The
+review found the `sanity` row claiming the opposite — that *"every print whose paper is its ground"*
+reads the derived ground, when `On White` reads `3.7509` against a `1.17` cut — and found
+`fragment_tiledmono.toml`'s *"this frame is a gate constant"* header still naming the retired `0.31`
+and `0.2631`. Both repaired, and ADR-0200 gained the Negative the class was missing.
+- **The carved-out half is now its own entry.** Whether `Sumi`, `Whorl`, `Supernova` and
+`Neon Tunnel` are compositions or fills is backlog 0248, citing the archived 0128 body. It is the
+last live piece of a diagnosis three ADRs and three plans have worked on, and the instrument it wants
+— a statistic reading a full frame's internal organization rather than its departure from a ground —
+is the one shape this line has never tabled.
 
 ### [0183 - A low density is a trace count](done/0183-a-low-density-is-a-trace-count.md)
 

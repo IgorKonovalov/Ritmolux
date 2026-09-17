@@ -1,8 +1,8 @@
 # ADR-0200 — The flatness conjunction's second term reads the reference a role classifier assigns
 
-> **Status:** proposed
+> **Status:** accepted
 > **Date:** 2026-09-17
-> **Related plan(s):** [0186](../plans/0186-the-flatness-gate-tells-a-figure-from-its-ground.md)
+> **Related plan(s):** [0186](../plans/done/0186-the-flatness-gate-tells-a-figure-from-its-ground.md)
 > **Supersedes in part:** [0161](0161-the-blot-anchor-becomes-a-defect-record-because-term-two-reads-the-fringe.md)
 > (its defect record becomes a conviction again)
 > **Extends:** [0130](0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md),
