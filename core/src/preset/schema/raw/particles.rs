@@ -152,7 +152,10 @@ pub(in crate::preset::schema) const PARTICLES: TableDesc = TableDesc {
             name: "density",
             kind: KeyKind::Float,
             default: "1",
-            doc: "Fraction of the tier's particle budget actually drawn.",
+            doc: "How much of the tier's particle budget is actually drawn. At or below 0.08 \
+                  it is a fixed count - the tier's anchor times this - at every window size; at \
+                  or above 0.16 it is a fraction of the budget, which grows with the render \
+                  target. Between the two it scales partly with the window.",
         },
         KeyDesc {
             name: "morph_to",

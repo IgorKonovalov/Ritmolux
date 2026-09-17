@@ -407,8 +407,8 @@
         },
         "density": {
           "type": "number",
-          "description": "Fraction of the tier's particle budget actually drawn.",
-          "markdownDescription": "Fraction of the tier's particle budget actually drawn.\n\nDefault `1`."
+          "description": "How much of the tier's particle budget is actually drawn. At or below 0.08 it is a fixed count - the tier's anchor times this - at every window size; at or above 0.16 it is a fraction of the budget, which grows with the render target. Between the two it scales partly with the window.",
+          "markdownDescription": "How much of the tier's particle budget is actually drawn. At or below 0.08 it is a fixed count - the tier's anchor times this - at every window size; at or above 0.16 it is a fraction of the budget, which grows with the render target. Between the two it scales partly with the window.\n\nDefault `1`."
         },
         "morph_to": {
           "type": "string",

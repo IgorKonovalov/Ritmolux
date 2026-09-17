@@ -231,8 +231,8 @@ ceiling is below 432,000, well inside `f32`'s 2^24 integer range.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The count resolves against the anchor for a trace | dev | done | committed with this row |
-| 2 — The reader, the schema doc and the two headers | dev | not started | |
+| 1 — The count resolves against the anchor for a trace | dev | done | a98773de |
+| 2 — The reader, the schema doc and the two headers | dev | done | committed with this row |
 | 3 — The look gate at the size the defect lives at | human | not started | |
 
 ### Notes
@@ -247,15 +247,39 @@ ceiling is below 432,000, well inside `f32`'s 2^24 integer range.
   beside `sample_budget` — rather than a hook beside `sample_budget` in the particles scene alone.
   The GPU assertion landed as a sibling test, `a_trace_preset_draws_its_anchor_count_at_1080p`, and
   `the_render_path_resolves_a_larger_budget_than_a_window_does` is unchanged.
+- Phase 2, file list: regenerating with `RLX_UPDATE_PRESET_SCHEMA=1` rewrote one file the phase's
+  `Files touched` does not name — `docs/specs/player-schema.json`, the committed snapshot of what
+  `ritmolux --schema` prints, which `preset_schema::the_player_schema_snapshot_is_current` holds to
+  the same `KeyDesc` `doc` the editor schemas render. It carries the one changed sentence and
+  nothing else.
+- Phase 2, prose beyond the listed anchors: two sentences adjacent to the named ones also asserted
+  the old behaviour and were changed with them — `docs/capturing.md`'s lead *"A render draws the
+  attractor denser than a window does"* (now *"gives the attractor a larger sample budget"*), and
+  the `density` row of `presets/README.md`'s `[particles]` key table, which the phase does name.
 
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`**
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** yes. `presets/README.md` (hand-written prose only, outside the generated
+  params block), `presets/attractor_thomas.toml` and `presets/fragment_sumi.toml` **comments only**,
+  and the generated `presets/preset.schema.json` + `presets/schema/*.schema.json`. No preset value
+  moved; `.taplo.toml` regenerated to no change.
+- **Plan header `Closes:`** design-backlog 0186. It is **not in the live backlog file** — it moved to
+  `docs/design-backlog-archive.md` on promotion (ADR-0206), so no live entry needs retiring and its
+  probes are no longer run.
+- **What shipped:** a fix. Engine behaviour changes for `[particles] density` at or below `0.08`, plus
+  the reader, schema-doc and header prose that describes it.
+- **Operator docs touched:** `docs/capturing.md` (the `--render` budget section), `docs/nfr.md`
+  (§1's tier paragraph), `presets/README.md`, `docs/specs/player-schema.json`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — 75 stated reductions across
+  33 live entries, 2 unprobeable, 34 advisory moved-path rows.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). Observation: at Phase 1's
+  done-when, `cargo nextest run --workspace` on Phase 1's tree exited 0 with 1986 passed, 6 skipped,
+  nothing blessed and no golden or baseline modified. Phase 2's tree was run against
+  `-p rlx-core --test golden --test sanity --test animation --test reactivity --test distinctness
+  --test attractor --test ink --test suite`: 656 passed, 4 skipped, exit 0, again with nothing
+  blessed.
+- **Outstanding `human` phases:** Phase 3 — the look gate at 640x360 against 1920x1080, before and
+  after, on three trace worlds plus two cloud controls. Its stop condition governs whether ADR-0195
+  is accepted at close.
 
 ## Followups (after this lands)
