@@ -889,10 +889,14 @@ impl AppState {
             (None, Some(overflow)) => {
                 eprintln!("preset '{}': {overflow}", self.renderer.preset_name());
             }
-            (Some(_), None) => {
+            // Rendered off the overflow that last bit rather than written here,
+            // so the recovery speaks for its own context: three of the five are
+            // clamps of a structural parameter and none of those is geometry.
+            (Some(prev), None) => {
                 eprintln!(
-                    "preset '{}': geometry is back within the segment cap",
-                    self.renderer.preset_name()
+                    "preset '{}': {}",
+                    self.renderer.preset_name(),
+                    prev.recovered()
                 );
             }
             // Still over (whatever the count now is), or still fine: say nothing.

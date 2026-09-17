@@ -72,6 +72,12 @@ fn help_prints_the_roster_and_exits_zero() {
             stdout.contains("usage: ritmolux"),
             "`ritmolux {flag}` printed no usage to stdout: {stdout:?}"
         );
+        // The product is `Ritmolux` (ADR-0162) and the binary is `ritmolux`, so
+        // the banner and the usage line disagree on case on purpose.
+        assert!(
+            stdout.starts_with("Ritmolux — "),
+            "the banner does not open with the product's name: {stdout:?}"
+        );
         // One flag from each of the two scanner families the roster spans, so a
         // roster that printed only what `main.rs` parses fails here.
         assert!(stdout.contains("--osc"), "the roster omitted --osc");

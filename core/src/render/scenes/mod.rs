@@ -603,6 +603,51 @@ impl std::fmt::Display for CapOverflow {
     }
 }
 
+impl CapOverflow {
+    /// The clearing of this overflow, worded in the same terms its onset was.
+    ///
+    /// Three of the five contexts clamp a structural parameter rather than
+    /// cutting geometry, so one sentence cannot speak for all five: what came
+    /// back is an iteration budget, a grid or a neighbourhood, not geometry and
+    /// not segments. The shell holds the overflow that last bit and renders this
+    /// off it, which keeps every word of the pair in this file.
+    pub fn recovered(&self) -> Recovered<'_> {
+        Recovered(self)
+    }
+}
+
+/// The recovery sentence for a [`CapOverflow`], as a [`Display`](std::fmt::Display)
+/// adapter rather than a `String` — the same reason [`OverflowContext`] is an
+/// enum: formatting happens only where something prints.
+pub struct Recovered<'a>(&'a CapOverflow);
+
+impl std::fmt::Display for Recovered<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // User-visible text the shell prints verbatim, like the onset above.
+        // No wildcard arm: a sixth context must choose its own sentence rather
+        // than inherit one that does not describe it.
+        let cap = self.0.cap;
+        match self.0.context {
+            OverflowContext::Mirror(_) | OverflowContext::Depth(_) => {
+                write!(f, "geometry is back within this tier's {cap}-segment cap")
+            }
+            OverflowContext::Iterations(_) => write!(
+                f,
+                "the iteration budget is back within this tier's cap of {cap}"
+            ),
+            OverflowContext::Grid(_) => {
+                write!(f, "the grid is back within this tier's cap of {cap}")
+            }
+            OverflowContext::Radius(_) => {
+                write!(
+                    f,
+                    "the neighbourhood is back within this tier's cap of {cap}"
+                )
+            }
+        }
+    }
+}
+
 /// One visual. `update` advances state from the analysis frame; `render` draws
 /// with the state it has.
 ///
@@ -1125,9 +1170,53 @@ mod tests {
     //! render path.
     #![allow(clippy::panic)]
 
-    use super::{ParamKind, create_all};
+    use super::{CapOverflow, OverflowContext, ParamKind, create_all};
     use crate::preset::SystemKind;
     use crate::render::context::{RenderContext, RenderError};
+
+    /// **Each context's recovery is worded in that context's own terms.** Three
+    /// of the five clamp a structural parameter rather than cutting geometry, so
+    /// a line telling an operator that "geometry is back within the segment cap"
+    /// after an iteration, grid or radius clamp names something that never
+    /// overflowed.
+    #[test]
+    fn each_overflow_context_recovers_in_its_own_words() {
+        for (context, word) in [
+            (OverflowContext::Mirror(8), "geometry"),
+            (OverflowContext::Depth(9), "geometry"),
+            (OverflowContext::Iterations(600), "iteration budget"),
+            (OverflowContext::Grid(512), "grid"),
+            (OverflowContext::Radius(7), "neighbourhood"),
+        ] {
+            let overflow = CapOverflow {
+                dropped: 0,
+                context,
+                cap: 20_000,
+            };
+            let text = overflow.recovered().to_string();
+            assert!(
+                text.contains(word),
+                "{context}'s recovery does not name {word}: {text}"
+            );
+            assert!(
+                text.contains("20000"),
+                "{context}'s recovery does not carry the cap that bit: {text}"
+            );
+            let structural = matches!(
+                context,
+                OverflowContext::Iterations(_)
+                    | OverflowContext::Grid(_)
+                    | OverflowContext::Radius(_)
+            );
+            if structural {
+                assert!(
+                    !text.contains("segment") && !text.contains("geometry"),
+                    "{context} is a clamp of a structural parameter, and its recovery \
+                     still speaks of geometry: {text}"
+                );
+            }
+        }
+    }
 
     /// `Structural` rounds and `Modal` does not — the whole of what a kind
     /// changes about a value.

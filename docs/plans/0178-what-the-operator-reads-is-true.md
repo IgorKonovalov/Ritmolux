@@ -312,8 +312,8 @@ flowchart LR
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The preset directory reports its drift | dev | done | a20bc34a |
-| 2 — `--list-presets` shows the set a launch would load | dev | done | committed with this row |
-| 3 — The banner and the recovery line say what is true | dev | not started | |
+| 2 — `--list-presets` shows the set a launch would load | dev | done | 2fd42a7d |
+| 3 — The banner and the recovery line say what is true | dev | done | committed with this row |
 | 4 — A written count of the systems cannot land | dev | not started | |
 | 5 — The microphone capture is settled on the machine it happened on | human | not started | |
 
@@ -334,6 +334,11 @@ flowchart LR
 - **Phase 2, where the printer lives.** `list_presets_and_exit` and its two helpers are in
   `standalone/src/run.rs`, beside `list_adapters_and_exit`, which is where the phase places the
   dispatch; `standalone/src/preset_dir.rs` is unchanged by this phase.
+- **Phase 3, the banner assertion is on stdout.** Phase 3's first `Done when` asks
+  `help_prints_the_roster_and_exits_zero` to assert "the first **stderr** line". `print_help` writes
+  the roster to **standard output** — the contract `schema_answers_on_stdout_and_exits_without_starting_the_app`
+  and the `STDOUT_WRITERS` allowlist both rest on — and `--help` writes nothing to stderr. The
+  assertion is on stdout's opening.
 
 ### Close triggers
 

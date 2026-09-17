@@ -245,8 +245,10 @@ pub(crate) fn print_help() {
 /// The name column is sized to the longest entry (`--list-adapters`) plus a
 /// gap, so adding a longer flag needs the width moved with it.
 pub(crate) fn help_text() -> String {
+    // `Ritmolux` is the product (ADR-0162); `ritmolux` on the usage line is the
+    // binary, which stays lower-case because that is what gets typed.
     let mut text =
-        String::from("ritmolux — a real-time music visualizer\n\nusage: ritmolux [flags]\n\n");
+        String::from("Ritmolux — a real-time music visualizer\n\nusage: ritmolux [flags]\n\n");
     for spec in FLAGS {
         // The dependency is rendered from `requires`, never read out of `help`:
         // one field feeds both the printed line and the refusal below, so a
