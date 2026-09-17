@@ -312,7 +312,6 @@ live entry citing this one.
 | 0203 | The smoke run captured from a microphone while the default is loopback | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 5. **Promoted** |
 | 0207 | The cap-recovery line says "geometry" for three contexts that are not geometry | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 3. **Promoted** |
 | 0208 | A system count written into prose goes stale on the next system | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 4 + ADR-0202. **Promoted** |
-| 0217 | `path_cost`'s arity probe prices an arc chain, not the polyline its header reports | [Plan 0160](plans/0160-the-silhouettes-preconditions-stop-being-silent.md) Phase 1b. **Promoted** |
 <!-- roster:end -->
 
 ### Closed
@@ -582,6 +581,7 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0128 | `tonal_flatness` convicts a flat-graphic composition | [Plan 0186](plans/done/0186-the-flatness-gate-tells-a-figure-from-its-ground.md) + [ADR-0200](adrs/0200-the-flatness-conjunctions-second-term-reads-the-reference-a-role-classifier-assigns.md). Four-field residue reopened as 0248. **Closed 2026-09-17** |
 | 0140 | The band contour can only be an anti-aliased grey on a hard-banded palette | [Plan 0184](plans/done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 1 + ADR-0197. Four styles. **Closed 2026-09-17** |
 | 0146 | `warp_mesh` colours its light at deposit time, so the palette cannot band the field | [Plan 0184](plans/done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 2 + ADR-0197. Bands, not the ink class; see 0251. **Closed 2026-09-17** |
+| 0217 | `path_cost`'s arity probe prices an arc chain, not the polyline its header reports | [Plan 0160](plans/done/0160-the-silhouettes-preconditions-stop-being-silent.md) Phase 1b. Polyline by construction; table re-taken at ~0.095 ms/segment. **Closed 2026-09-17** |
 <!-- roster:end -->
 
 ---
@@ -13423,9 +13423,20 @@ slope. The ceiling's argument is about the worst case an author can load, and th
 **Low.** Nothing renders wrong and the ceiling still stands. What is wrong is that the one test
 named as the ceiling's measurement cannot re-measure it.
 
-- **Promoted 2026-09-14** into [Plan 0160](plans/0160-the-silhouettes-preconditions-stop-being-silent.md) as optional Phase 1b: re-price the arity on a polyline and re-take the header table. If that phase is skipped this entry stays live.
+- **Promoted 2026-09-14** into [Plan 0160](plans/done/0160-the-silhouettes-preconditions-stop-being-silent.md) as optional Phase 1b: re-price the arity on a polyline and re-take the header table. If that phase is skipped this entry stays live.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0160](plans/0160-the-silhouettes-preconditions-stop-being-silent.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0160](plans/done/0160-the-silhouettes-preconditions-stop-being-silent.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+- **CLOSED 2026-09-17** — [Plan 0160](plans/done/0160-the-silhouettes-preconditions-stop-being-silent.md) Phase 1b was taken (`2afbf736`), and the entry is discharged in full.
+  `path_probe` now carries a `morph_to` identical to its `d` at `morph = 0`, which puts the scene on
+  its point representation **by construction** — a morph in flight cannot ride the arc chain — so
+  every arity is on the polyline route and the axis is the segment count again. The header table was
+  re-taken on that run and dated: **~0.095 ms per segment**, 42.6 % of the floor budget at 64 and
+  24.4 % at 32, with rows added at 8 and 48. `MAX_SAMPLES`'s own doc follows the new slope, and the
+  ceiling's argument still holds at 64, so nothing was logged for a later plan. Two figures the
+  entry did not ask about moved with it: the arc-comparison table beneath was deliberately **not**
+  re-taken, because its polyline column already measured a polyline, and the close review's M3
+  dated it 2026-09-09 so the two tables cannot be read as one run.
 
 
 ---

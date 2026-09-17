@@ -1,10 +1,16 @@
 # 0160 — The silhouette's preconditions stop being silent
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-17. All four phases landed (`8282d3a0`, `2afbf736`, `692461c5`,
+> Phase 3 in `7bfea383`), plus a pre-review `cargo doc` repair (`cf871dd8`) and the close review's
+> own prose repairs (`cb56df74`). Mode 4 round 1: **no blockers, no majors, three minors, three
+> nits** — every finding prose, all six repaired at the close. Verified: the full `--workspace`
+> suite green on this tree (1991 passed, 6 skipped), `cargo doc -D warnings` green across all five
+> crates, `fmt`/`clippy` clean, and all seven Node gates green including the backlog probes. Version
+> **0.130.1** (patch).
 > **Created:** 2026-09-09
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0179](../adrs/0179-a-precondition-is-checked-at-load-or-it-is-written-down.md) (a precondition is checked at load, or it is written down)
-> **Depends on:** [Plan 0092](done/0092-the-engine-draws-an-authored-path.md) (hard — `[path]` is the surface this is about, and 0092's own Phase 7 fixes the axis these figures are authored in)
+> **Related ADRs:** [0179](../../adrs/0179-a-precondition-is-checked-at-load-or-it-is-written-down.md) (a precondition is checked at load, or it is written down)
+> **Depends on:** [Plan 0092](0092-the-engine-draws-an-authored-path.md) (hard — `[path]` is the surface this is about, and 0092's own Phase 7 fixes the axis these figures are authored in)
 > **Closes:** design-backlog 0217
 
 > **Amended 2026-09-14, before any phase landed (architect validity sweep).** Five changes, each
@@ -405,11 +411,221 @@ did not touch: the band-count measure, and the over-general list. Both are prose
   the band-count rule is not, and the warning arrives at the right moment and place. Two prose
   findings carry forward to `## Followups` below; it gated nothing, as written.
 
+## Close review
+
+> Mode 4, round 1, conductor mode (ADR-0205) — a separate headless session handed this plan, this
+> lane and nothing an implementer wrote. Full text as written to
+> `tools/conductor/state/reviews/0160-round-1.md`. Six commits `8282d3a0..cf871dd8` over `main` at
+> `69b2fad8`. No earlier round; nothing below was raised and fixed in a prior round.
+
+**Verdict: Plan 0160 landed cleanly — no blockers, no majors, three minors and three nits.** The one
+checkable precondition is checked on the geometry with a fixture that can tell the two candidate
+centres apart, the scene and the load boundary decide the fallback on the same predicate, and the
+three unhookable constraints are in `presets/README.md` next to the parameters they constrain. Every
+finding is prose: an ADR cost claim the implementation falsified, a log sentence the tree
+contradicts, an undated measurement table, and three smaller wording matters.
+
+### Evidence
+
+- **Full suite.** The lock wrapper returned the ledger record rather than a run (ADR-0207):
+  `with-lock: skipped cargo nextest run --workspace: tree 0092221 is green in the suite ledger, run
+  by gate 0160-pre-review at 2026-09-17T19:40:14.216Z: 1991 tests run: 1991 passed (7 slow), 6
+  skipped`. That is this tree at full `--workspace` scope, including the nine deferred GPU suites
+  and the full preset sweeps. `dev`'s close block owes its `Full suite:` to that gate; in conductor
+  mode that is correct, and this record is it.
+- `cargo doc --workspace --no-deps` under `-D warnings`: clean. It was **not** clean before
+  `cf871dd8` — the pre-review gate caught `MAX_ARC_PIECES` and `star_shaped` linking private items,
+  which is backlog 0246's trigger (a visibility change, not a doc edit) firing exactly as predicted.
+- `cargo fmt --all --check` and `cargo clippy --workspace --all-targets -- -D warnings`: clean.
+- `check-doc-links`, `check-index-rows`, `check-reader-prose`, `toc --check`,
+  `check-comment-hygiene`, `check-filter-figures`: all OK.
+- `check-backlog-claims.mjs`: exit 0 — 82 stated reductions hold across all 35 live entries (3
+  unprobeable). The advisory lists 34 moved paths; the three this plan could have touched — 0021 and
+  0092 on `core/src`, 0042 on `presets/README.md` — were read and none is falsified.
+- `check-translations.mjs`: exit 0, and no translated source has moved since its translation was
+  stamped. Nothing is owed on the Russian slice this close.
+
+### Lens 1 — alignment with the plan and ADR-0179
+
+Every phase carries a single in-vocabulary `**Owner skill:**` tag. The `## Implementation log` is
+present and shorter than `## Implementation phases` (129 lines against 136), as ADR-0120 asks.
+
+**Phase 1.** `PathShape` gains a `star_shaped` field computed at parse, on the **resample** rather
+than the dense flatten — the right choice, argued in place: `points` is the contour the shader
+walks, so the verdict is about the figure `coord_mode = 1` is actually computed on, and the work is
+bounded at `MAX_SAMPLES` for free. `worst_ray_gap` is the shader's own crossing arithmetic, checked
+line for line against `path_boundary_radius`: the same `s*u = a + e*t` solve, the same `denom`
+epsilon, the same `[0,1]` segment test, the same positive-`s` filter. The shader keeps the max; the
+CPU keeps the max and the min. The edge traversal runs the other way round, which inverts `t` and is
+symmetric under the `[0,1]` test.
+
+The plan's second done-when — *"the centre it tests about is the one `coord_mode = 1` actually
+divides by"* — is the ADR-0037 shape one level up, and it is **properly probed**.
+`the_verdict_is_about_the_bounding_box_centre_and_not_the_centroid` is built on an `L` block whose
+bounding-box centre sits in the notch and whose area centroid sits inside the tall arm; it asserts
+the fixture really is star-shaped about its centroid *first*, so the test cannot pass vacuously, and
+then that the verdict follows the origin. That is the "find the configuration where the two sources
+disagree" discipline the rule asks for, and it is the single best thing in this diff.
+
+The sampler's completeness argument — two rays per vertex, because a double-crossing interval is
+bounded by rays grazing a vertex — checks out. At the interval's boundary the near and far crossings
+coincide at a vertex `v`, so the two edges crossed inside the interval are precisely the two edges
+incident to `v`; the midpoint of the one leaving `v` toward the interval therefore has a direction
+strictly inside it, and the code samples the midpoints of **all** edges. The reasoning in the
+comment is sound, not merely plausible.
+
+`load.rs` collapses the `ring` branch into one condition with one message shape, built as
+`PresetWarning::about("coord_mode", …)` so it still anchors to the binding's line for
+`ritmolux --check` and carries the studio's `param` (ADR-0192). The scene decides on the same
+predicate, and the `None` arm — no `[path]` table, roster arm is the figure — keeps the `ring` test
+where it belongs. The warning and the picture cannot disagree, which is the done-when that mattered.
+
+`a_contour_that_is_not_star_shaped_renders_the_distance_under_either_mode` is a real test, not a
+green one. It deliberately does **not** use the two-band look the other path tests use, on the
+stated ground that its only seam sits on the outline where both coordinates are 1 by contract and
+the two modes would match on *any* figure; it uses the banded look instead and carries a star-shaped
+leaf control in the same run, asserting the control *does* move.
+
+The morph extension is right and disclosed: `configure` ANDs both endpoints' verdicts, `load.rs`
+does the same, and both name the limitation. `aligned_to` carries the verdict over, correctly —
+reversal and cyclic rotation preserve the edge set, and `worst_ray_gap` is a function of the edge
+set. `resampled` re-takes it rather than carrying it, also correctly and for the opposite reason.
+
+**Phase 1b** was taken. The polyline route is forced **by construction** — `morph_to` identical to
+`d` at `morph = 0`, verified against `pack_path`, where `morphing` puts the figure back on points
+unconditionally. The plan's *"never by assumption"* is met, and the existing "drew a path rather
+than the roster's heart" assertion still runs for every case. The arity table is re-taken, dated and
+names the machine; a new inequality assertion keeps the axis honest. `MAX_SAMPLES`'s doc follows the
+new slope and the ceiling's argument still holds at 64, so nothing is owed under *What this plan
+does NOT do*.
+
+**Phase 2.** All four done-whens are met, and the arc-chain correction is the strongest part: it
+states **both** halves of the gate, names the reachable band from measured figures, and says plainly
+that a real silhouette is usually outside it. The half-arity arithmetic checks against `from_dense`
+— `pieces * 2 > points.len()` on the resample, so 32 at `samples = 64` and 16 at `samples = 32`, as
+written. `MAX_ARC_PIECES`'s doc names 24 and explains why
+`the_arc_fit_reports_what_a_curve_costs_in_pieces` reads 25 for the same blob (it refits the
+64-point resample; `from_dense` fits the dense flatten), confirmed from `refit`'s definition. The
+`ring` blockquote rewrite is beyond the four bullets and was disclosed; it was the right call,
+because Phase 1 changed both the condition and the message.
+
+**Phase 3** was taken in the `preset-author` lane and its three verdicts are recorded. The exercise
+was a use rather than a read — every choice and its predicted outcome written before the first
+render. Its own third finding, that the list of failing figures is over-general because membership
+is geometric, is a better observation than the phase was looking for and vindicates Phase 1's
+decision to test the contour rather than the name. One thing it claims did not happen; see M2.
+
+### Lens 2 — layering, coupling, real-time safety
+
+Nothing to report. No platform or audio-source type enters `core/`; no raw GPU call escapes the wgpu
+layer. `worst_ray_gap` is `O(N²)` but runs **once at parse**, not per frame — at `MAX_SAMPLES = 64`
+that is ~8k float operations at load, and the render path reads a `bool` field. No `unwrap`/`expect`
+was added anywhere; the walk uses `.get()` throughout. No new hot-path module, so Plan 0002's scan
+set needs no extension. The C ABI and the control protocol are untouched.
+
+### Lens 3 — docs, bookkeeping, release
+
+`presets/README.md` is the only reader-facing page that moved, and it is the right one — the
+`preset-author` lane keeps no catalogue and reads that file, which is ADR-0179's own Positive
+argument. No `ParamSpec`, structural table or `SystemKind` changed, so the generated parameter
+block, the JSON schemas and `.taplo.toml` are correctly untouched. No hotkey, flag, env var or
+config key moved, so `README.md`, `docs/running.md`, `docs/configuration.md` and the five
+translations are correctly untouched. Two documents the sweep should have reached and did not:
+`docs/preset-palettes.md` (N6) and this plan's own log (M2).
+
+**Version: patch.** Behaviour moved in two places, but no author-facing capability was added and no
+shipped preset renders differently.
+
+### Lens 4 — correctness and determinism
+
+The tolerance is handled the way ADR-0071 asks. `STAR_SHAPED_TOLERANCE = 0.02` is not asserted as a
+threshold: `the_tolerance_separates_the_measured_contours` prints the whole table — every fixture
+plus every shipped `[path]` contour at the arity it ships at — and asserts the **emptiness** of the
+band around it, that every contour measured lands a factor of four clear either way. That is a
+property, not a frozen number, and the test states why it is the right one: a figure decided
+narrowly flips verdict on an unrelated edit to its `d`, which is the plan's own second risk. The doc
+comment reports what the measurement found and says plainly that this is therefore not a threshold
+on real figures at all.
+
+No `aspect` derived from a grid size appears in the diff. No wall-clock read enters analysis;
+`path_cost.rs`'s `clippy::disallowed_methods` allow is unchanged, so Plan 0174 Phase 3's guard
+selector still holds. One arithmetic looseness in `presets/README.md` — *"about 0.095 ms per segment
+… so 64 segments is 43 %"*, where 43 % is the whole frame cost including the baseline and the slope
+alone gives 36 % — is inherited rather than introduced (the same `so` was equally loose at
+0.105/46 %) and is not raised as a finding.
+
+### Lens 5 — design integrity
+
+The shape of the change is right. The precondition is computed **where the geometry is** and read
+where it is needed; the scene takes a verdict rather than a contour to re-measure; the load boundary
+and the scene consult one predicate instead of two that can drift apart. `applied_coord_mode`'s
+`Option<bool>` is the correct encoding — `None` is genuinely "no contour, ask the roster", not a
+third truth value — and the three-arm `match` in `load.rs` mirrors it exactly. No seam widened.
+
+### Findings
+
+All six were repaired at the close; none was carried from an earlier round, because there was none.
+
+**minor**
+
+- **M1 — `docs/adrs/0179-…md:54`: the ADR's cost claim is falsified by what landed.** The Decision
+  says the test is *"an O(N) walk over at most `MAX_SAMPLES` points"*, and that claim carries weight
+  — the Negative section leans on it to justify *"a load-time cost on a path that has none today"*.
+  `worst_ray_gap` is **O(N²)**: two rays per vertex, each intersected against every edge, so
+  2·64² ≈ 8k operations at the ceiling arity. The conclusion survives; the number does not. Repaired
+  on the ADR-0054/0074 precedent — accepted **with a dated `Outcome` section** rather than by
+  editing the body.
+- **M2 — this plan, `### Phase 3`: the log said two findings were carried forward to the backlog,
+  and they were not.** No entry was written — the diff over the whole range does not touch
+  `docs/design-backlog.md`, and the close trigger eleven lines further down said so outright. The
+  half that was false was the half a later reader would act on. Phase 3 gates nothing and *may*
+  carry forward, so this was not an unmet done-when but a false statement in the record. Repaired by
+  correcting the sentence and listing both findings under `## Followups`; **filing them as live
+  backlog entries with ADR-0108 probes stays open and is the owner's**, since a new live entry adds
+  a probe the gate runs and is outside what a close may repair.
+- **M3 — `core/tests/path_cost.rs`: the arc-comparison table was a different day's reading and
+  nothing said so.** Phase 1b re-took the arity table above it and dated it 2026-09-17. The arc
+  table was deliberately not re-taken — correctly — but it was still introduced by *"Same machine
+  and same configuration:"*, which read as *same run* when both came from 2026-09-09. It carried no
+  date, and the sentence under it derived from the retired figures (1.03 ms baseline, ~0.105 ms
+  segment) while the table above now reads 1.07 and 0.095. That is the module's own new observation
+  turned on itself. Repaired by dating the arc section and marking its figures as that day's.
+
+**nit**
+
+- **N4 — `presets/README.md`: the quoted load warning was not quite verbatim.** The fenced `text`
+  block writes a plain hyphen where `load.rs` emits an em dash, so a reader grepping their console
+  output for the sentence gets no hit. Repaired.
+- **N5 — `presets/README.md`: an unearned causal claim about the maple.** *"…which is part of why
+  it draws under `\"0\"`"* attributes the choice to a test that did not exist when the maple was
+  authored, and the preset's own header gives no such reason. Repaired by keeping the measurement —
+  a worst ray gap of 0.40 against a 0.02 tolerance — and dropping the motive.
+- **N6 — `docs/preset-palettes.md`: the two-coordinates section gained no pointer at the
+  precondition.** It is the page an author reads when choosing a mode, and after this plan an
+  authored contour may be refused `"1"` with a load warning. Repaired with one sentence and a
+  pointer, not a copy.
+
+### Close bookkeeping
+
+- **Preset curation (step 3b).** `presets/` touched: `README.md` only — no `.toml` added, edited,
+  moved or removed, so the embedded set is unchanged and there is nothing to judge against it. The
+  stale-workaround sweep is clean **for a structural reason worth writing down**: this plan did not
+  fix the degeneracy, it announced it, so no preset written around it is now paying for nothing. All
+  four presets resting on `coord_mode = "1"` (`shape_pulse`, `shape_strataheart`, `shape_aperture`,
+  `shape_heartmono`) draw roster arms, where the contour verdict is `None` and the roster test is
+  unchanged; the two `[path]` presets bind `"0"` and neither header cites a defect it is dodging. No
+  preset moves a pixel, which the green goldens confirm.
+- **Backlog (step 3c).** Backlog 0217 is discharged: Phase 1b was taken (`2afbf736`), the arity
+  probe is on the polyline at every arity by construction, and the header figures it said could no
+  longer be re-taken have been re-taken. Its body was already archived **Promoted**; the close
+  appends the `CLOSED` marker and moves its ledger row.
+- **ADR-0179** flips `proposed → accepted`, with the dated `Outcome` M1 asks for.
+
 ## Followups (after this lands)
 
 Both are Phase 3's, both are prose repairs to `presets/README.md`, and neither gates anything.
 **Neither is in `docs/design-backlog.md` yet** — filing them as live entries with the probes
-[ADR-0108](../adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md) requires is
+[ADR-0108](../../adrs/0108-a-backlog-claim-about-the-repo-carries-an-executable-probe.md) requires is
 owed and open.
 
 - **The band count needs a measure, not three examples.** *"The thinnest feature sets the count"* is

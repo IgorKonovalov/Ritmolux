@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0160 - The silhouette's preconditions stop being silent](#0160---the-silhouettes-preconditions-stop-being-silent)
   - [0184 - Limited ink: a contour that is an ink, and a warp field that bands](#0184---limited-ink-a-contour-that-is-an-ink-and-a-warp-field-that-bands)
   - [0186 - The flatness gate tells a figure from its ground](#0186---the-flatness-gate-tells-a-figure-from-its-ground)
   - [0183 - A low density is a trace count](#0183---a-low-density-is-a-trace-count)
@@ -227,6 +228,48 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0160 - The silhouette's preconditions stop being silent](done/0160-the-silhouettes-preconditions-stop-being-silent.md)
+
+- closed 2026-09-17, conductor-run lane `plan-0160-the-silhouettes-preconditions-stop-being-silent`
+in `WORK/rlx-plan-0160`. Four phases: `8282d3a0`, `2afbf736` (the optional 1b, taken), `692461c5`,
+`7bfea383` (the `human` document gate), plus `cf871dd8` — a pre-review `cargo doc` repair — and
+`cb56df74`, the close review's own six prose repairs. Round-1 verdict: **no blockers, no majors,
+three minors and three nits, every one prose and every one repaired**. Version **0.130.1** (patch),
+ADR-0179 accepted **with an Outcome**, backlog 0217 closed.
+- **What landed.** ADR-0179's rule, in its four instances. The one mechanically decidable
+precondition — that `coord_mode = "1"` needs a figure every ray from its centre leaves exactly once —
+is now computed at parse on the contour's own geometry and carried on `PathShape`, and the `ring`
+branch became one instance of it rather than a name test beside it. The load warning and the scene's
+fallback read the same predicate, so the sentence and the picture cannot disagree; a morph pair is
+judged on both endpoints, because both are drawn. The three the engine cannot check are prose in
+`presets/README.md` next to the parameters they constrain: erosion against a figure's thinnest
+feature, the band-alignment arithmetic with its two consequences and the `gamma` proof, and a
+corrected arc-chain paragraph. Phase 1b re-priced the arity probe on the polyline **by
+construction** — a `morph_to` identical to `d` at `morph = 0`, which cannot ride the arc chain — and
+re-took the header table at **~0.095 ms per segment**.
+- **What was falsified.** Two things ADR-0179 wrote, both recorded in its Outcome rather than edited:
+the test is `O(N²)` and not the `O(N)` the Decision claims (two rays per vertex against every edge,
+~8k operations once at parse — the Negative section's conclusion survives, the complexity does not),
+and the centre is the **bounding box's**, not the centroid the Context names. The second is the one
+that mattered: the two agree on every figure in the suite, which is exactly the ADR-0037 shape, and
+`the_verdict_is_about_the_bounding_box_centre_and_not_the_centroid` separates them on a thick `L`
+whose bounding-box centre sits in the notch while its area centroid sits inside the tall arm. Also
+falsified: the arc chain is **not** selected by smoothness. *"A smooth figure gets it"* had been in
+`presets/README.md` since Plan 0092; the real gate is a piece count against a tolerance fixed at the
+tightest figure size, so a detailed contour is discarded however smooth every one of its curves is.
+- **What outlived the plan.** The tolerance turned out not to be a threshold. `0.02` sits in an empty
+band — a figure every ray leaves once measures `0` to six decimal places, a deep five-pointed star
+included, and the mildest real violation (the shipped maple, at `0.40`) is twenty times clear of it —
+so `the_tolerance_separates_the_measured_contours` asserts that **emptiness**, a factor of four
+either way, instead of the number. Phase 3's document gate was taken as a use rather than a read and
+returned three verdicts: the palette rule is sufficient to author against with no render at all, the
+band-count rule is **not** (its three cases are examples and do not convert into a measure), and
+`ritmolux --check` is the channel an author actually meets. Its third, unasked finding is the sharp
+one — the prose names shape *families* while membership is geometric, so a thick crescent renders
+correctly under `"1"` and only a thin one trips the check, which is precisely why Phase 1 tests the
+contour and not the name. Both of Phase 3's prose findings are under the plan's `## Followups` and
+are **not** yet live backlog entries.
 
 ### [0184 - Limited ink: a contour that is an ink, and a warp field that bands](done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md)
 
@@ -9288,7 +9331,7 @@ wave since it was written that will actually meet it. ([0160]'s half of this not
 to run after [0161] because both add load-time work to `core/src/preset/schema/`, and [0161] has
 landed.)
 
-[0160]: 0160-the-silhouettes-preconditions-stop-being-silent.md
+[0160]: done/0160-the-silhouettes-preconditions-stop-being-silent.md
 [0161]: done/0161-the-structural-parameter-is-held.md
 [0162]: done/0162-the-curve-families.md
 [0163]: done/0163-the-analytic-field.md
@@ -9308,7 +9351,7 @@ diffusion pass from the studio are each a later plan with its own interview; ADR
 
 [0158]: done/0158-the-player-grows-a-studio-facing-surface.md
 [0159]: done/0159-the-studio-opens.md
-[0160]: 0160-the-silhouettes-preconditions-stop-being-silent.md
+[0160]: done/0160-the-silhouettes-preconditions-stop-being-silent.md
 [0164]: done/0164-the-cellular-system.md
 
 ### Moved 2026-09-09 from `README.md` — the 0087-stop-condition risk

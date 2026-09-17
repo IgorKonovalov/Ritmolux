@@ -44,7 +44,6 @@ place. The plan file carries the real link.
 | [0120](0120-the-standalone-ships-on-ubuntu.md) | The standalone ships on Ubuntu | approved | dev, human | ADR-0131 (proposed): PulseAudio capture + an `ubuntu-latest` CI arm. **Phase 1 is a `human` stop gate before `dev`.** Guard is 5 zips + 1 tarball; folds backlog 0181 (Linux arm) + 0208. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + 0174 (proposed): Art-Net verified against `rlx-artnet-sim`. **Phase 8 opens on a decision** - 0115's tap is headless-only, and a windowed resolve is an ADR. Phase 9 is the rig. |
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. **0180 landed and moved both ends of its chain.** Amended 2026-09-16. Needs the rig. |
-| [0160](0160-the-silhouettes-preconditions-stop-being-silent.md) | The silhouette's preconditions stop being silent | approved | dev, human | ADR-0179: four silent `[path]` preconditions. **Amended 2026-09-14:** optional Phase 1b folds in backlog 0217 (arity probe re-prices a polyline). Phase 2 is prose. |
 | [0178](0178-what-the-operator-reads-is-true.md) | What the operator reads is true | approved | dev, human | Backlog 0172, 0185, 0207, 0208 + ADR-0202 (proposed): drift line, `--list-presets`, banner, recovery line, count gate. **0176 and 0166 both landed.** Phase 5 `human` settles 0203. |
 <!-- roster:end -->
 
@@ -68,7 +67,7 @@ it. The note is [in the archive](README-archive.md#prior-sequencing-notes-supers
 
 [0158]: done/0158-the-player-grows-a-studio-facing-surface.md
 [0159]: done/0159-the-studio-opens.md
-[0160]: 0160-the-silhouettes-preconditions-stop-being-silent.md
+[0160]: done/0160-the-silhouettes-preconditions-stop-being-silent.md
 [0161]: done/0161-the-structural-parameter-is-held.md
 [0162]: done/0162-the-curve-families.md
 [0163]: done/0163-the-analytic-field.md
@@ -859,6 +858,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0160 - The silhouette's preconditions stop being silent](done/0160-the-silhouettes-preconditions-stop-being-silent.md) - closed 2026-09-17. Review: **no blockers, no majors, three minors, three nits (all fixed).** Version: **0.130.1**. ADR-0179 accepted, Outcome. Closed backlog 0217. [Write-up](README-archive.md).
 - [0186 - The flatness gate tells a figure from its ground](done/0186-the-flatness-gate-tells-a-figure-from-its-ground.md) - closed 2026-09-17. Review: **no blockers, no majors, three minors, one nit (all fixed).** Version: **0.129.0**. ADR-0200 accepted. Closed backlog 0128; filed 0248. [Write-up](README-archive.md).
 - [0184 - Limited ink: a contour that is an ink](done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) - closed 2026-09-17. Review: **no blockers, no majors, one minor, one nit.** Version: **0.130.0**. ADR-0197 accepted, Outcome. Closed backlog 0140, 0146; filed 0251. [Write-up](README-archive.md).
 - [0183 - A low density is a trace count](done/0183-a-low-density-is-a-trace-count.md) - closed 2026-09-17. Review: **no blockers, no majors, two minors, one nit (all fixed).** Version: **0.128.1** (patch). ADR-0195 accepted. Archived backlog 0186. [Write-up](README-archive.md).
