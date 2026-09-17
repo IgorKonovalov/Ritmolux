@@ -370,9 +370,15 @@ not run at the plan's close, so the rich tier currently ships numbers nobody has
       [ADR-0140](adrs/0140-a-sample-budget-is-a-density-against-the-render-target.md) the sample
       budget is a density against the render target, so a `Rich` window above the 640x360 anchor
       resolves up to `attractor_particles_live_ceiling` (600 000) instead. **Record the size of the
-      window the reading was taken at**, because the drawn count now depends on it, and the relief
-      lever for an attractor miss is that ceiling rather than the anchor. Lowering the anchor still
-      costs shot noise at *every* size; lowering the ceiling costs it only on large displays.
+      window the reading was taken at, and the preset's `[particles] density`** — which lever
+      relieves a miss depends on both. Above `0.16` the drawn count scales with the window and the
+      ceiling is the lever: lowering the anchor costs shot noise at *every* size, lowering the
+      ceiling only on large displays. At or below `0.08` the count is
+      [ADR-0195](adrs/0195-a-low-density-is-a-trace-count-and-the-law-scales-only-a-cloud.md)'s
+      trace count — `anchor * density` at every size — so the ceiling relieves nothing there and the
+      anchor is the only lever, at the price of the authored stroke count itself. A sparse world is
+      also no longer the expensive case at a large window, so pick the attractor for this reading
+      with that in mind.
       **No number is invented upward to look good** — that was the phase's own rule, and it still
       binds. _(Plan 0044 Phase 4, carried forward at that plan's close 2026-07-30.)_
       **Two things changed under this item at [Plan 0057](plans/done/0057-the-attractors-compute-path.md)'s
