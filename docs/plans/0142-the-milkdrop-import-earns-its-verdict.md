@@ -389,6 +389,11 @@ probe at f30, and the present-pass gain.
   evaluation are both refused, and there is no fetch tool. Phase 2's honest stop branch ("the
   instrument cannot see it") is a conclusion about the instrument and is not what this is, so
   reaching it without the read would be a workaround.
+- **The park above is discharged (2026-09-17, by the owner's session).** `xeiraex/milkdrop2` is
+  cloned at `WORK/milkdrop2-src`, checked out at exactly `d4c843a` — *"Original Milkdrop 2 v2.25c
+  source code"* — with `vis_milk2/milkdropfs.cpp` present, and the lane reads it through the
+  `add_dirs` entry beside the preset corpus (`tools/conductor/queue.json`, `69b2fad8`). The source
+  read Phase 2 opens on is now performable; nothing else about the phase changed.
 - **Phase 2's `Files touched` names `docs/design-backlog.md`, and backlog 0113's body is in
   `docs/design-backlog-archive.md`.** It moved there on 2026-09-15 on promotion (ADR-0206), the day
   after the amendment that wrote the line. The dated update the phase owes goes to the archived
