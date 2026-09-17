@@ -50,6 +50,49 @@
 //! comparison of *levels* would be meaningless. The comparison is between the two
 //! **subjects** at one seam — same units on both sides — and then between those
 //! dimensionless ratios across seams, which is what [`SeamTrace`] carries.
+//!
+//! # The reading is a settled band, not a frame
+//!
+//! The defect being measured is an **equilibrium**: the field converges to a
+//! level over many frames, and a single frame is exactly what makes a seam look
+//! clean. So every seam is read at each of [`CHECKPOINTS`] — independent runs
+//! from frame zero, since `capture_preset` rebuilds the scenes and resets the
+//! clock — and the reported level is the mean over the last [`BAND`] of them.
+//!
+//! **It is a band and not a point, and that is a property of the subject rather
+//! than of the instrument.** A converged field still tracks whatever its preset's
+//! per-frame program is doing, and a program driving the warp from slow sine
+//! terms never stops moving it. Reading one frame would report a phase of that
+//! wobble as though it were the level. What separates the two is that the
+//! transient into the band is the larger motion by an order of magnitude, which
+//! is what the first checkpoint is for and what [`SETTLED_SPREAD`] and the
+//! transient assertion hold the instrument to.
+//!
+//! # The control reads zero, and what that buys and costs
+//!
+//! *Blur Mix 3*'s background sits at exactly `0.0` at every seam. Its warp shader
+//! subtracts a constant `0.02` from every texel each frame and divides by `1.1`,
+//! and its fixture binds the scene's own `deposit` to `0.0` — so nothing sustains
+//! a background and the subtraction floors it. The washed/control **ratio** is
+//! therefore undefined, and the bisect's departure test is unavailable in that
+//! form.
+//!
+//! What a zero control gives instead is stronger against one class of stage and
+//! blind to the other:
+//!
+//! - **An additive stage is ruled out at every seam of the chain.** Fed a field
+//!   that is black at the frame edge, the present pass and the tonemap return
+//!   black at the frame edge. No stage downstream of the field contributes a
+//!   background floor of its own, for any subject — that is a statement about the
+//!   chain, where a ratio is a statement about two subjects in it.
+//! - **A multiplicative stage is invisible to it**, since a gain maps `0` to `0`.
+//!   That class is bounded from the washed subject's own seam-to-seam gain, which
+//!   the probe prints beside the levels: `B/A` is the present pass's gain on a
+//!   real background, in linear light on both sides.
+//!
+//! A second control preset would restore the ratio, and it is not taken: the two
+//! subjects are the pair four look gates were judged on, and a third fixture
+//! bought for one column would not be one of them.
 
 use super::{HeadlessOptions, RenderError, Renderer, capture, scene_for};
 use crate::dsp::AnalysisFrame;
@@ -68,10 +111,17 @@ const BLUR_MIX_3: &str = include_str!("../../tests/fixtures/milk_wash_blur_mix_3
 /// weighted toward one of them.
 const SIZE: u32 = 128;
 
-/// Long enough for the feedback field to reach its equilibrium — Plan 0111 Phase
-/// 1 measured that at roughly 100 frames of time constant, so 300 is three of
-/// them.
-const FRAMES: u32 = 300;
+/// The frame counts every seam is read at, ascending. The first is the
+/// **transient probe** — one time constant of the field is roughly 100 frames, so
+/// at 30 it is still filling from black — and the remaining [`BAND`] are the
+/// **settled band**, spanning two more time constants.
+const CHECKPOINTS: [u32; 4] = [30, 100, 200, 300];
+
+/// How many of [`CHECKPOINTS`], counting from the end, form the settled band. The
+/// settled level is that band's mean, and its spread is the honest uncertainty on
+/// it: a converged field still rides whatever its preset's per-frame program is
+/// doing, and nothing here averages that out.
+const BAND: usize = 3;
 
 /// How thick the ring `edge` averages over. Two texels, matching the scene-level
 /// probe this statistic is borrowed from.
@@ -114,9 +164,26 @@ struct SeamTrace {
     e_display: f32,
 }
 
-/// Render `source` for [`FRAMES`] frames and read the background at every seam of
-/// **one** run.
-fn seam_trace(source: &str) -> Option<SeamTrace> {
+/// Picks one seam's level out of a [`SeamTrace`].
+type Pick = fn(&SeamTrace) -> f32;
+
+/// The seams in chain order, each with the reader that picks it out of a
+/// [`SeamTrace`], so the report loops over seams rather than repeating one block
+/// of formatting per field.
+const SEAMS: [(&str, Pick); 3] = [
+    ("A field", |t| t.a_field),
+    ("B present*", |t| t.b_present),
+    ("E display", |t| t.e_display),
+];
+
+/// Render `source` to each of [`CHECKPOINTS`] and read the background at every
+/// seam of each run, in checkpoint order.
+///
+/// One renderer serves all three because `capture_preset` rebuilds the scenes and
+/// resets the clock: each checkpoint is an independent run from frame zero and a
+/// pure function of (fixture, frame count), not a continuation of the one before
+/// it.
+fn seam_traces(source: &str) -> Option<Vec<SeamTrace>> {
     let preset = Preset::from_toml_str(source).expect("the fixture parses");
     let name = preset.name.clone();
 
@@ -134,25 +201,25 @@ fn seam_trace(source: &str) -> Option<SeamTrace> {
     };
     renderer.set_presets(vec![preset]);
 
-    // Seam E, and the thing that drives the run: `capture_preset` rebuilds the
-    // scenes and resets the clock, so the whole trace is a pure function of
-    // (fixture, frame, FRAMES). Everything read below belongs to its LAST frame.
-    let display = renderer
-        .capture_preset(&name, &AnalysisFrame::default(), FRAMES)
-        .expect("the capture succeeds");
-    let e_display = {
-        let linear: Vec<f32> = display.rgba.iter().map(|b| f32::from(*b) / 255.0).collect();
-        edge(&linear, display.width, display.height)
-    };
+    let mut traces = Vec::with_capacity(CHECKPOINTS.len());
+    for frames in CHECKPOINTS {
+        // Seam E, and the thing that drives the run. Everything read below
+        // belongs to this run's LAST frame.
+        let display = renderer
+            .capture_preset(&name, &AnalysisFrame::default(), frames)
+            .expect("the capture succeeds");
+        let e_display = {
+            let linear: Vec<f32> = display.rgba.iter().map(|b| f32::from(*b) / 255.0).collect();
+            edge(&linear, display.width, display.height)
+        };
 
-    let a_field = read_linear(&renderer, Seam::Field)?;
-    let b_present = read_linear(&renderer, Seam::Present)?;
-
-    Some(SeamTrace {
-        a_field,
-        b_present,
-        e_display,
-    })
+        traces.push(SeamTrace {
+            a_field: read_linear(&renderer, Seam::Field)?,
+            b_present: read_linear(&renderer, Seam::Present)?,
+            e_display,
+        });
+    }
+    Some(traces)
 }
 
 enum Seam {
@@ -187,87 +254,178 @@ fn read_linear(renderer: &Renderer, seam: Seam) -> Option<f32> {
     Some(edge(&rgba, width, height))
 }
 
-/// **The wash bisect.** Reports the background at every seam for a washed
-/// conversion and the clean control, and names the first seam at which their
-/// ratio departs from what it was at the field.
+/// **The wash bisect.** Reports the settled background at every seam for a washed
+/// conversion and the clean control, the band that level is settled within, and
+/// the present pass's gain on each subject.
 ///
-/// This test **asserts no threshold on the ratio** (ADR-0071). What separation is
-/// large enough to call a departure is exactly what the phase is measuring, and a
-/// number chosen before the measurement would be tuning to the instrument. What
-/// it does assert is that the instrument works: both subjects render and every
-/// seam reads back.
+/// This test **asserts no threshold on the ratio or on any level** (ADR-0071).
+/// What separation is large enough to call a departure is exactly what the
+/// measurement is for, and a number chosen before it would be tuning to the
+/// instrument. What it does assert is that the instrument works: both subjects
+/// render, every seam reads back at every checkpoint, and the reported level is
+/// an equilibrium — a band narrower than the transient that reached it — rather
+/// than a point on a climb.
 ///
-/// # What it measured, 2026-08-19
+/// # What it measured, 2026-09-17
 ///
-/// Dev box, 128x128, 300 frames, `AnalysisFrame::default()`, quantizer at its
-/// `DEFAULT_QUANTIZE_STEPS = 255` (neither fixture overrides it). Hardware
-/// readings are **bit-identical across three runs** — there is no run-to-run
-/// spread on this instrument, so a tolerance would have to come from the
-/// mechanism rather than from noise.
+/// Dev box, 128x128, `AnalysisFrame::default()`, quantizer at its
+/// `DEFAULT_QUANTIZE_STEPS = 255` (neither fixture overrides it). Levels are the
+/// `edge` mean at each of [`CHECKPOINTS`]; `settled` is the mean over the last
+/// [`BAND`] of them and `spread` its half-spread as a fraction of that mean.
 ///
 /// ```text
-///   seam        fog tunnel    blur mix 3    ratio     (hardware)
-///   A field     0.29798886    0.01990991    14.967
-///   B present   0.52298039    0.08744538     5.981
-///   E display   0.74454564    0.25118530     2.964
-///
-///   seam        fog tunnel    blur mix 3    ratio     (DX12 WARP)
-///   A field     0.29793853    0.01192657    24.981
-///   B present   0.52290142    0.05914328     8.841
-///   E display   0.74456638    0.24515122     3.037
+///   subject      seam               f30          f100          f200          f300       settled  spread
+///   fog tunnel   A field     0.09276785    0.13548748    0.14085685    0.13043343    0.13559258   3.84%
+///   fog tunnel   B present*  0.17703269    0.25443807    0.26188728    0.24317567    0.25316700   3.70%
+///   fog tunnel   E display   0.33025211    0.40570471    0.41156110    0.39624831    0.40450469   1.89%
+///   blur mix 3   A field     0.00000000    0.00000000    0.00000000    0.00000000    0.00000000   0.00%
+///   blur mix 3   B present*  0.00000000    0.00000000    0.00000000    0.00000000    0.00000000   0.00%
+///   blur mix 3   E display   0.00000000    0.00000000    0.00000000    0.00000000    0.00000000   0.00%
 /// ```
 ///
-/// **No seam departs upward. The ratio is maximal at the field and decreases
-/// monotonically through every stage**, on both adapters. The present pass and
-/// the tonemap compress the separation rather than creating it, so no downstream
-/// stage is the wash and Plan 0111 Phase 3 did not run.
+/// **The washed subject reaches a band, and it is a band rather than a point.**
+/// The transient from black is `0.093 -> 0.136` at the field, done by frame 100;
+/// what remains after it is a `+-3.8 %` wobble that is not monotone — `f200` is
+/// the highest of the three — and *Fog Tunnel*'s own per-frame program is where
+/// it comes from, driving `cx`, `cy`, `warp` and `rot` from four sine terms whose
+/// slowest period is longer than the whole run. So there is no frame at which the
+/// level stops moving, and the settled quantity is the band's mean.
 ///
-/// Two things the numbers do not say, both worth carrying:
+/// **The control is at the floor at every seam and every checkpoint**, including
+/// the transient one: *Blur Mix 3* never has a background to settle. The washed
+/// subject's present-pass gain is `B/A = 1.867` — linear against linear, so a
+/// real gain and not a domain artifact — and seam E is display-referred, so it is
+/// comparable only against another subject's E.
+///
+/// Three things the numbers do not say, all worth carrying:
 ///
 /// - **`edge` may not be reading background on this render of *Fog Tunnel*.** The
 ///   statistic reads background only for a figure that does not fill the frame,
 ///   and the reference's discrete rings are exactly that — but *our* conversion
 ///   draws the solid tube that is the defect, so at the frame edge this may be
-///   reading the figure. The monotonic trend survives either way, because it is
-///   the same statistic at every seam; the absolute `14.967` does not.
-/// - **The control diverges between adapters and the washed subject does not.**
-///   *Blur Mix 3*'s field reads `1.67x` higher on hardware than on WARP while
-///   *Fog Tunnel* agrees to five significant figures. *Blur Mix 3* is the subject
-///   with a blur chain. So any threshold on this ratio would be adapter-dependent,
-///   which is the second reason this test asserts none.
+///   reading the figure. What survives either way is the seam-to-seam trend,
+///   because it is one statistic at every seam of one run; the absolute level
+///   does not.
+/// - **The washed/control ratio is gone, not small.** A control at exactly zero
+///   divides into nothing. See the module docs for what replaces it and what that
+///   cannot see.
+/// - **Readings dated before 2026-09-16 are a different measurement.** Both
+///   fixtures then carried the scene's `DEFAULT_DEPOSIT`, so their field had a
+///   source term these bind to `0.0`. Numbers from either side of that are not
+///   comparable, and the older ones are not evidence about this tree.
 #[test]
 fn the_wash_bisect_reports_every_seam() {
-    let Some(fog) = seam_trace(FOG_TUNNEL) else {
+    let Some(fog) = seam_traces(FOG_TUNNEL) else {
         return;
     };
-    let blur = seam_trace(BLUR_MIX_3).expect("the second subject runs too");
+    let blur = seam_traces(BLUR_MIX_3).expect("the second subject runs too");
+    let subjects = [("fog tunnel", &fog), ("blur mix 3", &blur)];
 
-    let ratio = |w: f32, c: f32| if c > 0.0 { w / c } else { f32::INFINITY };
-    println!("[wash] seam          fog tunnel     blur mix 3     ratio");
+    let head: String = CHECKPOINTS
+        .iter()
+        .map(|n| format!("  {:>12}", format!("f{n}")))
+        .collect();
+    println!("[wash] subject      seam      {head}       settled  spread");
+    for (subject, traces) in subjects {
+        for (name, pick) in SEAMS {
+            let at = column(traces, pick);
+            let cells: String = at.iter().map(|v| format!("  {v:>12.8}")).collect();
+            let s = Settled::of(&at);
+            println!(
+                "[wash] {subject}   {name:<10}{cells}  {:>12.8}  {:>6.2}%",
+                s.level,
+                s.spread * 100.0
+            );
+        }
+    }
+    let gain = |traces: &[SeamTrace]| {
+        let level = |pick: Pick| Settled::of(&column(traces, pick)).level;
+        let (a, b) = (level(|t| t.a_field), level(|t| t.b_present));
+        if a > 0.0 { b / a } else { f32::NAN }
+    };
     println!(
-        "[wash] A field       {:>12.8}  {:>12.8}  {:>8.3}",
-        fog.a_field,
-        blur.a_field,
-        ratio(fog.a_field, blur.a_field)
-    );
-    println!(
-        "[wash] B present*    {:>12.8}  {:>12.8}  {:>8.3}",
-        fog.b_present,
-        blur.b_present,
-        ratio(fog.b_present, blur.b_present)
-    );
-    println!(
-        "[wash] E display     {:>12.8}  {:>12.8}  {:>8.3}",
-        fog.e_display,
-        blur.e_display,
-        ratio(fog.e_display, blur.e_display)
+        "[wash] present-pass gain B/A on the settled level: fog tunnel {:.3}, blur mix 3 {:.3}",
+        gain(&fog),
+        gain(&blur)
     );
     println!(
         "[wash] * B is also seams C and D: no post stage is active and the backdrop is unbound"
     );
 
-    assert!(
-        fog.a_field.is_finite() && blur.a_field.is_finite(),
-        "both subjects must reach the field seam"
-    );
+    for (subject, traces) in subjects {
+        for (name, pick) in SEAMS {
+            let at = column(traces, pick);
+            assert!(
+                at.iter().all(|v| v.is_finite()),
+                "{subject} must reach {name} at every checkpoint: {at:?}"
+            );
+            let s = Settled::of(&at);
+            // A floor is settled by inspection, and a relative spread on zero is
+            // not a quantity — so the band test applies to a level there is one for.
+            if s.level <= 0.0 {
+                continue;
+            }
+            assert!(
+                s.spread < SETTLED_SPREAD,
+                "{subject} at {name} must hold a band across the last {BAND} checkpoints: \
+                 it spread {:.4} about {:.8}, from {at:?}",
+                s.spread,
+                s.level
+            );
+            // The transient has to be the larger motion, or "settled" is just a
+            // slow climb measured over too short a run.
+            let start = at.first().copied().unwrap_or_default();
+            let transient = (s.level - start).abs();
+            assert!(
+                transient > s.spread * s.level,
+                "{subject} at {name} must have settled from a transient larger than its \
+                 own band: it moved {transient:.8} from the first checkpoint's {start:.8} \
+                 to the band's {:.8}, whose half-spread is {:.8}",
+                s.level,
+                s.spread * s.level
+            );
+        }
+    }
 }
+
+/// One seam's level at every checkpoint, in checkpoint order.
+fn column(traces: &[SeamTrace], pick: Pick) -> Vec<f32> {
+    traces.iter().map(pick).collect()
+}
+
+/// A settled reading: the mean over the last [`BAND`] checkpoints and the
+/// half-spread about it, as a fraction of the mean.
+///
+/// **The spread is not noise.** This instrument is deterministic — the same
+/// fixture at the same frame count reads bit-identically run to run. What the
+/// band covers is that a converged field still tracks its preset's own per-frame
+/// program, and the band is shorter than the slowest term in either fixture's,
+/// so the residual is a phase of that program rather than anything averaging out.
+struct Settled {
+    level: f32,
+    spread: f32,
+}
+
+impl Settled {
+    fn of(at: &[f32]) -> Self {
+        let band: Vec<f32> = at.iter().rev().take(BAND).copied().collect();
+        let level = band.iter().sum::<f32>() / band.len().max(1) as f32;
+        let lo = band.iter().copied().fold(f32::INFINITY, f32::min);
+        let hi = band.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        Self {
+            level,
+            spread: if level > 0.0 {
+                (hi - lo) / (2.0 * level)
+            } else {
+                0.0
+            },
+        }
+    }
+}
+
+/// How wide the settled band may be, as a fraction of its own mean, and still be
+/// called a band rather than a trend. Generous against the measurement, because
+/// what the assertion protects is the instrument's claim to report an equilibrium
+/// at all — not where the equilibrium is, which is what the phase measures
+/// (ADR-0071).
+const SETTLED_SPREAD: f32 = 0.20;

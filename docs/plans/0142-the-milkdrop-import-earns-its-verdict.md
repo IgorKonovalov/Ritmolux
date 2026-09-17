@@ -1,6 +1,6 @@
 # 0142 — The MilkDrop import earns its verdict
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-29
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)
@@ -324,3 +324,66 @@ flowchart LR
   (backlog 0214), is Plan 0180 Phase 2.
 - **It does not repair the seam or the waveform** (backlog 0215, 0216). Plan 0180 owns both; this
   plan only records what the reference shows.
+
+## Implementation log
+
+> Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
+> last one. **The phases above are the contract; everything here is what happened.**
+
+**Lane:** `WORK/rlx-plan-0142`, on `plan-0142-the-milkdrop-import-earns-its-verdict`
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — The equilibrium instrument | dev | done | committed with this row |
+| 2 — Name the mechanism | dev | not started | |
+| 3 — Bound the equilibrium | dev | not started | |
+| 4 — The look gate | human | not started | |
+| 5 — ADR-0113's third Outcome | dev | not started | |
+| 6 — The reach decision | dev | not started | |
+
+### Phase 1 — the re-taken table
+
+Dev box (hardware adapter), 128x128, `AnalysisFrame::default()`, quantizer at
+`DEFAULT_QUANTIZE_STEPS = 255`. `edge` in linear light at A and B, display-referred at E. `settled`
+is the mean over f100/f200/f300 and `spread` its half-spread as a fraction of that mean.
+
+```text
+  subject      seam               f30          f100          f200          f300       settled  spread
+  fog tunnel   A field     0.09276785    0.13548748    0.14085685    0.13043343    0.13559258   3.84%
+  fog tunnel   B present*  0.17703269    0.25443807    0.26188728    0.24317567    0.25316700   3.70%
+  fog tunnel   E display   0.33025211    0.40570471    0.41156110    0.39624831    0.40450469   1.89%
+  blur mix 3   A field     0.00000000    0.00000000    0.00000000    0.00000000    0.00000000   0.00%
+  blur mix 3   B present*  0.00000000    0.00000000    0.00000000    0.00000000    0.00000000   0.00%
+  blur mix 3   E display   0.00000000    0.00000000    0.00000000    0.00000000    0.00000000   0.00%
+
+  present-pass gain B/A on the settled level: fog tunnel 1.867, blur mix 3 n/a
+  * B is also seams C and D: no post stage is active and the backdrop is unbound
+```
+
+Seams covered before this phase: A, B (collapsed with C and D) and E, each at one frame count
+(300). What the phase added is the checkpoint set, the settled band and its spread, the transient
+probe at f30, and the present-pass gain.
+
+- **The washed level is not stationary at any frame.** f200 is the highest of the three band
+  readings, so the residual is not a residual climb; the band is +-3.8 % at the field.
+- **The control reads exactly `0.00000000` at every seam and every checkpoint**, f30 included, so
+  the washed/control ratio the earlier bisect was built on has no value at any seam.
+
+### Notes
+
+- **Phase 1 took no second control**, which the 2026-09-16 amendment left as a choice against a
+  stated reason. The reason is in `milk_wash.rs`'s module docs: a control at exactly zero rules an
+  *additive* stage out of the whole chain, which is stronger than a ratio, and leaves a
+  *multiplicative* stage invisible — bounded instead by the washed subject's own seam-to-seam gain,
+  now printed. A third fixture would also not be one of the seven pairs the look gates judge.
+- **`FieldTrace` in `warp_mesh/tests.rs` was listed under Files touched and was not changed.** It is
+  the synthetic per-frame probe driven by an empty bundle, and nothing the re-taken table needed
+  reached it.
+
+### Close triggers
+
+_(filled at the last implementer phase)_
+
+## Followups (after this lands)
+
+_(empty at Phase 1)_
