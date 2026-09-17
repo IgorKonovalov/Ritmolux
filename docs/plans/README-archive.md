@@ -242,7 +242,9 @@ eight `wave_mode` figures are `DrawWave`'s own; and `milkconv` binds `deposit = 
 `dev`'s to fix: `cargo doc --workspace` under `-D warnings` was **red on `main`** from Phase 7, which
 made the module header link the private `deposit_block` - repaired in `262a4c03`. Nothing local
 catches that class, because the pre-push doc step is scoped to `-p rlx-core` while CI runs
-`--workspace`; that is [backlog 0179](../design-backlog.md), and this is its second instance.
+`--workspace`; this is the class's second instance. The close named
+[backlog 0179](../design-backlog-archive.md) as its home, which was already closed - the residual it
+left behind is [backlog 0246](../design-backlog.md), raised 2026-09-17.
 Verified independently: `cargo nextest run --workspace` 1981 passed / 6 skipped in 852 s, `fmt` and
 `clippy` clean, every doc and backlog gate green.
 - **The log outran the phases section, and only half of that was repairable.** `d6b1003` stripped the

@@ -52,6 +52,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0243 — the served version-line rule is anchored to a column and a basename, not to the workspace section, so a dependency table edited in place would serve a code change to `-P fast`](#0243--the-served-version-line-rule-is-anchored-to-a-column-and-a-basename-not-to-the-workspace-section-so-a-dependency-table-edited-in-place-would-serve-a-code-change-to--p-fast)
 - [0244 — a custom wave is drawn from the source's traces but is neither smoothed nor scaled like the eight built-in figures](#0244--a-custom-wave-is-drawn-from-the-sources-traces-but-is-neither-smoothed-nor-scaled-like-the-eight-built-in-figures)
 - [0245 — the converted warp space has no pixel baseline, because every golden fixture is square and the two chains are identical there](#0245--the-converted-warp-space-has-no-pixel-baseline-because-every-golden-fixture-is-square-and-the-two-chains-are-identical-there)
+- [0246 — the local `cargo doc` mirror covers one crate of five, and the four it leaves out are still unreachable until after a push](#0246--the-local-cargo-doc-mirror-covers-one-crate-of-five-and-the-four-it-leaves-out-are-still-unreachable-until-after-a-push)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -2219,3 +2220,71 @@ computes is caught. The exposure is narrow: an incidental pixel change in a conv
 non-square target, which today means a test fixture and no shipped preset — `presets/` carries no
 `[milk]` bundle. It rises the day one ships.
 
+
+## 0246 — the local `cargo doc` mirror covers one crate of five, and the four it leaves out are still unreachable until after a push
+
+[Backlog 0179](design-backlog-archive.md) established that `cargo doc` was the one CI gate no local
+step mirrored, and [Plan 0177](plans/done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md)
+Phase 7 closed it: `.githooks/pre-push` now runs `cargo doc -p rlx-core --no-deps --features text`
+under `RUSTDOCFLAGS=-D warnings`, after clippy, for a measured 4.5-5.9 s. **That entry is closed and
+this one does not reopen it** — the step it asked for exists and works.
+
+What is left is the **scope**. The workspace has five members and the hook documents one of them, so
+`core-cabi`, `rlx-ring`, `milkconv` and `standalone` — each a `lib` target with its own public
+surface — are documented in CI and nowhere else. A rustdoc error in any of the four is still
+**structurally unreachable** before a push, which is 0179's own finding surviving its own repair at
+four-fifths strength.
+
+**It has already fired, and this is the second instance of the class.** At Plan 0180's close,
+`cargo doc --workspace` was red on `main`: `milkconv/src/convert.rs`'s module header made the private
+`deposit_block` an intra-doc link, which is an error for a public item under `-D warnings`. Repaired
+in `262a4c03`, after a `chore: Release` tag had already been written on top of the red. The first
+instance was Plan 0137 and is what raised 0179. Both shipped a red `main` under a release tag; the
+trigger in both is a **visibility or link change in a crate no local step documents**, not a doc edit.
+
+**The gap was written down at the moment it was created, in the one place a reader of this file
+would never look.** `.github/workflows/ci.yml` carries it in a comment beside the job — *"What it
+does NOT cover is `standalone`'s public surface (and `milkconv`'s and `rlx-core-cabi`'s); this job is
+the only place those are documented"* — and `.githooks/pre-push` says the same in fewer words. Both
+were accurate when written and neither is a backlog entry, so the residual had no name. That is why
+four documents now cite **backlog 0179** — a closed entry — as the home of a live gap
+(`.claude/skills/architect/SKILL.md` twice, `docs/plans/README-archive.md` twice, and `262a4c03`'s
+own commit message, which cannot be corrected). Note also that the `ci.yml` comment names **three**
+uncovered crates and the answer is four: `rlx-ring` is missing from it.
+
+Shapes, none decided:
+
+- **Widen the hook step to `--workspace`.** One word. Measured once on the development machine at
+  `0233a119`, warm, on an already-built tree: `RUSTDOCFLAGS="-D warnings" cargo doc --workspace
+  --no-deps` finished in **10.29 s**, green — against the scoped step's 4.5-5.9 s and the clippy step's
+  6.3-7.8 s from Plan 0177 Phase 7. **That is one warm run on one machine and not a budget ruling**;
+  ADR-0033's ~28 s hook budget is what a decision has to weigh it against, and a cold or
+  dependency-touching run was not measured. One simplification comes free: `--features text` is
+  needed only to document `rlx-core` alone, because `standalone/Cargo.toml:46` turns that feature on
+  and `--workspace` unifies it.
+- **Name the four crates instead of the workspace,** if the measurement above turns out to have been
+  flattered by the warm tree. Costs the same words to maintain as the comment already does.
+- **Leave the scope and move the class's home.** The hook's budget is real and ADR-0033 is entitled
+  to win; then the residual still needs a name that is not a closed entry, and the close ceremony's
+  own `cargo doc --workspace` line (Mode 4 lens 1) becomes the only carrier.
+
+- **Raised:** 2026-09-17, after Plan 0180's close, by `architect`. **Owner if taken:** `architect`
+  then `dev`.
+- **Verified 2026-09-17** — the hook's doc step is scoped to one crate:
+  `present: run_step "cargo doc -p rlx-core --no-deps --features text in: .githooks/pre-push`
+- **Verified 2026-09-17** — and no step in it documents the workspace (the bare string appears in the
+  hook's prose, which is why this probe reduces to the invocation):
+  `absent: run_step "cargo doc --workspace in: .githooks/pre-push`
+- **Verified 2026-09-17** — CI is the only place the other four are documented:
+  `present: this job is the only place those are documented in: .github/workflows/ci.yml`
+- **Verified 2026-09-17** — five members, one of them covered locally:
+  `present: members = \["core", "core-cabi", "rlx-ring", "milkconv", "standalone"\] in: Cargo.toml`
+- **Verified 2026-09-17** — the feature the scoped step needs and `--workspace` would not:
+  `present: rlx-core = \{ path = "\.\./core", features = \["text"\] \} in: standalone/Cargo.toml`
+
+### Priority
+
+**Medium.** It has shipped a red `main` under a release tag twice in sixteen days, and the cost each
+time was a close ceremony discovering after the fact what a hook step could have said before. It is
+not higher because the blast radius stops at CI — no user-visible behaviour is involved — and the
+repair may be a single word, which is also the reason it should not sit here long.

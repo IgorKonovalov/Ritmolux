@@ -254,7 +254,8 @@ not one phase. This is architectural integrity, not line-by-line style. Run five
   full suite is precisely the claim a deferred gate makes cheapest to get wrong, and a missing or
   vague bullet is a **blocker**, not a `minor`: it means nothing is known about the drift guards.
   Run `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` in the same sitting — CI runs it
-  and no local step does, so a close that skips it can tag a red `main` (backlog 0179).
+  over the whole workspace while the pre-push hook mirrors `-p rlx-core` alone, so a close that skips
+  it can tag a red `main` on any of the other four crates (backlog 0246).
 - **Silence in it is not
   certification:** done-when results are reported by exception, so a criterion with no note carries
   `dev`'s *belief* that it passed and nothing more — which is precisely the claim this lens exists
@@ -787,11 +788,13 @@ the line is absent (a plan predating [ADR-0120](../../../docs/adrs/0120-the-clos
    hook is **not** the backstop it looks like: it is opt-in per clone, `--no-verify` skips it, and
    its `nextest` step is narrowed (`-P fast`) rather than complete.
 
-   **The gate also owes `cargo doc`, because it is the one CI gate nothing local mirrors**
-   (backlog 0179). Plan 0137 made two items public whose doc comments linked private helpers; that
+   **The gate also owes `cargo doc`, because the hook mirrors it for `rlx-core` alone**
+   (backlog 0246 — `core-cabi`, `rlx-ring`, `milkconv` and `standalone` are documented in CI and
+   nowhere else). Plan 0137 made two items public whose doc comments linked private helpers; that
    is an error under `-D warnings` only once the item is public, so the trigger is a visibility
-   change rather than a doc edit, and it shipped a red `main` under a release tag. Run it before the
-   tag, beside the `nextest` above:
+   change rather than a doc edit, and it shipped a red `main` under a release tag. Plan 0180 did it
+   again in `milkconv`, which the scoped hook step cannot see. Run it before the tag, beside the
+   `nextest` above:
 
    ```sh
    RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps
