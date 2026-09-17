@@ -45,8 +45,11 @@
 # does not depend on `amount` - only what lands on them does - and a hard line
 # writes ONE flat value across the whole footprint. At 1.0 that value is pure
 # black, an ink this palette already holds, so the key adds nothing to the frame's
-# colour count. Below 1.0 it is a darkened grey, one new value per ink run it
-# crosses. Rendered at 640x360, loud, counting exact frame colours:
+# colour count. Below 1.0 that flat value is a darkened grey instead, and the
+# palette holds no such value - so the frame picks up a fresh one wherever the
+# line is laid over a colour it has not already darkened somewhere else. The
+# table is the count; do not predict it from the run count.
+# Rendered at 640x360, loud, counting exact frame colours:
 #
 #     style 1, contour 0.25    17 distinct colours    a grey key
 #     style 1, contour 0.5     18                     a darker grey key
