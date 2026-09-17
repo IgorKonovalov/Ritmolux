@@ -297,7 +297,7 @@ fn band_contour_ink(col: vec3<f32>, t: f32, steps: f32, amount: f32, style: f32,
 |---|---|---|---|
 | 1 — The contour copies are all watched, then the contour learns a style and an ink | dev | done | `277d7e1` (the watch), `80426fb` (the style and ink) |
 | 2 — `warp_mesh` colours by its own level | dev | done | `9627131` |
-| 3 — The palette reader says what a contour can be and where the warp field takes its colour | dev | done | committed with this row |
+| 3 — The palette reader says what a contour can be and where the warp field takes its colour | dev | done | `d575f65` |
 | 4 — The look gate: a hard key on the mono print, and a ladder world | human | not started | |
 
 ### Notes
@@ -404,12 +404,24 @@ its two new `###` headings; `presets/README.md`'s block is `depth=3` and gained 
 
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`**
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** yes, and **no `.toml` preset was added, removed or retuned**.
+  `presets/README.md` moved three ways — its generated params block regenerated for the three new
+  `ParamSpec`s, its hand-written `warp_mesh` prose, and its hand-written hard-bands section — and
+  `presets/preset.schema.json` plus seven files under `presets/schema/` are regenerated output.
+- **Plan header `Closes:`** design-backlog 0140, design-backlog 0146.
+- **What shipped:** a feature. Three new preset parameters (`palette_contour_style`,
+  `palette_contour_ink` on six scenes; `color_source` on `warp_mesh`), all three defaulting to the
+  arithmetic that shipped before them.
+- **Operator docs touched:** `docs/preset-palettes.md` and `presets/README.md`.
+  `docs/specs/player-schema.json` is generated and moved with the schema export.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — 75 stated reductions hold
+  across 33 live entries, 2 unprobeable, 36 advisory path-moved rows.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). Run per phase instead:
+  `cargo nextest run --workspace -P fast` (1693 passed, 305 skipped) plus the five deferred suites
+  this plan's blast radius calls for — `golden`, `sanity`, `reactivity`, `animation`, `distinctness`
+  — at both Phase 1 and Phase 2, **372 passed, 3 skipped, nothing blessed** each time.
+- **Outstanding `human` phases:** Phase 4, the `preset-author` look gate — `shape_contourmono`
+  re-authored onto a contour style, and a new mono `warp_mesh` ladder world on `color_source = 1`.
+  Its two verdicts are what ADR-0197's fringe question is left to.
 
 ## Followups (after this lands)
