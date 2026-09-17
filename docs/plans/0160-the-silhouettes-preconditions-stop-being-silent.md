@@ -1,6 +1,6 @@
 # 0160 — The silhouette's preconditions stop being silent
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-09
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0179](../adrs/0179-a-precondition-is-checked-at-load-or-it-is-written-down.md) (a precondition is checked at load, or it is written down)
@@ -283,16 +283,28 @@ flowchart TD
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(`main` directly, or the worktree path plus its branch)_
+**Lane:** `C:\Users\Igor Konovalov\WORK\rlx-plan-0160`, branch
+`plan-0160-the-silhouettes-preconditions-stop-being-silent`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The precondition is tested on the contour, not on the name | dev | not started | |
+| 1 — The precondition is tested on the contour, not on the name | dev | done | committed with this row |
 | 1b — The arity probe prices a polyline (optional) | dev | not started | |
 | 2 — The three unhookable constraints are written down | dev | not started | |
 | 3 — The document is checked against the engine, once | human | not started | |
 
 ### Notes
+
+- **Phase 1, the shipped maple fails the new test.** `worst ray gap 0.4017`, against a tolerance of
+  0.02 — its sinuses put a neighbouring lobe across the ray into the next one. It ships at
+  `coord_mode = "0"`, so no warning fires on it and no pixel of it moves; the reading is printed by
+  `the_tolerance_separates_the_measured_contours` alongside the lion's 0.0000. Phase 2's erosion
+  paragraph cites the maple as a worked case, which is unaffected — this is about a mode that
+  preset does not use.
+- **Phase 1 extends the verdict to a morph target**, which the plan's done-when speaks of in the
+  singular ("a contour that fails the test"). Both endpoints of a `morph_to` pair are drawn, so
+  either one failing takes the scaled copy away, on the scene and in the warning alike. An
+  intermediate contour of a morph is still not tested and cannot be from the load boundary.
 
 ### Close triggers
 

@@ -3462,6 +3462,75 @@ coord_mode = "1"
     );
 }
 
+/// ADR-0179: an **authored contour** resting on the scaled-copy coordinate warns
+/// on the same condition and in the same shape, tested on its geometry rather
+/// than on a roster name.
+///
+/// The `ring` above is one instance of the condition and this is the other: what
+/// the coordinate needs is a figure every ray from its centre leaves exactly
+/// once, and an authored contour can fail that in a way no name betrays. The
+/// crescent here is the failure as the content lane met it on a koi — the ray
+/// crosses the far horn, the shader takes the outermost crossing, and the figure
+/// collapses to a dot inside a few huge rays.
+///
+/// The second half is the one that makes the check worth having rather than
+/// merely noisy: a **star-shaped** authored contour is exactly what the mode is
+/// for and must pass silently, and a five-pointed star with deep reflex corners
+/// is the figure a check that convicted concavity as such would take with it.
+#[test]
+fn an_authored_contour_that_is_not_star_shaped_warns_on_the_scaled_copy() {
+    // A crescent: the outer arc and a shallower inner one, so the figure wraps
+    // around its own bounding-box centre.
+    const CRESCENT: &str = "M -1,0 C -0.7,-1.1 0.7,-1.1 1,0 C 0.55,-0.45 -0.55,-0.45 -1,0 Z";
+    // A deep five-pointed star: five reflex corners, and every ray from its
+    // centre still leaves once.
+    const STAR: &str = "M 0,-1 L 0.22,-0.31 L 0.95,-0.31 L 0.36,0.12 L 0.59,0.81 \
+                        L 0,0.38 L -0.59,0.81 L -0.36,0.12 L -0.95,-0.31 L -0.22,-0.31 Z";
+    let src = |d: &str| {
+        format!(
+            "system = \"shape_field\"\nname = \"Authored\"\n\
+             [path]\nd = \"{d}\"\n[params]\ncoord_mode = \"1\"\n"
+        )
+    };
+
+    let preset = Preset::from_toml_str(&src(CRESCENT)).expect("the combination still loads");
+    assert_eq!(
+        preset.warnings.len(),
+        1,
+        "one refused combination, one warning, got {:?}",
+        preset.warnings
+    );
+    let warning = preset.warnings.first().expect("the warning");
+    assert!(
+        warning.contains("coord_mode") && warning.contains("star-shaped"),
+        "the warning names the parameter and what was found in the geometry: {warning}"
+    );
+    assert!(
+        warning.contains("distance"),
+        "...and says what is drawn instead, which is the half an author acts on: {warning}"
+    );
+    // It is anchored to the binding's own line, which is what puts it on the
+    // right row in `ritmolux --check` and gives the studio's `preset_warning`
+    // event its `param` (ADR-0192).
+    assert_eq!(
+        warning.param.as_deref(),
+        Some("coord_mode"),
+        "the warning is anchored to the binding: {warning}"
+    );
+    assert!(
+        preset.params.iter().any(|b| b.name == "coord_mode"),
+        "the binding is kept"
+    );
+
+    // The positive control: the capability this mode exists for is untouched.
+    let ok = Preset::from_toml_str(&src(STAR)).expect("a star-shaped contour loads");
+    assert!(
+        !ok.warnings.iter().any(|w| w.contains("coord_mode")),
+        "a star-shaped authored contour must take the radius mode in silence: {:?}",
+        ok.warnings
+    );
+}
+
 /// The same check is silent on every combination that is not refused: the
 /// distance mode on a ring, the radius mode on an arm that has one, and a
 /// system with no `coord_mode` at all.

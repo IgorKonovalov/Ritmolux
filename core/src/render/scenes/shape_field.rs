@@ -787,6 +787,16 @@ pub struct ShapeFieldScene {
     /// sliver short of the palette's first texel.
     path_inradius: f32,
     path_inradius_to: f32,
+    /// Whether the contour(s) this scene is holding are star-shaped about the
+    /// centre `coord_mode = 1` divides by — `None` where the preset declares no
+    /// `[path]` and the roster arm is the figure.
+    ///
+    /// Read off the parsed shape at configure time, where the geometry is
+    /// (`PathShape::star_shaped`), and `false` when EITHER endpoint of a morph
+    /// pair fails: both are drawn. **An intermediate contour of a morph is not
+    /// tested** — it exists only between two frames' interpolation, and two
+    /// star-shaped endpoints can pass through a contour that is not.
+    path_star_shaped: Option<bool>,
     /// How far along `path_from` -> `path_to` the figure is, raw as the preset
     /// bound it. `0` — the default — is the authored figure, and an exact
     /// identity: the interpolation is skipped entirely.
@@ -885,6 +895,7 @@ impl ShapeFieldScene {
             path: Box::new([[0.0; 4]; PATH_VEC4S]),
             path_inradius: 1.0,
             path_inradius_to: 1.0,
+            path_star_shaped: None,
             occlude: crate::render::post::DEFAULT_OCCLUDE,
         }
     }
@@ -922,7 +933,8 @@ fn applied_rotation(rotation: f32) -> f32 {
 
 /// The `coord_mode` the shader is handed: clamped into the roster, then
 /// **rounded to an integer**, with a non-finite binding falling back to the
-/// default — and **forced back to the distance on a `ring`**.
+/// default — and **forced back to the distance on a figure the scaled copy has
+/// no single value on**.
 ///
 /// The quantizing half is `marks::mark_shape`'s treatment for
 /// `marks::mark_shape`'s reason, and the `kaleido_edge` precedent behind both. A
@@ -932,11 +944,24 @@ fn applied_rotation(rotation: f32) -> f32 {
 /// there is nothing halfway between an offset curve and a scaled copy for the
 /// shader to draw there.
 ///
-/// # The `ring` fallback, and why it is not silent
+/// # The fallback, and why it is not silent
 ///
-/// An annulus's centre is in its hole, so `r / r_boundary` has no single value
-/// there — the one behavioural choice ADR-0111 leaves open. Plan 0098
-/// Phase 4 rendered the three defensible answers before picking, and what
+/// The scaled copy divides by the boundary radius along a ray from the figure's
+/// centre, so it needs a figure every such ray leaves exactly once. Two figures
+/// this scene can draw are not: a **`ring`**, whose centre is in its hole, and
+/// an **authored contour that is not star-shaped about its centre** — a
+/// crescent, or a silhouette whose sinuses put one lobe across the ray into
+/// another. On both the shader takes the outermost crossing and everything
+/// between the crossings reads as interior, which collapses the figure to a dot
+/// inside a few huge rays.
+///
+/// `contour_star_shaped` is the verdict for the contour being drawn, or `None`
+/// where there is no `[path]` table — in which case the roster arm is the figure
+/// and the `ring` is the one arm that fails. A contour REPLACES the roster arm
+/// in the shader, so the two tests are alternatives rather than both.
+///
+/// The `ring`'s case is the one behavioural choice ADR-0111 leaves open. Plan
+/// 0098 Phase 4 rendered the three defensible answers before picking, and what
 /// settled it is that defining the boundary as the outer rim produces a figure
 /// **byte-identical to a `disc`**: the coordinate collapses to `length(p)` and
 /// the hole stops existing, so a preset naming one roster entry would be shown
@@ -944,11 +969,16 @@ fn applied_rotation(rotation: f32) -> f32 {
 ///
 /// So the combination is refused rather than approximated, and the refusal is
 /// **announced**: `Preset::from_toml_str` warns at load when a preset rests on
-/// it (ADR-0020's shape, the `thickness` dead-zone precedent). The silent
-/// fallback was the third candidate and it is the one this rejects — it renders
-/// the same pixels as this does and costs an author the afternoon.
-fn applied_coord_mode(mode: f32, shape: f32) -> f32 {
-    if shape == marks::RING_SHAPE {
+/// it (ADR-0020's shape, the `thickness` dead-zone precedent), on the same
+/// condition this decides on. The silent fallback was the third candidate and it
+/// is the one this rejects — it renders the same pixels as this does and costs
+/// an author the afternoon.
+fn applied_coord_mode(mode: f32, shape: f32, contour_star_shaped: Option<bool>) -> f32 {
+    let single_valued = match contour_star_shaped {
+        Some(star_shaped) => star_shaped,
+        None => shape != marks::RING_SHAPE,
+    };
+    if !single_valued {
         return DEFAULT_COORD_MODE;
     }
     if mode.is_finite() {
@@ -1337,6 +1367,7 @@ impl Scene for ShapeFieldScene {
             self.pieces.clear();
             self.path_inradius = 1.0;
             self.path_inradius_to = 1.0;
+            self.path_star_shaped = None;
             if let Some(contour) = shape {
                 // The load boundary already refused an arity above the ceiling,
                 // so the `take` is a belt on a boundary that holds rather than a
@@ -1344,6 +1375,7 @@ impl Scene for ShapeFieldScene {
                 self.path_from
                     .extend(contour.points().iter().take(MAX_SAMPLES).copied());
                 self.path_inradius = contour_inradius(&self.path_from);
+                self.path_star_shaped = Some(contour.star_shaped());
                 self.pieces.extend_from_slice(contour.pieces());
             }
             // The pair is aligned at load; a target of a different arity would
@@ -1355,6 +1387,10 @@ impl Scene for ShapeFieldScene {
             {
                 self.path_to.extend(target.points().iter().copied());
                 self.path_inradius_to = contour_inradius(&self.path_to);
+                // Both endpoints are drawn, so either one failing takes the
+                // scaled copy away for the whole travel.
+                self.path_star_shaped =
+                    Some(self.path_star_shaped.unwrap_or(true) && target.star_shaped());
             }
         }
         None
@@ -1401,7 +1437,7 @@ impl Scene for ShapeFieldScene {
         // not about the raw binding.
         let shape = marks::mark_shape(self.shape);
         self.gpu.flush_palette(queue);
-        let coord_mode = applied_coord_mode(self.coord_mode, shape);
+        let coord_mode = applied_coord_mode(self.coord_mode, shape, self.path_star_shaped);
         let (path_count, path_arcs, path_inradius) = self.pack_path(coord_mode);
 
         let params = Params {
