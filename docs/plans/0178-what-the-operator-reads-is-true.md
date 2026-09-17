@@ -314,7 +314,7 @@ flowchart LR
 | 1 — The preset directory reports its drift | dev | done | a20bc34a |
 | 2 — `--list-presets` shows the set a launch would load | dev | done | 2fd42a7d |
 | 3 — The banner and the recovery line say what is true | dev | done | committed with this row |
-| 4 — A written count of the systems cannot land | dev | not started | |
+| 4 — A written count of the systems cannot land | dev | done | committed with this row |
 | 5 — The microphone capture is settled on the machine it happened on | human | not started | |
 
 ### Notes
@@ -339,6 +339,29 @@ flowchart LR
   the roster to **standard output** — the contract `schema_answers_on_stdout_and_exits_without_starting_the_app`
   and the `STDOUT_WRITERS` allowlist both rest on — and `--help` writes nothing to stderr. The
   assertion is on stdout's opening.
+- **Phase 4 was done by the owner, not by a conductor session.** The phase declares
+  `.claude/skills/preset-author/SKILL.md`, and the CLI refuses a headless session an edit under
+  `.claude/` whatever the allowlist says, so the lane parked in front of the phase and nothing was
+  run (ADR-0210). The whole phase was then taken by hand in the lane on 2026-09-17.
+- **Phase 4, the first run reported thirteen instances, and one was the gate's own false positive.**
+  `studio/renderer/components/ParamPanel.tsx:13` reads *"seven of its system's twelve"* — a count of
+  params, not of systems. The singular possessive is now excluded in the script and the exclusion
+  says why; the plural possessive (`the twelve systems' palettes`) stays matched, because that one
+  is a roster count.
+- **Phase 4, what took `count-allow:` and what was rewritten.** One marker, on
+  `core/tests/suite/hygiene.rs`'s *"82 systems that do not exist"*, which is a count of per-preset
+  cards rather than a roster total — the case ADR-0202 names. Everything else was rewritten
+  count-free, including the two the ADR's table lists as dated records in live documents
+  (`.claude/skills/preset-author/SKILL.md`, `docs/content-brief.md`): both sentences survive without
+  the number, which the ADR prefers to a marker.
+- **Phase 4, the ordinals went with the counts.** `.githooks/pre-push`'s header called four of its
+  gates "the sixth", "the seventh", "the eighth" and "the ninth", and `ci.yml` numbered six steps
+  the same way. They are the same drift class as a roster count and adding a gate falsifies them, so
+  each now names its gate instead. `CLAUDE.md` already said its count was deliberately not written.
+- **Phase 4, the fixture's expected break count is five, not the four the phase's bullet list
+  implies.** The list names seven cases; `the other ten systems` has a zero-word gap, so a genuine
+  two-word-gap case (`twelve built-in scene systems`) was seeded beside it rather than instead of
+  it. A three-word gap is seeded as a silence, which makes the script's own named hole re-runnable.
 
 ### Close triggers
 

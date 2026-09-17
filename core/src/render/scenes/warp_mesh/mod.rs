@@ -687,7 +687,7 @@ pub struct WarpMeshScene {
     palette: Palette,
     /// The converted MilkDrop preset's live EEL2 state, when the preset carries a
     /// `[milk]` table (Plan 0100 Phase 2 / ADR-0113). `None` — a hand-authored
-    /// preset — executes no VM at all, so the ten native systems and a native
+    /// preset — executes no VM at all, so the native systems and a native
     /// `warp_mesh` preset take exactly the path they took before this existed.
     ///
     /// **The bundle drives the scene *after* the ordinary bindings**, and that is

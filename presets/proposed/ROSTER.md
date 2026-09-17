@@ -50,7 +50,7 @@ with a gallery card, which leaves the table above empty until the next authoring
 
 ## Notes on this pass
 
-**Twenty presets, all twelve systems, every one rendered at `--tier rich --signal
+**Twenty presets, every system then in the roster, all rendered at `--tier rich --signal
 dynamic:110 --frame-at 300 --size 640x360` and looked at.** Several were re-cut after
 the first render: `attractor_emberdrift` came back as a solid orange blob (the additive
 ceiling, exactly as advertised — `brightness` 0.92 → 0.22 and `fade` 0.955 → 0.90 fixed

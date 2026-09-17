@@ -274,11 +274,12 @@ const MIN_STRUCTURAL_SHELLS: usize = 4;
 /// The most the lowest-scoring preset in a system may sit above that system's
 /// floor before the floor has stopped doing anything (Plan 0058 Phase 2).
 ///
-/// The old floors were `0.01` for six of the eight systems against a library
-/// whose sparsest member now measures `0.1189` — a factor of **11.9**, and on
-/// the two systems above it a factor of 24 to 84. Nothing could fail them except
-/// a literally black frame, which is why they survived a preset drawn entirely
-/// off-frame. A floor is only a floor if the content is somewhere near it.
+/// The old floors were `0.01` for most of the systems then in the roster,
+/// against a library whose sparsest member now measures `0.1189` — a factor of
+/// **11.9**, and on the two systems above it a factor of 24 to 84. Nothing
+/// could fail them except a literally black frame, which is why they survived a
+/// preset drawn entirely off-frame. A floor is only a floor if the content is
+/// somewhere near it.
 ///
 /// Enforced by [`report_coverage_distribution`], which is the mechanism that
 /// gives this paragraph a shelf life instead of a good intention. It fires when
@@ -1797,7 +1798,7 @@ fn the_honest_mandala_tunings_pass_the_structural_measure() {
 
 /// The least coverage a preset may paint at [`MODERATE`] and still be a picture
 /// at a realistic level (Plan 0058 Phase 3). A **sentinel, not a floor** — one
-/// number across all eight systems, deliberately unlike [`coverage_floor`].
+/// number across every system, deliberately unlike [`coverage_floor`].
 ///
 /// The per-system floors were measured at [`LOUD`] and belong there. This asks a
 /// cruder question that needs no per-system calibration: *is the figure in the
