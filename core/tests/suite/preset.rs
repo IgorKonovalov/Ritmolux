@@ -2082,6 +2082,8 @@ const PALETTE_BLOCK: &[&str] = &[
     "palette_mix",
     "palette_steps",
     "palette_contour",
+    "palette_contour_style",
+    "palette_contour_ink",
     "saturation",
     "hue",
     "brightness",
@@ -2377,6 +2379,15 @@ const STRUCTURAL: &[(&str, &str)] = &[
     ("shape_field", "palette_steps"),
     ("warp_mesh", "palette_steps"),
     ("analytic_field", "palette_steps"),
+    // `palette::band_contour_style`: clamps into `0..=3` and rounds, on the six
+    // scenes whose fragment stage carries `band_contour_ink` — a selector over
+    // four lines, so a fraction between two of them names none (ADR-0197).
+    ("fragment_field", "palette_contour_style"),
+    ("reaction_diffusion", "palette_contour_style"),
+    ("shape_field", "palette_contour_style"),
+    ("warp_mesh", "palette_contour_style"),
+    ("analytic_field", "palette_contour_style"),
+    ("cellular", "palette_contour_style"),
     // `analytic_field::applied_mode`: clamps into the plate's range and rounds,
     // because a fractional mode is not a standing wave of the plate at all.
     ("analytic_field", "mode_n"),

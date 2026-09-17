@@ -620,6 +620,8 @@ pub const PARAMS: &[ParamSpec] = &[
     crate::render::scenes::common::PALETTE_MIX,
     crate::render::scenes::common::PALETTE_STEPS,
     crate::render::scenes::common::PALETTE_CONTOUR,
+    crate::render::scenes::common::PALETTE_CONTOUR_STYLE,
+    crate::render::scenes::common::PALETTE_CONTOUR_INK,
     crate::render::scenes::common::brightness(DEFAULT_BRIGHTNESS),
 ];
 

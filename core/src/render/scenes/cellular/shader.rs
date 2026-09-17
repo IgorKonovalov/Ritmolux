@@ -251,6 +251,10 @@ struct Present {
     // x: trail (generations, >= 0, clamped CPU-side), y: age_tint,
     // z: 1 for the cyclic family, w: cyclic's states (>= 2)
     d: vec4<f32>,
+    // x: palette_contour_style (integral, rounded CPU-side),
+    // y: palette_contour_ink (ADR-0197), zw: unused. Its own vec4 because every
+    // slot above is spent.
+    e: vec4<f32>,
 }
 @group(0) @binding(0) var field: texture_2d<f32>;
 @group(0) @binding(1) var lut_a: texture_2d<f32>;
@@ -273,21 +277,24 @@ fn band_coord(t: f32, steps: f32) -> f32 {
     return (floor(t * steps) + 0.5) / steps;
 }
 
-// Shared `palette_contour` (ADR-0078 / ADR-0133), copied verbatim from
+// Shared `palette_contour` (ADR-0078 / ADR-0133 / ADR-0197), copied verbatim from
 // `fragment_field.rs`, whose comment carries the reasoning.
-fn band_contour(
+fn band_contour_ink(
+    col: vec3<f32>,
     t: f32,
     steps: f32,
     amount: f32,
+    style: f32,
+    ink_t: f32,
     lut_a: texture_2d<f32>,
     lut_b: texture_2d<f32>,
     lut_samp: sampler,
     mix_ab: f32,
-) -> f32 {
+) -> vec3<f32> {
     let f = t * steps;
     let w = max(fwidth(f), 1e-5);
     if (steps < 1.5 || amount <= 0.0) {
-        return 1.0;
+        return col;
     }
     let n = round(f);
     let m = clamp(mix_ab, 0.0, 1.0);
@@ -302,10 +309,21 @@ fn band_contour(
         m
     );
     if (all(abs(hi - lo) < vec3<f32>(0.5 / 255.0))) {
-        return 1.0;
+        return col;
     }
     let d = min(fract(f), 1.0 - fract(f));
-    return 1.0 - clamp(amount, 0.0, 1.0) * (1.0 - smoothstep(0.0, w, d));
+    if (style < 0.5) {
+        return col * (1.0 - clamp(amount, 0.0, 1.0) * (1.0 - smoothstep(0.0, w, d)));
+    }
+    let hard = style == 1.0 || style == 3.0;
+    let cover = select(1.0 - smoothstep(0.0, w, d), f32(d < w), hard);
+    let ink_lut = mix(
+        textureSampleLevel(lut_a, lut_samp, vec2<f32>(ink_t, 0.5), 0.0).rgb,
+        textureSampleLevel(lut_b, lut_samp, vec2<f32>(ink_t, 0.5), 0.0).rgb,
+        m
+    );
+    let ink = select(vec3<f32>(0.0), ink_lut, style >= 2.0);
+    return mix(col, ink, clamp(amount, 0.0, 1.0) * cover);
 }
 
 // What one cell hands the colour stage: where on the palette it reads (before
@@ -368,7 +386,9 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let ca = textureSampleLevel(lut_a, lut_samp, vec2<f32>(banded, 0.5), 0.0).rgb;
     let cb = textureSampleLevel(lut_b, lut_samp, vec2<f32>(banded, 0.5), 0.0).rgb;
     var col = mix(ca, cb, clamp(palette_mix, 0.0, 1.0));
-    col = col * band_contour(coord, steps, pp.b.y, lut_a, lut_b, lut_samp, palette_mix);
+    col = band_contour_ink(
+        col, coord, steps, pp.b.y, pp.e.x, pp.e.y, lut_a, lut_b, lut_samp, palette_mix
+    );
     col = apply_saturation(col, pp.a.z);
     col = col * (max(pp.a.y, 0.0) * light);
 

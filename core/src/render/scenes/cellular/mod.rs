@@ -600,6 +600,8 @@ pub const PARAMS: &[ParamSpec] = &[
     common::PALETTE_MIX,
     common::PALETTE_STEPS,
     common::PALETTE_CONTOUR,
+    common::PALETTE_CONTOUR_STYLE,
+    common::PALETTE_CONTOUR_INK,
 ];
 
 /// One row of [`FAMILY_PARAMS`], its ranges in [`CellularFamily::ALL`]'s
@@ -684,6 +686,8 @@ struct PresentParams {
     c: [f32; 4],
     /// x: trail (generations), y: age_tint, z: 1 for `cyclic`, w: its states.
     d: [f32; 4],
+    /// x: palette_contour_style, y: palette_contour_ink (ADR-0197); zw unused.
+    e: [f32; 4],
 }
 
 /// The two bind groups of one pass over the ping-pong pair — reading texture A
@@ -1403,6 +1407,12 @@ impl Scene for CellularScene {
                     0.0
                 },
                 applied_states(self.states) as f32,
+            ],
+            e: [
+                palette::band_contour_style(self.colour.contour_style),
+                self.colour.contour_ink,
+                0.0,
+                0.0,
             ],
         };
 

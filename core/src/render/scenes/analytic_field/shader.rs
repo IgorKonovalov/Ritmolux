@@ -39,6 +39,12 @@ struct Params {
     // x: trap (0 none, 1 point, 2 line, 3 cross, 4 circle), y: trap_radius,
     // z: trap_rotate in radians, w: unused
     h: vec4<f32>,
+    // x: palette_contour_style (integral, rounded CPU-side),
+    // y: palette_contour_ink (ADR-0197), zw: unused.
+    //
+    // Its own vec4 rather than two of the `w` slots left free above: the two are
+    // one control split in half, and no free PAIR exists in this struct.
+    i: vec4<f32>,
 }
 
 // One group, the LUTs before the uniform. The order is what keeps this layout a
@@ -69,22 +75,26 @@ fn band_coord(t: f32, steps: f32) -> f32 {
     return (floor(t * steps) + 0.5) / steps;
 }
 
-// Shared `palette_contour` (ADR-0078 / ADR-0133), copied verbatim from
+// Shared `palette_contour` (ADR-0078 / ADR-0133 / ADR-0197), copied verbatim from
 // `fragment_field.rs`, whose comment carries the reasoning: a one-pixel line at
-// each band edge, drawn only where the ink actually changes.
-fn band_contour(
+// each band edge, drawn only where the ink actually changes, in the style
+// `palette_contour_style` names.
+fn band_contour_ink(
+    col: vec3<f32>,
     t: f32,
     steps: f32,
     amount: f32,
+    style: f32,
+    ink_t: f32,
     lut_a: texture_2d<f32>,
     lut_b: texture_2d<f32>,
     lut_samp: sampler,
     mix_ab: f32,
-) -> f32 {
+) -> vec3<f32> {
     let f = t * steps;
     let w = max(fwidth(f), 1e-5);
     if (steps < 1.5 || amount <= 0.0) {
-        return 1.0;
+        return col;
     }
     let n = round(f);
     let m = clamp(mix_ab, 0.0, 1.0);
@@ -99,10 +109,21 @@ fn band_contour(
         m
     );
     if (all(abs(hi - lo) < vec3<f32>(0.5 / 255.0))) {
-        return 1.0;
+        return col;
     }
     let d = min(fract(f), 1.0 - fract(f));
-    return 1.0 - clamp(amount, 0.0, 1.0) * (1.0 - smoothstep(0.0, w, d));
+    if (style < 0.5) {
+        return col * (1.0 - clamp(amount, 0.0, 1.0) * (1.0 - smoothstep(0.0, w, d)));
+    }
+    let hard = style == 1.0 || style == 3.0;
+    let cover = select(1.0 - smoothstep(0.0, w, d), f32(d < w), hard);
+    let ink_lut = mix(
+        textureSampleLevel(lut_a, lut_samp, vec2<f32>(ink_t, 0.5), 0.0).rgb,
+        textureSampleLevel(lut_b, lut_samp, vec2<f32>(ink_t, 0.5), 0.0).rgb,
+        m
+    );
+    let ink = select(vec3<f32>(0.0), ink_lut, style >= 2.0);
+    return mix(col, ink, clamp(amount, 0.0, 1.0) * cover);
 }
 
 // What one family hands the colour stage: where on the palette this pixel
@@ -314,6 +335,8 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let palette_mix = params.c.x;
     let palette_steps = params.c.z;
     let palette_contour = params.c.w;
+    let palette_contour_style = params.i.x;
+    let palette_contour_ink = params.i.y;
 
     let coord = s.coord * color_span + color_center + hue;
     let banded = band_coord(coord, palette_steps);
@@ -323,8 +346,9 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let ca = textureSampleLevel(lut_a, lut_samp, vec2<f32>(banded, 0.5), 0.0).rgb;
     let cb = textureSampleLevel(lut_b, lut_samp, vec2<f32>(banded, 0.5), 0.0).rgb;
     var col = mix(ca, cb, clamp(palette_mix, 0.0, 1.0));
-    col = col * band_contour(
-        coord, palette_steps, palette_contour, lut_a, lut_b, lut_samp, palette_mix
+    col = band_contour_ink(
+        col, coord, palette_steps, palette_contour, palette_contour_style,
+        palette_contour_ink, lut_a, lut_b, lut_samp, palette_mix
     );
     col = apply_saturation(col, saturation);
     col = col * (max(params.d.x, 0.0) * s.light);

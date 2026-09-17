@@ -63,9 +63,30 @@
 //! LUT once *per particle*, in the vertex stage and on the CPU respectively, where
 //! a point sprite has a single palette coordinate and so there is no gradient
 //! across it to contour. So **banding reaches every scene; contours reach the
-//! continuous-field scenes** (the fragment field and reaction-diffusion).
-//! `palette_contour` elsewhere is inert and nothing warns, because the param *is*
-//! known — which is why `presets/README.md` says so beside it.
+//! continuous-field scenes**: `analytic_field`, `cellular`, `fragment_field`,
+//! `reaction_diffusion`, `shape_field` and `warp_mesh`, which are exactly the
+//! sources carrying a copy of the WGSL below. `palette_contour` elsewhere is inert
+//! and nothing warns, because the param *is* known — which is why
+//! `presets/README.md` says so beside it.
+//!
+//! ## What the contour is drawn in (ADR-0197)
+//!
+//! `palette_contour_style` picks one of four lines, and the rounding that makes
+//! the shader's comparisons exact is [`band_contour_style`], on this side:
+//!
+//! | style | footprint | ink |
+//! |---|---|---|
+//! | `0` | soft, ramped over one `fwidth` | black (a darkening) |
+//! | `1` | hard, a step over the same footprint | black |
+//! | `2` | soft | the palette at `palette_contour_ink` |
+//! | `3` | hard | the palette at `palette_contour_ink` |
+//!
+//! `0` is the default and its arm is the expression that shipped before the other
+//! three existed, so nothing moves by adding the control. `palette_contour_ink` is
+//! an **absolute** LUT coordinate — `hue` does not shift it — so it names a stop,
+//! and it is crossfaded A/B by `palette_mix` like every other sample. Styles 1 and
+//! 3 are the limited-ink pair: at `palette_contour = 1` a hard line writes one
+//! flat value, which is what keeps a plateau palette's frame down to its own inks.
 
 // Hot-path panic-denial pragma (Plan 0002 Phase 2; render/ is scanned by the
 // hygiene guard). `sample` runs per particle per frame in the swarm.
@@ -563,6 +584,15 @@ impl LutPair {
 pub const DEFAULT_PALETTE_STEPS: f32 = 0.0;
 /// `palette_contour` default — 0, no contour.
 pub const DEFAULT_PALETTE_CONTOUR: f32 = 0.0;
+/// `palette_contour_style` default — 0, the soft darkening toward black that was
+/// the only line before ADR-0197.
+pub const DEFAULT_PALETTE_CONTOUR_STYLE: f32 = 0.0;
+/// `palette_contour_ink` default — 0, the palette's own origin. Unread at the
+/// default style, which draws in black rather than in an ink.
+pub const DEFAULT_PALETTE_CONTOUR_INK: f32 = 0.0;
+/// The highest contour style, and the count of them minus one. See the module
+/// docs for the table.
+pub const MAX_PALETTE_CONTOUR_STYLE: f32 = 3.0;
 /// At or below this band count the banding is **off**, and off is the exact
 /// identity rather than a degenerate case of the quantized path: one band would
 /// snap the whole palette to `(0 + 0.5)/1`, a single flat colour.
@@ -621,6 +651,28 @@ pub fn band_contour(contour: f32) -> f32 {
         contour.clamp(0.0, 1.0)
     } else {
         DEFAULT_PALETTE_CONTOUR
+    }
+}
+
+/// The contour style the sample sites are handed: clamped into
+/// `[0, MAX_PALETTE_CONTOUR_STYLE]` and **rounded to an integer**, with a
+/// non-finite binding falling back to the soft darkening.
+///
+/// The rounding is what lets the WGSL compare the style for equality — `style ==
+/// 1.0` — rather than bracketing it, which would mean deciding what `1.5` means at
+/// six sites instead of one. It is `band_steps`' treatment for `band_steps`'
+/// reason: `[smoothing]` and preset dissolves sweep a binding *continuously*
+/// between two settings, and this is a selector rather than an amount.
+///
+/// It **clamps** where `echo_orientation` wraps, because the four styles are two
+/// independent flags rather than a cycle: counting past `3` means asking for a
+/// harder, inkier line than exists, and landing back on the soft black one would
+/// be a surprise rather than a rotation.
+pub fn band_contour_style(style: f32) -> f32 {
+    if style.is_finite() {
+        style.clamp(0.0, MAX_PALETTE_CONTOUR_STYLE).round()
+    } else {
+        DEFAULT_PALETTE_CONTOUR_STYLE
     }
 }
 
@@ -960,6 +1012,33 @@ mod tests {
         assert_eq!(band_contour(f32::NAN), DEFAULT_PALETTE_CONTOUR);
     }
 
+    /// The style reaches the shader as one of exactly four integers, so its WGSL
+    /// can compare it for equality instead of bracketing it. **Clamped, not
+    /// wrapped**: counting past the hardest ink line asks for one that does not
+    /// exist, and landing back on the soft black one would read as a bug.
+    #[test]
+    fn band_contour_style_is_one_of_four_integers() {
+        for &raw in &[-4.0f32, -0.4, 0.0, 0.4, 0.6, 1.4, 2.5, 3.0, 9.0, 1e9] {
+            let s = band_contour_style(raw);
+            assert_eq!(
+                s,
+                s.round(),
+                "band_contour_style({raw}) = {s} is fractional"
+            );
+            assert!((0.0..=MAX_PALETTE_CONTOUR_STYLE).contains(&s));
+        }
+        assert_eq!(band_contour_style(0.4), 0.0);
+        assert_eq!(band_contour_style(0.6), 1.0);
+        assert_eq!(band_contour_style(2.5), 3.0);
+        assert_eq!(band_contour_style(99.0), MAX_PALETTE_CONTOUR_STYLE);
+        assert_eq!(band_contour_style(-99.0), 0.0);
+        assert_eq!(band_contour_style(f32::NAN), DEFAULT_PALETTE_CONTOUR_STYLE);
+        assert_eq!(
+            band_contour_style(f32::INFINITY),
+            DEFAULT_PALETTE_CONTOUR_STYLE
+        );
+    }
+
     // --- The WGSL copies have not drifted --------------------------------
     //
     // ADR-0078's accepted cost: this project has no shader include mechanism, so
@@ -985,19 +1064,22 @@ fn band_coord(t: f32, steps: f32) -> f32 {
     /// The canonical WGSL contour function. **Fragment stage only** — it calls
     /// `fwidth`.
     const BAND_CONTOUR_WGSL: &str = "\
-fn band_contour(
+fn band_contour_ink(
+    col: vec3<f32>,
     t: f32,
     steps: f32,
     amount: f32,
+    style: f32,
+    ink_t: f32,
     lut_a: texture_2d<f32>,
     lut_b: texture_2d<f32>,
     lut_samp: sampler,
     mix_ab: f32,
-) -> f32 {
+) -> vec3<f32> {
     let f = t * steps;
     let w = max(fwidth(f), 1e-5);
     if (steps < 1.5 || amount <= 0.0) {
-        return 1.0;
+        return col;
     }
     let n = round(f);
     let m = clamp(mix_ab, 0.0, 1.0);
@@ -1012,10 +1094,21 @@ fn band_contour(
         m
     );
     if (all(abs(hi - lo) < vec3<f32>(0.5 / 255.0))) {
-        return 1.0;
+        return col;
     }
     let d = min(fract(f), 1.0 - fract(f));
-    return 1.0 - clamp(amount, 0.0, 1.0) * (1.0 - smoothstep(0.0, w, d));
+    if (style < 0.5) {
+        return col * (1.0 - clamp(amount, 0.0, 1.0) * (1.0 - smoothstep(0.0, w, d)));
+    }
+    let hard = style == 1.0 || style == 3.0;
+    let cover = select(1.0 - smoothstep(0.0, w, d), f32(d < w), hard);
+    let ink_lut = mix(
+        textureSampleLevel(lut_a, lut_samp, vec2<f32>(ink_t, 0.5), 0.0).rgb,
+        textureSampleLevel(lut_b, lut_samp, vec2<f32>(ink_t, 0.5), 0.0).rgb,
+        m
+    );
+    let ink = select(vec3<f32>(0.0), ink_lut, style >= 2.0);
+    return mix(col, ink, clamp(amount, 0.0, 1.0) * cover);
 }";
 
     const FRAGMENT_FIELD_SRC: &str = include_str!("scenes/fragment_field.rs");
@@ -1125,21 +1218,21 @@ fn band_contour(
     /// never opened; the scan is what makes a seventh copy impossible to miss.
     #[test]
     fn the_contour_reaches_the_fragment_sites_and_not_the_vertex_one() {
-        let carriers = scene_files_containing("fn band_contour");
+        let carriers = scene_files_containing("fn band_contour_ink");
         assert!(
             carriers.len() >= 6,
-            "only {} scene sources carry a `band_contour` copy: {carriers:?}",
+            "only {} scene sources carry a `band_contour_ink` copy: {carriers:?}",
             carriers.len()
         );
         for name in &carriers {
             assert!(
                 source_of(name).contains(BAND_CONTOUR_WGSL),
-                "{name}'s copy of the WGSL `band_contour` has drifted"
+                "{name}'s copy of the WGSL `band_contour_ink` has drifted"
             );
         }
         assert!(
             !carriers.iter().any(|name| name == "particles/shaders.rs"),
-            "particles/shaders.rs grew a `band_contour` — its LUT read is in the \
+            "particles/shaders.rs grew a `band_contour_ink` — its LUT read is in the \
              VERTEX stage, which has no derivatives and no gradient across a point \
              sprite to contour (ADR-0078)"
         );

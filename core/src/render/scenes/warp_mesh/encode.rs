@@ -200,6 +200,12 @@ pub(super) fn upload_uniforms(
                 palette::band_contour(scene.colour.contour),
                 0.0,
             ],
+            e: [
+                palette::band_contour_style(scene.colour.contour_style),
+                scene.colour.contour_ink,
+                0.0,
+                0.0,
+            ],
         }),
     );
     queue.write_buffer(

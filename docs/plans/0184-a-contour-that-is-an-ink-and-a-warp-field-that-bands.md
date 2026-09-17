@@ -290,16 +290,63 @@ fn band_contour_ink(col: vec3<f32>, t: f32, steps: f32, amount: f32, style: f32,
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(`main` directly, or the worktree path plus its branch)_
+**Lane:** `C:\Users\Igor Konovalov\WORK\rlx-plan-0184` on branch
+`plan-0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The contour copies are all watched, then the contour learns a style and an ink | dev | not started | |
+| 1 — The contour copies are all watched, then the contour learns a style and an ink | dev | done | `277d7e1` (the watch), committed with this row (the style and ink) |
 | 2 — `warp_mesh` colours by its own level | dev | not started | |
 | 3 — The palette reader says what a contour can be and where the warp field takes its colour | dev | not started | |
 | 4 — The look gate: a hard key on the mono print, and a ladder world | human | not started | |
 
 ### Notes
+
+**Phase 1 — two done-when subset claims are asserted in the opposite direction, and one of them as
+a bound.** Both concern the same 8-bit fact.
+
+- *"The pixels a style-1 capture darkens relative to contour-off are a non-empty subset of the
+  pixels the style-0 capture darkens."* The two styles share the footprint `d < w`, but the soft
+  ramp's outermost sliver darkens by **less than one code value** and so is invisible to any
+  differential, while the step paints it at full strength. The hard set is therefore the soft set
+  plus that fringe, not a subset of it. `a_hard_contour_draws_where_the_soft_one_does_and_barely_wider`
+  asserts containment the other way (every pixel the soft line darkens, the hard one darkens) plus
+  `hard <= 1.5 * soft` on the counts. Measured at the fixture: the ratio is far inside that.
+- *"...changes every pixel style 0 would darken ... and changes no other pixel."* On a palette whose
+  inks already include the ink, the line is **invisible where it is laid over its own run** — at the
+  ink2/ink3 boundary only the ink2 side moves, which is the property the style exists for.
+  `an_ink_contour_draws_in_the_palettes_own_colour` asserts the equivalent claim that survives that:
+  the line's whole footprint (taken from a style-1 capture, which is visible against every ink)
+  renders **exactly** the ink's own code value, and nothing outside the footprint changes.
+
+**Phase 1 — two paths in `Files touched` do not exist under those names.** `core/tests/preset.rs`
+and `core/tests/palette_contour.rs` are `core/tests/suite/preset.rs` and
+`core/tests/suite/palette_contour.rs`; both were edited there. `.taplo.toml` did not regenerate — no
+new filename family.
+
+**Phase 1 — `core/tests/suite/preset.rs`'s `STRUCTURAL` roster gained six rows**, one per contour
+scene, beyond the `PALETTE_BLOCK` roster the plan names. ADR-0180 rule 2's gate is a second,
+hand-kept statement of every `ParamKind::Structural` declaration and it is red without them.
+
+**Phase 1 — packing.** Free adjacent slots took the pair on `fragment_field` (`e.zw`) and
+`reaction_diffusion` (`d.zw`); `shape_field`, `analytic_field`, `cellular` and `warp_mesh`'s deposit
+each gained one appended `vec4`, because none of the four had a free *pair* and splitting one control
+across two unrelated slots is the packing the plan's own Context complains about.
+
+**Phase 1, recorded not asserted — the backlog-0140 reading.** `shape_contourmono`'s params and
+palette rendered from a scratch file through `shot`, 640x360, 120 frames, stimulus
+`bass=1,mid=1,treb=1,onset=1,bar=1,novelty=1,beat=1`, `palette_contour = 1.0` throughout. Adapter
+**AMD Radeon(TM) Graphics (Dx12, IntegratedGpu), driver 30.0.13002.1001**, debug profile, floor tier.
+
+| `palette_contour_style` | distinct colours | share at the reddest value (`#d63131`) |
+|---|---|---|
+| `0` (shipped) | 677 | 4.63 % |
+| `1` hard black | **9** | 4.57 % |
+| `3` hard ink at `palette_contour_ink = 0.955` | **9** | 11.70 % |
+
+The entry's own figures were 9 with the contour off and 684 at `1.0`; the 677 here is the same
+reading on a stimulus and frame count that were not recorded with it. The `0` row is not the
+contour-off frame — it is the shipped preset.
 
 ### Close triggers
 
