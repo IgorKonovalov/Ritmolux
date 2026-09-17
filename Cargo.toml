@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["core", "core-cabi", "rlx-ring", "milkconv", "standalone"]
+members = ["core", "core-cabi", "rlx-ring", "milkconv", "rlx-artnet-sim", "standalone"]
 # ADR-0072's whole point: `core-cabi` is the only crate emitting a cdylib and a
 # staticlib, and nothing in this workspace links either - the one consumer is
 # the foobar C++ shim, built on demand through plugin-foobar/build.ps1. Leaving
@@ -14,6 +14,11 @@ members = ["core", "core-cabi", "rlx-ring", "milkconv", "standalone"]
 # it is the MilkDrop converter, it NEVER ships, and no shipped artifact depends on
 # it — so the everyday loop should not compile it. Same three ways in: `--workspace`,
 # `-p milkconv`, or its own tests.
+#
+# `rlx-artnet-sim` is the third (ADR-0174): the simulated rig that decodes the
+# Art-Net `standalone` emits and draws it as a raster. It never ships either, and
+# the only thing that links it is `standalone`'s dev-dependency, so `--workspace`
+# and `-p rlx-artnet-sim` reach it and a bare `cargo build` does not.
 default-members = ["core", "rlx-ring", "standalone"]
 
 [workspace.package]

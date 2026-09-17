@@ -1,6 +1,6 @@
 # 0133 — The engine drives the lights
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-29
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0145](../adrs/0145-the-engine-drives-the-fixtures-directly-over-art-net.md) (proposed),
@@ -551,3 +551,37 @@ which nothing but the rig can answer. Phase 9 is the whole of the second half, i
 
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
+
+**Lane:** `WORK/rlx-plan-0133`, on `plan-0133-the-engine-drives-the-lights`
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — The virtual rig | dev | done | committed with this row |
+| 2 — A configured rig lights up | dev | not started | |
+| 3 — Folded tempo and musical beat | dev | not started | |
+| 4 — The send path, measured | dev | not started | |
+| 5 — A look is a TOML file | dev | not started | |
+| 6 — The look that already works | dev | not started | |
+| 7 — The operator can stop it | dev | not started | |
+| 8 — The picture drives the lamps | dev | not started | |
+| 9 — The rig session | human | not started | |
+| 10 — Operator documentation | dev | not started | |
+
+### Notes
+
+- Phase 1: the `default-members` done-when has no committed gate — nothing in `scripts/` or CI
+  asserts crate membership. Checked in-session with
+  `cargo build --message-format json | grep -c rlx-artnet-sim` → 0, and
+  `cargo build -p rlx-artnet-sim` → success.
+
+### Close triggers
+
+- **`presets/` touched:**
+- **Plan header `Closes:`**
+- **What shipped:**
+- **Operator docs touched:**
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
+- **Full suite:**
+- **Outstanding `human` phases:**
+
+## Followups (after this lands)

@@ -1,0 +1,39 @@
+# The simulated rig (ADR-0174). **Never ships.**
+#
+# An `ArtDmx` decoder, a receiver that reassembles datagrams into the rig's
+# 24 x 170 raster, and a PNG writer. Its library is a `dev-dependency` of
+# `standalone`'s integration tests, which point a configured Art-Net sink at an
+# ephemeral loopback port and assert the decoded stream; its binary is a viewer
+# an author runs by hand.
+#
+# Deliberately OUTSIDE the workspace `default-members`, exactly as `rlx-core-cabi`
+# (ADR-0072) and `milkconv` (ADR-0113) are: a bare `cargo build` / `cargo run` /
+# `cargo nextest run` must not spend time on a developer tool no shipped artifact
+# depends on. `--workspace` selects it - CI and the pre-push hook both pass it, so
+# its tests and clippy still cover it - and `cargo build -p rlx-artnet-sim` builds
+# it directly.
+[package]
+name = "rlx-artnet-sim"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+# A developer tool, not a crates.io package.
+publish = false
+
+[lib]
+name = "rlx_artnet_sim"
+path = "src/lib.rs"
+
+[[bin]]
+name = "rlx-artnet-sim"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+# The one dependency, and it costs the workspace nothing: the same exact version
+# and the same trimmed feature set `core` and `standalone` already pin, so the
+# lock file gains no crate (NFR 4).
+image = { version = "=0.25.10", default-features = false, features = ["png"] }
