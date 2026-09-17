@@ -97,8 +97,25 @@ statistic ADR-0130 established rather than becoming a new one.
   them is cleared by **term one** rather than by term two. The conjunction is doing real work there,
   and a future change that loosens `MAX_TONAL_FLATNESS` would convict them. Criterion 2 registered
   exactly this in advance: none of the 28 is above the flatness ceiling today.
-- **The floor is a measurement, not a property**, so it names 96x96 and skips elsewhere in
-  ADR-0016's shape. A gate that wanted to read at another size owes its own derivation.
+- **The floor is a measurement, not a property**, so it names 96x96 in its own doc block. Nothing
+  skips on it, because the only reader is this suite's fixed `SIZE` capture and there is no other
+  size for it to run at — a gate that wanted to read at another one owes its own derivation rather
+  than a scaling of this.
+- **The cut divides something narrower than figure from ground, and on one class the term stops
+  measuring the picture.** `role_ratio` separates *the modal band is near-black* from *it is not*,
+  which coincides with figure-versus-ground on a scene drawing light onto darkness and on a print
+  whose ground is dark — `Tiled Rosette Mono` among them — and does **not** coincide on a frame that
+  paints its own paper. Such a frame lands above the cut, so term two reads black over a lit mask
+  that is the whole frame and collapses to the frame's own border, `(4L - 4) / L²` — `0.0412` at
+  96x96. Eight shipped presets read that constant or near it today (`Nocturne`, `On White`,
+  `Suprematist`, `Vitrail`, `Etching Plate`, `Banded Mandala`, `Tiled Rosette` at `0.0412`,
+  `Collage Mono` at `0.0800`), and **term one is the whole of what holds them** — `Collage Mono` is
+  the closest to the ceiling at `0.7239` against `0.90`. It is the mirror of the defect this ADR
+  repairs: ADR-0161 convicted the term for reading a rasterizer's rim instead of the picture, and on
+  this class the successor reads a frame border instead of the picture. Criterion 2 registered the
+  class in advance and nothing in it is convictable today; a loosened `MAX_TONAL_FLATNESS`, or a
+  light-ground family gaining a member over the ceiling, is what would make it fire — and the
+  failure message would tell the author to open an interior the statistic never examined.
 - **A frame whose two coverages are close is classified on a small difference.** The composition sits
   at 1.0780 against a cut of 1.17 — comfortable, but the margin is a tenth, not an order of
   magnitude, and nothing in the table says where the next composition lands.
