@@ -296,8 +296,8 @@ fn band_contour_ink(col: vec3<f32>, t: f32, steps: f32, amount: f32, style: f32,
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The contour copies are all watched, then the contour learns a style and an ink | dev | done | `277d7e1` (the watch), `80426fb` (the style and ink) |
-| 2 — `warp_mesh` colours by its own level | dev | done | committed with this row |
-| 3 — The palette reader says what a contour can be and where the warp field takes its colour | dev | not started | |
+| 2 — `warp_mesh` colours by its own level | dev | done | `9627131` |
+| 3 — The palette reader says what a contour can be and where the warp field takes its colour | dev | done | committed with this row |
 | 4 — The look gate: a hard key on the mono print, and a ladder world | human | not started | |
 
 ### Notes
@@ -393,6 +393,14 @@ slope, best of 3, interleaved in one process, same adapter, debug.
 
 **Phase 2 — `milkconv/` and `core/src/milk/` contain no `color_source`**, checked by grep over the
 tree.
+
+**Phase 3 — `presets/README.md`'s own hard-bands section was repaired too**, beyond the `warp_mesh`
+prose the plan names. Its bullet said contours reach *"`fragment_field` and `reaction_diffusion`"*,
+the same drift `docs/preset-palettes.md` carried, and its parameter table described only the
+darkening. `docs/presets.md` was read and left alone: it never restates the contour's colour.
+
+**Phase 3 — `docs/preset-palettes.md` carries no contents block**, so `toc.mjs` rewrote nothing for
+its two new `###` headings; `presets/README.md`'s block is `depth=3` and gained no heading.
 
 ### Close triggers
 

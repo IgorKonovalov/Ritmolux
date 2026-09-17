@@ -2067,10 +2067,22 @@ instead, or ease something the expression reads.
 | `deposit_twist` | how much the arms spiral with radius. Default `0` |
 | `deposit_spin` | how fast they turn, in radians a second. **Integrates a phase** ([ADR-0132](../docs/adrs/0132-a-rate-parameter-integrates-a-phase.md)), like `warp_speed` above and for the same reason, so binding it to audio bends the arms' rotation instead of teleporting it. Default `0` |
 
-The deposit is coloured **by angle** through the shared palette, so the shared
-colour vocabulary applies as it does everywhere else: `hue`, `color_span`,
-`color_center`, `saturation`, `palette_mix`, `palette_steps`, `palette_contour`,
-and `brightness` scaling the whole present.
+**`color_source` picks which of two coordinates the palette is read at, and they
+exclude each other.** At `0` — the default — the deposit is coloured **by angle**,
+before the feedback loop, so `palette_steps` quantizes the light going *in* and the
+structure the loop builds carries no bands. At `1` the deposit writes uncoloured
+light, the field accumulates a **level**, and the present pass colours by
+`hue + color_center + color_span * level`: what `palette_steps` then draws are the
+loop's own decay contours, a ladder of concentric rungs. The level is not bounded
+by `1` and the palette is repeat-addressed, so it wraps outward rather than
+clipping; and because the present writes `ink * coverage`, the outermost rungs fade
+through intermediate values as the coverage does.
+[`docs/preset-palettes.md`](../docs/preset-palettes.md) has the section.
+
+Either way the shared colour vocabulary applies as it does everywhere else: `hue`,
+`color_span`, `color_center`, `saturation`, `palette_mix`, `palette_steps`,
+`palette_contour` with its `palette_contour_style` and `palette_contour_ink`, and
+`brightness` scaling the whole present.
 
 #### MilkDrop's composite roster
 
@@ -3770,6 +3782,8 @@ them to an existing preset is the only thing that changes it.
 |---|---|---|---|
 | `palette_steps` | `0` (off) | **`4`–`12`** | `0` = smooth, up to `64` |
 | `palette_contour` | `0` (none) | **`0`–`0.5`** | `0` = none, up to `1`. Draws **only where the two bands it separates are different colours** ([ADR-0133](../docs/adrs/0133-the-band-contour-fires-where-the-ink-changes.md)) — so it is silent inside a plateau and draws at each run boundary, which is what makes it usable on a limited-ink palette. Unchanged on a smooth one at any step count |
+| `palette_contour_style` | `0` | one of four | `0` a soft darkening toward black, `1` a hard one over the same footprint, `2` a soft line in the palette's own colour, `3` a hard one ([ADR-0197](../docs/adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md)). `0` is the arithmetic that shipped before the others existed. The hard pair is what keeps a limited-ink frame down to its own inks — and it has no anti-aliasing, so on a smooth palette it reads as jagged |
+| `palette_contour_ink` | `0` | a palette coordinate | Where styles `2` and `3` take their colour. **Absolute** — `hue` does not shift it and `color_span` does not scale it — so it names a stop, and it crossfades A/B by `palette_mix` like every other sample |
 
 Those two ranges were read off a rendered sweep rather than argued. Outside them
 nothing breaks — it just stops being the *graphic* look:
@@ -3795,9 +3809,12 @@ Three things to know before binding them:
   sit in, and those scenes take one palette sample per particle or per segment —
   the attractor's in the vertex stage, where the derivative the contour is measured
   against does not exist at all. **Banding reaches every scene; contours reach the
-  continuous-field scenes**, `fragment_field` and `reaction_diffusion`. The
-  parameter is accepted everywhere because it *is* a known name, so no
-  unknown-param warning fires; this paragraph is the warning.
+  six continuous-field scenes** — `analytic_field`, `cellular`, `fragment_field`,
+  `reaction_diffusion`, `shape_field` and `warp_mesh`. `palette_contour` is
+  accepted everywhere because it *is* a known name, so no unknown-param warning
+  fires; this paragraph is the warning. **`palette_contour_style` and
+  `palette_contour_ink` do not inherit the trap** — they are declared only by
+  those six, so binding one elsewhere warns.
 - **Banding fights bloom.** The bright pass blurs exactly the hard edges this
   creates, so a preset cannot have crisp bands and heavy `bloom_amount` at full
   strength. Pick one.
