@@ -2414,3 +2414,188 @@ fn a_converted_preset_and_a_native_one_draw_from_different_warp_pipelines() {
         "switching back to a native preset must rebuild onto the native pipeline"
     );
 }
+
+// --- The level coordinate's working range (ADR-0197) -----------------------
+
+/// The ladder fixture, read as text so the probe below and
+/// `core/tests/suite/warp_mesh.rs` cannot describe two different pictures.
+const LADDER_FIXTURE: &str = include_str!("../../../../tests/fixtures/warp_mesh_ladder.toml");
+
+/// The ladder fixture's constant bindings, as the probe sets them.
+///
+/// The fixture is TOML a `Renderer` loads and this probe drives the scene
+/// directly — the only way the field itself is reachable — so the values are
+/// restated here and [`the_level_probe_matches_the_ladder_fixture`] holds the two
+/// together by scanning the fixture's text for each pair.
+const LADDER_PARAMS: &[(&str, f32)] = &[
+    ("color_source", 1.0),
+    ("decay", 0.45),
+    ("deposit", 3.0),
+    ("deposit_x", 0.5),
+    ("deposit_y", 0.5),
+    ("deposit_radius", 0.0),
+    ("deposit_width", 0.06),
+    ("deposit_arms", 0.0),
+    ("color_span", 1.0),
+    ("color_center", 0.0),
+    ("hue", 0.0),
+    ("palette_steps", 20.0),
+    ("palette_contour", 0.0),
+    ("saturation", 1.0),
+    ("brightness", 0.25),
+    ("zoom", 1.04),
+];
+
+#[test]
+fn the_level_probe_matches_the_ladder_fixture() {
+    // Every binding in the fixture is a constant written `name = "value"`, on a
+    // line of its own, so the pair is recovered by splitting rather than by
+    // matching a spelling — `3` and `3.0` are the same number and only one of
+    // them is what `{}` prints.
+    let bound: Vec<(&str, f32)> = LADDER_FIXTURE
+        .lines()
+        .filter_map(|line| {
+            let (name, rest) = line.split_once('=')?;
+            let value = rest.trim().trim_matches('"').parse::<f32>().ok()?;
+            Some((name.trim(), value))
+        })
+        .collect();
+    for (name, value) in LADDER_PARAMS {
+        let found = bound.iter().find(|(n, _)| n == name);
+        assert_eq!(
+            found.map(|(_, v)| *v),
+            Some(*value),
+            "the ladder fixture binds `{name}` to {found:?} and this probe drives \
+             it at {value}, so the two measure different pictures"
+        );
+    }
+}
+
+/// **What level does the feedback field actually work at?** — the reading
+/// ADR-0197's Negative asks for before `color_span`'s declared `0..1` range is
+/// judged adequate.
+///
+/// `color_span` multiplies the level into a palette coordinate, so a full cycle
+/// of the palette needs the level to *range* by at least `1 / color_span`. If the
+/// field worked at a level far below one, the range would not accept a span large
+/// enough and the repair would be a documented gain on the level.
+///
+/// It lives here rather than beside the suite's assertions because the field is
+/// reachable only from inside the crate, and the level is the field's own value
+/// rather than anything the present pass writes.
+///
+/// Printed rather than asserted (ADR-0071): a level is a fact about a preset's
+/// `deposit` and `decay`, so a floor here would be a floor on the fixture rather
+/// than on the mechanism.
+#[test]
+#[ignore = "a measurement, not a gate — ADR-0071"]
+fn the_level_the_field_works_at() {
+    use crate::render::capture;
+    use crate::render::context::{RenderContext, RenderError};
+
+    const W: u32 = 640;
+    const H: u32 = 360;
+    /// Long enough for a decay of 0.45/s to settle: its tail is about a second
+    /// and this is four.
+    const FRAMES: usize = 240;
+
+    let ctx = match RenderContext::new_headless(W, H, false) {
+        Ok(ctx) => ctx,
+        Err(RenderError::RequestAdapter(_)) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return;
+        }
+        Err(e) => panic!("headless context build failed: {e}"),
+    };
+
+    let mut scene = WarpMeshScene::new(
+        &ctx.device,
+        crate::render::COMPOSITE_FORMAT,
+        TierConfig::FLOOR.mesh_grid,
+        TierConfig::FLOOR.max_segments,
+    );
+    scene.configure(&super::super::GeneratorConfig::WarpMesh {
+        mesh: (32, 24),
+        milk: None,
+        salt: 0,
+    });
+    for (name, value) in LADDER_PARAMS {
+        assert!(
+            declares(PARAMS, name) || declares(PER_VERTEX_PARAMS, name),
+            "the probe set an unknown param `{name}`"
+        );
+        scene.set_param(name, *value);
+    }
+
+    let (_target, view) =
+        capture::create_target(&ctx.device, crate::render::COMPOSITE_FORMAT, W, H);
+    let (readback, padded_bpr) = capture::create_linear_readback(&ctx.device, W, H);
+    let frame = AnalysisFrame::default();
+
+    let mut levels: Vec<f32> = Vec::new();
+    for i in 0..FRAMES {
+        let last = i + 1 == FRAMES;
+        scene.set_target_size(W, H);
+        scene.set_time(i as f32 * FIELD_DT);
+        scene.advance(FIELD_DT);
+        scene.update(&frame);
+        let mut encoder = ctx
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("ladder-level-probe"),
+            });
+        capture::record_clear(&mut encoder, &view);
+        scene.render(&ctx.queue, &mut encoder, &view, W as f32 / H as f32);
+        if last {
+            let field = scene
+                .res
+                .as_ref()
+                .expect("the first render builds the resources")
+                .field
+                .read_texture()
+                .clone();
+            capture::record_copy(&mut encoder, &field, &readback, padded_bpr, W, H);
+        }
+        ctx.queue.submit(std::iter::once(encoder.finish()));
+        if last {
+            let texels = capture::read_back_linear(&ctx.device, &readback, W, H, padded_bpr)
+                .expect("the field reads back");
+            for rgba in texels.chunks_exact(4) {
+                // Coverage above one half: the deposit's alpha saturates, so this
+                // is the part of the frame the ladder is actually drawn on.
+                if rgba[3] > 0.5 {
+                    levels.push(rgba[0].max(rgba[1]).max(rgba[2]));
+                }
+            }
+        }
+    }
+
+    levels.sort_by(f32::total_cmp);
+    let at = |q: f64| -> f32 {
+        if levels.is_empty() {
+            return 0.0;
+        }
+        let i = ((levels.len() - 1) as f64 * q).round() as usize;
+        levels[i]
+    };
+    let (p05, median, p95) = (at(0.05), at(0.50), at(0.95));
+    let span = p95 - p05;
+
+    println!(
+        "warp_mesh level coordinate at {W}x{H}, {FRAMES} frames, coverage > 0.5 \
+         (ADR-0071 report)"
+    );
+    println!("  adapter: {}", ctx.adapter());
+    println!("  fixture: warp_mesh_ladder.toml");
+    println!("  covered texels: {} of {}", levels.len(), W * H);
+    println!("  max(rgb): p05 {p05:.4}  median {median:.4}  p95 {p95:.4}");
+    println!(
+        "  a full palette cycle needs the level to range by 1 / color_span; at \
+         color_span = 1 that is 1.0, and p95 - p05 is {span:.4} — {}",
+        if span >= 1.0 {
+            "it fits"
+        } else {
+            "IT DOES NOT FIT: ADR-0197's documented gain on the level is owed"
+        }
+    );
+}

@@ -802,6 +802,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 |---|---|---|---|
 | `deposit_arms` | `0` | `0` – `16` | How many arms the ring is broken into, as a whole number of arms; 0 leaves it whole. |
 | `echo_orient` | `0` | `0` – `3` | Which way the echoed copy is flipped before it is blended. |
+| `color_source` | `0` | `0` – `1` | Where the field takes its colour: 0 the deposit's own angle, 1 the light it has built up. |
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
 | `palette_contour_style` | `0` | `0` – `3` | Which line the contour draws: 0 a soft darkening, 1 a hard one, 2 a soft ink, 3 a hard ink. |
 

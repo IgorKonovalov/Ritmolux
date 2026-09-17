@@ -616,6 +616,13 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "Shifts which part of that range lands in the middle of the palette.",
         kind: ParamKind::Modal,
     },
+    ParamSpec {
+        name: "color_source",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "Where the field takes its colour: 0 the deposit's own angle, 1 the light it has built up.",
+        kind: ParamKind::Structural,
+    },
     crate::render::scenes::common::SATURATION,
     crate::render::scenes::common::PALETTE_MIX,
     crate::render::scenes::common::PALETTE_STEPS,
@@ -624,6 +631,25 @@ pub const PARAMS: &[ParamSpec] = &[
     crate::render::scenes::common::PALETTE_CONTOUR_INK,
     crate::render::scenes::common::brightness(DEFAULT_BRIGHTNESS),
 ];
+
+/// `color_source` at rest: the deposit colours by angle, which is the path every
+/// shipped and every converted `warp_mesh` preset takes.
+const DEFAULT_COLOR_SOURCE: f32 = default_of(PARAMS, "color_source");
+
+/// `color_source` as the two shaders read it — **0 or 1 exactly**.
+///
+/// Rounded here for `echo_orientation`'s reason on a smaller set: the value is a
+/// selector between two whole colour paths, a `[smoothing]` entry or a preset
+/// dissolve sweeps a binding continuously between them, and half of one path is
+/// not a picture. Clamped rather than wrapped — two states are not a cycle — and
+/// total on a non-finite input, which falls back to today's path.
+fn colour_source(v: f32) -> f32 {
+    if v.is_finite() {
+        v.clamp(0.0, 1.0).round()
+    } else {
+        DEFAULT_COLOR_SOURCE
+    }
+}
 
 /// The warp mesh scene (ADR-0113).
 pub struct WarpMeshScene {
@@ -682,6 +708,9 @@ pub struct WarpMeshScene {
     colour: common::PaletteParams,
     color_span: f32,
     color_center: f32,
+    /// Which of the two colour paths is live (ADR-0197), raw as the preset bound
+    /// it; [`colour_source`] rounds it on the way to both uniforms.
+    color_source: f32,
     occlude: f32,
     /// The active baked palette. Held here rather than only in the resources'
     /// [`palette::LutPair`] because the resources are rebuilt on a resize and
@@ -793,6 +822,7 @@ impl WarpMeshScene {
             colour: common::PaletteParams::new(DEFAULT_HUE, DEFAULT_BRIGHTNESS),
             color_span: DEFAULT_COLOR_SPAN,
             color_center: DEFAULT_COLOR_CENTER,
+            color_source: DEFAULT_COLOR_SOURCE,
             occlude: crate::render::post::DEFAULT_OCCLUDE,
             palette: Palette::default_spectrum(),
             milk: None,
@@ -917,6 +947,7 @@ impl Scene for WarpMeshScene {
         self.colour.reset();
         self.color_span = DEFAULT_COLOR_SPAN;
         self.color_center = DEFAULT_COLOR_CENTER;
+        self.color_source = DEFAULT_COLOR_SOURCE;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
@@ -957,6 +988,7 @@ impl Scene for WarpMeshScene {
             "echo_orient" => self.echo_orient = value,
             "color_span" => self.color_span = value,
             "color_center" => self.color_center = value,
+            "color_source" => self.color_source = value,
             _ => {}
         }
     }

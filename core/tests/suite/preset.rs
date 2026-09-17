@@ -2354,6 +2354,10 @@ const STRUCTURAL: &[(&str, &str)] = &[
     ("shape_collage", "roster"),
     // `echo_orientation`: rounds, then wraps modulo the four flips.
     ("warp_mesh", "echo_orient"),
+    // `warp_mesh::colour_source`: rounds, on the same argument one set smaller —
+    // a selector between two whole colour paths, and half of one is not a
+    // picture (ADR-0197).
+    ("warp_mesh", "color_source"),
     // The one entry that is not already a no-op (see the header): the deposit
     // shader multiplies the raw value into an angular phase, so a fraction tears
     // the ring along the branch cut. The engine's round is the fix.

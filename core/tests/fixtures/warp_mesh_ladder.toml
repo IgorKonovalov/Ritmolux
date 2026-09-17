@@ -1,0 +1,82 @@
+# TEST FIXTURE - do not tune; the assertions in core/tests/suite/warp_mesh.rs and the
+# level measurement in core/src/render/scenes/warp_mesh/tests.rs are both written
+# against these exact numbers.
+#
+# THE LEVEL COORDINATE (ADR-0197): `color_source = 1` makes the deposit write
+# UNCOLOURED light, so the feedback field accumulates a scalar level, and the
+# present pass reads that level as the palette coordinate. Quantized by
+# `palette_steps` onto a plateau palette it draws the loop's own DECAY CONTOURS -
+# concentric rungs marching outward - which is the one thing the deposit's angle
+# coordinate cannot express and the look backlog 0146 asked for.
+#
+# EVERY BINDING IS A CONSTANT, deliberately. The assertions are about what the
+# mechanism draws, not about what a preset does with it: a steady deposit under a
+# steady zoom converges to a stationary radial profile, which is exactly the
+# still picture a per-pixel claim can be made against. Whether the rungs MOVE is
+# a property of an authored, pulsed deposit and is judged by the look gate.
+#
+# THE FOUR INKS ARE MONO and their runs meet on BAND EDGES. Twenty bands put the
+# centres at 0.025 + 0.05k, so the stops below - 0.24/0.26, 0.49/0.51, 0.74/0.76 -
+# leave no centre inside a transition, and every banded coordinate resolves to
+# exactly one of the four greys. That is what lets the suite compare the ladder
+# against one single-ink capture per ink, pixel for pixel: in level mode the
+# field evolution does not depend on the palette at all, so those captures share
+# this one's coverage exactly and differ only in the ink they multiply it by.
+#
+# `deposit_radius = 0` degenerates the gaussian ring to a blob at the centre, and
+# `deposit_arms = 0` leaves it radially symmetric, so the level is a function of
+# radius alone. `zoom` above 1 shrinks each vertex's source window, so the past
+# is resampled magnified and the field's content travels OUTWARD.
+#
+# `decay` is a factor per second and 0.45 leaves a tail of about a second, which
+# is long enough for several rungs to be in flight at once and short enough that
+# the field settles well inside the frames the suite renders.
+system = "warp_mesh"
+name   = "fixture_warp_mesh_ladder"
+
+[mesh]
+x = 32
+y = 24
+
+[palette]
+stops = [
+  { at = 0.00, color = [0.15, 0.15, 0.15] },
+  { at = 0.24, color = [0.15, 0.15, 0.15] },
+  { at = 0.26, color = [0.45, 0.45, 0.45] },
+  { at = 0.49, color = [0.45, 0.45, 0.45] },
+  { at = 0.51, color = [0.70, 0.70, 0.70] },
+  { at = 0.74, color = [0.70, 0.70, 0.70] },
+  { at = 0.76, color = [1.00, 1.00, 1.00] },
+  { at = 1.00, color = [1.00, 1.00, 1.00] },
+]
+
+# The outward drift, uniform across the mesh: every vertex resamples the past at
+# the same slightly magnified scale, so the ladder is concentric rather than
+# sheared.
+[per_vertex]
+zoom = "1.04"
+
+[params]
+color_source    = "1"
+decay           = "0.45"
+deposit         = "3.0"
+deposit_x       = "0.5"
+deposit_y       = "0.5"
+deposit_radius  = "0"
+deposit_width   = "0.06"
+deposit_arms    = "0"
+color_span      = "1.0"
+color_center    = "0"
+hue             = "0"
+palette_steps   = "20"
+palette_contour = "0"
+saturation      = "1.0"
+# WELL UNDER THE TONEMAP'S KNEE, deliberately. At `color_source = 0` the field
+# holds the level multiplied INTO the ink, so it reaches four times one, and the
+# shoulder would compress the three brightest inks onto the same byte — which
+# would make the smear the suite compares against invisible rather than absent.
+# In level mode the present writes `ink * coverage`, which never exceeds one, so
+# this only dims the picture.
+brightness      = "0.25"
+bloom_amount    = "0"
+trails          = "0"

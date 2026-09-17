@@ -937,6 +937,7 @@
             "hue": { "$ref": "#/definitions/param.hue.fragment_field" },
             "color_span": { "$ref": "#/definitions/param.color_span.warp_mesh" },
             "color_center": { "$ref": "#/definitions/param.color_center.shape_field" },
+            "color_source": { "$ref": "#/definitions/param.color_source" },
             "saturation": { "$ref": "#/definitions/param.saturation" },
             "palette_mix": { "$ref": "#/definitions/param.palette_mix" },
             "palette_steps": { "$ref": "#/definitions/param.palette_steps" },
@@ -1592,6 +1593,7 @@
             "hue": { "$ref": "#/definitions/param.hue.fragment_field" },
             "color_span": { "$ref": "#/definitions/param.color_span.warp_mesh" },
             "color_center": { "$ref": "#/definitions/param.color_center.shape_field" },
+            "color_source": { "$ref": "#/definitions/param.color_source" },
             "saturation": { "$ref": "#/definitions/param.saturation" },
             "palette_mix": { "$ref": "#/definitions/param.palette_mix" },
             "palette_steps": { "$ref": "#/definitions/param.palette_steps" },
@@ -3063,6 +3065,11 @@
       "type": "string",
       "description": "How much of the palette the field's range covers.",
       "markdownDescription": "How much of the palette the field's range covers.\n\n- default `1.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.color_source": {
+      "type": "string",
+      "description": "Where the field takes its colour: 0 the deposit's own angle, 1 the light it has built up.",
+      "markdownDescription": "Where the field takes its colour: 0 the deposit's own angle, 1 the light it has built up.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
     },
     "param.count": {
       "type": "string",

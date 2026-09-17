@@ -295,8 +295,8 @@ fn band_contour_ink(col: vec3<f32>, t: f32, steps: f32, amount: f32, style: f32,
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The contour copies are all watched, then the contour learns a style and an ink | dev | done | `277d7e1` (the watch), committed with this row (the style and ink) |
-| 2 — `warp_mesh` colours by its own level | dev | not started | |
+| 1 — The contour copies are all watched, then the contour learns a style and an ink | dev | done | `277d7e1` (the watch), `80426fb` (the style and ink) |
+| 2 — `warp_mesh` colours by its own level | dev | done | committed with this row |
 | 3 — The palette reader says what a contour can be and where the warp field takes its colour | dev | not started | |
 | 4 — The look gate: a hard key on the mono print, and a ladder world | human | not started | |
 
@@ -347,6 +347,52 @@ palette rendered from a scratch file through `shot`, 640x360, 120 frames, stimul
 The entry's own figures were 9 with the contour off and 684 at `1.0`; the 677 here is the same
 reading on a stimulus and frame count that were not recorded with it. The `0` row is not the
 contour-off frame — it is the shipped preset.
+
+**Phase 2 — the level measurement lives in the crate, not beside the suite.** The field is reachable
+only from a `#[cfg(test)]` accessor inside `rlx-core`, so
+`the_level_the_field_works_at` is an `#[ignore]`d printed report in
+`core/src/render/scenes/warp_mesh/tests.rs`. It restates the fixture's constants and
+`the_level_probe_matches_the_ladder_fixture` holds the two together by parsing the fixture's own
+bindings. The behavioural assertions are in `core/tests/suite/warp_mesh.rs` (the plan writes
+`core/tests/warp_mesh.rs`) and the cost reading is a new `core/tests/warp_level_cost.rs`, beside the
+five other `*_cost` binaries.
+
+**Phase 2 — the reading.** `warp_mesh_ladder.toml` at 640x360, 240 frames, over texels with coverage
+above one half. Adapter **AMD Radeon(TM) Graphics (Dx12, IntegratedGpu), driver 30.0.13002.1001**,
+debug. `max(rgb)`: p05 **1.0859**, median **1.9033**, p95 **3.2305** — a range of **2.1445**, so a
+full palette cycle fits inside `color_span = 1` and the phase does not stop.
+
+**Phase 2 — the non-vacuity for *the field bands* is the ray's crossing count, not a stray count.**
+The done-when asks for pixels on the ray at `color_source = 0` that are none of the inks; on this
+fixture there are **none anywhere in the frame** (measured: 1614 pixels match exactly one ink, 7602
+match several because they are black or clipped, 0 match none). A purely radial resample of a radial
+sector pattern does not blend two sectors above the 8-bit floor. What the ray does show is the
+sharper version of the same claim, and it is backlog 0146's own words: the level path crosses
+between inks **10** times along the ray and the deposit-angle path **0** times, because the angle
+coordinate is constant along a ray. Both figures are printed; the stray count is printed beside them.
+
+**Phase 2 — `echo_zoom` had to move for the echo assertion to mean anything.** The echo samples
+`(uv - 0.5) / echo_zoom + 0.5`, so at the default `1.0` it reads the pixel it is already on and
+`mix(c, c, alpha)` is the identity. The test sets `echo_alpha = 0.5` **and** `echo_zoom = 1.6`.
+
+**Phase 2 — the ladder fixture renders at `brightness = 0.25`.** At `color_source = 0` the field
+holds the level multiplied into the ink and reaches about four, and the tonemap's shoulder was
+compressing the three brightest inks onto one byte — which made the smear the suite compares against
+invisible rather than absent. In level mode the present writes `ink * coverage`, which never exceeds
+one, so this only dims the picture.
+
+**Phase 2, recorded not asserted — the cost.** `warp_mesh_ladder.toml` at 1920x1080, 100 frames of
+slope, best of 3, interleaved in one process, same adapter, debug.
+
+| `color_source` | `palette_contour` | ms/frame | share of 16.67 ms | vs the angle path, contour off |
+|---|---|---|---|---|
+| 0 | 0 | 1.715 | 10.3 % | — |
+| 0 | 1 | 1.778 | 10.7 % | +0.063 |
+| 1 | 0 | 1.695 | 10.2 % | −0.020 |
+| 1 | 1 | 1.796 | 10.8 % | +0.081 |
+
+**Phase 2 — `milkconv/` and `core/src/milk/` contain no `color_source`**, checked by grep over the
+tree.
 
 ### Close triggers
 
