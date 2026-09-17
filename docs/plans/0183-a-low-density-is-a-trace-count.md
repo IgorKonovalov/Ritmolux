@@ -1,6 +1,6 @@
 # 0183 — A low density is a trace count
 
-> **Status:** approved (2026-09-14)
+> **Status:** in-progress (2026-09-17)
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`, `human`
 > **Related ADRs:** [0195](../adrs/0195-a-low-density-is-a-trace-count-and-the-law-scales-only-a-cloud.md) (proposed),
@@ -227,15 +227,26 @@ ceiling is below 432,000, well inside `f32`'s 2^24 integer range.
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(`main` directly, or the worktree path plus its branch)_
+**Lane:** `C:\Users\Igor Konovalov\WORK\rlx-plan-0183` on branch `plan-0183-a-low-density-is-a-trace-count`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The count resolves against the anchor for a trace | dev | not started | |
+| 1 — The count resolves against the anchor for a trace | dev | done | committed with this row |
 | 2 — The reader, the schema doc and the two headers | dev | not started | |
 | 3 — The look gate at the size the defect lives at | human | not started | |
 
 ### Notes
+
+- Phase 1, backlog probe: `node scripts/check-backlog-claims.mjs` exits 0 and reports 33 live
+  entries. Entry 0186 is **not among them** — it left `docs/design-backlog.md` for
+  `docs/design-backlog-archive.md` on promotion (ADR-0206), so its
+  `present: active_particles.self\.budget` probe is no longer evaluated and does not go red as the
+  phase's last bullet expected. The probe string would no longer match the tree.
+- Phase 1, done-when scope: `active_particles` gained the anchor argument, so the trait hook added
+  for the built-scene assertion is a second one — `Scene::active_sample_count`, `#[cfg(test)]`
+  beside `sample_budget` — rather than a hook beside `sample_budget` in the particles scene alone.
+  The GPU assertion landed as a sibling test, `a_trace_preset_draws_its_anchor_count_at_1080p`, and
+  `the_render_path_resolves_a_larger_budget_than_a_window_does` is unchanged.
 
 ### Close triggers
 

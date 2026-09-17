@@ -357,13 +357,64 @@ fn streak_flag(on: bool) -> f32 {
 /// guarantees at least one particle, so nothing here can produce an empty draw.
 pub const MIN_PARTICLE_DENSITY: f32 = 0.0005;
 
+/// At or below this `density`, the drawn count is a fraction of the tier's
+/// **anchor** — the same number of trajectories at every render target
+/// (ADR-0195).
+///
+/// The boundary brackets the gap the authored population leaves: the densest
+/// trace world in `presets/` sits at `0.06` and the sparsest figure at `0.18`,
+/// so both ends of the band `TRACE_DENSITY..=`[`CLOUD_DENSITY`] fall in empty
+/// space. A density inside the band is legal and scales partly with the target.
+pub const TRACE_DENSITY: f32 = 0.08;
+
+/// At or above this `density`, the drawn count is a fraction of the
+/// target-scaled budget [`attractor_budget`] resolved — ADR-0140's law
+/// untouched. See [`TRACE_DENSITY`] for where the boundaries come from.
+pub const CLOUD_DENSITY: f32 = 0.16;
+
 /// Resolve a validated `density` against a tier's particle budget.
+///
+/// The fraction is taken of an **effective budget** that is the tier's `anchor`
+/// for a trace, the target-scaled `budget` for a cloud, and a linear blend of
+/// the two across the band between them (ADR-0195):
+///
+/// ```text
+/// w         = clamp((density - TRACE_DENSITY) / (CLOUD_DENSITY - TRACE_DENSITY), 0, 1)
+/// effective = anchor + (budget - anchor) * w
+/// drawn     = clamp(round(effective * density), 1, budget)
+/// ```
+///
+/// Both outer arms are written as the bare `(n as f32 * density).round()`
+/// product rather than as the blend evaluated at `w = 0` or `w = 1`, so each is
+/// exact rather than within one particle of a `.5` case. Where
+/// `budget == anchor` — every target at or under
+/// [`REFERENCE_PX`](crate::render::REFERENCE_PX), and every
+/// `Floor` window — all three arms coincide, so no density resolves differently
+/// there.
+///
+/// `budget >= anchor` holds by [`attractor_budget`]'s own lower clamp, so
+/// `budget - anchor` cannot underflow.
+///
+/// **The blend arm is steep by construction.** Across the band the drawn count
+/// rises by `(CLOUD_DENSITY / TRACE_DENSITY) * (budget / anchor)` — 8x at a
+/// 1080p `Rich` window, 36x at a 4K `Rich` render — while `density` only
+/// doubles. The `f32` product stays exact: `effective * density` is bounded by
+/// `budget`, itself far inside `f32`'s 2^24 integer range.
 ///
 /// Rounds rather than truncates, and floors at one particle: `density` is already
 /// range-checked at load, so this cannot be handed a zero, but a scene that drew
 /// zero instances would silently render nothing rather than fail.
-fn active_particles(budget: u32, density: f32) -> u32 {
-    ((budget as f32 * density).round() as u32).clamp(1, budget)
+fn active_particles(anchor: u32, budget: u32, density: f32) -> u32 {
+    let drawn = if density <= TRACE_DENSITY {
+        (anchor as f32 * density).round()
+    } else if density >= CLOUD_DENSITY {
+        (budget as f32 * density).round()
+    } else {
+        let w = (density - TRACE_DENSITY) / (CLOUD_DENSITY - TRACE_DENSITY);
+        let effective = anchor as f32 + (budget - anchor) as f32 * w;
+        (effective * density).round()
+    };
+    (drawn as u32).clamp(1, budget)
 }
 
 /// The CPU transcription of [`DRAW_SHADER`]'s depth projection (ADR-0076).
@@ -1573,7 +1624,7 @@ impl Scene for AttractorScene {
             width.saturating_mul(height),
             self.particle_count,
         );
-        self.active_count = active_particles(self.budget, self.density);
+        self.active_count = active_particles(self.anchor, self.budget, self.density);
     }
 
     // No `set_time`. The display rotation was this scene's only reader of the
@@ -1590,6 +1641,13 @@ impl Scene for AttractorScene {
     #[cfg(test)]
     fn sample_budget(&self) -> Option<u32> {
         self.targeted.then_some(self.budget)
+    }
+
+    /// What `density` resolved to out of that budget — `None` until a target
+    /// size has reached the scene, so the two hooks answer together.
+    #[cfg(test)]
+    fn active_sample_count(&self) -> Option<u32> {
+        self.targeted.then_some(self.active_count)
     }
 
     fn set_palette(&mut self, palette: &Palette) {
@@ -1749,7 +1807,7 @@ impl Scene for AttractorScene {
             // two presets can share a family and differ only in how much of it
             // they draw, and `configure` runs on every preset switch.
             self.density = *density;
-            self.active_count = active_particles(self.budget, *density);
+            self.active_count = active_particles(self.anchor, self.budget, *density);
             // Likewise the morph ends: two presets can share a figure and morph
             // it towards different partners. **Decomposed here**, off the hot
             // path, so a frame pays only the lerp and the recompose.
