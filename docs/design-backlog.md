@@ -55,6 +55,8 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0246 — the local `cargo doc` mirror covers one crate of five, and the four it leaves out are still unreachable until after a push](#0246--the-local-cargo-doc-mirror-covers-one-crate-of-five-and-the-four-it-leaves-out-are-still-unreachable-until-after-a-push)
 - [0247 — a suite run by hand inside a lane records into that lane's own ledger, which is the one place no gate reads](#0247--a-suite-run-by-hand-inside-a-lane-records-into-that-lanes-own-ledger-which-is-the-one-place-no-gate-reads)
 - [0248 — nothing in this repo asks whether a groundless luminous field is a composition or a fill, and four shipped presets are the open cases](#0248--nothing-in-this-repo-asks-whether-a-groundless-luminous-field-is-a-composition-or-a-fill-and-four-shipped-presets-are-the-open-cases)
+- [0249 — `warp_mesh`'s `zoom` doc says the opposite of what the shader does, and four generated surfaces carry it](#0249--warp_meshs-zoom-doc-says-the-opposite-of-what-the-shader-does-and-four-generated-surfaces-carry-it)
+- [0250 — a conductor session cannot run a command that carries an environment assignment, and two documented repairs need one](#0250--a-conductor-session-cannot-run-a-command-that-carries-an-environment-assignment-and-two-documented-repairs-need-one)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -2423,3 +2425,94 @@ nothing would notice if one became a wash. It is not lower because it is the las
 diagnosis three ADRs and three plans have now worked on, and because the instrument it wants — a
 statistic that reads a full frame's *internal* organization rather than its departure from a ground —
 is the one shape this line has never tabled.
+
+## 0249 — `warp_mesh`'s `zoom` doc says the opposite of what the shader does, and four generated surfaces carry it
+
+The `ParamSpec` doc for `warp_mesh`'s `zoom` reads *"Scale the previous frame is resampled at, per
+vertex; above 1 the image tunnels inward."* The shader says the reverse, in a comment written to
+explain exactly this trap: *"The INVERSE of the motion the outputs name throughout: a destination
+vertex asks where its content came from, so a `zoom` above 1 shrinks the source window and the past
+appears to grow."* The plan's own fixture agrees with the shader — `warp_mesh_ladder.toml` uses
+`1.04` to make content travel outward.
+
+**The string is declared twice and rendered four times.** `mod.rs:116` (`PER_VERTEX_PARAMS`) and
+`mod.rs:397` (`PARAMS`) carry identical copies, and ADR-0170's generation pipes them into
+`presets/README.md`'s parameter table, `presets/schema/warp_mesh.schema.json` (twice — `description`
+and `markdownDescription`) and `docs/specs/player-schema.json`. So an author who checks the reference
+before binding the parameter is told the wrong direction by every surface this project offers.
+
+**It has already produced a false claim in shipped content.** Plan 0184's `presets/warp_ladder.toml`
+was authored with a header paragraph explaining that `zoom` below 1 makes the field creep outward —
+written from the reference, not from the shader — and the close review of that plan convicted it
+(minor 2) and traced it here (nit 6). The preset's prose is repaired; the source of it is not.
+
+**The repair is small and is `dev`'s**, because it is an engine edit that moves three generated
+artifacts: correct both declarations, then regenerate with `RLX_UPDATE_PARAM_REFERENCE=1` and
+`RLX_UPDATE_PRESET_SCHEMA=1`. The review wrote the replacement text: *"Scale the previous frame is
+resampled at, per vertex; above 1 the past is magnified and the image travels outward."* That is
+outside what a conductor close may repair (ADR-0209), which is why it is here rather than fixed.
+
+- **Raised:** 2026-09-17, from Plan 0184's close review, by the owner's session. **Owner if taken:**
+  `dev`.
+- **Verified 2026-09-17** — the declaration says inward:
+  `present: above 1 the image tunnels inward in: core/src/render/scenes/warp_mesh/mod.rs`
+- **Verified 2026-09-17** — and the shader beside it says the opposite:
+  `present: above 1 shrinks the source in: core/src/render/scenes/warp_mesh/shaders.rs`
+- **Verified 2026-09-17** — the generated parameter table carries the wrong one:
+  `present: above 1 the image tunnels inward in: presets/README.md`
+- **Verified 2026-09-17** — and so does the editor schema:
+  `present: above 1 the image tunnels inward in: presets/schema/warp_mesh.schema.json`
+
+### Priority
+
+**Medium.** It is two lines of text and a regeneration, and it has already cost one shipped header a
+false paragraph and a close-review finding. It is not higher because nothing it touches is executable:
+every picture the engine draws is correct, and only the prose about it is wrong.
+
+## 0250 — a conductor session cannot run a command that carries an environment assignment, and two documented repairs need one
+
+`tools/conductor/settings.conductor.json` allows commands by **prefix** — `Bash(cargo *)`,
+`Bash(node *)`, `Bash(npx *)` and so on. A command written `RLX_UPDATE_PRESET_SCHEMA=1 cargo nextest
+run …` does not begin with `cargo`, so it matches no rule and is denied. The same holds for
+`RLX_UPDATE_PARAM_REFERENCE=1`, and for any other `VAR=value cmd` form.
+
+**Two repairs the project documents are therefore unreachable from inside the conductor**, and both
+have now been met:
+
+- **Regenerating a generated file to resolve a merge.** Plan 0184's close hit a conflict in
+  `docs/specs/player-schema.json`, which both branches had rewritten whole. The session diagnosed it
+  correctly, named the command `docs/developing.md` prescribes, and parked `merge_conflict` because it
+  could not run it. The owner resolved it by hand in one step.
+- **Any `RLX_UPDATE_*` regeneration a phase needs.** A phase that renames a parameter or moves a
+  default must regenerate the reference and the schemas; the same denial applies.
+
+**The park is honest and the lane is left clean, so this is a cost rather than a hazard** — but it is
+a cost paid in a full review session each time, and the class will recur for as long as generated
+files are committed.
+
+Shapes, none decided:
+
+- **Allow the two spellings by name.** `Bash(RLX_UPDATE_PRESET_SCHEMA=1 cargo *)` and the parameter
+  one, which keeps the allowlist a list of things rather than a pattern. Narrow, and it needs a case
+  in `test/settings.test.mjs` like every other rule.
+- **Teach the repairs the `--config` form.** `cargo test --config 'env.RLX_UPDATE_PRESET_SCHEMA="1"'`
+  begins with `cargo` and is already allowed; a session tried exactly this at Plan 0183 and it was
+  denied for a different reason, so the form needs checking before it is documented.
+- **Let the conductor resolve a generated-file conflict itself**, from a declared list of
+  regenerate-don't-merge paths. The largest change, and the one that removes the class rather than
+  the two instances.
+
+- **Raised:** 2026-09-17, from Plan 0184's `merge_conflict` park, by the owner's session.
+  **Owner if taken:** `dev`.
+- **Verified 2026-09-17** — the allowlist admits `cargo` only as a prefix:
+  `present: "Bash\(cargo \*\)" in: tools/conductor/settings.conductor.json`
+- **Verified 2026-09-17** — and carries no environment-assignment rule of any kind:
+  `absent: Bash\(RLX_ in: tools/conductor/settings.conductor.json`
+- **Verified 2026-09-17** — while the documented regeneration is written in exactly that form:
+  `present: RLX_UPDATE_PRESET_SCHEMA=1 cargo nextest in: docs/developing.md`
+
+### Priority
+
+**Low.** It costs one parked plan and one hand resolution per occurrence, it never produces a wrong
+result, and the park names the command to run. It rises if a plan lands that regenerates a parameter
+surface per phase, because then every phase meets it.
