@@ -245,13 +245,24 @@ catches that class, because the pre-push doc step is scoped to `-p rlx-core` whi
 `--workspace`; that is [backlog 0179](../design-backlog.md), and this is its second instance.
 Verified independently: `cargo nextest run --workspace` 1981 passed / 6 skipped in 852 s, `fmt` and
 `clippy` clean, every doc and backlog gate green.
-- **The log outran the phases section, and only half of that was repairable.** `1c0f5e0` stripped the
+- **The log outran the phases section, and only half of that was repairable.** `d6b1003` stripped the
 1,640 bytes of resume scaffolding the park left behind - the class the size rule exists to catch.
 What remains is 34.8 KB against 29.5 KB, an excess of 5.3 KB, and Phase 1's source-read tables are
 6.8 KB of it: that phase's **done-when commissioned them into the log**, and both ADRs cite them
 there. So the rule and the plan's own contract conflict here and the rule loses. A plan whose
 deliverable is a written record should say so in the log's preamble rather than leave the next
 close to re-derive it.
+- **The review's five code findings were fixed after the tag**, in `e32d0f3` (four nits) and
+`6cbabf6` (the one minor). The minor is worth the line: `ONE_SIDED_ENOUGH` was a frozen `0.015`
+on an absolute byte distance, below the `0.02` `golden.rs` calls rasterizer drift for the same
+statistic. The suggested repair - brighten the fixtures so the floor could rise - turned out to
+have no lever (`shapecode_0_a` is already `1.0`, and every other route changes the geometry the
+hunts read). Measuring instead found the asymmetry is **exactly 2.000x each render's own mean
+level**, which is an identity: one-sided light is differenced against black twice. The floor is
+now that ratio - dimensionless, ceiling derivable at `2.0`, mutation-checked - which is a better
+instrument than the one the review asked for. **`v0.127.0` stays at `d6b1003`**: an annotated tag
+does not follow commits, `check-release-tag.mjs` asserts ancestry rather than tip, and whether a
+post-release test fix earns a re-tag is the owner's call.
 - **Three findings the plan reversed about itself, which is the shape of the whole plan.** Phase 1's
 read found the divergence was **not** confined to the program's inputs - four warp stages differed
 too - which parked Phase 3 and produced ADR-0212. Phase 4 ruled out its own predicted cause for the
