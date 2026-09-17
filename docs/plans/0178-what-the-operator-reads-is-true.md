@@ -1,6 +1,6 @@
 # 0178 — What the operator reads is true
 
-> **Status:** approved (2026-09-14)
+> **Status:** in-progress (2026-09-14)
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`, `human`
 > **Related ADRs:** [0202](../adrs/0202-a-written-count-of-the-systems-is-refused-by-a-gate.md) (proposed), [0007](../adrs/0007-line-geometry-generators.md), [0162](../adrs/0162-the-application-is-renamed-to-ritmolux.md), [0022](../adrs/0022-build-time-preset-embedding.md)
@@ -307,17 +307,28 @@ flowchart LR
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(`main` directly, or the worktree path plus its branch)_
+**Lane:** `C:\Users\Igor Konovalov\WORK\rlx-plan-0178` on branch `plan-0178-what-the-operator-reads-is-true`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The preset directory reports its drift | dev | not started | |
+| 1 — The preset directory reports its drift | dev | done | committed with this row |
 | 2 — `--list-presets` shows the set a launch would load | dev | not started | |
 | 3 — The banner and the recovery line say what is true | dev | not started | |
 | 4 — A written count of the systems cannot land | dev | not started | |
 | 5 — The microphone capture is settled on the machine it happened on | human | not started | |
 
 ### Notes
+
+- **Phase 1, the drift fixture.** Phase 1's first `Done when` bullet describes three mutations
+  (edit a shipped file, add an unshipped file, add a second file duplicating a shipped name) and
+  then asserts "exactly one `Differs`, one `NotShipped` and one duplicate name". Three mutations
+  give two `NotShipped`, because any added file is by definition not in `EMBEDDED`. The test
+  `drift_reports_an_edit_an_extra_file_and_a_duplicate_name` makes the counts hold: one edited
+  shipped file, and one added file that is both the unshipped one and the duplicate claimant.
+- **Phase 1, where the line's subject lives.** `DriftReport::line()` returns the summary **without**
+  a leading `preset directory:`; `seed_preset_dir` prints that prefix. A shell diagnostic beginning
+  with an interpolation fails `stream_split::no_human_diagnostic_line_can_begin_with_a_brace`, and
+  the alternative was an entry in that test's `MESSAGE_PLACEHOLDERS`, outside the phase's files.
 
 ### Close triggers
 
