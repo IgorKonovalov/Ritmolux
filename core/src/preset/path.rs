@@ -85,7 +85,7 @@ pub const MAX_SAMPLES: usize = 64;
 /// blob of `core/tests/path_cost.rs`'s arc comparison; the circle there fits in
 /// 6 and the leaf in 16. `the_arc_fit_reports_what_a_curve_costs_in_pieces`
 /// reads 25 for that same blob at this same budget because it refits the
-/// 64-point resample, where [`PathShape::from_dense`] fits the dense flatten.
+/// 64-point resample, where `PathShape::from_dense` fits the dense flatten.
 pub const MAX_ARC_PIECES: usize = 32;
 
 /// The lateral error the arc fit is held to, in the contour's own normalized
@@ -282,7 +282,7 @@ impl PathShape {
     }
 
     /// **Whether a ray from the figure's centre meets this outline exactly
-    /// once**, to within [`STAR_SHAPED_TOLERANCE`].
+    /// once**, to within `STAR_SHAPED_TOLERANCE`.
     ///
     /// The scaled-copy coordinate (`coord_mode = 1`) divides by the boundary
     /// radius along such a ray, so on a contour where the answer is `false` that
