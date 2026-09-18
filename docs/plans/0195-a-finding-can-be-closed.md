@@ -137,6 +137,14 @@ against the branch — nothing can verify it.
   `openFindings`. Every finding with its verb, reason and date is in that run's **Closed** section,
   which is where `digest --history` keeps the record.
 - `node --test "tools/conductor/test/*.test.mjs"`: 341 tests, 341 pass, 0 fail.
+- **Round 1 finding 0 (major), the verb parse** — `0bc634e5`: the verb is the `FINDING_VERBS` entry
+  that matched the flag in full, and a bare `done` is a usage refusal.
+- **Round 1 finding 1 (major), the closing verdict** — `74b7e833`: `finding` refuses a plan with no
+  `closed`, so a round's verdict on a plan still in fix rounds neither lists nor takes a
+  disposition; the refusal says where the plan stands, and the test seeds a parked plan with a
+  verdict.
+- **Round 1 finding 2 (minor), the README bullet** — `f444c306`: only recording is refused mid-run.
+- **Round 1 finding 3 (nit), the nothing-to-close refusal** — `6c882c1e`: it prints on `o.err`.
 
 ### Close triggers
 
