@@ -1,7 +1,8 @@
 # 0193 — The digest says what is happening, and where you are needed
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-09-18
+> **Approved:** 2026-09-18 (user)
 > **Owner skill(s):** dev
 > **Related ADRs:** [0214](../adrs/0214-the-digest-is-a-current-state-page-and-history-is-regenerated-on-demand.md)
 > (proposed), [0205](../adrs/0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md)
