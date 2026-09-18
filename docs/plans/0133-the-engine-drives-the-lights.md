@@ -559,7 +559,7 @@ which nothing but the rig can answer. Phase 9 is the whole of the second half, i
 | 1 — The virtual rig | dev | done | `e637ae99` |
 | 2 — A configured rig lights up | dev | done | `3787908c` |
 | 3 — Folded tempo and musical beat | dev | done | `d5641815` + committed with this row |
-| 4 — The send path, measured | dev | not started | |
+| 4 — The send path, measured | dev | parked | |
 | 5 — A look is a TOML file | dev | not started | |
 | 6 — The look that already works | dev | not started | |
 | 7 — The operator can stop it | dev | not started | |
@@ -651,6 +651,24 @@ which nothing but the rig can answer. Phase 9 is the whole of the second half, i
 - Phase 3 — **no golden baseline moved.** `cargo nextest run -p rlx-core -E 'binary(golden)'`:
   3 passed, and `git status` clean afterwards. `-P fast` across the workspace: 1753 passed,
   308 skipped. Clippy `--workspace --all-targets -- -D warnings` clean.
+- **Phase 4 parked, 2026-09-18, with no code written.** It is a measurement session at the machine,
+  and both of its halves are out of reach of a conductor-started session (ADR-0205). Recorded here
+  so whoever runs it does not re-derive the two reasons:
+  - **The ARP pre-population the phase names is refused.** `netsh interface ipv4 add neighbors` is
+    not on this session's allowlist, and the phase requires it so that no send stalls on address
+    resolution. There is a substitution that needs no elevation — target a **live** address on the
+    segment, such as the default gateway, whose ARP entry the OS maintains for the same reason the
+    static entry would, which is also what Plan 0132 Phase 3 did (`192.168.0.1:9000`). It is worth
+    taking, and it fixes only this half.
+  - **The frame-time comparison needs the windowed app, and nothing here can run one.**
+    `ArtnetSink::send` is called from `app_state::redraw` and from nowhere else — `standalone/src/stream.rs`
+    never mentions the sink — so the headless path cannot exercise it. The windowed path has no
+    self-terminating run: `--frames` requires `--stream`, and the operator's quit is
+    `WindowEvent::CloseRequested`. The criterion compares an alternating series of off/on runs, and
+    a session with nobody at the keyboard can produce neither side of it.
+  - What is in place for whoever does run it, measured 2026-09-18: the only interface up is Wi-Fi
+    (MediaTek MT7921, 78 Mbps negotiated), host `192.168.0.12/24` — the same link family Plan 0132
+    Phase 3's numbers were taken on, so its readings are the comparable ones.
 
 ### Close triggers
 
