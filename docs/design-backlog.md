@@ -59,6 +59,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0250 — a conductor session cannot run a command that carries an environment assignment, and two documented repairs need one](#0250--a-conductor-session-cannot-run-a-command-that-carries-an-environment-assignment-and-two-documented-repairs-need-one)
 - [0251 — `warp_mesh`'s level mode draws bands but not an ink class, because coverage is a continuum nothing thresholds](#0251--warp_meshs-level-mode-draws-bands-but-not-an-ink-class-because-coverage-is-a-continuum-nothing-thresholds)
 - [0252 — the conductor's gate is a hand-maintained copy of the Node gate list, and it has fallen behind twice](#0252--the-conductors-gate-is-a-hand-maintained-copy-of-the-node-gate-list-and-it-has-fallen-behind-twice)
+- [0253 — the conductor can be stopped but not paused, so finishing the plan in flight is done by hand with a stopwatch](#0253--the-conductor-can-be-stopped-but-not-paused-so-finishing-the-plan-in-flight-is-done-by-hand-with-a-stopwatch)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -2670,3 +2671,38 @@ two names — restores the invariant for a day and rebuilds the same trap. The s
 on every local push by anyone with the hook installed. What is lost is the pre-close reading for
 conductor-run plans, which is exactly where a red gate is cheapest to repair. It rises with each
 further gate added, because the gap is not one checker but a list that nobody is told to update.
+
+## 0253 — the conductor can be stopped but not paused, so finishing the plan in flight is done by hand with a stopwatch
+
+`abort` stops the conductor and every session under it, and a step in flight runs again on the next
+`run`. That is the right behaviour for "stop now" — Ctrl+C does the same — and it is the **only**
+stopping behaviour there is. What an operator asks for far more often is *"finish what you are
+doing, then stop"*: the machine is wanted for something else, or a `human` phase is ready to be done
+and the GPU is busy, or the day is over and nothing new should start.
+
+**Done by hand, that means watching the record and timing an `abort`**, because the two failure
+modes sit either side of the right moment. Abort too early and a review session's spend is lost and
+its step re-runs from scratch. Abort too late and the next plan's session has already started, which
+costs the same. On 2026-09-18 this was done three times in one session: once by polling
+`state/conductor.json` in a loop until `0178` read `merged` and aborting inside the gap, and twice by
+noticing that the queue happened to hold exactly one plan, so the run would end by itself.
+
+**What the shape probably is**, and it is small: a `pause` command that sets a flag the lane loop
+reads where it already reads `stopRequested()` — no new session starts, the one in flight finishes,
+its close and fast-forward complete, then the run ends normally. `run --once` is the same idea
+expressed at start time and is evidence the seam exists; what is missing is saying it *during* a run.
+Worth deciding alongside: whether `pause` survives into the next `run` (a paused conductor that
+forgets by morning is a trap), and whether it prints what it is waiting for, since the gap between
+asking and stopping is exactly the suite's twelve minutes.
+
+- **Raised:** 2026-09-18 by the owner, after the third hand-timed stop of the day. **Owner if
+  taken:** `architect` then `dev`.
+- **Verified 2026-09-18** — the command roster has no pause:
+  `absent: pause: in: tools/conductor/conductor.mjs`
+- **Verified 2026-09-18** — the only stop is the abrupt one, and it says so:
+  `present: in-flight step\(s\) will run again on the next in: tools/conductor/conductor.mjs`
+- **Verified 2026-09-18** — the lane loop already reads a stop request each iteration, which is where
+  a pause would be read too:
+  `present: stopRequested in: tools/conductor/lib/lane.mjs`
+- **Verified 2026-09-18** — and `--once` shows the same intent is already expressible at start time:
+  `present: once in: tools/conductor/conductor.mjs`
