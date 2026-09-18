@@ -141,7 +141,7 @@ closed findings are the only human-readable account of an unattended night).
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — the page leads with the worklist, and the history moves behind a flag | dev | done | `04b18360` |
-| 2 — a park the repository has already settled reads as stale | dev | committed with this row | |
+| 2 — a park the repository has already settled reads as stale | dev | done | `65a0f62e` |
 
 ### Notes
 
@@ -163,13 +163,17 @@ closed findings are the only human-readable account of an unattended night).
 
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`**
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** no.
+- **Plan header `Closes:`** the header carries no `Closes:` line.
+- **What shipped:** a feature, entirely inside `tools/conductor/` plus one `.gitignore` rule. No
+  file under `core/`, `core-cabi/`, `rlx-ring/`, `standalone/`, `plugin-foobar/`, `presets/` or
+  `studio/` changed, so no shipped artifact moved.
+- **Operator docs touched:** `tools/conductor/README.md` — the commands table, *What to read
+  afterwards* (now two pages), and the two lines elsewhere that named a section of `digest.md`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — 98 reductions across 39
+  live entries, 3 unprobeable, 46 advisory path-moved rows.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
+- **Outstanding `human` phases:** none — the plan has two phases, both `dev`, both committed.
 
 ## Followups (after this lands)
 
