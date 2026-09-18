@@ -160,6 +160,11 @@ by name, so the second is loaded and rotated through but cannot be selected by `
 studio, or by the browse overlay. The same drift is summarised in **one startup line**, printed only
 when something has drifted, so an untouched install says nothing.
 
+That startup line is for the **seeded per-user directory only** — the one the app writes the curated
+set into on first run. With `RLX_PRESET_DIR` set, the app neither seeds nor reports: that directory
+is yours, differing from the shipped set is usually the point of it, and `--list-presets` is the only
+reading of its drift.
+
 **`--gpu <name|index>`** works for both the window and `--stream`. **On a machine with one GPU you
 will never need it; on a hybrid laptop it is the difference between a picture and nothing.** A
 Spout sender shares a D3D11 texture by handle and the receiver opens it on its own device, which

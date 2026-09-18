@@ -474,7 +474,7 @@ pub(super) fn evaluate_preset(
     // The `[per_vertex]` table (Plan 0100 Phase 1), after the scalars — so a
     // per-vertex binding overrides the scalar of the same name for this frame
     // rather than racing it. `None` for every preset with no per-vertex surface,
-    // and `per_vertex` is empty for every preset that declares no table, so the
+    // and `per_vertex` is empty for every preset that declares no table, so
     // every other system takes exactly the path it took before this existed.
     if let Some(mut surface) = vertex {
         for binding in &preset.per_vertex {
