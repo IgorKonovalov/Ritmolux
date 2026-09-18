@@ -257,8 +257,8 @@ first because every later phase increases the number of people who meet the defe
 |---|---|---|---|
 | 1 — the component survives a stranger's first five minutes | dev | done | `2c9cbbc` |
 | 2 — the README leads with the product | dev | done | `b72b035` |
-| 3 — a demo that moves | dev | done | committed with this row |
-| 4 — the repository says what it is | human | done | committed with this row |
+| 3 — a demo that moves | dev | done | `cff8167`, `684dded` |
+| 4 — the repository says what it is | human | done | `e5d7c7f` |
 
 ### Notes
 

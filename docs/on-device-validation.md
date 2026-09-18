@@ -484,20 +484,28 @@ or an older copy shadows the one under test and the version check means nothing.
       `ritmolux-v<version>-foobar2000-component.zip` from the Releases page, unzip,
       and install via File → Preferences → Components. Then, in this order:
       **(a)** the Components list shows the released version, not the dev build's;
-      **(b)** dock it as a Default UI panel **before playing anything** and record whether it comes
-      up black — this is [backlog 0102](design-backlog-archive.md), which says the panel renders without
-      presenting and revives only at a track boundary, and one reporter's account is all the
-      evidence there is;
+      **(b)** dock it as a Default UI panel **before playing anything** and record the frame times
+      of the panel's first seconds — [Plan 0103](plans/done/0103-the-project-gets-an-audience.md)
+      Phase 1 made the attach wait for a real client size, so the criterion is that the first rows of
+      `plugin-diagnostics.log` read like the steady state playback reaches rather than an order of
+      magnitude off it, and that `surface_w`/`surface_h` there equal `client_w`/`client_h`. Those
+      four columns are that phase's own instrument: `gpu_bytes` is arithmetic over the core's config
+      and reads the same whether or not the surface matches its window. **Start a clean
+      `plugin-diagnostics.log`** — the header is written only when the file is created, so a file
+      carried over from an earlier build gets wide rows under a narrow header;
       **(c)** open the pop-out from View → Ritmolux;
       **(d)** play a track, confirm it reacts, change track, press `Space` a few times;
-      **(e)** in layout-editing mode, right-click the panel and check whether Remove is reachable —
-      this is [backlog 0103](design-backlog-archive.md), expected to fail, and confirming it on a second
-      machine is worth the ten seconds;
+      **(e)** in layout-editing mode, right-click the panel: foobar2000's own Cut / Copy / Replace /
+      Remove must appear and Remove must work, and with layout editing off the component's own menu
+      must still appear. Same phase; confirming it on a second machine is worth the ten seconds;
       **(f)** `%APPDATA%\Ritmolux\` exists and is the same folder the standalone uses.
       **Escalation:** a failure is a new backlog entry or a followup plan, never a re-opened plan —
-      on-device checks do not gate closes here. (b) and (e) failing is the *expected* result and
-      confirms two filed defects rather than finding new ones; anything else is new.
-      _(Plan 0102 Phase 5, carried forward at that plan's close 2026-08-16.)_
+      on-device checks do not gate closes here. **(b) and (e) are the two halves of Plan 0103 Phase
+      1's done-when, and that phase closed without either being measured** — no runner loads
+      foobar2000 and the lane that wrote it had no SDK to compile with, so this item is the first
+      reading of that fix and a failure here convicts it.
+      _(Plan 0102 Phase 5, carried forward at that plan's close 2026-08-16; (b) and (e) rewritten at
+      Plan 0103's close, where they stopped being expected failures.)_
 
 - [ ] **The Russian install note in the component zip is readable, and opens on its title.** The
       whole point of the Russian slice is the install path, and the one thing that proves it is a
@@ -536,9 +544,9 @@ or an older copy shadows the one under test and the version check means nothing.
       persist-by-name.
       **Two things to note rather than fix.** The restore is a *dissolve*, not a cut, so a fresh
       handle starts on the roster's first entry and crossfades to the remembered one over ~1 s —
-      at every start, and at every mid-playback format change. And the menu still shadows
-      foobar2000's own in layout-editing mode ([backlog 0103](design-backlog-archive.md)), which this plan
-      made larger rather than fixing; Plan 0103 Phase 1 owns it.
+      at every start, and at every mid-playback format change. And the menu no longer shadows
+      foobar2000's own in layout-editing mode — [Plan 0103](plans/done/0103-the-project-gets-an-audience.md)
+      Phase 1 hands that right-click to the host, which the item above checks as its (e).
       **Escalation:** same rule as above — a failure is a backlog entry or a followup plan.
       **Ran 2026-08-24 — all four pass, no finding.** Component rebuilt from `main` first: the
       profile held a `foo_lmv.dll` dated 2026-08-16, predating the very menu this item drives, so

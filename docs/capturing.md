@@ -1255,25 +1255,32 @@ cargo run -p standalone --example shot -- --preset "Perseids" \
   --audio assets/test/clip.wav --strip 8 --out clip.png
 ```
 
-**Three committed scripts drive `shot`**, all self-documenting in their headers — run them with
+**Four committed scripts drive `shot`**, all self-documenting in their headers — run them with
 `node`, no arguments needed:
 
 | Script | What it renders | Output |
 |---|---|---|
 | `scripts/tuple-sheets.mjs` | one labeled contact sheet per attractor family, a cell per roster entry — the menu a `tuple` curation judges | `target/`, not committed |
 | `scripts/tuple-paths.mjs` | one filmstrip per candidate `tuple_from`/`tuple_to` pair, a cell per `morph` step; pairs the engine refuses a walk for are skipped rather than rendered as identical cells | `target/`, not committed |
-| `scripts/docs-shots.mjs` | every documentation image, from an inline manifest naming the preset file, stimulus, hop, size and tier behind each one | **`docs/images/`, committed** |
+| `scripts/docs-shots.mjs` | every documentation still, from an inline manifest naming the preset file, stimulus, hop, size and tier behind each one | **`docs/images/`, committed** |
+| `scripts/docs-clip.mjs` | the two artifacts that are not stills — the demo clip and the 2:1 social preview — from a manifest of the same shape, over a stimulus WAV it synthesizes into `target/` | **`docs/images/`, committed** |
 
 The first two read the roster straight out of `core/src/render/scenes/particles/family.rs`, so a
 roster edit needs no script edit, and their output is a scratch artifact — re-run them when a
 judgement is owed.
 
-`docs-shots.mjs` is the odd one: its output *is* committed, so the manifest is the provenance record
+The last two are the odd ones: their output *is* committed, so the manifest is the provenance record
 for every picture in the documentation, and swapping which preset represents a family is one line
-plus a re-run ([ADR-0100](adrs/0100-documentation-images-are-committed-headless-renders.md)). It
-writes only under `docs/images/` and refuses an entry pointing anywhere else. **It is not a CI gate
-and must not become one** — renders are not byte-reproducible across machines, so freshness is a
+plus a re-run ([ADR-0100](adrs/0100-documentation-images-are-committed-headless-renders.md)). Each
+writes only under `docs/images/` and refuses an entry pointing anywhere else. **Neither is a CI gate
+and neither must become one** — renders are not byte-reproducible across machines, so freshness is a
 close-ceremony sweep duty rather than a check.
+
+They are separate because `docs-shots.mjs` writes only PNG, spawns only `cargo`, and needs nothing
+installed beyond the toolchain, while a clip writes a container through an external encoder:
+`docs-clip.mjs` needs **`ffmpeg` on `PATH`** and stops before rendering anything without one. Its
+still also carries a byte budget — GitHub refuses a social preview over 1 MB — so that entry
+quantizes to a 256-colour palette and fails the run if it is still over.
 
 `--signal` kinds: `click:<bpm>`, `bass:<hz>`, `treble:<hz>`, `noise:<seed>`,
 `chord`, `dynamic:<bpm>`. The synth path needs no committed asset. `--audio`
