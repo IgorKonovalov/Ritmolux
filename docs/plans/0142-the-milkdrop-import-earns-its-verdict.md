@@ -339,7 +339,7 @@ flowchart LR
 | 3 — Bound the equilibrium | dev | done | `42b4bb97` |
 | 4 — The look gate | human | done | `15514a8a` |
 | 5 — ADR-0113's third Outcome | dev | done | `7299cc90` |
-| 6 — The reach decision | dev | done | committed with this row |
+| 6 — The reach decision | dev | done | `9d149505` |
 
 ### Phase 1 — the re-taken table
 
@@ -513,6 +513,8 @@ necessarily a unit sample at the draw call — which weakens the absolute `k`, n
   it**, rather than rewritten. The phase asks for "a dated update tying its priority to this phase's
   verdict"; the file's own form is dated updates that supersede, and the new one says in its first
   sentence that it replaces the line above as the live priority.
+- **The close block rode inside Phase 6's commit** (`9d149505`) rather than following it as its own
+  `docs(plans):` commit; the commit that carries this line backfills Phase 6's SHA and nothing else.
 
 ### Close triggers
 
