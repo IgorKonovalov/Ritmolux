@@ -123,19 +123,33 @@ against the branch — nothing can verify it.
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — a finding carries a disposition, and one command writes it | dev | done | `4737305` |
-| 2 — the page carries the open ones and counts the closed | dev | committed with this row | |
+| 2 — the page carries the open ones and counts the closed | dev | done | `b38a4eb` |
 
 ### Notes
 
+- **Added beyond the plan, Phase 1 (`4737305`): `finding` refuses to record a disposition while a
+  conductor is running**, the way `resume`, `park` and `adopt-close` do. A live run holds `state` in
+  memory and its next `saveState` writes the whole file, so a disposition recorded beside it is lost
+  with no trace. Listing is read-only and is not refused.
+- **`<ref>` by index is 0-based** — the array index in the closing verdict's `findings`, which is
+  what `fixes[].resolved[].finding` already means in the record. `finding NNNN` prints it per row.
+- **The history's own `Needs you` hides a disposed finding too**, because both pages share
+  `openFindings`. Every finding with its verb, reason and date is in that run's **Closed** section,
+  which is where `digest --history` keeps the record.
+- `node --test "tools/conductor/test/*.test.mjs"`: 341 tests, 341 pass, 0 fail.
+
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`**
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** no.
+- **Plan header `Closes:`** the header declares none.
+- **What shipped:** a feature, inside `tools/conductor/` only — one new operator command and a digest
+  change. No cargo crate, no shipped artifact and no C ABI surface was touched.
+- **Operator docs touched:** `tools/conductor/README.md` — the command table, a new
+  `## Closing a finding` section, and the two digest-page descriptions.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — 98 stated reductions across
+  39 live entries, 3 unprobeable, 47 advisory moved-path rows.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207).
+- **Outstanding `human` phases:** none; both phases are `dev`.
 
 ## Followups (after this lands)
 
