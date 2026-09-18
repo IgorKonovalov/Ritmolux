@@ -274,6 +274,7 @@ first because every later phase increases the number of people who meet the defe
 | 1 — the component survives a stranger's first five minutes | dev | done | `2c9cbbc` |
 | 2 — the README leads with the product | dev | done | `b72b035` |
 | 3 — a demo that moves | dev | done | committed with this row |
+| 4 — the repository says what it is | human | done | committed with this row |
 
 ### Notes
 
@@ -316,6 +317,19 @@ first because every later phase increases the number of people who meet the defe
   with five named exceptions" and names five. `scripts/docs-clip.mjs` is a sixth.
 - Followup noticed and not acted on: nothing links `docs/images/demo.mp4`. Phase 3's files are
   `scripts/` and `docs/images/`, and Phase 6 is where the clip is posted.
+- Phase 4 applied by the owner, 2026-09-18. `gh repo edit` set the five topics
+  `packaging/repo-metadata.md` names, and the social preview was uploaded through **Settings →
+  General → Social preview**. `gh repo view --json repositoryTopics,usesCustomOpenGraphImage`
+  reads all five and `usesCustomOpenGraphImage: true`. The done-when's last clause — a link pasted
+  into a chat showing the picture rather than a grey placeholder — is not checked here: GitHub
+  caches the card, so it is read at the first paste rather than on demand.
+- Phase 4 found the preview unuploadable as Phase 3 wrote it. GitHub refuses a social preview over
+  1 MB and the truecolour PNG was 1.18 MB, so `684ddeba` gave the manifest entry a `maxBytes`
+  budget, quantized the committed picture to 446 KB to meet it, and made a still that is still over
+  budget fail the run.
+- Phase 4 left one thing in `packaging/repo-metadata.md` unreconciled, which that file says is part
+  of applying it: its Description section and the live description differ. Live names the platforms
+  and carries the gallery URL; the file's text does neither. Nothing was changed on either side.
 
 ## Followups (after this lands)
 
