@@ -1,8 +1,8 @@
 # ADR-0202 — A written-out count of the systems is refused by a gate, and the threshold is five
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-18 (Plan 0178), with an `Outcome`
 > **Date:** 2026-09-14
-> **Related plan(s):** [0178](../plans/0178-what-the-operator-reads-is-true.md)
+> **Related plan(s):** [0178](../plans/done/0178-what-the-operator-reads-is-true.md)
 > **Extends:** [0168](0168-the-reader-documents-address-a-reader-and-the-record-stays-a-link.md)
 > (a reader-document rule carried by a gate), [0163](0163-a-long-document-carries-a-generated-contents-block.md)
 > and [0149](0149-a-backlog-reference-is-a-bare-number-and-a-file-link.md) (the same convention-to-gate
@@ -107,3 +107,25 @@ usually reads better without it.
 **Rejected for its false positives.** "two passes", "three bands", "four quadrants" are properties of
 the design and do not drift. A noun list has to be chosen noun by noun, which is the extension named
 in Negative above.
+
+## Outcome (2026-09-18, Plan 0178's close)
+
+**The match carries one exclusion this Decision does not name: the singular possessive.** The gate's
+first run over the tree reported thirteen instances, and one of them was its own false positive —
+`studio/renderer/components/ParamPanel.tsx` reads *"seven of its system's twelve"*, which counts a
+system's **params** rather than the roster. `system's` is therefore excluded and `systems'` is not,
+because the plural possessive (*"the twelve systems' palettes"*) is a roster count. The exclusion is
+in the script beside the reason.
+
+**The threshold held.** The Negative above priced the risk that a legitimate cohort of five or more
+would need markers; the repair pass took exactly **one** `count-allow:`, on
+`core/tests/suite/hygiene.rs`'s *"82 systems that do not exist"* — the not-a-roster-count case this
+ADR already named. Everything else was rewritten count-free, **including the two this ADR's Context
+table classed as dated records inside live documents** (`.claude/skills/preset-author/SKILL.md`,
+`docs/content-brief.md`): both sentences survive without the number, which is the outcome this ADR
+prefers to a marker. The threshold is not being revisited.
+
+**The ordinals went with the counts.** `.githooks/pre-push` and `.github/workflows/ci.yml` numbered
+their gate steps — *"the sixth"*, *"And the seventh"* — which is the same drift class under a
+different noun, falsified by adding a gate rather than a system. Each step now names its gate. That
+is still the by-hand rewrite this ADR's Negative describes; the grammar was not extended.

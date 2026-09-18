@@ -45,7 +45,6 @@ place. The plan file carries the real link.
 | [0120](0120-the-standalone-ships-on-ubuntu.md) | The standalone ships on Ubuntu | approved | dev, human | ADR-0131 (proposed): PulseAudio capture + an `ubuntu-latest` CI arm. **Phase 1 is a `human` stop gate before `dev`.** Guard is 5 zips + 1 tarball; folds backlog 0181 (Linux arm) + 0208. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + 0174 (proposed): Art-Net verified against `rlx-artnet-sim`. **Phase 8 opens on a decision** - 0115's tap is headless-only, and a windowed resolve is an ADR. Phase 9 is the rig. |
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. **0180 landed and moved both ends of its chain.** Amended 2026-09-16. Needs the rig. |
-| [0178](0178-what-the-operator-reads-is-true.md) | What the operator reads is true | approved | dev, human | Backlog 0172, 0185, 0207, 0208 + ADR-0202 (proposed): drift line, `--list-presets`, banner, recovery line, count gate. **0176 and 0166 both landed.** Phase 5 `human` settles 0203. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
@@ -290,8 +289,8 @@ naming what moved. The order:
 
 - **Delivery and infrastructure lane.** [0174] closed first, then [0176] (both 2026-09-14), which
   discharges [0103] Phase 5's wait on a tag that reliably reaches origin. [0177] closed 2026-09-15, its fold re-derived from 0174's final run-alone filter. [0166] closed
-  2026-09-17 and took the gate-count prose count-free, as [0176] had; [0178] rebases onto that
-  wording and restores no number.
+  2026-09-17 and took the gate-count prose count-free, as [0176] had; [0178] closed 2026-09-18 onto
+  that wording and restored no number — it retired the ordinals beside the counts instead.
 - **Engine lane.** [0181], [0185] and then [0175] closed 2026-09-15, and none moved a golden.
   [0180] parked `plan_wrong` on 2026-09-14 and was amended on its lane branch 2026-09-15; resuming it
   is next. The opening this replaced is [in the archive](README-archive.md). [0180] runs before [0142]: 0180 re-draws the
@@ -314,7 +313,7 @@ naming what moved. The order:
 
 [0176]: done/0176-a-release-tag-reaches-origin.md
 [0177]: done/0177-the-test-tree-stops-costing-disk-and-touching-the-machine.md
-[0178]: 0178-what-the-operator-reads-is-true.md
+[0178]: done/0178-what-the-operator-reads-is-true.md
 [0179]: done/0179-a-parameters-range-belongs-to-its-family.md
 [0180]: done/0180-the-converted-picture-follows-the-source.md
 [0181]: done/0181-a-scene-advances-after-its-frames-bindings.md
@@ -859,6 +858,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0178 - What the operator reads is true](done/0178-what-the-operator-reads-is-true.md) - closed 2026-09-18. Review: **no blockers, no majors, three minors, two nits (three fixed).** Version: **0.131.0**. ADR-0202 accepted, Outcome. Closed 0172, 0185, 0203, 0207, 0208; filed 0252. [Write-up](README-archive.md).
 - [0160 - The silhouette's preconditions stop being silent](done/0160-the-silhouettes-preconditions-stop-being-silent.md) - closed 2026-09-17. Review: **no blockers, no majors, three minors, three nits (all fixed).** Version: **0.130.1**. ADR-0179 accepted, Outcome. Closed backlog 0217. [Write-up](README-archive.md).
 - [0186 - The flatness gate tells a figure from its ground](done/0186-the-flatness-gate-tells-a-figure-from-its-ground.md) - closed 2026-09-17. Review: **no blockers, no majors, three minors, one nit (all fixed).** Version: **0.129.0**. ADR-0200 accepted. Closed backlog 0128; filed 0248. [Write-up](README-archive.md).
 - [0184 - Limited ink: a contour that is an ink](done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) - closed 2026-09-17. Review: **no blockers, no majors, one minor, one nit.** Version: **0.130.0**. ADR-0197 accepted, Outcome. Closed backlog 0140, 0146; filed 0251. [Write-up](README-archive.md).

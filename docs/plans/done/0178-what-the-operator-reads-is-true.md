@@ -1,9 +1,13 @@
 # 0178 — What the operator reads is true
 
-> **Status:** in-progress (2026-09-14)
+> **Status:** done (2026-09-18) — five phase commits `a20bc34a`, `2fd42a7d`, `8b4b7f69`, `955cb766`,
+> `f8e29cf7`, plus the close-review repairs in `fb9687f4`. Round-1 close review (conductor mode):
+> **no blockers, no majors, three minors and two nits**, three of them repaired at the close. Full
+> suite green on the reviewed tree (`e3c158e`, 1985 passed / 6 skipped, suite ledger), and again on
+> the tagged tip; `cargo doc --workspace` under `-D warnings` clean; every Node gate exit 0.
 > **Created:** 2026-09-14
 > **Owner skill(s):** `dev`, `human`
-> **Related ADRs:** [0202](../adrs/0202-a-written-count-of-the-systems-is-refused-by-a-gate.md) (proposed), [0007](../adrs/0007-line-geometry-generators.md), [0162](../adrs/0162-the-application-is-renamed-to-ritmolux.md), [0022](../adrs/0022-build-time-preset-embedding.md)
+> **Related ADRs:** [0202](../../adrs/0202-a-written-count-of-the-systems-is-refused-by-a-gate.md) (accepted), [0007](../../adrs/0007-line-geometry-generators.md), [0162](../../adrs/0162-the-application-is-renamed-to-ritmolux.md), [0022](../../adrs/0022-build-time-preset-embedding.md)
 > **Closes:** design-backlog 0172, 0185, 0207, 0208; carries the diagnosis of 0203
 
 ## TL;DR
@@ -404,4 +408,191 @@ flowchart LR
 - **Full suite:**
 - **Outstanding `human` phases:**
 
+## Close review
+
+> Round 1, 2026-09-18, conductor mode (ADR-0205): a fresh session handed the plan and the lane and
+> nothing an implementer wrote. Verbatim from
+> `tools/conductor/state/reviews/0178-round-1.md`. No earlier round, so no fix-round lines follow it.
+
+Lane `C:\Users\Igor Konovalov\WORK\rlx-plan-0178` on branch
+`plan-0178-what-the-operator-reads-is-true`, tip `f8e29cf7`, tree `e3c158e5`. The implementation log
+was read as claims and every one of them re-derived from the diff, the tests and the gates.
+
+**Verdict: Plan 0178 landed cleanly — no blockers, no majors, three minors and two nits.** Five
+phases, five commits, every done-when met or its deviation disclosed with a reason that holds. The
+two deviations `dev` recorded (Phase 1's three-mutation arithmetic, Phase 3's stderr/stdout mix-up in
+the plan's own wording) are cases where the **plan** was wrong and the implementation is right.
+
+### Lens 1 — alignment with the plan and the ADR
+
+| phase | commit | verified against the tree |
+|---|---|---|
+| 1 — the preset directory reports its drift | `a20bc34a` | `preset::drift`, `DriftReport`, two new core tests |
+| 2 — `--list-presets` | `2fd42a7d` | `FLAGS` entry, `run.rs` dispatch, `help_cli.rs` subprocess case |
+| 3 — banner and cap-recovery line | `8b4b7f69` | `CapOverflow::recovered()`, the banner, the settings fixture |
+| 4 — the count gate | `955cb766` | `scripts/check-system-counts.mjs`, fixture, hook, CI, twelve rewrites |
+| 5 — the microphone capture (`human`) | `f8e29cf7` | three observations recorded in the log |
+
+Every phase carries a single, in-vocabulary `**Owner skill:**` tag. The log is shorter than
+`## Implementation phases` and stays observational.
+
+**Full suite.** Run as `node tools/conductor/with-lock.mjs suite -- cargo nextest run --workspace`.
+The wrapper did not re-run it and printed the ledger record instead (ADR-0207), which is this lens's
+evidence: *"skipped cargo nextest run --workspace: tree e3c158e is green in the suite ledger, run by
+gate 0178-pre-review at 2026-09-18T11:43:26.281Z: 1985 tests run: 1985 passed (4 slow), 6 skipped"*.
+`git log -1 --format=%T` on the tip is `e3c158e5a82eac4f6aeddc9fd82952b474d7a6c1`, so the record is
+this tree's and not an ancestor's. **Rustdoc**: `cargo doc --workspace --no-deps` under
+`build.rustdocflags=["-D","warnings"]` exits 0.
+
+The done-whens, opened one at a time:
+
+- *Phase 1.* `drift_reports_an_edit_an_extra_file_and_a_duplicate_name` asserts `differs() == 1`,
+  `not_shipped() == 1`, one duplicate name, `winner()` naming the shipped file, and that the line
+  carries both the contested name and `--list-presets`.
+  `a_freshly_seeded_dir_has_no_drift_and_no_line` pins `line() == None` on a clean directory, which
+  is what the startup silence rests on. `seed_dir_writes_all_then_nothing` is untouched. The plan's
+  first bullet asked for "exactly one `Differs`, one `NotShipped` and one duplicate" from **three**
+  mutations, which is arithmetically impossible — any added file is `NotShipped` by construction.
+  `dev` folded the unshipped file and the duplicate claimant into one file and said so.
+- *Phase 2.* `list_presets_names_each_files_status_and_exits_zero` spawns the real binary with
+  `RLX_PRESET_DIR` **and** the data root pointed at scratch (the backlog-0181 class the plan named),
+  asserts exit 0, and reads the `shipped` / `not shipped` rows, the shadowing marker and the
+  directory line out of stderr. `grep "is not a flag" standalone/src/stream.rs` matches nothing.
+  `run.rs`'s `"--list-presets"` literal is inside the scan `every_scanner_flag_literal_is_rostered`
+  reads, so the roster/scanner tie is live rather than asserted by hand.
+- *Phase 3.* `each_overflow_context_recovers_in_its_own_words` builds one `CapOverflow` per variant,
+  asserts each recovery names its own noun and carries the cap, and asserts `Iterations`/`Grid`/
+  `Radius` contain neither `segment` nor `geometry`. The `match` in `Recovered`'s `Display` has no
+  wildcard arm, so a sixth variant cannot compile without choosing a sentence. `grep "geometry is
+  back within the segment cap" standalone/src/app_state.rs` matches nothing. The plan asked the
+  banner assertion to read "the first **stderr** line"; `print_help` writes to stdout, which
+  `schema_answers_on_stdout_and_exits_without_starting_the_app` and the `STDOUT_WRITERS` allowlist
+  both rest on, so the assertion is `stdout.starts_with("Ritmolux — ")`. Disclosed, and right.
+- *Phase 4.* `node scripts/check-system-counts.mjs` → exit 0, 446 files scanned from git.
+  `node scripts/check-system-counts.mjs scripts/fixtures/system-counts` → exit 1 with **exactly
+  five** breaks, which is the count `scripts/fixtures/README.md` states; the numeral, the number
+  word, the complement form, the two-word gap and the `.rs` string-literal case each report, and
+  `four systems`, `file systems`, the `count-allow:` line, the fenced block and the three-word gap
+  are each silent. The repo-wide `grep -riE "\b(nine|seven|eight|six|five) (node )?gates\b"` over
+  `CLAUDE.md`, `README.md` and `ci.yml` matches nothing; every surviving hit elsewhere is either the
+  **five preset gates** (a different, stable roster) or a dated record.
+- *Phase 5.* The three observations are recorded, with the endpoint names, the exact WASAPI error and
+  the `config.toml` reading. The extra finding — three microphone verdicts in `diagnostics.log`, all
+  on 2026-09-11, with every run before and since on the render endpoint — is the independent
+  confirmation the code reading could not supply on its own. By the phase's own rule, backlog 0203
+  closes as a persisted overlay choice, not a defect.
+
+**The ADR.** `scripts/check-system-counts.mjs` implements ADR-0202 as decided: the match, the
+threshold of five, the scope and the dated-record exclusions, fences skipped, `.rs` read whole,
+`count-allow: <reason>` with a reason-less marker itself a finding, `file:line  <text>` reporting and
+the `root` argument. One narrowing the ADR does not carry: the **singular** possessive `system's` is
+excluded, to spare `studio/renderer/components/ParamPanel.tsx:13`, where "seven of its system's
+twelve" counts params. The plural possessive stays matched. That is a refinement of the decision
+rather than a reversal of it, and the close records it as a dated `Outcome` on the ADR rather than
+editing its body. No ADR decision was reversed. No C ABI change, no OSC address, event or stream
+added, so spec 0001 and spec 0003 are both unmoved — which is what the plan promised.
+
+### Lens 2 — layering, coupling, real-time safety
+
+`preset::drift` reads a directory with `std::fs`, exactly as its neighbours `seed_dir` and
+`load_dir` already do; no platform, audio-source or windowing type enters `core/`, and the standalone
+owns every decision about printing. The audio callback is untouched. `poll_cap_overflow` stays
+edge-triggered, and `prev.recovered()` returns a `Display` adapter rather than a `String` — the same
+no-allocation reason `OverflowContext` is an enum. `seed_preset_dir` now parses the directory a third
+time on a launch that also calls `startup_preset_names`; it is a startup-only read, the second read
+was already priced in that module's own comment, and no NFR budget covers it — noted, not a finding.
+No `Scene` method, no C ABI function, no protocol message: `--list-presets` is a shell flag beside
+`--list-devices` and `--list-adapters` and reaches core only through the two public reads.
+
+### Lens 3 — docs, freshness, bookkeeping
+
+`docs/configuration.md` gains the flag-table row and a paragraph explaining all three statuses and
+the shadowing rule. `docs/running.md` says nothing about presets at all, so the plan's conditional
+sweep of it correctly did nothing — verified rather than taken on trust. `docs/developing.md`'s
+pre-push step table carries the new gate; `CLAUDE.md` and `README.md`'s `scripts/` inventories carry
+it, both count-free; the pre-push header and `ci.yml`'s step comments now name each gate instead of
+numbering it, which is the same drift class and was the right call. No hotkey, menu row, default,
+param, grammar function or palette moved, so the preset-facing documents and the schemas are
+correctly untouched, and no English source of a `.ru.md` translation moved. Gates re-run at the tip:
+`check-doc-links`, `check-index-rows`, `check-comment-hygiene`, `check-filter-figures`,
+`check-reader-prose`, `toc.mjs --check` and `check-backlog-claims` (75 reductions across 33 live
+entries, 2 unprobeable) all exit 0. **Version bump owed: minor** — a new public core API, a new CLI
+flag, a new gate — plus the studio's two copies.
+
+### Lens 4 — correctness and determinism
+
+`drift` walks the directory with the same `read_dir` → `.toml` filter → `sort()` sequence `load_dir`
+uses, so "the first file in filename order" means the same thing in both, and `select_preset_by_name`
+is a `position()` first-exact-match — the `winner()` claim is therefore true of the running engine,
+not just of the report. A file whose name is shipped but which cannot be read is classed `Differs`,
+not `Shipped`: the conservative direction, and documented. `DuplicateName::winner()` indexes
+`files[0]`, and the only constructor filters on `len() > 1`. No numeric assertion was added or moved;
+the one assertion **message** that changed (`common.rs:366`) still reads truthfully when it fires. No
+`aspect`, no grid, no geometry in the diff; no wall-clock read, no unseeded randomness. The
+configuration-where-two-sources-agree question: the one place this plan could hide such a coincidence
+is the report's notion of "the file a name resolves to", invisible on any directory with no duplicate
+names — the development box's and every CI checkout's. The Phase 1 test constructs the disagreeing
+configuration deliberately, and the `help_cli` case constructs it again through a real subprocess.
+
+### Lens 5 — design integrity
+
+Dependencies still point inward. `Recovered` keeps the recovery wording in the same file as the onset
+wording, which is the plan's stated reason for putting it in core rather than matching on the context
+in `app_state.rs` — and the exhaustive match makes the pairing structural instead of conventional. No
+god module: the `--list-presets` printer sits in `run.rs` beside `list_adapters_and_exit`, its two
+helpers are private, and `preset_dir.rs` was left alone. No new hot-path module, so Plan 0002's guard
+set needs no extension.
+
+### Findings
+
+**minor 1 — `core/src/render/evaluate.rs:478`: the count-free rewrite left an ungrammatical
+sentence.** *"so the every other system takes exactly the path it took before this existed"* — the
+rewrite dropped the count but kept the article. **Repaired in `fb9687f4`.**
+
+**minor 2 — `docs/configuration.md:160`: the drift line's scope is not stated.** The paragraph reads
+as a property of whatever directory the launch uses; the line is printed only from the
+`PresetDir::Default` arm, so with `RLX_PRESET_DIR` set — the case the same page documents, and the
+case a developer pointing at the repository's `presets/` is always in — no line is ever printed,
+however far that directory differs, and its silence reads as a clean directory. **Repaired in
+`fb9687f4`**: the paragraph now names the directory it speaks for and says `--list-presets` is the
+only reading of an override's drift.
+
+**minor 3 — this plan's `### Close triggers` block is empty.** All seven bullets are unfilled. Phase
+4 and Phase 5 were taken by the owner by hand rather than by a conductor session, which is the likely
+reason, and the log's `### Notes` are otherwise unusually complete. It costs the review nothing
+material — every trigger is a starting point the close re-derives anyway, and in conductor mode the
+`Full suite:` bullet's evidentiary role belongs to the suite ledger (ADR-0207), which is why this is
+not the blocker lens 1 would otherwise make it. **Left open**: the block is `dev`'s record of what it
+observed, and a reviewer filling it in would be manufacturing that record rather than repairing prose.
+
+**nit 4 — `README.md:23`: the caption lost its subject.** *"Built-in rendering systems, all driven by
+editable text presets"* is what is left of *"Twelve built-in rendering systems, …"*, and it reads as
+a fragment on the repository's front page. **Repaired in `fb9687f4`.**
+
+**nit 5 — `tools/conductor/lib/gate.mjs:45`: the conductor's own gate does not run the new checker.**
+`defaultGate()` lists nine Node invocations and carries neither `check-system-counts.mjs` nor,
+already, `check-translations.mjs`, so for a conductor-run plan the `pre-review` and `post-close` gates
+do not exercise either one and CI after the push is the first machine that does. The plan and
+ADR-0202 both scope the wiring to `.githooks/pre-push` and the CI `links` job, so this is not a
+missed done-when; it is a third carrier that has now fallen behind twice. **Left open** — it is code,
+outside what a close may repair, and the translation half predates this plan.
+
+### Close notes
+
+- **Preset curation (step 3b).** The plan touched `presets/` only at `presets/proposed/ROSTER.md`, a
+  prose file — no `.toml` changed and no engine defect was fixed, so nothing shipped can have been
+  working around this plan. The workaround-header grep over `presets/*.toml` names nothing this plan
+  made stale.
+- **Translation advisory (step 1e).** No rows: no translated source has moved past its stamp.
+- **Backlog (step 3c).** 0172, 0185, 0203, 0207 and 0208 were all promoted out of the live file at
+  approval, so the close appends their `CLOSED` markers to the archived bodies and moves their ledger
+  rows from `### Promoted` to `### Closed`. 0203 closes on Phase 5's own rule, as a persisted overlay
+  choice rather than a defect.
+
 ## Followups (after this lands)
+
+- **The conductor's `defaultGate()` runs neither `check-system-counts.mjs` nor
+  `check-translations.mjs`** (nit 5 above). Filed at this close as **design-backlog 0252**, with its
+  probes, rather than repaired here: adding the two names restores the invariant for a day and
+  rebuilds the same trap, and which of the three shapes replaces the hand-maintained list is a
+  decision.
