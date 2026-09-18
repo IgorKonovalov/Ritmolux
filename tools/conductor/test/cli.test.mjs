@@ -558,7 +558,14 @@ test("finding on a plan with no closing verdict exits non-zero saying why, and a
   assert.equal(none.code, 0);
   assert.deepEqual(none.out, ["conductor: plan 0183 closed with no findings (verdict round 2)."]);
 
-  for (const argv of [["finding"], ["finding", "181"], ["finding", "0181", "0"], ["finding", "0181", "0", "--nope", "x"], ["finding", "0181", "--done", "x"]]) {
+  for (const argv of [
+    ["finding"],
+    ["finding", "181"],
+    ["finding", "0181", "0"],
+    ["finding", "0181", "0", "--nope", "x"],
+    ["finding", "0181", "0", "done", "x"],
+    ["finding", "0181", "--done", "x"],
+  ]) {
     const r = await cli(...argv);
     assert.equal(r.code, 2, argv.join(" "));
     assert.match(r.err[0], /^usage: conductor\.mjs finding NNNN \[<ref> --done\|--wontfix\|--filed <reason>\]$/);

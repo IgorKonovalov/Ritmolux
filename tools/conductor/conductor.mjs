@@ -399,11 +399,13 @@ function findingText(f, index) {
 function cmdFinding(args, o) {
   const p = o.p;
   const [plan, ref, flag, ...reasonWords] = args;
-  if (!isPlan(plan) || args.length === 2 || (args.length > 2 && !FINDING_VERBS.includes((flag ?? "").replace(/^--/, "")))) {
+  // The verb is the entry that matched the flag in full, dashes included: taking it from the typed
+  // word instead lets `done` through as `ne`, and nothing downstream verifies a disposition.
+  const verb = args.length > 2 ? (FINDING_VERBS.find((v) => flag === `--${v}`) ?? null) : null;
+  if (!isPlan(plan) || args.length === 2 || (args.length > 2 && verb === null)) {
     o.err(FINDING_USAGE);
     return 2;
   }
-  const verb = args.length > 2 ? flag.slice(2) : null;
   const reason = reasonWords.join(" ").trim();
   if (verb && !reason) {
     o.err(`conductor: --${verb} needs a reason; a disposition with none is how a finding gets closed for being old (ADR-0216)`);
