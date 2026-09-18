@@ -8,13 +8,20 @@ later reader compares the live values against.
 
 ## Description
 
-> A lightweight, real-time music visualizer: one shared Rust core, a standalone app and a
-> foobar2000 component, driven by editable text presets.
+> A lightweight real-time music visualizer for Windows and macOS: a standalone app and a
+> foobar2000 component over one Rust + wgpu core, driven by editable text presets. Docs and preset
+> gallery: https://igorkonovalov.github.io/Ritmolux/
 
 240 characters is GitHub's limit and the box is shown on one line in search results, so the useful
-length is much shorter than the limit. The description was first set on the repository around
-2026-09-14, outside this file; the text above is what it should read, and reconciling the two is
-part of applying this file.
+length is much shorter than the limit.
+
+**Reconciled 2026-09-18 to what is live, not the other way round.** The description was first set
+on the repository around 2026-09-14, outside this file, and the two had since drifted. The live
+text is the better one — it names the platforms a reader is deciding about and carries the gallery
+URL, which the shorter draft did neither — and it is what search results and every social card
+already carry, so rewriting the repository to match a file nobody had applied would have cost
+indexing to gain nothing. The URL is duplicated from Homepage on purpose: a search result shows the
+description, and not always the homepage field beside it.
 
 ## Homepage
 

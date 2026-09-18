@@ -327,9 +327,10 @@ first because every later phase increases the number of people who meet the defe
   1 MB and the truecolour PNG was 1.18 MB, so `684ddeba` gave the manifest entry a `maxBytes`
   budget, quantized the committed picture to 446 KB to meet it, and made a still that is still over
   budget fail the run.
-- Phase 4 left one thing in `packaging/repo-metadata.md` unreconciled, which that file says is part
-  of applying it: its Description section and the live description differ. Live names the platforms
-  and carries the gallery URL; the file's text does neither. Nothing was changed on either side.
+- Phase 4 reconciled `packaging/repo-metadata.md`'s Description to the live one, which that file
+  says is part of applying it. The direction was the owner's call: the live text names the platforms
+  and carries the gallery URL where the file's draft did neither, and it is what search results and
+  every social card already carry, so the file moved and the repository did not.
 
 ## Followups (after this lands)
 
