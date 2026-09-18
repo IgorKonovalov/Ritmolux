@@ -266,7 +266,7 @@ fn read_linear(renderer: &Renderer, seam: Seam) -> Option<f32> {
 /// an equilibrium — a band narrower than the transient that reached it — rather
 /// than a point on a climb.
 ///
-/// # What it measured, 2026-09-17
+/// # What it measured, 2026-09-18
 ///
 /// Dev box, 128x128, `AnalysisFrame::default()`, quantizer at its
 /// `DEFAULT_QUANTIZE_STEPS = 255` (neither fixture overrides it). Levels are the
@@ -275,25 +275,26 @@ fn read_linear(renderer: &Renderer, seam: Seam) -> Option<f32> {
 ///
 /// ```text
 ///   subject      seam               f30          f100          f200          f300       settled  spread
-///   fog tunnel   A field     0.09276785    0.13548748    0.14085685    0.13043343    0.13559258   3.84%
-///   fog tunnel   B present*  0.17703269    0.25443807    0.26188728    0.24317567    0.25316700   3.70%
-///   fog tunnel   E display   0.33025211    0.40570471    0.41156110    0.39624831    0.40450469   1.89%
+///   fog tunnel   A field     0.07266875    0.08851405    0.08849836    0.08170217    0.08623820   3.95%
+///   fog tunnel   B present*  0.14117473    0.16968489    0.16830856    0.15579858    0.16459735   4.22%
+///   fog tunnel   E display   0.29694083    0.33533174    0.33402455    0.31976217    0.32970616   2.36%
 ///   blur mix 3   A field     0.00000000    0.00000000    0.00000000    0.00000000    0.00000000   0.00%
 ///   blur mix 3   B present*  0.00000000    0.00000000    0.00000000    0.00000000    0.00000000   0.00%
 ///   blur mix 3   E display   0.00000000    0.00000000    0.00000000    0.00000000    0.00000000   0.00%
 /// ```
 ///
 /// **The washed subject reaches a band, and it is a band rather than a point.**
-/// The transient from black is `0.093 -> 0.136` at the field, done by frame 100;
-/// what remains after it is a `+-3.8 %` wobble that is not monotone — `f200` is
-/// the highest of the three — and *Fog Tunnel*'s own per-frame program is where
-/// it comes from, driving `cx`, `cy`, `warp` and `rot` from four sine terms whose
-/// slowest period is longer than the whole run. So there is no frame at which the
-/// level stops moving, and the settled quantity is the band's mean.
+/// The transient from black is `0.073 -> 0.086` at the field, done by frame 100;
+/// what remains after it is a `+-4.0 %` wobble that is not monotone — `f100` is
+/// the highest of the three, by a hair over `f200` — and *Fog Tunnel*'s own
+/// per-frame program is where it comes from, driving `cx`, `cy`, `warp` and `rot`
+/// from four sine terms whose slowest period is longer than the whole run. So
+/// there is no frame at which the level stops moving, and the settled quantity is
+/// the band's mean.
 ///
 /// **The control is at the floor at every seam and every checkpoint**, including
 /// the transient one: *Blur Mix 3* never has a background to settle. The washed
-/// subject's present-pass gain is `B/A = 1.867` — linear against linear, so a
+/// subject's present-pass gain is `B/A = 1.909` — linear against linear, so a
 /// real gain and not a domain artifact — and seam E is display-referred, so it is
 /// comparable only against another subject's E.
 ///
@@ -309,10 +310,16 @@ fn read_linear(renderer: &Renderer, seam: Seam) -> Option<f32> {
 /// - **The washed/control ratio is gone, not small.** A control at exactly zero
 ///   divides into nothing. See the module docs for what replaces it and what that
 ///   cannot see.
-/// - **Readings dated before 2026-09-16 are a different measurement.** Both
-///   fixtures then carried the scene's `DEFAULT_DEPOSIT`, so their field had a
-///   source term these bind to `0.0`. Numbers from either side of that are not
-///   comparable, and the older ones are not evidence about this tree.
+/// - **Two dated boundaries sit behind this table, and a reading from before
+///   either is a different measurement.** Before 2026-09-16 both fixtures carried
+///   the scene's `DEFAULT_DEPOSIT`, so their field had a source term these now
+///   bind to `0.0`. And before the converted path took the reference's own decay
+///   — encoded domain, factor truncated to 8 bits, `warp_mesh`'s `milk_decay` and
+///   `rlx_milk_decay` — the same instrument read `0.13559258 / 0.25316700 /
+///   0.40450469` with a gain of `1.867`, which is the `1.572x` / `1.538x` /
+///   `1.227x` fall that repair bought. Numbers from either side of either
+///   boundary are not comparable, and the older ones are not evidence about this
+///   tree.
 #[test]
 fn the_wash_bisect_reports_every_seam() {
     let Some(fog) = seam_traces(FOG_TUNNEL) else {

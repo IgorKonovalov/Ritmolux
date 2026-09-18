@@ -197,8 +197,47 @@ recorded here rather than by editing it.
 
 **Still open, and owed elsewhere.** `k` is confirmed on **mode 6 alone**. The unit-scale mode-0
 capture that would test the inference for the other seven is
-[Plan 0142](../plans/0142-the-milkdrop-import-earns-its-verdict.md) Phase 4's rig session, as is
+[Plan 0142](../plans/done/0142-the-milkdrop-import-earns-its-verdict.md) Phase 4's rig session, as is
 whether the reference shows a seam at all. And **custom waves are outside the contract**: they read
 the same smoothed, `wave_scale`d traces, but are not passed through `SmoothWave` and do not carry
 `k`, per backlog 0216's scope. Whether the eight-mode contract should reach them is
 [backlog 0244](../design-backlog.md).
+
+## Outcome — 2026-09-18, at [Plan 0142](../plans/done/0142-the-milkdrop-import-earns-its-verdict.md)'s close
+
+**The capture this ADR asked for landed, and it does not support the inference the Negative rests
+on.** The sentence being answered is that section's own: *"That modes 0-5 share the same gap is an
+inference from where the gap lives, not a measurement. Plan 0142's Phase 4 rig session is asked to
+capture mode 0 at unit scale as a confirmation. Until one lands, this ADR says so."* One landed.
+
+Plan 0142's rig session ran `!LMV-0142-mode0-unit.milk` — `!LMV-0127-A-crisp.milk` with `nWaveMode`
+6 to 0 and nothing else moved — on `foo_vis_milk2` 0.2.0.0 (DX11), over the same 60 s full-scale
+200 Hz sine Plan 0127 used, verified at 0.0 dBFS peak and -3.0 dB mean, at 2000x1125. Radius was
+taken about the trace's own bounding-box centre, because the mode-0 figure translates between
+frames, over 720 angle bins. The swing at thresholds 140 and 200 is **`0.1366` / `0.1364` frame
+heights over a `0.3055` H base radius** — the reading of record — corroborated by a second capture
+at `0.1295` / `0.1288` H over `0.3067` H, stable to about 0.5 % on both.
+
+For `r(theta) = R0 + k*s(theta)` with `s` in `[-1, 1]` the swing is `2k`, so this host draws mode 0
+at **`k ~ 0.068`** against the **`0.158`** the Negative records for mode 6 on the same rig and the
+same stimulus — a ratio of **`0.43`**. The two modes do **not** share one host factor.
+
+Three things this does and does not settle:
+
+- **It falsifies the inference, not the decision.** Clause 2 says a converted waveform draws at the
+  scale its host renders; what moves is that `k` is a per-mode quantity on this host rather than one
+  constant. Nothing about reading the source's figure from the released source, or about the stereo
+  pair, is touched.
+- **It does not give mode 0 a corrected `k`.** MilkDrop gains the waveform before drawing, so a
+  full-scale input is not necessarily a unit sample at the draw call. That weakens the **absolute**
+  `0.068` and leaves the **ratio** standing, which is the part that refutes the inference. Fitting a
+  per-mode roster needs a stimulus whose sample value at the draw call is known, and that is a
+  different rig session from this one.
+- **The seam half of the ask is answered, and negatively.** Neither renderer showed the left-edge
+  seam of design-backlog 0215 on either seam preset. That half is closed; nothing is owed on it.
+
+So this ADR no longer says *"until one lands"*. It says the confirmation was attempted, the
+measurement disagrees with the inference by a factor of `0.43`, and the eight-mode contract's scale
+term is uniform in the code while the host it was fitted against is not. The same reading is quoted
+in [ADR-0113](0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)'s third
+`Outcome`, where it is one of the three named differences that are not the wash.

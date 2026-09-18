@@ -82,7 +82,18 @@ This engine's vocabulary is per second throughout (ADR-0019). The runtime conver
 at MilkDrop's nominal **30 fps** — a factor becomes `v^30`, a rate `v * 30` — which
 is what makes a converted preset move at the speed its author saw, on any display.
 
-Two consequences worth knowing before reading a number in a bundle:
+**`decay` carries one term more than that, and it is not a rounding detail.**
+MilkDrop hands the warp blit's `fDecay` to the hardware as a vertex diffuse colour
+built by `D3DCOLOR_RGBA_01`, which truncates to 8 bits — so a `.milk` at
+`fDecay = 0.98` was always applied as `249/255`, never as `0.98`. The runtime
+reproduces that where the author wrote it, on the nominal frame: the factor is
+taken back to 30 fps, truncated, and returned per second. The feedback field's
+equilibrium gain is `1 / (1 - d)`, so the bite is `42.5` against `50.0` at `0.98`
+and widens as the authored factor approaches 1 — which is why it is reproduced
+rather than rounded away
+([Plan 0142](plans/done/0142-the-milkdrop-import-earns-its-verdict.md) Phase 3).
+
+Two more consequences worth knowing before reading a number in a bundle:
 
 - A `zoom` of `1.02` in a `.milk` file is `1.81` per second here. The numbers are
   not on the same scale as a hand-authored `[params]` binding beside them.

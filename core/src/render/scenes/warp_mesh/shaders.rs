@@ -219,6 +219,13 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // thing — the reference's 8-bit target — so a field carrying the floor
     // without the ceiling is a state neither renderer has.
     //
+    // On ADR-0118's Alternative D (`steps < 0`) `rlx_quantize` kills below a
+    // threshold and returns everything else UNCLAMPED, so there the ceiling
+    // arrives with this line rather than beside it. That is the same target
+    // modelled a second way and the ceiling belongs to it either way; it is said
+    // here because the sentence above reads like a claim about the floor's own
+    // clamp, and on that arm there is none.
+    //
     // Off, `faded` keeps the expression that was always here, association
     // included, so a native `warp_mesh` preset's arithmetic is untouched down to
     // the last bit rather than merely within a tolerance.
