@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0196** (ADRs are a separate sequence — next free there is **0216**; 0200 is reserved for Plan 0186 Phase 2.)
+**Next free number: 0196** (ADRs are a separate sequence — next free there is **0217**; 0200 is reserved for Plan 0186 Phase 2.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -43,7 +43,7 @@ place. The plan file carries the real link.
 | [0192](0192-the-component-reaches-its-audience.md) | The component reaches its audience | draft | human | 0103's Phases 5-6 plus the release they stand on. Push ONE tag: the pipeline has published nothing since v0.126.0, two runs red on the foobar job and three tags with no run. |
 | [0120](0120-the-standalone-ships-on-ubuntu.md) | The standalone ships on Ubuntu | approved | dev, human | ADR-0131 (proposed): PulseAudio capture + an `ubuntu-latest` CI arm. **Postponed 2026-09-18, off the queue: Phase 1's probe needs an Ubuntu box nobody has yet.** Folds backlog 0181 + 0208. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + 0174 (proposed): Art-Net. Phases 1-3 landed on its branch. **Postponed 2026-09-18, off the queue: Phase 9 is the rig and its date is unknown.** Phases 4-8 need no rig. |
-| [0194](0194-the-analysis-gains-a-stereo-field.md) | The analysis gains a stereo field | draft | dev, human | ADR-0215 (proposed): absolute `balance`/`spread` + per-band balance, never levelled. Phase 1 closes a harness blind spot - every `--signal` kind is mono duplicated today, so nothing can see stereo. |
+| [0194](0194-the-analysis-gains-a-stereo-field.md) | The analysis gains a stereo field | approved | dev, human | ADR-0215 (proposed): absolute `balance`/`spread` + per-band balance, never levelled. Phase 1 closes a harness blind spot - every `--signal` kind is mono duplicated today, so nothing can see stereo. |
 | [0195](0195-a-finding-can-be-closed.md) | A finding can be closed | approved | dev | ADR-0216 (proposed): one command records a dated disposition, the page carries the open and counts the closed. Nothing but a human may write one. |
 <!-- roster:end -->
 
