@@ -10,15 +10,15 @@
 > Phase 5 found the shipped component starves its host; former Phases 1-5 renumbered 2-6
 > **Closes:** design-backlog 0102, design-backlog 0103
 > **Soft dependency:** [0101](done/0101-the-engine-renders-a-music-video.md) (closed — `shot --render` records motion)
-> **Hard dependency for Phase 5:** [0102](done/0102-the-component-ships.md)
 > **Coordinates with:** [0156](done/0156-the-site-becomes-the-reference.md) (closed) — it moved the
 > operator and developer sections out of `README.md` into `docs/` (ADR-0169): the file Phase 2 here
 > reorders is now **346 lines, not 650**, and its operator material is
 > [running.md](../running.md) and [configuration.md](../configuration.md).
 > The architecture diagram now lives in `docs/how-it-works.md`; the README's `## Architecture` is a
 > short paragraph pointing at it.
-> **Hard dependency for Phase 5 (added 2026-09-14):** Plan 0176 — a `v*` tag must verifiably reach
-> `origin` and produce a published release before anything is submitted (backlog 0196).
+> **Split 2026-09-18:** Phases 5 and 6 — the component submission and the three posts — moved to
+> [0192](0192-the-component-reaches-its-audience.md), with the dependencies that were theirs
+> ([0102](done/0102-the-component-ships.md), Plan 0176, backlog 0196). This plan now ends at Phase 4.
 
 > **Amended 2026-09-14** (architect backlog sweep): Phase 1's files follow Plan 0126 Phase 8's split
 > of `foo_ritmolux.cpp` (`1779520`) into `host_window.cpp` / `viz_session.cpp`; the repository
@@ -35,9 +35,14 @@ Ninety-seven plans, 110 ADRs, 66 releases — and **1 star, 0 forks, and no repo
 description** when this plan was written (2026-08-16; re-measured 2026-09-14 in the table below).
 This plan does the small, unglamorous, mostly non-technical things that stand
 between a finished product and anyone knowing it exists: a README that leads with the product,
-a demo that moves, repository metadata, a component submission, and three posts. Its done-whens
+a demo that moves, and repository metadata. Its done-whens
 are about **shipping the artifacts, not about the outcome** — nobody can plan adoption, and a plan
 that promised it would be lying.
+
+**The last two steps are no longer here.** The submission and the posts both point strangers at a
+component that must exist as a published release first, and that release can only carry Phase 1's
+fix once *this* plan merges — so they were a phase waiting on their own plan's close. They are
+[Plan 0192](0192-the-component-reaches-its-audience.md), which starts from the release instead.
 
 **Phase 1 is the exception, and it comes first.** Everything after it points strangers at the
 foobar2000 component, and as of [Plan 0102](done/0102-the-component-ships.md)'s Phase 5 that
@@ -77,7 +82,8 @@ competitor is a port of a 2007 plugin — is reachable through a component nobod
 ## Decision
 
 Do the distribution work as a tracked plan with a close ceremony, rather than as a someday. The
-phases are ordered so the `dev` phases produce material the `human` phases then publish; nothing
+phases are ordered so the `dev` phases produce the material — a README, a clip, a preview — that
+Phase 4 and then [Plan 0192](0192-the-component-reaches-its-audience.md) publish; nothing
 here is clever and that is deliberate — **except Phase 1, which is a design pass and is ordered
 first because every later phase increases the number of people who meet the defect it fixes.**
 
@@ -184,44 +190,20 @@ first because every later phase increases the number of people who meet the defe
   (`gh repo view --json repositoryTopics,usesCustomOpenGraphImage`), and a link pasted into a chat
   shows the picture rather than a grey placeholder.
 
-### Phase 5 — the component reaches its audience
-
-- **Owner skill:** human
-- **What:** Submit the `.fb2k-component` to the foobar2000 component repository.
-- **Precondition (added 2026-09-14, backlog 0196):** Plan 0176 has landed, and the tag carrying
-  Phase 1's fix is **on `origin` and has a published release with the component zip attached** —
-  checked with `git ls-remote --tags origin` and `gh release view <tag>`, not assumed from a local
-  `git tag`. The failure this guards against is silent: most `v*` tags since `v0.115.0` exist only
-  locally, because the close ceremony's re-tag writes a lightweight tag and `--follow-tags` pushes
-  only annotated ones.
-- **Done when:** the submission is filed. **Hard-depends on
-  [0102](done/0102-the-component-ships.md)** — there is nothing to submit until that plan produces a
-  released artifact, and submitting a locally built DLL with no release behind it would be worse
-  than waiting.
-
-### Phase 6 — tell three specific places
-
-- **Owner skill:** human
-- **What:** Post where the audience already is, not everywhere. Hydrogenaudio's foobar2000 forum
-  (the component's actual home), `r/foobar2000`, and `r/rust` (which cares about the wgpu/real-time
-  engineering, not the visuals).
-- **Done when:** the three posts exist. **The plan closes on the posts, not on the reception** —
-  and if the reception is informative, it becomes design-backlog entries, which is the only
-  outcome this plan can honestly commit to producing.
-
 ## Risks & open questions
 
 - **Mac users will be the first testers of a path that has never run.** The macOS build compiles
   in CI and has **never executed on Apple hardware** ([NFR §9](../nfr.md#9-test-hardware-matrix-what-the-user-has)).
   An announcement will produce Mac downloads. The README already says this; Phase 2 must keep it
-  above the fold rather than tidying it away, and Phase 6's posts should say it in the post itself.
+  above the fold rather than tidying it away, and the posts — now
+  [0192](0192-the-component-reaches-its-audience.md) Phase 3 — should say it in the post itself.
 - **Every shipped artifact is unsigned** — a `v*` tag now ships five zips (the standalone for
   Windows and macOS, the foobar2000 component, and the studio for Windows and macOS), so the
   first-run experience on both platforms is an OS warning. This is known and accepted
   ([NFR §8](../nfr.md#8-distribution-v1)); what it means here is that the friction is highest at
-  exactly the moment attention is highest. **Phases 2 and 6 must decide whether to pitch the
-  studio** — it is a release artifact nobody has been told about, and a post that names it invites
-  a third first-run path.
+  exactly the moment attention is highest. **The studio question was Phase 2's to settle and is
+  settled** (owner's call, 2026-09-18): the README names the studio in `## Download` and nowhere
+  above it. Whether a post pitches it is [0192](0192-the-component-reaches-its-audience.md)'s.
 - **The library was small and lopsided** when this plan was written — four systems with exactly one
   world each. [Plan 0104](done/0104-the-library-stops-being-lopsided.md) has since closed and the
   embedded set has grown several-fold, so this risk is largely retired; a visitor still judges the
@@ -240,12 +222,12 @@ first because every later phase increases the number of people who meet the defe
   hand against [`on-device-validation.md`](../on-device-validation.md) — the same gap the macOS path
   has ([ADR-0115](../adrs/0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md)).
   The evidence it is checked against is one machine and one host version.
-- **Phase 1 has a release cost the others do not.** It changes shipped plugin behaviour, so the
-  fixed component only reaches anyone on the next `v*` tag — which means the ordering constraint is
-  stronger than "Phase 1 first": **the tag has to be pushed and its release green before Phase 5
-  submits anything.** Backlog 0196 showed that "pushed" cannot be read off a local `git tag`: most
-  recent tags never reached `origin`. Phase 5's precondition (Plan 0176) is what makes this bullet
-  checkable.
+- **Phase 1 has a release cost the others do not, and it is what forced the split.** It changes
+  shipped plugin behaviour, so the fixed component reaches nobody until a `v*` tag carrying it is
+  pushed and its release is green — and that tag cannot exist until this plan closes and merges. A
+  submission phase inside this plan was therefore waiting on this plan's own close. It is
+  [0192](0192-the-component-reaches-its-audience.md) Phase 1, which is the release, and the
+  submission follows it there.
 - **Contention:** `plugin-foobar/viz_session.cpp`, `host_window.cpp`, `foo_ritmolux.cpp` (Phase 1),
   `README.md`, `docs/images/`, `scripts/`. A close ceremony's image re-render is the usual other
   writer to `docs/images/` — sequence if they land together.
@@ -258,6 +240,8 @@ first because every later phase increases the number of people who meet the defe
   and is where the README sends a reader for reference
   ([ADR-0169](../adrs/0169-the-site-is-organised-by-reader-task-and-the-readme-stops-being-a-reference.md)).
   This plan links to it; it does not redesign it or buy it a domain.
+- **No submission and no posts.** Both moved to
+  [0192](0192-the-component-reaches-its-audience.md) on 2026-09-18, with the release they stand on.
 - **No paid promotion, no mailing list, no social accounts.**
 - **No code signing** — that stays a future plan and a `human` cost.
 - **No submission to app stores or package managers.**
@@ -334,5 +318,8 @@ first because every later phase increases the number of people who meet the defe
 
 ## Followups (after this lands)
 
+- **The submission and the posts are [0192](0192-the-component-reaches-its-audience.md)**, which
+  also owns the release they need. The log's note that nothing links `docs/images/demo.mp4` points
+  at a Phase 6 that lives there now; the clip is that plan's Phase 3 material.
 - Winget / Homebrew, if there is demand.
 - Code signing, if the SmartScreen friction shows up in reports rather than in speculation.
