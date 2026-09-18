@@ -45,5 +45,9 @@ gh repo view --json repositoryTopics,homepageUrl,description,usesCustomOpenGraph
 
 `docs/images/social-preview.png` — a headless render, produced by `node scripts/docs-clip.mjs`
 like every other committed picture here (ADR-0100). Uploaded under **Settings → General → Social
-preview**; there is no `gh` flag for it. Without one, a link pasted into a chat or a post shows a
+preview**; there is no `gh` flag for it.
+
+**GitHub refuses an image over 1 MB**, and this frame in truecolour is 1.18 MB, so the manifest
+entry carries a `maxBytes` budget and the script quantizes to a 256-colour palette to meet it —
+446 KB, and the run fails rather than committing a file the upload would reject. Without one, a link pasted into a chat or a post shows a
 grey placeholder with the repository name, which is the whole reason the file exists.

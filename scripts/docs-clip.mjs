@@ -26,7 +26,7 @@
 // this script stops before rendering anything and says so.
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve, sep } from "node:path";
 
 // ---------------------------------------------------------------------------
@@ -200,6 +200,11 @@ const MANIFEST = [
     // at. 48 kHz / 512-sample hops is 93.75 hops per second, so 300 is 3.2 s in:
     // the top of the first phrase's build, just before the two-beat rest.
     hop: 300,
+    // **GitHub refuses a social preview over 1 MB**, and `shot`'s truecolour PNG
+    // of this frame is 1.18 MB — the upload the picture exists for fails, and
+    // nothing here would have said so. So this entry declares a budget and the
+    // runner quantizes to meet it; over budget after that is a failed run.
+    maxBytes: 1_000_000,
   },
 ];
 
@@ -211,6 +216,36 @@ const MANIFEST = [
 /// entry pointing anywhere else is a bug, and one that overwrote a source file
 /// would be an expensive one to notice.
 const IMAGE_ROOT = resolve("docs/images");
+
+/// Bring a still inside its `maxBytes` by quantizing it to a 256-colour palette,
+/// and fail the run if it is still over.
+///
+/// **Quantize rather than re-render smaller or drop to JPEG.** The size is the
+/// slot GitHub shows, so it cannot move; a lossy encode of a dark gradient field
+/// bands worse than a dithered palette does at the same budget. The two passes
+/// are ffmpeg's own — one reads the frame's colour statistics, the second maps
+/// the frame onto them — and both are deterministic on the same input, so a
+/// re-run writes the same bytes and `git status` stays quiet.
+function fitToBudget(entry) {
+  const before = statSync(entry.out).size;
+  if (before <= entry.maxBytes) return;
+  const palette = `target/docs-clip/${entry.out.replace(/[\/]/g, "-")}-palette.png`;
+  const fitted = `target/docs-clip/${entry.out.replace(/[\/]/g, "-")}-fitted.png`;
+  mkdirSync(dirname(palette), { recursive: true });
+  execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-i", entry.out,
+    "-vf", "palettegen=max_colors=256:stats_mode=full", palette], { stdio: "inherit" });
+  execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-i", entry.out, "-i", palette,
+    "-lavfi", "paletteuse=dither=sierra2_4a", "-compression_level", "100", fitted], { stdio: "inherit" });
+  renameSync(fitted, entry.out);
+  rmSync(palette, { force: true });
+  const after = statSync(entry.out).size;
+  console.log(`  quantized to 256 colours: ${kb(before)} -> ${kb(after)}, budget ${kb(entry.maxBytes)}`);
+  if (after > entry.maxBytes) {
+    throw new Error(`${entry.out} is ${kb(after)} after quantizing, over its ${kb(entry.maxBytes)} budget`);
+  }
+}
+
+const kb = (bytes) => `${Math.round(bytes / 1024)} KB`;
 
 for (const [index, entry] of MANIFEST.entries()) {
   const where = `manifest entry ${index} (${entry.out})`;
@@ -267,6 +302,7 @@ for (const entry of MANIFEST) {
   }
   try {
     execFileSync("cargo", args, { stdio: "inherit" });
+    if (entry.maxBytes) fitToBudget(entry);
   } catch (err) {
     // A non-zero `shot` must not leave the previous file sitting there looking
     // current: `git status` would be clean over a stale artifact and the run's
