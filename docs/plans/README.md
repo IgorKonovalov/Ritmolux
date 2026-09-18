@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0193** (ADRs are a separate sequence — next free there is **0214**; 0200 is reserved for Plan 0186 Phase 2.)
+**Next free number: 0194** (ADRs are a separate sequence — next free there is **0214**; 0200 is reserved for Plan 0186 Phase 2.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -42,6 +42,7 @@ place. The plan file carries the real link.
 |------|-------|--------|-------|-----------------|
 | [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | in-progress | dev, human | Phases 1-4 done on its branch; closes there. Phases 5-6 left on 2026-09-18 for [0192] - a submission needs a release of Phase 1's own fix, which only exists after this plan merges. |
 | [0192](0192-the-component-reaches-its-audience.md) | The component reaches its audience | draft | human | 0103's Phases 5-6 plus the release they stand on. Push ONE tag: the pipeline has published nothing since v0.126.0, two runs red on the foobar job and three tags with no run. |
+| [0193](0193-the-digest-says-what-is-happening-and-where-you-are-needed.md) | The digest says what is happening, and where you are needed | approved | dev | ADR-0214 (proposed): Needs you + Now, history behind `digest --history`. Phase 2's false 'already settled' is the risk; its negative case is a done-when. |
 | [0120](0120-the-standalone-ships-on-ubuntu.md) | The standalone ships on Ubuntu | approved | dev, human | ADR-0131 (proposed): PulseAudio capture + an `ubuntu-latest` CI arm. **Phase 1 is a `human` stop gate before `dev`.** Guard is 5 zips + 1 tarball; folds backlog 0181 (Linux arm) + 0208. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + 0174 (proposed): Art-Net verified against `rlx-artnet-sim`. **Phase 8 opens on a decision** - 0115's tap is headless-only, and a windowed resolve is an ADR. Phase 9 is the rig. |
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. **0180 landed and moved both ends of its chain.** Amended 2026-09-16. Needs the rig. |
@@ -1114,6 +1115,7 @@ Later, unordered: better tempo tracking, preset sharing/library, signed installe
 [0102]: done/0102-the-component-ships.md
 [0103]: 0103-the-project-gets-an-audience.md
 [0192]: 0192-the-component-reaches-its-audience.md
+[0193]: 0193-the-digest-says-what-is-happening-and-where-you-are-needed.md
 [0104]: done/0104-the-library-stops-being-lopsided.md
 [0115]: done/0115-the-engine-becomes-a-live-video-source.md
 [0123]: done/0123-a-gate-a-latch-and-an-ink.md
