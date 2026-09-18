@@ -38,6 +38,58 @@ preset that ships.
 > change between releases — stability begins at 1.0.0. See [`docs/plans/`](docs/plans/) for what's
 > in flight.
 
+## Download
+
+Prebuilt binaries are attached to each tag on the
+[Releases page](https://github.com/IgorKonovalov/Ritmolux/releases). One zip per artifact, each
+carrying a `READ-ME-FIRST.txt`:
+
+| Zip | What's in it |
+|-----|--------------|
+| `ritmolux-…-macos-universal.zip` | `Ritmolux.app` — universal (Apple Silicon + Intel), **macOS 13+** |
+| `ritmolux-…-windows-x64.zip` | `ritmolux.exe` — Windows x64 |
+| `ritmolux-…-foobar2000-component.zip` | `foo_ritmolux.fb2k-component` — foobar2000 v2, **x64 only** |
+| `ritmolux-studio-…-macos-universal.zip` | `Ritmolux Studio.app` — the editor, universal, **macOS 13+** |
+| `ritmolux-studio-…-windows-x64.zip` | `Ritmolux Studio.exe` — the editor, Windows x64 |
+
+The two standalone zips also carry a reference copy of the presets.
+
+The **studio** is the window where you change what the visualizer draws while it is drawing it: it
+starts a player and edits a preset live. Each studio zip carries its own copy of that player, so it
+is the download you take *instead of* the standalone app rather than beside it — and
+[`packaging/studio/READ-ME-FIRST.md`](packaging/studio/READ-ME-FIRST.md) is the file that ships
+inside it, with the rest. It is much younger than the player it drives.
+
+Every one of them is **unsigned**, so each host objects once. On Windows, SmartScreen says "Windows
+protected your PC" → More info → Run anyway. On macOS, the app is ad-hoc signed only, so either
+right-click it and choose **Open**, or strip the quarantine attribute first:
+
+```sh
+xattr -dr com.apple.quarantine Ritmolux.app
+```
+
+The macOS build then asks for the **Screen Recording** permission — that is the only first-party
+way to tap system audio — and needs a **relaunch** after you grant it. Releases are marked
+prerelease while the app is `0.x`. The `READ-ME-FIRST.txt` in each zip has the rest.
+
+### The foobar2000 component
+
+Unzip, then in foobar2000: **File → Preferences → Components → Install…**, pick
+`foo_ritmolux.fb2k-component`, **Apply**, and let it restart. Open it from **View → Light Music
+Visualizer**, or dock it into the layout as a *Playback visualisation* element. `Space` cycles
+scenes; **right-click** for the menu: **Preset ▸** picks one by name (the choice is remembered
+across restarts), **Reload presets** picks up a file you just dropped into the preset folder, and
+**Open presets folder** takes you there.
+
+It needs **64-bit foobar2000 v2 on Windows** — there is no 32-bit build and no macOS component
+([ADR-0001](docs/adrs/0001-rust-core-wgpu-cabi-foobar-shim.md); the SDK is Windows-centric). A
+32-bit install will simply not list it.
+
+Because it reads what foobar2000 is already decoding, there is no audio capture to permit and no
+output device to route — it is the path with the fewest ways to go wrong. If you run both, the
+component and the standalone app **share one preset folder**, so a preset edited in either shows
+up in both — the standalone hot-reloads it on save, the component on **Reload presets**.
+
 ## Architecture
 
 Two frontends over one shared Rust engine. The standalone app taps OS loopback audio; the
@@ -120,50 +172,6 @@ docs/
 
 The per-system parameter tables live in [`presets/README.md`](presets/README.md), beside the
 preset files they document.
-
-## Download
-
-Prebuilt binaries are attached to each tag on the
-[Releases page](https://github.com/IgorKonovalov/Ritmolux/releases). Three zips per
-release, each carrying a `READ-ME-FIRST.txt`:
-
-| Zip | What's in it |
-|-----|--------------|
-| `…-macos-universal.zip` | `Ritmolux.app` — universal (Apple Silicon + Intel), **macOS 13+** |
-| `…-windows-x64.zip` | `ritmolux.exe` — Windows x64 |
-| `…-foobar2000-component.zip` | `foo_ritmolux.fb2k-component` — foobar2000 v2, **x64 only** |
-
-The two standalone zips also carry a reference copy of the presets.
-
-All three are **unsigned**, so each host objects once. On Windows, SmartScreen says "Windows
-protected your PC" → More info → Run anyway. On macOS, the app is ad-hoc signed only, so either
-right-click it and choose **Open**, or strip the quarantine attribute first:
-
-```sh
-xattr -dr com.apple.quarantine Ritmolux.app
-```
-
-The macOS build then asks for the **Screen Recording** permission — that is the only first-party
-way to tap system audio — and needs a **relaunch** after you grant it. Releases are marked
-prerelease while the app is `0.x`. The `READ-ME-FIRST.txt` in each zip has the rest.
-
-### The foobar2000 component
-
-Unzip, then in foobar2000: **File → Preferences → Components → Install…**, pick
-`foo_ritmolux.fb2k-component`, **Apply**, and let it restart. Open it from **View → Light Music
-Visualizer**, or dock it into the layout as a *Playback visualisation* element. `Space` cycles
-scenes; **right-click** for the menu: **Preset ▸** picks one by name (the choice is remembered
-across restarts), **Reload presets** picks up a file you just dropped into the preset folder, and
-**Open presets folder** takes you there.
-
-It needs **64-bit foobar2000 v2 on Windows** — there is no 32-bit build and no macOS component
-([ADR-0001](docs/adrs/0001-rust-core-wgpu-cabi-foobar-shim.md); the SDK is Windows-centric). A
-32-bit install will simply not list it.
-
-Because it reads what foobar2000 is already decoding, there is no audio capture to permit and no
-output device to route — it is the path with the fewest ways to go wrong. If you run both, the
-component and the standalone app **share one preset folder**, so a preset edited in either shows
-up in both — the standalone hot-reloads it on save, the component on **Reload presets**.
 
 ## Running it
 

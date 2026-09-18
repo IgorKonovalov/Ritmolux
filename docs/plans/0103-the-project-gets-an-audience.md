@@ -271,7 +271,8 @@ first because every later phase increases the number of people who meet the defe
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the component survives a stranger's first five minutes | dev | done | committed with this row |
+| 1 — the component survives a stranger's first five minutes | dev | done | `2c9cbbc` |
+| 2 — the README leads with the product | dev | done | committed with this row |
 
 ### Notes
 
@@ -288,6 +289,16 @@ first because every later phase increases the number of people who meet the defe
   surface-size and layout-edit-menu checks are the on-device checklist's, under
   [`on-device-validation.md`](../on-device-validation.md)'s *"Runnable now — the foobar2000
   component's clean-profile install"*.
+- Phase 2's studio sentence does **not** say where the site explains the studio, because the site
+  does not: `PUBLISHED` in `site/src/plugins/rewrite-links.mjs` carries no studio page, and
+  `packaging/studio/READ-ME-FIRST.md` is deliberately outside it. The sentence links that shipped
+  file in the repository instead.
+- Phase 2 also re-spelled the three existing Download rows with their `ritmolux-` prefix. With the
+  studio rows added, `…-macos-universal.zip` and `…-windows-x64.zip` each match two of the five
+  assets, so the elided form no longer names one.
+- `packaging/repo-metadata.md` records the description as the text to set, not as the text applied:
+  the live value was set outside the repository around 2026-09-14 and nothing in the checkout
+  records what it says, so a claim either way would be unchecked.
 - The plugin diagnostics log's row shape changed (four columns appended). Its header is written only
   when the file is created, so a `plugin-diagnostics.log` carried over from an earlier build gets
   wide rows under a narrow header; the clean-profile install the done-when uses starts a new file.
