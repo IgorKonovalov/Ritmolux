@@ -315,7 +315,7 @@ flowchart LR
 | 2 — `--list-presets` shows the set a launch would load | dev | done | 2fd42a7d |
 | 3 — The banner and the recovery line say what is true | dev | done | committed with this row |
 | 4 — A written count of the systems cannot land | dev | done | committed with this row |
-| 5 — The microphone capture is settled on the machine it happened on | human | not started | |
+| 5 — The microphone capture is settled on the machine it happened on | human | done | committed with this row |
 
 ### Notes
 
@@ -362,6 +362,37 @@ flowchart LR
   implies.** The list names seven cases; `the other ten systems` has a zero-word gap, so a genuine
   two-word-gap case (`twelve built-in scene systems`) was seeded beside it rather than instead of
   it. A three-word gap is seeded as a silence, which makes the script's own named hole re-runnable.
+- **Phase 5, run by the owner on 2026-09-18** against `main` at `1afc0674`, built as
+  `target/release/ritmolux.exe` — this branch changes nothing on the capture path, and the phase
+  reads behaviour that predates the plan. Machine: the development box, one render endpoint
+  (`Speakers (Realtek(R) Audio)`) and one capture endpoint (`Microphone Array (Realtek(R) Audio)`),
+  per `--list-devices`. The three observations, in the phase's order:
+  1. **`[input] mode = "loopback"`, `device = "default"`: no `audio input … by config.toml` line.**
+     That pair is the built-in default, so `resolve_input` reports `InputSource::Default` and the
+     line is not printed at all — the absence is the code's rule rather than a silence. `F3` read
+     `audio  live WASAPI 48000/2 Speakers (Realtek(R) Audio)`, a render endpoint, and
+     `diagnostics.log` carried that verdict once a second for the whole run.
+  2. **With the only render endpoint disabled, capture failed and did not fall back.** stderr:
+     `audio capture unavailable (WASAPI error: Element not found. (0x80070490)); rendering without
+     audio`. `F3`: `audio  failed WASAPI WASAPI error: Element not found. (0x80070490)`, every band
+     at `0.00`. **No microphone verdict**, though the machine has exactly one microphone and nothing
+     else to fall back to. The instance already running when the endpoint went away recorded
+     `lost WASAPI not recovered in 3 attempts` and then stayed failed, so neither the start path nor
+     the recovery path reaches a capture endpoint.
+  3. **The overlay's choice persists immediately.** `S` → `Input mode` → right read `line-in` in the
+     menu, and `config.toml` carried `mode = "line-in"` at the same second, before the app was
+     closed. Set back to `loopback` afterwards.
+  So **step 2 showed no fallback and step 3 persisted `line-in`**: by this phase's own rule,
+  backlog 0203 closes at the review as a persisted overlay choice or config, not a defect.
+- **Phase 5 found the record of the original sighting still on the machine, and it is one day wide.**
+  `%APPDATA%\Ritmolux\diagnostics.log` spans 2026-09-11 to 2026-09-18 and holds
+  `live WASAPI 48000/4 Microphone Array (Realtek(R) Audio)` in exactly three runs, all on
+  **2026-09-11** (07:48, 11:24, 19:49), with every run before and since on `Speakers … 48000/2`.
+  The `/4` is the capture endpoint's own channel count. A fallback that fires whenever loopback
+  fails would not be confined to one day, which is the same conclusion observation 2 reaches from
+  the code's side.
+- **Phase 5, noticed and not this phase's business:** the overlay's failed line reads
+  `failed WASAPI WASAPI error: …` — the backend label and the error text both name WASAPI.
 
 ### Close triggers
 
