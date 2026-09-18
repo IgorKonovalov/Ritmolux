@@ -434,8 +434,14 @@ function cmdFinding(args, o) {
   }
   const findings = verdict.findings ?? [];
   if (findings.length === 0) {
-    o.log(`conductor: plan ${plan} closed with no findings (verdict round ${verdict.round}).`);
-    return verb ? 1 : 0;
+    const where = `conductor: plan ${plan} closed with no findings (verdict round ${verdict.round})`;
+    // A refusal says its one sentence on stderr, like every other one here; the listing is output.
+    if (verb) {
+      o.err(`${where}, so there is nothing to close`);
+      return 1;
+    }
+    o.log(`${where}.`);
+    return 0;
   }
   if (!verb) {
     o.log(`conductor: plan ${plan}, closing verdict round ${verdict.round}, ${findings.length} finding${findings.length === 1 ? "" : "s"}:`);

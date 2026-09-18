@@ -575,6 +575,12 @@ test("finding on a plan with no closing verdict exits non-zero saying why, and a
   assert.equal(none.code, 0);
   assert.deepEqual(none.out, ["conductor: plan 0183 closed with no findings (verdict round 2)."]);
 
+  // A refusal is on stderr, so an operator reading it never sees a non-zero exit and nothing said.
+  const nothingToClose = await cli("finding", "0183", "0", "--done", "repaired");
+  assert.equal(nothingToClose.code, 1);
+  assert.equal(nothingToClose.err[0], "conductor: plan 0183 closed with no findings (verdict round 2), so there is nothing to close");
+  assert.deepEqual(nothingToClose.out, []);
+
   for (const argv of [
     ["finding"],
     ["finding", "181"],
