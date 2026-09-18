@@ -389,6 +389,12 @@ function findingText(f, index) {
   );
 }
 
+/** Where a plan stands when it has no close, said in the refusal so the reader knows why. */
+function planStanding(rec) {
+  if (!rec) return "it never started";
+  return `it is ${rec.status}` + (rec.fixRounds ? `, ${rec.fixRounds} fix round${rec.fixRounds === 1 ? "" : "s"} in` : "");
+}
+
 /**
  * `finding NNNN` lists a plan's closing verdict; `finding NNNN <ref> --done|--wontfix|--filed
  * <reason>` records the owner's disposition against one of them (ADR-0216). The reason is required
@@ -418,9 +424,12 @@ function cmdFinding(args, o) {
 
   const state = loadState(p.stateDir);
   const rec = state.plans[plan];
-  const verdict = rec?.verdicts?.at(-1);
+  // The close, not the array, is what makes the last verdict a closing one: a `verdict` outcome
+  // pushes its findings before any fix round, so a plan still in or parked at a round carries
+  // verdicts and no close, and its blockers are the conductor's own work in flight.
+  const verdict = rec?.closed ? rec.verdicts?.at(-1) : null;
   if (!verdict) {
-    o.err(`conductor: plan ${plan} has no closing verdict, so it has no findings (${rec ? `it is ${rec.status}` : "it never started"})`);
+    o.err(`conductor: plan ${plan} has no closing verdict, so it has no findings (${planStanding(rec)})`);
     return 1;
   }
   const findings = verdict.findings ?? [];

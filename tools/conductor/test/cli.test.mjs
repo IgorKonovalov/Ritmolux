@@ -452,7 +452,10 @@ test("adopt-close on a lane with no close review changes nothing, and a bad plan
 function seedPlan(p, plan, rec) {
   mkdirSync(p.stateDir, { recursive: true });
   const state = loadState(p.stateDir);
-  state.plans[plan] = { plan, status: "merged", lane: "a", worktree: null, branch: null, steps: [], park: null, parks: [], fixRounds: 0, verdicts: [], fixes: [], gates: [], closed: null, merge: null, lockWaits: [], started: null, ended: null, ...rec };
+  // A merged plan always carries the close its last verdict closed with, so that is the default; a
+  // seed of a plan that never closed passes `closed: null` back.
+  const closed = { version: "0.1.0", tag: "v0.1.0", head: "0".repeat(40), at: "2026-09-18T00:00:00.000Z" };
+  state.plans[plan] = { plan, status: "merged", lane: "a", worktree: null, branch: null, steps: [], park: null, parks: [], fixRounds: 0, verdicts: [], fixes: [], gates: [], closed, merge: null, lockWaits: [], started: null, ended: null, ...rec };
   writeFileSync(statePaths(p.stateDir).file, JSON.stringify(state, null, 2));
 }
 
@@ -543,8 +546,16 @@ test("a second disposition overwrites the first, and the first survives in the f
 
 test("finding on a plan with no closing verdict exits non-zero saying why, and a malformed call is a usage error", async () => {
   const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] });
-  seedPlan(p, "0182", { status: "parked", verdicts: [] });
+  // A plan parked at a fix round carries the round's verdict and no close: its findings are the
+  // conductor's own work in flight, so neither listing nor disposing them is allowed.
+  seedPlan(p, "0182", {
+    status: "parked",
+    closed: null,
+    fixRounds: 2,
+    verdicts: verdictOf([{ severity: "blocker", file: "core/src/a.rs", line: 12, what: "the ring drops a frame" }]),
+  });
   seedPlan(p, "0183", { verdicts: verdictOf([]) });
+  const untouched = readFileSync(statePaths(p.stateDir).file, "utf8");
 
   const never = await cli("finding", "0199");
   assert.equal(never.code, 1);
@@ -552,7 +563,13 @@ test("finding on a plan with no closing verdict exits non-zero saying why, and a
 
   const parked = await cli("finding", "0182", "0", "--done", "x");
   assert.equal(parked.code, 1);
-  assert.equal(parked.err[0], "conductor: plan 0182 has no closing verdict, so it has no findings (it is parked)");
+  assert.equal(parked.err[0], "conductor: plan 0182 has no closing verdict, so it has no findings (it is parked, 2 fix rounds in)");
+
+  const listed = await cli("finding", "0182");
+  assert.equal(listed.code, 1);
+  assert.equal(listed.err[0], parked.err[0]);
+  assert.deepEqual(listed.out, []);
+  assert.equal(readFileSync(statePaths(p.stateDir).file, "utf8"), untouched, "no refusal wrote state");
 
   const none = await cli("finding", "0183");
   assert.equal(none.code, 0);
