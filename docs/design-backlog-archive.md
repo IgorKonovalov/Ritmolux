@@ -300,21 +300,11 @@ live entry citing this one.
 
 | # | Entry | Owned by |
 |---|-------|----------|
-| 0102 | A foobar panel attaches its surface at 1x1 and only a stream-format change revives it | [Plan 0103](plans/0103-the-project-gets-an-audience.md) Phase 1. **Promoted** |
-| 0103 | The plugin's context menu shadows foobar's, so the panel cannot be removed from a layout | [Plan 0103](plans/0103-the-project-gets-an-audience.md) Phase 1. **Promoted** |
 | 0113 | The converted feedback field equilibrates far brighter than the reference's | [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md). **Promoted** |
 | 0124 | ADR-0113's motivating claim still reads "provisionally negative" | [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md). **Promoted** |
-| 0140 | The band contour can only be an anti-aliased grey on a hard-banded palette | [Plan 0184](plans/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 1 + ADR-0197. **Promoted** |
-| 0146 | `warp_mesh` colours its light at deposit time, so the palette cannot band the field | [Plan 0184](plans/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 2 + ADR-0197. **Promoted** |
 | 0157 | The fixed telemetry set omits the bar grid the engine already computes | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0158 | The tempo octave is unsettled by design, and the rig saw the fold run the other way | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
-| 0172 | The seeded preset directory is never pruned, so a roster drifts from the shipped set | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phases 1-2. **Promoted** |
-| 0185 | The `--help` banner still calls the application `ritmolux` | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 3. **Promoted** |
-| 0203 | The smoke run captured from a microphone while the default is loopback | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 5. **Promoted** |
-| 0207 | The cap-recovery line says "geometry" for three contexts that are not geometry | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 3. **Promoted** |
-| 0208 | A system count written into prose goes stale on the next system | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 4 + ADR-0202. **Promoted** |
-| 0217 | `path_cost`'s arity probe prices an arc chain, not the polyline its header reports | [Plan 0160](plans/0160-the-silhouettes-preconditions-stop-being-silent.md) Phase 1b. **Promoted** |
 <!-- roster:end -->
 
 ### Closed
@@ -582,6 +572,16 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0216 | The converted waveform follows neither reference | [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md) Phases 5-6 + ADR-0199. Custom waves: see 0244. **Closed 2026-09-16** |
 | 0186 | The density law scales a low-`density` preset's trace count on a large display | [Plan 0183](plans/done/0183-a-low-density-is-a-trace-count.md) + [ADR-0195](adrs/0195-a-low-density-is-a-trace-count-and-the-law-scales-only-a-cloud.md). Band 0.08-0.16; no baseline moved. **Closed 2026-09-17** |
 | 0128 | `tonal_flatness` convicts a flat-graphic composition | [Plan 0186](plans/done/0186-the-flatness-gate-tells-a-figure-from-its-ground.md) + [ADR-0200](adrs/0200-the-flatness-conjunctions-second-term-reads-the-reference-a-role-classifier-assigns.md). Four-field residue reopened as 0248. **Closed 2026-09-17** |
+| 0140 | The band contour can only be an anti-aliased grey on a hard-banded palette | [Plan 0184](plans/done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 1 + ADR-0197. Four styles. **Closed 2026-09-17** |
+| 0146 | `warp_mesh` colours its light at deposit time, so the palette cannot band the field | [Plan 0184](plans/done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 2 + ADR-0197. Bands, not the ink class; see 0251. **Closed 2026-09-17** |
+| 0217 | `path_cost`'s arity probe prices an arc chain, not the polyline its header reports | [Plan 0160](plans/done/0160-the-silhouettes-preconditions-stop-being-silent.md) Phase 1b. Polyline by construction; table re-taken at ~0.095 ms/segment. **Closed 2026-09-17** |
+| 0172 | The seeded preset directory is never pruned, so a roster drifts from the shipped set | [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phases 1-2. Reported, never pruned. **Closed 2026-09-18** |
+| 0185 | The `--help` banner still calls the application `ritmolux` | [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phase 3. Product capitalised, binary not. **Closed 2026-09-18** |
+| 0203 | The smoke run captured from a microphone while the default is loopback | [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phase 5. On-device: no fallback exists; a persisted overlay choice. **Closed 2026-09-18** |
+| 0207 | The cap-recovery line says "geometry" for three contexts that are not geometry | [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phase 3. Rendered per context, no wildcard arm. **Closed 2026-09-18** |
+| 0208 | A system count written into prose goes stale on the next system | [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phase 4 + [ADR-0202](adrs/0202-a-written-count-of-the-systems-is-refused-by-a-gate.md). One marker taken. **Closed 2026-09-18** |
+| 0102 | A foobar panel attaches its surface at 1x1 and only a stream-format change revives it | [Plan 0103](plans/done/0103-the-project-gets-an-audience.md) Phase 1. The attach waits for a size; no fallback, no flag. Unmeasured on device. **Closed 2026-09-18** |
+| 0103 | The plugin's context menu shadows foobar's, so the panel cannot be removed from a layout | [Plan 0103](plans/done/0103-the-project-gets-an-audience.md) Phase 1. One per-window question, shared branch intact, no ADR. **Closed 2026-09-18** |
 <!-- roster:end -->
 
 ---
@@ -7803,7 +7803,7 @@ Then correct the comment: the safety comes from re-resolving, not from modality.
 
 **Low.** A few lines, no design question, and it removes a false claim from a file whose comments
 are load-bearing. Natural pickup for whoever takes
-[Plan 0103](plans/0103-the-project-gets-an-audience.md) Phase 1, which rewrites this same handler.
+[Plan 0103](plans/done/0103-the-project-gets-an-audience.md) Phase 1, which rewrites this same handler.
 
 ---
 
@@ -8812,7 +8812,7 @@ gates on `ffmpeg_on_path()`. (c) If they cannot survive H.264-in-MP4 the way thi
 them, correct the paragraph rather than the command.
 
 **Impact:** low-medium. No reported visual defect; a documented guarantee that is not checked, on
-the path [Plan 0103](plans/0103-the-project-gets-an-audience.md) publishes from. **No ADR needed.**
+the path [Plan 0103](plans/done/0103-the-project-gets-an-audience.md) publishes from. **No ADR needed.**
 - **PROMOTED 2026-09-01 -> [Plan 0148](plans/done/0148-the-shipped-artifacts-carry-their-own-guarantees.md) Phase 3**, whose done-when is written around *establishing what is
   true* and admits both repairs this entry names - move the arguments, or correct the paragraph.
 
@@ -9240,7 +9240,7 @@ exactly the class [ADR-0065](adrs/0065-the-attractor-deposit-is-normalized-by-pa
 `tier.rs` module header already argue about. **Priority: high for the video path, low for the
 app** — nothing shipped is broken and the live tiers are validated where they are. It gates
 whether a rendered file is publishable, which is the question Plan 0101 exists to make askable and
-[Plan 0103](plans/0103-the-project-gets-an-audience.md) depends on the answer to.
+[Plan 0103](plans/done/0103-the-project-gets-an-audience.md) depends on the answer to.
 
 --
 
@@ -11290,7 +11290,20 @@ panel — it makes **foobar2000 itself** feel dead, with no visible cause and no
 Compounding it, [0103](design-backlog.md) means the user cannot remove the panel by the documented
 route to escape. Whoever picks this up should read the two together.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0103](plans/0103-the-project-gets-an-audience.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0103](plans/done/0103-the-project-gets-an-audience.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **CLOSED 2026-09-18** — [Plan 0103](plans/done/0103-the-project-gets-an-audience.md) Phase 1
+  (`2c9cbbca`) took the deferred-attach option this entry called the safer of the two, and took it
+  whole: the `1x1` fallback and `needs_reattach` are both gone, `attach_if_ready` creates and
+  attaches only once the owner reports a client size, and both the first real `WM_SIZE` and the
+  500 ms watchdog call it, so a missed size message costs one tick rather than the session.
+  Ownership became a property of the window rather than of the handle — `claim` now succeeds with no
+  surface, and every consumer already guarded on `handle`. **The instrument this entry asked for
+  exists**: the diagnostics log gained `surface_w`, `surface_h`, `client_w` and `client_h`, so the
+  question `gpu_bytes` structurally cannot answer is now one column comparison. **What is still not
+  established is what this entry said was not: nothing has measured it.** The component was not
+  compiled in the plan's lane (no SDK there) and CI builds no C++, so the first reading of the fix is
+  the clean-profile item in [`on-device-validation.md`](on-device-validation.md), which that close
+  rewrote for it. A failure there convicts the fix and returns as a new live entry citing this one.
 
 
 ---
@@ -11338,7 +11351,18 @@ question, since sharing `wnd_proc` between both host kinds is deliberate in this
 **Medium-low.** One workaround exists and works, but it is undiscoverable, and "I cannot remove your
 component from my layout" is a bad first impression.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0103](plans/0103-the-project-gets-an-audience.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0103](plans/done/0103-the-project-gets-an-audience.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **CLOSED 2026-09-18** — [Plan 0103](plans/done/0103-the-project-gets-an-audience.md) Phase 1
+  (`2c9cbbca`). **The design question this entry posed was answered the other way, and that is the
+  substantive part of the close.** The two hosts did *not* stop sharing one `WM_CONTEXTMENU` branch:
+  the branch asks one per-window question, `host_defers_context_menu(HWND)`, answered from the
+  panel's `ui_element_instance_callback` through a `GWLP_USERDATA` back-pointer, and the pop-out —
+  which never writes that word — answers `false` by construction rather than by a special case. So
+  the edit-mode query did reach the panel path and `DefWindowProc` does forward the message to the
+  host, while the deliberate sharing of `wnd_proc` survived intact and no ADR was owed. The probe
+  above is now false by delivery: `is_edit_mode_enabled` is present in
+  `plugin-foobar/foo_ritmolux.cpp`. **Unmeasured on device**, like 0102 — the clean-profile item's
+  (e) in [`on-device-validation.md`](on-device-validation.md) is its first reading.
 
 
 ---
@@ -12035,10 +12059,23 @@ the frame — so the contour is the only source of intermediate values in the pi
 looks good, and the fix costs a parameter on a surface that was deliberately kept free of one.
 Revisit if a second limited-ink world lands on a contoured scene.
 
-- **Promoted 2026-09-14** to [Plan 0184](plans/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 1 and [ADR-0197](adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md): the contour gains a hard/soft style and an ink taken from a palette coordinate, on every scene that draws it, with the default byte-identical.
+- **Promoted 2026-09-14** to [Plan 0184](plans/done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 1 and [ADR-0197](adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md): the contour gains a hard/soft style and an ink taken from a palette coordinate, on every scene that draws it, with the default byte-identical.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0184](plans/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0184](plans/done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) owns the ask, and its close appends the `CLOSED` marker here.
 
+- **CLOSED 2026-09-17** by [Plan 0184](plans/done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md)
+  Phase 1 and [ADR-0197](adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md),
+  **fully, and the entry's own reading is the one that closes it.** `palette_contour_style` takes four
+  values on all six contour scenes — soft or hard footprint, black or an ink read at
+  `palette_contour_ink` — with style `0` the expression that shipped before it, so no golden moved.
+  The entry measured `shape_contourmono` at 9 distinct colours with the contour off and 684 at
+  `palette_contour = 1.0`; the same picture under the plan's recorded stimulus measures **677 at style
+  0 and 9 at style 1**, and `shape_contourmono` ships on style 1. Style 3, the hard ink key, also
+  measures 9 and was rendered and rejected on composition — it lays red at every run boundary, taking
+  red from 4.57 % to 11.70 % of the frame — and that rejection is in the preset's header as a rejected
+  alternative. The entry's *"revisit if a second limited-ink world lands on a contoured scene"* is
+  discharged rather than deferred. The drift guard that never opened two of the six sites now scans
+  for them.
 
 ---
 
@@ -12086,10 +12123,24 @@ small enough to fold into someone else's plan.
 cohort has four systems that do work. It rises if `warp_mesh` is wanted for a limited-ink world
 specifically, because nothing else in the engine makes a decay contour.
 
-- **Promoted 2026-09-14** to [Plan 0184](plans/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 2 and [ADR-0197](adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md): `warp_mesh` `color_source` deposits uncoloured light and colours the field by its level at present time; the two colour paths exclude each other, and the phase stops if the level outgrows `color_span`.
+- **Promoted 2026-09-14** to [Plan 0184](plans/done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 2 and [ADR-0197](adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md): `warp_mesh` `color_source` deposits uncoloured light and colours the field by its level at present time; the two colour paths exclude each other, and the phase stops if the level outgrows `color_span`.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0184](plans/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0184](plans/done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) owns the ask, and its close appends the `CLOSED` marker here.
 
+- **CLOSED 2026-09-17** by [Plan 0184](plans/done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md)
+  Phase 2 and [ADR-0197](adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md),
+  **and the half that did not arrive is named rather than glossed.** `color_source = "1"` makes the
+  deposit write uncoloured light and the present pass colour the field by `max(rgb)` of its own
+  accumulated level, after the echo, so `palette_steps` bands what the loop builds.
+  `presets/warp_ladder.toml` is the world the entry asked for and its rungs are the decay contours it
+  named: along a ray from the deposit centre the level path crosses between inks **10** times and the
+  deposit-angle path **0**, because the angle coordinate does not vary along a ray — the measured
+  form of this entry's *"smeared coloured blob with no bands at all"*.
+  **What did not arrive is the ink class.** The present writes `ink * coverage` and coverage is a
+  continuum, so two inks measure **851** exact frame colours; `palette_steps = "12"` quantizes the
+  level the coverage is computed from and brings that to **60**. The ladder is an op-art print, not a
+  limited-ink one, and the preset's header says so in its own words. The coverage threshold that would
+  close the gap is live as **0251**, which is a new question rather than an edit to this closed entry.
 
 ---
 
@@ -12472,9 +12523,17 @@ would serve the same end deliberately rather than as a side effect.
 - **Verified 2026-08-31** - selection by name is a first-exact-match, so a duplicate name makes one preset unreachable: `present: position\(\|n\| n == name\) in: core/src/render/roster.rs`
 - **Verified 2026-08-31** - `unprobeable: the drift itself is a property of a machine's %APPDATA% preset directory, which exists in no checkout - presets/ is clean by construction and a probe against it would pass forever while saying nothing about the condition`
 
-- **Promoted 2026-09-14** to [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phases 1-2: a startup line naming files outside the embedded set and duplicate display names, and a `--list-presets` flag. Nothing is pruned.
+- **Promoted 2026-09-14** to [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phases 1-2: a startup line naming files outside the embedded set and duplicate display names, and a `--list-presets` flag. Nothing is pruned.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+- **CLOSED 2026-09-18** by [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phases 1-2.
+  `preset::drift` judges each `*.toml` against `EMBEDDED` as `shipped` / `differs` / `not shipped`
+  and names every display name a second file claims, with the file a lookup reaches; seeding prints
+  one line when — and only when — something drifted, and `--list-presets` prints the per-file rows
+  without seeding. **Nothing is pruned or overwritten**, which was this entry's own argument. The
+  half nothing can repair stands: `differs` cannot tell an operator's edit from an older release's
+  copy, because no build carries a manifest of past hashes, and the status name says so.
 
 
 ---
@@ -12797,9 +12856,15 @@ plan-relative narration.
 consistency. It is a `dev` edit rather than a docs one, which is the only reason a docs lane left it
 standing. If the golden `--help` output is ever pinned byte-for-byte, pin it after this moves.
 
-- **Promoted 2026-09-14** to [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 3: the banner's product token is capitalised; the binary name stays lower-case.
+- **Promoted 2026-09-14** to [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phase 3: the banner's product token is capitalised; the binary name stays lower-case.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+- **CLOSED 2026-09-18** by [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phase 3.
+  The banner reads `Ritmolux — a real-time music visualizer`; `usage: ritmolux [flags]` stays
+  lower-case because it is what gets typed, and `help_prints_the_roster_and_exits_zero` asserts both
+  against the real binary's stdout. `standalone/src/settings/tests.rs`'s fixture path is
+  `Roaming\Ritmolux\presets`.
 
 
 ---
@@ -13015,9 +13080,20 @@ defect worth a plan. Nothing has established which.
 cannot close — a silent fallback to the wrong endpoint — would be a defect every user hits without
 knowing.
 
-- **Promoted 2026-09-14** to [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 5. The code shows no loopback-to-microphone fallback; the settings overlay's Input mode row persists `line-in` on one arrow press, which is the likely cause. A human on-device check settles it.
+- **Promoted 2026-09-14** to [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phase 5. The code shows no loopback-to-microphone fallback; the settings overlay's Input mode row persists `line-in` on one arrow press, which is the likely cause. A human on-device check settles it.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+- **CLOSED 2026-09-18** by [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phase 5,
+  **as a persisted choice rather than a defect**, which is the verdict that phase's own rule
+  prescribed. Run by the owner on the machine it happened on: with the only render endpoint
+  disabled, capture failed with `WASAPI error: Element not found. (0x80070490)` and the verdict
+  stayed `failed` — **no microphone verdict**, on a machine whose only capture endpoint is the
+  microphone, on the start path and on the recovery path alike. One right-arrow on the overlay's
+  **Input mode** row wrote `mode = "line-in"` into `config.toml` at the same second, before the app
+  was closed. And the machine's own `%APPDATA%\Ritmolux\diagnostics.log` confines every microphone
+  verdict to three runs on **2026-09-11**, which a fallback firing whenever loopback fails would not
+  do. No fallback exists in the code and none was observed.
 
 
 ---
@@ -13117,9 +13193,16 @@ than a rough edge.
 frame a clamp releases. It is on this list because it is the second half of a pair whose first half
 is correct, which is how it stayed wrong across two plans that each looked straight at it.
 
-- **Promoted 2026-09-14** to [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 3: the recovery line renders per context, as the onset line already does.
+- **Promoted 2026-09-14** to [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phase 3: the recovery line renders per context, as the onset line already does.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+- **CLOSED 2026-09-18** by [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phase 3.
+  `CapOverflow::recovered()` renders the clearing in the terms the onset used: geometry and the
+  segment cap for `Mirror` and `Depth`, the iteration budget, the grid and the neighbourhood for the
+  three that clamp a structural parameter. The `match` has **no wildcard arm**, so a sixth context
+  cannot compile without choosing its own sentence, and a core test asserts that none of the three
+  structural recoveries says `segment` or `geometry`.
 
 
 ---
@@ -13162,9 +13245,18 @@ to `system` in the reader documents and in `.rs` comments.
 reviewer attention rather than a wrong build. It is worth an entry because the catching is the
 expensive part and it recurs on a fixed schedule: once per new system, forever.
 
-- **Promoted 2026-09-14** to [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 4 and [ADR-0202](adrs/0202-a-written-count-of-the-systems-is-refused-by-a-gate.md): a count gate over the reader documents and `.rs` comments, and the gate inventory rewritten without numbers. [Plan 0120](plans/0120-the-standalone-ships-on-ubuntu.md) Phase 5 uses count-free platform wording.
+- **Promoted 2026-09-14** to [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phase 4 and [ADR-0202](adrs/0202-a-written-count-of-the-systems-is-refused-by-a-gate.md): a count gate over the reader documents and `.rs` comments, and the gate inventory rewritten without numbers. [Plan 0120](plans/0120-the-standalone-ships-on-ubuntu.md) Phase 5 uses count-free platform wording.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+- **CLOSED 2026-09-18** by [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phase 4
+  and [ADR-0202](adrs/0202-a-written-count-of-the-systems-is-refused-by-a-gate.md).
+  `scripts/check-system-counts.mjs` runs at pre-push and in the CI `links` job, reads `.rs` whole
+  because the instance that survived two closes was an assertion message, and carries its own seeded
+  bite check. The first run reported thirteen instances; one was the gate's own false positive (a
+  count of params, now excluded), and of the rest **exactly one** took a `count-allow:` marker. The
+  gate inventory's own ordinals went with the counts, by hand — the grammar was not extended to a
+  second noun, which the ADR's Negative still records as unguarded.
 
 
 ---
@@ -13495,9 +13587,20 @@ slope. The ceiling's argument is about the worst case an author can load, and th
 **Low.** Nothing renders wrong and the ceiling still stands. What is wrong is that the one test
 named as the ceiling's measurement cannot re-measure it.
 
-- **Promoted 2026-09-14** into [Plan 0160](plans/0160-the-silhouettes-preconditions-stop-being-silent.md) as optional Phase 1b: re-price the arity on a polyline and re-take the header table. If that phase is skipped this entry stays live.
+- **Promoted 2026-09-14** into [Plan 0160](plans/done/0160-the-silhouettes-preconditions-stop-being-silent.md) as optional Phase 1b: re-price the arity on a polyline and re-take the header table. If that phase is skipped this entry stays live.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0160](plans/0160-the-silhouettes-preconditions-stop-being-silent.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0160](plans/done/0160-the-silhouettes-preconditions-stop-being-silent.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+- **CLOSED 2026-09-17** — [Plan 0160](plans/done/0160-the-silhouettes-preconditions-stop-being-silent.md) Phase 1b was taken (`2afbf736`), and the entry is discharged in full.
+  `path_probe` now carries a `morph_to` identical to its `d` at `morph = 0`, which puts the scene on
+  its point representation **by construction** — a morph in flight cannot ride the arc chain — so
+  every arity is on the polyline route and the axis is the segment count again. The header table was
+  re-taken on that run and dated: **~0.095 ms per segment**, 42.6 % of the floor budget at 64 and
+  24.4 % at 32, with rows added at 8 and 48. `MAX_SAMPLES`'s own doc follows the new slope, and the
+  ceiling's argument still holds at 64, so nothing was logged for a later plan. Two figures the
+  entry did not ask about moved with it: the arc-comparison table beneath was deliberately **not**
+  re-taken, because its polyline column already measured a polyline, and the close review's M3
+  dated it 2026-09-09 so the two tables cannot be read as one run.
 
 
 ---

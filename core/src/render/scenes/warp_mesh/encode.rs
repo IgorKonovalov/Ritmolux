@@ -228,6 +228,12 @@ pub(super) fn upload_uniforms(
                 scene.colour.mix,
                 palette::band_steps(scene.colour.steps),
                 palette::band_contour(scene.colour.contour),
+                colour_source(scene.color_source),
+            ],
+            e: [
+                palette::band_contour_style(scene.colour.contour_style),
+                scene.colour.contour_ink,
+                0.0,
                 0.0,
             ],
         }),
@@ -258,6 +264,22 @@ pub(super) fn upload_uniforms(
                     f32::from(orient & 2 != 0),
                 ]
             },
+            // The level palette (ADR-0197). Every slot is inert at
+            // `color_source = 0`, where the fragment never reaches the branch
+            // that reads them.
+            d: [
+                colour_source(scene.color_source),
+                scene.colour.hue + scene.color_center,
+                scene.color_span,
+                scene.colour.saturation,
+            ],
+            e: [
+                scene.colour.mix,
+                palette::band_steps(scene.colour.steps),
+                palette::band_contour(scene.colour.contour),
+                palette::band_contour_style(scene.colour.contour_style),
+            ],
+            f: [scene.colour.contour_ink, 0.0, 0.0, 0.0],
         }),
     );
     // The converted-shader uniform, filled from the same frame the EEL

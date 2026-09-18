@@ -72,6 +72,12 @@ bool handle_timer(HWND wnd, WPARAM wp) {
         if (g_session.owner == wnd) {
             const bool showing = host_is_showing(wnd);
             if (g_session.visible != showing) g_session.visible = showing;
+            // Ground truth for the surface too: a host claimed while 0-sized has
+            // no surface until something notices it has a size, and the WM_SIZE
+            // that should say so can be missed or delivered while another host
+            // owned the session. Asking the window here bounds the surfaceless
+            // window at one tick instead of at the next stream-format change.
+            if (showing) g_session.attach_if_ready();
             g_session.sync_render_timer();
         }
         return true;
@@ -198,15 +204,12 @@ LRESULT CALLBACK wnd_proc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp) {
                                  (LOWORD(lp) == 0) || (HIWORD(lp) == 0);
             set_host_visibility(wnd, !hidden);
             if (g_session.owner == wnd) {
-                if (!hidden && g_session.handle != nullptr) {
-                    if (g_session.needs_reattach) {
-                        // First real size for a surface attached while the host
-                        // was still 0-sized: recreate it so it actually presents
-                        // (a plain resize can't revive the dead 1x1 surface).
-                        g_session.reattach_at_current_size();
-                    } else {
-                        rlx_resize(g_session.handle, LOWORD(lp), HIWORD(lp));
-                    }
+                if (!hidden) {
+                    // The first real size is where a host claimed while 0-sized
+                    // gets its surface; once it has one this is a no-op and the
+                    // resize below is the whole of the work.
+                    g_session.attach_if_ready();
+                    g_session.size_surface(LOWORD(lp), HIWORD(lp));
                 }
             } else {
                 InvalidateRect(wnd, nullptr, FALSE); // re-centre the placeholder
@@ -228,6 +231,18 @@ LRESULT CALLBACK wnd_proc(HWND wnd, UINT msg, WPARAM wp, LPARAM lp) {
             SetFocus(wnd); // so a subsequent Space reaches this panel/window
             return 0;
         case WM_CONTEXTMENU: {
+            // The host's claim on this right-click comes first: a Default UI
+            // panel in layout-edit mode must surface foobar2000's own Cut / Copy
+            // / Replace / Remove, and a component that answers instead cannot be
+            // removed by the documented route. Breaking here reaches
+            // DefWindowProc, which forwards WM_CONTEXTMENU to the parent - so the
+            // host gets the message it would have got had this window handled
+            // nothing at all.
+            //
+            // ONE branch still serves both host kinds. The question is asked of
+            // the window, not of the host kind: the pop-out has no ui_element
+            // host and no layout to edit, so it answers false by construction.
+            if (host_defers_context_menu(wnd)) break;
             // Owner-only: the right-click "Next scene" works without keyboard
             // focus; a placeholder (non-owner) host offers nothing.
             if (g_session.owner != wnd || g_session.handle == nullptr) break;

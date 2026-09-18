@@ -297,7 +297,7 @@ Four riders, all from the close:
   reason (0.248 at 12 points). Both are recorded in `presets/README.md` beside the params.
 - **`docs/preset-guide.md`'s section 2 owes a tenth entry, and only a shipped preset can pay it.**
   Every entry there is a real shipped preset with a committed render, so the guide currently
-  describes nine systems and the engine has ten. When a `shape_field` world lands, add the section
+  lags the roster by one system. When a `shape_field` world lands, add the section
   and re-run `node scripts/docs-shots.mjs` — argument-free, and nothing else moves.
 
 **Record the verdict here**, then move the row to `Done` below.

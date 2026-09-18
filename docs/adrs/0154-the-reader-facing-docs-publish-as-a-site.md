@@ -43,7 +43,7 @@ in CI's `links` job, and the same relative form is what makes these documents na
 and on GitHub. Rewriting them to absolute URLs would trade a working gate and working local
 navigation for a working site.
 
-Finally, [Plan 0103](../plans/0103-the-project-gets-an-audience.md) — approved 2026-08-16, still
+Finally, [Plan 0103](../plans/done/0103-the-project-gets-an-audience.md) — approved 2026-08-16, still
 open — states in its exclusions: *"No website, no landing page, no domain. The repository is the
 landing page."* That plan is distribution work, its Phase 2 owns the README, and its exclusion was
 written against a **promotional** site. A documentation site is a different artifact aimed at people

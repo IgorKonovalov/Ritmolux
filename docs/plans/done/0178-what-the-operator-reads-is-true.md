@@ -1,0 +1,598 @@
+# 0178 — What the operator reads is true
+
+> **Status:** done (2026-09-18) — five phase commits `a20bc34a`, `2fd42a7d`, `8b4b7f69`, `955cb766`,
+> `f8e29cf7`, plus the close-review repairs in `fb9687f4`. Round-1 close review (conductor mode):
+> **no blockers, no majors, three minors and two nits**, three of them repaired at the close. Full
+> suite green on the reviewed tree (`e3c158e`, 1985 passed / 6 skipped, suite ledger), and again on
+> the tagged tip; `cargo doc --workspace` under `-D warnings` clean; every Node gate exit 0.
+> **Created:** 2026-09-14
+> **Owner skill(s):** `dev`, `human`
+> **Related ADRs:** [0202](../../adrs/0202-a-written-count-of-the-systems-is-refused-by-a-gate.md) (accepted), [0007](../../adrs/0007-line-geometry-generators.md), [0162](../../adrs/0162-the-application-is-renamed-to-ritmolux.md), [0022](../../adrs/0022-build-time-preset-embedding.md)
+> **Closes:** design-backlog 0172, 0185, 0207, 0208; carries the diagnosis of 0203
+
+## TL;DR
+
+This plan fixes five things an operator or contributor reads that are false, stale or silent. Each is
+small, and they share one property: nothing currently catches them.
+
+1. **Preset directory drift.** The per-user preset directory drifts from the shipped set and can hold
+   two presets under one name. It now says so in one startup line, and a new `--list-presets` flag
+   shows the whole set with each file's status. Nothing is ever deleted.
+2. **The `--help` banner** calls the product `ritmolux`.
+3. **The cap-recovery line** calls every recovery "geometry", and three of the five contexts are not
+   geometry.
+4. **Written counts of the systems** go stale with every new system. A gate now refuses them
+   (ADR-0202), and the counts in the repository's own gate inventory are rewritten without numbers.
+5. **Backlog 0203** is settled on the machine where it happened. A code reading below shows there is
+   no silent fallback to explain it.
+
+## Context & problem
+
+**Backlog 0172: the seeded directory.** `preset::seed_dir` (`core/src/preset/mod.rs:68`) writes a
+shipped file only `if !path.exists()` and never removes one. That is right: it must never overwrite
+an operator's edit. But it has no counterpart. Three kinds of drift build up without anyone noticing:
+
+- files the shipped set no longer has;
+- shipped files whose copy is older than, or edited away from, the shipped one. A retune upstream
+  never reaches an install that already has the file;
+- two files under one display name.
+
+`Renderer::select_preset_by_name` takes the first exact match (`core/src/render/roster.rs:736`), so
+the second preset of a name cannot be reached by name. When 0172 was filed, the development box held
+118 files against 81 shipped, two of them named `Coral`. `stream.rs:784` even tells the operator
+*"--list-presets is not a flag"*.
+
+**Backlog 0185: the banner.** `standalone/src/cli.rs:243` reads
+`"ritmolux — a real-time music visualizer\n\nusage: ritmolux [flags]"`. The first token is the
+product name, which ADR-0162 capitalises. The second is the binary name, which stays lower-case.
+`standalone/src/settings/tests.rs:26` still carries `Roaming\ritmolux\presets`.
+
+**Backlog 0207: the recovery line.** `AppState::poll_cap_overflow` (`standalone/src/app_state.rs:886`)
+prints the onset through `CapOverflow`'s `Display`. That speaks for each context in its own words
+(`core/src/render/scenes/mod.rs:567`). The recovery, though, is one hardcoded string:
+`"geometry is back within the segment cap"` (`app_state.rs:894`). `OverflowContext` has five
+variants, and `Iterations`, `Grid` and `Radius` are clamps of a structural parameter, not geometry.
+
+**Backlog 0208: counts in prose.** ADR-0202 carries the 2026-09-14 sweep: 11 matches across 9 files
+outside the dated records, from stale roster totals to one false positive. The gate inventory itself
+suffers the same drift with a different noun. `CLAUDE.md:153` reads *"Nine Node gates. SEVEN run by
+pre-push"*, `README.md:73` *"the seven Node gates"*, and `ci.yml:246` *"And the seventh"*. This plan
+adds a gate, and Plans 0166 and 0176 each add another.
+
+**Backlog 0203: the microphone capture.** The Sep 10 smoke run captured from `Microphone Array`, and
+the owner does not remember whether `[input] mode` said `line-in`. **Reading the code on 2026-09-14
+finds no fallback that could have chosen it:**
+
+- `start_capture` (`standalone/src/capture_start.rs:320`, Windows arm) makes one `capture_win::start` with the
+  resolved mode. On an error it renders without audio, with a `failed` verdict. It never tries a
+  second mode.
+- `dataflow` (`capture_win.rs:300`) maps loopback to `eRender` and nothing else.
+- A line-in capture is reachable from exactly three places:
+  - the `--input` flag;
+  - `config.toml`'s `[input]` section;
+  - the settings overlay's **Input mode** row, where one right-arrow press sends
+    `SetInputMode(LineIn)` (`standalone/src/settings.rs:332`). `set_input_mode` restarts capture with
+    `Persist::Yes` (`app_state.rs:1487-1497`), so it writes `line-in` to `config.toml` for every
+    later launch, the studio's player included.
+- When the source is not the default, the startup line already says which it was:
+  `audio input line-in on 'default' by config.toml` (`standalone/src/run.rs:590`).
+
+So the likely explanation is an Input mode row nudged during an earlier session and persisted. A
+silent fallback is not a candidate. What is left is confirming it on the device.
+
+## Decision
+
+- **Preset drift: report it, never prune.** Core gains a pure `preset::drift(dir)` over the directory
+  and `EMBEDDED`. The standalone prints one line after seeding, only when something drifted, and adds
+  `--list-presets`: one row per preset the launch would load, with its status. Both are human
+  diagnostics. No event is added, so spec 0003 does not widen.
+  - **Rejected: pruning retired files.** The directory is one the operator is invited to edit, so
+    deleting from it eats their work (backlog 0172's own argument).
+  - **Rejected: overwriting stale shipped copies.** Same reason.
+- **The recovery line renders from core, beside the onset.** A `CapOverflow::recovered()` adapter
+  matches on `OverflowContext` exhaustively, so a sixth variant cannot compile without choosing its
+  own sentence. All user-visible cap text stays in the one file whose comment already declares it
+  user-visible.
+  - **Rejected: a `match` in `app_state.rs`.** It would split the onset and recovery wording across
+  two crates.
+- **Counts: ADR-0202's gate**, plus rewriting the gate inventory without numbers by hand. The
+  inventory is a different noun, and ADR-0202 deliberately does not extend its grammar to it.
+
+## Architecture diagram
+
+```mermaid
+flowchart LR
+    subgraph core["core/"]
+        E[EMBEDDED set] --> D["preset::drift(dir)"]
+        O[OverflowContext] --> R["CapOverflow Display + recovered()"]
+    end
+    subgraph standalone["standalone/"]
+        S[seed_preset_dir] --> L1[one drift line on stderr]
+        F["--list-presets"] --> L2[per-file status rows, exit]
+        P[poll_cap_overflow] --> L3[onset / recovery lines]
+    end
+    subgraph repo["scripts/ + CI"]
+        G[check-system-counts.mjs] --> H[pre-push + links job]
+    end
+    D --> S
+    D --> F
+    R --> P
+```
+
+## Implementation phases
+
+### Phase 1 — The preset directory reports its drift
+
+- **Owner skill:** dev
+- **What:** `rlx_core::preset::drift(dir: &Path) -> DriftReport`, pure over the directory listing and
+  `EMBEDDED`. For each `*.toml` it gives one status:
+  - `Shipped`: the name is in `EMBEDDED` and the bytes are equal;
+  - `Differs`: the name is in `EMBEDDED` and the bytes differ, an edit or an older shipped copy.
+    The two cannot be told apart, and the line says so;
+  - `NotShipped`: the name is not in `EMBEDDED`.
+
+  It also gives each display name claimed by more than one file that compiles, and names the
+  winning file: the first in filename order, which is the order `load_dir` sorts and
+  `select_preset_by_name` takes. `seed_preset_dir` (`standalone/src/preset_dir.rs:87`) prints one
+  line after seeding, **only when any drift is present**, naming the `Differs` and `NotShipped`
+  counts, each duplicate name, and `--list-presets` as where to read the rows. It runs only in the `PresetDir::Default` arm. An `RLX_PRESET_DIR` override is the
+  operator's own directory, often the repository's `presets/`, and seeding never touches it either.
+- **Files touched:** `core/src/preset/mod.rs` (the function, the report type, and unit tests beside
+  `seed_dir_writes_all_then_nothing`); `standalone/src/preset_dir.rs`.
+- **Done when:**
+  - A core test seeds a temp directory, then edits one shipped file, adds one unshipped file, and adds
+    a second file whose `name` duplicates a shipped preset. `drift` reports exactly one `Differs`, one
+    `NotShipped` and one duplicate name, with the winning file identified.
+  - A freshly seeded, untouched directory reports all `Shipped`, no duplicates, and **no line
+    printed**. Pin that by testing the line's formatter on an empty report: it returns `None`.
+  - The seeding path still never writes over an existing file: `seed_dir_writes_all_then_nothing`
+    is unchanged and green.
+
+### Phase 2 — `--list-presets` shows the set a launch would load
+
+- **Owner skill:** dev
+- **What:** A new valueless flag in `FLAGS` (`standalone/src/cli.rs:76`), dispatched in
+  `standalone/src/run.rs` beside `--list-devices` and `--list-adapters` (`run.rs:491`). It resolves
+  the directory the way `startup_preset_names` (`preset_dir.rs:70`) does, **without seeding**, and
+  prints on stderr like its siblings.
+  - Each preset in the set the launch would hold gets one row: display name, file name, and the
+    Phase 1 status, with a duplicate marker where one applies.
+  - Files that fail to compile are listed after the rows, with their errors.
+  - An empty or unresolved directory lists the embedded set, all `Shipped`, and says that is what it
+    is.
+
+  The flag exits 0. `stream.rs:784`'s message now points at `--list-presets`, and the windowed
+  unknown-`--preset` refusal (`run.rs:670-676`) names the flag after its roster. The prose-scanner
+  test comment at `cli.rs:1353` loses the example it cites.
+- **Files touched:** `standalone/src/cli.rs`; `standalone/src/run.rs`; `standalone/src/stream.rs`;
+  `standalone/tests/help_cli.rs`; `docs/configuration.md` (the flag table and a short paragraph beside
+  `--list-adapters`'); `docs/running.md` if it describes the preset directory's contents.
+- **Done when:**
+  - A `help_cli.rs` case spawns `--list-presets` with `RLX_PRESET_DIR` pointed at a temp directory
+    holding one unshipped file and one duplicate name. It exits 0 and its stderr names both statuses
+    and the duplicate. The subprocess must not read or write the developer's real data root, which
+    is the class backlog 0181 records, so the case sets that root to scratch as well.
+  - `--help` lists `--list-presets`, and the existing roster/scanner consistency tests in `cli.rs`
+    pass. The flag is in `FLAGS` and in the scanner.
+  - `grep -n "is not a flag" standalone/src/stream.rs` matches nothing.
+
+### Phase 3 — The banner and the recovery line say what is true
+
+- **Owner skill:** dev
+- **What:** Two console lines.
+  - **Backlog 0185:** the banner's first token becomes `Ritmolux`. `usage: ritmolux [flags]` stays
+    lower-case, because it is the binary name. `settings/tests.rs:26`'s fixture path becomes
+    `Roaming\Ritmolux\presets`.
+  - **Backlog 0207:** `CapOverflow` gains `recovered()`, a `Display` adapter over the overflow that
+    last bit. `poll_cap_overflow`'s `(Some(prev), None)` arm prints
+    `preset '{}': {prev.recovered()}`. The wording per context mirrors the onset's own terms:
+    - `Mirror`/`Depth`: geometry is back within the `{cap}`-segment cap;
+    - `Iterations`: the iteration budget;
+    - `Grid`: the grid;
+    - `Radius`: the neighbourhood.
+
+    Each is back within this tier's cap of `{cap}`. The comment at `scenes/mod.rs:536` ("user-visible
+    text ... the shell prints verbatim") covers the new adapter too.
+- **Files touched:** `standalone/src/cli.rs`; `standalone/src/settings/tests.rs`;
+  `standalone/tests/help_cli.rs`; `core/src/render/scenes/mod.rs`; `standalone/src/app_state.rs`.
+- **Done when:**
+  - `help_prints_the_roster_and_exits_zero` (or a sibling) asserts the first stderr line starts with
+    `Ritmolux — `, and the usage line still reads `usage: ritmolux [flags]`.
+  - A core test builds one `CapOverflow` per `OverflowContext` variant and asserts that each
+    `recovered()` text contains its own context's word. `Iterations`, `Grid` and `Radius` must not
+    contain `segment` or `geometry`. The match has no wildcard arm, so a new variant fails to compile.
+  - `grep -n "geometry is back within the segment cap" standalone/src/app_state.rs` matches nothing.
+
+### Phase 4 — A written count of the systems cannot land
+
+- **Owner skill:** dev
+- **What:** `scripts/check-system-counts.mjs`, exactly as ADR-0202 decides it: the match, the
+  threshold of five, the scope and its exclusions, fenced code skipped, the `count-allow: <reason>`
+  escape, `file:line  <text>` output and the `root` argument. The header comment carries the mechanism
+  and cites ADR-0202 by bare number.
+  - Add `scripts/fixtures/system-counts/`, seeded, with its expected exact break count, and a section
+    in `scripts/fixtures/README.md`. The repository walks in the existing checkers skip
+    `scripts/fixtures` by path, so this tree is added to this script's own skip.
+  - Wire it into `.githooks/pre-push` and the CI `links` job.
+  - Repair every instance the first run reports. Rewrite each count-free where the sentence survives
+    without it (ADR-0202's Context table lists the 2026-09-14 set). Use `count-allow:` only where the
+    number is not a roster count (`core/tests/hygiene.rs:642`) or is a dated record inside a live
+    document that must keep it.
+  - **Rewrite the gate inventory without numbers:** the `scripts/` paragraph in `CLAUDE.md`, the
+    `scripts/` line in `README.md`, `ci.yml`'s ordinal comments in the `links` job ("And the fifth",
+    "And the seventh"), the opening of `scripts/fixtures/README.md` ("Eight checkers"), and the
+    pre-push step list in `docs/developing.md` if it counts.
+- **Files touched:** `scripts/check-system-counts.mjs` (new); `scripts/fixtures/system-counts/`
+  (new); `scripts/fixtures/README.md`; `.githooks/pre-push`; `.github/workflows/ci.yml`; `CLAUDE.md`;
+  `README.md`; `docs/developing.md`; `core/src/render/scenes/common.rs`; `core/src/render/evaluate.rs`;
+  `core/src/render/scenes/warp_mesh/mod.rs`; `core/tests/sanity.rs`; `core/tests/hygiene.rs`;
+  `docs/content-brief.md`; `presets/proposed/ROSTER.md`; `.claude/skills/preset-author/SKILL.md`;
+  whatever else the first run names.
+- **Done when:**
+  - `node scripts/check-system-counts.mjs` exits 0 on the tree.
+  - `node scripts/check-system-counts.mjs scripts/fixtures/system-counts` exits 1 with exactly the
+    break count the fixture README states. The fixture includes:
+    - a numeral case and a number-word case;
+    - a two-word-gap case (`the other ten systems`), which must break;
+    - `four systems` and `file systems`, which must not break;
+    - a `count-allow:` line, which must not break;
+    - a match inside a fenced block, which must not break;
+    - a `.rs` string-literal match, which must break.
+  - `grep -rniE "\b(nine|seven|eight|six|five) (node )?gates\b" CLAUDE.md README.md .github/workflows/ci.yml`
+    matches nothing.
+  - `cargo nextest run --workspace` moves no golden, because comment and message text is all this
+    phase touches in Rust. `common.rs:366`'s assertion message must still read truthfully when it
+    fires.
+  - Every other gate at pre-push and in the `links` job still exits 0.
+
+### Phase 5 — The microphone capture is settled on the machine it happened on
+
+- **Owner skill:** human
+- **What:** Confirm backlog 0203's remaining half against the code reading in Context. On the
+  development machine:
+  1. Set `[input] mode = "loopback"` in `config.toml`, launch the player, and read the startup stderr.
+     No `audio input … by config.toml` line should appear. F3's verdict should name a render endpoint.
+  2. Disable the default render endpoint in Windows Sound settings, which makes loopback unable to
+     start, and launch again. **Expected from the code:** the `audio capture unavailable` line and a
+     `failed` verdict, **never** a `live … Microphone Array` verdict.
+  3. Re-enable the endpoint. Open the settings overlay, press right on **Input mode**, close the app,
+     and check `config.toml`, which should now read `line-in`. Set it back.
+- **Files touched:** none in the repository. The machine's `config.toml`, restored.
+- **Done when:** the three observations are recorded in this plan's log.
+  - If step 2 shows no fallback and step 3 persists `line-in`, backlog 0203 closes at the review as
+    "a persisted overlay choice or config, not a defect".
+  - **If step 2 shows a microphone verdict**, the code reading is wrong. That is a new backlog entry
+    about capture start, and 0203 stays live.
+
+## Risks & open questions
+
+- **Three plans edit the gate inventory.** Plan 0176 adds `check-release-tag.mjs`, Plan 0166 adds a
+  translation gate, and this plan adds a count gate and removes the numbers. **This plan lands last of
+  the three** so the inventory it rewrites is final. If it cannot, Phase 4's count-free wording still
+  holds, because it names no number for the next gate to break.
+- **Phase 1's drift line may be noisy on a long-lived install.** It fires every launch until the
+  operator acts, and `Differs` will be large on a machine that has tracked many retunes, by design.
+  The line is one line and names `--list-presets`. If the owner finds it unbearable, the fallback is
+  printing it only when the counts change since the last launch, which needs persisted state and is
+  not built here.
+- **`Differs` cannot tell an operator's edit from an outdated shipped copy.** Telling them apart would
+  need a manifest of every past shipped version's hash, and this plan does not build one. The status
+  name and `--list-presets`' legend say so.
+- **The studio shows the player's stderr.** A new human line is additive, and spec 0003 requires human
+  diagnostics to be byte-identical with and without `--events`. Nothing parses them, so no protocol
+  changes. A studio-visible drift report would be a spec 0003 widening, and is out of scope.
+- **ADR-0202's threshold is argued, not derived.** A legitimate cohort of five or more needs an allow
+  marker. The Phase 4 run shows how many exist, and if the count is large the threshold is wrong and
+  goes back to the architect, not to the allow list.
+- **Three backlog probes go red on delivery, by design.** Backlog 0185's probe matches the lower-case
+  banner string, 0207's the hardcoded recovery sentence, and 0208's `twelve systems` in `common.rs`.
+  Phases 3 and 4 remove all three. `dev` reports the red exit in the log and leaves the entries
+  alone; correcting and archiving them is architect's work at the close. 0172's probe
+  (`if !path.exists()`) must stay **green**, because a red one means seeding changed.
+- **Phase 5 changes a Windows sound setting.** Restore it. A tester's machine is not the place to run
+  it.
+
+## What this plan does NOT do
+
+- **It never prunes, overwrites or migrates** a file in the preset directory.
+- **It adds no event, OSC address or studio surface** for drift or for the list.
+- **It does not change what the settings overlay's Input mode row persists.** Persisting an
+  operator's choice is by design. Phase 5 only confirms that it explains 0203.
+- **It does not extend ADR-0202's grammar** to other nouns (gates, presets, zips). The gate inventory
+  is made count-free by hand.
+- **It does not touch Plan 0120's count-free rewording** of platform counts. That plan carries it for
+  its own docs.
+
+## Implementation log
+
+> Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
+> last one. **The phases above are the contract; everything here is what happened.**
+> **Observations, never conclusions:** this says where to look, architect decides how it went.
+> No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
+> an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
+
+**Lane:** `C:\Users\Igor Konovalov\WORK\rlx-plan-0178` on branch `plan-0178-what-the-operator-reads-is-true`
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — The preset directory reports its drift | dev | done | a20bc34a |
+| 2 — `--list-presets` shows the set a launch would load | dev | done | 2fd42a7d |
+| 3 — The banner and the recovery line say what is true | dev | done | committed with this row |
+| 4 — A written count of the systems cannot land | dev | done | committed with this row |
+| 5 — The microphone capture is settled on the machine it happened on | human | done | committed with this row |
+
+### Notes
+
+- **Phase 1, the drift fixture.** Phase 1's first `Done when` bullet describes three mutations
+  (edit a shipped file, add an unshipped file, add a second file duplicating a shipped name) and
+  then asserts "exactly one `Differs`, one `NotShipped` and one duplicate name". Three mutations
+  give two `NotShipped`, because any added file is by definition not in `EMBEDDED`. The test
+  `drift_reports_an_edit_an_extra_file_and_a_duplicate_name` makes the counts hold: one edited
+  shipped file, and one added file that is both the unshipped one and the duplicate claimant.
+- **Phase 1, where the line's subject lives.** `DriftReport::line()` returns the summary **without**
+  a leading `preset directory:`; `seed_preset_dir` prints that prefix. A shell diagnostic beginning
+  with an interpolation fails `stream_split::no_human_diagnostic_line_can_begin_with_a_brace`, and
+  the alternative was an entry in that test's `MESSAGE_PLACEHOLDERS`, outside the phase's files.
+- **Phase 2, `docs/running.md` untouched.** Phase 2 lists it conditionally ("if it describes the
+  preset directory's contents"). It does not mention presets at all.
+- **Phase 2, where the printer lives.** `list_presets_and_exit` and its two helpers are in
+  `standalone/src/run.rs`, beside `list_adapters_and_exit`, which is where the phase places the
+  dispatch; `standalone/src/preset_dir.rs` is unchanged by this phase.
+- **Phase 3, the banner assertion is on stdout.** Phase 3's first `Done when` asks
+  `help_prints_the_roster_and_exits_zero` to assert "the first **stderr** line". `print_help` writes
+  the roster to **standard output** — the contract `schema_answers_on_stdout_and_exits_without_starting_the_app`
+  and the `STDOUT_WRITERS` allowlist both rest on — and `--help` writes nothing to stderr. The
+  assertion is on stdout's opening.
+- **Phase 4 was done by the owner, not by a conductor session.** The phase declares
+  `.claude/skills/preset-author/SKILL.md`, and the CLI refuses a headless session an edit under
+  `.claude/` whatever the allowlist says, so the lane parked in front of the phase and nothing was
+  run (ADR-0210). The whole phase was then taken by hand in the lane on 2026-09-17.
+- **Phase 4, the first run reported thirteen instances, and one was the gate's own false positive.**
+  `studio/renderer/components/ParamPanel.tsx:13` reads *"seven of its system's twelve"* — a count of
+  params, not of systems. The singular possessive is now excluded in the script and the exclusion
+  says why; the plural possessive (`the twelve systems' palettes`) stays matched, because that one
+  is a roster count.
+- **Phase 4, what took `count-allow:` and what was rewritten.** One marker, on
+  `core/tests/suite/hygiene.rs`'s *"82 systems that do not exist"*, which is a count of per-preset
+  cards rather than a roster total — the case ADR-0202 names. Everything else was rewritten
+  count-free, including the two the ADR's table lists as dated records in live documents
+  (`.claude/skills/preset-author/SKILL.md`, `docs/content-brief.md`): both sentences survive without
+  the number, which the ADR prefers to a marker.
+- **Phase 4, the ordinals went with the counts.** `.githooks/pre-push`'s header called four of its
+  gates "the sixth", "the seventh", "the eighth" and "the ninth", and `ci.yml` numbered six steps
+  the same way. They are the same drift class as a roster count and adding a gate falsifies them, so
+  each now names its gate instead. `CLAUDE.md` already said its count was deliberately not written.
+- **Phase 4, the fixture's expected break count is five, not the four the phase's bullet list
+  implies.** The list names seven cases; `the other ten systems` has a zero-word gap, so a genuine
+  two-word-gap case (`twelve built-in scene systems`) was seeded beside it rather than instead of
+  it. A three-word gap is seeded as a silence, which makes the script's own named hole re-runnable.
+- **Phase 5, run by the owner on 2026-09-18** against `main` at `1afc0674`, built as
+  `target/release/ritmolux.exe` — this branch changes nothing on the capture path, and the phase
+  reads behaviour that predates the plan. Machine: the development box, one render endpoint
+  (`Speakers (Realtek(R) Audio)`) and one capture endpoint (`Microphone Array (Realtek(R) Audio)`),
+  per `--list-devices`. The three observations, in the phase's order:
+  1. **`[input] mode = "loopback"`, `device = "default"`: no `audio input … by config.toml` line.**
+     That pair is the built-in default, so `resolve_input` reports `InputSource::Default` and the
+     line is not printed at all — the absence is the code's rule rather than a silence. `F3` read
+     `audio  live WASAPI 48000/2 Speakers (Realtek(R) Audio)`, a render endpoint, and
+     `diagnostics.log` carried that verdict once a second for the whole run.
+  2. **With the only render endpoint disabled, capture failed and did not fall back.** stderr:
+     `audio capture unavailable (WASAPI error: Element not found. (0x80070490)); rendering without
+     audio`. `F3`: `audio  failed WASAPI WASAPI error: Element not found. (0x80070490)`, every band
+     at `0.00`. **No microphone verdict**, though the machine has exactly one microphone and nothing
+     else to fall back to. The instance already running when the endpoint went away recorded
+     `lost WASAPI not recovered in 3 attempts` and then stayed failed, so neither the start path nor
+     the recovery path reaches a capture endpoint.
+  3. **The overlay's choice persists immediately.** `S` → `Input mode` → right read `line-in` in the
+     menu, and `config.toml` carried `mode = "line-in"` at the same second, before the app was
+     closed. Set back to `loopback` afterwards.
+  So **step 2 showed no fallback and step 3 persisted `line-in`**: by this phase's own rule,
+  backlog 0203 closes at the review as a persisted overlay choice or config, not a defect.
+- **Phase 5 found the record of the original sighting still on the machine, and it is one day wide.**
+  `%APPDATA%\Ritmolux\diagnostics.log` spans 2026-09-11 to 2026-09-18 and holds
+  `live WASAPI 48000/4 Microphone Array (Realtek(R) Audio)` in exactly three runs, all on
+  **2026-09-11** (07:48, 11:24, 19:49), with every run before and since on `Speakers … 48000/2`.
+  The `/4` is the capture endpoint's own channel count. A fallback that fires whenever loopback
+  fails would not be confined to one day, which is the same conclusion observation 2 reaches from
+  the code's side.
+- **Phase 5, noticed and not this phase's business:** the overlay's failed line reads
+  `failed WASAPI WASAPI error: …` — the backend label and the error text both name WASAPI.
+
+### Close triggers
+
+- **`presets/` touched:**
+- **Plan header `Closes:`**
+- **What shipped:**
+- **Operator docs touched:**
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
+- **Full suite:**
+- **Outstanding `human` phases:**
+
+## Close review
+
+> Round 1, 2026-09-18, conductor mode (ADR-0205): a fresh session handed the plan and the lane and
+> nothing an implementer wrote. Verbatim from
+> `tools/conductor/state/reviews/0178-round-1.md`. No earlier round, so no fix-round lines follow it.
+
+Lane `C:\Users\Igor Konovalov\WORK\rlx-plan-0178` on branch
+`plan-0178-what-the-operator-reads-is-true`, tip `f8e29cf7`, tree `e3c158e5`. The implementation log
+was read as claims and every one of them re-derived from the diff, the tests and the gates.
+
+**Verdict: Plan 0178 landed cleanly — no blockers, no majors, three minors and two nits.** Five
+phases, five commits, every done-when met or its deviation disclosed with a reason that holds. The
+two deviations `dev` recorded (Phase 1's three-mutation arithmetic, Phase 3's stderr/stdout mix-up in
+the plan's own wording) are cases where the **plan** was wrong and the implementation is right.
+
+### Lens 1 — alignment with the plan and the ADR
+
+| phase | commit | verified against the tree |
+|---|---|---|
+| 1 — the preset directory reports its drift | `a20bc34a` | `preset::drift`, `DriftReport`, two new core tests |
+| 2 — `--list-presets` | `2fd42a7d` | `FLAGS` entry, `run.rs` dispatch, `help_cli.rs` subprocess case |
+| 3 — banner and cap-recovery line | `8b4b7f69` | `CapOverflow::recovered()`, the banner, the settings fixture |
+| 4 — the count gate | `955cb766` | `scripts/check-system-counts.mjs`, fixture, hook, CI, twelve rewrites |
+| 5 — the microphone capture (`human`) | `f8e29cf7` | three observations recorded in the log |
+
+Every phase carries a single, in-vocabulary `**Owner skill:**` tag. The log is shorter than
+`## Implementation phases` and stays observational.
+
+**Full suite.** Run as `node tools/conductor/with-lock.mjs suite -- cargo nextest run --workspace`.
+The wrapper did not re-run it and printed the ledger record instead (ADR-0207), which is this lens's
+evidence: *"skipped cargo nextest run --workspace: tree e3c158e is green in the suite ledger, run by
+gate 0178-pre-review at 2026-09-18T11:43:26.281Z: 1985 tests run: 1985 passed (4 slow), 6 skipped"*.
+`git log -1 --format=%T` on the tip is `e3c158e5a82eac4f6aeddc9fd82952b474d7a6c1`, so the record is
+this tree's and not an ancestor's. **Rustdoc**: `cargo doc --workspace --no-deps` under
+`build.rustdocflags=["-D","warnings"]` exits 0.
+
+The done-whens, opened one at a time:
+
+- *Phase 1.* `drift_reports_an_edit_an_extra_file_and_a_duplicate_name` asserts `differs() == 1`,
+  `not_shipped() == 1`, one duplicate name, `winner()` naming the shipped file, and that the line
+  carries both the contested name and `--list-presets`.
+  `a_freshly_seeded_dir_has_no_drift_and_no_line` pins `line() == None` on a clean directory, which
+  is what the startup silence rests on. `seed_dir_writes_all_then_nothing` is untouched. The plan's
+  first bullet asked for "exactly one `Differs`, one `NotShipped` and one duplicate" from **three**
+  mutations, which is arithmetically impossible — any added file is `NotShipped` by construction.
+  `dev` folded the unshipped file and the duplicate claimant into one file and said so.
+- *Phase 2.* `list_presets_names_each_files_status_and_exits_zero` spawns the real binary with
+  `RLX_PRESET_DIR` **and** the data root pointed at scratch (the backlog-0181 class the plan named),
+  asserts exit 0, and reads the `shipped` / `not shipped` rows, the shadowing marker and the
+  directory line out of stderr. `grep "is not a flag" standalone/src/stream.rs` matches nothing.
+  `run.rs`'s `"--list-presets"` literal is inside the scan `every_scanner_flag_literal_is_rostered`
+  reads, so the roster/scanner tie is live rather than asserted by hand.
+- *Phase 3.* `each_overflow_context_recovers_in_its_own_words` builds one `CapOverflow` per variant,
+  asserts each recovery names its own noun and carries the cap, and asserts `Iterations`/`Grid`/
+  `Radius` contain neither `segment` nor `geometry`. The `match` in `Recovered`'s `Display` has no
+  wildcard arm, so a sixth variant cannot compile without choosing a sentence. `grep "geometry is
+  back within the segment cap" standalone/src/app_state.rs` matches nothing. The plan asked the
+  banner assertion to read "the first **stderr** line"; `print_help` writes to stdout, which
+  `schema_answers_on_stdout_and_exits_without_starting_the_app` and the `STDOUT_WRITERS` allowlist
+  both rest on, so the assertion is `stdout.starts_with("Ritmolux — ")`. Disclosed, and right.
+- *Phase 4.* `node scripts/check-system-counts.mjs` → exit 0, 446 files scanned from git.
+  `node scripts/check-system-counts.mjs scripts/fixtures/system-counts` → exit 1 with **exactly
+  five** breaks, which is the count `scripts/fixtures/README.md` states; the numeral, the number
+  word, the complement form, the two-word gap and the `.rs` string-literal case each report, and
+  `four systems`, `file systems`, the `count-allow:` line, the fenced block and the three-word gap
+  are each silent. The repo-wide `grep -riE "\b(nine|seven|eight|six|five) (node )?gates\b"` over
+  `CLAUDE.md`, `README.md` and `ci.yml` matches nothing; every surviving hit elsewhere is either the
+  **five preset gates** (a different, stable roster) or a dated record.
+- *Phase 5.* The three observations are recorded, with the endpoint names, the exact WASAPI error and
+  the `config.toml` reading. The extra finding — three microphone verdicts in `diagnostics.log`, all
+  on 2026-09-11, with every run before and since on the render endpoint — is the independent
+  confirmation the code reading could not supply on its own. By the phase's own rule, backlog 0203
+  closes as a persisted overlay choice, not a defect.
+
+**The ADR.** `scripts/check-system-counts.mjs` implements ADR-0202 as decided: the match, the
+threshold of five, the scope and the dated-record exclusions, fences skipped, `.rs` read whole,
+`count-allow: <reason>` with a reason-less marker itself a finding, `file:line  <text>` reporting and
+the `root` argument. One narrowing the ADR does not carry: the **singular** possessive `system's` is
+excluded, to spare `studio/renderer/components/ParamPanel.tsx:13`, where "seven of its system's
+twelve" counts params. The plural possessive stays matched. That is a refinement of the decision
+rather than a reversal of it, and the close records it as a dated `Outcome` on the ADR rather than
+editing its body. No ADR decision was reversed. No C ABI change, no OSC address, event or stream
+added, so spec 0001 and spec 0003 are both unmoved — which is what the plan promised.
+
+### Lens 2 — layering, coupling, real-time safety
+
+`preset::drift` reads a directory with `std::fs`, exactly as its neighbours `seed_dir` and
+`load_dir` already do; no platform, audio-source or windowing type enters `core/`, and the standalone
+owns every decision about printing. The audio callback is untouched. `poll_cap_overflow` stays
+edge-triggered, and `prev.recovered()` returns a `Display` adapter rather than a `String` — the same
+no-allocation reason `OverflowContext` is an enum. `seed_preset_dir` now parses the directory a third
+time on a launch that also calls `startup_preset_names`; it is a startup-only read, the second read
+was already priced in that module's own comment, and no NFR budget covers it — noted, not a finding.
+No `Scene` method, no C ABI function, no protocol message: `--list-presets` is a shell flag beside
+`--list-devices` and `--list-adapters` and reaches core only through the two public reads.
+
+### Lens 3 — docs, freshness, bookkeeping
+
+`docs/configuration.md` gains the flag-table row and a paragraph explaining all three statuses and
+the shadowing rule. `docs/running.md` says nothing about presets at all, so the plan's conditional
+sweep of it correctly did nothing — verified rather than taken on trust. `docs/developing.md`'s
+pre-push step table carries the new gate; `CLAUDE.md` and `README.md`'s `scripts/` inventories carry
+it, both count-free; the pre-push header and `ci.yml`'s step comments now name each gate instead of
+numbering it, which is the same drift class and was the right call. No hotkey, menu row, default,
+param, grammar function or palette moved, so the preset-facing documents and the schemas are
+correctly untouched, and no English source of a `.ru.md` translation moved. Gates re-run at the tip:
+`check-doc-links`, `check-index-rows`, `check-comment-hygiene`, `check-filter-figures`,
+`check-reader-prose`, `toc.mjs --check` and `check-backlog-claims` (75 reductions across 33 live
+entries, 2 unprobeable) all exit 0. **Version bump owed: minor** — a new public core API, a new CLI
+flag, a new gate — plus the studio's two copies.
+
+### Lens 4 — correctness and determinism
+
+`drift` walks the directory with the same `read_dir` → `.toml` filter → `sort()` sequence `load_dir`
+uses, so "the first file in filename order" means the same thing in both, and `select_preset_by_name`
+is a `position()` first-exact-match — the `winner()` claim is therefore true of the running engine,
+not just of the report. A file whose name is shipped but which cannot be read is classed `Differs`,
+not `Shipped`: the conservative direction, and documented. `DuplicateName::winner()` indexes
+`files[0]`, and the only constructor filters on `len() > 1`. No numeric assertion was added or moved;
+the one assertion **message** that changed (`common.rs:366`) still reads truthfully when it fires. No
+`aspect`, no grid, no geometry in the diff; no wall-clock read, no unseeded randomness. The
+configuration-where-two-sources-agree question: the one place this plan could hide such a coincidence
+is the report's notion of "the file a name resolves to", invisible on any directory with no duplicate
+names — the development box's and every CI checkout's. The Phase 1 test constructs the disagreeing
+configuration deliberately, and the `help_cli` case constructs it again through a real subprocess.
+
+### Lens 5 — design integrity
+
+Dependencies still point inward. `Recovered` keeps the recovery wording in the same file as the onset
+wording, which is the plan's stated reason for putting it in core rather than matching on the context
+in `app_state.rs` — and the exhaustive match makes the pairing structural instead of conventional. No
+god module: the `--list-presets` printer sits in `run.rs` beside `list_adapters_and_exit`, its two
+helpers are private, and `preset_dir.rs` was left alone. No new hot-path module, so Plan 0002's guard
+set needs no extension.
+
+### Findings
+
+**minor 1 — `core/src/render/evaluate.rs:478`: the count-free rewrite left an ungrammatical
+sentence.** *"so the every other system takes exactly the path it took before this existed"* — the
+rewrite dropped the count but kept the article. **Repaired in `fb9687f4`.**
+
+**minor 2 — `docs/configuration.md:160`: the drift line's scope is not stated.** The paragraph reads
+as a property of whatever directory the launch uses; the line is printed only from the
+`PresetDir::Default` arm, so with `RLX_PRESET_DIR` set — the case the same page documents, and the
+case a developer pointing at the repository's `presets/` is always in — no line is ever printed,
+however far that directory differs, and its silence reads as a clean directory. **Repaired in
+`fb9687f4`**: the paragraph now names the directory it speaks for and says `--list-presets` is the
+only reading of an override's drift.
+
+**minor 3 — this plan's `### Close triggers` block is empty.** All seven bullets are unfilled. Phase
+4 and Phase 5 were taken by the owner by hand rather than by a conductor session, which is the likely
+reason, and the log's `### Notes` are otherwise unusually complete. It costs the review nothing
+material — every trigger is a starting point the close re-derives anyway, and in conductor mode the
+`Full suite:` bullet's evidentiary role belongs to the suite ledger (ADR-0207), which is why this is
+not the blocker lens 1 would otherwise make it. **Left open**: the block is `dev`'s record of what it
+observed, and a reviewer filling it in would be manufacturing that record rather than repairing prose.
+
+**nit 4 — `README.md:23`: the caption lost its subject.** *"Built-in rendering systems, all driven by
+editable text presets"* is what is left of *"Twelve built-in rendering systems, …"*, and it reads as
+a fragment on the repository's front page. **Repaired in `fb9687f4`.**
+
+**nit 5 — `tools/conductor/lib/gate.mjs:45`: the conductor's own gate does not run the new checker.**
+`defaultGate()` lists nine Node invocations and carries neither `check-system-counts.mjs` nor,
+already, `check-translations.mjs`, so for a conductor-run plan the `pre-review` and `post-close` gates
+do not exercise either one and CI after the push is the first machine that does. The plan and
+ADR-0202 both scope the wiring to `.githooks/pre-push` and the CI `links` job, so this is not a
+missed done-when; it is a third carrier that has now fallen behind twice. **Left open** — it is code,
+outside what a close may repair, and the translation half predates this plan.
+
+### Close notes
+
+- **Preset curation (step 3b).** The plan touched `presets/` only at `presets/proposed/ROSTER.md`, a
+  prose file — no `.toml` changed and no engine defect was fixed, so nothing shipped can have been
+  working around this plan. The workaround-header grep over `presets/*.toml` names nothing this plan
+  made stale.
+- **Translation advisory (step 1e).** No rows: no translated source has moved past its stamp.
+- **Backlog (step 3c).** 0172, 0185, 0203, 0207 and 0208 were all promoted out of the live file at
+  approval, so the close appends their `CLOSED` markers to the archived bodies and moves their ledger
+  rows from `### Promoted` to `### Closed`. 0203 closes on Phase 5's own rule, as a persisted overlay
+  choice rather than a defect.
+
+## Followups (after this lands)
+
+- **The conductor's `defaultGate()` runs neither `check-system-counts.mjs` nor
+  `check-translations.mjs`** (nit 5 above). Filed at this close as **design-backlog 0252**, with its
+  probes, rather than repaired here: adding the two names restores the invariant for a day and
+  rebuilds the same trap, and which of the three shapes replaces the hand-maintained list is a
+  decision.

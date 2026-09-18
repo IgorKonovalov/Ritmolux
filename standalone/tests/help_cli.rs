@@ -72,6 +72,12 @@ fn help_prints_the_roster_and_exits_zero() {
             stdout.contains("usage: ritmolux"),
             "`ritmolux {flag}` printed no usage to stdout: {stdout:?}"
         );
+        // The product is `Ritmolux` (ADR-0162) and the binary is `ritmolux`, so
+        // the banner and the usage line disagree on case on purpose.
+        assert!(
+            stdout.starts_with("Ritmolux — "),
+            "the banner does not open with the product's name: {stdout:?}"
+        );
         // One flag from each of the two scanner families the roster spans, so a
         // roster that printed only what `main.rs` parses fails here.
         assert!(stdout.contains("--osc"), "the roster omitted --osc");
@@ -236,6 +242,102 @@ fn schema_answers_on_stdout_and_exits_without_starting_the_app() {
     assert!(
         trimmed.contains("\"hash\":\"") && trimmed.contains("\"systems\":["),
         "the document is missing the hash or the systems roster"
+    );
+}
+
+/// **`--list-presets` answers from the directory this launch would read, and
+/// exits.** The property is the same one `--help` and `--schema` are spawned
+/// for, plus the one only a subprocess can show here: the statuses are computed
+/// against a directory handed in from outside, so the row for a file nobody
+/// shipped and the marker on a name two files claim are visible rather than
+/// inferred.
+///
+/// The preset directory is scratch **and so is the data root**: left inherited,
+/// the run would resolve the developer's own `%APPDATA%` for `config.toml` and
+/// the diagnostics log, which is the class design-backlog 0181 records.
+/// `common::player` sets the root; `RLX_PRESET_DIR` is set here on top of it.
+#[test]
+fn list_presets_names_each_files_status_and_exits_zero() {
+    let dir = common::scratch_data_root().join("presets");
+    std::fs::create_dir_all(&dir).expect("create the scratch preset directory");
+
+    // A byte-identical copy of a shipped file, so one row reads `shipped`, and
+    // a second file carrying the same display name under a filename that sorts
+    // after it, so the first is the one a lookup by name reaches.
+    let (shipped_file, shipped_source) = rlx_core::preset::EMBEDDED[0];
+    let duplicated = rlx_core::preset::Preset::from_toml_str(shipped_source)
+        .expect("a shipped preset compiles")
+        .name;
+    std::fs::write(dir.join(shipped_file), shipped_source).expect("write the shipped copy");
+    std::fs::write(dir.join("zz_duplicate.toml"), shipped_source).expect("write the duplicate");
+
+    // A preset this build's set does not have, under a name no build ships:
+    // another shipped source with its `name =` line rewritten, so it is known to
+    // compile and its display name is known not to collide.
+    let (_, borrowed) = rlx_core::preset::EMBEDDED[1];
+    // The **first** `name =` line only: it precedes every `[table]` header, so
+    // it is the preset's own, and a later one would be a palette's.
+    let mut rewritten = false;
+    let mine: String = borrowed
+        .lines()
+        .map(|line| {
+            if !rewritten && line.starts_with("name") && line.contains('=') {
+                rewritten = true;
+                "name = \"A Name No Build Ships\"".to_owned()
+            } else {
+                line.to_owned()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(
+        mine.contains("A Name No Build Ships"),
+        "the fixture's `name` line was not found in the borrowed source"
+    );
+    std::fs::write(dir.join("zz_mine.toml"), &mine).expect("write the unshipped preset");
+
+    let output = common::player()
+        .arg("--list-presets")
+        .env(standalone::PRESET_DIR_ENV, &dir)
+        .output()
+        .expect("failed to spawn the ritmolux binary");
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "--list-presets is a query and exits cleanly"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+
+    let row = |file: &str| -> String {
+        stderr
+            .lines()
+            .find(|line| line.contains(file))
+            .unwrap_or_else(|| panic!("no row for {file} in:\n{stderr}"))
+            .to_owned()
+    };
+
+    let shipped_row = row(shipped_file);
+    assert!(
+        !shipped_row.contains("not shipped") && shipped_row.contains("shipped"),
+        "the untouched copy is not reported as shipped: {shipped_row}"
+    );
+    let mine_row = row("zz_mine.toml");
+    assert!(
+        mine_row.contains("not shipped") && mine_row.contains("A Name No Build Ships"),
+        "the unshipped file's row does not say so: {mine_row}"
+    );
+    let duplicate_row = row("zz_duplicate.toml");
+    assert!(
+        duplicate_row.contains("not shipped") && duplicate_row.contains(shipped_file),
+        "the second claimant's row does not name the file that wins the name: {duplicate_row}"
+    );
+    assert!(
+        stderr.matches(duplicated.as_str()).count() >= 2,
+        "the contested display name appears on only one row: {stderr}"
+    );
+    assert!(
+        stderr.contains(&dir.display().to_string()),
+        "the listing does not name the directory it read: {stderr}"
     );
 }
 

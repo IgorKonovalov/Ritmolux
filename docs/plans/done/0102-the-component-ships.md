@@ -192,13 +192,13 @@ flowchart TB
 
 - **No signing, no notarization, no installer.**
 - **No submission to the foobar2000 component repository** — that is a separate, human, external
-  process and it belongs with [Plan 0103](../0103-the-project-gets-an-audience.md).
+  process and it belongs with [Plan 0103](0103-the-project-gets-an-audience.md).
 - **No macOS plugin.** foobar2000's SDK is Windows-centric per ADR-0001, unchanged.
 - **No C ABI change.**
 
 ## Followups (after this lands)
 
-- Submit to the foobar2000 component repository ([Plan 0103](../0103-the-project-gets-an-audience.md)).
+- Submit to the foobar2000 component repository ([Plan 0103](0103-the-project-gets-an-audience.md)).
 - Revisit whether the component's preset directory should be shared with the standalone app's, once
   real users have both installed.
 

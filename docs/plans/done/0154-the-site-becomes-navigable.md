@@ -19,7 +19,7 @@
 > **Related ADRs:** [0166](../../adrs/0166-a-published-document-splits-into-routes-by-size.md),
 > [0167](../../adrs/0167-the-site-owns-its-entrance-and-the-install-page-is-the-testers-own-file.md),
 > [0168](../../adrs/0168-the-reader-documents-address-a-reader-and-the-record-stays-a-link.md)
-> **Coordinates with:** [0103](../0103-the-project-gets-an-audience.md) — that plan owns `README.md`;
+> **Coordinates with:** [0103](0103-the-project-gets-an-audience.md) — that plan owns `README.md`;
 > **this plan does not touch it**, and ADR-0167 records the narrowing of its exclusion.
 > **Sequenced before:** [0155](0155-the-reader-documents-stop-explaining-themselves.md) — that plan's
 > prose rewrite renames headings, and Phase 3 here is what turns a broken inbound anchor into a

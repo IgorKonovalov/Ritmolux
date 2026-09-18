@@ -100,7 +100,7 @@ flowchart TB
   - The existing post-dismiss guard checks `g_session.owner != wnd || g_session.handle == nullptr`. A
     handle that was **replaced** rather than dropped passes it — note that in the comment, since it is
     the second half of why the old reasoning failed.
-  - **This contends with [Plan 0103](../0103-the-project-gets-an-audience.md) Phase 1**, which rewrites
+  - **This contends with [Plan 0103](0103-the-project-gets-an-audience.md) Phase 1**, which rewrites
     this same handler. Backlog 0117 calls itself a natural pickup for whoever takes that phase; if
     0103 is live, coordinate rather than racing.
 - **Done when:** a menu click selects the preset whose name was displayed, and no code path resolves a

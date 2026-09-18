@@ -121,7 +121,7 @@ echo "pre-push: running the fast subset (doc links, backlog claims, comment hygi
 # on the repository's, and the `file:line  N bytes (cap C)` reporting path, which
 # no other run of this gate reaches at all. Same cost class again, two more walks.
 #
-# The contents-block gate (ADR-0163) is the sixth, and it is invoked twice for a
+# The contents-block gate (ADR-0163) rides it too, and it is invoked twice for a
 # reason that is NOT the index-row one. `--check` regenerates each block from the
 # headings under it and reports drift, so it cannot go quietly green on a detector
 # that stopped matching - an empty generated block would not equal a populated
@@ -131,8 +131,8 @@ echo "pre-push: running the fast subset (doc links, backlog claims, comment hygi
 # together. `--self-test` is where that is pinned, against two anchors this
 # repository already links.
 #
-# The reader-prose gate is the seventh (ADR-0168), and it runs last because it is
-# the only one whose subject is prose rather than structure. It asserts that in
+# The reader-prose gate (ADR-0168) is one of the two here whose subject is prose
+# rather than structure. It asserts that in
 # the documents a reader meets on the site, every citation of a plan or an ADR
 # sits inside a markdown link rather than bare in a sentence - the exact inverse
 # of what ADR-0127 asks of a `.rs` comment, because those documents address a
@@ -144,7 +144,7 @@ echo "pre-push: running the fast subset (doc links, backlog claims, comment hygi
 # throughout, and is exactly how those documents accumulated 235 bare citations.
 # Same cost class again - one file read per document and a regex scan of each.
 #
-# The release-tag gate is the eighth (ADR-0203), and it is the only one whose
+# The release-tag gate (ADR-0203) is the only one whose
 # subject is a git ref rather than a file. It asserts that the version the root
 # Cargo.toml declares has a tag that exists locally, is ANNOTATED, and sits on
 # HEAD's history. Push time is exactly the right moment: `git push --follow-tags`
@@ -155,7 +155,7 @@ echo "pre-push: running the fast subset (doc links, backlog claims, comment hygi
 # offline reading (its checkout carries no tags); it runs `--remote` instead, on a
 # push to main. A handful of git calls, plus one `git init` for the self-test.
 #
-# The translation gate is the ninth (ADR-0185), and it is the only one whose
+# The translation gate (ADR-0185) is the only one whose
 # subject is a second copy nothing can check: no machine here can tell whether a
 # Russian page still says what the English one now says. So it splits — a missing
 # or malformed `translated-from` stamp is an exit code, because that is
@@ -169,6 +169,19 @@ echo "pre-push: running the fast subset (doc links, backlog claims, comment hygi
 # the shallow-clone withholding against a real `--depth 1` clone of it, and the
 # site banner's four behaviours — which is also what pins the banner's copy of
 # the stamp rule to this one, since the two live in different projects.
+#
+# The system-count gate rides it too (ADR-0202), and it is the other prose one.
+# It rejects a written-out count of the systems - a count token within two words
+# of `system` or `systems` - everywhere but the dated records, which are the
+# plans, the ADRs and the design backlog. A count goes stale whether or not it is
+# right today, so the number is the defect rather than its value: two systems
+# landed three days apart and each close found sentences carrying the old total,
+# one of them inside an assertion MESSAGE, which no comment lexer sees. Push time
+# for the index-row reason again - CLAUDE.md has asked for count-free phrasing
+# throughout, and that is exactly how those sentences accumulated. Same cost
+# class as the gates beside it: one file read per tracked document and a regex
+# scan of each. `count-allow: <why>` on the line is the escape, and the reason is
+# required.
 if command -v node >/dev/null 2>&1; then
     run_step "node scripts/check-doc-links.mjs" node scripts/check-doc-links.mjs
     run_step "node scripts/check-index-rows.mjs" node scripts/check-index-rows.mjs
@@ -183,8 +196,9 @@ if command -v node >/dev/null 2>&1; then
     run_step "node scripts/check-release-tag.mjs --self-test" node scripts/check-release-tag.mjs --self-test
     run_step "node scripts/check-translations.mjs" node scripts/check-translations.mjs
     run_step "node scripts/check-translations.mjs --self-test" node scripts/check-translations.mjs --self-test
+    run_step "node scripts/check-system-counts.mjs" node scripts/check-system-counts.mjs
 else
-    echo "pre-push: skipping the doc-link, index-row, backlog-claim, filter-figure, comment-hygiene, reader-prose, contents-block, release-tag and translation checks (no node on PATH)"
+    echo "pre-push: skipping the doc-link, index-row, backlog-claim, filter-figure, comment-hygiene, reader-prose, contents-block, release-tag, translation and system-count checks (no node on PATH)"
 fi
 
 # The diffusion filter's own suite (Plan 0106 Phase 7c) rides the same guard, in

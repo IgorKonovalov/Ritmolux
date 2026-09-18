@@ -22,25 +22,35 @@
 //!
 //! # The reading, and what it did to the ceiling
 //!
-//! **On the machine Plan 0092 was implemented on** — Windows 10 19045, DX12,
-//! AMD Radeon(TM) Graphics (IntegratedGpu), debug profile, **1920x1080** (§1's
-//! own floor resolution), floor tier, best of three interleaved repeats:
+//! **Taken 2026-09-17** on Windows 10 19045, DX12, AMD Radeon(TM) Graphics
+//! (IntegratedGpu), driver 30.0.13002.1001, debug profile, **1920x1080** (§1's
+//! own floor resolution), floor tier, best of three interleaved repeats. Every
+//! row is the **polyline** route — see [`path_probe`] for how that is held —
+//! so the axis is the segment count and nothing else:
 //!
 //! | case | ms/frame | of the 16.67 ms floor budget |
 //! |---|---|---|
-//! | `heart` (roster control, no path) | 1.03 | 6 % |
-//! | path, `samples = 16` | 2.69 | 16 % |
-//! | path, `samples = 32` | 4.33 | 26 % |
-//! | path, `samples = 64` | 7.70 | 46 % |
+//! | `heart` (roster control, no path) | 1.07 | 6.4 % |
+//! | path, `samples = 8` | 1.76 | 10.6 % |
+//! | path, `samples = 16` | 2.54 | 15.2 % |
+//! | path, `samples = 32` | 4.07 | 24.4 % |
+//! | path, `samples = 48` | 5.58 | 33.5 % |
+//! | path, `samples = 64` | 7.09 | 42.6 % |
 //!
-//! **The slope is the finding: ~0.105 ms per segment**, flat across the range,
-//! against a construction estimate of ~2 % of such a GPU at 32 segments. The
-//! measurement says 26 % there — an order of magnitude out, and the estimate is
-//! what was wrong. Two readings taken before the ceiling came down and now out
-//! of reach of this test, kept because they are what set it: `samples = 128`
-//! measured 14.51 ms (87 %) and `samples = 192` measured 21.22 ms (127 %) — the
-//! second over the whole floor budget on its own, with nothing else in the
-//! frame.
+//! **The slope is the finding: ~0.095 ms per segment**, flat across the range —
+//! 0.095 taken between 8 and 64 and 0.095 between 16 and 64 — against a
+//! construction estimate of ~2 % of such a GPU at 32 segments. The measurement
+//! says 24 % there: an order of magnitude out, and the estimate is what was
+//! wrong.
+//!
+//! Two readings from **2026-09-09**, out of reach of this test because the
+//! ceiling refuses those arities, kept because they are what set it:
+//! `samples = 128` measured 14.51 ms (87 %) and `samples = 192` measured
+//! 21.22 ms (127 %) — the second over the whole floor budget on its own, with
+//! nothing else in the frame. Both are the polyline too, and both sit on a
+//! ~0.105 ms slope taken the same day; the difference between that slope and
+//! this one is the same machine on a different day, which is the size of reading
+//! ADR-0071 asks be dated rather than treated as a constant.
 //!
 //! # What the ceiling is, and why it is a refusal rather than a cap
 //!
@@ -62,7 +72,11 @@
 //! ADR-0107 recorded, as its live risk, the scenario where "Plan 0087's arcs
 //! stop being an optimisation and become the thing that makes this viable". The
 //! reading above is that scenario, and the second test here is the answer to it.
-//! Same machine and same configuration:
+//! **Taken 2026-09-09**, on the same machine and the same configuration as the
+//! table above but not on the same day — the arity table was re-taken and this
+//! one deliberately was not, because its polyline column already measured a
+//! polyline. Read the two together as two runs, which is what the slope moving
+//! 0.105 -> 0.095 between them is the size of:
 //!
 //! | figure | pieces | arcs | polyline (64 pts) | |
 //! |---|---|---|---|---|
@@ -72,8 +86,10 @@
 //!
 //! **An arc piece costs about 1.6 segments and the fit needs about four times
 //! fewer of them**, so a curved figure comes out 30 % to 72 % cheaper depending
-//! on how few pieces its curvature collapses into. Subtracting the 1.03 ms
-//! roster baseline puts a piece at ~0.17 ms against a segment's ~0.105.
+//! on how few pieces its curvature collapses into. Subtracting that run's own
+//! 1.03 ms roster baseline puts a piece at ~0.17 ms against the same run's
+//! ~0.105 ms segment — both figures are 2026-09-09's, and pairing either with
+//! the 2026-09-17 table above would be mixing two runs.
 //!
 //! That also sets the *other* ceiling: at [`MAX_ARC_PIECES`] the chain is
 //! 1.03 + 32 x 0.17 = 6.4 ms, or 38 % of the floor budget — under what the
@@ -145,10 +161,24 @@ fn control() -> Preset {
     Preset::from_toml_str(&toml).expect("the roster control preset parses")
 }
 
+/// One arity of the leaf, **on the polyline route by construction**.
+///
+/// The `morph_to` is the same `d` string, which is the device
+/// [`polyline_probe`] uses below: a morph in flight cannot ride the arc chain,
+/// so the scene draws this figure from its points, and at `morph = 0` those
+/// points are the authored contour with no interpolation run. The silhouette is
+/// identical to the one a bare `[path]` draws.
+///
+/// Without it the arity axis stops being an arity axis partway along. The fit is
+/// kept when it collapses the count — `pieces * 2 <= points.len()` — and this
+/// leaf fits to 16 pieces, so `samples = 32`, `48` and `64` would each time the
+/// same 16-piece chain and the top three rows would read alike whatever the
+/// segment count said.
 fn path_probe(samples: usize) -> Preset {
     let toml = format!(
         "system = \"shape_field\"\nname = \"path_cost_{samples}\"\n\
-         [path]\nd = \"{LEAF}\"\nsamples = {samples}\n[params]\n{LOOK}"
+         [path]\nd = \"{LEAF}\"\nmorph_to = \"{LEAF}\"\nsamples = {samples}\n\
+         [params]\n{LOOK}morph = \"0\"\n"
     );
     Preset::from_toml_str(&toml).expect("the path cost probe preset parses")
 }

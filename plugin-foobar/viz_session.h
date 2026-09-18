@@ -67,12 +67,19 @@ struct VizSession {
     uint32_t rate = 0;
     uint16_t channels = 0;
     bool visible = true;   // is the owner host currently shown?
-    // The surface was attached before the host had a real (non-zero) client
-    // size - a Default UI panel is created 0x0, then sized by the layout. Such
-    // a surface never presents; recreate it once the first real WM_SIZE lands.
-    // Without this, a panel added mid-playback stays blank until an audio-format
-    // change happens to recreate the handle (see reattach_at_current_size).
-    bool needs_reattach = false;
+    // The stream format the surface SHOULD carry. Recorded by every
+    // ensure_handle call, including the ones made while the owner has no client
+    // size yet and so cannot be served - `attach_if_ready` reads it when the
+    // window finally has one. Seeded to the default format `claim` asks for.
+    uint32_t want_rate = 48000;
+    uint16_t want_channels = 2;
+    // The size the live surface was actually configured at, 0 while there is no
+    // surface. Reported in the diagnostics log: `gpu_bytes` is derived from the
+    // core's own config rather than measured, so it cannot tell a surface that
+    // matches its window from one that does not, and that is the one distinction
+    // a badly-attached panel turns on.
+    uint32_t surface_w = 0;
+    uint32_t surface_h = 0;
     UINT timer_ms = 0;     // current render-timer interval (0 = not running)
     ULONGLONG last_log_ms = 0;    // last diagnostics-log write (GetTickCount64)
     LONGLONG last_render_qpc = 0; // QPC at the previous render (0 = first frame)
@@ -100,11 +107,21 @@ struct VizSession {
     FILE *log = nullptr;
 
     void destroy_handle();
+    // Record the stream format the surface should carry, and attach at it if the
+    // owner can be served now (see attach_if_ready).
     void ensure_handle(uint32_t rate, uint16_t channels);
-    // Recreate the handle so its wgpu surface re-attaches at the owner's current
-    // (now real) client size. Used once when the initial attach happened at a
-    // degenerate size (needs_reattach); preserves the current stream format.
-    void reattach_at_current_size();
+    // Create the handle and attach its wgpu surface, once the owner has a real
+    // client size and the live surface does not already carry `want_rate` /
+    // `want_channels`. A no-op in every other case - including the whole window
+    // between a panel claiming the session and the layout giving it a size.
+    //
+    // A SURFACE IS NEVER ATTACHED AT A SIZE THE WINDOW DOES NOT HAVE. Both the
+    // first real WM_SIZE and the watchdog call this, so a missed size message
+    // costs one 500 ms tick rather than the session.
+    void attach_if_ready();
+    // Follow the host's client size, skipping a reconfigure the surface already
+    // carries (WM_SIZE also arrives for moves and restores).
+    void size_surface(uint32_t w, uint32_t h);
     void push_converted(const audio_sample *data, size_t total, unsigned channels);
     void pump();
     // Real seconds since the previous render, for the frame-rate-independent
@@ -121,9 +138,11 @@ struct VizSession {
     // hidden. Idempotent - only touches the timer when the cadence changes.
     void sync_render_timer();
 
-    // Take ownership for `host` if the session is free. On success the core
-    // handle + stream + render timer are live on `host`; returns false (no
-    // core created) if another host already owns the session.
+    // Take ownership for `host` if the session is free; returns false (and
+    // touches nothing) if another host already owns it. On success the stream
+    // and the timers are live on `host` - the HANDLE may not be, because a host
+    // with no client area yet is claimed without a surface and served by
+    // `attach_if_ready` as soon as it has one.
     bool claim(HWND host);
     // Release ownership held by `host` (no-op if `host` is not the owner),
     // freeing the handle + stream and stopping the timer.
@@ -167,7 +186,19 @@ void reload_presets_keeping_selection(RlxHandle *h);
 void open_preset_folder();
 bool env_overlay_on();
 
+// ---- foo_ritmolux.cpp ---------------------------------------------------
+
+// Whether `wnd`'s own host wants this right-click for itself, so the component
+// must not answer it. True only for a Default UI panel while layout editing is
+// on; the pop-out has no such host and always answers false.
+bool host_defers_context_menu(HWND wnd);
+
 // ---- viz_session.cpp ---------------------------------------------------
+
+// The owner's client size, or false when it has none yet. A Default UI panel is
+// created 0x0 and sized by the layout afterwards, so "no size yet" is a panel's
+// ordinary first state rather than an error.
+bool client_size(HWND host, uint32_t &w, uint32_t &h);
 
 bool host_is_showing(HWND host);
 void set_host_visibility(HWND host, bool vis);

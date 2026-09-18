@@ -77,7 +77,7 @@ invert.** A preset that "needs just a small code change" is not a preset, it's a
 ## The authoring surface in one screen
 
 **The system roster is deliberately not copied here.** A table of it lived in this spot and was
-wrong: it named nine systems while the engine carried fourteen, and it had been behind for three
+wrong: it named fewer systems than the engine carried, and it had been behind for three
 of them before a single night's work took it further. Every system a preset may name
 (`system = "…"`, the underscore name — distinct from a scene's display name), and every
 structural table beside it, lives in two documents that cannot drift from the engine the way a

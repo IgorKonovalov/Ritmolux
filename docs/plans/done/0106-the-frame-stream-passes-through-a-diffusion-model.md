@@ -1251,5 +1251,5 @@ collision above is unresolved. Phases 1—6's prose sections still predate the l
   is the first item the realtime plan starts from — see *What this plan does NOT do* and ADR-0121.
 - **Audio-conditioned diffusion** — denoise from the onset envelope, prompt blend on bar
   boundaries — if Phase 2 finds the dynamics flattened, or simply as the next thing to want.
-- **Demo material for [0103](../0103-the-project-gets-an-audience.md)**, which needs moving images
+- **Demo material for [0103](0103-the-project-gets-an-audience.md)**, which needs moving images
   and currently has none.

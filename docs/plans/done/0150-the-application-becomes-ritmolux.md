@@ -18,7 +18,7 @@
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0162](../../adrs/0162-the-application-is-renamed-to-ritmolux.md)
 > **Blocks:** [0143](0143-the-documentation-gets-a-front-end.md) (parked in writing on this
-> decision) and [0103](../0103-the-project-gets-an-audience.md) Phases 4-6 (repository metadata,
+> decision) and [0103](0103-the-project-gets-an-audience.md) Phases 4-6 (repository metadata,
 > component submission, three posts). Neither may ship before this lands.
 > **Lane guidance:** `main` directly, with **no other lane live** — see Phase 1. A worktree buys
 > nothing here (the sweep touches every crate, so the lane pays a cold `target/` for no isolation)
@@ -41,7 +41,7 @@ The name is a description that was never chosen as a product name, and two appro
 waiting on it. [Plan 0143](0143-the-documentation-gets-a-front-end.md) is parked in its own header —
 *"the rename is itself parked … that decision is the named trigger for this one"* — because a
 GitHub Pages project site lives at a path derived from the repository name and **a renamed
-repository does not redirect its Pages URLs**. [Plan 0103](../0103-the-project-gets-an-audience.md)
+repository does not redirect its Pages URLs**. [Plan 0103](0103-the-project-gets-an-audience.md)
 Phase 5 submits the component to the foobar2000 component repository, and
 `VALIDATE_COMPONENT_FILENAME("foo_lmv.dll")` makes that filename a contract with every installed
 copy — foobar2000 refuses to load the component if the file is renamed. Publish either, and the
@@ -354,7 +354,7 @@ flowchart TB
   clearance opinion is a different exercise, and the trigger for it is commercial distribution.
 - **It does not publish anything.** The docs site is [0143](0143-the-documentation-gets-a-front-end.md);
   the component submission, the repository metadata and the posts are
-  [0103](../0103-the-project-gets-an-audience.md) Phases 4-6. This plan only removes the reason both
+  [0103](0103-the-project-gets-an-audience.md) Phases 4-6. This plan only removes the reason both
   are waiting.
 - **It does not move to 1.0.** The version bump at close is an ordinary one, decided by the
   architect against what shipped. Whether the rename and 1.0 coincide is a separate call.
@@ -683,6 +683,6 @@ body below it is byte-identical — the diff is 1 insertion, 1 deletion.
 
 - Unpark [0143](0143-the-documentation-gets-a-front-end.md): remove the `Parked until` block and
   choose the Pages subpath under the new repository name.
-- Unblock [0103](../0103-the-project-gets-an-audience.md) Phases 4-6.
+- Unblock [0103](0103-the-project-gets-an-audience.md) Phases 4-6.
 - Decide whether the rename and 1.0 coincide, and whether `RLX_ABI_VERSION` moves at 1.0 for
   reasons of its own.

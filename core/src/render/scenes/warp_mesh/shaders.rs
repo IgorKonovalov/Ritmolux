@@ -350,8 +350,14 @@ struct Deposit {
     b: vec4<f32>,
     // x: spin phase (rad), y: hue + color_center, z: color_span, w: saturation
     c: vec4<f32>,
-    // x: palette_mix, y: palette_steps, z: palette_contour, w: unused
+    // x: palette_mix, y: palette_steps, z: palette_contour,
+    // w: color_source (0 colour by angle here, 1 uncoloured light the present
+    // pass colours by the field's own level — ADR-0197)
     d: vec4<f32>,
+    // x: palette_contour_style (integral, rounded CPU-side),
+    // y: palette_contour_ink (ADR-0197), zw: unused. Its own vec4 rather than
+    // `d.w` plus a borrowed slot: the two are one control split in half.
+    e: vec4<f32>,
 }
 @group(0) @binding(0) var lut_a: texture_2d<f32>;
 @group(0) @binding(1) var lut_b: texture_2d<f32>;
@@ -388,26 +394,36 @@ fn band_coord(t: f32, steps: f32) -> f32 {
 // no new parameter.
 //
 // The two LUTs, the sampler and `palette_mix` are EXPLICIT parameters rather
-// than module-scope globals this happens to find: all four sites name them the
+// than module-scope globals this happens to find: all six sites name them the
 // same today, so implicit capture would compile — and would silently bind the
 // shared function to whatever a future site called its textures.
 //
 // `textureSampleLevel`, not `textureSample`: the LUT has one mip, and an
 // explicit LOD keeps these reads free of the uniformity requirement that a
 // sample after a conditional return would otherwise carry.
-fn band_contour(
+//
+// **What the line is drawn in is `style`** (ADR-0197): `0` the soft darkening
+// above, `1` a hard darkening over the same footprint, `2` a soft line in the
+// palette's own colour at `ink_t` and `3` a hard one. `style` arrives rounded to
+// a whole number from the CPU (`palette::band_contour_style`), so the equality
+// comparisons below are exact. The `style < 0.5` arm is the expression that
+// shipped before the other three existed, which is what keeps every golden still.
+fn band_contour_ink(
+    col: vec3<f32>,
     t: f32,
     steps: f32,
     amount: f32,
+    style: f32,
+    ink_t: f32,
     lut_a: texture_2d<f32>,
     lut_b: texture_2d<f32>,
     lut_samp: sampler,
     mix_ab: f32,
-) -> f32 {
+) -> vec3<f32> {
     let f = t * steps;
     let w = max(fwidth(f), 1e-5);
     if (steps < 1.5 || amount <= 0.0) {
-        return 1.0;
+        return col;
     }
     let n = round(f);
     let m = clamp(mix_ab, 0.0, 1.0);
@@ -422,10 +438,21 @@ fn band_contour(
         m
     );
     if (all(abs(hi - lo) < vec3<f32>(0.5 / 255.0))) {
-        return 1.0;
+        return col;
     }
     let d = min(fract(f), 1.0 - fract(f));
-    return 1.0 - clamp(amount, 0.0, 1.0) * (1.0 - smoothstep(0.0, w, d));
+    if (style < 0.5) {
+        return col * (1.0 - clamp(amount, 0.0, 1.0) * (1.0 - smoothstep(0.0, w, d)));
+    }
+    let hard = style == 1.0 || style == 3.0;
+    let cover = select(1.0 - smoothstep(0.0, w, d), f32(d < w), hard);
+    let ink_lut = mix(
+        textureSampleLevel(lut_a, lut_samp, vec2<f32>(ink_t, 0.5), 0.0).rgb,
+        textureSampleLevel(lut_b, lut_samp, vec2<f32>(ink_t, 0.5), 0.0).rgb,
+        m
+    );
+    let ink = select(vec3<f32>(0.0), ink_lut, style >= 2.0);
+    return mix(col, ink, clamp(amount, 0.0, 1.0) * cover);
 }
 
 @fragment
@@ -456,12 +483,27 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 
     // Palette by angle, so the deposit lays down colour the warp can drag into
     // structure rather than one flat tone.
-    let coord = dp.c.y + dp.c.z * (ang / 6.2831853);
-    let banded = band_coord(coord, dp.d.y);
-    let ca = textureSample(lut_a, lut_samp, vec2<f32>(banded, 0.5)).rgb;
-    let cb = textureSample(lut_b, lut_samp, vec2<f32>(banded, 0.5)).rgb;
-    let mixed = mix(ca, cb, clamp(dp.d.x, 0.0, 1.0)) * band_contour(coord, dp.d.y, dp.d.z, lut_a, lut_b, lut_samp, dp.d.x);
-    let col = apply_saturation(mixed, dp.c.w);
+    //
+    // **At `color_source = 1` this pass lays down no colour at all** (ADR-0197):
+    // white light, so the field accumulates a LEVEL and the present pass reads
+    // it as the palette coordinate. No LUT sample, no band and no contour here —
+    // a coloured deposit would make the level hue-dependent and the bands would
+    // be decay contours bent by the palette. The branch is on a uniform, so the
+    // derivative inside `band_contour_ink` stays in uniform control flow.
+    var col: vec3<f32>;
+    if (dp.d.w > 0.5) {
+        col = vec3<f32>(1.0);
+    } else {
+        let coord = dp.c.y + dp.c.z * (ang / 6.2831853);
+        let banded = band_coord(coord, dp.d.y);
+        let ca = textureSample(lut_a, lut_samp, vec2<f32>(banded, 0.5)).rgb;
+        let cb = textureSample(lut_b, lut_samp, vec2<f32>(banded, 0.5)).rgb;
+        let mixed = band_contour_ink(
+            mix(ca, cb, clamp(dp.d.x, 0.0, 1.0)),
+            coord, dp.d.y, dp.d.z, dp.e.x, dp.e.y, lut_a, lut_b, lut_samp, dp.d.x
+        );
+        col = apply_saturation(mixed, dp.c.w);
+    }
 
     // Additive light with saturating coverage (ADR-0056): premultiplied colour,
     // and an alpha equal to the coverage this fragment actually has.
@@ -526,10 +568,89 @@ struct Present {
     // The video echo: x: alpha, y: zoom, z: flip x (0/1), w: flip y (0/1).
     // The orientation arrives already decoded into two flags — see `render`.
     c: vec4<f32>,
+    // The level palette (ADR-0197), unread at `color_source = 0`:
+    // x: color_source, y: hue + color_center, z: color_span, w: saturation
+    d: vec4<f32>,
+    // x: palette_mix, y: palette_steps, z: palette_contour,
+    // w: palette_contour_style
+    e: vec4<f32>,
+    // x: palette_contour_ink, yzw: unused
+    f: vec4<f32>,
 }
 @group(0) @binding(0) var<uniform> pp: Present;
 @group(0) @binding(1) var field: texture_2d<f32>;
 @group(0) @binding(2) var field_samp: sampler;
+// The same A/B pair the deposit binds, because in level mode the palette is read
+// HERE instead of there. Bound unconditionally: one layout serves both modes, and
+// at `color_source = 0` nothing in the fragment reads them.
+@group(0) @binding(3) var lut_a: texture_2d<f32>;
+@group(0) @binding(4) var lut_b: texture_2d<f32>;
+@group(0) @binding(5) var lut_samp: sampler;
+
+// Shared `saturation` (mirrors core/src/render/palette.rs::desaturate verbatim).
+fn apply_saturation(col: vec3<f32>, s: f32) -> vec3<f32> {
+    let luma = dot(col, vec3<f32>(0.299, 0.587, 0.114));
+    return vec3<f32>(luma) + (col - vec3<f32>(luma)) * s;
+}
+
+// Shared `palette_steps` (mirrors core/src/render/palette.rs::band_coord).
+fn band_coord(t: f32, steps: f32) -> f32 {
+    if (steps < 1.5) {
+        return t;
+    }
+    return (floor(t * steps) + 0.5) / steps;
+}
+
+// Shared `palette_contour` (ADR-0078 / ADR-0133 / ADR-0197), copied verbatim from
+// `fragment_field.rs`, whose comment carries the reasoning. The seventh copy, and
+// the only one on a coordinate that is a FEEDBACK LEVEL rather than a field
+// evaluated in closed form.
+fn band_contour_ink(
+    col: vec3<f32>,
+    t: f32,
+    steps: f32,
+    amount: f32,
+    style: f32,
+    ink_t: f32,
+    lut_a: texture_2d<f32>,
+    lut_b: texture_2d<f32>,
+    lut_samp: sampler,
+    mix_ab: f32,
+) -> vec3<f32> {
+    let f = t * steps;
+    let w = max(fwidth(f), 1e-5);
+    if (steps < 1.5 || amount <= 0.0) {
+        return col;
+    }
+    let n = round(f);
+    let m = clamp(mix_ab, 0.0, 1.0);
+    let lo = mix(
+        textureSampleLevel(lut_a, lut_samp, vec2<f32>((n - 0.5) / steps, 0.5), 0.0).rgb,
+        textureSampleLevel(lut_b, lut_samp, vec2<f32>((n - 0.5) / steps, 0.5), 0.0).rgb,
+        m
+    );
+    let hi = mix(
+        textureSampleLevel(lut_a, lut_samp, vec2<f32>((n + 0.5) / steps, 0.5), 0.0).rgb,
+        textureSampleLevel(lut_b, lut_samp, vec2<f32>((n + 0.5) / steps, 0.5), 0.0).rgb,
+        m
+    );
+    if (all(abs(hi - lo) < vec3<f32>(0.5 / 255.0))) {
+        return col;
+    }
+    let d = min(fract(f), 1.0 - fract(f));
+    if (style < 0.5) {
+        return col * (1.0 - clamp(amount, 0.0, 1.0) * (1.0 - smoothstep(0.0, w, d)));
+    }
+    let hard = style == 1.0 || style == 3.0;
+    let cover = select(1.0 - smoothstep(0.0, w, d), f32(d < w), hard);
+    let ink_lut = mix(
+        textureSampleLevel(lut_a, lut_samp, vec2<f32>(ink_t, 0.5), 0.0).rgb,
+        textureSampleLevel(lut_b, lut_samp, vec2<f32>(ink_t, 0.5), 0.0).rgb,
+        m
+    );
+    let ink = select(vec3<f32>(0.0), ink_lut, style >= 2.0);
+    return mix(col, ink, clamp(amount, 0.0, 1.0) * cover);
+}
 
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
@@ -578,6 +699,35 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // `echo`, and an echo-less preset must render the bytes it rendered before
     // this stage existed.
 
+    // **The level palette** (ADR-0197), at `color_source = 1`. The field holds
+    // uncoloured premultiplied light, so `max(rgb)` is the accumulated, decayed
+    // deposit — a quantity that falls off with distance from where light landed,
+    // which is what makes `palette_steps` draw the loop's own DECAY CONTOURS.
+    //
+    // Taken AFTER the echo, so the echo mixes two levels and the result is
+    // coloured once: no blend of two inks can appear. The LUT is repeat-addressed,
+    // so a level past `1 / color_span` wraps onto the palette again and the ladder
+    // repeats outward instead of clipping.
+    //
+    // `ink * coverage` and today's coverage alpha, because everything downstream
+    // reads this as premultiplied. The fringe is not two-ink: coverage decays with
+    // the level, so the outermost rungs fade toward the backdrop through
+    // intermediate values — ADR-0138's guarantee is at the draw seam, not over the
+    // whole frame.
+    if (pp.d.x > 0.5) {
+        let level = max(c.r, max(c.g, c.b));
+        let coord = pp.d.y + pp.d.z * level;
+        let banded = band_coord(coord, pp.e.y);
+        let ca = textureSampleLevel(lut_a, lut_samp, vec2<f32>(banded, 0.5), 0.0).rgb;
+        let cb = textureSampleLevel(lut_b, lut_samp, vec2<f32>(banded, 0.5), 0.0).rgb;
+        var ink = mix(ca, cb, clamp(pp.e.x, 0.0, 1.0));
+        ink = band_contour_ink(
+            ink, coord, pp.e.y, pp.e.z, pp.e.w, pp.f.x, lut_a, lut_b, lut_samp, pp.e.x
+        );
+        ink = apply_saturation(ink, pp.d.w);
+        c = vec4<f32>(ink * clamp(c.a, 0.0, 1.0), c.a);
+    }
+
     // The field already holds premultiplied colour and coverage (the deposit
     // writes them that way and the warp scales both together), so `brightness`
     // and `gamma` scale the light and `occlude` scales only how much backdrop is
@@ -617,6 +767,7 @@ pub(super) struct DepositUniform {
     pub(super) b: [f32; 4],
     pub(super) c: [f32; 4],
     pub(super) d: [f32; 4],
+    pub(super) e: [f32; 4],
 }
 
 #[repr(C)]
@@ -631,6 +782,9 @@ pub(super) struct PresentUniform {
     pub(super) a: [f32; 4],
     pub(super) b: [f32; 4],
     pub(super) c: [f32; 4],
+    pub(super) d: [f32; 4],
+    pub(super) e: [f32; 4],
+    pub(super) f: [f32; 4],
 }
 
 /// One mesh vertex, as the warp pipeline reads it.

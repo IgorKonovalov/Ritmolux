@@ -27,30 +27,49 @@
 # them. A key line there is what makes a printed red read as registered rather
 # than as a fill.
 #
-# 1.0 AND NOT LESS, WHICH IS THE OPPOSITE OF THE USUAL ADVICE, and the reason is
-# measurable. The SET of pixels the contour touches does not depend on `amount` -
-# only how dark they go does - so a low value pays the full cost and buys nothing
-# visible. Rendered at 640x360, loud, counting exact frame colours:
+# THE KEY IS HARD, AND IT COSTS NOTHING (ADR-0197). This world shipped on the
+# only contour the engine had - a soft darkening, ramped across a pixel by
+# `fwidth` - and paid for it in the one currency it cares about: 9 exact colours
+# in the frame became 684, because every step of every falloff is a value the
+# palette never named. The paragraph here used to file that as feedback, and the
+# feedback was answered. `palette_contour_style = "1"` fills the same footprint
+# with a step instead of a ramp, so the frame measures 9 again, and the red's pure
+# share comes back to 4.57 % from 4.63 %. Those two are one reading, taken
+# together on one stimulus; the 684 above is the figure this header carried from
+# the start, on a stimulus and a frame count nobody wrote down, and the same
+# picture measures 677 under the one the two shares come from. Do not put a
+# difference between numbers taken on different stimuli - re-render both.
 #
-#     contour 0     9 distinct colours    pure red 6.00 %   invisible line
-#     contour 0.25  80                    4.79 %            invisible line
-#     contour 0.5   179                   4.73 %            barely visible
-#     contour 1.0   684                   4.69 %            a key   <- shipped
+# 1.0 AND NOT LESS, WHICH IS THE OPPOSITE OF THE USUAL ADVICE, and under the hard
+# style the reason stops being a trade. The SET of pixels the contour touches
+# does not depend on `amount` - only what lands on them does - and a hard line
+# writes ONE flat value across the whole footprint. At 1.0 that value is pure
+# black, an ink this palette already holds, so the key adds nothing to the frame's
+# colour count. Below 1.0 that flat value is a darkened grey instead, and the
+# palette holds no such value - so the frame picks up a fresh one wherever the
+# line is laid over a colour it has not already darkened somewhere else. The
+# table is the count; do not predict it from the run count.
+# Rendered at 640x360, loud, counting exact frame colours:
 #
-# At 1.0 about a sixth of the touched pixels reach TRUE BLACK - the line has an
-# ink core, and the grey is only the one-pixel `fwidth` ramp either side of it.
-# Below 1.0 there is no core at all and the whole line is grey, which is the
-# thing this world objects to, paid for without the line.
+#     style 1, contour 0.25    17 distinct colours    a grey key
+#     style 1, contour 0.5     18                     a darker grey key
+#     style 1, contour 1.0      9                     a BLACK key   <- shipped
 #
-# THE HONEST COST IS THE COLOUR COUNT: 9 exact values in the frame becomes 684.
-# The frame stops being literally two-ink-plus-red at the pixel level, and the
-# red's pure share drops from 6.00 % to 4.69 % as its two edges pick up the ramp.
-# What buys that back is where the grey sits: aligned with a hard edge it reads
-# as an edge, not as shading, which is exactly the distinction the plateau case
-# failed. FILED AS FEEDBACK all the same - the surface cannot draw a HARD
-# contour, or one in an ink colour rather than toward black, and on a palette
-# whose every band edge is already hard by construction that is the shape this
-# world actually wants.
+# Nine is also the count with the contour switched off, which is the whole claim:
+# at full strength the key is free.
+#
+# THE OTHER HARD STYLE WAS TRIED AND REJECTED, on composition rather than on ink
+# count. `palette_contour_style = "3"` draws the key in the palette's own colour
+# at `palette_contour_ink`; at 0.955 - inside the red run - it measures 9 colours
+# too, and it makes a striking frame. But it lays a red line at EVERY run
+# boundary, so the red's share goes 4.57 % -> 11.70 % and the accent band stops
+# being distinguishable from the key. This world holds its red to one ring. A red
+# key is a different world, not this one retuned.
+#
+# A HARD LINE HAS NO ANTI-ALIASING, and that is a real cost this palette does not
+# pay. Every band edge here is already a step between two plateaus, so there is no
+# smooth ramp for the step to read jagged against. On a continuous palette it
+# would, and `docs/preset-palettes.md` says so where the styles are listed.
 #
 # PALETTE SHARE IS PIXEL SHARE HERE, AND THAT INVERTS THE TILED SIBLING'S RULE.
 # That preset records a band taking about HALF the screen area its palette width
@@ -137,6 +156,11 @@ scale       = "0.46 + clamp(bass * 0.176, 0, 0.15)"
 # is at full strength rather than at the usual 0.2-0.5.
 palette_steps   = "20"
 palette_contour = "1.0"
+# HARD, AND BLACK. Style 1 fills the contour's footprint with one flat value
+# instead of ramping it, which is what keeps the frame at its nine inks - see the
+# header for the counts. It takes no `palette_contour_ink`: that coordinate
+# belongs to styles 2 and 3, which draw the key in a palette colour instead.
+palette_contour_style = "1"
 
 # THE RING SPACING. `color_span` scales the distance before it becomes a palette
 # coordinate, so it sets how many full cycles of the five-run palette fit between

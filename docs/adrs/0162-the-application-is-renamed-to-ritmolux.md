@@ -17,7 +17,7 @@ reader-facing docs as a site and is already parked in writing — *"the rename i
 for this one"* — because the project name lands in the Starlight title, the header of every page,
 and the Pages subpath every published URL carries. A renamed repository redirects its web traffic,
 its git operations, its issues and its stars; **its GitHub Pages URLs do not.**
-[Plan 0103](../plans/0103-the-project-gets-an-audience.md) Phase 5 submits the component to the
+[Plan 0103](../plans/done/0103-the-project-gets-an-audience.md) Phase 5 submits the component to the
 foobar2000 component repository, and `plugin-foobar/foo_lmv.cpp` declares
 `VALIDATE_COMPONENT_FILENAME("foo_lmv.dll")` — foobar2000 refuses to load a component whose file
 has been renamed, so the filename is a contract with every installed copy rather than a cosmetic

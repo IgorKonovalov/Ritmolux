@@ -781,7 +781,7 @@ pub fn run(
     if let Some(name) = request.preset.as_deref() {
         if !renderer.select_preset_by_name(name) {
             return Err(format!(
-                "--stream: no preset named '{name}'; --list-presets is not a flag, but the preset directory is what the window browses"
+                "--stream: no preset named '{name}'; run --list-presets for the set this launch holds"
             ));
         }
         eprintln!("preset   : '{name}', held for the run - rotation is off");

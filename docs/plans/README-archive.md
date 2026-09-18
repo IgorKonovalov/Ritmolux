@@ -18,6 +18,10 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0103 - The project gets an audience](#0103---the-project-gets-an-audience)
+  - [0178 - What the operator reads is true](#0178---what-the-operator-reads-is-true)
+  - [0160 - The silhouette's preconditions stop being silent](#0160---the-silhouettes-preconditions-stop-being-silent)
+  - [0184 - Limited ink: a contour that is an ink, and a warp field that bands](#0184---limited-ink-a-contour-that-is-an-ink-and-a-warp-field-that-bands)
   - [0186 - The flatness gate tells a figure from its ground](#0186---the-flatness-gate-tells-a-figure-from-its-ground)
   - [0183 - A low density is a trace count](#0183---a-low-density-is-a-trace-count)
   - [0166 - The basics read in Russian](#0166---the-basics-read-in-russian)
@@ -197,6 +201,7 @@ hand-edited.
   - [0002 — Rust enforcement tooling](#0002--rust-enforcement-tooling)
   - [0001 — Core + standalone MVP, then foobar parity](#0001--core--standalone-mvp-then-foobar-parity)
 - [Prior sequencing notes (superseded)](#prior-sequencing-notes-superseded)
+  - [Moved 2026-09-18 from `README.md` — item 5 of the 2026-08-18 sequence, 0103 goes last, spent](#moved-2026-09-18-from-readmemd--item-5-of-the-2026-08-18-sequence-0103-goes-last-spent)
   - [Moved 2026-09-16 from `README.md` — the conductor stand-down that waited on 0180, spent](#moved-2026-09-16-from-readmemd--the-conductor-stand-down-that-waited-on-0180-spent)
   - [Moved 2026-09-15 from `README.md` — the engine-lane opening that resumed 0175 first, spent](#moved-2026-09-15-from-readmemd--the-engine-lane-opening-that-resumed-0175-first-spent)
   - [Moved 2026-09-15 from `README.md` — the opening of the engine-lane bullet, spent](#moved-2026-09-15-from-readmemd--the-opening-of-the-engine-lane-bullet-spent)
@@ -226,6 +231,206 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0103 - The project gets an audience](done/0103-the-project-gets-an-audience.md)
+
+- closed 2026-09-18, conductor-run lane `plan-0103-the-project-gets-an-audience` in
+`WORK/rlx-plan-0103`. Four phases: `2c9cbbca`, `b72b035`, `cff81675` (with `684ddeba`, the
+preview-size repair Phase 4 forced) and `e5d7c7f4` (the `human` metadata phase), plus `d6e275e6`,
+the close review's five prose repairs. Round-1 verdict: **no blockers, no majors, five minors and
+two nits**, five repaired at the close and two left open. Version **0.131.1** (patch), no ADR
+paired, backlog 0102 and 0103 closed. **Approved 2026-08-16 and closed a month later**, having shed
+two phases on the way: the submission and the posts left for
+[Plan 0192](0192-the-component-reaches-its-audience.md) on 2026-09-18, because both
+point strangers at a component that must be a published release first, and that release can only
+carry Phase 1's own fix once this plan merges.
+- **What landed.** The four unglamorous things between a finished product and anyone knowing it
+exists. A **surface-lifetime design pass** on the foobar2000 shim: the `1x1` fallback attach and the
+`needs_reattach` flag that was supposed to repair it are both gone, `attach_if_ready` creates the
+handle and attaches the surface only once the owner window reports a real client size, and both the
+first non-degenerate `WM_SIZE` and the 500 ms watchdog call it — so ownership is a property of the
+window rather than of the handle, `claim` succeeds with no surface, and a missed size message costs
+one tick instead of the session. The diagnostics log gained `surface_w`, `surface_h`, `client_w`,
+`client_h`, which is the instrument backlog 0102 said did not exist: `gpu_bytes` is arithmetic over
+the core's config and reads identically whether or not the surface matches its window. A
+**layout-edit-aware right-click**, answered per window rather than per host kind. `## Download`
+moved above `## Architecture` and `## Repository layout` and gained the two studio rows a `v*` tag
+had been shipping unexplained. And `scripts/docs-clip.mjs`, a sibling of `docs-shots.mjs` for the
+two artifacts that are not stills.
+- **What the close had to decide, and why the answer was "one branch".** The plan made an ADR
+conditional: *if* the fix ends the two hosts' shared `WM_CONTEXTMENU` branch, that sharing is
+deliberate and its ending is ADR-worthy. It does not end. The branch asks one per-window question,
+`host_defers_context_menu(HWND)`, answered from the panel's `ui_element_instance_callback` through a
+`GWLP_USERDATA` back-pointer, and the pop-out — which never writes that word — answers `false` by
+construction rather than by a special case. The question lives in the only file that knows what a
+`ui_element` is, so the shared window procedure stays ignorant of both host kinds. **backlog 0103's
+"what a fix would have to decide" was therefore answered the other way**, which is the substantive
+half of that entry's closure.
+- **What outlived the plan, and it is the finding to carry forward.** **Nothing has compiled or
+measured Phase 1.** The lane had no foobar2000 SDK and the fetch script is outside a conductor
+session's allowlist, so the C++ was never built; `ci.yml` builds no C++, so the **first compilation
+is `release.yml`'s `foobar` job on the tag this close wrote**; and the done-when's three
+measurements are the clean-profile checklist's, which nobody has run. That is not a novel gap — it
+is ADR-0115's known one, and the repository's rule is that on-device checks do not gate closes — but
+this plan is the first to put a *behavioural* fix through it, so the close rewrote the checklist item
+that verifies it: (b) and (e) had been standing instructions to expect both defects to **fail**, in
+the only functional check the component has.
+- **Two artifacts and one document the close could not repair.** `docs/images/demo.mp4` is 6.19 MB,
+the largest file in the repository, and nothing links it — Plan 0192 Phase 3 is its consumer.
+ADR-0100's negative sized the *whole* committed image set at "~28 MB to every clone forever" and
+called the decision one-way; one file is now a fifth of that. The `--crf` lever was measured (6.2 MB
+at 28 against 10.7 MB at 23 on this preset at this size) and recorded in the manifest, which is the
+right record in the wrong-sized file. And `packaging/foobar/READ-ME-FIRST.ru.md` — the site's
+Russian install page — goes stale against the English the close repaired, which is ADR-0185's
+advisory working exactly as designed and content work for the translator.
+
+### [0178 - What the operator reads is true](done/0178-what-the-operator-reads-is-true.md)
+
+- closed 2026-09-18, conductor-run lane `plan-0178-what-the-operator-reads-is-true` in
+`WORK/rlx-plan-0178`. Five phases: `a20bc34a`, `2fd42a7d`, `8b4b7f69`, `955cb766` and `f8e29cf7`
+(the `human` on-device phase), plus `fb9687f4`, the close review's three prose repairs. Round-1
+verdict: **no blockers, no majors, three minors and two nits**, three of them repaired at the close
+and two left open by the rules that govern them. Version **0.131.0** (minor), ADR-0202 accepted
+**with an Outcome**, and backlog 0172, 0185, 0203, 0207 and 0208 all closed.
+- **What landed.** Five things an operator or a contributor reads that were false, stale or silent.
+`preset::drift` reads the per-user preset directory against the embedded set without touching it and
+reports `shipped` / `differs` / `not shipped` plus every display name a second file claims — the
+reachability loss backlog 0172 filed, since selection by name is a first-exact-match over a
+filename-sorted load. Seeding prints one line when something drifted and nothing when nothing did;
+`--list-presets` prints the rows, without seeding, and its `help_cli` case proves it through a real
+subprocess with both the preset directory and the data root pointed at scratch. The `--help` banner
+capitalises the product and leaves the binary alone. `CapOverflow::recovered()` renders the
+cap-recovery line per context, with no wildcard arm, so the three that clamp a structural parameter
+stop claiming geometry came back. And `scripts/check-system-counts.mjs` refuses a written-out count
+of the systems at pre-push and in CI, reading `.rs` whole because the instance that survived two
+closes was an assertion message.
+- **What the `human` phase settled, and how.** Backlog 0203 — a smoke run that captured from a
+microphone while the default is loopback — closes as **a persisted overlay choice, not a defect**.
+With the machine's only render endpoint disabled, capture failed with `Element not found.
+(0x80070490)` and the verdict stayed `failed` on both the start path and the recovery path: no
+microphone verdict, on a box whose only capture endpoint is the microphone. One right-arrow on the
+overlay's **Input mode** row wrote `line-in` into `config.toml` at the same second. The phase then
+found the original sighting still on disk — `%APPDATA%\Ritmolux\diagnostics.log` confines every
+microphone verdict to three runs on **2026-09-11** — which a fallback firing whenever loopback fails
+would not do. A code reading, an experiment and a log all reaching the same conclusion is what a
+`human` phase is for.
+- **What the gate's first run taught, and it is in ADR-0202's Outcome.** Thirteen instances, of which
+one was the gate's own false positive: `"seven of its system's twelve"` counts a system's params, so
+the **singular** possessive is excluded and the plural is not. Of the twelve real ones, exactly
+**one** took a `count-allow:` marker — the count of per-preset cards this ADR had already named —
+and that includes the two the ADR's own table classed as dated records inside live documents, both
+of which read better with the number gone. The threshold of five was not touched. The gate
+inventory's ordinals (*"And the seventh"*, *"the sixth"*) went with the counts by hand: the same
+drift class under a different noun, falsified by adding a gate rather than a system, and the grammar
+was deliberately **not** extended to reach them.
+- **What outlived the plan.** Two findings the close could not repair. This plan's own
+`### Close triggers` block is empty — Phases 4 and 5 were taken by the owner rather than by a
+conductor session — and a reviewer filling it in would manufacture `dev`'s record rather than repair
+prose, so it stands as written. And the conductor's `defaultGate()` runs neither the new
+`check-system-counts.mjs` nor, already, `check-translations.mjs`, so for a conductor-run plan CI
+after the push is the first machine that sees either. Both gates are wired exactly where ADR-0202
+and Plan 0166 put them; the third carrier is the one that has now fallen behind twice, and it was
+filed at this close as **backlog 0252** rather than repaired — adding the two names restores the
+invariant for a day and rebuilds the same trap.
+
+### [0160 - The silhouette's preconditions stop being silent](done/0160-the-silhouettes-preconditions-stop-being-silent.md)
+
+- closed 2026-09-17, conductor-run lane `plan-0160-the-silhouettes-preconditions-stop-being-silent`
+in `WORK/rlx-plan-0160`. Four phases: `8282d3a0`, `2afbf736` (the optional 1b, taken), `692461c5`,
+`7bfea383` (the `human` document gate), plus `cf871dd8` — a pre-review `cargo doc` repair — and
+`cb56df74`, the close review's own six prose repairs. Round-1 verdict: **no blockers, no majors,
+three minors and three nits, every one prose and every one repaired**. Version **0.130.1** (patch),
+ADR-0179 accepted **with an Outcome**, backlog 0217 closed.
+- **What landed.** ADR-0179's rule, in its four instances. The one mechanically decidable
+precondition — that `coord_mode = "1"` needs a figure every ray from its centre leaves exactly once —
+is now computed at parse on the contour's own geometry and carried on `PathShape`, and the `ring`
+branch became one instance of it rather than a name test beside it. The load warning and the scene's
+fallback read the same predicate, so the sentence and the picture cannot disagree; a morph pair is
+judged on both endpoints, because both are drawn. The three the engine cannot check are prose in
+`presets/README.md` next to the parameters they constrain: erosion against a figure's thinnest
+feature, the band-alignment arithmetic with its two consequences and the `gamma` proof, and a
+corrected arc-chain paragraph. Phase 1b re-priced the arity probe on the polyline **by
+construction** — a `morph_to` identical to `d` at `morph = 0`, which cannot ride the arc chain — and
+re-took the header table at **~0.095 ms per segment**.
+- **What was falsified.** Two things ADR-0179 wrote, both recorded in its Outcome rather than edited:
+the test is `O(N²)` and not the `O(N)` the Decision claims (two rays per vertex against every edge,
+~8k operations once at parse — the Negative section's conclusion survives, the complexity does not),
+and the centre is the **bounding box's**, not the centroid the Context names. The second is the one
+that mattered: the two agree on every figure in the suite, which is exactly the ADR-0037 shape, and
+`the_verdict_is_about_the_bounding_box_centre_and_not_the_centroid` separates them on a thick `L`
+whose bounding-box centre sits in the notch while its area centroid sits inside the tall arm. Also
+falsified: the arc chain is **not** selected by smoothness. *"A smooth figure gets it"* had been in
+`presets/README.md` since Plan 0092; the real gate is a piece count against a tolerance fixed at the
+tightest figure size, so a detailed contour is discarded however smooth every one of its curves is.
+- **What outlived the plan.** The tolerance turned out not to be a threshold. `0.02` sits in an empty
+band — a figure every ray leaves once measures `0` to six decimal places, a deep five-pointed star
+included, and the mildest real violation (the shipped maple, at `0.40`) is twenty times clear of it —
+so `the_tolerance_separates_the_measured_contours` asserts that **emptiness**, a factor of four
+either way, instead of the number. Phase 3's document gate was taken as a use rather than a read and
+returned three verdicts: the palette rule is sufficient to author against with no render at all, the
+band-count rule is **not** (its three cases are examples and do not convert into a measure), and
+`ritmolux --check` is the channel an author actually meets. Its third, unasked finding is the sharp
+one — the prose names shape *families* while membership is geometric, so a thick crescent renders
+correctly under `"1"` and only a thin one trips the check, which is precisely why Phase 1 tests the
+contour and not the name. Both of Phase 3's prose findings are under the plan's `## Followups` and
+are **not** yet live backlog entries.
+
+### [0184 - Limited ink: a contour that is an ink, and a warp field that bands](done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md)
+
+- closed 2026-09-17, conductor-run lane `plan-0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands`
+in `WORK/rlx-plan-0184`. Four phases: `277d7e1` + `80426fb` (Phase 1, the watch then the change),
+`9627131`, `d575f65`, `a31fc17` (the `human` look gate). An earlier close attempt parked
+`merge_conflict` after repairing four prose findings (`b014a23a`); the round-1 verdict is **no
+blockers, no majors, one minor and one nit**, the nit repaired in `a3d2be38` and the minor left open
+deliberately. Version **0.130.0** (minor), ADR-0197 accepted **with an Outcome**, backlog 0140 and
+0146 both closed, and the half that did not arrive refiled as 0251.
+- **What landed.** `palette_contour_style` takes four values on all six contour scenes — soft or hard
+footprint, black or an ink read at an absolute `palette_contour_ink` coordinate — with style `0` the
+expression that shipped before it, so no golden moved. And `warp_mesh` gained `color_source`: at `1`
+the deposit writes uncoloured light and the present pass colours the field by `max(rgb)` of its own
+accumulated level, which is the only decay contour in the engine.
+- **The drift guard stopped being a list, and that is the durable half.** The test that holds the six
+WGSL copies of the contour together had silently skipped `warp_mesh` for two plans and
+`analytic_field` and `cellular` for two more, reporting green over sites it never opened — ADR-0133's
+Outcome, recurring. It now **scans** `core/src/render/scenes/` for the function and fails naming any
+carrier it has no `include_str!` for, so the membership question is answered by the filesystem rather
+than by whoever last remembered. The seventh copy, in `warp_mesh`'s present pass, was picked up
+without an edit to the test.
+- **Two done-whens were wrong and the log said so rather than satisfying them.** *"The hard line's
+pixels are a subset of the soft line's"* is false by one sliver — the soft ramp's outermost pixel
+darkens by less than one code value, so no differential sees it while the step paints it at full
+strength — and the test asserts containment the other way plus a bound. *"The ink line changes every
+pixel style 0 would darken"* is false where the ink is laid over its own run, which is the property
+the style exists for; the test asserts instead that the whole footprint **renders exactly the ink's
+own code value**, taken from a style-1 capture that is visible against every ink. Both replacements
+are stronger than what they replaced.
+- **The level mode's tests rest on one property worth remembering.** In level mode the field's
+evolution does not depend on the palette at all, so "this pixel is one of the palette's inks" is
+checkable *exactly* — against a capture of the same fixture with that ink end to end, through the
+tonemap and the position-dependent dither. That is what lets a per-pixel ink claim be made at any
+coverage with no tolerance.
+- **The plan's own non-vacuity did not exist, and the substitute is sharper.** The done-when asked for
+stray non-ink pixels on the deposit-angle path; there are none, because a purely radial resample of a
+radial sector pattern blends nothing above the 8-bit floor. What the suite asserts is backlog 0146's
+own sentence: along a ray the level path crosses between inks **10** times and the angle path **0**,
+because the angle coordinate does not vary along a ray.
+- **Phase 2's stop condition did not fire.** `max(rgb)` over the ladder fixture measures p05 1.0859,
+median 1.9033, p95 3.2305, so a full palette cycle fits inside `color_span = 1` and the documented
+gain ADR-0197 priced was not needed. The cost reading is the other surprise: level mode with the
+contour off is *cheaper* than the angle path (1.695 ms against 1.715 at 1920x1080), because the
+deposit stops sampling the LUT.
+- **What outlived the plan is a negative result, stated rather than tuned around.** The ladder is the
+op-art world backlog 0146 asked for and is **not** a limited-ink print. The present writes
+`ink * coverage`, coverage is a continuum, and two inks measure **851** exact colours;
+`palette_steps = "12"` quantizes the level the coverage is computed from and brings the same frame to
+**60**. `presets/warp_ladder.toml` ships at twelve and says so in its header instead of claiming a
+class. ADR-0197's fringe question — dissolving or shading — is answered *shading*, recorded in the
+ADR's `Outcome`, and the coverage-threshold repair is backlog 0251 rather than a quiet retune.
+- **Two presets moved.** `shape_contourmono` re-authored onto the hard black key, which restores the
+9 exact frame colours the soft line cost it, with style 3 rendered and rejected on composition (a red
+line at every run boundary takes red from 4.57 % to 11.70 %) and that rejection kept in its header.
+`presets/warp_ladder.toml` is new. Both carry gallery cards, rendered by hand at the manifest's own
+settings rather than by re-running the whole gallery.
 
 ### [0186 - The flatness gate tells a figure from its ground](done/0186-the-flatness-gate-tells-a-figure-from-its-ground.md)
 
@@ -9048,6 +9253,22 @@ uncovered (its C side remains the Plan 0001 Phase-6 smoke program's job, per ADR
 
 ## Prior sequencing notes (superseded)
 
+### Moved 2026-09-18 from `README.md` — item 5 of the 2026-08-18 sequence, 0103 goes last, spent
+
+Spent when [Plan 0103](done/0103-the-project-gets-an-audience.md) closed on 2026-09-18. The
+disagreement it settled ran from 2026-08-16 to 2026-08-18 and both of its reasons for holding the
+plan have since expired: [Plan 0104](done/0104-the-library-stops-being-lopsided.md) closed and the
+library grew several-fold, and Plan 0101 Phase 5's upscale reading was the demo material's own
+constraint, which Phase 3 then shot at 720p rather than 1080p. Kept verbatim, except that the
+backlog link is written for this file's depth:
+
+5. **[Plan 0103](done/0103-the-project-gets-an-audience.md)** — last. **Decided 2026-08-18: it waits
+   for [Plan 0104](done/0104-the-library-stops-being-lopsided.md)**, which closes the disagreement
+   this section carried open since 2026-08-16. The cost being avoided is announcing into a library
+   where four of eleven systems have one world each; 0101's Phase 5 adds a second reason to hold the
+   demo material, a 1080p render still reading as an upscale
+   ([backlog 0110](../design-backlog.md)).
+
 ### Moved 2026-09-16 from `README.md` — the conductor stand-down that waited on 0180, spent
 
 Spent when [Plan 0180](done/0180-the-converted-picture-follows-the-source.md) closed on 2026-09-16,
@@ -9230,7 +9451,7 @@ wave since it was written that will actually meet it. ([0160]'s half of this not
 to run after [0161] because both add load-time work to `core/src/preset/schema/`, and [0161] has
 landed.)
 
-[0160]: 0160-the-silhouettes-preconditions-stop-being-silent.md
+[0160]: done/0160-the-silhouettes-preconditions-stop-being-silent.md
 [0161]: done/0161-the-structural-parameter-is-held.md
 [0162]: done/0162-the-curve-families.md
 [0163]: done/0163-the-analytic-field.md
@@ -9250,7 +9471,7 @@ diffusion pass from the studio are each a later plan with its own interview; ADR
 
 [0158]: done/0158-the-player-grows-a-studio-facing-surface.md
 [0159]: done/0159-the-studio-opens.md
-[0160]: 0160-the-silhouettes-preconditions-stop-being-silent.md
+[0160]: done/0160-the-silhouettes-preconditions-stop-being-silent.md
 [0164]: done/0164-the-cellular-system.md
 
 ### Moved 2026-09-09 from `README.md` — the 0087-stop-condition risk
@@ -9349,7 +9570,7 @@ short front door rather than the operator reference - which is the live constrai
 carries.
 
 [0092]: done/0092-the-engine-draws-an-authored-path.md
-[0103]: 0103-the-project-gets-an-audience.md
+[0103]: done/0103-the-project-gets-an-audience.md
 [0140]: done/0140-every-rate-integrates-for-real.md
 [0156]: done/0156-the-site-becomes-the-reference.md
 
@@ -9629,7 +9850,7 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
 [0095]: done/0095-the-downbeat-fold-gets-a-musical-beat.md
 [0100]: done/0100-the-engine-speaks-milkdrop.md
 [0101]: done/0101-the-engine-renders-a-music-video.md
-[0103]: 0103-the-project-gets-an-audience.md
+[0103]: done/0103-the-project-gets-an-audience.md
 [0104]: done/0104-the-library-stops-being-lopsided.md
 [0061]: done/0061-the-build-stops-paying-for-what-it-is-not-building.md
 [0143]: done/0143-the-documentation-gets-a-front-end.md
@@ -9662,14 +9883,14 @@ renderer, and they sort into two groups that barely interact:
   0106) and the fidelity work list 0106–0108. Its Phase 4 contention with [0087] is discharged.
 - **The cheap ones, in parallel, in this order: [0104] → ~~[0101]~~ → [0103].** 0101 is closed.
   **[0102](done/0102-the-component-ships.md) is done (closed 2026-08-16), so
-  [0103](0103-the-project-gets-an-audience.md) Phase 4 is unblocked** — with one asterisk that
+  [0103](done/0103-the-project-gets-an-audience.md) Phase 4 is unblocked** — with one asterisk that
   belongs to 0103 rather than to 0102: the component now ships carrying two filed `Medium` defects
   a new user meets first ([backlog 0102](../design-backlog.md) and
   [0103](../design-backlog.md)), and announcing a channel is a poor moment to discover them.
   [0104](done/0104-the-library-stops-being-lopsided.md) is content work in `presets/` and collides with
   no engine lane. **[0101](done/0101-the-engine-renders-a-music-video.md) closed 2026-08-17**, so
   the `standalone/src/shot/` lane is free and the engine can render a music video today.
-  [0103](0103-the-project-gets-an-audience.md) goes last on purpose: it is the only one whose cost
+  [0103](done/0103-the-project-gets-an-audience.md) goes last on purpose: it is the only one whose cost
   of being early is real, since announcing before [0104] lands means visitors judge a library where
   four of ten systems have a single world. **0101's Phase 5 added a second reason to hold it**: a
   1080p render currently reads as an upscale ([backlog 0110](../design-backlog.md)), so demo
@@ -9678,7 +9899,7 @@ renderer, and they sort into two groups that barely interact:
 - ~~**Approved 2026-08-16 from a user request, and it collides with exactly one plan:
   [0107](done/0107-the-foobar-menu-picks-a-preset.md).**~~ **Resolved 2026-08-18: 0107 went first
   and closed.** The sequencing question this bullet posed is answered, and the answer costs
-  [0103](0103-the-project-gets-an-audience.md)'s amended Phase 1 something: it now restructures a
+  [0103](done/0103-the-project-gets-an-audience.md)'s amended Phase 1 something: it now restructures a
   menu of five items and a whole-roster submenu rather than the two-item one it was scoped against,
   and 0107's Preset submenu did **not** inherit the layout-edit deference it would have got for
   free the other way round. [Backlog 0103](../design-backlog.md) carries a dated note saying the
