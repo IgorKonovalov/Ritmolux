@@ -234,8 +234,9 @@ node tools/conductor/conductor.mjs finding 0181 3 --wontfix "assertion message, 
   that matches nothing, or more than one, is refused naming what it saw.
 - **Re-dispositioning overwrites and keeps the previous one** in the finding's history: a `--wontfix`
   you later repair should read as repaired, and that you first declined it is worth keeping.
-- **Only you write one.** No session, no close and no gate may, and the command refuses to run while
-  a conductor is live, because that run would write its own copy of the record over yours.
+- **Only you write one.** No session, no close and no gate may, and *recording* one is refused while
+  a conductor is live, because that run would write its own copy of the record over yours; listing is
+  read-only and runs at any time.
 
 The dispositions live in `state/conductor.json`, which is gitignored: losing that file returns every
 closed finding to the page. The finding *text* is safe — it is committed in each plan's
