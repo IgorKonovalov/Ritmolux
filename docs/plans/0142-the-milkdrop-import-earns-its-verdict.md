@@ -335,8 +335,8 @@ flowchart LR
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The equilibrium instrument | dev | done | `20ba8731` |
-| 2 — Name the mechanism | dev | done | committed with this row |
-| 3 — Bound the equilibrium | dev | not started | |
+| 2 — Name the mechanism | dev | done | `cc2488cd` |
+| 3 — Bound the equilibrium | dev | done | committed with this row |
 | 4 — The look gate | human | not started | |
 | 5 — ADR-0113's third Outcome | dev | not started | |
 | 6 — The reach decision | dev | not started | |
@@ -369,8 +369,62 @@ probe at f30, and the present-pass gain.
 - **The control reads exactly `0.00000000` at every seam and every checkpoint**, f30 included, so
   the washed/control ratio the earlier bisect was built on has no value at any seam.
 
+### Phase 3 — the same table, after the repair
+
+Same box, same fixture, same statistic as Phase 1's table above.
+
+```text
+  subject      seam           Phase 1        Phase 3   ratio
+  fog tunnel   A field     0.13559258     0.08623820   1.572
+  fog tunnel   B present*  0.25316700     0.16459735   1.538
+  fog tunnel   E display   0.40450469     0.32970616   1.227
+  blur mix 3   every seam  0.00000000     0.00000000   n/a
+
+  present-pass gain B/A on the settled level: 1.867 -> 1.909
+```
+
+The undeposited-fade probe, in the reference's own encoded domain over the same
+2.650 s window: `0.3034` before, `0.1948` after, against the reference's
+arithmetic `0.2007` — **-2.9 %**, where a pure-linear multiply predicts `0.4819`.
+
 ### Notes
 
+- **Phase 3's done-when is not measurable as stated, and what was measured
+  instead.** It reads *"the washed pairs' settled field level lands within the
+  reference's, measured by Phase 1's instrument"*, and there is no instrument on
+  the reference: it is an external renderer, which is why backlog 0113 carries an
+  `unprobeable:`. What is measurable is the loop's own per-frame factor, and that
+  is what the repair matches — `the_field_fades_at_the_references_own_rate`
+  asserts the field's fade against `d^T`, the reference's arithmetic, and
+  `the_converted_decay_is_truncated_on_the_nominal_frame` asserts the factor
+  itself against `(int)(fDecay*255)/255` at seven authored values. The settled
+  levels are reported above rather than asserted.
+- **Phase 2's arithmetic predicted a `2.6x` to `7.0x` fall at the field and the
+  instrument read `1.572x`.** The prediction takes the equilibrium as
+  `s / (1 - d)`, which assumes the warp resample's dominant eigenvalue is 1 — true
+  of a still field, not of this subject. Solving the measured ratio for it gives
+  about `0.948` at the edge ring, which is what *Fog Tunnel*'s `zoom = 1.042`
+  does to light there. The mechanism and the direction stand; the magnitude was an
+  upper bound on a still field and is not a prediction for this preset.
+- **The repair's gate is `quantize_steps`, not the presence of a bundle**, and the
+  first attempt used the latter. Under it both arms of
+  `the_field_equilibrates_only_when_the_quantizer_runs` moved — its unquantized
+  control converged (`0.2586` at f120 to `0.3553` at f300, under the probe's
+  `1.5x` bar), so the probe would have been asserting that a field with an
+  equilibrium has none. On `quantize_steps` both probes' OFF arms are unchanged to
+  the digit against their recorded tables, and only the ON arms move.
+- **Two comment blocks in `warp_mesh/tests.rs` were rewritten beyond the
+  repair.** The first is the *"Dead hypothesis: the decay multiply's domain"*
+  paragraph, which the repair makes false. The second is the *"live hypothesis"*
+  paragraph beside it, which claimed the shader-`decay` gap *"predicts the look
+  gate's own pattern: the five washed presets are shader presets"* — backlog
+  0113's own 2026-08-19 census already recorded the inverse, and the source read
+  settles it (`WarpedBlit_Shaders` applies no host decay either, so that path is
+  not a divergence from the reference).
+- **The converted-warp-shader path was not touched**, and it carries the same
+  domain question: a preset whose HLSL says `ret *= decay` multiplies linear light
+  here and encoded values there. It reaches 1 253 corpus files, none of them among
+  the seven pairs, and it is noted under Followups rather than repaired.
 - **Phase 1 took no second control**, which the 2026-09-16 amendment left as a choice against a
   stated reason. The reason is in `milk_wash.rs`'s module docs: a control at exactly zero rules an
   *additive* stage out of the whole chain, which is stronger than a ratio, and leaves a
@@ -399,4 +453,11 @@ _(filled at the last implementer phase)_
 
 ## Followups (after this lands)
 
-_(empty at Phase 1)_
+- **The converted-warp-shader path applies `decay` in linear light too.** Phase 3
+  repaired only the built-in fragment, gated on `quantize_steps`. A preset whose
+  own HLSL says `ret *= decay` runs that multiply on this engine's linear field
+  and on the reference's 8-bit one, which is the same domain divergence at the
+  same `1/(1 - d)` amplification. 1 253 of the corpus's 8 162 warp-shader files
+  name `decay`; none of the seven look-gate pairs is one, which is why it is here
+  rather than in the phase. It is a `milk/shader.rs` epilogue question and it
+  wants the reference on screen before it is answered.

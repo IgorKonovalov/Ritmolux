@@ -1049,32 +1049,34 @@ fn the_echo_orientation_quantizes_to_four_states() {
 // bound. Both are asserted below. ADR-0118's mechanism is therefore confirmed at
 // the field rather than inferred from a picture, which is what it was.
 //
-// **Dead hypothesis: the decay multiply's domain.** This engine multiplies the
-// field by `decay` in LINEAR light; the reference multiplies its 8-bit target in
-// the GAMMA-ENCODED domain, and a factor `a` encoded is `a^2.2` linear, so the
-// arithmetic predicts our trails outliving the reference's by roughly that much.
-// Measured, they do not: with the quantizer on, an undeposited field fading from
-// frame 40 to frame 200 reads an encoded-domain ratio of **0.2303** against the
-// reference's arithmetic **0.1986** — 16 % slower, not the 2.4x the domain
-// difference alone predicts (0.4797). **The truncation absorbs most of the
-// domain error**, and this is not the wash. That is the third hypothesis this
-// defect has killed, after frame-rate accumulation and `bAdditiveWaves`.
+// **The decay multiply's domain — small on the fade, large on the
+// equilibrium.** The reference's feedback field is an 8-bit display-referred
+// target, so its decay scales ENCODED values, and it scales them by
+// `(int)(fDecay*255)/255` rather than by `fDecay`. A linear-light multiply by the
+// same nominal factor is `a^(1/2.2)` of the encoded value, which on a *fade* is a
+// difference the quantizer's truncation mostly absorbs —
+// [`the_decay_domain_is_not_the_wash`] measures that, and it is why the domain
+// joined frame-rate accumulation and `bAdditiveWaves` as a dead hypothesis about
+// how long a trail lives.
 //
-// **The live hypothesis, and it is not in this path.** A converted warp shader
-// applies `decay` only if the preset's own HLSL names it: `emit.rs` exposes
-// `decay` as a readable `U.misc.x` and nothing multiplies by it, so a preset
-// whose shader merely samples never fades at all — its field is bounded by the
-// epilogue's clamp and the quantizer's floor, which is a saturated plateau
-// rather than a fade. **Of the corpus's 8 162 files carrying a warp shader,
-// only 1 253 name `decay` in it** — so 6 909 presets, two thirds of the whole
-// corpus, land on that path. It predicts the look gate's own pattern: the five
-// washed presets are shader presets, and the one clean control, *Blur Mix 3*, is
-// the one whose blur chain darkens by a second mechanism.
+// On the *equilibrium* it is not absorbed. A decay plus a per-frame source
+// settles at `s / (1 - d)`, and `1 - d` in the denominator amplifies precisely
+// what a fade ratio compresses: at a nominal `0.98` the gain is `109.4` for a
+// linear multiply against the reference's `42.50`. So `rlx_milk_decay`
+// (`shaders.rs`) and `encode::milk_decay` run the reference's own arithmetic —
+// encoded domain, factor truncated to 8 bits — for a field whose
+// `quantize_steps` says it is that target.
+// [`the_field_fades_at_the_references_own_rate`] is the gate on it, and
+// [`the_converted_decay_is_truncated_on_the_nominal_frame`] on the factor.
 //
-// Whether the engine should apply `decay` there — and what to do about the 15 %
-// that would then apply it twice — is a design call about matching the
-// reference, not an implementation detail. It needs the reference on screen,
-// which is Phase 5, and an ADR. Phase 4 stops here.
+// **A converted warp shader is a different path and is left alone.** It applies
+// `decay` only if the preset's own HLSL names it — `emit.rs` exposes `decay` as a
+// readable `U.misc.x` and nothing multiplies by it — and **the reference does the
+// same**: `WarpedBlit_Shaders` applies no host decay at all, and MilkDrop only
+// writes `ret *= <decay>` into a warp shader it generates for a preset that
+// carries none. Of the corpus's 8 162 files with a warp shader, 1 253 name
+// `decay` in it. That path's own domain question is unanswered here; the five
+// washed pairs do not reach it, being MilkDrop 1.x files with no shader at all.
 
 /// Field-probe capture size. Small: the recursion under test is per-texel, so
 /// resolution buys nothing but readback time.
@@ -1477,30 +1479,29 @@ fn the_quantized_background_stays_black() {
 /// - the **pure-linear** prediction, which is our multiply expressed in that
 ///   same domain so the two are comparable: `d^(T/2.2)`
 ///
-/// The measured fade lands far closer to the first than to the second. The
-/// quantizer's truncation absorbs most of the domain error, so the domain
-/// difference is real arithmetic that does **not** reach the picture — and it is
-/// not what makes converted presets wash out. That is the third hypothesis this
-/// defect has killed, after frame-rate accumulation and `bAdditiveWaves`.
-///
-/// **What it does not touch** is the live hypothesis, which is in the other warp
-/// path entirely — see the module note above.
+/// The measured fade lands far closer to the first than to the second, and it did
+/// so even while the multiply was in linear light: the quantizer's truncation
+/// absorbed most of the domain error *on a fade*. **What the name records is that
+/// a fade is not the wash** — the equilibrium is, and the module note above says
+/// why the same `d` behaves differently there.
 ///
 /// # What it read
 ///
-/// Measured 2026-08-19 on the development box (Windows 10, DX12), 64x64, decay
-/// `0.5455`/s over 2.650 s of undeposited field:
+/// Measured on the development box (Windows 10, DX12), 64x64, decay `0.5455`/s
+/// over 2.650 s of undeposited field:
 ///
 /// ```text
-///   measured                 0.3034
-///   reference arithmetic     0.2007   <- 0.103 away
-///   pure-linear prediction   0.4819   <- 0.179 away
+///                            2026-08-19   2026-09-17
+///   measured                     0.3034       0.1948
+///   reference arithmetic         0.2007       0.2007
+///   pure-linear prediction       0.4819       0.4819
 /// ```
 ///
-/// Those are an observation and not the assertion — nothing above is asserted
-/// against them. Plan 0109 Phase 4 read `0.2303` for the same quantity on a
-/// window it did not commit, which is nearer the reference still; both readings
-/// say the same thing about the hypothesis and neither is load-bearing.
+/// Those are an observation and not the assertion — nothing here is asserted
+/// against them, and [`the_field_fades_at_the_references_own_rate`] is what holds
+/// the second column where it is. Plan 0109 Phase 4 read `0.2303` on a window it
+/// did not commit; all three readings say the same thing about the hypothesis and
+/// none is load-bearing.
 #[test]
 fn the_decay_domain_is_not_the_wash() {
     /// The frame the deposit stops on, so everything after it is the field
@@ -1575,6 +1576,117 @@ fn the_decay_domain_is_not_the_wash() {
          {linear_domain:.4} than the reference's {reference:.4}, so the decay \
          multiply's domain IS reaching the picture after all and this \
          hypothesis is alive again — Plan 0109 Phase 4 recorded it as dead"
+    );
+}
+
+/// **The converted field fades at the rate the reference's own arithmetic
+/// gives** — the gate on the repair to design-backlog 0113's decay term.
+///
+/// Same window and same quantity as [`the_decay_domain_is_not_the_wash`], stated
+/// in the reference's encoded domain: `d^T` is what a MilkDrop 1.x preset's
+/// 8-bit target would hold after `T` seconds, and this field must now land on it
+/// rather than merely nearer it than a pure-linear multiply would.
+///
+/// The band is one-sided in its reasoning. Above the reference is the failure
+/// that matters: a field fading *slower* than the target is the wash, and it is
+/// bounded tightly. Below it is expected and allowed room — the quantizer's floor
+/// (ADR-0118) rides on top of the decay and can only take light away, and how
+/// much it takes depends on the adapter's `Rgba16Float` rounding.
+///
+/// Measured 2026-09-17 on the development box: `0.1948` against the reference's
+/// `0.2007`, so the floor's own contribution is about 3 %.
+#[test]
+fn the_field_fades_at_the_references_own_rate() {
+    const DEPOSIT_OFF_AT: usize = 40;
+    const FRAMES: usize = 200;
+
+    let decay = 0.98f32.powf(crate::milk::NOMINAL_FPS);
+    let Some(trace) = field_trace(
+        255.0,
+        &still_field_params(),
+        FRAMES,
+        DEPOSIT_OFF_AT,
+        Some(decay),
+    ) else {
+        return;
+    };
+    let read = |n: usize| trace.levels.get(n).copied().unwrap_or_default();
+    let (first, last) = (read(DEPOSIT_OFF_AT).mean, read(FRAMES - 1).mean);
+    let d = f64::from(trace.decay.clamp(0.0, MAX_DECAY));
+    let elapsed = f64::from((FRAMES - 1 - DEPOSIT_OFF_AT) as f32 * FIELD_DT);
+
+    let measured = (f64::from(last) / f64::from(first)).powf(1.0 / ENCODE_GAMMA);
+    let reference = d.powf(elapsed);
+    println!(
+        "[field] fade {measured:.4} against the reference's {reference:.4} \
+         ({:+.1} %)",
+        (measured / reference - 1.0) * 100.0
+    );
+
+    assert!(
+        first > 0.0 && last < first * 0.9,
+        "the field did not fade between frames {DEPOSIT_OFF_AT} and {FRAMES} \
+         ({first:.4} -> {last:.4}), so nothing below measures a decay"
+    );
+    assert!(
+        measured < reference * 1.25,
+        "the field fades SLOWER than the reference's arithmetic — {measured:.4} \
+         against {reference:.4}. That is the wash: a decay applied in the wrong \
+         domain, or one that skipped the reference's 8-bit truncation, leaves \
+         the equilibrium `s/(1 - d)` above the target's"
+    );
+    assert!(
+        measured > reference * 0.5,
+        "the field fades far faster than the reference's arithmetic — \
+         {measured:.4} against {reference:.4}. The quantizer's floor alone does \
+         not account for that much; something is taking light out of the loop"
+    );
+}
+
+/// **The reference truncates `fDecay` to 8 bits, and that lands on the nominal
+/// frame** — the CPU half of the same repair.
+///
+/// MilkDrop carries the warp blit's decay as a vertex diffuse colour built by
+/// `D3DCOLOR_RGBA_01`, which is `(int)(v * 255.0)`, so an authored `0.98` is
+/// applied as `249/255`. This engine's `decay` is a factor per *second*
+/// (ADR-0019), so the truncation has to land where the preset authored it — on
+/// the nominal frame — or the display's refresh would enter the equilibrium.
+///
+/// Asserted as a round trip at every `fDecay` a preset plausibly writes, and at
+/// the equilibrium gain that is the point of it: `1/(1 - 249/255)` is exactly
+/// `42.5` where `1/(1 - 0.98)` is `50.0`.
+#[test]
+fn the_converted_decay_is_truncated_on_the_nominal_frame() {
+    use super::encode::milk_decay;
+    let fps = crate::milk::NOMINAL_FPS;
+
+    for authored in [0.5f32, 0.9, 0.96, 0.98, 0.99, 0.995, 0.998] {
+        let expected = ((authored * 255.0) as u32) as f32 / 255.0;
+        let got = milk_decay(authored.powf(fps), 255.0).powf(1.0 / fps);
+        assert!(
+            (got - expected).abs() < 1e-5,
+            "fDecay {authored}: the field runs at {got} per nominal frame where \
+             the reference applies {expected}"
+        );
+    }
+
+    // Off is an exact identity: a native `warp_mesh` preset authored a
+    // per-second factor and never had an 8-bit target.
+    for per_second in [0.0f32, 0.3, 0.72, 0.995] {
+        assert_eq!(
+            milk_decay(per_second, 0.0),
+            per_second,
+            "a native field must keep its own factor"
+        );
+    }
+
+    // The equilibrium the truncation buys, which is why it is here at all.
+    let d = f64::from(milk_decay(0.98f32.powf(fps), 255.0).powf(1.0 / fps));
+    let gain = 1.0 / (1.0 - d);
+    assert!(
+        (gain - 42.5).abs() < 0.05,
+        "MilkDrop's own default fDecay must give the reference's equilibrium \
+         gain of 42.5, not 50.0 — it gave {gain:.3}"
     );
 }
 

@@ -140,6 +140,35 @@ pub(super) fn prepare_mesh(scene: &mut WarpMeshScene, aspect: f32) {
     scene.state.assemble(&scene.scalars);
 }
 
+/// The per-second decay a converted preset's feedback field actually runs at,
+/// which is not the factor the preset authored.
+///
+/// MilkDrop carries `fDecay` to the hardware as a vertex diffuse colour built by
+/// `D3DCOLOR_RGBA_01`, which is `(int)(v * 255.0)` — a **truncation**, not a
+/// round — so `0.98` is applied as `249/255 = 0.976471`. The field's equilibrium
+/// gain is `1 / (1 - d)`, so that bite is not a rounding detail: it is `42.5`
+/// against `50.0` at `0.98`, and it widens without bound as the authored factor
+/// approaches 1 — `1.57x` at `0.995`.
+///
+/// **The truncation lands on the nominal frame, not on this one.** The value
+/// arrives per second (ADR-0019), so it is taken back to
+/// [`NOMINAL_FPS`](crate::milk::NOMINAL_FPS), truncated where the reference
+/// truncates it, and returned per second. Truncating the `dt`-converted factor
+/// instead would put the display's refresh into the equilibrium.
+///
+/// **The gate is `quantize_steps`**, ADR-0118's own, for the reason
+/// `rlx_milk_decay` gives: this is the same 8-bit target seen at its ceiling.
+/// Zero — every native `warp_mesh` preset — returns the argument, since such a
+/// preset authored a per-second factor directly and never had that target.
+pub(super) fn milk_decay(per_second: f32, quantize_steps: f32) -> f32 {
+    if quantize_steps.abs() < 1.0 {
+        return per_second;
+    }
+    let fps = crate::milk::NOMINAL_FPS;
+    let per_frame = per_second.powf(1.0 / fps);
+    ((per_frame * 255.0).floor() / 255.0).powf(fps)
+}
+
 /// Upload the mesh and the three per-pass uniform blocks, plus the
 /// converted-shader block when the preset carries one.
 pub(super) fn upload_uniforms(
@@ -156,8 +185,9 @@ pub(super) fn upload_uniforms(
         bytemuck::cast_slice(&scene.state.vertices),
     );
     // `decay` is a factor per second, like `fb_zoom`, and is clamped below 1
-    // so the field cannot integrate without bound.
-    let decay = scene.decay.clamp(0.0, MAX_DECAY).powf(dt);
+    // so the field cannot integrate without bound. The 8-bit bite below only
+    // ever shortens it, so the clamp still governs.
+    let decay = milk_decay(scene.decay.clamp(0.0, MAX_DECAY), scene.quantize_steps).powf(dt);
     queue.write_buffer(
         &res.warp_uniform,
         0,

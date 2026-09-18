@@ -35,6 +35,7 @@ struct Warp {
     // w: darken_center amount
     misc2: vec4<f32>,
     // x: feedback quantize steps (0 = off, negative = ADR-0118 Alternative D),
+    //    and the 8-bit-era gate the decay reads,
     // yzw: unused
     misc3: vec4<f32>,
 }
@@ -163,6 +164,26 @@ fn vs_main(in: VsIn) -> VsOut {
     return out;
 }
 
+// One frame of decay, in the domain the field's own era multiplies in.
+//
+// **MilkDrop's feedback field is an 8-bit display-referred target, so its decay
+// scales ENCODED values; this one is linear `Rgba16Float`.** A decay plus a
+// per-frame source settles at `s / (1 - d)`, which carries `1 - d` in the
+// denominator, so the domain is not a shading nuance — a factor `a` applied to
+// linear light is `a^(1/2.2)` of the encoded value, and at a nominal `0.98` that
+// is an equilibrium gain of `109.4` against the reference's `42.5`.
+//
+// Alpha takes the same law as the colour. The map is monotone, so premultiplied
+// `rgb <= a` (ADR-0026) survives it; two different laws would not. `d` is this
+// frame's share of the factor, already truncated to 8 bits on the nominal frame
+// by `encode::milk_decay` - the other half of the reference's arithmetic.
+fn rlx_milk_decay(c: vec4<f32>, d: f32) -> vec4<f32> {
+    // The clamp is the reference's own target, which holds nothing above 1.
+    let rgb = rlx_srgb_encode(clamp(c.rgb, vec3<f32>(0.0), vec3<f32>(1.0)));
+    let a = rlx_srgb_encode(vec3<f32>(clamp(c.a, 0.0, 1.0)));
+    return vec4<f32>(rlx_srgb_decode(rgb * d), rlx_srgb_decode(a * d).x);
+}
+
 @fragment
 fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let wrap = wu.misc2.z;
@@ -193,7 +214,18 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     centred.x = centred.x * wu.misc.x;
     let dc = 1.0 - wu.misc2.w * (1.0 - smoothstep(0.0, 0.32, length(centred)));
 
-    let faded = past_c * (wu.misc2.x * inside * dc);
+    // **The gate is ADR-0118's own `steps`, and deliberately so.** The ceiling
+    // `rlx_milk_decay` reproduces and the floor below are two halves of one
+    // thing — the reference's 8-bit target — so a field carrying the floor
+    // without the ceiling is a state neither renderer has.
+    //
+    // Off, `faded` keeps the expression that was always here, association
+    // included, so a native `warp_mesh` preset's arithmetic is untouched down to
+    // the last bit rather than merely within a tolerance.
+    var faded = past_c * (wu.misc2.x * inside * dc);
+    if (abs(wu.misc3.x) >= 1.0) {
+        faded = rlx_milk_decay(past_c, wu.misc2.x) * (inside * dc);
+    }
     // The 8-bit floor an MD1-era preset's feedback field had (ADR-0118). A
     // bundle with no custom warp shader takes THIS path, so the quantizer has to
     // reach it too or a whole era of the corpus washes out unfixed. Off — every
