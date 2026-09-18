@@ -171,9 +171,29 @@ public:
         m_wnd = CreateWindowExW(0, kWindowClass, L"", WS_CHILD | WS_VISIBLE, 0, 0,
                                 0, 0, parent, nullptr,
                                 core_api::get_my_instance(), nullptr);
+        // The window's back-pointer to its panel, and the only way the shared
+        // window procedure can reach a host-specific question (edit mode) from a
+        // file that knows nothing about ui_element. Set AFTER creation on
+        // purpose: WM_CREATE runs inside CreateWindowExW, before this object
+        // exists to point at, and nothing in that message needs it.
+        SetWindowLongPtrW(m_wnd, GWLP_USERDATA,
+                          reinterpret_cast<LONG_PTR>(this));
     }
     ~rlx_ui_element_instance() {
-        if (m_wnd != nullptr) DestroyWindow(m_wnd);
+        if (m_wnd != nullptr) {
+            // Cleared before the window can dispatch anything else: the
+            // destruction below runs window messages, and a back-pointer to a
+            // half-destroyed panel is worse than none.
+            SetWindowLongPtrW(m_wnd, GWLP_USERDATA, 0);
+            DestroyWindow(m_wnd);
+        }
+    }
+
+    // Whether Default UI is in layout-edit mode, where the host owns the panel's
+    // right-click. `is_edit_mode_enabled` is the host's own answer, asked per
+    // click rather than latched, so no notification has to be tracked.
+    bool defers_context_menu() {
+        return m_callback.is_valid() && m_callback->is_edit_mode_enabled();
     }
 
     fb2k::hwnd_t get_wnd() override { return m_wnd; }
@@ -233,3 +253,24 @@ public:
 service_factory_single_t<rlx_ui_element> g_rlx_ui_element_factory;
 
 } // namespace
+
+namespace rlx {
+
+// Whether `wnd`'s own host wants this right-click for itself.
+//
+// Lives here because the answer is the ui_element host's, and this is the only
+// file that knows what a ui_element is; the window procedure asks through this
+// declaration and stays free of both host kinds' APIs.
+//
+// GWLP_USERDATA is the window's back-pointer to the panel that created it. The
+// pop-out never writes it, so it reads 0 there and the pop-out - which has no
+// layout to edit - answers false without a special case.
+bool host_defers_context_menu(HWND wnd) {
+    if (wnd == nullptr) return false;
+    const LONG_PTR tag = GetWindowLongPtrW(wnd, GWLP_USERDATA);
+    if (tag == 0) return false;
+    return reinterpret_cast<rlx_ui_element_instance *>(tag)
+        ->defers_context_menu();
+}
+
+} // namespace rlx

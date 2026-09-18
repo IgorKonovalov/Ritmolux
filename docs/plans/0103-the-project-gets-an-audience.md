@@ -1,6 +1,6 @@
 # 0103 — The project gets an audience
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-08-16
 > **Approved:** 2026-08-16 (user)
 > **Owner skill(s):** dev, human
@@ -256,6 +256,36 @@ first because every later phase increases the number of people who meet the defe
 - **No paid promotion, no mailing list, no social accounts.**
 - **No code signing** — that stays a future plan and a `human` cost.
 - **No submission to app stores or package managers.**
+
+## Implementation log
+
+> Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
+> last one. **The phases above are the contract; everything here is what happened.**
+
+**Lane:** `WORK/rlx-plan-0103` on `plan-0103-the-project-gets-an-audience`
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — the component survives a stranger's first five minutes | dev | done | committed with this row |
+
+### Notes
+
+- Phase 1 also edits `plugin-foobar/viz_session.h`, which the phase's file list does not name: the
+  session's state (`needs_reattach` → `want_rate`/`want_channels`/`surface_w`/`surface_h`) and its
+  methods are declared there.
+- Phase 1's backlog-0103 half did **not** end the two hosts' shared `WM_CONTEXTMENU` branch, so no
+  ADR was written. The branch asks one per-window question — `host_defers_context_menu(HWND)`,
+  answered from the panel's `ui_element_instance_callback` through a `GWLP_USERDATA` back-pointer —
+  and the pop-out, which never writes that word, answers `false` by construction.
+- Phase 1's done-when is not checkable in this lane and none of it was run here: the component was
+  **not compiled** (the foobar2000 SDK is gitignored and unstaged in this worktree, and
+  `packaging/foobar/fetch-sdk.ps1` is outside the conductor session's allowlist), and the frame-time,
+  surface-size and layout-edit-menu checks are the on-device checklist's, under
+  [`on-device-validation.md`](../on-device-validation.md)'s *"Runnable now — the foobar2000
+  component's clean-profile install"*.
+- The plugin diagnostics log's row shape changed (four columns appended). Its header is written only
+  when the file is created, so a `plugin-diagnostics.log` carried over from an earlier build gets
+  wide rows under a narrow header; the clean-profile install the done-when uses starts a new file.
 
 ## Followups (after this lands)
 

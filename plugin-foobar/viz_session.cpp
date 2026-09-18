@@ -36,33 +36,64 @@ void VizSession::destroy_handle() {
     }
     rate = 0;
     channels = 0;
-    needs_reattach = false;
+    surface_w = 0;
+    surface_h = 0;
 }
 
-// (Re)create the core handle for a stream format and attach the owner window.
-// Called with the default format on claim so scenes render even in silence,
-// then again whenever the track's format differs. Requires `owner` set.
-void VizSession::ensure_handle(uint32_t new_rate, uint16_t new_channels) {
-    if (handle != nullptr && new_rate == rate && new_channels == channels) return;
-    destroy_handle();
-    RlxHandle *h = rlx_create(new_rate, new_channels);
-    if (h == nullptr) return; // format outside core bounds - skip
+// The owner's client size, or false when it has none yet.
+bool client_size(HWND host, uint32_t &w, uint32_t &h) {
     RECT rc = {};
-    GetClientRect(owner, &rc);
-    const uint32_t w = static_cast<uint32_t>(rc.right - rc.left);
-    const uint32_t ht = static_cast<uint32_t>(rc.bottom - rc.top);
-    if (rlx_attach_window(h, owner, w ? w : 1, ht ? ht : 1) != RLX_OK) {
+    if (host == nullptr || GetClientRect(host, &rc) == FALSE) return false;
+    const LONG cw = rc.right - rc.left;
+    const LONG ch = rc.bottom - rc.top;
+    if (cw <= 0 || ch <= 0) return false;
+    w = static_cast<uint32_t>(cw);
+    h = static_cast<uint32_t>(ch);
+    return true;
+}
+
+// Record the format the surface should carry, and attach at it if that can be
+// done now. Called with the default format on claim so scenes render even in
+// silence, then again whenever the track's format differs.
+void VizSession::ensure_handle(uint32_t new_rate, uint16_t new_channels) {
+    want_rate = new_rate;
+    want_channels = new_channels;
+    attach_if_ready();
+}
+
+// (Re)create the core handle for `want_rate`/`want_channels` and attach the
+// owner window at its real client size.
+//
+// THE ATTACH WAITS FOR A SIZE; it does not fall back to one. A Default UI panel
+// is created 0x0 and sized by the layout afterwards, and a surface configured
+// against a size its window does not have is not merely invisible: it can
+// present a correct picture at several times the steady-state frame cost, on the
+// one thread foobar2000 also paints its own UI with, so the host looks dead while
+// the panel looks fine. Nothing the shim can measure separates that from a
+// healthy frame. Hence no fallback size and no flag marking a surface
+// provisional - either the window has a size and the surface carries it, or there
+// is no surface and every caller's `handle` guard does the rest. The evidence and
+// the rejected watchdog-repair alternative are in backlog 0102 / Plan 0103 Phase 1.
+void VizSession::attach_if_ready() {
+    if (owner == nullptr) return;
+    if (handle != nullptr && rate == want_rate && channels == want_channels) return;
+    uint32_t w = 0;
+    uint32_t ht = 0;
+    if (!client_size(owner, w, ht)) return; // no size yet: stay deferred
+    // Destroyed before the replacement is built: one wgpu surface per window is
+    // the shim's whole ownership model, so the old one cannot outlive this call.
+    destroy_handle();
+    RlxHandle *h = rlx_create(want_rate, want_channels);
+    if (h == nullptr) return; // format outside core bounds - skip
+    if (rlx_attach_window(h, owner, w, ht) != RLX_OK) {
         rlx_free(h);
         return;
     }
     handle = h;
-    rate = new_rate;
-    channels = new_channels;
-    // If the owner had no real client area yet (a panel is created 0x0 then
-    // sized), this surface was attached at the 1x1 fallback and will not
-    // present. Flag it so the first real WM_SIZE recreates the handle at the
-    // correct size instead of merely resizing the dead surface.
-    needs_reattach = (w == 0 || ht == 0);
+    rate = want_rate;
+    channels = want_channels;
+    surface_w = w;
+    surface_h = ht;
     // Every freshly created handle loads the shared curated + user library so
     // Next-scene cycles it. Called here (not only on claim) so a mid-playback
     // format change, which recreates the handle, does not drop the presets.
@@ -76,14 +107,18 @@ void VizSession::ensure_handle(uint32_t new_rate, uint16_t new_channels) {
     // handle re-creation (mid-playback format change); the core otherwise
     // re-seeds from the env at create.
     if (g_session.abi_ok) rlx_set_debug(h, g_session.debug_flags);
+    // The banner belongs to the handle, so a deferred attach reaches its first
+    // one here rather than in `claim`. The core ignores a string it already
+    // holds, so a format change mid-track does not re-trigger the fade.
+    announce_current();
 }
 
-void VizSession::reattach_at_current_size() {
-    if (owner == nullptr || handle == nullptr) return;
-    const uint32_t r = rate;
-    const uint16_t c = channels;
-    destroy_handle();    // clears rate/channels so ensure_handle re-attaches
-    ensure_handle(r, c); // fresh rlx_create + rlx_attach_window at the real size
+void VizSession::size_surface(uint32_t w, uint32_t h) {
+    if (handle == nullptr || w == 0 || h == 0) return;
+    if (w == surface_w && h == surface_h) return;
+    rlx_resize(handle, w, h);
+    surface_w = w;
+    surface_h = h;
 }
 
 // Append a diagnostics sample to %APPDATA%\Ritmolux\
@@ -120,9 +155,20 @@ void VizSession::maybe_log_metrics() {
         if (log == nullptr) return;
         if (is_new) {
             fprintf(log, "unix_ms\tfps\tframe_ms_avg\tframe_ms_p99\tframes_total"
-                         "\tframes_dropped\tgpu_bytes\tdraw_calls\n");
+                         "\tframes_dropped\tgpu_bytes\tdraw_calls"
+                         "\tsurface_w\tsurface_h\tclient_w\tclient_h\n");
         }
     }
+    // The surface's configured size beside the window's current one. `gpu_bytes`
+    // cannot arbitrate between them - it is arithmetic over the core's own
+    // config, so it reads the same whether or not that config matches the
+    // window, and a panel whose surface does not match its window is the
+    // expensive failure this log exists to make visible. Zeroes mean there is no
+    // surface (the attach is waiting for a size) or the window has no client
+    // area, which are different states and read differently here.
+    uint32_t client_w = 0;
+    uint32_t client_h = 0;
+    client_size(owner, client_w, client_h);
     FILE *const f = log;
     FILETIME ft = {};
     GetSystemTimeAsFileTime(&ft);
@@ -130,12 +176,14 @@ void VizSession::maybe_log_metrics() {
         (static_cast<ULONGLONG>(ft.dwHighDateTime) << 32) | ft.dwLowDateTime;
     // FILETIME is 100 ns ticks since 1601; convert to Unix milliseconds.
     const ULONGLONG unix_ms = (ft100 - 116444736000000000ULL) / 10000ULL;
-    fprintf(f, "%llu\t%.1f\t%.3f\t%.3f\t%llu\t%llu\t%llu\t%u\n",
+    fprintf(f, "%llu\t%.1f\t%.3f\t%.3f\t%llu\t%llu\t%llu\t%u\t%u\t%u\t%u\t%u\n",
             static_cast<unsigned long long>(unix_ms), m.fps, m.frame_ms_avg,
             m.frame_ms_p99, static_cast<unsigned long long>(m.frames_total),
             static_cast<unsigned long long>(m.frames_dropped),
             static_cast<unsigned long long>(m.gpu_bytes),
-            static_cast<unsigned>(m.draw_calls));
+            static_cast<unsigned>(m.draw_calls),
+            static_cast<unsigned>(surface_w), static_cast<unsigned>(surface_h),
+            static_cast<unsigned>(client_w), static_cast<unsigned>(client_h));
     // Flushed, not closed: a crash mid-show must still leave the samples that
     // led up to it on disk, which is the whole point of a 1 Hz log.
     fflush(f);
@@ -279,15 +327,16 @@ bool VizSession::claim(HWND host) {
         visualisation_manager::get()->create_stream(stream, 0);
     }
     cursor = 0.0;
-    owner = host; // ensure_handle attaches to the owner window
+    owner = host; // attach_if_ready attaches to the owner window
     // Default format so visuals run before (or without) playback; swapped
     // out automatically when the first chunk reports the real format.
+    //
+    // A panel is still 0x0 at WM_CREATE, so for that host this usually only
+    // RECORDS the format and the surface arrives later. Ownership is therefore a
+    // property of the WINDOW rather than of the handle: claiming succeeds with no
+    // surface, and a second host that would create the same core on the same
+    // machine gains nothing by being offered the session instead.
     ensure_handle(48000, 2);
-    if (handle == nullptr) {
-        owner = nullptr; // create failed - stay free so another host may try
-        stream.release();
-        return false;
-    }
     visible = true;
     timer_ms = 0;
     sync_render_timer(); // starts the render timer at the right cadence
