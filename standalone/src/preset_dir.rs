@@ -81,9 +81,20 @@ pub(crate) fn startup_preset_names() -> Vec<String> {
     set.into_iter().map(|preset| preset.name).collect()
 }
 
-/// Seed the embedded curated set into `dir` on first run. An unresolved
+/// Seed the embedded curated set into `dir` on first run, then report how far
+/// the directory has drifted from the set this build ships. An unresolved
 /// (empty) path or a seeding error is logged and otherwise ignored — the
 /// renderer's embedded defaults remain (degrade, never crash — NFR 10).
+///
+/// **Reports, never prunes.** Seeding writes if-absent so an operator's edits
+/// survive, which means a retired file, an outdated copy and a second file
+/// claiming one display name all accumulate unseen. The line is printed only
+/// when something drifted, so an untouched install stays silent; the per-file
+/// rows are `--list-presets`.
+///
+/// Called only from the `PresetDir::Default` arm. An `RLX_PRESET_DIR` override
+/// names a directory the operator owns — often the repository's own `presets/` —
+/// where "differs from the shipped set" is the point rather than a finding.
 pub(crate) fn seed_preset_dir(dir: &Path) {
     if dir.as_os_str().is_empty() {
         return;
@@ -92,6 +103,9 @@ pub(crate) fn seed_preset_dir(dir: &Path) {
         Ok(0) => {}
         Ok(n) => eprintln!("seeded {n} curated preset(s) into {}", dir.display()),
         Err(err) => eprintln!("could not seed presets into {}: {err}", dir.display()),
+    }
+    if let Some(line) = rlx_core::preset::drift(dir).line() {
+        eprintln!("preset directory: {line}");
     }
 }
 

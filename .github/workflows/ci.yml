@@ -222,14 +222,14 @@ jobs:
       # written. Unlike the pre-push hook this cannot skip itself for want of a
       # Node, which is what makes it the backstop rather than the gate.
       - run: node scripts/check-backlog-claims.mjs
-      # And the fourth of the same family (ADR-0122): the diffusion filter's cost
+      # And another of the same family (ADR-0122): the diffusion filter's cost
       # figures live in docs/diffusion-filter.md and nowhere else. The feature was
       # documented in three files at once, and a correction at Plan 0106's close
       # enumerated two of the three copies and missed the third - so this asserts
       # that duplicates do not EXIST rather than that they agree, which is the
       # only shape that would have caught it.
       - run: node scripts/check-filter-figures.mjs
-      # And the fifth (ADR-0127): a relative link in a `.rs` comment, and
+      # And the comment-hygiene gate (ADR-0127): a relative link in a `.rs` comment, and
       # plan-relative narration. The link half is why this job is the right home
       # rather than the close ceremony alone - check-doc-links.mjs above walks
       # `.md` only, so eleven `.rs` links sat broken on main under a green gate,
@@ -238,7 +238,7 @@ jobs:
       # with the defect and is gamed by a blank line, so that judgement stays
       # with the Mode 4 review.
       - run: node scripts/check-comment-hygiene.mjs
-      # And the sixth (ADR-0163): every generated contents block still agrees
+      # And the contents-block gate (ADR-0163): every generated contents block still agrees
       # with the headings beneath it. `--check` regenerates and reports drift, so
       # unlike the index-row gate it cannot go green on a detector that stopped
       # matching. What it cannot see is an anchor that is merely plausible -
@@ -248,7 +248,7 @@ jobs:
       # already links, and to the shapes the corpus contains.
       - run: node scripts/toc.mjs --check
       - run: node scripts/toc.mjs --self-test
-      # And the seventh (ADR-0168): in the documents a reader meets on the site,
+      # And the reader-prose gate (ADR-0168): in the documents a reader meets on the site,
       # every citation of a plan or an ADR sits inside a markdown link rather than
       # bare in a sentence. It is the exact inverse of what the comment-hygiene
       # gate above asks of a `.rs` comment, and the boundary between the two rules
@@ -258,7 +258,7 @@ jobs:
       # bare-number citation throughout, and that is how those documents
       # accumulated 235 of them.
       - run: node scripts/check-reader-prose.mjs
-      # And the eighth (ADR-0203): the version main declares has an annotated
+      # And the release-tag gate (ADR-0203): the version main declares has an annotated
       # release tag on origin. The pre-push hook reads the same property offline,
       # but that hook is opt-in per clone and bypassable, and a tag that never
       # left the machine is what stranded every silent release recorded - so this
@@ -271,7 +271,7 @@ jobs:
       - run: node scripts/check-release-tag.mjs --self-test
       - if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: node scripts/check-release-tag.mjs --remote
-      # And the ninth (ADR-0185): every `.ru.md` translation opens with a
+      # And the translation gate (ADR-0185): every `.ru.md` translation opens with a
       # `translated-from: <sha>` stamp naming the commit its source was
       # translated from. A translation is the one second copy here that no
       # machine can check - nothing can tell whether the Russian still says what
@@ -288,6 +288,17 @@ jobs:
       # stale. The pre-push hook is where that half is read.
       - run: node scripts/check-translations.mjs
       - run: node scripts/check-translations.mjs --self-test
+      # And the system-count gate (ADR-0202): no sentence outside a dated record
+      # writes down how many systems the roster has. A count goes stale whether
+      # or not it is right today - a true "fourteen systems" is wrong the day the
+      # fifteenth lands - so the gate rejects the number rather than comparing it
+      # against the live roster, which would fail exactly the sentences it exists
+      # to stop on exactly the close that has already missed them twice. It reads
+      # `.rs` WHOLE, comments and string literals alike, because the instance
+      # that survived two closes was an assertion message. `count-allow: <why>`
+      # on the line is the escape, and a marker with no reason is itself a
+      # finding.
+      - run: node scripts/check-system-counts.mjs
       # The conductor's own suite (ADR-0205): the queue and plan readers, the lane
       # state machine against throwaway git repositories, the digest, the operator
       # commands, the two PreToolUse hooks' bite checks and the machine-wide lock.

@@ -10,7 +10,7 @@ are the exceptions and invert it — and `index-rows-red/` is the half that rest
 direction. See those sections below.
 
 `check-doc-links.mjs`, `check-index-rows.mjs`, `check-filter-figures.mjs`,
-`check-comment-hygiene.mjs`, `check-translations.mjs` and `toc.mjs` skip this tree **by path** on an ordinary repo walk — `scripts/fixtures`,
+`check-comment-hygiene.mjs`, `check-translations.mjs`, `check-system-counts.mjs` and `toc.mjs` skip this tree **by path** on an ordinary repo walk — `scripts/fixtures`,
 enumerated once in the script — and scans it when it **is** the root, which is the only way the
 seeded breaks below are reachable. Without that skip, this directory would red the link gate on
 every push. The skip matched the directory *name* until Plan 0094 Phase 1, which meant it also
@@ -415,6 +415,40 @@ release process wants the working record, so that group keeps its bare citations
 are ever reported, the filename list inside the script has widened past what ADR-0168 decided.
 `docs/capturing.md` held this role until the list widened, and the two files swapping places is the
 clearest record of where the boundary now sits.
+
+## `system-counts/` — for `check-system-counts.mjs`
+
+```
+node scripts/check-system-counts.mjs scripts/fixtures/system-counts
+```
+
+Expect **exit 1 and exactly five breaks, across two files**. The tree is small because the rule is
+one sentence — a count token within two words of `system` or `systems` — and what needs seeding is
+the boundary around it rather than a corpus.
+
+| File | Line | Case | Expected |
+|------|-----:|------|----------|
+| `docs/prose.md` | 3 | a number word, directly before the noun | reported |
+| `docs/prose.md` | 6 | a **numeral** (`14`), the other half of the count token | reported |
+| `docs/prose.md` | 9 | `the other ten systems` — the complement form, which is how a stale total survives a rename of the roster | reported |
+| `docs/prose.md` | 12 | a **two-word gap** (`twelve built-in scene systems`), the widest the match reaches | reported |
+| `core/scene.rs` | 10 | a count inside an assertion **message** — a string literal, not a comment | reported |
+
+**The silences are the half that decides whether the gate is usable**, and each one is a form that
+occurs in this repository:
+
+- **`four systems` and `four quadrants`** — below the threshold of five, which ADR-0202 argues from
+  the prose as it stood on 2026-09-14: the largest legitimate count was four and the smallest stale
+  one was seven.
+- **`file systems`** — a different noun that shares a word. The exclusion is decided by what sits
+  immediately before the noun, so `seven file systems` is not a roster count either.
+- **A `count-allow:` marker**, as an HTML comment at the end of the line it excuses. It carries a
+  reason, because a marker without one is itself reported — the escape is reviewed rather than
+  checked.
+- **A match inside a fenced block**, which is a command rather than a claim.
+- **A three-word gap** (`the fourteen distinct built-in scene systems`), which is hole 2 in the
+  script's own header. It is seeded so that the hole is a decision anyone can re-run rather than a
+  sentence in a comment.
 
 ## `site-links/` — for `check-site-links.mjs`
 

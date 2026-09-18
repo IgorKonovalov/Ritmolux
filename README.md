@@ -20,7 +20,7 @@ codebase serve both frontends.
 | [![A luminous sea-green rosette of fine particle filaments on black](docs/images/gallery/attractor.png)](docs/preset-guide.md) | [![A radial spectrum readout: coloured spokes radiating from a dark centre](docs/images/gallery/spectrum.png)](docs/preset-guide.md) | [![A bold gold rose window of nested twelve-pointed stars](docs/images/gallery/star_pattern.png)](docs/preset-guide.md) |
 | `attractor` | `spectrum` | `star_pattern` |
 
-Twelve built-in rendering systems, all driven by editable text presets —
+Every built-in rendering system is driven by editable text presets —
 **[see them, and how to write one](docs/preset-guide.md)**.
 
 **Documentation site: [igorkonovalov.github.io/Ritmolux](https://igorkonovalov.github.io/Ritmolux/)**
@@ -129,7 +129,10 @@ scripts/             # Repo maintenance: the Node gates the pre-push hook and CI
                      #   check-release-tag.mjs reads the current version's annotated tag: offline at
                      #   pre-push, `--remote` against origin in CI on main, and at the close; and
                      #   check-translations.mjs reads every `.ru.md`'s `translated-from` stamp,
-                     #   failing on a missing one and reporting drift as an advisory (ADR-0185).
+                     #   failing on a missing one and reporting drift as an advisory (ADR-0185); and
+                     #   check-system-counts.mjs refuses a written-out count of the systems outside
+                     #   the dated records, because a count goes stale whether or not it is right
+                     #   today (ADR-0202).
                      #   And scripts/fixtures/ seeded bite checks.
 site/                # The documentation site: an Astro Starlight front end publishing the
                      #   reader-facing subset of docs/ with search, at igorkonovalov.github.io/Ritmolux/.

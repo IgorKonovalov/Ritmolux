@@ -129,6 +129,12 @@ pub(crate) const FLAGS: &[FlagSpec] = &[
         help: "print the renderer and Spout adapter rosters and exit",
     },
     FlagSpec {
+        name: "--list-presets",
+        takes_value: false,
+        requires: None,
+        help: "print the presets this launch would load, with each file's status, and exit",
+    },
+    FlagSpec {
         name: "--input",
         takes_value: true,
         requires: None,
@@ -239,8 +245,10 @@ pub(crate) fn print_help() {
 /// The name column is sized to the longest entry (`--list-adapters`) plus a
 /// gap, so adding a longer flag needs the width moved with it.
 pub(crate) fn help_text() -> String {
+    // `Ritmolux` is the product (ADR-0162); `ritmolux` on the usage line is the
+    // binary, which stays lower-case because that is what gets typed.
     let mut text =
-        String::from("ritmolux — a real-time music visualizer\n\nusage: ritmolux [flags]\n\n");
+        String::from("Ritmolux — a real-time music visualizer\n\nusage: ritmolux [flags]\n\n");
     for spec in FLAGS {
         // The dependency is rendered from `requires`, never read out of `help`:
         // one field feeds both the printed line and the refusal below, so a
@@ -1350,10 +1358,9 @@ pub(crate) mod tests {
     ///
     /// A flag literal is the **whole** string — `"--osc"`, or the `=` spelling
     /// `"--tier="` — which is what separates a comparison from prose that
-    /// mentions a flag (`"--stream: no preset named …"`, and `stream.rs`'s line
-    /// saying `--list-presets` is not a flag). The scan stops at the test module,
-    /// where a `--`-prefixed literal is an input rather than a flag the binary
-    /// claims.
+    /// mentions a flag (`"--stream: no preset named …"`). The scan stops at the
+    /// test module, where a `--`-prefixed literal is an input rather than a flag
+    /// the binary claims.
     fn scanner_flag_literals(source: &str) -> Vec<String> {
         let body = source.split("#[cfg(test)]").next().unwrap_or(source);
         let bytes = body.as_bytes();

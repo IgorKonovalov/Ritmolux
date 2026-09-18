@@ -194,7 +194,11 @@ scripts/             # Repo maintenance. The Node gates, and a count of them is 
                      #   translation's `translated-from: <sha>` stamp - a MISSING or malformed one
                      #   is an exit code, a source that has MOVED past its stamp is an advisory row
                      #   and never one, because no machine here can read the prose either way
-                     #   (ADR-0185).
+                     #   (ADR-0185); check-system-counts.mjs rejects a written-out count of the
+                     #   systems - a count token within two words of `system(s)` - everywhere but the
+                     #   dated records (plans, ADRs, the backlog), because a count goes stale whether
+                     #   or not it is right today, and it reads .rs WHOLE since the instance that
+                     #   survived two closes was an assertion message (ADR-0202).
                      #   scripts/fixtures/ holds their seeded bite checks.
                      #   RENDERERS, NOT GATES: docs-shots.mjs (every committed still under
                      #   docs/images/) and its sibling docs-clip.mjs (the two artifacts that are

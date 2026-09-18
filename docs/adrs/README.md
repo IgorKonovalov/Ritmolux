@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0214.** *(0120 was reserved for
+**Next free number: 0216.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -223,7 +223,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0199](0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md) | A converted waveform draws the released source's figure at the scale its host renders, from a stereo pair the analyzer already receives | accepted 2026-09-16 (Plan 0180), extends 0139, Outcome |
 | [0200](0200-the-flatness-conjunctions-second-term-reads-the-reference-a-role-classifier-assigns.md) | The flatness conjunction's second term reads the reference a role classifier assigns | accepted 2026-09-17 (Plan 0186), supersedes 0161 in part; extends 0128, 0129, 0130 |
 | [0201](0201-a-fullscreen-scene-presents-premultiplied-over-the-backdrop.md) | A fullscreen scene presents premultiplied over the backdrop, and the chain's occlude value is the only switch | accepted 2026-09-15 (Plan 0185), extends 0026, 0085 |
-| [0202](0202-a-written-count-of-the-systems-is-refused-by-a-gate.md) | A written-out count of the systems is refused by a gate, and the threshold is five | proposed (Plan 0178), extends 0168 |
+| [0202](0202-a-written-count-of-the-systems-is-refused-by-a-gate.md) | A written-out count of the systems is refused by a gate, and the threshold is five | accepted 2026-09-18 (Plan 0178), Outcome; extends 0168 |
 | [0203](0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md) | A release tag is annotated, and what gets checked is whether origin has it | accepted 2026-09-14 (Plan 0176), extends 0038 |
 | [0204](0204-a-cheap-integration-test-shares-one-binary-and-a-test-that-needs-its-own-stays-its-own.md) | A cheap integration test shares one binary per package, and a test that needs its own binary keeps one | accepted 2026-09-15 (Plan 0177), Outcome; extends 0156, 0165, 0193 |
 | [0205](0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md) | An approved plan runs under a conductor, and every judgement it cannot make parks the plan | accepted 2026-09-14 (Plan 0187), Outcome; supersedes 0188 in part; amended by 0207, 0208, 0209 |
@@ -235,4 +235,6 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0211](0211-a-green-suite-record-serves-a-later-tree-when-no-deferred-suite-can-read-the-diff.md) | A green suite record serves a later tree when no deferred suite can read the diff | accepted 2026-09-16 (Plan 0191), amends 0207 |
 | [0212](0212-a-converted-preset-gets-its-own-vertex-module-and-the-pipeline-is-chosen-not-branched.md) | A converted preset gets its own vertex module, and the pipeline is chosen rather than branched | accepted 2026-09-16 (Plan 0180), Outcome |
 | [0213](0213-the-russian-slice-stays-a-section-and-gets-a-header-control.md) | The Russian slice stays a section, and gets a header control | proposed, amends 0185 |
+| [0214](0214-the-digest-is-a-current-state-page-and-history-is-regenerated-on-demand.md) | The digest is a current-state page, and history is regenerated on demand | proposed, amends 0205 |
+| [0215](0215-the-analyzer-publishes-an-absolute-stereo-field.md) | The analyzer publishes an absolute stereo field, and the mono path does not move | proposed, extends 0199 |
 <!-- roster:end -->

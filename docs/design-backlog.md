@@ -58,6 +58,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0249 — `warp_mesh`'s `zoom` doc says the opposite of what the shader does, and four generated surfaces carry it](#0249--warp_meshs-zoom-doc-says-the-opposite-of-what-the-shader-does-and-four-generated-surfaces-carry-it)
 - [0250 — a conductor session cannot run a command that carries an environment assignment, and two documented repairs need one](#0250--a-conductor-session-cannot-run-a-command-that-carries-an-environment-assignment-and-two-documented-repairs-need-one)
 - [0251 — `warp_mesh`'s level mode draws bands but not an ink class, because coverage is a continuum nothing thresholds](#0251--warp_meshs-level-mode-draws-bands-but-not-an-ink-class-because-coverage-is-a-continuum-nothing-thresholds)
+- [0252 — the conductor's gate is a hand-maintained copy of the Node gate list, and it has fallen behind twice](#0252--the-conductors-gate-is-a-hand-maintained-copy-of-the-node-gate-list-and-it-has-fallen-behind-twice)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -2574,3 +2575,52 @@ and the residue is a class the frame does not join rather than a picture that is
 second author asks `warp_mesh` for a print, or if the same question arrives from another
 premultiplied-light scene — at which point it is ADR-0138's boundary being asked to move, not this
 scene's.
+
+## 0252 — the conductor's gate is a hand-maintained copy of the Node gate list, and it has fallen behind twice
+
+The pre-push hook and CI's `links` job are the two carriers every Node gate is wired into, and a
+plan that adds one edits both. There is a **third** carrier nothing points a plan at:
+`defaultGate()` in `tools/conductor/lib/gate.mjs`, the list the conductor runs at `pre-review` and
+`post-close` for a plan it runs itself. It is a literal roster, maintained by hand, and it is
+missing two gates: `check-translations.mjs` (Plan 0166) and `check-system-counts.mjs` (Plan 0178).
+
+**What that costs is the whole point of running a gate before the close rather than after the
+push.** For a conductor-run plan the first machine that executes either checker is CI, after the
+owner pushes — which is the shape backlog 0246 already records for `cargo doc`, arriving here by a
+different route. Neither plan did anything wrong: ADR-0202 scopes its gate to the hook and the
+`links` job, Plan 0166 the same, and both wired it exactly there. The defect is that a third list
+exists and no rule, gate or ceremony step names it.
+
+**What a fix looks like, and it is a decision rather than an edit.** The obvious repair — add the
+two names — restores the invariant for a day and rebuilds the same trap. The shapes worth weighing:
+
+- **Derive the list from the hook.** `.githooks/pre-push` already runs every Node gate in order;
+  a conductor gate that parsed its `run_step "node scripts/…"` lines could not fall behind, at the
+  price of reading a shell script as data.
+- **Derive both from one manifest** — a committed list of gates that the hook, the `links` job and
+  `defaultGate()` all read. The largest change, and the only one that also covers CI.
+- **Add a gate that asserts the three carriers agree.** The same substitution this repository has
+  made three times (ADR-0116, ADR-0149, ADR-0202): when a convention keeps failing, it takes a
+  checker. It is also the only option that catches the next one without changing how any of them
+  runs.
+
+- **Raised:** 2026-09-18, at [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md)'s close
+  review, by `architect`. **Owner if taken:** `architect` then `dev`.
+- **Verified 2026-09-18** — the conductor's gate does not run the count gate:
+  `absent: check-system-counts in: tools/conductor/lib/gate.mjs`
+- **Verified 2026-09-18** — nor the translation gate, which has been missing a plan longer:
+  `absent: check-translations in: tools/conductor/lib/gate.mjs`
+- **Verified 2026-09-18** — it does carry the gates either side of them in the hook's own order, so
+  this is an omission rather than a scope decision:
+  `present: check-reader-prose.mjs in: tools/conductor/lib/gate.mjs`
+- **Verified 2026-09-18** — the two carriers a plan is told to edit both have the count gate:
+  `present: node scripts/check-system-counts.mjs in: .githooks/pre-push`
+- **Verified 2026-09-18** — and:
+  `present: node scripts/check-system-counts.mjs in: .github/workflows/ci.yml`
+
+### Priority
+
+**Low-medium.** Nothing user-visible is involved and both gates do run — on every push, by CI, and
+on every local push by anyone with the hook installed. What is lost is the pre-close reading for
+conductor-run plans, which is exactly where a red gate is cheapest to repair. It rises with each
+further gate added, because the gap is not one checker but a list that nobody is told to update.

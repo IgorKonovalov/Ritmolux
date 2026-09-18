@@ -1,6 +1,6 @@
 //! The parameter blocks the scenes share.
 //!
-//! Twelve systems implement [`Scene`](super::Scene) and most of them accept the
+//! Every system implements [`Scene`](super::Scene) and most of them accept the
 //! same colour and framing names — `palette_mix`, `palette_steps`,
 //! `palette_contour`, `palette_contour_style`, `palette_contour_ink`,
 //! `saturation`, `hue`, `brightness`, `pan_x`, `pan_y`. Each
@@ -400,7 +400,7 @@ mod tests {
         }
         assert!(
             seen > 40,
-            "only {seen} shared-name declarations found across twelve systems — \
+            "only {seen} shared-name declarations found across the scene roster — \
              the scan has stopped seeing them, so this guard would pass vacuously"
         );
     }

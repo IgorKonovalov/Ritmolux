@@ -307,11 +307,6 @@ live entry citing this one.
 | 0157 | The fixed telemetry set omits the bar grid the engine already computes | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0158 | The tempo octave is unsettled by design, and the rig saw the fold run the other way | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
-| 0172 | The seeded preset directory is never pruned, so a roster drifts from the shipped set | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phases 1-2. **Promoted** |
-| 0185 | The `--help` banner still calls the application `ritmolux` | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 3. **Promoted** |
-| 0203 | The smoke run captured from a microphone while the default is loopback | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 5. **Promoted** |
-| 0207 | The cap-recovery line says "geometry" for three contexts that are not geometry | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 3. **Promoted** |
-| 0208 | A system count written into prose goes stale on the next system | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 4 + ADR-0202. **Promoted** |
 <!-- roster:end -->
 
 ### Closed
@@ -582,6 +577,11 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0140 | The band contour can only be an anti-aliased grey on a hard-banded palette | [Plan 0184](plans/done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 1 + ADR-0197. Four styles. **Closed 2026-09-17** |
 | 0146 | `warp_mesh` colours its light at deposit time, so the palette cannot band the field | [Plan 0184](plans/done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 2 + ADR-0197. Bands, not the ink class; see 0251. **Closed 2026-09-17** |
 | 0217 | `path_cost`'s arity probe prices an arc chain, not the polyline its header reports | [Plan 0160](plans/done/0160-the-silhouettes-preconditions-stop-being-silent.md) Phase 1b. Polyline by construction; table re-taken at ~0.095 ms/segment. **Closed 2026-09-17** |
+| 0172 | The seeded preset directory is never pruned, so a roster drifts from the shipped set | [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phases 1-2. Reported, never pruned. **Closed 2026-09-18** |
+| 0185 | The `--help` banner still calls the application `ritmolux` | [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phase 3. Product capitalised, binary not. **Closed 2026-09-18** |
+| 0203 | The smoke run captured from a microphone while the default is loopback | [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phase 5. On-device: no fallback exists; a persisted overlay choice. **Closed 2026-09-18** |
+| 0207 | The cap-recovery line says "geometry" for three contexts that are not geometry | [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phase 3. Rendered per context, no wildcard arm. **Closed 2026-09-18** |
+| 0208 | A system count written into prose goes stale on the next system | [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phase 4 + [ADR-0202](adrs/0202-a-written-count-of-the-systems-is-refused-by-a-gate.md). One marker taken. **Closed 2026-09-18** |
 <!-- roster:end -->
 
 ---
@@ -12400,9 +12400,17 @@ would serve the same end deliberately rather than as a side effect.
 - **Verified 2026-08-31** - selection by name is a first-exact-match, so a duplicate name makes one preset unreachable: `present: position\(\|n\| n == name\) in: core/src/render/roster.rs`
 - **Verified 2026-08-31** - `unprobeable: the drift itself is a property of a machine's %APPDATA% preset directory, which exists in no checkout - presets/ is clean by construction and a probe against it would pass forever while saying nothing about the condition`
 
-- **Promoted 2026-09-14** to [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phases 1-2: a startup line naming files outside the embedded set and duplicate display names, and a `--list-presets` flag. Nothing is pruned.
+- **Promoted 2026-09-14** to [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phases 1-2: a startup line naming files outside the embedded set and duplicate display names, and a `--list-presets` flag. Nothing is pruned.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+- **CLOSED 2026-09-18** by [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phases 1-2.
+  `preset::drift` judges each `*.toml` against `EMBEDDED` as `shipped` / `differs` / `not shipped`
+  and names every display name a second file claims, with the file a lookup reaches; seeding prints
+  one line when — and only when — something drifted, and `--list-presets` prints the per-file rows
+  without seeding. **Nothing is pruned or overwritten**, which was this entry's own argument. The
+  half nothing can repair stands: `differs` cannot tell an operator's edit from an older release's
+  copy, because no build carries a manifest of past hashes, and the status name says so.
 
 
 ---
@@ -12725,9 +12733,15 @@ plan-relative narration.
 consistency. It is a `dev` edit rather than a docs one, which is the only reason a docs lane left it
 standing. If the golden `--help` output is ever pinned byte-for-byte, pin it after this moves.
 
-- **Promoted 2026-09-14** to [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 3: the banner's product token is capitalised; the binary name stays lower-case.
+- **Promoted 2026-09-14** to [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phase 3: the banner's product token is capitalised; the binary name stays lower-case.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+- **CLOSED 2026-09-18** by [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phase 3.
+  The banner reads `Ritmolux — a real-time music visualizer`; `usage: ritmolux [flags]` stays
+  lower-case because it is what gets typed, and `help_prints_the_roster_and_exits_zero` asserts both
+  against the real binary's stdout. `standalone/src/settings/tests.rs`'s fixture path is
+  `Roaming\Ritmolux\presets`.
 
 
 ---
@@ -12943,9 +12957,20 @@ defect worth a plan. Nothing has established which.
 cannot close — a silent fallback to the wrong endpoint — would be a defect every user hits without
 knowing.
 
-- **Promoted 2026-09-14** to [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 5. The code shows no loopback-to-microphone fallback; the settings overlay's Input mode row persists `line-in` on one arrow press, which is the likely cause. A human on-device check settles it.
+- **Promoted 2026-09-14** to [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phase 5. The code shows no loopback-to-microphone fallback; the settings overlay's Input mode row persists `line-in` on one arrow press, which is the likely cause. A human on-device check settles it.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+- **CLOSED 2026-09-18** by [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phase 5,
+  **as a persisted choice rather than a defect**, which is the verdict that phase's own rule
+  prescribed. Run by the owner on the machine it happened on: with the only render endpoint
+  disabled, capture failed with `WASAPI error: Element not found. (0x80070490)` and the verdict
+  stayed `failed` — **no microphone verdict**, on a machine whose only capture endpoint is the
+  microphone, on the start path and on the recovery path alike. One right-arrow on the overlay's
+  **Input mode** row wrote `mode = "line-in"` into `config.toml` at the same second, before the app
+  was closed. And the machine's own `%APPDATA%\Ritmolux\diagnostics.log` confines every microphone
+  verdict to three runs on **2026-09-11**, which a fallback firing whenever loopback fails would not
+  do. No fallback exists in the code and none was observed.
 
 
 ---
@@ -13045,9 +13070,16 @@ than a rough edge.
 frame a clamp releases. It is on this list because it is the second half of a pair whose first half
 is correct, which is how it stayed wrong across two plans that each looked straight at it.
 
-- **Promoted 2026-09-14** to [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 3: the recovery line renders per context, as the onset line already does.
+- **Promoted 2026-09-14** to [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phase 3: the recovery line renders per context, as the onset line already does.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+- **CLOSED 2026-09-18** by [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phase 3.
+  `CapOverflow::recovered()` renders the clearing in the terms the onset used: geometry and the
+  segment cap for `Mirror` and `Depth`, the iteration budget, the grid and the neighbourhood for the
+  three that clamp a structural parameter. The `match` has **no wildcard arm**, so a sixth context
+  cannot compile without choosing its own sentence, and a core test asserts that none of the three
+  structural recoveries says `segment` or `geometry`.
 
 
 ---
@@ -13090,9 +13122,18 @@ to `system` in the reader documents and in `.rs` comments.
 reviewer attention rather than a wrong build. It is worth an entry because the catching is the
 expensive part and it recurs on a fixed schedule: once per new system, forever.
 
-- **Promoted 2026-09-14** to [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 4 and [ADR-0202](adrs/0202-a-written-count-of-the-systems-is-refused-by-a-gate.md): a count gate over the reader documents and `.rs` comments, and the gate inventory rewritten without numbers. [Plan 0120](plans/0120-the-standalone-ships-on-ubuntu.md) Phase 5 uses count-free platform wording.
+- **Promoted 2026-09-14** to [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phase 4 and [ADR-0202](adrs/0202-a-written-count-of-the-systems-is-refused-by-a-gate.md): a count gate over the reader documents and `.rs` comments, and the gate inventory rewritten without numbers. [Plan 0120](plans/0120-the-standalone-ships-on-ubuntu.md) Phase 5 uses count-free platform wording.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+- **CLOSED 2026-09-18** by [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phase 4
+  and [ADR-0202](adrs/0202-a-written-count-of-the-systems-is-refused-by-a-gate.md).
+  `scripts/check-system-counts.mjs` runs at pre-push and in the CI `links` job, reads `.rs` whole
+  because the instance that survived two closes was an assertion message, and carries its own seeded
+  bite check. The first run reported thirteen instances; one was the gate's own false positive (a
+  count of params, now excluded), and of the rest **exactly one** took a `count-allow:` marker. The
+  gate inventory's own ordinals went with the counts, by hand — the grammar was not extended to a
+  second noun, which the ADR's Negative still records as unguarded.
 
 
 ---

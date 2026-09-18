@@ -401,7 +401,7 @@ pub(super) fn evaluate_preset(
         // A binding that names `index` is asking to be evaluated once per
         // element (Plan 0034 Phase 4). The test is a `bool` read decided at
         // compile, and `series` is empty for every system without a per-element
-        // surface — so for the other seven systems this branch is never taken
+        // surface — so for every other system this branch is never taken
         // and the path below is the one that ran before this existed.
         //
         // Tested *before* the scalar evaluation, not inside the routing match:
@@ -474,8 +474,8 @@ pub(super) fn evaluate_preset(
     // The `[per_vertex]` table (Plan 0100 Phase 1), after the scalars — so a
     // per-vertex binding overrides the scalar of the same name for this frame
     // rather than racing it. `None` for every preset with no per-vertex surface,
-    // and `per_vertex` is empty for every preset that declares no table, so the
-    // other ten systems take exactly the path they took before this existed.
+    // and `per_vertex` is empty for every preset that declares no table, so
+    // every other system takes exactly the path it took before this existed.
     if let Some(mut surface) = vertex {
         for binding in &preset.per_vertex {
             evaluate_vertex_series(&binding.expr, vars, &mut surface);

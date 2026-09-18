@@ -649,7 +649,8 @@ fn system_names(schema: &str) -> Vec<String> {
 /// A stem containing `/` is skipped, and that is what keeps the two collections
 /// apart: the per-preset cards live one level down at
 /// `docs/images/gallery/presets/<preset>.png`, so they match the same prefix and
-/// would otherwise read as 82 systems that do not exist. They are read instead
+/// would otherwise read as 82 systems that do not exist (count-allow: a count of
+/// per-preset cards, not a roster total). They are read instead
 /// by [`card_presets`], out of the manifest's own `CARDS` list.
 fn gallery_names(manifest: &str) -> Vec<String> {
     let mut out = Vec::new();

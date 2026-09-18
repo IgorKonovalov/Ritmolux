@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0178 - What the operator reads is true](#0178---what-the-operator-reads-is-true)
   - [0160 - The silhouette's preconditions stop being silent](#0160---the-silhouettes-preconditions-stop-being-silent)
   - [0184 - Limited ink: a contour that is an ink, and a warp field that bands](#0184---limited-ink-a-contour-that-is-an-ink-and-a-warp-field-that-bands)
   - [0186 - The flatness gate tells a figure from its ground](#0186---the-flatness-gate-tells-a-figure-from-its-ground)
@@ -228,6 +229,55 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0178 - What the operator reads is true](done/0178-what-the-operator-reads-is-true.md)
+
+- closed 2026-09-18, conductor-run lane `plan-0178-what-the-operator-reads-is-true` in
+`WORK/rlx-plan-0178`. Five phases: `a20bc34a`, `2fd42a7d`, `8b4b7f69`, `955cb766` and `f8e29cf7`
+(the `human` on-device phase), plus `fb9687f4`, the close review's three prose repairs. Round-1
+verdict: **no blockers, no majors, three minors and two nits**, three of them repaired at the close
+and two left open by the rules that govern them. Version **0.131.0** (minor), ADR-0202 accepted
+**with an Outcome**, and backlog 0172, 0185, 0203, 0207 and 0208 all closed.
+- **What landed.** Five things an operator or a contributor reads that were false, stale or silent.
+`preset::drift` reads the per-user preset directory against the embedded set without touching it and
+reports `shipped` / `differs` / `not shipped` plus every display name a second file claims — the
+reachability loss backlog 0172 filed, since selection by name is a first-exact-match over a
+filename-sorted load. Seeding prints one line when something drifted and nothing when nothing did;
+`--list-presets` prints the rows, without seeding, and its `help_cli` case proves it through a real
+subprocess with both the preset directory and the data root pointed at scratch. The `--help` banner
+capitalises the product and leaves the binary alone. `CapOverflow::recovered()` renders the
+cap-recovery line per context, with no wildcard arm, so the three that clamp a structural parameter
+stop claiming geometry came back. And `scripts/check-system-counts.mjs` refuses a written-out count
+of the systems at pre-push and in CI, reading `.rs` whole because the instance that survived two
+closes was an assertion message.
+- **What the `human` phase settled, and how.** Backlog 0203 — a smoke run that captured from a
+microphone while the default is loopback — closes as **a persisted overlay choice, not a defect**.
+With the machine's only render endpoint disabled, capture failed with `Element not found.
+(0x80070490)` and the verdict stayed `failed` on both the start path and the recovery path: no
+microphone verdict, on a box whose only capture endpoint is the microphone. One right-arrow on the
+overlay's **Input mode** row wrote `line-in` into `config.toml` at the same second. The phase then
+found the original sighting still on disk — `%APPDATA%\Ritmolux\diagnostics.log` confines every
+microphone verdict to three runs on **2026-09-11** — which a fallback firing whenever loopback fails
+would not do. A code reading, an experiment and a log all reaching the same conclusion is what a
+`human` phase is for.
+- **What the gate's first run taught, and it is in ADR-0202's Outcome.** Thirteen instances, of which
+one was the gate's own false positive: `"seven of its system's twelve"` counts a system's params, so
+the **singular** possessive is excluded and the plural is not. Of the twelve real ones, exactly
+**one** took a `count-allow:` marker — the count of per-preset cards this ADR had already named —
+and that includes the two the ADR's own table classed as dated records inside live documents, both
+of which read better with the number gone. The threshold of five was not touched. The gate
+inventory's ordinals (*"And the seventh"*, *"the sixth"*) went with the counts by hand: the same
+drift class under a different noun, falsified by adding a gate rather than a system, and the grammar
+was deliberately **not** extended to reach them.
+- **What outlived the plan.** Two findings the close could not repair. This plan's own
+`### Close triggers` block is empty — Phases 4 and 5 were taken by the owner rather than by a
+conductor session — and a reviewer filling it in would manufacture `dev`'s record rather than repair
+prose, so it stands as written. And the conductor's `defaultGate()` runs neither the new
+`check-system-counts.mjs` nor, already, `check-translations.mjs`, so for a conductor-run plan CI
+after the push is the first machine that sees either. Both gates are wired exactly where ADR-0202
+and Plan 0166 put them; the third carrier is the one that has now fallen behind twice, and it was
+filed at this close as **backlog 0252** rather than repaired — adding the two names restores the
+invariant for a day and rebuilds the same trap.
 
 ### [0160 - The silhouette's preconditions stop being silent](done/0160-the-silhouettes-preconditions-stop-being-silent.md)
 

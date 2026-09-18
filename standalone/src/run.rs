@@ -11,7 +11,9 @@ use std::time::Instant;
 
 use rlx_core::render::{AdapterChoice, Tier};
 use standalone::osc::OscSink;
-use standalone::{AppDirMigration, migrate_app_dir, resolve_tier, tier_env};
+use standalone::{
+    AppDirMigration, PresetDir, migrate_app_dir, resolve_preset_dir, resolve_tier, tier_env,
+};
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
@@ -370,6 +372,129 @@ pub(crate) fn list_adapters_and_exit() {
     }
 }
 
+/// Print the presets this launch would load, one row each with its standing
+/// against the set this build ships, and exit.
+///
+/// The directory is resolved the way [`startup_preset_names`] resolves it and
+/// **without seeding**: this is a query, and a query that wrote files on the way
+/// past would be a side effect nobody asked for. A directory that yields at
+/// least one preset replaces the embedded set, so the rows are one list or the
+/// other and never their union — the same rule every other reader of the
+/// directory follows.
+pub(crate) fn list_presets_and_exit() {
+    let dir = match resolve_preset_dir() {
+        PresetDir::Override(dir) | PresetDir::Default(dir) => dir,
+        PresetDir::Unresolved => PathBuf::new(),
+    };
+    let report = rlx_core::preset::load_dir(&dir);
+
+    if report.presets.is_empty() {
+        if dir.as_os_str().is_empty() {
+            eprintln!("no preset directory resolved, so this launch loads the set built in:");
+        } else {
+            eprintln!(
+                "nothing in {} loaded, so this launch loads the set built in:",
+                dir.display()
+            );
+        }
+        eprintln!();
+        let rows: Vec<(String, String, String)> = rlx_core::preset::EMBEDDED
+            .iter()
+            .map(|&(file, source)| {
+                let name = rlx_core::preset::Preset::from_toml_str(source)
+                    .map(|preset| preset.name)
+                    .unwrap_or_else(|_| "(does not compile)".to_owned());
+                (
+                    name,
+                    (*file).to_owned(),
+                    rlx_core::preset::DriftStatus::Shipped.as_str().to_owned(),
+                )
+            })
+            .collect();
+        print_preset_rows(&rows);
+        print_preset_errors(&report.errors);
+        return;
+    }
+
+    eprintln!("presets this launch loads, from {}:", dir.display());
+    eprintln!();
+    let drift = rlx_core::preset::drift(&dir);
+    let rows: Vec<(String, String, String)> = drift
+        .entries
+        .iter()
+        .filter_map(|entry| {
+            // A file that did not compile is not in the set this launch holds;
+            // it is reported below, with its error, rather than as a row.
+            let name = entry.name.clone()?;
+            let mut status = entry.status.as_str().to_owned();
+            if let Some(duplicate) = drift
+                .duplicates
+                .iter()
+                .find(|duplicate| duplicate.name == name)
+            {
+                if duplicate.winner() == entry.file {
+                    status.push_str(", and the file `--preset` and the studio reach for this name");
+                } else {
+                    status.push_str(&format!(
+                        ", and shadowed for this name by {}",
+                        duplicate.winner()
+                    ));
+                }
+            }
+            Some((name, entry.file.clone(), status))
+        })
+        .collect();
+    print_preset_rows(&rows);
+    print_preset_errors(&report.errors);
+}
+
+/// The name/file/status table `--list-presets` prints, with its legend.
+///
+/// The columns are sized from the rows themselves, so a long preset name widens
+/// the table rather than wrapping out of it.
+fn print_preset_rows(rows: &[(String, String, String)]) {
+    let name_width = rows
+        .iter()
+        .map(|(name, _, _)| name.len())
+        .max()
+        .unwrap_or(0);
+    let file_width = rows
+        .iter()
+        .map(|(_, file, _)| file.len())
+        .max()
+        .unwrap_or(0);
+    for (name, file, status) in rows {
+        eprintln!("  {name:<name_width$}  {file:<file_width$}  {status}");
+    }
+    eprintln!();
+    eprintln!("{} preset(s).", rows.len());
+    eprintln!("shipped     this file is byte-identical to the copy this build carries.");
+    eprintln!(
+        "differs     an edit of yours, or a copy from an older release - nothing on disk \
+         records which, so they cannot be told apart."
+    );
+    eprintln!(
+        "not shipped your own preset, or one a later release retired. Seeding writes \
+         if-absent and never deletes, so both stay."
+    );
+}
+
+/// The files in the directory that did not compile, after the rows, because
+/// they are not in the set the launch holds.
+fn print_preset_errors(errors: &[(PathBuf, rlx_core::preset::PresetError)]) {
+    if errors.is_empty() {
+        return;
+    }
+    eprintln!();
+    eprintln!(
+        "{} file(s) did not compile and are in no set above:",
+        errors.len()
+    );
+    for (path, err) in errors {
+        eprintln!("  {}: {err}", path.display());
+    }
+}
+
 pub fn run() {
     // Ahead of the roster gate: someone asking what the flags are is the one
     // caller to answer rather than refuse, so `--help` wins over a typo sharing
@@ -498,6 +623,14 @@ pub fn run() {
     // whether a receiver can open the stream at all (ADR-0146).
     if std::env::args().skip(1).any(|arg| arg == "--list-adapters") {
         list_adapters_and_exit();
+        return;
+    }
+
+    // And the same aid for the preset library: which files this launch would
+    // load, and how far each has drifted from the set this build ships. Beside
+    // its siblings and, like them, before anything opens.
+    if std::env::args().skip(1).any(|arg| arg == "--list-presets") {
+        list_presets_and_exit();
         return;
     }
 
@@ -674,6 +807,10 @@ pub fn run() {
                     sorted.sort();
                     sorted.join(", ")
                 });
+                eprintln!(
+                    "run --list-presets for the file behind each name, and how far it has \
+                     drifted from the set this build ships"
+                );
                 std::process::exit(2);
             }
             Some(name)

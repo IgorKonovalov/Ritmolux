@@ -137,6 +137,7 @@ What it runs, stopping at the first failure and naming the step that failed:
 | Release tag (self-test) | `node scripts/check-release-tag.mjs --self-test` |
 | Translations | `node scripts/check-translations.mjs` |
 | Translations (self-test) | `node scripts/check-translations.mjs --self-test` |
+| System counts | `node scripts/check-system-counts.mjs` |
 | Format | `cargo fmt --all --check` |
 | Lint | `cargo clippy --workspace --all-targets -- -D warnings` |
 | Rustdoc | `cargo doc -p rlx-core --no-deps --features text` under `RUSTDOCFLAGS=-D warnings` |
