@@ -1,7 +1,8 @@
 # 0195 — A finding can be closed
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-09-18
+> **Approved:** 2026-09-18 (user)
 > **Owner skill(s):** dev
 > **Related ADRs:** [0216](../adrs/0216-a-review-finding-is-closed-by-the-owner-and-the-page-stops-carrying-it.md)
 > (proposed), [0214](../adrs/0214-the-digest-is-a-current-state-page-and-history-is-regenerated-on-demand.md),
