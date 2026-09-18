@@ -305,14 +305,26 @@ worktree, each phase whose log row flips to done, each test and gate command wit
 wait, the 5-hour and 7-day usage readings, and every command a permission rule denied. The same lines
 go to `tools/conductor/state/live.log`, under one header per run, for a run you did not watch.
 
-**Next morning, read `tools/conductor/digest.md`.** It lists what needs you first: each park with its
-resume command and the usage reading its session ended on, then every merge's still-open findings
-with their `file:line`. The newest run also lists what an earlier run left parked, with its age and
-the worktree it holds — or the branch `resume` reopens it from, when you have already removed that
-worktree. Totals carry the usage windows at run start and run end, and gate minutes split into the
-full workspace suite and everything else, with the count of suite runs skipped because the conductor
-had already seen that exact tree pass
+**Next morning, read `tools/conductor/digest.md`.** It is the current state in two sections and
+nothing else
+([ADR-0214](adrs/0214-the-digest-is-a-current-state-page-and-history-is-regenerated-on-demand.md)).
+**Needs you** comes first and is the whole worklist: each park with its age, the worktree it holds —
+or the branch `resume` reopens it from, when you have already removed that worktree — the usage
+reading its session ended on and its resume command; each lane stopped at the worktree cap; each lane
+still on disk after a merge; and every merge's still-open findings with their `file:line`. A park the
+repository itself shows as finished closes that section under **Already settled, clear the record**,
+counted apart from the live ones, so a plan you closed by hand is never repeated at you as work.
+**Now** follows: per lane, the plan, the step and how long it has been in it, and what it has spent.
+A first section that says it found nothing means nothing is waiting on you.
+
+**What last night produced is one command away:** `node tools/conductor/conductor.mjs digest
+--history` writes `digest-history.md` beside it, newest run first, each run with its own closed
+plans, its failures and its Totals — the usage windows at run start and run end, and gate minutes
+split into the full workspace suite and everything else, with the count of suite runs skipped because
+the conductor had already seen that exact tree pass
 ([ADR-0207](adrs/0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md)).
+Nothing writes that file until you ask for it, and a closed plan's own committed `## Close review`
+carries its review either way.
 
 The operator guide — every command, what to do about each kind of park, and how to verify a new CLI
 version — is [`tools/conductor/README.md`](../tools/conductor/README.md). Its tests need no network

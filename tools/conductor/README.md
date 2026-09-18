@@ -105,11 +105,11 @@ once, whatever `state/conductor.json` says.
 - **`tools/conductor/digest.md`** is the **current state**, in two sections and nothing else
   (ADR-0214):
   - **Needs you** — the whole worklist, first, so that a page whose first section is empty means
-    nothing is waiting on you. It opens with a one-line count and then lists: every standing park
-    with its age, the worktree it holds (or the branch `resume` reopens it from), the usage reading
-    its session ended on and its resume command; every lane stopped at the worktree cap, naming what
-    holds the slots; every lane still on disk after a merge; every merge's open findings with their
-    `file:line`; and the CLI-version warning when the last run carried one.
+    nothing is waiting on you. It opens with a one-line count and then lists, in this order: the
+    CLI-version warning when the last run carried one; every standing park with its age, the worktree
+    it holds (or the branch `resume` reopens it from), the usage reading its session ended on and its
+    resume command; every lane stopped at the worktree cap, naming what holds the slots; every lane
+    still on disk after a merge; and every merge's open findings with their `file:line`.
 
     **Already settled, clear the record** closes that section: a park the repository itself shows as
     finished, counted apart from the live ones and never listed among them. Two conditions decide it,
