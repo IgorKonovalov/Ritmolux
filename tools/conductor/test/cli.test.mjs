@@ -1,5 +1,5 @@
-// The operator surface: `run`, `status`, `resume`, `park` and `abort` against a scratch repository
-// and the fake CLI, driven through the same `main` the command line calls.
+// The operator surface: `run`, `status`, `digest`, `resume`, `park` and `abort` against a scratch
+// repository and the fake CLI, driven through the same `main` the command line calls.
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -116,10 +116,32 @@ test("status regenerates a deleted digest byte for byte", async () => {
   const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] });
   await cli("run");
   const before = readFileSync(p.digest, "utf8");
-  assert.match(before, /### Closed\n\n- \*\*0101 - Plan 0101 fixture\*\*/);
+  assert.match(before, /^## Needs you\n\nNothing: no park, no lane stopped at the worktree cap, no open finding\.$/m);
   rmSync(p.digest);
   await cli("status");
   assert.equal(readFileSync(p.digest, "utf8"), before);
+});
+
+// ADR-0214: the per-run account is one command away rather than on the page, and the flag is what
+// creates the file — nothing writes it until it is asked for.
+test("digest rewrites the page, and digest --history writes the per-run account beside it", async () => {
+  const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] });
+  await cli("run");
+  assert.equal(existsSync(p.digestHistory), false, "no run writes the history page");
+
+  rmSync(p.digest);
+  const plain = await cli("digest");
+  assert.equal(plain.code, 0);
+  assert.deepEqual(plain.out, [`digest: ${p.digest}`]);
+  assert.match(readFileSync(p.digest, "utf8"), /^# Conductor digest$/m);
+
+  const history = await cli("digest", "--history");
+  assert.equal(history.code, 0);
+  assert.deepEqual(history.out, [`history: ${p.digestHistory}`]);
+  const text = readFileSync(p.digestHistory, "utf8");
+  assert.match(text, /^# Conductor history$/m);
+  assert.match(text, /### Closed\n\n- \*\*0101 - Plan 0101 fixture\*\*/);
+  assert.ok(!readFileSync(p.digest, "utf8").includes("### Closed"), "the page carries no run's own sections");
 });
 
 test("resume refuses a human-phase park the log does not mark done, and accepts the digest's command once it does", async () => {
@@ -322,13 +344,19 @@ test("run on a patch above the verified CLI prints the warning, records it on th
     const state = loadState(p.stateDir);
     assert.deepEqual(state.runs.at(-1).cli, { version, warning });
     assert.equal(state.plans["0101"].status, "merged", JSON.stringify(state.plans["0101"].park));
-    assert.ok(readFileSync(p.digest, "utf8").includes(`- **claude ${version} is not a verified CLI version** - the run went ahead with a warning (ADR-0208): ${warning}.`));
+    assert.ok(readFileSync(p.digest, "utf8").includes(`- **claude ${version} is not a verified CLI version** - the last run went ahead with a warning (ADR-0208): ${warning}.`));
+    assert.equal((await cli("digest", "--history")).code, 0);
+    assert.ok(readFileSync(p.digestHistory, "utf8").includes(`- **claude ${version} is not a verified CLI version** - the run went ahead with a warning (ADR-0208): ${warning}.`));
 
-    // The next run on a verified version carries no warning in its own section.
+    // The next run on a verified version leaves the page with no warning at all, and the history
+    // keeps it on the run that carried it.
     process.env.FAKE_CLAUDE_VERSION = `${VERIFIED_CLI[0]} (Claude Code)`;
     await cli("run");
-    const newest = readFileSync(p.digest, "utf8").split(/^## Run /m)[1];
+    assert.ok(!readFileSync(p.digest, "utf8").includes("is not a verified CLI version"));
+    await cli("digest", "--history");
+    const [newest, earlier] = readFileSync(p.digestHistory, "utf8").split(/^## Run /m).slice(1);
     assert.ok(!newest.includes("is not a verified CLI version"), newest);
+    assert.ok(earlier.includes("is not a verified CLI version"), earlier);
   } finally {
     process.env.FAKE_CLAUDE_VERSION = "2.1.270 (Claude Code)";
   }

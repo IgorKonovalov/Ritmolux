@@ -1,5 +1,7 @@
-// The digest is a pure function of state and git: regenerating it gives the same bytes, and a
-// finding line is the verdict's own fields and nothing from the review's prose.
+// Both digest pages are a pure function of state, git and the clock the current page's ages read:
+// regenerating either from the same state and the same `now` gives the same bytes, and a finding
+// line is the verdict's own fields and nothing from the review's prose. `renderDigest` is the
+// current-state page; `renderHistory` is what `digest --history` writes (ADR-0214).
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -7,8 +9,11 @@ import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { duration, renderDigest, writeDigest } from "../lib/digest.mjs";
+import { duration, renderDigest, renderHistory, writeDigest, writeHistory } from "../lib/digest.mjs";
 import { tmp, writePlan } from "./helpers.mjs";
+
+/** A fixed clock, so the current page's park ages are the same on every render. */
+const NOW = Date.parse("2026-09-15T12:00:00.000Z");
 
 function repoWithTag() {
   const repo = tmp("rlx-digest-repo-");
@@ -85,29 +90,37 @@ function sampleState(repo, head, stateDir) {
   };
 }
 
-test("regenerating the digest from the same state and git gives identical bytes", () => {
+test("regenerating either page from the same state and git gives identical bytes", () => {
   const { repo, head } = repoWithTag();
   const stateDir = tmp("rlx-digest-state-");
   const state = sampleState(repo, head, stateDir);
-  const path = join(tmp("rlx-digest-out-"), "digest.md");
-  const first = writeDigest(path, state, { repo, stateDir });
+  const out = tmp("rlx-digest-out-");
+  const path = join(out, "digest.md");
+  const first = writeDigest(path, state, { repo, stateDir, now: NOW });
   rmSync(path);
-  writeDigest(path, state, { repo, stateDir });
+  writeDigest(path, state, { repo, stateDir, now: NOW });
   assert.equal(readFileSync(path, "utf8"), first);
-  assert.equal(renderDigest(state, { repo, stateDir }), first);
+  assert.equal(renderDigest(state, { repo, stateDir, now: NOW }), first);
+
+  const historyPath = join(out, "digest-history.md");
+  const history = writeHistory(historyPath, state, { repo, stateDir });
+  rmSync(historyPath);
+  writeHistory(historyPath, state, { repo, stateDir });
+  assert.equal(readFileSync(historyPath, "utf8"), history);
 });
 
 test("a finding line carries only what the verdict carried", () => {
   const { repo, head } = repoWithTag();
   const stateDir = tmp("rlx-digest-state-");
   const state = sampleState(repo, head, stateDir);
-  // The review file holds prose the digest must never quote.
+  // The review file holds prose neither page may quote.
   const reviews = join(stateDir, "reviews");
   spawnSync(process.execPath, ["-e", `require('fs').mkdirSync(${JSON.stringify(reviews)},{recursive:true})`]);
   writeFileSync(join(reviews, "0175-round-1.md"), `# Review\n\n${REVIEW_PROSE}\n`);
-  const text = renderDigest(state, { repo, stateDir });
+  const text = renderHistory(state, { repo, stateDir });
 
   assert.ok(!text.includes("SENTINEL-PROSE"), "no review prose reaches the digest");
+  assert.ok(!renderDigest(state, { repo, stateDir, now: NOW }).includes("SENTINEL-PROSE"));
   const lines = text.split("\n");
   assert.ok(lines.includes("  - major `core/src/preset/schema/easing.rs:88` snap test missing the alpha-near-1 case - resolved in `e4f5a6b`"));
   assert.ok(lines.includes('  - minor `docs/presets.md:612` occlude row still says "with a stage"'));
@@ -136,7 +149,7 @@ test("a plan spanning two runs counts each lock wait in the run it happened in, 
   const rec = state.plans["0175"];
   rec.steps.unshift({ kind: "implement", label: "0175-00-implement", started: "2026-09-14T20:05:00.000Z", ended: "2026-09-14T21:00:00.000Z", result: { status: "ok", spendUsd: 1 } });
   rec.lockWaits.unshift({ lock: "suite", ms: 20 * 60000, at: "2026-09-14T20:30:00.000Z" });
-  const lines = renderDigest(state, { repo, stateDir }).split("\n");
+  const lines = renderHistory(state, { repo, stateDir }).split("\n");
   const runLines = lines.filter((l) => l.startsWith("- run: "));
   assert.equal(runLines.length, 2);
   assert.match(runLines[0], /Suite-lock wait 38 min; close-lock wait 6 min\.$/, "the newer run keeps only its own waits");
@@ -160,14 +173,14 @@ test("a closed plan's bullet names this run's spend and the plan's total, and th
     result: { status: "ok", spendUsd: 20.14 },
   });
 
-  const lines = renderDigest(state, { repo, stateDir }).split("\n");
+  const lines = renderHistory(state, { repo, stateDir }).split("\n");
   const bullet = lines.find((l) => l.startsWith("- **0175 - "));
   assert.match(bullet, /\$12\.30 this run, \$32\.44 total\./, bullet);
 
   // The figure the bullet calls "this run" is the one Totals sums, for the run the bullet is under.
   const inThisRun = lines.filter((l) => l.startsWith("- run: "))[0];
   assert.match(inThisRun, /\$12\.30\./, inThisRun);
-  const thisRun = [...renderDigest(state, { repo, stateDir }).matchAll(/^- \*\*0175 - .*?\$(\d+\.\d\d) this run/gm)].map((m) => Number(m[1]));
+  const thisRun = [...renderHistory(state, { repo, stateDir }).matchAll(/^- \*\*0175 - .*?\$(\d+\.\d\d) this run/gm)].map((m) => Number(m[1]));
   assert.deepEqual(thisRun, [12.3], "the plan merged in one run, and only that run lists it as closed");
 });
 
@@ -181,10 +194,10 @@ test("a run's cap stop and its not-started plans render from state alone, byte f
     { plan: "0181", lane: "a", reason: "worktree cap" },
     { plan: "0182", lane: "a", reason: "after 0180 (parked)" },
   ];
-  const path = join(tmp("rlx-digest-out-"), "digest.md");
-  const first = writeDigest(path, state, { repo, stateDir });
+  const path = join(tmp("rlx-digest-out-"), "digest-history.md");
+  const first = writeHistory(path, state, { repo, stateDir });
   rmSync(path);
-  assert.equal(writeDigest(path, state, { repo, stateDir }), first);
+  assert.equal(writeHistory(path, state, { repo, stateDir }), first);
 
   const lines = first.split("\n");
   assert.ok(lines.includes("- **Lane a stopped at the worktree cap** (`max_open_worktrees` 3): 0181 was not opened. Worktrees held by 0175, 0180, 0185."), first);
@@ -196,7 +209,7 @@ test("a run's cap stop and its not-started plans render from state alone, byte f
   // The same run with nothing left unopened has no Not started section.
   run.stops = [];
   run.notStarted = [];
-  assert.ok(!renderDigest(state, { repo, stateDir }).includes("### Not started"));
+  assert.ok(!renderHistory(state, { repo, stateDir }).includes("### Not started"));
 });
 
 const W = (five, seven, status = "allowed") => ({ status, five: { utilization: five, resetsAt: 1789481400 }, seven: { utilization: seven, resetsAt: 1790056800 } });
@@ -276,7 +289,7 @@ test("a plan parked overnight reports its active time in the run it merged in, n
   const { repo, head } = repoWithTag();
   const stateDir = tmp("rlx-digest-state-");
   const state = pilotState(repo, head, stateDir);
-  const text = renderDigest(state, { repo, stateDir });
+  const text = renderHistory(state, { repo, stateDir });
   const line = text.split("\n").find((l) => l.startsWith("- **0185 - "));
   assert.ok(line, text);
   // Steps in the morning run: 30 + 26 min; gates: 12 + 11 min. 79 min in all.
@@ -293,7 +306,7 @@ test("the newest run lists the plans an earlier run left parked, and the earlier
   const { repo, head } = repoWithTag();
   const stateDir = tmp("rlx-digest-state-");
   const state = pilotState(repo, head, stateDir);
-  const text = renderDigest(state, { repo, stateDir });
+  const text = renderHistory(state, { repo, stateDir });
   const [newest, earlier] = text.split(/^## Run /m).slice(1);
   const section = newest.slice(newest.indexOf("#### Still parked from an earlier run"), newest.indexOf("### Closed"));
   const items = section.split("\n").filter((l) => l.startsWith("- **"));
@@ -320,8 +333,8 @@ test("the newest run lists the plans an earlier run left parked, and the earlier
   assert.match(newest, /^- usage at run start: 5h 0\.02 \(resets [^)]+\); 7d 0\.00 \(resets [^)]+\)\. At run end: 5h 0\.08 \(resets [^)]+\); 7d 0\.01 \(resets [^)]+\)\.$/m);
   assert.match(newest, /^- gate: 23 min; full suite 21 min over 2 runs, served -P fast none, everything else 2 min; 0 suite runs skipped\.$/m);
 
-  // And the whole digest regenerates byte for byte.
-  assert.equal(renderDigest(state, { repo, stateDir }), text);
+  // And the whole history regenerates byte for byte.
+  assert.equal(renderHistory(state, { repo, stateDir }), text);
 });
 
 // ADR-0211: a served run is a `-P fast` run in the full suite's place, so counting it with the full
@@ -333,14 +346,14 @@ test("Totals counts a served suite run apart from a full one, and the digest sti
   // The close tip was served: `-P fast` ran for 4 minutes where the full suite ran 11.
   const postClose = state.plans["0185"].gates.find((g) => g.label === "post-close");
   postClose.commands = [{ name: "cargo nextest", code: 0, ms: 4 * 60000, suite: true, served: true, by: "gate pre-review" }];
-  const text = renderDigest(state, { repo, stateDir });
+  const text = renderHistory(state, { repo, stateDir });
   const newest = text.split(/^## Run /m)[1];
   assert.match(newest, /^- gate: 16 min; full suite 10 min over 1 run, served -P fast 4 min over 1 run, everything else 2 min; 0 suite runs skipped\.$/m);
-  assert.equal(renderDigest(state, { repo, stateDir }), text);
+  assert.equal(renderHistory(state, { repo, stateDir }), text);
 
   // A skipped suite step is still neither: it is counted as a skip and costs no minutes.
   postClose.commands = [{ name: "cargo nextest", code: 0, ms: 0, suite: true, skipped: true, by: "gate pre-review" }];
-  assert.match(renderDigest(state, { repo, stateDir }), /^- gate: 12 min; full suite 10 min over 1 run, served -P fast none, everything else 2 min; 0 suite runs skipped\.$/m);
+  assert.match(renderHistory(state, { repo, stateDir }), /^- gate: 12 min; full suite 10 min over 1 run, served -P fast none, everything else 2 min; 0 suite runs skipped\.$/m);
 });
 
 test("newest run first, and a run with nothing in it says so", () => {
@@ -353,10 +366,82 @@ test("newest run first, and a run with nothing in it says so", () => {
     lanes: {},
     plans: {},
   };
-  const text = renderDigest(state, { repo: tmp(), stateDir: tmp() });
+  const text = renderHistory(state, { repo: tmp(), stateDir: tmp() });
   assert.ok(text.indexOf("## Run 2026-09-15 10:00 -> running") < text.indexOf("## Run 2026-09-14 10:00"));
   assert.match(text, /### Closed\n\n- none\n/);
   assert.match(text, /still running/);
+});
+
+// ADR-0214: the page answers "where am I needed" first and "what is happening" second, and the
+// per-run account it used to carry is a command away.
+
+test("the page leads with the worklist and carries no run's own totals", () => {
+  const { repo, head } = repoWithTag();
+  const stateDir = tmp("rlx-digest-state-");
+  const state = pilotState(repo, head, stateDir);
+  state.runs[0].cli = { version: "2.1.400", warning: "a patch update of a verified version" };
+  const text = renderDigest(state, { repo, stateDir, now: NOW });
+  const lines = text.split("\n");
+
+  assert.deepEqual(
+    lines.filter((l) => l.startsWith("## ")),
+    ["## Needs you", "## Now"],
+  );
+  for (const gone of ["## Run ", "### Closed", "### Totals", "### Failed and parked", "Still parked from an earlier run", "- run: "]) {
+    assert.ok(!text.includes(gone), `${gone} belongs to the history page, not this one: ${text}`);
+  }
+  // The CLI reading belongs to the run that is current, not to the one that carried the warning.
+  assert.ok(!text.includes("2.1.400"), "an older run's CLI warning is not current state");
+
+  // Both standing parks, each with its age and the one command that clears it.
+  assert.equal(lines[lines.indexOf("## Needs you") + 2], "2 parks, 1 merge with open findings.");
+  assert.match(text, /^- \*\*0185 merged with 2 open findings\*\*:\n {2}- minor `a\.rs:3` stale comment\n {2}- nit `b\.md` typo$/m);
+  assert.match(text, /^- \*\*0175\*\* \(`plan_wrong`\) parked 2026-09-14 17:40, 18 h 20 min ago\. .*Worktree removed; `resume` reopens it from branch `plan-0175-an-eased-value-arrives`\.$/m);
+  assert.match(text, /^ {2}Resume: `node tools\/conductor\/conductor\.mjs resume 0175`$/m);
+  assert.match(text, /^ {2}Resume: `node tools\/conductor\/conductor\.mjs resume 0180`$/m);
+  assert.match(text, /^- \*\*0180\*\* \(`plan_wrong`\).*Usage at park: 5h 0\.31 \(resets 09-15 \d\d:\d\d\); 7d 0\.85 \(resets 09-22 \d\d:\d\d\); allowed_warning\.$/m);
+
+  // Now, with no run live: the last run's end and its one-line totals.
+  assert.match(text, /^- No run is live\. The last ended 2026-09-15 11:00: 1 merged, 0 parked, 2 h 30 min, \$2\.00\.$/m);
+});
+
+test("a live run's Now names each lane's plan, step and spend so far", () => {
+  const { repo, head } = repoWithTag();
+  const stateDir = tmp("rlx-digest-state-");
+  const state = pilotState(repo, head, stateDir);
+  state.runs[1].ended = null;
+  state.runs[1].lanes = ["a", "b"];
+  state.lanes = { a: { plan: "0185", step: "0185-03-review", stepStarted: "2026-09-15T09:14:00.000Z" }, b: { plan: null, step: null } };
+  const text = renderDigest(state, { repo, stateDir, now: Date.parse("2026-09-15T09:40:00.000Z") });
+  assert.match(text, /^- lane a: 0185, step `0185-03-review` for 26 min, \$10\.10 spent so far\.$/m);
+  assert.match(text, /^- lane b: idle\.$/m);
+  assert.match(text, /^- run started 2026-09-15 08:30, 1 h 10 min ago\.$/m);
+});
+
+test("an empty worklist is one line, and says what it found nothing of", () => {
+  const state = {
+    version: 1,
+    runs: [{ started: "2026-09-15T10:00:00.000Z", ended: "2026-09-15T11:00:00.000Z", lanes: ["a"] }],
+    lanes: {},
+    plans: {},
+  };
+  const lines = renderDigest(state, { repo: tmp(), stateDir: tmp(), now: NOW }).split("\n");
+  const at = lines.indexOf("## Needs you");
+  assert.deepEqual(lines.slice(at + 1, at + 5), ["", "Nothing: no park, no lane stopped at the worktree cap, no open finding.", "", "## Now"]);
+});
+
+test("digest --history carries every run with its Closed and its Totals", () => {
+  const { repo, head } = repoWithTag();
+  const stateDir = tmp("rlx-digest-state-");
+  const state = pilotState(repo, head, stateDir);
+  const runs = renderHistory(state, { repo, stateDir }).split(/^## Run /m).slice(1);
+  assert.equal(runs.length, 2);
+  for (const run of runs) {
+    assert.ok(run.includes("### Closed"), run);
+    assert.ok(run.includes("### Totals"), run);
+    assert.match(run, /^- run: \d+ merged, \d+ parked, /m);
+  }
+  assert.match(runs[0], /^- \*\*0185 - Plan 0185\*\* - 0\.124\.0, tag `v0\.124\.0` annotated, /m);
 });
 
 test("durations", () => {

@@ -1,15 +1,22 @@
-// tools/conductor/digest.md: what happened, readable the morning after (ADR-0205).
+// tools/conductor/digest.md: what is happening, and where you are needed (ADR-0214).
 //
-// Generated from state/ and git only — never written by hand, never inside a worktree — so
-// deleting it and regenerating from the same state yields the same bytes. It carries no generation
-// timestamp for that reason. Newest run first; each run's section is Needs you, Still parked from
-// an earlier run (the newest run only, and only when one is), Not started (only when a queued plan
-// was not opened), Closed, Failed and parked, Totals. Time is always time within one run: a plan's
-// active time is its steps' and gates' own durations, never a span across a park.
+// Two renderers over one state reader. `renderDigest` is the current-state page, rewritten after
+// every step: **Needs you** — the whole worklist — then **Now**, what each lane is doing this minute.
+// `renderHistory` is the per-run account `conductor.mjs digest --history` writes beside it in
+// digest-history.md: newest run first, each run's Needs you, Still parked from an earlier run (the
+// newest run only), Not started, Closed, Failed and parked, Totals. Both build from
+// `readDigestState` and neither reaches past it: a second traversal of state/conductor.json is where
+// the two pages would drift.
 //
-// A finding line copies the verdict outcome the reviewer emitted — severity, file:line, what — and
-// nothing else; the digest never summarizes review prose. An event (a step, a park, a merge)
-// belongs to the latest run that had started by the event's timestamp.
+// Generated from state/ and git only — never written by hand, never inside a worktree — so neither
+// page carries a generation timestamp. The current page's park ages and a live lane's elapsed time
+// are the one reading of the clock, taken from the reader's `now`; with no run live and nothing
+// parked, either page regenerated from the same state yields the same bytes.
+//
+// Time in the history is always time within one run: a plan's active time is its steps' and gates'
+// own durations, never a span across a park. A finding line copies the verdict outcome the reviewer
+// emitted — severity, file:line, what — and nothing else; neither page summarizes review prose. An
+// event (a step, a park, a merge) belongs to the latest run that had started by the event's timestamp.
 
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -28,6 +35,7 @@ const API_REASONS = new Set(["api", "no_outcome", "bad_outcome"]);
 const stamp = (iso) => (iso ? iso.slice(0, 16).replace("T", " ") : "?");
 const usd = (n) => `$${(n ?? 0).toFixed(2)}`;
 const short = (sha) => (sha ? sha.slice(0, 7) : "?");
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 export function duration(ms) {
   if (!(ms >= 0)) return "?";
@@ -152,12 +160,148 @@ function closedFindings(rec) {
   return lines;
 }
 
-export function renderDigest(state, { repo, stateDir }) {
+/**
+ * The one traversal of `state`, `state/` and git both pages render from. `now` is an option so a
+ * test can pin the clock the current page's ages read.
+ */
+export function readDigestState(state, { repo, stateDir, now = Date.now() }) {
   const runs = state.runs ?? [];
-  const lockLog = readLockLog(stateDir);
-  const ledger = readLedger(join(stateDir, "suite-ledger.jsonl"));
-  const plans = Object.values(state.plans).sort((a, b) => a.plan.localeCompare(b.plan));
-  const out = ["# Conductor digest", "", "Generated from `tools/conductor/state/` and git after every step. Newest run first.", ""];
+  const plans = Object.values(state.plans ?? {}).sort((a, b) => a.plan.localeCompare(b.plan));
+  const latest = runs.at(-1) ?? null;
+  return {
+    repo,
+    stateDir,
+    now,
+    runs,
+    plans,
+    latest,
+    running: Boolean(latest && !latest.ended),
+    laneStates: state.lanes ?? {},
+    lockLog: readLockLog(stateDir),
+    ledger: readLedger(join(stateDir, "suite-ledger.jsonl")),
+    parked: plans.filter((r) => r.status === "parked" && r.park),
+    merged: plans.filter((r) => r.status === "merged"),
+    stops: latest?.stops ?? [],
+    cli: latest?.cli ?? null,
+  };
+}
+
+/** `1 merged, 0 parked, 6 h 28 min, $12.30` — one run's own figures, for both pages. */
+function runFigures(view, i) {
+  const run = view.runs[i];
+  const inRun = (iso) => runOf(view.runs, iso) === i;
+  const merged = view.plans.filter((r) => r.status === "merged" && inRun(r.merge?.at)).length;
+  const parked = view.plans.reduce((n, r) => n + r.parks.filter((p) => inRun(p.at)).length, 0);
+  const spend = view.plans.reduce((s, r) => s + spendInRun(r, inRun), 0);
+  return `${merged} merged, ${parked} parked, ${run.ended ? span(run.started, run.ended) : "still running"}, ${usd(spend)}`;
+}
+
+/** Where a parked plan's work sits: the worktree it still holds, or the branch `resume` reopens. */
+function parkHolds(rec) {
+  return laneOpen(rec) ? `Holds \`${rec.worktree}\`.` : `Worktree removed; \`resume\` reopens it from branch \`${rec.branch ?? "?"}\`.`;
+}
+
+/** A standing park as the worklist states it: one bullet, then the command that clears it. */
+function standingParkLines(view, rec) {
+  const p = rec.park;
+  const i = runOf(view.runs, p.at);
+  const step = parkSession(rec, p, (iso) => runOf(view.runs, iso) === i);
+  const usage = step ? stepUsage(step).last : null;
+  return [
+    `- **${rec.plan}** (\`${p.reason}\`)${p.phase ? ` at Phase ${p.phase}` : ""} parked ${stamp(p.at)}, ${duration(view.now - Date.parse(p.at))} ago. ` +
+      `${p.detail}. Read: ${p.read ?? "the plan"}. ${parkHolds(rec)}` +
+      (p.dirty ? ` Left dirty: ${dirtyText(p.dirty)}.` : "") +
+      (usage ? ` Usage at park: ${usageLine(usage)}.` : ""),
+    `  Resume: \`${resumeCommand(rec.plan)}\``,
+  ];
+}
+
+/** The current page's first section: everything waiting on the owner, and nothing else. */
+function needsYou(view) {
+  const lines = [];
+  const counts = { parked: 0, stops: 0, findings: 0, lanes: 0 };
+  // The run carries its own CLI reading, so the line stops appearing on the first run whose version is listed.
+  if (view.cli?.warning) {
+    lines.push(`- **claude ${view.cli.version} is not a verified CLI version** - the last run went ahead with a warning (ADR-0208): ${view.cli.warning}.`);
+  }
+  for (const rec of view.parked) {
+    counts.parked += 1;
+    lines.push(...standingParkLines(view, rec));
+  }
+  for (const s of view.stops) {
+    counts.stops += 1;
+    lines.push(
+      `- **Lane ${s.lane} stopped at the worktree cap** (\`max_open_worktrees\` ${s.max}): ${s.plan} was not opened. ` +
+        `Worktrees held by ${s.holding.join(", ")}.`,
+    );
+  }
+  for (const rec of view.merged) {
+    // A cleanup failure is settled the moment the directory is gone, whatever the record still says.
+    if (rec.cleanup && !rec.cleanup.ok && laneOpen(rec)) {
+      counts.lanes += 1;
+      lines.push(`- **${rec.plan} merged, lane not removed**: ${rec.cleanup.detail}. Holds \`${rec.worktree}\`.`);
+    }
+    const open = openFindings(rec);
+    if (open.length === 0) continue;
+    counts.findings += 1;
+    lines.push(`- **${rec.plan} merged with ${plural(open.length, "open finding")}**:`);
+    for (const f of open) lines.push(`  - ${f.severity} \`${f.line ? `${f.file}:${f.line}` : f.file}\` ${f.what}`);
+  }
+  const parts = [];
+  if (counts.parked) parts.push(plural(counts.parked, "park"));
+  if (counts.stops) parts.push(`${plural(counts.stops, "lane")} stopped at the worktree cap`);
+  if (counts.findings) parts.push(`${plural(counts.findings, "merge")} with open findings`);
+  if (counts.lanes) parts.push(`${plural(counts.lanes, "lane")} still on disk after a merge`);
+  const summary = parts.length ? `${parts.join(", ")}.` : "Nothing: no park, no lane stopped at the worktree cap, no open finding.";
+  return ["## Needs you", "", summary, "", ...(lines.length ? [...lines, ""] : [])];
+}
+
+/** The current page's second section: what each lane is doing, or what the last run left. */
+function nowSection(view) {
+  const out = ["## Now", ""];
+  if (!view.latest) return [...out, "No run has started yet.", ""];
+  if (!view.running) {
+    return [...out, `- No run is live. The last ended ${stamp(view.latest.ended)}: ${runFigures(view, view.runs.length - 1)}.`, ""];
+  }
+  const lanes = view.latest.lanes?.length ? view.latest.lanes : Object.keys(view.laneStates).sort();
+  for (const lane of lanes) {
+    const l = view.laneStates[lane];
+    if (!l?.plan) {
+      out.push(`- lane ${lane}: idle.`);
+      continue;
+    }
+    const rec = view.plans.find((r) => r.plan === l.plan);
+    const where = l.step ? `step \`${l.step}\` for ${duration(view.now - Date.parse(l.stepStarted))}` : "between steps";
+    out.push(`- lane ${lane}: ${l.plan}, ${where}, ${usd(rec ? totalSpend(rec) : 0)} spent so far.`);
+  }
+  out.push(`- run started ${stamp(view.latest.started)}, ${duration(view.now - Date.parse(view.latest.started))} ago.`, "");
+  return out;
+}
+
+/** The page written after every step: the worklist, then what is running. */
+export function renderDigest(state, opts) {
+  const view = readDigestState(state, opts);
+  return [
+    "# Conductor digest",
+    "",
+    "The current state, rewritten from `tools/conductor/state/` and git after every step. " +
+      "Per-run history: `node tools/conductor/conductor.mjs digest --history`.",
+    "",
+    ...needsYou(view),
+    ...nowSection(view),
+  ].join("\n");
+}
+
+/** The per-run account `digest --history` writes to digest-history.md. */
+export function renderHistory(state, opts) {
+  const view = readDigestState(state, opts);
+  const { repo, runs, plans, lockLog, ledger } = view;
+  const out = [
+    "# Conductor history",
+    "",
+    "Every run, newest first, regenerated from `tools/conductor/state/` and git by `conductor.mjs digest --history`.",
+    "",
+  ];
   if (runs.length === 0) out.push("No run has started yet.", "");
 
   for (let i = runs.length - 1; i >= 0; i--) {
@@ -191,7 +335,7 @@ export function renderDigest(state, { repo, stateDir }) {
         }
         const open = openFindings(rec);
         if (open.length > 0) {
-          minorsMerged.push(`- **${rec.plan} merged with ${open.length} open finding${open.length === 1 ? "" : "s"}**:`);
+          minorsMerged.push(`- **${rec.plan} merged with ${plural(open.length, "open finding")}**:`);
           for (const f of open) minorsMerged.push(`  - ${f.severity} \`${f.line ? `${f.file}:${f.line}` : f.file}\` ${f.what}`);
         }
       }
@@ -208,9 +352,8 @@ export function renderDigest(state, { repo, stateDir }) {
       for (const rec of plans) {
         if (rec.status !== "parked" || !rec.park?.at || runOf(runs, rec.park.at) >= i) continue;
         const p = rec.park;
-        const holds = laneOpen(rec) ? `Holds \`${rec.worktree}\`.` : `Worktree removed; \`resume\` reopens it from branch \`${rec.branch ?? "?"}\`.`;
         standing.push(
-          `- **${rec.plan}** (\`${p.reason}\`) parked ${stamp(p.at)}, ${span(p.at, run.started)} before this run. ${p.detail}. ${holds}`,
+          `- **${rec.plan}** (\`${p.reason}\`) parked ${stamp(p.at)}, ${span(p.at, run.started)} before this run. ${p.detail}. ${parkHolds(rec)}`,
           `  Resume: \`${resumeCommand(rec.plan)}\``,
         );
       }
@@ -272,9 +415,6 @@ export function renderDigest(state, { repo, stateDir }) {
     // Totals
     out.push("### Totals", "");
     const laneLines = [];
-    let runMerged = 0;
-    let runParked = 0;
-    let runSpend = 0;
     let closeWait = 0;
     let suiteWait = 0;
     for (const lane of run.lanes) {
@@ -282,9 +422,6 @@ export function renderDigest(state, { repo, stateDir }) {
       const merged = recs.filter((r) => r.status === "merged" && inRun(r.merge?.at)).length;
       const parked = recs.reduce((n, r) => n + r.parks.filter((p) => inRun(p.at)).length, 0);
       const spend = recs.reduce((s, r) => s + spendInRun(r, inRun), 0);
-      runMerged += merged;
-      runParked += parked;
-      runSpend += spend;
       laneLines.push(`lane ${lane}: ${merged} merged, ${parked} parked, ${usd(spend)}`);
       for (const r of recs) {
         for (const w of Array.isArray(r.lockWaits) ? r.lockWaits : []) {
@@ -296,10 +433,7 @@ export function renderDigest(state, { repo, stateDir }) {
     }
     suiteWait += lockLog.filter((e) => e.lock === "suite" && inRun(e.at)).reduce((s, e) => s + (e.waited_ms ?? 0), 0);
     out.push(`- ${laneLines.join("; ")}.`);
-    out.push(
-      `- run: ${runMerged} merged, ${runParked} parked, ${run.ended ? span(run.started, run.ended) : "still running"}, ${usd(runSpend)}. ` +
-        `Suite-lock wait ${duration(suiteWait)}; close-lock wait ${duration(closeWait)}.`,
-    );
+    out.push(`- run: ${runFigures(view, i)}. Suite-lock wait ${duration(suiteWait)}; close-lock wait ${duration(closeWait)}.`);
 
     const readings = plans
       .flatMap((r) => r.steps.filter((s) => inRun(s.started)))
@@ -333,7 +467,7 @@ export function renderDigest(state, { repo, stateDir }) {
     }
     // Every skip, the gate's and a session's alike, is a line in the suite ledger.
     const suiteSkips = ledger.filter((e) => e.skip && inRun(e.at)).length;
-    const times = (n) => `${n} run${n === 1 ? "" : "s"}`;
+    const times = (n) => plural(n, "run");
     out.push(
       `- gate: ${duration(suiteMs + otherMs + servedMs)}; full suite ${duration(suiteMs)} over ${times(suiteRuns)}, ` +
         `served -P fast ${servedRuns ? `${duration(servedMs)} over ${times(servedRuns)}` : "none"}, ` +
@@ -346,6 +480,12 @@ export function renderDigest(state, { repo, stateDir }) {
 
 export function writeDigest(path, state, opts) {
   const text = renderDigest(state, opts);
+  writeAtomic(path, text);
+  return text;
+}
+
+export function writeHistory(path, state, opts) {
+  const text = renderHistory(state, opts);
   writeAtomic(path, text);
   return text;
 }

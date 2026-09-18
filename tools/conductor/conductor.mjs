@@ -6,14 +6,16 @@
 //
 //   node tools/conductor/conductor.mjs run [--lane a|b] [--once]
 //   node tools/conductor/conductor.mjs status
+//   node tools/conductor/conductor.mjs digest [--history]
 //   node tools/conductor/conductor.mjs resume NNNN
 //   node tools/conductor/conductor.mjs park NNNN
 //   node tools/conductor/conductor.mjs adopt-close NNNN
 //   node tools/conductor/conductor.mjs abort
 //   node tools/conductor/conductor.mjs check
 //
-// Runs from the main checkout. Runtime output lives under tools/conductor/state/ and in
-// tools/conductor/digest.md, both gitignored. tools/conductor/README.md is the operator guide.
+// Runs from the main checkout. Runtime output lives under tools/conductor/state/, in
+// tools/conductor/digest.md and — only once `digest --history` has been asked for — in
+// tools/conductor/digest-history.md, all gitignored. tools/conductor/README.md is the operator guide.
 
 import { spawnSync } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -22,7 +24,7 @@ import { fileURLToPath } from "node:url";
 
 import { pidAlive } from "./with-lock.mjs";
 import { adoptedClose, verifyClose } from "./lib/close.mjs";
-import { writeDigest } from "./lib/digest.mjs";
+import { writeDigest, writeHistory } from "./lib/digest.mjs";
 import { currentBranch, head, isClean } from "./lib/git.mjs";
 import { appendPark, dirtyText, dirtyWorktree } from "./lib/inbox.mjs";
 import { runLanes } from "./lib/lane.mjs";
@@ -68,6 +70,7 @@ export function paths({ repo = REPO, toolDir = TOOL_DIR } = {}) {
     local: join(toolDir, "local.json"),
     stateDir: join(toolDir, "state"),
     digest: join(toolDir, "digest.md"),
+    digestHistory: join(toolDir, "digest-history.md"),
     settings: join(toolDir, "settings.conductor.json"),
     prompts: join(toolDir, "prompts"),
     withLock: join(toolDir, "with-lock.mjs"),
@@ -265,6 +268,24 @@ function cmdStatus(args, o) {
   return 0;
 }
 
+/**
+ * `digest` rewrites the current-state page; `digest --history` writes the per-run account beside it
+ * (ADR-0214). The history is written only when asked for: a second page always on disk, read
+ * approximately never, is where a stale reading would hide.
+ */
+function cmdDigest(args, o) {
+  const p = o.p;
+  const state = loadState(p.stateDir);
+  if (args.includes("--history")) {
+    writeHistory(p.digestHistory, state, { repo: p.repo, stateDir: p.stateDir });
+    o.log(`history: ${p.digestHistory}`);
+    return 0;
+  }
+  regenerate(p, state);
+  o.log(`digest: ${p.digest}`);
+  return 0;
+}
+
 /** Why a park still holds, or null when the owner has acted on it. */
 function parkStillTrue(p, rec) {
   const { reason, phase } = rec.park;
@@ -432,7 +453,7 @@ function cmdCheck(args, o) {
   return 0;
 }
 
-const COMMANDS = { run: cmdRun, status: cmdStatus, resume: cmdResume, park: cmdPark, "adopt-close": cmdAdoptClose, abort: cmdAbort, check: cmdCheck };
+const COMMANDS = { run: cmdRun, status: cmdStatus, digest: cmdDigest, resume: cmdResume, park: cmdPark, "adopt-close": cmdAdoptClose, abort: cmdAbort, check: cmdCheck };
 
 /** `overrides` exists for tests: { p, claude, gate, worktreeRoot, lockDir, lockPollMs, pollMs, commitPollMs, log, err, signals }. */
 export async function main(argv, overrides = {}) {
@@ -445,7 +466,10 @@ export async function main(argv, overrides = {}) {
   const [command, ...args] = argv;
   const fn = COMMANDS[command];
   if (!fn) {
-    o.err("usage: node tools/conductor/conductor.mjs run [--lane a|b] [--once] | status | resume NNNN | park NNNN | adopt-close NNNN | abort | check");
+    o.err(
+      "usage: node tools/conductor/conductor.mjs run [--lane a|b] [--once] | status | digest [--history] | " +
+        "resume NNNN | park NNNN | adopt-close NNNN | abort | check",
+    );
     return 2;
   }
   return fn(args, o);

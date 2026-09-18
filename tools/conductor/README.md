@@ -51,6 +51,7 @@ All of them run from the main checkout.
 |---|---|
 | `run [--lane a\|b] [--once]` | Runs the queue: both lanes, or one. `--once` stops a lane after one plan. A second conductor is refused while one runs. |
 | `status` | Per lane: the plan, the step, the time in it, the spend so far. Then every parked plan with its reason. Regenerates the digest and ends with its path. |
+| `digest [--history]` | Rewrites `digest.md`. `--history` writes the per-run account to `digest-history.md` instead, and is the only thing that ever writes that file. |
 | `resume NNNN` | Queues a parked plan again. Refused while the park's reason still holds, e.g. a `human` phase the plan's log does not yet mark done. |
 | `park NNNN` | Parks a plan that has not merged, with an inbox entry. |
 | `adopt-close NNNN` | Records the close a lane already carries, when a session committed one and then lost its outcome. Verifies the branch first and writes nothing unless it passes. |
@@ -101,12 +102,27 @@ once, whatever `state/conductor.json` says.
 
 ## What to read afterwards
 
-- **`tools/conductor/digest.md`** is the morning-after record, newest run first:
-  - **Needs you:** every park with its resume command and the usage reading its session ended on,
-    every lane that stopped at the worktree cap, then every merge's open findings with their
-    `file:line`. The newest run adds **Still parked from an earlier run**: each plan still parked
-    from before it, with its age, the worktree it holds (or the branch `resume` reopens it from) and
-    its resume command.
+- **`tools/conductor/digest.md`** is the **current state**, in two sections and nothing else
+  (ADR-0214):
+  - **Needs you** — the whole worklist, first, so that a page whose first section is empty means
+    nothing is waiting on you. It opens with a one-line count and then lists: every standing park
+    with its age, the worktree it holds (or the branch `resume` reopens it from), the usage reading
+    its session ended on and its resume command; every lane stopped at the worktree cap, naming what
+    holds the slots; every lane still on disk after a merge; every merge's open findings with their
+    `file:line`; and the CLI-version warning when the last run carried one.
+  - **Now** — per lane, the plan, the step and how long it has been in it, and what the plan has
+    spent. When no run is live, the last run's end time and its one-line totals.
+
+  It is gitignored and rewritten from `state/` and `git` after every step, so deleting it loses
+  nothing. Nothing on it is per-run: **what last night produced is `digest --history`**, or the
+  closed plan's own committed `## Close review`.
+- **`tools/conductor/digest-history.md`** is the per-run account, written only by
+  `conductor.mjs digest --history`, newest run first:
+  - **Needs you:** every park in that run with its resume command and the usage reading its session
+    ended on, every lane that stopped at the worktree cap, then every merge's open findings with
+    their `file:line`. The newest run adds **Still parked from an earlier run**: each plan still
+    parked from before it, with its age, the worktree it holds (or the branch `resume` reopens it
+    from) and its resume command.
   - **Not started:** each queued plan the run did not open, with why: `worktree cap`, `--once`, or
     `after NNNN (parked)` naming the plan it waits on and that plan's status. Left out when the run
     opened everything it could.
@@ -121,8 +137,7 @@ once, whatever `state/conductor.json` says.
     7-day usage windows at run start and run end, and gate minutes split into the full suite and
     everything else, with the count of suite runs skipped.
 
-  It is gitignored and regenerated from `state/` and `git` after every step, so deleting it loses
-  nothing.
+  It is gitignored too, and both pages are built from one reader over `state/conductor.json`.
 - **`state/live.log`** holds every line the run terminal printed, one header per run, for a run you
   did not watch.
 - **`## Close review` in each closed plan** holds the review itself, committed with the close.
@@ -235,7 +250,7 @@ an inbox entry, not a park: close the shell, then `git worktree remove`, `git wo
 - **A served run never becomes a green record.** Its ledger line carries `served: true` and a `cmd`
   that is not the one the key names, so neither lookup can read it back: the next stage leans on the
   full-suite record again, and one `-P fast` never chains off another. The run terminal prints a
-  served step's own line naming the tier and the tree it leaned on, and the digest's Totals counts
+  served step's own line naming the tier and the tree it leaned on, and the history's Totals counts
   served runs apart from full ones.
 - **The locks.** `with-lock.mjs` holds two machine-wide locks. The **suite** lock stops two lanes
   running the GPU suites at once. The **close** lock runs from before a review until `main` has
@@ -279,8 +294,9 @@ probe before the review is not a defect yet. `post-close` still parks a close th
 produced on (ADR-0208).
 
 - **A higher patch of a listed major.minor runs, with a warning.** `run` and `check` print it, the run
-  records it as `cli`, and that run's **Needs you** in the digest carries it. The line stops appearing
-  on the first run whose version is listed. This CLI numbers nearly every release as a patch, so in
+  records it as `cli`, and the digest's **Needs you** carries it while that run is the latest one.
+  The line stops appearing on the first run whose version is listed; the history keeps it on the run
+  that carried it. This CLI numbers nearly every release as a patch, so in
   practice most updates land here.
 - **Any other unlisted version is refused**, as before: a new minor or major, or a lower patch.
 

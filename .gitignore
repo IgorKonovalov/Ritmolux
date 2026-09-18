@@ -78,8 +78,10 @@ spike/
 # caps, which are the owner's figures and never committed.
 tools/conductor/state/
 tools/conductor/local.json
-# The morning-after digest (Plan 0187 Phase 4b), regenerated from state/ and git after every step.
+# The current-state digest (Plan 0187 Phase 4b), regenerated from state/ and git after every step,
+# and the per-run history beside it, written only when `digest --history` asks for it (ADR-0214).
 tools/conductor/digest.md
+tools/conductor/digest-history.md
 
 # The diffusion filter's Python environment (Plan 0106). `docs/diffusion-filter.md`
 # tells a creator to build it at the repo root with `python -m venv .venv`, so it

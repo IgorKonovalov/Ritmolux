@@ -8,7 +8,7 @@ import { appendFileSync, existsSync, readFileSync, rmSync, writeFileSync } from 
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { writeDigest } from "../lib/digest.mjs";
+import { writeDigest, writeHistory } from "../lib/digest.mjs";
 import { git, resolveCommit, tagObjectType } from "../lib/git.mjs";
 import { runLanes } from "../lib/lane.mjs";
 import { readLedger } from "../lib/ledger.mjs";
@@ -73,15 +73,20 @@ export function scratch({ plans, lanes, after = {}, spec = {}, local = {} }) {
     pollMs: 50,
     events: (name, data) => appendFileSync(events, JSON.stringify({ t: Date.now(), plan: data.plan, event: `conductor-${name}` }) + "\n"),
   };
-  // The digest lives outside the scratch repository, as the real one lives in a gitignored path:
+  // Both pages live outside the scratch repository, as the real ones live in gitignored paths:
   // a file inside would make the main checkout dirty and refuse every fast-forward.
-  const digestPath = join(tmp("rlx-digest-"), "digest.md");
-  ctx.onChange = () => writeDigest(digestPath, ctx.state, { repo, stateDir });
-  const digest = (heading) => {
-    const text = readFileSync(digestPath, "utf8");
+  const outDir = tmp("rlx-digest-");
+  const digestPath = join(outDir, "digest.md");
+  const historyPath = join(outDir, "digest-history.md");
+  ctx.onChange = () => {
+    writeDigest(digestPath, ctx.state, { repo, stateDir });
+    writeHistory(historyPath, ctx.state, { repo, stateDir });
+  };
+  const sectionOf = (path) => (heading) => {
+    const text = readFileSync(path, "utf8");
     if (!heading) return text;
     const start = text.indexOf(`${heading}\n`);
-    assert.ok(start >= 0, `digest has no ${heading}:\n${text}`);
+    assert.ok(start >= 0, `${path} has no ${heading}:\n${text}`);
     const rest = text.slice(start + heading.length + 1);
     const end = rest.search(/^#{2,3} /m);
     return end < 0 ? rest : rest.slice(0, end);
@@ -92,7 +97,7 @@ export function scratch({ plans, lanes, after = {}, spec = {}, local = {} }) {
       .split("\n")
       .filter(Boolean)
       .map((l) => JSON.parse(l));
-  return { ctx, repo, readEvents, digest };
+  return { ctx, repo, readEvents, digest: sectionOf(digestPath), history: sectionOf(historyPath) };
 }
 
 const dev = (id) => ({ id, owner: "dev" });
@@ -101,7 +106,7 @@ const human = (id) => ({ id, owner: "human" });
 const kinds = (rec) => rec.steps.map((s) => (s.owner ? `${s.kind}:${s.owner}` : s.kind));
 
 test("a dev run then a studio-builder run with a clean review merges, tagged, lane removed", async () => {
-  const { ctx, repo, digest } = scratch({ plans: [{ number: "0101", phases: [dev("1"), dev("2"), studio("3")] }], lanes: { a: ["0101"] } });
+  const { ctx, repo, digest, history } = scratch({ plans: [{ number: "0101", phases: [dev("1"), dev("2"), studio("3")] }], lanes: { a: ["0101"] } });
   const worktreeBefore = join(ctx.worktreeRoot, "rlx-plan-0101");
   await runLanes(ctx);
   const rec = loadState(ctx.stateDir).plans["0101"];
@@ -122,10 +127,11 @@ test("a dev run then a studio-builder run with a clean review merges, tagged, la
   assert.deepEqual(rec.gates.map((g) => g.label), ["pre-review", "post-close"], "the close tip is gated before main moves");
   assert.equal(rec.gatedHead, resolveCommit("main", repo), "what reached main is what the conductor gated");
 
-  const closed = digest("### Closed");
+  const closed = history("### Closed");
   assert.match(closed, /^- \*\*0101 - Plan 0101 fixture\*\* - 0\.1\.1, tag `v0\.1\.1` annotated, merge `[0-9a-f]{7}`, 0 fix rounds, /m);
   assert.match(closed, /Review: `docs\/plans\/done\/0101-fixture\.md` `## Close review`\./);
-  assert.match(digest("### Needs you"), /^- nothing: no park, and every merge was clean\.$/m);
+  assert.match(history("### Needs you"), /^- nothing: no park, and every merge was clean\.$/m);
+  assert.match(digest("## Needs you"), /^Nothing: no park, no lane stopped at the worktree cap, no open finding\.$/m);
 });
 
 test("a closed outcome whose plan has no ## Close review parks as a disagreement", async () => {
@@ -144,7 +150,7 @@ test("a closed outcome whose plan has no ## Close review parks as a disagreement
 });
 
 test("a human phase parks with its worktree kept, the lane runs on, and a dependant is held", async () => {
-  const { ctx, repo, digest } = scratch({
+  const { ctx, repo, digest, history } = scratch({
     plans: [
       { number: "0101", phases: [dev("1"), human("2"), dev("3")] },
       { number: "0102", phases: [dev("1")] },
@@ -169,10 +175,16 @@ test("a human phase parks with its worktree kept, the lane runs on, and a depend
   assert.match(inbox, /plan 0101 parked: human_phase/);
   assert.match(inbox, /Resume:\*\* `node tools\/conductor\/conductor\.mjs resume 0101`/);
 
-  const needs = digest("### Needs you");
+  const needs = history("### Needs you");
   assert.match(needs, /^- \*\*0101 parked\*\* at Phase 2 \(`human_phase`\)\. Phase 2 is owned by human\. Read: docs\/plans\/0101-fixture\.md Phase 2\. Holds `[^`]*rlx-plan-0101`\.$/m);
   assert.match(needs, /^ {2}Resume: `node tools\/conductor\/conductor\.mjs resume 0101`$/m);
-  assert.match(digest("### Closed"), /^- \*\*0102 - Plan 0102 fixture\*\*/m);
+  assert.match(history("### Closed"), /^- \*\*0102 - Plan 0102 fixture\*\*/m);
+
+  // The same park is the current page's whole worklist, with the command that clears it.
+  const worklist = digest("## Needs you");
+  assert.match(worklist, /^1 park\.$/m);
+  assert.match(worklist, /^- \*\*0101\*\* \(`human_phase`\) at Phase 2 parked .* Holds `[^`]*rlx-plan-0101`\.$/m);
+  assert.match(worklist, /^ {2}Resume: `node tools\/conductor\/conductor\.mjs resume 0101`$/m);
 
   // A park on a clean worktree records no path list and prints nothing extra.
   assert.equal("dirty" in parked.park, false);
@@ -181,7 +193,7 @@ test("a human phase parks with its worktree kept, the lane runs on, and a depend
 });
 
 test("a park that leaves the worktree dirty names the paths, capped, in the record, the inbox and the digest", async () => {
-  const { ctx, digest } = scratch({
+  const { ctx, history } = scratch({
     plans: [{ number: "0101", phases: [dev("1")] }],
     lanes: { a: ["0101"] },
     spec: { "0101": { dirtyPark: { untracked: 13 } } },
@@ -196,13 +208,13 @@ test("a park that leaves the worktree dirty names the paths, capped, in the reco
   const text = `${shown.map((p) => `\`${p}\``).join(", ")} and 4 more`;
   const inbox = readFileSync(statePaths(ctx.stateDir).inbox, "utf8");
   assert.ok(inbox.includes(`- **Left dirty:** ${text}. \`resume\` refuses until the worktree is clean.`), inbox);
-  const needs = digest("### Needs you");
+  const needs = history("### Needs you");
   assert.match(needs, /^- \*\*0101 parked\*\* \(`check_red`\)\. .* Holds `[^`]*rlx-plan-0101`\. Left dirty: .*$/m);
   assert.ok(needs.includes(` Left dirty: ${text}.\n`), needs);
 });
 
 test("a lane that reaches the worktree cap stops, and the run and the digest say why", async () => {
-  const { ctx, readEvents, digest } = scratch({
+  const { ctx, readEvents, digest, history } = scratch({
     plans: [
       { number: "0101", phases: [dev("1"), human("2")] },
       { number: "0102", phases: [dev("1")] },
@@ -228,10 +240,15 @@ test("a lane that reaches the worktree cap stops, and the run and the digest say
   ]);
   assert.ok(readEvents().some((e) => e.event === "conductor-worktree-cap" && e.plan === "0102"));
 
-  const needs = digest("### Needs you");
-  const capLines = needs.split("\n").filter((l) => l.includes("worktree cap"));
-  assert.deepEqual(capLines, ["- **Lane a stopped at the worktree cap** (`max_open_worktrees` 1): 0102 was not opened. Worktrees held by 0101."]);
-  assert.equal(digest("### Not started").trim(), "- **0102** (lane a): worktree cap\n- **0103** (lane a): after 0101 (parked)");
+  const cap = "- **Lane a stopped at the worktree cap** (`max_open_worktrees` 1): 0102 was not opened. Worktrees held by 0101.";
+  const needs = history("### Needs you");
+  assert.deepEqual(needs.split("\n").filter((l) => l.includes("worktree cap")), [cap]);
+  assert.equal(history("### Not started").trim(), "- **0102** (lane a): worktree cap\n- **0103** (lane a): after 0101 (parked)");
+
+  // The cap is current state too: it is still holding the slot when the run ends.
+  const worklist = digest("## Needs you");
+  assert.match(worklist, /^1 park, 1 lane stopped at the worktree cap\.$/m);
+  assert.deepEqual(worklist.split("\n").filter((l) => l.startsWith("- **Lane ")), [cap]);
 });
 
 /** Three plans parked in an earlier run, each naming a worktree directory the test builds for real. */
@@ -295,14 +312,14 @@ test("the cap counts worktrees on disk: the same three with their directories pr
 });
 
 test("a run that opens every queued plan it can has no Not started list", async () => {
-  const { ctx, digest } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
+  const { ctx, history } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
   await runLanes(ctx);
   assert.equal(loadState(ctx.stateDir).runs.at(-1).notStarted.length, 0);
-  assert.ok(!digest().includes("### Not started"));
+  assert.ok(!history().includes("### Not started"));
 });
 
 test("a review with one major takes exactly one fix round and a re-review, then merges", async () => {
-  const { ctx, digest } = scratch({
+  const { ctx, history } = scratch({
     plans: [{ number: "0101", phases: [dev("1")] }],
     lanes: { a: ["0101"] },
     spec: { "0101": { reviews: ["major", "clean"] } },
@@ -318,7 +335,7 @@ test("a review with one major takes exactly one fix round and a re-review, then 
   assert.deepEqual(rec.gates.map((g) => g.label), ["pre-review", "fix-1", "post-close"]);
 
   const fixSha = rec.fixes[0].resolved[0].commit.slice(0, 7);
-  const closed = digest("### Closed");
+  const closed = history("### Closed");
   assert.match(closed, /, 1 fix round, /);
   assert.ok(
     closed.includes(`  - major \`phase-0101-1.txt:1\` major finding in round 1 - resolved in \`${fixSha}\``),
@@ -519,7 +536,7 @@ test("two lanes closing at once serialize on the close lock", async () => {
 });
 
 test("a budget-exhausted step parks with its spend recorded", async () => {
-  const { ctx, digest } = scratch({
+  const { ctx, history } = scratch({
     plans: [{ number: "0101", phases: [dev("1")] }],
     lanes: { a: ["0101"] },
     spec: { "0101": { budget: "implement" } },
@@ -531,8 +548,8 @@ test("a budget-exhausted step parks with its spend recorded", async () => {
   assert.equal(rec.steps[0].result.spendUsd, 7.5);
   assert.equal(rec.steps[0].result.subtype, "error_max_budget_usd");
 
-  assert.match(digest("### Failed and parked"), /^- \*\*0101\*\* spend cap hit in `0101-01-implement`: spent \$7\.50\.$/m);
-  assert.match(digest("### Totals"), /^- lane a: 0 merged, 1 parked, \$7\.50\.$/m);
+  assert.match(history("### Failed and parked"), /^- \*\*0101\*\* spend cap hit in `0101-01-implement`: spent \$7\.50\.$/m);
+  assert.match(history("### Totals"), /^- lane a: 0 merged, 1 parked, \$7\.50\.$/m);
 });
 
 test("a probe the implement commit breaks and the close repairs is not gated before the review, and merges", async () => {
@@ -568,18 +585,30 @@ test("a probe the close leaves red parks gate_red at post-close and main does no
 });
 
 test("a close that repairs one minor and leaves one open shows exactly the open one in Needs you", async () => {
-  const { ctx, digest } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] }, spec: { "0101": { closeRepair: "ok" } } });
+  const { ctx, digest, history } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] }, spec: { "0101": { closeRepair: "ok" } } });
   await runLanes(ctx);
   const rec = loadState(ctx.stateDir).plans["0101"];
   assert.equal(rec.status, "merged", JSON.stringify(rec.park));
   const repaired = rec.verdicts.at(-1).findings.find((f) => f.fixed_in);
   assert.ok(repaired, "the verdict kept fixed_in");
-  const needs = digest("### Needs you");
+  const open = ["- **0101 merged with 1 open finding**:", "  - minor `phase-0101-1.txt:2` a duplicated constant, left open"];
   assert.deepEqual(
-    needs.split("\n").filter((l) => l.trim()),
-    ["- **0101 merged with 1 open finding**:", "  - minor `phase-0101-1.txt:2` a duplicated constant, left open"],
+    history("### Needs you")
+      .split("\n")
+      .filter((l) => l.trim()),
+    open,
   );
-  assert.ok(digest("### Closed").includes(`  - minor \`phase-0101-1.txt:1\` a comment the plan made false - repaired by the close in \`${repaired.fixed_in.slice(0, 7)}\``));
+  // An open finding is current state, so the page carries it and counts it in its summary.
+  const worklist = digest("## Needs you");
+  assert.match(worklist, /^1 merge with open findings\.$/m);
+  assert.deepEqual(
+    worklist
+      .split("\n")
+      .filter((l) => l.trim())
+      .slice(1),
+    open,
+  );
+  assert.ok(history("### Closed").includes(`  - minor \`phase-0101-1.txt:1\` a comment the plan made false - repaired by the close in \`${repaired.fixed_in.slice(0, 7)}\``));
 });
 
 test("a fixed_in commit that does not change the finding's file parks as a disagreement", async () => {
@@ -603,7 +632,7 @@ test("a fixed_in commit that is not on the branch parks as a disagreement", asyn
 });
 
 test("with no fix round and an unmoved main, a plan executes the full suite twice and skips it twice", async () => {
-  const { ctx, digest } = scratch({ plans: [{ number: "0101", phases: [dev("1"), dev("2")] }], lanes: { a: ["0101"] }, spec: { "0101": { ledgerFlow: true } } });
+  const { ctx, history } = scratch({ plans: [{ number: "0101", phases: [dev("1"), dev("2")] }], lanes: { a: ["0101"] }, spec: { "0101": { ledgerFlow: true } } });
   ctx.gate = [{ name: "cargo nextest", cmd: [process.execPath, "-e", "console.log('     Summary [   1.000s] 3 tests run: 3 passed')"], lock: "suite", ledger: true }];
   await runLanes(ctx);
   const rec = loadState(ctx.stateDir).plans["0101"];
@@ -620,13 +649,13 @@ test("with no fix round and an unmoved main, a plan executes the full suite twic
     ["gate 0101-post-close", "0101-02-review"],
   ]);
   assert.deepEqual(rec.gates[1].commands.map((c) => c.skipped), [true]);
-  assert.match(digest("### Totals"), /; 2 suite runs skipped\.$/m);
+  assert.match(history("### Totals"), /; 2 suite runs skipped\.$/m);
 });
 
 // ADR-0211: the close tip differs from the reviewed tree only in prose, a version line and a merge,
 // so its gate runs `-P fast` in the full suite's place — and says so on its own run-terminal line.
 test("a close tip whose diff is served runs -P fast, and the run terminal names the tier and the tree", async () => {
-  const { ctx, digest } = scratch({ plans: [{ number: "0101", phases: [dev("1"), dev("2")] }], lanes: { a: ["0101"] }, spec: { "0101": { servedClose: true } } });
+  const { ctx, history } = scratch({ plans: [{ number: "0101", phases: [dev("1"), dev("2")] }], lanes: { a: ["0101"] }, spec: { "0101": { servedClose: true } } });
   // A script file, not `node -e`: node parses a trailing `-P` after `-e <code>` as its own option.
   const script = join(tmp("rlx-lane-suite-"), "suite.cjs");
   writeFileSync(script, "console.log('     Summary [   1.000s] 3 tests run: 3 passed');\n");
@@ -662,7 +691,7 @@ test("a close tip whose diff is served runs -P fast, and the run terminal names 
   assert.ok(out.indexOf(served[0]) < out.findIndex((l) => /gate post-close  green/.test(l)), out.join("\n"));
   for (const l of out) assert.match(l, /^[\x20-\x7e]*$/, `ASCII: ${l}`);
 
-  assert.match(digest("### Totals"), /full suite .+ over 1 run, served -P fast .+ over 1 run, everything else /);
+  assert.match(history("### Totals"), /full suite .+ over 1 run, served -P fast .+ over 1 run, everything else /);
 });
 
 test("a red conductor gate parks before any review", async () => {

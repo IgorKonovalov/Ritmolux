@@ -1,6 +1,6 @@
 # 0193 — The digest says what is happening, and where you are needed
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-18
 > **Approved:** 2026-09-18 (user)
 > **Owner skill(s):** dev
@@ -136,14 +136,20 @@ closed findings are the only human-readable account of an unattended night).
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(`main` directly, or the worktree path plus its branch)_
+**Lane:** `C:\Users\Igor Konovalov\WORK\rlx-plan-0193` on branch `plan-0193-the-digest-says-what-is-happening-and-where-you-are-needed`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the page leads with the worklist, and the history moves behind a flag | dev | not started | |
+| 1 — the page leads with the worklist, and the history moves behind a flag | dev | committed with this row | |
 | 2 — a park the repository has already settled reads as stale | dev | not started | |
 
 ### Notes
+
+- Phase 1 adds a fifth item to **Needs you** that the plan's list does not name: a merged plan whose
+  lane the conductor could not remove, gated on the worktree still existing on disk. It is a standing
+  obligation that holds a `max_open_worktrees` slot, and the plan's enumeration would have dropped it
+  from the default page. `tools/conductor/test/lane.test.mjs` covers the four enumerated items; this
+  one is covered only by the history page's existing test.
 
 ### Close triggers
 
