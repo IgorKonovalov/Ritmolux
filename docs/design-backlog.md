@@ -1169,6 +1169,24 @@ this entry and does not take it.)*
 **Low until 0106/0107 land** — the blank list is contaminated by both, so counting it again first
 is wasted; re-run `--render` after they land and re-rank.
 
+**Re-ranked 2026-09-18**, by [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md) Phase 6,
+which names this entry and does not take it. The line above pointed at a gate that had already
+expired, so this replaces it as the live priority.
+
+**Low, and behind [0109](#0109--disk-textures-are-887--of-every-milkdrop-conversion-failure-and-the-exclusions-trigger-condition-is-already-met).**
+Both are conversion-rate work and both ride on the same trigger — a verdict that converted presets
+are worth having more of — which Plan 0142's look gate read as **still not better** for the third
+time (that entry's dated no-go, and
+[ADR-0113](adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)'s third
+`Outcome`). So neither is buyable today, and if that changes, 0109 goes first by 25x on its own
+arithmetic.
+
+**The 218 count above is un-recounted, and should not be restated as current.** It measures the
+2026-08-16 corpus run, before Plan 0108, Plan 0109, Plan 0111, Plan 0180 and Plan 0142 Phase 3 each
+changed what a converted preset renders. Whoever takes this re-runs `milkconv --report`/`--render`
+over the corpus before touching anything; the numbers in *The finding* are what was true then, not a
+present-day residual.
+
 ---
 
 ## 0109 — disk textures are 88.7 % of every MilkDrop conversion failure, and the exclusion's trigger condition is already met
@@ -1251,6 +1269,34 @@ import ships and works on four fifths of the corpus. Take it when the fidelity w
 presets are worth having more of, which is the honest ordering: reach is only worth buying after
 quality is judged. **Do not take it before Plan 0108's Phase 2**, whose verdict on whether these
 presets read as better or merely different is exactly the evidence for how much reach is worth.
+
+### The go/no-go, third time — **no-go, 2026-09-18**
+
+[Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md) Phase 4 re-ran the seven pairs
+against `foo_vis_milk2` 0.2.0.0 (DX11), and
+[ADR-0113](adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)'s third
+`Outcome` records what the user read: **one pair better, two good, one fixed, two still washed at the
+ground, one wrong on structure.** The precondition this entry sets for itself — that the fidelity
+work has settled whether converted presets are *worth having more of* — is therefore **still unmet**,
+after Plan 0100 Phase 7, Plan 0108 Phase 2 and now Plan 0142 Phase 4. This entry is unbought for the
+third time by a verdict, not un-picked-up.
+
+**What is different about this "no", and why it is not the same answer a third time.** The first two
+were *merely different* with one defect dominating and unnamed. This one has the wash **named at the
+reference's own source** (this file's archived 0113 body, `### Update 2026-09-17`: the reference
+truncates its per-frame decay factor and multiplies it in an encoded domain) and **partly repaired**
+— Plan 0142 Phase 3 — and the plan's own subject moved from washed to fixed. Each of the three pairs
+that still read wrong now names a **different** mechanism: a per-frame deposit against a per-second
+transform rate at 164-165 fps, an echo that is bound and is not nesting (*Songflower*, which sets
+`fDecay = 1.000` so no wash repair reaches it), and a waveform scale confirmed on one mode only. So a
+fourth gate has a route rather than a re-ask, and this entry's trigger is that verdict and nothing
+else.
+
+Nothing in this entry's own arithmetic moved: 1 826 files, 88.7 % of every conversion failure, 25x
+the ~71 of
+[0108](#0108--the-conversion-tail-hlsl-arrays-71-files-and-218-md2-presets-that-convert-but-render-blank).
+**If reach is ever bought, this is still the one to buy first**, and it still wants an ADR and an
+interview rather than a phase.
 
 ---
 

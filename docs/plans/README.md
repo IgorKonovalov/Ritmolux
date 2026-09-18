@@ -180,6 +180,11 @@ the round split them on one line and took one side:
   changed nothing a converted preset renders** (see its Phase 6 section). The trigger for planning
   reach is therefore still unbought, and it now rides on the successor to backlog 0113. Backlog
   0108 (the conversion tail) is 25x smaller than 0109 by its own arithmetic and waits behind it.
+  **Answered 2026-09-18, by [0142]'s Phase 4 gate and Phase 6 decision.** The third re-take read one
+  pair better, two good, one fixed, two still washed and one wrong on structure — ADR-0113 now
+  carries that as its third `Outcome`, so the trigger is **unbought a third time**. Backlog 0109
+  carries the dated no-go and 0108 a dated re-rank behind it; neither is picked up, and the wash the
+  bullet above rides on is named at the reference's source and partly repaired rather than open.
 - **One thing the authoring turned up and the plan carries:** `gamma` is applied as a **linear
   multiply** in the present shader while being named for MilkDrop's `fGammaAdj`, so a preset at
   `fGammaAdj = 1.9` takes an unclamped 1.9x linear gain into the tonemap. It is a **lead and not a

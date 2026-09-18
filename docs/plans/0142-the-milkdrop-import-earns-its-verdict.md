@@ -338,8 +338,8 @@ flowchart LR
 | 2 — Name the mechanism | dev | done | `cc2488cd` |
 | 3 — Bound the equilibrium | dev | done | `42b4bb97` |
 | 4 — The look gate | human | done | `15514a8a` |
-| 5 — ADR-0113's third Outcome | dev | done | committed with this row |
-| 6 — The reach decision | dev | not started | |
+| 5 — ADR-0113's third Outcome | dev | done | `7299cc90` |
+| 6 — The reach decision | dev | done | committed with this row |
 
 ### Phase 1 — the re-taken table
 
@@ -509,10 +509,37 @@ necessarily a unit sample at the draw call — which weakens the absolute `k`, n
   the same subject — the fixture is a 128x128 silent frame of a cut-down bundle, the gate is the
   whole converted preset on a track — so nothing here contradicts, and nothing here explains it
   either. The Outcome states the verdict and does not attempt the reconciliation.
+- **Phase 6 — backlog 0108's expired priority line is left standing with the re-rank appended under
+  it**, rather than rewritten. The phase asks for "a dated update tying its priority to this phase's
+  verdict"; the file's own form is dated updates that supersede, and the new one says in its first
+  sentence that it replaces the line above as the live priority.
 
 ### Close triggers
 
-_(filled at the last implementer phase)_
+- **`presets/` touched:** no. No file under `presets/` changed in any phase.
+- **Plan header `Closes:`** design-backlog 0113 and 0124. Both bodies are in
+  `docs/design-backlog-archive.md`, archived as **Promoted** on 2026-09-15 (ADR-0206), so neither is
+  live, neither carries a probe and neither moves at the close; the `CLOSED` markers are step 3c's.
+  0113's archived body gained Phase 2's `### Update 2026-09-17`. **0109 is not taken.** It and 0108
+  are live, and each carries a dated Phase 6 update in `docs/design-backlog.md`.
+- **What shipped:** a fix to what a converted preset renders, plus documentation. Phase 3
+  (`42b4bb97`) changed the factor and the domain the built-in warp fragment decays in, gated on
+  `quantize_steps`, and re-blessed `core/tests/golden/warp_mesh_milk.png` and
+  `warp_mesh_stroke.png` — the only two baselines that moved. No native preset's output moved, no
+  new surface was added, and Phases 1, 2, 4, 5 and 6 are instrument, docs and ADR text.
+- **Operator docs touched:** none. `docs/milkdrop-conversion.md` was not edited; its rate section
+  and Phase 3's truncation are under Followups.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — 89 stated reductions across
+  37 live entries, 3 unprobeable, 36 advisory "path moved" rows. It names 0109 twice among those
+  advisories (`milkconv/src/shader/emit.rs`, `docs/milkdrop-conversion.md`), both stamped 2026-08-17
+  and both moved by plans before this one.
+- **The other Node gates, this session:** `check-doc-links.mjs`, `toc.mjs --check`,
+  `check-index-rows.mjs` and `check-reader-prose.mjs` all exit 0.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). No suite ran in this session —
+  Phases 5 and 6 changed no code. The upward override ADR-0156 allows was taken at Phase 3, whose
+  commit carries the two re-blessed goldens.
+- **Outstanding `human` phases:** none. Phase 4 is the plan's only `human` phase and it ran
+  2026-09-18; its table is above, committed in `15514a8a`.
 
 ## Followups (after this lands)
 
@@ -529,3 +556,8 @@ _(filled at the last implementer phase)_
   `k ~ 0.068` against `0.158`, ratio `0.43`, which does not support the inference) and is quoted in
   ADR-0113's third `Outcome`, but ADR-0199 itself was not edited: no phase of this plan lists it
   under `Files touched`. A one-section append is all it wants.
+- **`docs/milkdrop-conversion.md`'s rate section does not carry Phase 3's truncation.** *"Rates are
+  converted, and that is why a preset moves at the right speed"* says a factor becomes `v^30`, which
+  is now incomplete for `decay` alone: `milk_decay` takes it back to the nominal frame, truncates it
+  where `D3DCOLOR_RGBA_01` does and returns it per second, so a `.milk` at `fDecay = 0.98` runs at
+  `249/255` per frame. Two sentences in the operator doc; no phase of this plan lists that file.
