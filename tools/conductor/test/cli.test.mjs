@@ -1,5 +1,5 @@
-// The operator surface: `run`, `status`, `digest`, `resume`, `park` and `abort` against a scratch
-// repository and the fake CLI, driven through the same `main` the command line calls.
+// The operator surface: `run`, `status`, `digest`, `resume`, `park`, `finding` and `abort` against a
+// scratch repository and the fake CLI, driven through the same `main` the command line calls.
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -443,6 +443,126 @@ test("adopt-close on a lane with no close review changes nothing, and a bad plan
   const never = await cli("adopt-close", "0199");
   assert.equal(never.code, 1);
   assert.match(never.err.join("\n"), /no lane on disk/);
+});
+
+// ADR-0216: a finding leaves the page only when the owner says why, so every refusal below is a
+// finding that stays on it rather than one closed by a guess.
+
+/** A plan record straight into state/, so a refusal has the exact findings it is about. */
+function seedPlan(p, plan, rec) {
+  mkdirSync(p.stateDir, { recursive: true });
+  const state = loadState(p.stateDir);
+  state.plans[plan] = { plan, status: "merged", lane: "a", worktree: null, branch: null, steps: [], park: null, parks: [], fixRounds: 0, verdicts: [], fixes: [], gates: [], closed: null, merge: null, lockWaits: [], started: null, ended: null, ...rec };
+  writeFileSync(statePaths(p.stateDir).file, JSON.stringify(state, null, 2));
+}
+
+const verdictOf = (findings) => [{ round: 2, blockers: 0, majors: 0, minors: findings.length, review_path: "r.md", findings }];
+
+test("finding lists a merged plan's closing verdict, and a disposition records verb, reason and date", async () => {
+  const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] }, { spec: { "0101": { minors: 2 } } });
+  await cli("run");
+  assert.equal(loadState(p.stateDir).plans["0101"].status, "merged");
+
+  const before = await cli("finding", "0101");
+  assert.equal(before.code, 0, before.err.join("\n"));
+  assert.deepEqual(before.out, [
+    "conductor: plan 0101, closing verdict round 1, 2 findings:",
+    "  [0] minor phase-0101-1.txt:1 - minor finding 1",
+    "  [1] minor phase-0101-1.txt:2 - minor finding 2",
+  ]);
+
+  const closed = await cli("finding", "0101", "1", "--wontfix", "assertion message, no reader");
+  assert.equal(closed.code, 0, closed.err.join("\n"));
+  assert.deepEqual(closed.out, ["conductor: plan 0101 finding 1 (minor phase-0101-1.txt:2) is closed wontfix: assertion message, no reader"]);
+
+  const d = loadState(p.stateDir).plans["0101"].verdicts.at(-1).findings[1].disposition;
+  assert.equal(d.verb, "wontfix");
+  assert.equal(d.reason, "assertion message, no reader");
+  assert.match(d.at, /^\d{4}-\d\d-\d\dT\d\d:\d\d/);
+
+  // The listing is where a `<ref>` comes from, so it carries the disposition it just recorded.
+  const after = await cli("finding", "0101");
+  assert.equal(after.out[2], `  [1] minor phase-0101-1.txt:2 - minor finding 2 - closed ${d.at.slice(0, 10)} (wontfix): assertion message, no reader`);
+  assert.equal(after.out[1], "  [0] minor phase-0101-1.txt:1 - minor finding 1", "the open one is unchanged");
+
+  // The same finding by its file:line, and the page regenerates on the way out.
+  const byWhere = await cli("finding", "0101", "phase-0101-1.txt:1", "--filed", "backlog 0251");
+  assert.equal(byWhere.code, 0, byWhere.err.join("\n"));
+  assert.equal(loadState(p.stateDir).plans["0101"].verdicts.at(-1).findings[0].disposition.verb, "filed");
+  assert.match(readFileSync(p.digest, "utf8"), /^# Conductor digest$/m);
+});
+
+test("a disposition is refused with no reason, with a ref matching nothing, and with one matching two findings", async () => {
+  const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] });
+  seedPlan(p, "0181", {
+    verdicts: verdictOf([
+      { severity: "minor", file: "core/src/a.rs", line: 88, what: "one" },
+      { severity: "nit", file: "docs/b.md", line: null, what: "two" },
+      { severity: "nit", file: "docs/b.md", line: null, what: "three" },
+    ]),
+  });
+  const untouched = readFileSync(statePaths(p.stateDir).file, "utf8");
+
+  for (const argv of [["finding", "0181", "0", "--wontfix"], ["finding", "0181", "0", "--wontfix", "   "]]) {
+    const r = await cli(...argv);
+    assert.equal(r.code, 2, argv.join(" "));
+    assert.match(r.err[0], /--wontfix needs a reason; a disposition with none is how a finding gets closed for being old \(ADR-0216\)/);
+  }
+
+  const past = await cli("finding", "0181", "9", "--done", "repaired");
+  assert.equal(past.code, 1);
+  assert.equal(past.err[0], "conductor: there is no finding 9; the verdict carries 0 core/src/a.rs:88, 1 docs/b.md, 2 docs/b.md");
+
+  const nowhere = await cli("finding", "0181", "docs/z.md", "--done", "repaired");
+  assert.equal(nowhere.code, 1);
+  assert.equal(nowhere.err[0], "conductor: no finding is at docs/z.md; the verdict carries 0 core/src/a.rs:88, 1 docs/b.md, 2 docs/b.md");
+
+  const both = await cli("finding", "0181", "docs/b.md", "--filed", "backlog 0250");
+  assert.equal(both.code, 1);
+  assert.equal(both.err[0], "conductor: docs/b.md names 2 findings, so it says nothing: 1 nit two; 2 nit three");
+
+  assert.equal(readFileSync(statePaths(p.stateDir).file, "utf8"), untouched, "no refusal wrote state");
+});
+
+test("a second disposition overwrites the first, and the first survives in the finding's history", async () => {
+  const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] });
+  seedPlan(p, "0181", { verdicts: verdictOf([{ severity: "nit", file: "core/src/a.rs", line: 3, what: "a latent regex" }]) });
+
+  assert.equal((await cli("finding", "0181", "0", "--wontfix", "no reader today")).code, 0);
+  const first = loadState(p.stateDir).plans["0181"].verdicts.at(-1).findings[0].disposition;
+
+  const second = await cli("finding", "0181", "0", "--done", "repaired in a later plan");
+  assert.equal(second.code, 0, second.err.join("\n"));
+  assert.equal(second.out[1], `  it was wontfix on ${first.at.slice(0, 10)} (no reader today); that stays in the finding's history.`);
+
+  const f = loadState(p.stateDir).plans["0181"].verdicts.at(-1).findings[0];
+  assert.deepEqual(f.disposition.verb, "done");
+  assert.equal(f.disposition.reason, "repaired in a later plan");
+  assert.deepEqual(f.dispositionHistory, [first]);
+});
+
+test("finding on a plan with no closing verdict exits non-zero saying why, and a malformed call is a usage error", async () => {
+  const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] });
+  seedPlan(p, "0182", { status: "parked", verdicts: [] });
+  seedPlan(p, "0183", { verdicts: verdictOf([]) });
+
+  const never = await cli("finding", "0199");
+  assert.equal(never.code, 1);
+  assert.equal(never.err[0], "conductor: plan 0199 has no closing verdict, so it has no findings (it never started)");
+
+  const parked = await cli("finding", "0182", "0", "--done", "x");
+  assert.equal(parked.code, 1);
+  assert.equal(parked.err[0], "conductor: plan 0182 has no closing verdict, so it has no findings (it is parked)");
+
+  const none = await cli("finding", "0183");
+  assert.equal(none.code, 0);
+  assert.deepEqual(none.out, ["conductor: plan 0183 closed with no findings (verdict round 2)."]);
+
+  for (const argv of [["finding"], ["finding", "181"], ["finding", "0181", "0"], ["finding", "0181", "0", "--nope", "x"], ["finding", "0181", "--done", "x"]]) {
+    const r = await cli(...argv);
+    assert.equal(r.code, 2, argv.join(" "));
+    assert.match(r.err[0], /^usage: conductor\.mjs finding NNNN \[<ref> --done\|--wontfix\|--filed <reason>\]$/);
+  }
 });
 
 test("resume refuses a claude_dir park until the plan's log marks that phase done", async () => {

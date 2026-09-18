@@ -1,6 +1,6 @@
 # 0195 — A finding can be closed
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-18
 > **Approved:** 2026-09-18 (user)
 > **Owner skill(s):** dev
@@ -118,11 +118,11 @@ against the branch — nothing can verify it.
 > No per-criterion pass list, no self-assessment, no narrative — but a deviation from the plan or
 > an unmet done-when is always disclosed. Stays shorter than `## Implementation phases` above.
 
-**Lane:** _(`main` directly, or the worktree path plus its branch)_
+**Lane:** `C:\Users\Igor Konovalov\WORK\rlx-plan-0195` on branch `plan-0195-a-finding-can-be-closed`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — a finding carries a disposition, and one command writes it | dev | not started | |
+| 1 — a finding carries a disposition, and one command writes it | dev | committed with this row | |
 | 2 — the page carries the open ones and counts the closed | dev | not started | |
 
 ### Notes
