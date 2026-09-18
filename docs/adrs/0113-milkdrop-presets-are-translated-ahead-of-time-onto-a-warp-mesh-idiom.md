@@ -221,3 +221,58 @@ which washes or inverts every feedback-heavy preset. The one pair whose tone sur
 3*) looked genuinely good, so the claim is unfalsified where the defect is absent. The HDR
 question is re-judged after 0106 lands; conversion fidelity itself was judged *mostly there, with
 defects* (0106–0108), and the provenance question (Phase 8) was deferred with nothing shipping.
+
+## Outcome (2026-09-18, at [Plan 0142](../plans/0142-the-milkdrop-import-earns-its-verdict.md)'s look gate — the third re-take)
+
+**The decision stands. The claim still does not read "better" — and what says so is no longer one
+defect.** The sentence being updated is the Outcome above's: **"merely different, not better"**,
+which has stood since 2026-08-16 together with its own undischarged commitment, *"The HDR question
+is re-judged after 0106 lands."* 0106 landed 2026-08-17 and two further look gates ran without
+re-taking it. This discharges that, and it makes design-backlog 0124's premise — that no gate
+produced a third Outcome — false.
+
+The gate ran 2026-09-18 on the same seven pairs against the same rig, `foo_vis_milk2` 0.2.0.0
+(DX11), both renderers fed one track through foobar2000, judged live by the user. The per-pair table
+is in Plan 0142's implementation log and is comparable to Plan 0100 Phase 7's and Plan 0109 Phase
+5's. Of the seven: **one reads better** (*Cauldron painterly 5*, its core clipping white), **two read
+good** (*Contortion (Escher's Tunnel Mix)*; *Cosmic Dust 2*, where ours is sparser rather than
+brighter), **one reads fixed** (*Fog Tunnel*, which read "still washed" at both earlier gates),
+**two still read washed at the ground** (*chasers 19 Portal*; *Blur Mix 3*, whose traces read
+horizontal and correct but whose ground is grey with blown blobs) and **one reads wrong on structure
+rather than on brightness** (*Songflower (Moss Posy)*, where the reference's woven lattice is absent
+and ours draws the bare grid).
+
+So the founding claim is **not carried by the set**: one pair of seven reads better than the
+reference. What moved is the qualifier the previous Outcome attached to it.
+
+- **The wash is a named and partly repaired mechanism rather than a single dominating unknown.**
+  Plan 0142 Phase 2 read the reference's loop at `xeiraex/milkdrop2` `d4c843a` and found two
+  divergences in the decay term: the reference truncates the factor to `(int)(fDecay*255)/255` and
+  multiplies it in an 8-bit **encoded** display-referred domain, where this engine multiplied linear
+  light. Phase 3 repaired both, gated on the quantizer; the plan's own subject went from washed to
+  fixed. The full reading is design-backlog 0113's `### Update 2026-09-17`.
+- **What still washes is a different candidate, and it is not settled.** Ours ran at 164-165 fps
+  against the rig's frame cap. Transforms convert per second; the **deposit is per frame and is not
+  converted**, so a rate mismatch raises the field by `1/(1 - d)` and bites hardest on high-`fDecay`
+  presets — which is the shape of the two remaining washed pairs. Plan 0142's log names the render
+  that would settle it and does not claim it.
+- **Three differences are not the wash at all.** *Songflower* sets `fDecay = 1.000`, so no decay runs
+  and no wash repair can reach it; its `echo_alpha`/`echo_zoom`/`echo_orient` are bound and are not
+  producing the reference's nesting. The converted waveform's scale is confirmed on one mode only:
+  the unit-scale `nWaveMode = 0` capture this gate took for
+  [ADR-0199](0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md) reads
+  `k ~ 0.068` against the `0.158` fitted on mode 6, a ratio of `0.43`, which does **not** support
+  that ADR's inference that modes 0-5 share mode 6's gap. And a custom wave is outside the
+  eight-figure contract entirely (design-backlog 0244).
+- **Two things this gate ruled out.** The left-edge seam of design-backlog 0215 is present in
+  **neither** renderer for either seam preset. And hue is ruled out of every verdict above: both
+  renderers animate their palettes off their own clock, so two stills sit at different palette
+  phases — which is why *Contortion* and *Cosmic Dust 2* read good against obviously different
+  colour.
+
+Nothing here reopens the Decision: ahead-of-time translation onto a warp-mesh idiom is not what any
+of these verdicts is about. What the third re-take changes is the shape of the remaining work. After
+five plans the honest statement of the motivating claim is that it is **demonstrated on one pair,
+unfalsified on three, and outstanding on three** — and that each of those three now names its own
+mechanism, so the next moves are per-mechanism rather than one HDR question. Plan 0142 Phase 6
+records what this verdict means for design-backlog 0109's reach work.

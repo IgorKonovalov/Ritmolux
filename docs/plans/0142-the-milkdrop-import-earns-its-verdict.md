@@ -336,9 +336,9 @@ flowchart LR
 |---|---|---|---|
 | 1 — The equilibrium instrument | dev | done | `20ba8731` |
 | 2 — Name the mechanism | dev | done | `cc2488cd` |
-| 3 — Bound the equilibrium | dev | done | committed with this row |
-| 4 — The look gate | human | done | committed with this row |
-| 5 — ADR-0113's third Outcome | dev | not started | |
+| 3 — Bound the equilibrium | dev | done | `42b4bb97` |
+| 4 — The look gate | human | done | `15514a8a` |
+| 5 — ADR-0113's third Outcome | dev | done | committed with this row |
 | 6 — The reach decision | dev | not started | |
 
 ### Phase 1 — the re-taken table
@@ -497,6 +497,18 @@ necessarily a unit sample at the draw call — which weakens the absolute `k`, n
   a different finding from Plan 0108's "no video-echo stage".
 - **Phase 4 — the seam question is answered negatively for both presets** (backlog 0215): none in the
   reference and none in ours. Plan 0180 Phase 4 located a ray on our side; nothing shown here had one.
+- **Phase 5 — the mode-0 capture was not written into ADR-0199, and no phase's `Files touched` allows
+  it.** Phase 4's note says the reading "is recorded here and written into ADR-0199 as an `Outcome`";
+  Phase 4 is `human` with `Files touched: none` and Phase 5's list is ADR-0113 alone. ADR-0113's
+  third `Outcome` carries the reading and the `0.43` ratio, so it is on the record; ADR-0199 still
+  says its `k` rests on one mode and asks Plan 0142 for the confirmation. Under Followups.
+- **Phase 5 — *Blur Mix 3* is read as the gate read it, and that is not reconciled with Phase 1's
+  instrument.** It was the control at both earlier gates (Plan 0100: *"the one pair whose tone
+  survived looked genuinely good"*; Plan 0109 Phase 5: traces fixed) and this gate reads its ground
+  washed, while `milk_wash_blur_mix_3.toml` reads exactly `0.00000000` at every seam. The two are not
+  the same subject — the fixture is a 128x128 silent frame of a cut-down bundle, the gate is the
+  whole converted preset on a track — so nothing here contradicts, and nothing here explains it
+  either. The Outcome states the verdict and does not attempt the reconciliation.
 
 ### Close triggers
 
@@ -512,3 +524,8 @@ _(filled at the last implementer phase)_
   name `decay`; none of the seven look-gate pairs is one, which is why it is here
   rather than in the phase. It is a `milk/shader.rs` epilogue question and it
   wants the reference on screen before it is answered.
+- **ADR-0199 owes an `Outcome` for the mode-0 capture.** That ADR's Negative asks this plan's rig
+  session for it and says *"Until one lands, this ADR says so"*. The capture landed (Phase 4's table:
+  `k ~ 0.068` against `0.158`, ratio `0.43`, which does not support the inference) and is quoted in
+  ADR-0113's third `Outcome`, but ADR-0199 itself was not edited: no phase of this plan lists it
+  under `Files touched`. A one-section append is all it wants.
