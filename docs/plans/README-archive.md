@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0193 - The digest says what is happening, and where you are needed](#0193---the-digest-says-what-is-happening-and-where-you-are-needed)
   - [0142 - The MilkDrop import earns its verdict](#0142---the-milkdrop-import-earns-its-verdict)
   - [0103 - The project gets an audience](#0103---the-project-gets-an-audience)
   - [0178 - What the operator reads is true](#0178---what-the-operator-reads-is-true)
@@ -232,6 +233,57 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0193 - The digest says what is happening, and where you are needed](done/0193-the-digest-says-what-is-happening-and-where-you-are-needed.md)
+
+- closed 2026-09-18, conductor-run lane `plan-0193-the-digest-says-what-is-happening-and-where-you-are-needed`
+in `WORK/rlx-plan-0193`. Two phases, `04b18360` and `65a0f62e`, plus `35141369`, the close review's
+two prose repairs. Round-1 verdict: **no blockers, no majors, three minors and one nit**, two
+repaired at the close and two left open. Version **0.132.0** (minor). ADR-0214 accepted, amending
+ADR-0205. No backlog entry closed and none filed.
+- **What landed.** `tools/conductor/digest.md` had been appending a section per run and forgetting
+none, so at twelve runs the two questions its reader actually has were spread across ~40 KB. The
+page is now **current state only**: **Needs you** first — the whole worklist — then **Now**, what
+each lane is doing this minute. The per-run account moved behind
+`conductor.mjs digest --history`, into `digest-history.md`, gitignored beside it and written by
+nothing until the flag asks for it. Both pages build from **one** `readDigestState`, which is the
+structural answer to the drift ADR-0214 named as the price of having two renderers.
+- **The failure that prompted it, and how narrowly it was repaired.** On 2026-09-18 the page
+reported five plans parked and needing the owner, and **four were already finished** — three closed
+and merged in owner-led sessions, one whose blocking phase had landed on its branch. A plan closed
+outside the conductor never touches `state/conductor.json`, so its record stays `parked` and every
+later page repeats it in the present tense beside the one park that was real. Phase 2's
+`settledPark` reads the **tree** for two conditions and nothing else: the plan under
+`docs/plans/done/` **in the main checkout** with `Status: done`, or a `human_phase` / `claude_dir`
+park whose phase the plan's own `## Implementation log` now marks done — read in the lane when the
+worktree is still there, in the main checkout when it is gone. **Never an age, never a branch's
+commits, never a tag.** A close committed in a lane that has not merged is deliberately *not*
+settled, and that case has its own test.
+- **The negative case is the product here, not a formality.** The plan's own risk section says a
+wrong "already settled" tells the owner that real work is finished, which is worse than the noise it
+replaces — so a `human_phase` park whose row still reads `not started` staying a live park is a
+done-when with a real assertion behind it, and `settledPark`'s return value is checked directly so
+the two conditions are distinguishable in the test output. `status` calls the same function the
+renderer does rather than reimplementing the verdict, and one test drives a real run to a park,
+flips the row in the lane, commits it, and then asserts the `status` line, the page, **and** that
+the record was not written back. ADR-0214 forbids a renderer editing what it renders, and that
+prohibition is the thing the assertion holds.
+- **What the close left open, both by rule rather than by choice.** `needsYou` counts parks, cap
+stops, open findings and undeleted lanes into its one-line summary but never counts the
+**CLI-version warning**, so a quiet night on a patched CLI renders *"Nothing: no park, no lane
+stopped at the worktree cap, no open finding."* and then lists the warning underneath it — confirmed
+by rendering, and not a corner, since the conductor README says this CLI numbers nearly every
+release as a patch. And the fifth **Needs you** item, a merged plan whose lane could not be removed,
+is rendered by the new page and asserted only through the history page's older test; `dev` added it
+deliberately and disclosed the gap. Both repairs are code, which ADR-0209 does not let a close
+touch. What the close *did* repair was prose: `docs/developing.md` still described `digest.md` as
+carrying a per-run section and Totals, and the conductor README enumerated the CLI warning last
+where the renderer emits it first.
+- **What outlived the plan.** Two: `digest --history` is a deliberate act rather than a file always
+on disk, which is the shape ADR-0214 argued for on the grounds that *the more often a page is
+written the more confidently it is believed when it is stale*; and the current page takes `now` as
+an **option** rather than calling `Date.now()` inside the renderer, so the clock is an input and
+byte-for-byte regeneration survives the split.
 
 ### [0142 - The MilkDrop import earns its verdict](done/0142-the-milkdrop-import-earns-its-verdict.md)
 

@@ -41,7 +41,6 @@ place. The plan file carries the real link.
 | Plan | Title | Status | Owner | Live constraint |
 |------|-------|--------|-------|-----------------|
 | [0192](0192-the-component-reaches-its-audience.md) | The component reaches its audience | draft | human | 0103's Phases 5-6 plus the release they stand on. Push ONE tag: the pipeline has published nothing since v0.126.0, two runs red on the foobar job and three tags with no run. |
-| [0193](0193-the-digest-says-what-is-happening-and-where-you-are-needed.md) | The digest says what is happening, and where you are needed | approved | dev | ADR-0214 (proposed): Needs you + Now, history behind `digest --history`. Phase 2's false 'already settled' is the risk; its negative case is a done-when. |
 | [0120](0120-the-standalone-ships-on-ubuntu.md) | The standalone ships on Ubuntu | approved | dev, human | ADR-0131 (proposed): PulseAudio capture + an `ubuntu-latest` CI arm. **Phase 1 is a `human` stop gate before `dev`.** Guard is 5 zips + 1 tarball; folds backlog 0181 (Linux arm) + 0208. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + 0174 (proposed): Art-Net verified against `rlx-artnet-sim`. **Phase 8 opens on a decision** - 0115's tap is headless-only, and a windowed resolve is an ADR. Phase 9 is the rig. |
 | [0194](0194-the-analysis-gains-a-stereo-field.md) | The analysis gains a stereo field | draft | dev, human | ADR-0215 (proposed): absolute `balance`/`spread` + per-band balance, never levelled. Phase 1 closes a harness blind spot - every `--signal` kind is mono duplicated today, so nothing can see stereo. |
@@ -873,6 +872,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0193 - The digest says what is happening, and where you are needed](done/0193-the-digest-says-what-is-happening-and-where-you-are-needed.md) - closed 2026-09-18. Review: **no blockers, no majors, three minors, one nit (two fixed).** Version: **0.132.0**. ADR-0214 accepted. [Write-up](README-archive.md).
 - [0142 - The MilkDrop import earns its verdict](done/0142-the-milkdrop-import-earns-its-verdict.md) - closed 2026-09-18. Review: **no blockers, no majors, five minors, one nit (four fixed).** Version: **0.131.2**. ADR-0113 third Outcome, ADR-0199 Outcome. Closed backlog 0113, 0124. [Write-up](README-archive.md).
 - [0103 - The project gets an audience](done/0103-the-project-gets-an-audience.md) - closed 2026-09-18. Review: **no blockers, no majors, five minors, two nits (five fixed).** Version: **0.131.1** (patch). No ADR paired. Closed backlog 0102, 0103 - neither measured on device. [Write-up](README-archive.md).
 - [0178 - What the operator reads is true](done/0178-what-the-operator-reads-is-true.md) - closed 2026-09-18. Review: **no blockers, no majors, three minors, two nits (three fixed).** Version: **0.131.0**. ADR-0202 accepted, Outcome. Closed 0172, 0185, 0203, 0207, 0208; filed 0252. [Write-up](README-archive.md).
@@ -1131,7 +1131,7 @@ Later, unordered: better tempo tracking, preset sharing/library, signed installe
 [0102]: done/0102-the-component-ships.md
 [0103]: done/0103-the-project-gets-an-audience.md
 [0192]: 0192-the-component-reaches-its-audience.md
-[0193]: 0193-the-digest-says-what-is-happening-and-where-you-are-needed.md
+[0193]: done/0193-the-digest-says-what-is-happening-and-where-you-are-needed.md
 [0104]: done/0104-the-library-stops-being-lopsided.md
 [0115]: done/0115-the-engine-becomes-a-live-video-source.md
 [0123]: done/0123-a-gate-a-latch-and-an-ink.md

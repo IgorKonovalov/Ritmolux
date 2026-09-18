@@ -1,8 +1,8 @@
 # ADR-0214 — The digest is a current-state page, and history is regenerated on demand
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-18
 > **Date:** 2026-09-18
-> **Related plan(s):** [0193](../plans/0193-the-digest-says-what-is-happening-and-where-you-are-needed.md)
+> **Related plan(s):** [0193](../plans/done/0193-the-digest-says-what-is-happening-and-where-you-are-needed.md)
 > **Amends:** [0205](0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md)
 > (the digest it describes), [0208](0208-a-patch-cli-update-runs-with-a-warning-and-every-session-proves-the-hooks-ran.md)
 > (the CLI warning that appears on it)
