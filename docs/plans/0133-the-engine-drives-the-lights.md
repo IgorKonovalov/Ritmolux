@@ -669,6 +669,12 @@ which nothing but the rig can answer. Phase 9 is the whole of the second half, i
   - What is in place for whoever does run it, measured 2026-09-18: the only interface up is Wi-Fi
     (MediaTek MT7921, 78 Mbps negotiated), host `192.168.0.12/24` — the same link family Plan 0132
     Phase 3's numbers were taken on, so its readings are the comparable ones.
+- **Parked by the owner on 2026-09-18: the rig is not available, and it is not known when it will
+  be.** Phase 9 is a session at the physical rig and nothing substitutes for it, so the plan cannot
+  reach its close whatever else lands. Phases 4-8 do **not** need the rig — Phase 4 measures to a
+  live address on the LAN segment with no node answering, by its own instruction — so this park is
+  a decision about sequencing, not a blocker those phases inherit. Resume the plan when the rig is
+  back, or ask for phases 4-8 alone before then.
 
 ### Close triggers
 
