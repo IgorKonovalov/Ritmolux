@@ -161,13 +161,25 @@ impl<'a> Telemetry<'a> {
             // prefix (ADR-0164), so a mapping bound to the rows above keeps
             // working; a consumer that wants a musical unit no longer has to
             // rebuild one from the transient counter.
-            ("/rlx/v1/bar/beat", Arg::I(i32::try_from(self.beat_in_bar).unwrap_or(i32::MAX))),
-            ("/rlx/v1/bar/index", Arg::I(i32::try_from(self.bar_index).unwrap_or(i32::MAX))),
+            (
+                "/rlx/v1/bar/beat",
+                Arg::I(i32::try_from(self.beat_in_bar).unwrap_or(i32::MAX)),
+            ),
+            (
+                "/rlx/v1/bar/index",
+                Arg::I(i32::try_from(self.bar_index).unwrap_or(i32::MAX)),
+            ),
             ("/rlx/v1/bar/phase", Arg::F(self.bar_phase)),
-            ("/rlx/v1/bar/locked", Arg::I(i32::from(self.downbeat_locked))),
+            (
+                "/rlx/v1/bar/locked",
+                Arg::I(i32::from(self.downbeat_locked)),
+            ),
             // The musical layer: one octave, and a beat that is one of them.
             ("/rlx/v1/music/tempo", Arg::F(self.tempo_folded)),
-            ("/rlx/v1/music/trigger", Arg::I(i32::from(self.musical_beat))),
+            (
+                "/rlx/v1/music/trigger",
+                Arg::I(i32::from(self.musical_beat)),
+            ),
             (
                 "/rlx/v1/music/index",
                 Arg::I(i32::try_from(self.musical_beat_index).unwrap_or(i32::MAX)),

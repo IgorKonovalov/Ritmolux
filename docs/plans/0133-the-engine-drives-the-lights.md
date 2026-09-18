@@ -557,8 +557,8 @@ which nothing but the rig can answer. Phase 9 is the whole of the second half, i
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The virtual rig | dev | done | `e637ae99` |
-| 2 — A configured rig lights up | dev | done | committed with this row |
-| 3 — Folded tempo and musical beat | dev | not started | |
+| 2 — A configured rig lights up | dev | done | `3787908c` |
+| 3 — Folded tempo and musical beat | dev | done | `d5641815` + committed with this row |
 | 4 — The send path, measured | dev | not started | |
 | 5 — A look is a TOML file | dev | not started | |
 | 6 — The look that already works | dev | not started | |
@@ -595,6 +595,62 @@ which nothing but the rig can answer. Phase 9 is the whole of the second half, i
   record, not the code: the diagnosis of the 200.9 BPM reading, what the estimator reports against
   what the fold produces on real material with the machine and material named, and confirmation
   that no golden moved. Verify the code against the done-when before writing that row.
+- Phase 3 landed in two commits for that reason: `d5641815` is the code the killed session wrote,
+  and the commit carrying this row is the record plus the one thing that session left behind — the
+  new OSC rows in `standalone/src/osc.rs` were not rustfmt'd, so `cargo fmt --all --check` was red
+  on the branch tip. Nothing else moved.
+- Phase 3 — **the 200.9 BPM reading is neither of the two explanations the phase offered.** It is
+  not a warm-up artefact and not a settled octave error: it is the **top of the search range**, and
+  the value is arithmetic rather than an estimate. `min_lag` is `floor(60 / (MAX_BPM * hop_sec))`,
+  which at 48 kHz floors 28.125 hops to 28, and 28 hops reads 200.89 BPM — above `MAX_BPM = 200`
+  itself. `refine` declines to interpolate at either end of the range, so the wall is reported as
+  that one exact repeated value rather than as a neighbourhood around it, which is why the rig saw
+  a suspiciously precise number. Asserted in
+  `core/src/dsp/tempo.rs::the_top_of_the_search_range_is_a_wall_at_200_9_bpm`, and stated for
+  operators in `docs/configuration.md`. A reading pinned there means the strongest periodicity sits
+  at or past the edge of the range; backlog 0158's third possibility (warm-up) is therefore not
+  what happened, and a tempo-lock flag would not have helped — the estimate was settled, and settled
+  on the wall.
+- Phase 3 — **the bar grid is published over OSC** (backlog 0157's own fix): `/rlx/v1/bar/beat`,
+  `/rlx/v1/bar/index`, `/rlx/v1/bar/phase` and `/rlx/v1/bar/locked`, plus `/rlx/v1/music/tempo`,
+  `/rlx/v1/music/trigger` and `/rlx/v1/music/index`. Additive under the same prefix; no existing
+  address changed type or meaning. Spec 0003 and `docs/configuration.md` name all seven.
+  **The gate was still needed, and it is not a gate.** Publishing the bar grid gives a consumer a
+  musical unit at the *raw* estimate's octave, so a rig deriving "one climb per eight beats" from it
+  still climbs at twice or half the asked rate — which is the failure backlog 0158 reported. So the
+  musical layer ships, and it is a **second `BarGrid` run at `bpm_folded`** rather than a gate on
+  `beat_index`: a gate inherits the transient detector's jitter (an early beat is refused and the
+  gate latches onto the off-beat), while a phase accumulator crosses its boundary exactly once per
+  folded beat period whatever the detector does.
+- Phase 3 — **the fold stayed in this plan.** It is a stated window, `[FOLD_MIN_BPM, FOLD_MAX_BPM)`
+  = `[70, 140)` with the top exactly twice the bottom, published beside `bpm` and never instead of
+  it. It is not estimator work: the diagnosis above shows the estimator reported the edge of its own
+  search range correctly, so there is nothing in it to fix, and the octave it declines to settle is
+  the ambiguity Plan 0095 measured as unresolvable from the autocorrelation. The fold settles that
+  by fiat so every consumer settles it the same way.
+- Phase 3 — **estimator against fold, and the machine** (ADR-0071). Machine: AMD Ryzen 9 5900HS,
+  16 logical CPUs, Windows 10 19045. **No new real-material run was possible**: this lane has no
+  capture device and no music in the checkout, so the done-when's "on real material" is met only by
+  the reading already on the record — the rig, 2026-08-29, on the set's own material, where the
+  estimator reported **200.9 BPM** for material the room heard at half that and `fold(200.9)` is
+  **100.45 BPM**. What this session measured is synthesized, printed by the two tests under
+  `-P fast`:
+
+  | material | estimator | folded |
+  |---|---|---|
+  | 90 BPM click | 90.01 | 90.01 |
+  | 120 BPM click | 119.89 | 119.89 |
+  | 150 BPM click | 75.00 | 75.00 |
+  | 90 BPM `dynamic_groove`, 14 s | 180.27 | 90.13 |
+  | 124 BPM `dynamic_groove`, 14 s | 124.10 | 124.10 |
+
+  The 150 and the 90-groove rungs are the two the fold exists for, and they land on opposite sides:
+  the estimator halved one and doubled the other, and the fold left the first alone (75 is inside
+  the window) and corrected the second. On the same groove the transient counter fired 40 times
+  against the musical clock's 19.
+- Phase 3 — **no golden baseline moved.** `cargo nextest run -p rlx-core -E 'binary(golden)'`:
+  3 passed, and `git status` clean afterwards. `-P fast` across the workspace: 1753 passed,
+  308 skipped. Clippy `--workspace --all-targets -- -D warnings` clean.
 
 ### Close triggers
 
