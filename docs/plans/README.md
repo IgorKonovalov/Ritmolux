@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0194** (ADRs are a separate sequence — next free there is **0214**; 0200 is reserved for Plan 0186 Phase 2.)
+**Next free number: 0195** (ADRs are a separate sequence — next free there is **0216**; 0200 is reserved for Plan 0186 Phase 2.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -46,6 +46,7 @@ place. The plan file carries the real link.
 | [0120](0120-the-standalone-ships-on-ubuntu.md) | The standalone ships on Ubuntu | approved | dev, human | ADR-0131 (proposed): PulseAudio capture + an `ubuntu-latest` CI arm. **Phase 1 is a `human` stop gate before `dev`.** Guard is 5 zips + 1 tarball; folds backlog 0181 (Linux arm) + 0208. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + 0174 (proposed): Art-Net verified against `rlx-artnet-sim`. **Phase 8 opens on a decision** - 0115's tap is headless-only, and a windowed resolve is an ADR. Phase 9 is the rig. |
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. **0180 landed and moved both ends of its chain.** Amended 2026-09-16. Needs the rig. |
+| [0194](0194-the-analysis-gains-a-stereo-field.md) | The analysis gains a stereo field | draft | dev, human | ADR-0215 (proposed): absolute `balance`/`spread` + per-band balance, never levelled. Phase 1 closes a harness blind spot - every `--signal` kind is mono duplicated today, so nothing can see stereo. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
