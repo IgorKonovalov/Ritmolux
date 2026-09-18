@@ -140,10 +140,15 @@ first because every later phase increases the number of people who meet the defe
   (and the description text as applied, so it has a committed source) for Phase 4.
 - **Notes for the implementer:** the sections are already strong and should mostly keep their
   wording — this is a reordering, not a rewrite. The status paragraph (pre-1.0, formats may change)
-  stays visible; understating instability to look finished would be the wrong trade. **Open
-  question for this phase:** a `v*` tag now ships the studio as well (two of its five zips), and the
-  README does not mention it. Whether the first screen pitches the studio, or keeps it for the
-  site, is a product call — raise it with the user before reordering rather than deciding it here.
+  stays visible; understating instability to look finished would be the wrong trade. **The open
+  question is settled — the owner's call, 2026-09-18: name the studio in `## Download` and nowhere
+  above it.** The opening sections and the hero stay player-first, because the studio is young and
+  the first screen should not promise it. But a `v*` tag attaches five zips where the Download table
+  lists three and says so in words, so a reader who follows the README to the Releases page finds
+  two artifacts it does not explain. This phase therefore adds `studio-macos-universal` and
+  `studio-windows-x64` to that table, with one sentence on what the studio is for and where the site
+  explains it, and the note that each carries its own player so there is no second download. Prefer
+  a count-free sentence over correcting "Three zips" to "Five".
 - **Done when:** a reader who has never seen the project learns what it is, sees it, and finds the
   download **without scrolling past the repository layout**. The topic list exists as committed
   text for Phase 4.
