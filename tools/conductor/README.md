@@ -50,7 +50,7 @@ All of them run from the main checkout.
 | Command | What it does |
 |---|---|
 | `run [--lane a\|b] [--once]` | Runs the queue: both lanes, or one. `--once` stops a lane after one plan. A second conductor is refused while one runs. |
-| `status` | Per lane: the plan, the step, the time in it, the spend so far. Then every parked plan with its reason. Regenerates the digest and ends with its path. |
+| `status` | Per lane: the plan, the step, the time in it, the spend so far. Then every parked plan with its reason, and whether the repository has already settled it. Regenerates the digest and ends with its path. |
 | `digest [--history]` | Rewrites `digest.md`. `--history` writes the per-run account to `digest-history.md` instead, and is the only thing that ever writes that file. |
 | `resume NNNN` | Queues a parked plan again. Refused while the park's reason still holds, e.g. a `human` phase the plan's log does not yet mark done. |
 | `park NNNN` | Parks a plan that has not merged, with an inbox entry. |
@@ -110,6 +110,17 @@ once, whatever `state/conductor.json` says.
     its session ended on and its resume command; every lane stopped at the worktree cap, naming what
     holds the slots; every lane still on disk after a merge; every merge's open findings with their
     `file:line`; and the CLI-version warning when the last run carried one.
+
+    **Already settled, clear the record** closes that section: a park the repository itself shows as
+    finished, counted apart from the live ones and never listed among them. Two conditions decide it,
+    both narrow, both read from the tree, and **nothing else — never an age, never a branch's commits,
+    never a tag**: the plan is under `docs/plans/done/` **in the main checkout** with `Status: done`
+    (a close that landed outside the conductor never touches `state/conductor.json`), or a
+    `human_phase` / `claude_dir` park sits on a phase the plan's own `## Implementation log` now marks
+    `done` — read in the lane when the worktree is still there, in the main checkout when it is gone.
+    A close committed in a lane that has not merged is **not** settled. `status` prints the same
+    verdict on the same park. **The digest writes nothing back**: `resume NNNN` clears the record, and
+    it stays your explicit act.
   - **Now** — per lane, the plan, the step and how long it has been in it, and what the plan has
     spent. When no run is live, the last run's end time and its one-line totals.
 

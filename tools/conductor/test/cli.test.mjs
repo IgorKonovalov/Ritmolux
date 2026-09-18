@@ -174,6 +174,37 @@ test("resume refuses a human-phase park the log does not mark done, and accepts 
   assert.deepEqual(done.steps.map((s) => s.kind), ["implement", "implement", "review"]);
 });
 
+// ADR-0214: the page and `status` read the same verdict, so the owner cannot be told a record is
+// stale on one and a park on the other.
+test("status marks a park the lane has already settled exactly as the digest does", async () => {
+  const { p, cli } = setup([{ number: "0101", phases: [dev("1"), human("2"), dev("3")] }], { a: ["0101"] });
+  await cli("run");
+  const rec = loadState(p.stateDir).plans["0101"];
+  assert.equal(rec.park.reason, "human_phase");
+
+  const before = await cli("status");
+  assert.ok(before.out.includes("- 0101 (human_phase): Phase 2 is owned by human"), before.out.join("\n"));
+  assert.ok(!readFileSync(p.digest, "utf8").includes("Already settled"));
+
+  // The owner does the phase and commits its row in the lane; nothing tells the conductor.
+  const planPath = join(rec.worktree, "docs", "plans", "0101-fixture.md");
+  writeFileSync(planPath, readFileSync(planPath, "utf8").replace(/^\| 2 — Step 2 \| human \| not started \|/m, "| 2 — Step 2 | human | done |"));
+  sh(["commit", "-q", "-am", "docs(plans): phase 2 done by the owner"], rec.worktree);
+
+  const after = await cli("status");
+  assert.ok(
+    after.out.includes(
+      "- 0101 (human_phase): Phase 2 is owned by human - already settled: Phase 2 now reads `done` in the plan's `## Implementation log`; " +
+        "`resume 0101` clears the record",
+    ),
+    after.out.join("\n"),
+  );
+  const page = readFileSync(p.digest, "utf8");
+  assert.match(page, /^1 already settled\.$/m);
+  assert.match(page, /^### Already settled, clear the record\n\n- \*\*0101\*\* \(`human_phase`\) at Phase 2 parked /m);
+  assert.equal(loadState(p.stateDir).plans["0101"].status, "parked", "the renderer wrote nothing back");
+});
+
 test("run starts again after a merge, and a resumed sibling of the merged plan runs to its merge", async () => {
   const { p, cli } = setup(
     [

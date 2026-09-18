@@ -24,7 +24,7 @@ import { fileURLToPath } from "node:url";
 
 import { pidAlive } from "./with-lock.mjs";
 import { adoptedClose, verifyClose } from "./lib/close.mjs";
-import { writeDigest, writeHistory } from "./lib/digest.mjs";
+import { settledPark, writeDigest, writeHistory } from "./lib/digest.mjs";
 import { currentBranch, head, isClean } from "./lib/git.mjs";
 import { appendPark, dirtyText, dirtyWorktree } from "./lib/inbox.mjs";
 import { runLanes } from "./lib/lane.mjs";
@@ -261,7 +261,12 @@ function cmdStatus(args, o) {
   if (parked.length === 0) o.log("parked: none");
   else {
     o.log("parked:");
-    for (const r of parked) o.log(`- ${r.plan} (${r.park.reason}): ${r.park.detail}`);
+    // The same verdict the digest renders, so a record the repository has already settled is never
+    // printed here as work while the page calls it stale (ADR-0214).
+    for (const r of parked) {
+      const settled = settledPark(r, p.repo);
+      o.log(`- ${r.plan} (${r.park.reason}): ${r.park.detail}${settled ? ` - already settled: ${settled}; \`resume ${r.plan}\` clears the record` : ""}`);
+    }
   }
   regenerate(p, state);
   o.log(`digest: ${p.digest}`);

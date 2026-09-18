@@ -140,8 +140,8 @@ closed findings are the only human-readable account of an unattended night).
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the page leads with the worklist, and the history moves behind a flag | dev | committed with this row | |
-| 2 — a park the repository has already settled reads as stale | dev | not started | |
+| 1 — the page leads with the worklist, and the history moves behind a flag | dev | done | `04b18360` |
+| 2 — a park the repository has already settled reads as stale | dev | committed with this row | |
 
 ### Notes
 
@@ -150,6 +150,16 @@ closed findings are the only human-readable account of an unattended night).
   obligation that holds a `max_open_worktrees` slot, and the plan's enumeration would have dropped it
   from the default page. `tools/conductor/test/lane.test.mjs` covers the four enumerated items; this
   one is covered only by the history page's existing test.
+- Phase 2 edits `tools/conductor/conductor.mjs`, which its **Files touched** does not list. Its last
+  done-when — *"`status` agrees with the page"* — is a change to `cmdStatus`, which lives there;
+  `status` now calls the same `settledPark` the renderer does.
+- Phase 2's first condition reads the plan **only from the main checkout**, where the plan's *How*
+  says "from the tree" without naming a checkout. A close committed in a lane that has not merged is
+  under `done/` on that branch and is unfinished work, so treating it as settled would be the wrong
+  verdict the phase's risk names. `tools/conductor/test/digest.test.mjs` asserts that case.
+- The Phase 1 test `the page leads with the worklist and carries no run's own totals` changed in
+  Phase 2's commit: its fixture repository holds plan 0175 under `done/`, so that park now renders
+  under the stale heading rather than among the live ones.
 
 ### Close triggers
 

@@ -9,7 +9,7 @@ import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { duration, renderDigest, renderHistory, writeDigest, writeHistory } from "../lib/digest.mjs";
+import { duration, renderDigest, renderHistory, settledPark, writeDigest, writeHistory } from "../lib/digest.mjs";
 import { tmp, writePlan } from "./helpers.mjs";
 
 /** A fixed clock, so the current page's park ages are the same on every render. */
@@ -393,13 +393,20 @@ test("the page leads with the worklist and carries no run's own totals", () => {
   // The CLI reading belongs to the run that is current, not to the one that carried the warning.
   assert.ok(!text.includes("2.1.400"), "an older run's CLI warning is not current state");
 
-  // Both standing parks, each with its age and the one command that clears it.
-  assert.equal(lines[lines.indexOf("## Needs you") + 2], "2 parks, 1 merge with open findings.");
+  // 0175's plan sits under done/ in this fixture repository, so it is a record to clear rather than
+  // work; 0180 is the live park, with its age and the one command that clears it.
+  assert.equal(lines[lines.indexOf("## Needs you") + 2], "1 park, 1 already settled, 1 merge with open findings.");
   assert.match(text, /^- \*\*0185 merged with 2 open findings\*\*:\n {2}- minor `a\.rs:3` stale comment\n {2}- nit `b\.md` typo$/m);
-  assert.match(text, /^- \*\*0175\*\* \(`plan_wrong`\) parked 2026-09-14 17:40, 18 h 20 min ago\. .*Worktree removed; `resume` reopens it from branch `plan-0175-an-eased-value-arrives`\.$/m);
-  assert.match(text, /^ {2}Resume: `node tools\/conductor\/conductor\.mjs resume 0175`$/m);
+  assert.match(text, /^- \*\*0180\*\* \(`plan_wrong`\) parked 2026-09-14 18:20, 17 h 40 min ago\. .*Holds `[^`]*rlx-plan-0180-[^`]*`\. /m);
   assert.match(text, /^ {2}Resume: `node tools\/conductor\/conductor\.mjs resume 0180`$/m);
   assert.match(text, /^- \*\*0180\*\* \(`plan_wrong`\).*Usage at park: 5h 0\.31 \(resets 09-15 \d\d:\d\d\); 7d 0\.85 \(resets 09-22 \d\d:\d\d\); allowed_warning\.$/m);
+  const stale = lines.indexOf("### Already settled, clear the record");
+  assert.ok(stale > 0 && stale < lines.indexOf("## Now"), `the stale heading sits inside Needs you:\n${text}`);
+  assert.deepEqual(lines.slice(stale + 2, stale + 4), [
+    "- **0175** (`plan_wrong`) parked 2026-09-14 17:40: the plan is under `docs/plans/done/` with `Status: done`. " +
+      "Worktree removed; `resume` reopens it from branch `plan-0175-an-eased-value-arrives`.",
+    "  Clear the record: `node tools/conductor/conductor.mjs resume 0175`",
+  ]);
 
   // Now, with no run live: the last run's end and its one-line totals.
   assert.match(text, /^- No run is live\. The last ended 2026-09-15 11:00: 1 merged, 0 parked, 2 h 30 min, \$2\.00\.$/m);
@@ -428,6 +435,76 @@ test("an empty worklist is one line, and says what it found nothing of", () => {
   const lines = renderDigest(state, { repo: tmp(), stateDir: tmp(), now: NOW }).split("\n");
   const at = lines.indexOf("## Needs you");
   assert.deepEqual(lines.slice(at + 1, at + 5), ["", "Nothing: no park, no lane stopped at the worktree cap, no open finding.", "", "## Now"]);
+});
+
+// ADR-0214's stale-park rule. A wrong verdict here tells the owner that real work is finished, so
+// each of the two conditions has a case and so does the negative.
+
+/** A repo holding plan 0301 alone, with its phase rows and its directory as the caller asks. */
+function repoWithPlan({ status = "approved (2026-09-14)", rows, done = false }) {
+  const repo = tmp("rlx-stale-repo-");
+  writePlan(repo, { number: "0301", title: "A park to judge", status, phases: [{ id: "1", owner: "dev" }, { id: "2", owner: "human" }], rows }, { done });
+  return repo;
+}
+
+/** One parked plan 0301, parked `reason` at Phase 2, whose worktree does not exist on disk. */
+function parkedState(reason) {
+  const park = { reason, detail: `Phase 2 is owned by human`, phase: "2", read: "docs/plans/0301-fixture.md Phase 2", worktree: join(tmp("rlx-gone-"), "rlx-plan-0301"), at: "2026-09-15T09:00:00.000Z" };
+  return {
+    version: 1,
+    runs: [{ started: "2026-09-15T08:00:00.000Z", ended: "2026-09-15T11:00:00.000Z", lanes: ["a"] }],
+    lanes: {},
+    plans: {
+      "0301": { plan: "0301", status: "parked", lane: "a", worktree: park.worktree, branch: "plan-0301-a-park-to-judge", steps: [], park, parks: [park], fixRounds: 0, verdicts: [], fixes: [], gates: [], lockWaits: [], started: null, ended: null },
+    },
+  };
+}
+
+test("a human_phase park whose log row now reads done is a record to clear, not a park", () => {
+  const repo = repoWithPlan({ rows: { 1: { state: "done", commit: "abc1234" }, 2: { state: "done" } } });
+  const lines = renderDigest(parkedState("human_phase"), { repo, stateDir: tmp(), now: NOW }).split("\n");
+  assert.equal(lines[lines.indexOf("## Needs you") + 2], "1 already settled.");
+  assert.ok(!lines.some((l) => l.startsWith("- **0301** (`human_phase`) at Phase 2 parked 2026-09-15 09:00, ")), "not among the live parks");
+  const stale = lines.indexOf("### Already settled, clear the record");
+  assert.deepEqual(lines.slice(stale + 2, stale + 4), [
+    "- **0301** (`human_phase`) at Phase 2 parked 2026-09-15 09:00: Phase 2 now reads `done` in the plan's `## Implementation log`. " +
+      "Worktree removed; `resume` reopens it from branch `plan-0301-a-park-to-judge`.",
+    "  Clear the record: `node tools/conductor/conductor.mjs resume 0301`",
+  ]);
+});
+
+test("a gate_red park whose plan is under done/ is a record to clear", () => {
+  const repo = repoWithPlan({ status: "done (2026-09-15)", rows: { 1: { state: "done" }, 2: { state: "done" } }, done: true });
+  const text = renderDigest(parkedState("gate_red"), { repo, stateDir: tmp(), now: NOW });
+  assert.match(text, /^1 already settled\.$/m);
+  assert.match(text, /^- \*\*0301\*\* \(`gate_red`\) at Phase 2 parked 2026-09-15 09:00: the plan is under `docs\/plans\/done\/` with `Status: done`\. /m);
+});
+
+test("a human_phase park whose row still reads not started stays a live park", () => {
+  const repo = repoWithPlan({ rows: { 1: { state: "done" }, 2: { state: "not started" } } });
+  const text = renderDigest(parkedState("human_phase"), { repo, stateDir: tmp(), now: NOW });
+  assert.match(text, /^1 park\.$/m);
+  assert.ok(!text.includes("Already settled"), text);
+  assert.match(text, /^- \*\*0301\*\* \(`human_phase`\) at Phase 2 parked 2026-09-15 09:00, 3 h 0 min ago\. /m);
+});
+
+test("a plan under done/ only on its branch is not settled: the main checkout is what decides", () => {
+  // The lane closed the plan but nothing merged, so the main checkout still has it active.
+  const repo = repoWithPlan({ rows: { 1: { state: "done" }, 2: { state: "not started" } } });
+  const lane = repoWithPlan({ status: "done (2026-09-15)", rows: { 1: { state: "done" }, 2: { state: "not started" } }, done: true });
+  const state = parkedState("gate_red");
+  state.plans["0301"].worktree = lane;
+  assert.equal(settledPark(state.plans["0301"], repo), null);
+  assert.match(renderDigest(state, { repo, stateDir: tmp(), now: NOW }), /^1 park\.$/m);
+});
+
+test("a human_phase park reads its row in the lane when the worktree is still there", () => {
+  const repo = repoWithPlan({ rows: { 1: { state: "done" }, 2: { state: "not started" } } });
+  const lane = repoWithPlan({ rows: { 1: { state: "done" }, 2: { state: "done" } } });
+  const state = parkedState("human_phase");
+  state.plans["0301"].worktree = lane;
+  assert.equal(settledPark(state.plans["0301"], repo), "Phase 2 now reads `done` in the plan's `## Implementation log`");
+  assert.match(renderDigest(state, { repo, stateDir: tmp(), now: NOW }), /^1 already settled\.$/m);
 });
 
 test("digest --history carries every run with its Closed and its Totals", () => {

@@ -26,7 +26,8 @@ import { dirtyText, resumeCommand } from "./inbox.mjs";
 import { laneOpen } from "./lane.mjs";
 import { readLedger } from "./ledger.mjs";
 import { usageReading } from "./live.mjs";
-import { findPlan, readPlanFile } from "./plan.mjs";
+import { CLAUDE_DIR } from "./outcome.mjs";
+import { donePhases, findPlan, readPlanFile } from "./plan.mjs";
 import { statePaths, totalSpend, writeAtomic } from "./state.mjs";
 
 const HUMAN_REASONS = new Set(["human_phase", "stop_condition", "question", "plan_wrong"]);
@@ -161,6 +162,34 @@ function closedFindings(rec) {
 }
 
 /**
+ * Why the repository has already settled a park, as a phrase, or null while the park still holds.
+ * Two conditions, both read from the tree and both narrow (ADR-0214):
+ *
+ * - the plan is under `docs/plans/done/` **in the main checkout** with `Status: done` — a close that
+ *   landed outside the conductor, which never touches state/conductor.json;
+ * - a park on a phase only the owner can do (`human_phase`, `claude_dir`) sits on a phase the plan's
+ *   own `## Implementation log` now marks done. That row is read in the lane when the worktree is
+ *   still there and in the main checkout otherwise, so a lane removed by hand is not a missing plan.
+ *
+ * A branch's own `done/` copy is deliberately not enough: a close committed in a lane that has not
+ * merged is unfinished work, and a wrong "already settled" tells the owner the opposite. Nothing else
+ * is a signal here — never an age, never a branch's commits, never a tag.
+ */
+export function settledPark(rec, repo) {
+  if (!rec.park) return null;
+  const closed = findPlan(repo, rec.plan);
+  if (closed?.done && readPlanFile(closed.path).statusWord === "done") {
+    return "the plan is under `docs/plans/done/` with `Status: done`";
+  }
+  const { reason, phase } = rec.park;
+  if ((reason !== "human_phase" && reason !== CLAUDE_DIR) || !phase) return null;
+  const where = rec.worktree && existsSync(rec.worktree) ? rec.worktree : repo;
+  const found = findPlan(where, rec.plan);
+  if (!found || !donePhases(readPlanFile(found.path)).has(phase)) return null;
+  return `Phase ${phase} now reads \`done\` in the plan's \`## Implementation log\``;
+}
+
+/**
  * The one traversal of `state`, `state/` and git both pages render from. `now` is an option so a
  * test can pin the clock the current page's ages read.
  */
@@ -168,6 +197,7 @@ export function readDigestState(state, { repo, stateDir, now = Date.now() }) {
   const runs = state.runs ?? [];
   const plans = Object.values(state.plans ?? {}).sort((a, b) => a.plan.localeCompare(b.plan));
   const latest = runs.at(-1) ?? null;
+  const parked = plans.filter((r) => r.status === "parked" && r.park).map((rec) => ({ rec, settled: settledPark(rec, repo) }));
   return {
     repo,
     stateDir,
@@ -179,7 +209,8 @@ export function readDigestState(state, { repo, stateDir, now = Date.now() }) {
     laneStates: state.lanes ?? {},
     lockLog: readLockLog(stateDir),
     ledger: readLedger(join(stateDir, "suite-ledger.jsonl")),
-    parked: plans.filter((r) => r.status === "parked" && r.park),
+    parked: parked.filter((p) => !p.settled).map((p) => p.rec),
+    settled: parked.filter((p) => p.settled),
     merged: plans.filter((r) => r.status === "merged"),
     stops: latest?.stops ?? [],
     cli: latest?.cli ?? null,
@@ -247,13 +278,32 @@ function needsYou(view) {
     lines.push(`- **${rec.plan} merged with ${plural(open.length, "open finding")}**:`);
     for (const f of open) lines.push(`  - ${f.severity} \`${f.line ? `${f.file}:${f.line}` : f.file}\` ${f.what}`);
   }
+  // A park the repository has already settled is a record to clear, never work: it goes under its own
+  // heading and is counted apart, so one real park is not read as five (ADR-0214). The digest writes
+  // nothing back — clearing it stays an explicit `resume`.
+  const stale = [];
+  for (const { rec, settled } of view.settled) {
+    stale.push(
+      `- **${rec.plan}** (\`${rec.park.reason}\`)${rec.park.phase ? ` at Phase ${rec.park.phase}` : ""} parked ${stamp(rec.park.at)}: ` +
+        `${settled}. ${parkHolds(rec)}`,
+      `  Clear the record: \`${resumeCommand(rec.plan)}\``,
+    );
+  }
   const parts = [];
   if (counts.parked) parts.push(plural(counts.parked, "park"));
+  if (view.settled.length) parts.push(`${view.settled.length} already settled`);
   if (counts.stops) parts.push(`${plural(counts.stops, "lane")} stopped at the worktree cap`);
   if (counts.findings) parts.push(`${plural(counts.findings, "merge")} with open findings`);
   if (counts.lanes) parts.push(`${plural(counts.lanes, "lane")} still on disk after a merge`);
   const summary = parts.length ? `${parts.join(", ")}.` : "Nothing: no park, no lane stopped at the worktree cap, no open finding.";
-  return ["## Needs you", "", summary, "", ...(lines.length ? [...lines, ""] : [])];
+  return [
+    "## Needs you",
+    "",
+    summary,
+    "",
+    ...(lines.length ? [...lines, ""] : []),
+    ...(stale.length ? ["### Already settled, clear the record", "", ...stale, ""] : []),
+  ];
 }
 
 /** The current page's second section: what each lane is doing, or what the last run left. */
