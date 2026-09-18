@@ -35,7 +35,7 @@ disk before the encoder.
 
 The repository also has a smaller, embarrassing version of the same gap. Every picture in it is a
 **still**, because there has never been a way to record a moving one — which is exactly what
-[Plan 0103](../0103-the-project-gets-an-audience.md) needs and cannot make.
+[Plan 0103](0103-the-project-gets-an-audience.md) needs and cannot make.
 
 ## Decision
 
@@ -179,7 +179,7 @@ flowchart LR
   50,000 / 150,000 with no render-target term, while the trail grid *is* surface-sized, so 1080p
   multiplies pixels 4x while `Rich` multiplies particles 3x and **density falls as resolution
   rises**. Filed as [design-backlog 0110](../../design-backlog.md), which now gates whether a
-  rendered file is publishable and which [Plan 0103](../0103-the-project-gets-an-audience.md) depends
+  rendered file is publishable and which [Plan 0103](0103-the-project-gets-an-audience.md) depends
   on.
 
 ## Risks & open questions
@@ -213,7 +213,7 @@ flowchart LR
 - A preset **arc** across a render — the engine has a `director` module and a novelty signal, and
   an authored per-track sequence is the natural next thing to want once one video exists.
 - Use this to produce the repository's demo material for
-  [Plan 0103](../0103-the-project-gets-an-audience.md), which currently has no way to record motion.
+  [Plan 0103](0103-the-project-gets-an-audience.md), which currently has no way to record motion.
 - **Raise the attractor's sample density before that material is made** —
   [design-backlog 0110](../../design-backlog.md), found by Phase 5 and the one thing standing between
   a rendered file and a publishable one.

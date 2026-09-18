@@ -300,8 +300,6 @@ live entry citing this one.
 
 | # | Entry | Owned by |
 |---|-------|----------|
-| 0102 | A foobar panel attaches its surface at 1x1 and only a stream-format change revives it | [Plan 0103](plans/0103-the-project-gets-an-audience.md) Phase 1. **Promoted** |
-| 0103 | The plugin's context menu shadows foobar's, so the panel cannot be removed from a layout | [Plan 0103](plans/0103-the-project-gets-an-audience.md) Phase 1. **Promoted** |
 | 0113 | The converted feedback field equilibrates far brighter than the reference's | [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md). **Promoted** |
 | 0124 | ADR-0113's motivating claim still reads "provisionally negative" | [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md). **Promoted** |
 | 0157 | The fixed telemetry set omits the bar grid the engine already computes | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
@@ -582,6 +580,8 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0203 | The smoke run captured from a microphone while the default is loopback | [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phase 5. On-device: no fallback exists; a persisted overlay choice. **Closed 2026-09-18** |
 | 0207 | The cap-recovery line says "geometry" for three contexts that are not geometry | [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phase 3. Rendered per context, no wildcard arm. **Closed 2026-09-18** |
 | 0208 | A system count written into prose goes stale on the next system | [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phase 4 + [ADR-0202](adrs/0202-a-written-count-of-the-systems-is-refused-by-a-gate.md). One marker taken. **Closed 2026-09-18** |
+| 0102 | A foobar panel attaches its surface at 1x1 and only a stream-format change revives it | [Plan 0103](plans/done/0103-the-project-gets-an-audience.md) Phase 1. The attach waits for a size; no fallback, no flag. Unmeasured on device. **Closed 2026-09-18** |
+| 0103 | The plugin's context menu shadows foobar's, so the panel cannot be removed from a layout | [Plan 0103](plans/done/0103-the-project-gets-an-audience.md) Phase 1. One per-window question, shared branch intact, no ADR. **Closed 2026-09-18** |
 <!-- roster:end -->
 
 ---
@@ -7803,7 +7803,7 @@ Then correct the comment: the safety comes from re-resolving, not from modality.
 
 **Low.** A few lines, no design question, and it removes a false claim from a file whose comments
 are load-bearing. Natural pickup for whoever takes
-[Plan 0103](plans/0103-the-project-gets-an-audience.md) Phase 1, which rewrites this same handler.
+[Plan 0103](plans/done/0103-the-project-gets-an-audience.md) Phase 1, which rewrites this same handler.
 
 ---
 
@@ -8812,7 +8812,7 @@ gates on `ffmpeg_on_path()`. (c) If they cannot survive H.264-in-MP4 the way thi
 them, correct the paragraph rather than the command.
 
 **Impact:** low-medium. No reported visual defect; a documented guarantee that is not checked, on
-the path [Plan 0103](plans/0103-the-project-gets-an-audience.md) publishes from. **No ADR needed.**
+the path [Plan 0103](plans/done/0103-the-project-gets-an-audience.md) publishes from. **No ADR needed.**
 - **PROMOTED 2026-09-01 -> [Plan 0148](plans/done/0148-the-shipped-artifacts-carry-their-own-guarantees.md) Phase 3**, whose done-when is written around *establishing what is
   true* and admits both repairs this entry names - move the arguments, or correct the paragraph.
 
@@ -9240,7 +9240,7 @@ exactly the class [ADR-0065](adrs/0065-the-attractor-deposit-is-normalized-by-pa
 `tier.rs` module header already argue about. **Priority: high for the video path, low for the
 app** — nothing shipped is broken and the live tiers are validated where they are. It gates
 whether a rendered file is publishable, which is the question Plan 0101 exists to make askable and
-[Plan 0103](plans/0103-the-project-gets-an-audience.md) depends on the answer to.
+[Plan 0103](plans/done/0103-the-project-gets-an-audience.md) depends on the answer to.
 
 --
 
@@ -11290,7 +11290,20 @@ panel — it makes **foobar2000 itself** feel dead, with no visible cause and no
 Compounding it, [0103](design-backlog.md) means the user cannot remove the panel by the documented
 route to escape. Whoever picks this up should read the two together.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0103](plans/0103-the-project-gets-an-audience.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0103](plans/done/0103-the-project-gets-an-audience.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **CLOSED 2026-09-18** — [Plan 0103](plans/done/0103-the-project-gets-an-audience.md) Phase 1
+  (`2c9cbbca`) took the deferred-attach option this entry called the safer of the two, and took it
+  whole: the `1x1` fallback and `needs_reattach` are both gone, `attach_if_ready` creates and
+  attaches only once the owner reports a client size, and both the first real `WM_SIZE` and the
+  500 ms watchdog call it, so a missed size message costs one tick rather than the session.
+  Ownership became a property of the window rather than of the handle — `claim` now succeeds with no
+  surface, and every consumer already guarded on `handle`. **The instrument this entry asked for
+  exists**: the diagnostics log gained `surface_w`, `surface_h`, `client_w` and `client_h`, so the
+  question `gpu_bytes` structurally cannot answer is now one column comparison. **What is still not
+  established is what this entry said was not: nothing has measured it.** The component was not
+  compiled in the plan's lane (no SDK there) and CI builds no C++, so the first reading of the fix is
+  the clean-profile item in [`on-device-validation.md`](on-device-validation.md), which that close
+  rewrote for it. A failure there convicts the fix and returns as a new live entry citing this one.
 
 
 ---
@@ -11338,7 +11351,18 @@ question, since sharing `wnd_proc` between both host kinds is deliberate in this
 **Medium-low.** One workaround exists and works, but it is undiscoverable, and "I cannot remove your
 component from my layout" is a bad first impression.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0103](plans/0103-the-project-gets-an-audience.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0103](plans/done/0103-the-project-gets-an-audience.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **CLOSED 2026-09-18** — [Plan 0103](plans/done/0103-the-project-gets-an-audience.md) Phase 1
+  (`2c9cbbca`). **The design question this entry posed was answered the other way, and that is the
+  substantive part of the close.** The two hosts did *not* stop sharing one `WM_CONTEXTMENU` branch:
+  the branch asks one per-window question, `host_defers_context_menu(HWND)`, answered from the
+  panel's `ui_element_instance_callback` through a `GWLP_USERDATA` back-pointer, and the pop-out —
+  which never writes that word — answers `false` by construction rather than by a special case. So
+  the edit-mode query did reach the panel path and `DefWindowProc` does forward the message to the
+  host, while the deliberate sharing of `wnd_proc` survived intact and no ADR was owed. The probe
+  above is now false by delivery: `is_edit_mode_enabled` is present in
+  `plugin-foobar/foo_ritmolux.cpp`. **Unmeasured on device**, like 0102 — the clean-profile item's
+  (e) in [`on-device-validation.md`](on-device-validation.md) is its first reading.
 
 
 ---

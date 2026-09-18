@@ -40,7 +40,6 @@ place. The plan file carries the real link.
 <!-- roster:begin cap=320 -->
 | Plan | Title | Status | Owner | Live constraint |
 |------|-------|--------|-------|-----------------|
-| [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | in-progress | dev, human | Phases 1-4 done on its branch; closes there. Phases 5-6 left on 2026-09-18 for [0192] - a submission needs a release of Phase 1's own fix, which only exists after this plan merges. |
 | [0192](0192-the-component-reaches-its-audience.md) | The component reaches its audience | draft | human | 0103's Phases 5-6 plus the release they stand on. Push ONE tag: the pipeline has published nothing since v0.126.0, two runs red on the foobar job and three tags with no run. |
 | [0193](0193-the-digest-says-what-is-happening-and-where-you-are-needed.md) | The digest says what is happening, and where you are needed | approved | dev | ADR-0214 (proposed): Needs you + Now, history behind `digest --history`. Phase 2's false 'already settled' is the risk; its negative case is a done-when. |
 | [0120](0120-the-standalone-ships-on-ubuntu.md) | The standalone ships on Ubuntu | approved | dev, human | ADR-0131 (proposed): PulseAudio capture + an `ubuntu-latest` CI arm. **Phase 1 is a `human` stop gate before `dev`.** Guard is 5 zips + 1 tarball; folds backlog 0181 (Linux arm) + 0208. |
@@ -290,7 +289,8 @@ re-checked against the tree and none was withdrawn; each carries a dated `Amende
 naming what moved. The order:
 
 - **Delivery and infrastructure lane.** [0174] closed first, then [0176] (both 2026-09-14), which
-  discharges [0103] Phase 5's wait on a tag that reliably reaches origin. [0177] closed 2026-09-15, its fold re-derived from 0174's final run-alone filter. [0166] closed
+  discharges the wait on a tag that reliably reaches origin — an [0103] phase then, [0192] Phase 1
+  now. [0177] closed 2026-09-15, its fold re-derived from 0174's final run-alone filter. [0166] closed
   2026-09-17 and took the gate-count prose count-free, as [0176] had; [0178] closed 2026-09-18 onto
   that wording and restored no number — it retired the ordinals beside the counts instead.
 - **Engine lane.** [0181], [0185] and then [0175] closed 2026-09-15, and none moved a golden.
@@ -303,7 +303,9 @@ naming what moved. The order:
   behind.
   [0179] closed 2026-09-16 and [0183] 2026-09-17, moving no baseline.
   [0182] closed 2026-09-15 ahead of them; it touched only the report, so it constrains none.
-- **Still gated on a human:** [0120] Phase 1, [0133] Phase 9 and all three phases of [0192]. [0103] Phase 4 is discharged - the owner set the topics and the social preview on 2026-09-18. [0166] Phase 3
+- **Still gated on a human:** [0120] Phase 1, [0133] Phase 9 and all three phases of [0192]. [0103]
+  closed 2026-09-18, its Phase 4 discharged by the owner the same day - topics and the social
+  preview. [0166] Phase 3
   is discharged - the owner read the five translations on 2026-09-16, 44 corrections.
 - **All eleven approved 2026-09-14 with [0175], and [0181]'s reversal of an interview pick confirmed.** Backlog 0142's double-advance is
   unreachable - `shares_resources` answers true for any same-system pair, so every such dissolve
@@ -334,7 +336,8 @@ sequence and the prior sequence notes under it — is in
 [README-archive.md](README-archive.md) under `## Prior sequencing notes (superseded)`.
 Four calls set it: the next stretch is **engine and visual richness**, work runs
 in **two lanes**, [0103] waits for [0104], and [0087] goes **early to de-risk** rather than late
-because it is large.
+because it is large. **All four are spent: [0103] closed 2026-09-18 behind [0104], which is the
+last of the four to resolve.**
 
 **Added 2026-08-29, on show day: [0131] and [0133] are approved, and the order below is the
 user's call.** Both were `draft` carrying proposed ADRs, and neither could serve the show that
@@ -507,11 +510,10 @@ would revert most quietly.
    a `rotation` lever, and [0087]'s Phase 4 means `star_pattern` can be authored on the arc
    primitive. `star_mandala_bordered` is the worked example of what that surface reaches. Every
    phase is a `preset-author` session in `presets/`.
-5. **[0103]** — last. **Decided 2026-08-18: it waits for [0104]**, which closes the disagreement
-   this section carried open since 2026-08-16. The cost being avoided is announcing into a library
-   where four of eleven systems have one world each; 0101's Phase 5 adds a second reason to hold the
-   demo material, a 1080p render still reading as an upscale
-   ([backlog 0110](../design-backlog.md)).
+5. ~~**[0103]** — last, waiting for [0104].~~ — **closed 2026-09-18**, and with it this whole
+   numbered sequence is spent. Both reasons for holding it expired first: [0104] closed and the
+   library grew several-fold, and the demo material was shot at 720p. The note is
+   [in the archive](README-archive.md#prior-sequencing-notes-superseded).
 
 **Added 2026-08-28, from a whole-codebase review (layering, god modules, hot-path safety, doc
 drift): [0124](done/0124-the-review-fixes-that-move-no-pixels.md) →
@@ -860,6 +862,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0103 - The project gets an audience](done/0103-the-project-gets-an-audience.md) - closed 2026-09-18. Review: **no blockers, no majors, five minors, two nits (five fixed).** Version: **0.131.1** (patch). No ADR paired. Closed backlog 0102, 0103 - neither measured on device. [Write-up](README-archive.md).
 - [0178 - What the operator reads is true](done/0178-what-the-operator-reads-is-true.md) - closed 2026-09-18. Review: **no blockers, no majors, three minors, two nits (three fixed).** Version: **0.131.0**. ADR-0202 accepted, Outcome. Closed 0172, 0185, 0203, 0207, 0208; filed 0252. [Write-up](README-archive.md).
 - [0160 - The silhouette's preconditions stop being silent](done/0160-the-silhouettes-preconditions-stop-being-silent.md) - closed 2026-09-17. Review: **no blockers, no majors, three minors, three nits (all fixed).** Version: **0.130.1**. ADR-0179 accepted, Outcome. Closed backlog 0217. [Write-up](README-archive.md).
 - [0186 - The flatness gate tells a figure from its ground](done/0186-the-flatness-gate-tells-a-figure-from-its-ground.md) - closed 2026-09-17. Review: **no blockers, no majors, three minors, one nit (all fixed).** Version: **0.129.0**. ADR-0200 accepted. Closed backlog 0128; filed 0248. [Write-up](README-archive.md).
@@ -1114,7 +1117,7 @@ Later, unordered: better tempo tracking, preset sharing/library, signed installe
 [0100]: done/0100-the-engine-speaks-milkdrop.md
 [0101]: done/0101-the-engine-renders-a-music-video.md
 [0102]: done/0102-the-component-ships.md
-[0103]: 0103-the-project-gets-an-audience.md
+[0103]: done/0103-the-project-gets-an-audience.md
 [0192]: 0192-the-component-reaches-its-audience.md
 [0193]: 0193-the-digest-says-what-is-happening-and-where-you-are-needed.md
 [0104]: done/0104-the-library-stops-being-lopsided.md

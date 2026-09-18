@@ -1,24 +1,28 @@
 # 0103 — The project gets an audience
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-18. Four phases landed (`2c9cbbca`, `b72b035`, `cff81675` +
+> `684ddeba`, `e5d7c7f4`), plus `d6e275e6`, the close review's five prose repairs. Round-1 verdict:
+> **no blockers, no majors, five minors and two nits** — five repaired, two left open (the
+> uncompiled, unmeasured Phase 1, and the clip's clone weight). Version **0.131.1** (patch). No ADR
+> paired, and the one Phase 1 was conditioned on is genuinely not owed. Backlog 0102 and 0103 closed.
 > **Created:** 2026-08-16
 > **Approved:** 2026-08-16 (user)
 > **Owner skill(s):** dev, human
 > **Related ADRs:** none yet — this is mostly distribution work, but **Phase 1 may earn one**
 > (see that phase)
-> **Amended:** 2026-08-16 — Phase 1 added after [Plan 0102](done/0102-the-component-ships.md)'s
+> **Amended:** 2026-08-16 — Phase 1 added after [Plan 0102](0102-the-component-ships.md)'s
 > Phase 5 found the shipped component starves its host; former Phases 1-5 renumbered 2-6
 > **Closes:** design-backlog 0102, design-backlog 0103
-> **Soft dependency:** [0101](done/0101-the-engine-renders-a-music-video.md) (closed — `shot --render` records motion)
-> **Coordinates with:** [0156](done/0156-the-site-becomes-the-reference.md) (closed) — it moved the
+> **Soft dependency:** [0101](0101-the-engine-renders-a-music-video.md) (closed — `shot --render` records motion)
+> **Coordinates with:** [0156](0156-the-site-becomes-the-reference.md) (closed) — it moved the
 > operator and developer sections out of `README.md` into `docs/` (ADR-0169): the file Phase 2 here
 > reorders is now **346 lines, not 650**, and its operator material is
-> [running.md](../running.md) and [configuration.md](../configuration.md).
+> [running.md](../../running.md) and [configuration.md](../../configuration.md).
 > The architecture diagram now lives in `docs/how-it-works.md`; the README's `## Architecture` is a
 > short paragraph pointing at it.
 > **Split 2026-09-18:** Phases 5 and 6 — the component submission and the three posts — moved to
-> [0192](0192-the-component-reaches-its-audience.md), with the dependencies that were theirs
-> ([0102](done/0102-the-component-ships.md), Plan 0176, backlog 0196). This plan now ends at Phase 4.
+> [0192](../0192-the-component-reaches-its-audience.md), with the dependencies that were theirs
+> ([0102](0102-the-component-ships.md), Plan 0176, backlog 0196). This plan now ends at Phase 4.
 
 > **Amended 2026-09-14** (architect backlog sweep): Phase 1's files follow Plan 0126 Phase 8's split
 > of `foo_ritmolux.cpp` (`1779520`) into `host_window.cpp` / `viz_session.cpp`; the repository
@@ -42,10 +46,10 @@ that promised it would be lying.
 **The last two steps are no longer here.** The submission and the posts both point strangers at a
 component that must exist as a published release first, and that release can only carry Phase 1's
 fix once *this* plan merges — so they were a phase waiting on their own plan's close. They are
-[Plan 0192](0192-the-component-reaches-its-audience.md), which starts from the release instead.
+[Plan 0192](../0192-the-component-reaches-its-audience.md), which starts from the release instead.
 
 **Phase 1 is the exception, and it comes first.** Everything after it points strangers at the
-foobar2000 component, and as of [Plan 0102](done/0102-the-component-ships.md)'s Phase 5 that
+foobar2000 component, and as of [Plan 0102](0102-the-component-ships.md)'s Phase 5 that
 component makes foobar2000 itself feel dead until the user starts playback — while looking
 perfectly fine. Driving an audience into that is not a smaller version of this plan's goal, it is
 the opposite of it, so the fix is a phase here rather than a plan somewhere else.
@@ -83,7 +87,7 @@ competitor is a port of a 2007 plugin — is reachable through a component nobod
 
 Do the distribution work as a tracked plan with a close ceremony, rather than as a someday. The
 phases are ordered so the `dev` phases produce the material — a README, a clip, a preview — that
-Phase 4 and then [Plan 0192](0192-the-component-reaches-its-audience.md) publish; nothing
+Phase 4 and then [Plan 0192](../0192-the-component-reaches-its-audience.md) publish; nothing
 here is clever and that is deliberate — **except Phase 1, which is a design pass and is ordered
 first because every later phase increases the number of people who meet the defect it fixes.**
 
@@ -92,8 +96,8 @@ first because every later phase increases the number of people who meet the defe
 ### Phase 1 — the component survives a stranger's first five minutes
 
 - **Owner skill:** dev
-- **What:** Fix [design-backlog 0102](../design-backlog-archive.md) — the panel attaches its wgpu surface
-  before it has a real client rect — and [design-backlog 0103](../design-backlog-archive.md) — the panel's
+- **What:** Fix [design-backlog 0102](../../design-backlog-archive.md) — the panel attaches its wgpu surface
+  before it has a real client rect — and [design-backlog 0103](../../design-backlog-archive.md) — the panel's
   `WM_CONTEXTMENU` shadows foobar2000's layout-edit menu, so it cannot be removed by the documented
   route. Both pre-date this plan. Since Plan 0126 Phase 8 (`1779520`) split the shim, the surface
   lifetime lives in `plugin-foobar/viz_session.cpp` (`VizSession::ensure_handle`, the
@@ -131,7 +135,7 @@ first because every later phase increases the number of people who meet the defe
   layout editing enabled, right-clicking the panel surfaces **foobar2000's** menu and Remove works,
   while with it disabled the component's own menu still appears.
   **Then re-run Plan 0102 Phase 5's checklist** — the section of
-  [`on-device-validation.md`](../on-device-validation.md) headed *"Runnable now — the foobar2000
+  [`on-device-validation.md`](../../on-device-validation.md) headed *"Runnable now — the foobar2000
   component's clean-profile install"* — which is where the original evidence lives and which is the
   only functional check this component has.
 
@@ -164,10 +168,10 @@ first because every later phase increases the number of people who meet the defe
 - **Owner skill:** dev
 - **What:** A short rendered clip of the app running, plus a social-preview still, produced from a
   committed manifest the way every other image here is
-  ([ADR-0100](../adrs/0100-documentation-images-are-committed-headless-renders.md)).
+  ([ADR-0100](../../adrs/0100-documentation-images-are-committed-headless-renders.md)).
 - **Files touched:** `scripts/docs-shots.mjs` (or a sibling), `docs/images/`.
 - **Notes for the implementer:** **this is the phase that wants
-  [0101](done/0101-the-engine-renders-a-music-video.md)** — `shot --render` is the only way this repo
+  [0101](0101-the-engine-renders-a-music-video.md)** — `shot --render` is the only way this repo
   can record motion, and screen-capturing the window would be the one image here that is not a
   reproducible render. 0101 has closed, so `--render` is available; do not introduce a
   hand-captured video.
@@ -193,40 +197,40 @@ first because every later phase increases the number of people who meet the defe
 ## Risks & open questions
 
 - **Mac users will be the first testers of a path that has never run.** The macOS build compiles
-  in CI and has **never executed on Apple hardware** ([NFR §9](../nfr.md#9-test-hardware-matrix-what-the-user-has)).
+  in CI and has **never executed on Apple hardware** ([NFR §9](../../nfr.md#9-test-hardware-matrix-what-the-user-has)).
   An announcement will produce Mac downloads. The README already says this; Phase 2 must keep it
   above the fold rather than tidying it away, and the posts — now
-  [0192](0192-the-component-reaches-its-audience.md) Phase 3 — should say it in the post itself.
+  [0192](../0192-the-component-reaches-its-audience.md) Phase 3 — should say it in the post itself.
 - **Every shipped artifact is unsigned** — a `v*` tag now ships five zips (the standalone for
   Windows and macOS, the foobar2000 component, and the studio for Windows and macOS), so the
   first-run experience on both platforms is an OS warning. This is known and accepted
-  ([NFR §8](../nfr.md#8-distribution-v1)); what it means here is that the friction is highest at
+  ([NFR §8](../../nfr.md#8-distribution-v1)); what it means here is that the friction is highest at
   exactly the moment attention is highest. **The studio question was Phase 2's to settle and is
   settled** (owner's call, 2026-09-18): the README names the studio in `## Download` and nowhere
-  above it. Whether a post pitches it is [0192](0192-the-component-reaches-its-audience.md)'s.
+  above it. Whether a post pitches it is [0192](../0192-the-component-reaches-its-audience.md)'s.
 - **The library was small and lopsided** when this plan was written — four systems with exactly one
-  world each. [Plan 0104](done/0104-the-library-stops-being-lopsided.md) has since closed and the
+  world each. [Plan 0104](0104-the-library-stops-being-lopsided.md) has since closed and the
   embedded set has grown several-fold, so this risk is largely retired; a visitor still judges the
   content, not the composite.
 - **This plan cannot promise adoption** and does not. Every done-when is an artifact. **Phase 1 is
   the one exception to that and is held to a measured property instead**, which is the right trade
   but a different kind of promise from the rest of the plan.
 - **Phase 1 is not the first change to the shim's window/ownership path** — `6f2862c`'s render
-  timer and the surface work before it, then [Plan 0107](done/0107-the-foobar-menu-picks-a-preset.md)'s
+  timer and the surface work before it, then [Plan 0107](0107-the-foobar-menu-picks-a-preset.md)'s
   menu rebuild and Plan 0126's split into `host_window.cpp` / `viz_session.cpp` all came first.
-  [Backlog 0102](../design-backlog.md) says in as many words
+  [Backlog 0102](../../design-backlog.md) says in as many words
   that it *"wants a design pass over surface lifetime, not another edge case handled"* — and that
   it was filed rather than fixed precisely to avoid *"a third guess layered on two"*. Treat a fix
   that only makes the reported symptom go away as a failure of this phase, not a pass.
 - **Nothing in CI can verify Phase 1.** No runner loads foobar2000, so its done-when is checked by
-  hand against [`on-device-validation.md`](../on-device-validation.md) — the same gap the macOS path
-  has ([ADR-0115](../adrs/0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md)).
+  hand against [`on-device-validation.md`](../../on-device-validation.md) — the same gap the macOS path
+  has ([ADR-0115](../../adrs/0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md)).
   The evidence it is checked against is one machine and one host version.
 - **Phase 1 has a release cost the others do not, and it is what forced the split.** It changes
   shipped plugin behaviour, so the fixed component reaches nobody until a `v*` tag carrying it is
   pushed and its release is green — and that tag cannot exist until this plan closes and merges. A
   submission phase inside this plan was therefore waiting on this plan's own close. It is
-  [0192](0192-the-component-reaches-its-audience.md) Phase 1, which is the release, and the
+  [0192](../0192-the-component-reaches-its-audience.md) Phase 1, which is the release, and the
   submission follows it there.
 - **Contention:** `plugin-foobar/viz_session.cpp`, `host_window.cpp`, `foo_ritmolux.cpp` (Phase 1),
   `README.md`, `docs/images/`, `scripts/`. A close ceremony's image re-render is the usual other
@@ -235,13 +239,13 @@ first because every later phase increases the number of people who meet the defe
 ## What this plan does NOT do
 
 - **No new website work, and no domain.** The documentation site already exists
-  ([ADR-0154](../adrs/0154-the-reader-facing-docs-publish-as-a-site.md)), owns its own entrance and
-  install page ([ADR-0167](../adrs/0167-the-site-owns-its-entrance-and-the-install-page-is-the-testers-own-file.md)),
+  ([ADR-0154](../../adrs/0154-the-reader-facing-docs-publish-as-a-site.md)), owns its own entrance and
+  install page ([ADR-0167](../../adrs/0167-the-site-owns-its-entrance-and-the-install-page-is-the-testers-own-file.md)),
   and is where the README sends a reader for reference
-  ([ADR-0169](../adrs/0169-the-site-is-organised-by-reader-task-and-the-readme-stops-being-a-reference.md)).
+  ([ADR-0169](../../adrs/0169-the-site-is-organised-by-reader-task-and-the-readme-stops-being-a-reference.md)).
   This plan links to it; it does not redesign it or buy it a domain.
 - **No submission and no posts.** Both moved to
-  [0192](0192-the-component-reaches-its-audience.md) on 2026-09-18, with the release they stand on.
+  [0192](../0192-the-component-reaches-its-audience.md) on 2026-09-18, with the release they stand on.
 - **No paid promotion, no mailing list, no social accounts.**
 - **No code signing** — that stays a future plan and a `human` cost.
 - **No submission to app stores or package managers.**
@@ -273,7 +277,7 @@ first because every later phase increases the number of people who meet the defe
   **not compiled** (the foobar2000 SDK is gitignored and unstaged in this worktree, and
   `packaging/foobar/fetch-sdk.ps1` is outside the conductor session's allowlist), and the frame-time,
   surface-size and layout-edit-menu checks are the on-device checklist's, under
-  [`on-device-validation.md`](../on-device-validation.md)'s *"Runnable now — the foobar2000
+  [`on-device-validation.md`](../../on-device-validation.md)'s *"Runnable now — the foobar2000
   component's clean-profile install"*.
 - Phase 2's studio sentence does **not** say where the site explains the studio, because the site
   does not: `PUBLISHED` in `site/src/plugins/rewrite-links.mjs` carries no studio page, and
@@ -316,9 +320,161 @@ first because every later phase increases the number of people who meet the defe
   and carries the gallery URL where the file's draft did neither, and it is what search results and
   every social card already carry, so the file moved and the repository did not.
 
+## Close review
+
+> Round 1, 2026-09-18. Mode 4 in conductor mode (ADR-0205): a separate headless process, handed
+> this plan and the lane and nothing an implementer wrote outside the repository. Written to
+> `tools/conductor/state/reviews/0103-round-1.md` and reproduced here in full, because a
+> conductor-run close has no reader in the room.
+
+### Verdict
+
+**Plan 0103 landed cleanly: no blockers, no majors, five minor items and two nits.** Phase 1 is a
+real design pass over surface lifetime rather than a third guess layered on two — the fallback size
+and the flag that repaired it are both gone, and ownership moved from the handle to the window,
+which is what [backlog 0102](../../design-backlog-archive.md) asked for and what this plan told the
+implementer not to substitute a symptom patch for. Phases 2 and 4 meet their done-whens as written.
+Phase 3 produced both artifacts from an argument-free manifest.
+
+Every minor is documentation that this plan made false, except one: **the Phase 1 C++ has never been
+compiled or measured anywhere**, and that one cannot be repaired in this lane or in a fix round.
+
+### Evidence
+
+| Check | Result |
+|---|---|
+| `with-lock.mjs suite -- cargo nextest run --workspace` | `skipped: tree 101ffa5 is green in the suite ledger, run by gate 0103-pre-review at 2026-09-18T13:50:38.809Z: 2004 tests run: 2004 passed (6 slow), 7 skipped` — the ledger record is the full-suite evidence (ADR-0207) |
+| `cargo fmt --all -- --check` | clean |
+| `cargo clippy --workspace --all-targets -- -D warnings` | clean |
+| `cargo doc --workspace --no-deps`, rustdocflags `-D warnings` | clean, six crates |
+| `check-doc-links`, `toc --check`, `check-index-rows`, `check-comment-hygiene`, `check-reader-prose`, `check-system-counts` | all OK |
+| `check-backlog-claims` | OK — 93 reductions across 38 live entries, 3 unprobeable; 36 moved-path advisory rows, none this plan's |
+| `check-translations` | OK, 5 stamped; the advisory was empty before this close's repairs |
+
+### Lens 1 — alignment with the plan
+
+Four phases, four in-vocabulary owner tags (`dev`, `dev`, `dev`, `human`). The log is shorter than
+`## Implementation phases`, as ADR-0120 asks, and reports by exception in the right places —
+including three things a log is tempted to omit: that Phase 1 was never compiled, that `--crf 28`
+was measured against `--crf 23`, and that `CLAUDE.md` now undercounts the renderers.
+
+Done-whens, read against the tree rather than the log. **Phase 2:** `## Download` is at
+`README.md:41`, above `## Architecture` and `## Repository layout`; the studio appears there and
+nowhere above it; the sentence is count-free; `packaging/repo-metadata.md` carries the topic list
+Phase 4 applied. **Met.** **Phase 3:** both artifacts committed, the script argument-free, and every
+`shot` flag it passes exists with the meaning it relies on — including the parser rule that
+`--render` refuses `--signal`/`--audio`, which is why the stimulus is synthesized. Hop 300 is inside
+the clip. **Met.** **Phase 4:** topics and preview recorded, with the cached-card clause honestly
+marked unchecked. **Met.** **Phase 1: not verified, and the log says so** (see minor 5).
+
+The ADR this plan conditioned on Phase 1 is genuinely not owed: `host_window.cpp`'s
+`WM_CONTEXTMENU` is still **one** branch asking one per-window question, answered from the panel's
+`ui_element_instance_callback` through a `GWLP_USERDATA` back-pointer, with the pop-out answering
+`false` by construction rather than by a special case. The two-host design is preserved, not ended.
+
+### Lens 2 — layering, coupling, real-time safety
+
+Nothing under `core/` changed and the C ABI is untouched: the four new diagnostics columns are the
+*shim's* own state, which is exactly the distinction `gpu_bytes` structurally cannot make — widening
+the ABI to expose a surface size would have been the ADR-worthy move and was correctly not taken.
+No audio-thread change: everything Phase 1 touches runs on the main thread, and the newly placed
+`announce_current()` is reachable only from a window message. The handle guards are complete, which
+is the property the new no-fallback rule depends on — `claim` can now return `true` with no handle,
+and the render tick, `pump`, `size_surface`, `maybe_log_metrics`, `announce` and both input arms all
+test it, while `destroy_handle` zeroes the surface size with the handle. The surfaceless retry is
+bounded by the 500 ms watchdog and is *slower* than the 400 ms arbitration retry it replaces. No
+reference to either removed member survives in any source.
+
+### Lens 3 — doc freshness and release bookkeeping
+
+Where every repairable finding is: the plan changed two things a user observes and added a fourth
+`shot`-driving script whose output is committed, and four documents asserted the old state
+(minors 1-4). Nothing else in the sweep table is implicated — no param, grammar, palette, schema,
+preset, hotkey, CLI flag, config key, OSC address or NFR budget moved. The version bump is a
+**patch**: a fix to shipped plugin behaviour plus documentation, metadata and a maintenance
+renderer, which is no new capability of either frontend
+([ADR-0005](../../adrs/0005-versioning-and-release-cadence.md)).
+
+### Lens 4 — correctness and determinism
+
+The boundary still validates once, in one place: `client_size` rejects a null window, a failed
+`GetClientRect` and any non-positive extent before a surface is ever configured, and it is the
+single computation of that answer. No aspect ratio is derived from anything but the target — the
+only sizes in the diff are the window's own client extent and the manifest's declared output sizes.
+No new Rust, so no new panic path. The one new randomness is explicitly seeded
+(`mulberry32(0x5eed0103)`), so the stimulus is reproducible rather than merely similar. Every
+numeric claim in the diff is a measurement that names its configuration (10.7 MB at `crf` 23
+against 6.2 MB at 28 on this preset at this size; 1.18 MB truecolour against 446 KB quantized
+against GitHub's 1 MB limit), none is asserted by a test, and the one assertion the script does make
+— fail the run when the still is still over budget — is the upload's own rule rather than a frozen
+number about a machine.
+
+### Lens 5 — design integrity
+
+Dependency direction unchanged. The seam that could have widened did not: reaching a host-specific
+answer from a shared window procedure is exactly where a shim grows a `host_kind` enum or a second
+window class, and instead the question lives in the one file that knows what a `ui_element` is,
+leaving the procedure ignorant of both hosts and the branch count at one. The back-pointer is set
+after `CreateWindowExW` and cleared before `DestroyWindow`, which is the ordering that makes it
+safe. `ensure_handle` is now a two-line recorder in front of `attach_if_ready`, which is the whole
+of the create-and-attach decision — one job per function where there were three spread across two.
+No new hot-path Rust module, so Plan 0002's guard set needs no extension.
+
+### Findings
+
+- **minor 1 — the shipped and published install page still listed both fixed defects as known.**
+  `packaging/foobar/READ-ME-FIRST.md` section 5 called a black docked panel "a known defect in this
+  build" and told a reader to route around the layout-edit right-click through Preferences, and
+  section 6 asked whether a track change fixed the panel. That file is both the `READ-ME-FIRST.txt`
+  in the component zip and the site's foobar2000 install page (ADR-0167), so the live install page
+  described defects the next release does not have. Repaired in `d6e275e6`, keeping the questions
+  useful rather than deleting them, because the fix is unverified on device: the bullets say the
+  defect is fixed in this build and ask the tester to report it if it is still there. Its Russian
+  second copy goes stale in the same edit — ADR-0185's advisory row, and content work for the
+  translator.
+- **minor 2 — the component's only functional check still expected both defects to fail.**
+  [`on-device-validation.md`](../../on-device-validation.md)'s clean-profile item said in as many
+  words that "(b) and (e) failing is the *expected* result", and Phase 1's own done-when routes its
+  verifier through that item. The four new diagnostics columns — the instrument this phase added so
+  the done-when is measurable — were unnamed there. Repaired in `d6e275e6`: (b) and (e) now state
+  the criteria to pass, name the columns, and say plainly that the item is the first reading of a fix
+  that closed unmeasured. Every dated run record untouched.
+- **minor 3 — `docs/capturing.md` said three committed scripts drive `shot`.** `docs-clip.mjs` is a
+  fourth and the second whose output is committed, and the only one needing an external encoder.
+  Repaired in `d6e275e6`.
+- **minor 4 — the renderer roster in `CLAUDE.md` undercounted by one.** "A rule with five named
+  exceptions" named five; `docs-clip.mjs` is a sixth, and the `docs/images/` line in both layout
+  blocks credited `docs-shots.mjs` alone. Repaired in `d6e275e6`.
+- **minor 5 — the Phase 1 C++ has never been compiled, and its done-when has never been measured.**
+  Left open. The lane has no foobar2000 SDK and the fetch script is outside the session's allowlist,
+  so the change was not compiled; `ci.yml` builds no C++, so the **first compilation of this code is
+  `release.yml`'s `foobar` job on the tag this close writes**; and the measurements are the
+  clean-profile checklist's, which nobody has run. A fix round cannot close this either, and the
+  repository's own rule is that on-device checks do not gate closes — so it is a minor with an owner
+  action: `plugin-foobar/build.ps1` for the compile, then the checklist item this close rewrote.
+  What a reading can carry: the change compiles cleanly by inspection —
+  `is_edit_mode_enabled()` is a real `ui_element_instance_callback` method, `m_callback` is a
+  `service_ptr` with `is_valid()`, both new free functions are declared and defined in
+  `namespace rlx`, the `fprintf` gains four `%u` and four `unsigned` arguments, and nothing
+  references the two removed members. That is not a substitute for a compiler.
+- **nit 6 — two log rows named no commit.** Phases 3 and 4 read "committed with this row", which
+  stops resolving the moment the plan moves to `done/`. Filled in with `cff8167` / `684dded` and
+  `e5d7c7f` in `d6e275e6`.
+- **nit 7 — the clip is the largest file in the repository and nothing links it.** Left open.
+  6.19 MB committed, no document references it, and the plan's followups point at
+  [Plan 0192](../0192-the-component-reaches-its-audience.md) Phase 3 as its consumer.
+  [ADR-0100](../../adrs/0100-documentation-images-are-committed-headless-renders.md)'s negative
+  sized the *entire* committed image set at "~28 MB to every clone forever" and noted the decision
+  is one-way; one file is now a fifth of that figure. The lever was measured and recorded in the
+  manifest, which is the right record — what is left for the owner is that this plan's risks never
+  weighed a clone-weight cost, and that the file has no reader until 0192 posts it. Deleting or
+  re-encoding a committed artifact is not something a close repairs.
+
+No earlier round raised a finding: this is round 1, and it closed the plan.
+
 ## Followups (after this lands)
 
-- **The submission and the posts are [0192](0192-the-component-reaches-its-audience.md)**, which
+- **The submission and the posts are [0192](../0192-the-component-reaches-its-audience.md)**, which
   also owns the release they need. The log's note that nothing links `docs/images/demo.mp4` points
   at a Phase 6 that lives there now; the clip is that plan's Phase 3 material.
 - Winget / Homebrew, if there is demand.

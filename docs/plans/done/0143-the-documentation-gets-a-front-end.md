@@ -17,7 +17,7 @@
 > **Approved:** 2026-08-30 (user)
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0154](../../adrs/0154-the-reader-facing-docs-publish-as-a-site.md)
-> **Coordinates with:** [0103](../0103-the-project-gets-an-audience.md) — that plan owns `README.md`
+> **Coordinates with:** [0103](0103-the-project-gets-an-audience.md) — that plan owns `README.md`
 > and the repository front door; **this plan does not touch `README.md`**
 > **Lane guidance:** build on `main` directly, **not** in a worktree. ADR-0053's default does not pay
 > here: every phase but 5 is JavaScript, markdown and config, and a fresh worktree would buy a cold

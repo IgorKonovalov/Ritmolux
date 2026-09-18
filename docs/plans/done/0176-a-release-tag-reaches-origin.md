@@ -10,7 +10,7 @@
 > **Owner skill(s):** `dev`, `human`
 > **Related ADRs:** [0203](../../adrs/0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md) (accepted), [0038](../../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md), [0005](../../adrs/0005-versioning-and-release-cadence.md)
 > **Closes:** design-backlog 0196
-> **Blocks:** [Plan 0103](../0103-the-project-gets-an-audience.md) Phase 5 — nobody outside is asked to download a build until a tag reliably becomes a release
+> **Blocks:** [Plan 0103](0103-the-project-gets-an-audience.md) Phase 5 — nobody outside is asked to download a build until a tag reliably becomes a release
 
 ## TL;DR
 

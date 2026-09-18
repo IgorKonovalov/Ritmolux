@@ -73,7 +73,7 @@ capture, and it is the whole reason the feature is cheap here and expensive ever
 - **It costs the shipped binary nothing.** No new runtime dependency, no size movement, no code on
   a hot path.
 - **The instrument is reusable.** The same loop produces the repository's own demo material, which
-  [Plan 0103](../plans/0103-the-project-gets-an-audience.md) needs and currently has no way to
+  [Plan 0103](../plans/done/0103-the-project-gets-an-audience.md) needs and currently has no way to
   make: every image in this repo is a still, because there was no way to record a moving one.
 
 ### Negative

@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0103 - The project gets an audience](#0103---the-project-gets-an-audience)
   - [0178 - What the operator reads is true](#0178---what-the-operator-reads-is-true)
   - [0160 - The silhouette's preconditions stop being silent](#0160---the-silhouettes-preconditions-stop-being-silent)
   - [0184 - Limited ink: a contour that is an ink, and a warp field that bands](#0184---limited-ink-a-contour-that-is-an-ink-and-a-warp-field-that-bands)
@@ -200,6 +201,7 @@ hand-edited.
   - [0002 — Rust enforcement tooling](#0002--rust-enforcement-tooling)
   - [0001 — Core + standalone MVP, then foobar parity](#0001--core--standalone-mvp-then-foobar-parity)
 - [Prior sequencing notes (superseded)](#prior-sequencing-notes-superseded)
+  - [Moved 2026-09-18 from `README.md` — item 5 of the 2026-08-18 sequence, 0103 goes last, spent](#moved-2026-09-18-from-readmemd--item-5-of-the-2026-08-18-sequence-0103-goes-last-spent)
   - [Moved 2026-09-16 from `README.md` — the conductor stand-down that waited on 0180, spent](#moved-2026-09-16-from-readmemd--the-conductor-stand-down-that-waited-on-0180-spent)
   - [Moved 2026-09-15 from `README.md` — the engine-lane opening that resumed 0175 first, spent](#moved-2026-09-15-from-readmemd--the-engine-lane-opening-that-resumed-0175-first-spent)
   - [Moved 2026-09-15 from `README.md` — the opening of the engine-lane bullet, spent](#moved-2026-09-15-from-readmemd--the-opening-of-the-engine-lane-bullet-spent)
@@ -229,6 +231,58 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0103 - The project gets an audience](done/0103-the-project-gets-an-audience.md)
+
+- closed 2026-09-18, conductor-run lane `plan-0103-the-project-gets-an-audience` in
+`WORK/rlx-plan-0103`. Four phases: `2c9cbbca`, `b72b035`, `cff81675` (with `684ddeba`, the
+preview-size repair Phase 4 forced) and `e5d7c7f4` (the `human` metadata phase), plus `d6e275e6`,
+the close review's five prose repairs. Round-1 verdict: **no blockers, no majors, five minors and
+two nits**, five repaired at the close and two left open. Version **0.131.1** (patch), no ADR
+paired, backlog 0102 and 0103 closed. **Approved 2026-08-16 and closed a month later**, having shed
+two phases on the way: the submission and the posts left for
+[Plan 0192](0192-the-component-reaches-its-audience.md) on 2026-09-18, because both
+point strangers at a component that must be a published release first, and that release can only
+carry Phase 1's own fix once this plan merges.
+- **What landed.** The four unglamorous things between a finished product and anyone knowing it
+exists. A **surface-lifetime design pass** on the foobar2000 shim: the `1x1` fallback attach and the
+`needs_reattach` flag that was supposed to repair it are both gone, `attach_if_ready` creates the
+handle and attaches the surface only once the owner window reports a real client size, and both the
+first non-degenerate `WM_SIZE` and the 500 ms watchdog call it — so ownership is a property of the
+window rather than of the handle, `claim` succeeds with no surface, and a missed size message costs
+one tick instead of the session. The diagnostics log gained `surface_w`, `surface_h`, `client_w`,
+`client_h`, which is the instrument backlog 0102 said did not exist: `gpu_bytes` is arithmetic over
+the core's config and reads identically whether or not the surface matches its window. A
+**layout-edit-aware right-click**, answered per window rather than per host kind. `## Download`
+moved above `## Architecture` and `## Repository layout` and gained the two studio rows a `v*` tag
+had been shipping unexplained. And `scripts/docs-clip.mjs`, a sibling of `docs-shots.mjs` for the
+two artifacts that are not stills.
+- **What the close had to decide, and why the answer was "one branch".** The plan made an ADR
+conditional: *if* the fix ends the two hosts' shared `WM_CONTEXTMENU` branch, that sharing is
+deliberate and its ending is ADR-worthy. It does not end. The branch asks one per-window question,
+`host_defers_context_menu(HWND)`, answered from the panel's `ui_element_instance_callback` through a
+`GWLP_USERDATA` back-pointer, and the pop-out — which never writes that word — answers `false` by
+construction rather than by a special case. The question lives in the only file that knows what a
+`ui_element` is, so the shared window procedure stays ignorant of both host kinds. **backlog 0103's
+"what a fix would have to decide" was therefore answered the other way**, which is the substantive
+half of that entry's closure.
+- **What outlived the plan, and it is the finding to carry forward.** **Nothing has compiled or
+measured Phase 1.** The lane had no foobar2000 SDK and the fetch script is outside a conductor
+session's allowlist, so the C++ was never built; `ci.yml` builds no C++, so the **first compilation
+is `release.yml`'s `foobar` job on the tag this close wrote**; and the done-when's three
+measurements are the clean-profile checklist's, which nobody has run. That is not a novel gap — it
+is ADR-0115's known one, and the repository's rule is that on-device checks do not gate closes — but
+this plan is the first to put a *behavioural* fix through it, so the close rewrote the checklist item
+that verifies it: (b) and (e) had been standing instructions to expect both defects to **fail**, in
+the only functional check the component has.
+- **Two artifacts and one document the close could not repair.** `docs/images/demo.mp4` is 6.19 MB,
+the largest file in the repository, and nothing links it — Plan 0192 Phase 3 is its consumer.
+ADR-0100's negative sized the *whole* committed image set at "~28 MB to every clone forever" and
+called the decision one-way; one file is now a fifth of that. The `--crf` lever was measured (6.2 MB
+at 28 against 10.7 MB at 23 on this preset at this size) and recorded in the manifest, which is the
+right record in the wrong-sized file. And `packaging/foobar/READ-ME-FIRST.ru.md` — the site's
+Russian install page — goes stale against the English the close repaired, which is ADR-0185's
+advisory working exactly as designed and content work for the translator.
 
 ### [0178 - What the operator reads is true](done/0178-what-the-operator-reads-is-true.md)
 
@@ -9199,6 +9253,22 @@ uncovered (its C side remains the Plan 0001 Phase-6 smoke program's job, per ADR
 
 ## Prior sequencing notes (superseded)
 
+### Moved 2026-09-18 from `README.md` — item 5 of the 2026-08-18 sequence, 0103 goes last, spent
+
+Spent when [Plan 0103](done/0103-the-project-gets-an-audience.md) closed on 2026-09-18. The
+disagreement it settled ran from 2026-08-16 to 2026-08-18 and both of its reasons for holding the
+plan have since expired: [Plan 0104](done/0104-the-library-stops-being-lopsided.md) closed and the
+library grew several-fold, and Plan 0101 Phase 5's upscale reading was the demo material's own
+constraint, which Phase 3 then shot at 720p rather than 1080p. Kept verbatim, except that the
+backlog link is written for this file's depth:
+
+5. **[Plan 0103](done/0103-the-project-gets-an-audience.md)** — last. **Decided 2026-08-18: it waits
+   for [Plan 0104](done/0104-the-library-stops-being-lopsided.md)**, which closes the disagreement
+   this section carried open since 2026-08-16. The cost being avoided is announcing into a library
+   where four of eleven systems have one world each; 0101's Phase 5 adds a second reason to hold the
+   demo material, a 1080p render still reading as an upscale
+   ([backlog 0110](../design-backlog.md)).
+
 ### Moved 2026-09-16 from `README.md` — the conductor stand-down that waited on 0180, spent
 
 Spent when [Plan 0180](done/0180-the-converted-picture-follows-the-source.md) closed on 2026-09-16,
@@ -9500,7 +9570,7 @@ short front door rather than the operator reference - which is the live constrai
 carries.
 
 [0092]: done/0092-the-engine-draws-an-authored-path.md
-[0103]: 0103-the-project-gets-an-audience.md
+[0103]: done/0103-the-project-gets-an-audience.md
 [0140]: done/0140-every-rate-integrates-for-real.md
 [0156]: done/0156-the-site-becomes-the-reference.md
 
@@ -9780,7 +9850,7 @@ on the RD present, left from before 0025's alpha switch — **carried by [0031] 
 [0095]: done/0095-the-downbeat-fold-gets-a-musical-beat.md
 [0100]: done/0100-the-engine-speaks-milkdrop.md
 [0101]: done/0101-the-engine-renders-a-music-video.md
-[0103]: 0103-the-project-gets-an-audience.md
+[0103]: done/0103-the-project-gets-an-audience.md
 [0104]: done/0104-the-library-stops-being-lopsided.md
 [0061]: done/0061-the-build-stops-paying-for-what-it-is-not-building.md
 [0143]: done/0143-the-documentation-gets-a-front-end.md
@@ -9813,14 +9883,14 @@ renderer, and they sort into two groups that barely interact:
   0106) and the fidelity work list 0106–0108. Its Phase 4 contention with [0087] is discharged.
 - **The cheap ones, in parallel, in this order: [0104] → ~~[0101]~~ → [0103].** 0101 is closed.
   **[0102](done/0102-the-component-ships.md) is done (closed 2026-08-16), so
-  [0103](0103-the-project-gets-an-audience.md) Phase 4 is unblocked** — with one asterisk that
+  [0103](done/0103-the-project-gets-an-audience.md) Phase 4 is unblocked** — with one asterisk that
   belongs to 0103 rather than to 0102: the component now ships carrying two filed `Medium` defects
   a new user meets first ([backlog 0102](../design-backlog.md) and
   [0103](../design-backlog.md)), and announcing a channel is a poor moment to discover them.
   [0104](done/0104-the-library-stops-being-lopsided.md) is content work in `presets/` and collides with
   no engine lane. **[0101](done/0101-the-engine-renders-a-music-video.md) closed 2026-08-17**, so
   the `standalone/src/shot/` lane is free and the engine can render a music video today.
-  [0103](0103-the-project-gets-an-audience.md) goes last on purpose: it is the only one whose cost
+  [0103](done/0103-the-project-gets-an-audience.md) goes last on purpose: it is the only one whose cost
   of being early is real, since announcing before [0104] lands means visitors judge a library where
   four of ten systems have a single world. **0101's Phase 5 added a second reason to hold it**: a
   1080p render currently reads as an upscale ([backlog 0110](../design-backlog.md)), so demo
@@ -9829,7 +9899,7 @@ renderer, and they sort into two groups that barely interact:
 - ~~**Approved 2026-08-16 from a user request, and it collides with exactly one plan:
   [0107](done/0107-the-foobar-menu-picks-a-preset.md).**~~ **Resolved 2026-08-18: 0107 went first
   and closed.** The sequencing question this bullet posed is answered, and the answer costs
-  [0103](0103-the-project-gets-an-audience.md)'s amended Phase 1 something: it now restructures a
+  [0103](done/0103-the-project-gets-an-audience.md)'s amended Phase 1 something: it now restructures a
   menu of five items and a whole-roster submenu rather than the two-item one it was scoped against,
   and 0107's Preset submenu did **not** inherit the layout-edit deference it would have got for
   free the other way round. [Backlog 0103](../design-backlog.md) carries a dated note saying the

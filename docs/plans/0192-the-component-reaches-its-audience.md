@@ -6,10 +6,10 @@
 > **Related ADRs:** [0115](../adrs/0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md),
 > [0038](../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md),
 > [0203](../adrs/0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md)
-> **Split from:** [0103](0103-the-project-gets-an-audience.md) on 2026-09-18 — its Phases 5 and 6
+> **Split from:** [0103](done/0103-the-project-gets-an-audience.md) on 2026-09-18 — its Phases 5 and 6
 > arrive here unchanged in substance, because they could not be satisfied while they sat there
 > (see Context)
-> **Hard dependency:** [0103](0103-the-project-gets-an-audience.md) must close, merge and be
+> **Hard dependency:** [0103](done/0103-the-project-gets-an-audience.md) must close, merge and be
 > released; Phase 1 below is that release
 
 ## TL;DR

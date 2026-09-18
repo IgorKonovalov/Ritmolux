@@ -62,7 +62,7 @@ colour tags are the half most likely to ship wrong"* and argues `-color_trc bt70
 `iec61966-2-1` on the ground that *"every player assumes the former"* — reasoning applied to arguments
 that may have no effect. Nothing is known to be wrong on screen: the **range** tag produces the
 washed-out failure and it does survive. What is wrong is that a guarantee is stated as a property and
-is not verified as one, on the path [Plan 0103](../0103-the-project-gets-an-audience.md) publishes from.
+is not verified as one, on the path [Plan 0103](0103-the-project-gets-an-audience.md) publishes from.
 
 **The size cap is a duty, not a guard.** `packaging/foobar/build-component.ps1` runs seven fatal
 checks over `foo_lmv.dll` and parses PE headers by hand to do it, but **never reads the file's

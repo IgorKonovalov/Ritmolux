@@ -10,7 +10,7 @@
 [ADR-0154](0154-the-reader-facing-docs-publish-as-a-site.md) decided that *"the site's home page is
 a **router** — two entrance cards and a gallery strip — and carries no product prose of its own, so
 there is no second copy of the pitch to drift."* That clause was written to protect
-[Plan 0103](../plans/0103-the-project-gets-an-audience.md), which owns `README.md` and excludes
+[Plan 0103](../plans/done/0103-the-project-gets-an-audience.md), which owns `README.md` and excludes
 *"No website, no landing page, no domain. The repository is the landing page."*
 
 The site went live on 2026-09-05 with exactly that shape, and the shape has a hole in it. Of the 15
