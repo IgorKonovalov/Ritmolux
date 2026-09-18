@@ -53,6 +53,11 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0244 — a custom wave is drawn from the source's traces but is neither smoothed nor scaled like the eight built-in figures](#0244--a-custom-wave-is-drawn-from-the-sources-traces-but-is-neither-smoothed-nor-scaled-like-the-eight-built-in-figures)
 - [0245 — the converted warp space has no pixel baseline, because every golden fixture is square and the two chains are identical there](#0245--the-converted-warp-space-has-no-pixel-baseline-because-every-golden-fixture-is-square-and-the-two-chains-are-identical-there)
 - [0246 — the local `cargo doc` mirror covers one crate of five, and the four it leaves out are still unreachable until after a push](#0246--the-local-cargo-doc-mirror-covers-one-crate-of-five-and-the-four-it-leaves-out-are-still-unreachable-until-after-a-push)
+- [0247 — a suite run by hand inside a lane records into that lane's own ledger, which is the one place no gate reads](#0247--a-suite-run-by-hand-inside-a-lane-records-into-that-lanes-own-ledger-which-is-the-one-place-no-gate-reads)
+- [0248 — nothing in this repo asks whether a groundless luminous field is a composition or a fill, and four shipped presets are the open cases](#0248--nothing-in-this-repo-asks-whether-a-groundless-luminous-field-is-a-composition-or-a-fill-and-four-shipped-presets-are-the-open-cases)
+- [0249 — `warp_mesh`'s `zoom` doc says the opposite of what the shader does, and four generated surfaces carry it](#0249--warp_meshs-zoom-doc-says-the-opposite-of-what-the-shader-does-and-four-generated-surfaces-carry-it)
+- [0250 — a conductor session cannot run a command that carries an environment assignment, and two documented repairs need one](#0250--a-conductor-session-cannot-run-a-command-that-carries-an-environment-assignment-and-two-documented-repairs-need-one)
+- [0251 — `warp_mesh`'s level mode draws bands but not an ink class, because coverage is a continuum nothing thresholds](#0251--warp_meshs-level-mode-draws-bands-but-not-an-ink-class-because-coverage-is-a-continuum-nothing-thresholds)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -2288,3 +2293,284 @@ Shapes, none decided:
 time was a close ceremony discovering after the fact what a hook step could have said before. It is
 not higher because the blast radius stops at CI — no user-visible behaviour is involved — and the
 repair may be a single word, which is also the reason it should not sit here long.
+
+## 0247 — a suite run by hand inside a lane records into that lane's own ledger, which is the one place no gate reads
+
+[ADR-0207](adrs/0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md)
+gave the operator an affordance and
+`tools/conductor/README.md` states it: *"A suite you run by hand counts. Run one through the wrapper
+— `node tools/conductor/with-lock.mjs suite -- cargo nextest run --workspace` — and, because the
+wrapper can see it is running inside this repository or one of its worktrees, it records the result
+in `state/suite-ledger.jsonl` as `hand`. The conductor's next gate on that same tree finds the
+record, prints it and does not run the suite again."*
+
+**The last sentence does not hold when the hand run happens in a lane, and a lane is where the
+operator is.** `suiteLedger()` resolves the destination as `join(selfDir, "state",
+"suite-ledger.jsonl")` — beside *the copy of the script that was invoked*. `tools/conductor/state/`
+is gitignored, so every worktree has its own, and `node tools/conductor/with-lock.mjs` run from
+`WORK/rlx-plan-NNNN` writes that worktree's file. The guard in front of it compares
+`gitCommonDir(cwd)` with `gitCommonDir(selfDir)`, which is the **same directory** for a checkout and
+all its worktrees — so a lane run passes the "inside this repository" test exactly as the comment
+above it intends (*"the main checkout or any of its worktrees"*), records itself `hand`, and lands
+where the conductor will never look. The conductor runs from the main checkout and reads the ledger
+beside *its* copy.
+
+**Observed 2026-09-17**, settling Plan 0178's `claude_dir` park. The wrapped
+`cargo nextest run --workspace` in `WORK/rlx-plan-0178` finished green — 1985 passed, 6 skipped, 640 s
+— and wrote `{"tree":"e6634cd2…","by":"hand",…}` into the lane's `state/suite-ledger.jsonl`. The main
+checkout's ledger has no line for that date at all, so the pre-review gate on that same tree will run
+the full suite a second time.
+
+**The cost is redundant work, never a wrong answer**, and that bound is worth stating: nothing reads
+a lane's ledger, so no run can be skipped on the strength of a record the gate cannot see. A second
+hand run in the same lane on the same tree does skip, correctly, off the lane's own file.
+
+**What makes it worth an entry rather than a note is where it fires.** The park table sends the
+operator *into the lane* for every reason it lists — `human_phase`, `claude_dir`, `gate_red`,
+`review_failed` — so the affordance works in the checkout where a repair does not happen and fails in
+the worktree where it does. Nothing is red: `test/with-lock.test.mjs` asserts the `hand` case only
+with `selfDir` and `cwd` in the same tree, which is the case that works.
+
+Shapes, none decided:
+
+- **Resolve the ledger through the common dir.** One file per repository rather than per worktree:
+  derive the main checkout from `git rev-parse --git-common-dir` and write beside it. Needs a rule for
+  a bare or relocated `.git`, and it changes where a hand run in the main checkout writes (nowhere, if
+  the derivation is right — it is already that file).
+- **Have the gate read the lane's ledger too** when it gates that lane's tree. Leaves the resolution
+  alone and puts the knowledge in one place, at the cost of a second lookup path and a second file
+  that can disagree.
+- **Sweep on `resume`.** The conductor already reads a lane at resume; folding its ledger into the
+  main one there is small and touches nothing that runs during a step.
+- **Document the override and stop promising.** `RLX_SUITE_LEDGER` already wins over the resolution,
+  so the operator can point a hand run at the main checkout's file. Weakest: it is a per-run manual
+  step, and the README sentence would have to be narrowed to the main checkout, which is the half of
+  the affordance nobody needs.
+
+- **Raised:** 2026-09-17, from the Plan 0178 Phase 4 park repair, by the owner's session.
+  **Owner if taken:** `dev`.
+- **Verified 2026-09-17** — the README makes the promise:
+  `present: A suite you run by hand counts in: tools/conductor/README.md`
+- **Verified 2026-09-17** — the destination is beside the invoked script:
+  `present: join\(selfDir, "state", "suite-ledger\.jsonl"\) in: tools/conductor/with-lock.mjs`
+- **Verified 2026-09-17** — and the comment above it means to cover a worktree:
+  `present: the main checkout or any of its worktrees in: tools/conductor/with-lock.mjs`
+- **Verified 2026-09-17** — `state/` is gitignored, so each worktree carries its own:
+  `present: tools/conductor/state/ in: .gitignore`
+- **Verified 2026-09-17** — the test's `hand` case shares one directory, so this is unasserted rather
+  than asserted-and-broken:
+  `present: suiteLedger\(s\.repo, \{\}, s\.selfDir\) in: tools/conductor/test/with-lock.test.mjs`
+
+### Priority
+
+**Low.** It costs one redundant full suite — about 11 minutes — per lane the operator repairs by
+hand, and it cannot produce a wrong skip. It is not lower because the repair is small and the
+affordance is documented as working, which is the shape that wastes someone's afternoon before they
+think to check the file it wrote.
+
+---
+
+## 0248 — nothing in this repo asks whether a groundless luminous field is a composition or a fill, and four shipped presets are the open cases
+
+The surviving half of [backlog 0128](design-backlog-archive.md), carved out by
+[Plan 0186](plans/done/0186-the-flatness-gate-tells-a-figure-from-its-ground.md)'s
+`## What this plan does NOT do` and refiled here at its close, because the archive is append-only
+and closed. Read the archived body for the full history; this is the question it left standing.
+
+`Sumi`, `Whorl`, `Supernova` and `Neon Tunnel` are `fragment_field` presets that fill the frame with
+luminous tone and have no ground worth the name. The `sanity` harness marks them in its printed
+table and has done since Plan 0116 — the `NOTE` line above the candidate rows names all four — but
+**no statistic in this repository decides between the two readings**:
+
+- a **composition** that happens to cover the frame, which is legitimate content and must pass; or
+- a **fill**, a wash with no figure in it, which is the defect `sanity` exists to catch and which
+  today's conjunction cannot reach because term one clears it.
+
+Their readings at the suite's 96x96 capture, 2026-09-17, after ADR-0200:
+
+| preset | `coverage` | `tonal_flatness` (max 0.90) | term two | `role_ratio` (cut 1.17) |
+|---|---|---|---|---|
+| `Sumi` | 0.9253 | 0.2085 | 0.1001 | 1.0807 → ground |
+| `Whorl` | 0.9504 | 0.2552 | 0.1182 | 1.0522 → ground |
+| `Supernova` | 0.9934 | 0.4241 | 0.0644 | 1.0067 → ground |
+| `Neon Tunnel` | 0.9969 | 0.1690 | 0.0540 | 1.0032 → ground |
+
+All four are under the `0.23` default boundary floor and all four are far under the flatness
+ceiling, so each is among the 62 of 112 presets held out of conviction by term one alone. **Nothing
+here says whether that is correct.** The tonal term reports plenty of tonal structure, which is true
+of a beautiful wash and of a broken one alike; `coverage`, `quadrant_spread` and
+`radial_shell_occupancy` are all near-degenerate at this density, which is the failure the archived
+0128 body already diagnosed for the light-ground case.
+
+ADR-0200 did not touch this and could not: the role classifier puts all four on the *ground* side,
+which is the correct call for a luminous field and leaves term two reading their ink — where they
+genuinely have little perimeter. The missing instrument is a third question, not a different
+reference for the second.
+
+- **Raised:** 2026-09-17, at Plan 0186's close, carried over from backlog 0128's 2026-09-02 re-open.
+  **Owner if taken:** `architect` first — like its parent, this is a question about what the sanity
+  lens *means* before it is a threshold.
+- **Verified 2026-09-17** — the harness still marks the four and still asks nothing about them:
+  `present: the four groundless luminous in: core/tests/sanity.rs`
+- **Verified 2026-09-17** — the conjunction that cannot reach them:
+  `present: flat > MAX_TONAL_FLATNESS && boundary < b_floor in: core/tests/sanity.rs`
+- **Verified 2026-09-17** — and the question itself has no instrument, which is the absence of a
+  mechanism rather than a fact about the tree:
+  `unprobeable: whether Sumi, Whorl, Supernova and Neon Tunnel are compositions or fills is a
+  question no statistic in this repo asks, so there is nothing to match on`
+
+### Priority
+
+**Low, and honestly so.** All four ship, none is suspected broken, and the cost of the gap is that
+nothing would notice if one became a wash. It is not lower because it is the last live piece of a
+diagnosis three ADRs and three plans have now worked on, and because the instrument it wants — a
+statistic that reads a full frame's *internal* organization rather than its departure from a ground —
+is the one shape this line has never tabled.
+
+## 0249 — `warp_mesh`'s `zoom` doc says the opposite of what the shader does, and four generated surfaces carry it
+
+The `ParamSpec` doc for `warp_mesh`'s `zoom` reads *"Scale the previous frame is resampled at, per
+vertex; above 1 the image tunnels inward."* The shader says the reverse, in a comment written to
+explain exactly this trap: *"The INVERSE of the motion the outputs name throughout: a destination
+vertex asks where its content came from, so a `zoom` above 1 shrinks the source window and the past
+appears to grow."* The plan's own fixture agrees with the shader — `warp_mesh_ladder.toml` uses
+`1.04` to make content travel outward.
+
+**The string is declared twice and rendered four times.** `mod.rs:116` (`PER_VERTEX_PARAMS`) and
+`mod.rs:397` (`PARAMS`) carry identical copies, and ADR-0170's generation pipes them into
+`presets/README.md`'s parameter table, `presets/schema/warp_mesh.schema.json` (twice — `description`
+and `markdownDescription`) and `docs/specs/player-schema.json`. So an author who checks the reference
+before binding the parameter is told the wrong direction by every surface this project offers.
+
+**It has already produced a false claim in shipped content.** Plan 0184's `presets/warp_ladder.toml`
+was authored with a header paragraph explaining that `zoom` below 1 makes the field creep outward —
+written from the reference, not from the shader — and the close review of that plan convicted it
+(minor 2) and traced it here (nit 6). The preset's prose is repaired; the source of it is not.
+
+**The repair is small and is `dev`'s**, because it is an engine edit that moves three generated
+artifacts: correct both declarations, then regenerate with `RLX_UPDATE_PARAM_REFERENCE=1` and
+`RLX_UPDATE_PRESET_SCHEMA=1`. The review wrote the replacement text: *"Scale the previous frame is
+resampled at, per vertex; above 1 the past is magnified and the image travels outward."* That is
+outside what a conductor close may repair (ADR-0209), which is why it is here rather than fixed.
+
+- **Raised:** 2026-09-17, from Plan 0184's close review, by the owner's session. **Owner if taken:**
+  `dev`.
+- **Verified 2026-09-17** — the declaration says inward:
+  `present: above 1 the image tunnels inward in: core/src/render/scenes/warp_mesh/mod.rs`
+- **Verified 2026-09-17** — and the shader beside it says the opposite:
+  `present: above 1 shrinks the source in: core/src/render/scenes/warp_mesh/shaders.rs`
+- **Verified 2026-09-17** — the generated parameter table carries the wrong one:
+  `present: above 1 the image tunnels inward in: presets/README.md`
+- **Verified 2026-09-17** — and so does the editor schema:
+  `present: above 1 the image tunnels inward in: presets/schema/warp_mesh.schema.json`
+
+### Priority
+
+**Medium.** It is two lines of text and a regeneration, and it has already cost one shipped header a
+false paragraph and a close-review finding. It is not higher because nothing it touches is executable:
+every picture the engine draws is correct, and only the prose about it is wrong.
+
+## 0250 — a conductor session cannot run a command that carries an environment assignment, and two documented repairs need one
+
+`tools/conductor/settings.conductor.json` allows commands by **prefix** — `Bash(cargo *)`,
+`Bash(node *)`, `Bash(npx *)` and so on. A command written `RLX_UPDATE_PRESET_SCHEMA=1 cargo nextest
+run …` does not begin with `cargo`, so it matches no rule and is denied. The same holds for
+`RLX_UPDATE_PARAM_REFERENCE=1`, and for any other `VAR=value cmd` form.
+
+**Two repairs the project documents are therefore unreachable from inside the conductor**, and both
+have now been met:
+
+- **Regenerating a generated file to resolve a merge.** Plan 0184's close hit a conflict in
+  `docs/specs/player-schema.json`, which both branches had rewritten whole. The session diagnosed it
+  correctly, named the command `docs/developing.md` prescribes, and parked `merge_conflict` because it
+  could not run it. The owner resolved it by hand in one step.
+- **Any `RLX_UPDATE_*` regeneration a phase needs.** A phase that renames a parameter or moves a
+  default must regenerate the reference and the schemas; the same denial applies.
+
+**The park is honest and the lane is left clean, so this is a cost rather than a hazard** — but it is
+a cost paid in a full review session each time, and the class will recur for as long as generated
+files are committed.
+
+Shapes, none decided:
+
+- **Allow the two spellings by name.** `Bash(RLX_UPDATE_PRESET_SCHEMA=1 cargo *)` and the parameter
+  one, which keeps the allowlist a list of things rather than a pattern. Narrow, and it needs a case
+  in `test/settings.test.mjs` like every other rule.
+- **Teach the repairs the `--config` form.** `cargo test --config 'env.RLX_UPDATE_PRESET_SCHEMA="1"'`
+  begins with `cargo` and is already allowed; a session tried exactly this at Plan 0183 and it was
+  denied for a different reason, so the form needs checking before it is documented.
+- **Let the conductor resolve a generated-file conflict itself**, from a declared list of
+  regenerate-don't-merge paths. The largest change, and the one that removes the class rather than
+  the two instances.
+
+- **Raised:** 2026-09-17, from Plan 0184's `merge_conflict` park, by the owner's session.
+  **Owner if taken:** `dev`.
+- **Verified 2026-09-17** — the allowlist admits `cargo` only as a prefix:
+  `present: "Bash\(cargo \*\)" in: tools/conductor/settings.conductor.json`
+- **Verified 2026-09-17** — and carries no environment-assignment rule of any kind:
+  `absent: Bash\(RLX_ in: tools/conductor/settings.conductor.json`
+- **Verified 2026-09-17** — while the documented regeneration is written in exactly that form:
+  `present: RLX_UPDATE_PRESET_SCHEMA=1 cargo nextest in: docs/developing.md`
+
+### Priority
+
+**Low.** It costs one parked plan and one hand resolution per occurrence, it never produces a wrong
+result, and the park names the command to run. It rises if a plan lands that regenerates a parameter
+surface per phase, because then every phase meets it.
+
+## 0251 — `warp_mesh`'s level mode draws bands but not an ink class, because coverage is a continuum nothing thresholds
+
+[ADR-0197](adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md)
+gave `warp_mesh` a second colour path — `color_source = "1"` deposits uncoloured light and the present
+pass colours the field by its own accumulated level — and it does exactly what backlog 0146 asked for
+as *structure*: the bands are the feedback loop's own decay contours, and nothing else in this engine
+makes one. **What it does not produce is a limited-ink frame**, and that is a property of the last
+line in the pass rather than of the coordinate.
+
+The present writes `ink * coverage`. `ink` is one of the palette's own values, but coverage is the
+field's alpha — a continuum — so every pixel short of full coverage is a fresh value the palette never
+named. Measured on the shipped `presets/warp_ladder.toml` at 640x360 loud: **a two-ink palette renders
+851 exact colours** with `palette_steps = "0"`. Quantizing recovers most of it, because quantizing the
+palette *coordinate* quantizes the level the coverage is computed from as well — twelve bands bring the
+same frame to **60** — and the preset ships at twelve for that reason, stating the count in its header
+instead of claiming a class it does not have.
+
+**Sixty is not two, and no switch in the engine gets there.** `palette_contour` does not help: it draws
+at a *band* edge, so at `palette_steps = "0"` there is no edge and it is inert (851 colours with the key
+at full strength and 851 without, measured both ways), and with the bands on it lands inside a black rung
+on a duotone.
+
+**The candidate the plan named, undecided.** Plan 0184 Phase 4's stop condition says that if the fringe
+reads as shading rather than as the ladder dissolving, the verdict comes back here rather than being
+tuned around — and it reads as shading. The obvious shape is a **coverage threshold in level mode**: a
+parameter above which coverage snaps to 1 and below which it snaps to 0, so the frame holds only the
+palette's inks and the paper. Everything about that is a design question and none of it is decided:
+
+- **Whether the edge then aliases**, since it would be a hard alpha cutoff with no derivative behind it —
+  the same trade the hard contour style already makes, but on a silhouette rather than a hairline.
+- **Whether it belongs to `warp_mesh` or to ADR-0138's draw seam.** ADR-0138 defines the limited-ink
+  guarantee *at the draw seam*, and this is a present-time composite; a threshold here may be a
+  `warp_mesh` parameter or may be the general repair for every scene whose output is premultiplied light.
+- **Whether a soft outer edge is worth keeping as the default.** `warp_ladder`'s header argues the fade
+  reads as the ladder running out of ink at the edge of the sheet, which is a look rather than a defect.
+  Two shipped worlds would want opposite defaults.
+
+- **Raised:** 2026-09-17, from Plan 0184 Phase 4's look gate, routed by its own stop condition and
+  recorded in ADR-0197's `Outcome`. **Owner if taken:** `architect` (an ADR) then `dev`.
+- **Verified 2026-09-17** — the present pass multiplies the ink by a continuous coverage, with nothing
+  between them:
+  `present: ink \* clamp\(c\.a, 0\.0, 1\.0\) in: core/src/render/scenes/warp_mesh/shaders.rs`
+- **Verified 2026-09-17** — and `warp_mesh` declares no parameter that touches coverage at all:
+  `absent: coverage in: core/src/render/scenes/warp_mesh/mod.rs`
+- **Verified 2026-09-17** — the shipped world states the measured count rather than an ink class:
+  `present: 851 exact colours in: presets/warp_ladder.toml`
+- **Verified 2026-09-17** — and the reader document says the same thing in its own words:
+  `present: The fringe is not two-ink in: docs/preset-palettes.md`
+
+### Priority
+
+**Low.** Nothing is broken: the mechanism does what ADR-0197 decided, the world that wanted it ships,
+and the residue is a class the frame does not join rather than a picture that is wrong. It rises if a
+second author asks `warp_mesh` for a print, or if the same question arrives from another
+premultiplied-light scene — at which point it is ADR-0138's boundary being asked to move, not this
+scene's.

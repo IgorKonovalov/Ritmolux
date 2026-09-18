@@ -210,7 +210,9 @@ pub fn tonal_flatness(img: &CaptureImage, bg: [u8; 4], eps: u8) -> f32 {
 /// least one **unlit** 4-neighbour (`0.0..=1.0`) — "is the lit set a solid mass,
 /// or does it have interior?"
 ///
-/// This is the second term of the flatness gate (ADR-0128, settled by ADR-0130).
+/// This is the statistic under the second term of the flatness gate (ADR-0128,
+/// settled by ADR-0130); [`assigned_boundary_density`] is what that term calls,
+/// because **which** reference this is handed decides what it measures (ADR-0200).
 /// [`tonal_flatness`] asks whether the figure has any *tonal* structure and
 /// convicts a two-ink print for having exactly two tones, which is what that
 /// idiom is; this asks the orthogonal question, and a picture is called a blot
@@ -500,6 +502,70 @@ pub fn pooled_modal_ground(images: &[CaptureImage]) -> [u8; 4] {
         None => NO_GROUND,
     }
 }
+
+/// Which of the frame's large tone populations is the **figure**: [`coverage`]
+/// against [`NO_GROUND`] over [`coverage`] against [`modal_ground`].
+///
+/// [`modal_ground`] finds the frame's majority tone, and that is the right
+/// reference exactly while the majority tone is the *ground*. A mass stacked past
+/// the additive ceiling until it clips to one tone **is its own modal band**, so
+/// every statistic conditioned on that reference is then handed the mass's
+/// leftovers — its fringe — rather than the mass. No ground estimator can see
+/// that, because the majority tone is the majority tone either way; the question
+/// is about the band's role, and this is the reading of it.
+///
+/// A scene drawing light onto darkness has the same reference under both lenses,
+/// so the two coverages coincide and the ratio sits at `1.0`. A frame whose modal
+/// band is its figure departs from that band almost nowhere and from black almost
+/// everywhere, so the denominator collapses while the numerator stays near `1.0`
+/// and the ratio climbs without bound.
+///
+/// Both terms are coverages of one frame under two references, so this is a ratio
+/// of one kind of quantity rather than a comparison of two (ADR-0074). Unlike
+/// [`boundary_density`] it is an **areal** share on both sides and carries no
+/// resolution binding: the two frozen blot anchors read 27.58 / 1.2718 at 96×96
+/// and 27.70 / 1.2734 at 192×192.
+///
+/// [`f32::INFINITY`] when the frame does not depart from its own modal band at
+/// all — the maximal reading of *the modal band is the figure*, which keeps the
+/// function monotone in the direction it classifies.
+pub fn figure_ground_ratio(img: &CaptureImage, eps: u8) -> f32 {
+    let derived = coverage(img, modal_ground(img), eps);
+    if derived <= 0.0 {
+        return f32::INFINITY;
+    }
+    coverage(img, NO_GROUND, eps) / derived
+}
+
+/// [`boundary_density`] against the reference [`figure_ground_ratio`] assigns —
+/// [`NO_GROUND`] at or above `figure_cut`, where the modal band is the figure,
+/// and [`modal_ground`] below it (ADR-0200).
+///
+/// This is the flatness conjunction's second term. The statistic is unchanged and
+/// so is everything ADR-0130 established about it; what the role classifier
+/// supplies is the *reference*, which is the half ADR-0161 found wrong. Pointed
+/// at a blot's mass it reads the `2/r` perimeter of a solid disc; pointed at a
+/// print's ink it reads the ink's perimeter rather than the paper's perforation.
+///
+/// **`figure_cut` is a measurement the caller owns, and so is any floor compared
+/// against the value returned.** A cut is a bound over a population — the lowest
+/// blot against the highest non-blot among the frames a first term can reach —
+/// and there is no value defensible outside the population it was read from.
+///
+/// **The two halves have different resolution bindings, which is the trap.** The
+/// ratio is areal and near size-invariant; the density is perimeter over area and
+/// goes as ~`1/L` in the capture's linear size, so a floor on it halves with a
+/// doubling of the capture. A caller reading at another size re-derives its floor
+/// from its own anchors and does not scale one in (ADR-0071).
+pub fn assigned_boundary_density(img: &CaptureImage, eps: u8, figure_cut: f32) -> f32 {
+    let reference = if figure_ground_ratio(img, eps) >= figure_cut {
+        NO_GROUND
+    } else {
+        modal_ground(img)
+    };
+    boundary_density(img, reference, eps)
+}
+
 /// Concentric annuli [`radial_shell_occupancy`] divides the frame's inscribed
 /// disc into. Ten equal-radius shells is the granularity the Plan 0065 lane's
 /// one-off prototype measured with when it separated the four-ring mandala from

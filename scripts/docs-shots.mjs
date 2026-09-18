@@ -253,8 +253,9 @@ const CARDS = [
   "swarm_murmuration",
   "swarm_shatter",
   "swarm_stipple",
-  // warp_mesh (5)
+  // warp_mesh (6)
   "warp_cauldron",
+  "warp_ladder",
   "warp_millrace",
   "warp_sirocco",
   "warp_smoke",

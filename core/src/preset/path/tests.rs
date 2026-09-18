@@ -383,6 +383,185 @@ fn a_curve_is_flattened_finely_enough_that_the_resample_sets_the_fidelity() {
     }
 }
 
+// ------------------------------------------------- star-shaped about the centre
+
+/// A crescent: an outer arc and a shallower inner one, so the figure wraps
+/// around its own bounding-box centre. The ray from that centre into the horns
+/// leaves the concavity and crosses the far horn — two crossings, which is the
+/// whole failure.
+const CRESCENT: &str = "M -1,0 C -0.7,-1.1 0.7,-1.1 1,0 C 0.55,-0.45 -0.55,-0.45 -1,0 Z";
+
+/// A thick `L`. **Its bounding-box centre sits in the notch, outside the
+/// figure, and its area centroid sits inside the tall arm** — which is what
+/// makes it the fixture that can tell the two centres apart.
+const L_BLOCK: &str = "M -1,-1 L -0.1,-1 L -0.1,0.1 L 1,0.1 L 1,1 L -1,1 Z";
+
+/// A five-pointed star, cut deep enough to be spiky and still star-shaped in the
+/// literal sense — the positive control that a test convicting concavity as such
+/// would fail.
+const SPIKY_STAR: &str = "M 0,-1 L 0.22,-0.31 L 0.95,-0.31 L 0.36,0.12 L 0.59,0.81 \
+                          L 0,0.38 L -0.59,0.81 L -0.36,0.12 L -0.95,-0.31 L -0.22,-0.31 Z";
+
+/// The area centroid of a closed polygon — **not** the point the coordinate
+/// divides by, and used here only to show that it is not.
+fn area_centroid(points: &[[f32; 2]]) -> [f32; 2] {
+    let n = points.len();
+    let (mut a2, mut cx, mut cy) = (0.0f32, 0.0f32, 0.0f32);
+    for i in 0..n {
+        let (Some(&p), Some(&q)) = (points.get(i), points.get((i + 1) % n)) else {
+            continue;
+        };
+        let cross = p[0] * q[1] - q[0] * p[1];
+        a2 += cross;
+        cx += (p[0] + q[0]) * cross;
+        cy += (p[1] + q[1]) * cross;
+    }
+    if a2.abs() < 1e-9 {
+        return [0.0, 0.0];
+    }
+    [cx / (3.0 * a2), cy / (3.0 * a2)]
+}
+
+/// `points` re-expressed about `centre`, so the ray walk can be re-run from a
+/// different origin.
+fn about(points: &[[f32; 2]], centre: [f32; 2]) -> Vec<[f32; 2]> {
+    points
+        .iter()
+        .map(|p| [p[0] - centre[0], p[1] - centre[1]])
+        .collect()
+}
+
+/// **One star-shaped contour and one that is not get opposite verdicts** — the
+/// precondition `coord_mode = 1` rests on, tested on the geometry.
+///
+/// Both halves matter and for different reasons. The crescent is the failure the
+/// scaled-copy coordinate degenerates on: a ray from its centre crosses the far
+/// horn, the shader takes the outermost crossing, and everything between the two
+/// reads as interior. The leaf and the deep star are the figures a test that
+/// convicted *concavity* would wrongly take with it — a star has five reflex
+/// corners and every ray from its centre still leaves exactly once, which is
+/// precisely the capability this mode exists for.
+#[test]
+fn a_star_shaped_contour_and_a_crescent_get_opposite_verdicts() {
+    for (name, d) in [
+        ("square", SQUARE_CW),
+        ("leaf", LEAF_CCW),
+        ("spiky star", SPIKY_STAR),
+    ] {
+        let s = shape(d);
+        assert!(
+            s.star_shaped(),
+            "{name} is star-shaped about its centre and must be cleared — worst \
+             ray gap {:.4} against a tolerance of {STAR_SHAPED_TOLERANCE}",
+            worst_ray_gap(s.points())
+        );
+    }
+    for (name, d) in [("crescent", CRESCENT), ("L block", L_BLOCK)] {
+        let s = shape(d);
+        assert!(
+            !s.star_shaped(),
+            "{name} wraps around its own centre and must be convicted — worst ray \
+             gap {:.4} against a tolerance of {STAR_SHAPED_TOLERANCE}",
+            worst_ray_gap(s.points())
+        );
+    }
+}
+
+/// **The centre tested about is the one the shader divides by — the origin of
+/// the normalized contour, which is the source drawing's bounding-box centre and
+/// not its centroid.**
+///
+/// The two agree closely on any figure that is broad in every direction, which
+/// is every contour in the suite, so a test about the wrong point would pass
+/// everywhere and be wrong where it matters. The `L` is the fixture that
+/// separates them: about its centroid, inside the tall arm, every ray leaves
+/// once; about its bounding-box centre, which is in the notch and outside the
+/// figure entirely, rays cross twice. The verdict must follow the second.
+#[test]
+fn the_verdict_is_about_the_bounding_box_centre_and_not_the_centroid() {
+    let l = shape(L_BLOCK);
+    let centroid = area_centroid(l.points());
+    let by_centroid = worst_ray_gap(&about(l.points(), centroid));
+    let by_origin = worst_ray_gap(l.points());
+    println!(
+        "L block: worst ray gap {by_origin:.4} about the normalized origin, \
+         {by_centroid:.4} about its centroid {centroid:?}"
+    );
+    assert!(
+        by_centroid <= STAR_SHAPED_TOLERANCE,
+        "the fixture must be star-shaped about its CENTROID or this test proves \
+         nothing: gap {by_centroid:.4}"
+    );
+    assert!(
+        !l.star_shaped() && by_origin > STAR_SHAPED_TOLERANCE,
+        "the verdict must follow the shader's centre, where the gap is \
+         {by_origin:.4}"
+    );
+}
+
+/// **The tolerance is decided by real contours, and nothing real lands near
+/// it** — the measurement [`STAR_SHAPED_TOLERANCE`] cites, re-taken on every
+/// run.
+///
+/// A binary verdict on a continuous property is only honest if the figures it
+/// judges are not sitting on the boundary: one that is, flickers between
+/// authoring sessions on unrelated edits to `d`. So this asserts the shape of
+/// the evidence rather than a number — every contour this engine ships or tests
+/// with is decided by at least a factor of four either way — and prints the
+/// whole table, which is what a later re-measure reads.
+#[test]
+fn the_tolerance_separates_the_measured_contours() {
+    let mut rows: Vec<(String, f32)> = Vec::new();
+    for (name, d) in [
+        ("square", SQUARE_CW),
+        ("leaf", LEAF_CCW),
+        ("spiky star", SPIKY_STAR),
+        ("crescent", CRESCENT),
+        ("L block", L_BLOCK),
+    ] {
+        rows.push((name.to_string(), worst_ray_gap(shape(d).points())));
+    }
+    // Every shipped `[path]` contour, at the arity it ships at: the figures the
+    // tolerance is actually for are the authored ones, not the fixtures above.
+    for &(file, contents) in crate::preset::EMBEDDED {
+        let value: toml::Value = toml::from_str(contents)
+            .unwrap_or_else(|e| panic!("shipped preset {file} is not TOML: {e}"));
+        let Some(table) = value.get("path") else {
+            continue;
+        };
+        let Some(d) = table.get("d").and_then(toml::Value::as_str) else {
+            continue;
+        };
+        let samples = table
+            .get("samples")
+            .and_then(toml::Value::as_integer)
+            .map_or(DEFAULT_SAMPLES, |n| n as usize);
+        let contour = PathShape::parse(d, samples)
+            .unwrap_or_else(|e| panic!("shipped preset {file} has an unparsable [path]: {e}"));
+        rows.push((file.to_string(), worst_ray_gap(contour.points())));
+    }
+
+    println!("worst ray gap, as a fraction of the ray's own boundary radius:");
+    for (name, gap) in &rows {
+        let verdict = if *gap <= STAR_SHAPED_TOLERANCE {
+            "star-shaped"
+        } else {
+            "not"
+        };
+        println!("  {name:<28} {gap:.6}  {verdict}");
+    }
+
+    for (name, gap) in &rows {
+        assert!(
+            *gap <= STAR_SHAPED_TOLERANCE * 0.25 || *gap >= STAR_SHAPED_TOLERANCE * 4.0,
+            "{name} measures {gap:.4}, within a factor of four of the \
+             {STAR_SHAPED_TOLERANCE} tolerance — a figure decided that narrowly \
+             flips verdict on an unrelated edit to its `d`, and the answer to \
+             that is a quieter test rather than a tighter one"
+        );
+    }
+}
+
 // ------------------------------------------------------- the morph alignment
 
 /// The contour halfway between two aligned endpoints — what a frame at

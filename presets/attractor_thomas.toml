@@ -22,10 +22,13 @@
 # shift - the old densities put nearly the whole figure over the ink pole and
 # the drawing rendered as a solid indigo blot with the lattice inside it lost.
 #
-# THE ANSWER IS `density`, NOT A DIMMER (ADR-0069). At the full 50 000
-# particles the lattice is a fog whatever the level - the ink remap just
-# turns a bright fog into a dark one. At 0.02 - 1 000 particles at the floor
-# tier, 3 000 at rich - each trajectory is a separate stroke, the segment joins
+# THE ANSWER IS `density`, NOT A DIMMER (ADR-0069). At `density = 1.0` - the
+# whole budget, 50 000 particles at the floor tier's anchor and more than that
+# at a large target - the lattice is a fog whatever the level, and the ink remap
+# just turns a bright fog into a dark one. At 0.02 - 1 000 particles at the
+# floor tier, 3 000 at rich, AT EVERY WINDOW SIZE, because a density this low
+# resolves against the tier's anchor rather than against the target-scaled
+# budget (ADR-0195) - each trajectory is a separate stroke, the segment joins
 # its steps end to end, and ~25 frames of trail draw the loops as pen lines on
 # the page. RENDERED, not reasoned: 1.0 / 0.02 / 0.005 / 0.002 goes blot,
 # drawing, sketch, scribble.

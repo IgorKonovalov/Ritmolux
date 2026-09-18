@@ -18,6 +18,10 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0160 - The silhouette's preconditions stop being silent](#0160---the-silhouettes-preconditions-stop-being-silent)
+  - [0184 - Limited ink: a contour that is an ink, and a warp field that bands](#0184---limited-ink-a-contour-that-is-an-ink-and-a-warp-field-that-bands)
+  - [0186 - The flatness gate tells a figure from its ground](#0186---the-flatness-gate-tells-a-figure-from-its-ground)
+  - [0183 - A low density is a trace count](#0183---a-low-density-is-a-trace-count)
   - [0166 - The basics read in Russian](#0166---the-basics-read-in-russian)
   - [0180 - The converted picture follows the source](#0180---the-converted-picture-follows-the-source)
   - [0191 - A green tree is not tested four times](#0191---a-green-tree-is-not-tested-four-times)
@@ -224,6 +228,201 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0160 - The silhouette's preconditions stop being silent](done/0160-the-silhouettes-preconditions-stop-being-silent.md)
+
+- closed 2026-09-17, conductor-run lane `plan-0160-the-silhouettes-preconditions-stop-being-silent`
+in `WORK/rlx-plan-0160`. Four phases: `8282d3a0`, `2afbf736` (the optional 1b, taken), `692461c5`,
+`7bfea383` (the `human` document gate), plus `cf871dd8` — a pre-review `cargo doc` repair — and
+`cb56df74`, the close review's own six prose repairs. Round-1 verdict: **no blockers, no majors,
+three minors and three nits, every one prose and every one repaired**. Version **0.130.1** (patch),
+ADR-0179 accepted **with an Outcome**, backlog 0217 closed.
+- **What landed.** ADR-0179's rule, in its four instances. The one mechanically decidable
+precondition — that `coord_mode = "1"` needs a figure every ray from its centre leaves exactly once —
+is now computed at parse on the contour's own geometry and carried on `PathShape`, and the `ring`
+branch became one instance of it rather than a name test beside it. The load warning and the scene's
+fallback read the same predicate, so the sentence and the picture cannot disagree; a morph pair is
+judged on both endpoints, because both are drawn. The three the engine cannot check are prose in
+`presets/README.md` next to the parameters they constrain: erosion against a figure's thinnest
+feature, the band-alignment arithmetic with its two consequences and the `gamma` proof, and a
+corrected arc-chain paragraph. Phase 1b re-priced the arity probe on the polyline **by
+construction** — a `morph_to` identical to `d` at `morph = 0`, which cannot ride the arc chain — and
+re-took the header table at **~0.095 ms per segment**.
+- **What was falsified.** Two things ADR-0179 wrote, both recorded in its Outcome rather than edited:
+the test is `O(N²)` and not the `O(N)` the Decision claims (two rays per vertex against every edge,
+~8k operations once at parse — the Negative section's conclusion survives, the complexity does not),
+and the centre is the **bounding box's**, not the centroid the Context names. The second is the one
+that mattered: the two agree on every figure in the suite, which is exactly the ADR-0037 shape, and
+`the_verdict_is_about_the_bounding_box_centre_and_not_the_centroid` separates them on a thick `L`
+whose bounding-box centre sits in the notch while its area centroid sits inside the tall arm. Also
+falsified: the arc chain is **not** selected by smoothness. *"A smooth figure gets it"* had been in
+`presets/README.md` since Plan 0092; the real gate is a piece count against a tolerance fixed at the
+tightest figure size, so a detailed contour is discarded however smooth every one of its curves is.
+- **What outlived the plan.** The tolerance turned out not to be a threshold. `0.02` sits in an empty
+band — a figure every ray leaves once measures `0` to six decimal places, a deep five-pointed star
+included, and the mildest real violation (the shipped maple, at `0.40`) is twenty times clear of it —
+so `the_tolerance_separates_the_measured_contours` asserts that **emptiness**, a factor of four
+either way, instead of the number. Phase 3's document gate was taken as a use rather than a read and
+returned three verdicts: the palette rule is sufficient to author against with no render at all, the
+band-count rule is **not** (its three cases are examples and do not convert into a measure), and
+`ritmolux --check` is the channel an author actually meets. Its third, unasked finding is the sharp
+one — the prose names shape *families* while membership is geometric, so a thick crescent renders
+correctly under `"1"` and only a thin one trips the check, which is precisely why Phase 1 tests the
+contour and not the name. Both of Phase 3's prose findings are under the plan's `## Followups` and
+are **not** yet live backlog entries.
+
+### [0184 - Limited ink: a contour that is an ink, and a warp field that bands](done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md)
+
+- closed 2026-09-17, conductor-run lane `plan-0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands`
+in `WORK/rlx-plan-0184`. Four phases: `277d7e1` + `80426fb` (Phase 1, the watch then the change),
+`9627131`, `d575f65`, `a31fc17` (the `human` look gate). An earlier close attempt parked
+`merge_conflict` after repairing four prose findings (`b014a23a`); the round-1 verdict is **no
+blockers, no majors, one minor and one nit**, the nit repaired in `a3d2be38` and the minor left open
+deliberately. Version **0.130.0** (minor), ADR-0197 accepted **with an Outcome**, backlog 0140 and
+0146 both closed, and the half that did not arrive refiled as 0251.
+- **What landed.** `palette_contour_style` takes four values on all six contour scenes — soft or hard
+footprint, black or an ink read at an absolute `palette_contour_ink` coordinate — with style `0` the
+expression that shipped before it, so no golden moved. And `warp_mesh` gained `color_source`: at `1`
+the deposit writes uncoloured light and the present pass colours the field by `max(rgb)` of its own
+accumulated level, which is the only decay contour in the engine.
+- **The drift guard stopped being a list, and that is the durable half.** The test that holds the six
+WGSL copies of the contour together had silently skipped `warp_mesh` for two plans and
+`analytic_field` and `cellular` for two more, reporting green over sites it never opened — ADR-0133's
+Outcome, recurring. It now **scans** `core/src/render/scenes/` for the function and fails naming any
+carrier it has no `include_str!` for, so the membership question is answered by the filesystem rather
+than by whoever last remembered. The seventh copy, in `warp_mesh`'s present pass, was picked up
+without an edit to the test.
+- **Two done-whens were wrong and the log said so rather than satisfying them.** *"The hard line's
+pixels are a subset of the soft line's"* is false by one sliver — the soft ramp's outermost pixel
+darkens by less than one code value, so no differential sees it while the step paints it at full
+strength — and the test asserts containment the other way plus a bound. *"The ink line changes every
+pixel style 0 would darken"* is false where the ink is laid over its own run, which is the property
+the style exists for; the test asserts instead that the whole footprint **renders exactly the ink's
+own code value**, taken from a style-1 capture that is visible against every ink. Both replacements
+are stronger than what they replaced.
+- **The level mode's tests rest on one property worth remembering.** In level mode the field's
+evolution does not depend on the palette at all, so "this pixel is one of the palette's inks" is
+checkable *exactly* — against a capture of the same fixture with that ink end to end, through the
+tonemap and the position-dependent dither. That is what lets a per-pixel ink claim be made at any
+coverage with no tolerance.
+- **The plan's own non-vacuity did not exist, and the substitute is sharper.** The done-when asked for
+stray non-ink pixels on the deposit-angle path; there are none, because a purely radial resample of a
+radial sector pattern blends nothing above the 8-bit floor. What the suite asserts is backlog 0146's
+own sentence: along a ray the level path crosses between inks **10** times and the angle path **0**,
+because the angle coordinate does not vary along a ray.
+- **Phase 2's stop condition did not fire.** `max(rgb)` over the ladder fixture measures p05 1.0859,
+median 1.9033, p95 3.2305, so a full palette cycle fits inside `color_span = 1` and the documented
+gain ADR-0197 priced was not needed. The cost reading is the other surprise: level mode with the
+contour off is *cheaper* than the angle path (1.695 ms against 1.715 at 1920x1080), because the
+deposit stops sampling the LUT.
+- **What outlived the plan is a negative result, stated rather than tuned around.** The ladder is the
+op-art world backlog 0146 asked for and is **not** a limited-ink print. The present writes
+`ink * coverage`, coverage is a continuum, and two inks measure **851** exact colours;
+`palette_steps = "12"` quantizes the level the coverage is computed from and brings the same frame to
+**60**. `presets/warp_ladder.toml` ships at twelve and says so in its header instead of claiming a
+class. ADR-0197's fringe question — dissolving or shading — is answered *shading*, recorded in the
+ADR's `Outcome`, and the coverage-threshold repair is backlog 0251 rather than a quiet retune.
+- **Two presets moved.** `shape_contourmono` re-authored onto the hard black key, which restores the
+9 exact frame colours the soft line cost it, with style 3 rendered and rejected on composition (a red
+line at every run boundary takes red from 4.57 % to 11.70 %) and that rejection kept in its header.
+`presets/warp_ladder.toml` is new. Both carry gallery cards, rendered by hand at the manifest's own
+settings rather than by re-running the whole gallery.
+
+### [0186 - The flatness gate tells a figure from its ground](done/0186-the-flatness-gate-tells-a-figure-from-its-ground.md)
+
+- closed 2026-09-17, conductor-run lane `plan-0186-the-flatness-gate-tells-a-figure-from-its-ground`
+in `WORK/rlx-plan-0186`. Four phases: `fa5d282b`, `ae8bd31d` (the `human` gate), `703af6df`,
+`0c66c1d9`. The close's repairs are `39ca44fa`. Close review round 1: **no blockers, no majors, three
+minors and one nit**, all four repaired here. Version **0.129.0** (minor), ADR-0200 accepted, backlog
+0128 closed and its residue refiled as 0248.
+- **What landed.** The `sanity` blot check convicts again. Since ADR-0161 it convicted nothing, not
+even the frozen fixture it was built around, and the cause was the *reference* rather than the
+statistic: `boundary_density` read the frame's derived ground, a saturated blot **is** its own modal
+band, and the term was therefore handed the mass's fringe — which reads *more* structured the
+smoother the rim gets. `metrics::figure_ground_ratio` classifies the modal band as figure or ground
+from `coverage(BLACK) / coverage(derived)`, and `metrics::assigned_boundary_density` reads the
+reference that role assigns. `boundary_density` itself is untouched, so everything ADR-0130
+established about it carries over.
+- **The plan measured before it decided, and that is the whole method.** ADR-0126, 0128 and 0129 each
+named a mechanism before measuring it and each was falsified or superseded by the next phase; this
+plan registered a four-part stop condition in its own text before any number was read, added a
+**second** blot anchor with a ragged rim (frozen against validity conditions only), tabled ten
+candidates and read every column at 96x96 **and** 192x192. The second anchor is what buys criterion 3
+— that the blot-to-composition gap exceeds the two blots' own spread — which a single-anchor
+calibration cannot state at all, and which is exactly the property ADR-0161's `0.31` lacked.
+- **Eight of the ten candidates passed, so the condition selected but did not decide.** `role_ratio`
+was chosen over `min_ground` (4.2), `ground_side` (3.9), `modal_connected` (5.7, the widest) and the
+`sobel`/`tile@N` family because it is the only one that answers the question the defect asked: the
+others replace the statistic, while this one names the choice of reference and makes it. Each
+rejection is recorded against a named property rather than a preference — `modal_connected` reads
+`0.0000` for any frame whose ground is one piece, `min_ground` hides a false conviction inside a true
+verdict, `ground_side` compares a paper's perforation and a mass's rim against one floor.
+- **`boundary_floor` is `0.23` and `MODAL_FIGURE_CUT` is `1.17`, both at 96x96 and neither
+travelling.** The floor is the midpoint of the higher blot's `0.0934` and the frozen composition's
+`0.3602`, each read under the role it is assigned — the first time those two anchors have been
+commensurable, which is what the superseded `0.31` was not. The cut's population end is a bound over
+every frame term one can reach rather than one fixture. Both name their capture size and forbid
+scaling; the same anchors at 192x192 give `0.12` (ADR-0071).
+- **No preset was edited and no golden blessed**, and the metric renders no pixel, so a moved golden
+would have been a finding rather than a bless. The two defect-record tests flip from ADR-0161's
+inverted assertions back to convictions, each blot asserted under three lenses so that a classifier
+that regresses shows as a *disagreement* between the areal control and the gate's own reading rather
+than as a silent acquittal.
+- **What the close added to the record rather than removed.** Term two now reads black for any frame
+holding almost no near-black pixel — which is right for a blot, and degenerate for a canvas that
+paints its own paper: the lit mask is the whole frame and the statistic collapses to the frame's own
+border, `0.0412` at 96x96, for eight shipped presets. Term one is the whole of what holds them, the
+under-floor count moved `48 → 62` of 112, and none of the 62 is above the flatness ceiling. The
+review found the `sanity` row claiming the opposite — that *"every print whose paper is its ground"*
+reads the derived ground, when `On White` reads `3.7509` against a `1.17` cut — and found
+`fragment_tiledmono.toml`'s *"this frame is a gate constant"* header still naming the retired `0.31`
+and `0.2631`. Both repaired, and ADR-0200 gained the Negative the class was missing.
+- **The carved-out half is now its own entry.** Whether `Sumi`, `Whorl`, `Supernova` and
+`Neon Tunnel` are compositions or fills is backlog 0248, citing the archived 0128 body. It is the
+last live piece of a diagnosis three ADRs and three plans have worked on, and the instrument it wants
+— a statistic reading a full frame's internal organization rather than its departure from a ground —
+is the one shape this line has never tabled.
+
+### [0183 - A low density is a trace count](done/0183-a-low-density-is-a-trace-count.md)
+
+- closed 2026-09-17, conductor-run lane `plan-0183-a-low-density-is-a-trace-count` in
+`WORK/rlx-plan-0183`. Three phases: `a98773de`, `887590bd`, `af3055d2` (the `human` look gate). The
+close's repairs are `cc068151`. Close review round 1: **no blockers, no majors, two minors and one
+nit**, all three repaired here. Version **0.128.1** (patch), ADR-0195 accepted.
+- **What landed.** `[particles] density` at or below `0.08` now resolves the drawn count against the
+tier's *anchor* rather than against ADR-0140's target-scaled budget, so a trace world draws the
+count its author picked at every window size, live or rendered; at or above `0.16` the old law is
+untouched, and the effective budget blends linearly between the two. `active_particles` gained the
+anchor as an argument — neither call site needed new state, because `AttractorScene` already stored
+it as ADR-0140's lower clamp. The resolved *budget* never moves, so `shot --render`'s header and
+`Scene::sample_budget` are unchanged; only `active_count` does.
+- **No baseline moved, and the reason is a property rather than a run.** Every golden is `Floor` at
+128x128 and every sanity frame 96x96, where `budget == anchor` and all three arms of the formula
+coincide. The plan asserted that as its own done-when — a 2,000-point density sweep at three
+size/tier cases, each guarded by `assert_eq!(budget, anchor)` so a constant change that breaks the
+premise fails loudly instead of passing vacuously — rather than inferring it from a green suite.
+- **The invisibility is the finding's whole shape, and the tests are written against it.** The old
+law and the new one agree at every size the harness runs at; an assertion written at a golden's size
+would have passed before and after and proved nothing. The new unit tests are deliberately written
+at 640x360 through 3840x2160 under both ceilings, and `TRACE_SIZES` carries a comment saying why.
+That is ADR-0037's lesson one level up, and this plan is the second time it has been the defect.
+- **The `human` look gate was taken, and half of it is a measurement rather than a judgement.** The
+owner's verdict on the three trace worlds is recorded verbatim in the log; the two cloud controls
+(`attractor_leviathan`, `attractor_fernmono`) are recorded as **byte-identical 1920x1080 PNGs**
+before and after, which is a stronger claim than "looks the same" and the right one for a control.
+- **What outlived the plan.** `Scene::active_sample_count`, a `#[cfg(test)]` sibling of
+`sample_budget`: the pair is what lets a test say a density change moved the drawn count and left
+the allocation alone, without a shipped path ever asking a scene how many instances it will draw.
+And the band's two constants are a classification of *authored intent* — 0.08 sits a third above the
+densest shipped trace (`attractor_thomasred`, 0.060) and 0.16 below the sparsest figure
+(`attractor_fernmono`, 0.18) — so ADR-0195's own Negative section is right that a world authored
+inside the band would get the original defect back in a weaker form. Nothing is authored there yet.
+- **Three findings, all repaired.** `active_count`'s field doc still carried `round(budget *
+density)`, false below the cloud boundary and contradicting `active_particles`' own doc fifteen
+lines away; `docs/on-device-validation.md`'s `Rich` calibration item still told an operator the
+drawn count depends on the window and the live ceiling is the relief lever, both of which are now
+true only above 0.16; and three doc comments still called the key a bare "fraction of the tier's
+particle budget" while the `KeyDesc` doc six lines from one of them had been corrected.
 
 ### [0166 - The basics read in Russian](done/0166-the-basics-read-in-russian.md)
 
@@ -9132,7 +9331,7 @@ wave since it was written that will actually meet it. ([0160]'s half of this not
 to run after [0161] because both add load-time work to `core/src/preset/schema/`, and [0161] has
 landed.)
 
-[0160]: 0160-the-silhouettes-preconditions-stop-being-silent.md
+[0160]: done/0160-the-silhouettes-preconditions-stop-being-silent.md
 [0161]: done/0161-the-structural-parameter-is-held.md
 [0162]: done/0162-the-curve-families.md
 [0163]: done/0163-the-analytic-field.md
@@ -9152,7 +9351,7 @@ diffusion pass from the studio are each a later plan with its own interview; ADR
 
 [0158]: done/0158-the-player-grows-a-studio-facing-surface.md
 [0159]: done/0159-the-studio-opens.md
-[0160]: 0160-the-silhouettes-preconditions-stop-being-silent.md
+[0160]: done/0160-the-silhouettes-preconditions-stop-being-silent.md
 [0164]: done/0164-the-cellular-system.md
 
 ### Moved 2026-09-09 from `README.md` — the 0087-stop-condition risk

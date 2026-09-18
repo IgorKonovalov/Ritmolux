@@ -304,19 +304,14 @@ live entry citing this one.
 | 0103 | The plugin's context menu shadows foobar's, so the panel cannot be removed from a layout | [Plan 0103](plans/0103-the-project-gets-an-audience.md) Phase 1. **Promoted** |
 | 0113 | The converted feedback field equilibrates far brighter than the reference's | [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md). **Promoted** |
 | 0124 | ADR-0113's motivating claim still reads "provisionally negative" | [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md). **Promoted** |
-| 0128 | `tonal_flatness` convicts a flat-graphic composition | [Plan 0186](plans/0186-the-flatness-gate-tells-a-figure-from-its-ground.md). Half closed by Plan 0116. **Promoted** |
-| 0140 | The band contour can only be an anti-aliased grey on a hard-banded palette | [Plan 0184](plans/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 1 + ADR-0197. **Promoted** |
-| 0146 | `warp_mesh` colours its light at deposit time, so the palette cannot band the field | [Plan 0184](plans/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 2 + ADR-0197. **Promoted** |
 | 0157 | The fixed telemetry set omits the bar grid the engine already computes | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0158 | The tempo octave is unsettled by design, and the rig saw the fold run the other way | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
 | 0172 | The seeded preset directory is never pruned, so a roster drifts from the shipped set | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phases 1-2. **Promoted** |
 | 0185 | The `--help` banner still calls the application `ritmolux` | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 3. **Promoted** |
-| 0186 | The density law scales a low-`density` preset's trace count on a large display | [Plan 0183](plans/0183-a-low-density-is-a-trace-count.md) + ADR-0195. **Promoted** |
 | 0203 | The smoke run captured from a microphone while the default is loopback | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 5. **Promoted** |
 | 0207 | The cap-recovery line says "geometry" for three contexts that are not geometry | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 3. **Promoted** |
 | 0208 | A system count written into prose goes stale on the next system | [Plan 0178](plans/0178-what-the-operator-reads-is-true.md) Phase 4 + ADR-0202. **Promoted** |
-| 0217 | `path_cost`'s arity probe prices an arc chain, not the polyline its header reports | [Plan 0160](plans/0160-the-silhouettes-preconditions-stop-being-silent.md) Phase 1b. **Promoted** |
 <!-- roster:end -->
 
 ### Closed
@@ -582,6 +577,11 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0214 | A converted comp shader and per-vertex program read other coordinates than the source | [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md) Phases 1-3 + ADR-0212. **Closed 2026-09-16** |
 | 0215 | The seam on two MilkDrop 1.x presets is unexplained | [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md) Phases 1, 4, 7. Cause: the unbound scene deposit. **Closed 2026-09-16** |
 | 0216 | The converted waveform follows neither reference | [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md) Phases 5-6 + ADR-0199. Custom waves: see 0244. **Closed 2026-09-16** |
+| 0186 | The density law scales a low-`density` preset's trace count on a large display | [Plan 0183](plans/done/0183-a-low-density-is-a-trace-count.md) + [ADR-0195](adrs/0195-a-low-density-is-a-trace-count-and-the-law-scales-only-a-cloud.md). Band 0.08-0.16; no baseline moved. **Closed 2026-09-17** |
+| 0128 | `tonal_flatness` convicts a flat-graphic composition | [Plan 0186](plans/done/0186-the-flatness-gate-tells-a-figure-from-its-ground.md) + [ADR-0200](adrs/0200-the-flatness-conjunctions-second-term-reads-the-reference-a-role-classifier-assigns.md). Four-field residue reopened as 0248. **Closed 2026-09-17** |
+| 0140 | The band contour can only be an anti-aliased grey on a hard-banded palette | [Plan 0184](plans/done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 1 + ADR-0197. Four styles. **Closed 2026-09-17** |
+| 0146 | `warp_mesh` colours its light at deposit time, so the palette cannot band the field | [Plan 0184](plans/done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 2 + ADR-0197. Bands, not the ink class; see 0251. **Closed 2026-09-17** |
+| 0217 | `path_cost`'s arity probe prices an arc chain, not the polyline its header reports | [Plan 0160](plans/done/0160-the-silhouettes-preconditions-stop-being-silent.md) Phase 1b. Polyline by construction; table re-taken at ~0.095 ms/segment. **Closed 2026-09-17** |
 <!-- roster:end -->
 
 ---
@@ -11849,9 +11849,39 @@ shell-occupancy rescue, reading the tonal statistic at the quiet excitation too,
 lens, is a real decision with real alternatives and belongs in an ADR. It should land **before Plan
 0113 Phase 6**, which is where the emptying canvas arrives. Phases 3-5 are unaffected.
 
-- **Promoted 2026-09-14** to [Plan 0186](plans/0186-the-flatness-gate-tells-a-figure-from-its-ground.md): five figure/ground candidates measured against two blot anchors under a stop condition registered before any number is read; its Phase 2 human gate writes ADR-0200 whichever way it falls, and a negative result is a valid end. The composition-or-fill question for Sumi, Whorl, Supernova and Neon Tunnel is carved out and re-filed at that close if still open.
+- **Promoted 2026-09-14** to [Plan 0186](plans/done/0186-the-flatness-gate-tells-a-figure-from-its-ground.md): five figure/ground candidates measured against two blot anchors under a stop condition registered before any number is read; its Phase 2 human gate writes ADR-0200 whichever way it falls, and a negative result is a valid end. The composition-or-fill question for Sumi, Whorl, Supernova and Neon Tunnel is carved out and re-filed at that close if still open.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0186](plans/0186-the-flatness-gate-tells-a-figure-from-its-ground.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0186](plans/done/0186-the-flatness-gate-tells-a-figure-from-its-ground.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+### CLOSED 2026-09-17 by [Plan 0186](plans/done/0186-the-flatness-gate-tells-a-figure-from-its-ground.md) + [ADR-0200](adrs/0200-the-flatness-conjunctions-second-term-reads-the-reference-a-role-classifier-assigns.md) — the fringe mechanism this entry named is where the repair was found, and the carved-out half reopens as 0248
+
+**Closed on the narrow form this entry was left in**, which is the form the 2026-09-02 re-open
+states: *"a gate that can tell a deliberately flat graphic composition from a saturated blot ... Start
+from the fringe mechanism, not from ADR-0128's roster."* That instruction was followed and it was the
+right one — but the answer was not another structural statistic. It was the **reference**. A
+saturated blot is its own modal band, so term two conditioned on the derived ground was handed the
+mass's fringe; `metrics::figure_ground_ratio` classifies the modal band as figure or ground from
+`coverage(BLACK) / coverage(derived)`, and `metrics::assigned_boundary_density` reads the reference
+that role assigns. `boundary_density` itself — the statistic ADR-0130 established and this entry's
+re-open did not convict — is unchanged.
+
+Plan 0186 tabled ten candidates against **two** frozen blot anchors (a stroke figure's rasterized rim
+and a particle cloud's scatter) at two capture sizes under a four-part stop condition registered
+before any number was read. Eight passed; ADR-0200 records the choice and the four rejected
+alternatives. Both anchors are convicted again, `Tiled Rosette Mono` is admitted on its ink, and the
+constants are `boundary_floor = 0.23` and `MODAL_FIGURE_CUT = 1.17`, both at 96x96 and neither
+travelling (ADR-0071).
+
+**What is not closed, and is now its own entry.** Whether `Sumi`, `Whorl`, `Supernova` and
+`Neon Tunnel` are compositions or fills — the half the plan carved out in its
+`## What this plan does NOT do` — is **0248**, in the live file, citing this body. The archive is
+append-only and closed, so it is a new entry rather than an edit here.
+
+**And one thing this close added to the record rather than removed**: above the cut term two reads
+black over a lit mask that is the whole frame, so on a canvas that paints its own paper the statistic
+collapses to the frame's own border (`0.0412` at 96x96, for eight shipped presets). Term one is the
+whole of what holds them. That is ADR-0200's fifth Negative and is the successor of the failure this
+entry diagnosed, one class over.
 
 
 ---
@@ -11906,10 +11936,23 @@ the frame — so the contour is the only source of intermediate values in the pi
 looks good, and the fix costs a parameter on a surface that was deliberately kept free of one.
 Revisit if a second limited-ink world lands on a contoured scene.
 
-- **Promoted 2026-09-14** to [Plan 0184](plans/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 1 and [ADR-0197](adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md): the contour gains a hard/soft style and an ink taken from a palette coordinate, on every scene that draws it, with the default byte-identical.
+- **Promoted 2026-09-14** to [Plan 0184](plans/done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 1 and [ADR-0197](adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md): the contour gains a hard/soft style and an ink taken from a palette coordinate, on every scene that draws it, with the default byte-identical.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0184](plans/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0184](plans/done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) owns the ask, and its close appends the `CLOSED` marker here.
 
+- **CLOSED 2026-09-17** by [Plan 0184](plans/done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md)
+  Phase 1 and [ADR-0197](adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md),
+  **fully, and the entry's own reading is the one that closes it.** `palette_contour_style` takes four
+  values on all six contour scenes — soft or hard footprint, black or an ink read at
+  `palette_contour_ink` — with style `0` the expression that shipped before it, so no golden moved.
+  The entry measured `shape_contourmono` at 9 distinct colours with the contour off and 684 at
+  `palette_contour = 1.0`; the same picture under the plan's recorded stimulus measures **677 at style
+  0 and 9 at style 1**, and `shape_contourmono` ships on style 1. Style 3, the hard ink key, also
+  measures 9 and was rendered and rejected on composition — it lays red at every run boundary, taking
+  red from 4.57 % to 11.70 % of the frame — and that rejection is in the preset's header as a rejected
+  alternative. The entry's *"revisit if a second limited-ink world lands on a contoured scene"* is
+  discharged rather than deferred. The drift guard that never opened two of the six sites now scans
+  for them.
 
 ---
 
@@ -11957,10 +12000,24 @@ small enough to fold into someone else's plan.
 cohort has four systems that do work. It rises if `warp_mesh` is wanted for a limited-ink world
 specifically, because nothing else in the engine makes a decay contour.
 
-- **Promoted 2026-09-14** to [Plan 0184](plans/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 2 and [ADR-0197](adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md): `warp_mesh` `color_source` deposits uncoloured light and colours the field by its level at present time; the two colour paths exclude each other, and the phase stops if the level outgrows `color_span`.
+- **Promoted 2026-09-14** to [Plan 0184](plans/done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) Phase 2 and [ADR-0197](adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md): `warp_mesh` `color_source` deposits uncoloured light and colours the field by its level at present time; the two colour paths exclude each other, and the phase stops if the level outgrows `color_span`.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0184](plans/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0184](plans/done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) owns the ask, and its close appends the `CLOSED` marker here.
 
+- **CLOSED 2026-09-17** by [Plan 0184](plans/done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md)
+  Phase 2 and [ADR-0197](adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md),
+  **and the half that did not arrive is named rather than glossed.** `color_source = "1"` makes the
+  deposit write uncoloured light and the present pass colour the field by `max(rgb)` of its own
+  accumulated level, after the echo, so `palette_steps` bands what the loop builds.
+  `presets/warp_ladder.toml` is the world the entry asked for and its rungs are the decay contours it
+  named: along a ray from the deposit centre the level path crosses between inks **10** times and the
+  deposit-angle path **0**, because the angle coordinate does not vary along a ray — the measured
+  form of this entry's *"smeared coloured blob with no bands at all"*.
+  **What did not arrive is the ink class.** The present writes `ink * coverage` and coverage is a
+  continuum, so two inks measure **851** exact frame colours; `palette_steps = "12"` quantizes the
+  level the coverage is computed from and brings that to **60**. The ladder is an op-art print, not a
+  limited-ink one, and the preset's header says so in its own words. The coverage threshold that would
+  close the gap is live as **0251**, which is a new question rather than an edit to this closed entry.
 
 ---
 
@@ -12753,9 +12810,24 @@ which is exactly the sentence that is false for a trace.
 Either way the two stale headers above want a sweep, and `presets/README.md`'s note wants the trace
 half added beside the cloud half it already has.
 
-- **Promoted 2026-09-14** to [Plan 0183](plans/0183-a-low-density-is-a-trace-count.md) and [ADR-0195](adrs/0195-a-low-density-is-a-trace-count-and-the-law-scales-only-a-cloud.md): at or below density 0.08 the drawn count is the tier anchor's at every size, at or above 0.16 the law applies unchanged, and the count blends linearly between. The table above misses `attractor_lorenzknot` at 0.02.
+- **Promoted 2026-09-14** to [Plan 0183](plans/done/0183-a-low-density-is-a-trace-count.md) and [ADR-0195](adrs/0195-a-low-density-is-a-trace-count-and-the-law-scales-only-a-cloud.md): at or below density 0.08 the drawn count is the tier anchor's at every size, at or above 0.16 the law applies unchanged, and the count blends linearly between. The table above misses `attractor_lorenzknot` at 0.02.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0183](plans/0183-a-low-density-is-a-trace-count.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0183](plans/done/0183-a-low-density-is-a-trace-count.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+- **CLOSED 2026-09-17**, at [Plan 0183](plans/done/0183-a-low-density-is-a-trace-count.md)'s close.
+  `active_particles` takes the tier anchor and resolves ADR-0195's effective budget: `anchor *
+  density` at or below 0.08, the ADR-0140 budget at or above 0.16, a linear blend between. The eight
+  worlds this entry tabulated, plus `attractor_lorenzknot` at 0.02 which it missed, now draw the
+  count their author picked at every window size, live or rendered. **The entry's framing was right
+  and its arithmetic held** — nothing under verification inverted. Two halves it asked for landed as
+  asked: the two stale headers (`attractor_thomas`, `fragment_sumi`) became true rather than being
+  rewritten around a moving number, and `presets/README.md`'s note gained the trace half beside the
+  cloud half. **No golden or sanity baseline moved**, because every one is `Floor` at or under
+  `REFERENCE_PX` where the anchor *is* the budget — asserted as a swept property, not inferred from
+  a green run. The owner's look gate at 1920x1080 `Rich` confirmed the picture on all three trace
+  worlds, with two cloud controls byte-identical before and after. What the entry did not foresee is
+  in ADR-0195's Negative section: the band between the two constants is steep, and a world authored
+  inside it would get a weaker form of this defect back. Nothing is authored there.
 
 
 ---
@@ -13351,9 +13423,20 @@ slope. The ceiling's argument is about the worst case an author can load, and th
 **Low.** Nothing renders wrong and the ceiling still stands. What is wrong is that the one test
 named as the ceiling's measurement cannot re-measure it.
 
-- **Promoted 2026-09-14** into [Plan 0160](plans/0160-the-silhouettes-preconditions-stop-being-silent.md) as optional Phase 1b: re-price the arity on a polyline and re-take the header table. If that phase is skipped this entry stays live.
+- **Promoted 2026-09-14** into [Plan 0160](plans/done/0160-the-silhouettes-preconditions-stop-being-silent.md) as optional Phase 1b: re-price the arity on a polyline and re-take the header table. If that phase is skipped this entry stays live.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0160](plans/0160-the-silhouettes-preconditions-stop-being-silent.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0160](plans/done/0160-the-silhouettes-preconditions-stop-being-silent.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+- **CLOSED 2026-09-17** — [Plan 0160](plans/done/0160-the-silhouettes-preconditions-stop-being-silent.md) Phase 1b was taken (`2afbf736`), and the entry is discharged in full.
+  `path_probe` now carries a `morph_to` identical to its `d` at `morph = 0`, which puts the scene on
+  its point representation **by construction** — a morph in flight cannot ride the arc chain — so
+  every arity is on the polyline route and the axis is the segment count again. The header table was
+  re-taken on that run and dated: **~0.095 ms per segment**, 42.6 % of the floor budget at 64 and
+  24.4 % at 32, with rows added at 8 and 48. `MAX_SAMPLES`'s own doc follows the new slope, and the
+  ceiling's argument still holds at 64, so nothing was logged for a later plan. Two figures the
+  entry did not ask about moved with it: the arc-comparison table beneath was deliberately **not**
+  re-taken, because its polyline column already measured a polyline, and the close review's M3
+  dated it 2026-09-09 so the two tables cannot be read as one run.
 
 
 ---

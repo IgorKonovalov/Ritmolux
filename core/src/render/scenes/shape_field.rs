@@ -259,6 +259,13 @@ struct Params {
     // w: arc piece count — nonzero means `path` holds an ARC CHAIN rather than
     // a polyline, and `x` is then unread.
     f: vec4<f32>,
+    // x: palette_contour_style (integral, rounded CPU-side),
+    // y: palette_contour_ink (ADR-0197), zw: unused.
+    //
+    // Its own vec4 rather than `e.w` plus a slot borrowed from elsewhere: the two
+    // are one control split in half, and `e.w` is the only free slot this struct
+    // has.
+    g: vec4<f32>,
     // The authored contour (ADR-0107), in one of two packings.
     //
     // **As a polyline** (`f.w == 0`): TWO POINTS PER ELEMENT, point `i` at
@@ -327,26 +334,36 @@ fn band_coord(t: f32, steps: f32) -> f32 {
 // no new parameter.
 //
 // The two LUTs, the sampler and `palette_mix` are EXPLICIT parameters rather
-// than module-scope globals this happens to find: all four sites name them the
+// than module-scope globals this happens to find: all six sites name them the
 // same today, so implicit capture would compile — and would silently bind the
 // shared function to whatever a future site called its textures.
 //
 // `textureSampleLevel`, not `textureSample`: the LUT has one mip, and an
 // explicit LOD keeps these reads free of the uniformity requirement that a
 // sample after a conditional return would otherwise carry.
-fn band_contour(
+//
+// **What the line is drawn in is `style`** (ADR-0197): `0` the soft darkening
+// above, `1` a hard darkening over the same footprint, `2` a soft line in the
+// palette's own colour at `ink_t` and `3` a hard one. `style` arrives rounded to
+// a whole number from the CPU (`palette::band_contour_style`), so the equality
+// comparisons below are exact. The `style < 0.5` arm is the expression that
+// shipped before the other three existed, which is what keeps every golden still.
+fn band_contour_ink(
+    col: vec3<f32>,
     t: f32,
     steps: f32,
     amount: f32,
+    style: f32,
+    ink_t: f32,
     lut_a: texture_2d<f32>,
     lut_b: texture_2d<f32>,
     lut_samp: sampler,
     mix_ab: f32,
-) -> f32 {
+) -> vec3<f32> {
     let f = t * steps;
     let w = max(fwidth(f), 1e-5);
     if (steps < 1.5 || amount <= 0.0) {
-        return 1.0;
+        return col;
     }
     let n = round(f);
     let m = clamp(mix_ab, 0.0, 1.0);
@@ -361,10 +378,21 @@ fn band_contour(
         m
     );
     if (all(abs(hi - lo) < vec3<f32>(0.5 / 255.0))) {
-        return 1.0;
+        return col;
     }
     let d = min(fract(f), 1.0 - fract(f));
-    return 1.0 - clamp(amount, 0.0, 1.0) * (1.0 - smoothstep(0.0, w, d));
+    if (style < 0.5) {
+        return col * (1.0 - clamp(amount, 0.0, 1.0) * (1.0 - smoothstep(0.0, w, d)));
+    }
+    let hard = style == 1.0 || style == 3.0;
+    let cover = select(1.0 - smoothstep(0.0, w, d), f32(d < w), hard);
+    let ink_lut = mix(
+        textureSampleLevel(lut_a, lut_samp, vec2<f32>(ink_t, 0.5), 0.0).rgb,
+        textureSampleLevel(lut_b, lut_samp, vec2<f32>(ink_t, 0.5), 0.0).rgb,
+        m
+    );
+    let ink = select(vec3<f32>(0.0), ink_lut, style >= 2.0);
+    return mix(col, ink, clamp(amount, 0.0, 1.0) * cover);
 }
 
 // Point `i` of the authored contour, unpacked from the two-per-vec4 array.
@@ -558,6 +586,8 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let path_inradius = params.f.y;
     let stroke = params.f.z;
     let path_arcs = u32(params.f.w);
+    let palette_contour_style = params.g.x;
+    let palette_contour_ink = params.g.y;
 
     // Square units, from the RENDER TARGET's aspect (ADR-0037): stretching x
     // makes one unit of `uv` the same length on both axes, so the figure below
@@ -643,7 +673,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
 
     // **The stroke's screen width, taken before any branch.** A derivative has
     // to be evaluated in uniform control flow, and hoisting it is what keeps
-    // that true however the branch below is compiled — `band_contour` hoists
+    // that true however the branch below is compiled — `band_contour_ink` hoists
     // its own for the same reason.
     let d_width = max(fwidth(d), 1e-5);
     // The response exponent, applied to the distance BEFORE it becomes a palette
@@ -660,8 +690,9 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let ca = textureSample(lut_a, lut_samp, vec2<f32>(banded, 0.5)).rgb;
     let cb = textureSample(lut_b, lut_samp, vec2<f32>(banded, 0.5)).rgb;
     var col = mix(ca, cb, clamp(palette_mix, 0.0, 1.0));
-    col = col * band_contour(
-        coord, palette_steps, palette_contour, lut_a, lut_b, lut_samp, palette_mix
+    col = band_contour_ink(
+        col, coord, palette_steps, palette_contour, palette_contour_style,
+        palette_contour_ink, lut_a, lut_b, lut_samp, palette_mix
     );
     col = apply_saturation(col, saturation);
 
@@ -696,6 +727,8 @@ struct Params {
     d: [f32; 4],
     e: [f32; 4],
     f: [f32; 4],
+    /// x: palette_contour_style, y: palette_contour_ink (ADR-0197); zw unused.
+    g: [f32; 4],
     /// The authored contour, two points per element — see the WGSL's `path_pt`.
     /// Written every frame with the rest of the struct; it changes only on a
     /// preset switch, and 1.5 KB of `write_buffer` is far below the cost of
@@ -787,6 +820,16 @@ pub struct ShapeFieldScene {
     /// sliver short of the palette's first texel.
     path_inradius: f32,
     path_inradius_to: f32,
+    /// Whether the contour(s) this scene is holding are star-shaped about the
+    /// centre `coord_mode = 1` divides by — `None` where the preset declares no
+    /// `[path]` and the roster arm is the figure.
+    ///
+    /// Read off the parsed shape at configure time, where the geometry is
+    /// (`PathShape::star_shaped`), and `false` when EITHER endpoint of a morph
+    /// pair fails: both are drawn. **An intermediate contour of a morph is not
+    /// tested** — it exists only between two frames' interpolation, and two
+    /// star-shaped endpoints can pass through a contour that is not.
+    path_star_shaped: Option<bool>,
     /// How far along `path_from` -> `path_to` the figure is, raw as the preset
     /// bound it. `0` — the default — is the authored figure, and an exact
     /// identity: the interpolation is skipped entirely.
@@ -885,6 +928,7 @@ impl ShapeFieldScene {
             path: Box::new([[0.0; 4]; PATH_VEC4S]),
             path_inradius: 1.0,
             path_inradius_to: 1.0,
+            path_star_shaped: None,
             occlude: crate::render::post::DEFAULT_OCCLUDE,
         }
     }
@@ -922,7 +966,8 @@ fn applied_rotation(rotation: f32) -> f32 {
 
 /// The `coord_mode` the shader is handed: clamped into the roster, then
 /// **rounded to an integer**, with a non-finite binding falling back to the
-/// default — and **forced back to the distance on a `ring`**.
+/// default — and **forced back to the distance on a figure the scaled copy has
+/// no single value on**.
 ///
 /// The quantizing half is `marks::mark_shape`'s treatment for
 /// `marks::mark_shape`'s reason, and the `kaleido_edge` precedent behind both. A
@@ -932,11 +977,24 @@ fn applied_rotation(rotation: f32) -> f32 {
 /// there is nothing halfway between an offset curve and a scaled copy for the
 /// shader to draw there.
 ///
-/// # The `ring` fallback, and why it is not silent
+/// # The fallback, and why it is not silent
 ///
-/// An annulus's centre is in its hole, so `r / r_boundary` has no single value
-/// there — the one behavioural choice ADR-0111 leaves open. Plan 0098
-/// Phase 4 rendered the three defensible answers before picking, and what
+/// The scaled copy divides by the boundary radius along a ray from the figure's
+/// centre, so it needs a figure every such ray leaves exactly once. Two figures
+/// this scene can draw are not: a **`ring`**, whose centre is in its hole, and
+/// an **authored contour that is not star-shaped about its centre** — a
+/// crescent, or a silhouette whose sinuses put one lobe across the ray into
+/// another. On both the shader takes the outermost crossing and everything
+/// between the crossings reads as interior, which collapses the figure to a dot
+/// inside a few huge rays.
+///
+/// `contour_star_shaped` is the verdict for the contour being drawn, or `None`
+/// where there is no `[path]` table — in which case the roster arm is the figure
+/// and the `ring` is the one arm that fails. A contour REPLACES the roster arm
+/// in the shader, so the two tests are alternatives rather than both.
+///
+/// The `ring`'s case is the one behavioural choice ADR-0111 leaves open. Plan
+/// 0098 Phase 4 rendered the three defensible answers before picking, and what
 /// settled it is that defining the boundary as the outer rim produces a figure
 /// **byte-identical to a `disc`**: the coordinate collapses to `length(p)` and
 /// the hole stops existing, so a preset naming one roster entry would be shown
@@ -944,11 +1002,16 @@ fn applied_rotation(rotation: f32) -> f32 {
 ///
 /// So the combination is refused rather than approximated, and the refusal is
 /// **announced**: `Preset::from_toml_str` warns at load when a preset rests on
-/// it (ADR-0020's shape, the `thickness` dead-zone precedent). The silent
-/// fallback was the third candidate and it is the one this rejects — it renders
-/// the same pixels as this does and costs an author the afternoon.
-fn applied_coord_mode(mode: f32, shape: f32) -> f32 {
-    if shape == marks::RING_SHAPE {
+/// it (ADR-0020's shape, the `thickness` dead-zone precedent), on the same
+/// condition this decides on. The silent fallback was the third candidate and it
+/// is the one this rejects — it renders the same pixels as this does and costs
+/// an author the afternoon.
+fn applied_coord_mode(mode: f32, shape: f32, contour_star_shaped: Option<bool>) -> f32 {
+    let single_valued = match contour_star_shaped {
+        Some(star_shaped) => star_shaped,
+        None => shape != marks::RING_SHAPE,
+    };
+    if !single_valued {
         return DEFAULT_COORD_MODE;
     }
     if mode.is_finite() {
@@ -1139,6 +1202,8 @@ pub const PARAMS: &[ParamSpec] = &[
     crate::render::scenes::common::PALETTE_MIX,
     crate::render::scenes::common::PALETTE_STEPS,
     crate::render::scenes::common::PALETTE_CONTOUR,
+    crate::render::scenes::common::PALETTE_CONTOUR_STYLE,
+    crate::render::scenes::common::PALETTE_CONTOUR_INK,
     ParamSpec {
         name: "gamma",
         default: 1.0,
@@ -1337,6 +1402,7 @@ impl Scene for ShapeFieldScene {
             self.pieces.clear();
             self.path_inradius = 1.0;
             self.path_inradius_to = 1.0;
+            self.path_star_shaped = None;
             if let Some(contour) = shape {
                 // The load boundary already refused an arity above the ceiling,
                 // so the `take` is a belt on a boundary that holds rather than a
@@ -1344,6 +1410,7 @@ impl Scene for ShapeFieldScene {
                 self.path_from
                     .extend(contour.points().iter().take(MAX_SAMPLES).copied());
                 self.path_inradius = contour_inradius(&self.path_from);
+                self.path_star_shaped = Some(contour.star_shaped());
                 self.pieces.extend_from_slice(contour.pieces());
             }
             // The pair is aligned at load; a target of a different arity would
@@ -1355,6 +1422,10 @@ impl Scene for ShapeFieldScene {
             {
                 self.path_to.extend(target.points().iter().copied());
                 self.path_inradius_to = contour_inradius(&self.path_to);
+                // Both endpoints are drawn, so either one failing takes the
+                // scaled copy away for the whole travel.
+                self.path_star_shaped =
+                    Some(self.path_star_shaped.unwrap_or(true) && target.star_shaped());
             }
         }
         None
@@ -1401,7 +1472,7 @@ impl Scene for ShapeFieldScene {
         // not about the raw binding.
         let shape = marks::mark_shape(self.shape);
         self.gpu.flush_palette(queue);
-        let coord_mode = applied_coord_mode(self.coord_mode, shape);
+        let coord_mode = applied_coord_mode(self.coord_mode, shape, self.path_star_shaped);
         let (path_count, path_arcs, path_inradius) = self.pack_path(coord_mode);
 
         let params = Params {
@@ -1437,6 +1508,12 @@ impl Scene for ShapeFieldScene {
                 path_inradius,
                 applied_stroke(self.stroke),
                 path_arcs as f32,
+            ],
+            g: [
+                palette::band_contour_style(self.colour.contour_style),
+                self.colour.contour_ink,
+                0.0,
+                0.0,
             ],
             path: *self.path,
         };

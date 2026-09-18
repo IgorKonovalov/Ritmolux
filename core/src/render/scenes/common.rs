@@ -2,7 +2,8 @@
 //!
 //! Every system implements [`Scene`](super::Scene) and most of them accept the
 //! same colour and framing names — `palette_mix`, `palette_steps`,
-//! `palette_contour`, `saturation`, `hue`, `brightness`, `pan_x`, `pan_y`. Each
+//! `palette_contour`, `palette_contour_style`, `palette_contour_ink`,
+//! `saturation`, `hue`, `brightness`, `pan_x`, `pan_y`. Each
 //! spelled its own field, its own `set_param` arm, its own `reset_params` line
 //! and its own `DEFAULT_*` const for them. The names are the preset grammar's,
 //! not any one scene's, so their storage and their resting values belong in one
@@ -17,10 +18,11 @@
 //! *continuously* toward its target, so clamping on the way in would quantize the
 //! sweep rather than the destination. Nothing here clamps, rounds, or rejects.
 //!
-//! # Two of the six are not universal
+//! # Two of them are not universal
 //!
 //! `saturation` rests at 1.0 and `palette_mix`, `palette_steps`,
-//! `palette_contour`, `pan_x` and `pan_y` at their off values on every system
+//! `palette_contour`, `palette_contour_style`, `palette_contour_ink`, `pan_x` and
+//! `pan_y` at their off values on every system
 //! that has them, so those resting values are stated once below. `hue` and
 //! `brightness` are not: the line families each open on a different hue (0.3
 //! l-system, 0.5 star, 0.55 spectrum, 0.6 parametric, 0.0 elsewhere) and the
@@ -100,6 +102,27 @@ pub(crate) const PALETTE_CONTOUR: ParamSpec = ParamSpec {
     kind: ParamKind::Modal,
 };
 
+/// `palette_contour_style`, shared: which of the four lines the contour draws
+/// (ADR-0197). Structural, and rounded at the read side by
+/// [`palette::band_contour_style`] so the shader can compare it exactly.
+pub(crate) const PALETTE_CONTOUR_STYLE: ParamSpec = ParamSpec {
+    name: "palette_contour_style",
+    default: palette::DEFAULT_PALETTE_CONTOUR_STYLE,
+    range: Some([0.0, palette::MAX_PALETTE_CONTOUR_STYLE]),
+    doc: "Which line the contour draws: 0 a soft darkening, 1 a hard one, 2 a soft ink, 3 a hard ink.",
+    kind: ParamKind::Structural,
+};
+
+/// `palette_contour_ink`, shared: where on the palette an ink contour takes its
+/// colour (ADR-0197). Absolute — `hue` does not shift it — so it names a stop.
+pub(crate) const PALETTE_CONTOUR_INK: ParamSpec = ParamSpec {
+    name: "palette_contour_ink",
+    default: palette::DEFAULT_PALETTE_CONTOUR_INK,
+    range: Some([0.0, 1.0]),
+    doc: "Where along the palette an ink contour takes its colour; unread by the two black styles.",
+    kind: ParamKind::Modal,
+};
+
 /// `pan_x`, shared: the scene's horizontal offset.
 pub(crate) const PAN_X: ParamSpec = ParamSpec {
     name: "pan_x",
@@ -165,6 +188,8 @@ const PALETTE_PARAMS: &[&str] = &[
     "palette_mix",
     "palette_steps",
     "palette_contour",
+    "palette_contour_style",
+    "palette_contour_ink",
     "saturation",
     "hue",
     "brightness",
@@ -177,7 +202,7 @@ const PAN_PARAMS: &[&str] = &["pan_x", "pan_y"];
 
 /// The palette-facing params a shader-coloured scene reads.
 ///
-/// [`set`](PaletteParams::set) recognizes all six names. A scene whose roster is
+/// [`set`](PaletteParams::set) recognizes every name in the block. A scene whose roster is
 /// narrower — `shape_collage` accepts only `saturation` and `palette_mix`,
 /// `shape_field` adds the two banding names, `fragment_field` has no
 /// `brightness` — still delegates the whole block: the roster that decides what a
@@ -192,6 +217,12 @@ pub(crate) struct PaletteParams {
     pub steps: f32,
     /// `palette_contour` — the contour line drawn at each band edge.
     pub contour: f32,
+    /// `palette_contour_style` — which of the four lines it is (ADR-0197);
+    /// rounded at the read side by `palette::band_contour_style`.
+    pub contour_style: f32,
+    /// `palette_contour_ink` — the absolute palette coordinate the two ink
+    /// styles draw in.
+    pub contour_ink: f32,
     /// `saturation` — 0 desaturates toward grey, 1 is the palette's own colour.
     pub saturation: f32,
     /// `hue` — the palette coordinate the scene starts from.
@@ -211,6 +242,8 @@ impl PaletteParams {
             mix: DEFAULT_PALETTE_MIX,
             steps: palette::DEFAULT_PALETTE_STEPS,
             contour: palette::DEFAULT_PALETTE_CONTOUR,
+            contour_style: palette::DEFAULT_PALETTE_CONTOUR_STYLE,
+            contour_ink: palette::DEFAULT_PALETTE_CONTOUR_INK,
             saturation: DEFAULT_SATURATION,
             hue: hue_rest,
             brightness: brightness_rest,
@@ -229,6 +262,8 @@ impl PaletteParams {
             "palette_mix" => self.mix = value,
             "palette_steps" => self.steps = value,
             "palette_contour" => self.contour = value,
+            "palette_contour_style" => self.contour_style = value,
+            "palette_contour_ink" => self.contour_ink = value,
             "saturation" => self.saturation = value,
             "hue" => self.hue = value,
             "brightness" => self.brightness = value,
@@ -243,6 +278,8 @@ impl PaletteParams {
         self.mix = DEFAULT_PALETTE_MIX;
         self.steps = palette::DEFAULT_PALETTE_STEPS;
         self.contour = palette::DEFAULT_PALETTE_CONTOUR;
+        self.contour_style = palette::DEFAULT_PALETTE_CONTOUR_STYLE;
+        self.contour_ink = palette::DEFAULT_PALETTE_CONTOUR_INK;
         self.saturation = DEFAULT_SATURATION;
         self.hue = self.hue_rest;
         self.brightness = self.brightness_rest;

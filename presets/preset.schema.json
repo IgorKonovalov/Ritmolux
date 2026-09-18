@@ -139,6 +139,8 @@
             "palette_mix": { "$ref": "#/definitions/param.palette_mix" },
             "palette_steps": { "$ref": "#/definitions/param.palette_steps" },
             "palette_contour": { "$ref": "#/definitions/param.palette_contour" },
+            "palette_contour_style": { "$ref": "#/definitions/param.palette_contour_style" },
+            "palette_contour_ink": { "$ref": "#/definitions/param.palette_contour_ink" },
             "bg_hue": { "$ref": "#/definitions/param.bg_hue" },
             "bg_bright": { "$ref": "#/definitions/param.bg_bright" },
             "bg_vignette": { "$ref": "#/definitions/param.bg_vignette" },
@@ -519,6 +521,8 @@
             "palette_mix": { "$ref": "#/definitions/param.palette_mix" },
             "palette_steps": { "$ref": "#/definitions/param.palette_steps" },
             "palette_contour": { "$ref": "#/definitions/param.palette_contour" },
+            "palette_contour_style": { "$ref": "#/definitions/param.palette_contour_style" },
+            "palette_contour_ink": { "$ref": "#/definitions/param.palette_contour_ink" },
             "zoom": { "$ref": "#/definitions/param.zoom.fragment_field" },
             "pan_x": { "$ref": "#/definitions/param.pan_x" },
             "pan_y": { "$ref": "#/definitions/param.pan_y" },
@@ -839,6 +843,8 @@
             "palette_mix": { "$ref": "#/definitions/param.palette_mix" },
             "palette_steps": { "$ref": "#/definitions/param.palette_steps" },
             "palette_contour": { "$ref": "#/definitions/param.palette_contour" },
+            "palette_contour_style": { "$ref": "#/definitions/param.palette_contour_style" },
+            "palette_contour_ink": { "$ref": "#/definitions/param.palette_contour_ink" },
             "gamma": { "$ref": "#/definitions/param.gamma.shape_field" },
             "coord_mode": { "$ref": "#/definitions/param.coord_mode" },
             "rotation": { "$ref": "#/definitions/param.rotation.shape_field" },
@@ -931,10 +937,13 @@
             "hue": { "$ref": "#/definitions/param.hue.fragment_field" },
             "color_span": { "$ref": "#/definitions/param.color_span.warp_mesh" },
             "color_center": { "$ref": "#/definitions/param.color_center.shape_field" },
+            "color_source": { "$ref": "#/definitions/param.color_source" },
             "saturation": { "$ref": "#/definitions/param.saturation" },
             "palette_mix": { "$ref": "#/definitions/param.palette_mix" },
             "palette_steps": { "$ref": "#/definitions/param.palette_steps" },
             "palette_contour": { "$ref": "#/definitions/param.palette_contour" },
+            "palette_contour_style": { "$ref": "#/definitions/param.palette_contour_style" },
+            "palette_contour_ink": { "$ref": "#/definitions/param.palette_contour_ink" },
             "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" },
             "bg_hue": { "$ref": "#/definitions/param.bg_hue" },
             "bg_bright": { "$ref": "#/definitions/param.bg_bright" },
@@ -1090,6 +1099,8 @@
             "palette_mix": { "$ref": "#/definitions/param.palette_mix" },
             "palette_steps": { "$ref": "#/definitions/param.palette_steps" },
             "palette_contour": { "$ref": "#/definitions/param.palette_contour" },
+            "palette_contour_style": { "$ref": "#/definitions/param.palette_contour_style" },
+            "palette_contour_ink": { "$ref": "#/definitions/param.palette_contour_ink" },
             "bg_hue": { "$ref": "#/definitions/param.bg_hue" },
             "bg_bright": { "$ref": "#/definitions/param.bg_bright" },
             "bg_vignette": { "$ref": "#/definitions/param.bg_vignette" },
@@ -1166,6 +1177,8 @@
             "palette_mix": { "$ref": "#/definitions/param.palette_mix" },
             "palette_steps": { "$ref": "#/definitions/param.palette_steps" },
             "palette_contour": { "$ref": "#/definitions/param.palette_contour" },
+            "palette_contour_style": { "$ref": "#/definitions/param.palette_contour_style" },
+            "palette_contour_ink": { "$ref": "#/definitions/param.palette_contour_ink" },
             "bg_hue": { "$ref": "#/definitions/param.bg_hue" },
             "bg_bright": { "$ref": "#/definitions/param.bg_bright" },
             "bg_vignette": { "$ref": "#/definitions/param.bg_vignette" },
@@ -1234,7 +1247,9 @@
             "saturation": { "$ref": "#/definitions/param.saturation" },
             "palette_mix": { "$ref": "#/definitions/param.palette_mix" },
             "palette_steps": { "$ref": "#/definitions/param.palette_steps" },
-            "palette_contour": { "$ref": "#/definitions/param.palette_contour" }
+            "palette_contour": { "$ref": "#/definitions/param.palette_contour" },
+            "palette_contour_style": { "$ref": "#/definitions/param.palette_contour_style" },
+            "palette_contour_ink": { "$ref": "#/definitions/param.palette_contour_ink" }
           } } } } } }
     },
     {
@@ -1385,6 +1400,8 @@
             "palette_mix": { "$ref": "#/definitions/param.palette_mix" },
             "palette_steps": { "$ref": "#/definitions/param.palette_steps" },
             "palette_contour": { "$ref": "#/definitions/param.palette_contour" },
+            "palette_contour_style": { "$ref": "#/definitions/param.palette_contour_style" },
+            "palette_contour_ink": { "$ref": "#/definitions/param.palette_contour_ink" },
             "zoom": { "$ref": "#/definitions/param.zoom.fragment_field" },
             "pan_x": { "$ref": "#/definitions/param.pan_x" },
             "pan_y": { "$ref": "#/definitions/param.pan_y" }
@@ -1528,6 +1545,8 @@
             "palette_mix": { "$ref": "#/definitions/param.palette_mix" },
             "palette_steps": { "$ref": "#/definitions/param.palette_steps" },
             "palette_contour": { "$ref": "#/definitions/param.palette_contour" },
+            "palette_contour_style": { "$ref": "#/definitions/param.palette_contour_style" },
+            "palette_contour_ink": { "$ref": "#/definitions/param.palette_contour_ink" },
             "gamma": { "$ref": "#/definitions/param.gamma.shape_field" },
             "coord_mode": { "$ref": "#/definitions/param.coord_mode" },
             "rotation": { "$ref": "#/definitions/param.rotation.shape_field" },
@@ -1574,10 +1593,13 @@
             "hue": { "$ref": "#/definitions/param.hue.fragment_field" },
             "color_span": { "$ref": "#/definitions/param.color_span.warp_mesh" },
             "color_center": { "$ref": "#/definitions/param.color_center.shape_field" },
+            "color_source": { "$ref": "#/definitions/param.color_source" },
             "saturation": { "$ref": "#/definitions/param.saturation" },
             "palette_mix": { "$ref": "#/definitions/param.palette_mix" },
             "palette_steps": { "$ref": "#/definitions/param.palette_steps" },
             "palette_contour": { "$ref": "#/definitions/param.palette_contour" },
+            "palette_contour_style": { "$ref": "#/definitions/param.palette_contour_style" },
+            "palette_contour_ink": { "$ref": "#/definitions/param.palette_contour_ink" },
             "brightness": { "$ref": "#/definitions/param.brightness.parametric_curve" }
           } } } } } }
     },
@@ -1640,7 +1662,9 @@
             "saturation": { "$ref": "#/definitions/param.saturation" },
             "palette_mix": { "$ref": "#/definitions/param.palette_mix" },
             "palette_steps": { "$ref": "#/definitions/param.palette_steps" },
-            "palette_contour": { "$ref": "#/definitions/param.palette_contour" }
+            "palette_contour": { "$ref": "#/definitions/param.palette_contour" },
+            "palette_contour_style": { "$ref": "#/definitions/param.palette_contour_style" },
+            "palette_contour_ink": { "$ref": "#/definitions/param.palette_contour_ink" }
           } } } } } }
     },
     {
@@ -1670,7 +1694,9 @@
             "saturation": { "$ref": "#/definitions/param.saturation" },
             "palette_mix": { "$ref": "#/definitions/param.palette_mix" },
             "palette_steps": { "$ref": "#/definitions/param.palette_steps" },
-            "palette_contour": { "$ref": "#/definitions/param.palette_contour" }
+            "palette_contour": { "$ref": "#/definitions/param.palette_contour" },
+            "palette_contour_style": { "$ref": "#/definitions/param.palette_contour_style" },
+            "palette_contour_ink": { "$ref": "#/definitions/param.palette_contour_ink" }
           } } } } } }
     }
   ],
@@ -1896,8 +1922,8 @@
         },
         "density": {
           "type": "number",
-          "description": "Fraction of the tier's particle budget actually drawn.",
-          "markdownDescription": "Fraction of the tier's particle budget actually drawn.\n\nDefault `1`."
+          "description": "How much of the tier's particle budget is actually drawn. At or below 0.08 it is a fixed count - the tier's anchor times this - at every window size; at or above 0.16 it is a fraction of the budget, which grows with the render target. Between the two it scales partly with the window.",
+          "markdownDescription": "How much of the tier's particle budget is actually drawn. At or below 0.08 it is a fixed count - the tier's anchor times this - at every window size; at or above 0.16 it is a fraction of the budget, which grows with the render target. Between the two it scales partly with the window.\n\nDefault `1`."
         },
         "morph_to": {
           "type": "string",
@@ -2264,6 +2290,16 @@
       "type": "string",
       "description": "Draws a line at each band edge when the palette is stepped; 0 draws none.",
       "markdownDescription": "Draws a line at each band edge when the palette is stepped; 0 draws none.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.palette_contour_style": {
+      "type": "string",
+      "description": "Which line the contour draws: 0 a soft darkening, 1 a hard one, 2 a soft ink, 3 a hard ink.",
+      "markdownDescription": "Which line the contour draws: 0 a soft darkening, 1 a hard one, 2 a soft ink, 3 a hard ink.\n\n- default `0.0`\n- typical range `0.0` to `3.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.palette_contour_ink": {
+      "type": "string",
+      "description": "Where along the palette an ink contour takes its colour; unread by the two black styles.",
+      "markdownDescription": "Where along the palette an ink contour takes its colour; unread by the two black styles.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.force": {
       "type": "string",
@@ -3029,6 +3065,11 @@
       "type": "string",
       "description": "How much of the palette the field's range covers.",
       "markdownDescription": "How much of the palette the field's range covers.\n\n- default `1.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.color_source": {
+      "type": "string",
+      "description": "Where the field takes its colour: 0 the deposit's own angle, 1 the light it has built up.",
+      "markdownDescription": "Where the field takes its colour: 0 the deposit's own angle, 1 the light it has built up.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
     },
     "param.count": {
       "type": "string",

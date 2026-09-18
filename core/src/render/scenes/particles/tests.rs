@@ -3,16 +3,16 @@
 #![allow(clippy::panic, clippy::expect_used)]
 
 use super::{
-    AttractorFamily, AttractorScene, Basis, DEFAULT_BRIGHTNESS, DEFAULT_DEPTH_FADE,
+    AttractorFamily, AttractorScene, Basis, CLOUD_DENSITY, DEFAULT_BRIGHTNESS, DEFAULT_DEPTH_FADE,
     DEFAULT_DEPTH_HUE, DEFAULT_SPIN, FIXED_STEP, JITTER_MODE, MAX_PERSPECTIVE,
     MIN_PARTICLE_DENSITY, PARTICLE_ATTRIBUTES, Particle, Phase, RESEED_DRAWS_STREAK, SPIN_RATE,
-    STEP_SLOTS, Scene, StepUniform, active_particles, brightness_factor, deposit_scale, family,
-    ifs, projection_mirror, spin_phase, streak_flag,
+    STEP_SLOTS, Scene, StepUniform, TRACE_DENSITY, active_particles, brightness_factor,
+    deposit_scale, family, ifs, projection_mirror, spin_phase, streak_flag,
 };
 use crate::dsp::AnalysisFrame;
 use crate::render::context::RenderContext;
 use crate::render::scenes::declares;
-use crate::render::{Tier, TierConfig};
+use crate::render::{Tier, TierConfig, attractor_budget};
 use family::Framing;
 use ifs::{IfsFigure, Levers};
 
@@ -947,30 +947,212 @@ fn only_continuous_families_ask_for_a_segment() {
 
 /// `density` resolves against the budget, rounds, and never leaves the range
 /// a draw can survive.
+///
+/// At the anchor itself — `anchor == budget`, which is every target at or under
+/// the reference — the two arms coincide, so these are the counts both the
+/// ADR-0069 captures and the ADR-0195 trace arm are written against.
 #[test]
 fn density_resolves_against_the_tier_budget() {
     let floor = TierConfig::FLOOR.attractor_particles;
     let rich = TierConfig::RICH.attractor_particles;
-    assert_eq!(active_particles(floor, 1.0), floor);
-    assert_eq!(active_particles(rich, 1.0), rich);
-    assert_eq!(active_particles(floor, 0.5), 25_000);
+    assert_eq!(active_particles(floor, floor, 1.0), floor);
+    assert_eq!(active_particles(rich, rich, 1.0), rich);
+    assert_eq!(active_particles(floor, floor, 0.5), 25_000);
 
     // The documented floor, at both tiers. These are the numbers
     // `MIN_PARTICLE_DENSITY`'s rationale is written against — and that
     // rationale is a rendered capture, so pinning them here is what keeps the
     // doc comment honest if the constant is ever nudged.
-    assert_eq!(active_particles(floor, MIN_PARTICLE_DENSITY), 25);
-    assert_eq!(active_particles(rich, MIN_PARTICLE_DENSITY), 75);
+    assert_eq!(active_particles(floor, floor, MIN_PARTICLE_DENSITY), 25);
+    assert_eq!(active_particles(rich, rich, MIN_PARTICLE_DENSITY), 75);
 
     // The captures that set the floor were taken at these fractions, so the
     // counts they correspond to are pinned too.
-    assert_eq!(active_particles(floor, 0.01), 500);
-    assert_eq!(active_particles(floor, 0.002), 100);
+    assert_eq!(active_particles(floor, floor, 0.01), 500);
+    assert_eq!(active_particles(floor, floor, 0.002), 100);
 
     // Never zero (a scene drawing nothing would look like a hang, not an
     // error) and never above the allocation (an out-of-bounds vertex fetch).
-    assert_eq!(active_particles(1, MIN_PARTICLE_DENSITY), 1);
-    assert_eq!(active_particles(floor, 1.0), floor);
+    assert_eq!(active_particles(1, 1, MIN_PARTICLE_DENSITY), 1);
+    assert_eq!(active_particles(floor, floor, 1.0), floor);
+}
+
+// -----------------------------------------------------------------------
+// A low density is a trace count (ADR-0195)
+// -----------------------------------------------------------------------
+
+/// The targets the density law separates. Every one of them is above
+/// `REFERENCE_PX`, which is the only region where the anchor and the budget
+/// differ — an assertion written at a golden's size passes before and after the
+/// trace arm exists and proves nothing.
+const TRACE_SIZES: [(u32, u32); 4] = [(640, 360), (1280, 720), (1920, 1080), (3840, 2160)];
+
+/// Every `(anchor, budget)` pair the shipped tiers resolve at `sizes` — both
+/// tiers against both ceilings — labelled for the failure message.
+fn tier_budgets(sizes: &[(u32, u32)]) -> Vec<(String, u32, u32)> {
+    let mut out = Vec::new();
+    for tier in [TierConfig::FLOOR, TierConfig::RICH] {
+        for (mode, ceiling) in [
+            ("live", tier.attractor_particles_live_ceiling),
+            ("offline", tier.attractor_particles_offline_ceiling),
+        ] {
+            for &(w, h) in sizes {
+                out.push((
+                    format!("{:?} {mode} at {w}x{h}", tier.tier),
+                    tier.attractor_particles,
+                    attractor_budget(tier.attractor_particles, w * h, ceiling),
+                ));
+            }
+        }
+    }
+    out
+}
+
+/// **A trace draws the anchor's count at every target size**, live or rendered
+/// (ADR-0195 property 1).
+///
+/// The sizes are the ones where the old expression scaled: at 1080p `Rich` it
+/// resolved 12 000 live and 27 000 offline for `density = 0.02`, and the last
+/// two assertions here pin those so the 3 000 above is a change and not a
+/// coincidence.
+#[test]
+fn a_trace_density_draws_the_anchor_count_at_every_target() {
+    for (label, anchor, budget) in tier_budgets(&TRACE_SIZES) {
+        for density in [0.0005_f32, 0.006, 0.02, 0.06, TRACE_DENSITY] {
+            let want = ((anchor as f32 * density).round() as u32).max(1);
+            assert_eq!(
+                active_particles(anchor, budget, density),
+                want,
+                "{label}: density {density} against anchor {anchor}, budget {budget}"
+            );
+        }
+        // The count the two trace headers quote, at both tiers.
+        let named = if anchor == TierConfig::RICH.attractor_particles {
+            3_000
+        } else {
+            1_000
+        };
+        assert_eq!(
+            active_particles(anchor, budget, 0.02),
+            named,
+            "{label}: density 0.02"
+        );
+    }
+
+    // Non-vacuity: what the budget alone resolves at the size the defect lives
+    // at. Both differ from the 3 000 asserted above.
+    let rich = TierConfig::RICH;
+    let px = 1920 * 1080;
+    let live = attractor_budget(
+        rich.attractor_particles,
+        px,
+        rich.attractor_particles_live_ceiling,
+    );
+    let offline = attractor_budget(
+        rich.attractor_particles,
+        px,
+        rich.attractor_particles_offline_ceiling,
+    );
+    assert_eq!((live as f32 * 0.02).round() as u32, 12_000);
+    assert_eq!((offline as f32 * 0.02).round() as u32, 27_000);
+}
+
+/// **A cloud resolves exactly what the budget law alone resolved** (ADR-0195
+/// property 2) — checked against the old expression evaluated here, not against
+/// a frozen number, so a later change to `attractor_budget` cannot make this
+/// pass by moving both sides.
+#[test]
+fn a_cloud_density_resolves_exactly_as_the_budget_alone_does() {
+    for (label, anchor, budget) in tier_budgets(&TRACE_SIZES) {
+        for density in [CLOUD_DENSITY, 0.18, 0.4, 0.5, 1.0] {
+            let old = ((budget as f32 * density).round() as u32).clamp(1, budget);
+            assert_eq!(
+                active_particles(anchor, budget, density),
+                old,
+                "{label}: density {density}"
+            );
+        }
+    }
+}
+
+/// **Where the budget is the anchor, no density resolves differently** (ADR-0195
+/// property 3) — which is why no golden and no sanity baseline moves.
+///
+/// Swept rather than sampled, in `MIN_PARTICLE_DENSITY` steps across the whole
+/// legal range, because the claim is about every density and not about the five
+/// a preset happens to use. The two boundary assertions are what say the sweep
+/// lands on the band's ends exactly rather than straddling them.
+#[test]
+fn where_the_budget_is_the_anchor_no_density_moved() {
+    assert_eq!(160.0_f32 / 2_000.0, TRACE_DENSITY);
+    assert_eq!(320.0_f32 / 2_000.0, CLOUD_DENSITY);
+
+    let floor = TierConfig::FLOOR;
+    let mut cases = tier_budgets(&[(128, 128), (96, 96)]);
+    cases.push((
+        "Floor live at 1920x1080".to_string(),
+        floor.attractor_particles,
+        attractor_budget(
+            floor.attractor_particles,
+            1920 * 1080,
+            floor.attractor_particles_live_ceiling,
+        ),
+    ));
+
+    for (label, anchor, budget) in cases {
+        assert_eq!(budget, anchor, "{label} is supposed to resolve the anchor");
+        for i in 1..=2_000_u32 {
+            let density = i as f32 / 2_000.0;
+            let old = ((budget as f32 * density).round() as u32).clamp(1, budget);
+            assert_eq!(
+                active_particles(anchor, budget, density),
+                old,
+                "{label}: density {density}"
+            );
+        }
+    }
+}
+
+/// **The count never decreases as `density` rises, and neither boundary is a
+/// step** (ADR-0195 property 4), at the steepest pair the shipped tiers
+/// reach — a 4K `--render` at `Rich`, where the budget is 18 anchors.
+#[test]
+fn the_count_is_monotone_and_neither_boundary_is_a_step() {
+    let rich = TierConfig::RICH;
+    let anchor = rich.attractor_particles;
+    let budget = attractor_budget(
+        anchor,
+        3840 * 2160,
+        rich.attractor_particles_offline_ceiling,
+    );
+    assert_eq!(budget / anchor, 18, "the steepest case");
+
+    let mut previous = 0;
+    for i in 1..=2_000_u32 {
+        let density = i as f32 / 2_000.0;
+        let count = active_particles(anchor, budget, density);
+        assert!(
+            count >= previous,
+            "density {density} draws {count} after {previous}"
+        );
+        previous = count;
+    }
+
+    // The band's ends, and the 36x rise across it that ADR-0195's Negative
+    // section names.
+    assert_eq!(active_particles(anchor, budget, TRACE_DENSITY), 12_000);
+    assert_eq!(active_particles(anchor, budget, CLOUD_DENSITY), 432_000);
+    // The budget alone would have drawn this at the trace boundary, which is
+    // the distance the trace arm covers here.
+    assert_eq!((budget as f32 * TRACE_DENSITY).round() as u32, 216_000);
+
+    // Continuity, asserted on the function at the nearest representable
+    // neighbour of each boundary rather than on a limit: one ulp of `density`
+    // may not move the count by more than one particle.
+    let ulp_above = f32::from_bits(TRACE_DENSITY.to_bits() + 1);
+    let ulp_below = f32::from_bits(CLOUD_DENSITY.to_bits() - 1);
+    assert!(active_particles(anchor, budget, ulp_above).abs_diff(12_000) <= 1);
+    assert!(active_particles(anchor, budget, ulp_below).abs_diff(432_000) <= 1);
 }
 
 /// **Total deposited light is invariant across `density`** — the property that
@@ -987,7 +1169,7 @@ fn total_deposited_light_is_invariant_across_density() {
     let floor = TierConfig::FLOOR.attractor_particles;
     let reference = floor as f64 * f64::from(deposit_scale(floor));
     for density in [1.0, 0.5, 0.25, 0.1, MIN_PARTICLE_DENSITY] {
-        let active = active_particles(floor, density);
+        let active = active_particles(floor, floor, density);
         let total = f64::from(active) * f64::from(deposit_scale(active));
         assert!(
             (total - reference).abs() < 1e-6 * reference,
@@ -997,8 +1179,8 @@ fn total_deposited_light_is_invariant_across_density() {
     // Non-vacuity: the counts genuinely differ, so the constancy above is a
     // property of the scalar and not of an unchanging `active`.
     assert_ne!(
-        active_particles(floor, 1.0),
-        active_particles(floor, MIN_PARTICLE_DENSITY)
+        active_particles(floor, floor, 1.0),
+        active_particles(floor, floor, MIN_PARTICLE_DENSITY)
     );
 }
 
@@ -1016,7 +1198,7 @@ fn the_tail_beyond_the_active_count_never_moves() {
     let Some(mut h) = Harness::with_density(AttractorFamily::DeJong, DENSITY) else {
         return;
     };
-    let active = active_particles(TEST_PARTICLES, DENSITY) as usize;
+    let active = active_particles(TEST_PARTICLES, TEST_PARTICLES, DENSITY) as usize;
     assert!(active > 0 && active < TEST_PARTICLES as usize);
     let seeded: Vec<[f32; 3]> = h.scene.seed_particles.iter().map(|p| p.pos).collect();
 

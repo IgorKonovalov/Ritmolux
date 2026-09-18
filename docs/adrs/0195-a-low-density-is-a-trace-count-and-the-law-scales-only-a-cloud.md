@@ -1,8 +1,8 @@
 # ADR-0195 — A low `density` is a trace count, and the density law scales only a cloud
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-17
 > **Date:** 2026-09-14
-> **Related plan(s):** [0183](../plans/0183-a-low-density-is-a-trace-count.md)
+> **Related plan(s):** [0183](../plans/done/0183-a-low-density-is-a-trace-count.md)
 > **Amends:** [0140](0140-a-sample-budget-is-a-density-against-the-render-target.md) (the sample
 > budget is a density against the render target)
 > **Supplements:** [0069](0069-the-attractor-trades-sample-count-for-trace-length.md) (`[particles]

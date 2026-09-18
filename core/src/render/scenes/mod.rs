@@ -365,7 +365,10 @@ pub enum GeneratorConfig {
         /// is a load error rather than a silent no-op, because the author asked
         /// for something the engine cannot do.
         morph_to: Option<particles::ifs::IfsFigure>,
-        /// Fraction of the tier's particle budget actually drawn (ADR-0069),
+        /// How much of the tier's particle budget is actually drawn (ADR-0069)
+        /// — a count against the tier's anchor for a trace and a fraction of
+        /// the target-scaled budget for a cloud, the band between them resolved
+        /// by `active_particles` (ADR-0195) —
         /// validated at load into
         /// [`MIN_PARTICLE_DENSITY`](particles::MIN_PARTICLE_DENSITY)`..=1.0`.
         /// Structural, not bindable: an eased integer count would re-decide the
@@ -890,6 +893,23 @@ pub(crate) trait Scene {
     fn sample_budget(&self) -> Option<u32> {
         None
     }
+
+    /// The count the scene actually **draws** out of that budget, where it has
+    /// one — `[particles] density` resolved against the effective budget
+    /// ADR-0195 defines, which is the anchor for a trace and the target-scaled
+    /// budget for a cloud.
+    ///
+    /// Distinct from [`sample_budget`](Self::sample_budget) for the reason that
+    /// hook's own doc gives: the budget is a property of the target, and this
+    /// is the look choice taken out of it. Both are needed to state that a
+    /// density change moved the drawn count and left the allocation alone.
+    ///
+    /// `#[cfg(test)]` for `sample_budget`'s reason — no shipped path asks a
+    /// scene how many instances it is about to draw.
+    #[cfg(test)]
+    fn active_sample_count(&self) -> Option<u32> {
+        None
+    }
 }
 
 /// The registry: every built-in scene, **keyed by the [`SystemKind`] it drives**,
@@ -1377,6 +1397,71 @@ mod tests {
                     tier.tier
                 );
             }
+        }
+    }
+
+    /// **The built scene draws a trace's anchor count out of an unchanged
+    /// budget** (ADR-0195), at 1920x1080 under both ceilings.
+    ///
+    /// The sibling above pins the budget; this pins what is drawn out of it, and
+    /// the pair is the statement that only the drawn count moved. Read off the
+    /// scene for that test's reason — a recomputation here would pass with
+    /// `configure` never reaching `active_count` at all, which is one of the two
+    /// call sites that has to pass the anchor.
+    ///
+    /// No frame is rendered: both hooks are CPU arithmetic.
+    #[test]
+    fn a_trace_preset_draws_its_anchor_count_at_1080p() {
+        use crate::render::{SampleBudget, TierConfig};
+
+        let ctx = match RenderContext::new_headless(64, 64, true) {
+            Ok(ctx) => ctx,
+            Err(RenderError::RequestAdapter(_)) => {
+                eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+                return;
+            }
+            Err(e) => panic!("headless context build failed: {e}"),
+        };
+
+        // `density = 0.02` is the shipped trace value — `attractor_thomas` and
+        // `fragment_sumi`'s layer among them.
+        const DENSITY: f32 = 0.02;
+        let rich = TierConfig::RICH;
+
+        for (budget, expected) in [
+            (SampleBudget::Live, rich.attractor_particles_live_ceiling),
+            (SampleBudget::Offline, 1_350_000),
+        ] {
+            let mut scenes = create_all(&ctx.device, ctx.surface_format(), &rich, budget);
+            let Some((_, scene)) = scenes
+                .iter_mut()
+                .find(|(kind, _)| *kind == SystemKind::Attractor)
+            else {
+                panic!("the roster has no attractor");
+            };
+            // The preset switch order: `configure` carries the density, and the
+            // first frame's `set_target_size` carries the target.
+            scene.configure(&super::lines::GeneratorConfig::Particles {
+                family: crate::render::scenes::particles::AttractorFamily::Thomas,
+                density: DENSITY,
+                morph_to: None,
+                tuple_path: None,
+            });
+            scene.set_target_size(1920, 1080);
+
+            assert_eq!(
+                scene.active_sample_count(),
+                Some(3_000),
+                "{budget:?} at 1080p Rich draws the anchor's count for a trace"
+            );
+            assert_eq!(
+                scene.sample_budget(),
+                Some(expected),
+                "{budget:?} at 1080p Rich resolves an unchanged budget"
+            );
+            // Non-vacuity: the budget is what the old expression took the
+            // fraction of, and it is nine times (or four times) the count above.
+            assert_ne!((expected as f32 * DENSITY).round() as u32, 3_000);
         }
     }
 

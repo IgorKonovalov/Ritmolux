@@ -126,19 +126,28 @@ impl Preset {
             }
         }
 
-        // A `ring` asked for the scaled-copy coordinate (Plan 0098 Phase 4,
-        // ADR-0111's one open behavioural choice). An annulus is the single arm
-        // of the roster that is not star-shaped about its own centre — that
-        // centre is in the hole, a ray from it crosses the boundary twice, and
-        // `r / r_boundary` has no value there. The scene therefore renders the
-        // distance instead, and this is what stops that from being silent.
+        // The scaled-copy coordinate was asked for on a figure it has no single
+        // value on (Plan 0098 Phase 4 for the `ring`, ADR-0111's one open
+        // behavioural choice; ADR-0179 for the authored contour).
         //
-        // Announcing it is the whole point. The three defensible answers were
-        // rendered before one was chosen, and the outer-edge definition came out
-        // BYTE-IDENTICAL to a `disc`: the coordinate collapses to `length(p)`
-        // and the hole stops existing. A preset would name one roster entry and
-        // be shown another. The silent fallback renders exactly what this does
-        // and only differs in whether anyone is told.
+        // **One condition, tested on the figure that will be drawn.** `r /
+        // r_boundary` needs a figure every ray from its centre leaves exactly
+        // once. A `ring` is the single arm of the roster that is not — its
+        // centre is in the hole — and an authored contour replaces the roster
+        // arm entirely, so there the question is about the contour's own
+        // geometry rather than about a name. No name betrays it: a figure with
+        // fins, a crescent, or a silhouette whose sinuses put one lobe across
+        // the ray into another all fail, and on every one of them the shader
+        // takes the outermost crossing and the figure collapses to a dot inside
+        // a few huge rays.
+        //
+        // Announcing it is the whole point. On the `ring` the three defensible
+        // answers were rendered before one was chosen, and the outer-edge
+        // definition came out BYTE-IDENTICAL to a `disc`: the coordinate
+        // collapses to `length(p)` and the hole stops existing. A preset would
+        // name one roster entry and be shown another. The silent fallback
+        // renders exactly what this does and only differs in whether anyone is
+        // told.
         //
         // A warning rather than an error, in ADR-0020's shape and on the
         // `thickness` dead-zone surface above: both values are legal, the
@@ -151,22 +160,48 @@ impl Preset {
                     .find(|b| b.name == name)
                     .and_then(|b| b.expr.as_const())
             };
-            let shape = resting("shape").map(crate::render::scenes::marks::mark_shape);
             let mode = resting("coord_mode");
             // The ceiling is `shape_field`'s own roster, not a literal `1.0`: a
             // third coordinate would leave a hardcoded bound quietly testing the
             // wrong thing, and this quantizes the way the scene does.
             let max_mode = (crate::render::scenes::shape_field::COORD_MODES.len() - 1) as f32;
-            if shape == Some(crate::render::scenes::marks::RING_SHAPE)
+            // The contour, when the preset authored one — and BOTH endpoints of
+            // a morph pair, because both are drawn. The scene decides the
+            // fallback on exactly this, so the warning and the picture cannot
+            // disagree.
+            let contour = match &config {
+                Some(GeneratorConfig::Path { shape, morph_to }) => shape.as_ref().map(|from| {
+                    from.star_shaped()
+                        && morph_to
+                            .as_ref()
+                            .is_none_or(crate::preset::path::PathShape::star_shaped)
+                }),
+                _ => None,
+            };
+            let figure = match contour {
+                Some(false) => Some(
+                    "an authored contour that is not star-shaped about its centre: a ray from \
+                     there crosses the outline more than once",
+                ),
+                Some(true) => None,
+                None => (resting("shape").map(crate::render::scenes::marks::mark_shape)
+                    == Some(crate::render::scenes::marks::RING_SHAPE))
+                .then_some(
+                    "a `ring`: an annulus's centre lies in its hole, so a ray from there crosses \
+                     the outline twice",
+                ),
+            };
+            if let Some(figure) = figure
                 && mode.is_some_and(|m| m.is_finite() && m.clamp(0.0, max_mode).round() >= 1.0)
             {
                 warnings.push(PresetWarning::about(
                     "coord_mode",
-                    "parameter 'coord_mode' is ignored on a `ring`: an annulus's centre lies in \
-                     its hole, so a ray from there crosses the outline twice and the \
-                     scaled-copy coordinate has no single value. The figure is drawn with the \
-                     distance instead. Defining it against the outer rim was the alternative \
-                     and it renders a `disc` — the hole stops existing",
+                    format!(
+                        "parameter 'coord_mode' is ignored on {figure} and the scaled-copy \
+                         coordinate has no single value there. The figure is drawn with the \
+                         distance instead — a band of constant distance rather than a scaled \
+                         copy of the outline"
+                    ),
                 ));
             }
         }

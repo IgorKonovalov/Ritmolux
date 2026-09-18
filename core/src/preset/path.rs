@@ -65,13 +65,13 @@ pub const MIN_SAMPLES: usize = 3;
 ///
 /// **The number is measured, and the measurement disagreed with ADR-0107's
 /// construction by an order of magnitude.** `core/tests/path_cost.rs` prices the
-/// contour walk at ~0.105 ms per segment at 1920x1080 on the integrated adapter
-/// `docs/nfr.md` §1's floor is calibrated against; the ADR predicted ~2 % of
-/// such a GPU at 32 segments and measured 26 %. At **64** the field alone is
-/// 46 % of the floor's 16.67 ms frame budget, which is the most that can be
-/// spent while leaving the composite chain room — so this is where the ceiling
-/// sits, and it is the same value as [`DEFAULT_SAMPLES`] because that is where
-/// the two independent answers landed.
+/// contour walk at **~0.095 ms per segment** (2026-09-17, 1920x1080, floor tier,
+/// on the integrated adapter `docs/nfr.md` §1's floor is calibrated against);
+/// the ADR predicted ~2 % of such a GPU at 32 segments and the measurement reads
+/// 24 % there. At **64** the field alone is 43 % of the floor's 16.67 ms frame
+/// budget, which is about the most that can be spent while leaving the composite
+/// chain room — so this is where the ceiling sits, and it is the same value as
+/// [`DEFAULT_SAMPLES`] because that is where the two independent answers landed.
 pub const MAX_SAMPLES: usize = 64;
 
 /// The most arc pieces a fitted contour may carry before the fit is discarded
@@ -79,8 +79,13 @@ pub const MAX_SAMPLES: usize = 64;
 ///
 /// A bound on the uniform the chain rides in, and a bound on the point of doing
 /// it at all: an arc piece costs more per pixel than a line segment, so a fit
-/// that did not collapse the count is not worth evaluating. The measured counts
-/// at the tightest budget below sit at 25 and under.
+/// that did not collapse the count is not worth evaluating.
+///
+/// **The chains the scene actually draws top out at 24 pieces**, on the 4-cubic
+/// blob of `core/tests/path_cost.rs`'s arc comparison; the circle there fits in
+/// 6 and the leaf in 16. `the_arc_fit_reports_what_a_curve_costs_in_pieces`
+/// reads 25 for that same blob at this same budget because it refits the
+/// 64-point resample, where `PathShape::from_dense` fits the dense flatten.
 pub const MAX_ARC_PIECES: usize = 32;
 
 /// The lateral error the arc fit is held to, in the contour's own normalized
@@ -121,6 +126,35 @@ const MAX_FLATTEN_PER_SEGMENT: usize = 256;
 /// so a `Z` landing exactly on the start point leaves no zero-length closing
 /// edge for the arc-length walk to divide by.
 const DEDUPE_FRACTION: f32 = 1e-6;
+
+/// How far the outermost and the innermost crossing of one ray may sit apart —
+/// as a fraction of the outermost — and still count as **one** crossing, which
+/// is what [`PathShape::star_shaped`] tests for.
+///
+/// The property it holds is a *screen* one: the gap is the share of that ray's
+/// boundary radius over which `coord_mode = 1` reports an interior coordinate
+/// for a point that is outside the figure, so a gap under this is a sliver
+/// thinner than a band edge is wide and cannot be seen. The number is a
+/// fraction of the ray's own radius, so it does not move with `scale`.
+///
+/// **Measured on the contours this engine has**, by
+/// `the_tolerance_separates_the_measured_contours`, which prints the whole table
+/// and re-takes it on every run. What that measurement found is that the
+/// property is not continuous in practice: a figure every ray leaves once
+/// measures **0 to six decimal places** — a deep five-pointed star and the
+/// shipped lion's mane both do, so concavity as such is not what this catches —
+/// and the mildest figure that fails measures **0.40** (the shipped maple, whose
+/// sinuses put a neighbouring lobe across the ray). There is nothing in between
+/// to separate, so this number is not a threshold on real figures at all: it is
+/// the width of the band the resample's own chord error could ever put between
+/// two coincident crossings, an order of magnitude under the mildest real
+/// violation and far above the arithmetic's noise.
+///
+/// The test holds that emptiness rather than these numbers — every contour
+/// measured must land a factor of four clear of this value either way — because
+/// a figure decided narrowly is one whose verdict flips on an unrelated edit to
+/// its `d`.
+const STAR_SHAPED_TOLERANCE: f32 = 0.02;
 
 /// Why a `[path] d` string could not be parsed.
 ///
@@ -210,6 +244,10 @@ pub struct PathShape {
     /// the chain is not limited by the resample's arity: `samples` governs the
     /// polyline's fidelity and the fit's own budget governs the chain's.
     pieces: Vec<crate::render::scenes::lines::biarc::Piece>,
+    /// Whether every ray from the contour's centre meets the outline once — the
+    /// precondition `coord_mode = 1` needs, decided at parse because it is a
+    /// property of the geometry and the geometry is here.
+    star_shaped: bool,
     source_center: [f32; 2],
     source_scale: f32,
 }
@@ -241,6 +279,28 @@ impl PathShape {
     /// longer bounding-box axis, recorded.
     pub fn source_scale(&self) -> f32 {
         self.source_scale
+    }
+
+    /// **Whether a ray from the figure's centre meets this outline exactly
+    /// once**, to within `STAR_SHAPED_TOLERANCE`.
+    ///
+    /// The scaled-copy coordinate (`coord_mode = 1`) divides by the boundary
+    /// radius along such a ray, so on a contour where the answer is `false` that
+    /// coordinate has no single value: the shader takes the outermost crossing,
+    /// every point between the crossings reads as interior, and a figure with
+    /// fins or a crescent collapses to a dot inside a few huge rays. The scene
+    /// draws the distance instead and the load boundary says so.
+    ///
+    /// **The centre is the origin of these points, because that is the point the
+    /// shader's own ray starts from** — `shape_field`'s `path_boundary_radius`
+    /// builds its direction as `p / length(p)` and intersects the contour from
+    /// there. The normalization has already put the source drawing's
+    /// bounding-box centre on that origin, so this is a test about the bounding
+    /// box's centre and **not** about the centroid; the two differ on any figure
+    /// that is heavier on one side, and a test about the wrong one convicts good
+    /// figures and clears bad ones.
+    pub fn star_shaped(&self) -> bool {
+        self.star_shaped
     }
 
     /// Twice the shoelace sum: positive when the contour winds
@@ -324,6 +384,9 @@ impl PathShape {
         Some(Self {
             points,
             pieces: Vec::new(),
+            // Reversal and cyclic rotation are re-orderings of the same point
+            // set, and the verdict is a property of the set.
+            star_shaped: self.star_shaped,
             source_center: self.source_center,
             source_scale: self.source_scale,
         })
@@ -362,9 +425,15 @@ impl PathShape {
     /// from its own first point. `None` when the contour or the request is
     /// degenerate.
     pub fn resampled(&self, samples: usize) -> Option<Self> {
+        let points = resample(&self.points, samples)?;
+        // Re-taken rather than carried over: a different arity is a different
+        // polygon, and a coarse resample of a figure that was star-shaped can
+        // cut a corner across its own centre.
+        let star_shaped = star_shaped(&points);
         Some(Self {
-            points: resample(&self.points, samples)?,
+            points,
             pieces: Vec::new(),
+            star_shaped,
             source_center: self.source_center,
             source_scale: self.source_scale,
         })
@@ -437,9 +506,16 @@ impl PathShape {
             pieces.clear();
         }
 
+        // Tested on the RESAMPLE, not on the dense flatten: `points` is the
+        // contour the shader walks when `coord_mode = 1` selects the boundary
+        // radius, so this verdict is about the figure that coordinate is
+        // actually computed on. It also bounds the work at `MAX_SAMPLES`.
+        let star_shaped = star_shaped(&points);
+
         Ok(Self {
             points,
             pieces,
+            star_shaped,
             source_center: center,
             source_scale: scale,
         })
@@ -877,6 +953,78 @@ fn dedupe(points: &mut Vec<[f32; 2]>, eps: f32) {
             break;
         }
     }
+}
+
+/// Whether every ray from the origin meets the closed polygon exactly once, to
+/// within [`STAR_SHAPED_TOLERANCE`] — see [`PathShape::star_shaped`] for what
+/// the answer is used for and why the origin is the right centre.
+fn star_shaped(points: &[[f32; 2]]) -> bool {
+    worst_ray_gap(points) <= STAR_SHAPED_TOLERANCE
+}
+
+/// The widest gap between the outermost and the innermost crossing over the
+/// sampled rays, as a fraction of the outermost — 0 on a contour every ray meets
+/// once, and the share of the boundary radius the scaled-copy coordinate is
+/// wrong over on one it does not.
+///
+/// **The crossing arithmetic is the shader's**, line for line: `shape_field`'s
+/// `path_boundary_radius` solves `s*u = a + e*t` for each edge and keeps the
+/// largest `s`. What this adds is the *smallest* one, because the two agreeing
+/// is exactly the property `coord_mode = 1` needs.
+///
+/// Two rays per vertex — at the vertex, and at the midpoint of the edge leaving
+/// it. A double crossing occupies an interval of directions bounded by the two
+/// where the crossings coincide, and those bounds are rays grazing a vertex, so
+/// a vertex ray alone can land on the boundary of the interval and read 0. The
+/// midpoint ray is what puts a sample *inside* it.
+fn worst_ray_gap(points: &[[f32; 2]]) -> f32 {
+    let n = points.len();
+    if n < 3 {
+        return 0.0;
+    }
+    let mut worst = 0.0f32;
+    for i in 0..n {
+        let (Some(&a), Some(&b)) = (points.get(i), points.get((i + 1) % n)) else {
+            continue;
+        };
+        for target in [a, [(a[0] + b[0]) * 0.5, (a[1] + b[1]) * 0.5]] {
+            let len = (target[0] * target[0] + target[1] * target[1]).sqrt();
+            if len <= 1e-6 {
+                // The centre itself names no direction.
+                continue;
+            }
+            let u = [target[0] / len, target[1] / len];
+            let (mut near, mut far) = (f32::INFINITY, 0.0f32);
+            for k in 0..n {
+                let (Some(&p), Some(&q)) = (points.get(k), points.get((k + 1) % n)) else {
+                    continue;
+                };
+                let e = [q[0] - p[0], q[1] - p[1]];
+                let denom = e[0] * u[1] - e[1] * u[0];
+                if denom.abs() <= 1e-9 {
+                    continue;
+                }
+                let t = (p[1] * u[0] - p[0] * u[1]) / denom;
+                if !(0.0..=1.0).contains(&t) {
+                    continue;
+                }
+                let s = (p[0] + e[0] * t) * u[0] + (p[1] + e[1] * t) * u[1];
+                if s > 0.0 {
+                    near = near.min(s);
+                    far = far.max(s);
+                }
+            }
+            // A ray that found nothing is a ray running along an edge's own
+            // line, where the test above rejected every candidate for being
+            // parallel to it. That is arithmetic rather than shape — the vertex
+            // rays either side of it carry the verdict — so it is skipped
+            // rather than convicted.
+            if far > 0.0 && near.is_finite() {
+                worst = worst.max((far - near) / far);
+            }
+        }
+    }
+    worst
 }
 
 /// Twice the shoelace sum over a closed polygon.

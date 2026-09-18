@@ -1,8 +1,11 @@
 # Sumi - glowing calligraphy over smoke: the second layered world (ADR-0090),
 # and the first to hang a STATEFUL scene as the layer. The ground is a slow,
 # dark smoke field; the layer is the Thomas flow drawn as a sparse luminous
-# pen-trace (the ADR-0069 density+fade mechanism: ~1000 particles, each a
-# followable trajectory, the segment joining its steps into a stroke),
+# pen-trace (the ADR-0069 density+fade mechanism: ~1000 particles at the floor
+# tier and 3 000 at rich, the same count at every window size because a density
+# this low resolves against the anchor rather than the target-scaled budget
+# (ADR-0195) - each a followable trajectory, the segment joining its steps into
+# a stroke),
 # floating crisp above the smoke's trails on the over-join. One palette
 # serves both, by the engine's rule: the smoke lives on the ramp's deep
 # blue-charcoal floor, the trace's dense cores climb to its amber top.

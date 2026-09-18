@@ -375,7 +375,12 @@ $readmeText = $readmeText.Replace("@SDK_VERSION@", $RlxSdkVersion)
 #   - THE STAMP IS STRIPPED. `<!-- translated-from: <sha> -->` is line 1 of every
 #     translation and it is the site's, not the reader's: a tester opening this in
 #     Notepad would meet an HTML comment before the title. It goes here rather
-#     than in the source, because the source is what the site reads.
+#     than in the source, because the source is what the site reads. The newline
+#     is the regex escape `\r?\n`, NEVER a literal line break inside the
+#     pattern: .gitattributes checks this script out eol=crlf and the .md eol=lf, so
+#     a literal break becomes CRLF and matches nothing the source can hold. A working
+#     copy of this script that kept LF strips the stamp anyway, which is what hides
+#     the breakage everywhere but a fresh clone.
 #   - UTF-8 IS EXPLICIT ON BOTH SIDES. See the read above: 5.1 falls back to the
 #     ANSI codepage for a BOM-less file when reading as well as writing, so the
 #     pair has to be ReadAllText + WriteAllText. Either one left as a Get-Content
@@ -384,9 +389,7 @@ $readmeText = $readmeText.Replace("@SDK_VERSION@", $RlxSdkVersion)
 $readmeRuSource = Join-Path $script:here "READ-ME-FIRST.ru.md"
 if (-not (Test-Path $readmeRuSource)) { Die "missing $readmeRuSource" }
 $readmeRuText = [System.IO.File]::ReadAllText($readmeRuSource, [System.Text.Encoding]::UTF8)
-$readmeRuText = $readmeRuText -replace '^\s*<!--\s*translated-from:[^>]*-->
-?
-', ''
+$readmeRuText = $readmeRuText -replace '^\s*<!--\s*translated-from:[^>]*-->\r?\n', ''
 $readmeRuText = $readmeRuText.Replace("@VERSION@", $version)
 $readmeRuText = $readmeRuText.Replace("@SDK_VERSION@", $RlxSdkVersion)
 [System.IO.File]::WriteAllText(

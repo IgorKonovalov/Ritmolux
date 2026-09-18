@@ -11,9 +11,11 @@ use super::super::*;
 pub(in crate::preset::schema) struct RawParticles {
     /// Attractor family name (e.g. `"lorenz"`); validated at load.
     pub(in crate::preset::schema) family: String,
-    /// Fraction of the tier's particle budget to draw (ADR-0069). Optional —
-    /// absent means the whole budget, which is byte-identical to the behaviour
-    /// before the key existed.
+    /// How much of the tier's particle budget to draw (ADR-0069) — a fixed
+    /// count against the tier's anchor at or below `0.08`, a fraction of the
+    /// target-scaled budget at or above `0.16` (ADR-0195). Optional — absent
+    /// means the whole budget, which is byte-identical to the behaviour before
+    /// the key existed.
     pub(in crate::preset::schema) density: Option<f32>,
     /// The IFS figure the bindable `morph` param travels towards (ADR-0075).
     /// Optional; absent pins the figure and makes `morph` inert.
@@ -152,7 +154,10 @@ pub(in crate::preset::schema) const PARTICLES: TableDesc = TableDesc {
             name: "density",
             kind: KeyKind::Float,
             default: "1",
-            doc: "Fraction of the tier's particle budget actually drawn.",
+            doc: "How much of the tier's particle budget is actually drawn. At or below 0.08 \
+                  it is a fixed count - the tier's anchor times this - at every window size; at \
+                  or above 0.16 it is a fraction of the budget, which grows with the render \
+                  target. Between the two it scales partly with the window.",
         },
         KeyDesc {
             name: "morph_to",

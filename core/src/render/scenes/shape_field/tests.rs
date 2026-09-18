@@ -571,26 +571,30 @@ fn the_ring_count_steps_between_whole_figures() {
 #[test]
 fn the_coordinate_mode_clamps_rounds_and_falls_back() {
     // Any arm but `ring`, which refuses the radius mode outright and has
-    // its own test below.
+    // its own test below. `None` is "no `[path]` table", so the roster arm is
+    // the figure.
     const NOT_RING: f32 = marks::DEFAULT_SHAPE;
-    assert_eq!(applied_coord_mode(DEFAULT_COORD_MODE, NOT_RING), 0.0);
-    assert_eq!(applied_coord_mode(-3.0, NOT_RING), MIN_COORD_MODE);
-    assert_eq!(applied_coord_mode(99.0, NOT_RING), MAX_COORD_MODE);
-    assert_eq!(applied_coord_mode(0.4, NOT_RING), 0.0);
-    assert_eq!(applied_coord_mode(0.6, NOT_RING), 1.0);
-    assert_eq!(applied_coord_mode(f32::NAN, NOT_RING), DEFAULT_COORD_MODE);
+    assert_eq!(applied_coord_mode(DEFAULT_COORD_MODE, NOT_RING, None), 0.0);
+    assert_eq!(applied_coord_mode(-3.0, NOT_RING, None), MIN_COORD_MODE);
+    assert_eq!(applied_coord_mode(99.0, NOT_RING, None), MAX_COORD_MODE);
+    assert_eq!(applied_coord_mode(0.4, NOT_RING, None), 0.0);
+    assert_eq!(applied_coord_mode(0.6, NOT_RING, None), 1.0);
     assert_eq!(
-        applied_coord_mode(f32::INFINITY, NOT_RING),
+        applied_coord_mode(f32::NAN, NOT_RING, None),
+        DEFAULT_COORD_MODE
+    );
+    assert_eq!(
+        applied_coord_mode(f32::INFINITY, NOT_RING, None),
         DEFAULT_COORD_MODE
     );
     for (i, _) in COORD_MODES.iter().enumerate() {
-        assert_eq!(applied_coord_mode(i as f32, NOT_RING), i as f32);
+        assert_eq!(applied_coord_mode(i as f32, NOT_RING, None), i as f32);
     }
 
     // ...and nothing the quantizer emits is ever fractional, anywhere in range.
     for i in 0..=400 {
         let raw = -1.0 + 3.0 * i as f32 / 400.0;
-        let q = applied_coord_mode(raw, NOT_RING);
+        let q = applied_coord_mode(raw, NOT_RING, None);
         assert_eq!(
             q,
             q.round(),
@@ -856,13 +860,15 @@ fn the_two_modes_coincide_on_a_disc() {
 // which is the whole of ADR-0020's argument for a load warning.
 
 /// **A `ring` never reaches the shader with the radius mode selected**, whatever
-/// the binding says.
+/// the binding says — and neither does a contour that is not star-shaped about
+/// its centre, which is the same condition tested on the figure that replaces
+/// the roster arm (ADR-0179).
 #[test]
 fn the_ring_arm_falls_back_to_the_distance() {
     // Every mode, every way of spelling it, on a ring: always the distance.
     for raw in [0.0f32, 0.6, 1.0, 4.0, -2.0, f32::NAN, f32::INFINITY] {
         assert_eq!(
-            applied_coord_mode(raw, marks::RING_SHAPE),
+            applied_coord_mode(raw, marks::RING_SHAPE, None),
             DEFAULT_COORD_MODE,
             "a ring must take the distance whatever `coord_mode` says ({raw})"
         );
@@ -870,8 +876,24 @@ fn the_ring_arm_falls_back_to_the_distance() {
     // ...and the refusal is scoped to that one arm. Every other shape still
     // gets the mode it asked for.
     for shape in [0.0f32, 2.0, 3.0, 4.0] {
-        assert_eq!(applied_coord_mode(1.0, shape), 1.0, "shape {shape}");
-        assert_eq!(applied_coord_mode(0.0, shape), 0.0, "shape {shape}");
+        assert_eq!(applied_coord_mode(1.0, shape, None), 1.0, "shape {shape}");
+        assert_eq!(applied_coord_mode(0.0, shape, None), 0.0, "shape {shape}");
+    }
+
+    // An authored contour is the figure, so the roster's `shape` decides
+    // nothing: a star-shaped contour keeps the radius mode even where the
+    // binding names a `ring`, and one that is not loses it on every arm.
+    for shape in [marks::RING_SHAPE, marks::DEFAULT_SHAPE, 2.0] {
+        assert_eq!(
+            applied_coord_mode(1.0, shape, Some(true)),
+            1.0,
+            "a star-shaped contour takes the radius mode it asked for (shape {shape})"
+        );
+        assert_eq!(
+            applied_coord_mode(1.0, shape, Some(false)),
+            DEFAULT_COORD_MODE,
+            "a contour that is not star-shaped must fall back to the distance (shape {shape})"
+        );
     }
 }
 
@@ -1308,6 +1330,88 @@ fn an_authored_contour_draws_a_figure_the_roster_cannot_select() {
         (ratio - LEAF_ASPECT).abs() < 0.08,
         "the figure is {half_w} x {half_h} px (ratio {ratio:.3}), not the leaf's \
          {LEAF_ASPECT:.3}. A disc or any rostered arm at this scale would read 1.0"
+    );
+}
+
+/// **A contour the scaled-copy coordinate has no single value on renders the
+/// DISTANCE, whatever `coord_mode` says** — so the load warning and the picture
+/// say the same thing (ADR-0179).
+///
+/// The same claim, and the same pair of frames, as the `ring` has: identical to
+/// the byte under both modes. A warning beside a degenerate figure would be
+/// worse than either alone, and a figure quietly collapsing to a dot inside four
+/// huge rays is what the crescent does if the fallback is missing.
+///
+/// The leaf is the control, in the same run and the same harness. Without it
+/// "the two frames match" would pass on a scene that ignored `coord_mode`
+/// entirely, on a broken pack, and on a frame that rendered nothing.
+#[test]
+fn a_contour_that_is_not_star_shaped_renders_the_distance_under_either_mode() {
+    /// A crescent: an outer arc and a shallower inner one, so the figure wraps
+    /// around its own bounding-box centre and a ray from there crosses the far
+    /// horn.
+    const CRESCENT: &str = "M -1,0 C -0.7,-1.1 0.7,-1.1 1,0 C 0.55,-0.45 -0.55,-0.45 -1,0 Z";
+
+    const SIZE: u32 = 240;
+    let Some(mut renderer) = headless(SIZE, SIZE) else {
+        return;
+    };
+    // **Not the two-band look the other path tests use.** That one puts its only
+    // seam exactly on the outline, where both coordinates are 1 by contract, so
+    // the two modes would render the same frame on *any* figure and the control
+    // below could never fire. This is the banded look the `disc`/`ring` pair is
+    // measured through: a wide span and seven steps, so the interior carries
+    // bands and the two constructions have somewhere to disagree.
+    let body = |name: &str, d: &str, mode: &str| {
+        let toml = format!(
+            "name = \"{name}\"\nsystem = \"shape_field\"\n[path]\nd = \"{d}\"\n\
+             [params]\nscale = \"0.55\"\ncolor_span = \"0.5\"\npalette_steps = \"7\"\n\
+             palette_contour = \"0.6\"\ncoord_mode = \"{mode}\"\n"
+        );
+        Preset::from_toml_str(&toml).unwrap_or_else(|e| panic!("{name} failed to load: {e}"))
+    };
+    renderer.set_presets(vec![
+        body("crescent_d", CRESCENT, "0"),
+        body("crescent_r", CRESCENT, "1"),
+        body("leaf_d", LEAF, "0"),
+        body("leaf_r", LEAF, "1"),
+    ]);
+    let shot = |renderer: &mut Renderer, name: &str| {
+        renderer
+            .capture_preset(name, &AnalysisFrame::default(), 2)
+            .unwrap_or_else(|e| panic!("capture {name}: {e}"))
+    };
+    let crescent_d = shot(&mut renderer, "crescent_d");
+    let crescent_r = shot(&mut renderer, "crescent_r");
+    let leaf_d = shot(&mut renderer, "leaf_d");
+    let leaf_r = shot(&mut renderer, "leaf_r");
+
+    let differing = |a: &CaptureImage, b: &CaptureImage| -> usize {
+        a.rgba
+            .chunks_exact(4)
+            .zip(b.rgba.chunks_exact(4))
+            .filter(|(x, y)| x[..3] != y[..3])
+            .count()
+    };
+    let total = (SIZE * SIZE) as usize;
+    let crescent = differing(&crescent_d, &crescent_r);
+    let leaf = differing(&leaf_d, &leaf_r);
+    println!(
+        "of {total} pixels, the crescent differs in {crescent} between the two \
+         modes and the star-shaped leaf in {leaf}"
+    );
+
+    assert_eq!(
+        crescent, 0,
+        "a contour that is not star-shaped must render the distance under both \
+         modes — {crescent} of {total} pixels differ, so the scaled copy reached \
+         the shader on a figure it has no single value on"
+    );
+    assert!(
+        leaf * 20 > total,
+        "the control must differ: only {leaf} of {total} pixels move between the \
+         two modes on a star-shaped contour, so this harness cannot tell the two \
+         coordinates apart and the assertion above proves nothing"
     );
 }
 

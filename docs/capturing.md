@@ -307,7 +307,8 @@ is injected ([ADR-0013](adrs/0013-c-abi-v4-render-dt.md)), the DSP is a pure fun
 ([ADR-0051](adrs/0051-seeded-grammar-randomness-with-per-run-opt-in.md)). Two runs of the same command produce **byte-identical** streams, and
 that is asserted in `standalone/tests/suite/shot_cli.rs` rather than inferred.
 
-**A render draws the attractor denser than a window does, deliberately**
+**A render gives the attractor a larger sample budget than a window does,
+deliberately**
 ([ADR-0140](adrs/0140-a-sample-budget-is-a-density-against-the-render-target.md)).
 The attractor's sample budget is a *density* against the render target rather
 than a flat tier constant —
@@ -329,8 +330,16 @@ buffer is paid for in every window; a render answers to memory instead, so a
 it drew at** — `tier rich, attractor samples 1350000` in the header — which is
 the only way to tell two files apart afterwards.
 
-Three consequences worth knowing before you read a rendered file as evidence:
+Four consequences worth knowing before you read a rendered file as evidence:
 
+- **A sparse preset does not get denser, whatever the table says.** The budget
+  above is what a `[particles] density` above `0.16` takes its fraction of; at or
+  below `0.08` the fraction is taken of the *anchor* instead
+  ([ADR-0195](adrs/0195-a-low-density-is-a-trace-count-and-the-law-scales-only-a-cloud.md)),
+  so a trace world draws the same count under `--render` as in a window of the
+  same tier, at every size. The header still prints the budget, because the
+  budget is what moved — a file's `attractor samples` figure is not the number of
+  trajectories a sparse preset drew.
 - **A rendered file is not the frames the app would have drawn at that size.**
   That is the one property `shot` otherwise works to keep, and `--render` gives
   it up on purpose. `--frame-at` and every other mode here stay on the window's

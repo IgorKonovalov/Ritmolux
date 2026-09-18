@@ -1290,3 +1290,254 @@ fn the_floor_matches_the_sanity_gate() {
          warp_mesh preset ships"
     );
 }
+
+// --- The level coordinate (ADR-0197) ---------------------------------------
+//
+// `color_source = 1` makes the deposit write uncoloured light and the present
+// pass colour the field by its own accumulated level, so `palette_steps` bands
+// the structure the FEEDBACK LOOP builds rather than the light going into it.
+//
+// **Every assertion below rests on one property: in level mode the field's
+// evolution does not depend on the palette at all.** The deposit writes
+// `vec3(amount)` whatever the stops say, so the ladder fixture and a capture of
+// the same fixture with a single-ink palette share their coverage bit for bit and
+// differ only in the ink that coverage is multiplied by. A pixel that "is one of
+// the palette's inks" is therefore checkable **exactly**, at any coverage and
+// through the tonemap and the position-dependent dither: it is the byte one of
+// the single-ink captures holds at that same pixel.
+
+/// The ladder fixture — a mono four-plateau palette on `color_source = 1`, with
+/// every binding a constant. Its header says why each number is what it is.
+const LADDER: &str = include_str!("../fixtures/warp_mesh_ladder.toml");
+
+/// Its four inks, in run order. The header's stop list is the authority; these
+/// are read back out of it by [`the_ladder_inks_are_the_fixtures_own`].
+const LADDER_INKS: [f32; 4] = [0.15, 0.45, 0.70, 1.00];
+
+/// The frames every ladder capture renders. The decay is `0.45` per second, a
+/// tail of about a second, so ninety frames at the capture cadence is a settled
+/// radial profile rather than an integrator still climbing.
+const LADDER_FRAMES: u32 = 90;
+
+/// The ladder fixture with its whole stop list replaced by one flat ink.
+fn ladder_flat(ink: f32) -> String {
+    let start = LADDER
+        .find("stops = [")
+        .expect("the ladder fixture declares a stop list");
+    let end = LADDER[start..]
+        .find("\n]")
+        .expect("the stop list closes on a line of its own")
+        + start
+        + 1;
+    format!(
+        "{}stops = [{{ at = 0.0, color = [{ink}, {ink}, {ink}] }}, \
+         {{ at = 1.0, color = [{ink}, {ink}, {ink}] }}{}",
+        &LADDER[..start],
+        &LADDER[end..]
+    )
+}
+
+/// The same preset text with the deposit colouring by angle again — today's path,
+/// and the one backlog 0146 measured as a smear.
+fn by_angle(text: &str) -> String {
+    let out = text.replace("color_source    = \"1\"", "color_source    = \"0\"");
+    assert_ne!(
+        out, text,
+        "the ladder fixture no longer spells `color_source` the way this \
+         substitution expects"
+    );
+    out
+}
+
+/// ...and with the video echo on. `[params]` is the fixture's last table, so an
+/// appended line joins it.
+///
+/// **`echo_zoom` too, and it is load-bearing**: the echo samples the field at
+/// `(uv - 0.5) / echo_zoom + 0.5`, so at the default `1.0` it reads the pixel it
+/// is already on and `mix(c, c, alpha)` is the identity at every alpha. A second
+/// copy has to be somewhere else to be a second copy.
+fn with_echo(text: &str) -> String {
+    format!("{text}echo_alpha = \"0.5\"\necho_zoom = \"1.6\"\n")
+}
+
+fn ladder_capture(renderer: &mut Renderer, text: &str) -> CaptureImage {
+    let preset = Preset::from_toml_str(text).expect("the ladder preset parses");
+    let name = preset.name.clone();
+    renderer.set_presets(vec![preset]);
+    renderer
+        .capture_preset(&name, &AnalysisFrame::default(), LADDER_FRAMES)
+        .expect("capture the ladder fixture")
+}
+
+fn rgb(img: &CaptureImage, i: usize) -> [u8; 3] {
+    let px = &img.rgba[i * 4..i * 4 + 3];
+    [px[0], px[1], px[2]]
+}
+
+/// Which single-ink captures agree with `img` at pixel `i`. Empty means the pixel
+/// is a value no ink of the palette can produce there.
+fn matching_inks(img: &CaptureImage, flats: &[CaptureImage], i: usize) -> Vec<usize> {
+    let want = rgb(img, i);
+    flats
+        .iter()
+        .enumerate()
+        .filter(|(_, flat)| rgb(flat, i) == want)
+        .map(|(k, _)| k)
+        .collect()
+}
+
+/// Pixel indices along a ray from the deposit centre to the right edge.
+fn ray() -> Vec<usize> {
+    let mid = (SIZE / 2) as usize;
+    (mid..SIZE as usize)
+        .map(|x| mid * SIZE as usize + x)
+        .collect()
+}
+
+#[test]
+fn the_ladder_inks_are_the_fixtures_own() {
+    for ink in LADDER_INKS {
+        assert!(
+            LADDER.contains(&format!("[{ink:.2}, {ink:.2}, {ink:.2}]")),
+            "the ladder fixture no longer carries the ink {ink}, so every \
+             single-ink comparison below is against a palette it does not have"
+        );
+    }
+}
+
+/// **The field bands into its own decay contours.** Every pixel of the ladder is
+/// one of the four inks at that pixel's coverage, and a ray out from the deposit
+/// centre crosses between inks several times — which is `palette_steps`
+/// quantizing a quantity the feedback loop built, the only decay contour in the
+/// engine.
+///
+/// The non-vacuity is the same fixture at `color_source = 0`: colouring at
+/// deposit time puts the palette into the light *before* the warp resamples it,
+/// so neighbouring inks are blended by the resample and the frame carries values
+/// no ink of the palette can produce. That is backlog 0146's smear.
+#[test]
+fn the_level_bands_the_field_where_the_deposit_angle_smears_it() {
+    let Some(mut r) = common::headless(SIZE, SIZE) else {
+        return;
+    };
+
+    let ladder = ladder_capture(&mut r, LADDER);
+    let flats: Vec<CaptureImage> = LADDER_INKS
+        .iter()
+        .map(|ink| ladder_capture(&mut r, &ladder_flat(*ink)))
+        .collect();
+
+    let stray = (0..(SIZE * SIZE) as usize)
+        .filter(|&i| matching_inks(&ladder, &flats, i).is_empty())
+        .count();
+    assert_eq!(
+        stray, 0,
+        "{stray} pixels of the level-mode frame are a value none of the four \
+         inks produces there. In level mode the deposit is uncoloured, so every \
+         pixel is exactly one ink times its own coverage"
+    );
+
+    let path = ray();
+    let mut crossings = 0usize;
+    let mut previous: Vec<usize> = Vec::new();
+    for &i in &path {
+        let here = matching_inks(&ladder, &flats, i);
+        if !previous.is_empty() && !here.is_empty() && previous.iter().all(|k| !here.contains(k)) {
+            crossings += 1;
+        }
+        previous = here;
+    }
+    assert!(
+        crossings >= 3,
+        "the ray from the deposit centre to the edge crossed between inks only \
+         {crossings} time(s); a decay contour ladder is several rungs, not one edge"
+    );
+
+    // The non-vacuity: the same palette and steps, coloured at deposit time.
+    //
+    // **It is the crossing count, not a stray count**, and the reason is the shape
+    // of the coordinate being measured. The deposit's coordinate is the ANGLE, so
+    // a radial ray is a line of *constant* coordinate — the one line in the frame
+    // the angle palette cannot band. That is backlog 0146's reading in its own
+    // words: a smeared blob with no bands at all. The stray count is printed
+    // beside it and is 0 on this fixture, because a purely radial resample of a
+    // radial sector pattern does not blend two sectors above the 8-bit floor.
+    let angle = ladder_capture(&mut r, &by_angle(LADDER));
+    let angle_flats: Vec<CaptureImage> = LADDER_INKS
+        .iter()
+        .map(|ink| ladder_capture(&mut r, &by_angle(&ladder_flat(*ink))))
+        .collect();
+    let smeared = (0..(SIZE * SIZE) as usize)
+        .filter(|&i| matching_inks(&angle, &angle_flats, i).is_empty())
+        .count();
+    // ...and on the ray itself the angle coordinate bands nothing at all, which
+    // is backlog 0146's reading in its own words: a smeared blob with no bands.
+    let mut angle_crossings = 0usize;
+    let mut previous: Vec<usize> = Vec::new();
+    for &i in &path {
+        let here = matching_inks(&angle, &angle_flats, i);
+        if !previous.is_empty() && !here.is_empty() && previous.iter().all(|k| !here.contains(k)) {
+            angle_crossings += 1;
+        }
+        previous = here;
+    }
+    println!(
+        "[warp_mesh ladder] ray crossings: level {crossings}, deposit angle \
+         {angle_crossings}; pixels that are none of the inks: level 0, deposit \
+         angle {smeared} of {}",
+        SIZE * SIZE
+    );
+    assert_eq!(
+        angle_crossings, 0,
+        "the deposit-angle path crossed between inks {angle_crossings} times along \
+         a ray, where it should cross none at all — its coordinate is the angle, \
+         which does not vary along one. If that changed, the comparison below \
+         stopped being the one backlog 0146 made"
+    );
+    assert!(
+        crossings > angle_crossings,
+        "the level path drew {crossings} rungs along the ray and the deposit-angle \
+         path {angle_crossings}. That difference is the whole of what the level \
+         coordinate adds"
+    );
+}
+
+/// **The echo colours once.** The level is read *after* the video echo mixes its
+/// two samples, so the echo mixes levels and the result is coloured one time: no
+/// blend of two inks can reach the frame. At `color_source = 0` the echo mixes
+/// two already-coloured samples and does produce blends.
+#[test]
+fn the_echo_mixes_levels_and_the_result_is_coloured_once() {
+    let Some(mut r) = common::headless(SIZE, SIZE) else {
+        return;
+    };
+
+    let ladder = ladder_capture(&mut r, &with_echo(LADDER));
+    let flats: Vec<CaptureImage> = LADDER_INKS
+        .iter()
+        .map(|ink| ladder_capture(&mut r, &with_echo(&ladder_flat(*ink))))
+        .collect();
+    let stray = (0..(SIZE * SIZE) as usize)
+        .filter(|&i| matching_inks(&ladder, &flats, i).is_empty())
+        .count();
+    assert_eq!(
+        stray, 0,
+        "{stray} pixels under echo_alpha = 0.5 are a value none of the four inks \
+         produces there. The echo is upstream of the level read, so it mixes \
+         levels rather than inks"
+    );
+
+    let angle = ladder_capture(&mut r, &with_echo(&by_angle(LADDER)));
+    let angle_flats: Vec<CaptureImage> = LADDER_INKS
+        .iter()
+        .map(|ink| ladder_capture(&mut r, &with_echo(&by_angle(&ladder_flat(*ink)))))
+        .collect();
+    let blended = (0..(SIZE * SIZE) as usize)
+        .filter(|&i| matching_inks(&angle, &angle_flats, i).is_empty())
+        .count();
+    assert!(
+        blended > 0,
+        "at color_source = 0 the same echo produced no blended value at all, so \
+         the level mode's not producing one says nothing"
+    );
+}

@@ -1,8 +1,8 @@
 # ADR-0179 — A precondition on a figure is checked at load, or it is written down
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-17, with an `Outcome`
 > **Date:** 2026-09-09
-> **Related plan(s):** [0160 — The silhouette's preconditions stop being silent](../plans/0160-the-silhouettes-preconditions-stop-being-silent.md)
+> **Related plan(s):** [0160 — The silhouette's preconditions stop being silent](../plans/done/0160-the-silhouettes-preconditions-stop-being-silent.md)
 > **Related:** [ADR-0107](0107-an-authored-path-is-inline-svg-data-and-it-morphs-by-resampling.md) (the authored path, and the two things it refuses by name),
 > [ADR-0111](0111-the-shape-field-gains-a-scaled-copy-coordinate.md) (the scaled-copy coordinate, whose precondition this is about),
 > [ADR-0020](0020-preset-grammar-v2-branching-functions-tempo.md) (the warn-but-load precedent: a preset degrades with a surfaced warning, it does not vanish)
@@ -110,3 +110,33 @@ next to the parameter it constrains, in terms of what the author must do about i
 - **Widen the roster instead**, adding the figures authors want as named arms whose preconditions are
   known. Rejected by ADR-0107, which took `[path]` precisely to stop answering only the asks someone
   has already had; this ADR is the cost of that decision arriving.
+
+## Outcome — 2026-09-17, at Plan 0160's close
+
+The rule stands and all four instances landed. Two things this ADR wrote are wrong, and both are
+recorded here rather than edited above, because an accepted ADR is append-only.
+
+**The test is `O(N²)`, not the `O(N)` the Decision claims.** `worst_ray_gap` casts **two rays per
+vertex** — at the vertex, and at the midpoint of the edge leaving it — and intersects each against
+**every** edge, so the cost is `2N²`: about 8,000 float operations at `MAX_SAMPLES = 64`, once, at
+parse. The Negative section's conclusion survives unchanged — that is still nothing beside the
+flatten and the resample already on that path — but the complexity the Decision states is not what
+was built, and the second ray per vertex is not an implementation detail: without it a vertex ray
+can land exactly on the boundary of a double-crossing interval and read a gap of zero, so the
+midpoint ray is what puts a sample inside the interval at all.
+
+**The centre is the bounding box's, not the centroid.** The Context says a koi *"is not star-shaped
+about its centroid"*, which reads as a claim about the centre the test uses. It is not: the
+normalization has already put the source drawing's bounding-box centre on the origin, and the
+shader's own ray starts from that origin, so the test is about the bounding box's centre. The two
+differ on any figure heavier on one side, and a test about the centroid would convict good figures
+and clear bad ones. `the_verdict_is_about_the_bounding_box_centre_and_not_the_centroid` pins the
+distinction on a thick `L` whose bounding-box centre sits in the notch while its area centroid sits
+inside the tall arm.
+
+One thing the ADR predicted and the plan measured: the tolerance the Negative section says *"this
+ADR does not fix"* came out at `0.02`, and the measurement found there is nothing to separate. Every
+contour this engine ships or tests with lands a factor of four clear of it either way — a figure
+every ray leaves once reads `0` to six decimal places, and the mildest real violation reads `0.40`.
+So the *"star-shaped by a hair"* case the ADR worried about does not occur among real figures, and
+the test asserts that emptiness rather than the number.

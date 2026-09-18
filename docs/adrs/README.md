@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0213.** *(0200 is reserved for [Plan 0186](../plans/0186-the-flatness-gate-tells-a-figure-from-its-ground.md) Phase 2, which writes it whichever way its stop gate falls.)* *(0120 was reserved for
+**Next free number: 0214.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -149,9 +149,9 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0125](0125-the-live-video-out-is-a-spout-sender-fed-by-a-frame-tap.md) | The live video-out is a Spout sender fed by a headless frame tap | accepted 2026-08-30 (Plan 0115), Outcome, refined by 0146 |
 | [0126](0126-the-sanity-lens-measures-departure-from-the-frames-own-ground.md) | The sanity lens measures departure from the frame's own ground, not from black | accepted 2026-08-26 (Plan 0116), Outcome; residue routed to 0128 |
 | [0127](0127-a-comment-carries-the-mechanism-and-the-decision-record-stays-in-docs.md) | A comment carries the mechanism, and the decision record stays in `docs/` | accepted 2026-08-27 (Plan 0118) |
-| [0128](0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md) | A tonally flat picture is a blot only if it is also structureless | accepted 2026-08-26 (Plan 0119), two Outcomes; completed by 0129, implemented by 0130, conjunction falsified by 0161 |
+| [0128](0128-a-tonally-flat-picture-is-a-blot-only-if-it-is-also-structureless.md) | A tonally flat picture is a blot only if it is also structureless | accepted 2026-08-26 (Plan 0119), two Outcomes; completed by 0129, implemented by 0130, falsified by 0161, repaired by 0200 |
 | [0129](0129-the-structural-term-is-measured-at-composition-scale-not-pixel-scale.md) | The structural term is measured at composition scale, not at pixel scale | accepted 2026-08-26 (Plan 0119), Outcome - Decision superseded by 0130, its stop condition stands |
-| [0130](0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md) | The structural term is boundary density, and conditioning the population is what made it work | accepted 2026-08-26 (Plan 0119), default floor arm falsified by 0161 |
+| [0130](0130-the-structural-term-is-boundary-density-and-conditioning-the-population-is-what-made-it-work.md) | The structural term is boundary density, and conditioning the population is what made it work | accepted 2026-08-26 (Plan 0119), default floor arm falsified by 0161, re-derived by 0200 |
 | [0131](0131-the-linux-standalone-captures-through-pulseaudios-simple-api.md) | The Linux standalone captures system audio through PulseAudio's simple API, on a third platform arm | proposed 2026-08-26 (Plan 0120) |
 | [0132](0132-a-rate-parameter-integrates-a-phase.md) | A rate parameter integrates a phase; multiplying scene time makes an audio-bound rate a teleport | accepted 2026-08-27 (Plan 0121), Outcome, extended by 0153 |
 | [0133](0133-the-band-contour-fires-where-the-ink-changes.md) | The band contour fires where the ink changes, and equality is the test | accepted 2026-08-27 (Plan 0121), Outcome |
@@ -161,7 +161,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0137](0137-a-latch-is-render-layer-state-and-its-name-resolves-to-a-slot-at-load.md) | A latch is render-layer state, and its name resolves to a slot at load | accepted 2026-08-28 (Plan 0123) |
 | [0138](0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md) | Limited ink is a supported palette class, defined at the draw seam | accepted 2026-08-28 (Plan 0123), Outcome |
 | [0139](0139-the-waveform-is-levelled-at-the-analyzer-and-publishes-its-gain.md) | The waveform is levelled at the analyzer, and it publishes the gain it removed | accepted 2026-08-28 (Plan 0127) |
-| [0140](0140-a-sample-budget-is-a-density-against-the-render-target.md) | An attractor's sample budget is a density against the render target, capped live and uncapped offline | accepted 2026-08-28 (Plan 0128), Outcome |
+| [0140](0140-a-sample-budget-is-a-density-against-the-render-target.md) | An attractor's sample budget is a density against the render target, capped live and uncapped offline | accepted 2026-08-28 (Plan 0128), amended by 0195, Outcome |
 | [0141](0141-one-artifact-store-serves-every-lane.md) | One artifact store serves every lane, and its config lives above the repo | accepted 2026-08-29 (Plan 0129), Outcome, superseded in part by 0147 |
 | [0142](0142-the-audio-input-is-switched-live-and-the-shell-owns-the-policy.md) | The audio input is switched live, and the shell owns the policy | accepted 2026-08-28 (Plan 0130), Outcome |
 | [0143](0143-the-operator-console-is-a-second-surface-and-the-shell-owns-its-meaning.md) | The operator console is a second surface on the render device, and the shell owns every pixel's meaning | accepted 2026-08-30 (Plan 0131), two Outcomes, supplemented by 0172 |
@@ -182,7 +182,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0158](0158-a-joined-end-carries-its-own-miter-length.md) | A joined end carries its own miter length, not a flag the shader expands by a half-width | accepted 2026-09-02 (Plan 0149), supersedes the geometry half of 0041, unblocked by 0160, Decision corrected before acceptance |
 | [0159](0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md) | The component gets its own size cap, and the recipe that builds it is what carries it | accepted 2026-09-02 (Plan 0148), Outcome, amends nfr.md 4 |
 | [0160](0160-the-stroke-is-measured-where-the-screen-is-isotropic.md) | The stroke is measured where the screen is isotropic, not in NDC | accepted 2026-09-02 (Plan 0149), supersedes the metric half of 0041, unblocks 0158 |
-| [0161](0161-the-blot-anchor-becomes-a-defect-record-because-term-two-reads-the-fringe.md) | The blot anchor becomes a defect record, because term two reads the fringe | accepted 2026-09-02 (Plan 0149), falsifies 0130's default floor arm |
+| [0161](0161-the-blot-anchor-becomes-a-defect-record-because-term-two-reads-the-fringe.md) | The blot anchor becomes a defect record, because term two reads the fringe | accepted 2026-09-02 (Plan 0149), falsifies 0130's default floor arm; superseded in part by 0200 |
 | [0162](0162-the-application-is-renamed-to-ritmolux.md) | The application is renamed to Ritmolux, and the record keeps the old name | accepted 2026-09-02 (Plan 0150), Outcome |
 | [0163](0163-a-long-document-carries-a-generated-contents-block.md) | A long document carries a generated contents block, and spent prose archives at the close | accepted 2026-09-04 (Plan 0151), extends 0116, extended by 0170 |
 | [0164](0164-the-osc-address-root-becomes-rlx-in-one-break.md) | The OSC address root becomes `/rlx`, in one break, and `/v1` does not move | accepted 2026-09-05 (Plan 0152), extends 0144 |
@@ -200,13 +200,13 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0176](0176-the-player-is-driven-over-osc-control-in-and-reports-on-its-standard-streams.md) | The player is driven over OSC control-in, and reports on its standard streams | accepted 2026-09-10 (Plan 0158), extends 0164 |
 | [0177](0177-a-fourth-skill-lane-builds-the-studio.md) | A fourth skill lane, `studio-builder`, builds the studio and never touches the engine | accepted 2026-09-10 (Plan 0159), extends 0017; amended by 0188 |
 | [0178](0178-the-studio-shell-conventions.md) | The studio shell conventions: three processes, a mirrored protocol, and the same security defaults as the sibling repository | accepted 2026-09-10 (Plan 0159); Outcome |
-| [0179](0179-a-precondition-is-checked-at-load-or-it-is-written-down.md) | A precondition on a figure is checked at load, or it is written down | proposed 2026-09-09 (Plan 0160), extends 0107, 0111 |
+| [0179](0179-a-precondition-is-checked-at-load-or-it-is-written-down.md) | A precondition on a figure is checked at load, or it is written down | accepted 2026-09-17 (Plan 0160), extends 0107, 0111, Outcome |
 | [0180](0180-a-mathematical-world-joins-a-system-as-a-family-and-a-structural-parameter-is-held.md) | A mathematical world joins a system as a family, and a structural parameter is quantized and held | accepted 2026-09-10, fully built 2026-09-11 (Plans 0161-0164), extends 0007, 0015, Outcome |
 | [0181](0181-the-gate-compiles-every-feature-a-release-ships.md) | The per-push gate compiles every feature a release ships | accepted 2026-09-10 (Plan 0165); Outcome |
 | [0182](0182-a-plan-lane-may-live-inside-the-repository.md) | A plan lane may live inside the repository, and a tool that enumerates from git already knows it | accepted 2026-09-10 (Plan 0165), supplements 0053 |
 | [0183](0183-the-studio-drives-one-player-and-the-show-loop-is-extracted.md) | The studio drives one player, and the show loop is extracted so every mode runs it | accepted 2026-09-10 (Plan 0159), revises 0175; Outcome |
 | [0184](0184-the-player-reports-what-it-loaded-and-the-studio-re-derives-nothing.md) | The player reports what it loaded, and the studio re-derives nothing | accepted 2026-09-10 (Plan 0159), extends 0176 |
-| [0185](0185-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md) | The documentation translates a slice, and a stamp makes staleness visible | accepted 2026-09-17 (Plan 0166), extends 0154, 0167 |
+| [0185](0185-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md) | The documentation translates a slice, and a stamp makes staleness visible | accepted 2026-09-17 (Plan 0166), extends 0154, 0167; amended by 0213 |
 | [0186](0186-the-studios-player-mode-is-a-per-machine-setting.md) | The studio's player mode is a per-machine setting, and the windowless path is a peer | accepted 2026-09-11 (Plan 0167), amends 0183 |
 | [0187](0187-the-preview-pipe-has-a-fixed-shape-and-names-its-true-format.md) | The preview pipe has a fixed shape and names the format it actually carries | accepted 2026-09-11 (Plan 0167), revises 0176, Outcome |
 | [0188](0188-the-two-implementer-lanes-hand-off-automatically.md) | The two implementer lanes hand off to each other automatically, and every other seam stays manual | accepted 2026-09-10 (no plan), amends 0177; superseded in part by 0205 |
@@ -216,11 +216,12 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0192](0192-a-preset-warning-names-its-parameter.md) | A preset warning names the parameter it is about | accepted 2026-09-14 (Plan 0172; Outcome), extends 0176 |
 | [0193](0193-a-test-that-reads-the-clock-runs-alone.md) | A test that reads the clock runs alone, and the lint exemption that marks it is what selects it | accepted 2026-09-14 (Plan 0174), Outcome; extends 0173; extended by 0204, 0205 |
 | [0194](0194-a-family-dependent-range-travels-in-the-schema-and-the-player-reports-the-family.md) | A family-dependent range travels in the schema, and the player reports the family | accepted 2026-09-16 (Plan 0179) |
-| [0195](0195-a-low-density-is-a-trace-count-and-the-law-scales-only-a-cloud.md) | A low `density` is a trace count, and the density law scales only a cloud | proposed (Plan 0183), amends 0140 |
+| [0195](0195-a-low-density-is-a-trace-count-and-the-law-scales-only-a-cloud.md) | A low `density` is a trace count, and the density law scales only a cloud | accepted 2026-09-17 (Plan 0183), amends 0140 |
 | [0196](0196-the-report-hears-the-musical-clock-in-a-column-of-its-own.md) | The report hears the musical clock in a column of its own, and every existing column keeps its stimulus | accepted 2026-09-15 (Plan 0182; Outcome), supplements 0134 |
-| [0197](0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md) | The band contour can be a hard ink, and the warp field can be coloured by its own level | proposed (Plan 0184), supplements 0133 |
+| [0197](0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md) | The band contour can be a hard ink, and the warp field can be coloured by its own level | accepted 2026-09-17 (Plan 0184), Outcome; supplements 0133 |
 | [0198](0198-a-scene-advances-after-its-frames-bindings.md) | A scene advances after its frame's bindings, and a shared scene is never evaluated twice in a frame | accepted 2026-09-15 (Plan 0181), Outcome; extends 0135 |
 | [0199](0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md) | A converted waveform draws the released source's figure at the scale its host renders, from a stereo pair the analyzer already receives | accepted 2026-09-16 (Plan 0180), extends 0139, Outcome |
+| [0200](0200-the-flatness-conjunctions-second-term-reads-the-reference-a-role-classifier-assigns.md) | The flatness conjunction's second term reads the reference a role classifier assigns | accepted 2026-09-17 (Plan 0186), supersedes 0161 in part; extends 0128, 0129, 0130 |
 | [0201](0201-a-fullscreen-scene-presents-premultiplied-over-the-backdrop.md) | A fullscreen scene presents premultiplied over the backdrop, and the chain's occlude value is the only switch | accepted 2026-09-15 (Plan 0185), extends 0026, 0085 |
 | [0202](0202-a-written-count-of-the-systems-is-refused-by-a-gate.md) | A written-out count of the systems is refused by a gate, and the threshold is five | proposed (Plan 0178), extends 0168 |
 | [0203](0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md) | A release tag is annotated, and what gets checked is whether origin has it | accepted 2026-09-14 (Plan 0176), extends 0038 |
@@ -233,4 +234,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0210](0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md) | A `.claude/` repair is the owner's, and a session that needs one parks with the edit | accepted 2026-09-16 (Plan 0190), supersedes 0209 in part |
 | [0211](0211-a-green-suite-record-serves-a-later-tree-when-no-deferred-suite-can-read-the-diff.md) | A green suite record serves a later tree when no deferred suite can read the diff | accepted 2026-09-16 (Plan 0191), amends 0207 |
 | [0212](0212-a-converted-preset-gets-its-own-vertex-module-and-the-pipeline-is-chosen-not-branched.md) | A converted preset gets its own vertex module, and the pipeline is chosen rather than branched | accepted 2026-09-16 (Plan 0180), Outcome |
+| [0213](0213-the-russian-slice-stays-a-section-and-gets-a-header-control.md) | The Russian slice stays a section, and gets a header control | proposed, amends 0185 |
 <!-- roster:end -->

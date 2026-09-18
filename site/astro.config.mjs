@@ -170,14 +170,25 @@ function translationCrossLink() {
 
     const label = ru ? 'In English' : 'Читать по-русски';
     const at = tree.children[0]?.type === 'heading' && tree.children[0].depth === 1 ? 1 : 0;
+    // A blockquote rather than a bare paragraph: Starlight gives it a left rule
+    // and a tinted ground, so the one affordance a reader has for finding the
+    // other language reads as a control rather than as the page's first
+    // sentence. It was a plain link until 2026-09-17, and the owner reported not
+    // finding it. There is no header picker to compete with - that needs the
+    // locale migration this site has not made.
     tree.children.splice(at, 0, {
-      type: 'paragraph',
+      type: 'blockquote',
       children: [
         {
-          type: 'link',
-          url: `${BASE}${entry.route}/`,
-          title: entry.title,
-          children: [{ type: 'text', value: label }],
+          type: 'paragraph',
+          children: [
+            {
+              type: 'link',
+              url: `${BASE}${entry.route}/`,
+              title: entry.title,
+              children: [{ type: 'strong', children: [{ type: 'text', value: label }] }],
+            },
+          ],
         },
       ],
     });

@@ -454,6 +454,7 @@ fn build_present(
     device: &wgpu::Device,
     surface_format: wgpu::TextureFormat,
     common: &Common,
+    luts: &palette::LutPair,
 ) -> PresentParts {
     let Common {
         present_shader,
@@ -467,6 +468,12 @@ fn build_present(
     //
     // Uniform first and sized, which separates this from `ink-bind-layout`'s
     // unsized `[Uniform, Texture, Sampler]` (ADR-0058).
+    //
+    // The **deposit's** A/B LUT pair and its sampler ride here too, because at
+    // `color_source = 1` the palette is read in this pass instead of that one
+    // (ADR-0197). One layout for both modes rather than two pipelines: the mode
+    // is a uniform branch in the fragment, and a second pipeline would be a
+    // second layout to keep off every other one's shape.
     let present_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("warp-mesh-present-layout"),
         entries: &[
@@ -484,26 +491,35 @@ fn build_present(
             },
             gpu::texture(1, true),
             gpu::sampler(2),
+            gpu::texture(3, true),
+            gpu::texture(4, true),
+            gpu::sampler(5),
         ],
     });
     let present_bind_group = |view: &wgpu::TextureView| {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("warp-mesh-present-bg"),
             layout: &present_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: present_uniform.as_entire_binding(),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::Sampler(sampler),
-                },
-            ],
+            entries: &{
+                let [lut_a, lut_b, lut_sampler] = luts.bind_entries(3, 4, 5);
+                [
+                    wgpu::BindGroupEntry {
+                        binding: 0,
+                        resource: present_uniform.as_entire_binding(),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 1,
+                        resource: wgpu::BindingResource::TextureView(view),
+                    },
+                    wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: wgpu::BindingResource::Sampler(sampler),
+                    },
+                    lut_a,
+                    lut_b,
+                    lut_sampler,
+                ]
+            },
         })
     };
     let present_bg_a = present_bind_group(field.view_a());
@@ -657,7 +673,7 @@ impl Resources {
         let common = build_common(device, size);
         let warp = build_warp(device, &common);
         let deposit = build_deposit(device, &common);
-        let present = build_present(device, surface_format, &common);
+        let present = build_present(device, surface_format, &common, &deposit.luts);
         let draw = build_draw_layer(device, surface_format, max_segments);
 
         let Common {

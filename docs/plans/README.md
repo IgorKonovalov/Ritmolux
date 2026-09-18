@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0192** (ADRs are a separate sequence — next free there is **0213**; 0200 is reserved for Plan 0186 Phase 2.)
+**Next free number: 0193** (ADRs are a separate sequence — next free there is **0214**; 0200 is reserved for Plan 0186 Phase 2.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -40,15 +40,12 @@ place. The plan file carries the real link.
 <!-- roster:begin cap=320 -->
 | Plan | Title | Status | Owner | Live constraint |
 |------|-------|--------|-------|-----------------|
-| [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | approved | dev, human | Phase 1 fixes backlog 0102 + 0103 (`viz_session.cpp`, `host_window.cpp`) first. Phase 5's wait on 0176 is discharged - a tag reaches origin, and a gate reads it. Phase 4 shrinks to topics + preview. |
+| [0103](0103-the-project-gets-an-audience.md) | The project gets an audience | in-progress | dev, human | Phases 1-4 done on its branch; closes there. Phases 5-6 left on 2026-09-18 for [0192] - a submission needs a release of Phase 1's own fix, which only exists after this plan merges. |
+| [0192](0192-the-component-reaches-its-audience.md) | The component reaches its audience | draft | human | 0103's Phases 5-6 plus the release they stand on. Push ONE tag: the pipeline has published nothing since v0.126.0, two runs red on the foobar job and three tags with no run. |
 | [0120](0120-the-standalone-ships-on-ubuntu.md) | The standalone ships on Ubuntu | approved | dev, human | ADR-0131 (proposed): PulseAudio capture + an `ubuntu-latest` CI arm. **Phase 1 is a `human` stop gate before `dev`.** Guard is 5 zips + 1 tarball; folds backlog 0181 (Linux arm) + 0208. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + 0174 (proposed): Art-Net verified against `rlx-artnet-sim`. **Phase 8 opens on a decision** - 0115's tap is headless-only, and a windowed resolve is an ADR. Phase 9 is the rig. |
 | [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. **0180 landed and moved both ends of its chain.** Amended 2026-09-16. Needs the rig. |
-| [0160](0160-the-silhouettes-preconditions-stop-being-silent.md) | The silhouette's preconditions stop being silent | approved | dev, human | ADR-0179: four silent `[path]` preconditions. **Amended 2026-09-14:** optional Phase 1b folds in backlog 0217 (arity probe re-prices a polyline). Phase 2 is prose. |
 | [0178](0178-what-the-operator-reads-is-true.md) | What the operator reads is true | approved | dev, human | Backlog 0172, 0185, 0207, 0208 + ADR-0202 (proposed): drift line, `--list-presets`, banner, recovery line, count gate. **0176 and 0166 both landed.** Phase 5 `human` settles 0203. |
-| [0183](0183-a-low-density-is-a-trace-count.md) | A low density is a trace count | approved | dev, human | ADR-0195 (proposed): a trace (density <= 0.08) draws the tier anchor's count at every size; clouds keep ADR-0140. **No golden moves.** Phase 3 is a `human` look gate at 1080p Rich. |
-| [0184](0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) | Limited ink: a contour that is an ink, and a warp field that bands | approved | dev, human | ADR-0197 (proposed): hard ink contours on six scenes; `warp_mesh` bands by level. **Phase 2 stops if level outgrows `color_span`.** Phase 4: look gate. |
-| [0186](0186-the-flatness-gate-tells-a-figure-from-its-ground.md) | The flatness gate tells a figure from its ground | approved | dev, human | Backlog 0128: five figure/ground candidates vs two blot anchors at 96 and 192 px. **Phase 2 is a human gate that writes ADR-0200**; a negative result is a valid end. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
@@ -71,7 +68,7 @@ it. The note is [in the archive](README-archive.md#prior-sequencing-notes-supers
 
 [0158]: done/0158-the-player-grows-a-studio-facing-surface.md
 [0159]: done/0159-the-studio-opens.md
-[0160]: 0160-the-silhouettes-preconditions-stop-being-silent.md
+[0160]: done/0160-the-silhouettes-preconditions-stop-being-silent.md
 [0161]: done/0161-the-structural-parameter-is-held.md
 [0162]: done/0162-the-curve-families.md
 [0163]: done/0163-the-analytic-field.md
@@ -298,10 +295,14 @@ naming what moved. The order:
 - **Engine lane.** [0181], [0185] and then [0175] closed 2026-09-15, and none moved a golden.
   [0180] parked `plan_wrong` on 2026-09-14 and was amended on its lane branch 2026-09-15; resuming it
   is next. The opening this replaced is [in the archive](README-archive.md). [0180] runs before [0142]: 0180 re-draws the
-  waveform 0142's wash is measured on and needs no rig. After those, [0184], [0183],
-  [0186], in any order that keeps each bless set clean. [0179] closed 2026-09-16.
+  waveform 0142's wash is measured on and needs no rig. ~~[0186] closed 2026-09-17 having edited no
+  preset and blessed no golden, so it constrains nothing and [0184] is what is left of that pair.~~ -
+  **spent 2026-09-17**, when [0184] closed behind [0186] the same day. Neither blessed a golden; 0184
+  landed two presets and re-rendered two gallery cards, which is the whole of what that pair left
+  behind.
+  [0179] closed 2026-09-16 and [0183] 2026-09-17, moving no baseline.
   [0182] closed 2026-09-15 ahead of them; it touched only the report, so it constrains none.
-- **Still gated on a human:** [0120] Phase 1, [0133] Phase 9 and [0103] Phases 4-6. [0166] Phase 3
+- **Still gated on a human:** [0120] Phase 1, [0133] Phase 9 and all three phases of [0192]. [0103] Phase 4 is discharged - the owner set the topics and the social preview on 2026-09-18. [0166] Phase 3
   is discharged - the owner read the five translations on 2026-09-16, 44 corrections.
 - **All eleven approved 2026-09-14 with [0175], and [0181]'s reversal of an interview pick confirmed.** Backlog 0142's double-advance is
   unreachable - `shares_resources` answers true for any same-system pair, so every such dissolve
@@ -318,10 +319,10 @@ naming what moved. The order:
 [0180]: done/0180-the-converted-picture-follows-the-source.md
 [0181]: done/0181-a-scene-advances-after-its-frames-bindings.md
 [0182]: done/0182-the-report-hears-a-counter.md
-[0183]: 0183-a-low-density-is-a-trace-count.md
-[0184]: 0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md
+[0183]: done/0183-a-low-density-is-a-trace-count.md
+[0184]: done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md
 [0185]: done/0185-a-fullscreen-field-lets-the-sky-through-with-no-post-stage.md
-[0186]: 0186-the-flatness-gate-tells-a-figure-from-its-ground.md
+[0186]: done/0186-the-flatness-gate-tells-a-figure-from-its-ground.md
 [0174]: done/0174-the-clock-reading-tests-run-alone.md
 [0175]: done/0175-an-eased-value-arrives.md
 [0120]: 0120-the-standalone-ships-on-ubuntu.md
@@ -858,6 +859,10 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0160 - The silhouette's preconditions stop being silent](done/0160-the-silhouettes-preconditions-stop-being-silent.md) - closed 2026-09-17. Review: **no blockers, no majors, three minors, three nits (all fixed).** Version: **0.130.1**. ADR-0179 accepted, Outcome. Closed backlog 0217. [Write-up](README-archive.md).
+- [0186 - The flatness gate tells a figure from its ground](done/0186-the-flatness-gate-tells-a-figure-from-its-ground.md) - closed 2026-09-17. Review: **no blockers, no majors, three minors, one nit (all fixed).** Version: **0.129.0**. ADR-0200 accepted. Closed backlog 0128; filed 0248. [Write-up](README-archive.md).
+- [0184 - Limited ink: a contour that is an ink](done/0184-a-contour-that-is-an-ink-and-a-warp-field-that-bands.md) - closed 2026-09-17. Review: **no blockers, no majors, one minor, one nit.** Version: **0.130.0**. ADR-0197 accepted, Outcome. Closed backlog 0140, 0146; filed 0251. [Write-up](README-archive.md).
+- [0183 - A low density is a trace count](done/0183-a-low-density-is-a-trace-count.md) - closed 2026-09-17. Review: **no blockers, no majors, two minors, one nit (all fixed).** Version: **0.128.1** (patch). ADR-0195 accepted. Archived backlog 0186. [Write-up](README-archive.md).
 - [0180 - The converted picture follows the source](done/0180-the-converted-picture-follows-the-source.md) - closed 2026-09-16. Review: **one blocker (fixed), no majors, six minors, four nits.** Version: **0.127.0**. ADR-0199 + 0212 accepted, Outcomes. Archived 0214-0216; filed 0244-0245. [Write-up](README-archive.md).
 - [0179 - A parameter's range belongs to its family](done/0179-a-parameters-range-belongs-to-its-family.md) - closed 2026-09-16. Review: **no blockers, no majors, one minor, one nit.** Version: **0.126.0**. ADR-0194 accepted. Archived 0198, 0204. [Write-up](README-archive.md).
 - [0191 - A green tree is not tested four times](done/0191-a-green-tree-is-not-tested-four-times.md) - closed 2026-09-16. Review: **no blockers, no majors, one minor, two nits (both fixed).** Version: **none** (tooling). ADR-0211 accepted. Archived 0227. [Write-up](README-archive.md).
@@ -1108,6 +1113,7 @@ Later, unordered: better tempo tracking, preset sharing/library, signed installe
 [0101]: done/0101-the-engine-renders-a-music-video.md
 [0102]: done/0102-the-component-ships.md
 [0103]: 0103-the-project-gets-an-audience.md
+[0192]: 0192-the-component-reaches-its-audience.md
 [0104]: done/0104-the-library-stops-being-lopsided.md
 [0115]: done/0115-the-engine-becomes-a-live-video-source.md
 [0123]: done/0123-a-gate-a-latch-and-an-ink.md

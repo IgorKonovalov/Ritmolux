@@ -21,7 +21,14 @@ the decision that moved it is linked.
   anchor of `clamp(round(anchor * target_px / 230400), anchor, ceiling)`, resolved per target size
   rather than once at construction, against a frame-time ceiling in a window and a larger
   memory-bound one under `shot --render`. The *allocation* is still made once, at the ceiling, so a
-  resize moves the drawn count and rebuilds no GPU resource. `Floor`'s live ceiling **is** its
+  resize moves the drawn count and rebuilds no GPU resource. **That law scales a cloud and not a
+  trace.** Since
+  [ADR-0195](adrs/0195-a-low-density-is-a-trace-count-and-the-law-scales-only-a-cloud.md) a
+  `[particles] density` at or below `0.08` takes its fraction of the **anchor** instead, so a sparse
+  world draws the same number of trajectories at every target size; at or above `0.16` the
+  target-scaled budget is what the fraction is taken of, unchanged; between the two the effective
+  budget blends linearly. The budget itself never moves, so this lowers the drawn count at a large
+  target and never raises it. `Floor`'s live ceiling **is** its
   anchor, which is what keeps this section's floor commitment true at every target size.
   The values are capacities read at resource-construction time, so a change
   rebuilds GPU resources and costs one visible re-accumulation of trails and feedback; nothing
@@ -368,7 +375,10 @@ All four are v1 requirements, delivered as their own plan after the [Plan 0001](
 - Settings persistence (last scene, window size/position/mode — small config file; the quality
   tier already persists via `[quality] tier`).
 
-## 12. Runtime memory (added 2026-07-21; retargeted 2026-07-22 per [ADR-0010](adrs/0010-accept-gpu-driver-memory-floor.md))
+## 12. Runtime memory
+
+Added 2026-07-21 and retargeted 2026-07-22 per
+[ADR-0010](adrs/0010-accept-gpu-driver-memory-floor.md).
 
 "Lightweight" (NFR §4) caps *binary* size but not *working set*. The original §12 target — "well under
 ~100 MB", to be hit primarily by compiling wgpu with only the per-OS backend — was **measured and

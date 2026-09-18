@@ -416,6 +416,8 @@ pub const PARAMS: &[ParamSpec] = &[
     common::PALETTE_MIX,
     common::PALETTE_STEPS,
     common::PALETTE_CONTOUR,
+    common::PALETTE_CONTOUR_STYLE,
+    common::PALETTE_CONTOUR_INK,
 ];
 
 /// One row of [`FAMILY_PARAMS`], its ranges in [`FieldFamily::ALL`]'s order.
@@ -470,6 +472,7 @@ struct Params {
     f: [f32; 4],
     g: [f32; 4],
     h: [f32; 4],
+    i: [f32; 4],
 }
 
 /// The fullscreen analytic field, driven by named preset parameters and one
@@ -749,6 +752,12 @@ impl Scene for AnalyticFieldScene {
                 // Whole turns to radians; `fract` keeps a long-running bound
                 // angle from losing precision without moving the picture.
                 std::f32::consts::TAU * bounded(self.trap_rotate, -1e6, 1e6, 0.0).fract(),
+                0.0,
+            ],
+            i: [
+                palette::band_contour_style(self.colour.contour_style),
+                self.colour.contour_ink,
+                0.0,
                 0.0,
             ],
         };
