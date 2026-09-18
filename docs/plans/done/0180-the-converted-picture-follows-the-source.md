@@ -17,7 +17,7 @@
 > [0139](../../adrs/0139-the-waveform-is-levelled-at-the-analyzer-and-publishes-its-gain.md),
 > [0071](../../adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)
 > **Closes:** design-backlog 0214, 0215, 0216
-> **Runs before:** [Plan 0142](../0142-the-milkdrop-import-earns-its-verdict.md), all of it (see Decision)
+> **Runs before:** [Plan 0142](0142-the-milkdrop-import-earns-its-verdict.md), all of it (see Decision)
 
 > **Amended 2026-09-15** after Phase 3 parked `plan_wrong`. The changes:
 > - **Phase 3 is re-specified.** `vs_main` serves native and converted presets alike, so Phase 1's
@@ -36,7 +36,7 @@
 > Phase 4 found that `milkconv` emits a `[params]` comment saying the scene's deposit stays off and
 > never emits the key, so `DEFAULT_DEPOSIT = 1.6` draws a ring into every converted preset. It
 > recorded the finding and held the one-line repair back, on the ground that the light is a term in
-> the settled field level [Plan 0142](../0142-the-milkdrop-import-earns-its-verdict.md) Phase 2
+> the settled field level [Plan 0142](0142-the-milkdrop-import-earns-its-verdict.md) Phase 2
 > measures. **The close reverses that call**, for three reasons it had evidence for and the phase
 > did not:
 > - **The sequencing argument runs the other way.** Plan 0142 has not measured anything. Its Phase 2

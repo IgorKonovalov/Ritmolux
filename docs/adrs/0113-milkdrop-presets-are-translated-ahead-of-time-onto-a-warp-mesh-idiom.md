@@ -222,7 +222,7 @@ which washes or inverts every feedback-heavy preset. The one pair whose tone sur
 question is re-judged after 0106 lands; conversion fidelity itself was judged *mostly there, with
 defects* (0106–0108), and the provenance question (Phase 8) was deferred with nothing shipping.
 
-## Outcome (2026-09-18, at [Plan 0142](../plans/0142-the-milkdrop-import-earns-its-verdict.md)'s look gate — the third re-take)
+## Outcome (2026-09-18, at [Plan 0142](../plans/done/0142-the-milkdrop-import-earns-its-verdict.md)'s look gate — the third re-take)
 
 **The decision stands. The claim still does not read "better" — and what says so is no longer one
 defect.** The sentence being updated is the Outcome above's: **"merely different, not better"**,

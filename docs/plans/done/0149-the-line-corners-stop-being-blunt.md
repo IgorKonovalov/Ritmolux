@@ -146,7 +146,7 @@ carries the `/ aspect`. `width` and `ext_*` become world half-widths — a chang
 layout, so the instance stays 44 bytes. The producer's world-space `theta` is then the angle the
 shader extends along and [ADR-0158] needs no amendment. `warp_mesh` keeps the clip metric, selected
 per draw call through the segment uniform's documented-unused `v.w` lane, because
-[Plan 0142](../0142-the-milkdrop-import-earns-its-verdict.md) is about to take `foo_vis_milk2` readings
+[Plan 0142](0142-the-milkdrop-import-earns-its-verdict.md) is about to take `foo_vis_milk2` readings
 on it and its stroke weight must not move between the question and the answer.
 
 We rejected **handing the miter the aspect instead** (a bisector or neighbour direction on the
@@ -281,7 +281,7 @@ flowchart LR
 - **`warp_mesh` renders exactly what it renders today.** Its four baselines are unmoved and
   unblessed, and `milkconv/tests/draw_layer.rs` still passes unchanged. Its two call sites pass the
   clip metric with a comment naming
-  [Plan 0142](../0142-the-milkdrop-import-earns-its-verdict.md) as the revisit trigger and ADR-0160 as
+  [Plan 0142](0142-the-milkdrop-import-earns-its-verdict.md) as the revisit trigger and ADR-0160 as
   the reason — and stating the open possibility that the clip metric is *correct* there rather than
   merely deferred, which nobody has measured.
 - **`WIDTH_SCALE` does not move in this phase.** Every stroke gets thinner — the factor is `1.00`
@@ -629,7 +629,7 @@ pub struct SegmentInstance {
   extension as a cap on a zero-length segment rather than as a join.
 - **It does not draw an inward scallop.** Phase 3 refuses one.
 - **It does not change `warp_mesh`'s stroke metric.** Phase 2a scopes it out and gates the question
-  on [Plan 0142](../0142-the-milkdrop-import-earns-its-verdict.md), which is about to take
+  on [Plan 0142](0142-the-milkdrop-import-earns-its-verdict.md), which is about to take
   `foo_vis_milk2` readings on that surface. Whether the clip metric is *correct* there — MilkDrop
   authors in a square space and may be anisotropic on screen itself — is unverified and is that
   plan's to answer, not this one's.
@@ -1048,7 +1048,7 @@ that is the accepted look rather than an unexamined consequence.
 - Whether any roster figure reaches below the 28.96-degree miter limit; if none does, the clamp arm
   needs a synthetic fixture.
 - The ~4.8 MB `segments` / `single_buf` allocation that predates Plan 0087, still unexamined.
-- **`warp_mesh`'s stroke metric, at [Plan 0142](../0142-the-milkdrop-import-earns-its-verdict.md)'s
+- **`warp_mesh`'s stroke metric, at [Plan 0142](0142-the-milkdrop-import-earns-its-verdict.md)'s
   close.** Phase 2a leaves it on the clip metric so its `foo_vis_milk2` readings are taken on an
   unmoved instrument. Once they exist, the question is whether the clip metric is what matches the
   reference — MilkDrop authors in a square space and may be anisotropic on screen itself — or

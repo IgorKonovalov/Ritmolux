@@ -1165,13 +1165,13 @@ there.
 ### Priority
 
 *(Updated 2026-09-15: 0106/0107 landed with Plan 0108, so the gate below has expired; the re-rank
-now waits on [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md) Phase 6, which names
+now waits on [Plan 0142](plans/done/0142-the-milkdrop-import-earns-its-verdict.md) Phase 6, which names
 this entry and does not take it.)*
 
 **Low until 0106/0107 land** — the blank list is contaminated by both, so counting it again first
 is wasted; re-run `--render` after they land and re-rank.
 
-**Re-ranked 2026-09-18**, by [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md) Phase 6,
+**Re-ranked 2026-09-18**, by [Plan 0142](plans/done/0142-the-milkdrop-import-earns-its-verdict.md) Phase 6,
 which names this entry and does not take it. The line above pointed at a gate that had already
 expired, so this replaces it as the live priority.
 
@@ -1274,7 +1274,7 @@ presets read as better or merely different is exactly the evidence for how much 
 
 ### The go/no-go, third time — **no-go, 2026-09-18**
 
-[Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md) Phase 4 re-ran the seven pairs
+[Plan 0142](plans/done/0142-the-milkdrop-import-earns-its-verdict.md) Phase 4 re-ran the seven pairs
 against `foo_vis_milk2` 0.2.0.0 (DX11), and
 [ADR-0113](adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)'s third
 `Outcome` records what the user read: **one pair better, two good, one fixed, two still washed at the
@@ -2224,7 +2224,7 @@ half of the question — it is a property of how a sample reaches the draw, whic
 **Low.** Nothing is wrong on screen: a custom wave draws where its program puts it, which is a
 defensible reading of the reference either way. It matters only when someone compares a converted
 preset's custom wave against `foo_vis_milk2` side by side and finds it thinner or smaller — which is
-[Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md) Phase 4's session, and the reason to
+[Plan 0142](plans/done/0142-the-milkdrop-import-earns-its-verdict.md) Phase 4's session, and the reason to
 have this written down before that session runs.
 
 ## 0245 — the converted warp space has no pixel baseline, because every golden fixture is square and the two chains are identical there

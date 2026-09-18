@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0142 - The MilkDrop import earns its verdict](#0142---the-milkdrop-import-earns-its-verdict)
   - [0103 - The project gets an audience](#0103---the-project-gets-an-audience)
   - [0178 - What the operator reads is true](#0178---what-the-operator-reads-is-true)
   - [0160 - The silhouette's preconditions stop being silent](#0160---the-silhouettes-preconditions-stop-being-silent)
@@ -231,6 +232,69 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0142 - The MilkDrop import earns its verdict](done/0142-the-milkdrop-import-earns-its-verdict.md)
+
+- closed 2026-09-18, conductor-run lane `plan-0142-the-milkdrop-import-earns-its-verdict` in
+`WORK/rlx-plan-0142`. Six phases: `20ba8731`, `cc2488cd`, `42b4bb97`, `15514a8a` (the `human` rig
+session), `7299cc90` and `9d149505`, plus `f43a2257`, the close review's four record repairs.
+Round-1 verdict: **no blockers, no majors, five minors and one nit**, four repaired at the close and
+two left open. Version **0.131.2** (patch). ADR-0113 gained its **third** `Outcome` and ADR-0199 one
+of its own; backlog 0113 and 0124 closed, 0109 and 0108 given dated updates and left live.
+**Approved 2026-09-14 and re-amended twice before it ran** — once at a validity sweep and once at
+Plan 0180's close, which moved the measurement subject rather than only the pictures.
+- **What landed, and the chain it was built as.** *Fix the wash, re-take the verdict, let the
+verdict decide backlog 0109.* Phase 1 extended Plan 0111's instrument from one frame at each seam to
+four checkpoints, a settled band, its half-spread and the present-pass gain — the defect is an
+**equilibrium**, and a single frame is exactly what made a seam look clean. Phase 2 stopped inferring
+the reference from pictures and **read its source**, `xeiraex/milkdrop2` at `d4c843a`, citing file,
+function and line and copying nothing: MilkDrop's feedback field is a plain 8-bit `D3DFMT_X8R8G8B8`
+target that linearizes nowhere, and it carries `fDecay` to the hardware through `D3DCOLOR_RGBA_01`,
+which **truncates** — so `0.98` was always applied as `249/255`. Two divergences in one term, both
+amplified by `1/(1 - d)`: the truncation (`42.50` against `50.00`) and the domain (`50.00` against
+`109.4`). Phase 3 repaired both, `encode::milk_decay` on the CPU and `rlx_milk_decay` in the warp
+fragment, **gated on `quantize_steps`** rather than on the presence of a bundle. Phase 4 ran the rig.
+Phases 5 and 6 wrote the verdict and the reach decision.
+- **The verdict, which is the plan's actual product.** Of the seven pairs against `foo_vis_milk2`
+0.2.0.0 (DX11): **one better**, **two good**, **one fixed**, **two still washed at the ground**, **one
+wrong on structure**. So the founding claim is still **not carried by the set** — but what moved is
+the qualifier. *Fog Tunnel*, the plan's own subject, read "still washed" at both earlier gates and
+now reads fixed. And each of the three that still read wrong names a **different** mechanism: a
+per-frame deposit against a per-second transform rate at 164-165 fps; *Songflower*'s echo, which is
+bound and is not nesting (`fDecay = 1.000`, so no wash repair can reach it); and a waveform scale
+confirmed on one mode only. **A fourth gate has routes rather than a re-ask**, which is the substantive
+difference between this "no" and the two before it. Backlog 0109 is unbought for the third time by a
+verdict rather than by nobody picking it up.
+- **Two measurements that came back against their own predictions, both recorded rather than
+buried.** Phase 2's arithmetic predicted a `2.6x`-`7.0x` fall at the field; the instrument read
+`1.572x`. The `s/(1 - d)` form assumes the warp resample's dominant eigenvalue is 1 — true of a still
+field, not of a subject whose `zoom = 1.042`; solving the measured ratio for it gives about `0.948`
+at the edge ring. The mechanism and the direction stand and the magnitude was an upper bound, which
+is what the log says. And the **mode-0 capture ADR-0199 asked for refutes that ADR's own inference**:
+`k ~ 0.068` against the `0.158` fitted on mode 6, a ratio of `0.43`, stable to ~0.5 % over two
+captures. The absolute figure is bounded (MilkDrop gains the waveform before drawing, so full-scale
+in is not a unit sample at the draw call); the **ratio** is what refutes, and it now sits in
+ADR-0199's `Outcome`.
+- **What the close had to repair, and one thing it deliberately did not.** Four records: the
+instrument's own measurement table, which Phase 1 wrote and Phase 3 falsified without coming back
+(`0.13559258` where the tree now reads `0.08623820`); ADR-0199's unwritten `Outcome`;
+`docs/milkdrop-conversion.md`'s rate section, still saying a factor merely becomes `v^30`; and the
+gate comment's account of ADR-0118's Alternative D. **Left open and worth carrying:**
+`the_field_fades_at_the_references_own_rate` builds its `reference` from the **untruncated** factor
+and restates `measured` through a `2.2` power where the shader uses sRGB's piecewise curve. The two
+errors run opposite ways and largely cancel, so the probe passes at `0.1948` — but the test gates the
+**domain** half well (a linear multiply reads about `0.42`, 2.1x the bar) and the **truncation** half
+barely at all (reverting `encode::milk_decay` alone lands at about `0.2516` against a bar of
+`0.2509`). The truncation is exactly gated one level down, at the function, so nothing ships wrong;
+what is not true is the test's claim to hold the field to the reference's rate.
+- **What outlived the plan.** The converted **warp-shader** path still multiplies `decay` in linear
+light — 1 253 of the corpus's 8 162 warp-shader files name it, none of them among the seven pairs —
+and it is a `milk/shader.rs` epilogue question that wants the reference on screen. The two remaining
+washed pairs want one `shot --render` comparison at `--fps 30` against `--fps 165`, which is cheap
+and was not run. And *Blur Mix 3* is read as **washed at the gate** while its 128x128 silent-frame
+fixture reads exactly `0.00000000` at every seam: the two are not the same subject, nothing here
+contradicts, and nothing here explains it either — the `Outcome` states the verdict and declines the
+reconciliation, which is the right call and a standing question.
 
 ### [0103 - The project gets an audience](done/0103-the-project-gets-an-audience.md)
 
@@ -624,7 +688,7 @@ repair back**; the close reversed that call and added Phase 7, on evidence the p
 And `d3b3f631` retracted Phase 7's own "the arms no longer separate" as a reading taken on the half
 `echo_orient = 1` mirrors away.
 - **What outlived the plan.** `k` is confirmed on **mode 6 alone** and the other seven are an
-inference; the unit-scale mode-0 capture is [Plan 0142](0142-the-milkdrop-import-earns-its-verdict.md)
+inference; the unit-scale mode-0 capture is [Plan 0142](done/0142-the-milkdrop-import-earns-its-verdict.md)
 Phase 4's rig session. That plan also had its subject moved under it - Phase 7 removed the deposit
 term from both `milk_wash` fixtures, so its clean control now reads **exactly zero** at every seam
 where Phase 3 read `0.0202 / 0.0885 / 0.2521`, and it is amended accordingly. **No golden moved in
@@ -9302,7 +9366,7 @@ stretch:
 
 [0189]: done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md
 [0190]: done/0190-the-conductor-survives-a-run-nobody-is-watching.md
-[0142]: 0142-the-milkdrop-import-earns-its-verdict.md
+[0142]: done/0142-the-milkdrop-import-earns-its-verdict.md
 [0191]: done/0191-a-green-tree-is-not-tested-four-times.md
 
 
@@ -9348,7 +9412,7 @@ consumer of the new `param`). ADR-0191 and ADR-0192 stay `proposed` until their 
   **[0170] and [0173] both closed 2026-09-14**, so lane 2 is spent. [0142] reads the source at
   `xeiraex/milkdrop2` `d4c843a`, the commit 0173's log names.
 
-[0142]: 0142-the-milkdrop-import-earns-its-verdict.md
+[0142]: done/0142-the-milkdrop-import-earns-its-verdict.md
 [0169]: done/0169-a-preset-is-checked-before-it-is-rendered.md
 [0170]: done/0170-the-horizon-reads-the-frames-own-ground.md
 [0171]: done/0171-one-stall-policy-and-a-guarded-clock.md

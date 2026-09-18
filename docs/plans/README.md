@@ -44,7 +44,6 @@ place. The plan file carries the real link.
 | [0193](0193-the-digest-says-what-is-happening-and-where-you-are-needed.md) | The digest says what is happening, and where you are needed | approved | dev | ADR-0214 (proposed): Needs you + Now, history behind `digest --history`. Phase 2's false 'already settled' is the risk; its negative case is a done-when. |
 | [0120](0120-the-standalone-ships-on-ubuntu.md) | The standalone ships on Ubuntu | approved | dev, human | ADR-0131 (proposed): PulseAudio capture + an `ubuntu-latest` CI arm. **Phase 1 is a `human` stop gate before `dev`.** Guard is 5 zips + 1 tarball; folds backlog 0181 (Linux arm) + 0208. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + 0174 (proposed): Art-Net verified against `rlx-artnet-sim`. **Phase 8 opens on a decision** - 0115's tap is headless-only, and a windowed resolve is an ADR. Phase 9 is the rig. |
-| [0142](0142-the-milkdrop-import-earns-its-verdict.md) | The MilkDrop import earns its verdict | approved | dev, human | Backlog 0113 (**the only High**) + 0124. **0180 landed and moved both ends of its chain.** Amended 2026-09-16. Needs the rig. |
 | [0194](0194-the-analysis-gains-a-stereo-field.md) | The analysis gains a stereo field | draft | dev, human | ADR-0215 (proposed): absolute `balance`/`spread` + per-band balance, never levelled. Phase 1 closes a harness blind spot - every `--signal` kind is mono duplicated today, so nothing can see stereo. |
 <!-- roster:end -->
 
@@ -279,13 +278,20 @@ set; that note is [in the archive](README-archive.md). What it leaves standing:
 - **Lane b stays retired as a question**, not deferred: [0189] measured the serialized suite fraction
   and a second lane buys nothing while single-lane runs still park on their own infrastructure.
   `queue.json` keeps its empty `b` lane, so re-opening costs nothing.
-- **[0142] is next in the engine lane and needs a human**, which is the one thing the conductor
+- ~~**[0142] is next in the engine lane and needs a human**, which is the one thing the conductor
   cannot supply: its Phase 4 is a rig session against `foo_vis_milk2`, and that session now also owes
-  ADR-0199's unit-scale mode-0 capture and the "does the reference seam?" reading.
+  ADR-0199's unit-scale mode-0 capture and the "does the reference seam?" reading.~~ — **spent
+  2026-09-18**, when [0142] closed. The rig session ran, and all three asks came back: the seven
+  pairs (one better, two good, one fixed, two washed, one wrong on structure), the mode-0 capture
+  (`k ~ 0.068` against mode 6's `0.158`, which does **not** support ADR-0199's inference, now its
+  `Outcome`) and the seam reading (**none in either renderer**, which closes that half of backlog
+  0215). What it leaves for the engine lane is not a rig: the two pairs still washed point at a
+  per-frame deposit against a per-second transform rate, and the plan names the `shot --render`
+  comparison that would settle it.
 
 [0189]: done/0189-the-conductor-can-be-watched-and-stops-re-proving-a-green-tree.md
 [0190]: done/0190-the-conductor-survives-a-run-nobody-is-watching.md
-[0142]: 0142-the-milkdrop-import-earns-its-verdict.md
+[0142]: done/0142-the-milkdrop-import-earns-its-verdict.md
 [0191]: done/0191-a-green-tree-is-not-tested-four-times.md
 
 **Added 2026-09-14 - a backlog sweep drafted [0176] through [0186] and amended all eight active
@@ -867,6 +873,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0142 - The MilkDrop import earns its verdict](done/0142-the-milkdrop-import-earns-its-verdict.md) - closed 2026-09-18. Review: **no blockers, no majors, five minors, one nit (four fixed).** Version: **0.131.2**. ADR-0113 third Outcome, ADR-0199 Outcome. Closed backlog 0113, 0124. [Write-up](README-archive.md).
 - [0103 - The project gets an audience](done/0103-the-project-gets-an-audience.md) - closed 2026-09-18. Review: **no blockers, no majors, five minors, two nits (five fixed).** Version: **0.131.1** (patch). No ADR paired. Closed backlog 0102, 0103 - neither measured on device. [Write-up](README-archive.md).
 - [0178 - What the operator reads is true](done/0178-what-the-operator-reads-is-true.md) - closed 2026-09-18. Review: **no blockers, no majors, three minors, two nits (three fixed).** Version: **0.131.0**. ADR-0202 accepted, Outcome. Closed 0172, 0185, 0203, 0207, 0208; filed 0252. [Write-up](README-archive.md).
 - [0160 - The silhouette's preconditions stop being silent](done/0160-the-silhouettes-preconditions-stop-being-silent.md) - closed 2026-09-17. Review: **no blockers, no majors, three minors, three nits (all fixed).** Version: **0.130.1**. ADR-0179 accepted, Outcome. Closed backlog 0217. [Write-up](README-archive.md).
@@ -1142,6 +1149,6 @@ Later, unordered: better tempo tracking, preset sharing/library, signed installe
 [0139]: done/0139-the-render-path-validates-before-it-spends.md
 [0140]: done/0140-every-rate-integrates-for-real.md
 [0141]: done/0141-the-plugin-seams-stop-drifting.md
-[0142]: 0142-the-milkdrop-import-earns-its-verdict.md
+[0142]: done/0142-the-milkdrop-import-earns-its-verdict.md
 [0145]: done/0145-the-per-phase-gate-stops-paying-for-the-preset-library.md
 [0146]: done/0146-the-preset-sweeps-stop-being-one-long-test.md

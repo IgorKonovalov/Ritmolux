@@ -1,12 +1,18 @@
 # 0142 — The MilkDrop import earns its verdict
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-18. Six phases landed (`20ba8731`, `cc2488cd`, `42b4bb97`,
+> `15514a8a`, `7299cc90`, `9d149505`), plus `f43a2257`, the close review's four record repairs.
+> Round-1 verdict: **no blockers, no majors, five minors and one nit**, four repaired at the close.
+> Phase 2 read the reference's loop at `xeiraex/milkdrop2` `d4c843a` and named two divergences in the
+> decay term; Phase 3 repaired both behind ADR-0118's gate, moving two converted goldens and no
+> native one; Phase 4's human look gate read the plan's own subject from *washed* to *fixed*; ADR-0113
+> carries its third `Outcome` and backlog 0109 its third dated no-go.
 > **Created:** 2026-08-29
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)
+> **Related ADRs:** [0113](../../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md)
 > (accepted — this plan appends its third `Outcome`)
 > **Closes:** design-backlog 0113, 0124. **0109 is not taken — this plan decides whether it may be.**
-> **Runs after:** [Plan 0180](done/0180-the-converted-picture-follows-the-source.md), all of it.
+> **Runs after:** [Plan 0180](0180-the-converted-picture-follows-the-source.md), all of it.
 
 > **Amended 2026-09-14**, at a validity sweep of the active roster. Edited in place:
 >
@@ -23,7 +29,7 @@
 > - **Phase 5.** Its `Outcome` names backlog 0216's residue if any remains.
 > - **Phase 6.** It re-ranks backlog 0108, whose 0106/0107 gate has expired.
 
-> **Amended 2026-09-16, at [Plan 0180](done/0180-the-converted-picture-follows-the-source.md)'s
+> **Amended 2026-09-16, at [Plan 0180](0180-the-converted-picture-follows-the-source.md)'s
 > close. That plan landed, and it moved this plan's measurement subject, not just its pictures.**
 > The 2026-09-14 amendment above anticipated the waveform being redrawn. Two things it did not:
 >
@@ -41,7 +47,7 @@
 >   ratio, so Phase 1 may need a second control or a stated reason it does not.
 >
 > Phase 4's rig session also inherits two questions from that plan:
-> [ADR-0199](../adrs/0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md)'s
+> [ADR-0199](../../adrs/0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md)'s
 > unit-scale mode-0 capture (its `k` is confirmed on mode 6 alone) and whether the reference shows
 > the seam at all.
 
@@ -102,7 +108,7 @@ our measured field — *Fog Tunnel*'s background reads 0.298 linear at the field
 divergence that arithmetic names, and stops as written if there is none. Nothing from the source is
 copied into the repository.
 
-**The commit is named.** [Plan 0173](done/0173-the-milkdrop-geometry-reads-the-source.md) read
+**The commit is named.** [Plan 0173](0173-the-milkdrop-geometry-reads-the-source.md) read
 `xeiraex/milkdrop2` at `d4c843a` (v2.25c) for the mesh's `ang` and the waveform, and this plan reads
 the same commit. **Plan 0173 did not read the feedback loop**, meaning the decay, echo, gamma and
 their order and domain. Its log says so, and Phase 2's read is still new work.
@@ -542,6 +548,241 @@ necessarily a unit sample at the draw call — which weakens the absolute `k`, n
   commit carries the two re-blessed goldens.
 - **Outstanding `human` phases:** none. Phase 4 is the plan's only `human` phase and it ran
   2026-09-18; its table is above, committed in `15514a8a`.
+
+## Close review
+
+> Mode 4, conductor mode (ADR-0205), **round 1**, run 2026-09-18 in a fresh session handed the plan
+> and the lane and nothing an implementer wrote outside the repository. No earlier round, so no
+> carried findings. Reviewed `20ba8731..7bbf52bc` (9 commits): `git diff main...HEAD` = 11 files,
+> +905 / -129.
+
+### Verdict
+
+**Plan 0142 landed cleanly: no blockers, no majors, five minors and one nit.** The plan's central
+claim is carried. Phase 2 read the reference's own source and named two divergences in one term;
+Phase 3 repaired both behind ADR-0118's own gate, with the native path left bit-identical by
+construction rather than by tolerance; Phase 4's human look gate ran and moved the plan's own
+subject from *washed* to *fixed*; Phase 5 wrote the third `Outcome` the plan exists to produce, and
+it records "not better" honestly rather than reading the repair as a verdict. Every finding below is
+documentation accuracy or test strength — none of them changes what the engine renders.
+
+### Evidence this review ran on
+
+- **Full suite.** `node tools/conductor/with-lock.mjs suite -- cargo nextest run --workspace` printed
+  the ledger record rather than re-running (ADR-0207):
+  `with-lock: skipped cargo nextest run --workspace: tree 737b6b8 is green in the suite ledger, run
+  by gate 0142-pre-review at 2026-09-18T14:02:41.357Z: 1988 tests run: 1988 passed (6 slow), 6
+  skipped`. That record is the full-suite evidence for lens 1. The log's `Full suite:` bullet says it
+  is owed to the conductor's pre-review gate, which is correct in this mode and not a missing run.
+- **Docs.** `cargo --config "build.rustdocflags=['-D','warnings']" doc --workspace --no-deps` — exit
+  0 across all five crates. (The `RUSTDOCFLAGS=` form is unavailable to a conductor session —
+  design-backlog 0250 — so the flag is passed through `--config`.)
+- **Node gates.** `check-doc-links.mjs`, `check-index-rows.mjs`, `check-comment-hygiene.mjs`,
+  `check-reader-prose.mjs`, `check-backlog-claims.mjs`, `check-translations.mjs` and
+  `toc.mjs --check` — all exit 0.
+- **One instrument re-run by hand**, to check a table this review suspected:
+  `... suite -- cargo nextest run -p rlx-core --no-capture -E "test(the_wash_bisect_reports_every_seam)"`.
+
+### Lens 1 — alignment with the plan and the ADR
+
+Every phase carries exactly one in-vocabulary `**Owner skill:**` tag (`dev` x5, `human` x1). No
+blocker here.
+
+The log's phase-to-commit table is accurate: all six SHAs are on the branch and each touches what
+its row claims. Three deviations from `Files touched` are disclosed by `dev` rather than found here,
+and all three are correct calls — `FieldTrace` was listed and not needed; Phase 2's dated update
+went to `design-backlog-archive.md` because 0113's body moved there on promotion (ADR-0206) and the
+live file carries no 0113 body; the close block rode inside Phase 6's commit.
+
+**The tests the plan named, read rather than trusted.**
+
+- `the_wash_bisect_reports_every_seam` (`core/src/render/milk_wash.rs`) is genuinely extended, not
+  rebuilt: four checkpoints where there was one frame, a settled band with a half-spread, a
+  transient probe and the present-pass gain. It asserts **no** threshold on any level (correct under
+  ADR-0071 — the level is what the phase measures), and what it does assert is that the instrument
+  reports an equilibrium: every seam finite at every checkpoint, the band inside `SETTLED_SPREAD`,
+  and the transient larger than the band. That last assertion is the one that would catch "settled"
+  being a slow climb, and it is the right one.
+- `the_field_fades_at_the_references_own_rate` and
+  `the_converted_decay_is_truncated_on_the_nominal_frame` are the two gates on Phase 3. The second
+  is exact and correct: a round trip at seven authored `fDecay` values against
+  `(int)(fDecay*255)/255`, an identity check on the off arm, and the `42.5` equilibrium gain that is
+  the point of the repair. The first has a real weakness — finding **M2** below.
+- **Phase 3's done-when is not measurable as stated**, and `dev` says so in the log instead of
+  quietly satisfying something else. That is the right disposition: there is no instrument on an
+  external renderer, which is why backlog 0113 carries an `unprobeable:`. What was substituted — the
+  loop's own per-frame factor, asserted against the reference's arithmetic — is the measurable
+  restatement, and the settled levels are reported rather than asserted.
+
+**Ruling out a silent ADR reversal.** ADR-0118's quantizer is not widened: the repair is gated on
+`quantize_steps`, and a preset with no bundle gets `0.0`, so every native preset takes the untouched
+expression. ADR-0019's per-second vocabulary is preserved — `milk_decay` takes the factor back to
+the nominal frame, truncates, and returns it per second, which is exactly what stops the display's
+refresh entering the equilibrium. Nothing from `xeiraex/milkdrop2` is copied into the repository;
+the Phase 2 read cites file, function and line throughout.
+
+**Log length.** `## Implementation log` is 218 lines against `## Implementation phases`' 154. That is
+finding **M5**.
+
+### Lens 2 — layering, coupling, real-time safety
+
+Nothing to report. No platform, audio-source or windowing type enters `core/`; the diff touches no
+capture path, no C ABI surface (spec 0001 unchanged) and no OSC address (spec 0003 unchanged). No
+allocation, lock or logging is added on any audio path — the diff is a shader, one pure function, a
+test instrument and prose. `milk_decay` is total: `powf` on a clamped non-negative factor, with an
+explicit early return for the off gate, and no `unwrap`/`expect` outside `#[cfg(test)]`.
+
+### Lens 3 — doc freshness and release bookkeeping
+
+- **ADR-0113 carries its third `Outcome`**, dated, quoting the sentence it updates
+  (*"merely different, not better"*), naming the per-pair result and — the part that makes it worth
+  having — discharging the previous `Outcome`'s own undischarged commitment about re-judging after
+  0106. It does not reopen the Decision. This is what Phase 5 promised.
+- **ADR-0199 was not updated, and this plan is the session it was waiting on** — finding **M3**.
+- **`docs/milkdrop-conversion.md` was not swept** — finding **M4**.
+- The plan's diagram is untouched and still accurate: the `FIELD -> "NO mechanism bounds the
+  EQUILIBRIUM level"` self-edge is what Phase 3 changed, and the plan moves to `done/` carrying it
+  as the record of the problem it was written against. No reader diagram changed.
+- No `presets/` file changed, so step 3b's curation sweep has nothing to judge.
+- **Version bump owed: `patch`.** Phase 3 changed what a converted preset renders and added no
+  surface; Phases 1, 2, 4, 5 and 6 are instrument, docs and ADR text.
+
+### Lens 4 — correctness and determinism
+
+- **The mechanism is right, and the arithmetic behind it is checkable.** `1/(1 - d)` carries
+  `(1 - d)` in the denominator, so a term a fade ratio compresses is amplified at the equilibrium.
+  That is what reconciles this repair with `the_decay_domain_is_not_the_wash`, which killed the
+  domain as a hypothesis *about a fade* and whose reading still stands. The plan's Notes admit the
+  prediction (`2.6x`-`7.0x`) overshot the measurement (`1.572x`) and give the reason — the
+  `s/(1 - d)` form assumes a resample eigenvalue of 1, which *Fog Tunnel*'s `zoom = 1.042` violates.
+  Admitting that in the log rather than burying it is the correct handling of a falsified
+  prediction.
+- **The ceiling the repair introduces is not new state.** `rlx_quantize` at positive `steps` already
+  clamps to `[0,1]` before encoding, so `rlx_milk_decay`'s clamp changes nothing on that arm. On
+  ADR-0118's Alternative D (`steps < 0`) it does — finding **N1**.
+- **Premultiplication survives.** `rgb` and `a` take the same monotone map, so `rgb <= a` (ADR-0026)
+  holds through the decay, and the comment says so.
+- **No aspect is taken from a grid.** The only `aspect` in the diff is `wu.misc.x`, pre-existing and
+  target-derived. `milk_wash.rs` renders 128x128, where MilkDrop's aspect pair is the identity — the
+  archived Phase 2 read names that explicitly when ruling the uv chain out of its reading. The
+  standing "square fixture" blind spot is already live as design-backlog 0245, and this diff does not
+  widen it.
+- **The instrument is deterministic.** No wall-clock read enters it: `capture_preset` resets the
+  clock, `field_trace` drives `set_time(i * dt)`, and `Settled`'s band is a pure function of the
+  checkpoints.
+- **Numeric assertions.** `(gain - 42.5).abs() < 0.05` and `(got - expected).abs() < 1e-5` are
+  properties of exact arithmetic. `SETTLED_SPREAD = 0.20` is documented as deliberately generous and
+  guards the instrument's claim to report an equilibrium rather than where the equilibrium is. The
+  `1.25x` / `0.5x` band in `the_field_fades_at_the_references_own_rate` is where this lens has a
+  finding: see **M2**.
+
+### Lens 5 — design integrity
+
+The shape holds. `milk_decay` is a `pub(super)` function in the module that already owns uniform
+upload; `rlx_milk_decay` is a WGSL helper beside the fragment it serves; neither adds a seam. The
+`Scene` trait is untouched, no scene branches on a backend, and no shell reaches past `core`'s API.
+The gate is a *bundle* property (`quantize_steps`) rather than a `WarpMeshScene` special case, which
+keeps "is this an 8-bit-era field?" a question about the preset rather than about the engine — that
+is the right place for it, and it is the reason the native golden did not move.
+
+One note under OCP, in the repair's favour: gating on `quantize_steps` rather than on "does a bundle
+exist" was reconsidered mid-phase after the first attempt moved **both** arms of
+`the_field_equilibrates_only_when_the_quantizer_runs`, which would have left that probe asserting
+that a field with an equilibrium has none. The log records the false start and the reason. That is
+the kind of thing a close normally has to find.
+
+### Findings
+
+#### minor
+
+**M1 — `core/src/render/milk_wash.rs:271` — the instrument's own measurement table is the
+pre-repair tree's, inside the tree that repaired it.**
+The `# What it measured` block reported `0.13559258 / 0.25316700 / 0.40450469` for *Fog Tunnel* and
+a present-pass gain of `1.867`. `milk_wash.rs` was last touched by Phase 1 (`20ba8731`); Phase 3
+(`42b4bb97`) moved every one of those numbers and did not come back. Re-run at the close, the tree
+prints `0.08623820 / 0.16459735 / 0.32970616`, gain `1.909`, and the prose built on the table was
+falsified with it: *"The transient from black is `0.093 -> 0.136`"* is now `0.073 -> 0.086`, and
+*"`f200` is the highest of the three"* is now `f100`. The table's own last bullet warned that
+*"Readings dated before 2026-09-16 are a different measurement"*, which invites a reader to trust
+anything dated after it. **Repaired in `f43a2257`**, with the re-taken numbers and both dated
+boundaries named.
+
+**M2 — `core/src/render/scenes/warp_mesh/tests.rs:1619` —
+`the_field_fades_at_the_references_own_rate` does not compute the reference's own rate, and the
+truncation half of the repair is effectively ungated by it.**
+`reference = d.powf(elapsed)` takes `d` from `trace.decay`, which is `FieldTrace`'s *"per-second
+`decay` in force on the last frame"* — the value the probe set, `0.98^30 = 0.5455/s`, **before**
+`milk_decay` truncates it. The reference truncates: its rate is `(249/255)^30 = 0.4895/s`, giving
+`0.1506` over the probe's 2.650 s, not the `0.2007` the test calls *"the reference's arithmetic"*.
+Separately, `measured` restates the linear ratio through `ENCODE_GAMMA = 2.2` while the shader
+encodes with `rlx_srgb_encode`'s piecewise curve; at this field's levels that inflates the statistic
+by roughly a third. The two errors run opposite ways and largely cancel, which is why the probe
+reads `0.1948` and passes comfortably.
+
+What survives: the **domain** half is gated well — restore the linear-light multiply and the same
+statistic reads about `0.42`, 2.1x the `1.25x` bar. What does not: revert `encode::milk_decay`
+alone, keeping the encoded domain, and the statistic lands near `0.2516` against a bar of
+`0.2007 * 1.25 = 0.2509` — inside a quarter of a percent of passing. The truncation is separately and
+exactly gated by `the_converted_decay_is_truncated_on_the_nominal_frame` at the function level, so
+nothing ships wrong; what is not true is this test's claim to hold the field to the reference's rate.
+**Left open** — the repair is the assertion and the constant, which are code, not the comment above
+them. The shape it wants: build `reference` from the truncated factor (`milk_decay(d, 255.0)`), and
+either restate `measured` through `rlx_srgb_encode`'s actual curve or say in the doc that
+`ENCODE_GAMMA` is an approximation whose error is comparable to the band.
+
+**M3 — ADR-0199 still asked this plan's rig session for a capture the rig session took and that
+refutes its inference.**
+That ADR's Negative reads *"Plan 0142's Phase 4 rig session is asked to capture mode 0 at unit scale
+as a confirmation. Until one lands, this ADR says so"*, and its own `Outcome` repeats it under
+**Still open, and owed elsewhere**. The capture landed — `k ~ 0.068` against the `0.158` fitted on
+mode 6, a ratio of `0.43` — and says the inference is **not** supported. `dev` flagged this under
+Followups rather than acting, correctly: no phase lists ADR-0199 under `Files touched`. It is close
+bookkeeping — an accepted ADR whose recorded claim the plan falsified takes a dated `Outcome`, the
+ADR-0054 / ADR-0074 precedent. **Repaired in `f43a2257`.**
+
+**M4 — `docs/milkdrop-conversion.md` — the operator doc's rate section did not carry Phase 3's
+truncation.**
+*"Rates are converted"* said *"a factor becomes `v^30`, a rate `v * 30`"* and listed `decay` among
+the factors. That is now incomplete for `decay` alone: it is taken back to the nominal frame,
+truncated where `D3DCOLOR_RGBA_01` truncates it, and returned per second, so a `.milk` at
+`fDecay = 0.98` runs at `249/255` per frame. A reader working a converted bundle backwards got the
+wrong number. **Repaired in `f43a2257`.**
+
+**M5 — this plan's `## Implementation log` outweighs the contract it reports against.**
+218 lines against `## Implementation phases`' 154. Nothing gates this property, which is why the
+close checks it. **Left open**: the log's content is genuinely load-bearing here — the false start on
+the gate, the falsified `2.6x`-`7.0x` prediction, the *Blur Mix 3* reconciliation that is declined
+rather than faked — and trimming a record to satisfy a ratio would cost more than the ratio is
+worth. What it says about the next plan of this kind is that some of this belongs in the phases as
+done-whens rather than in the report.
+
+#### nit
+
+**N1 — `core/src/render/scenes/warp_mesh/shaders.rs:217` — the comment justified the gate on the
+quantizer's floor, and the clamp also reaches the arm that has no floor.**
+The block reads *"The ceiling `rlx_milk_decay` reproduces and the floor below are two halves of one
+thing"*, which is right for `steps > 0`, where `rlx_quantize` already clamps to `[0,1]` before
+encoding. Under ADR-0118's Alternative D (`steps < 0`) `rlx_quantize` returns its argument
+**unclamped**, so on that arm the new clamp is a ceiling the field did not previously have. The
+behaviour is defensible and nothing in the repository sets a negative `quantize_steps`, but the
+comment did not cover it. **Repaired in `f43a2257`.**
+
+### Close bookkeeping notes
+
+- **Backlog probes** re-run at the close: exit 0, 89 reductions across 37 live entries, 3
+  unprobeable. Two advisory "path moved" rows are this plan's own — 0245 (`warp_mesh/tests.rs`) and
+  0249 (`warp_mesh/shaders.rs`), both stamped just before this lane touched those files. Neither
+  claim is falsified by the diff: 0245 is about square golden fixtures and 0249 about `zoom`'s doc,
+  and this plan touched neither.
+- **Translations:** `check-translations.mjs` exits 0 on five stamped translations. Its advisory was
+  empty on the lane and carries **one row** after `git merge main`:
+  `packaging/foobar/READ-ME-FIRST.ru.md`, stamped `f2b0048b`, against an English source now at
+  `d6e275e6` — which is [Plan 0103](0103-the-project-gets-an-audience.md)'s close, not this plan's
+  work. It is named here because reading the advisory is a close's duty whoever moved the source;
+  correcting the Russian is content work and is routed, not done here.
+- **Preset curation (step 3b):** no file under `presets/` changed. The standing workaround grep over
+  `presets/*.toml` turns up nothing this plan's engine fix makes stale — the repair is confined to
+  the converted path, and no shipped preset carries a `[milk]` table.
 
 ## Followups (after this lands)
 

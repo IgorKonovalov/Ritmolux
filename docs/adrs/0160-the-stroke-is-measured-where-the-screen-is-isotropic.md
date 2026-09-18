@@ -135,7 +135,7 @@ That an engine carries two stroke metrics is a cost, and it is deliberate and da
 the one [ADR-0158](0158-a-joined-end-carries-its-own-miter-length.md)'s Scope paragraph already
 gives, with more force here because this changes *thickness* rather than corner length:
 `warp_mesh` is judged against `foo_vis_milk2`, and
-[Plan 0142](../plans/0142-the-milkdrop-import-earns-its-verdict.md) is approved and about to write
+[Plan 0142](../plans/done/0142-the-milkdrop-import-earns-its-verdict.md) is approved and about to write
 ADR-0113's third Outcome from readings taken on it. **Moving the instrument between the question and
 the answer is not a tradeoff, it is a mistake.**
 

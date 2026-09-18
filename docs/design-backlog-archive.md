@@ -300,8 +300,6 @@ live entry citing this one.
 
 | # | Entry | Owned by |
 |---|-------|----------|
-| 0113 | The converted feedback field equilibrates far brighter than the reference's | [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md). **Promoted** |
-| 0124 | ADR-0113's motivating claim still reads "provisionally negative" | [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md). **Promoted** |
 | 0157 | The fixed telemetry set omits the bar grid the engine already computes | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0158 | The tempo octave is unsettled by design, and the rig saw the fold run the other way | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 3. **Promoted** |
 | 0163 | `level/bass` reads exactly 1.0 on every local peak by construction | [Plan 0133](plans/0133-the-engine-drives-the-lights.md) Phase 5 (preset-author residue). Consumer half: Plan 0147. **Promoted** |
@@ -582,6 +580,8 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0208 | A system count written into prose goes stale on the next system | [Plan 0178](plans/done/0178-what-the-operator-reads-is-true.md) Phase 4 + [ADR-0202](adrs/0202-a-written-count-of-the-systems-is-refused-by-a-gate.md). One marker taken. **Closed 2026-09-18** |
 | 0102 | A foobar panel attaches its surface at 1x1 and only a stream-format change revives it | [Plan 0103](plans/done/0103-the-project-gets-an-audience.md) Phase 1. The attach waits for a size; no fallback, no flag. Unmeasured on device. **Closed 2026-09-18** |
 | 0103 | The plugin's context menu shadows foobar's, so the panel cannot be removed from a layout | [Plan 0103](plans/done/0103-the-project-gets-an-audience.md) Phase 1. One per-window question, shared branch intact, no ADR. **Closed 2026-09-18** |
+| 0113 | The converted feedback field equilibrates far brighter than the reference's | [Plan 0142](plans/done/0142-the-milkdrop-import-earns-its-verdict.md) Phases 2-3. The decay's truncation and its domain, read from the source. The converted-shader path is that plan's own Followups. **Closed 2026-09-18** |
+| 0124 | ADR-0113's motivating claim still reads "provisionally negative" | [Plan 0142](plans/done/0142-the-milkdrop-import-earns-its-verdict.md) Phases 4-5. Third `Outcome`: one better, two good, one fixed, two washed, one structural. **Closed 2026-09-18** |
 <!-- roster:end -->
 
 ---
@@ -11538,9 +11538,9 @@ threshold here would be adapter-dependent; the probe asserts none.
 - **Verified 2026-08-19** — the field is still read back by the probe this update is built on:
   `present: fn feedback_field in: core/src/render/scenes/warp_mesh/mod.rs`
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0142](plans/done/0142-the-milkdrop-import-earns-its-verdict.md) owns the ask, and its close appends the `CLOSED` marker here.
 
-### Update 2026-09-17 — [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md) Phase 2 read the reference's source. **The mechanism is the decay term, and it is two divergences rather than one.**
+### Update 2026-09-17 — [Plan 0142](plans/done/0142-the-milkdrop-import-earns-its-verdict.md) Phase 2 read the reference's source. **The mechanism is the decay term, and it is two divergences rather than one.**
 
 **The entry stays live until Phase 3 lands a repair.** Every earlier attempt on this defect inferred the
 reference's loop from pictures. This one reads it: `xeiraex/milkdrop2` at `d4c843a` (MilkDrop 2 v2.25c),
@@ -11638,6 +11638,30 @@ floor act in one domain instead of two. `warp_mesh/shaders.rs`'s `faded` line an
 
 - **Verified 2026-09-17** — the linear-domain multiply this update names is still the line in force:
   `present: let faded = past_c in: core/src/render/scenes/warp_mesh/shaders.rs`
+  (**That bullet is a record of the tree Phase 2 read, and Phase 3 falsified it the next day** —
+  `faded` is now a `var` and the quantized arm runs `rlx_milk_decay`. Nothing re-runs it: the gate
+  reads the live file only, and an archived body is append-only.)
+
+### CLOSED 2026-09-18 — [Plan 0142](plans/done/0142-the-milkdrop-import-earns-its-verdict.md), Phases 2 and 3
+
+**The mechanism was named at the reference's own source and repaired, and the entry's headline
+subject went from washed to fixed at the look gate.** `encode::milk_decay` takes the per-second
+factor back to the nominal frame, truncates it where `D3DCOLOR_RGBA_01` truncates it, and returns it
+per second; `rlx_milk_decay` applies that frame's share in the encoded domain. Both are gated on
+`quantize_steps`, so a native `warp_mesh` preset's arithmetic is unchanged to the last bit — two
+converted goldens moved and no native one.
+
+Three things this closure does **not** claim, all of which are in the plan rather than here:
+
+- **The predicted magnitude was wrong and the direction was right.** The update above bounds the
+  divergence at `2.6x`–`7.0x` at the field; the instrument read `1.572x`. The `s/(1 - d)` form
+  assumes a resample eigenvalue of 1, which *Fog Tunnel*'s `zoom = 1.042` violates.
+- **The wash is not gone from the set.** Two of the seven pairs still read washed at the ground, and
+  the plan's leading candidate for them is a per-frame deposit against a per-second transform rate at
+  164-165 fps — named, unmeasured, with the `shot --render` comparison that would settle it written
+  down.
+- **The converted warp-shader path was not touched** and carries the same domain question, reaching
+  1 253 corpus files, none of them among the seven pairs.
 
 
 ---
@@ -11691,7 +11715,26 @@ answerable rather than leaving 2026-08-16's silence to stand for it.
 `architect` session — trusting a stale verdict about whether this project's whole MilkDrop
 translation strategy is worth it.
 
-- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md) owns the ask, and its close appends the `CLOSED` marker here.
+- **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0142](plans/done/0142-the-milkdrop-import-earns-its-verdict.md) owns the ask, and its close appends the `CLOSED` marker here.
+
+### CLOSED 2026-09-18 — [Plan 0142](plans/done/0142-the-milkdrop-import-earns-its-verdict.md), Phases 4 and 5
+
+**ADR-0113 carries a third dated `Outcome`, so this entry's premise — that no gate produced one — is
+false.** The look gate ran 2026-09-18 on the same seven pairs against the same rig,
+`foo_vis_milk2` 0.2.0.0 (DX11), judged live by the owner: **one better, two good, one fixed, two
+still washed at the ground, one wrong on structure.** So the founding claim is still not carried by
+the set, which this entry said in advance was *"a perfectly good third Outcome"*.
+
+**What the entry did not anticipate is the half that makes this "no" different from the two before
+it.** It expected *"merely different, with the wash dominating"* and named 0113 as the remaining
+blocker. The wash is no longer one dominating unknown: it was read at the reference's source, half
+repaired, and the plan's own subject moved from washed to fixed. Each of the three pairs that still
+read wrong now names a **different** mechanism — a per-frame deposit against a per-second transform
+rate, an echo that is bound and is not nesting, and a waveform scale confirmed on one mode only. A
+fourth gate has routes rather than a re-ask.
+
+The `Outcome` also discharges the 2026-08-16 one's own undischarged commitment, *"The HDR question
+is re-judged after 0106 lands"* — 0106 landed 2026-08-17 and two look gates ran without re-taking it.
 
 
 ---
@@ -13406,7 +13449,7 @@ converted preset reads differently from the reference. The citations are in the 
 **Medium.** Both are silent. Every comp shader or per-vertex program that reads these inputs renders
 a transformed version of the look it was authored for, and nothing in the conversion flags it.
 
-- **Promoted 2026-09-14** to [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md) Phases 1-3: read the warp uv chain, give the comp stage the source's polar pair, aspect-correct the per-vertex `x`/`y`. [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md) Phase 2 names the uv chain as a candidate cause of the wash.
+- **Promoted 2026-09-14** to [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md) Phases 1-3: read the warp uv chain, give the comp stage the source's polar pair, aspect-correct the per-vertex `x`/`y`. [Plan 0142](plans/done/0142-the-milkdrop-import-earns-its-verdict.md) Phase 2 names the uv chain as a candidate cause of the wash.
 
 - **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md) owns the ask, and its close appends the `CLOSED` marker here.
 
@@ -13461,7 +13504,7 @@ way.
 
 **Medium**, as 0119 was. It shows on real content, and the diagnosis it had is gone.
 
-- **Promoted 2026-09-14** to [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md) Phases 1 and 4: render the seam before anything moves, then find its ray and rewrite the stale test doc. [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md) Phase 4 adds a "seam present?" column for the reference side.
+- **Promoted 2026-09-14** to [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md) Phases 1 and 4: render the seam before anything moves, then find its ray and rewrite the stale test doc. [Plan 0142](plans/done/0142-the-milkdrop-import-earns-its-verdict.md) Phase 4 adds a "seam present?" column for the reference side.
 
 - **Moved to the archive 2026-09-15 on promotion** ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)): [Plan 0180](plans/done/0180-the-converted-picture-follows-the-source.md) owns the ask, and its close appends the `CLOSED` marker here.
 

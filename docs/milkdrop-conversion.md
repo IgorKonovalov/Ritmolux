@@ -72,7 +72,7 @@ are labelled as such.
 > which is worth knowing if you saw those pictures before the binding existed.
 > A residue survives it on some presets, and that one is a property of the
 > feedback loop rather than of the conversion —
-> [Plan 0142](plans/0142-the-milkdrop-import-earns-its-verdict.md) measures it.
+> [Plan 0142](plans/done/0142-the-milkdrop-import-earns-its-verdict.md) measures it.
 
 ### Rates are converted, and that is why a preset moves at the right speed
 
