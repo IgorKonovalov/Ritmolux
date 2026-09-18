@@ -337,7 +337,7 @@ flowchart LR
 | 1 — The equilibrium instrument | dev | done | `20ba8731` |
 | 2 — Name the mechanism | dev | done | `cc2488cd` |
 | 3 — Bound the equilibrium | dev | done | committed with this row |
-| 4 — The look gate | human | not started | |
+| 4 — The look gate | human | done | committed with this row |
 | 5 — ADR-0113's third Outcome | dev | not started | |
 | 6 — The reach decision | dev | not started | |
 
@@ -386,6 +386,42 @@ Same box, same fixture, same statistic as Phase 1's table above.
 The undeposited-fade probe, in the reference's own encoded domain over the same
 2.650 s window: `0.3034` before, `0.1948` after, against the reference's
 arithmetic `0.2007` — **-2.9 %**, where a pure-linear multiply predicts `0.4819`.
+
+### Phase 4 — the look gate, as run (2026-09-18)
+
+`foo_vis_milk2` 0.2.0.0 (DX11) in foobar2000 v2 beside this lane's release build (`42b4bb97`,
+reported as 0.129.0), one track through foobar2000 feeding both, ours taking it over loopback at
+164-165 fps. The seven were re-converted by `milkconv` at `main` 0.131.0 into `WORK/rlx-gate-0142/`
+and loaded through `RLX_PRESET_DIR`; that directory also holds the fixture and stimulus below and is
+outside the repository, as Plan 0127's material is. **Verdicts are the owner's, taken live.**
+
+| pair | verdict | what dominates | seam |
+|---|---|---|---|
+| *chasers 19 Portal* | washed | ground saturates to near-white; the traces survive under it | **none in either** |
+| *Blur Mix 3* (control) | washed | traces horizontal and correct; ground grey with blown blobs, not black | n/a |
+| *Songflower (Moss Posy)* | wrong, and not on brightness | the reference's woven lattice is **absent**: ours draws the bare grid with no nesting | **none in either** |
+| *Cauldron painterly 5* | better, centre blown | terrain and spiro both read; the core clips white |  n/a |
+| *Contortion (Escher's Tunnel Mix)* | good | sphere, tunnel and arcs all read; ground comparable | n/a |
+| *Cosmic Dust 2* | good, ours darker | ours is **sparser** than the reference rather than brighter | n/a |
+| *Fog Tunnel* | **fixed** | black ground, tube reads against the reference's structure | n/a |
+
+**The plan's own subject moved:** *Fog Tunnel* read "still washed" at both earlier gates and now
+reads fixed. **Hue is ruled out of every verdict** — both renderers animate their palettes off their
+own clock, so two stills sit at different palette phases; that is why *Contortion* and *Cosmic
+Dust 2* read good against obviously different colour.
+
+**The mode-0 capture (ADR-0199) does not confirm what that ADR asks it to.**
+`!LMV-0142-mode0-unit.milk` is `!LMV-0127-A-crisp.milk` with `nWaveMode` 6 -> 0 and nothing else
+moved, over a 60 s full-scale 200 Hz sine verified at 0.0 dBFS peak / -3.0 dB mean, at 2000x1125 —
+Plan 0127's own size. Radius is taken about the trace's own bounding-box centre, because the figure
+translates between frames, over 720 angle bins. Swing at thresholds 140 and 200: **0.1366 / 0.1364 H
+over a 0.3055 H base radius** (the reading of record), corroborated by a second capture at
+0.1295 / 0.1288 H over 0.3067 H — stable to ~0.5 % on both. For `r(theta) = R0 + k*s(theta)` with
+`s` in `[-1, 1]` the swing is `2k`, so **`k ~ 0.068`** against the **`0.158`** Plan 0127 derived from
+mode 6 on this same rig and stimulus, a ratio of **0.43**. ADR-0199's Negative calls modes 0-5
+sharing mode 6's gap *"an inference from where the gap lives, not a measurement"*; this does not
+support it. **Bound:** MilkDrop gains the waveform before drawing, so full-scale input is not
+necessarily a unit sample at the draw call — which weakens the absolute `k`, not the ratio.
 
 ### Notes
 
@@ -446,6 +482,21 @@ arithmetic `0.2007` — **-2.9 %**, where a pure-linear multiply predicts `0.481
   recorded as `d4c843a`. The rig the look gate uses is the later `foo_vis_milk2` 0.2.0.0 DX11 port
   of the same project, and whether that port kept `D3DCOLOR_RGBA_01`'s truncation is not readable
   from this tree.
+
+- **Phase 4 — what the session could not settle, with the test that would.** Ours ran at 164-165 fps
+  against the rig's own frame cap. Transforms convert per second and the owner read the motion as
+  matching, which tests that conversion; the **deposit is per frame and is not converted**, so a rate
+  mismatch raises the field by `1/(1 - d)` — hardest on high-`fDecay` presets, which is the shape of
+  the result above. Not settleable by eye: render one washed preset through `shot --render` at
+  `--fps 30` and at `--fps 165` and compare the ground level.
+- **Phase 4 — *Songflower*'s defect is not this plan's.** It sets `fDecay = 1.000`, so no decay runs
+  and Phase 3's repair cannot reach it. It sets `fVideoEchoAlpha = 1.0` with `echo_zoom` and
+  `echo_orient` driven from its per-frame code, and the reference's nested weave is that echo
+  compositing the previous frame zoomed and flipped. The engine carries `echo_alpha`/`echo_zoom`/
+  `echo_orient` as params, so the reading is "the echo is bound and is not producing the nesting" —
+  a different finding from Plan 0108's "no video-echo stage".
+- **Phase 4 — the seam question is answered negatively for both presets** (backlog 0215): none in the
+  reference and none in ours. Plan 0180 Phase 4 located a ray on our side; nothing shown here had one.
 
 ### Close triggers
 
