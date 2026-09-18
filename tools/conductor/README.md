@@ -112,6 +112,13 @@ once, whatever `state/conductor.json` says.
     resume command; every lane stopped at the worktree cap, naming what holds the slots; every lane
     still on disk after a merge; and every merge's open findings with their `file:line`.
 
+    A finding leaves that list when the close repaired it (`fixed_in`) or when you closed it with
+    `finding NNNN <ref> --done|--wontfix|--filed <reason>` (ADR-0216). **One line then counts every
+    finding you have closed**, and names the two commands that read them back — never a per-plan
+    breakdown, which is the same accumulation one indent further in. The count line is left out at
+    zero, and the section's opening count is of **open** findings only, so a page with nothing on it
+    is one line.
+
     **Already settled, clear the record** closes that section: a park the repository itself shows as
     finished, counted apart from the live ones and never listed among them. Two conditions decide it,
     both narrow, both read from the tree, and **nothing else — never an age, never a branch's commits,
@@ -142,7 +149,8 @@ once, whatever `state/conductor.json` says.
     and wall time within the run it merged in, **both** what it spent in that run and what it has
     spent over its whole life, and every review finding exactly as the reviewer emitted it. The two
     `$` figures are named because a run-scoped time beside a lifetime spend reads as neither; the
-    per-run one is what Totals below sums.
+    per-run one is what Totals below sums. A finding you have closed carries its verb, its reason and
+    the date here, whatever the current page counts: this is the record of the judgement.
   - **Failed and parked:** gate reds with the failing tests, disagreements, spend-cap hits, session
     errors.
   - **Totals:** merged and parked counts, spend, time spent waiting on each lock, the 5-hour and

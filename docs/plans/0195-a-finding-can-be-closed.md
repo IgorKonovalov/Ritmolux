@@ -122,8 +122,8 @@ against the branch — nothing can verify it.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — a finding carries a disposition, and one command writes it | dev | committed with this row | |
-| 2 — the page carries the open ones and counts the closed | dev | not started | |
+| 1 — a finding carries a disposition, and one command writes it | dev | done | `4737305` |
+| 2 — the page carries the open ones and counts the closed | dev | committed with this row | |
 
 ### Notes
 
