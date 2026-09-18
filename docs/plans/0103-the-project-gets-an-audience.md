@@ -272,7 +272,8 @@ first because every later phase increases the number of people who meet the defe
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — the component survives a stranger's first five minutes | dev | done | `2c9cbbc` |
-| 2 — the README leads with the product | dev | done | committed with this row |
+| 2 — the README leads with the product | dev | done | `b72b035` |
+| 3 — a demo that moves | dev | done | committed with this row |
 
 ### Notes
 
@@ -302,6 +303,19 @@ first because every later phase increases the number of people who meet the defe
 - The plugin diagnostics log's row shape changed (four columns appended). Its header is written only
   when the file is created, so a `plugin-diagnostics.log` carried over from an earlier build gets
   wide rows under a narrow header; the clean-profile install the done-when uses starts a new file.
+- Phase 3's script is a sibling, `scripts/docs-clip.mjs`, rather than an edit to
+  `scripts/docs-shots.mjs`: that script's stated contract is that it writes `docs/images/**.png` and
+  nothing else and spawns only `cargo`, and a video writes a container through an external encoder.
+- Phase 3 synthesizes its own stimulus WAV (`target/docs-clip/stimulus.wav`, not committed).
+  `--render` refuses `--signal`, nothing in the repository writes a WAV and no clip is committed, so
+  the script carries a second, smaller implementation of `dynamic_groove`'s musical shape in
+  JavaScript. It is not sample-identical to core's and does not claim to be.
+- Phase 3's clip is 6.2 MB — the largest file in the repository. `--crf 28` rather than `shot`'s
+  archival default of 18 is what holds it there; the same render at `--crf 23` is 10.7 MB.
+- Followup noticed and not acted on: `CLAUDE.md`'s `scripts/` block says its renderers are "a rule
+  with five named exceptions" and names five. `scripts/docs-clip.mjs` is a sixth.
+- Followup noticed and not acted on: nothing links `docs/images/demo.mp4`. Phase 3's files are
+  `scripts/` and `docs/images/`, and Phase 6 is where the clip is posted.
 
 ## Followups (after this lands)
 
