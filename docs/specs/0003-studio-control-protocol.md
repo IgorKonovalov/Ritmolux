@@ -1,17 +1,19 @@
 # Spec — Studio control protocol
 
-The behavioral contract for the two channels a parent process drives and reads this player
-through: the OSC control-in vocabulary under `/rlx/v1/ctl/`, and the structured event stream on
-standard error. It states what must be true of the running system, not how it is implemented.
+The behavioral contract for the channels a parent process drives and reads this player through:
+the OSC control-in vocabulary under `/rlx/v1/ctl/`, the analyzer telemetry published under the same
+`/rlx/v1` root, and the structured event stream on standard error. It states what must be true of
+the running system, not how it is implemented.
 
 > **Where it lives:** `standalone/src/osc/decode.rs` (the vocabulary and the wire decoder),
+> `standalone/src/osc.rs` (the telemetry table and the sending socket),
 > `standalone/src/osc/encode.rs` (the wire encoder both directions share),
 > `standalone/src/control.rs` (the listener, the bounded queue and the renderer-side applier),
 > `standalone/src/events.rs` (the event roster and its writer),
 > `standalone/src/show.rs` (the one owner of the listener and of every emission below,
 > called by the windowed and the headless paths alike),
-> `standalone/src/config.rs` (`[control]`) and `standalone/src/cli.rs` (`--control`,
-> `--events`).
+> `standalone/src/config.rs` (`[control]`, `[osc]`) and `standalone/src/cli.rs` (`--control`,
+> `--events`, `--osc`).
 > **Governing ADRs:** [0176](../adrs/0176-the-player-is-driven-over-osc-control-in-and-reports-on-its-standard-streams.md)
 > (the transports, the versioning rule and the two rosters),
 > [0175](../adrs/0175-the-studio-is-a-separate-application-that-never-draws-a-frame.md) (why the
@@ -54,9 +56,48 @@ Adding an event or a field is additive under the same `v`; changing or removing 
 | `stream` | `width`, `height`, `fps`, `format` (`rgba8` \| `bgra8`) | Once, before the first frame on a frame pipe |
 | `pong` | `nonce` | Answering a `ctl/ping` |
 
+## The telemetry roster
+
+The outbound half of the same versioned root: what the analyzer publishes, one address per signal,
+one argument per address. Off unless `--osc` or `[osc] enabled` asks for it, and independent of the
+control-in listener — the two are opposite directions of one address space and neither turns the
+other on. Adding a row is additive under the same prefix, exactly as the vocabulary above is.
+
+`standalone/src/osc.rs`'s `Telemetry::messages` is the table, sized by `ADDRESS_COUNT`, and
+[Configuration](../configuration.md) carries the operator-facing reading of each row — what it
+means for a fixture bound to it, which is a longer thing than a contract.
+
+| Address | Arg | Layer |
+|---------|-----|-------|
+| `/rlx/v1/level/bass` `.../mid` `.../treb` `.../onset` `.../rms` | `f` | Peak-normalized levels, plus the un-normalized broadband RMS |
+| `/rlx/v1/raw/bass` `.../mid` `.../treb` `.../onset` | `f` | The absolute twins of the four above |
+| `/rlx/v1/beat/trigger` | `i` | Transient layer: an onset fired this frame |
+| `/rlx/v1/beat/index` | `i` | Transient layer: onset count. **Not a meter** |
+| `/rlx/v1/beat/phase` | `f` | Transient layer: phase to the next onset |
+| `/rlx/v1/tempo` | `f` | The estimate, octave unsettled |
+| `/rlx/v1/bar/beat` `.../index` `.../phase` | `i` `i` `f` | Bar layer: the tempo-driven grid |
+| `/rlx/v1/bar/locked` | `i` | Bar layer: whether the grid is estimated or counted |
+| `/rlx/v1/music/tempo` | `f` | Musical layer: the estimate folded into one octave |
+| `/rlx/v1/music/trigger` `.../index` | `i` | Musical layer: a beat of that tempo, and their count |
+| `/rlx/v1/preset` | `s` | The active preset's name |
+
+- The four **layers** are distinct and none substitutes for another: `beat/*` counts transients,
+  `bar/*` is the grid the downbeat estimator folds over, `music/*` runs at a folded tempo, and
+  `tempo` is the raw estimate. A consumer that wants a musical unit MUST take one from `music/*`
+  rather than gating `beat/index` by hand — that reconstruction is strictly worse, because it has
+  no access to the grid or to `bar/locked`.
+- `tempo` MUST NOT be folded in place, and `music/tempo` MUST be a **power-of-two multiple** of it.
+  Presets and existing console mappings are bound to the raw estimate, and the fold settles an
+  octave the signal carries no evidence about.
+- `music/trigger` MUST fire **at most once per `music/tempo` beat period**. It is a phase clock at
+  that tempo, not a gate on the transient stream, so a detector that fires early cannot double it
+  and one that misses cannot swallow it.
+- Every address MUST carry exactly **one** argument. A console binds a parameter to an address, and
+  a multi-argument message would make it bind to a position inside one.
+
 ## Invariants
 
-- **Neither roster above is conditional on a run mode.** A run that holds a renderer, a preset
+- **Neither the vocabulary nor the event roster is conditional on a run mode.** A run that holds a renderer, a preset
   directory and a rotation policy performs both tables, whether it opens a window or writes frames
   to a pipe; the two differ in the window and the sink and in nothing here. A mode that held that
   state and reported none of it would be silent rather than broken, which is why this is an

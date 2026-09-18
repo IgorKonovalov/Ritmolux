@@ -29,6 +29,44 @@ const ENV_HISTORY: usize = 384;
 const MIN_BPM: f32 = 60.0;
 const MAX_BPM: f32 = 200.0;
 
+/// Bottom of the octave [`fold`] reports in, inclusive.
+pub const FOLD_MIN_BPM: f32 = 70.0;
+
+/// Top of that octave, exclusive. **Exactly twice [`FOLD_MIN_BPM`]**, which is
+/// what makes the fold total: halving until below the top leaves a value under
+/// it, and doubling until at or above the bottom cannot then pass it, so every
+/// positive input lands in the window in at most a few steps.
+pub const FOLD_MAX_BPM: f32 = 2.0 * FOLD_MIN_BPM;
+
+/// `bpm` moved by whole octaves into `[FOLD_MIN_BPM, FOLD_MAX_BPM)`; `0` for a
+/// cold or non-finite estimate.
+///
+/// **This settles the octave by fiat, and that is the whole of what it does.**
+/// The estimator declines to settle it because the autocorrelation carries no
+/// evidence either way (see [`TempoTracker::hold`]), and nothing here supplies
+/// that evidence — it picks one octave so that every consumer picks the *same*
+/// one. The result is a power-of-two multiple of the input and never a musical
+/// claim: a piece genuinely at 60 BPM folds to 120, and a consumer counting
+/// beats from it counts two per bar-line.
+///
+/// It is published beside [`BeatClock::bpm`] and never instead of it, because
+/// presets and the OSC contract are bound to the raw estimate.
+pub fn fold(bpm: f32) -> f32 {
+    if !bpm.is_finite() || bpm <= 0.0 {
+        return 0.0;
+    }
+    let mut folded = bpm;
+    // Each iteration strictly halves or doubles a positive finite value, so both
+    // loops terminate; the estimator's own range needs at most one step of each.
+    while folded >= FOLD_MAX_BPM {
+        folded *= 0.5;
+    }
+    while folded < FOLD_MIN_BPM {
+        folded *= 2.0;
+    }
+    folded
+}
+
 /// A challenging lag must lead the held one's correlation by this fraction
 /// before it even starts counting toward a switch, so two near-tied peaks
 /// cannot trade the estimate back and forth hop by hop. Named and sized after
@@ -81,6 +119,9 @@ pub struct TempoTracker {
 pub struct BeatClock {
     /// Tempo estimate in BPM; 0 until the tracker warms.
     pub bpm: f32,
+    /// [`bpm`](Self::bpm) folded into `[FOLD_MIN_BPM, FOLD_MAX_BPM)`, or 0 while
+    /// the tracker is cold. Beside the estimate, never instead of it.
+    pub bpm_folded: f32,
     /// Beat phase in [0, 1) — the shipped `bar` variable, whose name is a
     /// documented misnomer (ADR-0050).
     pub bar: f32,
@@ -142,6 +183,7 @@ impl TempoTracker {
 
         BeatClock {
             bpm: self.bpm,
+            bpm_folded: fold(self.bpm),
             bar: self.phase,
             beat_index: self.beats_seen.saturating_sub(1),
             time_since_beat: self.hops_since_beat as f32 * self.hop_sec,
@@ -260,5 +302,98 @@ impl TempoTracker {
             .zip(self.env.iter().skip(lag))
             .map(|(x, y)| (x - mean) * (y - mean))
             .sum()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::dsp::HOP_SIZE;
+
+    /// The fastest lag the search reaches at 48 kHz, and the BPM it reports
+    /// there.
+    ///
+    /// `min_lag` is `floor(60 / (MAX_BPM * hop_sec))`, and the floor is what
+    /// makes the wall sit *above* `MAX_BPM`: 28 hops rather than 28.125, which
+    /// reads 200.89 BPM. `refine` leaves it alone because it declines to
+    /// interpolate at either end of the range, so the wall is reported as that
+    /// one exact repeated value rather than as a neighbourhood around it.
+    #[test]
+    fn the_top_of_the_search_range_is_a_wall_at_200_9_bpm() {
+        let hop_sec = HOP_SIZE as f32 / 48_000.0;
+        let min_lag = (60.0 / (MAX_BPM * hop_sec)).floor();
+        assert_eq!(min_lag, 28.0);
+        let at_the_wall = 60.0 / (min_lag * hop_sec);
+        assert!(
+            (at_the_wall - 200.9).abs() < 0.05,
+            "the fastest searchable lag reads {at_the_wall:.2} BPM"
+        );
+        assert!(
+            at_the_wall > MAX_BPM,
+            "the wall sits above MAX_BPM, so a reading over {MAX_BPM} is the range's \
+             edge and not an estimate past it"
+        );
+    }
+
+    /// Every octave of one rate folds to the same answer, and that answer is in
+    /// the window.
+    #[test]
+    fn the_fold_lands_in_its_window_and_is_octave_invariant() {
+        for base in [70.0f32, 99.5, 100.45, 120.0, 139.9] {
+            let folded = fold(base);
+            assert!(
+                (folded - base).abs() < 1e-3,
+                "{base} is already in the window and should not move, got {folded}"
+            );
+            for octave in [0.25f32, 0.5, 2.0, 4.0] {
+                let shifted = fold(base * octave);
+                assert!(
+                    (shifted - base).abs() < 1e-2,
+                    "{base} BPM at {octave}x folded to {shifted}, not back to {base}"
+                );
+            }
+        }
+    }
+
+    /// The window is closed at the bottom and open at the top, over the whole
+    /// range the estimator can report plus an octave either side of it.
+    #[test]
+    fn the_fold_covers_the_estimators_whole_range() {
+        let hop_sec = HOP_SIZE as f32 / 48_000.0;
+        let wall = 60.0 / ((60.0 / (MAX_BPM * hop_sec)).floor() * hop_sec);
+        for step in 0..=400 {
+            let bpm = MIN_BPM + (wall - MIN_BPM) * step as f32 / 400.0;
+            let folded = fold(bpm);
+            assert!(
+                (FOLD_MIN_BPM..FOLD_MAX_BPM).contains(&folded),
+                "{bpm} BPM folded to {folded}, outside [{FOLD_MIN_BPM}, {FOLD_MAX_BPM})"
+            );
+            // A power-of-two multiple, asserted rather than assumed: the ratio's
+            // base-2 logarithm must be a whole number.
+            let octaves = (bpm / folded).log2();
+            assert!(
+                (octaves - octaves.round()).abs() < 1e-4,
+                "{bpm} BPM to {folded} is {octaves} octaves, which is not a whole one"
+            );
+        }
+    }
+
+    /// A cold or nonsense estimate folds to zero rather than looping.
+    #[test]
+    fn a_cold_estimate_folds_to_zero() {
+        assert_eq!(fold(0.0), 0.0);
+        assert_eq!(fold(-120.0), 0.0);
+        assert_eq!(fold(f32::NAN), 0.0);
+        assert_eq!(fold(f32::INFINITY), 0.0);
+    }
+
+    /// The published clock carries the fold beside the estimate rather than
+    /// instead of it.
+    #[test]
+    fn the_clock_publishes_both_tempos() {
+        let mut tracker = TempoTracker::new(48_000);
+        let clock = tracker.process(0.0, false);
+        assert_eq!(clock.bpm, 0.0);
+        assert_eq!(clock.bpm_folded, 0.0, "a cold tracker folds nothing");
     }
 }

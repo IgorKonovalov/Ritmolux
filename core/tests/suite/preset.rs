@@ -588,6 +588,13 @@ fn from_frame_binds_every_analysis_variable_to_its_own_field() {
             std::array::from_fn(|i| -0.5 + i as f32 / 512.0),
         ],
         waveform_pair_gain: 0.66,
+        // The musical layer (ADR-0145's lighting consumers). Deliberately
+        // non-zero and, like the two diagnostics above, deliberately outside
+        // the grammar — `the_schema_declares_every_grammar_name_the_engine
+        // _knows_and_no_other` is where that absence is asserted.
+        bpm_folded: 64.0,
+        musical_beat: true,
+        musical_beat_index: 41,
     };
     // Not on the frame: the renderer supplies its own clock here, the probe the
     // hop position it synthesized. That is why it stays an argument.
@@ -4538,6 +4545,12 @@ fn the_schema_declares_every_grammar_name_the_engine_knows_and_no_other() {
         // The downbeat gate's own confidence, deliberately out of the grammar.
         "downbeat_confidence",
         "downbeat_locked",
+        // The musical layer (ADR-0145): published on the frame and over OSC for
+        // a lighting consumer, and deliberately not a preset binding — a look
+        // that wants a beat has `beat` and the bar grid already.
+        "bpm_folded",
+        "musical_beat",
+        "musical_beat_index",
         // Plausible neighbours of names that are in it.
         "tan",
         "log10",

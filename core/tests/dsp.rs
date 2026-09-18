@@ -747,6 +747,9 @@ fn analysis_is_deterministic() {
                     treb_raw,
                     onset_raw,
                     bpm,
+                    bpm_folded,
+                    musical_beat,
+                    musical_beat_index,
                     bar,
                     beat_index,
                     time_since_beat,
@@ -777,6 +780,7 @@ fn analysis_is_deterministic() {
                         treb_raw.to_bits(),
                         onset_raw.to_bits(),
                         bpm.to_bits(),
+                        bpm_folded.to_bits(),
                         bar.to_bits(),
                         time_since_beat.to_bits(),
                         bar_phase.to_bits(),
@@ -784,7 +788,13 @@ fn analysis_is_deterministic() {
                         novelty.to_bits(),
                     ],
                     beat,
-                    vec![beat_index, beat_in_bar, bar_index],
+                    vec![
+                        beat_index,
+                        beat_in_bar,
+                        bar_index,
+                        musical_beat_index,
+                        u32::from(musical_beat),
+                    ],
                     downbeat_locked,
                 )
             })
@@ -1033,4 +1043,274 @@ fn a_high_tone_reads_as_an_oscillation_rather_than_aliasing_flat() {
         "a 12 kHz tone must read as a dense oscillation, got {crossings} crossings \
          — a decimated trace would be nearly flat"
     );
+}
+
+// ---------------------------------------------------------------------------
+// The musical layer: a folded tempo, and a beat that is one of them
+// ---------------------------------------------------------------------------
+
+/// What one run of the analyzer observed past its warm-up.
+///
+/// The warm-up matters here rather than being tidiness: the tempo tracker
+/// publishes 0 until its 4.1 s envelope history is full and then latches its
+/// first argmax, so a reading taken before it settles is a reading of the
+/// warm-up and not of the material.
+struct MusicalRun {
+    /// Seconds measured, from the first reported hop.
+    window_secs: f32,
+    /// Mean folded tempo across the window.
+    mean_folded: f32,
+    /// The fastest folded tempo seen in it, which is what bounds how close two
+    /// beat crossings may fall.
+    max_folded: f32,
+    /// Mean raw estimate across the window.
+    mean_bpm: f32,
+    /// Hops on which `musical_beat` was true, from the second reported hop on.
+    musical_hops: Vec<usize>,
+    /// `musical_beat_index` at the first and last reported hop.
+    musical_index: (u32, u32),
+    /// `beat_index` at the same two hops — the transient counter, for contrast.
+    onset_index: (u32, u32),
+}
+
+fn musical_run(pcm: &[f32], settle_secs: f32) -> MusicalRun {
+    let mut analyzer = mono_analyzer();
+    let settle_hops = (settle_secs * SR as f32 / HOP_SIZE as f32) as usize;
+    let hop_sec = HOP_SIZE as f32 / SR as f32;
+    let mut folded_sum = 0.0f64;
+    let mut max_folded = 0.0f32;
+    let mut bpm_sum = 0.0f64;
+    let mut measured = 0usize;
+    let mut musical_hops = Vec::new();
+    let mut musical_index = (0u32, 0u32);
+    let mut onset_index = (0u32, 0u32);
+    for (hop, samples) in pcm.chunks(HOP_SIZE).enumerate() {
+        analyzer.push_interleaved(samples);
+        let frame = analyzer.take_frame();
+        if hop < settle_hops {
+            continue;
+        }
+        if measured == 0 {
+            musical_index.0 = frame.musical_beat_index;
+            onset_index.0 = frame.beat_index;
+        } else if frame.musical_beat {
+            // From the second reported hop, so this list and the index
+            // difference below count the same crossings.
+            musical_hops.push(hop);
+        }
+        folded_sum += f64::from(frame.bpm_folded);
+        max_folded = max_folded.max(frame.bpm_folded);
+        bpm_sum += f64::from(frame.bpm);
+        musical_index.1 = frame.musical_beat_index;
+        onset_index.1 = frame.beat_index;
+        measured += 1;
+    }
+    MusicalRun {
+        window_secs: measured as f32 * hop_sec,
+        mean_folded: (folded_sum / measured.max(1) as f64) as f32,
+        max_folded,
+        mean_bpm: (bpm_sum / measured.max(1) as f64) as f32,
+        musical_hops,
+        musical_index,
+        onset_index,
+    }
+}
+
+/// **The property, not a threshold:** against a signal synthesized at a known
+/// BPM the folded tempo lands inside the fold window and is a power-of-two
+/// multiple of the synthesized rate.
+///
+/// The *estimator's* accuracy is explicitly not what this asserts — an octave
+/// error passes here, which is the whole point of a fold. What it catches is a
+/// fold that landed outside its own window, or one that moved the estimate by
+/// something other than a whole octave.
+#[test]
+fn the_folded_tempo_is_an_octave_of_the_synthesized_rate_inside_its_window() {
+    use rlx_core::dsp::tempo::{FOLD_MAX_BPM, FOLD_MIN_BPM};
+
+    let format = AudioFormat {
+        sample_rate: SR,
+        channels: 1,
+    };
+    for truth in [90.0f32, 120.0, 150.0] {
+        let pcm = rlx_core::signal::click_track(truth, 24.0, format);
+        let run = musical_run(&pcm, 10.0);
+        println!(
+            "[musical] {truth:.0} BPM click: estimator {:.2}, folded {:.2}",
+            run.mean_bpm, run.mean_folded
+        );
+        assert!(
+            (FOLD_MIN_BPM..FOLD_MAX_BPM).contains(&run.mean_folded),
+            "{truth} BPM folded to {:.2}, outside [{FOLD_MIN_BPM}, {FOLD_MAX_BPM})",
+            run.mean_folded
+        );
+        let octaves = (run.mean_folded / truth).log2();
+        assert!(
+            (octaves - octaves.round()).abs() < 0.06,
+            "{truth} BPM folded to {:.2}, which is {octaves:.3} octaves away — not a \
+             whole one, so the fold moved the estimate by something other than an octave",
+            run.mean_folded
+        );
+    }
+}
+
+/// **The musical beat fires at most once per folded beat period.**
+///
+/// A property of the clock rather than of a threshold: the beat is a phase
+/// accumulator advanced at the folded tempo, so the count over a window is that
+/// window's length in folded beats, to within the one crossing the window's own
+/// edges can hide. It fails loudly if the musical layer is ever reduced back to
+/// a gated transient counter — `beat_index` over the same material is the
+/// contrast, and it is printed.
+#[test]
+fn the_musical_beat_fires_at_most_once_per_folded_beat_period() {
+    let format = AudioFormat {
+        sample_rate: SR,
+        channels: 1,
+    };
+    let hop_sec = HOP_SIZE as f32 / SR as f32;
+    for truth in [90.0f32, 124.0] {
+        // `dynamic_groove` is material the transient detector over-fires on,
+        // which is what makes the contrast below a measurement rather than an
+        // arrangement.
+        let pcm = rlx_core::signal::dynamic_groove(truth, 24.0, format);
+        let run = musical_run(&pcm, 10.0);
+        let counted = run.musical_index.1 - run.musical_index.0;
+        let onsets = run.onset_index.1 - run.onset_index.0;
+        let available = run.window_secs * run.mean_folded / 60.0;
+        println!(
+            "[musical] {truth:.0} BPM groove over {:.1} s: estimator {:.2}, folded {:.2}, \
+             {counted} musical beat(s) against {available:.2} available, {onsets} onset(s)",
+            run.window_secs, run.mean_bpm, run.mean_folded
+        );
+
+        assert_eq!(
+            counted as usize,
+            run.musical_hops.len(),
+            "the flag and the index disagree about how many musical beats there were"
+        );
+        assert!(
+            counted > 0,
+            "no musical beat fired at all, so nothing below is asserted"
+        );
+        // One crossing of slack: the window's ends cut across beats, and the
+        // folded tempo moves a little inside it.
+        assert!(
+            counted as f32 <= available + 1.0,
+            "{counted} musical beats in {:.1} s at {:.2} folded BPM, where only \
+             {available:.2} beat periods fit — the clock fired more than once in one",
+            run.window_secs,
+            run.mean_folded
+        );
+
+        // And the gaps, one by one, against the bound the clock derives rather
+        // than a tuned one.
+        //
+        // A hop advances the grid's phase by at most `advance + LOCK_GAIN * 0.5`
+        // — the tempo plus the phase lock's largest possible correction — taken
+        // at the fastest folded tempo the window saw. A beat therefore needs at
+        // least `1 / step` hops, **less the carry**: the crossing leaves a
+        // remainder of up to one step on the phase, so the next beat can start
+        // that much of the way in. One whole step of carry is the worst case, so
+        // the floor is `1 / step - 1` hops.
+        //
+        // It is well under a nominal beat period because the lock is allowed to
+        // compress one beat while it pulls the grid onto the music. Averaging
+        // that away is what the count assertion above does; this one is what
+        // still fails if the clock is replaced by a transient counter.
+        let advance = run.max_folded * hop_sec / 60.0;
+        let step = advance + rlx_core::dsp::grid::LOCK_GAIN * 0.5;
+        let floor = (1.0 / step - 1.0) * hop_sec;
+        for pair in run.musical_hops.windows(2) {
+            let gap = (pair[1] - pair[0]) as f32 * hop_sec;
+            assert!(
+                gap >= floor,
+                "two musical beats {gap:.3} s apart, where the grid's own rate bound at \
+                 {:.2} folded BPM puts the shortest possible beat at {floor:.3} s",
+                run.max_folded
+            );
+        }
+        assert!(
+            onsets > counted,
+            "the transient counter fired {onsets} times and the musical clock {counted}; \
+             on material the detector over-fires on, the musical layer must be the sparser \
+             of the two or it is not a musical layer"
+        );
+    }
+}
+
+/// The musical layer is a pure function of its input, like everything else in
+/// the analyzer.
+#[test]
+fn the_musical_layer_is_deterministic() {
+    let format = AudioFormat {
+        sample_rate: SR,
+        channels: 1,
+    };
+    let pcm = rlx_core::signal::dynamic_groove(124.0, 12.0, format);
+    let run = || {
+        let mut analyzer = mono_analyzer();
+        let mut series = Vec::new();
+        for samples in pcm.chunks(HOP_SIZE) {
+            analyzer.push_interleaved(samples);
+            let frame = analyzer.take_frame();
+            series.push((
+                frame.bpm_folded.to_bits(),
+                frame.musical_beat,
+                frame.musical_beat_index,
+            ));
+        }
+        series
+    };
+    assert_eq!(run(), run());
+}
+
+/// **The musical layer moves nothing that was already published.** `beat`,
+/// `beat_index` and `time_since_beat` read what they always read, asserted by
+/// deriving them from the beat-flag stream rather than against a recorded
+/// series — so the claim holds with no baseline to bless.
+#[test]
+fn the_musical_layer_does_not_move_the_published_beat_clock() {
+    let format = AudioFormat {
+        sample_rate: SR,
+        channels: 1,
+    };
+    let pcm = rlx_core::signal::click_track(120.0, 12.0, format);
+    let mut analyzer = mono_analyzer();
+    let hop_sec = HOP_SIZE as f32 / SR as f32;
+    let mut flags = 0u32;
+    let mut since = 0u32;
+    let mut saw_a_beat = false;
+    for (hop, samples) in pcm.chunks(HOP_SIZE).enumerate() {
+        analyzer.push_interleaved(samples);
+        let frame = analyzer.take_frame();
+        if hop + 1 < rlx_core::dsp::WARMUP_HOPS {
+            continue;
+        }
+        if frame.beat {
+            flags += 1;
+            since = 0;
+            saw_a_beat = true;
+        } else {
+            since += 1;
+        }
+        assert_eq!(
+            frame.beat_index,
+            flags.saturating_sub(1),
+            "hop {hop}: beat_index must still be the flag count less one"
+        );
+        assert_eq!(
+            frame.time_since_beat.to_bits(),
+            (since as f32 * hop_sec).to_bits(),
+            "hop {hop}: time_since_beat must still be hops-since-flag on the hop clock"
+        );
+        // The fold is a function of the estimate and nothing else, so the two
+        // cannot drift apart inside a run.
+        assert_eq!(
+            frame.bpm_folded.to_bits(),
+            rlx_core::dsp::tempo::fold(frame.bpm).to_bits(),
+            "hop {hop}: the published fold is not the fold of the published estimate"
+        );
+    }
+    assert!(saw_a_beat, "the clip should have produced beats at all");
 }

@@ -191,6 +191,33 @@ pub struct AnalysisFrame {
     pub onset_raw: f32,
     /// Tempo estimate in BPM (hop-clock autocorrelation; 0 until warm).
     pub bpm: f32,
+    /// [`bpm`](Self::bpm) moved by whole octaves into
+    /// `[FOLD_MIN_BPM, FOLD_MAX_BPM)`; 0 while the tracker is cold.
+    ///
+    /// **Beside `bpm`, never instead of it.** The estimator declines to settle
+    /// the octave because the autocorrelation carries no evidence either way,
+    /// and this settles it by fiat so that every consumer settles it the *same*
+    /// way rather than each writing its own three lines. It is a power-of-two
+    /// multiple of `bpm` and it is not a musical claim.
+    ///
+    /// [`FOLD_MIN_BPM`]: tempo::FOLD_MIN_BPM
+    /// [`FOLD_MAX_BPM`]: tempo::FOLD_MAX_BPM
+    pub bpm_folded: f32,
+    /// Whether a **musical** beat boundary fell on this hop — the tempo-layer
+    /// counterpart of [`beat`](Self::beat).
+    ///
+    /// Not a gated [`beat_index`](Self::beat_index). It is a second
+    /// [`grid::BarGrid`] run at [`bpm_folded`](Self::bpm_folded) and
+    /// phase-locked to the onset envelope, so it fires **exactly once per
+    /// folded beat period** by construction rather than once per transient that
+    /// clears a window. A detector that fires early cannot double it and one
+    /// that misses cannot swallow it, which is ADR-0109's argument for a
+    /// tempo-driven clock applied one layer out.
+    pub musical_beat: bool,
+    /// Zero-based index of the musical beat now in progress, 0 until the folded
+    /// grid starts running. Increments exactly on the hops
+    /// [`musical_beat`](Self::musical_beat) is true.
+    pub musical_beat_index: u32,
     /// Beat phase in [0, 1): 0 on each beat, ramping to the next.
     ///
     /// The name is a **documented misnomer** — this is beat phase, not bar phase.
@@ -252,6 +279,9 @@ impl Default for AnalysisFrame {
             treb_raw: 0.0,
             onset_raw: 0.0,
             bpm: 0.0,
+            bpm_folded: 0.0,
+            musical_beat: false,
+            musical_beat_index: 0,
             bar: 0.0,
             beat_index: 0,
             time_since_beat: 0.0,
@@ -283,7 +313,9 @@ impl AnalysisFrame {
     ///   magnitude has no top to name, and any value picked for one would be a
     ///   gain-staging assumption. A binding reading `bass_raw` sees silence here.
     /// - `bpm` stays `0`, the tracker's own not-yet-warm value. There is no
-    ///   "full scale" tempo.
+    ///   "full scale" tempo — and `bpm_folded`, `musical_beat` and
+    ///   `musical_beat_index` are all derived from it, so a cold tempo is a
+    ///   silent musical layer and they take their defaults for the same reason.
     /// - `bar` is a **phase** in `[0, 1)`, not a level, so it takes `0.5` — the
     ///   middle of a beat rather than either edge, so a `bar`-driven binding
     ///   reads a typical position instead of sitting on the wrap.
@@ -339,6 +371,24 @@ pub struct Analyzer {
     /// absorbs it — and rounding *up* rather than down is what guarantees the
     /// published bar cannot step back at the handover.
     grid_offset: Option<u32>,
+    /// The **musical** beat clock: a second [`grid::BarGrid`] run at the folded
+    /// tempo rather than the raw estimate.
+    ///
+    /// A whole second grid rather than a gate on `beat_index`, because a gate is
+    /// the thing every consumer was already writing by hand and it inherits the
+    /// transient detector's jitter: a beat detected a little early is refused
+    /// and the gate then latches onto the off-beat. A phase accumulator advanced
+    /// at [`tempo::fold`]'s rate crosses its boundary exactly once per folded
+    /// beat period whatever the detector does, and the envelope lock is what
+    /// keeps it on the music.
+    ///
+    /// Separate from [`grid`](Self::grid) and never a replacement for it: that
+    /// one runs at the raw estimate because the downbeat fold's bar is defined
+    /// against it, and moving it would move every published bar variable.
+    musical: grid::BarGrid,
+    /// The musical grid's beat count as of the previous hop, so a crossing is
+    /// read as an increment rather than as a phase comparison.
+    musical_beats: u32,
     novelty: novelty::NoveltyDetector,
     /// ADR-0050 Layer 2. Reads the **normalized** bass and flux, unlike the
     /// detectors above: its accent blend weighs the two against each other, which
@@ -398,6 +448,8 @@ impl Analyzer {
             tempo: tempo::TempoTracker::new(format.sample_rate),
             grid: grid::BarGrid::new(format.sample_rate),
             grid_offset: None,
+            musical: grid::BarGrid::new(format.sample_rate),
+            musical_beats: 0,
             novelty: novelty::NoveltyDetector::new(format.sample_rate),
             downbeat: downbeat::DownbeatTracker::new(),
             band_gain: gain::BandNormalizer::new(format.sample_rate),
@@ -474,6 +526,17 @@ impl Analyzer {
                     // flattens by construction.
                     let clock = self.tempo.process(onset_raw, beat);
                     let grid = self.grid.process(clock.bpm, onset_raw);
+                    // The musical layer, on the same raw envelope and at the
+                    // folded rate. Its beat count is `bar_index * 4 +
+                    // beat_in_bar` — the grid publishes the decomposition and
+                    // not the total — and a crossing is that total increasing.
+                    let musical = self.musical.process(clock.bpm_folded, onset_raw);
+                    let musical_beats = musical
+                        .bar_index
+                        .saturating_mul(downbeat::BEATS_PER_BAR)
+                        .saturating_add(musical.beat_in_bar);
+                    let musical_beat = musical.running && musical_beats > self.musical_beats;
+                    self.musical_beats = musical_beats;
                     let novelty = self.novelty.process(&raw_spectrum);
 
                     // ...and normalization happens last, on the way out.
@@ -561,6 +624,9 @@ impl Analyzer {
                         treb_raw,
                         onset_raw,
                         bpm: clock.bpm,
+                        bpm_folded: clock.bpm_folded,
+                        musical_beat,
+                        musical_beat_index: musical_beats,
                         bar: clock.bar,
                         beat_index: clock.beat_index,
                         time_since_beat: clock.time_since_beat,

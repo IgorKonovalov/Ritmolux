@@ -27,6 +27,13 @@ fn sample(preset: &str) -> Telemetry<'_> {
         beat_index: 7,
         beat_phase: 0.75,
         tempo: 128.0,
+        beat_in_bar: 2,
+        bar_index: 9,
+        bar_phase: 0.5625,
+        downbeat_locked: true,
+        tempo_folded: 128.0,
+        musical_beat: true,
+        musical_beat_index: 11,
         preset,
     }
 }
@@ -178,7 +185,43 @@ fn the_table_binds_each_value_to_its_own_address() {
     assert_eq!(find("/rlx/v1/beat/index"), Arg::I(7));
     assert_eq!(find("/rlx/v1/beat/phase"), Arg::F(0.75));
     assert_eq!(find("/rlx/v1/tempo"), Arg::F(128.0));
+    assert_eq!(find("/rlx/v1/bar/beat"), Arg::I(2));
+    assert_eq!(find("/rlx/v1/bar/index"), Arg::I(9));
+    assert_eq!(find("/rlx/v1/bar/phase"), Arg::F(0.5625));
+    assert_eq!(find("/rlx/v1/bar/locked"), Arg::I(1));
+    assert_eq!(find("/rlx/v1/music/tempo"), Arg::F(128.0));
+    assert_eq!(find("/rlx/v1/music/trigger"), Arg::I(1));
+    assert_eq!(find("/rlx/v1/music/index"), Arg::I(11));
     assert_eq!(find("/rlx/v1/preset"), Arg::S("rose_star"));
+}
+
+/// The two flags are binary, and the musical trigger is **not** the transient
+/// one: a frame can carry either without the other, which is the whole reason
+/// the second address exists.
+#[test]
+fn the_two_triggers_are_independent_binary_flags() {
+    fn find<'a>(telemetry: &Telemetry<'a>, address: &str) -> Arg<'a> {
+        telemetry
+            .messages()
+            .iter()
+            .find(|(a, _)| *a == address)
+            .unwrap_or_else(|| panic!("{address} is not in the table"))
+            .1
+    }
+
+    let mut transient_only = sample("p");
+    transient_only.musical_beat = false;
+    assert_eq!(find(&transient_only, "/rlx/v1/beat/trigger"), Arg::I(1));
+    assert_eq!(find(&transient_only, "/rlx/v1/music/trigger"), Arg::I(0));
+
+    let mut musical_only = sample("p");
+    musical_only.beat = false;
+    assert_eq!(find(&musical_only, "/rlx/v1/beat/trigger"), Arg::I(0));
+    assert_eq!(find(&musical_only, "/rlx/v1/music/trigger"), Arg::I(1));
+
+    let mut warming = sample("p");
+    warming.downbeat_locked = false;
+    assert_eq!(find(&warming, "/rlx/v1/bar/locked"), Arg::I(0));
 }
 
 /// The beat trigger is the discrete event, so it is 0 on a frame with no onset —

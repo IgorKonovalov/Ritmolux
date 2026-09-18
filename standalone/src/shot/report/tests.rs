@@ -843,6 +843,9 @@ fn the_clock_stimulus_moves_the_clock_and_nothing_else() {
             downbeat_confidence,
             downbeat_locked,
             novelty,
+            bpm_folded,
+            musical_beat,
+            musical_beat_index,
         } = *frame;
 
         // Everything that is not the clock stays at rest.
@@ -890,6 +893,9 @@ fn the_clock_stimulus_moves_the_clock_and_nothing_else() {
                 rest.downbeat_confidence,
             ),
             ("novelty", novelty, rest.novelty),
+            // The musical layer rides the tempo estimate, which this stimulus
+            // does not move — so it stays at rest along with `bpm`.
+            ("bpm_folded", bpm_folded, rest.bpm_folded),
         ] {
             assert_eq!(
                 got.to_bits(),
@@ -900,6 +906,12 @@ fn the_clock_stimulus_moves_the_clock_and_nothing_else() {
         assert_eq!(
             downbeat_locked, rest.downbeat_locked,
             "frame {i}: downbeat_locked moved"
+        );
+        assert_eq!(
+            (musical_beat, musical_beat_index),
+            (rest.musical_beat, rest.musical_beat_index),
+            "frame {i}: the musical layer moved, and this stimulus drives the \
+             transient counter rather than a tempo"
         );
 
         // The clock: the event fires exactly where the counter steps.

@@ -1125,6 +1125,13 @@ impl AppState {
                     // (ADR-0050); the wire uses the true name.
                     beat_phase: frame.bar,
                     tempo: frame.bpm,
+                    beat_in_bar: frame.beat_in_bar,
+                    bar_index: frame.bar_index,
+                    bar_phase: frame.bar_phase,
+                    downbeat_locked: frame.downbeat_locked,
+                    tempo_folded: frame.bpm_folded,
+                    musical_beat: frame.musical_beat,
+                    musical_beat_index: frame.musical_beat_index,
                     preset,
                 },
             );

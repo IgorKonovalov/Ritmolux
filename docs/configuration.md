@@ -498,7 +498,14 @@ address, so a console binds a parameter to an address rather than to a position 
 | `/rlx/v1/beat/trigger` | `i` | `1` on a frame an onset fired, `0` otherwise — the discrete event |
 | `/rlx/v1/beat/index` | `i` | Monotone count of onset detections. **Not a musical beat count** — the detector fires 1.2x–2.3x per beat depending on material, so no fixed multiplier turns it into bars. Useful as a ratchet, not as a meter |
 | `/rlx/v1/beat/phase` | `f` | Beat phase in `[0, 1)`: `0` on each beat, ramping to the next |
-| `/rlx/v1/tempo` | `f` | Tempo estimate in BPM, `0` until the tracker warms. Expect a warm-up of tens of seconds before it settles |
+| `/rlx/v1/tempo` | `f` | Tempo estimate in BPM, `0` until the tracker warms. Expect a warm-up of tens of seconds before it settles, and **read the octave note below before deriving timing from it** |
+| `/rlx/v1/bar/beat` | `i` | Which beat of the bar this is, `0`–`3`, on the tempo-driven grid |
+| `/rlx/v1/bar/index` | `i` | Bar counter on that grid |
+| `/rlx/v1/bar/phase` | `f` | Position across the bar in `[0, 1)` — the true bar phase, as against `beat/phase` |
+| `/rlx/v1/bar/locked` | `i` | `1` while the three rows above come from the downbeat estimator, `0` while they come from the counter fallback. **Bind this before you trust the other three**: a warming grid is counting, not hearing |
+| `/rlx/v1/music/tempo` | `f` | `tempo` folded into one octave, `70`–`140` BPM. `0` until the tracker warms |
+| `/rlx/v1/music/trigger` | `i` | `1` on a frame a **musical** beat fell, `0` otherwise — the tempo-layer counterpart of `beat/trigger` |
+| `/rlx/v1/music/index` | `i` | Monotone count of musical beats. This one **is** a meter: it advances exactly once per `music/tempo` beat period |
 | `/rlx/v1/preset` | `s` | The active preset's name |
 
 **`level/*` touches its ceiling by design, and no input gain moves it.** Each of the four is
@@ -520,9 +527,24 @@ loudness. Two consequences are worth knowing before a fixture is bound to one:
   binding: reach for `raw/*`, which is the absolute twin and is published beside every one of them,
   and scale it yourself.
 
+**`tempo` does not settle the octave, and `music/tempo` settles it by fiat.** The estimator searches
+60–200 BPM and reports the strongest periodicity it finds; a signal at 100 BPM and one at 200 BPM
+look alike to an autocorrelation, so the reading is as likely to be double or half as it is to be
+right. `music/tempo` moves that reading by whole octaves into 70–140 BPM, which is **not** a claim
+about what the piece is — a piece genuinely at 60 BPM folds to 120 — but it does mean every consumer
+settles the octave the same way instead of each writing its own three lines. `music/trigger` and
+`music/index` run at `music/tempo`, so they inherit the same fold.
+
+Two readings to expect rather than be surprised by. `tempo` can report slightly **above 200** — the
+search's fastest lag lands at 200.9 BPM at 48 kHz, and a reading pinned there means the periodicity
+is at or past the edge of the range rather than that the piece is that fast. And at the fold's own
+boundary the estimate is least stable: an estimate wobbling around 140 makes `music/tempo` jump
+between 139 and 70, which halves and doubles the musical beat rate with it.
+
 Telemetry rides the rendered frame, so it stops when the window is hidden and the preset name lags
-a switch by one frame. Nothing here is a musical timebase you can drive a sequencer from — it is a
-level feed for lights.
+a switch by one frame. `music/*` and `bar/*` are the closest thing here to a musical timebase, and
+they are still an estimate followed by a phase lock — good enough to drive a room, not a clock to
+sequence against.
 
 **The root moved in this release: `/lmv/v1` became `/rlx/v1`.** There is no transition period and
 no dual-emit, and OSC has no error channel — so **a binding left on the old root stops firing and

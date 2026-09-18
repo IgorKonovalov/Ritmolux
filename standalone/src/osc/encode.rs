@@ -20,7 +20,7 @@ pub const ADDRESS_PREFIX: &str = "/rlx/v1";
 /// How many addresses the fixed set publishes — the length of
 /// [`super::Telemetry::messages`], exposed so a caller can size a buffer or assert the
 /// roster without re-counting it.
-pub const ADDRESS_COUNT: usize = 14;
+pub const ADDRESS_COUNT: usize = 21;
 
 /// One OSC argument. The three types this project reads and writes; `s` borrows
 /// so the preset name does not have to be cloned every frame.

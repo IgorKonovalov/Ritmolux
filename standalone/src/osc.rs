@@ -99,6 +99,30 @@ pub struct Telemetry<'a> {
     pub beat_phase: f32,
     /// Tempo estimate in BPM, 0 until the tracker warms.
     pub tempo: f32,
+    /// Which beat of the bar this is, `0..4`.
+    pub beat_in_bar: u32,
+    /// Bar counter on the tempo-driven grid.
+    pub bar_index: u32,
+    /// Position across the bar in `[0, 1)` — the true bar phase, as against
+    /// [`Self::beat_phase`].
+    pub bar_phase: f32,
+    /// Whether the bar trio above came from the downbeat estimator rather than
+    /// from the counter fallback.
+    ///
+    /// **Published beside the grid rather than withheld as a diagnostic.** A
+    /// consumer that cannot tell a locked grid from a warming one has to guess,
+    /// and the guess it writes is a worse version of this flag.
+    pub downbeat_locked: bool,
+    /// The tempo estimate folded into one octave — the same number every
+    /// consumer of [`Self::tempo`] was otherwise going to compute for itself,
+    /// each with its own window.
+    pub tempo_folded: f32,
+    /// Whether a musical beat fell on this frame, as against
+    /// [`Self::beat`]'s transient.
+    pub musical_beat: bool,
+    /// Monotone count of musical beats — the meter [`Self::beat_index`]
+    /// explicitly is not.
+    pub musical_beat_index: u32,
     /// The active preset's name.
     pub preset: &'a str,
 }
@@ -133,6 +157,21 @@ impl<'a> Telemetry<'a> {
             ),
             ("/rlx/v1/beat/phase", Arg::F(self.beat_phase)),
             ("/rlx/v1/tempo", Arg::F(self.tempo)),
+            // The bar grid the engine already computes. Additive under the same
+            // prefix (ADR-0164), so a mapping bound to the rows above keeps
+            // working; a consumer that wants a musical unit no longer has to
+            // rebuild one from the transient counter.
+            ("/rlx/v1/bar/beat", Arg::I(i32::try_from(self.beat_in_bar).unwrap_or(i32::MAX))),
+            ("/rlx/v1/bar/index", Arg::I(i32::try_from(self.bar_index).unwrap_or(i32::MAX))),
+            ("/rlx/v1/bar/phase", Arg::F(self.bar_phase)),
+            ("/rlx/v1/bar/locked", Arg::I(i32::from(self.downbeat_locked))),
+            // The musical layer: one octave, and a beat that is one of them.
+            ("/rlx/v1/music/tempo", Arg::F(self.tempo_folded)),
+            ("/rlx/v1/music/trigger", Arg::I(i32::from(self.musical_beat))),
+            (
+                "/rlx/v1/music/index",
+                Arg::I(i32::try_from(self.musical_beat_index).unwrap_or(i32::MAX)),
+            ),
             ("/rlx/v1/preset", Arg::S(self.preset)),
         ]
     }

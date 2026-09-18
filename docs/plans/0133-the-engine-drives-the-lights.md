@@ -588,6 +588,13 @@ which nothing but the rig can answer. Phase 9 is the whole of the second half, i
 - Phase 2: no operator-quit hotkey exists in this shell — `Escape` never quits and
   `WindowEvent::CloseRequested` is the operator's quit. The two exit paths the done-when names are
   therefore that event and the sink's `Drop`.
+- **Owner note, 2026-09-18: Phase 3's code is on the branch and its log record is not.** The
+  session implementing phases 3-8 was killed mid-phase by the machine going down, leaving Phase 3's
+  analyzer, OSC and spec work uncommitted; it was committed as it stood rather than discarded, and
+  the phase's row stays `not started` because the done-when is not met. What is still owed is the
+  record, not the code: the diagnosis of the 200.9 BPM reading, what the estimator reports against
+  what the fold produces on real material with the machine and material named, and confirmation
+  that no golden moved. Verify the code against the done-when before writing that row.
 
 ### Close triggers
 

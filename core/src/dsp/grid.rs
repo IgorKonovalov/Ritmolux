@@ -66,8 +66,14 @@ const LOCK_TAU_SECS: f32 = 2.0;
 /// structural guarantee is worth more here than an arithmetic one, because
 /// `bar_index` going backwards would be visible in a preset as a repeated bar.
 ///
+/// **Public because it bounds the grid's instantaneous rate**, which is the only
+/// thing that can be said about how close two of its beat crossings may fall: a
+/// hop advances the phase by at most `advance + LOCK_GAIN * 0.5`, so the
+/// shortest possible beat is one hop divided by that. A caller asserting on beat
+/// spacing derives its floor from this rather than tuning one.
+///
 /// [`MIN_BPM`]: super::tempo
-const LOCK_GAIN: f32 = 0.02;
+pub const LOCK_GAIN: f32 = 0.02;
 
 /// Where in the beat the lock parks the envelope's energy, in beats.
 ///
