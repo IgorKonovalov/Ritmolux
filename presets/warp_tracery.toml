@@ -1,0 +1,178 @@
+# Tracery - the banded-contour idiom carried onto a LOBED field, and the only
+# world in this family that prints in three inks. Authored fresh-slate
+# (ADR-0089).
+#
+# IT IS NOT CALLED ROSE WINDOW, AND THAT IS NOT TASTE. `star_rosewindow` already
+# claims that display name, and a duplicate is a hard failure rather than a
+# collision to live with - the shipped set is checked for it and the suite says
+# so by name. The two worlds are also genuinely different things that a shared
+# name would blur: that one is an interlace, drawn, repeated by the symmetry
+# stage into a Droste twist. This one draws nothing - it is a contour map of a
+# feedback field that happens to have seven lobes, and the ribwork is what the
+# contours do rather than a figure anyone laid down. Tracery is the stone
+# between the lights, which is the half of a window this world actually makes.
+#
+# WHAT CHANGES THE PICTURE IS THE SOURCE, NOT THE COLOUR SURFACE. Under
+# `color_source = "1"` a stepped palette draws a contour map of the accumulated
+# level (ADR-0197), so the family of curves it prints is decided entirely by the
+# shape of the hill the deposit builds. A blob gives concentric rings; two lobes
+# give a dipole. Seven lobes on a ring give a hill whose every contour is a
+# seven-petal rosette near the ring, relaxing to a circle far from it - so the
+# frame holds the whole progression from petal to disc at once, read from the
+# middle outward, which is what a rose window is.
+#
+# SEVEN BECAUSE IT IS ODD. An even count is bilaterally symmetric about two axes
+# at once and the eye finds the mirror immediately; an odd one has a single axis
+# and reads as a drawn figure rather than as a fold. It is also coprime with the
+# fourteen bands, so no contour ever lands with its petals on the band edges.
+#
+# THE TWIST IS WHAT MAKES IT A WINDOW AND NOT A GEAR. `deposit_twist` sweeps each
+# arm into a spiral with radius, so the petals lean - and because the contours
+# are curves of the field the lean travels outward with them, each successive
+# ring slightly more turned than the one inside it. Without it the contours are
+# concentric cogs, which is a machine part. With it they are tracery.
+#
+# THREE INKS, AND THE THIRD ONE EARNS THE CONTOUR KEY. `warp_ladder` prints two
+# inks and leaves `palette_contour` off, because on a duotone the key falls
+# INSIDE the dark run it would be marking - a harder edge nobody can see. Put a
+# vermilion between the black and the paper and there are now two seams in every
+# cycle that are worth registering, which is the condition `shape_contourmono`
+# states for wanting a key. It is on here, in the hard-ink style, and this is the
+# only `warp_mesh` world that uses it.
+#
+# NOTHING DRIVES LUMINANCE. The present writes `ink * coverage`, so a brightness
+# term writes values between the inks and the print becomes a photograph. The
+# music goes into the level and the coordinate - into where the tracery is.
+system = "warp_mesh"
+name = "Tracery"
+
+[palette]
+# NINE RUNS, THREE INKS, three cycles of black -> paper -> vermilion. The order
+# matters: paper sits between the two dark inks in both directions, so no cycle
+# ever puts black directly against vermilion, where the two would read as one
+# muddy band at a distance. The transitions are 0.015 wide - one LUT texel, a
+# step that does not alias.
+#
+# The black is `#15100f` and not `#000000` for the reason any print is: a black
+# laid on paper is never the absence of light. The vermilion is desaturated well
+# off the primary so it sits as an INK rather than as a highlight - a saturated
+# red beside a near-black reads as light coming through, and the whole claim here
+# is that nothing is lit.
+stops = [
+  { at = 0.000, color = "#15100f" },
+  { at = 0.095, color = "#15100f" },
+  { at = 0.110, color = "#f2ece0" },
+  { at = 0.205, color = "#f2ece0" },
+  { at = 0.220, color = "#a8232a" },
+  { at = 0.315, color = "#a8232a" },
+  { at = 0.330, color = "#15100f" },
+  { at = 0.425, color = "#15100f" },
+  { at = 0.440, color = "#f2ece0" },
+  { at = 0.535, color = "#f2ece0" },
+  { at = 0.550, color = "#a8232a" },
+  { at = 0.645, color = "#a8232a" },
+  { at = 0.660, color = "#15100f" },
+  { at = 0.755, color = "#15100f" },
+  { at = 0.770, color = "#f2ece0" },
+  { at = 0.865, color = "#f2ece0" },
+  { at = 0.880, color = "#a8232a" },
+  { at = 1.000, color = "#a8232a" },
+]
+
+[params]
+# BAND MAP
+#   bass  -> `deposit` (the tracery grows a ring outward)
+#   mid   -> `deposit_twist` (the petals lean further over, so the whole window
+#            winds and unwinds)
+#   treb  -> `color_span` (the rings crowd)
+#   onset -> a `color_center` push (the window jumps one ring)
+#   time  -> `color_center` (the slow outward growth)
+
+color_source = "1"
+
+# THE SOURCE. A ring at a little under a third of the frame height, broken into
+# seven lobes and swept into a spiral. The ring's radius is what sets where the
+# petals are sharpest: inside it the contours are still closing around each lobe,
+# outside it they have merged and are relaxing toward circles.
+deposit_x      = "0.5"
+deposit_y      = "0.5"
+deposit_radius = "0.30"
+deposit_width  = "0.055"
+deposit_arms   = "7"
+# The lean. Gain sized off the cap: C/G = 0.34/0.4 = 0.85. At rest the petals
+# already carry most of their sweep, and a loud passage pushes them over further
+# rather than starting the sweep from nothing - the window winds, it does not
+# assemble.
+deposit_twist  = "0.62 + clamp(mid * 0.4, 0, 0.34)"
+# A slow turn, and it has to be slower than a figure with fewer lobes would want:
+# the same angular rate carries seven petals past a fixed point instead of one,
+# so a rate that reads as a dignified rotation on a plain ring reads as shimmer
+# here.
+deposit_spin   = "0.045"
+
+# THE LIGHT. C/G = 0.95/1.118 = 0.85, so a typical passage sits near half the cap
+# and a peak reaches it. The baseline is what holds the inner tracery opaque at
+# rest; the reactive part walks a ring out past the ring of lobes.
+deposit = "4.8 + clamp(bass * 1.118, 0, 0.95)"
+# THE REACH. Seven lobes lay down seven times the light into one field, so the
+# tail has to be shorter than a single-source world's: at `warp_ladder`'s 0.955
+# the outer rings reach the corners and the rosette drowns in its own halo.
+decay = "0.928"
+
+# THE COUNTER-DRIFT, inward, and gentle. The resample is the inverse of the
+# motion it names, so below 1 the field's content
+# creeps toward the pivot - which pulls the outer rings back in over the lobes
+# and keeps the petal structure legible instead of letting it relax to circles
+# immediately. What makes the rings MARCH is `color_center`, not this.
+zoom = "0.988"
+# A turn on the resample itself, opposite in sign to `deposit_spin`. The source
+# turns one way and the field it has already laid down turns the other, so a
+# contour is wound slightly against the lobe that made it - which is the shear
+# that stops the window reading as one rigid object rotating.
+rot  = "-0.035"
+
+# THE WOBBLE, small. The tracery is already the ornament here, so this does less
+# than in the plainer worlds - just enough that a ring is a drawn line.
+warp       = "0.085"
+warp_scale = "3.1"
+warp_speed = "0.45"
+
+# THE INK COUNT. Quantizing the coordinate quantizes the coverage with it, which
+# is what makes this print rather than shade. Fourteen, and coprime with the
+# seven lobes.
+palette_steps = "14"
+# ON, and this is the only `warp_mesh` world that wants it: three inks give two
+# seams per cycle that are worth registering, where a duotone gives none. Style 3
+# is the hard ink - a crisp line rather than a soft darkening - and the ink is
+# taken from near the black end of the ramp, so the key reads as the plate's own
+# register mark.
+palette_contour       = "0.55"
+palette_contour_style = "3"
+palette_contour_ink   = "0.05"
+
+# THE RING SPACING. Scales the level before it becomes a palette coordinate, so
+# it sets how many rings fit between the lobes and the edge without touching how
+# far the light reaches. Treble crowds it by about a tenth.
+color_span   = "0.118 + clamp(treb * 0.0217, 0, 0.013)"
+# THE GROWTH. Sliding the coordinate slides every ring outward together, and it
+# is slow on purpose: a rosette that grows fast reads as a zoom, because the
+# petals stay the same shape as they travel.
+color_center = "time * 0.032 + clamp(onset * 0.2167, 0, 0.13)"
+hue          = "0"
+saturation   = "1.0"
+
+# OFF. Bloom blurs the hard edges the runs exist to make; trails smear one ring
+# into the next; the echo is taken before the level is read, so it mixes LEVELS
+# and moves rings rather than adding to them.
+bloom_amount = "0"
+trails       = "0"
+echo_alpha   = "0"
+
+[smoothing]
+color_center = { attack = 0.08, release = 0.55 }
+color_span   = 0.50
+deposit      = 0.45
+# The lean eases longest. It re-draws every petal in the frame at once, and a
+# fast twist is the one motion here that reads as a glitch rather than as the
+# window turning.
+deposit_twist = 0.80
