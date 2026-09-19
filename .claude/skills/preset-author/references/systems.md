@@ -6,6 +6,15 @@
 > the typical working range of each param (distilled from the shipped set, not an engine limit),
 > and which audio input it naturally rides. Where the two disagree, the code wins.
 
+> **Not every system has a section below.** `warp_mesh`, `shape_collage`, `analytic_field` and
+> `cellular` have none, and their absence here says nothing about them — all are shipped, curated
+> and gated exactly like the rest. Their params, defaults and ranges are in `presets/README.md`
+> like every other system's, and `docs/preset-guide.md` has a picture of each. What is missing is
+> only this file's own layer: what the scene is for, the working range distilled from the shipped
+> set, and which audio input it rides. Until that is written, read those two pages and the shipped
+> presets that use one — `grep -l 'system = "cellular"' presets/*.toml` — which are the distilled
+> working ranges, undistilled. [Backlog 0258](../../../../docs/design-backlog.md) tracks the gap.
+
 **Naming:** `system = "…"` is the underscore name; it differs from the scene's display name
 (`system = "lsystem"` → display "l-system").
 

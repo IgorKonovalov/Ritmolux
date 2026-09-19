@@ -108,11 +108,15 @@ packaging/           # What a `v*` tag ships (ADR-0038) — FIVE zips since Plan
                      #   bundle.sh — build both Apple targets, lipo, substitute the plist version,
                      #   ad-hoc sign, zip AND verify — so packaging runs the same on a Mac as in CI,
                      #   not CI-only magic. studio/ holds the same recipe for the studio, once per
-                     #   platform, each carrying a player into resources/player/. Plus the four
+                     #   platform, each carrying a player into resources/player/. foobar/ and spout/
+                     #   stage their pinned SDKs before the build that needs them; windows/ carries
+                     #   no recipe of its own, only its reader. Plus the four
                      #   READ-ME-FIRST.md a tester finds in the zips; the site publishes THREE of
                      #   them as its install pages (ADR-0167) — the studio's is not in the
                      #   PUBLISHED map, and a new one does not join by existing.
-docs/                # Full one-line-per-doc map: README.md "Repository layout". The load-bearing set:
+docs/                # Full one-line-per-doc map: README.md "Repository layout". Five *.ru.md carry a
+                     #   translated slice, each stamped with the commit it was made from (ADR-0185).
+                     #   The load-bearing set:
 ├── nfr.md           # Quantified v1 non-functional requirements — the numbers behind every
 │                    #   "lightweight" / "real-time" / "stable frame rate" in the plans.
 ├── preset-guide.md  # START HERE for presets — the illustrated entrance, one picture per system.
@@ -122,6 +126,8 @@ docs/                # Full one-line-per-doc map: README.md "Repository layout".
 ├── running.md       # What the app does once open: keys, menus, console, tiers, displays.
 ├── configuration.md # Every flag, env var and config.toml key, with defaults and precedence.
 ├── how-it-works.md  # The explanation: two frontends, one engine, and what happens each frame.
+├── embedding.md     # Embedding the core in another host: the C ABI lifecycle, walked through.
+│                    #   Spec 0001 is the contract; this is the walkthrough over it.
 ├── capturing.md     # Headless `shot` CLI + `--render` video + the live `--stream` video-out.
 ├── testing.md       # The core/tests/ visual-QA harness, and what a green gate is evidence of.
 ├── milkdrop-conversion.md  # Reading what `milkconv` produced, and judging it.
@@ -141,7 +147,7 @@ docs/                # Full one-line-per-doc map: README.md "Repository layout".
 │                    #   the demo clip and social preview from scripts/docs-clip.mjs.
 ├── examples/        # Teaching presets for the guide + walkthrough. Never shipped, never seeded.
 ├── specs/           # NNNN-<subsystem>.md — living behavioral contracts (C ABI, ring/DSP).
-│                    #   Deliberately minimal: the two highest-value contracts, no enforcement
+│                    #   Deliberately minimal: the highest-value contracts only, no enforcement
 │                    #   machinery (ADR-0004). Not a gap — see its own README.
 ├── adrs/            # NNNN-<slug>.md — architecture decisions + rejected alternatives. Append-only.
 │   └── README.md    #   ADR index
@@ -149,13 +155,20 @@ docs/                # Full one-line-per-doc map: README.md "Repository layout".
     ├── README.md    #   Plans index: roster + next free number. Read this first each session.
     └── done/         #   Completed plans move here
 .claude/
-├── skills/          # architect (designs docs/) + dev (all code) + preset-author (preset content)
-├── settings.json    # Registers the two PreToolUse hooks below
+├── skills/          # architect (designs docs/) + dev (all Rust and C++) + studio-builder (studio/)
+│                    #   + preset-author (preset content)
+├── settings.json    # Registers every PreToolUse hook below
 └── hooks/           # block-broad-git-add.js — enforces explicit-path staging;
                      #   block-attribution-trailers.js — denies agent attribution in a
-                     #   commit or PR message. Both are DENY hooks, not advice.
-.githooks/           # Checked-in git hooks. pre-push runs the fast subset (doc links + the studio's
-                     #   typecheck/lint/tests + fmt + clippy + a narrowed nextest). OPT-IN PER
+                     #   commit, tag or PR message; block-push-and-history-rewrite.js —
+                     #   denies the push and the amend/rebase/reset this file forbids in
+                     #   prose, so that rule is mechanical rather than honour-system;
+                     #   conductor-suite-lock.js and conductor-no-background.js — hold a
+                     #   conductor session to ADR-0207's suite ledger and ADR-0205's
+                     #   foreground rule. ALL of them DENY hooks, not advice.
+.githooks/           # Checked-in git hooks. pre-push runs the fast subset (the Node gate roster +
+                     #   the sd-filter suite + the studio's typecheck/lint/tests + fmt + clippy +
+                     #   rustdoc over the WHOLE workspace + a narrowed nextest). OPT-IN PER
                      #   CLONE — nothing runs until `git config core.hooksPath .githooks`, and the
                      #   studio step skips itself again on a clone with no studio/node_modules.
                      #   See README + ADR-0033.
@@ -169,10 +182,13 @@ scripts/             # Repo maintenance. The Node gates, and a count of them is 
                      #   from the menu rather than only by search, and that no route the splitter
                      #   produced exceeds 30,000 bytes of source (ADR-0166) - a route over that means
                      #   ADR-0166's arithmetic needs redoing, never that the constant needs raising.
-                     #   Of the pre-push set, the first three, toc.mjs, check-release-tag.mjs and
-                     #   check-translations.mjs also run in the close ceremony - the first five because a
+                     #   Six of them also run in the close ceremony - check-doc-links.mjs,
+                     #   check-index-rows.mjs, check-backlog-claims.mjs, toc.mjs,
+                     #   check-release-tag.mjs and check-translations.mjs - the first five because a
                      #   close is what breaks them, the last because its staleness half is an ADVISORY
-                     #   nothing else reads, and a close is where a moved English source is noticed. check-doc-links.mjs asserts
+                     #   nothing else reads, and a close is where a moved English source is noticed.
+                     #   Named rather than counted off the roster above, which is ordered by cost and
+                     #   reorders without telling anyone. check-doc-links.mjs asserts
                      #   every relative markdown link resolves (moving a plan to plans/done/ breaks
                      #   links in both directions, and rejects a design-backlog fragment outright
                      #   per ADR-0149); check-index-rows.mjs holds every roster row to 320 bytes AND
@@ -282,14 +298,15 @@ binaries — 25.5 MB per binary, measured, which the setting stops emitting. ADR
 
 ## How we work (canonical workflow)
 
-This project runs a **three-skill** plan-driven harness (`.claude/skills/`), adapted from the
-market-analyzer repo down to just the split that matters here (the third lane, `preset-author`,
-was added per [ADR-0017](docs/adrs/0017-preset-author-skill-lane.md)):
+This project runs a **four-skill** plan-driven harness (`.claude/skills/`), adapted from the
+market-analyzer repo down to just the split that matters here — `preset-author` was added per
+[ADR-0017](docs/adrs/0017-preset-author-skill-lane.md) and `studio-builder` per
+[ADR-0177](docs/adrs/0177-a-fourth-skill-lane-builds-the-studio.md):
 
 | Skill           | Owns                                             | Triggers on |
 |-----------------|--------------------------------------------------|-------------|
 | `architect`     | `docs/` — plans, ADRs, diagrams, reviews         | "how should we build X", "design the …", "should we A or B", "plan the …", "review plan N" |
-| `dev`           | all code — `core/`, `standalone/`, `plugin-foobar/` | "implement plan N", "do the DSP phase", "code up the …" |
+| `dev`           | all Rust and C++ — `core/`, `core-cabi/`, `rlx-ring/`, `standalone/`, `plugin-foobar/`, `milkconv/` | "implement plan N", "do the DSP phase", "code up the …" |
 | `preset-author` | preset **content** — `.toml` presets, expression bindings, `[curve]`/`[generator]` config; never engine Rust | "make an aurora-style preset", "a look that pulses on the beat", "tune rose_star", "make it more organic", "design a preset for the drop" |
 | `studio-builder` | `studio/` — the Electron studio that drives the player (ADR-0177); never Rust or C++, never a protocol widening | "build the param panel", "the preview canvas stutters", "implement phase 3 of plan 0159", "add a palette editor" |
 
