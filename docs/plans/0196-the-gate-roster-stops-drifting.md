@@ -211,6 +211,17 @@ flowchart TB
 - Phase 5: the `versionLineOnly` match moved from basename to full path for **both** files, so
   `Cargo.lock` is now the root one only; `Cargo.lock` keeps an any-section reading, since the plan
   named the section rule for the root `Cargo.toml` alone (`ea3c576`).
+- Round 1 finding 0 (major, the documented `[root]` form measured this repository): the argument
+  parse is one exported function whose `--roster` index guard holds when the flag is absent, and the
+  self-test asserts the parse and that the `missing` root against the real roster is not OK
+  (`ba8b0fa`).
+- Round 1 finding 1 (major, a `studio_install` park could not be cleared by `resume`): the install
+  call moved out of the `!laneOpen(rec)` branch and its trigger is now a missing
+  `studio/node_modules`, so the open lane a park leaves behind is installed into and an already
+  installed lane is not redone; two lane tests and the README's two sites (`75d6456`).
+- Round 1 finding 2 (major, `docs/developing.md` was not swept): the rustdoc row and the paragraph
+  arguing its scope now describe the workspace step, and the table and the Node-steps paragraph
+  carry the two roster-gate steps (`590f85a`).
 - Noticed, not acted on: `node scripts/check-doc-links.mjs scripts/fixtures` reports 10 breaks where
   `scripts/fixtures/README.md` states five. All five extra are in `reader-prose/` fixtures and
   predate this plan; the repository run is green.
