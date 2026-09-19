@@ -134,6 +134,13 @@ scripts/             # Repo maintenance: the Node gates the pre-push hook and CI
                      #   the dated records, because a count goes stale whether or not it is right
                      #   today (ADR-0202).
                      #   And scripts/fixtures/ seeded bite checks.
+tools/               # Developer tooling. Neither half is a cargo crate, and neither ever ships.
+├── sd-filter/       #   Python sidecar for the diffusion-filter pass (ADR-0122).
+└── conductor/       #   Zero-dependency Node that runs approved plans from a committed queue
+                     #   through headless `claude -p` sessions in worktree lanes to a
+                     #   fast-forwarded main, and never pushes (ADR-0205). It refuses to start
+                     #   without the gitignored local.json of spend caps. Its README is the
+                     #   operator guide; state/ and digest.md are the runtime record.
 site/                # The documentation site: an Astro Starlight front end publishing the
                      #   reader-facing subset of docs/ with search, at igorkonovalov.github.io/Ritmolux/.
                      #   Never shipped. `docs/` stays the single source — it is read in place, never
@@ -177,6 +184,10 @@ docs/
 
 The per-system parameter tables live in [`presets/README.md`](presets/README.md), beside the
 preset files they document.
+
+Running an approved plan with nobody at the keyboard is the conductor's job, and
+[`tools/conductor/README.md`](tools/conductor/README.md) is its operator guide: the first run, the
+commands, what to read the next morning, and how it stays safe.
 
 A Russian slice publishes beside the English: `docs/running.ru.md`, `docs/how-it-works.ru.md` and
 three of the four `packaging/*/READ-ME-FIRST.md`. Each carries a `translated-from` stamp naming the
@@ -331,6 +342,8 @@ A checked-in `.githooks/pre-push` runs the fast subset of CI before a push. It i
 clone** — `git config core.hooksPath .githooks` — and an uninstalled clone has no gate.
 **[Developing](https://igorkonovalov.github.io/Ritmolux/contribute/developing/)** has the build
 commands and every step the hook runs.
+
+Approved plans can also run unattended, under [the conductor](tools/conductor/README.md).
 
 
 ## Architecture decisions
