@@ -132,9 +132,11 @@ export function startedPlans(state) {
 
 /**
  * A copy of `queue` with every merged plan dropped from its lane list, and what was dropped:
- * [{ plan, lane, file }] in lane order. Nothing else about the file moves — a `plans` entry for a
- * dropped plan is inert once it is in no lane, and removing it is a second judgement about a file
- * the architect owns.
+ * [{ plan, lane, file }] in lane order. Every other lane list and the whole `plans` map keep their
+ * contents and their order — a `plans` entry for a dropped plan is inert once it is in no lane, and
+ * removing it is a second judgement about a file the architect owns. The caller re-serializes the
+ * result whole, so what lands on disk is the canonical two-space spelling rather than the
+ * byte-for-byte file that was read.
  */
 export function pruneQueue(queue, repo) {
   const dropped = [];
