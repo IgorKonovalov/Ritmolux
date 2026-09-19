@@ -32,21 +32,14 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0108 — the conversion tail: HLSL arrays (~71 files) and 218 MD2 presets that convert but render blank](#0108--the-conversion-tail-hlsl-arrays-71-files-and-218-md2-presets-that-convert-but-render-blank)
 - [0109 — disk textures are 88.7 % of every MilkDrop conversion failure, and the exclusion's trigger condition is already met](#0109--disk-textures-are-887--of-every-milkdrop-conversion-failure-and-the-exclusions-trigger-condition-is-already-met)
 - [0125 — every diffused frame is an upscale: both profiles diffuse well below the stream's own resolution](#0125--every-diffused-frame-is-an-upscale-both-profiles-diffuse-well-below-the-streams-own-resolution)
-- [0126 — a render is one prompt, one seed and one preset from first frame to last, so nothing varies across a track](#0126--a-render-is-one-prompt-one-seed-and-one-preset-from-first-frame-to-last-so-nothing-varies-across-a-track)
 - [0154 — a swap spawns a thread that creates a COM object, and one activation in 22 failed with `REGDB_E_CLASSNOTREG` where the retry budget cannot tell that from a dead device](#0154--a-swap-spawns-a-thread-that-creates-a-com-object-and-one-activation-in-22-failed-with-regdb_e_classnotreg-where-the-retry-budget-cannot-tell-that-from-a-dead-device)
 - [0165 - the windowed app cannot ask for the discrete GPU, so every windowed frame-time figure this project has quoted is an integrated-GPU figure](#0165---the-windowed-app-cannot-ask-for-the-discrete-gpu-so-every-windowed-frame-time-figure-this-project-has-quoted-is-an-integrated-gpu-figure)
 - [0187 — two measurements of the same console on the same adapter class disagree by 2x, and nothing explains which one the machine actually does](#0187--two-measurements-of-the-same-console-on-the-same-adapter-class-disagree-by-2x-and-nothing-explains-which-one-the-machine-actually-does)
 - [0219 — a `ctl/preset` datagram on loopback never reached the listener's queue, in 3 of 79 loaded runs, and nothing counted it](#0219--a-ctlpreset-datagram-on-loopback-never-reached-the-listeners-queue-in-3-of-79-loaded-runs-and-nothing-counted-it)
 - [0220 — a headless walk of the system roster stalls at `emitter`: the ping sent with the ask is answered and the preset never reaches the screen](#0220--a-headless-walk-of-the-system-roster-stalls-at-emitter-the-ping-sent-with-the-ask-is-answered-and-the-preset-never-reaches-the-screen)
 - [Entries 0227-0235 — from the Plan 0189 Phase 8 watched runs (2026-09-15), all archived](#entries-0227-0235--from-the-plan-0189-phase-8-watched-runs-2026-09-15-all-archived)
-- [0236 — the `.claude/` park reads a phase's declared `Files touched`, and Plan 0190's own Phase 9 declared its three `.claude/` files in prose](#0236--the-claude-park-reads-a-phases-declared-files-touched-and-plan-0190s-own-phase-9-declared-its-three-claude-files-in-prose)
-- [0237 — the session allowlist bounds a deletion by four literal path shapes, so a path the shell expands escapes the lane](#0237--the-session-allowlist-bounds-a-deletion-by-four-literal-path-shapes-so-a-path-the-shell-expands-escapes-the-lane)
-- [0241 — the session allowlist is asserted against a model of the CLI's matcher, and the first unattended run falsified the model on a case it asserts](#0241--the-session-allowlist-is-asserted-against-a-model-of-the-clis-matcher-and-the-first-unattended-run-falsified-the-model-on-a-case-it-asserts)
 - [0248 — nothing in this repo asks whether a groundless luminous field is a composition or a fill, and four shipped presets are the open cases](#0248--nothing-in-this-repo-asks-whether-a-groundless-luminous-field-is-a-composition-or-a-fill-and-four-shipped-presets-are-the-open-cases)
-- [0254 — every gallery card is captured at hop 300, which is before an accumulating world exists](#0254--every-gallery-card-is-captured-at-hop-300-which-is-before-an-accumulating-world-exists)
-- [0255 — `docs-shots.mjs` renders all or nothing, so adding one card is done by hand-copying its manifest entry](#0255--docs-shotsmjs-renders-all-or-nothing-so-adding-one-card-is-done-by-hand-copying-its-manifest-entry)
 - [0256 — the only report that asks whether two presets look alike covers nine of fourteen families, and both places naming the absent ones are stale](#0256--the-only-report-that-asks-whether-two-presets-look-alike-covers-nine-of-fourteen-families-and-both-places-naming-the-absent-ones-are-stale)
-- [0258 — the content lane's scene catalogue covers ten of fourteen systems, and nothing makes it notice the four it skipped](#0258--the-content-lanes-scene-catalogue-covers-ten-of-fourteen-systems-and-nothing-makes-it-notice-the-four-it-skipped)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -1162,41 +1155,13 @@ its price against inferred detail. This verdict does not obviously overturn that
 *more* detail, and an upscaler infers rather than generates — but it does mean the rejection was
 made before anyone had watched five minutes of output. A tiled or multi-pass approach that
 *generates* at higher resolution is the option neither the ADR nor the plan has costed.
-
-## 0126 — a render is one prompt, one seed and one preset from first frame to last, so nothing varies across a track
-
-**Raised by:** the user, at Plan 0106's Phase 6 human gate (2026-08-25), on a 5:15 render —
-*"...and with more variety"*. **Owner if taken:** `architect` — it is squarely inside Plan 0106's
-stated non-scope, so taking it is a scope decision, not an implementation one.
-
-- **Verified 2026-08-25** — one seed is fixed for the entire render, by construction and on purpose:
-  `present: manual_seed\(cfg in: tools/sd-filter/sd_filter.py`
-
-### The finding
-
-This is **not a defect** — it is Plan 0106's *What this plan does NOT do*, in as many words:
-*"No timeline, cuts, or prompt automation across a track. One prompt per render, matching 0101's one
-preset per render."* The fixed seed is load-bearing for the thing the gate approved: Phase 1 records
-that a per-frame seed *"guarantees boiling whatever else is tuned"*. So variety cannot be bought by
-simply unfixing it, and that is the first thing a designer would reach for.
-
-The plan already carries the shape of the answer in its own Followups — **audio-conditioned
-diffusion**, *"denoise from the onset envelope, prompt blend on bar boundaries"* — which was filed as
-a nice-to-have and is now a user ask with a watched render behind it. Levers worth costing, roughly
-in increasing order of what they disturb:
-
-- **Prompt interpolation on bar or section boundaries**, which the analyzer can already supply. The
-  smallest change that produces real variation, and it keeps one seed and one preset.
-- **Preset changes across a track** — 0101 renders one preset per render, so this is a `shot`
-  question before it is a filter question.
-- **Denoise strength driven by the onset envelope**, which is the one lever that **reopens Plan
-  0106's no-audio-conditioning decision**: it carries real audio data across a seam the plan
-  deliberately kept image-only. Phase 2 named exactly this as the repair if the music stopped
-  reading — it did not, so this would be taken for variety rather than for reactivity, which is a
-  different justification and wants its own ADR.
-
-**Do not fold this into a resolution plan.** It shares a verdict with backlog 0125 and nothing else:
-one is a pixel budget against a VRAM wall, the other is a timeline the pipeline does not have.
+- **PARTLY TAKEN 2026-09-19 -> [Plan 0211](plans/0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md)**,
+  which takes the *measurement* this entry asks for before any design: a matched pair of the same clip
+  at both budgets, then the owner's verdict. **This entry stays live because the verdict is what
+  decides whether anything is owed** — if `quality` answers the ask, what was filed as a wall was a
+  profile default and the residue is a documentation change; if it does not, the tiled route nobody has
+  costed is Phase 3 and an ADR reopening ADR-0121's Alternative C follows the plan rather than
+  preceding it.
 
 ## 0154 — a swap spawns a thread that creates a COM object, and one activation in 22 failed with `REGDB_E_CLASSNOTREG` where the retry budget cannot tell that from a dead device
 
@@ -1555,177 +1520,6 @@ cheaper-suite half living on as 0239 below. The bodies and the verdicts are in
 [the archive](design-backlog-archive.md); this heading stays because the group is how they were
 raised and the next reader of one will look for the other eight.
 
-## 0236 — the `.claude/` park reads a phase's declared `Files touched`, and Plan 0190's own Phase 9 declared its three `.claude/` files in prose
-
-[ADR-0210](adrs/0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md) parks a plan in front of a phase whose files include a path
-under `.claude/`, because the CLI refuses a headless session an `Edit` there. `claudePaths` (
-`tools/conductor/lib/plan.mjs`) implements exactly what the ADR says: it scans the phase's
-`**Files touched:**` bullet for a literal `.claude/…` path. `nextStep` parks on a non-empty result.
-
-The guarantee is therefore only as strong as a plan's prose, and **the plan that built the mechanism
-is itself the counterexample**. Run over
-[Plan 0190](plans/done/0190-the-conductor-survives-a-run-nobody-is-watching.md) at its close:
-
-```
-1 dev [".claude/hooks/conductor-no-background.js", ".claude/settings.json",
-       ".claude/skills/dev/SKILL.md", ".claude/skills/architect/SKILL.md",
-       ".claude/skills/studio-builder/SKILL.md"]
-9 dev []
-```
-
-Phase 9 edited three `.claude/skills/*/SKILL.md` files. Its `Files touched` names them as *"`lib/lane.mjs`,
-`lib/outcome.mjs`, `prompts/*.md` and the three conductor-mode sections"* — a true sentence with no
-literal path in it. Under the conductor that phase would have been handed to a session, run, hit the
-denial, and parked `check_red` on its own done-when: precisely the late failure ADR-0210 exists to
-move to the front. A whole-body scan would not have caught it either; the paths are not written
-anywhere in the phase.
-
-Shapes, none decided:
-
-- **A gate rather than a parser.** `check-index-rows.mjs`-style: a plan whose phase body names a
-  conductor-mode section, a skill or a hook by description, without a path in `Files touched`, is a
-  drafting error the architect fixes before approval. Cheap, and it fails at the right time.
-- **Widen the scan** to the whole phase body, which catches a `.claude/` path written in a Done-when
-  and still misses this one. Strictly weaker than the above.
-- **Accept it as bounded.** ADR-0210's Negative already says a plan that touches `.claude/` cannot
-  run under the conductor at all; the residual is only that an *undeclared* one fails late rather
-  than early, which is today's behaviour and no worse.
-
-- **Raised:** 2026-09-16, at Plan 0190's close review, by running `claudePaths` over that plan's own
-  phases. **Owner if taken:** `architect` (whether this is a gate or a parser), then `dev`.
-- **Verified 2026-09-16** — only the `Files touched` bullet is read:
-  `present: String\(phase\?\.filesText \?\? ""\) in: tools/conductor/lib/plan.mjs`
-- **Verified 2026-09-16** — and that bullet is the only thing `nextStep` consults for the park:
-  `present: claudePaths\(byId.get\(id\)\).length > 0 in: tools/conductor/lib/plan.mjs`
-
-### Priority
-
-**Low.** It degrades to the behaviour that existed before ADR-0210 — a late park instead of an early
-one — and the conductor is stood down. It matters the first time a conductor-run plan touches a skill
-file without naming it, which is a normal thing for a plan to do.
-
-## 0237 — the session allowlist bounds a deletion by four literal path shapes, so a path the shell expands escapes the lane
-
-[Plan 0190](plans/done/0190-the-conductor-survives-a-run-nobody-is-watching.md) Phase 2 allowed
-`Bash(rm *)` and `PowerShell(Remove-Item *)` and bounded them with deny rules for the four ways a
-written path leaves the worktree: `..`, `~`, a leading `/`, and a drive letter (`*:/*`, `*:\*`).
-Inside the lane, a relative path with no `..` cannot escape, so the bound holds for a path a session
-*writes out*.
-
-It does not hold for a path the shell *produces*. None of these match a deny rule, and all are
-allowed:
-
-```
-rm -rf $HOME/.cargo
-rm -rf "$(git rev-parse --show-toplevel)/../rlx-plan-0180"
-Remove-Item -Recurse $env:USERPROFILE\WORK
-```
-
-`test/settings.test.mjs` cannot see this either, and says so in its own header: it models the CLI's
-rule matching over the command *text*, which is the same level the CLI matches at. The gap is not in
-the model — it is that a glob over text cannot bound a path that does not exist until the shell runs.
-
-Shapes, none decided:
-
-- **Deny the expansion syntax**, not the path: `rm *$*`, `rm *%*`, `Remove-Item *$*`. Crude, cheap,
-  and it costs a session nothing it needs — a phase deleting its own scratch writes a literal path.
-- **Allowlist the scratch roots instead of the verb**: `Bash(rm -rf target/*)`, `Bash(rm target/*)`,
-  and nothing else. Narrower than what Phase 2 was asked for, and backlog 0231 lists deletions
-  outside `target/` (`studio/shared/seed-target.ts`).
-- **Accept it.** The lane is a worktree with nothing irreplaceable in it, a sibling lane is
-  recoverable from its branch, and the blast radius of `$HOME` is the machine rather than the repo —
-  which is exactly the argument against accepting it.
-
-- **Raised:** 2026-09-16, at Plan 0190's close review. **Owner if taken:** `dev`.
-- **Verified 2026-09-16** — the verb is allowed wholesale:
-  `present: "Bash\(rm \*\)" in: tools/conductor/settings.conductor.json`
-- **Verified 2026-09-16** — and no rule mentions an expansion:
-  `absent: HOME in: tools/conductor/settings.conductor.json`
-
-### Priority
-
-**Medium.** Nothing has triggered it and no session has reason to write one, but it is the one rule
-in that file whose stated bound — *"a path that leaves the lane is refused, whatever it is for"* — is
-not the bound the rules actually enforce, and the README repeats the claim.
-
----
-
-## 0241 — the session allowlist is asserted against a model of the CLI's matcher, and the first unattended run falsified the model on a case it asserts
-
-`test/settings.test.mjs` decides every case through a `decide()` it implements itself, and says so in
-its own header: *"`decide` below models the CLI's documented rule matching … It is a model of the
-CLI, not the CLI: it pins what this file means, and a CLI that changed its matcher would not turn it
-red."* One clause of that model is that **a compound command is split at `&&`, `||`, `;`, `|`, `&`
-and newlines and every part must be allowed on its own**, from which two cases follow:
-
-```js
-{ tool: "PowerShell", command: "cd studio; npm run typecheck", allowed: false, why: "`cd` is not a command a session may run" },
-{ tool: "Bash",       command: "cd studio && npm run typecheck", allowed: false, why: "same, in the other shell" },
-```
-
-**Step `0191-01-implement`, 2026-09-16, falsified that.** Under `settings.conductor.json` exactly as
-the conductor passes it, on CLI 2.1.273, these **ran**:
-
-```
-RAN     cd "C:/.../rlx-plan-0191" && node --test tools/conductor/test/ledger.test.mjs
-RAN     cd "C:/.../rlx-plan-0191" && git status --porcelain
-RAN     cd "C:/.../rlx-plan-0191" && rm argvcheck.cjs && git status --porcelain
-DENIED  cd /tmp && printf "..." > argvcheck.cjs && node argvcheck.cjs -P fast
-DENIED  cd "C:/.../rlx-plan-0191" && node --test ... | sed -n '/not ok 16/,/^  \.\.\./p' | head -40
-```
-
-26 of that step's 36 shell calls carried a `cd`, and **4 were denied**. Under the model all 26 should
-have been: `cd` matches no allow rule. The CLI is evidently doing something the model does not
-describe — the denials correlate with `/tmp` (a path outside the lane) and with `sed` / `head` (verbs
-on no rule), not with `cd` itself. **What the real rule is has not been established**, and this entry
-does not guess.
-
-Two consequences, and the second is the one that matters:
-
-- **Plan 0190 Phase 2's prompt half is not working, and now we know why.** `prompts/implement.md` says
-  *"Shell calls run one command per call … No `cd`"*. The session ignored it 26 times in one step
-  because ignoring it **works** — nothing teaches otherwise. Compound rates across the 15 recorded
-  sessions run 12 % (`0182-01`) to 89 % (`0177-04`), and 0191's 81 % sits inside that spread rather
-  than below it, so the rule moved nothing measurable. One post-rule session is not a trend; it is
-  enough to say the rule is not self-enforcing.
-- **The same model backs the safety claims.** `README.md`'s *"a path that leaves the lane is refused,
-  whatever it is for"*, and every `rm`/`Remove-Item` deny case, are asserted through `decide()` and
-  not against the CLI. A model already known to be wrong about one compound shape is a weak floor
-  under *"a deletion whose path leaves the worktree is refused"*. This is a different gap from
-  backlog 0237, which is about shell **expansion**; this one is about whether
-  the matcher splits compounds at all. **Neither is measured.**
-
-Shapes, none decided:
-
-- **Probe the matcher.** `spike/probe.mjs` already runs sessions under `settings.conductor.json` and
-  records what the CLI did; a session that attempts a fixed list of compound and escaping shapes
-  turns `decide()` from a model into a transcript. This is the one that answers the question rather
-  than working around it, and it is the same evidence discipline ADR-0208 applies to the version
-  table.
-- **Assert the deny half only, and assert it hard.** Keep `decide()` for the allow cases, where being
-  wrong costs a refused command, and move every negative case behind a probe, where being wrong costs
-  a deleted directory.
-- **Stop saying it in the prompt and let the allowlist be the whole contract.** If `cd <lane> && …`
-  is in fact safe, the prompt rule is noise the session correctly ignores; drop it and keep the
-  bound where it is enforced.
-
-- **Raised:** 2026-09-16, from the first unattended two-lane run, by reading `0191-01-implement`'s
-  transcript after the phase landed. **Owner if taken:** `architect` (what the negative cases must be
-  asserted against), then `dev`.
-- **Verified 2026-09-16** — the model asserts the shape production ran:
-  `present: cd studio && npm run typecheck in: tools/conductor/test/settings.test.mjs`
-- **Verified 2026-09-16** — and says of itself that it is not the CLI:
-  `present: It is a model of the CLI, not in: tools/conductor/test/settings.test.mjs`
-- **Verified 2026-09-16** — the prompt rule the sessions do not follow:
-  `present: one command per call in: tools/conductor/prompts/implement.md`
-
-### Priority
-
-**Medium**, and it would be Low but for the second consequence. Nothing has gone wrong: the denials
-cost turns, the sessions recovered, all three phases of 0191 committed. It is filed because the
-negative cases are the ones worth being right about, and the run just demonstrated that the thing
-asserting them can be wrong about a case it states outright.
-
 ## 0248 — nothing in this repo asks whether a groundless luminous field is a composition or a fill, and four shipped presets are the open cases
 
 The surviving half of [backlog 0128](design-backlog-archive.md), carved out by
@@ -1782,93 +1576,6 @@ nothing would notice if one became a wash. It is not lower because it is the las
 diagnosis three ADRs and three plans have now worked on, and because the instrument it wants — a
 statistic that reads a full frame's *internal* organization rather than its departure from a ground —
 is the one shape this line has never tabled.
-
-## 0254 — every gallery card is captured at hop 300, which is before an accumulating world exists
-
-The gallery renders one card per shipped preset at `--frame-at 300` — about 3.5 s of scene time at
-110 BPM — unless the preset is named in `CARD_HOP_OVERRIDES`. That roster holds four presets, all
-`swarm_*`, all at hop 374. So the mechanism for *"this world needs longer"* exists and has been used
-once, for one family, on the basis of that family's own development time. Nothing generalized it.
-
-**A world built on a feedback field is not developed at 3.5 s and cannot be.** `warp_ladder`'s
-header records its own horizon: the field is still filling for its first two minutes, coverage
-0.408 at the 30 s row against 0.619 at 300 s. `warp_tracery`'s card, rendered 2026-09-18 at the
-manifest's hop 300, shows the contours closed around each of seven lobes; the same preset rendered
-at 30 s shows them merged into the rosette the world is named for. Both pictures are true and only
-one of them is the look.
-
-It is not only the warp family. Trails, a `[feedback]` table, reaction-diffusion and the particle
-worlds all have an accumulation axis, and ADR-0099 already names that set for a different purpose —
-deciding when a horizon is owed. The gallery has no equivalent rule, and the card is the one picture
-most readers ever see of a preset.
-
-**What the shape probably is**, and it is not a larger constant for everyone: hop 300 is chosen and
-argued in the script's own header — it is the last hop of the loudest beat, and a later hop lands in
-the two-beat rest that `dynamic_groove` takes next, which is why the four swarm overrides at 374 are
-described as the exception rather than the better default. Either a per-family default beside
-`CARD_HOP_OVERRIDES`, or a longer synthesized signal for the accumulating set so that a late hop is
-still a loud one.
-
-- **Raised:** 2026-09-19 by `preset-author`, landing `warp_tracery` and reading its card against a
-  30 s render of the same file. **Owner if taken:** `architect` then `dev`.
-- **Verified 2026-09-19** — the default hop is 300 for every card that is not overridden:
-  `present: hop: CARD_HOP_OVERRIDES\[preset\] \?\? 300 in: scripts/docs-shots.mjs`
-- **Verified 2026-09-19** — the override mechanism exists, and its roster opens on a swarm preset:
-  `present: CARD_HOP_OVERRIDES = \{ swarm_ in: scripts/docs-shots.mjs`
-- **Verified 2026-09-19** — and no `warp_mesh` world is in it, though every one of them accumulates:
-  `absent: CARD_HOP_OVERRIDES = \{[^}]*warp_ in: scripts/docs-shots.mjs`
-- **Verified 2026-09-19** — the hop is argued from where the beat is, which is why raising it for
-  everyone is the wrong repair:
-  `present: the last hop of the loudest beat in: scripts/docs-shots.mjs`
-
-### Priority
-
-**Low-medium.** Nothing is broken and no gate is involved — a card is honest about the frame it
-shows, and `every_shipped_preset_has_a_gallery_card` deliberately checks existence rather than
-freshness. What it costs is the gallery's actual job. It rises as the accumulating share of the
-library grows, and it is cheapest to take alongside any other edit to the manifest.
-
-## 0255 — `docs-shots.mjs` renders all or nothing, so adding one card is done by hand-copying its manifest entry
-
-The runner loops every entry in `IMAGES` and reads no arguments at all. There is no way to say
-*"just this one"*. Adding a preset to `CARDS` therefore leaves two options: run the whole script,
-which rewrites every committed still under `docs/images/`, or reproduce that one entry's settings on
-the command line by hand.
-
-**The first is not available in practice, and the script's own header says why:** renders are not
-byte-reproducible across machines, so a full run produces a diff over ~100 unrelated images that
-records driver drift rather than anything true. The second is what was done on 2026-09-18 for
-`warp_tracery` — `--signal dynamic:110 --frame-at 300 --size 640x360 --tier rich`, read out of the
-manifest and retyped. That is correct only as long as whoever copies it copies all five settings,
-and nothing would notice a card rendered at the wrong size or tier: the test beside it checks that
-the PNG exists and deliberately does not check that it is current. So for the duration of a
-hand-run, the capture settings live in one place and are used from another.
-
-Two sibling renderers in the same directory already take an argument, so the shape is not novel
-here — it simply never reached this one.
-
-**What the shape probably is:** a name filter — `node scripts/docs-shots.mjs warp_tracery` —
-selecting the manifest entries whose `presetFile` or `out` matches and running only those. The
-settings then stay in the one place they are already written down, which is the whole point.
-
-- **Raised:** 2026-09-19 by `preset-author`, adding `warp_tracery` to `CARDS`. **Owner if taken:**
-  `architect` then `dev`.
-- **Verified 2026-09-19** — the renderer reads no arguments:
-  `absent: process\.argv in: scripts/docs-shots.mjs`
-- **Verified 2026-09-19** — it loops the whole manifest, unconditionally:
-  `present: for \(const \[index, entry\] of IMAGES\.entries\(\)\) in: scripts/docs-shots.mjs`
-- **Verified 2026-09-19** — and the script itself states why a full re-run is not a free way out:
-  `present: not byte-reproducible in: scripts/docs-shots.mjs`
-- **Verified 2026-09-19** — a sibling renderer in the same directory already takes an argument:
-  `present: process\.argv in: scripts/tuple-sheets.mjs`
-
-### Priority
-
-**Low.** A papercut with a correctness edge rather than a defect: the cost is paid once per preset
-landed, by whoever lands it, and the failure it invites — a card captured at settings the manifest
-does not name — is invisible to every gate that runs.
-
----
 
 ## 0256 — the only report that asks whether two presets look alike covers nine of fourteen families, and both places naming the absent ones are stale
 
@@ -1949,6 +1656,14 @@ the interesting half of the question has no statistic.
   assert:
   `unprobeable: whether a shipped preset is worth shipping is a look judgement; this repository has
   no statistic for it, which is the finding rather than a gap in the probe`
+- **PARTLY PROMOTED 2026-09-19 -> [Plan 0209](plans/0209-a-system-joins-the-instruments-by-existing.md)**,
+  which takes the **instrument half** only: the roster derives from `SystemKind` so all fourteen
+  families are reported and a new variant fails the build, and the two stale prose carriers stop naming
+  a list ([ADR-0234](adrs/0234-an-instruments-system-roster-is-derived-from-the-enum-the-engine-reads.md)).
+  **This entry stays live for the half that matters more** — whether the library should ship less and
+  better — which needs a person, an evening and the app, and whose evidence is the favourite/hidden
+  marks [Plan 0205](plans/0205-the-library-becomes-navigable.md) builds. Plan 0209 Phase 2 reads the
+  widened report and is forbidden from tuning a threshold to quiet it, so its output is input here.
 
 ### Priority
 
@@ -1957,79 +1672,3 @@ is that the set grows in the dark on a third of its families, and that the one d
 wants to make (ship less, better) has no evidence under it. Step 2 is cheap: it needs a person, an
 evening and the app, and it is the only step that cannot be skipped or automated.
 
-
-## 0258 — the content lane's scene catalogue covers ten of fourteen systems, and nothing makes it notice the four it skipped
-
-`.claude/skills/preset-author/references/systems.md` is the one document that carries what
-`presets/README.md` cannot generate: **what each scene is for, the working range of each param
-distilled from the shipped set (not an engine limit), and which audio input it naturally rides.**
-Its own header says so. It has a `## ` section for ten systems and none for `warp_mesh`,
-`shape_collage`, `analytic_field` or `cellular`.
-
-Those four are not experiments. By filename family over `presets/*.toml`:
-
-| family | shipped presets | section in `systems.md` |
-|---|---|---|
-| `analytic_field` | 12 | **no** |
-| `warp_mesh` | 7 | **no** |
-| `shape_collage` | 4 | **no** |
-| `cellular` | 3 | **no** |
-
-So the lane that authors preset content works from a catalogue that is silent on the systems
-behind 26 of the 114 shipped presets — including `analytic_field`, the second-largest family in
-the set.
-
-**The file half-knows.** Line 25 names `shape_collage` and `warp_mesh` in the shared-transform
-exceptions, and the engine-wide stage tables below cover all fourteen. Only the per-scene layer
-stops at ten, which is why nobody reading it front-to-back notices: the file never claims a roster,
-so its roster cannot look wrong.
-
-**This is the rot CLAUDE.md already declared cured.** Its own argument for why the content lane
-points at `docs/` instead of keeping private copies is that *"its private copies rotted while these
-stayed current (rewritten 2026-07-26, commit `0e1e500`)"*. `systems.md` is a private copy, it is
-the one the lane actually reads first, and it rotted again — four systems over roughly four months.
-The bolded-row sweep in the architect close ceremony covers `presets/README.md`,
-`docs/presets.md`, `docs/preset-palettes.md` and `docs/preset-guide.md`, all of which stayed
-current. It does not name this file, and that omission is the mechanism.
-
-**It is the same shape as 0256, one lane over.** That entry records a hand-written roster in
-`core/tests/distinctness.rs` missing five shipped families, with both prose carriers naming three
-of the five. Same four families dominate both lists. A repair that fixes one and not the other
-leaves the pattern intact.
-
-### What a fix is, and what it is not
-
-A fix is **four sections written by the content lane from the shipped presets and the live app** —
-what the scene is for, the working ranges, the audio input. It is explicitly *not* four sections
-generated or paraphrased from `presets/README.md`'s param tables: that would restate what the
-generated page already says better, add a second copy to drift, and supply none of the judgement
-the file exists for. The distilled working range is a look judgement over the shipped set, which is
-why this is `preset-author` work and not an architect edit.
-
-Worth deciding in the same pass: whether the per-scene layer should carry a **declared roster** at
-all, so the next system landing without a section is a visible hole rather than a silence. A
-`systems.md` heading per `SystemKind` — even one reading "no guidance yet" — is probeable, and this
-entry's probes below are exactly that check written by hand.
-
-- **Raised:** 2026-09-19 by `architect`, during a validity audit of `README.md`, `CLAUDE.md` and
-  the four skills. **Owner if taken:** `preset-author` for the four sections, `architect` for the
-  sweep-table row that keeps it from recurring.
-- **Verified 2026-09-19** — no per-scene section for the second-largest shipped family:
-  `absent: ^## .analytic_field in: .claude/skills/preset-author/references/systems.md`
-- **Verified 2026-09-19** — nor for `cellular`:
-  `absent: ^## .cellular in: .claude/skills/preset-author/references/systems.md`
-- **Verified 2026-09-19** — nor for `warp_mesh`:
-  `absent: ^## .warp_mesh in: .claude/skills/preset-author/references/systems.md`
-- **Verified 2026-09-19** — nor for `shape_collage`:
-  `absent: ^## .shape_collage in: .claude/skills/preset-author/references/systems.md`
-- **Verified 2026-09-19** — while the engine ships them, so the absence is the catalogue's and not
-  the engine's: `present: ^\s+Cellular, in: core/src/preset/schema/system.rs`
-- **Verified 2026-09-19** — and the close ceremony's sweep table does not name the file, which is
-  what lets it drift: `absent: preset-author/references/systems in: .claude/skills/architect/SKILL.md`
-
-### Priority
-
-**Medium.** Nothing is broken and no gate is red — the cost is that a lane composing looks cannot
-see a quarter of the surface it composes over, which reads as "these systems have no presets worth
-writing" rather than as a missing page. It rises with every system landed, and the four sections are
-an evening's work for someone who has the app open.

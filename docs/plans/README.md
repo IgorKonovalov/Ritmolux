@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0208** (ADRs are a separate sequence — next free there is **0233**; 0200 is reserved for Plan 0186 Phase 2.)
+**Next free number: 0213** (ADRs are a separate sequence — next free there is **0233**; 0200 is reserved for Plan 0186 Phase 2.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -52,6 +52,11 @@ place. The plan file carries the real link.
 | [0206](0206-the-browser-shows-the-look.md) | The browser shows the look | approved | dev | ADR-0230 (proposed): a low-priority subprocess of the player renders each still, cached by name + file stamp; a pane beside the list, never a grid. After 0205 - shares the overlay. Exe is already over cap, backlog 0257. |
 | [0205](0205-the-library-becomes-navigable.md) | The library becomes navigable | approved | dev, studio-builder | ADR-0228 + 0229 (proposed): favourite + hidden, name-keyed user state; the studio marks over `/ctl/mark` and never opens the file. Hidden is a view, not retirement. Builds backlog 0256's evidence. |
 | [0204](0204-the-library-learns-from-the-corpus-it-will-not-ship.md) | The library learns from the corpus it will not ship | approved | human | ADR-0227 (proposed): a borrowed look is authored natively and the reference stays outside. A judged 4-6 cohort of 21 picks, routed by look. After 0201's `zoom` fix. |
+| [0208](0208-the-conductors-safety-claims-get-their-evidence.md) | The conductor's safety claims get their evidence | approved | dev | ADR-0233 (proposed): the deny half is asserted against a probe transcript, not a model; Phase 1 can supersede it. Edits settings.conductor.json, so NOT queued. Closes 0236-0241. |
+| [0209](0209-a-system-joins-the-instruments-by-existing.md) | A system joins the instruments by existing | approved | dev, human | ADR-0234 (proposed): distinctness derives its roster from SystemKind; the catalogue declares an entry per system. Phases 4-5 edit .claude/, so NOT queued. Closes 0258, takes 0256's half. |
+| [0210](0210-the-gallery-card-shows-the-world-it-names.md) | The gallery card shows the world it names | approved | dev, human | ADR-0235 (proposed): the hop follows the family and the signal outlasts it. Phase 1 (a name filter) is what makes the rest affordable. Closes backlog 0254, 0255. |
+| [0211](0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md) | The diffused frame's resolution is measured before it is designed | approved | dev, human | No ADR yet: the quality profile has never run on a track, so Phase 1 renders the pair and Phase 2 may close the plan. Takes backlog 0125. |
+| [0212](0212-the-diffused-render-gains-a-timeline.md) | The diffused render gains a timeline | approved | dev, human | ADR-0236 (proposed): a prompt timeline in bars, the seed still fixed. Declines the onset-denoise lever. Not folded with 0211 - 0126 forbids it. Closes backlog 0126. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two

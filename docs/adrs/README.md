@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0233.** *(0120 was reserved for
+**Next free number: 0237.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -254,4 +254,8 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0230](0230-thumbnails-are-rendered-by-a-subprocess-of-the-player-itself.md) | Thumbnails are rendered by a subprocess of the player itself | proposed |
 | [0231](0231-the-standalone-size-cap-is-re-derived-from-what-it-carries-and-the-build-reports-it.md) | The standalone's size cap is re-derived from what it carries, and the build reports it | proposed, amends NFR §4 |
 | [0232](0232-a-presets-frame-cost-is-measured-and-reported-never-asserted.md) | A preset's frame cost is measured and reported, never asserted | proposed |
+| [0233](0233-a-session-allowlist-safety-claim-is-asserted-against-a-transcript.md) | A session-allowlist safety claim is asserted against a transcript, not a model | proposed |
+| [0234](0234-an-instruments-system-roster-is-derived-from-the-enum-the-engine-reads.md) | An instrument's system roster is derived from the enum the engine reads | proposed |
+| [0235](0235-a-gallery-cards-hop-is-chosen-per-family-and-the-signal-outlasts-it.md) | A gallery card's hop is chosen per family, and the signal outlasts it | proposed |
+| [0236](0236-a-diffused-render-varies-by-prompt-on-bar-boundaries-and-the-seed-stays-fixed.md) | A diffused render varies by prompt on bar boundaries, and the seed stays fixed | proposed |
 <!-- roster:end -->
