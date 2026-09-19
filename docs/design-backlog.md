@@ -46,6 +46,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0254 — every gallery card is captured at hop 300, which is before an accumulating world exists](#0254--every-gallery-card-is-captured-at-hop-300-which-is-before-an-accumulating-world-exists)
 - [0255 — `docs-shots.mjs` renders all or nothing, so adding one card is done by hand-copying its manifest entry](#0255--docs-shotsmjs-renders-all-or-nothing-so-adding-one-card-is-done-by-hand-copying-its-manifest-entry)
 - [0256 — the only report that asks whether two presets look alike covers nine of fourteen families, and both places naming the absent ones are stale](#0256--the-only-report-that-asks-whether-two-presets-look-alike-covers-nine-of-fourteen-families-and-both-places-naming-the-absent-ones-are-stale)
+- [0257 — the standalone exe is 9.7 % over NFR §4's soft cap, and only the component has anything that would have noticed](#0257--the-standalone-exe-is-97--over-nfr-4s-soft-cap-and-only-the-component-has-anything-that-would-have-noticed)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -1955,3 +1956,64 @@ the interesting half of the question has no statistic.
 is that the set grows in the dark on a third of its families, and that the one decision the owner
 wants to make (ship less, better) has no evidence under it. Step 2 is cheap: it needs a person, an
 evening and the app, and it is the only step that cannot be skipped or automated.
+
+---
+
+## 0257 — the standalone exe is 9.7 % over NFR §4's soft cap, and only the component has anything that would have noticed
+
+[NFR §4](nfr.md#4-size-and-dependencies) sets a **soft cap of 10,000,000 B** for the standalone
+release exe, and says of it, in its own words, that *"the **value** is the inherited one, and it
+has never been measured against what the exe actually contains."*
+
+It has now. On 2026-09-19, on this project's development box (Windows 10, `cargo build --release`,
+default features), `target/release/ritmolux.exe` measured **10,971,648 B** — **971,648 B over,
+9.7 %**. The measurement was incidental: it was taken to price embedding thumbnails for
+[Plan 0206](plans/0206-the-browser-shows-the-look.md), and the cap turned out to be already
+breached before that plan proposed adding anything at all.
+
+**The asymmetry is the finding, not the number.** The foobar component has a carrier for exactly
+this: `packaging/foobar/build-component.ps1` prints the component's length on every build and warns
+above 90 % of its cap, a mechanism
+[ADR-0159](adrs/0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md) put there
+deliberately. **The standalone has no equivalent** — no build step, no CI job and no gate reports
+its size, which is why a 9.7 % breach could sit unremarked in the artifact the project's own NFR
+names first.
+
+**Both halves of the question are open, and they are different questions.**
+
+1. **Is the cap right?** NFR §4 says the value is inherited and unexamined. The component's cap was
+   re-derived from what it actually carries (ADR-0159); the standalone's never was. It carries
+   `winit`, the window, the WASAPI capture stack and the embedded preset library, and a cap derived
+   from that may well be larger than 10,000,000 B.
+2. **Should anything report it?** A soft cap that nothing measures is a sentence, not a
+   constraint. The component's recipe is the precedent and it is cheap — a printed length and a
+   warning threshold, fatal to nothing.
+
+**What makes this live rather than tidy.** [Plan 0206](plans/0206-the-browser-shows-the-look.md)
+rejected embedding thumbnails partly on this measurement, and
+[ADR-0230](adrs/0230-thumbnails-are-rendered-by-a-subprocess-of-the-player-itself.md) records the
+arithmetic. If the cap is re-derived upward, that rejection deserves re-reading — it would not
+change the decision, because 4.9 MB of PNG plus a runtime image codec against
+[ADR-0011](adrs/0011-image-crate-for-capture-tooling.md) is not close, but the argument would rest
+on the codec rather than on the byte count.
+
+- **Raised:** 2026-09-19 by `architect`, incidentally, while pricing Plan 0206. **Owner if taken:**
+  `architect` (the cap is a decision, and re-deriving it supersedes part of NFR §4), then `dev` for
+  whatever reports it.
+- **Verified 2026-09-19** — the cap is stated, and at this value:
+  `present: Soft cap 10,000,000 B in: docs/nfr.md`
+- **Verified 2026-09-19** — and the document says nobody has checked it against the artifact:
+  `present: never been measured against what the exe actually contains in: docs/nfr.md`
+- **Verified 2026-09-19** — the component's recipe measures and warns, which is the precedent:
+  `present: WarnBytes in: packaging/foobar/build-component.ps1`
+- **Verified 2026-09-19** — the measurement itself is a reading of one build on one machine and no
+  probe can assert it:
+  `unprobeable: a binary's size is a property of a build, not of the tree; re-take it with
+  cargo build --release and stat rather than trusting this number`
+
+### Priority
+
+**Medium.** Nothing is broken and the caps are explicitly soft — ADR-0159 records that they *"never
+fail a release over a size"* — so no gate is red and no user is affected. What is affected is every
+future argument about whether a feature fits, because the number those arguments start from is
+wrong in an unknown direction and there is no instrument to correct it.
