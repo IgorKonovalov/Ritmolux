@@ -756,6 +756,8 @@ fn analysis_is_deterministic() {
                     downbeat_confidence,
                     downbeat_locked,
                     novelty,
+                    balance,
+                    spread,
                 } = f;
                 (
                     spectrum
@@ -782,6 +784,8 @@ fn analysis_is_deterministic() {
                         bar_phase.to_bits(),
                         downbeat_confidence.to_bits(),
                         novelty.to_bits(),
+                        balance.to_bits(),
+                        spread.to_bits(),
                     ],
                     beat,
                     vec![beat_index, beat_in_bar, bar_index],

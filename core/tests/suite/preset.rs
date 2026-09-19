@@ -588,6 +588,11 @@ fn from_frame_binds_every_analysis_variable_to_its_own_field() {
             std::array::from_fn(|i| -0.5 + i as f32 / 512.0),
         ],
         waveform_pair_gain: 0.66,
+        // The stereo field (ADR-0215). Absolute rather than `0..1`, so `balance`
+        // takes a negative value no other field here carries — a slot crossed
+        // with one of the levels reads a number that cannot be mistaken for it.
+        balance: -0.375,
+        spread: 0.125,
     };
     // Not on the frame: the renderer supplies its own clock here, the probe the
     // hop position it synthesized. That is why it stays an argument.

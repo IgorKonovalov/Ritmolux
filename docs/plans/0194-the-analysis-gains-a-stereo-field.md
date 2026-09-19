@@ -1,6 +1,6 @@
 # 0194 — The analysis gains a stereo field
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-18
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0215](../adrs/0215-the-analyzer-publishes-an-absolute-stereo-field.md)
@@ -273,11 +273,11 @@ shim are untouched by this plan.
 
 ## Implementation log
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `plan-0194-the-analysis-gains-a-stereo-field` in `C:\Users\Igor Konovalov\WORK\rlx-plan-0194`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The harness learns stereo, and the whole-mix field lands | dev | not started | |
+| 1 — The harness learns stereo, and the whole-mix field lands | dev | done | committed with this row |
 | 2 — The isolation guarantee | dev | not started | |
 | 3 — Per-band balance, and the measurement that chooses its mechanism | dev | not started | |
 | 4 — The five names reach the grammar | dev | not started | |
@@ -285,6 +285,27 @@ shim are untouched by this plan.
 | 6 — Hear it | human | not started | |
 
 ### Notes
+
+- **Phase 1 deviation — `pan:`'s source is seeded broadband noise, not `chord`.** The phase calls
+  `chord` broadband; it is three sines at 220/277/330 Hz, so the treble band carries nothing but
+  leakage and Phase 3's *"all three `*_balance` within 0.01 of -0.800"* could not hold under it.
+  Every Phase 1 property is a property of **one waveform at two gains** rather than of the waveform
+  — the RMS ratio is algebraically `p` and the correlation is algebraically 1 — so the substitution
+  costs none of them, and the measured table reads `balance` min/mean/max `-0.800` with `spread`
+  flat `0.000`.
+- **Phase 1 deviation — the new rows print from the band-levels table, and `--report` does not take
+  a `--signal`.** The done-when's literal command `shot --signal pan:-0.8 --report` exits with
+  `--signal/--audio needs --out <path>`: `--signal` selects the filmstrip path regardless of
+  `--report`, and `--report` synthesizes no clip of its own. The rows land where ADR-0215 decision
+  point 2 says — *"beside the band rows it already prints"*, which is `print_band_levels` — and the
+  verified invocation is `shot --signal pan:-0.8 --out <file>`. That printer lives in
+  `standalone/examples/shot.rs`, one file outside the phase's list; `BandLevels` and its
+  measurement are in `standalone/src/shot/args.rs` as listed, and the assertions are there rather
+  than on the CLI's text.
+- **Phase 1 — three files outside the phase's list changed because `AnalysisFrame` gained fields**:
+  `core/tests/dsp.rs`, `core/tests/suite/preset.rs` and `standalone/src/shot/report/tests.rs` each
+  destructure or construct the frame exhaustively **on purpose**, so that a new field stops them
+  compiling. Each was extended to carry the two new fields, which is the compile break working.
 
 ### Close triggers
 

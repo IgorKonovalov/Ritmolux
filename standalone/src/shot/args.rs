@@ -5,7 +5,9 @@
 
 use rlx_core::audio::AudioFormat;
 use rlx_core::dsp::{AnalysisFrame, Analyzer, HOP_SIZE};
-use rlx_core::signal::{bass_sine, chord, click_track, dynamic_groove, noise, treble_tone};
+use rlx_core::signal::{
+    bass_sine, chord, click_track, dynamic_groove, noise, pan, treble_tone, wide,
+};
 
 use super::film::FILMSTRIP_WARMUP;
 
@@ -139,9 +141,18 @@ pub fn synth_signal(spec: &str) -> Result<(Vec<f32>, AudioFormat), String> {
         // The one kind with dynamics — everything above is a steady tone or
         // steady noise (Plan 0037 Phase 3).
         "dynamic" => dynamic_groove(parse_param(param, "dynamic BPM")?, SIGNAL_SECS, format),
+        // The stereo kinds (ADR-0215). Every kind above builds a mono buffer and
+        // duplicates it into both channels, so under them a working stereo
+        // implementation and a broken one produce the same output.
+        "pan" => pan(parse_param(param, "pan position")?, SIGNAL_SECS, format),
+        "wide" => {
+            let seed = param.parse::<u64>().unwrap_or(1);
+            wide(seed, SIGNAL_SECS, format)
+        }
         other => {
             return Err(format!(
-                "--signal: unknown kind `{other}` (click|bass|treble|noise|chord|dynamic)"
+                "--signal: unknown kind `{other}` \
+                 (click|bass|treble|noise|chord|dynamic|pan|wide)"
             ));
         }
     };
@@ -188,6 +199,19 @@ pub struct BandLevels {
     /// ever crossed one. Four documents asserted `click:120` did not; only the
     /// table can settle it.
     pub onset: BandStats,
+    /// Where the mix sits, `-1` hard left to `+1` hard right — **not a band and
+    /// not levelled** (ADR-0215).
+    ///
+    /// Reported for the opposite reason to the rows above. Those exist because
+    /// `--set` magnitudes are unlike real levels; this one exists because
+    /// `balance` is absolute, so its usable range is whatever real material
+    /// happens to produce and an author has no other way to find out what that
+    /// is. A row of zeroes is a true statement — every mono or mono-duplicated
+    /// source reads exactly that.
+    pub balance: BandStats,
+    /// How decorrelated the two channels are: `0` identical, `0.5` fully
+    /// decorrelated, `1` polarity-inverted. Absolute, as `balance` is.
+    pub spread: BandStats,
     /// Hop index (within the measured, past-warm-up window) where `onset` peaked.
     /// The frame a reseed-gated preset fires on, so a `--strip` can be aimed at it.
     pub onset_peak_hop: usize,
@@ -210,6 +234,8 @@ pub fn band_levels(pcm: &[f32], format: AudioFormat) -> Result<BandLevels, Strin
     let mut mid = Vec::new();
     let mut treb = Vec::new();
     let mut onset = Vec::new();
+    let mut balance = Vec::new();
+    let mut spread = Vec::new();
     for (index, hop) in pcm.chunks(hop_samples).enumerate() {
         analyzer.push_interleaved(hop);
         let frame = analyzer.take_frame();
@@ -220,6 +246,8 @@ pub fn band_levels(pcm: &[f32], format: AudioFormat) -> Result<BandLevels, Strin
         mid.push(frame.mid);
         treb.push(frame.treb);
         onset.push(frame.onset);
+        balance.push(frame.balance);
+        spread.push(frame.spread);
     }
     if bass.is_empty() {
         return Err("audio too short to measure band levels".to_string());
@@ -233,6 +261,8 @@ pub fn band_levels(pcm: &[f32], format: AudioFormat) -> Result<BandLevels, Strin
         mid: band_stats(&mid),
         treb: band_stats(&treb),
         onset: band_stats(&onset),
+        balance: band_stats(&balance),
+        spread: band_stats(&spread),
         onset_peak_hop,
     })
 }
@@ -350,6 +380,9 @@ mod tests {
             "noise:7",
             "chord",
             "dynamic:110",
+            "pan:-0.8",
+            "pan:1",
+            "wide:1",
         ] {
             let (pcm, format) = synth_signal(spec).unwrap_or_else(|e| panic!("{spec}: {e}"));
             assert_eq!(format.sample_rate, 48_000);
@@ -364,8 +397,12 @@ mod tests {
                 "{spec} must not emit NaN/inf into the analyzer"
             );
         }
-        // `noise` takes a seed, not a float, and falls back rather than failing.
+        // `noise` and `wide` take a seed, not a float, and fall back rather
+        // than failing; `pan` takes a position and needs one.
         assert!(synth_signal("noise").is_ok(), "seedless noise defaults");
+        assert!(synth_signal("wide").is_ok(), "seedless wide defaults");
+        assert!(synth_signal("pan").is_err(), "pan needs a position");
+        assert!(synth_signal("pan:left").is_err());
         let err = synth_signal("sawtooth:1").expect_err("unknown kind");
         assert!(err.contains("unknown kind `sawtooth`"), "got {err}");
         // A numeric kind still needs its number.
@@ -397,6 +434,79 @@ mod tests {
         for band in [levels.bass, levels.mid, levels.treb] {
             assert!(band.min <= band.mean && band.mean <= band.max, "{band:?}");
             assert!(band.min.is_finite() && band.max.is_finite(), "{band:?}");
+        }
+    }
+
+    /// The stereo stimuli, measured through the real analyzer (ADR-0215).
+    ///
+    /// Both tolerances are properties of the construction rather than fitted
+    /// numbers. `pan` is one waveform at two gains, so the RMS ratio is
+    /// algebraically `p` and the correlation is algebraically 1; what is left is
+    /// f32 accumulation over a 512-sample hop. `wide` is two independent noise
+    /// sequences, whose correlation over a 512-sample hop has a standard
+    /// deviation near `1/sqrt(512)` = 0.044 — so per-hop `spread` has ~0.022,
+    /// and over the clip's 375 hops the mean's is near 0.0011. The bounds below
+    /// are more than nine of those.
+    #[test]
+    fn the_stereo_stimuli_land_where_their_construction_says() {
+        let (pcm, format) = synth_signal("pan:-0.8").expect("a hard-left pan");
+        let levels = band_levels(&pcm, format).expect("4 s is plenty of hops");
+        assert!(
+            (levels.balance.mean + 0.8).abs() < 1e-3,
+            "pan:-0.8 should read a mean balance of -0.800, got {:.4}",
+            levels.balance.mean
+        );
+        assert!(
+            levels.spread.mean.abs() < 1e-4,
+            "pan's two channels are one waveform, so spread is 0.000, got {:.4}",
+            levels.spread.mean
+        );
+
+        let (pcm, format) = synth_signal("wide:1").expect("decorrelated noise");
+        let levels = band_levels(&pcm, format).expect("4 s is plenty of hops");
+        assert!(
+            (levels.spread.mean - 0.5).abs() < 0.05,
+            "two independent noise streams should read a mean spread of 0.500, got {:.4}",
+            levels.spread.mean
+        );
+        assert!(
+            levels.balance.mean.abs() < 0.01,
+            "wide:1's channels carry equal level, so balance is centred, got {:.4}",
+            levels.balance.mean
+        );
+    }
+
+    /// **The evidence that the harness was blind**, and the property that must
+    /// stay true: every kind that predates the stereo stimuli builds one mono
+    /// buffer and duplicates it into both channels, so under all of them a
+    /// working stereo implementation and a broken one produce the same output.
+    ///
+    /// Asserted as exact zeroes rather than within a tolerance, because that is
+    /// what identical channels produce: the balance ratio's numerator is `0`,
+    /// and the correlation's numerator and denominator are the same sum.
+    #[test]
+    fn every_pre_stereo_signal_kind_reads_no_stereo_field_at_all() {
+        for spec in [
+            "click:120",
+            "bass:60",
+            "treble:10000",
+            "treb:8000",
+            "noise:7",
+            "chord",
+            "dynamic:110",
+        ] {
+            let (pcm, format) = synth_signal(spec).unwrap_or_else(|e| panic!("{spec}: {e}"));
+            let levels = band_levels(&pcm, format).unwrap_or_else(|e| panic!("{spec}: {e}"));
+            assert_eq!(
+                (levels.balance.min, levels.balance.mean, levels.balance.max),
+                (0.0, 0.0, 0.0),
+                "{spec} is mono duplicated into both channels and must read a flat balance"
+            );
+            assert_eq!(
+                (levels.spread.min, levels.spread.mean, levels.spread.max),
+                (0.0, 0.0, 0.0),
+                "{spec} is mono duplicated into both channels and must read a flat spread"
+            );
         }
     }
 

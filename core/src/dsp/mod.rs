@@ -28,6 +28,7 @@ pub mod gain;
 pub mod grid;
 pub mod novelty;
 pub mod onset;
+pub mod stereo;
 pub mod tempo;
 
 use crate::audio::{AudioFormat, FormatError};
@@ -232,6 +233,32 @@ pub struct AnalysisFrame {
     /// a steady segment, spiking at a spectral boundary. Native-API only — not
     /// exposed across the C ABI.
     pub novelty: f32,
+    /// Where the mix sits between channels 0 and 1, `-1` hard left to `+1` hard
+    /// right, `0` centred (ADR-0215).
+    ///
+    /// **Absolute, never levelled**, unlike the four headline levels above: it
+    /// is the plain ratio of the hop's per-channel RMS, so `0` means genuinely
+    /// centred on every track rather than "centred for this track". A running
+    /// peak cannot represent the *absence* of stereo information — it would
+    /// stretch a mono stream's noise floor into a confident wandering pan — and
+    /// position, unlike loudness, can genuinely be absent.
+    ///
+    /// Exactly `0` below [`gain::WAVE_FLOOR`], on a one-channel stream, and on
+    /// any mono-duplicated stereo stream, because that is the truth about all
+    /// three. Channels 0 and 1 only, as [`waveform_pair`](Self::waveform_pair)
+    /// is: a surround stream's other channels do not reach it.
+    ///
+    /// Published raw, per hop, with no smoother — `[smoothing]` eases any
+    /// binding that wants it, and a smoother here would be a second opinion an
+    /// author cannot turn off.
+    pub balance: f32,
+    /// How decorrelated channels 0 and 1 are over the hop: `0` identical, `0.5`
+    /// fully decorrelated, `1` polarity-inverted (ADR-0215).
+    ///
+    /// `(1 - corr) / 2` over the normalized L/R correlation, absolute on the
+    /// same terms as [`balance`](Self::balance). A 512-sample hop is about one
+    /// cycle of a low bass note, so this jitters on bass-heavy material.
+    pub spread: f32,
 }
 
 impl Default for AnalysisFrame {
@@ -261,6 +288,8 @@ impl Default for AnalysisFrame {
             downbeat_confidence: 0.0,
             downbeat_locked: false,
             novelty: 0.0,
+            balance: 0.0,
+            spread: 0.0,
         }
     }
 }
@@ -287,6 +316,11 @@ impl AnalysisFrame {
     /// - `bar` is a **phase** in `[0, 1)`, not a level, so it takes `0.5` — the
     ///   middle of a beat rather than either edge, so a `bar`-driven binding
     ///   reads a typical position instead of sitting on the wrap.
+    /// - The stereo field stays `0`. `balance` is a **position**, not a level:
+    ///   its top is "hard right", which is not what "fully driven" means, and
+    ///   `0` is the centred field most material sits near. `spread` follows it,
+    ///   since a frame claiming a centred mix and a decorrelated one at once
+    ///   describes nothing.
     pub fn fully_driven() -> Self {
         Self {
             bass: 1.0,
@@ -545,6 +579,14 @@ impl Analyzer {
                     let [left, right] = &mut waveform_pair;
                     let waveform_pair_gain = self.pair_gain.normalize_pair(left, right);
 
+                    // The stereo field (ADR-0215), from the hop's own two
+                    // channels. It reads nothing above this line and nothing
+                    // above this line reads it, which is what keeps every field
+                    // constructed before it a function of the channel average
+                    // alone. Unlevelled, so it is not routed through `gain`.
+                    let [hop_l, hop_r] = &self.hop_pair;
+                    let field = stereo::StereoField::measure(hop_l, hop_r);
+
                     self.latest = AnalysisFrame {
                         spectrum,
                         waveform,
@@ -570,6 +612,8 @@ impl Analyzer {
                         downbeat_confidence: bars.confidence,
                         downbeat_locked: bars.locked,
                         novelty,
+                        balance: field.balance,
+                        spread: field.spread,
                     };
                     self.pending_beat |= beat;
                 }

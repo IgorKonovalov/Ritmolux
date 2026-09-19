@@ -797,15 +797,21 @@ fn print_band_levels(levels: &BandLevels) {
          not against --set magnitudes:",
         levels.hops
     );
-    println!("  {:<6} {:>8} {:>8} {:>8}", "signal", "min", "mean", "max");
+    println!("  {:<7} {:>8} {:>8} {:>8}", "signal", "min", "mean", "max");
     for (name, band) in [
         ("bass", levels.bass),
         ("mid", levels.mid),
         ("treb", levels.treb),
         ("onset", levels.onset),
+        // The stereo field sits in the same table and is read differently: it
+        // is absolute, so these are magnitudes rather than fractions of a peak,
+        // and a row of zeroes means the clip carries no stereo information
+        // rather than that it is quiet (ADR-0215).
+        ("balance", levels.balance),
+        ("spread", levels.spread),
     ] {
         println!(
-            "  {name:<6} {:>8.3} {:>8.3} {:>8.3}",
+            "  {name:<7} {:>8.3} {:>8.3} {:>8.3}",
             band.min, band.mean, band.max
         );
     }

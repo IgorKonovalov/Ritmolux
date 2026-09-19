@@ -843,6 +843,8 @@ fn the_clock_stimulus_moves_the_clock_and_nothing_else() {
             downbeat_confidence,
             downbeat_locked,
             novelty,
+            balance,
+            spread,
         } = *frame;
 
         // Everything that is not the clock stays at rest.
@@ -890,6 +892,8 @@ fn the_clock_stimulus_moves_the_clock_and_nothing_else() {
                 rest.downbeat_confidence,
             ),
             ("novelty", novelty, rest.novelty),
+            ("balance", balance, rest.balance),
+            ("spread", spread, rest.spread),
         ] {
             assert_eq!(
                 got.to_bits(),
