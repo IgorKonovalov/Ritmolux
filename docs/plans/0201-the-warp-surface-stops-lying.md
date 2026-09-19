@@ -151,8 +151,8 @@ job of a baseline).
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `zoom` says what the shader does | dev | done | committed with this row |
-| 2 — A custom wave draws through the contract | dev | not started | |
+| 1 — `zoom` says what the shader does | dev | done | f14bcd47 |
+| 2 — A custom wave draws through the contract | dev | done | committed with this row |
 | 3 — Level mode can hold an ink | dev | not started | |
 | 4 — The converted chain gets a baseline that can see it | dev | not started | |
 
@@ -168,6 +168,12 @@ job of a baseline).
   `RLX_UPDATE_PRESET_SCHEMA=1` run as `presets/schema/warp_mesh.schema.json`; leaving it out would
   have left the generic editor schema saying the old direction and
   `preset_schema::the_generated_editor_files_are_current` red.
+- **Phase 2 also edited `docs/milkdrop-conversion.md`**, which the phase's `Files touched` does not
+  name. Its "what a conversion does and does not carry" table listed *a custom wave's `SmoothWave`
+  pass* as **not carried**, which the phase makes false; the row moved to the carried column with
+  ADR-0223 cited. The two custom-wave tests are in `core/src/render/scenes/warp_mesh/tests.rs` as
+  the phase names, built from a bundle written in the VM's own assembly, so `core` needs no EEL2
+  compiler to carry a custom wave.
 
 ### Close triggers
 
