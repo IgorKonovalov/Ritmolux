@@ -188,8 +188,8 @@ flowchart TB
 |---|---|---|---|
 | 1 — `pause`: finish the plan in flight, then stop | dev | done | 1928b879 |
 | 2 — The queue stands alone, and `prune` keeps it tidy | dev | done | 4625a537 |
-| 3 — One suite ledger per repository, not per worktree | dev | done | committed with this row |
-| 4 — A session can run the two documented regenerations | dev | not started | |
+| 3 — One suite ledger per repository, not per worktree | dev | done | 3ee9a776 |
+| 4 — A session can run the two documented regenerations | dev | done | committed with this row |
 
 ### Notes
 

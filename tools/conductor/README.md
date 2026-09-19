@@ -287,6 +287,16 @@ closed finding to the page. The finding *text* is safe — it is committed in ea
   reads each command of a compound call on its own, so `cd studio; npm run typecheck` is refused for
   its `cd` — the prompts tell a session to run one command per call and pass `--prefix` instead.
   **Every rule has a case in `test/settings.test.mjs`**, which fails on a rule added without one.
+- **An environment variable ahead of a command is allowed by name, never by shape.** A rule for
+  `VAR=value <allowed command>` would admit every variable there is, including the ones that change
+  what a build produces, so the allowlist instead lists the ones this project documents:
+  `RUSTDOCFLAGS` for `cargo doc`, and `RLX_UPDATE_PRESET_SCHEMA=1` / `RLX_UPDATE_PARAM_REFERENCE=1`
+  for the two regenerations in `docs/developing.md` and `presets/README.md`, which are the commands a
+  session runs unchanged. Each of those two is allowed both bare and in front of `with-lock.mjs`,
+  because the suite-lock hook denies the bare form of anything that runs tests. Adding a third
+  variable is an edit to this file and a case beside the others, deliberately. The other shell spells
+  an assignment as its own command (`$env:X = '1'; …`), which stays refused; the prompts tell a
+  session so.
 - **The hooks.** `.claude/hooks/block-push-and-history-rewrite.js` denies `git push`,
   `reset --hard`, `rebase`, `commit --amend` and `filter-branch` in every session, human-started
   ones included. `.claude/hooks/conductor-suite-lock.js` denies any `nextest` or `cargo test` a
