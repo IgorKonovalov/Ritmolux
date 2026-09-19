@@ -6,7 +6,7 @@
 > **Supersedes in part:** [0033](0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md) — its
 > roster, its opt-in-per-clone nature and its Alternative F exclusions all stand; what this replaces
 > is the rule that the hook's cargo steps run on every push
-> **Rests on:** [0207](0207-a-suite-is-locked-and-a-green-tree-is-recorded-once.md) (the ledger and
+> **Rests on:** [0207](0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md) (the ledger and
 > its tree key), [0211](0211-a-green-suite-record-serves-a-later-tree-when-no-deferred-suite-can-read-the-diff.md)
 > (serving a record), [0217](0217-the-node-gate-roster-is-one-manifest-and-a-checker-holds-every-carrier-to-it.md)
 > (the Node roster is a manifest), [0222](0222-a-preset-sweeps-fixed-cost-is-paid-per-process-so-the-lever-is-the-batch.md)
@@ -31,7 +31,7 @@ narrowing: a check the hook skips is not a check nobody runs.
 **Two things have changed under ADR-0033 since it was written.** The conductor
 ([ADR-0205](0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md))
 now gates every step of every lane it runs, and the suite ledger
-([ADR-0207](0207-a-suite-is-locked-and-a-green-tree-is-recorded-once.md),
+([ADR-0207](0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md),
 [ADR-0211](0211-a-green-suite-record-serves-a-later-tree-when-no-deferred-suite-can-read-the-diff.md))
 records a green run against the **hash of the tree it ran on**, refusing to record at all when the
 tree was dirty at either end. A conductor-produced push therefore arrives at the hook carrying
