@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0195 - A finding can be closed](#0195---a-finding-can-be-closed)
   - [0193 - The digest says what is happening, and where you are needed](#0193---the-digest-says-what-is-happening-and-where-you-are-needed)
   - [0142 - The MilkDrop import earns its verdict](#0142---the-milkdrop-import-earns-its-verdict)
   - [0103 - The project gets an audience](#0103---the-project-gets-an-audience)
@@ -233,6 +234,54 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0195 - A finding can be closed](done/0195-a-finding-can-be-closed.md)
+
+- closed 2026-09-19, conductor-run lane `plan-0195-a-finding-can-be-closed` in `WORK/rlx-plan-0195`.
+Two phases, `4737305b` and `b38a4ebd`; one fix round repairing all four round-1 findings
+(`0bc634e5`, `74b7e833`, `f444c306`, `6c882c1e`); plus `42e6bda0`, the round-2 close's one prose
+repair. Round 1: **no blockers, two majors, one minor, one nit.** Round 2: **no blockers, no majors,
+two nits**, one repaired at the close and one left open. Version **0.133.0** (minor). ADR-0216
+accepted, amending ADR-0214 and ADR-0209. No backlog entry closed and none filed.
+- **What landed.** The digest's **Needs you** carried every open review finding and nothing ever took
+one off, so the first page rendered under ADR-0214 was 45 lines of which 39 were findings from nine
+merges, the oldest days old — a worklist that grows per finding in place of a history that grew per
+run. `conductor.mjs finding <plan> [<ref> --done|--wontfix|--filed <reason>]` now records a dated
+disposition with a required reason beside the finding in `state/conductor.json`, and the page carries
+the open ones plus **one line** counting the closed. `<ref>` is the index the listing prints or the
+`file:line` exactly one finding carries; re-dispositioning overwrites and keeps the previous one in
+the finding's history; `digest --history` renders every finding with its verb, reason and date, which
+is the record ADR-0216 leans on when it accepts a gitignored store.
+- **The two majors were both in the new command's input handling, and both were repaired at the
+root.** The verb guard tested `FINDING_VERBS.includes(flag.replace(/^--/, ""))` — the dashes optional
+to that regex — and then took the verb as `flag.slice(2)`, so a bare `done` was accepted and written
+as `ne`; the verb *is* the judgement, nothing verifies a disposition, and repaired / declined / filed
+stop being distinguishable once one is `ne`. The repair takes the verb from the `FINDING_VERBS` entry
+that matched the flag in full, so the declaration that reaches the usage strings by interpolation is
+now the same declaration the parse uses. Second, `rec?.verdicts?.at(-1)` was called *the closing
+verdict* whatever the record said about the close, and a `verdict` outcome pushes its findings before
+any fix round — so a plan parked mid-round could have a **blocker** disposed of, a judgement written
+into the record with no carrier and orphaned by the next round's verdict. The repair decides on
+`rec.closed`, which both writers set immediately after pushing the closing verdict.
+- **What makes the severity question airtight rather than merely fixed.** `validate` in
+`lib/outcome.mjs` already rejects a `closed` outcome whose verdict carries blockers or majors, and
+`validateVerdict` allows `fixed_in` only on a `minor` or `nit`. So once the command decides on the
+close, a closing verdict's findings *can only be* the class ADR-0209 leaves open — no narrowing in
+`cmdFinding` is needed, and none was added.
+- **What the close left open.** One nit, by rule: the live-run refusal (`if (verb && runningPid(p))`,
+the one addition beyond the plan, and the only thing stopping a running conductor's next `saveState`
+from silently overwriting the owner's judgement) is asserted nowhere, and neither are the same
+refusals in `resume`, `park` and `adopt-close`. Testing it needs a live-pid fixture the suite does
+not have, so it is one decision for all four rather than four — and a test's logic is outside what
+ADR-0209 lets a close repair. What the close *did* repair was prose: `## Closing a finding` listed
+five rules and omitted the refusal an operator meets first, that a plan with no close has no findings
+to list.
+- **What outlived the plan.** Two. The **Needs you** summary is built from `counts`, which the
+closed-count line deliberately does not touch, so a page with every finding disposed of still reads
+`Nothing: no park, no lane stopped at the worktree cap, no open finding.` — the ADR-0214 property
+that plan promised and this one finally made reachable. And a finding is now named on both digest
+pages and on the command line through one `findingWhere`, retiring the three separate spellings of
+`file:line` that existed before.
 
 ### [0193 - The digest says what is happening, and where you are needed](done/0193-the-digest-says-what-is-happening-and-where-you-are-needed.md)
 

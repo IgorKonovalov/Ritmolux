@@ -44,7 +44,6 @@ place. The plan file carries the real link.
 | [0120](0120-the-standalone-ships-on-ubuntu.md) | The standalone ships on Ubuntu | approved | dev, human | ADR-0131 (proposed): PulseAudio capture + an `ubuntu-latest` CI arm. **Postponed 2026-09-18, off the queue: Phase 1's probe needs an Ubuntu box nobody has yet.** Folds backlog 0181 + 0208. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + 0174 (proposed): Art-Net. Phases 1-3 landed on its branch. **Postponed 2026-09-18, off the queue: Phase 9 is the rig and its date is unknown.** Phases 4-8 need no rig. |
 | [0194](0194-the-analysis-gains-a-stereo-field.md) | The analysis gains a stereo field | approved | dev, human | ADR-0215 (proposed): absolute `balance`/`spread` + per-band balance, never levelled. Phase 1 closes a harness blind spot - every `--signal` kind is mono duplicated today, so nothing can see stereo. |
-| [0195](0195-a-finding-can-be-closed.md) | A finding can be closed | approved | dev | ADR-0216 (proposed): one command records a dated disposition, the page carries the open and counts the closed. Nothing but a human may write one. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
@@ -873,6 +872,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0195 - A finding can be closed](done/0195-a-finding-can-be-closed.md) - closed 2026-09-19. Review: **round 1 two majors (both fixed), round 2 no blockers, no majors, two nits (one fixed).** Version: **0.133.0**. ADR-0216 accepted. [Write-up](README-archive.md).
 - [0193 - The digest says what is happening, and where you are needed](done/0193-the-digest-says-what-is-happening-and-where-you-are-needed.md) - closed 2026-09-18. Review: **no blockers, no majors, three minors, one nit (two fixed).** Version: **0.132.0**. ADR-0214 accepted. [Write-up](README-archive.md).
 - [0142 - The MilkDrop import earns its verdict](done/0142-the-milkdrop-import-earns-its-verdict.md) - closed 2026-09-18. Review: **no blockers, no majors, five minors, one nit (four fixed).** Version: **0.131.2**. ADR-0113 third Outcome, ADR-0199 Outcome. Closed backlog 0113, 0124. [Write-up](README-archive.md).
 - [0103 - The project gets an audience](done/0103-the-project-gets-an-audience.md) - closed 2026-09-18. Review: **no blockers, no majors, five minors, two nits (five fixed).** Version: **0.131.1** (patch). No ADR paired. Closed backlog 0102, 0103 - neither measured on device. [Write-up](README-archive.md).
