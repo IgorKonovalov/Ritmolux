@@ -325,18 +325,14 @@ live entry citing this one.
 | 0101 | The mark roster cannot morph between silhouettes, and two other rosters already do | [Plan 0203](plans/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md). **Promoted** |
 | 0221 | The run-alone override costs `-P fast` 165 s, because 18 testcases each drain the machine | [Plan 0199](plans/0199-the-gates-cost-is-measured-before-it-is-cut.md). **Promoted** |
 | 0239 | Three per-preset suites are 54 % of the workspace suite and grow with every preset shipped | [Plan 0199](plans/0199-the-gates-cost-is-measured-before-it-is-cut.md). **Promoted** |
-| 0240 | A merged plan never leaves `queue.json`, and the exemption is keyed on a gitignored file | [Plan 0197](plans/0197-the-conductor-becomes-operable.md). **Promoted** |
 | 0242 | The conductor's gate skips a check whose precondition a lane never has, and says nothing | [Plan 0196](plans/0196-the-gate-roster-stops-drifting.md). **Promoted** |
 | 0243 | The served version-line rule is anchored to a column and a basename, not to the section | [Plan 0196](plans/0196-the-gate-roster-stops-drifting.md). **Promoted** |
 | 0244 | A custom wave is neither smoothed nor scaled like the eight built-in figures | [Plan 0201](plans/0201-the-warp-surface-stops-lying.md). **Promoted** |
 | 0245 | The converted warp space has no pixel baseline, because every golden fixture is square | [Plan 0201](plans/0201-the-warp-surface-stops-lying.md). **Promoted** |
 | 0246 | The local `cargo doc` mirror covers one crate of five | [Plan 0196](plans/0196-the-gate-roster-stops-drifting.md). **Promoted** |
-| 0247 | A suite run by hand inside a lane records into that lane's own ledger, which no gate reads | [Plan 0197](plans/0197-the-conductor-becomes-operable.md). **Promoted** |
 | 0249 | `warp_mesh`'s `zoom` doc says the opposite of what the shader does | [Plan 0201](plans/0201-the-warp-surface-stops-lying.md). **Promoted** |
-| 0250 | A conductor session cannot run a command that carries an environment assignment | [Plan 0197](plans/0197-the-conductor-becomes-operable.md). **Promoted** |
 | 0251 | `warp_mesh`'s level mode draws bands but not an ink class | [Plan 0201](plans/0201-the-warp-surface-stops-lying.md). **Promoted** |
 | 0252 | The conductor's gate is a hand-maintained copy of the Node gate list | [Plan 0196](plans/0196-the-gate-roster-stops-drifting.md). **Promoted** |
-| 0253 | The conductor can be stopped but not paused | [Plan 0197](plans/0197-the-conductor-becomes-operable.md). **Promoted** |
 <!-- roster:end -->
 
 ### Closed
@@ -616,6 +612,10 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0103 | The plugin's context menu shadows foobar's, so the panel cannot be removed from a layout | [Plan 0103](plans/done/0103-the-project-gets-an-audience.md) Phase 1. One per-window question, shared branch intact, no ADR. **Closed 2026-09-18** |
 | 0113 | The converted feedback field equilibrates far brighter than the reference's | [Plan 0142](plans/done/0142-the-milkdrop-import-earns-its-verdict.md) Phases 2-3. The decay's truncation and its domain, read from the source. The converted-shader path is that plan's own Followups. **Closed 2026-09-18** |
 | 0124 | ADR-0113's motivating claim still reads "provisionally negative" | [Plan 0142](plans/done/0142-the-milkdrop-import-earns-its-verdict.md) Phases 4-5. Third `Outcome`: one better, two good, one fixed, two washed, one structural. **Closed 2026-09-18** |
+| 0253 | The conductor can be stopped but not paused | [Plan 0197](plans/done/0197-the-conductor-becomes-operable.md) Phase 1 + ADR-0219. `pause` finishes the plan in flight; the ask dies with the run. **Closed 2026-09-19** |
+| 0240 | A merged plan never leaves `queue.json`, and the exemption is keyed on a gitignored file | [Plan 0197](plans/done/0197-the-conductor-becomes-operable.md) Phase 2 + ADR-0220. A `done/` fallback and a notice; `prune` is the carrier. **Closed 2026-09-19** |
+| 0247 | A suite run by hand inside a lane records into that lane's own ledger, which no gate reads | [Plan 0197](plans/done/0197-the-conductor-becomes-operable.md) Phase 3. One ledger per repository, via the common git directory. **Closed 2026-09-19** |
+| 0250 | A conductor session cannot run a command that carries an environment assignment | [Plan 0197](plans/done/0197-the-conductor-becomes-operable.md) Phase 4. The two documented `RLX_UPDATE_*` variables by name, in both spellings. **Closed 2026-09-19** |
 <!-- roster:end -->
 
 ---
@@ -14807,9 +14807,17 @@ preflight names the plan and refuses, which is recoverable in one edit. It is fi
 reason it has never fired is that the queue was pruned by hand twice, and nothing records that as
 something anyone must keep doing.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0197](plans/0197-the-conductor-becomes-operable.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0197](plans/done/0197-the-conductor-becomes-operable.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+- **CLOSED 2026-09-19 by [Plan 0197](plans/done/0197-the-conductor-becomes-operable.md) Phase 2 +
+  ADR-0220.** `validateQueue` gained the `done/` fallback `merged()` already had, so a listed plan
+  found under `docs/plans/done/` is a notice naming the plan and the file rather than a fatal
+  preflight error — with empty state sets, which is the configuration this entry demonstrated — and
+  `conductor.mjs prune` is the carrier that takes the entry off the lane list. The demonstration in
+  this body reverses: the same call that returned *"plan 0190: already closed"* now returns no errors
+  and one notice. The close review caught the other half of the same collapse: removing the fatal
+  error left `pickNext` free to hand a lane a plan already under `done/`, repaired in `4bf9163f`.
 
 ---
 
@@ -15212,9 +15220,17 @@ hand, and it cannot produce a wrong skip. It is not lower because the repair is 
 affordance is documented as working, which is the shape that wastes someone's afternoon before they
 think to check the file it wrote.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0197](plans/0197-the-conductor-becomes-operable.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0197](plans/done/0197-the-conductor-becomes-operable.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+- **CLOSED 2026-09-19 by [Plan 0197](plans/done/0197-the-conductor-becomes-operable.md) Phase 3.**
+  `suiteLedger()` resolves `state/suite-ledger.jsonl` under this script's counterpart in the
+  repository's **main checkout**, derived through `git rev-parse --git-common-dir`, so a wrapped hand
+  run in any worktree records where the conductor's gate reads. There is one ledger per repository:
+  teaching the gate a second lookup path was rejected, because two files can disagree about one tree.
+  A common directory with no checkout beside it — a bare clone, a relocated `.git` — records beside
+  the invoked script as before and says so in one stderr line. The test runs `selfDir` and `cwd` in
+  different worktrees and asserts the lane's own ledger stays empty.
 
 ---
 
@@ -15315,9 +15331,18 @@ Shapes, none decided:
 result, and the park names the command to run. It rises if a plan lands that regenerates a parameter
 surface per phase, because then every phase meets it.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0197](plans/0197-the-conductor-becomes-operable.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0197](plans/done/0197-the-conductor-becomes-operable.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+- **CLOSED 2026-09-19 by [Plan 0197](plans/done/0197-the-conductor-becomes-operable.md) Phase 4.**
+  `settings.conductor.json` admits `RLX_UPDATE_PRESET_SCHEMA=1` and `RLX_UPDATE_PARAM_REFERENCE=1`
+  **by name**, each in front of `cargo` and of `node` — the second because the suite-lock hook denies
+  the bare form of anything that runs tests, so the `cargo` rule alone would have left the phase's own
+  purpose unreachable. The rule is a list of named variables and deliberately not the shape
+  `VAR=value <allowed command>`, which would admit every variable including the ones that change what
+  a build produces; `test/settings.test.mjs` pins the value too, so `=0` is still refused. The third
+  option in *What a fix looks like* — `--config 'env.X="1"'` — was not taken. Backlog 0241 still
+  stands over all of it: this is green against a model of the CLI's matcher, not against the CLI.
 
 ---
 
@@ -15474,6 +15499,15 @@ asking and stopping is exactly the suite's twelve minutes.
 - **Verified 2026-09-18** — and `--once` shows the same intent is already expressible at start time:
   `present: once in: tools/conductor/conductor.mjs`
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0197](plans/0197-the-conductor-becomes-operable.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0197](plans/done/0197-the-conductor-becomes-operable.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+- **CLOSED 2026-09-19 by [Plan 0197](plans/done/0197-the-conductor-becomes-operable.md) Phase 1 +
+  ADR-0219.** `conductor.mjs pause` records an ask in the state directory; `laneLoop` reads it beside
+  `stopRequested()` at the top of every iteration, so the plan in flight runs to its merge or its park
+  and no further plan starts. `pause` prints the plan and step each lane is on and how long that step
+  has been running, `pause --off` cancels while the run is live, and the run record carries `paused`
+  against every plan it did not start — apart from `--once` and from an exhausted queue. The ask does
+  not outlive its run: it is cleared when the run ends, and a `run` that finds one left behind by a
+  dead conductor clears it and says so. The probe in this body inverts — `pause:` is in
+  `tools/conductor/conductor.mjs` now.

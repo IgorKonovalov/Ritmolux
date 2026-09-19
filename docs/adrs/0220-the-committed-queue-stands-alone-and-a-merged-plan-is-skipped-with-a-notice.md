@@ -1,8 +1,8 @@
 # ADR-0220 — The committed queue stands alone, and a merged plan is skipped with a notice
 
-> **Status:** proposed
+> **Status:** accepted
 > **Date:** 2026-09-19
-> **Related plan(s):** [0197](../plans/0197-the-conductor-becomes-operable.md)
+> **Related plan(s):** [0197](../plans/done/0197-the-conductor-becomes-operable.md)
 > **Amends:** [0205](0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md)
 > (the committed queue)
 

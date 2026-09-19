@@ -128,7 +128,7 @@ single shipped picture.
 - **Phase 2's wobble may cost field accuracy**, and the done-when requires the number rather than an
   impression. A materially worse exterior is a stop, not a tuning problem.
 - **Every phase here regenerates a parameter surface**, which a conductor session cannot do until
-  [Plan 0197](0197-the-conductor-becomes-operable.md) Phase 4 lands (backlog 0250). Run this plan
+  [Plan 0197](done/0197-the-conductor-becomes-operable.md) Phase 4 lands (backlog 0250). Run this plan
   after 0197.
 - **This is the weakest-justified of this round's plans, and deliberately so.** Each entry says in
   its own words to take it *when someone wants the thing* — a rough figure, a vanishing point — and
