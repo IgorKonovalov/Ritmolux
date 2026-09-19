@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0231.** *(0120 was reserved for
+**Next free number: 0233.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -252,4 +252,6 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0228](0228-a-preset-mark-is-user-state-keyed-by-name-in-its-own-file.md) | A preset mark is user state, keyed by name, in its own file | proposed |
 | [0229](0229-the-studio-marks-a-preset-over-the-control-protocol.md) | The studio marks a preset over the control protocol, never by opening the file | proposed |
 | [0230](0230-thumbnails-are-rendered-by-a-subprocess-of-the-player-itself.md) | Thumbnails are rendered by a subprocess of the player itself | proposed |
+| [0231](0231-the-standalone-size-cap-is-re-derived-from-what-it-carries-and-the-build-reports-it.md) | The standalone's size cap is re-derived from what it carries, and the build reports it | proposed, amends NFR §4 |
+| [0232](0232-a-presets-frame-cost-is-measured-and-reported-never-asserted.md) | A preset's frame cost is measured and reported, never asserted | proposed |
 <!-- roster:end -->
