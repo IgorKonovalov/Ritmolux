@@ -59,6 +59,9 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0250 — a conductor session cannot run a command that carries an environment assignment, and two documented repairs need one](#0250--a-conductor-session-cannot-run-a-command-that-carries-an-environment-assignment-and-two-documented-repairs-need-one)
 - [0251 — `warp_mesh`'s level mode draws bands but not an ink class, because coverage is a continuum nothing thresholds](#0251--warp_meshs-level-mode-draws-bands-but-not-an-ink-class-because-coverage-is-a-continuum-nothing-thresholds)
 - [0252 — the conductor's gate is a hand-maintained copy of the Node gate list, and it has fallen behind twice](#0252--the-conductors-gate-is-a-hand-maintained-copy-of-the-node-gate-list-and-it-has-fallen-behind-twice)
+- [0253 — the conductor can be stopped but not paused, so finishing the plan in flight is done by hand with a stopwatch](#0253--the-conductor-can-be-stopped-but-not-paused-so-finishing-the-plan-in-flight-is-done-by-hand-with-a-stopwatch)
+- [0254 — every gallery card is captured at hop 300, which is before an accumulating world exists](#0254--every-gallery-card-is-captured-at-hop-300-which-is-before-an-accumulating-world-exists)
+- [0255 — `docs-shots.mjs` renders all or nothing, so adding one card is done by hand-copying its manifest entry](#0255--docs-shotsmjs-renders-all-or-nothing-so-adding-one-card-is-done-by-hand-copying-its-manifest-entry)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -2670,3 +2673,123 @@ two names — restores the invariant for a day and rebuilds the same trap. The s
 on every local push by anyone with the hook installed. What is lost is the pre-close reading for
 conductor-run plans, which is exactly where a red gate is cheapest to repair. It rises with each
 further gate added, because the gap is not one checker but a list that nobody is told to update.
+
+## 0253 — the conductor can be stopped but not paused, so finishing the plan in flight is done by hand with a stopwatch
+
+`abort` stops the conductor and every session under it, and a step in flight runs again on the next
+`run`. That is the right behaviour for "stop now" — Ctrl+C does the same — and it is the **only**
+stopping behaviour there is. What an operator asks for far more often is *"finish what you are
+doing, then stop"*: the machine is wanted for something else, or a `human` phase is ready to be done
+and the GPU is busy, or the day is over and nothing new should start.
+
+**Done by hand, that means watching the record and timing an `abort`**, because the two failure
+modes sit either side of the right moment. Abort too early and a review session's spend is lost and
+its step re-runs from scratch. Abort too late and the next plan's session has already started, which
+costs the same. On 2026-09-18 this was done three times in one session: once by polling
+`state/conductor.json` in a loop until `0178` read `merged` and aborting inside the gap, and twice by
+noticing that the queue happened to hold exactly one plan, so the run would end by itself.
+
+**What the shape probably is**, and it is small: a `pause` command that sets a flag the lane loop
+reads where it already reads `stopRequested()` — no new session starts, the one in flight finishes,
+its close and fast-forward complete, then the run ends normally. `run --once` is the same idea
+expressed at start time and is evidence the seam exists; what is missing is saying it *during* a run.
+Worth deciding alongside: whether `pause` survives into the next `run` (a paused conductor that
+forgets by morning is a trap), and whether it prints what it is waiting for, since the gap between
+asking and stopping is exactly the suite's twelve minutes.
+
+- **Raised:** 2026-09-18 by the owner, after the third hand-timed stop of the day. **Owner if
+  taken:** `architect` then `dev`.
+- **Verified 2026-09-18** — the command roster has no pause:
+  `absent: pause: in: tools/conductor/conductor.mjs`
+- **Verified 2026-09-18** — the only stop is the abrupt one, and it says so:
+  `present: in-flight step\(s\) will run again on the next in: tools/conductor/conductor.mjs`
+- **Verified 2026-09-18** — the lane loop already reads a stop request each iteration, which is where
+  a pause would be read too:
+  `present: stopRequested in: tools/conductor/lib/lane.mjs`
+- **Verified 2026-09-18** — and `--once` shows the same intent is already expressible at start time:
+  `present: once in: tools/conductor/conductor.mjs`
+
+## 0254 — every gallery card is captured at hop 300, which is before an accumulating world exists
+
+The gallery renders one card per shipped preset at `--frame-at 300` — about 3.5 s of scene time at
+110 BPM — unless the preset is named in `CARD_HOP_OVERRIDES`. That roster holds four presets, all
+`swarm_*`, all at hop 374. So the mechanism for *"this world needs longer"* exists and has been used
+once, for one family, on the basis of that family's own development time. Nothing generalized it.
+
+**A world built on a feedback field is not developed at 3.5 s and cannot be.** `warp_ladder`'s
+header records its own horizon: the field is still filling for its first two minutes, coverage
+0.408 at the 30 s row against 0.619 at 300 s. `warp_tracery`'s card, rendered 2026-09-18 at the
+manifest's hop 300, shows the contours closed around each of seven lobes; the same preset rendered
+at 30 s shows them merged into the rosette the world is named for. Both pictures are true and only
+one of them is the look.
+
+It is not only the warp family. Trails, a `[feedback]` table, reaction-diffusion and the particle
+worlds all have an accumulation axis, and ADR-0099 already names that set for a different purpose —
+deciding when a horizon is owed. The gallery has no equivalent rule, and the card is the one picture
+most readers ever see of a preset.
+
+**What the shape probably is**, and it is not a larger constant for everyone: hop 300 is chosen and
+argued in the script's own header — it is the last hop of the loudest beat, and a later hop lands in
+the two-beat rest that `dynamic_groove` takes next, which is why the four swarm overrides at 374 are
+described as the exception rather than the better default. Either a per-family default beside
+`CARD_HOP_OVERRIDES`, or a longer synthesized signal for the accumulating set so that a late hop is
+still a loud one.
+
+- **Raised:** 2026-09-19 by `preset-author`, landing `warp_tracery` and reading its card against a
+  30 s render of the same file. **Owner if taken:** `architect` then `dev`.
+- **Verified 2026-09-19** — the default hop is 300 for every card that is not overridden:
+  `present: hop: CARD_HOP_OVERRIDES\[preset\] \?\? 300 in: scripts/docs-shots.mjs`
+- **Verified 2026-09-19** — the override mechanism exists, and its roster opens on a swarm preset:
+  `present: CARD_HOP_OVERRIDES = \{ swarm_ in: scripts/docs-shots.mjs`
+- **Verified 2026-09-19** — and no `warp_mesh` world is in it, though every one of them accumulates:
+  `absent: CARD_HOP_OVERRIDES = \{[^}]*warp_ in: scripts/docs-shots.mjs`
+- **Verified 2026-09-19** — the hop is argued from where the beat is, which is why raising it for
+  everyone is the wrong repair:
+  `present: the last hop of the loudest beat in: scripts/docs-shots.mjs`
+
+### Priority
+
+**Low-medium.** Nothing is broken and no gate is involved — a card is honest about the frame it
+shows, and `every_shipped_preset_has_a_gallery_card` deliberately checks existence rather than
+freshness. What it costs is the gallery's actual job. It rises as the accumulating share of the
+library grows, and it is cheapest to take alongside any other edit to the manifest.
+
+## 0255 — `docs-shots.mjs` renders all or nothing, so adding one card is done by hand-copying its manifest entry
+
+The runner loops every entry in `IMAGES` and reads no arguments at all. There is no way to say
+*"just this one"*. Adding a preset to `CARDS` therefore leaves two options: run the whole script,
+which rewrites every committed still under `docs/images/`, or reproduce that one entry's settings on
+the command line by hand.
+
+**The first is not available in practice, and the script's own header says why:** renders are not
+byte-reproducible across machines, so a full run produces a diff over ~100 unrelated images that
+records driver drift rather than anything true. The second is what was done on 2026-09-18 for
+`warp_tracery` — `--signal dynamic:110 --frame-at 300 --size 640x360 --tier rich`, read out of the
+manifest and retyped. That is correct only as long as whoever copies it copies all five settings,
+and nothing would notice a card rendered at the wrong size or tier: the test beside it checks that
+the PNG exists and deliberately does not check that it is current. So for the duration of a
+hand-run, the capture settings live in one place and are used from another.
+
+Two sibling renderers in the same directory already take an argument, so the shape is not novel
+here — it simply never reached this one.
+
+**What the shape probably is:** a name filter — `node scripts/docs-shots.mjs warp_tracery` —
+selecting the manifest entries whose `presetFile` or `out` matches and running only those. The
+settings then stay in the one place they are already written down, which is the whole point.
+
+- **Raised:** 2026-09-19 by `preset-author`, adding `warp_tracery` to `CARDS`. **Owner if taken:**
+  `architect` then `dev`.
+- **Verified 2026-09-19** — the renderer reads no arguments:
+  `absent: process\.argv in: scripts/docs-shots.mjs`
+- **Verified 2026-09-19** — it loops the whole manifest, unconditionally:
+  `present: for \(const \[index, entry\] of IMAGES\.entries\(\)\) in: scripts/docs-shots.mjs`
+- **Verified 2026-09-19** — and the script itself states why a full re-run is not a free way out:
+  `present: not byte-reproducible in: scripts/docs-shots.mjs`
+- **Verified 2026-09-19** — a sibling renderer in the same directory already takes an argument:
+  `present: process\.argv in: scripts/tuple-sheets.mjs`
+
+### Priority
+
+**Low.** A papercut with a correctness edge rather than a defect: the cost is paid once per preset
+landed, by whoever lands it, and the failure it invites — a card captured at settings the manifest
+does not name — is invisible to every gate that runs.

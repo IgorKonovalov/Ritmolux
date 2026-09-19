@@ -1,6 +1,6 @@
 # 0194 — The analysis gains a stereo field
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-09-18
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0215](../adrs/0215-the-analyzer-publishes-an-absolute-stereo-field.md)
