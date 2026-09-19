@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0197 - The conductor becomes operable](#0197---the-conductor-becomes-operable)
   - [0196 - The gate roster stops drifting](#0196---the-gate-roster-stops-drifting)
   - [0194 - The analysis gains a stereo field](#0194---the-analysis-gains-a-stereo-field)
   - [0195 - A finding can be closed](#0195---a-finding-can-be-closed)
@@ -237,6 +238,43 @@ hand-edited.
 
 ## Recently closed (full entries)
 
+### [0197 - The conductor becomes operable](done/0197-the-conductor-becomes-operable.md)
+
+- closed 2026-09-19, conductor-run lane `plan-0197-the-conductor-becomes-operable` in
+`WORK/rlx-plan-0197`. Four phases, `1928b879`, `4625a537`, `3ee9a776` and `3619c8bb`; a fix round
+`4bf9163f`, `68e4acbd`, `7a35b07d`; and the close's `66c676b1`. Two review rounds: **round 1 one major
+and two minors, all three repaired; round 2 no blockers, no majors, one minor and one nit, both
+repaired.** Version **0.136.0** (minor). ADR-0219 and ADR-0220 accepted, neither with an `Outcome`.
+Closed backlog 0240, 0247, 0250 and 0253.
+- **What landed.** Four operator affordances the conductor was missing. `pause` records an ask in the
+state directory that `laneLoop` reads beside its stop request, so a run finishes the plan in flight
+and starts no other, prints the plan and step each lane is on and how long it has been there, and
+ends with `paused` in the run record — distinguishable from `--once` and from an exhausted queue. The
+committed `queue.json` now stands on its own: a listed plan found under `docs/plans/done/` is a
+notice rather than a fatal preflight error, whatever the gitignored `state/` says, and `prune` is the
+carrier that takes the entry off the list. The suite ledger resolves through the repository's common
+git directory, so a wrapped hand run in a lane records where the gate reads rather than in the one
+place nothing reads. And the session allowlist admits the two documented `RLX_UPDATE_*` regenerations
+by name, in the bare and the lock-wrapped spelling.
+- **The defect the first review found is the one worth remembering.** Phase 2 correctly demoted
+`validateQueue`'s *"already closed"* error to a notice — and that error was the only thing stopping
+`pickNext` from handing a lane a plan that had already merged, because the picker asked the state
+record's status (defaulting to `"queued"` with no record) and never asked `merged()` about the plan
+itself. On this machine nothing changed, because `state/conductor.json` exists; on the clone, the
+second machine or the wiped `state/` that is the entire motivation for ADR-0220, the run would have
+opened a worktree and spent a session on a plan closed weeks earlier. Reproduced against the
+repository's own committed queue. The repair is one condition at the place the ADR says the two
+predicates meet, and the test drives `run` — not `check` — with an empty state.
+- **What outlived the plan.** The ledger is now one file per repository rather than one per worktree,
+which is a property the park table depends on: every reason it lists sends the operator *into a lane*,
+and the wrapper they reach for there is the lane's own copy. A repository whose main checkout cannot
+be derived — a bare clone, a relocated `.git` — records beside the invoked script as before and says
+so in one stderr line, in ADR-0016's shape. The allowlist rule is a list of named variables and
+deliberately not the shape `VAR=value <allowed command>`, which would admit every variable including
+the ones that change what a build produces; a third variable is an edit to the file and a case beside
+the others. Phase 4's risk is unresolved and recorded as such: the allowlist is green against a
+*model* of the CLI's matcher (backlog 0241, still live), and the first conductor session that actually
+needs a regeneration is the real evidence.
 ### [0196 - The gate roster stops drifting](done/0196-the-gate-roster-stops-drifting.md)
 
 - closed 2026-09-19, conductor-run lane `plan-0196-the-gate-roster-stops-drifting` in

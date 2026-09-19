@@ -45,38 +45,89 @@ const SELF_DIR = dirname(fileURLToPath(import.meta.url));
 
 /**
  * The common git directory of the repository `dir` sits in, as one canonical absolute path, or null
- * when it is in none. A worktree and its main checkout share one common directory, which is what
- * makes a hand run in a lane record into the same ledger the conductor reads.
- *
- * Trap: the two sides of the comparison reach this from different roots — one from a cwd, one from
- * this script's own path — and on Windows either may carry an 8.3 short component or a different
- * case. `realpathSync.native` is what makes them the same string.
+ * when it is in none. A worktree and its main checkout share one common directory, which is both
+ * how a hand run is recognized as belonging to this repository and where the one ledger it records
+ * into is derived from.
  */
 function gitCommonDir(dir) {
   const r = git(["rev-parse", "--git-common-dir"], dir);
   if (r.code !== 0 || !r.stdout) return null;
   try {
-    const real = realpathSync.native(resolve(dir, r.stdout));
-    return process.platform === "win32" ? real.toLowerCase() : real;
+    return realpathSync.native(resolve(dir, r.stdout));
   } catch {
     return null;
   }
 }
 
 /**
- * Where a wrapped full suite records what it saw and who it records as, or null for neither.
+ * The comparison form of a path. Two common directories reached from different roots — one from a
+ * cwd, one from this script's own path — may on Windows carry an 8.3 short component or a different
+ * case; `realpathSync.native` above settles the first and this settles the second.
+ */
+const samePath = (p) => (process.platform === "win32" ? p.toLowerCase() : p);
+
+const realPath = (p) => {
+  try {
+    return realpathSync.native(p);
+  } catch {
+    return p;
+  }
+};
+
+/**
+ * This script's counterpart in the repository's **main checkout**: `selfDir` itself when that is
+ * already where it sits, and otherwise the same in-tree path under the main checkout, so a copy
+ * invoked from a worktree lane resolves the one directory the conductor reads.
+ *
+ * Null when the main checkout cannot be derived from `common` — a bare repository, or a `.git`
+ * relocated away from the tree it serves, where the common directory's parent is not a checkout at
+ * all. The second `gitCommonDir` call is the proof: that parent must itself report `common`.
+ *
+ * Trap: the main-checkout case returns `selfDir` untouched rather than re-deriving it, because a
+ * derived path is `realpathSync.native`'s spelling of it — an 8.3 component expanded, a junction
+ * followed — and the ledger is then a second name for one file.
+ */
+function conductorDirInMainCheckout(selfDir, common) {
+  if (basename(common) !== ".git") return null;
+  const root = dirname(common);
+  const there = gitCommonDir(root);
+  if (!there || samePath(there) !== samePath(common)) return null;
+  const top = git(["rev-parse", "--show-toplevel"], selfDir);
+  if (top.code !== 0 || !top.stdout) return null;
+  if (samePath(realPath(top.stdout)) === samePath(root)) return selfDir;
+  const prefix = git(["rev-parse", "--show-prefix"], selfDir);
+  return prefix.code === 0 ? join(root, prefix.stdout) : null;
+}
+
+/**
+ * Where a wrapped full suite records what it saw and who it records as, or null for neither, plus a
+ * `notice` the caller prints when the derivation below fell back.
  *
  * `RLX_SUITE_LEDGER` wins: the conductor hands every session its own path and step label. Otherwise a
- * run from inside this repository — the main checkout or any of its worktrees — records into
- * `state/suite-ledger.jsonl` beside this script, as `hand`, so a gate an operator runs by hand counts
- * and the next gate on that tree does not repeat it (ADR-0207). A run anywhere else records nothing:
- * the wrapper is a general-purpose lock, and a suite on another repository's tree is not this one's
- * evidence.
+ * run from inside this repository — the main checkout or any of its worktrees — records as `hand`, so
+ * a suite an operator runs by hand counts and the next gate on that tree does not repeat it
+ * (ADR-0207). A run anywhere else records nothing: the wrapper is a general-purpose lock, and a suite
+ * on another repository's tree is not this one's evidence.
+ *
+ * **There is one ledger per repository, not per worktree** (Plan 0197 Phase 3): the directory is
+ * this script's counterpart in the main checkout, so a lane's own copy of it records where the gate
+ * reads. A second lookup path was rejected — two files can disagree about one tree, and the value of
+ * the record is that there is one answer.
  */
 export function suiteLedger(cwd, env, selfDir = SELF_DIR) {
   if (env.RLX_SUITE_LEDGER) return { path: env.RLX_SUITE_LEDGER, by: env.RLX_SUITE_LEDGER_BY || "a session" };
   const here = gitCommonDir(cwd);
-  return here && here === gitCommonDir(selfDir) ? { path: join(selfDir, "state", "suite-ledger.jsonl"), by: "hand" } : null;
+  const mine = gitCommonDir(selfDir);
+  if (!here || !mine || samePath(here) !== samePath(mine)) return null;
+  const dir = conductorDirInMainCheckout(selfDir, mine);
+  if (dir === null) {
+    return {
+      path: join(selfDir, "state", "suite-ledger.jsonl"),
+      by: "hand",
+      notice: `no main checkout beside ${mine}, so the suite ledger stays beside this script instead of the repository's one`,
+    };
+  }
+  return { path: join(dir, "state", "suite-ledger.jsonl"), by: "hand" };
 }
 
 export function lockDir(env = process.env) {
@@ -278,6 +329,7 @@ export async function runWrapped(argv, { env = process.env, cwd = process.cwd(),
 
   const ledger = suiteLedger(cwd, env, selfDir);
   const suite = Boolean(ledger) && isFullSuite(command, args);
+  if (suite && ledger.notice) process.stderr.write(`with-lock: notice: ${ledger.notice}\n`);
   if (suite) {
     const green = greenRecord(ledger.path, cleanTree(cwd));
     if (green) {

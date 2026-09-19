@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 
 import { VERIFIED_CLI, paths, preflight } from "../conductor.mjs";
-import { loadLocal, validateQueue } from "../lib/queue.mjs";
+import { loadLocal, pruneQueue, validateQueue } from "../lib/queue.mjs";
 import { FAKE, tmp, writePlan } from "./helpers.mjs";
 
 const dev = (id) => ({ id, owner: "dev" });
@@ -51,24 +51,46 @@ test("a dependency on a plan neither queued nor done is rejected with both names
   assert.match(q.errors[0], /^plan 0101: depends on plan 0177, which is neither in the queue nor in docs\/plans\/done\/$/);
 });
 
-test("a closed plan, a missing plan, a duplicate and a malformed key are each rejected", () => {
+test("a missing plan, a duplicate and a malformed key are each rejected", () => {
   const q = validateQueue(
-    { lanes: { a: ["0090", "0101", "0999"], b: ["0101"] }, plans: { "0101": { add_dirs: "x", later: 1 } } },
+    { lanes: { a: ["0101", "0999"], b: ["0101"] }, plans: { "0101": { add_dirs: "x", later: 1 } } },
     scratchRepo(),
   );
   const text = q.errors.join("\n");
-  assert.match(text, /plan 0090: already closed/);
   assert.match(text, /plan 0999: no docs\/plans\/0999-\*\.md/);
   assert.match(text, /plan 0101: listed twice \(lanes a and b\)/);
   assert.match(text, /plan 0101: "add_dirs" must be a list of paths/);
   assert.match(text, /plan 0101: unknown key "later"/);
 });
 
-test("a closed plan the conductor itself merged stays accepted in the queue", () => {
+// ADR-0220, reversing backlog 0240's demonstration: state/ is gitignored, so a clone or a wiped
+// state has empty sets, and every merged plan still listed used to be a fatal preflight error.
+test("a queued plan under done/ is a notice rather than a fatal error, whatever the state says", () => {
   const repo = scratchRepo();
   const queue = { lanes: { a: ["0090", "0101"] } };
-  assert.match(validateQueue(queue, repo, new Set(["0090"])).errors.join("\n"), /plan 0090: already closed/);
-  assert.deepEqual(validateQueue(queue, repo, new Set(["0090"]), new Set(["0090"])).errors, []);
+  for (const started of [new Set(), new Set(["0090"])]) {
+    const q = validateQueue(queue, repo, started);
+    assert.deepEqual(q.errors, []);
+    assert.equal(q.notices.length, 1);
+    assert.match(q.notices[0], /^plan 0090: already merged \(0090-fixture\.md is under docs\/plans\/done\/\); `prune` drops it/);
+  }
+  // A queued number with no plan file at all is a different thing, and still fatal.
+  const missing = validateQueue({ lanes: { a: ["0999"] } }, repo);
+  assert.match(missing.errors.join("\n"), /plan 0999: no docs\/plans\/0999-\*\.md/);
+  assert.deepEqual(missing.notices, []);
+});
+
+test("prune drops every merged plan from its lane and touches nothing else", () => {
+  const repo = scratchRepo();
+  const queue = { lanes: { a: ["0090", "0101"], b: ["0102"], c: "not a list" }, plans: { "0101": { after: ["0090"] } } };
+  const { queue: pruned, dropped } = pruneQueue(queue, repo);
+  assert.deepEqual(dropped, [{ plan: "0090", lane: "a", file: "0090-fixture.md" }]);
+  assert.deepEqual(pruned, { lanes: { a: ["0101"], b: ["0102"], c: "not a list" }, plans: { "0101": { after: ["0090"] } } });
+
+  // Nothing merged: the same object back, and nothing dropped.
+  const tidy = pruneQueue(pruned, repo);
+  assert.deepEqual(tidy.dropped, []);
+  assert.deepEqual(tidy.queue, pruned);
 });
 
 test("local.json is required, and every step budget must be set by the owner", () => {

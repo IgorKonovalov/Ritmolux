@@ -36,6 +36,12 @@ The decision and its rejected alternatives are ADR-0205. The plan that built it 
    ```json
    { "lanes": { "a": ["0175", "0185"], "b": [] }, "plans": { "0181": { "after": ["0185"] } } }
    ```
+
+   The file is accumulate-only and **stands on its own** (ADR-0220): a plan it still lists whose file
+   has moved to `docs/plans/done/` is merged, and every command that reads the queue skips it with a
+   notice rather than refusing to start. That holds on a fresh clone and after a wiped `state/`,
+   because the judgement is the plan file's location and not the gitignored run record. `prune` is
+   what takes the entry off the list.
 3. **Run the preflight:** `node tools/conductor/conductor.mjs check`. It refuses when `local.json` is
    missing, when `queue.json` names a plan that is not approved or depends on a plan it cannot reach,
    or when `claude --version` is not a version the conductor was verified on and not a patch above one.
@@ -56,10 +62,23 @@ All of them run from the main checkout.
 | `park NNNN` | Parks a plan that has not merged, with an inbox entry. |
 | `finding NNNN [<ref> --done\|--wontfix\|--filed <reason>]` | With no verb, lists that plan's closing verdict with an index per finding. With one, records your disposition against the finding `<ref>` names, and the digest stops carrying it. |
 | `adopt-close NNNN` | Records the close a lane already carries, when a session committed one and then lost its outcome. Verifies the branch first and writes nothing unless it passes. |
+| `pause [--off]` | Asks the live run to finish the plan in flight and start no further one, and prints what it is now waiting for. `--off` cancels the ask. |
 | `abort` | Stops a running conductor and every session under it. Steps in flight run again on the next `run`. |
+| `prune` | Drops every merged plan from `queue.json`'s lane lists, prints each one, and rewrites nothing when there is none. Refused while a run is live. Commit the result. |
 | `check` | The preflight alone. |
 
 Ctrl+C on `run` does the same as `abort`.
+
+**`pause` is the stop that loses nothing** (ADR-0219). `abort` and Ctrl+C kill every session under the
+conductor, so a step in flight re-runs from scratch next time and its spend is gone; `pause` lets each
+lane reach a *merged* plan first, which is the state at which the machine is genuinely free. The ask is
+read between plans, so the wait is the rest of the plan in flight — a fix round and a suite, when one
+has just started. `pause` prints the plan and step each lane is on and how long it has been there, so
+that wait is legible before you decide to `abort` instead. **A pause does not outlive its run:** it is
+cleared when the run ends, a `run` that finds one left behind by a dead conductor clears it and says
+so, and there is therefore no way to say "start nothing tomorrow" — the answer to that is not to start
+a run. A paused lane records `paused` against every plan it did not start, which the history page's
+**Not started** section reads apart from `--once` and from a queue that ran out.
 
 `run` prints one line per milestone as it happens, each one `HH:MM NNNN <what>`. A line indented
 under a plan number happened inside a step or a gate:
@@ -192,6 +211,14 @@ a session's run: a tree that was dirty when the suite started or when it finishe
 because the tree hash would not name what was tested. `RLX_SUITE_LEDGER` still overrides the choice,
 and a wrapped run in any other repository records nothing.
 
+**There is one ledger per repository, not one per worktree.** The park table sends you *into a lane*
+for every reason it lists, so the wrapper you reach for there is usually the lane's own copy of it —
+and the file it writes has to be the one the gate reads. The wrapper therefore resolves
+`state/suite-ledger.jsonl` under its counterpart in the **main checkout**, found through the
+repository's common git directory, whichever worktree it was invoked from. A repository whose main
+checkout cannot be derived — a bare clone, or a `.git` relocated away from its tree — records beside
+the invoked script as before, and says so in one line on stderr.
+
 **A close that landed without an outcome is adopted, never reviewed a second time.** A review session
 commits its repairs, its `done/` move, its version bump and its tag before it prints anything, so a
 session that dies after that leaves the branch closed and the record open. Before a run reviews
@@ -261,6 +288,16 @@ closed finding to the page. The finding *text* is safe — it is committed in ea
   reads each command of a compound call on its own, so `cd studio; npm run typecheck` is refused for
   its `cd` — the prompts tell a session to run one command per call and pass `--prefix` instead.
   **Every rule has a case in `test/settings.test.mjs`**, which fails on a rule added without one.
+- **An environment variable ahead of a command is allowed by name, never by shape.** A rule for
+  `VAR=value <allowed command>` would admit every variable there is, including the ones that change
+  what a build produces, so the allowlist instead lists the ones this project documents:
+  `RUSTDOCFLAGS` for `cargo doc`, and `RLX_UPDATE_PRESET_SCHEMA=1` / `RLX_UPDATE_PARAM_REFERENCE=1`
+  for the two regenerations in `docs/developing.md` and `presets/README.md`, which are the commands a
+  session runs unchanged. Each of those two is allowed both bare and in front of `with-lock.mjs`,
+  because the suite-lock hook denies the bare form of anything that runs tests. Adding a third
+  variable is an edit to this file and a case beside the others, deliberately. The other shell spells
+  an assignment as its own command (`$env:X = '1'; …`), which stays refused; the prompts tell a
+  session so.
 - **The hooks.** `.claude/hooks/block-push-and-history-rewrite.js` denies `git push`,
   `reset --hard`, `rebase`, `commit --amend` and `filter-branch` in every session, human-started
   ones included. `.claude/hooks/conductor-suite-lock.js` denies any `nextest` or `cargo test` a

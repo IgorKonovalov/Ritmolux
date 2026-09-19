@@ -123,7 +123,7 @@ job of a baseline).
 ## Risks & open questions
 
 - **Phases 1 and 3 need an `RLX_UPDATE_*` regeneration**, which a conductor session cannot run
-  today (backlog 0250). [Plan 0197](0197-the-conductor-becomes-operable.md) Phase 4 makes it
+  today (backlog 0250). [Plan 0197](done/0197-the-conductor-becomes-operable.md) Phase 4 makes it
   runnable, so **this plan runs after 0197** or its first phase parks.
 - **Phase 2 changes what converted content draws.** No shipped preset is affected — `presets/`
   carries no `[milk]` bundle — so the blast radius is the conversion corpus, which lives outside

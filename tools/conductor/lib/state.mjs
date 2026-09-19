@@ -6,7 +6,7 @@
 // was in flight when the process died (re-run: its session's commits, if any, are re-derived from
 // the plan log and git, not from this file).
 
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { usageReading } from "./live.mjs";
@@ -24,7 +24,38 @@ export function statePaths(stateDir) {
     prompts: join(stateDir, "prompts"),
     inbox: join(stateDir, "inbox.md"),
     lockLog: join(stateDir, "locks.jsonl"),
+    pause: join(stateDir, "pause.json"),
   };
+}
+
+/**
+ * The pause ask (ADR-0219): the file `pause` writes and the lane loop reads between plans. It is its
+ * own file rather than a field of conductor.json because the two are written by different processes —
+ * the running conductor rewrites that record whole, and would overwrite an ask written under it.
+ *
+ * Returns what the ask says, or null when there is none. An unreadable ask still counts as one: the
+ * operator asked, and refusing to read their own file is not a reason to keep starting plans.
+ */
+export function pauseAsk(stateDir) {
+  const { pause } = statePaths(stateDir);
+  if (!existsSync(pause)) return null;
+  try {
+    return JSON.parse(readFileSync(pause, "utf8"));
+  } catch {
+    return { at: null };
+  }
+}
+
+export function askPause(stateDir, ask) {
+  writeAtomic(statePaths(stateDir).pause, JSON.stringify(ask, null, 2) + "\n");
+  return ask;
+}
+
+/** Removes the ask, returning what it said, or null when there was none. */
+export function clearPause(stateDir) {
+  const ask = pauseAsk(stateDir);
+  if (ask) rmSync(statePaths(stateDir).pause, { force: true });
+  return ask;
 }
 
 export function writeAtomic(path, text) {

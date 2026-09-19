@@ -314,6 +314,39 @@ test("the cap counts worktrees on disk: the same three with their directories pr
   for (const r of held) assert.ok(lines.some((l) => l.includes(` ${r.plan} still parked`) && l.includes(`holds ${r.worktree}`)), lines.join("\n"));
 });
 
+// ADR-0219: the ask is read where the stop request is, so the plan in flight finishes and no other
+// starts. The lane's own reason for stopping is in the run record, apart from `--once` and from a
+// queue that ran out.
+test("a paused lane finishes the plan in flight and starts no other, and the run says it was paused", async () => {
+  const { ctx } = scratch({
+    plans: [
+      { number: "0101", phases: [dev("1")] },
+      { number: "0102", phases: [dev("1")] },
+    ],
+    lanes: { a: ["0101", "0102"] },
+  });
+  // The ask arrives while 0101 runs: it is set the first time the loop looks, so 0101 is picked and
+  // run to its merge, and the second look is the one that stops the lane.
+  let looks = 0;
+  ctx.paused = () => looks++ > 0;
+  await runLanes(ctx);
+
+  const state = loadState(ctx.stateDir);
+  assert.equal(state.plans["0101"].status, "merged", JSON.stringify(state.plans["0101"].park));
+  assert.equal(state.plans["0102"], undefined, "the pause held 0102 back");
+  const run = state.runs.at(-1);
+  assert.deepEqual(run.paused.lanes, ["a"]);
+  assert.ok(run.paused.at);
+  assert.deepEqual(run.notStarted, [{ plan: "0102", lane: "a", reason: "paused" }]);
+  assert.equal(run.stops, undefined, "a pause is not a worktree-cap stop");
+});
+
+test("a lane that was never paused carries no pause in the run record", async () => {
+  const { ctx } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
+  await runLanes(ctx);
+  assert.equal(loadState(ctx.stateDir).runs.at(-1).paused, undefined);
+});
+
 test("a run that opens every queued plan it can has no Not started list", async () => {
   const { ctx, history } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
   await runLanes(ctx);

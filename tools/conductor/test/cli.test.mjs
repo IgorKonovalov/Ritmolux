@@ -12,6 +12,8 @@ import { resumeCommand } from "../lib/inbox.mjs";
 import { loadState, statePaths } from "../lib/state.mjs";
 import { FAKE, TEST_DIR, TOOL_DIR, tmp, writePlan } from "./helpers.mjs";
 
+const QUEUE_NOTICE = "conductor: notice: plan 0090: already merged (0090-fixture.md is under docs/plans/done/); `prune` drops it from the queue";
+
 function sh(args, cwd) {
   const r = spawnSync("git", args, { cwd, encoding: "utf8" });
   assert.equal(r.status, 0, `git ${args.join(" ")}: ${r.stderr}`);
@@ -302,6 +304,183 @@ test("run refuses a second conductor, and abort with nothing running recovers in
   assert.equal(aborted.code, 0);
   assert.equal(aborted.out[0], "conductor: not running");
   assert.equal(loadState(p.stateDir).plans["0101"].steps[0].result.status, "interrupted");
+});
+
+// ADR-0219. The ask is written by another process while a plan is in flight, so these drive it from
+// a gate command: the gate is a child process running inside the lane, mid-run, exactly as `pause`
+// would be run from another terminal.
+const writesPause = (p) => ({
+  name: "ask-pause",
+  cmd: [process.execPath, "-e", `require("fs").writeFileSync(${JSON.stringify(statePaths(p.stateDir).pause)}, '{"at":"2026-09-19T09:00:00.000Z"}')`],
+});
+
+test("pause asked mid-run lets the plan in flight merge, starts no other, and clears the ask", async () => {
+  const { p, cli } = setup(
+    [
+      { number: "0101", phases: [dev("1")] },
+      { number: "0102", phases: [dev("1")] },
+    ],
+    { a: ["0101", "0102"] },
+    { gate: (p) => [writesPause(p)] },
+  );
+  const r = await cli("run", "--lane", "a");
+  assert.equal(r.code, 0, r.err.join("\n"));
+  const state = loadState(p.stateDir);
+  assert.equal(state.plans["0101"].status, "merged", JSON.stringify(state.plans["0101"].park));
+  assert.equal(state.plans["0102"], undefined, "the second plan never started");
+  assert.deepEqual(state.runs.at(-1).paused.lanes, ["a"]);
+  assert.deepEqual(state.runs.at(-1).notStarted, [{ plan: "0102", lane: "a", reason: "paused" }]);
+  assert.equal(existsSync(statePaths(p.stateDir).pause), false, "the ask does not outlive the run");
+  assert.match(r.out.join("\n"), /^conductor: paused - the plan in flight finished and no further plan was started; the ask is cleared\.$/m);
+  assert.match(r.out.join("\n"), /run ended - 1 merged, 0 parked/);
+});
+
+test("an ask cancelled before the lane looks again lets the next plan start", async () => {
+  // The second gate step is `afterClose`, so it runs only on the close tip — after the ask above and
+  // before the lane's next look. It removes the same file `pause --off` removes.
+  const { p, cli } = setup(
+    [
+      { number: "0101", phases: [dev("1")] },
+      { number: "0102", phases: [dev("1")] },
+    ],
+    { a: ["0101", "0102"] },
+    {
+      gate: (p) => [
+        writesPause(p),
+        {
+          name: "cancel-pause",
+          afterClose: true,
+          cmd: [process.execPath, "-e", `require("fs").rmSync(${JSON.stringify(statePaths(p.stateDir).pause)}, { force: true })`],
+        },
+      ],
+    },
+  );
+  const r = await cli("run", "--lane", "a");
+  assert.equal(r.code, 0, r.err.join("\n"));
+  const state = loadState(p.stateDir);
+  assert.equal(state.plans["0102"].status, "merged", JSON.stringify(state.plans["0102"].park));
+  assert.equal(state.runs.at(-1).paused, undefined, "no lane stopped paused");
+  assert.doesNotMatch(r.out.join("\n"), /conductor: paused/);
+});
+
+test("pause needs a live run, writes the ask the lane reads, names what it waits for, and --off removes it", async () => {
+  const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] });
+
+  const noRun = await cli("pause");
+  assert.equal(noRun.code, 1);
+  assert.deepEqual(noRun.err, ["conductor: no conductor is running, and a pause does not outlive a run; start the run you want with `run --once`"]);
+  assert.equal(existsSync(statePaths(p.stateDir).pause), false, "nothing was written");
+
+  // This test process stands in for the live conductor, and the record for a lane mid-step.
+  mkdirSync(p.stateDir, { recursive: true });
+  writeFileSync(join(p.stateDir, "conductor.pid"), String(process.pid));
+  const state = loadState(p.stateDir);
+  state.lanes = { a: { plan: "0101", step: "0101-03-review", stepStarted: new Date(Date.now() - 4 * 60_000).toISOString() }, b: { plan: null, step: null } };
+  writeFileSync(statePaths(p.stateDir).file, JSON.stringify(state));
+
+  const asked = await cli("pause");
+  assert.equal(asked.code, 0, asked.err.join("\n"));
+  assert.deepEqual(asked.out, [
+    "conductor: paused - each lane finishes the plan in flight and starts no other. `pause --off` cancels. Waiting for:",
+    "- lane a: plan 0101, step 0101-03-review for 4 min",
+  ]);
+  assert.ok(existsSync(statePaths(p.stateDir).pause));
+
+  // Asking twice keeps the first ask's time rather than resetting it.
+  const first = readFileSync(statePaths(p.stateDir).pause, "utf8");
+  const again = await cli("pause");
+  assert.equal(again.code, 0);
+  assert.match(again.out[0], /^conductor: already paused \(asked at .+\)\. Waiting for:$/);
+  assert.equal(readFileSync(statePaths(p.stateDir).pause, "utf8"), first);
+
+  const off = await cli("pause", "--off");
+  assert.equal(off.code, 0, off.err.join("\n"));
+  assert.deepEqual(off.out, ["conductor: the pause is off; a lane starts its next queued plan again"]);
+  assert.equal(existsSync(statePaths(p.stateDir).pause), false);
+  assert.deepEqual((await cli("pause", "--off")).out, ["conductor: no pause was asked for"]);
+  rmSync(join(p.stateDir, "conductor.pid"));
+});
+
+test("a run started with an ask left behind by a dead conductor runs normally and says it cleared it", async () => {
+  const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] });
+  mkdirSync(p.stateDir, { recursive: true });
+  writeFileSync(statePaths(p.stateDir).pause, '{"at":"2026-09-18T20:00:00.000Z","pid":4242}');
+  const r = await cli("run", "--lane", "a");
+  assert.equal(r.code, 0, r.err.join("\n"));
+  assert.equal(r.out[0], "conductor: a pause left behind by an earlier run was cleared; a pause does not outlive its run");
+  const state = loadState(p.stateDir);
+  assert.equal(state.plans["0101"].status, "merged", JSON.stringify(state.plans["0101"].park));
+  assert.equal(state.runs.at(-1).paused, undefined);
+});
+
+// ADR-0220: the committed queue stands alone, and `prune` is the carrier for the one discipline it
+// still needs. `0090` stands for a plan merged in an earlier run and never taken off the list.
+test("a queue listing a merged plan starts with a notice, and prune drops exactly that entry", async () => {
+  const { repo, p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0090", "0101"], b: [] });
+  writePlan(repo, { number: "0090", phases: [dev("1")], status: "done — closed" }, { done: true });
+
+  const check = await cli("check");
+  assert.equal(check.code, 0, check.err.join("\n"));
+  assert.deepEqual(check.out, [
+    "conductor: notice: plan 0090: already merged (0090-fixture.md is under docs/plans/done/); `prune` drops it from the queue",
+    "conductor: preflight OK",
+  ]);
+
+  const before = JSON.stringify({ lanes: { a: ["0090", "0101"], b: [] }, plans: { "0101": { after: ["0090"] } } }, null, 2) + "\n";
+  writeFileSync(p.queue, before);
+  const pruned = await cli("prune");
+  assert.equal(pruned.code, 0, pruned.err.join("\n"));
+  assert.deepEqual(pruned.out, [
+    "conductor: dropped plan 0090 from lane a (0090-fixture.md is under docs/plans/done/)",
+    `conductor: ${p.queue} rewritten; commit it.`,
+  ]);
+  assert.equal(
+    readFileSync(p.queue, "utf8"),
+    JSON.stringify({ lanes: { a: ["0101"], b: [] }, plans: { "0101": { after: ["0090"] } } }, null, 2) + "\n",
+    "only the lane entry moved",
+  );
+  assert.deepEqual((await cli("check")).out, ["conductor: preflight OK"]);
+
+  // An already-tidy queue is not rewritten: this spelling is not the one `prune` would write.
+  const compact = JSON.stringify({ lanes: { a: ["0101"], b: [] } });
+  writeFileSync(p.queue, compact);
+  const again = await cli("prune");
+  assert.equal(again.code, 0, again.err.join("\n"));
+  assert.deepEqual(again.out, ["conductor: the queue lists no merged plan; nothing to prune"]);
+  assert.equal(readFileSync(p.queue, "utf8"), compact);
+});
+
+// The configuration ADR-0220 exists to enable: the committed queue and a state/ that knows nothing.
+// The notice must not turn into a session on a plan that merged before this checkout existed.
+test("a run with no state of its own starts no plan already under done/", async () => {
+  const { repo, p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0090", "0101"] });
+  writePlan(repo, { number: "0090", phases: [dev("1")], status: "done — closed" }, { done: true });
+  sh(["add", "docs"], repo);
+  sh(["commit", "-q", "-m", "0090 merged in an earlier run"], repo);
+  assert.equal(existsSync(join(p.stateDir, "conductor.json")), false, "the state the picker would read does not exist");
+
+  const r = await cli("run", "--lane", "a");
+  assert.equal(r.code, 0, r.err.join("\n"));
+  assert.equal(r.out[0], QUEUE_NOTICE);
+  const state = loadState(p.stateDir);
+  assert.equal(state.plans["0090"], undefined, "no record, so no worktree and no session for the merged plan");
+  assert.equal(state.plans["0101"].status, "merged", JSON.stringify(state.plans["0101"].park));
+  assert.deepEqual(state.runs.at(-1).notStarted ?? [], [], "a merged plan is not owed a not-started reason either");
+});
+
+test("prune is refused while a conductor runs, and says so when the queue cannot be read", async () => {
+  const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] });
+  mkdirSync(p.stateDir, { recursive: true });
+  writeFileSync(join(p.stateDir, "conductor.pid"), String(process.pid));
+  const refused = await cli("prune");
+  assert.equal(refused.code, 1);
+  assert.match(refused.err.join("\n"), /^conductor: a run is in progress and reads the queue it started with/);
+  rmSync(join(p.stateDir, "conductor.pid"));
+
+  writeFileSync(p.queue, "{ not json");
+  const broken = await cli("prune");
+  assert.equal(broken.code, 1);
+  assert.match(broken.err.join("\n"), /queue\.json is not valid JSON/);
 });
 
 test("run on a checkout with no state/ writes the pid file for the run and removes it after", async () => {

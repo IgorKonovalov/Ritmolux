@@ -4,7 +4,8 @@ One hand-authored **behavioral contract per core subsystem** — the invariants 
 `WHEN/THEN` scenarios that are true of the *running system today*. This layer is the one
 idea borrowed from the sibling repo's living-spec system
 ([ADR-0004](../adrs/0004-living-behavioral-spec-layer.md)) in its **minimal, lazy form**:
-the two highest-value contracts, and none of the enforcement machinery yet.
+the highest-value contracts only — the index below is the roster — and none of the
+enforcement machinery yet.
 
 ## What lives here, and what doesn't
 
