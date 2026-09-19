@@ -3,6 +3,10 @@
 > **Status:** approved
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user)
+> **Amended:** 2026-09-19 — four navigation affordances added after a second UX pass, all in the
+> owner's answer: a previous-preset key (Phase 2), and number-key jumps, a dwell countdown and
+> A/B compare as a new Phase 4. The thumbnail browser was considered and deliberately left to its
+> own plan, after this one — see `## Followups`.
 > **Owner skill(s):** dev, studio-builder
 > **Related ADRs:** [0228](../adrs/0228-a-preset-mark-is-user-state-keyed-by-name-in-its-own-file.md)
 > (proposed), [0229](../adrs/0229-the-studio-marks-a-preset-over-the-control-protocol.md)
@@ -14,8 +18,11 @@
 The shipped set is 114 presets and the app offers one flat roster to walk it. This plan adds two
 marks — **favourite** and **hidden** — persisted by preset name in the standalone's own user state,
 then spends them: auto-rotate can draw from favourites alone, hidden presets stop appearing, the
-browser filters by family and by favourite, and rotation stops repeating itself. The studio gets
-the same marks over the control protocol. The first visible behaviour is marking a preset with one
+browser filters by family and by favourite, and rotation stops repeating itself. Four navigation
+affordances ride along: stepping **backwards**, jumping to a favourite by **number**, seeing
+**when** the next rotation lands, and **A/B** flipping between two presets to compare them. The
+studio gets the same marks over the control protocol. The first visible behaviour is marking a
+preset with one
 key and finding it still marked after a restart.
 
 ## Context & problem
@@ -106,7 +113,7 @@ reason.
 
 ## Implementation phases
 
-Phases 1–4 are `dev` and run contiguously; phase 5 is `studio-builder` and hands off per
+Phases 1–5 are `dev` and run contiguously; phase 6 is `studio-builder` and hands off per
 [ADR-0188](../adrs/0188-the-two-implementer-lanes-hand-off-automatically.md).
 
 ### Phase 1 — The marks store, and one key that proves it
@@ -143,6 +150,12 @@ Phases 1–4 are `dev` and run contiguously; phase 5 is `studio-builder` and han
     needs a length somebody has to defend, and the permutation property needs no constant at all.
     The eligible set changes underfoot when a mark is toggled mid-show, so the traversal must
     tolerate its set growing and shrinking between draws.
+  - **The roster can be stepped backwards from the keyboard.** `console::previous_index` already
+    exists and is tested; it is reachable only from the console's clickable transport strip, so
+    overshooting a good preset with `Space` means walking the whole library to return. Give it a
+    key. Under the shuffled traversal above, "previous" means *the preset actually shown before
+    this one*, not an index one lower — the two stopped being the same thing the moment rotation
+    stopped being sequential, and the traversal is what has to answer it.
 
 ### Phase 3 — The browser narrows
 
@@ -164,7 +177,35 @@ Phases 1–4 are `dev` and run contiguously; phase 5 is `studio-builder` and han
     conventionally help and there is no help screen to collide with. **`dev` may counter-propose**
     — what is not negotiable is that the same key works in both contexts.
 
-### Phase 4 — The protocol carries a mark
+### Phase 4 — The keys and the HUD carry it
+
+- **Owner skill:** dev
+- **What:** Three affordances that spend Phase 1–2's state from the keyboard and the HUD, and one
+  that makes two presets comparable.
+- **Files touched:** `standalone/src/input.rs`, `standalone/src/hud.rs`,
+  `standalone/src/director.rs`, `docs/running.md`, `docs/configuration.md`.
+- **Done when:**
+  - **A number key lands on a favourite.** `1`–`9` select the first nine favourites in the
+    browser's own order, so the mapping is the one the eye already learned rather than a second
+    hidden ordering. Fewer than nine favourites means the unfilled keys do nothing — never wrap,
+    because a key that means a different preset depending on how many are marked is worse than a
+    key that means nothing. Digits are filter characters while the browser is open, exactly as
+    letters are; the binding applies outside it.
+  - **The HUD says when the next rotation lands**, whenever auto-rotate is on, and says nothing
+    when it is off. The console already names *what* comes next and the show window names neither,
+    which is the asymmetry this closes. It follows the existing `[hud]` precedent — a settings row
+    and a `config.toml` key, off-switchable like `preset_name` and `now_playing`.
+  - **A/B compare flips between two presets.** One key stashes the preset on screen as the B side;
+    pressing it again swaps the two, so a look can be held against another without hunting for it.
+    The flip **dissolves like any other change** — `docs/running.md` already fixes the behaviour
+    for a switch arriving mid-dissolve (*"finishes the one in flight and starts the new one, so you
+    always land where you asked"*), so a fast flip is defined rather than novel, and this phase
+    does not invent a second transition path for it. The B side is session state and is not
+    persisted: it is a comparison, not a mark.
+  - **The HUD shows whether the current preset is marked.** Marking is worthless if you cannot see
+    what is marked without opening the browser.
+
+### Phase 5 — The protocol carries a mark
 
 - **Owner skill:** dev
 - **What:** The player side of ADR-0229 — a `/ctl/mark` control message and marks on the event
@@ -181,7 +222,7 @@ Phases 1–4 are `dev` and run contiguously; phase 5 is `studio-builder` and han
   path. The spec is updated in this phase, not at the close — it is the contract, and
   `studio-builder` reads it next.
 
-### Phase 5 — The studio marks and filters
+### Phase 6 — The studio marks and filters
 
 - **Owner skill:** studio-builder
 - **What:** The studio side — mark controls and a favourites filter on its preset list.
@@ -217,6 +258,12 @@ pub enum RotateSource {
 - **The binding collision is the most likely thing to need rework.** Phase 3 states the constraint
   and proposes `F1`/`F2`; if `dev` finds a reason both keys are wrong, the requirement (one key,
   both contexts, no new modifier plumbing) is what must survive, not the choice.
+- **The keymap is filling up, and Phase 4 fills it further.** This plan adds marking, a previous
+  step, nine number keys and an A/B flip to a map that already binds `Space`, `A`, `Tab`, `S`, `C`,
+  `F`, `D`, `Esc`, `F3`, `[` and `]`. Every one of them competes with the browser's type-to-filter,
+  which consumes letters and digits alike. If Phase 4 cannot find keys that satisfy Phase 3's rule
+  — one binding, both contexts, no new modifier plumbing — then that rule is what needs revisiting
+  in the open, not the bindings quietly split into two sets.
 - **The shuffle bag meets a mutable set.** Toggling `hidden` on the preset currently showing, or
   favouriting mid-cycle, changes the traversal's universe between draws. The property in Phase 2 is
   stated to hold across that, which is the part most likely to be got subtly wrong and least likely
@@ -226,7 +273,7 @@ pub enum RotateSource {
   known-bad preset survives a curation pass. Mitigated only by ADR-0228's rule that the gates never
   read marks, so nothing red can be hidden green — and by the `hidden` set being read as evidence
   rather than as a conclusion.
-- **Phase 4 widens a spec that was minimal on purpose.** ADR-0229 names this cost. The open
+- **Phase 5 widens a spec that was minimal on purpose.** ADR-0229 names this cost. The open
   question it leaves: if a second library-state message is ever wanted, is that a pattern or a
   smell? Not this plan's to answer, but the second one should trigger the question.
 - **Nothing here prunes marks for deleted presets**, by decision. If the file becomes unwieldy that
@@ -242,6 +289,11 @@ pub enum RotateSource {
   Marks in the component are a separate ADR if ever wanted.
 - **It does not add tags, ratings, playlists or sorting.** Two marks and two filters; a richer
   taxonomy is a different plan with a different interview.
+- **It does not put pictures in the browser.** The thumbnail browser was weighed in this plan's
+  second UX pass and routed to its own plan, because where a thumbnail lives — embedded against
+  [NFR §4](../nfr.md#4-size-and-dependencies)'s soft cap, or generated on first run with a
+  staleness rule — is a decision with a real rejected alternative and belongs in an ADR of its
+  own. See `## Followups`.
 - **It does not change `[rotate]`'s dwell policy.** ADR-0027's cadence stands; only the set it
   draws from changes.
 - **It does not add a help screen**, despite taking `F1`.
@@ -258,8 +310,9 @@ pub enum RotateSource {
 | 1 — The marks store, and one key that proves it | dev | not started | |
 | 2 — Rotation spends the marks | dev | not started | |
 | 3 — The browser narrows | dev | not started | |
-| 4 — The protocol carries a mark | dev | not started | |
-| 5 — The studio marks and filters | studio-builder | not started | |
+| 4 — The keys and the HUD carry it | dev | not started | |
+| 5 — The protocol carries a mark | dev | not started | |
+| 6 — The studio marks and filters | studio-builder | not started | |
 
 ### Notes
 
@@ -275,6 +328,15 @@ pub enum RotateSource {
 
 ## Followups (after this lands)
 
+- **The thumbnail browser — its own plan and ADR, sequenced after this one.** It is the thing that
+  actually fixes picking a look out of a list of identifiers, and it shares the browser overlay
+  with Phase 3, so it cannot run beside this plan. The design question it opens: thumbnails
+  embedded at build time beside the presets ([ADR-0022](../adrs/0022-build-time-preset-embedding.md))
+  and charged against [NFR §4](../nfr.md#4-size-and-dependencies)'s 10,000,000 B soft cap — which
+  that document notes *"has never been measured against what the exe actually contains"* — or
+  rendered on first run and cached, which trades binary size for a first-launch cost and a rule
+  for when a thumbnail has gone stale. `scripts/docs-shots.mjs` already renders gallery cards, so
+  the capture half exists.
 - Read the accumulated `hidden` set as [backlog 0256](../design-backlog.md)'s step-2 evidence, once
   there has been enough ordinary use for it to mean something.
 - Pruning marks for names no longer in any library, if the file becomes unwieldy.
