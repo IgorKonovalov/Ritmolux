@@ -232,6 +232,9 @@ node tools/conductor/conductor.mjs finding 0181 3 --wontfix "assertion message, 
   a judgement checked against nothing — so the sentence you type is the whole record of it.
 - **`<ref>` is the index the listing prints**, or the `file:line` exactly one finding carries. A ref
   that matches nothing, or more than one, is refused naming what it saw.
+- **Only a closed plan has findings.** A plan still in a fix round, or parked at one, carries verdicts
+  that closed nothing — its blockers are the conductor's own work in flight — so `finding` refuses it
+  either way and names where the plan stands.
 - **Re-dispositioning overwrites and keeps the previous one** in the finding's history: a `--wontfix`
   you later repair should read as repaired, and that you first declined it is worth keeping.
 - **Only you write one.** No session, no close and no gate may, and *recording* one is refused while
