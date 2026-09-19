@@ -277,8 +277,8 @@ shim are untouched by this plan.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The harness learns stereo, and the whole-mix field lands | dev | done | committed with this row |
-| 2 — The isolation guarantee | dev | not started | |
+| 1 — The harness learns stereo, and the whole-mix field lands | dev | done | c99b4d10 |
+| 2 — The isolation guarantee | dev | done | committed with this row |
 | 3 — Per-band balance, and the measurement that chooses its mechanism | dev | not started | |
 | 4 — The five names reach the grammar | dev | not started | |
 | 5 — The documents that make an absolute quantity usable | dev | not started | |
@@ -302,6 +302,15 @@ shim are untouched by this plan.
   `standalone/examples/shot.rs`, one file outside the phase's list; `BandLevels` and its
   measurement are in `standalone/src/shot/args.rs` as listed, and the assertions are there rather
   than on the CLI's text.
+- **Phase 2 deviation — `waveform_pair` and `waveform_pair_gain` are excluded from the bit-identity
+  assertion, and no implementation could include them.** The pair *is* channels 0 and 1 (ADR-0199):
+  for a stimulus `S` whose channels differ it carries two different traces, and for `M` it carries
+  one trace twice, so `S` and `M` cannot agree on it whatever this plan does. It predates the plan,
+  nothing added here feeds it, and the mono path ADR-0215's title speaks for does not include it.
+  The exclusion is asserted in the other direction in the same test — the pair **must** differ, or
+  the test fails — so it names what the pair is rather than leaving a place for a regression to
+  hide. Every other field the phase enumerates is compared bit-for-bit, through an exhaustive
+  destructure, over both a correlated stereo stimulus and a decorrelated one.
 - **Phase 1 — three files outside the phase's list changed because `AnalysisFrame` gained fields**:
   `core/tests/dsp.rs`, `core/tests/suite/preset.rs` and `standalone/src/shot/report/tests.rs` each
   destructure or construct the frame exhaustively **on purpose**, so that a new field stops them

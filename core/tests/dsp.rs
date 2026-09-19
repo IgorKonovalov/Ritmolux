@@ -1,7 +1,9 @@
 //! Plan 0001 Phase 3 fixtures: known signals in, expected analysis out.
 
 use rlx_core::audio::AudioFormat;
-use rlx_core::dsp::{AnalysisFrame, Analyzer, HOP_SIZE, SPECTRUM_BINS, WAVE_SAMPLES, WINDOW_SIZE};
+use rlx_core::dsp::{
+    AnalysisFrame, Analyzer, HOP_SIZE, SPECTRUM_BINS, WARMUP_HOPS, WAVE_SAMPLES, WINDOW_SIZE,
+};
 
 const SR: u32 = 48_000;
 
@@ -702,6 +704,178 @@ fn a_panned_pair_keeps_the_ratio_between_its_channels() {
         (ratio - 0.25).abs() < 0.02,
         "the quiet channel read {ratio} of the loud one, want 0.25"
     );
+}
+
+/// **The compatibility contract** (ADR-0215 decision point 4): for a stereo
+/// stimulus `S` and the stimulus `M` whose two channels both carry `S`'s
+/// per-frame channel average, every field the analyzer published before the
+/// stereo field reads **bit-identically**, while the stereo field itself
+/// differs.
+///
+/// Stronger than a golden of the previous build, and for a different reason
+/// than it is longer: a golden freezes what the analyzer produced on one day,
+/// and this states the property, so it stays true for every field added after
+/// today. The frame is **destructured** rather than field-accessed, so a field
+/// added later stops this file compiling instead of quietly escaping the
+/// guarantee, and every comparison is on raw bits rather than an epsilon —
+/// "renders identically" admits no tolerance.
+///
+/// **`waveform_pair` and its gain are excluded, and cannot be otherwise.** The
+/// pair *is* channels 0 and 1 (ADR-0199): for any `S` whose channels differ it
+/// carries two different traces and for `M` it carries the same trace twice, so
+/// no implementation of anything could make the two agree. It predates this
+/// plan, nothing here feeds it, and it is the one field that already saw
+/// stereo. The exclusion is asserted in the other direction below — the pair
+/// **must** differ — so it is a statement about what the pair is rather than a
+/// place for a regression to hide.
+#[test]
+fn the_stereo_field_leaves_every_field_that_predates_it_bit_identical() {
+    let format = AudioFormat {
+        sample_rate: SR,
+        channels: 2,
+    };
+    // Two shapes of difference: a gain difference between correlated channels,
+    // and two channels sharing no samples at all. The first moves `balance`,
+    // the second `spread`, and a mono path that leaked either one would have to
+    // survive both.
+    for (label, stereo) in [
+        ("pan:-0.6", rlx_core::signal::pan(-0.6, 1.5, format)),
+        ("wide:5", rlx_core::signal::wide(5, 1.5, format)),
+    ] {
+        // `M`: the same per-frame average the analyzer itself forms, in both
+        // channels. Computed the way `push_interleaved` computes it — `(l + r)`
+        // then `/ 2.0` — so the two mono windows are equal bit for bit rather
+        // than to within a rounding.
+        let mono: Vec<f32> = stereo
+            .chunks_exact(2)
+            .flat_map(|frame| match frame {
+                [l, r] => {
+                    let m = (l + r) / 2.0;
+                    [m, m]
+                }
+                _ => [0.0, 0.0],
+            })
+            .collect();
+
+        let frames = |pcm: &[f32]| -> Vec<AnalysisFrame> {
+            let mut analyzer = stereo_analyzer();
+            pcm.chunks_exact(HOP_SIZE * 2)
+                .map(|hop| {
+                    analyzer.push_interleaved(hop);
+                    analyzer.take_frame()
+                })
+                .collect()
+        };
+        let with = frames(&stereo);
+        let without = frames(&mono);
+        assert_eq!(with.len(), without.len(), "{label}: hop counts differ");
+        assert!(
+            with.len() > WARMUP_HOPS,
+            "{label}: the clip never cleared warm-up"
+        );
+
+        let mut field_moved = false;
+        let mut pair_moved = false;
+        for (hop, (s, m)) in with.iter().zip(&without).enumerate() {
+            let AnalysisFrame {
+                spectrum,
+                waveform,
+                waveform_gain,
+                waveform_pair,
+                waveform_pair_gain,
+                onset,
+                beat,
+                bass,
+                mid,
+                treb,
+                bass_raw,
+                mid_raw,
+                treb_raw,
+                onset_raw,
+                bpm,
+                bar,
+                beat_index,
+                time_since_beat,
+                beat_in_bar,
+                bar_index,
+                bar_phase,
+                downbeat_confidence,
+                downbeat_locked,
+                novelty,
+                balance,
+                spread,
+            } = *s;
+
+            let bits =
+                |a: &[f32], b: &[f32]| a.iter().zip(b).all(|(x, y)| x.to_bits() == y.to_bits());
+            assert!(
+                bits(&spectrum, &m.spectrum),
+                "{label} hop {hop}: the band array moved"
+            );
+            assert!(
+                bits(&waveform, &m.waveform),
+                "{label} hop {hop}: the mono waveform moved"
+            );
+            for (name, a, b) in [
+                ("waveform_gain", waveform_gain, m.waveform_gain),
+                ("onset", onset, m.onset),
+                ("bass", bass, m.bass),
+                ("mid", mid, m.mid),
+                ("treb", treb, m.treb),
+                ("bass_raw", bass_raw, m.bass_raw),
+                ("mid_raw", mid_raw, m.mid_raw),
+                ("treb_raw", treb_raw, m.treb_raw),
+                ("onset_raw", onset_raw, m.onset_raw),
+                ("bpm", bpm, m.bpm),
+                ("bar", bar, m.bar),
+                ("time_since_beat", time_since_beat, m.time_since_beat),
+                ("bar_phase", bar_phase, m.bar_phase),
+                (
+                    "downbeat_confidence",
+                    downbeat_confidence,
+                    m.downbeat_confidence,
+                ),
+                ("novelty", novelty, m.novelty),
+            ] {
+                assert_eq!(
+                    a.to_bits(),
+                    b.to_bits(),
+                    "{label} hop {hop}: `{name}` reads {a} with stereo and {b} without"
+                );
+            }
+            assert_eq!(beat, m.beat, "{label} hop {hop}: `beat` moved");
+            assert_eq!(
+                downbeat_locked, m.downbeat_locked,
+                "{label} hop {hop}: `downbeat_locked` moved"
+            );
+            assert_eq!(
+                [beat_index, beat_in_bar, bar_index],
+                [m.beat_index, m.beat_in_bar, m.bar_index],
+                "{label} hop {hop}: a counter moved"
+            );
+
+            // The two halves of the exclusion, both of them claims.
+            pair_moved |= !bits(waveform_pair.as_flattened(), m.waveform_pair.as_flattened())
+                || waveform_pair_gain.to_bits() != m.waveform_pair_gain.to_bits();
+            field_moved |=
+                balance.to_bits() != m.balance.to_bits() || spread.to_bits() != m.spread.to_bits();
+            assert_eq!(
+                (m.balance, m.spread),
+                (0.0, 0.0),
+                "{label} hop {hop}: the mono-duplicated stimulus has no stereo field to read"
+            );
+        }
+        assert!(
+            field_moved,
+            "{label}: the stereo field read the same as the mono duplicate, so this \
+             test would pass against an analyzer that never looked at the channels"
+        );
+        assert!(
+            pair_moved,
+            "{label}: `waveform_pair` is excluded above because it carries the two \
+             channels, and it did not — so the exclusion is hiding something"
+        );
+    }
 }
 
 #[test]
