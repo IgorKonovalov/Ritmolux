@@ -216,9 +216,26 @@ job of a baseline).
 | 2 — A custom wave draws through the contract | dev | done | 48120eee |
 | 3 — Level mode can hold an ink | dev | done | c832e76c |
 | 4 — The converted chain gets a fixture that will see it | dev | done | 4c7f739b |
+| 4a — The fixture is made able to see what it guards | dev | done | committed with this row |
 | 4b — The baseline is captured by someone who looks at it | human | not started | |
 
 ### Notes
+
+- **Phase 4a — the subject changed, and the probe chose it.** The fixture now captures
+  `milk_wash_fog_tunnel.toml`. Four candidates were measured at 160x120 with `self.aspect = 1.0`
+  forced at the converted chain's entry, each probe applied alone and reverted: `milk_wash_fog_tunnel`
+  **mean 0.0139 / outlier 75** against tolerances of 0.02 and 48, which fails the fixture as the
+  phase asks; `warp_mesh_milk` 0.0057 / 21, which moves but stays inside tolerance; `warp_mesh_stroke`
+  and `milk_wash_blur_mix_3` both 0.0000 / 0. All four declare `zoom`, `rot` or `warp`. Under the same
+  probe `cargo test -p rlx-core --test golden` is **3 passed**, unchanged, which is the second half of
+  the done-when.
+- **`warp_mesh_shader.toml` was not edited.** It carries `GOLDEN FIXTURE - do not tune` and
+  ADR-0023, and `golden.rs` and `warp_mesh.rs` both read it; the subject moved to another fixture
+  instead. Its own probe reading is 0.0000 / 0 — it declares no mesh motion, so the corrected
+  coordinates reach nothing it draws.
+- **The blessed `warp_mesh_wide.png` from the earlier attempt was deleted**, not replaced: its
+  subject no longer exists in this fixture. The baseline is Phase 4b's and stays absent until then,
+  with the drift half skipping under ADR-0016.
 
 - **Phase 1's preset sweep convicted nothing.** Five shipped `warp_mesh` presets bind `zoom`, and
   every header already reasons from the shader's direction: `warp_wellhead` (*"Above 1 expands"*),

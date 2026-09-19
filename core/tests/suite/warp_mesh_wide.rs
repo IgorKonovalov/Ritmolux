@@ -34,13 +34,31 @@
 //! `RLX_BLESS=1 cargo test -p rlx-core --test suite warp_mesh_wide::` reaches
 //! this file and nothing else — the posture `attractor_trails.rs` documents.
 //!
-//! Everything else is `golden.rs`'s: `warp_mesh_shader.toml` unmodified, 60
-//! frames, the same two tolerances. The square capture there and this one differ
-//! in the target size and in nothing else, which is what makes a disagreement
+//! Everything else is `golden.rs`'s: `milk_wash_fog_tunnel.toml` unmodified, 60
+//! frames, the same two tolerances. The square capture and this one differ in
+//! the target size and in nothing else, which is what makes a disagreement
 //! between them a reading about the correction rather than about two fixtures.
-//! The shader bundle rather than the bytecode-only one because it is the fixture
-//! that reaches *both* halves — the mesh's `rad`/`ang` and the module's
-//! `U.aspect`.
+//!
+//! # Why this bundle, and not one that merely declares motion
+//!
+//! The subject is chosen by what the correction moves, not by what its `[milk]`
+//! table names. Forcing `self.aspect = 1.0` at the converted chain's own entry
+//! and capturing each candidate at this size (2026-09-19, development machine):
+//!
+//! | fixture | mean (tol 0.02) | max outlier (tol 48) |
+//! |---|---|---|
+//! | `milk_wash_fog_tunnel` | 0.0139 | **75 — convicts** |
+//! | `warp_mesh_milk` | 0.0057 | 21 |
+//! | `warp_mesh_stroke` | 0.0000 | 0 |
+//! | `milk_wash_blur_mix_3` | 0.0000 | 0 |
+//!
+//! All four declare `zoom`, `rot` or `warp`; only one of them renders a picture
+//! the corrected space reaches far enough to exceed a tolerance, and it does so
+//! on the **outlier** term rather than the mean — a warp redistributes edges
+//! rather than shifting the frame's average. `warp_mesh_shader.toml`, the
+//! subject this fixture first carried, reads 0.0000 and 0 under the same probe:
+//! it declares no mesh motion at all, so the corrected coordinates reach nothing
+//! it draws. A fixture that cannot fail is not a guard (Plan 0201 Phase 4a).
 
 use rlx_core::preset::Preset;
 use rlx_core::render::{CaptureImage, metrics::frame_diff};
@@ -61,7 +79,7 @@ const MEAN_TOL: f32 = 0.02;
 const MAX_OUTLIER: u8 = 48;
 
 const STEM: &str = "warp_mesh_wide";
-const FIXTURE: &str = include_str!("../fixtures/warp_mesh_shader.toml");
+const FIXTURE: &str = include_str!("../fixtures/milk_wash_fog_tunnel.toml");
 /// What captures the baseline, printed by both the skip and the drift failure so
 /// neither leaves a reader to reconstruct it.
 const BLESS_CMD: &str = "RLX_BLESS=1 cargo test -p rlx-core --test suite warp_mesh_wide::";
@@ -85,7 +103,7 @@ fn max_channel_outlier(a: &CaptureImage, b: &CaptureImage) -> u8 {
 fn capture() -> Option<CaptureImage> {
     let mut renderer = common::headless(WIDTH, HEIGHT)?;
     let preset = Preset::from_toml_str(FIXTURE)
-        .unwrap_or_else(|e| panic!("warp_mesh_shader.toml is invalid: {e}"));
+        .unwrap_or_else(|e| panic!("milk_wash_fog_tunnel.toml is invalid: {e}"));
     let name = preset.name.clone();
     renderer.set_presets(vec![preset]);
     Some(
@@ -185,5 +203,5 @@ fn the_capture_size_is_neither_square_nor_sixteen_by_nine() {
          the shape ADR-0037 records both shipped aspect confusions as invisible at"
     );
 
-    Preset::from_toml_str(FIXTURE).expect("warp_mesh_shader.toml parses");
+    Preset::from_toml_str(FIXTURE).expect("milk_wash_fog_tunnel.toml parses");
 }
