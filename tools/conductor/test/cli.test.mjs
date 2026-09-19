@@ -304,6 +304,113 @@ test("run refuses a second conductor, and abort with nothing running recovers in
   assert.equal(loadState(p.stateDir).plans["0101"].steps[0].result.status, "interrupted");
 });
 
+// ADR-0219. The ask is written by another process while a plan is in flight, so these drive it from
+// a gate command: the gate is a child process running inside the lane, mid-run, exactly as `pause`
+// would be run from another terminal.
+const writesPause = (p) => ({
+  name: "ask-pause",
+  cmd: [process.execPath, "-e", `require("fs").writeFileSync(${JSON.stringify(statePaths(p.stateDir).pause)}, '{"at":"2026-09-19T09:00:00.000Z"}')`],
+});
+
+test("pause asked mid-run lets the plan in flight merge, starts no other, and clears the ask", async () => {
+  const { p, cli } = setup(
+    [
+      { number: "0101", phases: [dev("1")] },
+      { number: "0102", phases: [dev("1")] },
+    ],
+    { a: ["0101", "0102"] },
+    { gate: (p) => [writesPause(p)] },
+  );
+  const r = await cli("run", "--lane", "a");
+  assert.equal(r.code, 0, r.err.join("\n"));
+  const state = loadState(p.stateDir);
+  assert.equal(state.plans["0101"].status, "merged", JSON.stringify(state.plans["0101"].park));
+  assert.equal(state.plans["0102"], undefined, "the second plan never started");
+  assert.deepEqual(state.runs.at(-1).paused.lanes, ["a"]);
+  assert.deepEqual(state.runs.at(-1).notStarted, [{ plan: "0102", lane: "a", reason: "paused" }]);
+  assert.equal(existsSync(statePaths(p.stateDir).pause), false, "the ask does not outlive the run");
+  assert.match(r.out.join("\n"), /^conductor: paused - the plan in flight finished and no further plan was started; the ask is cleared\.$/m);
+  assert.match(r.out.join("\n"), /run ended - 1 merged, 0 parked/);
+});
+
+test("an ask cancelled before the lane looks again lets the next plan start", async () => {
+  // The second gate step is `afterClose`, so it runs only on the close tip — after the ask above and
+  // before the lane's next look. It removes the same file `pause --off` removes.
+  const { p, cli } = setup(
+    [
+      { number: "0101", phases: [dev("1")] },
+      { number: "0102", phases: [dev("1")] },
+    ],
+    { a: ["0101", "0102"] },
+    {
+      gate: (p) => [
+        writesPause(p),
+        {
+          name: "cancel-pause",
+          afterClose: true,
+          cmd: [process.execPath, "-e", `require("fs").rmSync(${JSON.stringify(statePaths(p.stateDir).pause)}, { force: true })`],
+        },
+      ],
+    },
+  );
+  const r = await cli("run", "--lane", "a");
+  assert.equal(r.code, 0, r.err.join("\n"));
+  const state = loadState(p.stateDir);
+  assert.equal(state.plans["0102"].status, "merged", JSON.stringify(state.plans["0102"].park));
+  assert.equal(state.runs.at(-1).paused, undefined, "no lane stopped paused");
+  assert.doesNotMatch(r.out.join("\n"), /conductor: paused/);
+});
+
+test("pause needs a live run, writes the ask the lane reads, names what it waits for, and --off removes it", async () => {
+  const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] });
+
+  const noRun = await cli("pause");
+  assert.equal(noRun.code, 1);
+  assert.deepEqual(noRun.err, ["conductor: no conductor is running, and a pause does not outlive a run; start the run you want with `run --once`"]);
+  assert.equal(existsSync(statePaths(p.stateDir).pause), false, "nothing was written");
+
+  // This test process stands in for the live conductor, and the record for a lane mid-step.
+  mkdirSync(p.stateDir, { recursive: true });
+  writeFileSync(join(p.stateDir, "conductor.pid"), String(process.pid));
+  const state = loadState(p.stateDir);
+  state.lanes = { a: { plan: "0101", step: "0101-03-review", stepStarted: new Date(Date.now() - 4 * 60_000).toISOString() }, b: { plan: null, step: null } };
+  writeFileSync(statePaths(p.stateDir).file, JSON.stringify(state));
+
+  const asked = await cli("pause");
+  assert.equal(asked.code, 0, asked.err.join("\n"));
+  assert.deepEqual(asked.out, [
+    "conductor: paused - each lane finishes the plan in flight and starts no other. `pause --off` cancels. Waiting for:",
+    "- lane a: plan 0101, step 0101-03-review for 4 min",
+  ]);
+  assert.ok(existsSync(statePaths(p.stateDir).pause));
+
+  // Asking twice keeps the first ask's time rather than resetting it.
+  const first = readFileSync(statePaths(p.stateDir).pause, "utf8");
+  const again = await cli("pause");
+  assert.equal(again.code, 0);
+  assert.match(again.out[0], /^conductor: already paused \(asked at .+\)\. Waiting for:$/);
+  assert.equal(readFileSync(statePaths(p.stateDir).pause, "utf8"), first);
+
+  const off = await cli("pause", "--off");
+  assert.equal(off.code, 0, off.err.join("\n"));
+  assert.deepEqual(off.out, ["conductor: the pause is off; a lane starts its next queued plan again"]);
+  assert.equal(existsSync(statePaths(p.stateDir).pause), false);
+  assert.deepEqual((await cli("pause", "--off")).out, ["conductor: no pause was asked for"]);
+  rmSync(join(p.stateDir, "conductor.pid"));
+});
+
+test("a run started with an ask left behind by a dead conductor runs normally and says it cleared it", async () => {
+  const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] });
+  mkdirSync(p.stateDir, { recursive: true });
+  writeFileSync(statePaths(p.stateDir).pause, '{"at":"2026-09-18T20:00:00.000Z","pid":4242}');
+  const r = await cli("run", "--lane", "a");
+  assert.equal(r.code, 0, r.err.join("\n"));
+  assert.equal(r.out[0], "conductor: a pause left behind by an earlier run was cleared; a pause does not outlive its run");
+  const state = loadState(p.stateDir);
+  assert.equal(state.plans["0101"].status, "merged", JSON.stringify(state.plans["0101"].park));
+  assert.equal(state.runs.at(-1).paused, undefined);
+});
+
 test("run on a checkout with no state/ writes the pid file for the run and removes it after", async () => {
   // The gate runs mid-run, inside the lane: it is green only while the pid file exists.
   const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] }, {

@@ -1,6 +1,6 @@
 # 0197 — The conductor becomes operable
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user)
 > **Owner skill(s):** dev
@@ -182,11 +182,11 @@ flowchart TB
 
 ## Implementation log
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `WORK/rlx-plan-0197` on `plan-0197-the-conductor-becomes-operable`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `pause`: finish the plan in flight, then stop | dev | not started | |
+| 1 — `pause`: finish the plan in flight, then stop | dev | done | committed with this row |
 | 2 — The queue stands alone, and `prune` keeps it tidy | dev | not started | |
 | 3 — One suite ledger per repository, not per worktree | dev | not started | |
 | 4 — A session can run the two documented regenerations | dev | not started | |

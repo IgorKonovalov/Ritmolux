@@ -11,6 +11,7 @@
 //   node tools/conductor/conductor.mjs park NNNN
 //   node tools/conductor/conductor.mjs finding NNNN [<ref> --done|--wontfix|--filed <reason>]
 //   node tools/conductor/conductor.mjs adopt-close NNNN
+//   node tools/conductor/conductor.mjs pause [--off]
 //   node tools/conductor/conductor.mjs abort
 //   node tools/conductor/conductor.mjs check
 //
@@ -33,7 +34,7 @@ import { ascii } from "./lib/live.mjs";
 import { CLAUDE_DIR } from "./lib/outcome.mjs";
 import { donePhases, findPlan, readPlanFile } from "./lib/plan.mjs";
 import { loadLocal, loadQueue, stateSets } from "./lib/queue.mjs";
-import { FINDING_VERBS, disposeFinding, findingRef, findingWhere, loadState, planRecord, recoverInterrupted, saveState, statePaths, totalSpend } from "./lib/state.mjs";
+import { FINDING_VERBS, askPause, clearPause, disposeFinding, findingRef, findingWhere, loadState, pauseAsk, planRecord, recoverInterrupted, saveState, statePaths, totalSpend } from "./lib/state.mjs";
 import { activeChildren, killTree } from "./lib/step.mjs";
 
 export const TOOL_DIR = dirname(fileURLToPath(import.meta.url));
@@ -167,6 +168,12 @@ async function cmdRun(args, o) {
   if (recovered) o.log(`conductor: ${recovered} step(s) were in flight when the last run stopped; they will run again`);
   // A clean checkout has no state/ yet: nothing before this line writes into it.
   mkdirSync(p.stateDir, { recursive: true });
+  // A pause does not outlive the run it was asked of (ADR-0219), so an ask sitting here belongs to a
+  // conductor that is gone. Clearing it is what stops a dead run's ask from making this one a process
+  // that starts, does nothing and exits.
+  if (clearPause(p.stateDir)) {
+    o.log("conductor: a pause left behind by an earlier run was cleared; a pause does not outlive its run");
+  }
   writeFileSync(pidFile(p), String(process.pid));
 
   // Every line `run` prints while lanes run also goes to state/live.log, under one header per run.
@@ -200,6 +207,7 @@ async function cmdRun(args, o) {
     lockPollMs: o.lockPollMs,
     pollMs: o.pollMs,
     once: args.includes("--once"),
+    paused: () => Boolean(pauseAsk(p.stateDir)),
     lanes: lane ? [lane] : undefined,
     commitPollMs: o.commitPollMs,
     onChange: () => regenerate(p, state),
@@ -214,6 +222,7 @@ async function cmdRun(args, o) {
     for (const child of activeChildren) killTree(child);
     recoverInterrupted(p.stateDir, state);
     regenerate(p, state);
+    clearPause(p.stateDir);
     rmSync(pidFile(p), { force: true });
     o.err("conductor: interrupted; in-flight steps will run again on the next `run`");
     process.exit(130);
@@ -230,9 +239,13 @@ async function cmdRun(args, o) {
       process.removeListener("SIGTERM", interrupt);
     }
     regenerate(p, state);
+    clearPause(p.stateDir);
     rmSync(pidFile(p), { force: true });
   }
   const recs = Object.values(state.plans);
+  if (ctx.run?.paused) {
+    o.log("conductor: paused - the plan in flight finished and no further plan was started; the ask is cleared.");
+  }
   o.log(
     `conductor: run ended - ${recs.filter((r) => r.status === "merged").length} merged, ` +
       `${recs.filter((r) => r.status === "parked").length} parked. Nothing was pushed.`,
@@ -511,6 +524,43 @@ function cmdAdoptClose(args, o) {
   return 0;
 }
 
+/**
+ * `pause` asks a live run to finish the plan in flight and start no further one; `pause --off`
+ * cancels the ask while the run is still live (ADR-0219). It prints what it is now waiting for,
+ * because the gap between asking and stopping is a suite's twelve minutes and an operator who cannot
+ * see it reaches for `abort` instead. Setting one needs a running conductor: the ask does not outlive
+ * a run, so recorded against no run it would be an instruction nothing ever reads.
+ */
+function cmdPause(args, o) {
+  const p = o.p;
+  if (args.includes("--off")) {
+    const cleared = clearPause(p.stateDir);
+    o.log(cleared ? "conductor: the pause is off; a lane starts its next queued plan again" : "conductor: no pause was asked for");
+    return 0;
+  }
+  const pid = runningPid(p);
+  if (!pid) {
+    o.err("conductor: no conductor is running, and a pause does not outlive a run; start the run you want with `run --once`");
+    return 1;
+  }
+  const already = pauseAsk(p.stateDir);
+  askPause(p.stateDir, already ?? { at: new Date().toISOString(), pid });
+  o.log(
+    already
+      ? `conductor: already paused (asked at ${already.at ?? "an unreadable time"}). Waiting for:`
+      : "conductor: paused - each lane finishes the plan in flight and starts no other. `pause --off` cancels. Waiting for:",
+  );
+  const state = loadState(p.stateDir);
+  const inFlight = Object.entries(state.lanes)
+    .filter(([, l]) => l?.plan)
+    .sort(([a], [b]) => a.localeCompare(b));
+  if (inFlight.length === 0) o.log("- no lane has a plan in flight; the run ends as soon as each lane looks again");
+  for (const [lane, l] of inFlight) {
+    o.log(`- lane ${lane}: plan ${l.plan}, ${l.step ? `step ${l.step} for ${minutes(l.stepStarted)}` : "between steps"}`);
+  }
+  return 0;
+}
+
 function cmdAbort(args, o) {
   const p = o.p;
   const pid = runningPid(p);
@@ -545,7 +595,7 @@ function cmdCheck(args, o) {
   return 0;
 }
 
-const COMMANDS = { run: cmdRun, status: cmdStatus, digest: cmdDigest, resume: cmdResume, park: cmdPark, finding: cmdFinding, "adopt-close": cmdAdoptClose, abort: cmdAbort, check: cmdCheck };
+const COMMANDS = { run: cmdRun, status: cmdStatus, digest: cmdDigest, resume: cmdResume, park: cmdPark, finding: cmdFinding, "adopt-close": cmdAdoptClose, pause: cmdPause, abort: cmdAbort, check: cmdCheck };
 
 /** `overrides` exists for tests: { p, claude, gate, worktreeRoot, lockDir, lockPollMs, pollMs, commitPollMs, log, err, signals }. */
 export async function main(argv, overrides = {}) {
@@ -560,7 +610,7 @@ export async function main(argv, overrides = {}) {
   if (!fn) {
     o.err(
       "usage: node tools/conductor/conductor.mjs run [--lane a|b] [--once] | status | digest [--history] | " +
-        `resume NNNN | park NNNN | finding NNNN [<ref> --${FINDING_VERBS.join("|--")} <reason>] | adopt-close NNNN | abort | check`,
+        `resume NNNN | park NNNN | finding NNNN [<ref> --${FINDING_VERBS.join("|--")} <reason>] | adopt-close NNNN | pause [--off] | abort | check`,
     );
     return 2;
   }

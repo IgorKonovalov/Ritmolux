@@ -56,10 +56,22 @@ All of them run from the main checkout.
 | `park NNNN` | Parks a plan that has not merged, with an inbox entry. |
 | `finding NNNN [<ref> --done\|--wontfix\|--filed <reason>]` | With no verb, lists that plan's closing verdict with an index per finding. With one, records your disposition against the finding `<ref>` names, and the digest stops carrying it. |
 | `adopt-close NNNN` | Records the close a lane already carries, when a session committed one and then lost its outcome. Verifies the branch first and writes nothing unless it passes. |
+| `pause [--off]` | Asks the live run to finish the plan in flight and start no further one, and prints what it is now waiting for. `--off` cancels the ask. |
 | `abort` | Stops a running conductor and every session under it. Steps in flight run again on the next `run`. |
 | `check` | The preflight alone. |
 
 Ctrl+C on `run` does the same as `abort`.
+
+**`pause` is the stop that loses nothing** (ADR-0219). `abort` and Ctrl+C kill every session under the
+conductor, so a step in flight re-runs from scratch next time and its spend is gone; `pause` lets each
+lane reach a *merged* plan first, which is the state at which the machine is genuinely free. The ask is
+read between plans, so the wait is the rest of the plan in flight — a fix round and a suite, when one
+has just started. `pause` prints the plan and step each lane is on and how long it has been there, so
+that wait is legible before you decide to `abort` instead. **A pause does not outlive its run:** it is
+cleared when the run ends, a `run` that finds one left behind by a dead conductor clears it and says
+so, and there is therefore no way to say "start nothing tomorrow" — the answer to that is not to start
+a run. A paused lane records `paused` against every plan it did not start, which the history page's
+**Not started** section reads apart from `--once` and from a queue that ran out.
 
 `run` prints one line per milestone as it happens, each one `HH:MM NNNN <what>`. A line indented
 under a plan number happened inside a step or a gate:

@@ -215,9 +215,24 @@ function recordNotStarted(ctx, lane, stopped) {
   }
 }
 
+/**
+ * Records that `lane` stopped because the run was paused (ADR-0219), so the run's own record tells a
+ * pause apart from `--once` and from a queue that simply ran out.
+ */
+function recordPaused(ctx, lane) {
+  ctx.run.paused ??= { at: now(), lanes: [] };
+  ctx.run.paused.lanes.push(lane);
+  recordNotStarted(ctx, lane, "paused");
+  save(ctx);
+}
+
 async function laneLoop(ctx, lane) {
   for (;;) {
     if (ctx.stopRequested?.()) return recordNotStarted(ctx, lane, "stopped");
+    // The pause ask is read here, beside the stop request, and nowhere else: the plan in flight has
+    // already finished by the time the loop is back at the top, which is what makes the granularity
+    // the plan rather than the step.
+    if (ctx.paused?.()) return recordPaused(ctx, lane);
     const pick = pickNext(ctx, lane);
     if (pick.plan) {
       const rec = ctx.state.plans[pick.plan];
