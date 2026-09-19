@@ -120,7 +120,9 @@ git config core.hooksPath .githooks
 > is deliberately no auto-install ([ADR-0033](adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md)
 > Alternative H).
 
-What it runs, stopping at the first failure and naming the step that failed:
+### What it runs
+
+It stops at the first failure and names the step that failed:
 
 | Step | Command |
 |------|---------|
@@ -203,6 +205,8 @@ If `node` is not on your `PATH` they all **skip with a notice** rather than
 failing the push; nothing else here needs Node. That skip is about the hook only
 — CI's `links` job runs the same checks on `ubuntu-latest`, where they cannot
 skip and are not bypassable.
+
+### What it costs
 
 **Measured warm wall time of the test step: ~410 s** (2026-09-14, one run on the reference
 machine; `fmt` and `clippy` add under two seconds between them). About 165 s of that is idle.
