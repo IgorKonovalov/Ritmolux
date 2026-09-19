@@ -1,0 +1,10 @@
+#!/bin/sh
+# Case 3: every gate is here and two of them are in the wrong order. The lengths agree and the sets
+# agree, so this is the case a set comparison reports clean.
+set -u
+
+if command -v node >/dev/null 2>&1; then
+    run_step "node scripts/fixture-two.mjs" node scripts/fixture-two.mjs
+    run_step "node scripts/fixture-one.mjs" node scripts/fixture-one.mjs
+    run_step "node scripts/fixture-three.mjs --self-test" node scripts/fixture-three.mjs --self-test
+fi

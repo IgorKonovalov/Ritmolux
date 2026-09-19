@@ -20,34 +20,51 @@ import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { gatesFor } from "../../../scripts/gates.manifest.mjs";
 import { appendRecord, appendServed, appendSkip, cleanTree, greenRecord, SERVED_SUITE_ARGS, servingRecord, summaryLine } from "./ledger.mjs";
 import { SUITE, withLock } from "./locks.mjs";
+
+/**
+ * The one Node gate whose red is a judgement rather than a defect: a plan can deliver exactly what a
+ * live backlog entry's probe says is missing, and archiving that entry is the close's job (ADR-0108).
+ * The mark is this gate's stage semantics and not a roster fact, so it lives here rather than in the
+ * manifest.
+ */
+const AFTER_CLOSE_SCRIPTS = new Set(["check-backlog-claims.mjs"]);
+
+/** The manifest's `conductor` projection, as gate steps in roster order (ADR-0217). */
+function nodeGates() {
+  return gatesFor("conductor").map(({ script, args }) => ({
+    name: `${script} ${args.join(" ")}`.trim(),
+    cmd: ["node", `scripts/${script}`, ...args],
+    ...(AFTER_CLOSE_SCRIPTS.has(script) ? { afterClose: true } : {}),
+  }));
+}
 
 /**
  * What the pre-push hook runs, at full strength: the whole suite rather than `-P fast`, plus
  * `cargo doc` and the conductor's own tests, which CI runs and the hook does not. A step with
  * `onlyIf` skips when that path is absent from the worktree; one with `onlyIfCommand` skips when that
- * command does not run, as the hook skips the diffusion-filter suite with no python3 on PATH.
+ * command does not run, as the hook skips the diffusion-filter suite with no python3 on PATH. Either
+ * way the skip is reported rather than dropped, and `enabledBy` is what it tells the reader to do.
+ *
+ * The Node block is the manifest's projection for this carrier, read at run time rather than copied,
+ * which is what stops it falling behind the hook and CI (ADR-0217).
  */
 export function defaultGate() {
-  const node = (script, ...args) => ({ name: `${script} ${args.join(" ")}`.trim(), cmd: ["node", `scripts/${script}`, ...args] });
+  const studio = { onlyIf: "studio/node_modules", enabledBy: "npm --prefix studio ci" };
   return [
-    node("check-doc-links.mjs"),
-    node("check-index-rows.mjs"),
-    node("check-index-rows.mjs", "--self-test"),
-    { ...node("check-backlog-claims.mjs"), afterClose: true },
-    node("check-filter-figures.mjs"),
-    node("check-comment-hygiene.mjs"),
-    node("toc.mjs", "--check"),
-    node("toc.mjs", "--self-test"),
-    node("check-reader-prose.mjs"),
-    node("check-release-tag.mjs"),
-    node("check-release-tag.mjs", "--self-test"),
+    ...nodeGates(),
     { name: "conductor tests", cmd: ["node", "--test", "tools/conductor/test/*.test.mjs"] },
-    { name: "sd-filter tests", cmd: ["python3", "tools/sd-filter/test_sd_filter.py"], onlyIfCommand: ["python3", "--version"] },
-    { name: "studio typecheck", cmd: ["npm", "--prefix", "studio", "run", "typecheck"], onlyIf: "studio/node_modules" },
-    { name: "studio lint", cmd: ["npm", "--prefix", "studio", "run", "lint"], onlyIf: "studio/node_modules" },
-    { name: "studio test", cmd: ["npm", "--prefix", "studio", "test"], onlyIf: "studio/node_modules" },
+    {
+      name: "sd-filter tests",
+      cmd: ["python3", "tools/sd-filter/test_sd_filter.py"],
+      onlyIfCommand: ["python3", "--version"],
+      enabledBy: "put python3 on PATH",
+    },
+    { name: "studio typecheck", cmd: ["npm", "--prefix", "studio", "run", "typecheck"], ...studio },
+    { name: "studio lint", cmd: ["npm", "--prefix", "studio", "run", "lint"], ...studio },
+    { name: "studio test", cmd: ["npm", "--prefix", "studio", "test"], ...studio },
     { name: "cargo fmt", cmd: ["cargo", "fmt", "--all", "--check"] },
     { name: "cargo clippy", cmd: ["cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"] },
     { name: "cargo nextest", cmd: ["cargo", "nextest", "run", "--workspace"], lock: SUITE, ledger: true },
@@ -102,15 +119,34 @@ export function failingTests(output) {
 }
 
 /**
+ * Why a step will not run, in ADR-0016's shape — what is missing, and what would make it run — or
+ * null when its precondition holds.
+ *
+ * A precondition that fails is a REPORT rather than a bare `continue` (ADR-0218). Three of the
+ * default steps are guarded on `studio/node_modules`, which is gitignored and which `git worktree
+ * add` never creates, so every lane ran its gate with the studio unchecked and the only evidence was
+ * a step count nobody had a number to compare against.
+ */
+function unmetPrecondition(c, cwd) {
+  const how = c.enabledBy ? `; run: ${c.enabledBy}` : "";
+  if (c.onlyIf && !existsSync(join(cwd, c.onlyIf))) return `no ${c.onlyIf}${how}`;
+  if (c.onlyIfCommand && spawnSync(c.onlyIfCommand[0], c.onlyIfCommand.slice(1), { cwd, stdio: "ignore" }).status !== 0) {
+    return `${c.onlyIfCommand.join(" ")} does not run${how}`;
+  }
+  return null;
+}
+
+/**
  * Runs the gate. Resolves to
- *   { ok, ran: [names], commands: [{ name, code, ms, suite?, skipped?, served?, by? }],
+ *   { ok, ran: [names], commands: [{ name, code, ms, suite?, skipped?, unmet?, served?, by? }],
  *     failed?: { name, code, log, tail, tests } }.
  * `onLockWait(name, ms)` reports time spent waiting on a lock. `onCommandStart(command)` and
  * `onCommandEnd(command, { code, ms, output })` bracket each command that runs; `ms` excludes the
  * lock wait. `ledger` is the suite ledger's path; without it a `ledger` step always runs and nothing
  * is recorded. `onCommandSkipped(command, record)` reports a step the ledger skipped, which is not
  * in `ran`; `onCommandServed(command, serving)` reports one a record served down to `-P fast`,
- * which does run and is in `ran`.
+ * which does run and is in `ran`. `onCommandUnmet(command, why)` reports a step whose `onlyIf` or
+ * `onlyIfCommand` did not hold: it is in `commands` carrying `unmet`, and not in `ran`.
  */
 export async function runGate({
   cwd,
@@ -125,13 +161,18 @@ export async function runGate({
   ledger,
   onCommandSkipped,
   onCommandServed,
+  onCommandUnmet,
 }) {
   mkdirSync(logDir, { recursive: true });
   const ran = [];
   const timed = [];
   for (const [i, c] of commands.entries()) {
-    if (c.onlyIf && !existsSync(join(cwd, c.onlyIf))) continue;
-    if (c.onlyIfCommand && spawnSync(c.onlyIfCommand[0], c.onlyIfCommand.slice(1), { cwd, stdio: "ignore" }).status !== 0) continue;
+    const unmet = unmetPrecondition(c, cwd);
+    if (unmet) {
+      timed.push({ name: c.name, code: 0, ms: 0, skipped: true, unmet });
+      onCommandUnmet?.(c, unmet);
+      continue;
+    }
     const suite = Boolean(ledger && c.ledger);
     let serving = null;
     if (suite) {

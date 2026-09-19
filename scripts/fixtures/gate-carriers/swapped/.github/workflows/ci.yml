@@ -1,0 +1,14 @@
+# The carrier this case is NOT about, written correctly: one break per root, so the count is the
+# instrument.
+name: Fixture CI
+
+on:
+  push:
+
+jobs:
+  links:
+    runs-on: ubuntu-latest
+    steps:
+      - run: node scripts/fixture-one.mjs
+      - run: node scripts/fixture-two.mjs
+      - run: node scripts/fixture-three.mjs --self-test

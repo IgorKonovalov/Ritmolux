@@ -1,0 +1,23 @@
+#!/bin/sh
+# A pretend pre-push carrying this tree's roster exactly, in order, plus the shapes the parser must
+# NOT read: a cargo step, a commented-out gate, and a label that disagrees with its command.
+set -u
+
+run_step() {
+    label="$1"
+    shift
+    echo "pre-push: $label"
+    "$@" || exit 1
+}
+
+if command -v node >/dev/null 2>&1; then
+    run_step "node scripts/fixture-one.mjs" node scripts/fixture-one.mjs
+    # run_step "node scripts/fixture-commented-out.mjs" node scripts/fixture-commented-out.mjs
+    run_step "the second gate, named in prose" node scripts/fixture-two.mjs
+    run_step "node scripts/fixture-three.mjs --self-test" node scripts/fixture-three.mjs --self-test
+else
+    echo "pre-push: skipping the fixture checks (no node on PATH)"
+fi
+
+run_step "cargo fmt --all --check" cargo fmt --all --check
+run_step "cargo nextest run -P fast" cargo nextest run --workspace -P fast

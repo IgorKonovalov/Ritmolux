@@ -238,8 +238,8 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0214](0214-the-digest-is-a-current-state-page-and-history-is-regenerated-on-demand.md) | The digest is a current-state page, and history is regenerated on demand | accepted 2026-09-18 (Plan 0193), amends 0205; amended by 0216 |
 | [0215](0215-the-analyzer-publishes-an-absolute-stereo-field.md) | The analyzer publishes an absolute stereo field, and the mono path does not move | accepted 2026-09-19, Plan 0194, extends 0199 |
 | [0216](0216-a-review-finding-is-closed-by-the-owner-and-the-page-stops-carrying-it.md) | A review finding is closed by the owner, and the page stops carrying it | accepted 2026-09-19 (Plan 0195), amends 0214 + 0209 |
-| [0217](0217-the-node-gate-roster-is-one-manifest-and-a-checker-holds-every-carrier-to-it.md) | The Node gate roster is one manifest, and a checker holds every carrier to it | proposed |
-| [0218](0218-a-lane-makes-its-plans-preconditions-true-and-a-skipped-check-says-so.md) | A lane makes its plan's preconditions true, and a skipped check says so | proposed |
+| [0217](0217-the-node-gate-roster-is-one-manifest-and-a-checker-holds-every-carrier-to-it.md) | The Node gate roster is one manifest, and a checker holds every carrier to it | accepted 2026-09-19 (Plan 0196) |
+| [0218](0218-a-lane-makes-its-plans-preconditions-true-and-a-skipped-check-says-so.md) | A lane makes its plan's preconditions true, and a skipped check says so | accepted 2026-09-19 (Plan 0196), Outcome |
 | [0219](0219-the-conductor-can-be-asked-to-finish-and-stop-and-the-ask-does-not-outlive-the-run.md) | The conductor can be asked to finish and stop, and the ask does not outlive the run | accepted 2026-09-19 (Plan 0197), amends 0205 |
 | [0220](0220-the-committed-queue-stands-alone-and-a-merged-plan-is-skipped-with-a-notice.md) | The committed queue stands alone, and a merged plan is skipped with a notice | accepted 2026-09-19 (Plan 0197), amends 0205 |
 | [0221](0221-the-control-path-reports-what-it-did-not-do.md) | The control path reports what it did not do | proposed, extends 0176 |

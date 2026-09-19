@@ -1,0 +1,17 @@
+# Case 2: a gate this carrier runs and the roster does not. `fixture-rogue.mjs` is last, so the
+# difference is reported past the end of the projection - the position where "expected nothing" is
+# the only honest reading.
+name: Fixture CI
+
+on:
+  push:
+
+jobs:
+  links:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: node scripts/fixture-one.mjs
+      - run: node scripts/fixture-two.mjs
+      - run: node scripts/fixture-three.mjs --self-test
+      - run: node scripts/fixture-rogue.mjs

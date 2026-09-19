@@ -1,7 +1,8 @@
 # 0206 — The browser shows the look
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-09-19
+> **Approved:** 2026-09-19 (user)
 > **Owner skill(s):** dev
 > **Related ADRs:** [0230](../adrs/0230-thumbnails-are-rendered-by-a-subprocess-of-the-player-itself.md)
 > (proposed), [0011](../adrs/0011-image-crate-for-capture-tooling.md),

@@ -1,7 +1,8 @@
 # 0207 — The commitments get their instruments
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-09-19
+> **Approved:** 2026-09-19 (user)
 > **Owner skill(s):** dev, human
 > **Related ADRs:** [0231](../adrs/0231-the-standalone-size-cap-is-re-derived-from-what-it-carries-and-the-build-reports-it.md)
 > (proposed), [0232](../adrs/0232-a-presets-frame-cost-is-measured-and-reported-never-asserted.md)

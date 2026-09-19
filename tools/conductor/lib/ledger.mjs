@@ -81,8 +81,10 @@ export function greenRecord(path, tree) {
  * a list that forgets a path is merely slow, while the same list written as a denylist would
  * under-gate a path type nobody thought of, silently.
  *
- * `versionLineOnly` files are served only when their whole diff is a `version = "x.y.z"` line, the
- * shape a release bump produces; a dependency edit in the same file is unserved.
+ * `versionLineOnly` files are served only when their whole diff is a `version = "x.y.z"` line in the
+ * section named below, the shape a release bump produces; a dependency edit in the same file is
+ * unserved. They are matched by their FULL path, so a member crate's `Cargo.toml` is not one of them
+ * whatever it contains.
  */
 export const SERVED_PATHS = {
   dirs: ["docs/", ".claude/", "tools/", "site/", "studio/", "packaging/", "renders/"],
@@ -90,8 +92,22 @@ export const SERVED_PATHS = {
   versionLineOnly: ["Cargo.toml", "Cargo.lock"],
 };
 
+/**
+ * Where a `version` line may move in each of those files without re-arming the suite. `null` is
+ * Cargo.lock's shape — one `version` per `[[package]]`, and no other line spelled that way.
+ *
+ * The root `Cargo.toml` is anchored to `[workspace.package]` because that is the only section a
+ * release bump touches. Matching the line anywhere in the file, which is what a column-0 pattern
+ * does, would serve a dependency requirement written as a table and edited in place —
+ * `[workspace.dependencies.naga]` with a `version` under it — past the nine deferred GPU suites.
+ */
+const VERSION_SECTION = { "Cargo.toml": "workspace.package", "Cargo.lock": null };
+
 // A full three-part semver, so a two-part dependency requirement (`version = "0.20"`) is not one.
-const VERSION_LINE = /^[+-]version = "\d+\.\d+\.\d+"$/;
+const VERSION_LINE = /^version = "\d+\.\d+\.\d+"$/;
+// `[section]` or `[[array.of.tables]]`, at column 0: TOML's own rule is that every key below one
+// belongs to it until the next.
+const SECTION_HEADER = /^\[\[?([^\]]+)\]\]?$/;
 
 /** The paths `git diff --name-only a b` reports, forward-slashed, or null when git refused. */
 export function diffPaths(a, b, cwd) {
@@ -101,19 +117,60 @@ export function diffPaths(a, b, cwd) {
   return r.stdout ? r.stdout.split("\n").map((p) => p.trim().replace(/\\/g, "/")).filter(Boolean) : [];
 }
 
-/** True when nothing but a `version = "x.y.z"` line changed in `file` between `a` and `b`. */
+/**
+ * `text` with every three-part `version` line inside `section` dropped, and how many were dropped.
+ * `section` null drops them wherever they sit. The section is tracked while walking, so which lines
+ * are dropped is decided by the header above them rather than by the column they start in.
+ */
+function withoutVersionLines(text, section) {
+  let current = null;
+  const kept = [];
+  let removed = 0;
+  for (const line of text.split("\n")) {
+    const header = line.match(SECTION_HEADER);
+    if (header) current = header[1].trim();
+    else if (VERSION_LINE.test(line) && (section === null || current === section)) {
+      removed += 1;
+      continue;
+    }
+    kept.push(line);
+  }
+  return { rest: kept.join("\n"), removed };
+}
+
+/** `file`'s content at `rev`, or null when that revision does not hold it. */
+function fileAt(rev, file, cwd) {
+  const r = git(["show", `${rev}:${file}`], cwd);
+  return r.code === 0 ? r.stdout : null;
+}
+
+/**
+ * True when `file` differs between `a` and `b` in nothing but a `version = "x.y.z"` line in the
+ * section `VERSION_SECTION` names for it.
+ *
+ * Both revisions are read whole and compared with those lines removed, rather than the diff being
+ * pattern-matched: a hunk carries no section header, so the rule ADR-0211 states in prose — *the
+ * workspace version* — is not one a diff can be read for at all.
+ */
 function versionLineOnly(file, cwd, a, b) {
-  const r = git(["diff", "--unified=0", a, b, "--", file], cwd);
-  if (r.code !== 0) return false;
-  const body = r.stdout.split("\n").filter((l) => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l));
-  return body.length > 0 && body.every((l) => VERSION_LINE.test(l));
+  const section = VERSION_SECTION[file];
+  if (section === undefined) return false;
+  const before = fileAt(a, file, cwd);
+  const after = fileAt(b, file, cwd);
+  // An added or deleted file is not a bump, and neither is one git cannot show.
+  if (before === null || after === null) return false;
+  const x = withoutVersionLines(before, section);
+  const y = withoutVersionLines(after, section);
+  return x.removed > 0 && x.rest === y.rest;
 }
 
 function servesPath(p, cwd, a, b) {
   const path = String(p).replace(/\\/g, "/");
   if (SERVED_PATHS.dirs.some((d) => path.startsWith(d))) return true;
   if (SERVED_PATHS.suffixes.some((s) => path.toLowerCase().endsWith(s))) return true;
-  if (SERVED_PATHS.versionLineOnly.includes(basename(path))) return versionLineOnly(path, cwd, a, b);
+  // The full path, not the basename: `core/Cargo.toml` is a member crate's manifest and is served by
+  // nothing here.
+  if (SERVED_PATHS.versionLineOnly.includes(path)) return versionLineOnly(path, cwd, a, b);
   return false;
 }
 
