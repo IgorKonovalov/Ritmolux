@@ -120,18 +120,71 @@ fn wait_for_delivery(control: &Control) -> bool {
     true
 }
 
+/// The listener's readings at one instant, as the report names them.
+struct Readings {
+    /// Datagrams the socket handed over **since the send**, which is the count
+    /// a missing delivery is judged by: the per-process total includes whatever
+    /// an earlier step of the same test sent.
+    arrived: u64,
+    recv_errors: u64,
+    listening: bool,
+    rejected: u64,
+    dropped: u64,
+}
+
+/// Which of the candidates the readings convict, in one sentence.
+///
+/// The four ADR-0221 names, and the only reason this is a function rather than
+/// a line inside the panic is that each candidate's wording is then assertable
+/// without breaking a listener under a live test.
+///
+/// The order is what settles them. A datagram that reached the socket is the
+/// strongest fact available — whatever else is wrong, the send worked — so it
+/// is read first and `rejected`/`dropped` say what became of it. Past that, a
+/// thread that has left its loop explains every later silence, a receive error
+/// explains the thread leaving, and a listener that is reading a healthy quiet
+/// socket convicts the path in front of it.
+fn verdict(r: &Readings) -> String {
+    if r.arrived > 0 {
+        return format!(
+            "RECEIVED moved ({} since the send): the datagram reached the \
+             socket and was discarded after it — rejected {}, dropped {}",
+            r.arrived, r.rejected, r.dropped
+        );
+    }
+    if !r.listening {
+        return format!(
+            "LISTENING is false: the listener thread has left its receive loop, \
+             so nothing was reading the socket (recv_errors {})",
+            r.recv_errors
+        );
+    }
+    if r.recv_errors > 0 {
+        return format!(
+            "RECV_ERRORS moved ({}): the socket is failing receives, and the \
+             listener is still in its loop retrying them",
+            r.recv_errors
+        );
+    }
+    "RECEIVED did not move, RECV_ERRORS did not move and LISTENING is true: the \
+     listener was reading a healthy socket and no datagram reached it, so the \
+     loss is in front of the socket"
+        .to_owned()
+}
+
 /// Wait for the delivery of what was just sent, or fail with what the listener
 /// saw.
 ///
 /// On a miss it keeps watching for one more [`DELIVERY`] before failing, so the
 /// message tells a late delivery from one that never came; the test has already
-/// failed by then, and the extra wait is paid only on that path. The listener's
-/// counters say whether the datagram arrived and was refused (`rejected`) or
-/// arrived to a full queue (`dropped`). Whether the listener thread is still
-/// running is not observable through `Control`'s public surface, so the message
-/// says so rather than guess.
+/// failed by then, and the extra wait is paid only on that path. The readings
+/// [`verdict`] reads settle which candidate it was: whether any datagram reached
+/// the socket at all, whether receives are failing, and whether the listener
+/// thread is still there — the three facts a report that said only "rejected 0,
+/// dropped 0" could not distinguish.
 fn expect_delivery(control: &Control, what: &str) {
     let sent = Instant::now();
+    let before = control.received();
     if wait_for_delivery(control) {
         return;
     }
@@ -147,13 +200,26 @@ fn expect_delivery(control: &Control, what: &str) {
             sent.elapsed().as_secs_f64()
         )
     };
+    let readings = Readings {
+        arrived: control.received().saturating_sub(before),
+        recv_errors: control.recv_errors(),
+        listening: control.listening(),
+        rejected: control.rejected(),
+        dropped: control.dropped(),
+    };
     panic!(
         "{what}: nothing reached the listener within {DELIVERY:?} (gave up after \
-         {:.2} s); {late}; listener counters: rejected {}, dropped {}; listener \
-         thread liveness: not observable through Control",
+         {:.2} s); {late}\n\
+         listener readings: received +{} since the send, recv_errors {}, \
+         listening {}, rejected {}, dropped {}\n\
+         verdict: {}",
         missed_after.as_secs_f64(),
-        control.rejected(),
-        control.dropped(),
+        readings.arrived,
+        readings.recv_errors,
+        readings.listening,
+        readings.rejected,
+        readings.dropped,
+        verdict(&readings),
     );
 }
 
@@ -367,6 +433,77 @@ fn a_flood_through_the_socket_stays_one_slot_wide() {
         0,
         "a repeated name never fills the queue, so nothing should have been \
          dropped"
+    );
+}
+
+/// Each of the four candidates a broken listener produces is named by the
+/// reading that convicts it.
+///
+/// The deliberate break, expressed as the readings it leaves behind rather than
+/// by breaking a socket under a running test: the socket is moved into the
+/// listener thread and nothing outside holds a handle to it, so a live test
+/// cannot break one. What is asserted is the thing a failing run is read for —
+/// that the report names a reading and not merely a number.
+#[test]
+fn each_broken_listener_is_named_by_the_reading_that_convicts_it() {
+    let quiet = Readings {
+        arrived: 0,
+        recv_errors: 0,
+        listening: true,
+        rejected: 0,
+        dropped: 0,
+    };
+
+    let discarded = verdict(&Readings {
+        arrived: 1,
+        rejected: 1,
+        ..quiet
+    });
+    assert!(
+        discarded.contains("RECEIVED moved") && discarded.contains("rejected 1"),
+        "a datagram that reached the socket and was discarded must convict the \
+         path after the socket: {discarded}"
+    );
+
+    let dead = verdict(&Readings {
+        listening: false,
+        ..quiet
+    });
+    assert!(
+        dead.contains("LISTENING is false"),
+        "a listener thread that has left its loop must be named as such, not \
+         read as a quiet socket: {dead}"
+    );
+
+    let failing = verdict(&Readings {
+        recv_errors: 9,
+        ..quiet
+    });
+    assert!(
+        failing.contains("RECV_ERRORS moved") && failing.contains('9'),
+        "a socket failing its receives must be named as such: {failing}"
+    );
+
+    let lost = verdict(&quiet);
+    assert!(
+        lost.contains("RECEIVED did not move") && lost.contains("in front of the socket"),
+        "a live listener on a healthy socket that saw nothing convicts what is \
+         in front of it, and must say so rather than leave the four candidates \
+         open: {lost}"
+    );
+
+    // A dead listener and a failing socket are the same run seen twice, and the
+    // report must not read the second as the first: the thread leaves *because*
+    // the receives failed, so the liveness fact is the one to lead with.
+    let both = verdict(&Readings {
+        recv_errors: 64,
+        listening: false,
+        ..quiet
+    });
+    assert!(
+        both.contains("LISTENING is false") && both.contains("recv_errors 64"),
+        "a listener that failed its way out of the loop must report both facts \
+         in one sentence: {both}"
     );
 }
 

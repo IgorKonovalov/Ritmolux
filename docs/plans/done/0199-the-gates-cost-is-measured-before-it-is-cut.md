@@ -4,7 +4,7 @@
 > `4e621186`, `4397c31b`; close review round 1 found **no blockers, no majors, five minors** (three
 > repaired in `64ed10eb`). Both stop conditions were evaluated in writing; `-P fast`'s selection,
 > the sweeps' coverage of all 114 presets, conviction-by-name and the batch-independence threshold
-> were each re-verified against the tree. Version **0.136.1**.
+> were each re-verified against the tree. Version **0.137.1**.
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user)
 > **Owner skill(s):** dev

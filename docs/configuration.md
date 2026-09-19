@@ -58,6 +58,19 @@ actually bound; `preset` and `roster` as the show moves; `preset_error` and `pre
 the file, the message and — when the TOML parser gives a position — the line and column;
 `health` once a second while frames are being drawn; and `pong` answering a `ctl/ping`.
 
+`preset_error` also covers a **`ctl/preset` the player declined to select**: there its `file` holds
+the name that was asked for rather than a path, and the message says the selection did not take. It
+is the same event because it is the same fact to whoever asked — the preset you clicked is not on
+screen — and without it a click on a name the roster does not hold produced nothing at all.
+
+`health` reports the control listener alongside the frame timings: `ctl_rejected`, `ctl_dropped`
+and `ctl_refused` are what the path discarded, and `ctl_received`, `ctl_recv_errors` and
+`ctl_listening` are the listener's own state — datagrams the socket handed it, receive failures
+that were not the ordinary read timeout, and whether the receive loop is still running. Read
+together they say which of "nothing was sent", "something arrived and was discarded", "the socket
+is failing" and "the listener has gone" a silent control path is. A run without a listener reports
+zeros and `"ctl_listening":false`.
+
 Every event line begins with `{` and no human diagnostic does, so a parent splits the two on the
 first byte and needs no framing. The flag is purely **additive**: without it standard error carries
 exactly the lines it always did, and with it those same lines are still there, unchanged, beside
