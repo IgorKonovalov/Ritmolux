@@ -208,7 +208,7 @@ export async function runLanes(ctx) {
 /**
  * Records in the run every plan of `lane` still queued when the lane stops, with why it did not
  * start: the first unmerged plan it waits on and that plan's status, or else `stopped` — the lane's
- * own reason for stopping (`worktree cap`, `--once`, `stopped`).
+ * own reason for stopping (`worktree cap`, `--once`, `paused`, `stopped`).
  */
 function recordNotStarted(ctx, lane, stopped) {
   ctx.run.notStarted ??= [];
