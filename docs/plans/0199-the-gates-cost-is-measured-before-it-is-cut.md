@@ -147,8 +147,8 @@ Alternative B returning, and it needs an amendment this plan has no measurement 
 |---|---|---|---|
 | 1 — Measure what the override actually costs | dev | done | 2e04f9a5 |
 | 2 — Fold the exclusive testcases that are pure overhead | dev | done | e5a5da6e |
-| 3 — Measure a sweep's fixed cost per testcase | dev | done | committed with this row |
-| 4 — The sweeps run in batches | dev | not started | |
+| 3 — Measure a sweep's fixed cost per testcase | dev | done | 0a048973 |
+| 4 — The sweeps run in batches | dev | done | committed with this row |
 | 5 — A batched render equals a solo render | dev | not started | |
 
 ### Notes
@@ -353,6 +353,83 @@ and past it the return is bought with granularity. Granularity is the other cons
 what caps the size rather than the arithmetic: 114 presets in batches of 8 is 15 scheduling units
 per sweep against 16 slots, and a batch of 16 would halve that to 8 and leave slots idle on the
 tail.
+
+#### Phase 4 — the sweeps in batches
+
+`build.rs` partitions the roster into the declared representatives and the rest, chunks each run
+into batches of `BATCH = 8`, and emits `<sweep>_rep_batch_<nn>` / `<sweep>_batch_<nn>`, each handing
+its sweep's `_batch` helper the display names it holds. The per-family sweeps (`sanity_shape`,
+`distinctness`) keep the old one-test-per-family emitter untouched. The 114 shipped presets become
+**15 testcases per sweep** — 11 ordinary batches over 86 presets, 4 representative batches over 28 —
+where there were 114.
+
+**`.config/nextest.toml`'s filter expression needed no change.** The `-P fast` predicate is
+`test(/^(animation|reactivity|sanity_loudness)_rep_/)`, which matches `..._rep_batch_01` exactly as
+it matched `..._rep_<stem>`. Its surrounding comment block did change, because it described the old
+naming — including a hazard that the batching retires: a preset filed as `rep_*.toml` used to join
+the sample without declaring the flag, and a batch name carries no filename, so the `.toml` flag is
+now the only way in.
+
+**`-P fast` selects the same presets, by name.** The four representative batches in each sweep hold
+exactly the 28 presets the 28 `_rep_<stem>` testcases held, read off the generated file:
+
+- batch 01 — Stained Glass, Standing Wave, Leviathan, Rho Walk, Ember Life, Spiral Bloom,
+  Collage Mono, Suprematist
+- batch 02 — Loom, Nightbloom, Heartfall, Perseids, Tiled Rosette Mono, Whorl, Coral, Rime
+- batch 03 — Etching, Flux Mono, Contour Mono, Facet, Ridge, Skyline, Corona,
+  Star Mandala Bordered
+- batch 04 — Drift, Stipple, Cauldron, Millrace
+
+**Coverage against the library: 114 presets in each of the three sweeps.** Counted from the runs'
+own per-preset lines — `reactivity` printed 114 band vectors, `animation` 114 `frames 24/48:` rows,
+`sanity`'s loudness gate 114 `excitation ratio` blocks — against the 114 `presets/*.toml` the glob
+embeds.
+
+**A deliberately dead preset is convicted with its own name.** `presets/curve_turnabout.toml` had
+every audio reference stripped from its `[params]` (`n`, `pen`, `draw_progress`, `scale`, `hue`) and
+its batch was run; it was reverted with `git restore` before the commit and this phase touches no
+preset. `reactivity_batch_06` failed with
+
+```
+1 of the 8 presets in this batch react to no band:
+Turnabout reacts to no band above 0.02 (per-band [("bass", 0.0), ("mid", 0.0), ("treb", 0.0), ("onset", 0.0)])
+```
+
+and the other seven presets in the batch were still measured and still printed their vectors, which
+is the property the helpers' `filter_map`-then-assert shape exists for.
+
+**Wall time, against Phase 3's baseline.** Same machine and runner as Phases 1–3. The comparable
+measurement is a **serial** one, because Phase 3's baseline is serial: `cargo nextest run -p rlx-core
+-j 1 -E 'binary(reactivity)'` through the suite lock, **299.0 s** for the binary, of which the 15
+batches are **295.2 s** (the two non-generated tests in the file take 3.8 s). Phase 3 measured a
+per-testcase wall mean of 5.752 s for `reactivity`, which over 114 per-preset testcases is 655.7 s.
+
+**Believe the smaller of the two reductions.** Phase 3's four-preset sample overstates the library's
+variable cost — `Leviathan` alone is 7.6 s — so 655.7 s is an overestimate of the "before". Solving
+this run for the library's own variable cost gives `295.2 = 15 × 2.185 + 114 × V`, so `V = 2.33 s`
+per preset, and the same 114 presets as separate testcases would have been
+`114 × (2.33 + 2.185) = 514.7 s`. **295.2 s against 514.7 s is a 43 % cut on this sweep**; the
+naive comparison against Phase 3's own walls reads 55 % and is the flattered one.
+
+`animation` and `sanity`'s loudness sweep were run at `-j 4` to confirm green and count coverage
+rather than to time them (160.2 s for the 32 testcases, not comparable to anything above). All
+testcases in all three sweeps passed.
+
+**`-P fast` did not get faster, and may have got slower.** `cargo nextest run --workspace -P fast
+--no-fail-fast` on this tree: **412.1 s**, 1630 run / 86 skipped / 0 failed, against Phase 2's
+397.8 s and 1702 run. The 72 fewer tests are the 84 representative testcases becoming 12 batches.
+Two things are in that number and they pull opposite ways: the batches remove 72 renderer builds and
+72 processes, and they coarsen the phase tier's scheduling from 84 units to 12 — a batch is one slot
+for as long as its eight presets take, and a tail of twelve long units packs worse across sixteen
+slots than a tail of eighty-four short ones. Phase 1 measured a 30.5 s run-to-run spread on this
+machine, so a 14.3 s difference on one run per arm resolves neither effect. What the serial
+measurement above does show is that the saving is real where the work is: the whole library, which
+is the full suite's problem and not this tier's.
+
+**One forward reference, disclosed.** `docs/testing.md` names
+`core/tests/batch_independence.rs` as the guard on the independence a batch rests on. That file is
+Phase 5's and does not exist at this commit; Phase 5's own file list is `core/tests/` and does not
+include `docs/testing.md`, so this is where it had to be written.
 
 ### Close triggers
 

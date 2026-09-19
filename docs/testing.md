@@ -9,7 +9,7 @@ Nothing here is needed to write a preset. What a preset author reaches for is
 
 <!-- toc:begin depth=3 -->
 - [The `core/tests/` harness](#the-coretests-harness)
-  - [The preset sweeps are one test per preset (ADR-0157)](#the-preset-sweeps-are-one-test-per-preset-adr-0157)
+  - [The preset sweeps fan out in batches (ADR-0157, ADR-0222)](#the-preset-sweeps-fan-out-in-batches-adr-0157-adr-0222)
   - [What the five preset gates can and cannot see](#what-the-five-preset-gates-can-and-cannot-see)
   - [Golden baselines](#golden-baselines)
   - [The tonemap and pixel-level assertions (Plan 0045)](#the-tonemap-and-pixel-level-assertions-plan-0045)
@@ -63,32 +63,47 @@ either `suite/`.
 > the fullscreen-scene + background pipeline set, and — once a dissolve allocates
 > its blend targets mid-run — what the feedback `trails` stage resolves to.
 
-### The preset sweeps are one test per preset (ADR-0157)
+### The preset sweeps fan out in batches (ADR-0157, ADR-0222)
 
-The four sweeps that make a claim about a single preset — `animation`,
-`reactivity` and `sanity`'s loudness gate — are **generated, one `#[test]` per
-shipped `.toml`**, by the same `core/build.rs` glob that embeds the library. A
-new preset gets its tests by existing; no Rust is edited. `sanity`'s shape gate
+The sweeps that make a claim about a single preset — `animation`, `reactivity`
+and `sanity`'s loudness gate — are **generated**, by the same `core/build.rs`
+glob that embeds the library, as one `#[test]` per **batch of eight presets**. A
+new preset joins a batch by existing; no Rust is edited. `sanity`'s shape gate
 and `distinctness` generate **one test per family** instead, because their claims
 are about a family's distribution and its pairwise set and do not decompose
 further.
 
+**Why a batch rather than a preset.** nextest runs every testcase in its own
+process, so a per-preset testcase pays for that process *and* for the adapter,
+device and pipeline set it builds inside it before it renders anything. Measured
+on the reference machine through WARP, that fixed part is 38–55 % of a
+testcase's wall; a batch pays it once for the eight presets it holds, and eight
+is where the return on a larger batch stops paying for the granularity it costs
+([ADR-0222](adrs/0222-a-preset-sweeps-fixed-cost-is-paid-per-process-so-the-lever-is-the-batch.md)).
+What makes that sound is that the capture primitives are pure functions of their
+arguments — `capture_preset` reseeds every scene and resets the clock — and
+`core/tests/batch_independence.rs` holds them to it.
+
 Three things follow that matter when you are reading a red run:
 
-- **A failure names the preset**, not a loop index inside a multi-minute test,
-  and `-E 'test(animation_attractor_ink)'` re-runs exactly that one.
-- **The per-preset reports print per preset.** `sanity`'s loudness ratio no
-  longer arrives as one sorted table — sort a run's lines to rebuild it — and the
-  shape sweep's flattest-preset ranking is scoped to the family whose test
-  printed it.
+- **A failure names every preset it convicted**, in its message rather than in
+  the test's name, and it reports the whole batch rather than stopping at the
+  first: `1 of the 8 presets in this batch are frozen on both readings:` and then
+  the rows. `-E 'test(animation_batch_03)'` re-runs the batch that held it.
+- **The per-preset reports print per preset**, one line each, attributed to the
+  batch's test. `sanity`'s loudness ratio does not arrive as one sorted table —
+  sort a run's lines to rebuild it — and the shape sweep's flattest-preset
+  ranking is scoped to the family whose test printed it.
 - **`-P fast` renders a sample and the full run renders everything.** A preset
   may declare `representative = true` (see
-  [`presets/README.md`](../presets/README.md)); `build.rs` marks its generated
-  tests `<sweep>_rep_<stem>`, and the `fast` profile selects on that marker. So
-  the `dev` lane's per-phase gate renders **24 of the 81** presets, while a bare
+  [`presets/README.md`](../presets/README.md)); `build.rs` batches the
+  representatives apart from the rest and names their batches
+  `<sweep>_rep_batch_<nn>`, and the `fast` profile selects on that marker. So the
+  `dev` lane's per-phase gate renders the declared sample, while a bare
   `cargo nextest run --workspace` — what the plan close and CI's coverage job run
-  — renders all 81 plus the per-family shape and distinctness tests, which are
-  never sampled. ADR-0081's curation gate therefore still sees the whole library.
+  — renders the whole library plus the per-family shape and distinctness tests,
+  which are never sampled. ADR-0081's curation gate therefore still sees the
+  whole library.
 
 Individual tests (add `-- --nocapture` to see the printed diagnostics):
 
