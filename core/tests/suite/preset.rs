@@ -620,6 +620,15 @@ fn from_frame_binds_every_analysis_variable_to_its_own_field() {
         ("beat_in_bar", 2.0),
         ("bar_index", 9.0),
         ("bar_phase", 0.625),
+        // The stereo field (ADR-0215). Five more names on one builder, so the
+        // pairing worth guarding here is the three per-band balances against
+        // each other: they are the same quantity over three bands and a crossed
+        // slot reads as a plausible number in every other test.
+        ("balance", -0.375),
+        ("spread", 0.125),
+        ("bass_balance", -0.25),
+        ("mid_balance", 0.5),
+        ("treb_balance", 0.875),
     ] {
         let e = compile(name).unwrap_or_else(|err| panic!("{name} compiles: {err}"));
         assert_eq!(
@@ -655,6 +664,57 @@ fn from_frame_binds_every_analysis_variable_to_its_own_field() {
     // start at zero here rather than pick up a frame field.
     let index = compile("index").expect("compiles");
     assert_eq!(index.eval(&v), 0.0, "`index` is not fed by the frame");
+}
+
+/// **The stereo field reaches a binding from real audio** (ADR-0215), which is
+/// the claim the table above cannot make: that test hand-builds a frame, so it
+/// would pass just as well if nothing ever wrote these fields.
+///
+/// Here the frames come from the **analyzer**, over the two stimuli that differ
+/// in exactly one thing — where the sound is — and the expression is the one an
+/// author would write.
+#[test]
+fn a_binding_on_balance_moves_with_a_panned_stimulus() {
+    let format = rlx_core::audio::AudioFormat {
+        sample_rate: 48_000,
+        channels: 2,
+    };
+    let brightness = compile("0.5 + balance * 0.4").expect("compiles");
+
+    let mean_of = |pcm: Vec<f32>| -> f32 {
+        let mut analyzer = rlx_core::dsp::Analyzer::new(format).expect("valid format");
+        let hop = rlx_core::dsp::HOP_SIZE * 2;
+        let mut sum = 0.0f64;
+        let mut n = 0usize;
+        for (index, chunk) in pcm.chunks(hop).enumerate() {
+            analyzer.push_interleaved(chunk);
+            let frame = analyzer.take_frame();
+            if index < rlx_core::dsp::WARMUP_HOPS {
+                continue;
+            }
+            // Evaluated per frame, through the engine's own frame binding — the
+            // renderer's path, not a second copy of it.
+            sum += f64::from(brightness.eval(&Variables::from_frame(&frame, 0.0)));
+            n += 1;
+        }
+        (sum / n.max(1) as f64) as f32
+    };
+
+    // `pan:-0.8` reads `balance = -0.8` exactly, so the binding reads
+    // 0.5 - 0.32 = 0.18. The tolerance is the stimulus's own 1e-3 times the
+    // binding's gain.
+    let panned = mean_of(rlx_core::signal::pan(-0.8, 1.5, format));
+    assert!(
+        (panned - 0.18).abs() < 1e-3,
+        "a binding on `balance` under pan:-0.8 should read 0.180, got {panned}"
+    );
+    // ...and the counter-case that makes it a claim about the audio rather than
+    // about the constant: a centred source leaves the binding at its rest value.
+    let centred = mean_of(rlx_core::signal::pan(0.0, 1.5, format));
+    assert_eq!(
+        centred, 0.5,
+        "a centred source must leave the binding at its rest value exactly"
+    );
 }
 
 /// Plan 0034 Phase 1: `bin(x)` samples the log-spaced band array at a

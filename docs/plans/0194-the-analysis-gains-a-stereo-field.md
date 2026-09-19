@@ -279,8 +279,8 @@ shim are untouched by this plan.
 |---|---|---|---|
 | 1 — The harness learns stereo, and the whole-mix field lands | dev | done | c99b4d10 |
 | 2 — The isolation guarantee | dev | done | 565e74d0 |
-| 3 — Per-band balance, and the measurement that chooses its mechanism | dev | done | committed with this row |
-| 4 — The five names reach the grammar | dev | not started | |
+| 3 — Per-band balance, and the measurement that chooses its mechanism | dev | done | 1b090d38 |
+| 4 — The five names reach the grammar | dev | done | committed with this row |
 | 5 — The documents that make an absolute quantity usable | dev | not started | |
 | 6 — Hear it | human | not started | |
 
@@ -302,6 +302,13 @@ shim are untouched by this plan.
   `standalone/examples/shot.rs`, one file outside the phase's list; `BandLevels` and its
   measurement are in `standalone/src/shot/args.rs` as listed, and the assertions are there rather
   than on the CLI's text.
+- **Phase 4 — no shipped `[latch]` name collides with any of the five.** The whole shipped set
+  declares exactly **one** latch name, `recut`, in `collage_mono.toml`, `collage_nocturne.toml` and
+  `collage_suprematist.toml`; `presets/pending/` declares none. Nothing to rename.
+- **Phase 4 — the five names cost one regenerated file, `docs/specs/player-schema.json`.** The
+  per-system schemas under `presets/schema/` and `.taplo.toml` did not move: the grammar roster is
+  in the player-schema document alone, and the per-system files describe parameters rather than
+  variables.
 - **Phase 3 measurement — 51.8 µs per hop, so the exact mechanism is the implementation.** Measured
   by the method behind `docs/nfr.md`'s figure — `one_hop_analyzes_well_under_the_hop_interval`, in
   release, 1000 hops — on the reference machine (`x86_64-pc-windows-msvc`), both readings taken in

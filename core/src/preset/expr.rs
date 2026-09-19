@@ -77,7 +77,11 @@ use std::fmt;
 /// `beat_index` and `time_since_beat`, ADR-0050's unconditional Layer 1 musical
 /// clock, and `beat_in_bar`/`bar_index`/`bar_phase`, its Layer 2 bar position —
 /// gated on a confidence the grammar deliberately cannot see, so these three are
-/// always *something* sensible and never wrong about the music. Then
+/// always *something* sensible and never wrong about the music. Then the stereo
+/// field — `balance`, `spread` and the three per-band balances (ADR-0215) —
+/// which is the one block here that is **absolute**: it is never divided by a
+/// running peak, so `0` means centred on every track rather than centred for
+/// this one, and a mono source reads `0` forever. Then
 /// `x`/`y`/`rad`/`ang`, the **vertex's own position** during a per-vertex
 /// evaluation (Plan 0100 Phase 1) — the same kind of thing as `index` one axis
 /// up, and `0` anywhere else. Then the reserved `[latch]` block (ADR-0137),
@@ -87,7 +91,7 @@ use std::fmt;
 /// `index` stays **last** and is different in kind: it is not audio but the
 /// *element's own position* during a per-element evaluation (Plan 0034 Phase 4),
 /// and it reads `0` anywhere else.
-pub const VAR_NAMES: [&str; 27] = [
+pub const VAR_NAMES: [&str; 32] = [
     "bass",
     "mid",
     "treb",
@@ -106,6 +110,11 @@ pub const VAR_NAMES: [&str; 27] = [
     "beat_in_bar",
     "bar_index",
     "bar_phase",
+    "balance",
+    "spread",
+    "bass_balance",
+    "mid_balance",
+    "treb_balance",
     "x",
     "y",
     "rad",
@@ -185,6 +194,15 @@ const CLOCK_SLOT_BASE: usize = 13;
 /// gate to hand-tune. It rides on the analysis frame for diagnostics instead.
 const BAR_SLOT_BASE: usize = 15;
 
+/// Slot of `balance`, followed by `spread`, `bass_balance`, `mid_balance` and
+/// `treb_balance` — ADR-0215's stereo field, written by
+/// [`with_stereo`](Variables::with_stereo).
+///
+/// Placed with the audio variables rather than after the positional ones
+/// because that is what it is; the block's own position is checked by the same
+/// name assertion the raw and bar blocks get.
+const STEREO_SLOT_BASE: usize = 18;
+
 /// Slot of `x`, followed by `y`, `rad` and `ang` — the per-vertex position
 /// written by [`with_vertex`](Variables::with_vertex) (Plan 0100 Phase 1).
 ///
@@ -193,7 +211,7 @@ const BAR_SLOT_BASE: usize = 15;
 /// widened for other systems": the *names* exist crate-wide because slots are
 /// positional, and the only caller that ever binds them is the warp mesh's
 /// `[per_vertex]` table.
-const VERTEX_SLOT_BASE: usize = 18;
+const VERTEX_SLOT_BASE: usize = 23;
 
 /// How many `[latch]` entries one preset may declare (ADR-0137).
 ///
@@ -217,7 +235,7 @@ pub const LATCH_CAP: usize = 4;
 /// one and is therefore unmoved by it — and `latch_slots_are_where_the_names_say`
 /// holds all of them to their names, so a reordered `VAR_NAMES` fails a test
 /// rather than binding `bar_phase` to `_latch1`.
-const LATCH_SLOT_BASE: usize = 22;
+const LATCH_SLOT_BASE: usize = 27;
 
 // The five slot blocks must not overlap. Every bound here is a compile-time
 // constant, so this is checked at compile time: an overlapping base is a build
@@ -233,8 +251,12 @@ const _: () = assert!(
     "the clock block must end before the bar block begins"
 );
 const _: () = assert!(
-    BAR_SLOT_BASE + 3 <= VERTEX_SLOT_BASE,
-    "the bar block must end before the vertex block begins"
+    BAR_SLOT_BASE + 3 <= STEREO_SLOT_BASE,
+    "the bar block must end before the stereo block begins"
+);
+const _: () = assert!(
+    STEREO_SLOT_BASE + 5 <= VERTEX_SLOT_BASE,
+    "the stereo block must end before the vertex block begins"
 );
 const _: () = assert!(
     VERTEX_SLOT_BASE + 4 <= LATCH_SLOT_BASE,
@@ -342,6 +364,29 @@ impl<'a> Variables<'a> {
         next
     }
 
+    /// Bind `balance`, `spread` and the three per-band balances (ADR-0215),
+    /// leaving everything else as it was.
+    ///
+    /// These arrive **absolute** and stay that way: unlike the four levels
+    /// [`new`](Self::new) binds, nothing divides them by a running peak, so a
+    /// binding reading `balance` on a mono source reads a flat `0` rather than
+    /// an amplified noise floor. That is the point of the quantity, and it is
+    /// why they are not routed through the normalizers the bands are.
+    pub fn with_stereo(
+        self,
+        balance: f32,
+        spread: f32,
+        bass_balance: f32,
+        mid_balance: f32,
+        treb_balance: f32,
+    ) -> Self {
+        let mut next = self;
+        if let Some(slots) = next.values.get_mut(STEREO_SLOT_BASE..STEREO_SLOT_BASE + 5) {
+            slots.copy_from_slice(&[balance, spread, bass_balance, mid_balance, treb_balance]);
+        }
+        next
+    }
+
     /// Bind every analysis variable from `frame`, with the clock at `time`.
     ///
     /// **This is the only place the frame-to-slot mapping is written.** Both the
@@ -379,6 +424,13 @@ impl<'a> Variables<'a> {
         )
         .with_beat_clock(frame.beat_index, frame.time_since_beat)
         .with_bar(frame.beat_in_bar, frame.bar_index, frame.bar_phase)
+        .with_stereo(
+            frame.balance,
+            frame.spread,
+            frame.bass_balance,
+            frame.mid_balance,
+            frame.treb_balance,
+        )
         .with_spectrum(&frame.spectrum)
     }
 
@@ -1951,6 +2003,20 @@ mod tests {
                 "`{hidden}` must stay out of the grammar: authors get behavior, not homework"
             );
         }
+        assert_eq!(
+            VAR_NAMES.get(STEREO_SLOT_BASE..STEREO_SLOT_BASE + 5),
+            Some(
+                [
+                    "balance",
+                    "spread",
+                    "bass_balance",
+                    "mid_balance",
+                    "treb_balance"
+                ]
+                .as_slice()
+            ),
+            "with_stereo writes five floats starting at STEREO_SLOT_BASE"
+        );
         assert_eq!(
             VAR_NAMES.get(VERTEX_SLOT_BASE..VERTEX_SLOT_BASE + 4),
             Some(["x", "y", "rad", "ang"].as_slice()),
