@@ -194,8 +194,8 @@ flowchart TB
 | 1 — The manifest exists and the conductor reads it | dev | done | `aa320ab` |
 | 2 — A checker holds the hook and CI to the manifest | dev | done | `de526ac` |
 | 3 — The local `cargo doc` covers the workspace | dev | done | `a9ca7d9` |
-| 4 — A skipped step says so, and a studio lane can run its checks | dev | committed with this row | |
-| 5 — The served version line is anchored to the workspace section | dev | not started | |
+| 4 — A skipped step says so, and a studio lane can run its checks | dev | done | `731725c` |
+| 5 — The served version line is anchored to the workspace section | dev | committed with this row | |
 
 ### Notes
 

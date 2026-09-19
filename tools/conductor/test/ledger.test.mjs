@@ -179,17 +179,45 @@ test("Cargo.toml and Cargo.lock are served for a version line and nothing else",
   assert.deepEqual(locked.paths, ["Cargo.lock"]);
   assert.equal(servesDiff(locked.paths, locked.dir, locked.a, locked.b), false, "a checksum is not a version line");
 
-  // An added dependency table is refused by its own header line, not by the version pattern: the
-  // pattern matches any three-part `version = "x.y.z"` at column 0, wherever it sits, so a
-  // requirement already written in table form and edited in place would be served. Nothing in the
-  // repository is written that way, and a registry bump re-arms the suite through Cargo.lock's
-  // checksum in any case.
   const table = cargoCase({ "Cargo.toml": `${CARGO_TOML("0.124.0")}\n[workspace.dependencies.naga]\nversion = "0.20.1"\n` });
   assert.equal(servesDiff(table.paths, table.dir, table.a, table.b), false, "an added dependency table carries added lines");
 
   // Both files bumped plus one unserved path: the whole diff refuses.
   const mixed = cargoCase({ "Cargo.toml": CARGO_TOML("0.124.1"), "core/src/lib.rs": "fn main() {}\n" });
   assert.equal(servesDiff(mixed.paths, mixed.dir, mixed.a, mixed.b), false);
+});
+
+// The rule ADR-0211 states is the WORKSPACE version, and the line is read in the section it sits in
+// rather than by the column it starts in.
+
+test("a version line outside [workspace.package] is not served, however it is spelled", () => {
+  // A dependency requirement already written as a table, edited in place: no line is added or
+  // removed, and every changed line is a three-part `version = "x.y.z"` at column 0. This is the
+  // whole of what a diff-shaped rule cannot see, and it would serve a dependency change past the
+  // nine deferred GPU suites.
+  const withTable = (v) => `${CARGO_TOML("0.124.0")}\n[workspace.dependencies.naga]\nversion = "${v}"\n`;
+  const { dir, commit } = treeRepo();
+  const a = commit({ "Cargo.toml": withTable("0.20.1"), "README.md": "r\n" }, "init");
+  const b = commit({ "Cargo.toml": withTable("0.21.0") }, "chore: a registry bump, in place");
+  const paths = diffPaths(a, b, dir);
+  assert.deepEqual(paths, ["Cargo.toml"]);
+  assert.equal(servesDiff(paths, dir, a, b), false, "a dependency table's version is not the workspace's");
+
+  // And the section is what decides it: the same file, the same shape, bumping the line that IS
+  // under [workspace.package].
+  const c = commit({ "Cargo.toml": withTable("0.20.1").replace('version = "0.124.0"', 'version = "0.124.1"') }, "chore: Release 0.124.1");
+  const release = diffPaths(a, c, dir);
+  assert.deepEqual(release, ["Cargo.toml"]);
+  assert.equal(servesDiff(release, dir, a, c), true, "the release bump is still served, as ADR-0211 intends");
+});
+
+test("a member crate's Cargo.toml is served by nothing, whatever it contains", () => {
+  const { dir, commit } = treeRepo();
+  const a = commit({ "Cargo.toml": CARGO_TOML("0.124.0"), "core/Cargo.toml": CARGO_TOML("0.124.0"), "README.md": "r\n" }, "init");
+  const b = commit({ "core/Cargo.toml": CARGO_TOML("0.124.1") }, "chore: a member bump");
+  const paths = diffPaths(a, b, dir);
+  assert.deepEqual(paths, ["core/Cargo.toml"]);
+  assert.equal(servesDiff(paths, dir, a, b), false, "the basename is not what makes a file the workspace manifest");
 });
 
 test("the forward lookup takes the newest resolvable green record whose diff serves, and never the exact tree's own", () => {
