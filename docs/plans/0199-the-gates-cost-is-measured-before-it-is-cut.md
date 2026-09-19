@@ -1,6 +1,6 @@
 # 0199 — The gate's cost is measured before it is cut
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user)
 > **Owner skill(s):** dev
@@ -140,17 +140,72 @@ Alternative B returning, and it needs an amendment this plan has no measurement 
 
 ## Implementation log
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `plan-0199-the-gates-cost-is-measured-before-it-is-cut`, worktree
+`C:\Users\Igor Konovalov\WORK\rlx-plan-0199`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Measure what the override actually costs | dev | not started | |
+| 1 — Measure what the override actually costs | dev | done | committed with this row |
 | 2 — Fold the exclusive testcases that are pure overhead | dev | not started | |
 | 3 — Measure a sweep's fixed cost per testcase | dev | not started | |
 | 4 — The sweeps run in batches | dev | not started | |
 | 5 — A batched render equals a solo render | dev | not started | |
 
 ### Notes
+
+#### Phase 1 — what the run-alone override costs
+
+Machine: the reference machine (x86_64-pc-windows-msvc, 16 logical cores). Tree: `1df6ba33`,
+lane worktree above, `target/` built once before the first arm and untouched between them.
+Runner: cargo-nextest 0.9.140 (a9fef2964 2026-07-05), the pinned one. Command in every arm:
+`cargo nextest run --workspace -P fast`, through the conductor's suite lock, one run per arm,
+back to back, nothing else running on the box. Wall time is nextest's own `Summary [...]` figure,
+which equals the span of its JUnit report to 0.1 s where both were captured.
+
+A JUnit report was temporarily switched on (`[profile.fast.junit]`) for the three arms so the
+per-testcase start times could be read; `.config/nextest.toml` was restored before the commit and
+this phase touches no file.
+
+| arm | `.config/nextest.toml` | selected run-alone testcases | wall | tests |
+|---|---|---|---|---|
+| A | as committed | 20 | **426.2 s** | 1709 run, 311 skipped, 0 failed |
+| B | `threads-required = 1` | 0 | **277.1 s** | 1709 run, 311 skipped, 1 failed |
+| C | `binary(help_cli)` and `binary(stream_pipe)` dropped from the filter | 8 | **382.9 s** | 1709 run, 311 skipped, 1 failed |
+
+Arms B and C ran `--no-fail-fast` and each fails exactly one test —
+`hygiene::every_clock_reading_test_is_scheduled_alone`, which reads `.config/nextest.toml` and
+convicts the arm's own edit. No other test failed in any arm, including every clock-reading test
+in arm B, where they ran under the full 16-way load.
+
+**The selection is 20 testcases, not the 18 the plan's Context states**, and the cheap half is 12,
+not 11: `help_cli` carries nine tests and `stream_pipe` three. Listed by
+`cargo nextest list --workspace -P fast -E '<the override filter>'` on this tree.
+
+**The queue answer: nextest holds.** From arm A's JUnit report, over the five contiguous blocks of
+exclusive testcases: **zero** non-exclusive testcases started while a block was running, and none
+started for 3.8 s, 6.9 s, 10.0 s, 17.2 s and 42.4 s respectively before each block opened — the
+drain, during which 8 to 16 tests were still finishing and no new one was admitted. Arm B is the
+contrast on the same window: with the override off, 130 non-exclusive testcases started while the
+seven cost probes ran. So the slots sit idle through the drain; nextest does not fill them with
+work further down its queue while an exclusive testcase waits.
+
+**Whether the cost scales with the *count* of exclusive testcases: it does not — it scales with the
+number of contiguous *blocks* and with the serialized work inside them.** Consecutive exclusive
+testcases start with a 0.00 s gap in every block of arm A, so a drain is paid once at a block's
+leading edge however many testcases follow it. The 12 cheap testcases were one block, opening at
+387.0 s and closing at 394.7 s: 6.9 s of drain plus 7.7 s of serialized work, 14.6 s of the run's
+own timeline.
+
+Arm C moved the wall by 43.3 s against arm A, which is larger than that 14.6 s, and the excess is
+not a per-testcase constant: the eight cost probes that ran in **both** arms took 134.1 s of
+exclusive time in arm A and 93.1 s in arm C, a 30.5 s run-to-run spread on the same tree and the
+same machine. One run per arm cannot separate the two, and the plan asked for one run per arm. The
+mechanism above is read off start times rather than off the difference between arms, and it is the
+part later phases can rest on. The ceiling a fold can reach on this reading is the cheap block's
+own 14.6 s.
+
+Serialized time in arm A, as the sum over blocks of (drain + work): 80.3 s of drain + 134.1 s of
+work = 214.4 s of a 426.2 s run, against arm B's 277.1 s with no serialization at all.
 
 ### Close triggers
 
