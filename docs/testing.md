@@ -82,7 +82,7 @@ is where the return on a larger batch stops paying for the granularity it costs
 ([ADR-0222](adrs/0222-a-preset-sweeps-fixed-cost-is-paid-per-process-so-the-lever-is-the-batch.md)).
 What makes that sound is that the capture primitives are pure functions of their
 arguments — `capture_preset` reseeds every scene and resets the clock — and
-`core/tests/batch_independence.rs` holds them to it.
+`core/tests/suite/batch_independence.rs` holds them to it.
 
 Three things follow that matter when you are reading a red run:
 

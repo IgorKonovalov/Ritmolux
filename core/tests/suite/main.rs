@@ -33,6 +33,7 @@ mod analytic_field;
 mod attractor_trails;
 mod backdrop_palette;
 mod backdrop_ramp;
+mod batch_independence;
 mod beat;
 mod bloom;
 mod capture_advance;

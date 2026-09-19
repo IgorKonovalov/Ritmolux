@@ -148,8 +148,8 @@ Alternative B returning, and it needs an amendment this plan has no measurement 
 | 1 — Measure what the override actually costs | dev | done | 2e04f9a5 |
 | 2 — Fold the exclusive testcases that are pure overhead | dev | done | e5a5da6e |
 | 3 — Measure a sweep's fixed cost per testcase | dev | done | 0a048973 |
-| 4 — The sweeps run in batches | dev | done | committed with this row |
-| 5 — A batched render equals a solo render | dev | not started | |
+| 4 — The sweeps run in batches | dev | done | 4e621186 |
+| 5 — A batched render equals a solo render | dev | done | committed with this row |
 
 ### Notes
 
@@ -430,6 +430,59 @@ is the full suite's problem and not this tier's.
 `core/tests/batch_independence.rs` as the guard on the independence a batch rests on. That file is
 Phase 5's and does not exist at this commit; Phase 5's own file list is `core/tests/` and does not
 include `docs/testing.md`, so this is where it had to be written.
+
+#### Phase 5 — the independence is asserted
+
+`core/tests/suite/batch_independence.rs`, one test:
+`a_preset_renders_the_same_after_another_preset_as_it_does_alone`. Each subject is captured on a
+renderer that has already rendered every subject before it — the batch — and on a renderer of its
+own that has rendered nothing else, with the same roster loaded either way, so the only difference
+between the arms is what rendered first. Both capture primitives the sweeps use are compared:
+`capture_preset` (animation, sanity) and `capture_audio_after_warmup` (reactivity).
+
+Subjects, in batch order, from `core/tests/fixtures/` rather than from the shipped library so a
+content tune cannot reach this guard: `reaction_diffusion.toml` (a feedback world, whose field is
+the previous frame), `attractor.toml` (a particle world, whose positions are a GPU buffer) and
+`fragment_field.toml` (a plain one, integrating nothing, which is the control).
+
+Threshold: `MEAN_TOL = 0.02` and `MAX_OUTLIER = 48`, the same two `golden.rs` compares a fresh render
+against its committed baseline with (ADR-0023) — the project's declared rasterizer-drift floor, and
+no tighter, per the plan and ADR-0071.
+
+Measured on the reference machine through WARP, all six comparisons:
+
+```
+fixture_reaction_diffusion capture_preset             mean 0.000000 (tol 0.02) max_outlier 0 (tol 48)
+fixture_reaction_diffusion capture_audio_after_warmup mean 0.000000 (tol 0.02) max_outlier 0 (tol 48)
+fixture_attractor          capture_preset             mean 0.000000 (tol 0.02) max_outlier 0 (tol 48)
+fixture_attractor          capture_audio_after_warmup mean 0.000000 (tol 0.02) max_outlier 0 (tol 48)
+fixture_fragment_field     capture_preset             mean 0.000000 (tol 0.02) max_outlier 0 (tol 48)
+fixture_fragment_field     capture_audio_after_warmup mean 0.000000 (tol 0.02) max_outlier 0 (tol 48)
+```
+
+Bit-identical on this adapter. The threshold stays at the drift floor regardless: a zero is a
+reading about WARP today, not a licence to assert bit-equality.
+
+**Non-vacuity, since six zeros invite the question.** The comparison was temporarily pointed at a
+*different* subject's solo frame — the coarsest leak it could be asked to catch — and the three
+separated at mean 0.221, 0.464 and 0.548 with outliers of 255, 206 and 217, which is 11x to 27x over
+`MEAN_TOL`. The probe was reverted before the commit; its figures are recorded in the test's own
+header, where the "what would take this red" section is.
+
+**The test lives in `core/tests/suite/`, not as its own binary.** It reads no clock, reads no
+process-level quantity, and no `binary()` selector in `.config/nextest.toml` names it, so ADR-0204's
+rule puts it in the shared binary. The consequence is that it runs under `-P fast` on every push:
+22.7 s under that run's load, 11.6 s alone.
+
+**Deviation: `docs/testing.md` was edited in this phase, and it is not in Phase 5's file list.** One
+word. Phase 4's own text named the guard `core/tests/batch_independence.rs` before it existed, and
+ADR-0204 put it at `core/tests/suite/batch_independence.rs` instead; the path is corrected here
+rather than left wrong in a shipped document, because Phase 4 is already committed and
+`docs/testing.md` is not in Phase 5's list to begin with.
+
+**Gate:** `cargo nextest run --workspace -P fast --no-fail-fast` through the suite lock — 368.4 s,
+**1631 run / 86 skipped / 0 failed**. (Against Phase 4's 412.1 s on one fewer test; Phase 1's 30.5 s
+run-to-run spread covers that difference, so read neither as a trend.)
 
 ### Close triggers
 
