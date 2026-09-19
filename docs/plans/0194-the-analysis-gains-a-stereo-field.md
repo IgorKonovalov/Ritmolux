@@ -280,8 +280,8 @@ shim are untouched by this plan.
 | 1 — The harness learns stereo, and the whole-mix field lands | dev | done | c99b4d10 |
 | 2 — The isolation guarantee | dev | done | 565e74d0 |
 | 3 — Per-band balance, and the measurement that chooses its mechanism | dev | done | 1b090d38 |
-| 4 — The five names reach the grammar | dev | done | committed with this row |
-| 5 — The documents that make an absolute quantity usable | dev | not started | |
+| 4 — The five names reach the grammar | dev | done | 2fa92fef |
+| 5 — The documents that make an absolute quantity usable | dev | done | committed with this row |
 | 6 — Hear it | human | not started | |
 
 ### Notes

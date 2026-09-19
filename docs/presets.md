@@ -735,6 +735,11 @@ evaluation, and `x`/`y`/`rad`/`ang` for a per-vertex one.
 | `beat_in_bar` | Which beat of the bar, `0`–`3`. | `beat_in_bar == 0` is the downbeat. |
 | `bar_index` | Bar counter — monotone except across an alignment change. | `mod(bar_index, 8)` for an 8-bar arc, which a lock can repeat or drop one bar of. |
 | `bar_phase` | Position across the whole bar, `[0, 1)`. | The genuine bar phase, unlike `bar`. |
+| `balance` | Where the mix sits between the two channels: `-1` hard left, `0` centred, `+1` hard right. | **Absolute, never levelled** — and **`0` on any mono source, forever**. See below. |
+| `spread` | How decorrelated the channels are: `0` identical, `0.5` fully decorrelated, `1` polarity-inverted. | Absolute too. `0.5` means *decorrelated*, not "half wide". |
+| `bass_balance` | `balance` over the bass band alone. | Same bands as `bass`/`mid`/`treb`. `0` when that band is silent. |
+| `mid_balance` | `balance` over the mid band alone. | The expressive one: hats thrown sideways while the bass stays centred. |
+| `treb_balance` | `balance` over the treble band alone. | |
 | `index` | The element's own position in `[0, 1]` during a **per-element** evaluation. | Not audio. `0` everywhere else — see [below](#index--one-binding-evaluated-once-per-element). |
 | `x` / `y` | The vertex's position in `[0, 1]` during a **per-vertex** evaluation; `y = 0` is the top. | Not audio. `0` outside a `[per_vertex]` table — see [below](#per_vertex--one-binding-evaluated-once-per-mesh-vertex). |
 | `rad` | That vertex's distance from the centre, aspect-corrected against the render target. | `1.0` at the middle of the top and bottom edges on any display; further at the sides of a wide one. |
@@ -770,6 +775,49 @@ on any of them.
 > (`beat * (novelty > 0.5)`). Its DSP shape may change in a later release, or it
 > may be withdrawn; do not build a preset that only works with today's exact
 > values.
+
+#### The stereo field is absolute, and that is the whole design
+
+`balance`, `spread` and the three per-band balances are the only variables here
+that are **not** divided by a running peak
+([ADR-0215](adrs/0215-the-analyzer-publishes-an-absolute-stereo-field.md)). Every
+level is levelled, so `bass > 0.5` means "loud for this track"; `balance = 0`
+means *centred*, on every track, forever. Three consequences, and none of them is
+a bug to report:
+
+- **A mono source reads `0` for all five, permanently.** A mono file in foobar, a
+  mono capture device, `--signal chord` or any other synthesized kind that
+  predates [`pan:`](capturing.md#the-stereo-kinds-pan-wide-and-split) — all of
+  them duplicate one buffer into both channels, and duplicated channels carry no
+  position.
+  A preset leaning on stereo is silently still on perfectly ordinary input.
+- **Real music sits well inside `±0.3` of centre most of the time.** Bind
+  `balance` straight to a large visual move and the picture will look static and
+  you will suspect the engine. Multiply up and clamp, exactly as you would with
+  a `*_raw` level: `clamp(balance * 3, -1, 1)`.
+- **Levelling it would have been a lie you could not detect.** Divided by a
+  running peak, a centred mix's noise floor stretches into confident wandering
+  motion — convincing, and not in the music. Loudness is always present and only
+  its scale is in question; position can be genuinely absent, and a normalizer
+  cannot represent absence.
+
+`spread`'s midpoint is the one number worth memorizing. **`0.5` is *fully
+decorrelated*, not "half as wide as it gets"**: `0` is two identical channels,
+`0.5` is two channels sharing nothing, and `1` is a polarity-inverted pair, which
+almost nothing but a test signal produces. So a wide stereo mix hovers near `0.5`
+and a mono one sits at `0`, and the useful gate is `spread > 0.25` rather than
+anything near the top of the range.
+
+**The field is published raw, per hop, with no smoother** — the same choice the
+`*_raw` levels make. A hop is 10.7 ms, about one cycle of a low bass note, so
+`spread` in particular jitters on bass-heavy material. Ease it yourself with
+[`[smoothing]`](#what-an-expression-cannot-do-shape-a-value-over-time); a
+smoother inside the analyzer would be a second opinion you could not turn off.
+
+To see what a source actually produces, every `--signal` / `--audio` filmstrip
+prints `balance` and `spread` rows beside the band rows
+([capturing](capturing.md#the-three-calibration-traps)), and `--signal pan:<p>`,
+`wide:<seed>` and `split:<p>` synthesize stereo on demand.
 
 ### Constants
 

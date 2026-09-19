@@ -56,6 +56,19 @@ footprint so the vendor spread is on record.
 
 ## Checklist
 
+- [ ] **The stereo field against what a person hears (Plan 0194 Phase 6).** Every number behind
+      `balance` and `spread` was measured on synthetic stimuli, where the answer is known by
+      construction; nothing yet says the quantity tracks what a listener hears. With the standalone
+      capturing loopback and a preset binding `balance` to an obvious visual move — a horizontal
+      offset or a hue — report **(a)** a track with clear stereo movement moves the picture the way
+      it sounds, **(b)** a mono or near-mono track sits visibly still rather than wandering, which is
+      the absolute quantity's whole point ([ADR-0215](adrs/0215-the-analyzer-publishes-an-absolute-stereo-field.md)),
+      and **(c)** the observed real-world min/mean/max of `balance` and `spread` over a few tracks.
+      **(c) is the deliverable, not the check**: the range is written back into
+      [`docs/presets.md`](presets.md#the-stereo-field-is-absolute-and-that-is-the-whole-design) so
+      authors calibrate a gain against a measurement instead of a guess — the same reason the band
+      levels are published. The design expects real music well inside `±0.3`; a much wider or much
+      narrower reading is worth reporting either way.
 - [ ] **Low-end / older Windows iGPU box (§9), 1080p.** Run the current release standalone, let
       it reach steady state, capture `diagnostics.log`. Report **(a)** fps holds ≥ 60 @ 1080p, and
       **(b)** steady-state working set + private commit. _(This is Plan 0012 Phase 3, extracted; it
