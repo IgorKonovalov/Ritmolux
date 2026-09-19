@@ -175,7 +175,7 @@ flowchart TB
   shape). Phase 4 makes the command runnable; deciding which paths are regenerate-don't-merge is a
   separate design.
 - It does not touch the gate roster, `cargo doc`'s scope or the served-path rule — those are
-  [Plan 0196](0196-the-gate-roster-stops-drifting.md), which edits some of the same files. **The two
+  [Plan 0196](done/0196-the-gate-roster-stops-drifting.md), which edits some of the same files. **The two
   plans must not run in the same lane at the same time:** both edit `tools/conductor/lib/gate.mjs`
   (0196 Phases 1 and 4, this plan none), `lib/lane.mjs` (0196 Phase 4, this plan Phase 1) and
   `tools/conductor/README.md`. Run them in one lane, in either order.

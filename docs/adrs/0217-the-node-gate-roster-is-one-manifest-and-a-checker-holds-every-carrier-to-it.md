@@ -1,8 +1,8 @@
 # ADR-0217 — The Node gate roster is one manifest, and a checker holds every carrier to it
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-19 (Plan 0196)
 > **Date:** 2026-09-19
-> **Related plan(s):** [0196](../plans/0196-the-gate-roster-stops-drifting.md)
+> **Related plan(s):** [0196](../plans/done/0196-the-gate-roster-stops-drifting.md)
 > **Rests on:** [0033](0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md) (the hook and its
 > budget), [0205](0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md)
 > (the conductor's own gate)

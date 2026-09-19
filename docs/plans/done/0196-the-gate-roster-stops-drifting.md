@@ -1,14 +1,21 @@
 # 0196 — The gate roster stops drifting
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-19. Five `dev` phases (`aa320ab`, `de526ac`, `a9ca7d9`,
+> `731725c`, `ea3c576`), one fix round (`ba8b0fa`, `75d6456`, `590f85a`, `e06dd64`, `e2d7471`) and
+> one close repair (`e12459a`). Round-2 review: **no blockers, no majors, two minors, two nits.**
+> Verified: the manifest is the roster and the conductor imports it; the checker convicts all three
+> drift shapes and reads the root it is handed; the hook documents all five workspace members with
+> zero warnings; a skipped gate step names itself and the command that would enable it; a
+> `studio_install` park is cleared by the next run; and the served version line is read in its TOML
+> section. Full suite green on this tree by the suite ledger (ADR-0207).
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user)
 > **Owner skill(s):** dev
-> **Related ADRs:** [0217](../adrs/0217-the-node-gate-roster-is-one-manifest-and-a-checker-holds-every-carrier-to-it.md)
-> (proposed), [0218](../adrs/0218-a-lane-makes-its-plans-preconditions-true-and-a-skipped-check-says-so.md)
-> (proposed), [0033](../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md),
-> [0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md),
-> [0211](../adrs/0211-a-green-suite-record-serves-a-later-tree-when-no-deferred-suite-can-read-the-diff.md)
+> **Related ADRs:** [0217](../../adrs/0217-the-node-gate-roster-is-one-manifest-and-a-checker-holds-every-carrier-to-it.md)
+> (proposed), [0218](../../adrs/0218-a-lane-makes-its-plans-preconditions-true-and-a-skipped-check-says-so.md)
+> (proposed), [0033](../../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md),
+> [0016](../../adrs/0016-gpu-tests-opt-in-ci-scope.md),
+> [0211](../../adrs/0211-a-green-suite-record-serves-a-later-tree-when-no-deferred-suite-can-read-the-diff.md)
 > **Closes:** design-backlog 0242, 0243, 0246, 0252
 
 ## TL;DR
@@ -46,10 +53,10 @@ a table and edited in place would serve a dependency change past the nine deferr
 
 ## Decision
 
-Per [ADR-0217](../adrs/0217-the-node-gate-roster-is-one-manifest-and-a-checker-holds-every-carrier-to-it.md),
+Per [ADR-0217](../../adrs/0217-the-node-gate-roster-is-one-manifest-and-a-checker-holds-every-carrier-to-it.md),
 one committed manifest holds the roster; the conductor imports it, and a checker asserts the hook and
 the `links` job match its projection for them, in order. Per
-[ADR-0218](../adrs/0218-a-lane-makes-its-plans-preconditions-true-and-a-skipped-check-says-so.md), a
+[ADR-0218](../../adrs/0218-a-lane-makes-its-plans-preconditions-true-and-a-skipped-check-says-so.md), a
 skipped gate step reports itself in ADR-0016's shape and a lane whose plan touches `studio/` installs
 that project's dependencies when it opens. We rejected a single runner every carrier calls (it
 collapses the per-step reporting that makes a red cheap to read) and adding the two missing names (it
@@ -242,8 +249,165 @@ flowchart TB
   suite and no phase changed what one measures, so no upward override was taken (ADR-0156).
 - **Outstanding `human` phases:** none — every phase is `dev`.
 
+## Close review
+
+Conductor mode (ADR-0205), round 2, fresh session, in the lane
+`C:\Users\Igor Konovalov\WORK\rlx-plan-0196` on `plan-0196-the-gate-roster-stops-drifting`.
+Tip reviewed `e2d7471a`. **No blockers, no majors, two minors, two nits.** Round 1's review is at
+`tools/conductor/state/reviews/0196-round-1.md`, this one at `0196-round-2.md`; both are outside the
+repository, which is why this section carries the second in full.
+
+### Verdict
+
+Plan 0196 landed its five phases and round 1's three majors are repaired in a way that is verifiable
+rather than asserted. The documented `[root]` form now measures the root it was handed — reproduced
+against the seeded `missing` tree, which reports exit 1 and names both carriers where it previously
+printed OK. The `studio_install` park is clearable: `installStudioDeps` moved out of the open-lane
+branch and its trigger is the absence of `studio/node_modules`, so the worktree a park leaves behind
+is installed into on the next run, and a lane that already has its dependencies is not reinstalled —
+with a lane test that parks, recovers, resumes, and asserts all three studio checks ran at both
+stages. `docs/developing.md`'s step table matches the hook again, in the hook's order, and the
+paragraph that argued the one-crate rustdoc scope now describes the widened step with its three
+measured figures.
+
+Nothing found in round 2 rises above `minor`. Two of the four were raised in round 1 and left
+standing (they were not majors, so no fix round owed them); two are new. All four are prose or a doc
+comment, and three of the four are repaired by this close.
+
+### Evidence
+
+| What | How | Result |
+|---|---|---|
+| Full suite | `with-lock.mjs suite -- cargo nextest run --workspace` | `skipped: tree f4a04e2 is green in the suite ledger, run by gate 0196-fix-1 at 2026-09-19T10:07:45.945Z: 2013 tests run: 2013 passed (11 slow), 7 skipped` — the exact-tree ledger record is the full-suite evidence (ADR-0207) |
+| Rustdoc | `cargo doc --workspace --no-deps` | all five members re-documented, **zero warnings**, 13.11 s. (`RUSTDOCFLAGS=-D warnings` cannot be set from a conductor session — neither an assignment ahead of a command nor an `env` prefix is permitted — so the equivalent reading was taken: `-D warnings` only promotes warnings that were not emitted, and none were, on a run that did recompile every member.) |
+| Conductor suites | `node --test tools/conductor/test/{gate,lane,ledger}.test.mjs` | 66/66 |
+| Roster gate | `node scripts/check-gate-carriers.mjs` / `--self-test` | OK, 19 rostered, hook 16/16, ci 16/16; self-test 22 of 22 |
+| Round-1 finding 0 repro | `node scripts/check-gate-carriers.mjs scripts/fixtures/gate-carriers/missing` | **exit 1**, `hook 2/16, ci 3/16`, both carriers named at position 1 — it reads the root it was given |
+| Backlog probes | `node scripts/check-backlog-claims.mjs` | exit 0 — 55 reductions across 25 live entries, 3 unprobeable, 28 advisory *path moved* rows, none named by this plan |
+| Doc links | `node scripts/check-doc-links.mjs` | OK, 509 tracked files |
+| Index rows | `node scripts/check-index-rows.mjs` / `--self-test` | OK, 5 regions, 632 rows; self-test 10/10 |
+| Contents blocks | `node scripts/toc.mjs --check` / `--self-test` | OK, 7 blocks, 623 rows; self-test 33 of 33 |
+| Reader prose | `node scripts/check-reader-prose.mjs` | OK, 16 documents |
+| Comment hygiene | `node scripts/check-comment-hygiene.mjs` | OK, 290 tracked sources |
+| System counts | `node scripts/check-system-counts.mjs` | OK, 448 files |
+| Filter figures | `node scripts/check-filter-figures.mjs` | OK |
+| Release tag (self-test) | `node scripts/check-release-tag.mjs --self-test` | 4 of 4 |
+| Translations | `node scripts/check-translations.mjs` | exit 0, 5 stamped; one advisory row |
+
+### Findings
+
+**minor — `CLAUDE.md:162-212` — the `scripts/` enumeration claims completeness and still lacks this
+plan's two new files.** Raised in round 1 and not repaired. The block frames itself as exhaustive —
+*"every one below runs by pre-push and by the CI `links` job EXCEPT the two site gates"* — and then
+names every gate with its ADR. Neither `check-gate-carriers.mjs` nor `scripts/gates.manifest.mjs`
+appears, which is a poor place for that omission: the enumeration is the orientation map's own copy
+of the roster, one level up from the three the plan just unified. `gates.manifest.mjs` is also the
+first `.mjs` under `scripts/` that is neither a gate, a renderer nor a maintenance tool, so the
+block's three-way split has no slot for it and its closing sentence — *"every `.mjs` is wired into
+pre-push or CI" reads as a rule with six named exceptions* — had a seventh file it did not account
+for. **Repaired in `e12459a`.**
+
+**minor — `docs/developing.md:123-146` — the table of "every step the pre-push gate runs" omits the
+four guarded steps.** The table is introduced as *"What it runs, stopping at the first failure and
+naming the step that failed"*, and `CLAUDE.md` designates this document as the record of every
+pre-push step. It listed the sixteen Node steps and the four cargo steps and not the four the hook
+runs between them: `python3 tools/sd-filter/test_sd_filter.py` (`.githooks/pre-push:233`) and the
+three `npm --prefix studio …` steps (`:258-260`). Neither string appeared anywhere in the document.
+The drift predates this plan — both groups were added by earlier plans that never swept the table —
+but it is the same class the plan exists to close, seen in the one carrier of the roster that is
+prose and that nothing gates, and the table was reopened and corrected in round 1 for exactly that
+reason. A developer reproducing the hook from it ran a strict subset. **Repaired in `e12459a`:** four
+rows in the hook's order, each naming its guard, plus one paragraph on why those two groups skip with
+a notice rather than failing (ADR-0016).
+
+**nit — `.github/workflows/ci.yml:305` — a hand-written count of the invocations above it.** Raised
+in round 1 and not repaired. *"the fourteen invocations above are the projection of
+scripts/gates.manifest.mjs for this job"* was correct and the next gate added to the `links` job
+falsifies it, with nothing to say so — in the one comment whose subject is a roster that drifts, two
+screens from the gate this project wrote because a written-out count goes stale whether or not it is
+right today. **Repaired in `e12459a`.**
+
+**nit — `tools/conductor/lib/outcome.mjs:46` — the park's doc comment still said the install fails
+"as the worktree opened".** Introduced by round 1's own repair: `75d6456` moved `installStudioDeps`
+out of the `!laneOpen(rec)` branch and keyed it on a missing `studio/node_modules`, updating
+`lib/lane.mjs` and the two README sites but not `STUDIO_INSTALL`'s own doc comment, which described
+precisely the shape the fix abandoned. **Repaired in `e12459a`.**
+
+**nit — `scripts/check-gate-carriers.mjs:267` — the failure footer lists four carriers and the gate
+reads two — left open.** The footer prints `hook`, `ci`, `conductor` and `pages`. `conductor` reads
+as enforced and is, because `gate.mjs` imports the manifest; `pages` is neither imported nor parsed,
+so the two site entries are a record that `pages.yml` may drift from silently. (Checked by hand in
+both rounds — `pages.yml:137,141` matches the manifest's `pages` projection.) Left open deliberately:
+the repair is one clause on a `console.error` template literal, which is program output rather than a
+comment or an assertion message, and so falls outside the closed list ADR-0209 lets a close touch.
+The replacement line is
+`pages       .github/workflows/pages.yml, recorded here and not read by this gate`.
+
+### Lens notes
+
+- **Lens 1 (alignment).** All five phases carry a single in-vocabulary `**Owner skill:** dev`. The
+  `## Implementation log` is shorter than `## Implementation phases`. Each done-when has a real
+  assertion behind it, re-read in round 2 rather than taken from round 1: the manifest-projection
+  equality and the site-gates-are-not-gate-steps test, the three unmet-precondition tests and the
+  `enabledBy` roster test, the two install tests, the section-qualified and member-crate ledger
+  tests, and the five argument-parse assertions plus the real-roster `missing` case in the checker's
+  self-test. Phase 3's deliberate-rustdoc-break experiment is reported only by silence; the coverage
+  half is directly verified (all five members re-documented, zero warnings).
+- **Lens 2 (layering / real-time).** No Rust, no C++, nothing under `core/`. `gate.mjs` importing
+  `scripts/gates.manifest.mjs` is ADR-0217's decision: the manifest is dependency-free data and the
+  direction is conductor → repository. The conductor resolves that import from its own checkout, so
+  a lane adding a gate does not get it at its own `pre-review` — unchanged from before this plan,
+  flagged in the plan's own Risks, and demonstrated by this plan's own `pre-review`.
+- **Lens 3 (docs).** See the two minors. `tools/conductor/README.md` was swept twice and carries no
+  second copy of the roster — it points at `gateForStage`. `scripts/fixtures/README.md` documents the
+  new tree, its four runnable roots and the asserted `22 of 22`, verified by running it.
+- **Lens 4 (determinism / numbers).** Every figure the plan wrote names the machine. No numeric
+  assertion was added to any Rust test. `versionLineOnly`'s `x.removed > 0 && x.rest === y.rest`
+  fails **closed**: an unrecognised section header, a CRLF, an indented `version` line or a trailing
+  comment all re-arm the full suite rather than serving it, and a `version` line added where none
+  existed returns false. The `SECTION_HEADER` walk is TOML's own scoping rule rather than a column
+  test, which is the point of Phase 5.
+- **Lens 5 (design integrity).** The manifest is one ordered list projected per carrier; a gate
+  spelled differently per carrier is two entries with disjoint carrier sets, and the checker stays a
+  plain sequence equality with no second rule engine. `afterClose` correctly stayed in `gate.mjs` as
+  stage semantics rather than migrating into the roster. `STUDIO_INSTALL` is module-constant beside
+  `CLAUDE_DIR` and `LOST_BACKGROUND`, is absent from `parkStillTrue`'s owner-evidence arms (correctly
+  — the install itself is what un-parks it now) and no session can claim it. A step skipped for an
+  unmet precondition records `{ skipped: true, unmet }` with `code: 0` and no `suite` flag, so
+  `digest.mjs`'s suite accounting does not confuse it with a ledger skip.
+
+### Not findings, recorded
+
+- The log's *"noticed, not acted on"* item — `check-doc-links.mjs scripts/fixtures` reporting 10
+  breaks where `scripts/fixtures/README.md` states five — conflates two claims. Every *"exactly five
+  breaks"* in that README is scoped to one fixture **root**; running the checker over the whole
+  `scripts/fixtures` tree scans all of them at once and is not a count anything states. No repair is
+  owed.
+- ADR-0218's Decision says the install runs *"once as part of opening the worktree"*. Round 1's
+  required repair widened the trigger to the absence of `studio/node_modules`, asked before every
+  run. That is a superset serving the ADR's own refusal — *"rather than proceeding with checks that
+  cannot run"* — rather than a reversal, and it is recorded as a dated `Outcome` on the ADR at
+  acceptance rather than by editing its body.
+
+### Earlier rounds
+
+- **Round 1, finding 0 (major)** — `scripts/check-gate-carriers.mjs:223`, the documented `[root]`
+  form silently measured this repository and printed OK on a seeded red tree. Resolved in
+  **`ba8b0fa`**, with the asserted self-test count following in **`e2d7471`**.
+- **Round 1, finding 1 (major)** — `tools/conductor/lib/lane.mjs:445`, a `studio_install` park could
+  not be cleared by `resume`, and `tools/conductor/README.md:167` said it could. Resolved in
+  **`75d6456`**.
+- **Round 1, finding 2 (major)** — `docs/developing.md`, the document that records every pre-push
+  step still named the retired scoped `cargo doc` command and argued its scope. Resolved in
+  **`590f85a`**.
+- **Round 1, minor** — `CLAUDE.md`'s `scripts/` enumeration. Not repaired by the fix round; re-raised
+  in round 2 and repaired at the close in **`e12459a`**.
+- **Round 1, nit** — `ci.yml`'s hand-written count. Same: repaired at the close in **`e12459a`**.
+- **Round 1, nit** — the checker's failure footer listing `pages`. Left open in both rounds, because
+  ADR-0209 does not let a close edit program output.
+
 ## Followups (after this lands)
 
 - Backlog 0246 is archived on promotion, so the class's home is now this plan plus
-  [ADR-0217](../adrs/0217-the-node-gate-roster-is-one-manifest-and-a-checker-holds-every-carrier-to-it.md).
+  [ADR-0217](../../adrs/0217-the-node-gate-roster-is-one-manifest-and-a-checker-holds-every-carrier-to-it.md).
   Anything still pointing a reader at backlog 0179 for a live gap is stale by two hops.

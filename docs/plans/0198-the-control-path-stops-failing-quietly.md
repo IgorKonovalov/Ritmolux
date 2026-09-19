@@ -147,7 +147,7 @@ flowchart LR
   did not move", that convicts the send-to-queue path and still does not say where the datagram went;
   the next plan may need per-datagram sequencing, which is a protocol change.
 - **Phase 5 needs `studio/node_modules` in the lane.** Under the conductor that is exactly backlog
-  0242, which [Plan 0196](0196-the-gate-roster-stops-drifting.md) Phase 4 repairs. Run this plan
+  0242, which [Plan 0196](done/0196-the-gate-roster-stops-drifting.md) Phase 4 repairs. Run this plan
   after 0196, or the operator installs in the lane by hand before Phase 5.
 - **`health` is emitted once a second for the life of a run**, so the new fields are a permanent cost
   on the contract. Additive under the same `v`, per spec 0003's own rule.

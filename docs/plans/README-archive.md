@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0196 - The gate roster stops drifting](#0196---the-gate-roster-stops-drifting)
   - [0194 - The analysis gains a stereo field](#0194---the-analysis-gains-a-stereo-field)
   - [0195 - A finding can be closed](#0195---a-finding-can-be-closed)
   - [0193 - The digest says what is happening, and where you are needed](#0193---the-digest-says-what-is-happening-and-where-you-are-needed)
@@ -235,6 +236,72 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0196 - The gate roster stops drifting](done/0196-the-gate-roster-stops-drifting.md)
+
+- closed 2026-09-19, conductor-run lane `plan-0196-the-gate-roster-stops-drifting` in
+`WORK/rlx-plan-0196`. Five phases, `aa320ab`, `de526ac`, `a9ca7d9`, `731725c` and `ea3c576`; one fix
+round, `ba8b0fa`, `75d6456`, `590f85a`, `e06dd64` and `e2d7471`; one close repair, `e12459a`. Two
+review rounds: round 1 **no blockers, three majors, one minor, two nits**, round 2 **no blockers, no
+majors, two minors, two nits**, three repaired at the close and one left open. Version **0.135.0**
+(minor). ADR-0217 and ADR-0218 accepted, 0218 with a dated `Outcome`. Closed backlog 0242, 0243,
+0246 and 0252; none filed.
+- **What landed.** `.githooks/pre-push`, CI's `links` job and `defaultGate()` were three
+hand-maintained copies of one ordered list, and the third had fallen behind twice.
+`scripts/gates.manifest.mjs` is now the roster — `{ script, args, carriers }` in the hook's order,
+which is canonical — the conductor **imports** its `conductor` projection so that carrier cannot
+drift at all, and `scripts/check-gate-carriers.mjs` reads the other two out of their own files and
+asserts each equals its projection, in order. A gate spelled differently per carrier is two entries
+with disjoint carrier sets (`check-release-tag.mjs` bare, `--self-test`, `--remote`); a carrier that
+deliberately lacks a gate says so by absence, which is how the two site gates are recorded with
+`pages` alone. The checker joined all three carriers, so a carrier that stopped running it would stop
+noticing everything else that left.
+- **The `cargo doc` half was the same class from the other side.** The hook documented `-p rlx-core`
+while CI documented `--workspace`, so four of the five members were reachable only after a push —
+and a rustdoc error in one of them shipped a red `main` under a release tag twice in sixteen days
+(Plan 0137, then Plan 0180's `milkconv`). The step is now `cargo doc --workspace --no-deps` under
+`RUSTDOCFLAGS=-D warnings`, with `--features text` dropped because `--workspace` unifies the feature
+on through `standalone`. The phase measured rather than tuned: **7.8 s** warm after an edit to
+`rlx-ring`, **0.5 s** warm with nothing changed, **20.1 s** after `cargo clean --doc` — about two
+seconds over the scoped step. ADR-0033's *tens of seconds* budget was already past before this phase
+(ADR-0157's preset sample at +58.5 s, ADR-0178's studio trio at 15.2 s); the plan reported that and
+left the budget to ADR-0033.
+- **Two smaller defects rode along because they live in the same files.** `runGate` dropped a guarded
+step with a bare `continue` — not in `ran`, not in the result, not on the terminal — so since
+`studio/node_modules` is gitignored and `git worktree add` never creates one, **every conductor lane
+had ever run its gate with the studio's typecheck, lint and tests skipped, silently**. A skipped step
+now reports in ADR-0016's shape, naming the step, what is missing, and the `enabledBy` command that
+would make it run; and a lane whose plan **declares** files under `studio/` installs that project's
+dependencies before its first session, parking `studio_install` rather than proceeding with checks
+that cannot run. And ADR-0211's served version line, which was a column-0 regex over any file named
+`Cargo.toml`, is now read in its TOML **section**: both revisions are read whole and compared with
+the `[workspace.package]` `version` lines removed, because a hunk carries no section header and the
+rule could not be read off a diff at all. `Cargo.lock` keeps its any-section reading; a member
+crate's `Cargo.toml` is out of scope by full path rather than by basename.
+- **What the review rounds moved.** Round 1's three majors were each a mechanism rather than an
+instance: `args.indexOf("--roster")` returning `-1` made `rosterAt + 1` drop the **first positional
+argument**, so the documented `[root]` form measured this repository and printed OK on a seeded red
+tree — the exact vacuous green the plan is about, in the gate written to refuse it;
+`installStudioDeps` sat inside `if (!laneOpen(rec))`, so the park it entered could never be cleared
+by `resume` (the worktree already existed) and the README said the opposite; and `docs/developing.md`
+still told a reader to run the retired scoped `cargo doc`. Round 2 verified all three against the
+tree — the `missing` root now exits 1 and names both carriers — and found nothing above `minor`.
+- **What outlived the plan.** Three bounds are written down rather than papered over, and each is a
+place a future reader could otherwise over-read a green run. The checker's parsers are regexes over
+a shell script and a YAML file, so a spelling they do not recognise — `node "scripts/x.mjs"`, a
+`run: |` block, a loop, a composite action — is invisible; an invisible invocation reads as a
+**missing** gate rather than as a pass, which is the safe direction. It asserts invocations and order
+and never the `if:` conditions a carrier attaches, so CI's `--remote` guard is prose the manifest
+records and nothing enforces. And the hook's English skip notice stays hand-written and will drift,
+its cost being a notice that under-names what was skipped. The fourth, found at the close and left
+open, is that the checker's own failure footer lists `pages` beside three carriers it actually binds,
+without saying that entry is recorded and not read.
+- **What the conductor learned about itself.** This plan changed the gate that runs at its own close,
+which is why its `pre-review` ran the **old** roster: the conductor resolves `defaultGate()` from its
+own checkout, not from the lane, so `check-translations.mjs`, `check-system-counts.mjs` and the new
+`check-gate-carriers.mjs` were not in that run and were taken by hand in both reviews. The plan's own
+Risks predicted exactly this. It is unchanged behaviour — the list was a literal in the same file
+before — but it is now a named property of the manifest rather than an accident of a copy.
 
 ### [0194 - The analysis gains a stereo field](done/0194-the-analysis-gains-a-stereo-field.md)
 

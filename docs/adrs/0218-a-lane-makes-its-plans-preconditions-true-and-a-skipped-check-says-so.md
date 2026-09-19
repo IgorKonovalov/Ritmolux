@@ -1,8 +1,8 @@
 # ADR-0218 — A lane makes its plan's preconditions true, and a skipped check says so
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-19 (Plan 0196), with an Outcome
 > **Date:** 2026-09-19
-> **Related plan(s):** [0196](../plans/0196-the-gate-roster-stops-drifting.md)
+> **Related plan(s):** [0196](../plans/done/0196-the-gate-roster-stops-drifting.md)
 > **Rests on:** [0016](0016-gpu-tests-opt-in-ci-scope.md) (skip, but say so),
 > [0205](0205-an-approved-plan-runs-under-a-conductor-and-every-judgement-it-cannot-make-parks-the-plan.md)
 > (the conductor's gate), [0210](0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md)
@@ -88,6 +88,23 @@ conductor entirely in order to avoid a gap that an install closes.
 ### Alternative C — Commit or vendor the dependencies
 Puts `node_modules` in git so every worktree has one. Rejected on its face: a few hundred megabytes
 of third-party tree in the repository, to make one gate step runnable.
+
+## Outcome (2026-09-19, at Plan 0196's close)
+
+**The install's trigger is broader than this Decision says, and the widening is what makes the park
+recoverable.** The Decision reads *"a lane makes its plan's precondition true **at open** … once as
+part of opening the worktree"*. Implemented that way, `installStudioDeps` sat inside
+`if (!laneOpen(rec))`, and the close review's round 1 convicted it: a failed install parks a lane
+whose worktree **already exists**, `parkStillTrue` has no arm for the reason so the resume is
+granted, and `runPlan` then finds the lane open and never installs again — running the plan to a
+merge with the three studio checks skipped, which is the state this ADR's own Decision refuses.
+
+The shipped trigger is therefore the **absence of `studio/node_modules`**, asked before every run
+rather than only at open. A lane that already has its dependencies is never reinstalled, because
+`npm ci` deletes `node_modules` before it writes one, so the absence check is what keeps a resume
+from redoing a good install. Nothing else in the Decision moves: the plan's **declared** files are
+still the trigger for whether an install is owed at all, the park still comes before any session, and
+a lane that names no `studio/` path still installs nothing.
 
 ## Notes
 
