@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0199 - The gate's cost is measured before it is cut](#0199---the-gates-cost-is-measured-before-it-is-cut)
   - [0197 - The conductor becomes operable](#0197---the-conductor-becomes-operable)
   - [0196 - The gate roster stops drifting](#0196---the-gate-roster-stops-drifting)
   - [0194 - The analysis gains a stereo field](#0194---the-analysis-gains-a-stereo-field)
@@ -237,6 +238,42 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0199 - The gate's cost is measured before it is cut](done/0199-the-gates-cost-is-measured-before-it-is-cut.md)
+
+- closed 2026-09-19, conductor-run lane `plan-0199-the-gates-cost-is-measured-before-it-is-cut` in
+`WORK/rlx-plan-0199`. Five phases, `2e04f9a5`, `e5a5da6e`, `0a048973`, `4e621186` and `4397c31b`; the
+close block `34905af6`; the review's repairs `64ed10eb`. One review round: **no blockers, no majors,
+five minors, three repaired.** Version **0.136.1** (patch — test harness and documentation only).
+ADR-0222 accepted with an `Outcome`. Closed backlog 0221 and 0239.
+- **What landed.** Two costs measured before either was cut, which is the whole discipline of the
+plan. The run-alone override's cost was shown to scale with the number of contiguous *blocks* of
+exclusive testcases and the serialized work inside them, **not** with their count — read off a JUnit
+report's start times, where zero non-exclusive testcases were admitted inside a block and consecutive
+exclusive ones opened 0.00 s apart. `help_cli`'s nine testcases folded to three and `stream_pipe`'s
+three to two, losing no assertion. A per-preset sweep testcase was then shown to spend 38-55 % of its
+wall on the process plus the adapter, device and pipeline set it builds inside it, so `animation`,
+`reactivity` and `sanity`'s loudness gate now fan out in batches of eight — 15 testcases per sweep
+where there were 114 — with the declared representatives batched apart so `-P fast`'s predicate
+selects the same 28 presets by name. `core/tests/suite/batch_independence.rs` asserts the
+independence the batching rests on, at `golden.rs`'s own drift floor and no tighter.
+- **The honest negative, which the plan wrote down rather than discovered.** `-P fast` is **not**
+faster at the end of this plan than at its start: 426.2 s before anything, 397.8 s after the fold,
+412.1 s after the batching, 368.4 s after the guard — every gap inside the 30.5 s run-to-run spread
+Phase 1 measured on the same machine and tree. The saving is real and large where the work is, and
+that is the *serial* cost of the whole library: `reactivity` is 295.2 s batched against 514.7 s
+per-preset, a 43 % cut. The close review added the other half of that reading — the full workspace
+suite on the closing tree is 769 s, inside the 725-841 s band of the five comparable runs before it,
+so the serial cut has not yet shown up under 16-way scheduling. Both the ADR's `Outcome` and the
+plan's `## Followups` carry the re-measurement.
+- **What outlived the plan.** Three things. A batch reports *every* preset it convicted rather than
+stopping at the first — each sweep's per-preset helper returns `Option<String>` and the batch
+`filter_map`s before asserting — which is better than ADR-0222's own Negative predicted and is why
+the resolution lost is in the test *name* only. The batch size is a scheduling constant whose doc
+comment names the machine, the adapter and the thread count it was derived on and says plainly it
+will be wrong elsewhere; nothing asserts it. And the fan-out closes a hazard by construction: a batch
+name carries no preset filename, so a preset filed as `rep_*.toml` can no longer join the phase
+tier's sample without declaring the flag.
 
 ### [0197 - The conductor becomes operable](done/0197-the-conductor-becomes-operable.md)
 

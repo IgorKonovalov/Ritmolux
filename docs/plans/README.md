@@ -44,7 +44,6 @@ place. The plan file carries the real link.
 | [0120](0120-the-standalone-ships-on-ubuntu.md) | The standalone ships on Ubuntu | approved | dev, human | ADR-0131 (proposed): PulseAudio capture + an `ubuntu-latest` CI arm. **Postponed 2026-09-18, off the queue: Phase 1's probe needs an Ubuntu box nobody has yet.** Folds backlog 0181 + 0208. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + 0174 (proposed): Art-Net. Phases 1-3 landed on its branch. **Postponed 2026-09-18, off the queue: Phase 9 is the rig and its date is unknown.** Phases 4-8 need no rig. |
 | [0198](0198-the-control-path-stops-failing-quietly.md) | The control path stops failing quietly | approved | dev, studio-builder | ADR-0221 (proposed): the listener counts what it fails to receive; a refused selection reports. Takes the observability half of backlog 0219/0220. Phase 5 needs 0196's lane install. |
-| [0199](0199-the-gates-cost-is-measured-before-it-is-cut.md) | The gate's cost is measured before it is cut | approved | dev | ADR-0222 (proposed): a sweep's fixed cost is per process, so the lever is the batch. Phases 1 and 3 measure first; Phase 3's stop condition can supersede the ADR. |
 | [0201](0201-the-warp-surface-stops-lying.md) | The warp surface stops lying | approved | dev | ADR-0223 + 0224 (proposed): the figure contract reaches a custom wave, level mode gets a coverage threshold, `zoom`'s doc stops inverting the shader. Regenerates surfaces, so after 0197. |
 | [0202](0202-the-three-mechanisms-get-their-gate.md) | The three mechanisms get their gate | approved | dev, human | ADR-0113's third Outcome is the brief: the rate candidate, the echo, the per-mode wave scale, then a fourth look gate. Phases 5-6 need the rig and the corpus, so the conductor parks. |
 | [0203](0203-the-figure-gains-the-levers-it-was-measured-to-lack.md) | The figure gains the levers it was measured to lack | approved | dev | ADR-0225 + 0226 (proposed): the roster travels, the star wobbles, the backdrop converges. Every default an identity; Phase 3 can supersede ADR-0225. Weakest want - last. |
@@ -299,8 +298,9 @@ round's shape, since most of what it decided was sequencing:
   **Fully spent 2026-09-19 — [0196] and [0197] both closed**, so the shared-file conflict
   is gone; the lane install [0198] Phase 5 waits on is in `main`, and the `RLX_UPDATE_*`
   wall [0201] and [0203] were waiting on is down.
-- **[0199] is independent and can run beside them**, in the other lane. It touches `.config/nextest.toml`
-  and the sweep harness and nothing either infrastructure plan opens.
+- ~~**[0199] is independent and can run beside them**, in the other lane. It touches `.config/nextest.toml`
+  and the sweep harness and nothing either infrastructure plan opens.~~ — **spent 2026-09-19, when
+  [0199] closed.** It ran beside them exactly as written and conflicted with neither.
 - **[0202] parks twice, by design.** Its Phases 5 and 6 are `human` - a rig session against
   `foo_vis_milk2` and a corpus census - and both need what lives outside this checkout. Its first four
   phases need no rig, so the parks come last.
@@ -315,7 +315,7 @@ round's shape, since most of what it decided was sequencing:
 [0196]: done/0196-the-gate-roster-stops-drifting.md
 [0197]: done/0197-the-conductor-becomes-operable.md
 [0198]: 0198-the-control-path-stops-failing-quietly.md
-[0199]: 0199-the-gates-cost-is-measured-before-it-is-cut.md
+[0199]: done/0199-the-gates-cost-is-measured-before-it-is-cut.md
 [0201]: 0201-the-warp-surface-stops-lying.md
 [0202]: 0202-the-three-mechanisms-get-their-gate.md
 [0203]: 0203-the-figure-gains-the-levers-it-was-measured-to-lack.md
@@ -925,6 +925,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0199 - The gate's cost is measured before it is cut](done/0199-the-gates-cost-is-measured-before-it-is-cut.md) - closed 2026-09-19. Review: **no blockers, no majors, five minors (three fixed).** Version: **0.136.1**. ADR-0222 accepted with an Outcome. Closed backlog 0221, 0239. [Write-up](README-archive.md).
 - [0197 - The conductor becomes operable](done/0197-the-conductor-becomes-operable.md) - closed 2026-09-19. Review: **round 1 one major + two minors, round 2 one minor + one nit; all fixed.** Version: **0.136.0**. ADR-0219 + 0220 accepted. Closed backlog 0240, 0247, 0250, 0253. [Write-up](README-archive.md).
 - [0196 - The gate roster stops drifting](done/0196-the-gate-roster-stops-drifting.md) - closed 2026-09-19. Review: **no blockers, no majors, two minors, two nits (three fixed).** Version: **0.135.0**. ADR-0217 + 0218 accepted, 0218 with an Outcome. Closed backlog 0242, 0243, 0246, 0252. [Write-up](README-archive.md).
 - [0194 - The analysis gains a stereo field](done/0194-the-analysis-gains-a-stereo-field.md) - closed 2026-09-19. Review: **no blockers, no majors, six minors, one nit (three fixed).** Version: **0.134.0**. ADR-0215 accepted. [Write-up](README-archive.md).

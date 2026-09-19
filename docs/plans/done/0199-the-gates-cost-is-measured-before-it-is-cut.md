@@ -1,14 +1,18 @@
 # 0199 — The gate's cost is measured before it is cut
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-19. Phases 1-5 landed as `2e04f9a5`, `e5a5da6e`, `0a048973`,
+> `4e621186`, `4397c31b`; close review round 1 found **no blockers, no majors, five minors** (three
+> repaired in `64ed10eb`). Both stop conditions were evaluated in writing; `-P fast`'s selection,
+> the sweeps' coverage of all 114 presets, conviction-by-name and the batch-independence threshold
+> were each re-verified against the tree. Version **0.136.1**.
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user)
 > **Owner skill(s):** dev
-> **Related ADRs:** [0222](../adrs/0222-a-preset-sweeps-fixed-cost-is-paid-per-process-so-the-lever-is-the-batch.md)
-> (proposed), [0193](../adrs/0193-a-test-that-reads-the-clock-runs-alone.md),
-> [0157](../adrs/0157-the-preset-sweeps-split-per-preset-and-the-phase-tier-samples-a-declared-representative.md),
-> [0156](../adrs/0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md),
-> [0211](../adrs/0211-a-green-suite-record-serves-a-later-tree-when-no-deferred-suite-can-read-the-diff.md)
+> **Related ADRs:** [0222](../../adrs/0222-a-preset-sweeps-fixed-cost-is-paid-per-process-so-the-lever-is-the-batch.md)
+> (accepted), [0193](../../adrs/0193-a-test-that-reads-the-clock-runs-alone.md),
+> [0157](../../adrs/0157-the-preset-sweeps-split-per-preset-and-the-phase-tier-samples-a-declared-representative.md),
+> [0156](../../adrs/0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md),
+> [0211](../../adrs/0211-a-green-suite-record-serves-a-later-tree-when-no-deferred-suite-can-read-the-diff.md)
 > **Closes:** design-backlog 0221, 0239
 
 ## TL;DR
@@ -35,7 +39,7 @@ waits, has never been checked — and that decides how much any repair buys (bac
 pipeline set. The cost grows one adapter per preset shipped (backlog 0239). The entry's leading shape
 — a `OnceLock` context the per-preset cases share — rests on those cases sharing a process, and
 nextest runs each testcase in its own.
-[ADR-0222](../adrs/0222-a-preset-sweeps-fixed-cost-is-paid-per-process-so-the-lever-is-the-batch.md)
+[ADR-0222](../../adrs/0222-a-preset-sweeps-fixed-cost-is-paid-per-process-so-the-lever-is-the-batch.md)
 records that correction and makes the batch the lever instead.
 
 ## Decision
@@ -45,7 +49,7 @@ number nobody has. Then: fold the exclusive testcases whose content is not what 
 (`help_cli`'s eight, `stream_pipe`'s three) rather than exempting them from ADR-0193's class — the
 tests stay clock-guarded and honest, and the per-testcase overhead falls with the count. And batch
 the three sweeps per
-[ADR-0222](../adrs/0222-a-preset-sweeps-fixed-cost-is-paid-per-process-so-the-lever-is-the-batch.md),
+[ADR-0222](../../adrs/0222-a-preset-sweeps-fixed-cost-is-paid-per-process-so-the-lever-is-the-batch.md),
 keeping the declared representatives as their own batch so the phase tier's filter selects exactly
 what it selects today. We rejected exempting `help_cli` (it weakens ADR-0193's Decision point 2 for
 a cost that folding removes anyway) and a fractional `threads-required` (it is ADR-0193
@@ -343,7 +347,7 @@ adapter it built to do it.
 part of a sweep's time"*. It is not: the arithmetic over the shipped library is 114 presets ×
 (fixed + process) = 249 s in `reactivity`, 222 s in `animation` and 212 s in `sanity_loudness`,
 **683 s in total of a 1522 s serial cost for the three sweeps — 45 %.** Backlog 0239's premise
-stands, [ADR-0222](../adrs/0222-a-preset-sweeps-fixed-cost-is-paid-per-process-so-the-lever-is-the-batch.md)
+stands, [ADR-0222](../../adrs/0222-a-preset-sweeps-fixed-cost-is-paid-per-process-so-the-lever-is-the-batch.md)
 is to be implemented rather than superseded, and Phases 4 and 5 run.
 
 **The batch size Phase 4 takes from this is 8.** A batch of `B` presets costs `fixed + process +
@@ -534,6 +538,199 @@ No followup was noticed that is not already in the plan's own `## Followups`.
   368.4 s, 1631 run / 86 skipped / 0 failed.
 - **Outstanding `human` phases:** none — every phase in this plan is `dev`.
 
+## Close review
+
+Round 1, 2026-09-19, fresh conductor session against the lane at `cf2bc4b6` (tree `0d5ec039`).
+Written to `tools/conductor/state/reviews/0199-round-1.md` and reproduced here in full.
+
+**Verdict: Plan 0199 landed cleanly — no blockers, no majors, five minors.** The measurement
+discipline the plan is named for holds: both stop-condition phases were answered in writing before
+anything was changed, the fold preserves every property it folded, and the batching is verified here
+against the generated file and the preset roster rather than taken from the log. The five minors are
+three stale comment/prose blocks the plan's own commits falsified, the log/phases length ratio, and
+one done-when satisfied on one of three sweeps.
+
+- **Lane:** `plan-0199-the-gates-cost-is-measured-before-it-is-cut`, worktree
+  `C:\Users\Igor Konovalov\WORK\rlx-plan-0199`, tip `cf2bc4b6` (merge of `main`), tree `0d5ec039`.
+- **Phase commits:** 1 `2e04f9a5`, 2 `e5a5da6e`, 3 `0a048973`, 4 `4e621186`, 5 `4397c31b`, close
+  block `34905af6`.
+
+### Evidence run for this review
+
+- **Full suite.** `node tools/conductor/with-lock.mjs suite -- cargo nextest run --workspace` printed
+  `with-lock: skipped cargo nextest run --workspace: tree 0d5ec03 is green in the suite ledger, run
+  by gate 0199-pre-review at 2026-09-19T16:17:16.734Z: 1722 tests run: 1722 passed (35 slow), 7
+  skipped`. That ledger record is this review's full-suite evidence
+  ([ADR-0207](../../adrs/0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md)).
+  `dev`'s close block correctly owes its `Full suite:` to that gate.
+- **`cargo doc`.** `0199-pre-review-23-cargo_doc.log` documents all five crates on the same tree and
+  finishes clean under `-D warnings`.
+- Selection, coverage and threshold claims below were re-derived from the tree, not read off the log.
+
+### Lens 1 — alignment with the plan and ADR-0222
+
+**Every phase carries one in-vocabulary `**Owner skill:** dev` tag.** No `human` phase, none added,
+none missing.
+
+**The stop conditions were evaluated in writing, both of them.** Phase 1 was asked whether the
+override's cost scales with the *count* of exclusive testcases and answered that it does not — it
+scales with the number of contiguous blocks and the serialized work inside them — reading it off arm
+A's JUnit start times (zero non-exclusive testcases admitted inside a block; 0.00 s gaps between
+consecutive exclusive ones) rather than off the difference between arms. That is the honest form of
+the reading, and the log explicitly refuses the arm-difference (43.3 s) as an answer because the same
+eight cost probes moved 30.5 s run-to-run on one tree. Phase 3's stop condition was evaluated and
+did not fire: the fixed-plus-process share is 38-55 % of a testcase's wall, 683 s of a 1522 s serial
+cost over the shipped library. The plan's correction of its own Context (18 selected testcases to 20,
+11 cheap to 12) is stated rather than quietly absorbed.
+
+**The batching claims were re-verified here, and all three hold:**
+
+- ***`-P fast` selects the same presets.*** `presets/*.toml` declares `representative = true` in
+  **28** files; the generated `animation_tests.rs` in `target/debug/build/rlx-core-*/out/` puts
+  exactly those 28 display names into four `animation_rep_batch_0{1..4}` cases, and
+  `.config/nextest.toml`'s predicate `test(/^(animation|reactivity|sanity_loudness)_rep_/)`
+  matches `..._rep_batch_01` as it matched `..._rep_<stem>`. The sample is unchanged by name.
+- ***Coverage is the whole library.*** 28 representatives + 86 others = 114 across 15 batches per
+  sweep, against the 114 `presets/*.toml` the glob embeds.
+- ***A failure names its preset.*** `reacts_to_at_least_one_band` / `animates_over_time` /
+  `louder_frame_is_reported_against_a_quieter_one` each return `Option<String>` and the batch
+  helper `filter_map`s them before asserting, so every preset in a batch is measured and **all**
+  convictions are reported, not just the first. That is strictly better than ADR-0222's own
+  Negative predicted, and the ADR is accepted with an `Outcome` recording it.
+
+**The folded tests lose nothing.** Read assertion by assertion against `main`: `help_cli`'s nine
+cases become three and `stream_pipe`'s three become two, and every assertion survives — several
+strengthened with a message where the old one had none. The elapsed bound moved exactly where the
+log says: it stays on `--help`/`-h` and `--schema` in the query case and on `--preview syphon` in the
+refusal case, and the refusal case's doc comment still reads correctly. The deliberate-regression
+table names three probes that each sit *late* in a folded case, which is the right shape for proving
+a fold did not collapse eight assertions into one.
+
+**Phase 5's guard is real.** `MEAN_TOL = 0.02` and `MAX_OUTLIER = 48` are byte-for-byte
+`golden.rs`'s own — the declared drift floor and no tighter, exactly as the plan and ADR-0071 ask,
+and the header says so and refuses to tighten on a measured zero. The non-vacuity probe (each
+subject compared against a *different* subject's solo frame: mean 0.221/0.464/0.548) is recorded in
+the test's own header. The subjects are `core/tests/fixtures/` rather than shipped presets, so a
+content tune cannot reach the guard. Both capture primitives the three sweeps actually use are
+covered: `animation` and `sanity`'s loudness gate go through `capture_preset`, `reactivity` through
+`capture_audio_after_warmup`, and the guard compares both.
+
+**The log's deviations are declared honestly and none is a surprise.** Phase 2's 28.4 s is called
+noise by the log itself against Phase 1's own 30.5 s spread; `-P fast` is reported as *not* faster at
+the end of the plan than at its start; the `docs/testing.md` one-word edit outside Phase 5's file
+list is disclosed with its reason. The `### Close triggers` block is complete, and `presets/` is
+correctly reported untouched.
+
+### Lens 2 — layering, coupling, real-time safety
+
+Nothing in this plan reaches the engine, the audio path or the C ABI. The diff is `core/build.rs`,
+three sweep files, one new `core/tests/suite/` module, two `standalone/tests/` files,
+`.config/nextest.toml` and `docs/testing.md`. No platform or audio-source type enters `core/`; no
+`extern "C"` surface moves; no OSC address or event moves, so spec 0001 and spec 0003 are untouched.
+No allocation, lock or log is added to any callback path — none of this code runs outside a test
+binary.
+
+The one seam question worth asking is answered correctly: ADR-0222 explicitly declines the
+`OnceLock` shared-device shape because nextest gives each testcase its own process, and `build.rs`'s
+module header now records that mechanism where the next reader of the generator will find it.
+
+### Lens 3 — docs and bookkeeping
+
+`docs/testing.md`'s section head, the batch rationale, the three "reading a red run" bullets and the
+`-P fast` paragraph are all rewritten, and the count-free phrasing replaced two hard counts with
+"the declared sample" and "the whole library" — the right direction. `.config/nextest.toml`'s job-3
+comment block is rewritten and correctly retires a hazard the batching removes: a preset filed as
+`rep_*.toml` can no longer reach the sample, because a batch name carries no filename.
+
+Two stale spots remained that this plan's own commits falsified — minors 2 and 3 below. No operator
+doc (`running.md`, `configuration.md`, `capturing.md`) is implicated; `docs/testing.md` is the
+contributor's harness page and is the only reader document this plan owed.
+
+This plan is **test-harness and documentation only** — no engine, player, plugin or preset behaviour
+changes and no assertion in any sweep changes — so the bump is a **patch**.
+
+### Lens 4 — correctness and determinism
+
+**The one new question batching creates is asked and answered.** Before this plan nothing in the
+repository had ever rendered two presets through one device; the sweeps now do, and
+`batch_independence.rs` asserts the equality that makes it sound, at the engine's own drift floor,
+with a stated red condition and a measured non-vacuity figure. That is the strongest part of the
+plan.
+
+**No numeric assertion was added that states a measurement as a property.** The two constants the
+new test carries are imported reasoning from `golden.rs`, which is the project's declared floor; the
+batch size `BATCH = 8` is not asserted anywhere, it is a scheduling constant, and its doc comment
+names the machine and the adapter it was derived on and says plainly that it will be wrong on a
+machine with a different fixed cost. `help_cli`'s `RESPONDS_WITHIN` is unchanged.
+
+**Determinism is not weakened.** The captures were already reused within a preset (three
+`capture_preset` calls in a row in `motions`); what is new is reuse *across* presets, and that is the
+guarded property. No wall-clock read, no unseeded randomness and no new `unwrap` on a hot path
+enters the engine. Nothing derives an aspect from a grid — no `aspect` in the diff.
+
+**The configuration-agreement question.** The one place two sources could agree on the development
+box and disagree elsewhere is the batch arithmetic: `BATCH = 8` is sized against 16 test threads on
+the reference machine, and on a 4-core or 32-core box the granularity argument changes sign. Nothing
+probes that, and nothing should — it is a scheduling constant, not a correctness one, and the doc
+comment says as much.
+
+### Lens 5 — design integrity
+
+Dependencies still point inward; nothing in `core/` reaches a shell. The generator keeps two
+emitters rather than one, and the reason is stated where it belongs: a per-family sweep's claim is
+about a family's distribution and does not decompose, so it cannot be batched with interchangeable
+subjects. The `Scene` trait, the C ABI and the control protocol are all untouched. No hot-path
+directory was added, so Plan 0002's `hygiene.rs` scan set needs no extension.
+
+### Findings
+
+**minor 1 — `core/build.rs` — `emit_sweep`'s doc comment documented `const BATCH`.** The new `BATCH`
+doc block had been appended to the existing `emit_sweep` doc block instead of starting a new one, so
+the constant's rustdoc opened with "Write one `#[test]` per item into `OUT_DIR/<file>`..." and
+`fn emit_sweep` carried no doc comment at all. Nothing catches it — `build.rs` is not documented by
+`cargo doc`. **Repaired in `64ed10eb`**: the block goes back above the function it describes.
+
+**minor 2 — `docs/testing.md` — the `animation` row still described one test per preset.** Two
+clauses falsified by this plan's Phase 4 and not swept, in the one reader document the plan did edit:
+"Each preset's own test prints which branch carried its pass", and "Since the sweep became one test
+per preset (ADR-0157) there is no end of a run to collect the still images in silence into one roster
+at". **Repaired in `64ed10eb`**, with both citations inside markdown links per ADR-0168.
+
+**minor 3 — `core/tests/sanity.rs` — two comments justified per-preset printing from a premise this
+commit removed.** Both gave "with a test per preset there is no sweep to sort at the end of" /
+"no sweep header to hang it under" as the reason the ratio prints per preset and the legend repeats.
+A batch is now that unit. **Repaired in `64ed10eb`** to the surviving reason: the lines travel out of
+order and out of process.
+
+**minor 4 — the `## Implementation log` outweighs the `## Implementation phases` it reports on.**
+~395 lines against ~61. Flagged because the rule has no gate behind it and the close review is the
+only thing that reads it. It is also the least actionable instance of it this project has seen:
+Phases 1 and 3 touch **no file**, so their entire deliverable *is* the log, and the tables of arms,
+blocks, drains and fixed/variable shares are the plan's product rather than a report about it. **Left
+open** — trimming it would delete the evidence the plan was written to produce.
+
+**minor 5 — Phase 4's wall-time re-measurement covers one of three sweeps, and the full suite has not
+visibly moved.** `reactivity` was re-timed serially (295.2 s against a library-corrected 514.7 s, a
+43 % cut); `animation` and `sanity`'s loudness gate were run at `-j 4` only to confirm green and
+count coverage. The log declares this and states correctly what is therefore not known — each
+sweep's own ratio, which Phase 3 shows varies from 38 % to 55 %. The second half is new to this
+review: the suite ledger's record for this tree is **769 s / 1722 tests**, against the last five
+full-suite runs on comparable trees at **726, 725, 776, 841 and 733 s / 2025 tests**. The serial
+saving does not appear in the parallel suite it was taken for — plausibly because 45 long batches
+pack worse across 16 slots than 342 short testcases did (the record's `(35 slow)` against the usual
+`(5-9 slow)` is that effect showing), and because one run per arm cannot resolve a difference this
+size on a machine whose measured spread is 30.5 s. Nothing the plan asserts rests on it: selection,
+coverage, conviction-by-name and independence are all verified above, and the mechanism is confirmed
+on the largest of the three sweeps. **Left open**, and carried into the `## Followups` below, because
+the missing readings are serial re-runs no text edit produces.
+
 ## Followups (after this lands)
 
 - Re-measure ADR-0211's saving against the new full-suite cost, per ADR-0222's closing note.
+- **Re-measure the *parallel* full suite, which is the bill this plan was taken for.** The serial
+  43 % cut on `reactivity` does not show in the ledger's own figure for this tree (769 s / 1722
+  tests, against 725-841 s / 2025 tests on the five comparable trees before it). Two candidates,
+  both testable: 45 long batches packing worse across 16 slots than 342 short testcases did, and a
+  run-to-run spread of 30.5 s that one run per arm cannot see through. `animation` and `sanity`'s
+  loudness gate also still owe the serial before/after `reactivity` got. Close review round 1,
+  minor 5.
