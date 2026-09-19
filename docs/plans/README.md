@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0213** (ADRs are a separate sequence — next free there is **0233**; 0200 is reserved for Plan 0186 Phase 2.)
+**Next free number: 0214** (ADRs are a separate sequence — next free there is **0238**; 0200 is reserved for Plan 0186 Phase 2.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -57,6 +57,7 @@ place. The plan file carries the real link.
 | [0210](0210-the-gallery-card-shows-the-world-it-names.md) | The gallery card shows the world it names | approved | dev, human | ADR-0235 (proposed): the hop follows the family and the signal outlasts it. Phase 1 (a name filter) is what makes the rest affordable. Closes backlog 0254, 0255. |
 | [0211](0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md) | The diffused frame's resolution is measured before it is designed | approved | dev, human | No ADR yet: the quality profile has never run on a track, so Phase 1 renders the pair and Phase 2 may close the plan. Takes backlog 0125. |
 | [0212](0212-the-diffused-render-gains-a-timeline.md) | The diffused render gains a timeline | approved | dev, human | ADR-0236 (proposed): a prompt timeline in bars, the seed still fixed. Declines the onset-denoise lever. Not folded with 0211 - 0126 forbids it. Closes backlog 0126. |
+| [0213](0213-the-hook-costs-what-the-push-is-worth.md) | The hook costs what the push is worth | draft | dev | ADR-0237 (proposed): the Node roster always runs; cargo runs only when the push moved Rust, and the suite is served by a ledger record for that tree. 0199 measured the cost untrimmable. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
