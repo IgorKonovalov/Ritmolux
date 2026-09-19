@@ -270,39 +270,60 @@ which nothing but the rig can answer. Phase 9 is the whole of the second half, i
     ever removed.
   - No golden baseline moves, blessed or otherwise.
 
-### Phase 4 — Decide the send path by measurement, and record the number
+### Phase 4 — Measure the send path at the machine, and record the numbers
 
-- **Owner skill:** dev
-- **What:** establish whether building and sending 24 universes belongs inline in the frame loop.
-  This is a different question from Plan 0132 Phase 3, which measured a 392-byte `sendto` and found
-  it free; this builds 4,080 pixels and sends 24 datagrams, and **that plan's own log warns why its
-  answer does not transfer** — the inline exit there was earned by GPU-wait slack on a 165 Hz
-  display, not by the send being cheap.
-- **Files touched:** `standalone/src/artnet.rs`, `standalone/src/app_state.rs`.
+- **Owner skill:** human
+- **What:** produce the frame-time evidence that decides whether building and sending 24 universes
+  belongs inline in the frame loop. This is a different question from Plan 0132 Phase 3, which
+  measured a 392-byte `sendto` and found it free; this builds 4,080 pixels and sends 24 datagrams,
+  and **that plan's own log warns why its answer does not transfer** — the inline exit there was
+  earned by GPU-wait slack on a 165 Hz display, not by the send being cheap.
+- **Files touched:** none. The distributions go into the `## Implementation log`; Phase 4b is where
+  code moves, if any moves at all.
 - **How:**
-  - **Measure to a dead destination on a live LAN segment, not to loopback and not to the rig.**
+  - **Measure to a destination on a live LAN segment, not to loopback and not to the rig.**
     Art-Net is fire-and-forget UDP and a node never replies, so the only thing the rig contributes
-    to send cost is being an address that resolves (ADR-0174). Pre-populate the ARP entry —
-    `netsh interface ipv4 add neighbors "<interface>" <ip> <mac>` — so no send stalls on address
-    resolution, and pick an address on a segment whose **interface is actually up**, because a down
-    link takes a different path through the driver.
+    to send cost is being an address that resolves (ADR-0174). **Target a live address whose ARP
+    entry the OS already maintains — the default gateway, `192.168.0.1:9000`, which is what
+    Plan 0132 Phase 3 measured against** — rather than the static
+    `netsh interface ipv4 add neighbors` entry this phase first asked for. Both exist for one
+    reason, that no send stalls on address resolution; the live address reaches it without
+    elevation. Pick a segment whose **interface is actually up**, because a down link takes a
+    different path through the driver.
   - **Loopback is not a substitute here** and the plan says so: it skips the driver and the PHY,
     which is precisely the part being measured.
   - Measure the frame-time distribution with the sink off and on, alternating runs so drift falls on
     both configurations. Repeat each configuration enough times to characterize its own run-to-run
     spread.
-- **Done when** the log records the distributions and which exit was taken, against this criterion:
+  - **The operator runs the series at the keyboard, and that is why this phase is `human`.**
+    `ArtnetSink::send` is called from `app_state::redraw` and nowhere else, so the headless path
+    cannot exercise it, and the windowed path has no self-terminating run — `--frames` requires
+    `--stream`, and quitting is `WindowEvent::CloseRequested`. **No self-terminating windowed run is
+    built for this measurement**: a person starts and quits each run.
+- **Done when** the log records the distributions and the exit they imply, against this criterion:
   - **The property:** enabling the sink must not move the frame-time distribution outside the
     run-to-run variance the *same* configuration shows against itself. Inside it, the inline build
-    and send ships. Outside it, **the dedicated sender thread lands in this phase** — behind a
-    lock-free handoff, the same discipline as the audio/render seam.
+    and send stands as it is. Outside it, **the dedicated sender thread is owed**, and Phase 4b
+    lands it.
   - **Measure the build and the send separately**, as Plan 0132 Phase 3 did, because a distribution
     that does not move says nothing about how much headroom is left. The pixel build is CPU work
     that a GPU wait can hide on one machine and cannot on another.
   - The log names the machine, the display refresh rate, **the network interface, the destination
-    address, and that the ARP entry was pre-populated** — the last three because the substitution
-    for the rig is what makes this number arguable, and an unstated substitution is an unfalsifiable
-    number.
+    address, and that the address was a live one rather than a statically pre-populated entry** —
+    the last three because the substitution for the rig is what makes this number arguable, and an
+    unstated substitution is an unfalsifiable number.
+
+### Phase 4b — Take the exit the measurement earned
+
+- **Owner skill:** dev
+- **What:** act on Phase 4's recorded numbers and on nothing else. If the sink stayed inside the
+  same-configuration variance, the inline build and send stands and this phase is the log line that
+  says so against the numbers. If it did not, **the dedicated sender thread lands here** — behind a
+  lock-free handoff, the same discipline as the audio/render seam.
+- **Files touched:** `standalone/src/artnet.rs`, `standalone/src/app_state.rs`.
+- **Done when** the log names which exit was taken and quotes the distributions it was taken from,
+  and — only if the thread landed — the handoff allocates nothing on the render thread and drops a
+  frame's universes rather than blocking when the sender falls behind.
 
 ### Phase 5 — A look is a TOML file
 
@@ -675,6 +696,21 @@ which nothing but the rig can answer. Phase 9 is the whole of the second half, i
   live address on the LAN segment with no node answering, by its own instruction — so this park is
   a decision about sequencing, not a blocker those phases inherit. Resume the plan when the rig is
   back, or ask for phases 4-8 alone before then.
+
+- **Phase 4's park is settled by the owner, 2026-09-19, and the phase is split to match.** The
+  owner's words: *"lets use session argument, for off/on let it be me on keyboard, I'll need live
+  rig to experiment with anyways"*.
+  - **The destination is the live default gateway**, `192.168.0.1:9000`, whose ARP entry the OS
+    maintains for the same reason a static one would — the substitution the parked session proposed,
+    and what Plan 0132 Phase 3 measured against. The `netsh interface ipv4 add neighbors` entry is
+    not taken, so nothing in this phase needs elevation or an allowlist change.
+  - **The alternating off/on series is run by the owner at the keyboard**, and **no self-terminating
+    windowed run is built for it**. Phase 4 is therefore `human` and produces the numbers; the code
+    exit moved to **Phase 4b** (`dev`), which takes the exit those numbers earn. A `dev` tag on the
+    measurement itself is what parked this plan, because a headless session can produce neither side
+    of the series.
+  - **Still open: the sequencing.** Whether phases 4-8 run before the rig returns, or wait for it,
+    is not settled by the two decisions above, and the 2026-09-18 park stands until it is.
 
 ### Close triggers
 
