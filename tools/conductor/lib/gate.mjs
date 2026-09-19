@@ -20,29 +20,39 @@ import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { gatesFor } from "../../../scripts/gates.manifest.mjs";
 import { appendRecord, appendServed, appendSkip, cleanTree, greenRecord, SERVED_SUITE_ARGS, servingRecord, summaryLine } from "./ledger.mjs";
 import { SUITE, withLock } from "./locks.mjs";
+
+/**
+ * The one Node gate whose red is a judgement rather than a defect: a plan can deliver exactly what a
+ * live backlog entry's probe says is missing, and archiving that entry is the close's job (ADR-0108).
+ * The mark is this gate's stage semantics and not a roster fact, so it lives here rather than in the
+ * manifest.
+ */
+const AFTER_CLOSE_SCRIPTS = new Set(["check-backlog-claims.mjs"]);
+
+/** The manifest's `conductor` projection, as gate steps in roster order (ADR-0217). */
+function nodeGates() {
+  return gatesFor("conductor").map(({ script, args }) => ({
+    name: `${script} ${args.join(" ")}`.trim(),
+    cmd: ["node", `scripts/${script}`, ...args],
+    ...(AFTER_CLOSE_SCRIPTS.has(script) ? { afterClose: true } : {}),
+  }));
+}
 
 /**
  * What the pre-push hook runs, at full strength: the whole suite rather than `-P fast`, plus
  * `cargo doc` and the conductor's own tests, which CI runs and the hook does not. A step with
  * `onlyIf` skips when that path is absent from the worktree; one with `onlyIfCommand` skips when that
  * command does not run, as the hook skips the diffusion-filter suite with no python3 on PATH.
+ *
+ * The Node block is the manifest's projection for this carrier, read at run time rather than copied,
+ * which is what stops it falling behind the hook and CI (ADR-0217).
  */
 export function defaultGate() {
-  const node = (script, ...args) => ({ name: `${script} ${args.join(" ")}`.trim(), cmd: ["node", `scripts/${script}`, ...args] });
   return [
-    node("check-doc-links.mjs"),
-    node("check-index-rows.mjs"),
-    node("check-index-rows.mjs", "--self-test"),
-    { ...node("check-backlog-claims.mjs"), afterClose: true },
-    node("check-filter-figures.mjs"),
-    node("check-comment-hygiene.mjs"),
-    node("toc.mjs", "--check"),
-    node("toc.mjs", "--self-test"),
-    node("check-reader-prose.mjs"),
-    node("check-release-tag.mjs"),
-    node("check-release-tag.mjs", "--self-test"),
+    ...nodeGates(),
     { name: "conductor tests", cmd: ["node", "--test", "tools/conductor/test/*.test.mjs"] },
     { name: "sd-filter tests", cmd: ["python3", "tools/sd-filter/test_sd_filter.py"], onlyIfCommand: ["python3", "--version"] },
     { name: "studio typecheck", cmd: ["npm", "--prefix", "studio", "run", "typecheck"], onlyIf: "studio/node_modules" },

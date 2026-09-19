@@ -1,6 +1,6 @@
 # 0196 — The gate roster stops drifting
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user)
 > **Owner skill(s):** dev
@@ -187,11 +187,11 @@ flowchart TB
 
 ## Implementation log
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `plan-0196-the-gate-roster-stops-drifting` in `WORK/rlx-plan-0196`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The manifest exists and the conductor reads it | dev | not started | |
+| 1 — The manifest exists and the conductor reads it | dev | committed with this row | |
 | 2 — A checker holds the hook and CI to the manifest | dev | not started | |
 | 3 — The local `cargo doc` covers the workspace | dev | not started | |
 | 4 — A skipped step says so, and a studio lane can run its checks | dev | not started | |
