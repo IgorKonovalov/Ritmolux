@@ -222,10 +222,12 @@ flowchart TB
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — 59 reductions across 26 live
   entries, 4 unprobeable. Advisory only: 30 moved paths, of which this plan moved two —
   0237 (`tools/conductor/settings.conductor.json`) and 0241
-  (`tools/conductor/test/settings.test.mjs`). The four entries this plan closes are still live.
+  (`tools/conductor/test/settings.test.mjs`). The four entries this plan closes left the live file at
+  approval (ADR-0206) and are **Promoted** rows in
+  [`docs/design-backlog-archive.md`](../design-backlog-archive.md); their probes no longer run.
 - **Full suite:** not run here — owed to the conductor's pre-review gate (ADR-0207). No phase named a
   deferred GPU suite, so no upward override ran at an earlier phase.
-  `node --test "tools/conductor/test/*.test.mjs"`: 360 tests, 360 pass, 0 fail.
+  `node --test "tools/conductor/test/*.test.mjs"`: 361 tests, 361 pass, 0 fail.
 - **Outstanding `human` phases:** none; every phase is `dev`.
 
 ## Followups (after this lands)
