@@ -27,15 +27,20 @@ function readJson(path, what) {
 
 /**
  * Validates the queue against the repository. `startedPlans` are plans the conductor's state
- * already owns, which may legitimately read `in-progress` rather than `approved`. `mergedPlans`
- * are plans the conductor's state records as merged: they sit under done/ and stay listed in the
- * committed queue, so they are accepted there rather than rejected as closed — otherwise every run
- * after the first merge would refuse to start.
- * Returns { errors, lanes: {name: [plan]}, plans: {plan: {lane, after, add_dirs, path}} }.
+ * already owns, which may legitimately read `in-progress` rather than `approved`.
+ *
+ * A queued plan whose file is under docs/plans/done/ is **merged**, and is skipped with a notice
+ * rather than refused (ADR-0220): the same one condition `merged()` in lib/lane.mjs asks, so the
+ * validator and the picker never disagree, and so the committed queue validates without the
+ * gitignored state/ beside it. The check that condition used to carry — queueing a plan someone
+ * closed by hand is a typo — survives as the notice and nothing more.
+ *
+ * Returns { errors, notices, lanes: {name: [plan]}, plans: {plan: {lane, after, add_dirs, path}} }.
  */
-export function validateQueue(queue, repo, startedPlans = new Set(), mergedPlans = new Set()) {
+export function validateQueue(queue, repo, startedPlans = new Set()) {
   const errors = [];
-  const out = { errors, lanes: {}, plans: {} };
+  const notices = [];
+  const out = { errors, notices, lanes: {}, plans: {} };
   if (!queue || typeof queue !== "object" || !queue.lanes || typeof queue.lanes !== "object") {
     errors.push('queue: "lanes" must be an object of lane name -> ordered plan list');
     return out;
@@ -85,12 +90,9 @@ export function validateQueue(queue, repo, startedPlans = new Set(), mergedPlans
       errors.push(`plan ${plan}: no docs/plans/${plan}-*.md`);
       continue;
     }
-    if (found.done && mergedPlans.has(plan)) {
-      entry.path = found.path;
-      continue;
-    }
     if (found.done) {
-      errors.push(`plan ${plan}: already closed (${found.file} is under docs/plans/done/)`);
+      entry.path = found.path;
+      notices.push(`plan ${plan}: already merged (${found.file} is under docs/plans/done/); \`prune\` drops it from the queue`);
       continue;
     }
     entry.path = found.path;
@@ -112,16 +114,45 @@ export function validateQueue(queue, repo, startedPlans = new Set(), mergedPlans
   return out;
 }
 
-export function loadQueue(path, repo, startedPlans, mergedPlans) {
+export function loadQueue(path, repo, startedPlans) {
   const r = readJson(path, "queue.json");
-  if (r.error) return { errors: [r.error], lanes: {}, plans: {} };
-  return validateQueue(r.value, repo, startedPlans, mergedPlans);
+  if (r.error) return { errors: [r.error], notices: [], lanes: {}, plans: {} };
+  return validateQueue(r.value, repo, startedPlans);
 }
 
-/** The started and merged plan sets validateQueue takes, read from the conductor's state. */
-export function stateSets(state) {
-  const recs = Object.values(state.plans);
-  return [new Set(recs.map((r) => r.plan)), new Set(recs.filter((r) => r.status === "merged").map((r) => r.plan))];
+/** The committed queue as it is on disk: { value } or { error }, unvalidated. `prune` rewrites this. */
+export function readQueue(path) {
+  return readJson(path, "queue.json");
+}
+
+/** The started-plan set validateQueue takes, read from the conductor's state. */
+export function startedPlans(state) {
+  return new Set(Object.values(state.plans).map((r) => r.plan));
+}
+
+/**
+ * A copy of `queue` with every merged plan dropped from its lane list, and what was dropped:
+ * [{ plan, lane, file }] in lane order. Nothing else about the file moves — a `plans` entry for a
+ * dropped plan is inert once it is in no lane, and removing it is a second judgement about a file
+ * the architect owns.
+ */
+export function pruneQueue(queue, repo) {
+  const dropped = [];
+  const lanes = {};
+  for (const [lane, list] of Object.entries(queue?.lanes ?? {})) {
+    if (!Array.isArray(list)) {
+      lanes[lane] = list;
+      continue;
+    }
+    lanes[lane] = list.filter((entry) => {
+      const plan = String(entry);
+      const found = PLAN.test(plan) ? findPlan(repo, plan) : null;
+      if (!found?.done) return true;
+      dropped.push({ plan, lane, file: found.file });
+      return false;
+    });
+  }
+  return { queue: { ...queue, lanes }, dropped };
 }
 
 /** Validates local.json. Every budget is required: the conductor carries no default spend. */

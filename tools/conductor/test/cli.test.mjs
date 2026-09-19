@@ -12,6 +12,8 @@ import { resumeCommand } from "../lib/inbox.mjs";
 import { loadState, statePaths } from "../lib/state.mjs";
 import { FAKE, TEST_DIR, TOOL_DIR, tmp, writePlan } from "./helpers.mjs";
 
+const QUEUE_NOTICE = "conductor: notice: plan 0090: already merged (0090-fixture.md is under docs/plans/done/); `prune` drops it from the queue";
+
 function sh(args, cwd) {
   const r = spawnSync("git", args, { cwd, encoding: "utf8" });
   assert.equal(r.status, 0, `git ${args.join(" ")}: ${r.stderr}`);
@@ -409,6 +411,58 @@ test("a run started with an ask left behind by a dead conductor runs normally an
   const state = loadState(p.stateDir);
   assert.equal(state.plans["0101"].status, "merged", JSON.stringify(state.plans["0101"].park));
   assert.equal(state.runs.at(-1).paused, undefined);
+});
+
+// ADR-0220: the committed queue stands alone, and `prune` is the carrier for the one discipline it
+// still needs. `0090` stands for a plan merged in an earlier run and never taken off the list.
+test("a queue listing a merged plan starts with a notice, and prune drops exactly that entry", async () => {
+  const { repo, p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0090", "0101"], b: [] });
+  writePlan(repo, { number: "0090", phases: [dev("1")], status: "done — closed" }, { done: true });
+
+  const check = await cli("check");
+  assert.equal(check.code, 0, check.err.join("\n"));
+  assert.deepEqual(check.out, [
+    "conductor: notice: plan 0090: already merged (0090-fixture.md is under docs/plans/done/); `prune` drops it from the queue",
+    "conductor: preflight OK",
+  ]);
+
+  const before = JSON.stringify({ lanes: { a: ["0090", "0101"], b: [] }, plans: { "0101": { after: ["0090"] } } }, null, 2) + "\n";
+  writeFileSync(p.queue, before);
+  const pruned = await cli("prune");
+  assert.equal(pruned.code, 0, pruned.err.join("\n"));
+  assert.deepEqual(pruned.out, [
+    "conductor: dropped plan 0090 from lane a (0090-fixture.md is under docs/plans/done/)",
+    `conductor: ${p.queue} rewritten; commit it.`,
+  ]);
+  assert.equal(
+    readFileSync(p.queue, "utf8"),
+    JSON.stringify({ lanes: { a: ["0101"], b: [] }, plans: { "0101": { after: ["0090"] } } }, null, 2) + "\n",
+    "only the lane entry moved",
+  );
+  assert.deepEqual((await cli("check")).out, ["conductor: preflight OK"]);
+
+  // An already-tidy queue is not rewritten: this spelling is not the one `prune` would write.
+  const compact = JSON.stringify({ lanes: { a: ["0101"], b: [] } });
+  writeFileSync(p.queue, compact);
+  const again = await cli("prune");
+  assert.equal(again.code, 0, again.err.join("\n"));
+  assert.deepEqual(again.out, ["conductor: the queue lists no merged plan; nothing to prune"]);
+  assert.equal(readFileSync(p.queue, "utf8"), compact);
+});
+
+test("prune is refused while a conductor runs, and says so when the queue cannot be read", async () => {
+  const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] });
+  mkdirSync(p.stateDir, { recursive: true });
+  writeFileSync(join(p.stateDir, "conductor.pid"), String(process.pid));
+  const refused = await cli("prune");
+  assert.equal(refused.code, 1);
+  assert.match(refused.err.join("\n"), /^conductor: a run is in progress and reads the queue it started with/);
+  rmSync(join(p.stateDir, "conductor.pid"));
+
+  writeFileSync(p.queue, "{ not json");
+  const broken = await cli("prune");
+  assert.equal(broken.code, 1);
+  assert.match(broken.err.join("\n"), /queue\.json is not valid JSON/);
 });
 
 test("run on a checkout with no state/ writes the pid file for the run and removes it after", async () => {

@@ -13,6 +13,7 @@
 //   node tools/conductor/conductor.mjs adopt-close NNNN
 //   node tools/conductor/conductor.mjs pause [--off]
 //   node tools/conductor/conductor.mjs abort
+//   node tools/conductor/conductor.mjs prune
 //   node tools/conductor/conductor.mjs check
 //
 // Runs from the main checkout. Runtime output lives under tools/conductor/state/, in
@@ -33,7 +34,7 @@ import { runLanes } from "./lib/lane.mjs";
 import { ascii } from "./lib/live.mjs";
 import { CLAUDE_DIR } from "./lib/outcome.mjs";
 import { donePhases, findPlan, readPlanFile } from "./lib/plan.mjs";
-import { loadLocal, loadQueue, stateSets } from "./lib/queue.mjs";
+import { loadLocal, loadQueue, pruneQueue, readQueue, startedPlans } from "./lib/queue.mjs";
 import { FINDING_VERBS, askPause, clearPause, disposeFinding, findingRef, findingWhere, loadState, pauseAsk, planRecord, recoverInterrupted, saveState, statePaths, totalSpend } from "./lib/state.mjs";
 import { activeChildren, killTree } from "./lib/step.mjs";
 
@@ -90,7 +91,7 @@ export function claudeVersion(claude) {
 
 /**
  * Everything that must hold before a run starts. Returns
- * { errors, warnings, local, queue, state, claude, cli: { version, warning } | null }.
+ * { errors, warnings, notices, local, queue, state, claude, cli: { version, warning } | null }.
  * `claude` overrides local.json's command vector (tests pass the fake).
  */
 export function preflight(p = paths(), { claude } = {}) {
@@ -109,9 +110,9 @@ export function preflight(p = paths(), { claude } = {}) {
     cli = { version: v.version, warning: verdict.warning ?? null };
   }
   const state = loadState(p.stateDir);
-  const queue = loadQueue(p.queue, p.repo, ...stateSets(state));
+  const queue = loadQueue(p.queue, p.repo, startedPlans(state));
   errors.push(...queue.errors);
-  return { errors, warnings, local, queue, state, claude: command, cli };
+  return { errors, warnings, notices: queue.notices ?? [], local, queue, state, claude: command, cli };
 }
 
 const pidFile = (p) => join(p.stateDir, "conductor.pid");
@@ -161,6 +162,7 @@ async function cmdRun(args, o) {
     for (const e of errors) o.err(`conductor: ${e}`);
     return 1;
   }
+  for (const n of pf.notices) o.log(`conductor: notice: ${n}`);
   for (const w of pf.warnings) o.err(`conductor: warning: ${w}`);
 
   const state = pf.state;
@@ -259,7 +261,7 @@ function cmdStatus(args, o) {
   const state = loadState(p.stateDir);
   const pid = runningPid(p);
   o.log(pid ? `conductor: running (pid ${pid})` : "conductor: not running");
-  const { lanes } = loadQueue(p.queue, p.repo, ...stateSets(state));
+  const { lanes } = loadQueue(p.queue, p.repo, startedPlans(state));
   const laneNames = [...new Set([...Object.keys(lanes ?? {}), ...Object.keys(state.lanes)])].sort();
   for (const lane of laneNames) {
     const l = pid ? state.lanes[lane] : null;
@@ -590,12 +592,41 @@ function cmdCheck(args, o) {
     for (const e of r.errors) o.err(`conductor: ${e}`);
     return 1;
   }
+  for (const n of r.notices) o.log(`conductor: notice: ${n}`);
   for (const w of r.warnings) o.err(`conductor: warning: ${w}`);
   o.log(r.warnings.length ? "conductor: preflight OK, with a warning" : "conductor: preflight OK");
   return 0;
 }
 
-const COMMANDS = { run: cmdRun, status: cmdStatus, digest: cmdDigest, resume: cmdResume, park: cmdPark, finding: cmdFinding, "adopt-close": cmdAdoptClose, pause: cmdPause, abort: cmdAbort, check: cmdCheck };
+/**
+ * `prune` drops every merged plan from queue.json's lane lists (ADR-0220). The committed queue is
+ * accumulate-only and nothing else removes from it; this is the carrier for a discipline whose only
+ * previous enforcement was someone remembering. It edits a committed file, so it prints every plan
+ * it dropped and the file to commit, and it rewrites nothing when there is nothing to drop.
+ */
+function cmdPrune(args, o) {
+  const p = o.p;
+  if (runningPid(p)) {
+    o.err("conductor: a run is in progress and reads the queue it started with; prune after it ends, or `abort` it first");
+    return 1;
+  }
+  const r = readQueue(p.queue);
+  if (r.error) {
+    o.err(`conductor: ${r.error}`);
+    return 1;
+  }
+  const { queue, dropped } = pruneQueue(r.value, p.repo);
+  if (dropped.length === 0) {
+    o.log("conductor: the queue lists no merged plan; nothing to prune");
+    return 0;
+  }
+  writeFileSync(p.queue, JSON.stringify(queue, null, 2) + "\n");
+  for (const d of dropped) o.log(`conductor: dropped plan ${d.plan} from lane ${d.lane} (${d.file} is under docs/plans/done/)`);
+  o.log(`conductor: ${p.queue} rewritten; commit it.`);
+  return 0;
+}
+
+const COMMANDS = { run: cmdRun, status: cmdStatus, digest: cmdDigest, resume: cmdResume, park: cmdPark, finding: cmdFinding, "adopt-close": cmdAdoptClose, pause: cmdPause, abort: cmdAbort, prune: cmdPrune, check: cmdCheck };
 
 /** `overrides` exists for tests: { p, claude, gate, worktreeRoot, lockDir, lockPollMs, pollMs, commitPollMs, log, err, signals }. */
 export async function main(argv, overrides = {}) {
@@ -610,7 +641,7 @@ export async function main(argv, overrides = {}) {
   if (!fn) {
     o.err(
       "usage: node tools/conductor/conductor.mjs run [--lane a|b] [--once] | status | digest [--history] | " +
-        `resume NNNN | park NNNN | finding NNNN [<ref> --${FINDING_VERBS.join("|--")} <reason>] | adopt-close NNNN | pause [--off] | abort | check`,
+        `resume NNNN | park NNNN | finding NNNN [<ref> --${FINDING_VERBS.join("|--")} <reason>] | adopt-close NNNN | pause [--off] | abort | prune | check`,
     );
     return 2;
   }

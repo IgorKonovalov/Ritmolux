@@ -36,6 +36,12 @@ The decision and its rejected alternatives are ADR-0205. The plan that built it 
    ```json
    { "lanes": { "a": ["0175", "0185"], "b": [] }, "plans": { "0181": { "after": ["0185"] } } }
    ```
+
+   The file is accumulate-only and **stands on its own** (ADR-0220): a plan it still lists whose file
+   has moved to `docs/plans/done/` is merged, and every command that reads the queue skips it with a
+   notice rather than refusing to start. That holds on a fresh clone and after a wiped `state/`,
+   because the judgement is the plan file's location and not the gitignored run record. `prune` is
+   what takes the entry off the list.
 3. **Run the preflight:** `node tools/conductor/conductor.mjs check`. It refuses when `local.json` is
    missing, when `queue.json` names a plan that is not approved or depends on a plan it cannot reach,
    or when `claude --version` is not a version the conductor was verified on and not a patch above one.
@@ -58,6 +64,7 @@ All of them run from the main checkout.
 | `adopt-close NNNN` | Records the close a lane already carries, when a session committed one and then lost its outcome. Verifies the branch first and writes nothing unless it passes. |
 | `pause [--off]` | Asks the live run to finish the plan in flight and start no further one, and prints what it is now waiting for. `--off` cancels the ask. |
 | `abort` | Stops a running conductor and every session under it. Steps in flight run again on the next `run`. |
+| `prune` | Drops every merged plan from `queue.json`'s lane lists, prints each one, and rewrites nothing when there is none. Refused while a run is live. Commit the result. |
 | `check` | The preflight alone. |
 
 Ctrl+C on `run` does the same as `abort`.
