@@ -302,9 +302,12 @@ jobs:
       # on the line is the escape, and a marker with no reason is itself a
       # finding.
       - run: node scripts/check-system-counts.mjs
-      # And the roster's own gate (ADR-0217): the fourteen invocations above are the
-      # projection of scripts/gates.manifest.mjs for this job, in that order, and
-      # `.githooks/pre-push`'s are its projection for the hook. The third carrier,
+      # And the roster's own gate (ADR-0217): every `node scripts/...` invocation
+      # above is the projection of scripts/gates.manifest.mjs for this job, in that
+      # order, and `.githooks/pre-push`'s are its projection for the hook. How many
+      # there are is deliberately not written down here - a count in the one comment
+      # whose subject is a roster that drifts is the copy that drifts next, and the
+      # gate below is what holds the list rather than a number. The third carrier,
       # the conductor's `defaultGate()`, imports the manifest and so cannot drift
       # at all - it is the one that fell behind twice while the two file-backed
       # ones were kept in step by hand. It asserts invocations and ORDER and never

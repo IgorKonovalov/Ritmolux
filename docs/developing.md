@@ -140,10 +140,24 @@ What it runs, stopping at the first failure and naming the step that failed:
 | System counts | `node scripts/check-system-counts.mjs` |
 | Gate carriers | `node scripts/check-gate-carriers.mjs` |
 | Gate carriers (self-test) | `node scripts/check-gate-carriers.mjs --self-test` |
+| Diffusion filter | `python3 tools/sd-filter/test_sd_filter.py` (skips with no `python3`) |
+| Studio typecheck | `npm --prefix studio run typecheck` (skips with no `studio/node_modules`) |
+| Studio lint | `npm --prefix studio run lint` (same guard) |
+| Studio tests | `npm --prefix studio test` (same guard) |
 | Format | `cargo fmt --all --check` |
 | Lint | `cargo clippy --workspace --all-targets -- -D warnings` |
 | Rustdoc | `cargo doc --workspace --no-deps` under `RUSTDOCFLAGS=-D warnings` |
 | Tests | `cargo nextest run --workspace -P fast` (narrowed — see below) |
+
+**The two guarded groups skip rather than fail, and say so.** A clone with no
+`python3` on PATH and one that has never run `npm --prefix studio ci` are both
+ordinary, so those four steps print a notice naming what is missing and the
+command that would make them run, and the push continues
+([ADR-0016](adrs/0016-gpu-tests-opt-in-ci-scope.md)). CI runs all four
+unconditionally and is the backstop under both; so does the conductor's gate,
+which since
+[ADR-0218](adrs/0218-a-lane-makes-its-plans-preconditions-true-and-a-skipped-check-says-so.md)
+reports each skip the same way instead of dropping the step in silence.
 
 The Node steps come first because they are the cheapest (tens of milliseconds
 between them): every relative markdown link in the repo must resolve, every row

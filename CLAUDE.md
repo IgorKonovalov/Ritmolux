@@ -198,7 +198,12 @@ scripts/             # Repo maintenance. The Node gates, and a count of them is 
                      #   systems - a count token within two words of `system(s)` - everywhere but the
                      #   dated records (plans, ADRs, the backlog), because a count goes stale whether
                      #   or not it is right today, and it reads .rs WHOLE since the instance that
-                     #   survived two closes was an assertion message (ADR-0202).
+                     #   survived two closes was an assertion message (ADR-0202);
+                     #   check-gate-carriers.mjs asserts that .githooks/pre-push and the CI `links`
+                     #   job each run the ordered roster held in scripts/gates.manifest.mjs, in that
+                     #   order - the manifest being DATA rather than a gate, and the one the
+                     #   conductor's defaultGate() imports, so that third carrier cannot drift at
+                     #   all (ADR-0217).
                      #   scripts/fixtures/ holds their seeded bite checks.
                      #   RENDERERS, NOT GATES: docs-shots.mjs (every committed still under
                      #   docs/images/) and its sibling docs-clip.mjs (the two artifacts that are
@@ -208,8 +213,9 @@ scripts/             # Repo maintenance. The Node gates, and a count of them is 
                      #   judging sheets). Nothing runs these - an author does, by hand. The first
                      #   two write committed files under docs/images/; the other four land under
                      #   target/ uncommitted. They are here so that "every .mjs is wired into
-                     #   pre-push or CI" reads as a rule with six named exceptions rather than as
-                     #   a claim that is simply false.
+                     #   pre-push or CI" reads as a rule with named exceptions rather than as
+                     #   a claim that is simply false - these renderers, plus gates.manifest.mjs,
+                     #   which is wired nowhere because it is the roster the wiring is held to.
                      #   A MAINTENANCE TOOL, the third kind: prune-target.mjs deletes what the
                      #   everyday loop's cargo JSON no longer reports from <target>/debug/deps/
                      #   (dry run by default, --apply, --verify-fresh). A person runs it when
