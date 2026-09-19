@@ -170,8 +170,8 @@ flowchart LR
 |---|---|---|---|
 | 1 — The listener counts what it receives | dev | done | d2117b3c |
 | 2 — A refused selection is reported | dev | done | 5bf159f4 |
-| 3 — The two tests read the new evidence | dev | done | committed with this row |
-| 4 — The reproduction runs again, with a stop condition | dev | not started | |
+| 3 — The two tests read the new evidence | dev | done | f7e13b9d |
+| 4 — The reproduction runs again, with a stop condition | dev | done | committed with this row |
 | 5 — The studio carries the new readings | studio-builder | not started | |
 
 ### Notes
@@ -210,6 +210,50 @@ flowchart LR
   candidates plus the two cases neither covers (a listener that failed its way out of the loop, and
   no `health` line at all). The failure paths call the same function, so what a failing run prints
   is what those tests assert.
+
+#### Phase 4 — what the reproduction recorded
+
+**Outcome: the first of the two. A failure reproduced, twice, and both times the readings named the
+same candidate — a lost datagram, `received` did not move.** Per the phase's own done-when the fix
+is a new plan, and this plan stops here.
+
+**The run.** 19 runs on 2026-09-19, each one `cargo nextest run -p standalone -E 'binary(stream_show)
++ binary(control_loopback)' --no-fail-fast`, back to back, beside a second `cargo nextest run
+-p rlx-core -E 'binary(golden) + binary(attractor) + binary(reaction_diffusion)'` looping for the
+whole period. Driven from a scratch runner under `target/`, **not committed**: the two commands
+above are the whole of it, and a new `.mjs` under `scripts/` would be one nothing runs. 2 of the 19
+failed — a higher rate than the 3-in-79 of 2026-09-14, and the load here was heavier, with the
+player's own `health` reporting 4.1 fps and a p99 frame time of 6.4 s during the first failure.
+
+**Run 19 — `a_preset_datagram_selects_by_name` (backlog 0219).** The report, verbatim from the new
+surface:
+
+> `received +0 since the send, recv_errors 0, listening true, rejected 0, dropped 0`
+> `verdict: RECEIVED did not move, RECV_ERRORS did not move and LISTENING is true: the listener was
+> reading a healthy socket and no datagram reached it, so the loss is in front of the socket`
+
+`send_to` returned `Ok`, the listener thread was in its receive loop, the socket reported no failure,
+and `recv_from` was never handed the datagram in the 10 s the test then waited. Three of the four
+candidates ADR-0221 names are excluded by that line; the fourth is what is left.
+
+**Run 2 — `every_system_is_reported_by_the_key_the_schema_labels_its_roster_with` (backlog 0220).**
+Stalled at ask 2 of 14, `swarm`. `ctl_received` read 4 and stayed 4 across the three `health` lines
+covering the 120 s the test waited, with `ctl_recv_errors 0` and `ctl_listening true`; the
+`ctl/ping` sent **behind** the `ctl/preset` was answered. Five datagrams had been sent by then
+(`hold`, ask 1's preset, ask 1's ping, ask 2's preset, ask 2's ping) and the pong proves the last of
+them arrived and was drained — so four of five reached the socket and one did not. **No
+`preset_error` appeared**, which retires `select_preset_by_name` returning `false` as a candidate
+for this failure: that arm now reports itself and did not. The reading is the same as run 19's, one
+step less tightly: the report says `no health line preceded the ask, so ctl_received (4) has no
+baseline` — `Lines::wait_for` clears its record, and ask 1 resolved before a `health` line landed in
+it.
+
+**What is now excluded for both**, by evidence rather than by argument: a dead listener thread
+(`ctl_listening` was true throughout), a failing socket (`ctl_recv_errors` stayed 0), a decoder
+refusal or a full queue (`ctl_rejected` and `ctl_dropped` stayed 0), and — for the walk — a refused
+selection (no `preset_error`). What remains is the datagram not arriving at `recv_from` at all,
+which is ADR-0221's first Negative in the plan's Risks: the counters convict the path in front of
+the socket and cannot say where inside it the datagram went.
 
 ### Close triggers
 
