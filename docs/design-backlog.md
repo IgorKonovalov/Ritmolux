@@ -46,6 +46,7 @@ snapshots, and the surface moves (same rule the lanes apply to their own referen
 - [0254 — every gallery card is captured at hop 300, which is before an accumulating world exists](#0254--every-gallery-card-is-captured-at-hop-300-which-is-before-an-accumulating-world-exists)
 - [0255 — `docs-shots.mjs` renders all or nothing, so adding one card is done by hand-copying its manifest entry](#0255--docs-shotsmjs-renders-all-or-nothing-so-adding-one-card-is-done-by-hand-copying-its-manifest-entry)
 - [0256 — the only report that asks whether two presets look alike covers nine of fourteen families, and both places naming the absent ones are stale](#0256--the-only-report-that-asks-whether-two-presets-look-alike-covers-nine-of-fourteen-families-and-both-places-naming-the-absent-ones-are-stale)
+- [0258 — the content lane's scene catalogue covers ten of fourteen systems, and nothing makes it notice the four it skipped](#0258--the-content-lanes-scene-catalogue-covers-ten-of-fourteen-systems-and-nothing-makes-it-notice-the-four-it-skipped)
 <!-- toc:end -->
 
 ## Every live entry carries a probe, and something re-runs it
@@ -1956,3 +1957,79 @@ is that the set grows in the dark on a third of its families, and that the one d
 wants to make (ship less, better) has no evidence under it. Step 2 is cheap: it needs a person, an
 evening and the app, and it is the only step that cannot be skipped or automated.
 
+
+## 0258 — the content lane's scene catalogue covers ten of fourteen systems, and nothing makes it notice the four it skipped
+
+`.claude/skills/preset-author/references/systems.md` is the one document that carries what
+`presets/README.md` cannot generate: **what each scene is for, the working range of each param
+distilled from the shipped set (not an engine limit), and which audio input it naturally rides.**
+Its own header says so. It has a `## ` section for ten systems and none for `warp_mesh`,
+`shape_collage`, `analytic_field` or `cellular`.
+
+Those four are not experiments. By filename family over `presets/*.toml`:
+
+| family | shipped presets | section in `systems.md` |
+|---|---|---|
+| `analytic_field` | 12 | **no** |
+| `warp_mesh` | 7 | **no** |
+| `shape_collage` | 4 | **no** |
+| `cellular` | 3 | **no** |
+
+So the lane that authors preset content works from a catalogue that is silent on the systems
+behind 26 of the 114 shipped presets — including `analytic_field`, the second-largest family in
+the set.
+
+**The file half-knows.** Line 25 names `shape_collage` and `warp_mesh` in the shared-transform
+exceptions, and the engine-wide stage tables below cover all fourteen. Only the per-scene layer
+stops at ten, which is why nobody reading it front-to-back notices: the file never claims a roster,
+so its roster cannot look wrong.
+
+**This is the rot CLAUDE.md already declared cured.** Its own argument for why the content lane
+points at `docs/` instead of keeping private copies is that *"its private copies rotted while these
+stayed current (rewritten 2026-07-26, commit `0e1e500`)"*. `systems.md` is a private copy, it is
+the one the lane actually reads first, and it rotted again — four systems over roughly four months.
+The bolded-row sweep in the architect close ceremony covers `presets/README.md`,
+`docs/presets.md`, `docs/preset-palettes.md` and `docs/preset-guide.md`, all of which stayed
+current. It does not name this file, and that omission is the mechanism.
+
+**It is the same shape as 0256, one lane over.** That entry records a hand-written roster in
+`core/tests/distinctness.rs` missing five shipped families, with both prose carriers naming three
+of the five. Same four families dominate both lists. A repair that fixes one and not the other
+leaves the pattern intact.
+
+### What a fix is, and what it is not
+
+A fix is **four sections written by the content lane from the shipped presets and the live app** —
+what the scene is for, the working ranges, the audio input. It is explicitly *not* four sections
+generated or paraphrased from `presets/README.md`'s param tables: that would restate what the
+generated page already says better, add a second copy to drift, and supply none of the judgement
+the file exists for. The distilled working range is a look judgement over the shipped set, which is
+why this is `preset-author` work and not an architect edit.
+
+Worth deciding in the same pass: whether the per-scene layer should carry a **declared roster** at
+all, so the next system landing without a section is a visible hole rather than a silence. A
+`systems.md` heading per `SystemKind` — even one reading "no guidance yet" — is probeable, and this
+entry's probes below are exactly that check written by hand.
+
+- **Raised:** 2026-09-19 by `architect`, during a validity audit of `README.md`, `CLAUDE.md` and
+  the four skills. **Owner if taken:** `preset-author` for the four sections, `architect` for the
+  sweep-table row that keeps it from recurring.
+- **Verified 2026-09-19** — no per-scene section for the second-largest shipped family:
+  `absent: ^## .analytic_field in: .claude/skills/preset-author/references/systems.md`
+- **Verified 2026-09-19** — nor for `cellular`:
+  `absent: ^## .cellular in: .claude/skills/preset-author/references/systems.md`
+- **Verified 2026-09-19** — nor for `warp_mesh`:
+  `absent: ^## .warp_mesh in: .claude/skills/preset-author/references/systems.md`
+- **Verified 2026-09-19** — nor for `shape_collage`:
+  `absent: ^## .shape_collage in: .claude/skills/preset-author/references/systems.md`
+- **Verified 2026-09-19** — while the engine ships them, so the absence is the catalogue's and not
+  the engine's: `present: ^\s+Cellular, in: core/src/preset/schema/system.rs`
+- **Verified 2026-09-19** — and the close ceremony's sweep table does not name the file, which is
+  what lets it drift: `absent: preset-author/references/systems in: .claude/skills/architect/SKILL.md`
+
+### Priority
+
+**Medium.** Nothing is broken and no gate is red — the cost is that a lane composing looks cannot
+see a quarter of the surface it composes over, which reads as "these systems have no presets worth
+writing" rather than as a missing page. It rises with every system landed, and the four sections are
+an evening's work for someone who has the app open.
