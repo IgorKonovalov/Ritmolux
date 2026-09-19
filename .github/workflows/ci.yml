@@ -114,13 +114,16 @@ jobs:
       # cfg(test) items and redundant explicit targets. This is what turns that
       # exemption from a claim into a property.
       #
-      # The pre-push hook runs a SCOPED step, `cargo doc -p rlx-core --no-deps
-      # --features text` under the same flags, not this one. Measured warm on the
-      # development machine on one edit to core/src/render/metrics.rs (Plan 0177
-      # Phase 7): 4.5-5.9 s, against 6.3-7.8 s for the hook's clippy step on the
-      # same edit, and it fails on a public item linking a private one. What it
-      # does NOT cover is `standalone`'s public surface (and `milkconv`'s and
-      # `rlx-core-cabi`'s); this job is the only place those are documented.
+      # The pre-push hook runs THIS step, not a scoped one. It was scoped to
+      # `-p rlx-core --no-deps --features text` until Plan 0196 Phase 3, which
+      # left four of the five workspace members - `standalone`, `milkconv`,
+      # `rlx-core-cabi` and `rlx-ring` - documented here and nowhere else, so a
+      # rustdoc error in any of them could not be reached before a push. It fired
+      # twice in sixteen days and both repairs landed after a release tag had been
+      # written on top of the red (ADR-0217). The widened step measures 7.8 s warm
+      # on the development machine after an edit to the deepest crate, against
+      # 4.5-5.9 s for the scoped one on an engine edit (Plan 0177 Phase 7); the
+      # figures live beside the step in `.githooks/pre-push`.
       - run: cargo doc --workspace --no-deps
         env:
           RUSTDOCFLAGS: -D warnings
