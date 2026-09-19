@@ -282,7 +282,7 @@ shim are untouched by this plan.
 | 3 — Per-band balance, and the measurement that chooses its mechanism | dev | done | 1b090d38 |
 | 4 — The five names reach the grammar | dev | done | 2fa92fef |
 | 5 — The documents that make an absolute quantity usable | dev | done | ca724847 |
-| 6 — Hear it | human | not started | |
+| 6 — Hear it | human | done | (this commit) |
 
 ### Notes
 
@@ -336,6 +336,33 @@ shim are untouched by this plan.
 - **Phase 4 — no shipped `[latch]` name collides with any of the five.** The whole shipped set
   declares exactly **one** latch name, `recut`, in `collage_mono.toml`, `collage_nocturne.toml` and
   `collage_suprematist.toml`; `presets/pending/` declares none. Nothing to rename.
+- **Phase 6 — both judgements pass, and the measurement corrects two sentences the docs already
+  carried.** Run on the dev box with the standalone on loopback, against two throwaway probes kept
+  out of the repository: a bare readout (`pan_x` = `balance`, `pan_y` = `spread`, trail `0.955`, so
+  a phrase paints a cloud whose width is the movement and whose height is the width of the mix) and
+  `star_corona` re-bound so `balance` walks a two-sided palette and `spread` opens the figure. The
+  owner's verdict on both questions was yes: a track with obvious stereo movement moves the picture
+  the way it sounds, and a mono source sits visibly still. The ranges were taken through `--audio`
+  on three 60 s clips of commercial tracks (a 2025 electronic score, a 1992 piano record, a 1991
+  rock record) plus a mono downmix of the first as a control, ~5 100 hops each:
+
+  | clip | `balance` min/mean/max | `spread` min/mean/max |
+  |---|---|---|
+  | electronic, 2025 | -0.390 / 0.024 / 0.409 | 0.001 / 0.156 / 0.925 |
+  | piano, 1992 | -0.536 / 0.001 / 0.617 | 0.006 / 0.174 / 0.836 |
+  | rock, 1991 | -0.510 / -0.018 / 0.430 | 0.034 / 0.327 / 0.832 |
+  | the electronic clip, downmixed to mono | 0.000 / 0.000 / 0.000 | 0.000 / 0.000 / 0.000 |
+
+  The mono control reading exactly `0` on all five is the first evidence of that property from
+  material rather than from construction. Two written sentences did not survive the measurement and
+  were corrected in `docs/presets.md`: *"real music sits well inside ±0.3"* describes the **mean**,
+  which lands within `0.03` of centre, while single hops reach `±0.4`..`±0.6` — the excursions are
+  what a binding must be gained for — and *"a wide stereo mix hovers near `0.5`"* is wrong, since
+  `spread` averages `0.16`..`0.33` on wide material and only touches `0.8`+ in moments. The third
+  reading is new: a hard pan carries **no** `spread`, one waveform at two gains being perfectly
+  correlated, so the two quantities are independent and a preset that gates colour on `spread`
+  hides `balance` exactly where it is largest. The probes are readouts, not looks, and nothing from
+  them ships — preset content using the field remains `preset-author`'s work.
 - **Phase 4 — the five names cost one regenerated file, `docs/specs/player-schema.json`.** The
   per-system schemas under `presets/schema/` and `.taplo.toml` did not move: the grammar roster is
   in the player-schema document alone, and the per-system files describe parameters rather than
@@ -360,9 +387,9 @@ shim are untouched by this plan.
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207). `-P fast` ran green at
   Phase 4's tree — 1720 passed, 311 skipped, 414.8 s — and every phase ran its own done-when
   checks; the workspace run itself is the gate's.
-- **Outstanding `human` phases:** Phase 6 — *Hear it*. Nothing synthetic can settle whether
-  `balance` tracks what a person hears, and its deliverable is the observed real-world range
-  written back into `docs/presets.md`. A row for it is in `docs/on-device-validation.md`.
+- **Outstanding `human` phases:** none. Phase 6 — *Hear it* — was run on 2026-09-19 with the owner
+  present; both judgements pass, the measured ranges are in `docs/presets.md`, and the row in
+  `docs/on-device-validation.md` is ticked with the run record.
 
 ## Followups (after this lands)
 

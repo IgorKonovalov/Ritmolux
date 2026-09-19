@@ -56,7 +56,7 @@ footprint so the vendor spread is on record.
 
 ## Checklist
 
-- [ ] **The stereo field against what a person hears (Plan 0194 Phase 6).** Every number behind
+- [x] **The stereo field against what a person hears (Plan 0194 Phase 6).** Every number behind
       `balance` and `spread` was measured on synthetic stimuli, where the answer is known by
       construction; nothing yet says the quantity tracks what a listener hears. With the standalone
       capturing loopback and a preset binding `balance` to an obvious visual move — a horizontal
@@ -69,6 +69,20 @@ footprint so the vendor spread is on record.
       authors calibrate a gain against a measurement instead of a guess — the same reason the band
       levels are published. The design expects real music well inside `±0.3`; a much wider or much
       narrower reading is worth reporting either way.
+      - **RUN 2026-09-19 — `balance` tracks what a person hears; both (a) and (b) pass.**
+        Standalone on loopback, AMD iGPU dev box, against two throwaway probes: a bare readout
+        (`pan_x` = `balance`, `pan_y` = `spread`, long trail, so a phrase paints a cloud) and a
+        shipped look re-bound so `balance` walks a two-sided palette — blue at hard left, cream
+        centred, red at hard right — with `spread` opening the figure. **(a) Pass**, a track with
+        obvious stereo movement moves the picture the way it sounds. **(b) Pass**, a mono source
+        sits visibly still. **(c)** measured through `--audio` on three 60 s clips plus a mono
+        downmix as a control, ~5 100 hops each; the table and the three readings that come off it
+        are now in [`docs/presets.md`](presets.md#the-stereo-field-is-absolute-and-that-is-the-whole-design).
+        Two of those readings correct the prose this row was written against: the **mean** sits
+        within `0.03` of centre while single hops reach `±0.4`..`±0.6`, so `±0.3` describes the
+        average and not the excursions; and `spread` **averages `0.16`..`0.33`** even on wide
+        material rather than hovering near `0.5`. A hard pan carries no `spread` at all, so the
+        two quantities are independent and a preset must not gate colour on `spread`.
 - [ ] **Low-end / older Windows iGPU box (§9), 1080p.** Run the current release standalone, let
       it reach steady state, capture `diagnostics.log`. Report **(a)** fps holds ≥ 60 @ 1080p, and
       **(b)** steady-state working set + private commit. _(This is Plan 0012 Phase 3, extracted; it

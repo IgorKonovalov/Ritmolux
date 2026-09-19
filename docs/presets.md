@@ -804,9 +804,10 @@ a bug to report:
 `spread`'s midpoint is the one number worth memorizing. **`0.5` is *fully
 decorrelated*, not "half as wide as it gets"**: `0` is two identical channels,
 `0.5` is two channels sharing nothing, and `1` is a polarity-inverted pair, which
-almost nothing but a test signal produces. So a wide stereo mix hovers near `0.5`
-and a mono one sits at `0`, and the useful gate is `spread > 0.25` rather than
-anything near the top of the range.
+almost nothing but a test signal produces. A mono mix sits at `0`; a wide one
+**averages well below `0.5`** and only touches the top of the range in moments —
+see the measured table below — so the useful gate is `spread > 0.25` rather than
+anything near `1`.
 
 **The field is published raw, per hop, with no smoother** — the same choice the
 `*_raw` levels make. A hop is 10.7 ms, about one cycle of a low bass note, so
@@ -818,6 +819,37 @@ To see what a source actually produces, every `--signal` / `--audio` filmstrip
 prints `balance` and `spread` rows beside the band rows
 ([capturing](capturing.md#the-three-calibration-traps)), and `--signal pan:<p>`,
 `wide:<seed>` and `split:<p>` synthesize stereo on demand.
+
+**What real music reads, measured rather than guessed.** Three 60-second clips of
+commercial tracks — a 2025 electronic score, a 1992 piano record, a 1991 rock
+record — plus a mono downmix of the first as a control, each about 5 100 analysis
+hops through `--audio` on 2026-09-19:
+
+| clip | `balance` min / mean / max | `spread` min / mean / max |
+|------|----------------------------|---------------------------|
+| electronic, 2025 | `-0.390` / `0.024` / `0.409` | `0.001` / `0.156` / `0.925` |
+| piano, 1992 | `-0.536` / `0.001` / `0.617` | `0.006` / `0.174` / `0.836` |
+| rock, 1991 | `-0.510` / `-0.018` / `0.430` | `0.034` / `0.327` / `0.832` |
+| that electronic clip, downmixed to mono | `0.000` / `0.000` / `0.000` | `0.000` / `0.000` / `0.000` |
+
+Three readings come off that table, and each one changes how you bind the field.
+
+- **The mean is within `0.03` of centre on every track** while single hops reach
+  `±0.4`..`±0.6`. The excursions are the signal and the average is not, so
+  multiply for the excursions: `clamp(balance * 2.5, -1, 1)` spends a full visual
+  range on them without sitting on the rail.
+- **`spread` averages `0.16`..`0.33` even on wide material**, and a reading past
+  `0.8` is a moment rather than a mix. `spread > 0.25` is a *sustained-wide*
+  gate, not a common one.
+- **A hard pan carries no `spread` at all** — one waveform at two gains is
+  perfectly correlated, which is exactly what `pan:<p>` synthesizes. The two
+  quantities are independent: gate colour or opacity on `spread` and you hide
+  `balance` precisely where it is largest.
+
+The same bindings were watched against live loopback rather than only against
+clips: a track with obvious stereo movement moves a `balance`-bound preset the
+way it sounds, and a mono one sits visibly still
+([ADR-0215](adrs/0215-the-analyzer-publishes-an-absolute-stereo-field.md)).
 
 ### Constants
 
