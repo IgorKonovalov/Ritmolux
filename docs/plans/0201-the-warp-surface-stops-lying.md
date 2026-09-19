@@ -132,6 +132,35 @@ job of a baseline).
   **the suite is green at the end of this phase** — the test does not run while its baseline is
   absent and prints why, in ADR-0016's skip shape, rather than failing or asserting against nothing.
 
+### Phase 4a — The fixture is made able to see what it guards
+
+- **Owner skill:** dev
+- **What:** Phase 4's fixture renders a picture the aspect correction does not move, so it would
+  pass forever. Replace the fixture's subject with a converted preset whose picture the correction
+  demonstrably moves — or establish that none does, which is a finding and not a baseline.
+- **Files touched:** `core/tests/suite/warp_mesh_wide.rs`, `docs/testing.md`, and the fixture's
+  preset if the subject changes.
+- **The measurement that convicts the current fixture**, taken 2026-09-19 on the development
+  machine at 160x120, each probe applied alone and reverted:
+
+  | probe | what it removes | `warp_mesh_wide` |
+  |---|---|---|
+  | `mesh.rs` `vertex_position`: drop `* aspect` | the native mesh's x correction | passes |
+  | `shaders.rs`: drop `p.x = p.x * aspect` | the native shader's correction | passes |
+  | `milk/mod.rs`: force `self.aspect = 1.0` | **the converted chain's own aspect entry** | passes, `mean 0.0000 (tol 0.02) max_outlier 0 (tol 48)` |
+
+  The third is the decisive one: with the correction removed at the converted chain's entry the
+  capture is **byte-identical**, not merely inside tolerance. The blessed picture is a smooth
+  gradient, and a smooth gradient has no geometry for a geometric correction to move.
+- **Done when** the third probe above **fails** the fixture and the three square `warp_mesh`
+  fixtures in `golden` still pass unchanged, with both readings recorded; and `docs/testing.md`
+  says what the fixture guards in terms of that probe rather than in terms of its size.
+- **Stop condition:** if no converted preset the repository ships renders a picture that probe
+  moves, **stop and say so** rather than blessing anything. That result would mean the converted
+  chain's corrected space does not reach a shipped picture at all, which is a finding about
+  backlog 0245's premise and belongs in this plan's log and a backlog entry — not in a baseline
+  that cannot fail.
+
 ### Phase 4b — The baseline is captured by someone who looks at it
 - **Owner skill:** human
 - **What:** capture Phase 4's baseline, and confirm the guard actually guards.
