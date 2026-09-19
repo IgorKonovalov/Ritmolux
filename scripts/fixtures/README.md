@@ -490,13 +490,20 @@ the other two rather than being folded into them.
 | a `run:` in another job | `.github/workflows/ci.yml` | not read — the roster's CI carrier is the `links` job, and a gate moved out of it reads as missing |
 
 ```
-node scripts/check-gate-carriers.mjs --self-test    # expects exit 0, 17 of 17
+node scripts/check-gate-carriers.mjs --self-test    # expects exit 0, 22 of 22
 ```
 
 The self-test runs all four roots through the same function the exit code is taken from, asserts
 each printed line, asserts that every case reports **exactly one** problem, and adds the silences
 above plus one assertion pinned to the **real** roster: that every carrier name it uses is one the
 manifest knows, since a typo there would drop a gate from a projection without changing a count.
+
+**Five of the twenty-two are about the argument parse**, which is the one part of this gate a
+fixture root cannot reach on its own: a root dropped between the command line and the check reads
+*this* repository and reports OK, and the seeded root it never opened has no way to say so. They
+pin that a bare root is the root, that `--roster`'s value is never mistaken for one, and — the
+repro in one line — that the `missing` root measured against the **real** roster is not OK, which
+is what the `[root]` form alone must report.
 
 **Unlike every other gate here, the plain repository run cannot go vacuously green.** A parser that
 stopped matching reports an empty list against a roster that is not empty, which is the loudest

@@ -214,7 +214,8 @@ flowchart TB
 - Round 1 finding 0 (major, the documented `[root]` form measured this repository): the argument
   parse is one exported function whose `--roster` index guard holds when the flag is absent, and the
   self-test asserts the parse and that the `missing` root against the real roster is not OK
-  (`ba8b0fa`).
+  (`ba8b0fa`); `scripts/fixtures/README.md`'s asserted self-test count follows it to 22 in the
+  commit after.
 - Round 1 finding 1 (major, a `studio_install` park could not be cleared by `resume`): the install
   call moved out of the `!laneOpen(rec)` branch and its trigger is now a missing
   `studio/node_modules`, so the open lane a park leaves behind is installed into and an already
