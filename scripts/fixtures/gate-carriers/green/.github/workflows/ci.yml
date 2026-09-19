@@ -1,0 +1,32 @@
+# A pretend ci.yml carrying this tree's roster exactly, in the `links` job, plus the shapes the
+# parser must NOT read: a `node --test` that is not under scripts/, a gate in ANOTHER job, and a
+# gate under an `if:` guard, which is read like any other line because a condition is not this
+# roster's business (ADR-0217 Negative 2).
+name: Fixture CI
+
+on:
+  push:
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - run: cargo nextest run --workspace -P fast
+
+  links:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # A comment between two gates, which changes nothing.
+      - run: node scripts/fixture-one.mjs
+      - run: node scripts/fixture-two.mjs
+      - if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: node scripts/fixture-three.mjs --self-test
+      - uses: actions/setup-node@v4
+      - run: node --test "tools/conductor/test/*.test.mjs"
+      - run: python tools/sd-filter/test_sd_filter.py
+
+  studio:
+    runs-on: ubuntu-latest
+    steps:
+      - run: node scripts/fixture-other-job.mjs

@@ -299,6 +299,17 @@ jobs:
       # on the line is the escape, and a marker with no reason is itself a
       # finding.
       - run: node scripts/check-system-counts.mjs
+      # And the roster's own gate (ADR-0217): the fourteen invocations above are the
+      # projection of scripts/gates.manifest.mjs for this job, in that order, and
+      # `.githooks/pre-push`'s are its projection for the hook. The third carrier,
+      # the conductor's `defaultGate()`, imports the manifest and so cannot drift
+      # at all - it is the one that fell behind twice while the two file-backed
+      # ones were kept in step by hand. It asserts invocations and ORDER and never
+      # an `if:` condition: the `--remote` step above is guarded and this gate sees
+      # only the invocation. --self-test seeds the three drift shapes, one of them
+      # a gate in the wrong position, which is what a set comparison calls clean.
+      - run: node scripts/check-gate-carriers.mjs
+      - run: node scripts/check-gate-carriers.mjs --self-test
       # The conductor's own suite (ADR-0205): the queue and plan readers, the lane
       # state machine against throwaway git repositories, the digest, the operator
       # commands, the two PreToolUse hooks' bite checks and the machine-wide lock.

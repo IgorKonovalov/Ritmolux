@@ -450,6 +450,59 @@ occurs in this repository:
   script's own header. It is seeded so that the hole is a decision anyone can re-run rather than a
   sentence in a comment.
 
+## `gate-carriers/` — for `check-gate-carriers.mjs`
+
+```
+node scripts/check-gate-carriers.mjs scripts/fixtures/gate-carriers/green   --roster scripts/fixtures/gate-carriers/manifest.mjs
+node scripts/check-gate-carriers.mjs scripts/fixtures/gate-carriers/missing --roster scripts/fixtures/gate-carriers/manifest.mjs
+node scripts/check-gate-carriers.mjs scripts/fixtures/gate-carriers/extra   --roster scripts/fixtures/gate-carriers/manifest.mjs
+node scripts/check-gate-carriers.mjs scripts/fixtures/gate-carriers/swapped --roster scripts/fixtures/gate-carriers/manifest.mjs
+```
+
+**Four roots rather than one tree**, because this checker reads a whole carrier's list and compares
+it in order: a seeded break has to be the only break in its root, or the message it prints is about
+some other root's mistake. Each root holds both file-backed carriers —
+`.githooks/pre-push` and `.github/workflows/ci.yml` — and the carrier a case is *not* about is
+written correctly. `--roster` is what makes them roots at all: the real
+`scripts/gates.manifest.mjs` is what the repository's own run is measured against, and a fixture
+that mirrored it would have to be edited every time a gate is added.
+
+| Root | Case | Expected |
+|------|------|----------|
+| `green/` | both carriers carry the roster, in order | **exit 0** |
+| `missing/` | `fixture-two.mjs` absent from the hook | exit 1 — `hook: expected node scripts/fixture-two.mjs at position 2, found node scripts/fixture-three.mjs --self-test` |
+| `extra/` | a `fixture-rogue.mjs` CI runs and the roster does not | exit 1 — `ci: expected nothing at position 4, found node scripts/fixture-rogue.mjs` |
+| `swapped/` | the first two gates in the wrong order | exit 1 — `hook: expected node scripts/fixture-one.mjs at position 1, found node scripts/fixture-two.mjs` |
+
+**`swapped/` is the case a set comparison calls clean.** Its lengths agree, its two sets agree, and
+only the order does not — which is why this gate compares sequences and why that root exists beside
+the other two rather than being folded into them.
+
+`green/` is where the silences are pinned, and each is a shape both parsers must decline to read:
+
+| Case | Seeded in | Expected |
+|------|-----------|----------|
+| a `cargo` step | `.githooks/pre-push` | not a Node gate — the manifest holds Node gates only |
+| a commented-out `run_step` | `.githooks/pre-push` | not read |
+| a label that disagrees with its command | `.githooks/pre-push` | read by its **command**; the label is a display string, and holding it to the roster would convict a reworded echo |
+| a gate under an `if:` guard | `.github/workflows/ci.yml` | read like any other line — the condition is never this gate's business ([ADR-0217](../../docs/adrs/0217-the-node-gate-roster-is-one-manifest-and-a-checker-holds-every-carrier-to-it.md) Negative 2) |
+| `node --test`, which is not under `scripts/` | `.github/workflows/ci.yml` | not read |
+| a `run:` in another job | `.github/workflows/ci.yml` | not read — the roster's CI carrier is the `links` job, and a gate moved out of it reads as missing |
+
+```
+node scripts/check-gate-carriers.mjs --self-test    # expects exit 0, 17 of 17
+```
+
+The self-test runs all four roots through the same function the exit code is taken from, asserts
+each printed line, asserts that every case reports **exactly one** problem, and adds the silences
+above plus one assertion pinned to the **real** roster: that every carrier name it uses is one the
+manifest knows, since a typo there would drop a gate from a projection without changing a count.
+
+**Unlike every other gate here, the plain repository run cannot go vacuously green.** A parser that
+stopped matching reports an empty list against a roster that is not empty, which is the loudest
+possible exit 1. The self-test is here for the reporting path and the three drift shapes, not to
+rescue an exit code that could be a silence.
+
 ## `site-links/` — for `check-site-links.mjs`
 
 ```

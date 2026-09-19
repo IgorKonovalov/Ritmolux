@@ -60,6 +60,10 @@ export const GATES = [
   { script: "check-translations.mjs", args: [], carriers: CHECKOUT },
   { script: "check-translations.mjs", args: ["--self-test"], carriers: CHECKOUT },
   { script: "check-system-counts.mjs", args: [], carriers: CHECKOUT },
+  // The roster's own gate, carried by all three: a carrier that stopped running it would stop
+  // noticing everything else that left.
+  { script: "check-gate-carriers.mjs", args: [], carriers: CHECKOUT },
+  { script: "check-gate-carriers.mjs", args: ["--self-test"], carriers: CHECKOUT },
   // The two that need a built site, and the whole reason a carrier set is data.
   { script: "check-site-links.mjs", args: ["--require-api"], carriers: ["pages"] },
   { script: "check-site-routes.mjs", args: [], carriers: ["pages"] },

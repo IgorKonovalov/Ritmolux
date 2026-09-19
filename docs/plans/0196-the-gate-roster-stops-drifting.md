@@ -191,8 +191,8 @@ flowchart TB
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The manifest exists and the conductor reads it | dev | committed with this row | |
-| 2 — A checker holds the hook and CI to the manifest | dev | not started | |
+| 1 — The manifest exists and the conductor reads it | dev | done | `aa320ab` |
+| 2 — A checker holds the hook and CI to the manifest | dev | committed with this row | |
 | 3 — The local `cargo doc` covers the workspace | dev | not started | |
 | 4 — A skipped step says so, and a studio lane can run its checks | dev | not started | |
 | 5 — The served version line is anchored to the workspace section | dev | not started | |

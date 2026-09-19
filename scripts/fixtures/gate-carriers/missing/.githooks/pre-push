@@ -1,0 +1,9 @@
+#!/bin/sh
+# Case 1: a gate in the roster that this carrier does not run. `fixture-two.mjs` is gone, which is
+# what "added to CI and not to the hook" looks like from here.
+set -u
+
+if command -v node >/dev/null 2>&1; then
+    run_step "node scripts/fixture-one.mjs" node scripts/fixture-one.mjs
+    run_step "node scripts/fixture-three.mjs --self-test" node scripts/fixture-three.mjs --self-test
+fi
