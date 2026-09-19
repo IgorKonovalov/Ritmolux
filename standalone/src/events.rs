@@ -139,6 +139,20 @@ pub enum Event<'a> {
         /// Parameter overrides the engine refused because nothing claims the
         /// name, since start.
         ctl_refused: u64,
+        /// Control datagrams the socket handed the listener, since start,
+        /// before anything was made of them.
+        ///
+        /// The superset every other `ctl_` total above is drawn from, which is
+        /// what separates "nothing arrived" from "something arrived and was
+        /// discarded" (ADR-0221).
+        ctl_received: u64,
+        /// Receive failures on the control socket that were not the ordinary
+        /// read timeout, since start.
+        ctl_recv_errors: u64,
+        /// Whether the listener thread is still reading its socket. `false`
+        /// with a listener configured means the thread has gone, which is a
+        /// different fact from a socket nothing is sending to.
+        ctl_listening: bool,
         /// Frames handed to the preview pipe's writer, since start. `None` when
         /// no preview pipe is open.
         ///
@@ -272,13 +286,17 @@ impl Event<'_> {
                 ctl_rejected,
                 ctl_dropped,
                 ctl_refused,
+                ctl_received,
+                ctl_recv_errors,
+                ctl_listening,
                 preview_sent,
                 preview_dropped,
             } => {
                 out.push_str(&format!(
                     ",\"fps\":{},\"frame_ms_p50\":{},\"frame_ms_p99\":{},\
                      \"ctl_rejected\":{ctl_rejected},\"ctl_dropped\":{ctl_dropped},\
-                     \"ctl_refused\":{ctl_refused}",
+                     \"ctl_refused\":{ctl_refused},\"ctl_received\":{ctl_received},\
+                     \"ctl_recv_errors\":{ctl_recv_errors},\"ctl_listening\":{ctl_listening}",
                     num(*fps),
                     num(*frame_ms_p50),
                     num(*frame_ms_p99),
@@ -492,11 +510,15 @@ mod tests {
                 ctl_rejected: 2,
                 ctl_dropped: 3,
                 ctl_refused: 4,
+                ctl_received: 91,
+                ctl_recv_errors: 0,
+                ctl_listening: true,
                 preview_sent: Some(631),
                 preview_dropped: Some(97),
             },
             // No preview pipe: the counters are `null` rather than `0`, which is
-            // a different claim.
+            // a different claim. And a listener that has gone, which is the
+            // reading a silent control path is diagnosed from.
             Event::Health {
                 fps: 59.8,
                 frame_ms_p50: 4.1,
@@ -504,6 +526,9 @@ mod tests {
                 ctl_rejected: 2,
                 ctl_dropped: 3,
                 ctl_refused: 4,
+                ctl_received: 91,
+                ctl_recv_errors: 17,
+                ctl_listening: false,
                 preview_sent: None,
                 preview_dropped: None,
             },
@@ -620,6 +645,58 @@ mod tests {
             "the rendered roster moved; `roster` here covers every event but \
              `roster` itself, which needs an owned slice"
         );
+    }
+
+    /// **The `health` line carries the listener's three readings**, and carries
+    /// every field it carried before them unchanged.
+    ///
+    /// The second half is the additivity claim spec 0003 makes for this roster:
+    /// a consumer that reads only the fields it was written against keeps
+    /// working, so the older keys are asserted for by their exact rendered text
+    /// rather than merely for being present somewhere.
+    #[test]
+    fn the_health_line_adds_the_listener_readings_without_moving_the_older_ones() {
+        let line = Event::Health {
+            fps: 59.8,
+            frame_ms_p50: 4.1,
+            frame_ms_p99: 9.7,
+            ctl_rejected: 2,
+            ctl_dropped: 3,
+            ctl_refused: 4,
+            ctl_received: 91,
+            ctl_recv_errors: 17,
+            ctl_listening: false,
+            preview_sent: None,
+            preview_dropped: None,
+        }
+        .line();
+
+        for fragment in [
+            "\"ctl_received\":91",
+            "\"ctl_recv_errors\":17",
+            // A JSON boolean, not the string "false": a parent that branched on
+            // truthiness would read "false" as true.
+            "\"ctl_listening\":false",
+        ] {
+            assert!(
+                line.contains(fragment),
+                "the health line does not carry {fragment}: {line}"
+            );
+        }
+        for fragment in [
+            "\"fps\":59.8000",
+            "\"frame_ms_p50\":4.1000",
+            "\"frame_ms_p99\":9.7000",
+            "\"ctl_rejected\":2,\"ctl_dropped\":3,\"ctl_refused\":4",
+            "\"preview_sent\":null",
+            "\"preview_dropped\":null",
+        ] {
+            assert!(
+                line.contains(fragment),
+                "the health line no longer renders {fragment} as it did, so a \
+                 consumer written against the older roster breaks: {line}"
+            );
+        }
     }
 
     /// **The `preset` line carries the family the player drew, or `null`**

@@ -48,9 +48,9 @@ Adding an event or a field is additive under the same `v`; changing or removing 
 | `hello` | `version`, `schema`, `control` | Once, before the first frame of any run |
 | `preset` | `name`, `index`, `system`, `file`, `family` | The preset **on screen** changed |
 | `roster` | `names`, `dir` | Every preset reload |
-| `preset_error` | `file`, `message`, `line`, `col`, `param` | A preset failed to load |
+| `preset_error` | `file`, `message`, `line`, `col`, `param` | A preset failed to load, **or** a `ctl/preset` the renderer declined to select ([ADR-0221](../adrs/0221-the-control-path-reports-what-it-did-not-do.md)) |
 | `preset_warning` | `file`, `message`, `param` | A preset loaded with a non-fatal problem; `param` labels the binding it is about as `preset_error`'s does, or is `null` ([ADR-0192](../adrs/0192-a-preset-warning-names-its-parameter.md)) |
-| `health` | `fps`, `frame_ms_p50`, `frame_ms_p99`, `ctl_rejected`, `ctl_dropped`, `ctl_refused`, `preview_sent`, `preview_dropped` | Once a second while frames are drawn |
+| `health` | `fps`, `frame_ms_p50`, `frame_ms_p99`, `ctl_rejected`, `ctl_dropped`, `ctl_refused`, `ctl_received`, `ctl_recv_errors`, `ctl_listening`, `preview_sent`, `preview_dropped` | Once a second while frames are drawn |
 | `stream` | `width`, `height`, `fps`, `format` (`rgba8` \| `bgra8`) | Once, before the first frame on a frame pipe |
 | `pong` | `nonce` | Answering a `ctl/ping` |
 
@@ -159,6 +159,23 @@ Adding an event or a field is additive under the same `v`; changing or removing 
   parser provides a span**. An expression error carries the parameter name instead: it is raised
   after the document was parsed into values that no longer carry a position, so it has no span, and
   the missing position is reported as `null` rather than omitted.
+- A `ctl/preset` the renderer **declines to select** MUST raise a `preset_error` naming what was
+  asked for, and one it selects MUST raise none. A preset arrives from a click on a roster the
+  player itself published, so a refusal is one deliberate request that did not take — the opposite
+  population from a mistyped parameter name scrubbed at slider rate, which is why this one is
+  reported where that one is counted. **On this arm `file` holds the asked-for name, which is not a
+  path**: `preset_error` is reused rather than a second event added, because a parent's own fact is
+  the same either way — the preset you asked for is not on screen — and `line`, `col` and `param`
+  are `null`. (ADR-0221)
+- `health`'s `ctl_received`, `ctl_recv_errors` and `ctl_listening` MUST report the listener's own
+  state: datagrams the socket handed it before anything was made of them, receive failures that
+  were **not** the ordinary read timeout, and whether the receive loop is still running.
+  `ctl_received` is the superset the other `ctl_` totals are drawn from, which is what separates
+  "nothing arrived" from "something arrived and was discarded"; the read timeout is excluded from
+  `ctl_recv_errors` because it is how the stop flag gets read and would otherwise climb several
+  times a second on a healthy idle listener. A run with no listener reports zeros and
+  `"ctl_listening":false`, which is the same fact `hello`'s `"control":null` already carried.
+  (ADR-0221)
 - `health` MUST be tied to the drawn frame, so a stalled or hidden player goes quiet rather than
   reporting a stale figure on a timer of its own.
 - The writer MUST NOT fail the show: standard error may be closed or full, and a lost line is a
@@ -177,7 +194,8 @@ Adding an event or a field is additive under the same `v`; changing or removing 
   next frame, easing from where its smoother actually was rather than from the held value.
 - WHEN a `ctl/preset` names a preset the roster holds THEN the show **dissolves** to it, so the
   roster still names the outgoing preset for as long as the crossfade composites it. WHEN the
-  name is unknown THEN nothing changes and no post-switch bookkeeping runs.
+  name is unknown THEN nothing changes, no post-switch bookkeeping runs, and a `preset_error`
+  naming what was asked for goes out — so a studio click that did nothing says why.
 - WHEN ten thousand `ctl/param` datagrams for one name arrive between two frames THEN the render
   thread is handed one slot holding the last value the listener recorded.
 - WHEN a truncated, over-long or mistyped datagram arrives THEN it is refused and counted, the

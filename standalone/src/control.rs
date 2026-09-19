@@ -225,6 +225,14 @@ pub struct Applied {
     /// shell has bookkeeping that follows a switch, and an unknown name must not
     /// trigger it.
     pub switched: bool,
+    /// The name a `ctl/preset` asked for that the renderer declined to select.
+    ///
+    /// `None` when no preset was asked for and when the one asked for landed,
+    /// so the two silent cases stay silent and only the refusal is reportable.
+    /// Carried out rather than reported here because this function has the
+    /// renderer and not the event stream, and the refusal is a fact about the
+    /// request rather than about the picture.
+    pub unresolved_preset: Option<Name>,
     /// Parameter overrides the engine refused because nothing on the active
     /// preset's system claims the name.
     pub refused: u64,
@@ -245,6 +253,9 @@ pub fn apply_to_renderer(drained: &Drained, renderer: &mut Renderer) -> Applied 
     let mut applied = Applied::default();
     if let Some(name) = drained.preset() {
         applied.switched = renderer.select_preset_by_name(name.as_str());
+        if !applied.switched {
+            applied.unresolved_preset = Some(*name);
+        }
     }
     if drained.clear_all() {
         renderer.clear_param_overrides();
@@ -694,8 +705,8 @@ mod tests {
         );
     }
 
-    /// A receive that keeps failing is counted, ends the listener, and the
-    /// listener says it is no longer listening.
+    /// A receive that keeps failing is counted, ends the listener, and leaves
+    /// the listener reporting itself as not listening.
     #[test]
     fn a_failing_receive_is_counted_and_ends_the_listener() {
         let shared = Shared::new();
@@ -835,6 +846,76 @@ mod tests {
             shared.recv_errors.load(Ordering::Relaxed),
             0,
             "a datagram the decoder refuses is not a receive failure"
+        );
+    }
+
+    /// A `ctl/preset` the renderer declines carries the asked-for name back out,
+    /// and one it accepts carries nothing.
+    ///
+    /// The decision the `preset_error` emission acts on, asserted here because
+    /// the emission itself writes to standard error and offers nothing to read
+    /// back. Before this, a `false` from `select_preset_by_name` produced no
+    /// event, no counter and no line, so a studio click on a preset the player
+    /// will not select looked exactly like one it was about to select
+    /// (ADR-0221).
+    #[test]
+    fn a_refused_preset_selection_carries_the_name_back_out() {
+        let mut renderer = match Renderer::new_headless(rlx_core::render::HeadlessOptions {
+            width: 64,
+            height: 48,
+            prefer_software: true,
+        }) {
+            Ok(renderer) => renderer,
+            Err(_) => {
+                eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+                return;
+            }
+        };
+        let preset = rlx_core::preset::Preset::from_toml_str(
+            "system = \"swarm\"\nname = \"held\"\n[params]\nbg_bright = \"0.2\"\n",
+        )
+        .expect("hand-written probe preset is valid");
+        renderer.set_presets(vec![preset]);
+
+        let mut drained = Pending::default();
+        drained.record(Action::Preset {
+            name: name("no_such_preset"),
+        });
+        let applied = apply_to_renderer(&drained, &mut renderer);
+        assert!(
+            !applied.switched,
+            "a name the roster does not hold cannot switch"
+        );
+        assert_eq!(
+            applied
+                .unresolved_preset
+                .map(|held| held.as_str().to_owned()),
+            Some("no_such_preset".to_owned()),
+            "a refused selection must name what was asked for, or the parent \
+             that asked is told nothing at all"
+        );
+
+        let mut drained = Pending::default();
+        drained.record(Action::Preset { name: name("held") });
+        let applied = apply_to_renderer(&drained, &mut renderer);
+        assert!(applied.switched, "a name the roster holds switches");
+        assert_eq!(
+            applied.unresolved_preset, None,
+            "a selection that took is not an error, and reporting one would put \
+             a red line on the studio for every preset click that worked"
+        );
+
+        // And a frame that asked for no preset at all: the third case, which
+        // is every ordinary parameter frame and must stay silent.
+        let mut drained = Pending::default();
+        drained.record(Action::Param {
+            name: name("bg_bright"),
+            value: 0.5,
+        });
+        let applied = apply_to_renderer(&drained, &mut renderer);
+        assert_eq!(
+            applied.unresolved_preset, None,
+            "a frame carrying no ctl/preset asked for nothing to select"
         );
     }
 

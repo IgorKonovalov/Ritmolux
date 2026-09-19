@@ -79,6 +79,10 @@ const REPORT_OTHER_LINES: usize = 40;
 /// cannot be a coincidence.
 const PING_NONCE: i32 = 424_242;
 
+/// A preset name no roster in this file holds, sent to make the player refuse a
+/// selection.
+const ABSENT_PRESET: &str = "Show Nothing By This Name";
+
 /// A refusal this runner cannot help, recognised by the message the mode prints
 /// rather than by the exit code — a genuine defect exits 1 too, and telling the
 /// two apart is the whole point of skipping.
@@ -474,8 +478,14 @@ fn a_headless_run_emits_the_roster_the_preset_and_a_preset_error() {
 }
 
 /// `--control` on the headless path binds a real socket, says which one in
-/// `hello`, and drains it between frames: a `ctl/preset` moves the show and a
-/// `ctl/ping` is answered.
+/// `hello`, and drains it between frames: a `ctl/preset` moves the show, a
+/// `ctl/ping` is answered, and a `ctl/preset` naming nothing in the roster is
+/// **reported** rather than silently doing nothing.
+///
+/// That last one is the studio's silent click (ADR-0221): before it, a name the
+/// renderer declined produced no event, no counter and no line, so a click on a
+/// preset the player would not select looked exactly like one it was about to
+/// select.
 #[test]
 fn a_headless_run_binds_the_control_listener_and_drains_it() {
     let dir = scratch("control");
@@ -498,6 +508,22 @@ fn a_headless_run_binds_the_control_listener_and_drains_it() {
         socket.send_to(&buf, target).expect("send ctl/preset");
         Action::Ping(PING_NONCE).encode(&mut buf);
         socket.send_to(&buf, target).expect("send ctl/ping");
+        // Awaited rather than sent straight after the good one: the queue keeps
+        // the **last** preset asked for per frame, so two in one drain would
+        // leave only this one and the switch above would never be applied.
+        let landed = lines.wait_for(lines.opened, |line| {
+            (is_event(line, "preset") && field(line, "name").as_deref() == Some("Show Target"))
+                .then_some(())
+        });
+        if landed.is_ok() {
+            Action::Preset {
+                name: Name::new(ABSENT_PRESET).expect("a name inside the inline cap"),
+            }
+            .encode(&mut buf);
+            socket
+                .send_to(&buf, target)
+                .expect("send the unselectable ctl/preset");
+        }
     }
     let Some(stderr) = finish(child, drain, collector) else {
         return;
@@ -520,6 +546,26 @@ fn a_headless_run_binds_the_control_listener_and_drains_it() {
             .any(|line| line.contains("Show Target")),
         "a ctl/preset should move the show, and the move should be reported \
          in:\n{stderr}"
+    );
+
+    let errors = events(&stderr, "preset_error");
+    let naming = errors
+        .iter()
+        .filter(|line| field(line, "file").as_deref() == Some(ABSENT_PRESET))
+        .count();
+    assert_eq!(
+        naming, 1,
+        "a ctl/preset naming a preset the roster does not hold should produce \
+         exactly one preset_error naming it; {naming} of the {} preset_error \
+         lines did:\n{stderr}",
+        errors.len()
+    );
+    assert!(
+        !errors
+            .iter()
+            .any(|line| field(line, "file").as_deref() == Some("Show Target")),
+        "the ctl/preset that landed must raise no preset_error, or the studio \
+         puts a red line on every preset click that worked:\n{stderr}"
     );
 }
 

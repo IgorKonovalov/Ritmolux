@@ -168,8 +168,8 @@ flowchart LR
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The listener counts what it receives | dev | done | committed with this row |
-| 2 — A refused selection is reported | dev | not started | |
+| 1 — The listener counts what it receives | dev | done | d2117b3c |
+| 2 — A refused selection is reported | dev | done | committed with this row |
 | 3 — The two tests read the new evidence | dev | not started | |
 | 4 — The reproduction runs again, with a stop condition | dev | not started | |
 | 5 — The studio carries the new readings | studio-builder | not started | |
@@ -191,6 +191,16 @@ flowchart LR
 - **`Control::listening` is set true at `bind`, before the thread runs**, rather than only at the
   top of `listen`: a caller reading it between the spawn and the thread's first instruction would
   otherwise be told the listener had gone.
+- **Phase 2 touched two files the phase's `Files touched` does not list.**
+  `standalone/src/events.rs` holds the `Event::Health` variant, so the three new fields cannot be
+  added anywhere else; `standalone/tests/stream_show.rs` holds the only harness that spawns the
+  player and reads its event stream, which is where the phase's *"produces one `preset_error`
+  naming it … produces none"* is a claim rather than an inference — `Events` writes to standard
+  error and offers nothing to read back, so the in-process seam can only assert the decision
+  (`Applied::unresolved_preset`), which it does in `control.rs`.
+- **Phase 2 also rewrote one doc comment in `control.rs` that Phase 1 left**, because
+  `scripts/check-comment-hygiene.mjs` reads `no longer` as plan-relative narration; the sentence
+  now states the same fact as a property.
 
 ### Close triggers
 
