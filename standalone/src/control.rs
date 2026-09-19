@@ -39,6 +39,7 @@
 //! that survive it. [`Drained`] is the drained buffer and the shell walks it in
 //! this order.
 
+use std::io;
 use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -75,6 +76,17 @@ const RECV_BUF: usize = 1500;
 /// stop. The socket is otherwise idle, so this is the whole cost of being able
 /// to shut the thread down rather than leaking it.
 const POLL: Duration = Duration::from_millis(200);
+
+/// How many receive failures in a row end the listener.
+///
+/// A transient refusal — a stack handing back a queued ICMP unreachable — is one
+/// error with a datagram or a [`POLL`] timeout on either side of it, so the run
+/// resets to zero and the loop carries on. A socket that has gone is an error
+/// every iteration with nothing between them, which reaches this budget in
+/// microseconds; the thread then ends and [`Control::listening`] says so, which
+/// is the fact a reader wants and is also what stops the loop spinning a core
+/// for the life of a show.
+const RECV_ERROR_BUDGET: u32 = 64;
 
 /// What the listener has accumulated since the render thread last drained.
 ///
@@ -248,10 +260,28 @@ pub fn apply_to_renderer(drained: &Drained, renderer: &mut Renderer) -> Applied 
     applied
 }
 
-/// What the two threads share: the queue, and the two running totals the
-/// `health` event reports.
+/// What the two threads share: the queue, and the running totals the `health`
+/// event reports.
 struct Shared {
     pending: Mutex<Pending>,
+    /// Datagrams `recv_from` handed over, whatever became of them afterwards.
+    ///
+    /// Counted before the decoder, so it is the one reading that separates "no
+    /// datagram arrived" from "one arrived and was discarded": every other
+    /// total below is a subset of this one.
+    received: AtomicU64,
+    /// Receive failures that were not the ordinary read timeout.
+    ///
+    /// The timeout is how [`POLL`] gets the stop flag read and says nothing
+    /// about the socket, so counting it would bury the failures underneath a
+    /// number that climbs five times a second on a healthy idle listener.
+    recv_errors: AtomicU64,
+    /// Whether the listener thread is still in its receive loop.
+    ///
+    /// Set true before the loop and cleared when it returns by any route —
+    /// stop flag, error budget or unwind — so a thread that has gone is
+    /// distinguishable from a socket that is merely quiet.
+    listening: AtomicBool,
     /// Datagrams that did not decode into an action the player knows.
     rejected: AtomicU64,
     /// Actions that decoded but found the queue full for that frame.
@@ -263,6 +293,71 @@ struct Shared {
     /// where the answer exists: the decoder knows a name is well-formed, and
     /// only the engine knows whether anything answers to it.
     refused: AtomicU64,
+}
+
+impl Shared {
+    /// An empty queue and zeroed totals, not yet listening.
+    fn new() -> Self {
+        Self {
+            pending: Mutex::new(Pending::default()),
+            received: AtomicU64::new(0),
+            recv_errors: AtomicU64::new(0),
+            listening: AtomicBool::new(false),
+            rejected: AtomicU64::new(0),
+            dropped: AtomicU64::new(0),
+            refused: AtomicU64::new(0),
+        }
+    }
+}
+
+/// Holds [`Shared::listening`] true for as long as the receive loop runs.
+///
+/// A guard rather than a pair of stores: the loop leaves by the stop flag, by
+/// the error budget and — were a decoder ever to panic — by an unwind, and a
+/// flag that stayed true on the third would report a thread that is not there.
+struct Listening<'a>(&'a Shared);
+
+impl<'a> Listening<'a> {
+    fn start(shared: &'a Shared) -> Self {
+        shared.listening.store(true, Ordering::Relaxed);
+        Self(shared)
+    }
+}
+
+impl Drop for Listening<'_> {
+    fn drop(&mut self) {
+        self.0.listening.store(false, Ordering::Relaxed);
+    }
+}
+
+/// What the receive loop reads from.
+///
+/// One method, and [`UdpSocket`] is the only implementation that ships. It
+/// exists because the loop's failure policy cannot otherwise be exercised: the
+/// socket is moved into the listener thread and nothing outside that thread
+/// holds a handle to it, so no test can break the socket under a running
+/// listener. A fake receiver can.
+trait Receive {
+    /// Read one datagram into `buf`, returning its length.
+    fn receive(&self, buf: &mut [u8]) -> io::Result<usize>;
+}
+
+impl Receive for UdpSocket {
+    fn receive(&self, buf: &mut [u8]) -> io::Result<usize> {
+        self.recv_from(buf).map(|(len, _from)| len)
+    }
+}
+
+/// Whether `err` is the read timeout [`POLL`] arms rather than a failure.
+///
+/// Both kinds, because the platforms disagree: a socket with `SO_RCVTIMEO` set
+/// reports `WouldBlock` on Unix and `TimedOut` on Windows, and `std` documents
+/// either as possible.
+fn is_read_timeout(err: &io::Error) -> bool {
+    matches!(
+        err.kind(),
+        io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
+    )
 }
 
 /// The listener: a bound socket, the thread reading it, and the render thread's
@@ -299,12 +394,11 @@ impl Control {
             .set_read_timeout(Some(POLL))
             .map_err(|err| format!("--control `{addr}`: could not set a read timeout: {err}"))?;
 
-        let shared = Arc::new(Shared {
-            pending: Mutex::new(Pending::default()),
-            rejected: AtomicU64::new(0),
-            dropped: AtomicU64::new(0),
-            refused: AtomicU64::new(0),
-        });
+        let shared = Arc::new(Shared::new());
+        // True before the thread exists rather than at the top of `listen`: a
+        // caller that reads `listening` between the spawn and the thread's
+        // first instruction would otherwise be told the listener is gone.
+        shared.listening.store(true, Ordering::Relaxed);
         let stop = Arc::new(AtomicBool::new(false));
         let thread = std::thread::Builder::new()
             .name("rlx-control".to_owned())
@@ -327,6 +421,21 @@ impl Control {
     /// The address actually bound — what the `hello` event reports.
     pub fn local_addr(&self) -> SocketAddr {
         self.local
+    }
+
+    /// Datagrams the socket handed the listener, before decoding.
+    pub fn received(&self) -> u64 {
+        self.shared.received.load(Ordering::Relaxed)
+    }
+
+    /// Receive failures that were not the ordinary read timeout.
+    pub fn recv_errors(&self) -> u64 {
+        self.shared.recv_errors.load(Ordering::Relaxed)
+    }
+
+    /// Whether the listener thread is still reading the socket.
+    pub fn listening(&self) -> bool {
+        self.shared.listening.load(Ordering::Relaxed)
     }
 
     /// Datagrams the decoder refused.
@@ -410,15 +519,37 @@ impl Drop for Control {
 ///
 /// Allocates nothing after entry: the receive buffer is on the stack, the
 /// decoder is allocation-free by construction, and the queue's capacity was
-/// reserved before this thread existed.
-fn listen(socket: &UdpSocket, shared: &Shared, stop: &AtomicBool) {
+/// reserved before this thread existed. Every total it moves is a relaxed
+/// atomic — the readings are running counts a reader samples once a second, not
+/// a happens-before edge anything downstream depends on.
+fn listen<R: Receive>(socket: &R, shared: &Shared, stop: &AtomicBool) {
+    let _listening = Listening::start(shared);
     let mut buf = [0u8; RECV_BUF];
+    let mut failures = 0u32;
     while !stop.load(Ordering::Relaxed) {
-        let Ok((len, _from)) = socket.recv_from(&mut buf) else {
-            // A timeout is the ordinary case and is how the stop flag gets
-            // read; a real error on a bound loopback socket is not worth a line
-            // per occurrence on a show machine, and the next loop re-reads.
-            continue;
+        let len = match socket.receive(&mut buf) {
+            Ok(len) => {
+                failures = 0;
+                shared.received.fetch_add(1, Ordering::Relaxed);
+                len
+            }
+            // The ordinary case, and how the stop flag gets read. It says the
+            // socket is healthy and idle, so it also clears the failure run.
+            Err(ref err) if is_read_timeout(err) => {
+                failures = 0;
+                continue;
+            }
+            // Counted rather than logged: a socket that fails keeps failing,
+            // and a line per occurrence floods a show machine exactly when
+            // something is already wrong (ADR-0221).
+            Err(_) => {
+                shared.recv_errors.fetch_add(1, Ordering::Relaxed);
+                failures += 1;
+                if failures >= RECV_ERROR_BUDGET {
+                    return;
+                }
+                continue;
+            }
         };
         let Some(datagram) = buf.get(..len) else {
             continue;
@@ -447,6 +578,264 @@ mod tests {
 
     fn name(text: &str) -> Name {
         Name::new(text).expect("a short test name fits inline")
+    }
+
+    /// A scripted receiver: one outcome per call, then the last one forever.
+    ///
+    /// The socket a real listener reads is owned by its own thread and cannot
+    /// be broken from outside it, so this is how the receive loop's failure
+    /// policy is exercised at all.
+    struct Scripted {
+        script: Vec<io::ErrorKind>,
+        datagrams: Vec<Vec<u8>>,
+        calls: std::sync::atomic::AtomicUsize,
+    }
+
+    impl Scripted {
+        /// A receiver that fails with `kind` on every call.
+        fn failing(kind: io::ErrorKind) -> Self {
+            Self {
+                script: vec![kind],
+                datagrams: Vec::new(),
+                calls: std::sync::atomic::AtomicUsize::new(0),
+            }
+        }
+
+        /// A receiver that hands over each datagram in turn and then times out
+        /// forever.
+        fn delivering(datagrams: Vec<Vec<u8>>) -> Self {
+            Self {
+                script: vec![io::ErrorKind::WouldBlock],
+                datagrams,
+                calls: std::sync::atomic::AtomicUsize::new(0),
+            }
+        }
+
+        fn calls(&self) -> usize {
+            self.calls.load(Ordering::Relaxed)
+        }
+    }
+
+    impl Receive for Scripted {
+        fn receive(&self, buf: &mut [u8]) -> io::Result<usize> {
+            let call = self.calls.fetch_add(1, Ordering::Relaxed);
+            if let Some(datagram) = self.datagrams.get(call) {
+                buf[..datagram.len()].copy_from_slice(datagram);
+                return Ok(datagram.len());
+            }
+            let index = call.saturating_sub(self.datagrams.len());
+            let kind = self
+                .script
+                .get(index)
+                .copied()
+                .or_else(|| self.script.last().copied())
+                .unwrap_or(io::ErrorKind::WouldBlock);
+            Err(io::Error::from(kind))
+        }
+    }
+
+    /// The bytes a sender puts on the wire for `ctl/param warp 0.5`.
+    fn param_datagram() -> Vec<u8> {
+        let mut buf = Vec::new();
+        Action::Param {
+            name: name("warp"),
+            value: 0.5,
+        }
+        .encode(&mut buf);
+        buf
+    }
+
+    /// A real bound listener that has been sent one datagram reports one
+    /// received, and reports itself listening the whole time.
+    #[allow(
+        clippy::disallowed_methods,
+        reason = "a delivery deadline on a socket this test does not schedule"
+    )]
+    #[test]
+    fn a_delivered_datagram_is_counted_as_received() {
+        let Ok(mut control) = Control::bind("127.0.0.1:0") else {
+            eprintln!("skipped: could not bind a loopback control socket");
+            return;
+        };
+        assert_eq!(control.received(), 0, "nothing has been sent yet");
+        assert!(control.listening(), "a freshly bound listener is listening");
+
+        let socket = UdpSocket::bind("127.0.0.1:0").expect("bind an ephemeral sender");
+        socket
+            .send_to(&param_datagram(), control.local_addr())
+            .expect("send to the loopback listener");
+
+        // The listener runs on a thread this test does not schedule, so the
+        // only bound available is a deadline. Waited on the queue rather than
+        // on the count: `received` rises the instant `recv_from` returns and
+        // the record follows it, so a wait on the count would race the record.
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while !control.has_pending() && std::time::Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        assert_eq!(
+            control.received(),
+            1,
+            "one datagram was sent, so exactly one should be counted as received"
+        );
+        assert_eq!(
+            control.recv_errors(),
+            0,
+            "a healthy socket reports no receive errors"
+        );
+        assert!(
+            control.listening(),
+            "the listener is still reading the socket"
+        );
+        assert_eq!(
+            control.drain().params().len(),
+            1,
+            "and the datagram reached the queue"
+        );
+    }
+
+    /// A receive that keeps failing is counted, ends the listener, and the
+    /// listener says it is no longer listening.
+    #[test]
+    fn a_failing_receive_is_counted_and_ends_the_listener() {
+        let shared = Shared::new();
+        let stop = AtomicBool::new(false);
+        let socket = Scripted::failing(io::ErrorKind::ConnectionReset);
+
+        listen(&socket, &shared, &stop);
+
+        assert_eq!(
+            shared.recv_errors.load(Ordering::Relaxed),
+            u64::from(RECV_ERROR_BUDGET),
+            "every failure up to the budget is counted"
+        );
+        assert_eq!(
+            shared.received.load(Ordering::Relaxed),
+            0,
+            "a failed receive delivered no datagram"
+        );
+        assert!(
+            !shared.listening.load(Ordering::Relaxed),
+            "a listener that has left its receive loop must not report itself \
+             as still listening"
+        );
+        assert!(
+            !stop.load(Ordering::Relaxed),
+            "it stopped on the socket, not because it was asked to"
+        );
+    }
+
+    /// The ordinary read timeout moves neither counter, at any rate, and leaves
+    /// the listener listening until it is asked to stop.
+    #[test]
+    fn the_timeout_path_counts_nothing_and_stays_listening() {
+        for kind in [io::ErrorKind::WouldBlock, io::ErrorKind::TimedOut] {
+            let shared = Shared::new();
+            let stop = AtomicBool::new(false);
+            let socket = Scripted::failing(kind);
+
+            // Ten thousand timeouts, far past the failure budget: a timeout
+            // says the socket is idle, so no number of them is a failure.
+            std::thread::scope(|scope| {
+                scope.spawn(|| {
+                    while socket.calls() < 10_000 {
+                        std::hint::spin_loop();
+                    }
+                    assert!(
+                        shared.listening.load(Ordering::Relaxed),
+                        "a listener that has only timed out is still listening, \
+                         however many {kind:?} timeouts it has seen"
+                    );
+                    stop.store(true, Ordering::Relaxed);
+                });
+                listen(&socket, &shared, &stop);
+            });
+
+            assert!(
+                socket.calls() >= 10_000,
+                "the loop kept receiving through {kind:?} timeouts"
+            );
+            assert_eq!(
+                shared.recv_errors.load(Ordering::Relaxed),
+                0,
+                "a {kind:?} read timeout is not a receive error"
+            );
+            assert_eq!(
+                shared.received.load(Ordering::Relaxed),
+                0,
+                "a timeout delivered no datagram"
+            );
+        }
+    }
+
+    /// A timeout between two failures clears the run, so a transient refusal
+    /// never reaches the budget.
+    #[test]
+    fn a_transient_failure_does_not_end_the_listener() {
+        let shared = Shared::new();
+        let stop = AtomicBool::new(false);
+        let socket = Scripted {
+            // One failure, one timeout, repeated: twice the budget's worth of
+            // failures, none of them consecutive.
+            script: (0..RECV_ERROR_BUDGET * 2)
+                .flat_map(|_| [io::ErrorKind::ConnectionReset, io::ErrorKind::WouldBlock])
+                .collect(),
+            datagrams: Vec::new(),
+            calls: std::sync::atomic::AtomicUsize::new(0),
+        };
+        let wanted = RECV_ERROR_BUDGET as usize * 4;
+
+        std::thread::scope(|scope| {
+            scope.spawn(|| {
+                while socket.calls() < wanted {
+                    std::hint::spin_loop();
+                }
+                stop.store(true, Ordering::Relaxed);
+            });
+            listen(&socket, &shared, &stop);
+        });
+
+        assert!(
+            shared.recv_errors.load(Ordering::Relaxed) > u64::from(RECV_ERROR_BUDGET),
+            "more failures than the budget were counted, and the listener ran \
+             on through them because none of them were consecutive"
+        );
+    }
+
+    /// A datagram received and then refused by the decoder is counted in both
+    /// places: `received` is what separates "nothing arrived" from "something
+    /// arrived and was discarded".
+    #[test]
+    fn a_rejected_datagram_is_counted_as_received_too() {
+        let shared = Shared::new();
+        let stop = AtomicBool::new(false);
+        let socket = Scripted::delivering(vec![b"not osc at all\0\0".to_vec()]);
+
+        std::thread::scope(|scope| {
+            scope.spawn(|| {
+                while socket.calls() < 4 {
+                    std::hint::spin_loop();
+                }
+                stop.store(true, Ordering::Relaxed);
+            });
+            listen(&socket, &shared, &stop);
+        });
+
+        assert_eq!(
+            shared.received.load(Ordering::Relaxed),
+            1,
+            "the datagram arrived, whatever the decoder made of it"
+        );
+        assert_eq!(
+            shared.rejected.load(Ordering::Relaxed),
+            1,
+            "and the decoder refused it"
+        );
+        assert_eq!(
+            shared.recv_errors.load(Ordering::Relaxed),
+            0,
+            "a datagram the decoder refuses is not a receive failure"
+        );
     }
 
     /// A flood of one name occupies one slot, and the frame sees the last value.
@@ -529,12 +918,7 @@ mod tests {
     /// buffer with its capacity intact.
     #[test]
     fn a_drain_swaps_the_buffers_rather_than_taking_one() {
-        let shared = Arc::new(Shared {
-            pending: Mutex::new(Pending::default()),
-            rejected: AtomicU64::new(0),
-            dropped: AtomicU64::new(0),
-            refused: AtomicU64::new(0),
-        });
+        let shared = Arc::new(Shared::new());
         let mut control = Control {
             local: "127.0.0.1:0".parse().expect("a literal socket address"),
             shared: Arc::clone(&shared),

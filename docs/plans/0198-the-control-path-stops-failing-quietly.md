@@ -1,6 +1,6 @@
 # 0198 — The control path stops failing quietly
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user)
 > **Owner skill(s):** dev, studio-builder
@@ -163,17 +163,34 @@ flowchart LR
 
 ## Implementation log
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `plan-0198-the-control-path-stops-failing-quietly` in
+`C:\Users\Igor Konovalov\WORK\rlx-plan-0198`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The listener counts what it receives | dev | not started | |
+| 1 — The listener counts what it receives | dev | done | committed with this row |
 | 2 — A refused selection is reported | dev | not started | |
 | 3 — The two tests read the new evidence | dev | not started | |
 | 4 — The reproduction runs again, with a stop condition | dev | not started | |
 | 5 — The studio carries the new readings | studio-builder | not started | |
 
 ### Notes
+
+- **Phase 1 deviates from ADR-0221's Neutral point in one respect, to satisfy the phase's own
+  done-when.** The ADR says the receive loop "still continues on a failed receive"; the done-when
+  requires that a listener whose socket is closed under it "stops reporting itself as listening",
+  which a loop that never leaves cannot do. The listener therefore counts the failure and continues,
+  and leaves only after `RECV_ERROR_BUDGET` = 64 failures **with no datagram and no read timeout
+  between any two of them** — a run any transient refusal breaks and a gone socket reaches in
+  microseconds. A test asserts each half. It also ends the unbounded spin the bare `continue` left
+  on a dead socket.
+- **Phase 1 adds a private `Receive` trait over the one `recv_from` call**, with `UdpSocket` as the
+  only shipped implementation. The socket is moved into the listener thread and no handle to it
+  survives outside, so the failure policy above has no test at all without a receiver a test can
+  script.
+- **`Control::listening` is set true at `bind`, before the thread runs**, rather than only at the
+  top of `listen`: a caller reading it between the spawn and the thread's first instruction would
+  otherwise be told the listener had gone.
 
 ### Close triggers
 
