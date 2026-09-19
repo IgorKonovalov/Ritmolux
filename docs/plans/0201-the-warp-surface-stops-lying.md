@@ -186,7 +186,8 @@ job of a baseline).
 | 1 — `zoom` says what the shader does | dev | done | f14bcd47 |
 | 2 — A custom wave draws through the contract | dev | done | 48120eee |
 | 3 — Level mode can hold an ink | dev | done | c832e76c |
-| 4 — The converted chain gets a baseline that can see it | dev | parked, no code committed | |
+| 4 — The converted chain gets a fixture that will see it | dev | done | committed with this row |
+| 4b — The baseline is captured by someone who looks at it | human | not started | |
 
 ### Notes
 
@@ -234,35 +235,21 @@ job of a baseline).
 - **Phase 3 regenerated `presets/preset.schema.json` as well**, for the reason Phase 1's note above
   records: the same `RLX_UPDATE_PRESET_SCHEMA=1` run writes it, and a `warp_mesh` parameter reaches
   the generic editor schema too.
-- **Phase 4 is parked on a permission, and nothing of it is committed.** The phase's deliverable is a
-  committed baseline PNG, and a baseline is written by `RLX_BLESS=1`. A conductor session's allowlist
-  — `tools/conductor/settings.conductor.json` — carries `RLX_UPDATE_PRESET_SCHEMA=1 cargo *` and
-  `RLX_UPDATE_PARAM_REFERENCE=1 cargo *`, which is what unblocked Phases 1 and 3, and **no entry for
-  `RLX_BLESS`**; the bare `RLX_BLESS=1 …` form is refused. Nothing inside the phase reaches around
-  that: `shot` can write a PNG and it would be the wrong picture, because a baseline is captured
-  through `common::headless`'s software adapter and `fixed_frame_spectrum`, not through the CLI's
-  analysis path. Writing the allowlist entry is the owner's — it is outside this phase's
-  `Files touched`, it is the conductor's own configuration, and a session cannot grant itself a
-  permission it is already running under anyway.
-
-  **The work reverted, described so the re-do is mechanical.** A module of its own,
-  `core/tests/suite/warp_mesh_wide.rs` plus its `mod` line in `core/tests/suite/main.rs` — the file
-  shape `attractor_trails.rs` uses and for its reason, that `RLX_BLESS` is not scoped to a fixture
-  and a bless inside `golden.rs` would rewrite every 128x128 baseline to add one. Capture
-  **160x120**: 4:3, so neither 1:1 (where `vertex_position`'s aspect multiply and `shader.rs`'s
-  `(aspectx, aspecty)` pair are both the identity, which is why the three square fixtures cannot see
-  this chain) nor 16:9 (the shape ADR-0037 records as blind), and not `attractor_trails.rs`'s 1.6
-  either. Fixture `core/tests/fixtures/warp_mesh_shader.toml` unmodified, `FRAMES = 60` and the
-  `golden.rs` tolerances, so the square capture there and this one differ in the target size and in
-  nothing else; the shader bundle rather than the bytecode-only one because it reaches both halves of
-  the arithmetic — the mesh's `rad`/`ang` and `U.aspect`. Second test, no GPU: the capture size is
-  still neither square nor 16:9, so a later edit cannot leave a baseline that passes and guards
-  nothing. The one-term experiment the done-when asks for is dropping `* aspect` from
-  `mesh::vertex_position`, which is the identity at 1:1 and is not at 4:3. `core/tests/golden/` gains
-  `warp_mesh_wide.png`; `docs/testing.md` was not reached.
-- **`core/tests/suite/main.rs` is not in Phase 4's `Files touched`** and a new module there needs its
-  `mod` line. Named here rather than assumed, since the phase says *`core/tests/golden.rs` or a
-  sibling module* and the sibling-module route costs that one edit.
+- **Phase 4 landed the guard and not the picture, which is the shape the split gives it.**
+  `core/tests/suite/warp_mesh_wide.rs` captures `core/tests/fixtures/warp_mesh_shader.toml`
+  unmodified at **160x120**, with `golden.rs`'s `FRAMES = 60` and both of its tolerances, so the
+  square capture there and this one differ in the target size and in nothing else. Its drift test
+  skips in ADR-0016's shape while `core/tests/golden/warp_mesh_wide.png` is absent; its second test
+  needs no GPU, holds the capture size off 1:1 and off 16:9, and runs meanwhile.
+- **Phase 4 also edited `core/tests/suite/main.rs`**, which its `Files touched` does not name: a
+  sibling module needs its `mod` line, and the phase reads *`core/tests/golden.rs` or a sibling
+  module*.
+- **What Phase 4b touches besides the baseline**, named here so its holder need not find them: the
+  skip block in `warp_mesh_wide.rs`, marked in the file as the block to delete — after which the
+  `path.exists()` assertion under it is the live guard, the one every other baseline carries — and
+  the closing sentence of `docs/testing.md`'s `warp_mesh_wide` row, which says the first baseline is
+  a person's. The one-term experiment that done-when asks for is dropping `* aspect` from
+  `mesh::vertex_position`: the identity at 1:1, not at 4:3.
 
 ### Close triggers
 
