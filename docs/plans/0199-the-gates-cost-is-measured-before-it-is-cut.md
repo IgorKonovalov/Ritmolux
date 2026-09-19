@@ -146,8 +146,8 @@ Alternative B returning, and it needs an amendment this plan has no measurement 
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — Measure what the override actually costs | dev | done | 2e04f9a5 |
-| 2 — Fold the exclusive testcases that are pure overhead | dev | done | committed with this row |
-| 3 — Measure a sweep's fixed cost per testcase | dev | not started | |
+| 2 — Fold the exclusive testcases that are pure overhead | dev | done | e5a5da6e |
+| 3 — Measure a sweep's fixed cost per testcase | dev | done | committed with this row |
 | 4 — The sweeps run in batches | dev | not started | |
 | 5 — A batched render equals a solo render | dev | not started | |
 
@@ -282,6 +282,77 @@ the per-process share of 7 fewer test processes is removed. The honest reading i
 saves a few seconds of serialized work and cannot save more than the block's own 14.6 s, and that
 one run per arm cannot resolve it. No further arms were run: the plan asks for one re-measurement
 against Phase 1's baseline and this is it.
+
+#### Phase 3 — what a sweep testcase spends on its adapter
+
+Machine: the reference machine (x86_64-pc-windows-msvc, 16 logical cores), DX12 WARP — every one of
+these sweeps builds through `common::headless`, which is `prefer_software`. Runner: cargo-nextest
+0.9.140. Tree: this commit's parent, with a temporary `Instant` probe around `common::headless` and
+around the whole helper in each of the three per-preset sweeps, printing the elapsed pair and the
+process id; the probe was reverted with `git restore` before the commit and this phase touches no
+file.
+
+**The process model is one process per testcase, confirmed rather than assumed.** Every testcase
+printed a different process id, and `nextest`'s own per-test wall exceeds the in-test total by
+0.81–1.10 s in all twelve — the span outside the test function, which only exists because the test
+function is the whole of a process.
+
+Command: `cargo nextest run -p rlx-core -j 1 -E '<the twelve testcases>' --success-output immediate`
+through the suite lock. **`-j 1` on purpose**: a first attempt selected all 84 representative
+testcases at the default 16-way concurrency and every one of them was still running past 120 s,
+because selecting only the GPU sweeps puts 16 WARP devices on 16 cores at once — a reading about
+that contention and not about a testcase. It was stopped and re-taken serially. The absolute times
+below are therefore *floor* times, taken with the box otherwise idle.
+
+Four presets spanning what accumulates state: `Leviathan` (attractor, compute particles), `Etching`
+(reaction-diffusion, feedback field), `Loom` (parametric curve, lines), `Whorl` (fragment field,
+no accumulation). `fixed` is `common::headless` — instance, adapter, device and the pipeline set;
+`total` is the whole helper; `wall` is nextest's own figure for the testcase.
+
+| sweep | preset | fixed ms | total ms | fixed share of total | wall s | process ms |
+|---|---|---|---|---|---|---|
+| animation | Leviathan | 2116.6 | 6385.2 | 33 % | 7.200 | 815 |
+| animation | Loom | 818.9 | 2309.1 | 35 % | 3.116 | 807 |
+| animation | Whorl | 781.0 | 1850.0 | 42 % | 2.659 | 809 |
+| animation | Etching | 847.6 | 2983.5 | 28 % | 3.794 | 810 |
+| reactivity | Leviathan | 802.4 | 7558.4 | 11 % | 8.479 | 921 |
+| reactivity | Loom | 2247.5 | 4789.3 | 47 % | 5.887 | 1098 |
+| reactivity | Whorl | 1003.0 | 2825.3 | 36 % | 3.688 | 863 |
+| reactivity | Etching | 943.1 | 4090.4 | 23 % | 4.953 | 863 |
+| sanity_loudness | Leviathan | 889.2 | 3851.2 | 23 % | 4.719 | 868 |
+| sanity_loudness | Loom | 961.1 | 1907.7 | 50 % | 2.720 | 812 |
+| sanity_loudness | Whorl | 1080.6 | 1919.8 | 56 % | 2.789 | 869 |
+| sanity_loudness | Etching | 1001.7 | 2436.0 | 41 % | 3.386 | 950 |
+
+Per sweep, over these four presets:
+
+| sweep | fixed (mean) | variable (mean) | process (mean) | wall (mean) | fixed+process share of wall |
+|---|---|---|---|---|---|
+| animation | 1.141 s | 2.241 s | 0.810 s | 4.192 s | **46.5 %** |
+| reactivity | 1.249 s | 3.567 s | 0.936 s | 5.752 s | **38.0 %** |
+| sanity_loudness | 0.983 s | 1.545 s | 0.875 s | 3.404 s | **54.6 %** |
+
+Read the two columns that matter together: **`fixed` alone is 26–39 % of a testcase's in-test time,
+and the part a batch removes — the renderer build plus the process the testcase is — is 38–55 % of
+its wall.** The spread across presets is real and is the variable half moving: `Leviathan`'s
+reactivity testcase renders 120 attractor frames and spends 89 % of itself doing that, while
+`Whorl`'s loudness testcase renders two fragment-field captures and spends 56 % of itself on the
+adapter it built to do it.
+
+**The stop condition: it does not fire.** The plan's condition is *"if the fixed share is a small
+part of a sweep's time"*. It is not: the arithmetic over the shipped library is 114 presets ×
+(fixed + process) = 249 s in `reactivity`, 222 s in `animation` and 212 s in `sanity_loudness`,
+**683 s in total of a 1522 s serial cost for the three sweeps — 45 %.** Backlog 0239's premise
+stands, [ADR-0222](../adrs/0222-a-preset-sweeps-fixed-cost-is-paid-per-process-so-the-lever-is-the-batch.md)
+is to be implemented rather than superseded, and Phases 4 and 5 run.
+
+**The batch size Phase 4 takes from this is 8.** A batch of `B` presets costs `fixed + process +
+B × variable`, so its efficiency is `B × variable / (fixed + process + B × variable)`: at the
+sweeps' means that is 87 % at `B = 4`, **93 % at `B = 8`**, and 96 % at `B = 16` — the knee is at 8,
+and past it the return is bought with granularity. Granularity is the other constraint and it is
+what caps the size rather than the arithmetic: 114 presets in batches of 8 is 15 scheduling units
+per sweep against 16 slots, and a batch of 16 would halve that to 8 and leave slots idle on the
+tail.
 
 ### Close triggers
 
