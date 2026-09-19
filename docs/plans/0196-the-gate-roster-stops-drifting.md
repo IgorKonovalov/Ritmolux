@@ -174,9 +174,10 @@ flowchart TB
 
 ## What this plan does NOT do
 
-- It does not touch `.claude/`. Four documents cite backlog 0179 as the home of a live gap that is
-  really 0246's; two of them are under `.claude/skills/`, which a conductor session may not edit
-  (ADR-0210), and the architect corrects those in the close session.
+- It does not touch `.claude/`. Nothing here needs a skill edit: the two citations of backlog 0179
+  that 0246's body reported were repaired before this plan was written, and
+  `.claude/skills/architect/SKILL.md` cites 0246 at both sites. The two that remain are inside
+  `docs/plans/README-archive.md`, which is an append-only record of what was true then.
 - It does not unify the non-Node steps. `fmt`, `clippy`, `nextest`, the studio trio and the sd-filter
   suite differ between carriers by decision, and the manifest deliberately holds Node gates only.
 - It does not hold the hook's English skip notice to the manifest (ADR-0217's third Negative).
@@ -210,5 +211,6 @@ flowchart TB
 
 ## Followups (after this lands)
 
-- The four citations of backlog 0179 as a live gap (two under `.claude/skills/architect/`, two in
-  `docs/plans/README-archive.md`) — the architect's, at the close.
+- Backlog 0246 is archived on promotion, so the class's home is now this plan plus
+  [ADR-0217](../adrs/0217-the-node-gate-roster-is-one-manifest-and-a-checker-holds-every-carrier-to-it.md).
+  Anything still pointing a reader at backlog 0179 for a live gap is stale by two hops.
