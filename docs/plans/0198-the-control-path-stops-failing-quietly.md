@@ -172,7 +172,7 @@ flowchart LR
 | 2 — A refused selection is reported | dev | done | 5bf159f4 |
 | 3 — The two tests read the new evidence | dev | done | f7e13b9d |
 | 4 — The reproduction runs again, with a stop condition | dev | done | 7a00199d |
-| 5 — The studio carries the new readings | studio-builder | done | committed with this row |
+| 5 — The studio carries the new readings | studio-builder | done | 5e706521 |
 
 ### Notes
 
@@ -266,14 +266,24 @@ the socket and cannot say where inside it the datagram went.
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** none — no file under `presets/` is in this branch's diff.
 - **Plan header `Closes:`** none — see `**Takes:**`; backlog 0219 and 0220 stay live, each with a
   dated bullet naming the half this plan took and whatever Phase 4 recorded.
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** feature — three listener readings and a refused-selection `preset_error` on the
+  player's event stream (`standalone/src/control.rs`, `events.rs`, `show.rs`), and the studio
+  surface that reads them (`studio/shared/protocol.ts`, `studio/renderer/components/Footer.tsx`).
+- **Operator docs touched:** `docs/configuration.md` (the `health` line's fields) and
+  `docs/specs/0003-studio-control-protocol.md` (the `health` roster row, and two invariants — the
+  listener readings and the refused selection). No other operator doc moved.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 1, 1 broken —
+  `docs/design-backlog.md:1462 -> 0219 present: let Ok\(\(len, _from\)\) = socket\.recv_from\(&mut
+  buf\) else \{ in: standalone/src/control.rs`, which Phase 1 replaced. Advisory: 28 moved paths,
+  among them 0219's `standalone/tests/control_loopback.rs` and 0220's `standalone/src/show.rs` and
+  `standalone/tests/stream_show.rs`, all three touched by this plan.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). The studio gate ran at the
+  tip of Phase 5: `npm run typecheck` and `npm run lint` clean, `npm test` 282 passed across 30
+  files, 0 failed, 0 skipped.
+- **Outstanding `human` phases:** none — the plan declares none.
 
 ## Followups (after this lands)
 
