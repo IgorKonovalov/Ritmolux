@@ -76,10 +76,12 @@ impl StereoField {
         let corr = sum_lr / (sum_ll * sum_rr).sqrt().max(f32::MIN_POSITIVE);
         Self {
             balance: ratio(rms_l, rms_r),
-            // One channel under the floor beside a loud one leaves the
+            // One channel exactly silent beside a loud one leaves the
             // correlation undefined; the floored denominator reads it as `0`,
             // which is the fully-decorrelated midpoint — a hard pan is a wide
-            // image, not a narrow one.
+            // image, not a narrow one. A channel merely *below* the floor is a
+            // different case and needs no special handling: a scaled copy of
+            // the loud one still correlates exactly, so it reads `0`.
             spread: (1.0 - corr.clamp(-1.0, 1.0)) * 0.5,
         }
     }

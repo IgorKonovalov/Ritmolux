@@ -50,11 +50,12 @@ analysis that consumes it. It states what must be true, not how it is implemente
   here; ambient nondeterminism is still forbidden, and the distinction is what
   `analysis_is_deterministic` asserts by running the whole signal through two fresh analyzers.
   **The stereo field is the exception that proves the rule**: `balance`, `spread` and the three
-  per-band balances divide by nothing and carry no history at all, so each is a pure function of
-  its own hop and the same hop read at two points in a stream yields the same five numbers
-  ([ADR-0215](../adrs/0215-the-analyzer-publishes-an-absolute-stereo-field.md)). That is what
-  "absolute" costs and buys — no divisor to publish beside them, and no track on which `0` means
-  anything but centred.
+  per-band balances divide by nothing — no running peak, no normalizer, no gain to publish beside
+  them ([ADR-0215](../adrs/0215-the-analyzer-publishes-an-absolute-stereo-field.md)). `balance` and
+  `spread` are taken from the hop's own two channels and are therefore pure functions of that hop
+  alone; the three per-band balances resolve from the same short window the bands do, so they see
+  what that window sees and nothing further back. What all five share is that no track and no
+  history can make `0` mean anything but centred.
 - Any visual jitter or randomness, when wanted, MUST be **explicitly seeded** so a scene is
   reproducible from its seed. (CLAUDE.md)
 - Sample rate, channel count, and buffer size MUST be validated once where audio enters the

@@ -1374,7 +1374,7 @@ existed. Each is a pure function of its argument, like every generator here.
 
 | kind | what it is | what it reads |
 |---|---|---|
-| `pan:<p>`, `p` in `-1..1` | broadband seeded noise at per-channel gains `L = (1-p)/(1+|p|)`, `R = (1+p)/(1+|p|)` — one waveform, two gains | `balance` exactly `p`, `spread` exactly `0`, and all three `<band>_balance` at `p` as well |
+| `pan:<p>`, `p` in `-1..1` | broadband seeded noise at per-channel gains `L = (1-p)/(1+|p|)`, `R = (1+p)/(1+|p|)` — one waveform, two gains | `balance` exactly `p`, `spread` exactly `0` (but see the endpoints below), and all three `<band>_balance` at `p` as well |
 | `wide:<seed>` | independent seeded noise per channel, from two streams derived from `seed` | `spread ≈ 0.500`, `balance ≈ 0.000` |
 | `split:<p>` | a centred 80 Hz sine under an 8 kHz tone panned to `p` | `bass_balance ≈ 0`, `treb_balance ≈ p`, and a whole-mix `balance` strictly between them |
 
@@ -1385,6 +1385,16 @@ gains**, so the RMS ratio *is* `p` algebraically and the correlation is exactly
 while the treble is thrown to one side, which is the look per-band balance exists
 for, and `balance` alone would report some intermediate position belonging to
 neither layer.
+
+**`pan`'s two endpoints are the exception to its own `spread` row.** At `p = ±1`
+one gain is exactly `0`, so one channel is exactly silent — and a correlation
+against silence is undefined rather than perfect. The analyzer reports that as
+`spread = 0.5`, the fully-decorrelated midpoint, on the reasoning that a hard
+pan is a wide image and not a narrow one. So `pan:1` prints `balance 1.000` with
+`spread 0.500`, while `pan:0.999` prints `spread 0.000` like every other
+interior position: at `0.999` the quiet channel is a scaled copy of the loud one
+rather than silence, and a scaled copy correlates exactly. Use an interior `p`
+to exercise a `spread`-gated preset against a *narrow* image.
 
 Its treble layer is deliberately the louder of the two (0.6 against 0.3), which
 is arithmetic rather than taste: a band's value is a **mean over its linear
