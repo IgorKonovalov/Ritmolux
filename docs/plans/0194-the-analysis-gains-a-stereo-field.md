@@ -282,7 +282,7 @@ shim are untouched by this plan.
 | 3 — Per-band balance, and the measurement that chooses its mechanism | dev | done | 1b090d38 |
 | 4 — The five names reach the grammar | dev | done | 2fa92fef |
 | 5 — The documents that make an absolute quantity usable | dev | done | ca724847 |
-| 6 — Hear it | human | done | (this commit) |
+| 6 — Hear it | human | done | b33d8ceb |
 
 ### Notes
 
