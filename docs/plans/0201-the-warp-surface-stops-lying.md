@@ -100,12 +100,25 @@ job of a baseline).
   `core/src/render/scenes/warp_mesh/shaders.rs`, `presets/README.md` (generated),
   `presets/schema/warp_mesh.schema.json` (generated), `docs/specs/player-schema.json` (generated),
   `docs/preset-palettes.md`
-- **Done when:** the shipped `presets/warp_ladder.toml` rendered at 640x360 loud with a two-ink
-  palette and `palette_steps = "0"` produces **two** exact ink values plus the background with the
-  threshold on, against the 851 the same frame produces with it off — the same measurement backlog
-  0251 took, re-taken; the default renders that preset byte-identically to today, so no golden and
-  no card move; and `docs/preset-palettes.md` names the aliasing cost rather than leaving an author
-  to find it.
+- **Done when:** with the shipped `presets/warp_ladder.toml` at 640x360 loud, a two-ink palette and
+  a **banded** coordinate (`palette_steps = "12"`, what that preset ships), the threshold produces
+  the **ink class** — paper, plus the two inks each within one encoded level of its stop, and no
+  value between them — against the same frame with the threshold off; the default renders that
+  preset byte-identically to today, so no golden and no card move; and `docs/preset-palettes.md`
+  names the aliasing cost, and that the print needs both levers, rather than leaving an author to
+  find either.
+
+  **Amended 2026-09-19, after Phase 3's own measurement convicted the original.** It asked for *two
+  exact ink values plus the background at `palette_steps = "0"`*, which no coverage threshold can
+  reach: two continua sit downstream of the ink and this phase removes one. The 256-texel LUT is
+  sampled **linearly**, so a run boundary is one texel wide whatever the stops say, and an unbanded
+  coordinate sweeps it continuously; and the display write dithers by one encoded level (ADR-0096),
+  so even a perfect two-ink frame counts more than two exact values. The measured table is in the
+  `## Implementation log`: 886 to 802 at `"0"`, and **145 to 11** at `"12"`, where the 11 decomposes
+  as paper plus two dithered ink clusters with nothing between. The figures are measurements on the
+  development machine, not properties (ADR-0071) — what is asserted above is the class, which holds
+  wherever the two levers are both on. ADR-0224's first Positive carried the same overreach and is
+  corrected in the same commit.
 
 ### Phase 4 — The converted chain gets a baseline that can see it
 - **Owner skill:** dev

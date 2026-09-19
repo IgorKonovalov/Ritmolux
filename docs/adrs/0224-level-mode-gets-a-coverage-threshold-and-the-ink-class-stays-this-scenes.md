@@ -49,8 +49,15 @@ palette, which is the property a print needs and which this threshold delivers.
 ## Consequences
 
 ### Positive
-- A print becomes reachable: a two-ink palette with the threshold on renders two inks and the paper,
-  which no combination of today's switches reaches.
+- A print becomes reachable, and it takes **both** levers: the threshold removes the coverage
+  continuum, and a banded `palette_steps` removes the coordinate one. The 256-texel LUT is sampled
+  **linearly**, so a run boundary is one texel wide whatever the stops say, and an unbanded
+  coordinate sweeps it continuously — every pixel inside a transition texel is a blend of the two
+  inks. Measured 2026-09-19 on the development machine, `warp_ladder` at 640x360, bass=mid=treb=1,
+  exact frame colours: with `palette_steps = "0"` the threshold takes 886 to 802, and with the
+  shipped `palette_steps = "12"` it takes 145 to **11** — paper plus the two inks, each spread
+  across its own neighbouring encoded levels by ADR-0096's dither, and nothing between them. That
+  cluster is the ink class; "two inks" names two clusters, never two exact values.
 - Nothing shipped moves. Off by default, and `warp_ladder`'s fade is left as its header argues for.
 - The question stops being open in three places at once — ADR-0197's `Outcome`, Plan 0184's stop
   condition and the backlog entry all point at one decision.
@@ -68,7 +75,8 @@ palette, which is the property a print needs and which this threshold delivers.
 
 ### Neutral
 - The threshold interacts with `palette_steps`: quantized bands plus a threshold is a legal and
-  probably common combination, and neither cancels the other.
+  probably common combination, and neither cancels the other. **The print wants both** — see the
+  first Positive; the threshold alone leaves the coordinate continuum standing.
 
 ## Alternatives considered
 
