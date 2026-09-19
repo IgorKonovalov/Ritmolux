@@ -281,7 +281,7 @@ shim are untouched by this plan.
 | 2 — The isolation guarantee | dev | done | 565e74d0 |
 | 3 — Per-band balance, and the measurement that chooses its mechanism | dev | done | 1b090d38 |
 | 4 — The five names reach the grammar | dev | done | 2fa92fef |
-| 5 — The documents that make an absolute quantity usable | dev | done | committed with this row |
+| 5 — The documents that make an absolute quantity usable | dev | done | ca724847 |
 | 6 — Hear it | human | not started | |
 
 ### Notes
@@ -302,13 +302,19 @@ shim are untouched by this plan.
   `standalone/examples/shot.rs`, one file outside the phase's list; `BandLevels` and its
   measurement are in `standalone/src/shot/args.rs` as listed, and the assertions are there rather
   than on the CLI's text.
-- **Phase 4 — no shipped `[latch]` name collides with any of the five.** The whole shipped set
-  declares exactly **one** latch name, `recut`, in `collage_mono.toml`, `collage_nocturne.toml` and
-  `collage_suprematist.toml`; `presets/pending/` declares none. Nothing to rename.
-- **Phase 4 — the five names cost one regenerated file, `docs/specs/player-schema.json`.** The
-  per-system schemas under `presets/schema/` and `.taplo.toml` did not move: the grammar roster is
-  in the player-schema document alone, and the per-system files describe parameters rather than
-  variables.
+- **Phase 1 — three files outside the phase's list changed because `AnalysisFrame` gained fields**:
+  `core/tests/dsp.rs`, `core/tests/suite/preset.rs` and `standalone/src/shot/report/tests.rs` each
+  destructure or construct the frame exhaustively **on purpose**, so that a new field stops them
+  compiling. Each was extended to carry the new fields, which is the compile break working.
+- **Phase 2 deviation — `waveform_pair` and `waveform_pair_gain` are excluded from the bit-identity
+  assertion, and no implementation could include them.** The pair *is* channels 0 and 1 (ADR-0199):
+  for a stimulus `S` whose channels differ it carries two different traces, and for `M` it carries
+  one trace twice, so `S` and `M` cannot agree on it whatever this plan does. It predates the plan,
+  nothing added here feeds it, and the mono path ADR-0215's title speaks for does not include it.
+  The exclusion is asserted in the other direction in the same test — the pair **must** differ, or
+  the test fails — so it names what the pair is rather than leaving a place for a regression to
+  hide. Every other field the phase enumerates is compared bit-for-bit, through an exhaustive
+  destructure, over both a correlated stereo stimulus and a decorrelated one.
 - **Phase 3 measurement — 51.8 µs per hop, so the exact mechanism is the implementation.** Measured
   by the method behind `docs/nfr.md`'s figure — `one_hop_analyzes_well_under_the_hop_interval`, in
   release, 1000 hops — on the reference machine (`x86_64-pc-windows-msvc`), both readings taken in
@@ -327,29 +333,36 @@ shim are untouched by this plan.
   session. What kept the cost this low is that the per-channel pass runs the **short** window only:
   the band split reads the short window's linear magnitudes, so the 8192-point long window stays
   single (`fft::ShortSpectrum`).
-- **Phase 2 deviation — `waveform_pair` and `waveform_pair_gain` are excluded from the bit-identity
-  assertion, and no implementation could include them.** The pair *is* channels 0 and 1 (ADR-0199):
-  for a stimulus `S` whose channels differ it carries two different traces, and for `M` it carries
-  one trace twice, so `S` and `M` cannot agree on it whatever this plan does. It predates the plan,
-  nothing added here feeds it, and the mono path ADR-0215's title speaks for does not include it.
-  The exclusion is asserted in the other direction in the same test — the pair **must** differ, or
-  the test fails — so it names what the pair is rather than leaving a place for a regression to
-  hide. Every other field the phase enumerates is compared bit-for-bit, through an exhaustive
-  destructure, over both a correlated stereo stimulus and a decorrelated one.
-- **Phase 1 — three files outside the phase's list changed because `AnalysisFrame` gained fields**:
-  `core/tests/dsp.rs`, `core/tests/suite/preset.rs` and `standalone/src/shot/report/tests.rs` each
-  destructure or construct the frame exhaustively **on purpose**, so that a new field stops them
-  compiling. Each was extended to carry the two new fields, which is the compile break working.
+- **Phase 4 — no shipped `[latch]` name collides with any of the five.** The whole shipped set
+  declares exactly **one** latch name, `recut`, in `collage_mono.toml`, `collage_nocturne.toml` and
+  `collage_suprematist.toml`; `presets/pending/` declares none. Nothing to rename.
+- **Phase 4 — the five names cost one regenerated file, `docs/specs/player-schema.json`.** The
+  per-system schemas under `presets/schema/` and `.taplo.toml` did not move: the grammar roster is
+  in the player-schema document alone, and the per-system files describe parameters rather than
+  variables.
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** `presets/README.md` only — the hand-written variable roster in it, not
+  the generated parameter block and no preset content. No `.toml` under `presets/` was added,
+  removed or edited.
 - **Plan header `Closes:`** none
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** a feature — five new `AnalysisFrame` fields, five new grammar names, three new
+  `--signal` kinds and five new `--report` rows. No C ABI, control-protocol or converted-corpus
+  change; no preset content.
+- **Operator docs touched:** `docs/presets.md`, `docs/capturing.md`, `docs/nfr.md`,
+  `docs/specs/0002-ring-determinism.md`, `docs/on-device-validation.md`, `presets/README.md`, and
+  the regenerated `docs/specs/player-schema.json`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — *"102 stated reductions
+  still hold across all 40 live entries (3 unprobeable)"*. The advisory half lists 47 moved paths,
+  two of which this plan moved (`core/src/dsp/mod.rs` and `core/src/dsp/fft.rs`, both under entry
+  0032); it is never part of the exit code.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). `-P fast` ran green at
+  Phase 4's tree — 1720 passed, 311 skipped, 414.8 s — and every phase ran its own done-when
+  checks; the workspace run itself is the gate's.
+- **Outstanding `human` phases:** Phase 6 — *Hear it*. Nothing synthetic can settle whether
+  `balance` tracks what a person hears, and its deliverable is the observed real-world range
+  written back into `docs/presets.md`. A row for it is in `docs/on-device-validation.md`.
 
 ## Followups (after this lands)
 
