@@ -200,6 +200,13 @@ flowchart TB
   regeneration unreachable from the place the phase exists to reach it from.
 - Phase 4's risk asks what happens the first time a session actually runs one of the two
   regenerations. None ran in this session; nothing to record yet.
+- **Round 1 finding 0 (major), `pickNext` picks a merged plan** — `4bf9163f`: the picker asks
+  `merged()` about the plan itself, not only about its `after` deps, so a queue entry for a plan
+  under `done/` is skipped with no state record beside it. The new `cli.test.mjs` case drives `run`
+  over that configuration and asserts no lane opens for it.
+- **Round 1 finding 1 (minor), `recordNotStarted`'s reason list** — `68e4acbd`: `paused` added.
+- **Round 1 finding 2 (minor), `pruneQueue`'s header** — `7a35b07d`: it now states contents and
+  order preserved and the file rewritten in the canonical spelling, not that nothing else moves.
 
 ### Close triggers
 
