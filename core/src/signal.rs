@@ -337,6 +337,38 @@ pub fn wide(seed: u64, secs: f32, format: AudioFormat) -> Vec<f32> {
     interleave_pair(&left, &right, format.channels)
 }
 
+/// A centred bass sine under a treble tone panned to `p` — the case a whole-mix
+/// scalar cannot express (ADR-0215).
+///
+/// The 80 Hz layer is identical in both channels, so `bass_balance` reads `0`;
+/// the 8 kHz layer carries [`pan`]'s gains, so `treb_balance` reads `p`. The
+/// whole-mix `balance` lands strictly between them, at a value set by the
+/// relative energy of the two layers rather than by either position.
+///
+/// **The treble layer is the louder of the two** (0.6 against 0.3, summing
+/// inside the ±0.9 headroom), and that is arithmetic rather than taste: a band's
+/// value is a *mean over its linear bins*, and the treble band spans ~600 of
+/// them against the bass band's ~10. An equal-amplitude tone up there would
+/// average down to about the silence floor and the band would read as having no
+/// position at all.
+pub fn split(p: f32, secs: f32, format: AudioFormat) -> Vec<f32> {
+    let p = p.clamp(-1.0, 1.0);
+    let sr = format.sample_rate as f32;
+    let n = frame_count(secs, format.sample_rate);
+    let denom = 1.0 + p.abs();
+    let (gl, gr) = ((1.0 - p) / denom, (1.0 + p) / denom);
+    let mut left = Vec::with_capacity(n);
+    let mut right = Vec::with_capacity(n);
+    for i in 0..n {
+        let t = i as f32 / sr;
+        let low = 0.3 * (TAU * 80.0 * t).sin();
+        let high = 0.6 * (TAU * 8_000.0 * t).sin();
+        left.push(low + high * gl);
+        right.push(low + high * gr);
+    }
+    interleave_pair(&left, &right, format.channels)
+}
+
 /// Interleave a left/right pair up to `channels`: channel 0 is `left`, channel
 /// 1 is `right`, and any further channel carries their average.
 ///

@@ -259,6 +259,19 @@ pub struct AnalysisFrame {
     /// same terms as [`balance`](Self::balance). A 512-sample hop is about one
     /// cycle of a low bass note, so this jitters on bass-heavy material.
     pub spread: f32,
+    /// [`balance`](Self::balance) taken over the bass band alone — the ratio of
+    /// the two channels' energy across the same bins [`bass`](Self::bass)
+    /// summarises, since both come from one [`bands::BandSplitter`].
+    ///
+    /// The expressive half of the stereo field: a whole-mix scalar cannot say
+    /// that the hats are thrown to one side while the bass stays centred.
+    /// Exactly `0` when the band's louder channel sits below
+    /// [`gain::WAVE_FLOOR`] — a band with no energy has no position.
+    pub bass_balance: f32,
+    /// The same ratio over the mid band.
+    pub mid_balance: f32,
+    /// The same ratio over the treble band.
+    pub treb_balance: f32,
 }
 
 impl Default for AnalysisFrame {
@@ -290,6 +303,9 @@ impl Default for AnalysisFrame {
             novelty: 0.0,
             balance: 0.0,
             spread: 0.0,
+            bass_balance: 0.0,
+            mid_balance: 0.0,
+            treb_balance: 0.0,
         }
     }
 }
@@ -389,6 +405,17 @@ pub struct Analyzer {
     /// The pair's own normalizer, separate from `wave_gain` so the mono trace's
     /// running peak is untouched by this existing at all.
     pair_gain: gain::TraceNormalizer,
+    /// The short window per channel, the two-channel counterpart of `window`,
+    /// feeding the per-band stereo field alone (ADR-0215). Heap-held: 8 KB
+    /// apiece, and `Analyzer` is moved by value.
+    ///
+    /// Only the **short** window is kept per channel. The band split reads the
+    /// short window's linear magnitudes, so a per-channel long window would be
+    /// 32 KB and an 8192-point FFT each that nothing would read.
+    window_pair: [Vec<f32>; 2],
+    /// One short FFT per channel, feeding `bands.split` per channel so the band
+    /// edges are the ones `bass`/`mid`/`treb` already use.
+    pair_spectrum: [fft::ShortSpectrum; 2],
     window: [f32; WINDOW_SIZE],
     /// The long window feeding the sub-crossover bands (ADR-0049). Heap-held:
     /// 32 KB, and `Analyzer` is moved by value.
@@ -441,6 +468,8 @@ impl Analyzer {
             onset_gain: gain::PeakNormalizer::new(format.sample_rate, gain::ONSET_FLOOR),
             wave_gain: gain::TraceNormalizer::new(format.sample_rate),
             pair_gain: gain::TraceNormalizer::new(format.sample_rate),
+            window_pair: [vec![0.0; WINDOW_SIZE], vec![0.0; WINDOW_SIZE]],
+            pair_spectrum: [fft::ShortSpectrum::new(), fft::ShortSpectrum::new()],
             window: [0.0; WINDOW_SIZE],
             low_window: vec![0.0; LOW_WINDOW_SIZE],
             filled: 0,
@@ -492,6 +521,10 @@ impl Analyzer {
                 for (tail, hop) in self.wave_pair.iter_mut().zip(&self.hop_pair) {
                     tail.copy_within(HOP_SIZE.., 0);
                     tail[WAVE_SAMPLES - HOP_SIZE..].copy_from_slice(hop);
+                }
+                for (win, hop) in self.window_pair.iter_mut().zip(&self.hop_pair) {
+                    win.copy_within(HOP_SIZE.., 0);
+                    win[WINDOW_SIZE - HOP_SIZE..].copy_from_slice(hop);
                 }
                 self.filled = (self.filled + HOP_SIZE).min(LOW_WINDOW_SIZE);
                 if self.filled == LOW_WINDOW_SIZE {
@@ -586,6 +619,20 @@ impl Analyzer {
                     // alone. Unlevelled, so it is not routed through `gain`.
                     let [hop_l, hop_r] = &self.hop_pair;
                     let field = stereo::StereoField::measure(hop_l, hop_r);
+                    // ...and its per-band half, from one short FFT per channel
+                    // split by the **same** `BandSplitter` the mono bands come
+                    // from, so the edges cannot drift apart. Two short FFTs, not
+                    // two full spectra: the band split reads the short window's
+                    // linear magnitudes, so the long window stays single. That
+                    // is what kept the exact mechanism affordable against the
+                    // ~11 ms NFR section 3 allocates, and the alternative was a
+                    // time-domain approximation (ADR-0215 decision point 3).
+                    let [spectrum_l, spectrum_r] = &mut self.pair_spectrum;
+                    let [window_l, window_r] = &self.window_pair;
+                    let (bass_balance, mid_balance, treb_balance) = stereo::band_balance(
+                        self.bands.split(spectrum_l.analyze(window_l)),
+                        self.bands.split(spectrum_r.analyze(window_r)),
+                    );
 
                     self.latest = AnalysisFrame {
                         spectrum,
@@ -614,6 +661,9 @@ impl Analyzer {
                         novelty,
                         balance: field.balance,
                         spread: field.spread,
+                        bass_balance,
+                        mid_balance,
+                        treb_balance,
                     };
                     self.pending_beat |= beat;
                 }

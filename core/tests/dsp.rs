@@ -804,6 +804,9 @@ fn the_stereo_field_leaves_every_field_that_predates_it_bit_identical() {
                 novelty,
                 balance,
                 spread,
+                bass_balance,
+                mid_balance,
+                treb_balance,
             } = *s;
 
             let bits =
@@ -857,11 +860,24 @@ fn the_stereo_field_leaves_every_field_that_predates_it_bit_identical() {
             // The two halves of the exclusion, both of them claims.
             pair_moved |= !bits(waveform_pair.as_flattened(), m.waveform_pair.as_flattened())
                 || waveform_pair_gain.to_bits() != m.waveform_pair_gain.to_bits();
-            field_moved |=
-                balance.to_bits() != m.balance.to_bits() || spread.to_bits() != m.spread.to_bits();
+            field_moved |= [
+                (balance, m.balance),
+                (spread, m.spread),
+                (bass_balance, m.bass_balance),
+                (mid_balance, m.mid_balance),
+                (treb_balance, m.treb_balance),
+            ]
+            .iter()
+            .any(|(a, b)| a.to_bits() != b.to_bits());
             assert_eq!(
-                (m.balance, m.spread),
-                (0.0, 0.0),
+                [
+                    m.balance,
+                    m.spread,
+                    m.bass_balance,
+                    m.mid_balance,
+                    m.treb_balance
+                ],
+                [0.0; 5],
                 "{label} hop {hop}: the mono-duplicated stimulus has no stereo field to read"
             );
         }
@@ -932,6 +948,9 @@ fn analysis_is_deterministic() {
                     novelty,
                     balance,
                     spread,
+                    bass_balance,
+                    mid_balance,
+                    treb_balance,
                 } = f;
                 (
                     spectrum
@@ -960,6 +979,9 @@ fn analysis_is_deterministic() {
                         novelty.to_bits(),
                         balance.to_bits(),
                         spread.to_bits(),
+                        bass_balance.to_bits(),
+                        mid_balance.to_bits(),
+                        treb_balance.to_bits(),
                     ],
                     beat,
                     vec![beat_index, beat_in_bar, bar_index],

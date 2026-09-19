@@ -593,6 +593,9 @@ fn from_frame_binds_every_analysis_variable_to_its_own_field() {
         // with one of the levels reads a number that cannot be mistaken for it.
         balance: -0.375,
         spread: 0.125,
+        bass_balance: -0.25,
+        mid_balance: 0.5,
+        treb_balance: 0.875,
     };
     // Not on the frame: the renderer supplies its own clock here, the probe the
     // hop position it synthesized. That is why it stays an argument.

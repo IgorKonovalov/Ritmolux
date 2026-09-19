@@ -845,6 +845,9 @@ fn the_clock_stimulus_moves_the_clock_and_nothing_else() {
             novelty,
             balance,
             spread,
+            bass_balance,
+            mid_balance,
+            treb_balance,
         } = *frame;
 
         // Everything that is not the clock stays at rest.
@@ -894,6 +897,9 @@ fn the_clock_stimulus_moves_the_clock_and_nothing_else() {
             ("novelty", novelty, rest.novelty),
             ("balance", balance, rest.balance),
             ("spread", spread, rest.spread),
+            ("bass_balance", bass_balance, rest.bass_balance),
+            ("mid_balance", mid_balance, rest.mid_balance),
+            ("treb_balance", treb_balance, rest.treb_balance),
         ] {
             assert_eq!(
                 got.to_bits(),

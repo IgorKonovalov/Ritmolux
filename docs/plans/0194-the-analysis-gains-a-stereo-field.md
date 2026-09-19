@@ -278,8 +278,8 @@ shim are untouched by this plan.
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The harness learns stereo, and the whole-mix field lands | dev | done | c99b4d10 |
-| 2 — The isolation guarantee | dev | done | committed with this row |
-| 3 — Per-band balance, and the measurement that chooses its mechanism | dev | not started | |
+| 2 — The isolation guarantee | dev | done | 565e74d0 |
+| 3 — Per-band balance, and the measurement that chooses its mechanism | dev | done | committed with this row |
 | 4 — The five names reach the grammar | dev | not started | |
 | 5 — The documents that make an absolute quantity usable | dev | not started | |
 | 6 — Hear it | human | not started | |
@@ -302,6 +302,24 @@ shim are untouched by this plan.
   `standalone/examples/shot.rs`, one file outside the phase's list; `BandLevels` and its
   measurement are in `standalone/src/shot/args.rs` as listed, and the assertions are there rather
   than on the CLI's text.
+- **Phase 3 measurement — 51.8 µs per hop, so the exact mechanism is the implementation.** Measured
+  by the method behind `docs/nfr.md`'s figure — `one_hop_analyzes_well_under_the_hop_interval`, in
+  release, 1000 hops — on the reference machine (`x86_64-pc-windows-msvc`), both readings taken in
+  this session on the same tree so they are comparable with each other rather than with a remembered
+  number:
+
+  | | per-hop analysis | % of the ~11 ms allocation |
+  |---|---|---|
+  | before the per-channel spectra (whole-mix field already landed) | **34.5 µs** | 0.32 % |
+  | after | **51.8 µs** | 0.49 % |
+
+  The rule's threshold is 110 µs, so this is the **first branch**: `<band>_balance` is
+  `bands.split()` run per channel, over the band edges `bass`/`mid`/`treb` already use, and
+  ADR-0215 takes no `Outcome`. The same-session baseline reads 34.5 µs where `docs/nfr.md` records
+  31.5 — that gap is machine and day, not a regression, which is why both numbers here come from one
+  session. What kept the cost this low is that the per-channel pass runs the **short** window only:
+  the band split reads the short window's linear magnitudes, so the 8192-point long window stays
+  single (`fft::ShortSpectrum`).
 - **Phase 2 deviation — `waveform_pair` and `waveform_pair_gain` are excluded from the bit-identity
   assertion, and no implementation could include them.** The pair *is* channels 0 and 1 (ADR-0199):
   for a stimulus `S` whose channels differ it carries two different traces, and for `M` it carries

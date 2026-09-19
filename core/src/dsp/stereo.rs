@@ -100,6 +100,23 @@ pub fn ratio(left: f32, right: f32) -> f32 {
     (right - left) / (left + right).max(WAVE_FLOOR)
 }
 
+/// The per-band field: [`ratio`] taken over each band's own per-channel energy,
+/// `(bass, mid, treb)` in and out.
+///
+/// The two triples come from [`BandSplitter::split`](super::bands::BandSplitter)
+/// run on each channel's spectrum, so the band edges are **by construction**
+/// the ones `bass`/`mid`/`treb` already use rather than a second set that
+/// happens to agree. A band whose louder channel sits below [`WAVE_FLOOR`]
+/// reads exactly `0`: the treble of a bass-only source has no position, and a
+/// ratio of two leakage floors would invent one.
+pub fn band_balance(left: (f32, f32, f32), right: (f32, f32, f32)) -> (f32, f32, f32) {
+    (
+        ratio(left.0, right.0),
+        ratio(left.1, right.1),
+        ratio(left.2, right.2),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -181,6 +198,22 @@ mod tests {
         assert_eq!(StereoField::measure(&[], &[]), StereoField::default());
     }
 
+    /// The per-band field shares the whole-mix field's floor, which is the only
+    /// thing standing between `treb_balance` on a bass-only source and a
+    /// confident position derived from two spectral leakage floors.
+    #[test]
+    fn a_band_below_the_floor_has_no_position() {
+        let loud = (0.05, 0.02, WAVE_FLOOR * 0.5);
+        let quiet = (0.01, 0.02, WAVE_FLOOR * 0.1);
+        let (bass, mid, treb) = band_balance(loud, quiet);
+        assert!(
+            bass < -0.5,
+            "a band with energy keeps its ratio, got {bass}"
+        );
+        assert_eq!(mid, 0.0, "equal energy is centred");
+        assert_eq!(treb, 0.0, "a band under the floor reads exactly zero");
+    }
+
     /// The claim a one-channel stream makes: channel 1 is filled from channel 0
     /// exactly as `waveform_pair` fills it, so the field reads `0` — the truth
     /// about a stream that carries no position at all.
@@ -201,8 +234,14 @@ mod tests {
                 continue;
             }
             assert_eq!(
-                (frame.balance, frame.spread),
-                (0.0, 0.0),
+                (
+                    frame.balance,
+                    frame.spread,
+                    frame.bass_balance,
+                    frame.mid_balance,
+                    frame.treb_balance
+                ),
+                (0.0, 0.0, 0.0, 0.0, 0.0),
                 "a one-channel stream has no stereo field to read"
             );
         }

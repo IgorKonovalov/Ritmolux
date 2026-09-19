@@ -797,7 +797,7 @@ fn print_band_levels(levels: &BandLevels) {
          not against --set magnitudes:",
         levels.hops
     );
-    println!("  {:<7} {:>8} {:>8} {:>8}", "signal", "min", "mean", "max");
+    println!("  {:<12} {:>8} {:>8} {:>8}", "signal", "min", "mean", "max");
     for (name, band) in [
         ("bass", levels.bass),
         ("mid", levels.mid),
@@ -809,9 +809,12 @@ fn print_band_levels(levels: &BandLevels) {
         // rather than that it is quiet (ADR-0215).
         ("balance", levels.balance),
         ("spread", levels.spread),
+        ("bass_balance", levels.bass_balance),
+        ("mid_balance", levels.mid_balance),
+        ("treb_balance", levels.treb_balance),
     ] {
         println!(
-            "  {name:<7} {:>8.3} {:>8.3} {:>8.3}",
+            "  {name:<12} {:>8.3} {:>8.3} {:>8.3}",
             band.min, band.mean, band.max
         );
     }

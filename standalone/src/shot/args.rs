@@ -6,7 +6,7 @@
 use rlx_core::audio::AudioFormat;
 use rlx_core::dsp::{AnalysisFrame, Analyzer, HOP_SIZE};
 use rlx_core::signal::{
-    bass_sine, chord, click_track, dynamic_groove, noise, pan, treble_tone, wide,
+    bass_sine, chord, click_track, dynamic_groove, noise, pan, split, treble_tone, wide,
 };
 
 use super::film::FILMSTRIP_WARMUP;
@@ -149,10 +149,11 @@ pub fn synth_signal(spec: &str) -> Result<(Vec<f32>, AudioFormat), String> {
             let seed = param.parse::<u64>().unwrap_or(1);
             wide(seed, SIGNAL_SECS, format)
         }
+        "split" => split(parse_param(param, "pan position")?, SIGNAL_SECS, format),
         other => {
             return Err(format!(
                 "--signal: unknown kind `{other}` \
-                 (click|bass|treble|noise|chord|dynamic|pan|wide)"
+                 (click|bass|treble|noise|chord|dynamic|pan|wide|split)"
             ));
         }
     };
@@ -212,6 +213,13 @@ pub struct BandLevels {
     /// How decorrelated the two channels are: `0` identical, `0.5` fully
     /// decorrelated, `1` polarity-inverted. Absolute, as `balance` is.
     pub spread: BandStats,
+    /// `balance` over the bass band alone — the expressive half of the field,
+    /// and the one a whole-mix scalar cannot express.
+    pub bass_balance: BandStats,
+    /// `balance` over the mid band alone.
+    pub mid_balance: BandStats,
+    /// `balance` over the treble band alone.
+    pub treb_balance: BandStats,
     /// Hop index (within the measured, past-warm-up window) where `onset` peaked.
     /// The frame a reseed-gated preset fires on, so a `--strip` can be aimed at it.
     pub onset_peak_hop: usize,
@@ -236,6 +244,7 @@ pub fn band_levels(pcm: &[f32], format: AudioFormat) -> Result<BandLevels, Strin
     let mut onset = Vec::new();
     let mut balance = Vec::new();
     let mut spread = Vec::new();
+    let mut band_balance = [Vec::new(), Vec::new(), Vec::new()];
     for (index, hop) in pcm.chunks(hop_samples).enumerate() {
         analyzer.push_interleaved(hop);
         let frame = analyzer.take_frame();
@@ -248,10 +257,18 @@ pub fn band_levels(pcm: &[f32], format: AudioFormat) -> Result<BandLevels, Strin
         onset.push(frame.onset);
         balance.push(frame.balance);
         spread.push(frame.spread);
+        for (slot, v) in
+            band_balance
+                .iter_mut()
+                .zip([frame.bass_balance, frame.mid_balance, frame.treb_balance])
+        {
+            slot.push(v);
+        }
     }
     if bass.is_empty() {
         return Err("audio too short to measure band levels".to_string());
     }
+    let [bass_bal, mid_bal, treb_bal] = band_balance;
     // The **absolute** hop index, so it names a frame `--strip`/`filmstrip_indices`
     // can be aimed at: those count from hop 0 of the clip, not from the window.
     let onset_peak_hop = FILMSTRIP_WARMUP + peak_index(&onset);
@@ -263,6 +280,9 @@ pub fn band_levels(pcm: &[f32], format: AudioFormat) -> Result<BandLevels, Strin
         onset: band_stats(&onset),
         balance: band_stats(&balance),
         spread: band_stats(&spread),
+        bass_balance: band_stats(&bass_bal),
+        mid_balance: band_stats(&mid_bal),
+        treb_balance: band_stats(&treb_bal),
         onset_peak_hop,
     })
 }
@@ -383,6 +403,7 @@ mod tests {
             "pan:-0.8",
             "pan:1",
             "wide:1",
+            "split:-0.7",
         ] {
             let (pcm, format) = synth_signal(spec).unwrap_or_else(|e| panic!("{spec}: {e}"));
             assert_eq!(format.sample_rate, 48_000);
@@ -403,6 +424,7 @@ mod tests {
         assert!(synth_signal("wide").is_ok(), "seedless wide defaults");
         assert!(synth_signal("pan").is_err(), "pan needs a position");
         assert!(synth_signal("pan:left").is_err());
+        assert!(synth_signal("split").is_err(), "split needs a position");
         let err = synth_signal("sawtooth:1").expect_err("unknown kind");
         assert!(err.contains("unknown kind `sawtooth`"), "got {err}");
         // A numeric kind still needs its number.
@@ -476,6 +498,54 @@ mod tests {
         );
     }
 
+    /// The per-band field, on the stimulus built to discriminate it: bass
+    /// centred, treble panned (ADR-0215).
+    ///
+    /// The tolerance is `0.01` rather than the whole-mix field's `1e-3` because
+    /// the bands are separated by windowed spectral analysis with real leakage,
+    /// not by algebra over one waveform.
+    #[test]
+    fn a_band_split_stimulus_reads_its_pan_in_the_band_it_was_applied_to() {
+        let (pcm, format) = synth_signal("split:-0.7").expect("centred bass, panned treble");
+        let levels = band_levels(&pcm, format).expect("4 s is plenty of hops");
+        assert!(
+            levels.bass_balance.mean.abs() < 0.01,
+            "the 80 Hz layer is identical in both channels: bass_balance {:.4}",
+            levels.bass_balance.mean
+        );
+        assert!(
+            (levels.treb_balance.mean + 0.7).abs() < 0.01,
+            "the 8 kHz layer carries the pan: treb_balance {:.4}",
+            levels.treb_balance.mean
+        );
+        // The property that says per-band measures something whole-mix cannot.
+        // Stated as an ordering: the exact value depends on the relative energy
+        // of the two layers, and no number here would be earned.
+        let whole = levels.balance.mean.abs();
+        assert!(
+            whole < 0.7 && whole > 0.0,
+            "the whole-mix balance must sit strictly between the two bands, got {:.4}",
+            levels.balance.mean
+        );
+
+        // ...and a pan applied to everything reads as a pan in every band, which
+        // is the counter-case: without it the test above would pass just as well
+        // against an implementation that only ever moved the treble.
+        let (pcm, format) = synth_signal("pan:-0.8").expect("a broadband pan");
+        let levels = band_levels(&pcm, format).expect("4 s is plenty of hops");
+        for (name, band) in [
+            ("bass_balance", levels.bass_balance),
+            ("mid_balance", levels.mid_balance),
+            ("treb_balance", levels.treb_balance),
+        ] {
+            assert!(
+                (band.mean + 0.8).abs() < 0.01,
+                "a broadband pan should read -0.800 in every band: {name} {:.4}",
+                band.mean
+            );
+        }
+    }
+
     /// **The evidence that the harness was blind**, and the property that must
     /// stay true: every kind that predates the stereo stimuli builds one mono
     /// buffer and duplicates it into both channels, so under all of them a
@@ -507,6 +577,18 @@ mod tests {
                 (0.0, 0.0, 0.0),
                 "{spec} is mono duplicated into both channels and must read a flat spread"
             );
+            for (name, band) in [
+                ("bass_balance", levels.bass_balance),
+                ("mid_balance", levels.mid_balance),
+                ("treb_balance", levels.treb_balance),
+            ] {
+                assert_eq!(
+                    (band.min, band.mean, band.max),
+                    (0.0, 0.0, 0.0),
+                    "{spec} must read a flat {name} too — a band of two identical \
+                     channels has no position, and one below the floor has none either"
+                );
+            }
         }
     }
 
