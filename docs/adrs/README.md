@@ -236,7 +236,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0212](0212-a-converted-preset-gets-its-own-vertex-module-and-the-pipeline-is-chosen-not-branched.md) | A converted preset gets its own vertex module, and the pipeline is chosen rather than branched | accepted 2026-09-16 (Plan 0180), Outcome |
 | [0213](0213-the-russian-slice-stays-a-section-and-gets-a-header-control.md) | The Russian slice stays a section, and gets a header control | proposed, amends 0185 |
 | [0214](0214-the-digest-is-a-current-state-page-and-history-is-regenerated-on-demand.md) | The digest is a current-state page, and history is regenerated on demand | accepted 2026-09-18 (Plan 0193), amends 0205; amended by 0216 |
-| [0215](0215-the-analyzer-publishes-an-absolute-stereo-field.md) | The analyzer publishes an absolute stereo field, and the mono path does not move | proposed, extends 0199 |
+| [0215](0215-the-analyzer-publishes-an-absolute-stereo-field.md) | The analyzer publishes an absolute stereo field, and the mono path does not move | accepted 2026-09-19, Plan 0194, extends 0199 |
 | [0216](0216-a-review-finding-is-closed-by-the-owner-and-the-page-stops-carrying-it.md) | A review finding is closed by the owner, and the page stops carrying it | accepted 2026-09-19 (Plan 0195), amends 0214 + 0209 |
 | [0217](0217-the-node-gate-roster-is-one-manifest-and-a-checker-holds-every-carrier-to-it.md) | The Node gate roster is one manifest, and a checker holds every carrier to it | proposed |
 | [0218](0218-a-lane-makes-its-plans-preconditions-true-and-a-skipped-check-says-so.md) | A lane makes its plan's preconditions true, and a skipped check says so | proposed |

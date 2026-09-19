@@ -1,9 +1,13 @@
 # 0194 — The analysis gains a stereo field
 
-> **Status:** in-progress
+> **Status:** done — all six phases landed (`c99b4d10`, `565e74d0`, `1b090d38`, `2fa92fef`,
+> `ca724847`, `b33d8ceb`); close review round 1 found **no blockers, no majors, six minors and one
+> nit**, three of which this close repaired (`9c2b9037`). Verified against the finished tree: the
+> full workspace suite green in the ledger (2025 passed, 7 skipped), `fmt`/`clippy`/`cargo doc`
+> clean, every node gate green, and the bit-identity contract read assertion by assertion.
 > **Created:** 2026-09-18
 > **Owner skill(s):** dev, human
-> **Related ADRs:** [0215](../adrs/0215-the-analyzer-publishes-an-absolute-stereo-field.md)
+> **Related ADRs:** [0215](../../adrs/0215-the-analyzer-publishes-an-absolute-stereo-field.md)
 
 ## TL;DR
 
@@ -391,11 +395,168 @@ shim are untouched by this plan.
   present; both judgements pass, the measured ranges are in `docs/presets.md`, and the row in
   `docs/on-device-validation.md` is ticked with the run record.
 
+## Close review
+
+Round 1, 2026-09-19, conductor mode (ADR-0205), fresh session handed the plan and the lane and
+nothing an implementer wrote. Range `c99b4d10..768e6516`, eight commits.
+
+**Verdict: no blockers, no majors, six minors and one nit.** The stereo field is built the way
+ADR-0215 decided it: absolute, computed in a module nothing upstream reads, held to a bit-identity
+contract that is a property rather than a golden, and reachable from the grammar. Every finding is a
+documentation or coverage gap around a correct implementation; none changes a rendered frame.
+
+### Evidence
+
+- **Full suite.** The wrapped `cargo nextest run --workspace` printed the ledger record rather than
+  re-running (ADR-0207): *"skipped cargo nextest run --workspace: tree cb27c71 is green in the suite
+  ledger, run by gate 0194-pre-review at 2026-09-19T09:45:22.983Z: 2025 tests run: 2025 passed
+  (9 slow), 7 skipped"*. That is the full workspace run against this tree — the nine GPU suites and
+  the un-sampled preset sweeps, which the per-phase `-P fast` tier does not carry. The log's
+  `Full suite:` bullet correctly cites it as owed to the pre-review gate.
+- `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets -- -D warnings` and
+  `cargo doc --workspace --no-deps` under `-D warnings` — all clean.
+- `check-doc-links`, `toc --check`, `check-reader-prose`, `check-index-rows`,
+  `check-comment-hygiene`, `check-system-counts` — all green.
+- `check-backlog-claims` — exit 0, 102 reductions across 40 live entries, 3 unprobeable. The
+  advisory's 48 moved paths include two this plan moved, both under entry 0032, whose claim is about
+  module size and is untouched by an addition.
+- `check-translations` — exit 0, 5 stamped. One advisory row, `packaging/foobar/READ-ME-FIRST.ru.md`
+  stamped `f2b0048b` against a source at `d6e275e6`; it is not this plan's, and no document this
+  plan touched carries a translation.
+
+### Lens 1 — alignment
+
+Six phases, six commits, every one carrying a single in-vocabulary `**Owner skill:**`. The log is
+present, shorter than the `## Implementation phases` section it reports on, and its four deviations
+are each real and each argued. `pan:`'s substitution of seeded noise for `chord` costs none of
+Phase 1's properties, because every one of them is a property of *one waveform at two gains* rather
+than of the waveform — and `chord`, three sines below 350 Hz, could not have satisfied Phase 3's
+all-three-bands done-when. `--report` genuinely does not take a `--signal`: `print_band_levels` is
+called unconditionally from the filmstrip path, and the rows land beside the band rows exactly as
+ADR-0215 decision point 2 says. `waveform_pair`'s exclusion from the bit-identity assertion is
+sound *and* is asserted in the other direction in the same test, so it states what the pair is
+rather than leaving a place to hide. Phase 3's 51.8 µs against the rule's 110 µs takes the first
+branch, and the same-session 34.5 µs baseline is exactly what ADR-0071 asks for.
+
+Tests opened and read rather than trusted. `the_stereo_field_leaves_every_field_that_predates_it_bit_identical`
+destructures the frame exhaustively, compares `to_bits()`, runs two stimuli that move different
+quantities, and carries two counter-assertions — so it cannot pass against an analyzer that never
+looked at the channels. `every_pre_stereo_signal_kind_reads_no_stereo_field_at_all` asserts exact
+zeroes across min/mean/max for all five fields over all seven older kinds, which is the harness's
+blindness stated as the property it is. `a_band_split_stimulus_reads_its_pan_in_the_band_it_was_applied_to`
+carries the whole-mix ordering as an ordering, then the broadband counter-case without which it
+would pass against an implementation that only ever moved the treble.
+`a_binding_on_balance_moves_with_a_panned_stimulus` drives the real analyzer and evaluates through
+`Variables::from_frame` — the renderer's own path — and pins the centred case to `0.5` exactly. The
+`[latch]` collision check was verified independently: the shipped set declares one latch name,
+`recut`, in the three `collage_*` presets, and `presets/pending/` declares none.
+
+No ADR decision was reversed. `core-cabi/`, `rlx-ring/`, `plugin-foobar/` and the capture backends
+have an empty diff over the whole range, as ADR-0215 requires.
+
+### Lens 2 — layering, coupling, real-time safety
+
+`stereo.rs` imports `super::gain::WAVE_FLOOR` and nothing else; no platform, audio-source or GPU
+type enters `core/` anywhere in the range. Nothing on the analysis path allocates: `ShortSpectrum`
+holds its taper, transform buffer, scratch and magnitudes from construction, `StereoField::measure`
+is three accumulators over one pass, and both per-channel windows are allocated in `Analyzer::new`.
+The hot-path panic pragma is present with all five lints, and `core/src/dsp/` is already in the
+guard's scan set. The divisions the plan's risk section flagged are floored rather than guarded by a
+reorderable `if`, so both are total. Determinism holds: no clock is read, `pan` fixes its own seed
+and `wide` derives two streams from its argument. No seam widened — no `Scene` change, no OSC
+address, no `extern "C"` function.
+
+### Lens 3 — docs and bookkeeping
+
+The operator sweep is unusually complete: the variable table and a section on what absolute costs in
+`docs/presets.md`, the three kinds and the widened level table in `docs/capturing.md`, the cost
+figure with its whole history in `docs/nfr.md`, the determinism spec, the ticked Phase 6 row in
+`docs/on-device-validation.md`, `presets/README.md`'s roster (19 to 24, which is right), and the
+regenerated `docs/specs/player-schema.json`. `presets/schema/*.schema.json` and `.taplo.toml`
+correctly did not move — verified: they carry no variable roster. Three places naming the same facts
+were not swept; they are findings 3, 5 and 6.
+
+### Lens 4 — correctness and determinism
+
+Boundary validation unchanged. A one-channel stream fills channel 1 from channel 0 at the intake, so
+the field reads `0` without a second code path. No `aspect` appears anywhere in the range. Every new
+tolerance states a property and derives itself — `1e-3`/`1e-4` from f32 accumulation against an
+algebraic answer, `wide`'s bounds from `1/sqrt(512)` carried through 375 hops, Phase 3's `0.01` from
+spectral leakage rather than algebra — and the one measurement in the plan names its machine and its
+method in two places. The two-sources-that-agree question was asked and produced finding 4.
+
+### Lens 5 — design integrity
+
+Dependency direction unchanged, no god module, and the OCP shape is right: the per-band field is
+`bands.split()` run per channel rather than a second set of band edges, so a future edge change
+moves both by construction. The new `STEREO_SLOT_BASE + 5 <= VERTEX_SLOT_BASE` compile-time
+assertion means a later insertion cannot silently overlap, and `INDEX_SLOT` stays derived.
+
+### Findings
+
+- **minor 1 — `docs/specs/0002-ring-determinism.md`: the per-band balances do carry history.** The
+  spec said the whole field *"carr[ies] no history at all, so each is a pure function of its own
+  hop"*. True of `balance` and `spread`, which read the hop pair; the three per-band balances read
+  the `WINDOW_SIZE` sliding window, four hops at `HOP_SIZE = 512`. A reader writing the obvious
+  conformance test against a living contract would watch it fail on a correct analyzer.
+  **Repaired in `9c2b9037`** — the clause now says what all five actually share, the absence of a
+  divisor.
+- **minor 2 — `docs/capturing.md`: `pan:<p>` does not read `spread` `0` at `p = ±1`.** At the
+  endpoints one gain is exactly `0`, one channel is exactly silent, and the floored denominator
+  makes `corr = 0`, so `pan:1` reads `spread 0.500`. The behaviour is deliberate and argued in
+  `stereo.rs`; the table was wrong, and `pan:1` is in the harness's own roster. There is a
+  discontinuity worth stating too: at `p = 0.999` the quiet channel is a scaled copy, correlates
+  exactly, and reads `0`. **Repaired in `9c2b9037`** — the endpoints carry their own paragraph.
+- **minor 3 — `standalone/examples/shot.rs`: `--usage` still lists six `--signal` kinds.** The error
+  path learned `pan|wide|split`; the help text did not. An author reading `--usage` concludes the
+  harness cannot synthesize stereo — the blindness ADR-0215 records as worth more than the feature.
+  **Left open:** a help string is program output, which ADR-0209 does not let a close repair.
+- **minor 4 — `core/src/dsp/fft.rs`: `ShortSpectrum` duplicates the short spectral path, and nothing
+  holds the two together.** It reimplements `SpectrumAnalyzer`'s taper, its `4.0 / WINDOW_SIZE`
+  normalizer and its `MAG_BINS` output, and its doc comment states the coupling as a fact with no
+  test behind it. Nothing can catch a drift: a mono-duplicated source reads `0` whatever the scale
+  is, and on a stereo source the scale cancels out of the ratio — so the only observable consequence
+  is that `ratio`'s `WAVE_FLOOR` cutoff trips at the wrong loudness, silently changing which bands
+  are reported as having no position. The repository already treats this hazard as worth a test one
+  level up, where the short and long windows' `4/N` norms are pinned against each other.
+  **Left open:** a test is code.
+- **minor 5 — `.claude/skills/preset-author/SKILL.md`: the variable roster is missing the five
+  names.** The content lane would compose a stereo look, fail to find `balance` in its own roster,
+  and route a feedback note for a capability that shipped today. The repair is to insert the five
+  after `bar_phase` and before `index`, plus one sentence saying they are the only absolute ones.
+  **Left open:** the CLI refuses a write under `.claude/` to a headless session (ADR-0210).
+- **minor 6 — `.claude/skills/preset-author/references/render-loop.md`: the `--signal` kind list
+  stops at `dynamic:<bpm>`.** Same class, one file over: the lane judges a stereo-bound draft under
+  `click:120`, reads a correct flat `0.000`, and concludes the binding is dead. **Left open**, same
+  reason.
+- **nit 7 — `core/src/dsp/stereo.rs`: the comment's condition is "exactly silent", not "under the
+  floor".** The floored denominator only engages at exactly zero; a channel merely below the floor
+  is a scaled copy and correlates. Whoever next moves that guard would move it wrongly.
+  **Repaired in `9c2b9037`.**
+
+Three things looked at and not raised as findings. The stereo field is not `--set`-able, which the
+plan scoped deliberately and the docs route around. `signal::split` sits outside the
+purity/headroom loop that covers `pan` and `wide`, though its peak is `0.3 + 0.6` by construction
+and finiteness is covered elsewhere. And `WAVE_FLOOR`, a time-domain amplitude, is applied to a band
+mean in `ratio` — which is what the plan specified, and whose consequence is documented rather than
+hidden.
+
+### Bookkeeping at this close
+
+Version **minor** — a feature plan. ADR-0215 accepted with no `Outcome`, since Phase 3 took the
+first branch its own rule anticipated. No `Closes:` in the header and no live backlog entry
+discharged. `presets/` touched only in `README.md`, no `.toml` moved, so there is no set to curate
+and — this plan having fixed no engine defect — no preset header now dodging something lifted.
+
 ## Followups (after this lands)
 
 - The goniometer figure and the placement term — a follow-up plan under ADR-0215.
 - Per-band `spread`, if a look ever asks for it.
-- `.claude/skills/preset-author/references/grammar.md` carries a variable roster that this plan
-  makes incomplete. It is a fact that follows the tree, so the close corrects it.
+- `.claude/skills/preset-author/SKILL.md` carries a variable roster, and
+  `.claude/skills/preset-author/references/render-loop.md` a `--signal` kind list, both of which
+  this plan makes incomplete. (`references/grammar.md`, named here before the close, carries
+  neither.) They are facts that follow the tree, but a headless session cannot write under
+  `.claude/` (ADR-0210), so the close raised them as findings 5 and 6 with their replacement text
+  and left them for the owner.
 - The stereo stimuli make ADR-0199's `waveform_pair` testable for the first time. Nothing in this
   plan asserts against it; a cheap follow-up could.
