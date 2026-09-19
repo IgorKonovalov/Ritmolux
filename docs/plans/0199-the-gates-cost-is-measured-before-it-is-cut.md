@@ -145,8 +145,8 @@ Alternative B returning, and it needs an amendment this plan has no measurement 
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Measure what the override actually costs | dev | done | committed with this row |
-| 2 — Fold the exclusive testcases that are pure overhead | dev | not started | |
+| 1 — Measure what the override actually costs | dev | done | 2e04f9a5 |
+| 2 — Fold the exclusive testcases that are pure overhead | dev | done | committed with this row |
 | 3 — Measure a sweep's fixed cost per testcase | dev | not started | |
 | 4 — The sweeps run in batches | dev | not started | |
 | 5 — A batched render equals a solo render | dev | not started | |
@@ -206,6 +206,82 @@ own 14.6 s.
 
 Serialized time in arm A, as the sum over blocks of (drain + work): 80.3 s of drain + 134.1 s of
 work = 214.4 s of a 426.2 s run, against arm B's 277.1 s with no serialization at all.
+
+#### Phase 2 — the fold
+
+`.config/nextest.toml` **needed no change**: the run-alone filter names `binary(help_cli)` and
+`binary(stream_pipe)`, so it selects whatever testcases those binaries hold, and
+`hygiene::every_clock_reading_test_is_scheduled_alone` matches on the binary too.
+
+The selection falls from **20 testcases to 13**, listed by
+`cargo nextest list --workspace -P fast -E '<the override filter>'` on this tree: `help_cli` 9 → 3,
+`stream_pipe` 3 → 2, the eight cost probes and the `dsp` case untouched.
+
+| was | is now |
+|---|---|
+| `help_prints_the_roster_and_exits_zero` | `every_query_answers_within_the_bound_and_exits_zero` |
+| `help_is_answered_even_beside_an_unrecognized_argument` | ” |
+| `schema_answers_on_stdout_and_exits_without_starting_the_app` | ” |
+| `an_unrecognized_argument_exits_non_zero_and_names_it` | `an_unhonourable_command_line_is_refused_before_anything_is_built` |
+| `a_stream_only_flag_without_stream_exits_without_starting` | ” |
+| `the_windowed_preset_flag_is_not_refused_for_a_missing_stream` | ” |
+| `an_unknown_preset_exits_without_opening_a_window` | ” |
+| `an_unknown_preview_sink_exits_without_starting` | ” |
+| `list_presets_names_each_files_status_and_exits_zero` | unchanged, and still its own case |
+| `a_bounded_run_writes_whole_frames_and_announces_the_geometry_first` | `whole_frames_reach_the_pipe_at_the_announced_geometry` |
+| `an_explicit_size_overrides_the_preview_default` | ” |
+| `a_stalled_reader_costs_no_frames_and_the_run_catches_up` | unchanged, and still its own case |
+
+Every property, one line each, all still asserted and in the same order the spawns run:
+
+`every_query_answers_within_the_bound_and_exits_zero` — `--help` and `-h` each exit 0; each within
+`RESPONDS_WITHIN`; each prints `usage: ritmolux`; each opens with the `Ritmolux — ` banner; each
+names `--osc` and `--sender`. `--help` beside a misspelt flag exits 0 and still prints the usage.
+`--schema` exits 0; within `RESPONDS_WITHIN`; stderr empty; stdout is one `{`…`}` object; on one
+line; carrying `"hash":"` and `"systems":[`.
+
+`an_unhonourable_command_line_is_refused_before_anything_is_built` — `--ocs …` exits 2 naming
+`--ocs` and the nearest flag `--osc`. `--definitely-not-a-flag` exits 2 naming itself. Each of
+`--fps`, `--size`, `--sender=`, `--frames` alone exits 2 naming the missing `--stream`.
+`--preset <unknown>` exits 2, does **not** name `--stream`, and names what was typed.
+`--preset definitely-not-a-preset` exits 2 and lists the roster (`this launch holds`).
+`--preview syphon` exits 2, within `RESPONDS_WITHIN`, naming both the value and the sink that
+exists. The elapsed bound stays on exactly the one case that carried it.
+
+`whole_frames_reach_the_pipe_at_the_announced_geometry` — the preview-default run puts
+30 × 640×360×4 bytes on the pipe; the `stream` event carries width 640, height 360, fps 60,
+format `rgba8`; `hello` is the first event; stdout is a whole number of frames; the cost line names
+`pipe write` and `render+readback`. The `--size 320x180` run puts 8 × 320×180×4 bytes on the pipe
+and its announcement carries width 320 and height 180.
+
+`list_presets_…` and `a_stalled_reader_…` are untouched.
+
+**The deliberate regression.** Three defects were introduced in `standalone/src/`, each behind a
+property that sits *late* in a folded case, so a fold that stopped at its first spawn would have
+passed. All three were convicted, and the probes were reverted with `git restore` before the
+commit:
+
+| probe | caught by | at |
+|---|---|---|
+| `--schema` also writes a line to stderr | `every_query_answers_…` (3rd spawn) | `--schema wrote to stderr, so a parent reading both streams sees noise beside the document` |
+| the unknown-preset refusal drops its `this launch holds` roster line | `an_unhonourable_command_line_…` (5th spawn) | `the refusal did not list the roster` |
+| `Show::emit_stream` announces 640×360 whatever it was given | `whole_frames_reach_the_pipe_…` (2nd run) | `the announcement does not follow --size` |
+
+**Wall time.** Same machine and runner as Phase 1 (reference machine, 16 logical cores,
+cargo-nextest 0.9.140), tree = this commit's parent plus this phase's two test files, `target/`
+built before the run. `cargo nextest run --workspace -P fast --no-fail-fast` through the suite
+lock: **397.8 s**, 1702 run / 311 skipped / 0 failed — against Phase 1 arm A's **426.2 s**,
+1709 run. The test count falls by exactly the 7 the fold removed.
+
+**That 28.4 s is not 28.4 s of saving, and the mechanism says so.** Phase 1 measured a 30.5 s
+run-to-run spread on the exclusive block alone between arms A and C on the same tree, so a
+single-run delta of this size is inside the noise. What the mechanism predicts is smaller: the
+cheap testcases were one contiguous block costing 14.6 s of arm A's timeline (6.9 s of drain plus
+7.7 s of serialized work), the fold keeps them one block, so the drain is still paid once and only
+the per-process share of 7 fewer test processes is removed. The honest reading is that the fold
+saves a few seconds of serialized work and cannot save more than the block's own 14.6 s, and that
+one run per arm cannot resolve it. No further arms were run: the plan asks for one re-measurement
+against Phase 1's baseline and this is it.
 
 ### Close triggers
 

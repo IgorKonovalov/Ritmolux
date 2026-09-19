@@ -113,11 +113,19 @@ fn stream_event(stderr: &str) -> Option<&str> {
 }
 
 /// A bounded run puts exactly one frame's bytes on the pipe per frame, and the
-/// geometry is announced before any of them.
+/// geometry is announced before any of them — at the preview default, and at
+/// whatever `--size` and `--fps` say instead.
+///
+/// **Two spawned runs in one testcase, deliberately.** This binary is in the
+/// run-alone class (ADR-0193), where nextest drains every slot before a testcase
+/// starts and admits nothing beside it, so the unit that costs is the testcase
+/// rather than the run. Both runs hold the same property — bytes on the pipe are
+/// whole frames of the geometry that was announced — and the assertion messages
+/// say which run failed.
 #[test]
-fn a_bounded_run_writes_whole_frames_and_announces_the_geometry_first() {
+fn whole_frames_reach_the_pipe_at_the_announced_geometry() {
     const FRAMES: usize = 30;
-    let Some(run) = run(
+    let Some(preview) = run(
         &[
             "--stream", "--sink", "stdout", "--events", "--frames", "30", "--fps", "60",
         ],
@@ -127,18 +135,18 @@ fn a_bounded_run_writes_whole_frames_and_announces_the_geometry_first() {
     };
 
     assert_eq!(
-        run.stdout.len(),
+        preview.stdout.len(),
         FRAMES * FRAME_BYTES,
         "expected {FRAMES} frames of {FRAME_BYTES} bytes at the preview default \
          of {}x{}; got {} bytes, which is {:.2} frames",
         PREVIEW.0,
         PREVIEW.1,
-        run.stdout.len(),
-        run.stdout.len() as f64 / FRAME_BYTES as f64
+        preview.stdout.len(),
+        preview.stdout.len() as f64 / FRAME_BYTES as f64
     );
 
-    let announcement =
-        stream_event(&run.stderr).unwrap_or_else(|| panic!("no stream event:\n{}", run.stderr));
+    let announcement = stream_event(&preview.stderr)
+        .unwrap_or_else(|| panic!("no stream event:\n{}", preview.stderr));
     for field in [
         "\"width\":640",
         "\"height\":360",
@@ -159,7 +167,7 @@ fn a_bounded_run_writes_whole_frames_and_announces_the_geometry_first() {
     // and the frames to stdout, so "before" is asserted through the writer's own
     // ordering — `hello` precedes it and the run's first byte on stdout is a
     // frame, both of which this run shows.
-    let hello = run
+    let hello = preview
         .stderr
         .lines()
         .find(|line| line.starts_with('{'))
@@ -173,29 +181,27 @@ fn a_bounded_run_writes_whole_frames_and_announces_the_geometry_first() {
     // a prose line anywhere in it would have made it wrong. Stated separately
     // because it is the property, and the count is only its symptom.
     assert!(
-        run.stdout.len().is_multiple_of(FRAME_BYTES),
+        preview.stdout.len().is_multiple_of(FRAME_BYTES),
         "standard output is not a whole number of frames"
     );
 
     // The cost line names this sink's send stage rather than the other one's.
     assert!(
-        run.stderr.contains("pipe write"),
+        preview.stderr.contains("pipe write"),
         "the cost line does not report the pipe's own send stage:\n{}",
-        run.stderr
+        preview.stderr
     );
     assert!(
-        run.stderr.contains("render+readback"),
+        preview.stderr.contains("render+readback"),
         "the cost line does not report the render stage:\n{}",
-        run.stderr
+        preview.stderr
     );
-}
 
-/// `--size` and `--fps` still say otherwise, and the announcement follows them.
-#[test]
-fn an_explicit_size_overrides_the_preview_default() {
-    const FRAMES: usize = 8;
+    // `--size` and `--fps` still say otherwise, and the announcement follows
+    // them rather than the preview default asserted above.
+    const SIZED_FRAMES: usize = 8;
     const SIZE: (u32, u32) = (320, 180);
-    let Some(run) = run(
+    let Some(sized) = run(
         &[
             "--stream", "--sink", "stdout", "--events", "--frames", "8", "--size", "320x180",
             "--fps", "60",
@@ -206,12 +212,12 @@ fn an_explicit_size_overrides_the_preview_default() {
     };
     let expected = SIZE.0 as usize * SIZE.1 as usize * 4;
     assert_eq!(
-        run.stdout.len(),
-        FRAMES * expected,
+        sized.stdout.len(),
+        SIZED_FRAMES * expected,
         "the frames are not the size that was asked for"
     );
     let announcement =
-        stream_event(&run.stderr).unwrap_or_else(|| panic!("no stream event:\n{}", run.stderr));
+        stream_event(&sized.stderr).unwrap_or_else(|| panic!("no stream event:\n{}", sized.stderr));
     assert!(
         announcement.contains("\"width\":320") && announcement.contains("\"height\":180"),
         "the announcement does not follow --size: {announcement}"
