@@ -210,6 +210,14 @@ a session's run: a tree that was dirty when the suite started or when it finishe
 because the tree hash would not name what was tested. `RLX_SUITE_LEDGER` still overrides the choice,
 and a wrapped run in any other repository records nothing.
 
+**There is one ledger per repository, not one per worktree.** The park table sends you *into a lane*
+for every reason it lists, so the wrapper you reach for there is usually the lane's own copy of it —
+and the file it writes has to be the one the gate reads. The wrapper therefore resolves
+`state/suite-ledger.jsonl` under its counterpart in the **main checkout**, found through the
+repository's common git directory, whichever worktree it was invoked from. A repository whose main
+checkout cannot be derived — a bare clone, or a `.git` relocated away from its tree — records beside
+the invoked script as before, and says so in one line on stderr.
+
 **A close that landed without an outcome is adopted, never reviewed a second time.** A review session
 commits its repairs, its `done/` move, its version bump and its tag before it prints anything, so a
 session that dies after that leaves the branch closed and the record open. Before a run reviews
