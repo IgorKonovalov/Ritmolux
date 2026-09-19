@@ -1,8 +1,8 @@
 # ADR-0221 — The control path reports what it did not do
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-19 (Plan 0198) — with an `Outcome`
 > **Date:** 2026-09-19
-> **Related plan(s):** [0198](../plans/0198-the-control-path-stops-failing-quietly.md)
+> **Related plan(s):** [0198](../plans/done/0198-the-control-path-stops-failing-quietly.md)
 > **Extends:** [0176](0176-the-player-is-driven-over-osc-control-in-and-reports-on-its-standard-streams.md)
 > and [spec 0003](../specs/0003-studio-control-protocol.md) (the event roster)
 
@@ -88,6 +88,29 @@ build a user runs.
 event already expresses to the only consumer that reads it: from the studio's side, "the preset you
 asked for is not on screen, and here is why" is one case, and splitting it into two events means two
 render paths for one message.
+
+## Outcome — 2026-09-19, at Plan 0198's close
+
+Accepted as implemented, with two corrections the body above is left carrying because an accepted
+ADR is append-only. Both were raised as `minor` findings by the close review.
+
+- **Three fields joined `health`, not two.** The second Negative says *"Two more fields on `health`,
+  forever"*; `ctl_received`, `ctl_recv_errors` and `ctl_listening` all shipped, which is what the
+  Decision paragraph one section above already required — the liveness reading is a field like the
+  other two, not a property of them. The cost the Negative prices is a third larger than it says.
+  Read the roster table in [spec 0003](../specs/0003-studio-control-protocol.md) for the width, not
+  this number.
+- **The receive loop does leave, after a budget.** The Neutral says *"the loop still continues on a
+  failed receive, because there is nothing else it can do"*. There was: Plan 0198 Phase 1's own
+  done-when required that a listener whose socket is closed under it *"stops reporting itself as
+  listening"*, which a loop that never leaves cannot do. The shipped listener counts the failure and
+  continues, and leaves only after `RECV_ERROR_BUDGET` consecutive failures **with no datagram and
+  no read timeout between any two of them** — a run any transient refusal breaks, and one a gone
+  socket reaches in microseconds. It also ends the unbounded spin the previous bare `continue` left
+  on a dead socket. A consumer must therefore treat `ctl_listening: false` as reachable while a
+  listener is configured; that is the fact the field exists to carry.
+
+Neither correction touches the Decision, and no alternative was reopened.
 
 ## Notes
 

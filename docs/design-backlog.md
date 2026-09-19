@@ -1425,16 +1425,33 @@ gate does not retry (ADR-0193), so while this entry is open every full suite car
 
 - **Raised:** 2026-09-14, by `dev` during the ADR-0193 diagnosis. **Owner if taken:** `dev`; making
   the swallowed receive error observable comes before any fix.
-- **Verified 2026-09-14** — a receive error is swallowed without a count:
-  `present: let Ok\(\(len, _from\)\) = socket\.recv_from\(&mut buf\) else \{ in: standalone/src/control.rs`
+- ~~**Verified 2026-09-14** — a receive error is swallowed without a count:
+  `let Ok((len, _from)) = socket.recv_from(&mut buf) else {` in `standalone/src/control.rs`~~
+  **Delivered 2026-09-19** — [Plan 0198](plans/done/0198-the-control-path-stops-failing-quietly.md)
+  Phase 1 replaced that line, which is what this probe was written to detect; it went red on
+  delivery rather than on decay. The claim it stood for is now the opposite one, re-probed below.
+- **Verified 2026-09-19** — a non-timeout receive failure is counted rather than swallowed, and the
+  listener publishes whether it is still reading:
+  `present: shared\.recv_errors\.fetch_add\(1, Ordering::Relaxed\); in: standalone/src/control.rs`
 - **Verified 2026-09-14** — the test's delivery failure reports the listener counters and a late check:
   `present: still nothing \{:\.2\} s after the send in: standalone/tests/control_loopback.rs`
-- **Half taken 2026-09-19** — [Plan 0198](plans/0198-the-control-path-stops-failing-quietly.md) takes
+- **Half taken 2026-09-19** — [Plan 0198](plans/done/0198-the-control-path-stops-failing-quietly.md) takes
   the **observability half** this entry names as *"the first thing to close"*: the listener counts
   what it receives and what it fails to receive, and publishes whether it is still listening
   ([ADR-0221](adrs/0221-the-control-path-reports-what-it-did-not-do.md)). The cause is not taken —
   that plan's Phase 4 re-runs the reproduction with those readings and names a candidate or records
   that none reproduced. This entry stays live either way.
+- **The readings, 2026-09-19** — Plan 0198 Phase 4 re-ran the reproduction, 19 runs under the same
+  shape of load, and 2 failed. Run 19 was this entry's test, and the new surface reported
+  `received +0 since the send, recv_errors 0, listening true, rejected 0, dropped 0` with the
+  verdict *"the listener was reading a healthy socket and no datagram reached it, so the loss is in
+  front of the socket"*. **Three of the four candidates are now excluded by evidence** rather than
+  by argument: the listener thread was alive, the socket reported no failure, and nothing was
+  received to be discarded — the two gaps this entry named as *"the first thing to close"* are
+  closed, and they answered. **The cause is not found and this entry stays live**: what is left is
+  the datagram never reaching `recv_from`, and per-process counters cannot say where in front of the
+  socket it went. That is ADR-0221's first Negative, and naming it costs per-datagram sequencing,
+  which is a protocol change. Whoever takes this next starts there.
 
 ### Priority
 
@@ -1495,13 +1512,26 @@ why. Whether it was the same defect is unknown.
   `present: Evidence only, never asserted: see .Ask::ping. in: standalone/tests/stream_show.rs`
 - **Verified 2026-09-14** (the close's correction) — the ping goes out as its own datagram after the
   preset's: `present: Action::Ping\(nonce\)\.encode\(&mut buf\); in: standalone/tests/stream_show.rs`
-- **Half taken 2026-09-19** — [Plan 0198](plans/0198-the-control-path-stops-failing-quietly.md) takes
+- **Half taken 2026-09-19** — [Plan 0198](plans/done/0198-the-control-path-stops-failing-quietly.md) takes
   the **observability half**: one of this entry's four candidates, a `select_preset_by_name` that
   returns `false`, stops being silent and reports a `preset_error`
   ([ADR-0221](adrs/0221-the-control-path-reports-what-it-did-not-do.md)), and the listener's counters
   separate the lost-datagram candidate from a dead listener. The stall itself is not taken. The
   `Ask::ping` doc comment's overclaim, corrected in this body on 2026-09-14, is corrected in the
   source by that plan's Phase 3.
+- **The readings, 2026-09-19** — Plan 0198 Phase 4's reproduction caught this walk too, at run 2,
+  stalled at **ask 2 of 14, `swarm`** rather than at `emitter`, which retires *"both failures
+  stopped on the same ask"* as an argument for one defect. `ctl_received` read 4 and stayed 4 across
+  the three `health` lines covering the 120 s the test waited, with `ctl_recv_errors 0` and
+  `ctl_listening true`, and the `ctl/ping` sent **behind** the `ctl/preset` was answered — so four
+  of the five datagrams sent by then reached the socket and one did not. **No `preset_error`
+  appeared, which retires `select_preset_by_name` returning `false` as a candidate for this
+  failure**: that arm now reports itself and did not. A dead listener, a failing socket, a decoder
+  refusal and a full queue are excluded by the same lines. What is left is the same reading 0219
+  ends on, one step less tightly held — the report noted `no health line preceded the ask, so
+  ctl_received (4) has no baseline`, because `Lines::wait_for` clears its record and ask 1 resolved
+  before a `health` line landed in it. **Two of the four candidates remain and this entry stays
+  live**: a lost datagram, or a `true` whose dissolve never completed.
 
 ### Priority
 

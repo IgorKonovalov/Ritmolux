@@ -218,7 +218,7 @@ Phases 1–5 are `dev` and run contiguously; phase 6 is `studio-builder` and han
   must learn about a mark it did not set, which is ADR-0229's stated cost and the thing a
   request/reply shape would miss. A mark naming an unknown preset is refused with a reported
   reason rather than silently stored, matching the observability direction
-  [Plan 0198](0198-the-control-path-stops-failing-quietly.md) takes for the rest of the control
+  [Plan 0198](done/0198-the-control-path-stops-failing-quietly.md) takes for the rest of the control
   path. The spec is updated in this phase, not at the close — it is the contract, and
   `studio-builder` reads it next.
 
