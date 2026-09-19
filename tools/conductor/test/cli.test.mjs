@@ -450,6 +450,24 @@ test("a queue listing a merged plan starts with a notice, and prune drops exactl
   assert.equal(readFileSync(p.queue, "utf8"), compact);
 });
 
+// The configuration ADR-0220 exists to enable: the committed queue and a state/ that knows nothing.
+// The notice must not turn into a session on a plan that merged before this checkout existed.
+test("a run with no state of its own starts no plan already under done/", async () => {
+  const { repo, p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0090", "0101"] });
+  writePlan(repo, { number: "0090", phases: [dev("1")], status: "done — closed" }, { done: true });
+  sh(["add", "docs"], repo);
+  sh(["commit", "-q", "-m", "0090 merged in an earlier run"], repo);
+  assert.equal(existsSync(join(p.stateDir, "conductor.json")), false, "the state the picker would read does not exist");
+
+  const r = await cli("run", "--lane", "a");
+  assert.equal(r.code, 0, r.err.join("\n"));
+  assert.equal(r.out[0], QUEUE_NOTICE);
+  const state = loadState(p.stateDir);
+  assert.equal(state.plans["0090"], undefined, "no record, so no worktree and no session for the merged plan");
+  assert.equal(state.plans["0101"].status, "merged", JSON.stringify(state.plans["0101"].park));
+  assert.deepEqual(state.runs.at(-1).notStarted ?? [], [], "a merged plan is not owed a not-started reason either");
+});
+
 test("prune is refused while a conductor runs, and says so when the queue cannot be read", async () => {
   const { p, cli } = setup([{ number: "0101", phases: [dev("1")] }], { a: ["0101"] });
   mkdirSync(p.stateDir, { recursive: true });

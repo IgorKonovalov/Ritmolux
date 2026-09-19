@@ -169,6 +169,11 @@ export function openWorktreeCount(state) {
 export function pickNext(ctx, lane) {
   let wait = false;
   for (const plan of ctx.queue.lanes[lane] ?? []) {
+    // A merged plan is skipped here, not only by its state record: with no record beside the queue -
+    // a clone, a second machine, a wiped state/ - the status below reads `queued` while the plan is
+    // already under docs/plans/done/. This is the same one condition validateQueue reports as a
+    // notice rather than an error (ADR-0220), which is what makes the two agree.
+    if (merged(ctx, plan)) continue;
     const status = ctx.state.plans[plan]?.status ?? "queued";
     if (status === "running" && ctx.state.plans[plan].lane === lane) return { plan };
     if (status !== "queued") continue;
