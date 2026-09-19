@@ -849,6 +849,7 @@ function installStandIn() {
   return {
     cmd: [process.execPath, script],
     fail: () => writeFileSync(fail, ""),
+    recover: () => rmSync(fail, { force: true }),
     runs: () => (existsSync(ran) ? readFileSync(ran, "utf8").trim().split("\n").filter(Boolean) : []),
   };
 }
@@ -937,4 +938,61 @@ test("a failed install parks the plan before any session, with the tail as the d
   assert.deepEqual(rec.gates ?? [], [], "and no gate ran");
   assert.equal(rec.park.dirty, undefined, "the worktree was left clean");
   assert.match(readFileSync(statePaths(ctx.stateDir).inbox, "utf8"), /plan 0101 parked: studio_install/);
+});
+
+// The park leaves the worktree OPEN, which is what makes the recovery path load-bearing: an install
+// asked for only at open could never run again, and the resume would reach the merge with the three
+// studio checks skipped - the state ADR-0218 refuses.
+test("a studio_install park clears on resume: the install runs again and the three checks run", async () => {
+  const { ctx } = scratch({ plans: [{ number: "0101", phases: [studioPhase("1")] }], lanes: { a: ["0101"] } });
+  const install = installStandIn();
+  install.fail();
+  const gate = studioGate();
+  ctx.studioInstall = install.cmd;
+  ctx.gate = gate.commands;
+  await runLanes(ctx);
+  const parked = ctx.state.plans["0101"];
+  assert.equal(parked.park.reason, "studio_install");
+  assert.ok(existsSync(parked.worktree), "the lane is open, which is what the resume walks back into");
+
+  install.recover();
+  parked.status = "queued";
+  parked.park = null;
+  await runLanes(ctx);
+
+  const rec = loadState(ctx.stateDir).plans["0101"];
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  assert.deepEqual(install.runs(), [rec.worktree, rec.worktree], "the open lane was installed into a second time");
+  assert.deepEqual(rec.gates[0].commands.map((c) => c.unmet ?? null), [null, null, null], "nothing was skipped");
+  assert.deepEqual(gate.ran(), [
+    "studio typecheck",
+    "studio lint",
+    "studio test",
+    "studio typecheck",
+    "studio lint",
+    "studio test",
+  ], "all three, at pre-review and again at post-close");
+});
+
+test("a second run over an installed lane does not reinstall", async () => {
+  const { ctx } = scratch({
+    plans: [{ number: "0101", phases: [studioPhase("1")] }],
+    lanes: { a: ["0101"] },
+    spec: { "0101": { budget: "implement" } },
+  });
+  const install = installStandIn();
+  ctx.studioInstall = install.cmd;
+  ctx.gate = studioGate().commands;
+  await runLanes(ctx);
+  const parked = ctx.state.plans["0101"];
+  assert.equal(parked.park.reason, "budget", JSON.stringify(parked.park));
+  assert.deepEqual(install.runs(), [parked.worktree], "installed once, as the lane opened");
+
+  parked.status = "queued";
+  parked.park = null;
+  await runLanes(ctx);
+
+  // `npm ci` deletes node_modules before it installs, so redoing a good install is not free and is
+  // not harmless: the absence of studio/node_modules is the trigger, never the run.
+  assert.deepEqual(install.runs(), [parked.worktree], "and not again over a lane that already has its dependencies");
 });

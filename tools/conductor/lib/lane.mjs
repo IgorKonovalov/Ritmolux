@@ -64,9 +64,11 @@ export function laneOpen(rec) {
 const suiteLedger = (ctx) => join(ctx.stateDir, "suite-ledger.jsonl");
 
 /**
- * What a lane runs once, at open, when its plan touches `studio/` (ADR-0218). `--prefix` rather than
- * a `cd`, and relative to the worktree, which is the command's cwd. `ci` rather than `install`: it
- * installs the committed lockfile exactly and fails when it and `package.json` disagree.
+ * What a lane runs when its plan touches `studio/` and the dependencies are absent (ADR-0218).
+ * `--prefix` rather than a `cd`, and relative to the worktree, which is the command's cwd. `ci`
+ * rather than `install`: it installs the committed lockfile exactly and fails when it and
+ * `package.json` disagree — and it DELETES an existing `node_modules` first, which is why the
+ * caller's absence check is what keeps a resume from redoing a good install.
  */
 const STUDIO_INSTALL_CMD = ["npm", "--prefix", "studio", "ci"];
 
@@ -98,8 +100,14 @@ function runInstall(cmd, cwd) {
  * Makes the lane's plan's precondition true: with `studio/` in the plan's declared files, install the
  * studio's dependencies so the gate's three studio checks are real for this lane. Returns a park
  * detail when the install failed, and null when it succeeded or was not needed.
+ *
+ * ASKED ON EVERY RUN, NOT ONLY AT OPEN, and the absence of `studio/node_modules` is the trigger. A
+ * failed install parks a lane whose worktree already exists, so an open-lane-only call would leave
+ * that park unclearable: the resume would find the lane open, skip the install, and run the plan to
+ * a merge with the three studio checks skipped — the state ADR-0218 refuses.
  */
 function installStudioDeps(ctx, rec) {
+  if (existsSync(join(rec.worktree, "studio", "node_modules"))) return null;
   const found = findPlan(rec.worktree, rec.plan);
   if (!found || !touchesStudio(readPlanFile(found.path))) return null;
   const cmd = ctx.studioInstall ?? STUDIO_INSTALL_CMD;
@@ -440,11 +448,13 @@ export async function runPlan(ctx, lane, plan) {
     rec.laneRemoved = false;
     event(ctx, "lane-open", { plan, worktree: rec.worktree });
     save(ctx);
-    // At open, before any session: a lane that cannot run its plan's checks parks here, where the
-    // cost is one park, rather than after the phases that needed them (ADR-0218).
-    const install = installStudioDeps(ctx, rec);
-    if (install) return park(ctx, rec, { reason: STUDIO_INSTALL, detail: install });
   }
+  // Before any session, open lane or not: a lane that cannot run its plan's checks parks here, where
+  // the cost is one park, rather than after the phases that needed them (ADR-0218). A resume after a
+  // failed install reaches this again — the worktree it left behind is exactly the case an
+  // open-only call could never repair.
+  const install = installStudioDeps(ctx, rec);
+  if (install) return park(ctx, rec, { reason: STUDIO_INSTALL, detail: install });
   const wt = rec.worktree;
   const common = { plan, lane: wt, branch: rec.branch, with_lock: ctx.withLockPath };
 
