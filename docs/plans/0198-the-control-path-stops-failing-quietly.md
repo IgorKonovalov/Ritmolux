@@ -169,8 +169,8 @@ flowchart LR
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — The listener counts what it receives | dev | done | d2117b3c |
-| 2 — A refused selection is reported | dev | done | committed with this row |
-| 3 — The two tests read the new evidence | dev | not started | |
+| 2 — A refused selection is reported | dev | done | 5bf159f4 |
+| 3 — The two tests read the new evidence | dev | done | committed with this row |
 | 4 — The reproduction runs again, with a stop condition | dev | not started | |
 | 5 — The studio carries the new readings | studio-builder | not started | |
 
@@ -201,6 +201,15 @@ flowchart LR
 - **Phase 2 also rewrote one doc comment in `control.rs` that Phase 1 left**, because
   `scripts/check-comment-hygiene.mjs` reads `no longer` as plan-relative narration; the sentence
   now states the same fact as a property.
+- **Phase 3's *"a deliberately broken listener makes each of the two tests fail with a report that
+  names which reading convicted it"* is asserted over the readings a break leaves, not over a
+  broken listener.** Neither test can break one: `control_loopback.rs` sends to a socket owned by a
+  thread it does not hold a handle to, and `stream_show.rs` drives a separate process. Each file
+  therefore grew a pure function from readings to a one-sentence verdict — `verdict` over a live
+  `Control`, `listener_verdict` over two `health` lines — and a test that drives each of the four
+  candidates plus the two cases neither covers (a listener that failed its way out of the loop, and
+  no `health` line at all). The failure paths call the same function, so what a failing run prints
+  is what those tests assert.
 
 ### Close triggers
 
