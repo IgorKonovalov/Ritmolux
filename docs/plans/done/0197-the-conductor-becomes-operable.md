@@ -502,6 +502,34 @@ of this plan's own code lives.
 - **Round 1, minor** — the `prune` doc comment promises more than `pruneQueue` is tested for
   (`tools/conductor/lib/queue.mjs:140`). Resolved in **`7a35b07d`**.
 
+### What the close did, and where it stopped
+
+The two prose repairs (`66c676b1`), `git merge main` (clean, docs only), the bookkeeping
+(`da91a28f`) — plan to `done/` with the links repointed both ways, ADR-0219 and ADR-0220 to
+`accepted`, both plans READMEs, the write-up archived, the four backlog entries moved from
+`Promoted` to `Closed`, `toc.mjs` — then the version bump (`fe2f1a80`) and the studio's two copies
+(`7d01b68c`).
+
+**The version is 0.136.0, not 0.135.0.** `cargo release minor` refused: `v0.135.0` already exists,
+written by Plan 0196's lane on its own branch and not yet on `main`. The level is `minor` as ADR-0005
+asks for a feature plan; the number is the first one free.
+
+**The close's own gate did not finish, and this plan is parked in front of it.** `cargo fmt --all
+--check`, `cargo clippy --workspace --all-targets -- -D warnings` and `RUSTDOCFLAGS="-D warnings"
+cargo doc --workspace --no-deps` all ran green on the tagged tip. **The full suite did not run**: the
+machine reached `ENOSPC` with 2.9 MB free on `C:`, and `scripts/prune-target.mjs` cannot answer on a
+full disk because it derives its keep-set from a successful `cargo build`. That is ADR-0053's
+recurring disk cost rather than a defect in this plan — the same suite was green on the review tip an
+hour earlier (2025 tests run, 2025 passed, 7 skipped), and every commit between that tip and this one
+is prose, a docs-only merge of `main`, one version line and two version constants.
+
+**What is owed before this is pushed:** reclaim disk — a finished lane's worktree is the documented
+place — then re-run the whole gate on the branch tip, the suite as
+`node tools/conductor/with-lock.mjs suite -- cargo nextest run --workspace`. The `v0.136.0` tag is
+annotated and sits on the branch tip, so the tagged commit is the one carrying the studio's synced
+version, **but nothing has proved that tip green**: do not fast-forward `main` or push the tag until
+the suite has.
+
 ## Followups (after this lands)
 
 - Backlog 0237's deny rules would land naturally beside Phase 4's allowlist cases, once its three
