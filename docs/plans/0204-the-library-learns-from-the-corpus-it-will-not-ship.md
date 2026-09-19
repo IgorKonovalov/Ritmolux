@@ -1,7 +1,8 @@
 # 0204 — The library learns from the corpus it will not ship
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-09-19
+> **Approved:** 2026-09-19 (user)
 > **Owner skill(s):** human (the `preset-author` lane throughout)
 > **Related ADRs:** [0227](../adrs/0227-a-borrowed-look-is-authored-natively-and-the-reference-never-enters-the-repository.md)
 > (proposed), [0113](../adrs/0113-milkdrop-presets-are-translated-ahead-of-time-onto-a-warp-mesh-idiom.md),

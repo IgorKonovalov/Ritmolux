@@ -50,7 +50,7 @@ place. The plan file carries the real link.
 | [0201](0201-the-warp-surface-stops-lying.md) | The warp surface stops lying | approved | dev | ADR-0223 + 0224 (proposed): the figure contract reaches a custom wave, level mode gets a coverage threshold, `zoom`'s doc stops inverting the shader. Regenerates surfaces, so after 0197. |
 | [0202](0202-the-three-mechanisms-get-their-gate.md) | The three mechanisms get their gate | approved | dev, human | ADR-0113's third Outcome is the brief: the rate candidate, the echo, the per-mode wave scale, then a fourth look gate. Phases 5-6 need the rig and the corpus, so the conductor parks. |
 | [0203](0203-the-figure-gains-the-levers-it-was-measured-to-lack.md) | The figure gains the levers it was measured to lack | approved | dev | ADR-0225 + 0226 (proposed): the roster travels, the star wobbles, the backdrop converges. Every default an identity; Phase 3 can supersede ADR-0225. Weakest want - last. |
-| [0204](0204-the-library-learns-from-the-corpus-it-will-not-ship.md) | The library learns from the corpus it will not ship | draft | human | ADR-0227 (proposed): a borrowed look is authored natively and the reference stays outside. A judged 4-6 cohort of 21 picks, routed by look. After 0201's `zoom` fix. |
+| [0204](0204-the-library-learns-from-the-corpus-it-will-not-ship.md) | The library learns from the corpus it will not ship | approved | human | ADR-0227 (proposed): a borrowed look is authored natively and the reference stays outside. A judged 4-6 cohort of 21 picks, routed by look. After 0201's `zoom` fix. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
@@ -273,6 +273,16 @@ sized in samples, so 21 of 64 bands are bin-starved at 96 kHz — pinned by a te
 waiting on someone reporting a mushy low end on a 96 kHz interface).
 
 ## Recommended execution sequence
+
+**Added 2026-09-19 - [0204] is approved, it sits behind [0201], and it is not a conductor plan.**
+Every one of its phases is `human` - content-lane sittings the owner starts - so a conductor run
+would park at Phase 1 and stay there, and it is deliberately not in `queue.json`. Only its Phase 3
+waits on [0201]: the reference sheet and the routing table need nothing, and `warp_mesh` is the one
+system whose parameter reference is false today. It also jumps no queue - the six standing sittings
+in [`content-brief.md`](../content-brief.md) are unaffected, and whether the remaining picks join
+them is [0204]'s own Phase 4 verdict.
+
+[0204]: 0204-the-library-learns-from-the-corpus-it-will-not-ship.md
 
 **Added 2026-09-19 - a backlog round promoted seven plans, [0196] through [0203], and the order is
 infrastructure first because three of the others need it.** Seventeen live entries left the file for
