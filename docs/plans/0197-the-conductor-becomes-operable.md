@@ -189,19 +189,37 @@ flowchart TB
 | 1 — `pause`: finish the plan in flight, then stop | dev | done | 1928b879 |
 | 2 — The queue stands alone, and `prune` keeps it tidy | dev | done | 4625a537 |
 | 3 — One suite ledger per repository, not per worktree | dev | done | 3ee9a776 |
-| 4 — A session can run the two documented regenerations | dev | done | committed with this row |
+| 4 — A session can run the two documented regenerations | dev | done | 3619c8bb |
 
 ### Notes
 
+- Phase 4 admits each variable in **two** spellings, not the one the phase names: `RLX_UPDATE_*=1
+  cargo *` and `RLX_UPDATE_*=1 node *` (3619c8bb). `.claude/hooks/conductor-suite-lock.js` denies the
+  bare form of both documented commands in a conductor session — it reads the assignment prefix and
+  still sees the `cargo nextest` / `cargo test` behind it — so the `cargo` rule alone leaves the
+  regeneration unreachable from the place the phase exists to reach it from.
+- Phase 4's risk asks what happens the first time a session actually runs one of the two
+  regenerations. None ran in this session; nothing to record yet.
+
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** none.
 - **Plan header `Closes:`** design-backlog 0240, 0247, 0250, 0253
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** feature, in `tools/conductor/` only — `pause`, `prune`, the queue's `done/`
+  fallback, the per-repository suite ledger and four allowlist rules. Nothing under `core/`,
+  `standalone/`, `plugin-foobar/`, `studio/`, `presets/` or `packaging/` moved, so no release
+  artifact changed.
+- **Operator docs touched:** `tools/conductor/README.md` — the `pause` row and paragraph (Phase 1),
+  the queue's setup step and the `prune` row (Phase 2), the hand-suite paragraph (Phase 3), and the
+  allowlist bullet in *How it stays safe* (Phase 4). No file under `docs/` other than this plan.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — 59 reductions across 26 live
+  entries, 4 unprobeable. Advisory only: 30 moved paths, of which this plan moved two —
+  0237 (`tools/conductor/settings.conductor.json`) and 0241
+  (`tools/conductor/test/settings.test.mjs`). The four entries this plan closes are still live.
+- **Full suite:** not run here — owed to the conductor's pre-review gate (ADR-0207). No phase named a
+  deferred GPU suite, so no upward override ran at an earlier phase.
+  `node --test "tools/conductor/test/*.test.mjs"`: 360 tests, 360 pass, 0 fail.
+- **Outstanding `human` phases:** none; every phase is `dev`.
 
 ## Followups (after this lands)
 
