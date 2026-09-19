@@ -623,6 +623,13 @@ pub const PARAMS: &[ParamSpec] = &[
         doc: "Where the field takes its colour: 0 the deposit's own angle, 1 the light it has built up.",
         kind: ParamKind::Structural,
     },
+    ParamSpec {
+        name: "coverage_threshold",
+        default: 0.0,
+        range: Some([0.0, 1.0]),
+        doc: "In level mode, the coverage a pixel needs to hold the ink: at or above it the palette's colour, below it the backdrop. 0 is off.",
+        kind: ParamKind::Modal,
+    },
     crate::render::scenes::common::SATURATION,
     crate::render::scenes::common::PALETTE_MIX,
     crate::render::scenes::common::PALETTE_STEPS,
@@ -635,6 +642,14 @@ pub const PARAMS: &[ParamSpec] = &[
 /// `color_source` at rest: the deposit colours by angle, which is the path every
 /// shipped and every converted `warp_mesh` preset takes.
 const DEFAULT_COLOR_SOURCE: f32 = default_of(PARAMS, "color_source");
+
+/// `coverage_threshold` at rest: **off**, and off renders the exact bytes the
+/// present pass rendered before the parameter existed (ADR-0224).
+///
+/// Zero is the off state rather than a threshold of zero because coverage is
+/// never below zero: read as a threshold it would make every pixel of the frame,
+/// backdrop included, hold the ink.
+const DEFAULT_COVERAGE_THRESHOLD: f32 = default_of(PARAMS, "coverage_threshold");
 
 /// `color_source` as the two shaders read it — **0 or 1 exactly**.
 ///
@@ -711,6 +726,10 @@ pub struct WarpMeshScene {
     /// Which of the two colour paths is live (ADR-0197), raw as the preset bound
     /// it; [`colour_source`] rounds it on the way to both uniforms.
     color_source: f32,
+    /// The coverage a pixel needs to hold the ink in level mode (ADR-0224), or
+    /// `0` for off. Read only inside the present pass's level branch, so it is
+    /// inert at `color_source = 0`.
+    coverage_threshold: f32,
     occlude: f32,
     /// The active baked palette. Held here rather than only in the resources'
     /// [`palette::LutPair`] because the resources are rebuilt on a resize and
@@ -823,6 +842,7 @@ impl WarpMeshScene {
             color_span: DEFAULT_COLOR_SPAN,
             color_center: DEFAULT_COLOR_CENTER,
             color_source: DEFAULT_COLOR_SOURCE,
+            coverage_threshold: DEFAULT_COVERAGE_THRESHOLD,
             occlude: crate::render::post::DEFAULT_OCCLUDE,
             palette: Palette::default_spectrum(),
             milk: None,
@@ -948,6 +968,7 @@ impl Scene for WarpMeshScene {
         self.color_span = DEFAULT_COLOR_SPAN;
         self.color_center = DEFAULT_COLOR_CENTER;
         self.color_source = DEFAULT_COLOR_SOURCE;
+        self.coverage_threshold = DEFAULT_COVERAGE_THRESHOLD;
     }
 
     fn set_param(&mut self, name: &str, value: f32) {
@@ -989,6 +1010,7 @@ impl Scene for WarpMeshScene {
             "color_span" => self.color_span = value,
             "color_center" => self.color_center = value,
             "color_source" => self.color_source = value,
+            "coverage_threshold" => self.coverage_threshold = value,
             _ => {}
         }
     }

@@ -279,7 +279,19 @@ pub(super) fn upload_uniforms(
                 palette::band_contour(scene.colour.contour),
                 palette::band_contour_style(scene.colour.contour_style),
             ],
-            f: [scene.colour.contour_ink, 0.0, 0.0, 0.0],
+            // The coverage threshold (ADR-0224), clamped here so the shader's
+            // comparison is against a number in the range it reads coverage in;
+            // a non-finite binding falls back to off.
+            f: [
+                scene.colour.contour_ink,
+                if scene.coverage_threshold.is_finite() {
+                    scene.coverage_threshold.clamp(0.0, 1.0)
+                } else {
+                    0.0
+                },
+                0.0,
+                0.0,
+            ],
         }),
     );
     // The converted-shader uniform, filled from the same frame the EEL

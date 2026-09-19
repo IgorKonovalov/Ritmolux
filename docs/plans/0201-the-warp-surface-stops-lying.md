@@ -152,8 +152,8 @@ job of a baseline).
 | phase | owner | state | commit |
 |---|---|---|---|
 | 1 — `zoom` says what the shader does | dev | done | f14bcd47 |
-| 2 — A custom wave draws through the contract | dev | done | committed with this row |
-| 3 — Level mode can hold an ink | dev | not started | |
+| 2 — A custom wave draws through the contract | dev | done | 48120eee |
+| 3 — Level mode can hold an ink | dev | parked, code committed | committed with this row |
 | 4 — The converted chain gets a baseline that can see it | dev | not started | |
 
 ### Notes
@@ -174,6 +174,38 @@ job of a baseline).
   ADR-0223 cited. The two custom-wave tests are in `core/src/render/scenes/warp_mesh/tests.rs` as
   the phase names, built from a bundle written in the VM's own assembly, so `core` needs no EEL2
   compiler to carry a custom wave.
+- **Phase 3 is parked on its first done-when, which cannot be met as stated. The code is
+  committed.** `coverage_threshold` is declared, implemented, regenerated into the three artifacts
+  and documented; the second and third done-whens are met (the golden, `ink` and `sanity` suites are
+  green with no re-bless, and `docs/preset-palettes.md` names the aliasing cost). What cannot happen
+  is *two exact ink values plus the background at `palette_steps = "0"`*, and the obstacle is not
+  coverage. Measured on the `warp_ladder` frame at 640x360, `--set bass=1,mid=1,treb=1`, 120 frames,
+  counting exact frame colours:
+
+  | palette | `palette_steps` | threshold off | threshold on |
+  |---|---|---|---|
+  | the shipped one (runs 0.02 apart) | `"0"` | 886 | 802 |
+  | runs that jump (`0.1599` -> `0.1601`) | `"0"` | 625 | 517 |
+  | the shipped one, shipped banding | `"12"` | 145 | **11** |
+
+  Two continua sit downstream of the ink and neither is coverage. The LUT is 256 texels sampled
+  **linearly**, so a run boundary is one texel wide whatever the stops say, and at
+  `palette_steps = "0"` the coordinate sweeps that boundary continuously — every pixel landing inside
+  a transition texel is a blend of the two inks. The display write dithers by one encoded level
+  (ADR-0096), so even a perfect two-ink frame counts more than two values. The 11 above **is** the
+  ink class: `#000000` paper over a quarter of the frame, and the two inks, each spread across its
+  own neighbouring encoded levels and nothing between them. Banding the
+  coordinate is what removes the first continuum, and the threshold is what removes the coverage one;
+  the done-when asks for the second without the first.
+
+  Nothing inside this phase reaches the stated number: ADR-0224 thresholds coverage and not the ink,
+  and a nearest-filtered LUT would be a change to every palette-sampling scene in the engine. The
+  five scratch fixtures and the PNG colour counter that produced the table are in the lane's
+  `target/plan0201/`, uncommitted and gitignored — the session's allowlist refuses the delete, so
+  they are left for whoever reads this to re-run or remove.
+- **Phase 3 regenerated `presets/preset.schema.json` as well**, for the reason Phase 1's note above
+  records: the same `RLX_UPDATE_PRESET_SCHEMA=1` run writes it, and a `warp_mesh` parameter reaches
+  the generic editor schema too.
 
 ### Close triggers
 
