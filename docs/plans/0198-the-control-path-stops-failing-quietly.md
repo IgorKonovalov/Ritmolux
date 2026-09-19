@@ -171,8 +171,8 @@ flowchart LR
 | 1 — The listener counts what it receives | dev | done | d2117b3c |
 | 2 — A refused selection is reported | dev | done | 5bf159f4 |
 | 3 — The two tests read the new evidence | dev | done | f7e13b9d |
-| 4 — The reproduction runs again, with a stop condition | dev | done | committed with this row |
-| 5 — The studio carries the new readings | studio-builder | not started | |
+| 4 — The reproduction runs again, with a stop condition | dev | done | 7a00199d |
+| 5 — The studio carries the new readings | studio-builder | done | committed with this row |
 
 ### Notes
 
@@ -210,6 +210,15 @@ flowchart LR
   candidates plus the two cases neither covers (a listener that failed its way out of the loop, and
   no `health` line at all). The failure paths call the same function, so what a failing run prints
   is what those tests assert.
+- **Phase 5 makes the three `health` fields optional in the studio's schema**, where spec 0003's
+  roster table declares them like every other field: the phase's done-when requires a line without
+  them to parse, and a required field would drop that whole line — its frame times and preview
+  totals with it. The surface therefore reads three values, not two — listening, stopped, and a
+  player that does not say — and only an explicit `false` raises the alarm.
+- **Phase 5's parse test landed in `studio/electron/player/events.test.ts`**, which the phase's
+  `Files touched` names only as "their tests": that file holds the reader every event line is
+  validated by, and the two `health` lines are fixtures of the shape `standalone/src/events.rs`
+  writes.
 
 #### Phase 4 — what the reproduction recorded
 
