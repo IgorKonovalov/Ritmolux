@@ -2030,10 +2030,11 @@ const MODERATE_MIN_COVERAGE: f32 = 0.04;
 /// families; this measurement is the evidence that it is wanted.
 ///
 /// **The ratio is reported per preset rather than as one sorted table**
-/// (ADR-0157): with a test per preset there is no sweep to sort at the end of.
-/// The reading itself is unchanged and every preset still prints one, so the
-/// table above is reconstructed by sorting a run's lines rather than by the
-/// test doing it.
+/// (ADR-0157, ADR-0222): the sweep is fanned out across testcases and each runs
+/// in its own process, so there is no end of a *sweep* to sort at — a batch sees
+/// its own eight and nothing else. The reading itself is unchanged and every
+/// preset still prints one, so the table above is reconstructed by sorting a
+/// run's lines rather than by the test doing it.
 fn louder_frame_is_reported_against_a_quieter_one(
     renderer: &mut Renderer,
     name: &str,
@@ -2053,9 +2054,10 @@ fn louder_frame_is_reported_against_a_quieter_one(
         "excitation ratio — coverage at {LOUD} over coverage at {MODERATE} (a report, not a \
          gate; this helper's doc comment says why):"
     );
-    // The legend is reprinted per preset rather than once per sweep, because
-    // with a test per preset there is no sweep header to hang it under and a
-    // row of three bare numbers is not a reading anyone can use.
+    // The legend is reprinted per preset rather than once per sweep, because a
+    // run's lines are sorted back into a table out of order and out of process,
+    // so a row of three bare numbers is not a reading anyone can use. A batch
+    // could carry one header for its eight; the row still has to travel alone.
     println!("     ratio  cov@{MODERATE}  cov@{LOUD}  preset");
     println!(
         "  {:>8.4}   {mid_cov:.4}   {loud_cov:.4}  {name}",
