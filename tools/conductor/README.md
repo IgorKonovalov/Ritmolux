@@ -54,6 +54,7 @@ All of them run from the main checkout.
 | `digest [--history]` | Rewrites `digest.md`. `--history` writes the per-run account to `digest-history.md` instead, and is the only thing that ever writes that file. |
 | `resume NNNN` | Queues a parked plan again. Refused while the park's reason still holds, e.g. a `human` phase the plan's log does not yet mark done. |
 | `park NNNN` | Parks a plan that has not merged, with an inbox entry. |
+| `finding NNNN [<ref> --done\|--wontfix\|--filed <reason>]` | With no verb, lists that plan's closing verdict with an index per finding. With one, records your disposition against the finding `<ref>` names, and the digest stops carrying it. |
 | `adopt-close NNNN` | Records the close a lane already carries, when a session committed one and then lost its outcome. Verifies the branch first and writes nothing unless it passes. |
 | `abort` | Stops a running conductor and every session under it. Steps in flight run again on the next `run`. |
 | `check` | The preflight alone. |
@@ -111,6 +112,13 @@ once, whatever `state/conductor.json` says.
     resume command; every lane stopped at the worktree cap, naming what holds the slots; every lane
     still on disk after a merge; and every merge's open findings with their `file:line`.
 
+    A finding leaves that list when the close repaired it (`fixed_in`) or when you closed it with
+    `finding NNNN <ref> --done|--wontfix|--filed <reason>` (ADR-0216). **One line then counts every
+    finding you have closed**, and names the two commands that read them back — never a per-plan
+    breakdown, which is the same accumulation one indent further in. The count line is left out at
+    zero, and the section's opening count is of **open** findings only, so a page with nothing on it
+    is one line.
+
     **Already settled, clear the record** closes that section: a park the repository itself shows as
     finished, counted apart from the live ones and never listed among them. Two conditions decide it,
     both narrow, both read from the tree, and **nothing else — never an age, never a branch's commits,
@@ -141,7 +149,8 @@ once, whatever `state/conductor.json` says.
     and wall time within the run it merged in, **both** what it spent in that run and what it has
     spent over its whole life, and every review finding exactly as the reviewer emitted it. The two
     `$` figures are named because a run-scoped time beside a lifetime spend reads as neither; the
-    per-run one is what Totals below sums.
+    per-run one is what Totals below sums. A finding you have closed carries its verb, its reason and
+    the date here, whatever the current page counts: this is the record of the judgement.
   - **Failed and parked:** gate reds with the failing tests, disagreements, spend-cap hits, session
     errors.
   - **Totals:** merged and parked counts, spend, time spent waiting on each lock, the 5-hour and
@@ -203,6 +212,38 @@ evidence you need, such as the goldens a test run re-encoded. Read them, then co
 A merged plan whose worktree could not be removed (Windows refuses while any shell sits inside it) is
 an inbox entry, not a park: close the shell, then `git worktree remove`, `git worktree prune` and
 `git branch -d`.
+
+## Closing a finding
+
+A close review's `minor` and `nit` findings that the close did not repair are yours (ADR-0209), and
+they stay on the digest until you say what became of one. An open finding has three honest futures,
+and `finding` records which (ADR-0216):
+
+```text
+node tools/conductor/conductor.mjs finding 0181
+node tools/conductor/conductor.mjs finding 0181 3 --wontfix "assertion message, no reader"
+```
+
+- **`--done`** — you repaired it. **`--wontfix`** — you judged it not worth repairing. **`--filed`** —
+  it is now a `docs/design-backlog.md` entry, which carries its own probe. Writing that entry stays
+  yours; the verb only records that someone did.
+- **The reason is required**, and an empty or whitespace one is refused. Nothing verifies a
+  disposition — unlike `fixed_in`, which is a commit the conductor checks against the branch, this is
+  a judgement checked against nothing — so the sentence you type is the whole record of it.
+- **`<ref>` is the index the listing prints**, or the `file:line` exactly one finding carries. A ref
+  that matches nothing, or more than one, is refused naming what it saw.
+- **Only a closed plan has findings.** A plan still in a fix round, or parked at one, carries verdicts
+  that closed nothing — its blockers are the conductor's own work in flight — so `finding` refuses it
+  either way and names where the plan stands.
+- **Re-dispositioning overwrites and keeps the previous one** in the finding's history: a `--wontfix`
+  you later repair should read as repaired, and that you first declined it is worth keeping.
+- **Only you write one.** No session, no close and no gate may, and *recording* one is refused while
+  a conductor is live, because that run would write its own copy of the record over yours; listing is
+  read-only and runs at any time.
+
+The dispositions live in `state/conductor.json`, which is gitignored: losing that file returns every
+closed finding to the page. The finding *text* is safe — it is committed in each plan's
+`## Close review` — but the judgement about it is not.
 
 ## How it stays safe
 

@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0217.** *(0120 was reserved for
+**Next free number: 0227.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -230,12 +230,22 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0206](0206-a-promoted-backlog-entry-leaves-the-live-file.md) | A promoted backlog entry leaves the live file, and the ledger lives in the archive | accepted 2026-09-15, amends 0108, 0116 |
 | [0207](0207-a-suite-run-the-conductor-observed-green-is-not-run-again-on-the-same-tree.md) | A suite run the conductor observed green is not run again on the same tree | accepted 2026-09-16 (Plan 0189), amends 0205, 0156, Outcome; amended by 0211 |
 | [0208](0208-a-patch-cli-update-runs-with-a-warning-and-every-session-proves-the-hooks-ran.md) | A patch CLI update runs with a warning, and every session proves the hooks ran | accepted 2026-09-16 (Plan 0189), amends 0205, Outcome |
-| [0209](0209-a-conductor-close-repairs-the-prose-and-comments-its-findings-name.md) | A conductor close repairs the prose and comments its findings name | accepted 2026-09-16 (Plan 0189), amends 0205, Outcome; superseded in part by 0210 |
+| [0209](0209-a-conductor-close-repairs-the-prose-and-comments-its-findings-name.md) | A conductor close repairs the prose and comments its findings name | accepted 2026-09-16 (Plan 0189), amends 0205, Outcome; superseded in part by 0210, amended by 0216 |
 | [0210](0210-a-claude-repair-is-the-owners-and-a-session-that-needs-one-parks-with-the-edit.md) | A `.claude/` repair is the owner's, and a session that needs one parks with the edit | accepted 2026-09-16 (Plan 0190), supersedes 0209 in part |
 | [0211](0211-a-green-suite-record-serves-a-later-tree-when-no-deferred-suite-can-read-the-diff.md) | A green suite record serves a later tree when no deferred suite can read the diff | accepted 2026-09-16 (Plan 0191), amends 0207 |
 | [0212](0212-a-converted-preset-gets-its-own-vertex-module-and-the-pipeline-is-chosen-not-branched.md) | A converted preset gets its own vertex module, and the pipeline is chosen rather than branched | accepted 2026-09-16 (Plan 0180), Outcome |
 | [0213](0213-the-russian-slice-stays-a-section-and-gets-a-header-control.md) | The Russian slice stays a section, and gets a header control | proposed, amends 0185 |
-| [0214](0214-the-digest-is-a-current-state-page-and-history-is-regenerated-on-demand.md) | The digest is a current-state page, and history is regenerated on demand | accepted 2026-09-18 (Plan 0193), amends 0205 |
+| [0214](0214-the-digest-is-a-current-state-page-and-history-is-regenerated-on-demand.md) | The digest is a current-state page, and history is regenerated on demand | accepted 2026-09-18 (Plan 0193), amends 0205; amended by 0216 |
 | [0215](0215-the-analyzer-publishes-an-absolute-stereo-field.md) | The analyzer publishes an absolute stereo field, and the mono path does not move | proposed, extends 0199 |
-| [0216](0216-a-review-finding-is-closed-by-the-owner-and-the-page-stops-carrying-it.md) | A review finding is closed by the owner, and the page stops carrying it | proposed, amends 0214 + 0209 |
+| [0216](0216-a-review-finding-is-closed-by-the-owner-and-the-page-stops-carrying-it.md) | A review finding is closed by the owner, and the page stops carrying it | accepted 2026-09-19 (Plan 0195), amends 0214 + 0209 |
+| [0217](0217-the-node-gate-roster-is-one-manifest-and-a-checker-holds-every-carrier-to-it.md) | The Node gate roster is one manifest, and a checker holds every carrier to it | proposed |
+| [0218](0218-a-lane-makes-its-plans-preconditions-true-and-a-skipped-check-says-so.md) | A lane makes its plan's preconditions true, and a skipped check says so | proposed |
+| [0219](0219-the-conductor-can-be-asked-to-finish-and-stop-and-the-ask-does-not-outlive-the-run.md) | The conductor can be asked to finish and stop, and the ask does not outlive the run | proposed, amends 0205 |
+| [0220](0220-the-committed-queue-stands-alone-and-a-merged-plan-is-skipped-with-a-notice.md) | The committed queue stands alone, and a merged plan is skipped with a notice | proposed, amends 0205 |
+| [0221](0221-the-control-path-reports-what-it-did-not-do.md) | The control path reports what it did not do | proposed, extends 0176 |
+| [0222](0222-a-preset-sweeps-fixed-cost-is-paid-per-process-so-the-lever-is-the-batch.md) | A preset sweep's fixed cost is paid per process, so the lever is the batch | proposed, amends 0157 |
+| [0223](0223-the-figure-contract-reaches-a-custom-wave-because-the-source-applies-it-there.md) | The figure contract reaches a custom wave, because the source applies it there | proposed, extends 0199 |
+| [0224](0224-level-mode-gets-a-coverage-threshold-and-the-ink-class-stays-this-scenes.md) | Level mode gets a coverage threshold, and the ink class stays this scene's | proposed, extends 0197 |
+| [0225](0225-the-backdrop-ramp-gets-an-angular-coordinate-and-the-floor-stays-out-of-the-chain.md) | The backdrop ramp gets an angular coordinate, and the floor stays out of the chain | proposed |
+| [0226](0226-the-mark-roster-travels-by-blending-its-fields-and-an-integer-index-is-an-identity.md) | The mark roster travels by blending its fields, and an integer index is an identity | proposed |
 <!-- roster:end -->
