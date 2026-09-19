@@ -186,7 +186,7 @@ job of a baseline).
 | 1 — `zoom` says what the shader does | dev | done | f14bcd47 |
 | 2 — A custom wave draws through the contract | dev | done | 48120eee |
 | 3 — Level mode can hold an ink | dev | done | c832e76c |
-| 4 — The converted chain gets a fixture that will see it | dev | done | committed with this row |
+| 4 — The converted chain gets a fixture that will see it | dev | done | 4c7f739b |
 | 4b — The baseline is captured by someone who looks at it | human | not started | |
 
 ### Notes
@@ -253,13 +253,27 @@ job of a baseline).
 
 ### Close triggers
 
-- **`presets/` touched:**
-- **Plan header `Closes:`** design-backlog 0244, 0245, 0249, 0251
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **`presets/` touched:** yes, and only files that are generated — `presets/README.md`,
+  `presets/schema/warp_mesh.schema.json` and `presets/preset.schema.json`, all written by
+  `RLX_UPDATE_PARAM_REFERENCE=1` / `RLX_UPDATE_PRESET_SCHEMA=1` in Phases 1 and 3. No `presets/*.toml`
+  was edited, and no preset was added or removed.
+- **Plan header `Closes:`** design-backlog 0244, 0245, 0249, 0251. 0245's fixture is committed and its
+  baseline is Phase 4b's, so that chain has a guard that does not yet compare anything.
+- **What shipped:** a feature — a new `warp_mesh` parameter (the level-mode coverage threshold,
+  default off), a change to what a converted custom wave draws (midpoint smoothing plus the host
+  sample factor, dots excepted), the corrected `zoom` direction in both `ParamSpec` declarations and
+  in every generated surface that renders them, and a golden fixture at 160x120.
+- **Operator docs touched:** `docs/preset-palettes.md` (the threshold's limited-ink property and its
+  aliasing cost), `docs/milkdrop-conversion.md` (the custom-wave row moved to the carried column),
+  `docs/testing.md` (the new fixture's row and its bless scope), plus the generated
+  `presets/README.md` and `docs/specs/player-schema.json`.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — *59 stated reductions still
+  hold across all 26 live entries (4 unprobeable)*, with 30 advisory moved-path rows.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). The per-phase gate run on this
+  tree was `cargo nextest run --workspace -P fast`: 1725 passed, 0 failed, 311 skipped, in 459.5 s.
+- **Outstanding `human` phases:** Phase 4b — capture `core/tests/golden/warp_mesh_wide.png` under
+  `RLX_BLESS=1`, open it, delete the skip block, and run the one-term experiment. Phases 1–4 are
+  committed; the plan is not finished without it.
 
 ## Followups (after this lands)
 
