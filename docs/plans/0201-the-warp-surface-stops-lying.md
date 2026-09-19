@@ -1,0 +1,174 @@
+# 0201 — The warp surface stops lying
+
+> **Status:** approved
+> **Created:** 2026-09-19
+> **Approved:** 2026-09-19 (user)
+> **Owner skill(s):** dev
+> **Related ADRs:** [0223](../adrs/0223-the-figure-contract-reaches-a-custom-wave-because-the-source-applies-it-there.md)
+> (proposed), [0224](../adrs/0224-level-mode-gets-a-coverage-threshold-and-the-ink-class-stays-this-scenes.md)
+> (proposed), [0199](../adrs/0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md),
+> [0197](../adrs/0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md),
+> [0212](../adrs/0212-a-converted-preset-gets-its-own-vertex-module-and-the-pipeline-is-chosen-not-branched.md),
+> [0170](../adrs/0170-a-parameters-reference-row-is-generated-from-the-declaration-the-engine-reads.md)
+> **Closes:** design-backlog 0244, 0245, 0249, 0251
+
+## TL;DR
+
+Four things `warp_mesh` tells an author are wrong or missing: its `zoom` doc says the opposite of
+what its shader does and four generated surfaces carry the lie, a custom wave skips the smoothing and
+the host factor every built-in figure gets, level mode cannot produce the ink class it was asked
+for, and the converted warp space has no pixel baseline because every golden fixture is square. This
+plan repairs all four. The first visible behaviour is a parameter reference an author can bind
+`zoom` from without getting the direction backwards.
+
+## Context & problem
+
+**The `zoom` doc is inverted.** The `ParamSpec` reads *"above 1 the image tunnels inward"*; the
+shader beside it says the reverse in a comment written to explain exactly this trap, and the plan's
+own fixture agrees with the shader. The string is declared twice (`PER_VERTEX_PARAMS` and `PARAMS`)
+and rendered four times — `presets/README.md`, `presets/schema/warp_mesh.schema.json` twice, and
+`docs/specs/player-schema.json` — so every surface this project offers tells an author the wrong
+direction. It has already produced a false paragraph in shipped content, convicted at Plan 0184's
+close (backlog 0249).
+
+**A custom wave is drawn differently from every other figure.** The eight `wave_mode` figures pass
+through `SmoothWave` and carry `HOST_SAMPLE_FACTOR`; `custom_waves` gets neither, which was correctly
+scoped by Plan 0180 and left standing as a question (backlog 0244).
+
+**Level mode draws bands, not an ink.** The present writes `ink * coverage` and coverage is a
+continuum, so a two-ink palette renders 851 exact colours on the shipped `warp_ladder` at 640x360,
+and twelve quantized bands only bring it to 60 (backlog 0251).
+
+**The converted warp space has no baseline.** `golden.rs` renders every fixture at 128x128, and at a
+square target MilkDrop's aspect pair is the identity — so the three `warp_mesh` fixtures are
+structurally incapable of catching incidental pixel drift in the corrected-space chain, which is the
+class a golden exists for and the class ADR-0037 was written about (backlog 0245).
+
+## Decision
+
+The doc repair is mechanical: correct both declarations and regenerate the three artifacts, per
+[ADR-0170](../adrs/0170-a-parameters-reference-row-is-generated-from-the-declaration-the-engine-reads.md)
+— never a hand edit of a generated file. The figure contract reaches a custom wave per
+[ADR-0223](../adrs/0223-the-figure-contract-reaches-a-custom-wave-because-the-source-applies-it-there.md),
+because the source applies it there too. Level mode gets a default-off coverage threshold per
+[ADR-0224](../adrs/0224-level-mode-gets-a-coverage-threshold-and-the-ink-class-stays-this-scenes.md).
+And the converted chain gets **one fixture at a non-square size**, the way `attractor_trails` is
+captured at 160x100 with its own baseline: we rejected a second size for the whole golden roster
+(it doubles every bless to catch one chain) and rejected closing the gap with reasoning alone (the
+per-stage tests assert what the chain computes and cannot see incidental drift, which is the whole
+job of a baseline).
+
+## Implementation phases
+
+### Phase 1 — `zoom` says what the shader does
+- **Owner skill:** dev
+- **What:** correct both `ParamSpec` declarations to the replacement text Plan 0184's close review
+  wrote — *"Scale the previous frame is resampled at, per vertex; above 1 the past is magnified and
+  the image travels outward"* — and regenerate the parameter reference and the editor schemas with
+  `RLX_UPDATE_PARAM_REFERENCE=1` and `RLX_UPDATE_PRESET_SCHEMA=1`. Sweep the shipped presets for any
+  header that reasons from the old direction.
+- **Files touched:** `core/src/render/scenes/warp_mesh/mod.rs`, `presets/README.md` (generated),
+  `presets/schema/warp_mesh.schema.json` (generated), `docs/specs/player-schema.json` (generated),
+  any `presets/*.toml` header the sweep convicts
+- **Done when:** no surface in the repository says `zoom` above 1 tunnels inward — the two
+  declarations, the parameter table, both schema strings and the player schema all say what the
+  shader does; `core/tests/suite/preset_schema.rs` is green against the regenerated files, so the
+  regeneration was committed rather than the file hand-edited; and the preset sweep's result is named
+  in the log, whether or not it convicted anything.
+
+### Phase 2 — A custom wave draws through the contract
+- **Owner skill:** dev
+- **What:** `custom_waves` passes through the same midpoint insertion the eight built-in figures use
+  — except when the wave draws dots, which is the source's own exception — and carries
+  `HOST_SAMPLE_FACTOR` on its sample term.
+- **Files touched:** `core/src/render/scenes/warp_mesh/draw.rs`,
+  `core/src/render/scenes/warp_mesh/tests.rs`
+- **Done when:** a custom wave's vertex count after the draw matches what the source's smoothing
+  produces for the same input, and a dots wave's does not; the sample term carries the host factor,
+  asserted as the ratio between a known input and the drawn coordinate rather than as a frozen pixel
+  figure; and the eight built-in figures are unchanged, shown by their existing assertions staying
+  green without re-blessing.
+
+### Phase 3 — Level mode can hold an ink
+- **Owner skill:** dev
+- **What:** a `warp_mesh` parameter thresholds coverage in level mode — at or above it the ink,
+  below it the paper — default off, hard edge, declared through `ParamSpec` so ADR-0170's reference
+  row and the editor schema are generated from it. `docs/preset-palettes.md` states which limited-ink
+  property this gives and which one it does not (ADR-0138's draw-seam guarantee, which does not
+  move).
+- **Files touched:** `core/src/render/scenes/warp_mesh/mod.rs`,
+  `core/src/render/scenes/warp_mesh/shaders.rs`, `presets/README.md` (generated),
+  `presets/schema/warp_mesh.schema.json` (generated), `docs/specs/player-schema.json` (generated),
+  `docs/preset-palettes.md`
+- **Done when:** the shipped `presets/warp_ladder.toml` rendered at 640x360 loud with a two-ink
+  palette and `palette_steps = "0"` produces **two** exact ink values plus the background with the
+  threshold on, against the 851 the same frame produces with it off — the same measurement backlog
+  0251 took, re-taken; the default renders that preset byte-identically to today, so no golden and
+  no card move; and `docs/preset-palettes.md` names the aliasing cost rather than leaving an author
+  to find it.
+
+### Phase 4 — The converted chain gets a baseline that can see it
+- **Owner skill:** dev
+- **What:** one converted `warp_mesh` fixture rendered at a non-square size with its own baseline,
+  in the shape `attractor_trails` already uses, so incidental pixel drift in the corrected-space
+  chain has a guard.
+- **Files touched:** `core/tests/golden.rs` or a sibling module, `core/tests/golden/` (one new
+  baseline), `docs/testing.md`
+- **Done when:** the new baseline is captured at a size whose aspect is **not** 1:1 and not 16:9 —
+  the two shapes ADR-0037 records as the ones that hide this class — and the test's header says why
+  that size; a deliberate one-term change in the corrected-space arithmetic moves it, where the
+  existing square fixtures do not move at all; and `docs/testing.md` records what the new fixture
+  guards that the square ones cannot.
+
+## Risks & open questions
+
+- **Phases 1 and 3 need an `RLX_UPDATE_*` regeneration**, which a conductor session cannot run
+  today (backlog 0250). [Plan 0197](0197-the-conductor-becomes-operable.md) Phase 4 makes it
+  runnable, so **this plan runs after 0197** or its first phase parks.
+- **Phase 2 changes what converted content draws.** No shipped preset is affected — `presets/`
+  carries no `[milk]` bundle — so the blast radius is the conversion corpus, which lives outside
+  this checkout.
+- **Phase 3's threshold aliases by design** (ADR-0224's first Negative). The done-when asserts the
+  colour count, not the edge quality; whether the edge is acceptable in motion is a content
+  judgement for `preset-author`, and a look that wants it will arrive as a preset rather than as a
+  test.
+- **Phase 4 adds a baseline, and baselines are re-blessed.** One more fixture in every bless scope,
+  which is the cost ADR-0222's sibling question weighs elsewhere and is small here.
+
+## What this plan does NOT do
+
+- It does not move ADR-0138's draw-seam definition of limited ink. ADR-0224 says explicitly that a
+  second premultiplied-light scene asking the same question is the trigger for that, not a third copy
+  of this parameter.
+- It does not re-bless the three square `warp_mesh` golden fixtures. They keep guarding what they
+  guard; Phase 4 adds, it does not replace.
+- It does not take backlog 0248 (whether a groundless luminous field is a composition or a fill),
+  which is a curation question for the content lane rather than an engine gap.
+
+## Implementation log
+
+**Lane:** _(to be filled by `dev`)_
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — `zoom` says what the shader does | dev | not started | |
+| 2 — A custom wave draws through the contract | dev | not started | |
+| 3 — Level mode can hold an ink | dev | not started | |
+| 4 — The converted chain gets a baseline that can see it | dev | not started | |
+
+### Notes
+
+### Close triggers
+
+- **`presets/` touched:**
+- **Plan header `Closes:`** design-backlog 0244, 0245, 0249, 0251
+- **What shipped:**
+- **Operator docs touched:**
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
+- **Full suite:**
+- **Outstanding `human` phases:**
+
+## Followups (after this lands)
+
+- A `preset-author` look that uses the coverage threshold, which is what will say whether the hard
+  edge is usable in motion.
