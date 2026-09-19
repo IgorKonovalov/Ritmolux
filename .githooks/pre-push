@@ -182,6 +182,20 @@ echo "pre-push: running the fast subset (doc links, backlog claims, comment hygi
 # class as the gates beside it: one file read per tracked document and a regex
 # scan of each. `count-allow: <why>` on the line is the escape, and the reason is
 # required.
+#
+# The roster's own gate closes the block (ADR-0217), and its subject is this file
+# rather than a document: the list above is one of THREE copies - the hook, CI's
+# `links` job and the conductor's `defaultGate()` - and nothing held them equal,
+# so the third fell behind twice. scripts/gates.manifest.mjs is now the roster,
+# the conductor imports it, and this gate asserts that the `run_step` lines above
+# and CI's `run:` lines are its projection for each of them, in order. Cheapest
+# cost class here: two file reads and a regex scan of each. It is invoked twice
+# for the index-row reason - `--self-test` seeds a gate missing from a carrier, a
+# gate a carrier runs that the roster does not, and a gate in the wrong position,
+# the last of which is what a set comparison reports clean. It asserts
+# invocations and ORDER and never the `if:` conditions a carrier attaches, and it
+# does not read the English notice below - which will drift, and says less than
+# it should when it does.
 if command -v node >/dev/null 2>&1; then
     run_step "node scripts/check-doc-links.mjs" node scripts/check-doc-links.mjs
     run_step "node scripts/check-index-rows.mjs" node scripts/check-index-rows.mjs
@@ -197,8 +211,10 @@ if command -v node >/dev/null 2>&1; then
     run_step "node scripts/check-translations.mjs" node scripts/check-translations.mjs
     run_step "node scripts/check-translations.mjs --self-test" node scripts/check-translations.mjs --self-test
     run_step "node scripts/check-system-counts.mjs" node scripts/check-system-counts.mjs
+    run_step "node scripts/check-gate-carriers.mjs" node scripts/check-gate-carriers.mjs
+    run_step "node scripts/check-gate-carriers.mjs --self-test" node scripts/check-gate-carriers.mjs --self-test
 else
-    echo "pre-push: skipping the doc-link, index-row, backlog-claim, filter-figure, comment-hygiene, reader-prose, contents-block, release-tag, translation and system-count checks (no node on PATH)"
+    echo "pre-push: skipping the doc-link, index-row, backlog-claim, filter-figure, comment-hygiene, reader-prose, contents-block, release-tag, translation, system-count and gate-roster checks (no node on PATH)"
 fi
 
 # The diffusion filter's own suite (Plan 0106 Phase 7c) rides the same guard, in
@@ -252,15 +268,29 @@ run_step "cargo fmt --all --check" cargo fmt --all --check
 # clippy` / `cargo nextest run` silently stops covering the C ABI entirely.
 run_step "cargo clippy --workspace --all-targets -- -D warnings" cargo clippy --workspace --all-targets -- -D warnings
 
-# rustdoc over the engine's public surface, so a broken or private intra-doc link
-# fails here rather than in CI's `cargo doc --workspace` job. Scoped to rlx-core so a
-# warm engine edit costs no more here than the clippy step above (the timings are in
-# Plan 0177 Phase 7 and the ci.yml comment), and it still fails on a public item
-# linking a private one. `--features text` documents the rlx-core the
-# workspace builds: the standalone turns that feature on, and without it a link to
-# the feature-gated `aux_target` does not resolve. `standalone`'s public items are
-# NOT covered here; CI's job is the only place they are documented.
-run_step "cargo doc -p rlx-core --no-deps --features text (RUSTDOCFLAGS=-D warnings)" env "RUSTDOCFLAGS=-D warnings" cargo doc -p rlx-core --no-deps --features text
+# rustdoc over every workspace member's public surface, so a broken or private
+# intra-doc link fails here rather than in CI's `cargo doc --workspace` job.
+#
+# `--workspace` and not `-p rlx-core`: four of the five members were documented
+# in CI and nowhere else, which made a rustdoc error in any of them structurally
+# unreachable before a push - and it fired twice in sixteen days, both times
+# repaired after a release tag had been written on top of the red (ADR-0217).
+# No `--features text` either: it existed to document rlx-core alone, and
+# `--workspace` unifies the feature on because `standalone` turns it on, so the
+# link to the feature-gated `aux_target` resolves without it.
+#
+# Measured on the development machine, all five members, RUSTDOCFLAGS=-D warnings:
+#   7.8 s  warm, after one edit to rlx-ring - the deepest crate, so every member
+#          re-documents. The scoped step it replaces was 4.5-5.9 s on one engine
+#          edit (Plan 0177 Phase 7), so the widening costs about two seconds.
+#   0.5 s  warm, nothing changed.
+#   20.1 s cold, `cargo clean --doc` with the dependency graph already built -
+#          the once-per-tree figure, paid again after a `cargo clean`.
+#          (A lane with no target/ at all pays 1m19s, but that is the dependency
+#          compile every cargo command there pays once, not this step's.)
+# ADR-0033 keeps the gate in tens of seconds rather than minutes; the two seconds
+# this adds do not move that, and the 20 s cold case is a step, not the total.
+run_step "cargo doc --workspace --no-deps (RUSTDOCFLAGS=-D warnings)" env "RUSTDOCFLAGS=-D warnings" cargo doc --workspace --no-deps
 
 # nextest names what it skipped itself, on the profile's authority, so this step
 # does not enumerate it a second time - a hand-written echo of the list is the

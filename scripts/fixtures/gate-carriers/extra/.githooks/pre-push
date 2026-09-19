@@ -1,0 +1,8 @@
+#!/bin/sh
+# The carrier this case is NOT about, written correctly: one break per root, so the count is the
+# instrument.
+set -u
+
+run_step "node scripts/fixture-one.mjs" node scripts/fixture-one.mjs
+run_step "node scripts/fixture-two.mjs" node scripts/fixture-two.mjs
+run_step "node scripts/fixture-three.mjs --self-test" node scripts/fixture-three.mjs --self-test

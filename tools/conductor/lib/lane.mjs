@@ -1,6 +1,8 @@
 // The lane state machine (ADR-0205). Per plan:
 //
-//   open the lane -> for each same-owner run not done: one implement session, then verify its claim
+//   open the lane (installing the studio's dependencies when the plan declares files under studio/,
+//   since the gate's three studio checks are guarded on a directory no worktree is born with)
+//   -> for each same-owner run not done: one implement session, then verify its claim
 //   -> a `human` phase parks -> conductor gate -> take the close lock -> review session
 //   -> blockers/majors: release the lock, fix session, verify, gate, re-review (two fix rounds max)
 //   -> closed: verify the close -> gate the close tip -> fast-forward main (one automatic re-merge)
@@ -11,6 +13,7 @@
 // inbox gains an entry, and the lane moves to the next queued plan whose `after` list has merged.
 // The repository, not the session, is the evidence at every step (close.mjs).
 
+import { spawnSync } from "node:child_process";
 import { closeSync, existsSync, fstatSync, mkdirSync, openSync, readSync } from "node:fs";
 import { join, relative } from "node:path";
 
@@ -31,7 +34,7 @@ import {
 } from "./live.mjs";
 import { CLOSE, take } from "./locks.mjs";
 import { fastForwardMain } from "./merge.mjs";
-import { CLAUDE_DIR } from "./outcome.mjs";
+import { CLAUDE_DIR, STUDIO_INSTALL } from "./outcome.mjs";
 import { donePhases, findPlan, nextStep, rangeLabel, readPlanFile } from "./plan.mjs";
 import { endStep, planRecord, saveState, startStep, statePaths } from "./state.mjs";
 import { renderPromptFile, runStep } from "./step.mjs";
@@ -59,6 +62,63 @@ export function laneOpen(rec) {
 
 /** The suite ledger (ADR-0207): the gate reads and writes it, and every session's wrapper is handed it. */
 const suiteLedger = (ctx) => join(ctx.stateDir, "suite-ledger.jsonl");
+
+/**
+ * What a lane runs when its plan touches `studio/` and the dependencies are absent (ADR-0218).
+ * `--prefix` rather than a `cd`, and relative to the worktree, which is the command's cwd. `ci`
+ * rather than `install`: it installs the committed lockfile exactly and fails when it and
+ * `package.json` disagree — and it DELETES an existing `node_modules` first, which is why the
+ * caller's absence check is what keeps a resume from redoing a good install.
+ */
+const STUDIO_INSTALL_CMD = ["npm", "--prefix", "studio", "ci"];
+
+/**
+ * True when any phase's `Files touched` declares a path under `studio/`. The trigger is what the plan
+ * DECLARES, so a phase that edits the studio without naming it gets a lane with no install — and now
+ * an announced skip rather than a silent one.
+ */
+function touchesStudio(plan) {
+  return plan.phases.some((p) => /(^|[^\w/-])studio\//.test(String(p.filesText ?? "")));
+}
+
+/**
+ * Runs `cmd` to completion in `cwd` as one process. `npm` is a `.cmd` shim on Windows and is not
+ * spawnable without a shell there, which is the same retry `gate.mjs` makes for the same reason.
+ */
+function runInstall(cmd, cwd) {
+  const [bin, ...args] = cmd;
+  let r = spawnSync(bin, args, { cwd, encoding: "utf8" });
+  if (r.error?.code === "ENOENT" && process.platform === "win32") {
+    const quote = (a) => (/[\s"]/.test(a) ? `"${a.replace(/"/g, '\\"')}"` : a);
+    r = spawnSync(cmd.map(quote).join(" "), { cwd, encoding: "utf8", shell: true });
+  }
+  const output = `${r.stdout ?? ""}${r.stderr ?? ""}${r.error ? `\n${r.error.message}` : ""}`;
+  return { code: r.status ?? 1, output };
+}
+
+/**
+ * Makes the lane's plan's precondition true: with `studio/` in the plan's declared files, install the
+ * studio's dependencies so the gate's three studio checks are real for this lane. Returns a park
+ * detail when the install failed, and null when it succeeded or was not needed.
+ *
+ * ASKED ON EVERY RUN, NOT ONLY AT OPEN, and the absence of `studio/node_modules` is the trigger. A
+ * failed install parks a lane whose worktree already exists, so an open-lane-only call would leave
+ * that park unclearable: the resume would find the lane open, skip the install, and run the plan to
+ * a merge with the three studio checks skipped — the state ADR-0218 refuses.
+ */
+function installStudioDeps(ctx, rec) {
+  if (existsSync(join(rec.worktree, "studio", "node_modules"))) return null;
+  const found = findPlan(rec.worktree, rec.plan);
+  if (!found || !touchesStudio(readPlanFile(found.path))) return null;
+  const cmd = ctx.studioInstall ?? STUDIO_INSTALL_CMD;
+  const t0 = Date.now();
+  const r = runInstall(cmd, rec.worktree);
+  const took = `${Math.round((Date.now() - t0) / 1000)}s`;
+  live(ctx, rec.plan, `  lane   ${cmd.join(" ")} exited ${r.code} after ${took}`);
+  if (r.code === 0) return null;
+  const tail = r.output.trim().split("\n").slice(-15).join("\n");
+  return `${cmd.join(" ")} exited ${r.code} in ${rec.worktree}; the plan touches studio/ and its three gate checks cannot run without it:\n${tail}`;
+}
 
 /** Emits one run-terminal line; a display that throws never stops a lane. */
 function live(ctx, plan, body) {
@@ -329,6 +389,7 @@ async function gate(ctx, rec, label) {
     ledger: suiteLedger(ctx),
     onCommandSkipped: (c, record) => show(lines.skipped(c, `tree ${record.tree.slice(0, 7)} green by ${record.by} at ${record.at}`)),
     onCommandServed: (c, serving) => show(lines.served(c, servedNotice(serving))),
+    onCommandUnmet: (c, why) => show(lines.skipped(c, why)),
   });
   show(lines.finish(g, Date.now() - t0));
   rec.gates ??= [];
@@ -388,6 +449,12 @@ export async function runPlan(ctx, lane, plan) {
     event(ctx, "lane-open", { plan, worktree: rec.worktree });
     save(ctx);
   }
+  // Before any session, open lane or not: a lane that cannot run its plan's checks parks here, where
+  // the cost is one park, rather than after the phases that needed them (ADR-0218). A resume after a
+  // failed install reaches this again — the worktree it left behind is exactly the case an
+  // open-only call could never repair.
+  const install = installStudioDeps(ctx, rec);
+  if (install) return park(ctx, rec, { reason: STUDIO_INSTALL, detail: install });
   const wt = rec.worktree;
   const common = { plan, lane: wt, branch: rec.branch, with_lock: ctx.withLockPath };
 

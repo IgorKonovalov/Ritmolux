@@ -18,6 +18,8 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0196 - The gate roster stops drifting](#0196---the-gate-roster-stops-drifting)
+  - [0194 - The analysis gains a stereo field](#0194---the-analysis-gains-a-stereo-field)
   - [0195 - A finding can be closed](#0195---a-finding-can-be-closed)
   - [0193 - The digest says what is happening, and where you are needed](#0193---the-digest-says-what-is-happening-and-where-you-are-needed)
   - [0142 - The MilkDrop import earns its verdict](#0142---the-milkdrop-import-earns-its-verdict)
@@ -234,6 +236,144 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0196 - The gate roster stops drifting](done/0196-the-gate-roster-stops-drifting.md)
+
+- closed 2026-09-19, conductor-run lane `plan-0196-the-gate-roster-stops-drifting` in
+`WORK/rlx-plan-0196`. Five phases, `aa320ab`, `de526ac`, `a9ca7d9`, `731725c` and `ea3c576`; one fix
+round, `ba8b0fa`, `75d6456`, `590f85a`, `e06dd64` and `e2d7471`; one close repair, `e12459a`. Two
+review rounds: round 1 **no blockers, three majors, one minor, two nits**, round 2 **no blockers, no
+majors, two minors, two nits**, three repaired at the close and one left open. Version **0.135.0**
+(minor). ADR-0217 and ADR-0218 accepted, 0218 with a dated `Outcome`. Closed backlog 0242, 0243,
+0246 and 0252; none filed.
+- **What landed.** `.githooks/pre-push`, CI's `links` job and `defaultGate()` were three
+hand-maintained copies of one ordered list, and the third had fallen behind twice.
+`scripts/gates.manifest.mjs` is now the roster — `{ script, args, carriers }` in the hook's order,
+which is canonical — the conductor **imports** its `conductor` projection so that carrier cannot
+drift at all, and `scripts/check-gate-carriers.mjs` reads the other two out of their own files and
+asserts each equals its projection, in order. A gate spelled differently per carrier is two entries
+with disjoint carrier sets (`check-release-tag.mjs` bare, `--self-test`, `--remote`); a carrier that
+deliberately lacks a gate says so by absence, which is how the two site gates are recorded with
+`pages` alone. The checker joined all three carriers, so a carrier that stopped running it would stop
+noticing everything else that left.
+- **The `cargo doc` half was the same class from the other side.** The hook documented `-p rlx-core`
+while CI documented `--workspace`, so four of the five members were reachable only after a push —
+and a rustdoc error in one of them shipped a red `main` under a release tag twice in sixteen days
+(Plan 0137, then Plan 0180's `milkconv`). The step is now `cargo doc --workspace --no-deps` under
+`RUSTDOCFLAGS=-D warnings`, with `--features text` dropped because `--workspace` unifies the feature
+on through `standalone`. The phase measured rather than tuned: **7.8 s** warm after an edit to
+`rlx-ring`, **0.5 s** warm with nothing changed, **20.1 s** after `cargo clean --doc` — about two
+seconds over the scoped step. ADR-0033's *tens of seconds* budget was already past before this phase
+(ADR-0157's preset sample at +58.5 s, ADR-0178's studio trio at 15.2 s); the plan reported that and
+left the budget to ADR-0033.
+- **Two smaller defects rode along because they live in the same files.** `runGate` dropped a guarded
+step with a bare `continue` — not in `ran`, not in the result, not on the terminal — so since
+`studio/node_modules` is gitignored and `git worktree add` never creates one, **every conductor lane
+had ever run its gate with the studio's typecheck, lint and tests skipped, silently**. A skipped step
+now reports in ADR-0016's shape, naming the step, what is missing, and the `enabledBy` command that
+would make it run; and a lane whose plan **declares** files under `studio/` installs that project's
+dependencies before its first session, parking `studio_install` rather than proceeding with checks
+that cannot run. And ADR-0211's served version line, which was a column-0 regex over any file named
+`Cargo.toml`, is now read in its TOML **section**: both revisions are read whole and compared with
+the `[workspace.package]` `version` lines removed, because a hunk carries no section header and the
+rule could not be read off a diff at all. `Cargo.lock` keeps its any-section reading; a member
+crate's `Cargo.toml` is out of scope by full path rather than by basename.
+- **What the review rounds moved.** Round 1's three majors were each a mechanism rather than an
+instance: `args.indexOf("--roster")` returning `-1` made `rosterAt + 1` drop the **first positional
+argument**, so the documented `[root]` form measured this repository and printed OK on a seeded red
+tree — the exact vacuous green the plan is about, in the gate written to refuse it;
+`installStudioDeps` sat inside `if (!laneOpen(rec))`, so the park it entered could never be cleared
+by `resume` (the worktree already existed) and the README said the opposite; and `docs/developing.md`
+still told a reader to run the retired scoped `cargo doc`. Round 2 verified all three against the
+tree — the `missing` root now exits 1 and names both carriers — and found nothing above `minor`.
+- **What outlived the plan.** Three bounds are written down rather than papered over, and each is a
+place a future reader could otherwise over-read a green run. The checker's parsers are regexes over
+a shell script and a YAML file, so a spelling they do not recognise — `node "scripts/x.mjs"`, a
+`run: |` block, a loop, a composite action — is invisible; an invisible invocation reads as a
+**missing** gate rather than as a pass, which is the safe direction. It asserts invocations and order
+and never the `if:` conditions a carrier attaches, so CI's `--remote` guard is prose the manifest
+records and nothing enforces. And the hook's English skip notice stays hand-written and will drift,
+its cost being a notice that under-names what was skipped. The fourth, found at the close and left
+open, is that the checker's own failure footer lists `pages` beside three carriers it actually binds,
+without saying that entry is recorded and not read.
+- **What the conductor learned about itself.** This plan changed the gate that runs at its own close,
+which is why its `pre-review` ran the **old** roster: the conductor resolves `defaultGate()` from its
+own checkout, not from the lane, so `check-translations.mjs`, `check-system-counts.mjs` and the new
+`check-gate-carriers.mjs` were not in that run and were taken by hand in both reviews. The plan's own
+Risks predicted exactly this. It is unchanged behaviour — the list was a literal in the same file
+before — but it is now a named property of the manifest rather than an accident of a copy.
+
+### [0194 - The analysis gains a stereo field](done/0194-the-analysis-gains-a-stereo-field.md)
+
+- closed 2026-09-19, conductor-run lane `plan-0194-the-analysis-gains-a-stereo-field` in
+`WORK/rlx-plan-0194`. Six phases, `c99b4d10`, `565e74d0`, `1b090d38`, `2fa92fef`, `ca724847` and
+`b33d8ceb`, plus `9c2b9037`, the close's three prose repairs. One review round: **no blockers, no
+majors, six minors and one nit**, three repaired at the close and four left open. Version
+**0.134.0** (minor). ADR-0215 accepted with no `Outcome`. No backlog entry closed and none filed.
+- **What landed.** Stereo reached this engine and was averaged away before anything spectral ran, so
+a hard-panned hi-hat contributed half its level and nothing knew which side it came from.
+`AnalysisFrame` now carries five fields — whole-mix `balance` and `spread` plus per-band
+`bass_balance`/`mid_balance`/`treb_balance` — computed in a new `core/src/dsp/stereo.rs` that reads
+nothing but the hop's two channels and that nothing upstream reads, published to the expression
+grammar as five names, and printed as five rows beside the band levels. `balance` is the plain RMS
+ratio and `spread` is `(1 - corr) / 2`; both read exactly `0` below `gain::WAVE_FLOOR`, on a
+one-channel stream and on any mono-duplicated stereo stream.
+- **The absolute decision is the whole design, and it is a deliberate break with ADR-0049.** Every
+other level here is divided by a running peak, so `bass > 0.5` means "loud for this track". These
+five are divided by nothing, so `balance = 0` means centred on every track forever. The argument is
+that a normalizer cannot represent *absence*: loudness is always present and only its scale is in
+question, while position can genuinely be absent, and a levelled `balance` would stretch a mono
+stream's noise floor into a confident wandering pan that an author has no way to distinguish from
+real stereo. The price is a narrow usable range, and the mitigation is publication rather than
+mechanism — the report rows, and Phase 6's measured table.
+- **Phase 1 closed a blind spot before anything depended on it.** Every `--signal` kind built one
+mono buffer and interleaved it into both channels, so the two channels were bit-identical in every
+synthetic test in the repository and a working stereo implementation was indistinguishable from a
+broken one. Three kinds now synthesize stereo: `pan:<p>` is one waveform at two gains, so the RMS
+ratio is algebraically `p` and the correlation algebraically 1; `wide:<seed>` is independent seeded
+noise per channel; `split:<p>` is a centred 80 Hz sine under a panned 8 kHz tone, the case a
+whole-mix scalar cannot express. The assertion that every *older* kind still reads a flat zero is
+the evidence the blindness was real, stated as the exact property it is.
+- **The compatibility promise is a property, not a golden.** For a stereo stimulus `S` and the
+stimulus `M` carrying `S`'s per-frame channel average in both channels, every pre-existing field of
+`AnalysisFrame` reads bit-identically — asserted through an exhaustive destructure, so a field added
+later breaks the build rather than escaping the guarantee, and on raw bits rather than an epsilon.
+`waveform_pair` and its gain are excluded and no implementation could include them: the pair *is*
+channels 0 and 1 (ADR-0199), so `S` and `M` cannot agree on it. That exclusion is asserted in the
+other direction in the same test — the pair **must** differ — which turns it into a statement about
+what the pair is rather than a place for a regression to hide.
+- **Phase 3 followed a rule instead of making a judgement mid-session.** The plan wrote the branch
+condition before the measurement: under 110 µs per hop, the exact per-channel-spectrum mechanism;
+over it, a time-domain approximation and a dated `Outcome` on the ADR. Measured 51.8 µs against a
+same-session baseline of 34.5 µs, so the exact mechanism stands and `<band>_balance` is
+`bands.split()` run per channel over the band edges `bass`/`mid`/`treb` already use. What kept it
+affordable is that the per-channel pass runs the **short** window only — the band split reads the
+short window's linear magnitudes, so the 8192-point long window stays single. The same-session
+baseline reads 34.5 where `docs/nfr.md` recorded 31.5; that gap is machine and day, which is why
+both numbers came off one session, and ADR-0071 is why it is said out loud.
+- **Phase 6 corrected two sentences the documents already carried.** Watched on loopback against two
+throwaway probes, `balance` tracks what a listener hears and a mono source sits visibly still. Then
+the measurement: across three 60 s commercial clips plus a mono downmix as control, *"real music
+sits well inside ±0.3"* turns out to describe the **mean**, which lands within `0.03` of centre,
+while single hops reach `±0.4`..`±0.6` — the excursions are what a binding must be gained for. And
+*"a wide stereo mix hovers near 0.5"* is simply wrong: `spread` averages `0.16`..`0.33` on wide
+material and only touches `0.8`+ in moments. A third reading is new and is the one an author will
+trip on — a hard pan carries **no** `spread`, one waveform at two gains being perfectly correlated,
+so gating colour on `spread` hides `balance` exactly where it is largest. The mono control reading
+exactly `0` on all five is the first evidence of that property from material rather than
+construction.
+- **The findings were all around the edges of a correct implementation.** Two documents claimed more
+than the code does and were repaired at the close: the ring-determinism spec said the whole field is
+a pure function of its own hop, true of `balance` and `spread` but not of the three per-band
+balances, which resolve from a four-hop window; and `docs/capturing.md` promised `pan:<p>` reads
+`spread` `0` for every `p`, where at `±1` one gain is exactly `0`, one channel is exactly silent,
+and the floored denominator deliberately reports the fully-decorrelated midpoint. Four were left
+open: `shot --usage` still lists six `--signal` kinds where the error path lists nine (program
+output, which a close may not rewrite); `ShortSpectrum` duplicates `SpectrumAnalyzer`'s short path —
+same taper, same `4/N` norm — with nothing holding the two together, and nothing *can* catch a drift
+because the scale cancels out of every ratio, leaving only the silence floor tripping at the wrong
+loudness; and two facts under `.claude/skills/preset-author/` that the plan made false, which a
+headless session cannot write (ADR-0210) and which reach the owner with their replacement text.
 
 ### [0195 - A finding can be closed](done/0195-a-finding-can-be-closed.md)
 

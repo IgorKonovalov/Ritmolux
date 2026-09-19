@@ -291,6 +291,106 @@ pub fn dynamic_groove(bpm: f32, secs: f32, format: AudioFormat) -> Vec<f32> {
     interleave(&mono, format.channels)
 }
 
+/// Broadband seeded noise panned to `p`, `-1` hard left to `+1` hard right —
+/// the stimulus a stereo quantity can be measured against (ADR-0215).
+///
+/// **One waveform at two gains**, `L = (1 - p) / (1 + |p|)` and
+/// `R = (1 + p) / (1 + |p|)`, so the per-channel RMS ratio is algebraically `p`
+/// and the channels are perfectly correlated: `balance` reads `p` and `spread`
+/// reads `0`, both as exact properties of the construction rather than as
+/// fitted numbers. Neither gain exceeds 1, so the peak stays inside the
+/// generator family's ±0.9 headroom.
+///
+/// **Broadband on purpose**: the source is seeded noise rather than a chord,
+/// because a pan applied to everything has to read as a pan in *every* band,
+/// and a sum of three sines below 350 Hz leaves the treble band empty.
+pub fn pan(p: f32, secs: f32, format: AudioFormat) -> Vec<f32> {
+    let p = p.clamp(-1.0, 1.0);
+    let n = frame_count(secs, format.sample_rate);
+    let mut rng = SplitMix::new(0x0215_9A17_C0DE_5EED);
+    let denom = 1.0 + p.abs();
+    let (gl, gr) = ((1.0 - p) / denom, (1.0 + p) / denom);
+    let mono: Vec<f32> = (0..n).map(|_| (rng.next_f32() * 2.0 - 1.0) * 0.9).collect();
+    let left: Vec<f32> = mono.iter().map(|s| s * gl).collect();
+    let right: Vec<f32> = mono.iter().map(|s| s * gr).collect();
+    interleave_pair(&left, &right, format.channels)
+}
+
+/// Independent seeded noise per channel — the decorrelated stimulus, where
+/// [`pan`] is the correlated one.
+///
+/// The two streams come from two seeds drawn from `seed`, so the pair is a pure
+/// function of one argument (NFR section 6) and the channels share no samples:
+/// `spread` reads near `0.5` and `balance` near `0`, both to the accuracy a
+/// finite hop allows rather than exactly.
+pub fn wide(seed: u64, secs: f32, format: AudioFormat) -> Vec<f32> {
+    let n = frame_count(secs, format.sample_rate);
+    let mut derive = SplitMix::new(seed);
+    let mut lrng = SplitMix::new(derive.next_u64());
+    let mut rrng = SplitMix::new(derive.next_u64());
+    let left: Vec<f32> = (0..n)
+        .map(|_| (lrng.next_f32() * 2.0 - 1.0) * 0.9)
+        .collect();
+    let right: Vec<f32> = (0..n)
+        .map(|_| (rrng.next_f32() * 2.0 - 1.0) * 0.9)
+        .collect();
+    interleave_pair(&left, &right, format.channels)
+}
+
+/// A centred bass sine under a treble tone panned to `p` — the case a whole-mix
+/// scalar cannot express (ADR-0215).
+///
+/// The 80 Hz layer is identical in both channels, so `bass_balance` reads `0`;
+/// the 8 kHz layer carries [`pan`]'s gains, so `treb_balance` reads `p`. The
+/// whole-mix `balance` lands strictly between them, at a value set by the
+/// relative energy of the two layers rather than by either position.
+///
+/// **The treble layer is the louder of the two** (0.6 against 0.3, summing
+/// inside the ±0.9 headroom), and that is arithmetic rather than taste: a band's
+/// value is a *mean over its linear bins*, and the treble band spans ~600 of
+/// them against the bass band's ~10. An equal-amplitude tone up there would
+/// average down to about the silence floor and the band would read as having no
+/// position at all.
+pub fn split(p: f32, secs: f32, format: AudioFormat) -> Vec<f32> {
+    let p = p.clamp(-1.0, 1.0);
+    let sr = format.sample_rate as f32;
+    let n = frame_count(secs, format.sample_rate);
+    let denom = 1.0 + p.abs();
+    let (gl, gr) = ((1.0 - p) / denom, (1.0 + p) / denom);
+    let mut left = Vec::with_capacity(n);
+    let mut right = Vec::with_capacity(n);
+    for i in 0..n {
+        let t = i as f32 / sr;
+        let low = 0.3 * (TAU * 80.0 * t).sin();
+        let high = 0.6 * (TAU * 8_000.0 * t).sin();
+        left.push(low + high * gl);
+        right.push(low + high * gr);
+    }
+    interleave_pair(&left, &right, format.channels)
+}
+
+/// Interleave a left/right pair up to `channels`: channel 0 is `left`, channel
+/// 1 is `right`, and any further channel carries their average.
+///
+/// Channels 0 and 1 are the only two the analyzer's stereo field and
+/// `waveform_pair` read (ADR-0199), so the rest exist here only to keep a
+/// higher channel count from carrying silence.
+fn interleave_pair(left: &[f32], right: &[f32], channels: u16) -> Vec<f32> {
+    let ch = channels.max(1) as usize;
+    let n = left.len().min(right.len());
+    let mut out = Vec::with_capacity(n * ch);
+    for (l, r) in left.iter().zip(right).take(n) {
+        for c in 0..ch {
+            out.push(match c {
+                0 => *l,
+                1 => *r,
+                _ => (l + r) * 0.5,
+            });
+        }
+    }
+    out
+}
+
 /// Interleave a mono buffer up to `channels` (the same sample on every channel).
 fn interleave(mono: &[f32], channels: u16) -> Vec<f32> {
     let ch = channels.max(1) as usize;
@@ -473,6 +573,55 @@ mod tests {
         );
         // ...and the BPM is a real argument, not decoration.
         assert_ne!(a, dynamic_groove(90.0, 1.0, format), "the BPM does nothing");
+    }
+
+    /// The stereo generators are the first ones whose two channels differ, so
+    /// the properties worth pinning are the ones every kind before them got for
+    /// free: purity, headroom, and that the channels are what they claim.
+    #[test]
+    fn the_stereo_generators_are_pure_and_differ_between_channels() {
+        let format = fmt();
+        for pcm in [pan(-0.8, 0.5, format), wide(1, 0.5, format)] {
+            assert!(
+                pcm.iter().all(|s| s.is_finite()),
+                "NaN/inf into the analyzer"
+            );
+            assert!(
+                pcm.iter().all(|s| s.abs() <= 0.9001),
+                "the 0.9 headroom the generator family keeps"
+            );
+            let channels: Vec<Vec<f32>> = (0..2)
+                .map(|c| pcm.iter().skip(c).step_by(2).copied().collect())
+                .collect();
+            assert_ne!(
+                channels.first(),
+                channels.get(1),
+                "a stereo generator whose channels agree is a mono one"
+            );
+        }
+        assert_eq!(pan(-0.8, 0.5, format), pan(-0.8, 0.5, format));
+        assert_eq!(wide(1, 0.5, format), wide(1, 0.5, format));
+        assert_ne!(
+            pan(-0.8, 0.5, format),
+            pan(0.8, 0.5, format),
+            "the position does nothing"
+        );
+        assert_ne!(
+            wide(1, 0.5, format),
+            wide(2, 0.5, format),
+            "the seed does nothing"
+        );
+        // A centred pan is the one position whose channels do agree, and it is
+        // the boundary the analyzer reads as no stereo field at all.
+        let centred = pan(0.0, 0.5, format);
+        let (left, right): (Vec<f32>, Vec<f32>) = centred
+            .chunks_exact(2)
+            .filter_map(|f| match f {
+                [l, r] => Some((*l, *r)),
+                _ => None,
+            })
+            .unzip();
+        assert_eq!(left, right, "pan:0 is a mono signal in both channels");
     }
 
     #[test]

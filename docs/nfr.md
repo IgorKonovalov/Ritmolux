@@ -147,9 +147,20 @@ the decision that moved it is linked.
   read the 2048 window — the beat-to-reaction path never touches the long one. What the
   long window does cost is **low-band level response: ~85 ms of Hann group delay**, accepted
   as physics rather than compensated away, and applying to `bass` and the sub-crossover
-  `bin()` positions only. Measured per-hop analysis cost after the change is 31.5 µs
-  (from 17.2 µs), against the ~11 ms allocated here — roughly 350x headroom. Cold start
-  now publishes its first frame at ~171 ms instead of ~43 ms, once per stream.
+  `bin()` positions only. Cold start now publishes its first frame at ~171 ms instead of
+  ~43 ms, once per stream.
+- **Measured per-hop analysis cost is 51.8 µs**, against the ~11 ms allocated above —
+  roughly **200x headroom**. The figure has moved three times and each move is a spectral
+  pass: 17.2 µs before [ADR-0049](adrs/0049-analysis-v2-dual-resolution-axis-normalized-bands.md)'s
+  long window, 31.5 µs after it, and 51.8 µs since
+  [ADR-0215](adrs/0215-the-analyzer-publishes-an-absolute-stereo-field.md) added one **short**
+  FFT per channel for the per-band stereo field. That last step was measured against a
+  same-session baseline of 34.5 µs rather than against the 31.5 above, because the two
+  readings have to come off one machine on one day to be comparable — the per-channel pass
+  costs ~17 µs, not ~20. All of these are the same measurement by the same method
+  (`one_hop_analyzes_well_under_the_hop_interval`, release, 1000 hops) on the reference
+  machine; a number here is a measurement, not a property
+  ([ADR-0071](adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)).
 - **This budget binds the window, and the streamed picture sits outside it.**
   `ritmolux --stream` ([ADR-0125](adrs/0125-the-live-video-out-is-a-spout-sender-fed-by-a-frame-tap.md))
   publishes frames to another application, which then composites and presents them on its own

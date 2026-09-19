@@ -30,7 +30,8 @@ analysis that consumes it. It states what must be true, not how it is implemente
   ([Plan 0005](../plans/done/0005-miri-ring-extraction.md), `.github/workflows/ci.yml`)
 - DSP analysis (FFT bins, onset envelope, tempo/BPM estimate, the band axis, the normalized
   levels, the levelled waveform trace and its published gain, the levelled left/right waveform
-  pair and its own published gain, the beat/bar clock) MUST be a
+  pair and its own published gain, the stereo field — `balance`, `spread` and the three per-band
+  balances ([ADR-0215](../adrs/0215-the-analyzer-publishes-an-absolute-stereo-field.md)) — the beat/bar clock) MUST be a
   **pure function of the input stream**: no wall-clock reads, no unseeded randomness, no ambient
   state. The same sequence of hops fed to a freshly
   constructed `Analyzer` MUST produce a bit-identical sequence of analysis frames. (CLAUDE.md
@@ -48,6 +49,13 @@ analysis that consumes it. It states what must be true, not how it is implemente
   ([ADR-0199](../adrs/0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md)). History-dependence is the contract
   here; ambient nondeterminism is still forbidden, and the distinction is what
   `analysis_is_deterministic` asserts by running the whole signal through two fresh analyzers.
+  **The stereo field is the exception that proves the rule**: `balance`, `spread` and the three
+  per-band balances divide by nothing — no running peak, no normalizer, no gain to publish beside
+  them ([ADR-0215](../adrs/0215-the-analyzer-publishes-an-absolute-stereo-field.md)). `balance` and
+  `spread` are taken from the hop's own two channels and are therefore pure functions of that hop
+  alone; the three per-band balances resolve from the same short window the bands do, so they see
+  what that window sees and nothing further back. What all five share is that no track and no
+  history can make `0` mean anything but centred.
 - Any visual jitter or randomness, when wanted, MUST be **explicitly seeded** so a scene is
   reproducible from its seed. (CLAUDE.md)
 - Sample rate, channel count, and buffer size MUST be validated once where audio enters the

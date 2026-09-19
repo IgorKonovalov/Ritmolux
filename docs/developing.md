@@ -120,7 +120,9 @@ git config core.hooksPath .githooks
 > is deliberately no auto-install ([ADR-0033](adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md)
 > Alternative H).
 
-What it runs, stopping at the first failure and naming the step that failed:
+### What it runs
+
+It stops at the first failure and names the step that failed:
 
 | Step | Command |
 |------|---------|
@@ -138,10 +140,26 @@ What it runs, stopping at the first failure and naming the step that failed:
 | Translations | `node scripts/check-translations.mjs` |
 | Translations (self-test) | `node scripts/check-translations.mjs --self-test` |
 | System counts | `node scripts/check-system-counts.mjs` |
+| Gate carriers | `node scripts/check-gate-carriers.mjs` |
+| Gate carriers (self-test) | `node scripts/check-gate-carriers.mjs --self-test` |
+| Diffusion filter | `python3 tools/sd-filter/test_sd_filter.py` (skips with no `python3`) |
+| Studio typecheck | `npm --prefix studio run typecheck` (skips with no `studio/node_modules`) |
+| Studio lint | `npm --prefix studio run lint` (same guard) |
+| Studio tests | `npm --prefix studio test` (same guard) |
 | Format | `cargo fmt --all --check` |
 | Lint | `cargo clippy --workspace --all-targets -- -D warnings` |
-| Rustdoc | `cargo doc -p rlx-core --no-deps --features text` under `RUSTDOCFLAGS=-D warnings` |
+| Rustdoc | `cargo doc --workspace --no-deps` under `RUSTDOCFLAGS=-D warnings` |
 | Tests | `cargo nextest run --workspace -P fast` (narrowed — see below) |
+
+**The two guarded groups skip rather than fail, and say so.** A clone with no
+`python3` on PATH and one that has never run `npm --prefix studio ci` are both
+ordinary, so those four steps print a notice naming what is missing and the
+command that would make them run, and the push continues
+([ADR-0016](adrs/0016-gpu-tests-opt-in-ci-scope.md)). CI runs all four
+unconditionally and is the backstop under both; so does the conductor's gate,
+which since
+[ADR-0218](adrs/0218-a-lane-makes-its-plans-preconditions-true-and-a-skipped-check-says-so.md)
+reports each skip the same way instead of dropping the step in silence.
 
 The Node steps come first because they are the cheapest (tens of milliseconds
 between them): every relative markdown link in the repo must resolve, every row
@@ -160,13 +178,20 @@ every generated contents block must still match the headings beneath it
 the version root `Cargo.toml` declares must carry an annotated tag on `HEAD`'s
 history, because `git push --follow-tags` never sends a lightweight one
 ([ADR-0203](adrs/0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md)),
-and every `.ru.md` translation must open with the `translated-from: <sha>` stamp
+every `.ru.md` translation must open with the `translated-from: <sha>` stamp
 naming the commit its source was translated from
-([ADR-0185](adrs/0185-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md)).
+([ADR-0185](adrs/0185-the-docs-translate-a-slice-and-a-stamp-makes-staleness-visible.md)),
+and this table's own Node steps must equal the ordered roster in
+`scripts/gates.manifest.mjs`, as must CI's `links` job and the conductor's gate
+([ADR-0217](adrs/0217-the-node-gate-roster-is-one-manifest-and-a-checker-holds-every-carrier-to-it.md)) —
+so a gate added to one carrier and not the others is red here, at the push.
 The four that could go green on a rule that had quietly stopped working — a roster
 detector matching nothing, an anchor rule that is merely plausible, a tag-type check
 that no longer looks, a stamp reader that finds no translations at all — carry a
-`--self-test` beside their check.
+`--self-test` beside their check. The roster gate carries one for a different
+reason: its plain run cannot go vacuously green (a parser that stopped matching
+reports an empty list against a roster that is not), so its self-test is there for
+the reporting path and the three drift shapes instead.
 **A translation that has drifted is never a failure.** The stamp check reports a
 source that has moved as an advisory row and exits 0: nothing mechanical can judge
 whether the Russian still says what the English now says, and hard-failing would
@@ -180,6 +205,8 @@ If `node` is not on your `PATH` they all **skip with a notice** rather than
 failing the push; nothing else here needs Node. That skip is about the hook only
 — CI's `links` job runs the same checks on `ubuntu-latest`, where they cannot
 skip and are not bypassable.
+
+### What it costs
 
 **Measured warm wall time of the test step: ~410 s** (2026-09-14, one run on the reference
 machine; `fmt` and `clippy` add under two seconds between them). About 165 s of that is idle.
@@ -199,10 +226,16 @@ all of them regardless** — though since [ADR-0073](adrs/0073-the-windows-ci-cr
 it runs those nine in the `coverage` job alone rather than in two Windows jobs, so
 the promise is now underwritten by one job instead of a redundancy between two.
 
-The **rustdoc step** fails a broken or private intra-doc link in `rlx-core` before CI's
-`cargo doc --workspace` job does. It is scoped to that one crate because that is what fits: on one
-warm engine edit it cost 4.5-5.9 s against 6.3-7.8 s for the lint step on the same edit
-(2026-09-15, reference machine). `standalone`'s public items are documented in CI only.
+The **rustdoc step** fails a broken or private intra-doc link in **any of the five workspace
+members** before CI's `cargo doc --workspace` job does. Scoping it to `-p rlx-core` left the other
+four documented in CI and nowhere else — a rustdoc error in one of them was unreachable before a
+push, and it fired twice in sixteen days, both times repaired after a release tag had been written
+on top of the red
+([ADR-0217](adrs/0217-the-node-gate-roster-is-one-manifest-and-a-checker-holds-every-carrier-to-it.md)).
+On the reference machine the widened step measures
+7.8 s warm after an edit to `rlx-ring` (the deepest crate, so every member re-documents), 0.5 s warm
+with nothing changed, and 20.1 s after a `cargo clean --doc` — about two seconds more than the
+scoped step it replaces.
 
 `cargo deny`, doctests, Miri, and the coverage job are deliberately *not* in the
 hook — they push it into minutes, and a gate that hurts gets disabled

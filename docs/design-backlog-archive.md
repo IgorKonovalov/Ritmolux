@@ -292,6 +292,7 @@ accepted cost" are different documents and only one of them is honest.
 - [0251 — `warp_mesh`'s level mode draws bands but not an ink class, because coverage is a continuum nothing thresholds](#0251--warp_meshs-level-mode-draws-bands-but-not-an-ink-class-because-coverage-is-a-continuum-nothing-thresholds)
 - [0252 — the conductor's gate is a hand-maintained copy of the Node gate list, and it has fallen behind twice](#0252--the-conductors-gate-is-a-hand-maintained-copy-of-the-node-gate-list-and-it-has-fallen-behind-twice)
 - [0253 — the conductor can be stopped but not paused, so finishing the plan in flight is done by hand with a stopwatch](#0253--the-conductor-can-be-stopped-but-not-paused-so-finishing-the-plan-in-flight-is-done-by-hand-with-a-stopwatch)
+- [0257 — the standalone exe is 9.7 % over NFR §4's soft cap, and only the component has anything that would have noticed](#0257--the-standalone-exe-is-97--over-nfr-4s-soft-cap-and-only-the-component-has-anything-that-would-have-noticed)
 <!-- toc:end -->
 
 ## The ledger
@@ -326,17 +327,14 @@ live entry citing this one.
 | 0221 | The run-alone override costs `-P fast` 165 s, because 18 testcases each drain the machine | [Plan 0199](plans/0199-the-gates-cost-is-measured-before-it-is-cut.md). **Promoted** |
 | 0239 | Three per-preset suites are 54 % of the workspace suite and grow with every preset shipped | [Plan 0199](plans/0199-the-gates-cost-is-measured-before-it-is-cut.md). **Promoted** |
 | 0240 | A merged plan never leaves `queue.json`, and the exemption is keyed on a gitignored file | [Plan 0197](plans/0197-the-conductor-becomes-operable.md). **Promoted** |
-| 0242 | The conductor's gate skips a check whose precondition a lane never has, and says nothing | [Plan 0196](plans/0196-the-gate-roster-stops-drifting.md). **Promoted** |
-| 0243 | The served version-line rule is anchored to a column and a basename, not to the section | [Plan 0196](plans/0196-the-gate-roster-stops-drifting.md). **Promoted** |
 | 0244 | A custom wave is neither smoothed nor scaled like the eight built-in figures | [Plan 0201](plans/0201-the-warp-surface-stops-lying.md). **Promoted** |
 | 0245 | The converted warp space has no pixel baseline, because every golden fixture is square | [Plan 0201](plans/0201-the-warp-surface-stops-lying.md). **Promoted** |
-| 0246 | The local `cargo doc` mirror covers one crate of five | [Plan 0196](plans/0196-the-gate-roster-stops-drifting.md). **Promoted** |
 | 0247 | A suite run by hand inside a lane records into that lane's own ledger, which no gate reads | [Plan 0197](plans/0197-the-conductor-becomes-operable.md). **Promoted** |
 | 0249 | `warp_mesh`'s `zoom` doc says the opposite of what the shader does | [Plan 0201](plans/0201-the-warp-surface-stops-lying.md). **Promoted** |
 | 0250 | A conductor session cannot run a command that carries an environment assignment | [Plan 0197](plans/0197-the-conductor-becomes-operable.md). **Promoted** |
 | 0251 | `warp_mesh`'s level mode draws bands but not an ink class | [Plan 0201](plans/0201-the-warp-surface-stops-lying.md). **Promoted** |
-| 0252 | The conductor's gate is a hand-maintained copy of the Node gate list | [Plan 0196](plans/0196-the-gate-roster-stops-drifting.md). **Promoted** |
 | 0253 | The conductor can be stopped but not paused | [Plan 0197](plans/0197-the-conductor-becomes-operable.md). **Promoted** |
+| 0257 | The standalone exe is 9.7 % over NFR §4's cap, and only the component would have noticed | [Plan 0207](plans/0207-the-commitments-get-their-instruments.md). **Promoted** |
 <!-- roster:end -->
 
 ### Closed
@@ -616,6 +614,10 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0103 | The plugin's context menu shadows foobar's, so the panel cannot be removed from a layout | [Plan 0103](plans/done/0103-the-project-gets-an-audience.md) Phase 1. One per-window question, shared branch intact, no ADR. **Closed 2026-09-18** |
 | 0113 | The converted feedback field equilibrates far brighter than the reference's | [Plan 0142](plans/done/0142-the-milkdrop-import-earns-its-verdict.md) Phases 2-3. The decay's truncation and its domain, read from the source. The converted-shader path is that plan's own Followups. **Closed 2026-09-18** |
 | 0124 | ADR-0113's motivating claim still reads "provisionally negative" | [Plan 0142](plans/done/0142-the-milkdrop-import-earns-its-verdict.md) Phases 4-5. Third `Outcome`: one better, two good, one fixed, two washed, one structural. **Closed 2026-09-18** |
+| 0252 | The conductor's gate is a hand-maintained copy of the Node gate list | [ADR-0217](adrs/0217-the-node-gate-roster-is-one-manifest-and-a-checker-holds-every-carrier-to-it.md) + [Plan 0196](plans/done/0196-the-gate-roster-stops-drifting.md) Phases 1-2. The manifest is imported, not copied. **Closed 2026-09-19** |
+| 0246 | The local `cargo doc` mirror covers one crate of five | [Plan 0196](plans/done/0196-the-gate-roster-stops-drifting.md) Phase 3. `--workspace`, `--features text` dropped; +2 s warm, 20.1 s doc-cold, reported not tuned. **Closed 2026-09-19** |
+| 0242 | The conductor's gate skips a check a lane never satisfies, and says nothing | [ADR-0218](adrs/0218-a-lane-makes-its-plans-preconditions-true-and-a-skipped-check-says-so.md) + [Plan 0196](plans/done/0196-the-gate-roster-stops-drifting.md) Phase 4. Reported, and the lane installs. **Closed 2026-09-19** |
+| 0243 | The served version-line rule is anchored to a column and a basename, not to the section | [Plan 0196](plans/done/0196-the-gate-roster-stops-drifting.md) Phase 5. Read whole in its TOML section; the third probe is no longer what the claim rests on. **Closed 2026-09-19** |
 <!-- roster:end -->
 
 ---
@@ -14884,9 +14886,24 @@ every plan the conductor has run so far. 0179 is the first that does, and it is 
 so the cheap mitigation (`npm --prefix <lane>/studio ci` once the lane opens) is worth doing by hand
 before this is decided properly.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0196](plans/0196-the-gate-roster-stops-drifting.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0196](plans/done/0196-the-gate-roster-stops-drifting.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+
+### Closed 2026-09-19 by [Plan 0196](plans/done/0196-the-gate-roster-stops-drifting.md) Phase 4 — both halves taken, and the recovery path was a second finding
+
+`runGate` now reports every step whose `onlyIf` path or `onlyIfCommand` fails, through the run
+terminal and into the gate's own result, in the pre-push hook's shape: the step, what is missing, and
+the `enabledBy` command that would make it run. And a lane whose plan **declares** files under
+`studio/` runs `npm --prefix studio ci` before its first session, parking `studio_install` with the
+install's tail rather than proceeding with checks that cannot run
+([ADR-0218](adrs/0218-a-lane-makes-its-plans-preconditions-true-and-a-skipped-check-says-so.md)).
+
+**This entry's mitigation note was right about more than it knew.** It called the hand-run install
+worth doing before the decision; what the close review found is that the *decided* version had the
+same hole one level along — the install ran only inside `if (!laneOpen(rec))`, so the park it entered
+left a worktree behind that `resume` walked straight past. The shipped trigger is the absence of
+`studio/node_modules`, asked before every run, which is recorded as a dated `Outcome` on ADR-0218.
 
 ---
 
@@ -14961,9 +14978,23 @@ the first time anyone writes a dependency as a table — a normal thing to do wh
 source or adding `features` — because the rule would then quietly stop testing dependency changes on
 the GPU suites, and nothing would report it.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0196](plans/0196-the-gate-roster-stops-drifting.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0196](plans/done/0196-the-gate-roster-stops-drifting.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+
+### Closed 2026-09-19 by [Plan 0196](plans/done/0196-the-gate-roster-stops-drifting.md) Phase 5 — repaired by reading the file rather than the diff
+
+`versionLineOnly` no longer pattern-matches a hunk. Both revisions are read whole and compared with
+their three-part `version` lines removed, and which lines are removed is decided by the TOML section
+header above them — `[workspace.package]` for the root `Cargo.toml`, any section for `Cargo.lock`,
+which is the shape that file has. The diagnosis in this entry's own title was the reason: **a hunk
+carries no section header**, so the rule ADR-0211 states in prose is not one a diff can be read for
+at all. The match also moved from basename to full path, so a member crate's `Cargo.toml` is out of
+scope whatever it contains — a second hole this entry did not name.
+
+The third probe, `absent: ^\[workspace\.dependencies\.` in `Cargo.toml`, existed only because the
+rule could not see the section. It is no longer what the claim rests on: a dependency table edited in
+place now re-arms the full suite, asserted by a ledger test that commits exactly that shape.
 
 ---
 
@@ -15132,9 +15163,24 @@ time was a close ceremony discovering after the fact what a hook step could have
 not higher because the blast radius stops at CI — no user-visible behaviour is involved — and the
 repair may be a single word, which is also the reason it should not sit here long.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0196](plans/0196-the-gate-roster-stops-drifting.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0196](plans/done/0196-the-gate-roster-stops-drifting.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+
+### Closed 2026-09-19 by [Plan 0196](plans/done/0196-the-gate-roster-stops-drifting.md) Phase 3 — the first shape, taken, and the warm measurement above did flatter it
+
+The hook's step is `cargo doc --workspace --no-deps` under `RUSTDOCFLAGS=-D warnings`, and
+`--features text` is gone for the reason this entry names — `standalone` turns the feature on and
+`--workspace` unifies it. All five members are documented before a push; none is CI-only.
+
+The phase was required to measure rather than to trust the **10.29 s** warm figure above, and the
+suspicion in the second shape was right in kind if not in degree: the honest numbers are **7.8 s**
+warm after an edit to `rlx-ring` (the deepest crate, so every member re-documents), **0.5 s** warm
+with nothing changed, and **20.1 s** after `cargo clean --doc`. The widening costs about two seconds
+over the scoped step. The hook's total was already past ADR-0033's *tens of seconds* before this
+phase — ADR-0157's preset sample at +58.5 s, ADR-0178's studio trio at 15.2 s — so the phase reported
+that and did not tune; the budget stays ADR-0033's to move. The fallback shape (naming the four
+crates) was not needed.
 
 ---
 
@@ -15433,9 +15479,31 @@ on every local push by anyone with the hook installed. What is lost is the pre-c
 conductor-run plans, which is exactly where a red gate is cheapest to repair. It rises with each
 further gate added, because the gap is not one checker but a list that nobody is told to update.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0196](plans/0196-the-gate-roster-stops-drifting.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0196](plans/done/0196-the-gate-roster-stops-drifting.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+
+### Closed 2026-09-19 by [Plan 0196](plans/done/0196-the-gate-roster-stops-drifting.md) Phases 1-2 — closed as the class, which is the judgement this entry made for itself
+
+This entry argued against its own obvious repair — *"the gap is not one checker but a list that
+nobody is told to update"* — and ADR-0217 records that as the decisive reason Alternative C (add the
+two missing names) lost. `scripts/gates.manifest.mjs` is the roster; `defaultGate()` **imports** its
+`conductor` projection, so the carrier that fell behind twice cannot fall behind at all; and
+`scripts/check-gate-carriers.mjs` reads `.githooks/pre-push` and CI's `links` job out of their own
+files and asserts each equals its projection, in order. The checker is itself in the roster, carried
+by all three, because a carrier that stopped running it would stop noticing everything else that
+left.
+
+The three probes above are now the wrong shape rather than red: `check-system-counts` and
+`check-translations` are absent from `gate.mjs` as literals and present in what it runs, because the
+list is data it imports. What replaces them is `gate.test.mjs`'s assertion that the gate's Node steps
+are exactly `invocationsFor("conductor")`, in order, which CI runs.
+
+**What stayed open, stated rather than hidden:** the checker's parsers are regexes over a shell
+script and a YAML file and can be evaded by a spelling they do not know (an unrecognised invocation
+reads as *missing*, which is the safe direction); it asserts invocations and order and never the
+`if:` conditions a carrier attaches; and the hook's English skip notice stays hand-written and will
+drift. All three are ADR-0217's Negatives.
 
 ---
 
@@ -15475,5 +15543,70 @@ asking and stopping is exactly the suite's twelve minutes.
   `present: once in: tools/conductor/conductor.mjs`
 
 - **Moved to the archive 2026-09-19 on promotion**, when [Plan 0197](plans/0197-the-conductor-becomes-operable.md) was
+  approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
+  plan's done-whens are the check and this body is its evidence.
+
+---
+
+## 0257 — the standalone exe is 9.7 % over NFR §4's soft cap, and only the component has anything that would have noticed
+
+[NFR §4](nfr.md#4-size-and-dependencies) sets a **soft cap of 10,000,000 B** for the standalone
+release exe, and says of it, in its own words, that *"the **value** is the inherited one, and it
+has never been measured against what the exe actually contains."*
+
+It has now. On 2026-09-19, on this project's development box (Windows 10, `cargo build --release`,
+default features), `target/release/ritmolux.exe` measured **10,971,648 B** — **971,648 B over,
+9.7 %**. The measurement was incidental: it was taken to price embedding thumbnails for
+[Plan 0206](plans/0206-the-browser-shows-the-look.md), and the cap turned out to be already
+breached before that plan proposed adding anything at all.
+
+**The asymmetry is the finding, not the number.** The foobar component has a carrier for exactly
+this: `packaging/foobar/build-component.ps1` prints the component's length on every build and warns
+above 90 % of its cap, a mechanism
+[ADR-0159](adrs/0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md) put there
+deliberately. **The standalone has no equivalent** — no build step, no CI job and no gate reports
+its size, which is why a 9.7 % breach could sit unremarked in the artifact the project's own NFR
+names first.
+
+**Both halves of the question are open, and they are different questions.**
+
+1. **Is the cap right?** NFR §4 says the value is inherited and unexamined. The component's cap was
+   re-derived from what it actually carries (ADR-0159); the standalone's never was. It carries
+   `winit`, the window, the WASAPI capture stack and the embedded preset library, and a cap derived
+   from that may well be larger than 10,000,000 B.
+2. **Should anything report it?** A soft cap that nothing measures is a sentence, not a
+   constraint. The component's recipe is the precedent and it is cheap — a printed length and a
+   warning threshold, fatal to nothing.
+
+**What makes this live rather than tidy.** [Plan 0206](plans/0206-the-browser-shows-the-look.md)
+rejected embedding thumbnails partly on this measurement, and
+[ADR-0230](adrs/0230-thumbnails-are-rendered-by-a-subprocess-of-the-player-itself.md) records the
+arithmetic. If the cap is re-derived upward, that rejection deserves re-reading — it would not
+change the decision, because 4.9 MB of PNG plus a runtime image codec against
+[ADR-0011](adrs/0011-image-crate-for-capture-tooling.md) is not close, but the argument would rest
+on the codec rather than on the byte count.
+
+- **Raised:** 2026-09-19 by `architect`, incidentally, while pricing Plan 0206. **Owner if taken:**
+  `architect` (the cap is a decision, and re-deriving it supersedes part of NFR §4), then `dev` for
+  whatever reports it.
+- **Verified 2026-09-19** — the cap is stated, and at this value:
+  `present: Soft cap 10,000,000 B in: docs/nfr.md`
+- **Verified 2026-09-19** — and the document says nobody has checked it against the artifact:
+  `present: never been measured against what the exe actually contains in: docs/nfr.md`
+- **Verified 2026-09-19** — the component's recipe measures and warns, which is the precedent:
+  `present: WarnBytes in: packaging/foobar/build-component.ps1`
+- **Verified 2026-09-19** — the measurement itself is a reading of one build on one machine and no
+  probe can assert it:
+  `unprobeable: a binary's size is a property of a build, not of the tree; re-take it with
+  cargo build --release and stat rather than trusting this number`
+
+### Priority
+
+**Medium.** Nothing is broken and the caps are explicitly soft — ADR-0159 records that they *"never
+fail a release over a size"* — so no gate is red and no user is affected. What is affected is every
+future argument about whether a feature fits, because the number those arguments start from is
+wrong in an unknown direction and there is no instrument to correct it.
+
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0207](plans/0207-the-commitments-get-their-instruments.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.

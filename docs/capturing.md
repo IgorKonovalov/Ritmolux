@@ -574,11 +574,16 @@ those are the numbers to calibrate a gain against (here, `--signal bass:60`):
 
 ```
 audio levels over 355 analysis hops (past warm-up) — calibrate gains against these, not against --set magnitudes:
-  signal      min     mean      max
-  bass      1.000    1.000    1.000
-  mid       0.000    0.000    0.000
-  treb      0.000    0.000    0.000
-  onset     0.006    0.405    1.000
+  signal            min     mean      max
+  bass            1.000    1.000    1.000
+  mid             0.000    0.000    0.000
+  treb            0.000    0.000    0.000
+  onset           0.006    0.405    1.000
+  balance         0.000    0.000    0.000
+  spread          0.000    0.000    0.000
+  bass_balance    0.000    0.000    0.000
+  mid_balance     0.000    0.000    0.000
+  treb_balance    0.000    0.000    0.000
   onset peaks at 1.000 on hop 20 — the shipped attractor reseed gates run 0.50 to 0.75
 ```
 
@@ -592,6 +597,19 @@ because a whole class of binding — every shipped attractor's `reseed`, every
 beat-latched accent — is gated on it, and whether a given stimulus ever *crossed*
 such a gate was not answerable from a capture. The peak hop is printed beside it
 because that hop is the argument to [`--at`](#aiming-a-capture-at-a-transient).
+
+**The five stereo rows are read the other way round from every row above them.**
+`balance`, `spread` and the three `<band>_balance` are **absolute** — never
+divided by a running peak
+([ADR-0215](adrs/0215-the-analyzer-publishes-an-absolute-stereo-field.md)) — so
+they are not fractions of anything and a row of zeroes is a true statement rather
+than a quiet clip: the source carries no stereo information. Every kind but the
+[three stereo ones](#the-stereo-kinds-pan-wide-and-split) reads exactly that,
+and so does any mono file or mono capture device. They are printed here for the
+opposite reason the band rows are: those exist because `--set` magnitudes are
+unlike real levels, and these exist because an absolute quantity's usable range
+is whatever real material happens to produce and nothing else can tell you what
+that is.
 
 ### Aiming a capture at a transient
 
@@ -1283,7 +1301,8 @@ still also carries a byte budget — GitHub refuses a social preview over 1 MB �
 quantizes to a 256-colour palette and fails the run if it is still over.
 
 `--signal` kinds: `click:<bpm>`, `bass:<hz>`, `treble:<hz>`, `noise:<seed>`,
-`chord`, `dynamic:<bpm>`. The synth path needs no committed asset. `--audio`
+`chord`, `dynamic:<bpm>`, and the three stereo ones below — `pan:<p>`,
+`wide:<seed>`, `split:<p>`. The synth path needs no committed asset. `--audio`
 reads uncompressed 16-bit PCM WAV only (a hand-rolled reader — no decoder
 dependency); other encodings are a followup.
 
@@ -1343,6 +1362,68 @@ opposite sides of the output volume.
 > whether your gains match what your music actually produces; only `--audio` on
 > real material does — see [the reference range](#what-real-material-actually-produces)
 > below. Do not read a lively filmstrip as a calibration check.
+
+#### The stereo kinds: `pan`, `wide` and `split`
+
+Every kind above builds **one mono buffer and duplicates it into both channels**,
+so under all of them the stereo field
+([ADR-0215](adrs/0215-the-analyzer-publishes-an-absolute-stereo-field.md)) reads
+a flat zero — which is true, and is also why a working stereo implementation and
+a broken one were indistinguishable under the whole harness until these three
+existed. Each is a pure function of its argument, like every generator here.
+
+| kind | what it is | what it reads |
+|---|---|---|
+| `pan:<p>`, `p` in `-1..1` | broadband seeded noise at per-channel gains `L = (1-p)/(1+|p|)`, `R = (1+p)/(1+|p|)` — one waveform, two gains | `balance` exactly `p`, `spread` exactly `0` (but see the endpoints below), and all three `<band>_balance` at `p` as well |
+| `wide:<seed>` | independent seeded noise per channel, from two streams derived from `seed` | `spread ≈ 0.500`, `balance ≈ 0.000` |
+| `split:<p>` | a centred 80 Hz sine under an 8 kHz tone panned to `p` | `bass_balance ≈ 0`, `treb_balance ≈ p`, and a whole-mix `balance` strictly between them |
+
+`pan` and `split` are the two worth understanding. **`pan` is one waveform at two
+gains**, so the RMS ratio *is* `p` algebraically and the correlation is exactly
+1 — the numbers it produces are properties of the construction, not fitted ones.
+**`split` is the case a whole-mix scalar cannot express**: the bass is centred
+while the treble is thrown to one side, which is the look per-band balance exists
+for, and `balance` alone would report some intermediate position belonging to
+neither layer.
+
+**`pan`'s two endpoints are the exception to its own `spread` row.** At `p = ±1`
+one gain is exactly `0`, so one channel is exactly silent — and a correlation
+against silence is undefined rather than perfect. The analyzer reports that as
+`spread = 0.5`, the fully-decorrelated midpoint, on the reasoning that a hard
+pan is a wide image and not a narrow one. So `pan:1` prints `balance 1.000` with
+`spread 0.500`, while `pan:0.999` prints `spread 0.000` like every other
+interior position: at `0.999` the quiet channel is a scaled copy of the loud one
+rather than silence, and a scaled copy correlates exactly. Use an interior `p`
+to exercise a `spread`-gated preset against a *narrow* image.
+
+Its treble layer is deliberately the louder of the two (0.6 against 0.3), which
+is arithmetic rather than taste: a band's value is a **mean over its linear
+bins**, and the treble band spans ~600 of them against the bass band's ~10, so an
+equal-amplitude tone up there averages down to about the silence floor and the
+band reads as having no position at all.
+
+```bash
+# The stereo field, printed beside the band rows
+cargo run -p standalone --example shot -- --signal pan:-0.8 --out pan.png
+cargo run -p standalone --example shot -- --signal split:-0.7 --out split.png
+```
+
+What those two print, measured over their 355 past-warm-up hops:
+
+| row | `pan:-0.8` min / mean / max | `split:-0.7` min / mean / max |
+|---|---|---|
+| `balance` | −0.800 / −0.800 / −0.800 | −0.381 / −0.357 / −0.336 |
+| `spread` | 0.000 / 0.000 / 0.000 | 0.137 / 0.140 / 0.144 |
+| `bass_balance` | −0.800 / −0.800 / −0.800 | −0.000 / −0.000 / 0.000 |
+| `mid_balance` | −0.800 / −0.800 / −0.800 | 0.000 / 0.000 / 0.000 |
+| `treb_balance` | −0.800 / −0.800 / −0.800 | −0.700 / −0.700 / −0.700 |
+
+`pan` is flat to three decimals in every row because a gain ratio does not vary
+over time. `split`'s `mid_balance` is `0.000` for a different reason than its
+`bass_balance` is: no energy lands in the mid band at all, so it is under the
+silence floor and reads exactly zero rather than being centred. And its `spread`
+is `0.140` rather than `0` — the two channels carry the same two layers at
+different *proportions*, which is a real decorrelation, not a rounding.
 
 #### What real material actually produces
 
