@@ -145,6 +145,20 @@ function check(root, gates = GATES) {
   return { problems, counts };
 }
 
+/**
+ * The command line, as `{ root, roster }` — each null when it was not given.
+ *
+ * `--roster` takes a value, so that value is not a root. The index guard has to hold when the flag
+ * is ABSENT too: `indexOf` returns -1 there, and -1 + 1 is the first argument, which would silently
+ * eat the root and measure this repository instead of the tree the caller named.
+ */
+export function parseArgs(args) {
+  const at = args.indexOf("--roster");
+  const rosterValueAt = at < 0 ? -1 : at + 1;
+  const positional = args.filter((a, i) => !a.startsWith("--") && i !== rosterValueAt);
+  return { root: positional[0] ?? null, roster: at < 0 ? null : (args[rosterValueAt] ?? null) };
+}
+
 // ---------------------------------------------------------------------------------------------
 // --self-test
 
@@ -206,6 +220,19 @@ async function selfTest() {
   // The manifest's own shape, on the real roster rather than on the fixture's.
   is("every carrier the real roster names is a known one", unknownCarriers(GATES).length, 0);
 
+  // The documented `[root]` form, which is the one an operator types by hand. A root that survives
+  // the argument parse but is dropped before `check()` reads THIS repository and reports OK on a
+  // seeded red tree, which is the vacuous green this gate exists to refuse.
+  is("a bare root is the root, with no --roster to displace it", parseArgs(["some/tree"]).root, "some/tree");
+  is("a root before --roster is still the root", parseArgs(["some/tree", "--roster", "m.mjs"]).root, "some/tree");
+  is("and --roster's value is never read as a root", parseArgs(["--roster", "m.mjs"]).root, null);
+  is("--roster's value is the manifest", parseArgs(["t", "--roster", "m.mjs"]).roster, "m.mjs");
+  is(
+    "the missing root against the REAL roster is not OK, which is what `[root]` alone must report",
+    check(join(FIXTURES, "missing")).problems.length > 0,
+    true,
+  );
+
   const failed = results.filter((r) => !r.ok);
   for (const r of failed) console.error(`  FAIL ${r.what}\n    expected: ${JSON.stringify(r.wanted)}\n    actual:   ${JSON.stringify(r.actual)}`);
   console.log(`gate carriers self-test: ${results.length - failed.length} of ${results.length}`);
@@ -219,11 +246,10 @@ if (args.includes("--self-test")) {
   process.exit((await selfTest()) ? 0 : 1);
 }
 
-const rosterAt = args.indexOf("--roster");
-const positional = args.filter((a, i) => !a.startsWith("--") && i !== rosterAt + 1);
-const gates = rosterAt < 0 ? GATES : (await import(`file://${resolve(args[rosterAt + 1]).replace(/\\/g, "/")}`)).GATES;
+const { root, roster } = parseArgs(args);
+const gates = roster === null ? GATES : (await import(`file://${resolve(roster).replace(/\\/g, "/")}`)).GATES;
 
-const { problems, counts } = check(resolve(positional[0] ?? REPO_ROOT), gates);
+const { problems, counts } = check(resolve(root ?? REPO_ROOT), gates);
 console.log(`gate carriers: ${gates.length} rostered gate(s); read ${counts.join(", ")}`);
 if (problems.length === 0) {
   console.log("gate carriers: OK (every carrier runs the manifest's projection, in order)");
