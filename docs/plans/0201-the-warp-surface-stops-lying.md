@@ -120,18 +120,37 @@ job of a baseline).
   wherever the two levers are both on. ADR-0224's first Positive carried the same overreach and is
   corrected in the same commit.
 
-### Phase 4 — The converted chain gets a baseline that can see it
+### Phase 4 — The converted chain gets a fixture that will see it
 - **Owner skill:** dev
-- **What:** one converted `warp_mesh` fixture rendered at a non-square size with its own baseline,
-  in the shape `attractor_trails` already uses, so incidental pixel drift in the corrected-space
-  chain has a guard.
-- **Files touched:** `core/tests/golden.rs` or a sibling module, `core/tests/golden/` (one new
-  baseline), `docs/testing.md`
-- **Done when:** the new baseline is captured at a size whose aspect is **not** 1:1 and not 16:9 —
-  the two shapes ADR-0037 records as the ones that hide this class — and the test's header says why
-  that size; a deliberate one-term change in the corrected-space arithmetic moves it, where the
-  existing square fixtures do not move at all; and `docs/testing.md` records what the new fixture
-  guards that the square ones cannot.
+- **What:** one converted `warp_mesh` fixture rendered at a non-square size, in the shape
+  `attractor_trails` already uses — everything about the guard except the baseline image itself,
+  which Phase 4b captures.
+- **Files touched:** `core/tests/golden.rs` or a sibling module, `docs/testing.md`
+- **Done when:** the fixture renders at a size whose aspect is **not** 1:1 and not 16:9 — the two
+  shapes ADR-0037 records as the ones that hide this class — and the test's header says why that
+  size; `docs/testing.md` records what the new fixture guards that the square ones cannot; and
+  **the suite is green at the end of this phase** — the test does not run while its baseline is
+  absent and prints why, in ADR-0016's skip shape, rather than failing or asserting against nothing.
+
+### Phase 4b — The baseline is captured by someone who looks at it
+- **Owner skill:** human
+- **What:** capture Phase 4's baseline, and confirm the guard actually guards.
+- **Files touched:** `core/tests/golden/` (one new baseline), and the line Phase 4 left holding the
+  test back.
+- **How:** `RLX_BLESS=1` for that test alone, then **open the PNG** — a first baseline is not
+  checked by any comparison, only by a person deciding the picture is what the fixture meant to
+  render. Then release the test and re-run it green.
+- **Done when:** the baseline is committed, the test runs, and a deliberate one-term change in the
+  corrected-space arithmetic moves it while the existing square fixtures do not move at all —
+  reverted after, with the reading recorded in the `## Implementation log`.
+
+  **Split from Phase 4 on 2026-09-19, and the reason is the decision not to widen the allowlist.**
+  `RLX_BLESS=1` is not in `tools/conductor/settings.conductor.json` and is not being added: it
+  rewrites **any** baseline that differs, so a session that can create one can also erase the
+  evidence that it broke another, and the goldens are this project's only guard against silent
+  visual drift. That is ADR-0210's reasoning applied to a second surface — the repair a headless
+  session must not make is the owner's. A first baseline has nothing to compare against, so
+  capturing it is a look judgement in the sense ADR-0081 uses, not a command.
 
 ## Risks & open questions
 
