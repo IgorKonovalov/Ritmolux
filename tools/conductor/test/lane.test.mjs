@@ -37,8 +37,11 @@ export function scratch({ plans, lanes, after = {}, spec = {}, local = {} }) {
   writeFileSync(join(repo, "README.md"), "scratch\n");
   // Where a `servedClose` puts its bump, as the real close puts it: a version line and nothing else.
   writeFileSync(join(repo, "Cargo.toml"), '[workspace.package]\nversion = "0.1.0"\nedition = "2021"\n');
+  // As the real repository ignores it: a lane that installs the studio's dependencies must still
+  // read as a clean worktree, or the removal at the end of the plan refuses.
+  writeFileSync(join(repo, ".gitignore"), "studio/node_modules/\n");
   for (const p of plans) writePlan(repo, p);
-  sh(["add", "VERSION", "README.md", "Cargo.toml", "docs"], repo);
+  sh(["add", "VERSION", "README.md", "Cargo.toml", ".gitignore", "docs"], repo);
   sh(["commit", "-q", "-m", "init"], repo);
   sh(["tag", "-a", "v0.1.0", "-m", "init"], repo);
 
@@ -820,4 +823,118 @@ test("once the owner has done the `.claude/` phase and marked its row, the plan 
   assert.equal(rec.status, "merged", JSON.stringify(rec.park));
   assert.deepEqual(rec.steps.filter((s) => s.kind === "implement").map((s) => s.phases), [["2"]], "only Phase 2 was handed to a session");
   assert.equal(readFileSync(join(repo, "phase-0101-1.txt"), "utf8"), "done by the owner\n");
+});
+
+// ADR-0218: a lane makes its plan's preconditions true. `studio/node_modules` is gitignored and
+// `git worktree add` never creates one, so without an install the gate's three studio checks skip.
+
+const studioPhase = (id) => ({ id, owner: "studio-builder", files: "`studio/src/app.tsx`" });
+
+/**
+ * An install stand-in: it records the directory it ran in, creates the directory the gate's studio
+ * steps are guarded on, and fails when FAIL exists — which is what an offline lane looks like.
+ */
+function installStandIn() {
+  const dir = tmp("rlx-lane-install-");
+  const ran = join(dir, "ran.txt");
+  const fail = join(dir, "FAIL");
+  const script = join(dir, "install.cjs");
+  const q = (p) => JSON.stringify(p);
+  writeFileSync(
+    script,
+    `const fs=require('fs'),path=require('path');fs.appendFileSync(${q(ran)},process.cwd()+'\\n');\n` +
+      `if(fs.existsSync(${q(fail)})){console.log('npm error code ENOTFOUND');console.error('npm error network request to https://registry.npmjs.org failed');process.exit(1)}\n` +
+      `fs.mkdirSync(path.join(process.cwd(),'studio','node_modules'),{recursive:true});\n`,
+  );
+  return {
+    cmd: [process.execPath, script],
+    fail: () => writeFileSync(fail, ""),
+    runs: () => (existsSync(ran) ? readFileSync(ran, "utf8").trim().split("\n").filter(Boolean) : []),
+  };
+}
+
+/** The gate's three studio steps, stood in for: each records that it ran, and each is guarded. */
+function studioGate() {
+  const marker = join(tmp("rlx-lane-studio-gate-"), "ran.txt");
+  const step = (name) => ({
+    name,
+    cmd: [process.execPath, "-e", `require('fs').appendFileSync(${JSON.stringify(marker)}, ${JSON.stringify(name)} + '\\n')`],
+    onlyIf: "studio/node_modules",
+    enabledBy: "npm --prefix studio ci",
+  });
+  return {
+    commands: [step("studio typecheck"), step("studio lint"), step("studio test")],
+    ran: () => (existsSync(marker) ? readFileSync(marker, "utf8").trim().split("\n").filter(Boolean) : []),
+  };
+}
+
+test("a lane for a plan declaring studio/ installs its dependencies, and all three studio checks run", async () => {
+  const { ctx } = scratch({ plans: [{ number: "0101", phases: [studioPhase("1")] }], lanes: { a: ["0101"] } });
+  const install = installStandIn();
+  const gate = studioGate();
+  ctx.studioInstall = install.cmd;
+  ctx.gate = gate.commands;
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  assert.deepEqual(install.runs(), [rec.worktree], "installed once, in the lane");
+  assert.deepEqual(gate.ran(), [
+    "studio typecheck",
+    "studio lint",
+    "studio test",
+    "studio typecheck",
+    "studio lint",
+    "studio test",
+  ], "all three, at pre-review and again at post-close");
+  assert.deepEqual(rec.gates[0].ran, ["studio typecheck", "studio lint", "studio test"]);
+  assert.deepEqual(rec.gates[0].commands.map((c) => c.unmet ?? null), [null, null, null], "nothing was skipped");
+});
+
+test("a lane for a plan that does not name studio/ installs nothing, and the skipped checks say so", async () => {
+  const { ctx } = scratch({ plans: [{ number: "0101", phases: [dev("1")] }], lanes: { a: ["0101"] } });
+  const install = installStandIn();
+  const gate = studioGate();
+  ctx.studioInstall = install.cmd;
+  ctx.gate = gate.commands;
+  const out = [];
+  ctx.live = (l) => out.push(l);
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+
+  assert.equal(rec.status, "merged", JSON.stringify(rec.park));
+  assert.deepEqual(install.runs(), [], "nothing was installed");
+  assert.deepEqual(gate.ran(), [], "and the three checks could not run");
+  assert.deepEqual(rec.gates[0].ran, []);
+  assert.deepEqual(
+    rec.gates[0].commands.map((c) => [c.name, c.skipped, c.unmet]),
+    [
+      ["studio typecheck", true, "no studio/node_modules; run: npm --prefix studio ci"],
+      ["studio lint", true, "no studio/node_modules; run: npm --prefix studio ci"],
+      ["studio test", true, "no studio/node_modules; run: npm --prefix studio ci"],
+    ],
+    "the gate's own record carries the skip rather than only a step count",
+  );
+  const skipped = out.filter((l) => l.includes("skipped:"));
+  assert.equal(skipped.length, 6, out.join("\n"));
+  assert.match(skipped[0], /^\d\d:\d\d 0101   gate   studio typecheck skipped: no studio\/node_modules; run: npm --prefix studio ci$/);
+});
+
+test("a failed install parks the plan before any session, with the tail as the detail", async () => {
+  const { ctx } = scratch({ plans: [{ number: "0101", phases: [studioPhase("1")] }], lanes: { a: ["0101"] } });
+  const install = installStandIn();
+  install.fail();
+  ctx.studioInstall = install.cmd;
+  ctx.gate = studioGate().commands;
+  await runLanes(ctx);
+  const rec = loadState(ctx.stateDir).plans["0101"];
+
+  assert.equal(rec.status, "parked");
+  assert.equal(rec.park.reason, "studio_install");
+  assert.match(rec.park.detail, /exited 1/);
+  assert.match(rec.park.detail, /registry\.npmjs\.org failed/, "the install's tail is the detail");
+  assert.deepEqual(kinds(rec), [], "no session was started");
+  assert.deepEqual(rec.gates ?? [], [], "and no gate ran");
+  assert.equal(rec.park.dirty, undefined, "the worktree was left clean");
+  assert.match(readFileSync(statePaths(ctx.stateDir).inbox, "utf8"), /plan 0101 parked: studio_install/);
 });

@@ -41,6 +41,15 @@ export const LOST_BACKGROUND = "lost_background";
  */
 export const CLAUDE_DIR = "claude_dir";
 
+/**
+ * The park for a lane whose plan declares files under `studio/` and whose dependency install failed
+ * as the worktree opened. `studio/node_modules` is gitignored and `git worktree add` never creates
+ * one, so without the install the three studio checks skip and the lane's gate is silent about
+ * exactly the work the plan is doing (ADR-0218). Proceeding with checks that cannot run is what the
+ * park replaces, and it happens before any session starts. No session may claim this reason.
+ */
+export const STUDIO_INSTALL = "studio_install";
+
 const SHELL_TOOLS = new Set(["Bash", "PowerShell"]);
 
 /** One line, at most 80 characters, for naming a command in a park detail. */

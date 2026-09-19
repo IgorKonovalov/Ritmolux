@@ -307,6 +307,76 @@ test("a step whose onlyIfCommand does not run is skipped, and one whose command 
   assert.deepEqual(g.ran, ["present tool"]);
 });
 
+// ADR-0218: a skipped step says so, rather than leaving the step count as the only evidence.
+
+test("a step whose precondition fails is reported, named in the result, and out of ran", async () => {
+  const node = process.execPath;
+  const cwd = tmp();
+  const reported = [];
+  const g = await runGate({
+    cwd,
+    logDir: tmp(),
+    label: "unmet",
+    onCommandUnmet: (c, why) => reported.push(`${c.name}: ${why}`),
+    commands: [
+      { name: "studio test", cmd: [node, "-e", "process.exit(1)"], onlyIf: "studio/node_modules", enabledBy: "npm --prefix studio ci" },
+      { name: "sd-filter tests", cmd: [node, "-e", "process.exit(1)"], onlyIfCommand: ["rlx-no-such-command-anywhere", "--version"], enabledBy: "put python3 on PATH" },
+      { name: "a step with no guard", cmd: [node, "-e", "process.exit(0)"] },
+    ],
+  });
+  assert.equal(g.ok, true);
+  assert.deepEqual(g.ran, ["a step with no guard"], "a skipped step is not in ran");
+  assert.deepEqual(reported, [
+    "studio test: no studio/node_modules; run: npm --prefix studio ci",
+    "sd-filter tests: rlx-no-such-command-anywhere --version does not run; run: put python3 on PATH",
+  ]);
+  assert.deepEqual(
+    g.commands.map((c) => [c.name, c.skipped ?? false, c.unmet ?? null]),
+    [
+      ["studio test", true, "no studio/node_modules; run: npm --prefix studio ci"],
+      ["sd-filter tests", true, "rlx-no-such-command-anywhere --version does not run; run: put python3 on PATH"],
+      ["a step with no guard", false, null],
+    ],
+    "the gate's own result carries the skip, so a reader of state/gates/ sees it too",
+  );
+});
+
+test("every guarded step in the default gate names the command that would make it run", () => {
+  const guarded = defaultGate().filter((c) => c.onlyIf || c.onlyIfCommand);
+  assert.deepEqual(
+    guarded.map((c) => [c.name, c.enabledBy]),
+    [
+      ["sd-filter tests", "put python3 on PATH"],
+      ["studio typecheck", "npm --prefix studio ci"],
+      ["studio lint", "npm --prefix studio ci"],
+      ["studio test", "npm --prefix studio ci"],
+    ],
+  );
+});
+
+test("a gate in a tree with no studio/node_modules names the three studio steps and the command", async () => {
+  const reported = [];
+  // The default gate's own studio steps, verbatim, in a tree with no studio/node_modules. The rest
+  // of the gate is left out because every one of its steps would fail in an empty directory, and a
+  // gate stops at the first red - which is before these three.
+  const g = await runGate({
+    cwd: tmp(),
+    logDir: tmp(),
+    label: "studio",
+    commands: defaultGate().filter((c) => c.onlyIf === "studio/node_modules"),
+    onCommandUnmet: (c, why) => reported.push(`${c.name} skipped: ${why}`),
+  });
+  assert.deepEqual(g.ran, [], "none of them ran");
+  assert.deepEqual(
+    reported,
+    [
+      "studio typecheck skipped: no studio/node_modules; run: npm --prefix studio ci",
+      "studio lint skipped: no studio/node_modules; run: npm --prefix studio ci",
+      "studio test skipped: no studio/node_modules; run: npm --prefix studio ci",
+    ],
+  );
+});
+
 test("a .cmd shim named without its extension reports the shim's own exit code and output, not the failed direct spawn's", { skip: process.platform !== "win32" }, async () => {
   const dir = tmp();
   writeFileSync(join(dir, "rlx-shim.cmd"), "@echo shim ran\r\n@exit /b 3\r\n");

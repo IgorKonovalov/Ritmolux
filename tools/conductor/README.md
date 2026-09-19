@@ -164,6 +164,7 @@ once, whatever `state/conductor.json` says.
 |---|---|
 | `human_phase` | Do the phase. Mark its row `done` in the plan's `## Implementation log` **in the lane** (`WORK/rlx-plan-NNNN`) and commit it there. `resume` checks the row. |
 | `claude_dir` | The same, and for the same reason: the phase declares a file under `.claude/`, which the CLI will not let a session write (ADR-0210). **Nothing was run** — the park comes before the phase. The detail names the paths. Do the phase in the lane, mark its row `done`, commit; `resume` checks the row. |
+| `studio_install` | The plan declares files under `studio/` and `npm --prefix studio ci` failed as the lane opened, so the gate's three studio checks could not run (ADR-0218). The detail carries the install's tail; the usual cause is no network. **Nothing was run** — the park comes before the first session. Install by hand in the lane, or wait and `resume`, which installs again. |
 | `stop_condition`, `plan_wrong`, `question` | Read the transcript the inbox names. Settle it in a human-started `/architect` session. |
 | `gate_red` | Read the gate log. Fix the defect in the lane. The conductor never retries a red. |
 | `review_failed` | Read the last review under `state/reviews/`. Resuming grants two fresh fix rounds. |
@@ -294,6 +295,17 @@ as written. Any change to a tracked file, a doc included, is a new
 tree. A red run is recorded and never skipped on. Any argument vector other than the ledger's own
 (`SUITE_COMMAND` in `lib/ledger.mjs`) neither skips nor records, and outside the conductor the
 wrapper never reads the ledger.
+
+**A step it skips says so, and the lane makes the studio's precondition true** (ADR-0218). A step
+guarded on a path (`studio/node_modules`) or on a command (`python3`) used to drop out with nothing
+recorded, so the only evidence was a step count nobody had a number to compare against — and since
+`studio/node_modules` is gitignored and `git worktree add` never creates one, **every lane had ever
+run its gate with the studio's typecheck, lint and tests skipped**. Now the skip reaches the run
+terminal and the gate's own result, in the pre-push hook's shape: the step, what is missing, and the
+command that would make it run. And a lane whose plan **declares** files under `studio/` runs
+`npm --prefix studio ci` once as it opens, so those three are real for it; an install that fails
+parks the plan `studio_install` before any session starts. A plan that does not name `studio/` gets
+no install and the announced skip.
 
 **The backlog probes wait for the close.** A plan can deliver exactly what a live entry's probe says
 is missing, and turn that probe red. Archiving the entry is the close's job (ADR-0108), so a red
