@@ -114,6 +114,46 @@ export function recoverInterrupted(stateDir, state) {
   return found.length;
 }
 
+/** The three futures an open finding has: repaired, judged not worth repairing, filed (ADR-0216). */
+export const FINDING_VERBS = ["done", "wontfix", "filed"];
+
+/** How a finding is named on both digest pages and on the `finding` command line. */
+export function findingWhere(f) {
+  return f.line ? `${f.file}:${f.line}` : f.file;
+}
+
+/**
+ * The finding a `<ref>` names within `findings`: `{ index }`, or `{ error }` naming what it saw.
+ * A ref is either the index or the `file:line` exactly one finding carries — never a prefix and
+ * never a nearest match, because closing the wrong finding leaves no trace that it was wrong.
+ */
+export function findingRef(findings, ref) {
+  const roster = findings.map((f, i) => `${i} ${findingWhere(f)}`).join(", ");
+  if (/^\d+$/.test(ref)) {
+    const index = Number(ref);
+    if (index >= findings.length) return { error: `there is no finding ${index}; the verdict carries ${roster}` };
+    return { index };
+  }
+  const hits = findings.map((f, i) => ({ f, i })).filter(({ f }) => findingWhere(f) === ref);
+  if (hits.length === 0) return { error: `no finding is at ${ref}; the verdict carries ${roster}` };
+  if (hits.length > 1) {
+    return { error: `${ref} names ${hits.length} findings, so it says nothing: ${hits.map(({ f, i }) => `${i} ${f.severity} ${f.what}`).join("; ")}` };
+  }
+  return { index: hits[0].i };
+}
+
+/**
+ * Records the owner's disposition on a finding, keeping any previous one in `dispositionHistory`:
+ * a `wontfix` someone later repairs should read as repaired, and that it was first declined is
+ * worth more than a tidy record. Returns the disposition it replaced, or null.
+ */
+export function disposeFinding(finding, verb, reason, at = new Date().toISOString()) {
+  const previous = finding.disposition ?? null;
+  if (previous) (finding.dispositionHistory ??= []).push(previous);
+  finding.disposition = { verb, reason, at };
+  return previous;
+}
+
 export function completedSteps(rec) {
   return rec.steps.filter((s) => s.ended && s.result?.status !== "interrupted");
 }

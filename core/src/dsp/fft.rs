@@ -320,6 +320,67 @@ impl SpectrumAnalyzer {
     }
 }
 
+/// One channel's **short**-window linear magnitudes, and nothing else.
+///
+/// The per-channel half of the stereo field (ADR-0215) reads its band energies
+/// through [`BandSplitter`](super::bands::BandSplitter), which reads the short
+/// window's magnitudes alone — so a per-channel pass needs neither the long
+/// window nor the log-band axis. A second [`SpectrumAnalyzer`] per channel would
+/// plan an 8192-point FFT and carry its ~120 kB of buffers for nothing.
+///
+/// Every buffer is heap-held, including the taper: [`Analyzer`](super::Analyzer)
+/// keeps two of these and is constructed and moved by value.
+pub struct ShortSpectrum {
+    fft: Arc<dyn Fft<f32>>,
+    hann: Vec<f32>,
+    buf: Vec<Complex<f32>>,
+    scratch: Vec<Complex<f32>>,
+    mags: Vec<f32>,
+    norm: f32,
+}
+
+impl ShortSpectrum {
+    /// Plan the short FFT and precompute its Hann taper.
+    pub fn new() -> Self {
+        let fft = FftPlanner::new().plan_fft_forward(WINDOW_SIZE);
+        let scratch_len = fft.get_inplace_scratch_len();
+        Self {
+            fft,
+            hann: (0..WINDOW_SIZE).map(|i| hann_at(i, WINDOW_SIZE)).collect(),
+            buf: vec![Complex::new(0.0, 0.0); WINDOW_SIZE],
+            scratch: vec![Complex::new(0.0, 0.0); scratch_len],
+            mags: vec![0.0; MAG_BINS],
+            norm: 4.0 / WINDOW_SIZE as f32,
+        }
+    }
+
+    /// FFT `window` and return its linear magnitudes, on the same amplitude
+    /// scale [`SpectrumAnalyzer::magnitudes`] publishes — so a band mean taken
+    /// from these is comparable with the mono one bin for bin.
+    ///
+    /// A `window` shorter than [`WINDOW_SIZE`] leaves the tail of the transform
+    /// zeroed rather than panicking, exactly as the long window's fill does.
+    pub fn analyze(&mut self, window: &[f32]) -> &[f32] {
+        for (i, slot) in self.buf.iter_mut().enumerate() {
+            let s = window.get(i).copied().unwrap_or(0.0);
+            let w = self.hann.get(i).copied().unwrap_or(0.0);
+            *slot = Complex::new(s * w, 0.0);
+        }
+        self.fft
+            .process_with_scratch(&mut self.buf, &mut self.scratch);
+        for (i, m) in self.mags.iter_mut().enumerate() {
+            *m = self.buf.get(i).map_or(0.0, |c| c.norm()) * self.norm;
+        }
+        &self.mags
+    }
+}
+
+impl Default for ShortSpectrum {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Hann taper value at sample `i` of an `n`-long window.
 fn hann_at(i: usize, n: usize) -> f32 {
     let phase = i as f32 / (n.max(2) - 1) as f32;

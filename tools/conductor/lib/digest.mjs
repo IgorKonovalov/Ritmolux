@@ -15,8 +15,9 @@
 //
 // Time in the history is always time within one run: a plan's active time is its steps' and gates'
 // own durations, never a span across a park. A finding line copies the verdict outcome the reviewer
-// emitted — severity, file:line, what — and nothing else; neither page summarizes review prose. An
-// event (a step, a park, a merge) belongs to the latest run that had started by the event's timestamp.
+// emitted — severity, file:line, what — plus whatever the record says has become of it, and nothing
+// else; neither page summarizes review prose. An event (a step, a park, a merge) belongs to the
+// latest run that had started by the event's timestamp.
 
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -28,7 +29,7 @@ import { readLedger } from "./ledger.mjs";
 import { usageReading } from "./live.mjs";
 import { CLAUDE_DIR } from "./outcome.mjs";
 import { donePhases, findPlan, readPlanFile } from "./plan.mjs";
-import { statePaths, totalSpend, writeAtomic } from "./state.mjs";
+import { findingWhere, statePaths, totalSpend, writeAtomic } from "./state.mjs";
 
 const HUMAN_REASONS = new Set(["human_phase", "stop_condition", "question", "plan_wrong"]);
 const API_REASONS = new Set(["api", "no_outcome", "bad_outcome"]);
@@ -111,14 +112,24 @@ function planTitle(repo, plan) {
 }
 
 function findingLine(f, resolvedIn) {
-  const where = f.line ? `${f.file}:${f.line}` : f.file;
   const fixed = resolvedIn ? ` - resolved in \`${short(resolvedIn)}\`` : f.fixed_in ? ` - repaired by the close in \`${short(f.fixed_in)}\`` : "";
-  return `  - ${f.severity} \`${where}\` ${f.what}${fixed}`;
+  const d = f.disposition;
+  const closed = d ? ` - closed ${d.at.slice(0, 10)} (${d.verb}): ${d.reason}` : "";
+  return `  - ${f.severity} \`${findingWhere(f)}\` ${f.what}${fixed}${closed}`;
 }
 
-/** The minors and nits the closing verdict merged with that its close did not repair (ADR-0209). */
+/**
+ * The minors and nits the closing verdict merged with that its close did not repair (ADR-0209) and
+ * the owner has not disposed of (ADR-0216). `fixed_in` is evidence checked against the branch; a
+ * disposition is a judgement checked against nothing, and both take a finding off the worklist.
+ */
 function openFindings(rec) {
-  return (rec.verdicts.at(-1)?.findings ?? []).filter((f) => (f.severity === "minor" || f.severity === "nit") && !f.fixed_in);
+  return (rec.verdicts.at(-1)?.findings ?? []).filter((f) => (f.severity === "minor" || f.severity === "nit") && !f.fixed_in && !f.disposition);
+}
+
+/** How many of a plan's closing findings the owner has closed with a verb and a reason. */
+function closedCount(rec) {
+  return (rec.verdicts.at(-1)?.findings ?? []).filter((f) => f.disposition).length;
 }
 
 /**
@@ -266,17 +277,28 @@ function needsYou(view) {
         `Worktrees held by ${s.holding.join(", ")}.`,
     );
   }
+  let closed = 0;
   for (const rec of view.merged) {
     // A cleanup failure is settled the moment the directory is gone, whatever the record still says.
     if (rec.cleanup && !rec.cleanup.ok && laneOpen(rec)) {
       counts.lanes += 1;
       lines.push(`- **${rec.plan} merged, lane not removed**: ${rec.cleanup.detail}. Holds \`${rec.worktree}\`.`);
     }
+    closed += closedCount(rec);
     const open = openFindings(rec);
     if (open.length === 0) continue;
     counts.findings += 1;
     lines.push(`- **${rec.plan} merged with ${plural(open.length, "open finding")}**:`);
-    for (const f of open) lines.push(`  - ${f.severity} \`${f.line ? `${f.file}:${f.line}` : f.file}\` ${f.what}`);
+    for (const f of open) lines.push(`  - ${f.severity} \`${findingWhere(f)}\` ${f.what}`);
+  }
+  // One line for every finding the owner has closed, never a per-plan breakdown: that is the
+  // accumulation this page was rid of, one indent further in (ADR-0216). It is left out entirely at
+  // zero, so a page with nothing on it stays one line.
+  if (closed) {
+    lines.push(
+      `- ${plural(closed, "finding")} closed, each with a verb and a reason: ` +
+        "`node tools/conductor/conductor.mjs finding NNNN` lists one plan's, `digest --history` every one.",
+    );
   }
   // A park the repository has already settled is a record to clear, never work: it goes under its own
   // heading and is counted apart, so one real park is not read as five (ADR-0214). The digest writes
@@ -386,7 +408,7 @@ export function renderHistory(state, opts) {
         const open = openFindings(rec);
         if (open.length > 0) {
           minorsMerged.push(`- **${rec.plan} merged with ${plural(open.length, "open finding")}**:`);
-          for (const f of open) minorsMerged.push(`  - ${f.severity} \`${f.line ? `${f.file}:${f.line}` : f.file}\` ${f.what}`);
+          for (const f of open) minorsMerged.push(`  - ${f.severity} \`${findingWhere(f)}\` ${f.what}`);
         }
       }
     }

@@ -1,8 +1,8 @@
 # ADR-0216 — A review finding is closed by the owner, and the page stops carrying it
 
-> **Status:** proposed
-> **Date:** 2026-09-18
-> **Related plan(s):** [0195](../plans/0195-a-finding-can-be-closed.md)
+> **Status:** accepted
+> **Date:** 2026-09-18 (accepted 2026-09-19 with Plan 0195)
+> **Related plan(s):** [0195](../plans/done/0195-a-finding-can-be-closed.md)
 > **Amends:** [0214](0214-the-digest-is-a-current-state-page-and-history-is-regenerated-on-demand.md)
 > (what **Needs you** carries), [0209](0209-a-conductor-close-repairs-the-prose-and-comments-its-findings-name.md)
 > (which findings a close may repair, and which stay open)

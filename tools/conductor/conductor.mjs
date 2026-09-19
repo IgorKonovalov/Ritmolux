@@ -9,6 +9,7 @@
 //   node tools/conductor/conductor.mjs digest [--history]
 //   node tools/conductor/conductor.mjs resume NNNN
 //   node tools/conductor/conductor.mjs park NNNN
+//   node tools/conductor/conductor.mjs finding NNNN [<ref> --done|--wontfix|--filed <reason>]
 //   node tools/conductor/conductor.mjs adopt-close NNNN
 //   node tools/conductor/conductor.mjs abort
 //   node tools/conductor/conductor.mjs check
@@ -32,7 +33,7 @@ import { ascii } from "./lib/live.mjs";
 import { CLAUDE_DIR } from "./lib/outcome.mjs";
 import { donePhases, findPlan, readPlanFile } from "./lib/plan.mjs";
 import { loadLocal, loadQueue, stateSets } from "./lib/queue.mjs";
-import { loadState, planRecord, recoverInterrupted, saveState, statePaths, totalSpend } from "./lib/state.mjs";
+import { FINDING_VERBS, disposeFinding, findingRef, findingWhere, loadState, planRecord, recoverInterrupted, saveState, statePaths, totalSpend } from "./lib/state.mjs";
 import { activeChildren, killTree } from "./lib/step.mjs";
 
 export const TOOL_DIR = dirname(fileURLToPath(import.meta.url));
@@ -376,6 +377,92 @@ function cmdPark(args, o) {
   return 0;
 }
 
+const FINDING_USAGE = `usage: conductor.mjs finding NNNN [<ref> --${FINDING_VERBS.join("|--")} <reason>]`;
+
+/** How a finding reads on the command line: what the verdict carried, then what has become of it. */
+function findingText(f, index) {
+  const d = f.disposition;
+  return (
+    `  [${index}] ${f.severity} ${findingWhere(f)} - ${f.what}` +
+    (f.fixed_in ? ` - repaired by the close in ${f.fixed_in.slice(0, 7)}` : "") +
+    (d ? ` - closed ${d.at.slice(0, 10)} (${d.verb}): ${d.reason}` : "")
+  );
+}
+
+/** Where a plan stands when it has no close, said in the refusal so the reader knows why. */
+function planStanding(rec) {
+  if (!rec) return "it never started";
+  return `it is ${rec.status}` + (rec.fixRounds ? `, ${rec.fixRounds} fix round${rec.fixRounds === 1 ? "" : "s"} in` : "");
+}
+
+/**
+ * `finding NNNN` lists a plan's closing verdict; `finding NNNN <ref> --done|--wontfix|--filed
+ * <reason>` records the owner's disposition against one of them (ADR-0216). The reason is required
+ * and nothing verifies any of it: only the owner writes a disposition, so this command is the whole
+ * record of the judgement. `<ref>` is the index the listing prints, or the `file:line` exactly one
+ * finding carries.
+ */
+function cmdFinding(args, o) {
+  const p = o.p;
+  const [plan, ref, flag, ...reasonWords] = args;
+  // The verb is the entry that matched the flag in full, dashes included: taking it from the typed
+  // word instead lets `done` through as `ne`, and nothing downstream verifies a disposition.
+  const verb = args.length > 2 ? (FINDING_VERBS.find((v) => flag === `--${v}`) ?? null) : null;
+  if (!isPlan(plan) || args.length === 2 || (args.length > 2 && verb === null)) {
+    o.err(FINDING_USAGE);
+    return 2;
+  }
+  const reason = reasonWords.join(" ").trim();
+  if (verb && !reason) {
+    o.err(`conductor: --${verb} needs a reason; a disposition with none is how a finding gets closed for being old (ADR-0216)`);
+    return 2;
+  }
+  if (verb && runningPid(p)) {
+    o.err("conductor: a run is in progress and would overwrite the record; close the finding after it ends, or `abort` it first");
+    return 1;
+  }
+
+  const state = loadState(p.stateDir);
+  const rec = state.plans[plan];
+  // The close, not the array, is what makes the last verdict a closing one: a `verdict` outcome
+  // pushes its findings before any fix round, so a plan still in or parked at a round carries
+  // verdicts and no close, and its blockers are the conductor's own work in flight.
+  const verdict = rec?.closed ? rec.verdicts?.at(-1) : null;
+  if (!verdict) {
+    o.err(`conductor: plan ${plan} has no closing verdict, so it has no findings (${planStanding(rec)})`);
+    return 1;
+  }
+  const findings = verdict.findings ?? [];
+  if (findings.length === 0) {
+    const where = `conductor: plan ${plan} closed with no findings (verdict round ${verdict.round})`;
+    // A refusal says its one sentence on stderr, like every other one here; the listing is output.
+    if (verb) {
+      o.err(`${where}, so there is nothing to close`);
+      return 1;
+    }
+    o.log(`${where}.`);
+    return 0;
+  }
+  if (!verb) {
+    o.log(`conductor: plan ${plan}, closing verdict round ${verdict.round}, ${findings.length} finding${findings.length === 1 ? "" : "s"}:`);
+    for (const [i, f] of findings.entries()) o.log(findingText(f, i));
+    return 0;
+  }
+
+  const found = findingRef(findings, ref);
+  if (found.error) {
+    o.err(`conductor: ${found.error}`);
+    return 1;
+  }
+  const f = findings[found.index];
+  const previous = disposeFinding(f, verb, reason);
+  saveState(p.stateDir, state);
+  regenerate(p, state);
+  o.log(`conductor: plan ${plan} finding ${found.index} (${f.severity} ${findingWhere(f)}) is closed ${verb}: ${reason}`);
+  if (previous) o.log(`  it was ${previous.verb} on ${previous.at.slice(0, 10)} (${previous.reason}); that stays in the finding's history.`);
+  return 0;
+}
+
 /**
  * `adopt-close NNNN`: record the close a session already committed in the lane, so the repair for a
  * park that landed after its close is a command rather than a hand edit to state/conductor.json
@@ -458,7 +545,7 @@ function cmdCheck(args, o) {
   return 0;
 }
 
-const COMMANDS = { run: cmdRun, status: cmdStatus, digest: cmdDigest, resume: cmdResume, park: cmdPark, "adopt-close": cmdAdoptClose, abort: cmdAbort, check: cmdCheck };
+const COMMANDS = { run: cmdRun, status: cmdStatus, digest: cmdDigest, resume: cmdResume, park: cmdPark, finding: cmdFinding, "adopt-close": cmdAdoptClose, abort: cmdAbort, check: cmdCheck };
 
 /** `overrides` exists for tests: { p, claude, gate, worktreeRoot, lockDir, lockPollMs, pollMs, commitPollMs, log, err, signals }. */
 export async function main(argv, overrides = {}) {
@@ -473,7 +560,7 @@ export async function main(argv, overrides = {}) {
   if (!fn) {
     o.err(
       "usage: node tools/conductor/conductor.mjs run [--lane a|b] [--once] | status | digest [--history] | " +
-        "resume NNNN | park NNNN | adopt-close NNNN | abort | check",
+        `resume NNNN | park NNNN | finding NNNN [<ref> --${FINDING_VERBS.join("|--")} <reason>] | adopt-close NNNN | abort | check`,
     );
     return 2;
   }

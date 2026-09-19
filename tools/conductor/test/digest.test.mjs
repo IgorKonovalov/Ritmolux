@@ -507,6 +507,76 @@ test("a human_phase park reads its row in the lane when the worktree is still th
   assert.match(renderDigest(state, { repo, stateDir: tmp(), now: NOW }), /^1 already settled\.$/m);
 });
 
+// ADR-0216: a finding leaves the worklist when the owner disposes of it, the page counts what left,
+// and the history keeps the whole record — which is what makes an empty worklist reachable at all.
+
+/** The disposition the `finding` command writes, in the shape it writes it. */
+const disposed = (verb, reason, at) => ({ verb, reason, at });
+
+test("a merge whose findings are all disposed of leaves the worklist, and one line counts them", () => {
+  const { repo, head } = repoWithTag();
+  const stateDir = tmp("rlx-digest-state-");
+  const state = pilotState(repo, head, stateDir);
+  const findings = state.plans["0185"].verdicts[0].findings;
+  findings[0].disposition = disposed("wontfix", "assertion message, no reader", "2026-09-18T09:14:00.000Z");
+  findings[1].disposition = disposed("filed", "backlog 0251", "2026-09-18T09:15:00.000Z");
+
+  const text = renderDigest(state, { repo, stateDir, now: NOW });
+  const lines = text.split("\n");
+  assert.ok(!text.includes("0185 merged with"), `no finding line survives for the merge:\n${text}`);
+  assert.ok(!text.includes("stale comment") && !text.includes("`b.md`"), text);
+  // The summary counts open findings only, so the merge stops being listed as one that needs you.
+  assert.equal(lines[lines.indexOf("## Needs you") + 2], "1 park, 1 already settled.");
+  assert.ok(
+    lines.includes(
+      "- 2 findings closed, each with a verb and a reason: `node tools/conductor/conductor.mjs finding NNNN` lists one plan's, `digest --history` every one.",
+    ),
+    text,
+  );
+  assert.equal(renderDigest(state, { repo, stateDir, now: NOW }), text, "still a pure function of state");
+
+  // One of the two reopened: the merge is back on the worklist and the count follows it down.
+  delete findings[0].disposition;
+  const reopened = renderDigest(state, { repo, stateDir, now: NOW });
+  assert.match(reopened, /^- \*\*0185 merged with 1 open finding\*\*:\n {2}- minor `a\.rs:3` stale comment$/m);
+  assert.match(reopened, /^- 1 finding closed, each with a verb and a reason: /m);
+});
+
+test("the history renders every disposed finding with its verb, reason and date", () => {
+  const { repo, head } = repoWithTag();
+  const stateDir = tmp("rlx-digest-state-");
+  const state = pilotState(repo, head, stateDir);
+  const findings = state.plans["0185"].verdicts[0].findings;
+  findings[0].disposition = disposed("wontfix", "assertion message, no reader", "2026-09-18T09:14:00.000Z");
+  findings[1].disposition = disposed("filed", "backlog 0251", "2026-09-18T09:15:00.000Z");
+
+  const lines = renderHistory(state, { repo, stateDir }).split("\n");
+  assert.ok(lines.includes("  - minor `a.rs:3` stale comment - closed 2026-09-18 (wontfix): assertion message, no reader"), lines.join("\n"));
+  assert.ok(lines.includes("  - nit `b.md` typo - closed 2026-09-18 (filed): backlog 0251"), lines.join("\n"));
+});
+
+test("with nothing parked and every finding disposed of, the worklist is the one line ADR-0214 promised", () => {
+  const { repo, head } = repoWithTag();
+  const stateDir = tmp("rlx-digest-state-");
+  const state = pilotState(repo, head, stateDir);
+  // Both parks resumed, and the merge's two findings closed by the owner.
+  for (const plan of ["0175", "0180"]) {
+    Object.assign(state.plans[plan], { status: "merged", park: null, verdicts: [] });
+  }
+  for (const f of state.plans["0185"].verdicts[0].findings) f.disposition = disposed("done", "repaired", "2026-09-18T09:14:00.000Z");
+
+  const lines = renderDigest(state, { repo, stateDir, now: NOW }).split("\n");
+  const at = lines.indexOf("## Needs you");
+  assert.deepEqual(lines.slice(at + 1, at + 6), [
+    "",
+    "Nothing: no park, no lane stopped at the worktree cap, no open finding.",
+    "",
+    "- 2 findings closed, each with a verb and a reason: `node tools/conductor/conductor.mjs finding NNNN` lists one plan's, `digest --history` every one.",
+    "",
+  ]);
+  assert.equal(lines[at + 6], "## Now");
+});
+
 test("digest --history carries every run with its Closed and its Totals", () => {
   const { repo, head } = repoWithTag();
   const stateDir = tmp("rlx-digest-state-");

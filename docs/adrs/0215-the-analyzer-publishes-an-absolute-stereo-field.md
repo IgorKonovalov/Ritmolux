@@ -1,8 +1,8 @@
 # ADR-0215 — The analyzer publishes an absolute stereo field, and the mono path does not move
 
-> **Status:** proposed
+> **Status:** accepted
 > **Date:** 2026-09-18
-> **Related plan(s):** [0194](../plans/0194-the-analysis-gains-a-stereo-field.md)
+> **Related plan(s):** [0194](../plans/done/0194-the-analysis-gains-a-stereo-field.md)
 > **Extends:** [0199](0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md)
 > (a converted waveform draws the source's figure, from a stereo pair the analyzer already receives)
 

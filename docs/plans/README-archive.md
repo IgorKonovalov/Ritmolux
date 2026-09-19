@@ -18,6 +18,8 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0194 - The analysis gains a stereo field](#0194---the-analysis-gains-a-stereo-field)
+  - [0195 - A finding can be closed](#0195---a-finding-can-be-closed)
   - [0193 - The digest says what is happening, and where you are needed](#0193---the-digest-says-what-is-happening-and-where-you-are-needed)
   - [0142 - The MilkDrop import earns its verdict](#0142---the-milkdrop-import-earns-its-verdict)
   - [0103 - The project gets an audience](#0103---the-project-gets-an-audience)
@@ -233,6 +235,126 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0194 - The analysis gains a stereo field](done/0194-the-analysis-gains-a-stereo-field.md)
+
+- closed 2026-09-19, conductor-run lane `plan-0194-the-analysis-gains-a-stereo-field` in
+`WORK/rlx-plan-0194`. Six phases, `c99b4d10`, `565e74d0`, `1b090d38`, `2fa92fef`, `ca724847` and
+`b33d8ceb`, plus `9c2b9037`, the close's three prose repairs. One review round: **no blockers, no
+majors, six minors and one nit**, three repaired at the close and four left open. Version
+**0.134.0** (minor). ADR-0215 accepted with no `Outcome`. No backlog entry closed and none filed.
+- **What landed.** Stereo reached this engine and was averaged away before anything spectral ran, so
+a hard-panned hi-hat contributed half its level and nothing knew which side it came from.
+`AnalysisFrame` now carries five fields — whole-mix `balance` and `spread` plus per-band
+`bass_balance`/`mid_balance`/`treb_balance` — computed in a new `core/src/dsp/stereo.rs` that reads
+nothing but the hop's two channels and that nothing upstream reads, published to the expression
+grammar as five names, and printed as five rows beside the band levels. `balance` is the plain RMS
+ratio and `spread` is `(1 - corr) / 2`; both read exactly `0` below `gain::WAVE_FLOOR`, on a
+one-channel stream and on any mono-duplicated stereo stream.
+- **The absolute decision is the whole design, and it is a deliberate break with ADR-0049.** Every
+other level here is divided by a running peak, so `bass > 0.5` means "loud for this track". These
+five are divided by nothing, so `balance = 0` means centred on every track forever. The argument is
+that a normalizer cannot represent *absence*: loudness is always present and only its scale is in
+question, while position can genuinely be absent, and a levelled `balance` would stretch a mono
+stream's noise floor into a confident wandering pan that an author has no way to distinguish from
+real stereo. The price is a narrow usable range, and the mitigation is publication rather than
+mechanism — the report rows, and Phase 6's measured table.
+- **Phase 1 closed a blind spot before anything depended on it.** Every `--signal` kind built one
+mono buffer and interleaved it into both channels, so the two channels were bit-identical in every
+synthetic test in the repository and a working stereo implementation was indistinguishable from a
+broken one. Three kinds now synthesize stereo: `pan:<p>` is one waveform at two gains, so the RMS
+ratio is algebraically `p` and the correlation algebraically 1; `wide:<seed>` is independent seeded
+noise per channel; `split:<p>` is a centred 80 Hz sine under a panned 8 kHz tone, the case a
+whole-mix scalar cannot express. The assertion that every *older* kind still reads a flat zero is
+the evidence the blindness was real, stated as the exact property it is.
+- **The compatibility promise is a property, not a golden.** For a stereo stimulus `S` and the
+stimulus `M` carrying `S`'s per-frame channel average in both channels, every pre-existing field of
+`AnalysisFrame` reads bit-identically — asserted through an exhaustive destructure, so a field added
+later breaks the build rather than escaping the guarantee, and on raw bits rather than an epsilon.
+`waveform_pair` and its gain are excluded and no implementation could include them: the pair *is*
+channels 0 and 1 (ADR-0199), so `S` and `M` cannot agree on it. That exclusion is asserted in the
+other direction in the same test — the pair **must** differ — which turns it into a statement about
+what the pair is rather than a place for a regression to hide.
+- **Phase 3 followed a rule instead of making a judgement mid-session.** The plan wrote the branch
+condition before the measurement: under 110 µs per hop, the exact per-channel-spectrum mechanism;
+over it, a time-domain approximation and a dated `Outcome` on the ADR. Measured 51.8 µs against a
+same-session baseline of 34.5 µs, so the exact mechanism stands and `<band>_balance` is
+`bands.split()` run per channel over the band edges `bass`/`mid`/`treb` already use. What kept it
+affordable is that the per-channel pass runs the **short** window only — the band split reads the
+short window's linear magnitudes, so the 8192-point long window stays single. The same-session
+baseline reads 34.5 where `docs/nfr.md` recorded 31.5; that gap is machine and day, which is why
+both numbers came off one session, and ADR-0071 is why it is said out loud.
+- **Phase 6 corrected two sentences the documents already carried.** Watched on loopback against two
+throwaway probes, `balance` tracks what a listener hears and a mono source sits visibly still. Then
+the measurement: across three 60 s commercial clips plus a mono downmix as control, *"real music
+sits well inside ±0.3"* turns out to describe the **mean**, which lands within `0.03` of centre,
+while single hops reach `±0.4`..`±0.6` — the excursions are what a binding must be gained for. And
+*"a wide stereo mix hovers near 0.5"* is simply wrong: `spread` averages `0.16`..`0.33` on wide
+material and only touches `0.8`+ in moments. A third reading is new and is the one an author will
+trip on — a hard pan carries **no** `spread`, one waveform at two gains being perfectly correlated,
+so gating colour on `spread` hides `balance` exactly where it is largest. The mono control reading
+exactly `0` on all five is the first evidence of that property from material rather than
+construction.
+- **The findings were all around the edges of a correct implementation.** Two documents claimed more
+than the code does and were repaired at the close: the ring-determinism spec said the whole field is
+a pure function of its own hop, true of `balance` and `spread` but not of the three per-band
+balances, which resolve from a four-hop window; and `docs/capturing.md` promised `pan:<p>` reads
+`spread` `0` for every `p`, where at `±1` one gain is exactly `0`, one channel is exactly silent,
+and the floored denominator deliberately reports the fully-decorrelated midpoint. Four were left
+open: `shot --usage` still lists six `--signal` kinds where the error path lists nine (program
+output, which a close may not rewrite); `ShortSpectrum` duplicates `SpectrumAnalyzer`'s short path —
+same taper, same `4/N` norm — with nothing holding the two together, and nothing *can* catch a drift
+because the scale cancels out of every ratio, leaving only the silence floor tripping at the wrong
+loudness; and two facts under `.claude/skills/preset-author/` that the plan made false, which a
+headless session cannot write (ADR-0210) and which reach the owner with their replacement text.
+
+### [0195 - A finding can be closed](done/0195-a-finding-can-be-closed.md)
+
+- closed 2026-09-19, conductor-run lane `plan-0195-a-finding-can-be-closed` in `WORK/rlx-plan-0195`.
+Two phases, `4737305b` and `b38a4ebd`; one fix round repairing all four round-1 findings
+(`0bc634e5`, `74b7e833`, `f444c306`, `6c882c1e`); plus `42e6bda0`, the round-2 close's one prose
+repair. Round 1: **no blockers, two majors, one minor, one nit.** Round 2: **no blockers, no majors,
+two nits**, one repaired at the close and one left open. Version **0.133.0** (minor). ADR-0216
+accepted, amending ADR-0214 and ADR-0209. No backlog entry closed and none filed.
+- **What landed.** The digest's **Needs you** carried every open review finding and nothing ever took
+one off, so the first page rendered under ADR-0214 was 45 lines of which 39 were findings from nine
+merges, the oldest days old — a worklist that grows per finding in place of a history that grew per
+run. `conductor.mjs finding <plan> [<ref> --done|--wontfix|--filed <reason>]` now records a dated
+disposition with a required reason beside the finding in `state/conductor.json`, and the page carries
+the open ones plus **one line** counting the closed. `<ref>` is the index the listing prints or the
+`file:line` exactly one finding carries; re-dispositioning overwrites and keeps the previous one in
+the finding's history; `digest --history` renders every finding with its verb, reason and date, which
+is the record ADR-0216 leans on when it accepts a gitignored store.
+- **The two majors were both in the new command's input handling, and both were repaired at the
+root.** The verb guard tested `FINDING_VERBS.includes(flag.replace(/^--/, ""))` — the dashes optional
+to that regex — and then took the verb as `flag.slice(2)`, so a bare `done` was accepted and written
+as `ne`; the verb *is* the judgement, nothing verifies a disposition, and repaired / declined / filed
+stop being distinguishable once one is `ne`. The repair takes the verb from the `FINDING_VERBS` entry
+that matched the flag in full, so the declaration that reaches the usage strings by interpolation is
+now the same declaration the parse uses. Second, `rec?.verdicts?.at(-1)` was called *the closing
+verdict* whatever the record said about the close, and a `verdict` outcome pushes its findings before
+any fix round — so a plan parked mid-round could have a **blocker** disposed of, a judgement written
+into the record with no carrier and orphaned by the next round's verdict. The repair decides on
+`rec.closed`, which both writers set immediately after pushing the closing verdict.
+- **What makes the severity question airtight rather than merely fixed.** `validate` in
+`lib/outcome.mjs` already rejects a `closed` outcome whose verdict carries blockers or majors, and
+`validateVerdict` allows `fixed_in` only on a `minor` or `nit`. So once the command decides on the
+close, a closing verdict's findings *can only be* the class ADR-0209 leaves open — no narrowing in
+`cmdFinding` is needed, and none was added.
+- **What the close left open.** One nit, by rule: the live-run refusal (`if (verb && runningPid(p))`,
+the one addition beyond the plan, and the only thing stopping a running conductor's next `saveState`
+from silently overwriting the owner's judgement) is asserted nowhere, and neither are the same
+refusals in `resume`, `park` and `adopt-close`. Testing it needs a live-pid fixture the suite does
+not have, so it is one decision for all four rather than four — and a test's logic is outside what
+ADR-0209 lets a close repair. What the close *did* repair was prose: `## Closing a finding` listed
+five rules and omitted the refusal an operator meets first, that a plan with no close has no findings
+to list.
+- **What outlived the plan.** Two. The **Needs you** summary is built from `counts`, which the
+closed-count line deliberately does not touch, so a page with every finding disposed of still reads
+`Nothing: no park, no lane stopped at the worktree cap, no open finding.` — the ADR-0214 property
+that plan promised and this one finally made reachable. And a finding is now named on both digest
+pages and on the command line through one `findingWhere`, retiring the three separate spellings of
+`file:line` that existed before.
 
 ### [0193 - The digest says what is happening, and where you are needed](done/0193-the-digest-says-what-is-happening-and-where-you-are-needed.md)
 

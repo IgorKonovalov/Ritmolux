@@ -189,15 +189,25 @@ Each `[params]` value is a pure expression evaluated every frame. A malformed
 expression (or structural config) makes the whole preset fail to load with a
 surfaced error — the engine keeps the last good preset, never crashes (NFR 10).
 
-- **Variables** (19): `bass mid treb onset beat bar time tempo novelty
+- **Variables** (24): `bass mid treb onset beat bar time tempo novelty
   bass_raw mid_raw treb_raw onset_raw beat_index time_since_beat beat_in_bar
-  bar_index bar_phase index`. `beat` is 0/1; `bar` is the 0..1 **beat** phase
+  bar_index bar_phase balance spread bass_balance mid_balance treb_balance
+  index`. `beat` is 0/1; `bar` is the 0..1 **beat** phase
   despite the name (`bar_phase` is the real one); `time` is seconds; `tempo` is
   **BPM**, not a 0..1 band; `novelty` is an experimental track-change transient;
   `index` is the element's own 0..1 position in a per-element binding, and `0`
   everywhere else. The four `*_raw` escapes carry the pre-v2 absolute magnitudes
   (see below). The five musical-time variables are **not equals** — see the two
   layers immediately below.
+- **The five stereo variables are absolute**, alone among these: `balance` is
+  `-1` hard left to `+1` hard right with `0` centred, `spread` is `0` for
+  identical channels and `0.5` for fully decorrelated ones, and the three
+  `<band>_balance` are `balance` taken over the same bands `bass`/`mid`/`treb`
+  summarise. Nothing divides them by a running peak, so **a mono source reads
+  `0` for all five, forever**, and real music sits well inside `±0.3` of centre
+  — multiply up and clamp, as you would a `*_raw` level. The authoring guide's
+  [stereo section](../docs/presets.md#the-stereo-field-is-absolute-and-that-is-the-whole-design)
+  is the full account.
 
 **The two musical-time layers, and why neither is a musical period on its own.**
 `beat_index` and `time_since_beat` are unconditional — always tracked — but
