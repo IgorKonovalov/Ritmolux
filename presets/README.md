@@ -820,7 +820,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
-| `zoom` | `1` | `0.5` – `2` | Scale the previous frame is resampled at, per vertex; above 1 the image tunnels inward. |
+| `zoom` | `1` | `0.5` – `2` | Scale the previous frame is resampled at, per vertex; above 1 the past is magnified and the image travels outward. |
 | `rot` | `0` | `-1` – `1` | Turns per second the resample is rotated by, per vertex. |
 | `cx` | `0.5` | `0` – `1` | Horizontal point the per-vertex zoom and rotation pivot about, in uv. |
 | `cy` | `0.5` | `0` – `1` | Vertical point the per-vertex zoom and rotation pivot about, in uv. |

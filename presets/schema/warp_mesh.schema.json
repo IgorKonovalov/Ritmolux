@@ -767,8 +767,8 @@
     },
     "param.zoom.warp_mesh": {
       "type": "string",
-      "description": "Scale the previous frame is resampled at, per vertex; above 1 the image tunnels inward.",
-      "markdownDescription": "Scale the previous frame is resampled at, per vertex; above 1 the image tunnels inward.\n\n- default `1.0`\n- typical range `0.5` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "description": "Scale the previous frame is resampled at, per vertex; above 1 the past is magnified and the image travels outward.",
+      "markdownDescription": "Scale the previous frame is resampled at, per vertex; above 1 the past is magnified and the image travels outward.\n\n- default `1.0`\n- typical range `0.5` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.rot": {
       "type": "string",

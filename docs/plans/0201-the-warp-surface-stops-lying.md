@@ -1,6 +1,6 @@
 # 0201 — The warp surface stops lying
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user)
 > **Owner skill(s):** dev
@@ -147,16 +147,27 @@ job of a baseline).
 
 ## Implementation log
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `WORK/rlx-plan-0201` on `plan-0201-the-warp-surface-stops-lying`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — `zoom` says what the shader does | dev | not started | |
+| 1 — `zoom` says what the shader does | dev | done | committed with this row |
 | 2 — A custom wave draws through the contract | dev | not started | |
 | 3 — Level mode can hold an ink | dev | not started | |
 | 4 — The converted chain gets a baseline that can see it | dev | not started | |
 
 ### Notes
+
+- **Phase 1's preset sweep convicted nothing.** Five shipped `warp_mesh` presets bind `zoom`, and
+  every header already reasons from the shader's direction: `warp_wellhead` (*"Above 1 expands"*),
+  `warp_millrace` (*"just under 1, so the field creeps inward"*), `warp_ladder` (which spells the
+  inverse out in full), `warp_tracery` (0.988, *"creeps toward the pivot"*) and `warp_sirocco` (held
+  at 1). No `presets/*.toml` was touched.
+- **Phase 1 also regenerated `presets/preset.schema.json`**, which the phase's `Files touched` does
+  not name. It carries the same `zoom` string twice and is written by the same
+  `RLX_UPDATE_PRESET_SCHEMA=1` run as `presets/schema/warp_mesh.schema.json`; leaving it out would
+  have left the generic editor schema saying the old direction and
+  `preset_schema::the_generated_editor_files_are_current` red.
 
 ### Close triggers
 

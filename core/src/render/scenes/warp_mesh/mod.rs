@@ -113,7 +113,7 @@ pub const PER_VERTEX_PARAMS: &[ParamSpec] = &[
         name: "zoom",
         default: 1.0,
         range: Some([0.5, 2.0]),
-        doc: "Scale the previous frame is resampled at, per vertex; above 1 the image tunnels inward.",
+        doc: "Scale the previous frame is resampled at, per vertex; above 1 the past is magnified and the image travels outward.",
         kind: ParamKind::Modal,
     },
     ParamSpec {
@@ -394,7 +394,7 @@ pub const PARAMS: &[ParamSpec] = &[
         name: "zoom",
         default: 1.0,
         range: Some([0.5, 2.0]),
-        doc: "Scale the previous frame is resampled at, per vertex; above 1 the image tunnels inward.",
+        doc: "Scale the previous frame is resampled at, per vertex; above 1 the past is magnified and the image travels outward.",
         kind: ParamKind::Modal,
     },
     ParamSpec {
