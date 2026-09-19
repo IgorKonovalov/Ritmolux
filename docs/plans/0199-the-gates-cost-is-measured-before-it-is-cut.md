@@ -484,15 +484,55 @@ rather than left wrong in a shipped document, because Phase 4 is already committ
 **1631 run / 86 skipped / 0 failed**. (Against Phase 4's 412.1 s on one fewer test; Phase 1's 30.5 s
 run-to-run spread covers that difference, so read neither as a trend.)
 
+#### Deviations and unmet done-whens
+
+Everything not listed here passed as the phase stated it.
+
+- **Phase 4's *"the three sweeps' wall time is re-measured against the Phase 3 baseline"* is
+  satisfied for one of the three, not all three.** `reactivity` — the largest of them, 1566 of the
+  three sweeps' test-seconds — was re-timed serially against Phase 3's baseline; `animation` and
+  `sanity`'s loudness gate were run only to confirm green and count coverage, at `-j 4`, and their
+  serial before/after is not measured. The reason is session time: a serial pass over all three is
+  roughly 25 minutes of wall in a session whose individual commands are bounded at ten, and the
+  mechanism is shared — one renderer build and one process per batch instead of per preset — so the
+  second and third readings would confirm the first rather than test it. **What is therefore not
+  known is each sweep's own ratio**, which Phase 3 shows varies (the fixed share is 38 % of a
+  `reactivity` testcase and 55 % of a `sanity_loudness` one), so the 43 % cut measured on
+  `reactivity` is not a figure to quote for the other two.
+- **Phase 2's saving is inside the noise and the log says so rather than claiming it.** 397.8 s
+  against 426.2 s on one run per arm, where Phase 1 measured a 30.5 s run-to-run spread on the same
+  tree. The fold's mechanism caps it at the cheap block's own 14.6 s.
+- **`docs/testing.md` was edited in Phase 5, which does not list it** — a one-word path correction to
+  a filename Phase 4's own text named before the file existed. Written up under Phase 5.
+- **`-P fast` is not faster at the end of this plan than at its start**, and both halves of the plan
+  moved it. The three readings on this machine are 426.2 s (Phase 1, before anything), 397.8 s
+  (after the fold), 412.1 s (after the batching) and 368.4 s (after the guard was added). The spread
+  between any two of them is inside Phase 1's measured run-to-run spread. Where this plan's saving
+  is real and large is the **serial** cost of the whole library, which is the full suite's bill and
+  not this tier's.
+
+No followup was noticed that is not already in the plan's own `## Followups`.
+
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** no — `git diff main...HEAD -- presets/` is empty. One preset was
+  temporarily made dead inside Phase 4 to check a batch convicts by name, and reverted with
+  `git restore` before that commit.
 - **Plan header `Closes:`** design-backlog 0221, 0239
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** neither a feature nor a fix. Every commit is test harness plus the two documents
+  that describe it: the run-alone class holds 13 testcases instead of 20, the three preset sweeps
+  fan out in batches of eight instead of one testcase per preset, and one new guard asserts the
+  independence that makes the batching sound. No engine, player, plugin or preset behaviour changes,
+  and no assertion in any sweep changes.
+- **Operator docs touched:** none. `docs/testing.md` is the contributor's harness page;
+  `running.md`, `configuration.md` and `capturing.md` are untouched.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — *55 stated reductions still
+  hold across all 25 live entries (3 unprobeable)*. 28 advisory rows for probed paths that moved
+  since their entry was stamped, one of which this plan caused: 0248's `core/tests/sanity.rs`.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). The last per-phase gate run
+  was `cargo nextest run --workspace -P fast --no-fail-fast` through the suite lock at Phase 5:
+  368.4 s, 1631 run / 86 skipped / 0 failed.
+- **Outstanding `human` phases:** none — every phase in this plan is `dev`.
 
 ## Followups (after this lands)
 
