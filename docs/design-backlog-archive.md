@@ -324,8 +324,6 @@ live entry citing this one.
 | 0095 | The backdrop ramp makes parallel stripes only, and a converging fan cannot be lit *and* darkened | [Plan 0203](plans/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md). **Promoted** |
 | 0100 | "Hand-drawn" is edge wobble, not spike-length variation, and the star arm has no lever | [Plan 0203](plans/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md). **Promoted** |
 | 0101 | The mark roster cannot morph between silhouettes, and two other rosters already do | [Plan 0203](plans/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md). **Promoted** |
-| 0221 | The run-alone override costs `-P fast` 165 s, because 18 testcases each drain the machine | [Plan 0199](plans/0199-the-gates-cost-is-measured-before-it-is-cut.md). **Promoted** |
-| 0239 | Three per-preset suites are 54 % of the workspace suite and grow with every preset shipped | [Plan 0199](plans/0199-the-gates-cost-is-measured-before-it-is-cut.md). **Promoted** |
 | 0244 | A custom wave is neither smoothed nor scaled like the eight built-in figures | [Plan 0201](plans/0201-the-warp-surface-stops-lying.md). **Promoted** |
 | 0245 | The converted warp space has no pixel baseline, because every golden fixture is square | [Plan 0201](plans/0201-the-warp-surface-stops-lying.md). **Promoted** |
 | 0249 | `warp_mesh`'s `zoom` doc says the opposite of what the shader does | [Plan 0201](plans/0201-the-warp-surface-stops-lying.md). **Promoted** |
@@ -618,6 +616,8 @@ gate precisely so this entry could not be orphaned by that outcome, and it disch
 | 0246 | The local `cargo doc` mirror covers one crate of five | [Plan 0196](plans/done/0196-the-gate-roster-stops-drifting.md) Phase 3. `--workspace`, `--features text` dropped; +2 s warm, 20.1 s doc-cold, reported not tuned. **Closed 2026-09-19** |
 | 0242 | The conductor's gate skips a check a lane never satisfies, and says nothing | [ADR-0218](adrs/0218-a-lane-makes-its-plans-preconditions-true-and-a-skipped-check-says-so.md) + [Plan 0196](plans/done/0196-the-gate-roster-stops-drifting.md) Phase 4. Reported, and the lane installs. **Closed 2026-09-19** |
 | 0243 | The served version-line rule is anchored to a column and a basename, not to the section | [Plan 0196](plans/done/0196-the-gate-roster-stops-drifting.md) Phase 5. Read whole in its TOML section; the third probe is no longer what the claim rests on. **Closed 2026-09-19** |
+| 0221 | The run-alone override costs `-P fast` 165 s, because 18 testcases each drain the machine | [Plan 0199](plans/done/0199-the-gates-cost-is-measured-before-it-is-cut.md) Phases 1-2. 20 not 18; cost is per block, not per testcase. **Closed 2026-09-19** |
+| 0239 | Three per-preset suites are 54 % of the workspace suite and grow with every preset shipped | [ADR-0222](adrs/0222-a-preset-sweeps-fixed-cost-is-paid-per-process-so-the-lever-is-the-batch.md) + [Plan 0199](plans/done/0199-the-gates-cost-is-measured-before-it-is-cut.md). **Closed 2026-09-19** |
 <!-- roster:end -->
 
 ---
@@ -14682,9 +14682,24 @@ first.
 **Medium.** No test is wrong. The cost is 165 s on every push, and a gate that hurts gets bypassed
 (ADR-0033 Alternative F).
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0199](plans/0199-the-gates-cost-is-measured-before-it-is-cut.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0199](plans/done/0199-the-gates-cost-is-measured-before-it-is-cut.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+- **CLOSED 2026-09-19** by [Plan 0199](plans/done/0199-the-gates-cost-is-measured-before-it-is-cut.md),
+  which answered the question this entry says to answer first and then took the first shape.
+  **The queue holds**: nextest admits no unrelated testcase while an exclusive one waits, and starts
+  none for the whole drain before a block opens. But the cost does **not** scale with the *count* of
+  exclusive testcases — it scales with the number of contiguous *blocks* and the serialized work
+  inside them, since consecutive exclusive testcases open 0.00 s apart and a drain is paid once at a
+  block's leading edge. **Two numbers in this body are wrong** and the plan corrected them: the
+  selection is 20 testcases, not 18, and the cheap half is 12, not 11 (`help_cli` carries nine tests).
+  The fold landed — `help_cli` nine to three, `stream_pipe` three to two, no assertion lost — and the
+  other two shapes were **not** taken: nothing left ADR-0193's class and no fractional
+  `threads-required` was introduced. **The 165 s the title claims is not what a fold can recover.**
+  The cheap testcases were one contiguous block costing 14.6 s of the run's timeline, which is the
+  ceiling; the measured `-P fast` delta of 28.4 s sits inside the same tree's own 30.5 s run-to-run
+  spread, and the plan's log says so rather than claiming the saving. See also
+  [backlog 0239](design-backlog-archive.md), closed by the same plan.
 
 ---
 
@@ -14741,9 +14756,26 @@ should be re-measured rather than assumed.
 cheap part of that cost first, and this half needs a measurement and a testing-contract decision
 before it needs code.
 
-- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0199](plans/0199-the-gates-cost-is-measured-before-it-is-cut.md) was
+- **Moved to the archive 2026-09-19 on promotion**, when [Plan 0199](plans/done/0199-the-gates-cost-is-measured-before-it-is-cut.md) was
   approved ([ADR-0206](adrs/0206-a-promoted-backlog-entry-leaves-the-live-file.md)). From here the
   plan's done-whens are the check and this body is its evidence.
+- **CLOSED 2026-09-19** by [Plan 0199](plans/done/0199-the-gates-cost-is-measured-before-it-is-cut.md),
+  which measured the fixed cost and took the third-listed shape in a form this body did not name.
+  **The first shape is unavailable, not unwise.** A `OnceLock`-held context rests on the per-preset
+  cases sharing a process and nextest gives each testcase its own, so in-process sharing cannot be had
+  on any amount of code — [ADR-0222](adrs/0222-a-preset-sweeps-fixed-cost-is-paid-per-process-so-the-lever-is-the-batch.md)
+  records that correction and makes the **batch** the lever instead. The premise held: the process
+  plus the adapter, device and pipeline set is 38-55 % of a testcase's wall, 683 s of a 1522 s serial
+  cost over the 114 shipped presets. The three sweeps now fan out in batches of eight, 15 testcases
+  each where there were 114, with the declared representatives batched apart so ADR-0157's sampling
+  survives intact — which is why "retire the split" was not taken either. The leak question this body
+  raises is answered by assertion rather than by hope:
+  `core/tests/suite/batch_independence.rs` holds a batched render to a solo one at `golden.rs`'s own
+  drift floor. **The interaction warning at the end of this body is live and unsettled**: the 43 %
+  cut is *serial*, and the full workspace suite on the closing tree (769 s) sits inside the band of
+  the five runs before it, so the parallel re-measurement it asks for is owed and is carried in the
+  plan's `## Followups` and the ADR's `Outcome`. See also
+  [backlog 0221](design-backlog-archive.md), closed by the same plan.
 
 ---
 
