@@ -105,6 +105,29 @@ const CASES = [
   { tool: "Bash", command: "npx vitest run", allowed: true },
   { tool: "Bash", command: "python3 tools/sd-filter/bench.py", allowed: true },
   { tool: "Bash", command: "RUSTDOCFLAGS=-D warnings cargo doc --no-deps", allowed: true },
+
+  // The two regenerations this project documents, each in both spellings a session writes: the bare
+  // one docs/developing.md and presets/README.md give, and the lock-wrapped one a conductor session
+  // must use for anything that runs tests. Every other variable in the same shape stays refused —
+  // the rule is a list of named variables, not the shape `VAR=value <allowed command>`, which would
+  // admit the ones that change what a build does.
+  { tool: "Bash", command: "RLX_UPDATE_PRESET_SCHEMA=1 cargo nextest run -p rlx-core --test suite preset_schema::", allowed: true },
+  {
+    tool: "Bash",
+    command: "RLX_UPDATE_PRESET_SCHEMA=1 node tools/conductor/with-lock.mjs suite -- cargo nextest run -p rlx-core --test suite preset_schema::",
+    allowed: true,
+    why: "the suite-lock hook denies the bare form in a conductor session",
+  },
+  { tool: "Bash", command: "RLX_UPDATE_PARAM_REFERENCE=1 cargo test -p rlx-core --test suite the_parameter_reference_block_is_current", allowed: true },
+  {
+    tool: "Bash",
+    command: "RLX_UPDATE_PARAM_REFERENCE=1 node tools/conductor/with-lock.mjs suite -- cargo test -p rlx-core --test suite the_parameter_reference_block_is_current",
+    allowed: true,
+  },
+  { tool: "Bash", command: "RLX_ANYTHING_ELSE=1 cargo nextest run --workspace", allowed: false, why: "the rule names variables, it is not a shape" },
+  { tool: "Bash", command: "CARGO_TARGET_DIR=target/p9 cargo build", allowed: false, why: "same: a variable that changes what a build does" },
+  { tool: "Bash", command: "RLX_UPDATE_PRESET_SCHEMA=0 cargo nextest run --workspace", allowed: false, why: "the documented value is part of the rule" },
+  { tool: "PowerShell", command: "$env:RLX_UPDATE_PRESET_SCHEMA = '1'; cargo nextest run", allowed: false, why: "an assignment is its own command in that shell" },
   { tool: "PowerShell", command: "cargo clippy --workspace --all-targets -- -D warnings", allowed: true },
   { tool: "PowerShell", command: "node tools/conductor/with-lock.mjs suite -- cargo nextest run --workspace", allowed: true },
   { tool: "PowerShell", command: "npm --prefix studio run build", allowed: true },

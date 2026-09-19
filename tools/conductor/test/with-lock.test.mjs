@@ -270,14 +270,77 @@ test("a full suite run by hand from the repository records itself as hand, and t
   assert.equal(readLedger(s.ledger).at(-1).green.by, "hand");
 });
 
+/** A worktree of `s.repo` with a conductor directory of its own, as a lane of this repository has. */
+function lane(s, name) {
+  const dir = join(freshDir(), name);
+  assert.equal(spawnSync("git", ["worktree", "add", "-q", "-b", name, dir], { cwd: s.repo, encoding: "utf8" }).status, 0);
+  const selfDir = join(dir, "tools", "conductor");
+  mkdirSync(selfDir, { recursive: true });
+  return { dir, selfDir };
+}
+
 test("a hand run in a worktree of the repository records into the same ledger", async () => {
   const s = handScratch();
   // A lane is a worktree: `git rev-parse --git-common-dir` is the main checkout's either way.
-  const lane = join(freshDir(), "rlx-plan-0190");
-  assert.equal(spawnSync("git", ["worktree", "add", "-q", "-b", "plan-0190", lane], { cwd: s.repo, encoding: "utf8" }).status, 0);
-  const r = await quietly(() => runWrapped(SUITE_ARGV, { env: s.env, cwd: lane, run: s.run, selfDir: s.selfDir }));
+  const l = lane(s, "rlx-plan-0190");
+  const r = await quietly(() => runWrapped(SUITE_ARGV, { env: s.env, cwd: l.dir, run: s.run, selfDir: s.selfDir }));
   assert.equal(r.value, 0);
   assert.deepEqual(readLedger(s.ledger).map((e) => e.by), ["hand"]);
+});
+
+// Backlog 0247: the operator repairs inside a lane, and the wrapper there is the lane's own copy of
+// this script, so the record used to land in the one place no gate reads.
+test("a hand run through a lane's own copy of the wrapper records into the main checkout's ledger", async () => {
+  const s = handScratch();
+  const l = lane(s, "rlx-plan-0197");
+  const picked = suiteLedger(l.dir, {}, l.selfDir);
+  assert.equal(picked.by, "hand");
+  assert.equal(picked.notice, undefined, "the main checkout was derived, so there is nothing to say");
+  assert.ok(!picked.path.toLowerCase().startsWith(l.dir.toLowerCase()), `${picked.path} is outside the lane`);
+
+  const first = await quietly(() => runWrapped(SUITE_ARGV, { env: s.env, cwd: l.dir, run: s.run, selfDir: l.selfDir }));
+  assert.equal(first.value, 0);
+  assert.deepEqual(readLedger(s.ledger).map((e) => e.by), ["hand"], "recorded where the gate reads");
+  assert.deepEqual(readLedger(join(l.selfDir, "state", "suite-ledger.jsonl")), [], "and not in the lane");
+
+  // The gate the conductor runs next, from the main checkout, on the tree the lane is at.
+  const gate = await quietly(() =>
+    runWrapped(SUITE_ARGV, { env: { ...s.env, RLX_SUITE_LEDGER: s.ledger, RLX_SUITE_LEDGER_BY: "gate 0101-pre-review" }, cwd: s.repo, run: s.run }),
+  );
+  assert.equal(gate.value, 0);
+  assert.equal(s.calls.length, 1, "the gate did not run the suite again");
+  assert.match(gate.out, /is green in the suite ledger, run by hand at /);
+});
+
+// ADR-0016's shape: what cannot be derived is said in one line, and the old behaviour carries on.
+test("a common directory with no checkout beside it falls back to this script's own state, with a notice", async () => {
+  const repo = mkdtempSync(join(tmpdir(), "rlx-wrap-sep-"));
+  const gitDir = join(freshDir(), "relocated.git");
+  const sh = (...a) => assert.equal(spawnSync("git", a, { cwd: repo, encoding: "utf8" }).status, 0, a.join(" "));
+  sh("init", "-q", "-b", "main", `--separate-git-dir=${gitDir}`);
+  sh("config", "user.email", "t@example.invalid");
+  sh("config", "user.name", "T");
+  sh("config", "commit.gpgsign", "false");
+  writeFileSync(join(repo, ".gitignore"), "tools/conductor/state/\n");
+  sh("add", ".gitignore");
+  sh("commit", "-q", "-m", "init");
+  const selfDir = join(repo, "tools", "conductor");
+  mkdirSync(selfDir, { recursive: true });
+
+  const picked = suiteLedger(repo, {}, selfDir);
+  assert.equal(picked.path, join(selfDir, "state", "suite-ledger.jsonl"), "today's destination, unchanged");
+  assert.equal(picked.by, "hand");
+  assert.match(picked.notice, /^no main checkout beside .*relocated\.git, so the suite ledger stays beside this script/);
+
+  const calls = [];
+  const run = async (command, args, opts) => {
+    calls.push(opts.capture);
+    return { code: 0, output: "     Summary [   2.000s] 5 tests run: 5 passed\n" };
+  };
+  const r = await quietly(() => runWrapped(SUITE_ARGV, { env: { RLX_LOCK_DIR: freshDir() }, cwd: repo, run, selfDir }));
+  assert.equal(r.value, 0);
+  assert.match(r.out, /^with-lock: notice: no main checkout beside /m);
+  assert.deepEqual(readLedger(picked.path).map((e) => e.by), ["hand"], "it still records, where it always did");
 });
 
 test("a hand run that starts or ends dirty records nothing", async () => {
