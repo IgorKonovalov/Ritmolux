@@ -195,19 +195,40 @@ flowchart TB
 | 2 — A checker holds the hook and CI to the manifest | dev | done | `de526ac` |
 | 3 — The local `cargo doc` covers the workspace | dev | done | `a9ca7d9` |
 | 4 — A skipped step says so, and a studio lane can run its checks | dev | done | `731725c` |
-| 5 — The served version line is anchored to the workspace section | dev | committed with this row | |
+| 5 — The served version line is anchored to the workspace section | dev | done | `ea3c576` |
 
 ### Notes
 
+- Phase 2: the checker took a `--roster <manifest>` flag the plan does not name, so each seeded case
+  is a runnable root like every other fixture tree here rather than only a `--self-test` case; the
+  checker sits last in the roster, which the plan left open (`de526ac`).
+- Phase 3: the hook's total was already past ADR-0033's *tens of seconds* before this phase
+  (ADR-0157's preset sample at +58.5 s, ADR-0178's studio trio at 15.2 s). Against that, the widening
+  measures +2 s warm and 20.1 s in the doc-cold case; the phase reported and did not tune (`a9ca7d9`).
+- Phase 4: `scratch()` in `tools/conductor/test/lane.test.mjs` now commits a `.gitignore`, which every
+  lane test inherits — without it an installed `studio/node_modules` makes `git worktree remove`
+  refuse. The install command is read from `ctx.studioInstall`, so no test runs `npm` (`731725c`).
+- Phase 5: the `versionLineOnly` match moved from basename to full path for **both** files, so
+  `Cargo.lock` is now the root one only; `Cargo.lock` keeps an any-section reading, since the plan
+  named the section rule for the root `Cargo.toml` alone (`ea3c576`).
+- Noticed, not acted on: `node scripts/check-doc-links.mjs scripts/fixtures` reports 10 breaks where
+  `scripts/fixtures/README.md` states five. All five extra are in `reader-prose/` fixtures and
+  predate this plan; the repository run is green.
+
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** none.
 - **Plan header `Closes:`** design-backlog 0242, 0243, 0246, 0252
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** gate and conductor tooling only — `scripts/`, `.githooks/`, `.github/workflows/`
+  and `tools/conductor/`. No shipped artifact changed: nothing under `core/`, `core-cabi/`,
+  `rlx-ring/`, `standalone/`, `plugin-foobar/`, `presets/` or `studio/` is in any of the five commits.
+- **Operator docs touched:** `tools/conductor/README.md` (the `studio_install` park row, and the gate
+  section's skip/install paragraph). `scripts/fixtures/README.md` for the new fixture tree.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — 55 reductions across 25 live
+  entries, 3 unprobeable, 28 advisory *path moved* rows, none of them named by this plan.
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). No phase named a deferred GPU
+  suite and no phase changed what one measures, so no upward override was taken (ADR-0156).
+- **Outstanding `human` phases:** none — every phase is `dev`.
 
 ## Followups (after this lands)
 
