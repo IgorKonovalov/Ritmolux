@@ -300,8 +300,8 @@ pub enum RotateSource {
 
 ## Implementation log
 
-> Written by the lane — one row per phase as that phase's commit lands, and the close block after
-> the last one. **The phases above are the contract; everything here is what happened.**
+> Written by the lane, one row per phase as its commit lands, plus the close block after the last.
+> **The phases above are the contract; everything here is what happened.**
 
 **Lane:** `plan-0205-the-library-becomes-navigable` in `C:\Users\Igor Konovalov\WORK\rlx-plan-0205`
 
@@ -316,135 +316,109 @@ pub enum RotateSource {
 
 ### Notes
 
-- **Phase 1 touched files outside its list.** The store is `standalone/src/marks.rs` as stated,
-  but it is a **library** module (`standalone/src/lib.rs`) rather than a binary one, for the reason
-  `config` is: its round trip through a file is what the done-when asks for, and a library module is
-  where that test runs. Path resolution landed in `marks.rs` beside the store (`resolve_marks_path`)
-  rather than in `config.rs`, next to the `APP_DIR_NAME` join it mirrors. The marks are owned by
-  `standalone/src/show.rs` rather than by the window's state, because Phase 2 spends them in the
-  director and Phase 5 reports them on the event stream, both of which live there; `app_state.rs`
-  and `stream.rs` moved only to pass the resolved path into `Show::start`.
+- **Phase 1 touched files outside its list.** `standalone/src/marks.rs` is a **library** module for
+  the reason `config` is — its round trip through a file is what the done-when asks for, and that is
+  where such a test runs — and `resolve_marks_path` sits in it rather than in `config.rs`, next to
+  the `APP_DIR_NAME` join it mirrors. `show.rs` owns the marks rather than the window's state,
+  because Phase 2 spends them in the director and Phase 5 reports them on the event stream;
+  `app_state.rs` and `stream.rs` moved only to pass the path into `Show::start`.
 - **A file that is absent or empty is silent**; only one that exists and cannot be parsed prints a
-  line. The phase's done-when lists all three as yielding "empty mark sets and a diagnostic line" —
-  an empty file parses to empty sets with nothing to report, and an absent file is the ordinary
-  first run, so a line there would be permanent noise for anyone who never marks anything. The
-  no-failure-to-start half is asserted for all three
-  (`an_unusable_file_yields_empty_sets_rather_than_a_failure`).
-- Phase 1 binds `F1` (favourite) only. `F2` (hidden) waits for Phase 3, which is where the browser
-  learns to show hidden presets again — a mark that cannot be found is a mark that cannot be undone.
-- **Phase 2 retired `console::next_up` and rewrote the two tests that read it**
-  (`standalone/src/console.rs`, `standalone/src/console/tests.rs`, outside the phase's file list).
-  That function *was* the "which preset does a rotation take" rule — the roster's successor — and
-  the shuffled traversal replaces it, so leaving it in place would have left the console's `next up`
-  line naming a preset the rotation was not about to take. The claim it made is now
-  `the_announced_preset_is_the_one_the_next_draw_takes` in `director/tests.rs`, and
-  `the_staged_name_is_the_one_the_rotation_then_takes` in `console/tests.rs` still drives a real
-  director against the shipped roster.
-- **`prev` is one behaviour across three surfaces**, not two. `Backspace`, the console strip's
+  line. The done-when lists all three as yielding "empty mark sets and a diagnostic line", but an
+  empty file parses to empty sets with nothing to report and an absent file is the ordinary first
+  run, so a line there is permanent noise. All three are asserted not to stop the launch
+  (`an_unusable_file_yields_empty_sets_rather_than_a_failure`). Phase 1 binds `F1` only; `F2` waits
+  for Phase 3, where hidden presets become findable — a mark that cannot be found cannot be undone.
+- **Phase 2 retired `console::next_up` and rewrote the two tests that read it** (`console.rs`,
+  `console/tests.rs`, outside the phase's file list). That function *was* the "which preset does a
+  rotation take" rule — the roster's successor — and the shuffled traversal replaces it, so leaving
+  it would have left the console naming a preset the rotation was not about to take. Its claim is
+  now `the_announced_preset_is_the_one_the_next_draw_takes` in `director/tests.rs`, and
+  `the_staged_name_is_the_one_the_rotation_then_takes` still drives a real director against the set.
+- **`prev` is one behaviour across three surfaces**, not two: `Backspace`, the console strip's
   `< prev` and `ctl/transport prev` all walk the trail of presets actually shown, falling back to
-  `console::previous_index` only while a run has shown nothing yet. Spec 0003 still describes that
-  row as "cut to the roster's predecessor", which stopped being accurate here; the correction rides
-  in Phase 5, which is the phase that owns the spec.
+  `console::previous_index` when the trail is empty. Spec 0003 still described that row as "cut to
+  the roster's predecessor"; the correction rides in Phase 5, which owns the spec.
 - **Rotation now selects by name rather than by index** (`Show::rotate`), which is what ADR-0228's
-  name-keyed identity requires of anything the marks filter. The consequence: two presets sharing a
-  display name are one entry to the traversal, and the second copy is unreachable from rotation.
-  `rlx_core::preset::drift` already reports a contested display name, and nothing in the shipped set
-  has one.
-- Phase 2's reach beyond `director.rs` / `config.rs`: `show.rs` (the traversal's owner),
-  `app_state.rs` and `input.rs` (the `Trail` split and the `Backspace` binding), `hud.rs` (the
-  staging line reads the traversal's peek) and `stream.rs` (the headless path rotates through the
-  same traversal, so ADR-0181's invariant holds).
-
+  name-keyed identity requires of anything the marks filter. Consequence: two presets sharing a
+  display name are one entry to the traversal and the second copy is unreachable from rotation.
+  `rlx_core::preset::drift` already reports a contested display name, and nothing shipped has one.
+- Reach beyond `director.rs` / `config.rs`: `show.rs` (the traversal's owner), `app_state.rs` and
+  `input.rs` (the `Trail` split and the `Backspace` binding), `hud.rs` (the staging line reads the
+  peek) and `stream.rs` (the headless path rotates through it too, so ADR-0181's invariant holds).
 - **Phase 3 took the plan's proposed bindings and added three of its own.** `F1` favourite and `F2`
-  hide, working identically inside and outside the browser, exactly as proposed. The three
-  narrowings needed keys too and the same constraint applies to them, so they are `F4` favourites
-  only, `F5` family, `F6` show hidden — browser-only, since none of them means anything outside it.
-- **"Every row names its system" is drawn as the system's family** — `curve`, `attractor`, the
-  filename prefix `SystemKind::family()` returns — not as the canonical key. The key is up to
-  eighteen characters (`reaction_diffusion`) and the column that would need is four characters wider
-  than the whole name column; the family is the same identity in a form that fits, and it is the
-  token the `F5` filter and the filename already use, so the row, the filter and the file all read
-  as one word.
-- The column budget moved with it: `NAME_CHARS` 24 -> 18 (the longest shipped name is 18,
-  `Tiled Rosette Mono`, so truncation still never fires on the embedded set) and the column widened
-  from 26 to 32 characters, which is four columns at 1920x1080 against the previous five — still
-  more than the 116-preset roster needs at 32 rows a column.
-- Phase 3's reach beyond `overlay.rs` / `overlay/tests.rs`: the browser needs a **family per roster
-  entry**, which nothing held. `preset_dir.rs` now returns the families of the set it installs and
-  `show.rs` keeps them beside the roster, falling back to the embedded set's when a load installed
-  nothing. `app_state.rs` builds the rows, `input.rs` decodes the three keys, `hud.rs` draws the row
-  and the header. No core change: `SystemKind::family()` was already public.
-
+  hide work identically inside and outside the browser, exactly as proposed; the three narrowings
+  needed keys under the same constraint, so they are `F4` favourites only, `F5` family, `F6` show
+  hidden — browser-only, since none means anything outside it.
+- **"Every row names its system" is drawn as the system's family** — the filename prefix
+  `SystemKind::family()` returns — not the canonical key, which runs to eighteen characters
+  (`reaction_diffusion`) and would need a column four wider than the name's. The family is the same
+  identity in a form that fits, and the `F5` filter and the filename already use that token.
+- The column budget moved with it: `NAME_CHARS` 24 -> 18 and the column 26 -> 32 characters, four
+  columns at 1920x1080 against the previous five — still more than the 116-preset roster needs at 32
+  rows a column. One shipped name is longer than 18 and now truncates; see `## Close review`.
+- Reach beyond `overlay.rs` / `overlay/tests.rs`: the browser needs a **family per roster entry**,
+  which nothing held, so `preset_dir.rs` returns the families of the set it installs and `show.rs`
+  keeps them beside the roster, falling back to the embedded set's when a load installed nothing.
+  `app_state.rs` builds the rows, `input.rs` decodes the three keys, `hud.rs` draws the row and the
+  header. No core change: `SystemKind::family()` was already public.
 - **The countdown reports the hard cap, not the nudged one.** `Director::remaining_secs` answers
   `max_dwell - dwell`, so a drop or a track boundary can land the change sooner than the line says.
   The alternative — counting down to this frame's nudged cap — is a function of the audio arriving
   now, so it would jump under the operator's eye and still be wrong on the next frame.
 - The `[hud]` row and key are `Next in` / `next_rotation`, following the phase's stated precedent;
   that put a fourteenth row in the settings menu (`settings.rs`, `settings/tests.rs`, and the two
-  other `SettingsView` literals in `console/tests.rs` and `stream.rs`), which is beyond the phase's
-  file list but is what "a settings row and a `config.toml` key" means here.
+  other `SettingsView` literals in `console/tests.rs` and `stream.rs`) — beyond the file list, but
+  what "a settings row and a `config.toml` key" means.
 - **A/B is `B`, and the number keys are the top row and the numpad both.** `B` is an
-  outside-the-browser binding like `S`, `C`, `F` and `D` — the phase's own rule for the digits
-  ("the binding applies outside it") is the same one. `0` is deliberately not a tenth slot.
-
+  outside-the-browser binding like `S`, `C`, `F` and `D`, which is the phase's own rule for the
+  digits. `0` is deliberately not a tenth slot.
 - **`/ctl/mark` carries `s name`, `s mark`, `i state`** — a state rather than a press, deduplicated
   per `(preset, mark)` pair in the listener's queue like a parameter value. Any non-zero integer
   reads as "on"; refusing `-1` would be the decoder inventing a rule the type does not carry.
-- **A refused mark reuses `preset_error`**, which is the shape ADR-0221 already fixed for a refused
-  `ctl/preset`: `file` holds the asked-for name and is not a path, and `line`/`col`/`param` are
-  `null`. A second event for one more refusal arm would have widened the roster for no fact a
-  parent reads differently.
+- **A refused mark reuses `preset_error`**, the shape ADR-0221 already fixed for a refused
+  `ctl/preset`: `file` holds the asked-for name and is not a path, `line`/`col`/`param` are `null`.
+  A second event for one refusal arm would widen the roster for no fact a parent reads differently.
 - **Phase 5 also corrected spec 0003's `prev` row**, which still said "cut to the roster's
-  predecessor". Phase 2 made that inaccurate and does not own the spec; this phase does. The
-  invariant now states the trail and its roster-predecessor fallback.
-- The `marks` event is emitted **after** the startup `roster`, since a parent joins the two by name,
-  and on every change whoever made it — the hotkey path and the wire path both run through
-  `Show::set_mark`, which is the one writer.
-
+  predecessor"; the invariant now states the trail and its roster-predecessor fallback. The `marks`
+  event is emitted **after** the startup `roster`, since a parent joins the two by name, and on every
+  change whoever made it — hotkey and wire both run through `Show::set_mark`, the one writer.
 - **Phase 6 reached past the library view into the event state and the action layer**:
   `shared/protocol.ts` (the `marks` event, the `mark` action and its address),
   `electron/player/osc.ts` (its three arguments), `hooks/usePlayerEvents.ts` (the `marks` field),
-  `hooks/usePlayer.ts` (`setMark`), and `App.tsx`/`views/Editor.tsx`, which carry the marks down to
-  the library tab. Nothing in main changed: `ControlSender` and the `player:ctl` handler are generic
-  over `CtlAction`, so a new member of the union travels with no new plumbing.
+  `hooks/usePlayer.ts` (`setMark`), and `App.tsx`/`views/Editor.tsx`, which carry the marks to the
+  library tab. Nothing in main changed: `ControlSender` and the `player:ctl` handler are generic over
+  `CtlAction`. `renderer/views/Editor.test.tsx`'s props gained `marks: undefined`, also outside the
+  file list; the prop is required and that test predates it.
 - **A hidden preset keeps its row in the studio's list**, unlike the player's browser, where Phase 3
-  put it behind `F6`. The studio is the editing surface, and the mark is undone from the same row
-  that set it; the row is dimmed rather than removed. Only the favourites narrowing hides anything
-  here.
+  put it behind `F6`: the studio is the editing surface and the mark is undone from the row that set
+  it, so the row is dimmed rather than removed. Only the favourites narrowing hides anything here.
 - `marks` is `undefined` until a `marks` line arrives, and the list then shows **no mark controls and
-  no filter** rather than an unmarked library. The unsolicited half of ADR-0229 is asserted by
-  replacing the component's `marks` with no click in between, not by driving a live player.
-- The `Editor` test's props gained `marks: undefined` (`renderer/views/Editor.test.tsx`), which is
-  outside the phase's file list; the prop is required and that test predates it.
+  no filter** rather than an unmarked library. ADR-0229's unsolicited half is asserted by replacing
+  the component's `marks` with no click in between, not by driving a live player.
 
 ### Close triggers
 
-- **`presets/` touched:** no. No preset file was added, edited or removed; `presets/README.md` is
-  untouched.
+- **`presets/` touched:** no — no preset file added, edited or removed, `presets/README.md` untouched.
 - **Plan header `Closes:`** none
-- **What shipped:** feature — two preset marks and everything that spends them, in the standalone
-  and in the studio. `core/`, `core-cabi/`, `rlx-ring/`, `plugin-foobar/` and `presets/` are
-  byte-unchanged, so the C ABI does not move and the foobar component keeps rotating the whole set.
-- **Operator docs touched:** [`docs/running.md`](../running.md) (the six new keys, marking, the
-  browser's three narrowings, the A/B hold, the corner's marks and countdown),
+- **What shipped:** feature — two preset marks and everything that spends them, in the standalone and
+  the studio. `core/`, `core-cabi/`, `rlx-ring/`, `plugin-foobar/` and `presets/` are byte-unchanged,
+  so the C ABI does not move and the foobar component keeps rotating the whole set.
+- **Operator docs touched:** [`docs/running.md`](../running.md) (the six new keys, marking, the three
+  narrowings, the A/B hold, the corner's marks and countdown),
   [`docs/configuration.md`](../configuration.md) (the `marks.toml` section, `[rotate] source`,
   `[hud] next_rotation`, and the complete-file block both keys ride in) and
-  [`docs/specs/0003-studio-control-protocol.md`](../specs/0003-studio-control-protocol.md) (the
-  `ctl/mark` row, the `marks` event row, six invariants, two scenarios, a provenance entry and the
-  corrected `prev` invariant).
+  [spec 0003](../specs/0003-studio-control-protocol.md) (the `ctl/mark` and `marks` rows, six
+  invariants, two scenarios, a provenance entry and the corrected `prev` invariant).
 - **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — *43 stated reductions still
-  hold across all 20 live entries (4 unprobeable)*, re-run after Phase 6. The advisory half lists
-  `standalone/src/show.rs` as having moved past entry 0220's stamp, which is this plan's own edits.
+  hold across all 20 live entries (4 unprobeable)*, re-run after Phase 6. The advisory lists
+  `standalone/src/show.rs` as moved past entry 0220's stamp, which is this plan's own edits.
 - **Full suite:** owed to the conductor's pre-review gate (ADR-0207). Phases 1–5 each ran
-  `cargo nextest run -p standalone -P fast` green (455 tests at Phase 5), with
-  `cargo fmt --all --check` and `cargo clippy --workspace --all-targets -- -D warnings` clean;
-  Phase 6 touched no Rust and ran the studio's own gate — `npm --prefix studio run typecheck`,
-  `run lint` and `test` (31 files, 294 tests) all green.
-  `check-doc-links`, `check-comment-hygiene`, `check-index-rows`, `check-system-counts`,
-  `check-reader-prose`, `check-gate-carriers`, `check-backlog-claims` and `toc --check` were run by
-  hand at the close and are green.
-- **Outstanding `human` phases:** none. Every phase of the plan is committed; Phase 6 was a separate
-  `studio-builder` run over the same lane.
+  `cargo nextest run -p standalone -P fast` green (455 tests at Phase 5) with `fmt` and
+  `clippy --workspace --all-targets -- -D warnings` clean; Phase 6 touched no Rust and ran the
+  studio's `typecheck`, `lint` and `test` (31 files, 294 tests) green. `check-doc-links`,
+  `check-comment-hygiene`, `check-index-rows`, `check-system-counts`, `check-reader-prose`,
+  `check-gate-carriers`, `check-backlog-claims` and `toc --check` were run by hand and are green.
+- **Outstanding `human` phases:** none; Phase 6 was a separate `studio-builder` run over this lane.
 
 ## Followups (after this lands)
 

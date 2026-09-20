@@ -288,9 +288,10 @@ pub struct Traversal {
 impl Traversal {
     /// A fresh traversal seeded from `seed`.
     ///
-    /// Seeded rather than fixed so two machines with different libraries do not
-    /// walk the same order, and injected rather than read from a clock so a
-    /// test can state an exact sequence.
+    /// Injected rather than read from a clock, so a test can state an exact
+    /// sequence and a run is reproducible from its seed alone. One seed is one
+    /// order: a caller that passes the same number every launch gets the same
+    /// walk every launch, which is what the shell does.
     pub fn new(seed: u32) -> Self {
         Self {
             seen: Vec::new(),

@@ -46,9 +46,10 @@ const CHAR_W: f32 = ROW_SIZE * 0.62;
 /// two-character `"> "` marker, the mark glyph, a space, the name, a space and
 /// the family.
 const COL_CHARS: usize = 2 + 1 + 1 + NAME_CHARS + 1 + FAMILY_CHARS;
-/// Characters of the **name** a column can show before [`fit`] truncates it. The
-/// longest shipped preset name is 18, so truncation never fires on the embedded
-/// set; it exists for a custom `RLX_PRESET_DIR`.
+/// Characters of the **name** a column can show before [`fit`] truncates it.
+/// Every shipped name fits but one — `Star Mandala Bordered` is 21 characters
+/// and draws as `Star Mandala Bo...` — so truncation is a case the embedded set
+/// reaches, not only a custom `RLX_PRESET_DIR`.
 pub const NAME_CHARS: usize = 18;
 /// Characters the family label reserves. The longest system family is
 /// `attractor` at nine, and [`SystemKind::family`](rlx_core::preset::SystemKind::family)
@@ -99,8 +100,9 @@ pub fn capture_line(token: &str) -> String {
 
 /// A name shortened to fit one column, with an ASCII ellipsis.
 ///
-/// Borrowed when it already fits, which is every shipped preset — so the common
-/// case allocates nothing beyond what the caller was doing anyway. ASCII `...`
+/// Borrowed when it already fits, which is every shipped preset but the one
+/// [`NAME_CHARS`] names — so the common case allocates nothing beyond what the
+/// caller was doing anyway. ASCII `...`
 /// rather than `…` because the overlay's font coverage is not something this
 /// module can check.
 pub fn fit(name: &str) -> Cow<'_, str> {

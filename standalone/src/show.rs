@@ -164,10 +164,12 @@ impl Show {
             sig: None,
             last_poll: now,
             director: Director::from_config(rotate),
-            // Seeded from the roster this build ships, so two machines with
-            // different libraries do not walk the same order. The real roster is
-            // installed by the reload below; this is the embedded count, which
-            // differs per build and is all the seed needs to be.
+            // Seeded from the count of the set the binary carries — read before
+            // the reload below installs the per-user or `RLX_PRESET_DIR`
+            // library, so it is the *embedded* count and not this run's roster.
+            // It is therefore one number per build: every launch of a given
+            // build walks one order, which is what makes a run reproducible and
+            // is the property the traversal's tests state.
             traversal: Traversal::new(renderer.preset_names().count() as u32),
             source: rotate.source,
             families: Vec::new(),

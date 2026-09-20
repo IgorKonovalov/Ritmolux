@@ -1264,9 +1264,10 @@ impl AppState {
     /// Step back to the preset shown before this one (`Backspace`, and the
     /// console's `< prev`).
     ///
-    /// Falls back to the roster's predecessor while nothing has been shown yet,
-    /// which is the whole of a run that has not switched: there is no trail to
-    /// walk, and an inert key would read as an unbound one.
+    /// Falls back to the roster's predecessor whenever the trail is empty — a
+    /// run that has not switched yet, and equally a run whose trail has been
+    /// walked all the way back. There is nothing to return to either way, and an
+    /// inert key would read as an unbound one.
     pub(crate) fn step_previous(&mut self) {
         if self.show.has_trail() {
             if self.show.step_back(&mut self.renderer).is_some() {

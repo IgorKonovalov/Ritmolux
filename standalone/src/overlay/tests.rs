@@ -240,8 +240,8 @@ fn a_degenerate_window_still_lays_out_one_row_in_one_column() {
     }
 }
 
-/// Truncation is cosmetic and only fires past the budget, so no shipped name
-/// is ever shortened.
+/// Truncation is cosmetic and only fires past the budget, which every shipped
+/// name is inside but `Star Mandala Bordered`.
 #[test]
 fn a_name_is_only_shortened_past_the_column_budget() {
     assert_eq!(fit("Spectrum Corona"), "Spectrum Corona");
