@@ -129,13 +129,40 @@ pub(crate) fn dir_signature(dir: &Path) -> Option<(u128, usize)> {
     Some((latest, count))
 }
 
+/// The families of a loaded set, in roster order — the filename prefix each
+/// preset's system is named for (`curve`, `attractor`, …).
+///
+/// Read off the presets before they are handed to the renderer, which is the
+/// only moment the shell sees them: the renderer answers for the *active*
+/// preset's system and nothing keys a whole roster by one.
+pub(crate) fn families_of(presets: &[rlx_core::preset::Preset]) -> Vec<&'static str> {
+    presets
+        .iter()
+        .map(|preset| preset.system.family())
+        .collect()
+}
+
+/// The families of the embedded set, for a run whose directory yielded nothing
+/// and which is therefore showing the presets the binary carries.
+pub(crate) fn embedded_families() -> Vec<&'static str> {
+    families_of(&rlx_core::preset::default_presets())
+}
+
 /// Load presets from `dir` and, if any compiled, install them on the renderer.
 /// Malformed files are reported to stderr; a directory with no valid presets
 /// leaves the renderer's current set (embedded defaults or last good) in place.
 /// Non-fatal warnings (an unknown parameter name — usually a typo) are printed
 /// too: the preset still loads and renders, and the mistake is not silent
 /// (ADR-0020).
-pub(crate) fn reload_presets(renderer: &mut Renderer, dir: &Path, events: Option<&mut Events>) {
+///
+/// Returns the **families of the set it installed**, or `None` when it installed
+/// none and the renderer kept what it had — so a caller holding a family per
+/// roster entry knows whether its copy is still the roster's.
+pub(crate) fn reload_presets(
+    renderer: &mut Renderer,
+    dir: &Path,
+    events: Option<&mut Events>,
+) -> Option<Vec<&'static str>> {
     let report = rlx_core::preset::load_dir(dir);
     for (path, err) in &report.errors {
         eprintln!("preset {}: {err}", path.display());
@@ -143,6 +170,7 @@ pub(crate) fn reload_presets(renderer: &mut Renderer, dir: &Path, events: Option
     for (path, warning) in &report.warnings {
         eprintln!("preset {}: warning: {warning}", path.display());
     }
+    let mut families = None;
     if report.presets.is_empty() {
         if !report.errors.is_empty() {
             eprintln!("no valid presets in {}; keeping current set", dir.display());
@@ -153,6 +181,7 @@ pub(crate) fn reload_presets(renderer: &mut Renderer, dir: &Path, events: Option
             report.presets.len(),
             dir.display()
         );
+        families = Some(families_of(&report.presets));
         renderer.set_presets(report.presets);
         warn_cap_overflow(renderer);
     }
@@ -162,7 +191,7 @@ pub(crate) fn reload_presets(renderer: &mut Renderer, dir: &Path, events: Option
     // audiences, and the events exist because the operator's lines are prose
     // (ADR-0176).
     let Some(events) = events else {
-        return;
+        return families;
     };
     for (path, err) in &report.errors {
         // The parser gives a byte offset, not a position: turning it into a line
@@ -205,4 +234,5 @@ pub(crate) fn reload_presets(renderer: &mut Renderer, dir: &Path, events: Option
     // that can change it — see `AppState::report_active_preset`. A switch
     // dissolves, so a site that announced its own would name the incoming preset
     // a frame before it was drawn.
+    families
 }

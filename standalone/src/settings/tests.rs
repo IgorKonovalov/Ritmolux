@@ -22,6 +22,7 @@ fn view() -> SettingsView {
         input_editable: true,
         preset_name: true,
         now_playing: true,
+        next_rotation: true,
         console: false,
         preset_dir: r"C:\Users\x\AppData\Roaming\Ritmolux\presets".to_owned(),
     }
@@ -95,6 +96,10 @@ fn each_row_emits_the_action_its_table_row_names() {
             SettingsAction::ToggleNowPlaying
         );
         assert_eq!(
+            edit_at(SettingsRow::NextRotation, right, &v),
+            SettingsAction::ToggleNextRotation
+        );
+        assert_eq!(
             edit_at(SettingsRow::InputDevice, right, &v),
             SettingsAction::CycleInputDevice
         );
@@ -144,7 +149,7 @@ fn the_presets_row_emits_nothing() {
 /// as a count: every other test here reaches its row through `ALL`, which means
 /// a reordering would move them all in step and go unnoticed.
 #[test]
-fn the_rows_are_the_thirteen_the_menu_promises_in_order() {
+fn the_rows_are_the_ones_the_menu_promises_in_order() {
     assert_eq!(
         SettingsRow::ALL,
         [
@@ -159,6 +164,7 @@ fn the_rows_are_the_thirteen_the_menu_promises_in_order() {
             SettingsRow::InputDevice,
             SettingsRow::PresetName,
             SettingsRow::NowPlaying,
+            SettingsRow::NextRotation,
             SettingsRow::Console,
             SettingsRow::Presets,
         ]

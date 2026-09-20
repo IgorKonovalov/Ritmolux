@@ -19,10 +19,13 @@ use rlx_core::render::{PixelOrder, Renderer};
 use standalone::config;
 use standalone::control::Control;
 use standalone::events::{Event, Events};
+use standalone::marks::{Mark, Marks};
 use standalone::osc::decode::Transport;
 
-use crate::director::Director;
-use crate::preset_dir::{PRESET_POLL, dir_signature, reload_presets, startup_preset_dir};
+use crate::director::{Director, Traversal, eligible_names};
+use crate::preset_dir::{
+    PRESET_POLL, dir_signature, embedded_families, reload_presets, startup_preset_dir,
+};
 
 /// How often a `health` event goes out while frames are being drawn.
 ///
@@ -46,6 +49,14 @@ const PING_SCRATCH: usize = 8;
 const UNRESOLVED_PRESET: &str =
     "ctl/preset: the selection did not take, so this preset is not on screen";
 
+/// What a `preset_error` raised by a refused `ctl/mark` says.
+///
+/// Phrased as the request's outcome, like its sibling above: the mark was not
+/// stored, so nothing about the library moved — and a mark kept for a name the
+/// roster does not hold would grow the file forever off a channel nobody sees.
+const UNMARKABLE_PRESET: &str =
+    "ctl/mark: no preset of this name is loaded, so the mark was not stored";
+
 /// Everything a run manages around the renderer, in one owner.
 pub(crate) struct Show {
     /// Preset directory watched for hot-reload, with its last-seen signature and
@@ -63,6 +74,28 @@ pub(crate) struct Show {
     /// operator to press Space and a headless source does not — and that
     /// disagreement belongs to the caller rather than here.
     pub(crate) director: Director,
+
+    /// Which preset each rotation takes, and the trail of what was shown.
+    ///
+    /// Beside the director rather than inside it, because the two answer
+    /// different questions: the director decides *when* from the audio, and this
+    /// decides *which* from the library and the user's marks. Keeping them apart
+    /// is what lets the second one be a pure, seeded function with no clock in
+    /// it at all.
+    traversal: Traversal,
+
+    /// Which part of the library rotation draws from (`[rotate] source`).
+    source: config::RotateSource,
+
+    /// The family of each preset in the roster, positionally — the filename
+    /// prefix its system is named for, which is what the browser narrows by and
+    /// labels each row with.
+    ///
+    /// Held rather than asked of the renderer, which answers for the *active*
+    /// preset's system only. Refreshed by every reload that installs a set, and
+    /// re-derived from the embedded presets when the roster is one this module
+    /// did not load.
+    families: Vec<&'static str>,
 
     /// The structured event stream (ADR-0176), present only when `--events`
     /// turned it on. Absent otherwise, so every emission below is a `None` test
@@ -84,6 +117,18 @@ pub(crate) struct Show {
     /// is not a change, and a parent keeps drawing a panel for the system it was
     /// last told about.
     reported_preset: Option<(String, &'static str, Option<&'static str>)>,
+
+    /// The user's marks on the library, and the file they live in (ADR-0228).
+    ///
+    /// Held here rather than on the window's state because every path that runs
+    /// a show holds one of these: the marks decide what rotation draws from, and
+    /// a path that held them and rotated without them would be silently
+    /// different rather than broken (ADR-0181). `path` is `None` when no
+    /// per-user directory resolved, and then a mark applies live and is not
+    /// persisted — the rule `config.toml` already follows.
+    marks: Marks,
+
+    marks_path: Option<PathBuf>,
 
     /// When the next `health` event is due. The stream's own cadence, not the
     /// diagnostics log's: that one writes a file an operator reads afterwards
@@ -111,6 +156,7 @@ impl Show {
         rotate: &config::Rotate,
         events: Option<Events>,
         control: Option<Control>,
+        marks_path: Option<PathBuf>,
     ) -> Self {
         let now = Instant::now();
         let mut show = Self {
@@ -118,9 +164,20 @@ impl Show {
             sig: None,
             last_poll: now,
             director: Director::from_config(rotate),
+            // Seeded from the count of the set the binary carries — read before
+            // the reload below installs the per-user or `RLX_PRESET_DIR`
+            // library, so it is the *embedded* count and not this run's roster.
+            // It is therefore one number per build: every launch of a given
+            // build walks one order, which is what makes a run reproducible and
+            // is the property the traversal's tests state.
+            traversal: Traversal::new(renderer.preset_names().count() as u32),
+            source: rotate.source,
+            families: Vec::new(),
             events,
             control,
             reported_preset: None,
+            marks: marks_path.as_deref().map(Marks::load).unwrap_or_default(),
+            marks_path,
             // Due one interval from now, not immediately: the diagnostics window
             // is empty before the first frame, so a reading taken at startup is
             // a row of zeros — which a parent cannot tell from a player that has
@@ -128,6 +185,21 @@ impl Show {
             next_health: now + HEALTH_INTERVAL,
         };
         show.reload(renderer);
+        // The mark sets on connect, after the roster the reload above emitted:
+        // a parent joins the two by name, so the names have to exist first.
+        show.report_marks();
+        // What the user state carried across the restart. Silent when there is
+        // none, so a fresh install says nothing; a count otherwise, because a
+        // marks file that failed to load reports its own reason and one that
+        // loaded empty would otherwise be indistinguishable from one that
+        // loaded at all.
+        let (favourite, hidden) = (show.marks.favourite.len(), show.marks.hidden.len());
+        if favourite + hidden > 0 {
+            eprintln!(
+                "preset marks: {favourite} favourite, {hidden} hidden; rotation draws from {}",
+                show.source.as_str()
+            );
+        }
         show
     }
 
@@ -136,13 +208,147 @@ impl Show {
         &self.dir
     }
 
+    /// Re-derive the preset a rotation will take next.
+    ///
+    /// Cached rather than computed per frame: the console names it once a frame
+    /// while it is open, and the eligible set moves only on a reload, a mark or
+    /// a rotation — so the three that move it refresh it, and the reader is a
+    /// borrow.
+    pub(crate) fn refresh_upcoming(&mut self, renderer: &Renderer) {
+        let Self {
+            marks,
+            traversal,
+            source,
+            ..
+        } = self;
+        let eligible = eligible_names(renderer.preset_names(), marks, *source);
+        traversal.peek(&eligible);
+    }
+
+    /// The preset the next rotation will take, or `None` on an empty roster.
+    pub(crate) fn next_up(&self) -> Option<&str> {
+        self.traversal.upcoming()
+    }
+
+    /// Rotate: draw the next preset out of the eligible set and dissolve to it,
+    /// returning its name.
+    ///
+    /// **The one place a rotation picks a preset**, whether the director's timer
+    /// asked or the operator did. The traversal decides which, not the roster's
+    /// successor, so a caller that stepped the roster itself would show hidden
+    /// presets and repeat while unseen ones remained.
+    pub(crate) fn rotate(&mut self, renderer: &mut Renderer) -> Option<String> {
+        let pick = {
+            let Self {
+                marks,
+                traversal,
+                source,
+                ..
+            } = self;
+            let eligible = eligible_names(renderer.preset_names(), marks, *source);
+            traversal.draw(&eligible)?
+        };
+        renderer.select_preset_by_name(&pick);
+        self.refresh_upcoming(renderer);
+        Some(pick)
+    }
+
+    /// Step back to the preset shown before the current one, returning its name.
+    ///
+    /// Walks past any name the roster does not hold — a hot-reload can retire a
+    /// preset while it is still on the trail — and answers `None` once the trail
+    /// is spent.
+    pub(crate) fn step_back(&mut self, renderer: &mut Renderer) -> Option<String> {
+        while let Some(name) = self.traversal.step_back() {
+            if renderer.select_preset_by_name(&name) {
+                self.refresh_upcoming(renderer);
+                return Some(name);
+            }
+        }
+        None
+    }
+
+    /// Record `name` as having been on screen, so a step backwards can return
+    /// to it.
+    pub(crate) fn note_shown(&mut self, name: &str) {
+        self.traversal.note_shown(name);
+    }
+
+    /// Whether anything is left to step back to.
+    pub(crate) fn has_trail(&self) -> bool {
+        self.traversal.trail_len() > 0
+    }
+
+    /// Put `name` in or out of `mark`'s set, persisting the change.
+    ///
+    /// **The one writer**, whatever asked — a hotkey, the browser, or a control
+    /// message (ADR-0229). Returns whether anything moved, so a surface
+    /// restating a mark it already set neither rewrites the file nor announces a
+    /// change that did not happen.
+    pub(crate) fn set_mark(&mut self, mark: Mark, name: &str, on: bool) -> bool {
+        if !self.marks.apply(mark, name, on) {
+            return false;
+        }
+        if let Some(path) = &self.marks_path {
+            self.marks.save(path);
+        }
+        self.report_marks();
+        true
+    }
+
+    /// Put the whole of both mark sets on the event stream.
+    ///
+    /// **Whole sets rather than a delta**, and on every change whoever made it:
+    /// a parent that missed a line cannot reconstruct the state from the next
+    /// one, and a mark made from the player's own hotkey has to reach a studio
+    /// that did not ask (ADR-0229). Marks are changed by a keypress, so the cost
+    /// of re-sending both sets is paid at human rate.
+    pub(crate) fn report_marks(&mut self) {
+        let Some(events) = self.events.as_mut() else {
+            return;
+        };
+        let favourite: Vec<&str> = self.marks.favourite.iter().map(String::as_str).collect();
+        let hidden: Vec<&str> = self.marks.hidden.iter().map(String::as_str).collect();
+        events.emit(&Event::Marks {
+            favourite: &favourite,
+            hidden: &hidden,
+        });
+    }
+
+    /// Flip `name`'s membership of `mark`'s set, returning the new state.
+    pub(crate) fn toggle_mark(&mut self, mark: Mark, name: &str) -> bool {
+        let on = !self.marks.is(mark, name);
+        self.set_mark(mark, name, on);
+        on
+    }
+
     /// **The single caller of [`reload_presets`]**, which is what holds the
     /// startup load and the watcher's reload to one behaviour rather than two
     /// that agree today. `sig` is re-baselined here so the next poll compares
     /// against what this load actually saw.
     fn reload(&mut self, renderer: &mut Renderer) {
-        reload_presets(renderer, &self.dir, self.events.as_mut());
+        if let Some(families) = reload_presets(renderer, &self.dir, self.events.as_mut()) {
+            self.families = families;
+        }
         self.sig = dir_signature(&self.dir);
+        // The roster the renderer is actually running is the embedded set
+        // whenever a load installed nothing — at startup, and after a reload
+        // that found no valid preset and kept what was there. A length that
+        // disagrees is the only symptom either case has.
+        if self.families.len() != renderer.preset_names().count() {
+            self.families = embedded_families();
+        }
+        self.refresh_upcoming(renderer);
+    }
+
+    /// The family of each preset in the roster, positionally.
+    pub(crate) fn families(&self) -> &[&'static str] {
+        &self.families
+    }
+
+    /// The user's marks on the library.
+    pub(crate) fn marks(&self) -> &Marks {
+        &self.marks
     }
 
     /// Re-scan the preset directory if the poll interval has elapsed and its
@@ -354,6 +560,14 @@ impl Show {
         let mut scratch = [0_i32; PING_SCRATCH];
         let count = nonces.len().min(PING_SCRATCH);
         scratch[..count].copy_from_slice(&nonces[..count]);
+        // The marks, copied out before the listener goes back: they are applied
+        // below through `set_mark`, which needs `self`. Bounded by
+        // `MARK_SLOTS`, so this copy is bounded by construction.
+        let asked: Vec<(String, Mark, bool)> = drained
+            .marks()
+            .iter()
+            .map(|(name, mark, on)| (name.as_str().to_owned(), *mark, *on))
+            .collect();
         control.note_refused(applied.refused);
         self.control = Some(control);
         // The one message answered individually (ADR-0176): OSC carries no
@@ -371,6 +585,30 @@ impl Show {
                     // discover it.
                     file: Path::new(name.as_str()),
                     message: UNRESOLVED_PRESET,
+                    line: None,
+                    col: None,
+                    param: None,
+                });
+            }
+        }
+        // The marks last, after everything about the frame being rendered: a
+        // mark changes what rotation will draw from, never what this frame
+        // shows, so it cannot be ordered against the values above.
+        //
+        // **A mark naming a preset the roster does not hold is refused and
+        // reported**, not stored. The opposite population from a mistyped
+        // parameter scrubbed at slider rate: a mark comes from a click on a
+        // roster the player itself published, so one refusal is one deliberate
+        // request that did not land — the direction ADR-0221 takes for the rest
+        // of this path. Storing it would also grow the file with names nothing
+        // prunes, off a channel the user never sees.
+        for (name, mark, on) in &asked {
+            if renderer.preset_names().any(|held| held == name) {
+                self.set_mark(*mark, name, *on);
+            } else if let Some(events) = self.events.as_mut() {
+                events.emit(&Event::PresetError {
+                    file: Path::new(name.as_str()),
+                    message: UNMARKABLE_PRESET,
                     line: None,
                     col: None,
                     param: None,
@@ -414,9 +652,14 @@ mod tests {
             sig: None,
             last_poll: now,
             director: Director::from_config(&config::Rotate::default()),
+            traversal: Traversal::new(0),
+            source: config::RotateSource::All,
+            families: Vec::new(),
             events: None,
             control: None,
             reported_preset: None,
+            marks: Marks::default(),
+            marks_path: None,
             next_health: now + HEALTH_INTERVAL,
         }
     }

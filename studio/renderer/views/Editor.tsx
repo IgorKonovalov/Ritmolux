@@ -39,7 +39,7 @@ import { useRoster } from '../hooks/useRoster'
 import { useActivePreset } from '../hooks/useActivePreset'
 import { usePlayerActions } from '../hooks/usePlayer'
 import { useSchema } from '../hooks/useSchema'
-import type { Problem } from '../hooks/usePlayerEvents'
+import type { Marks, Problem } from '../hooks/usePlayerEvents'
 
 import styles from './Editor.module.css'
 
@@ -62,6 +62,8 @@ export interface EditorProps {
   active: string | undefined
   /** Where the watcher is looking, or `null` when nothing resolved. */
   dir: string | null
+  /** The player's marks, or `undefined` while no player has reported any. */
+  marks: Marks | undefined
   onProblem: (reason: string | undefined) => void
 }
 
@@ -93,6 +95,7 @@ export function Editor({
   roster,
   active,
   dir,
+  marks,
   onProblem,
 }: EditorProps): JSX.Element {
   const schema = useSchema()
@@ -325,7 +328,9 @@ export function Editor({
             active={library.pending ?? library.active}
             dir={dir}
             system={system}
+            marks={marks}
             onSelect={library.select}
+            onMark={actions.setMark}
             // Through the same create the fork takes: it refuses a name that is
             // already a preset, and it remembers the file as this session's own so
             // editing what was just made does not ask for a name again.

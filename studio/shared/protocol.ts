@@ -25,7 +25,7 @@ export const EVENT_VERSION = 1
  * rule and a mismatch means the bundle was assembled wrong or a path in
  * settings points at a stale build.
  */
-export const EXPECTED_PLAYER_VERSION = '0.138.0'
+export const EXPECTED_PLAYER_VERSION = '0.139.0'
 
 export function isKnownPlayerVersion(version: string): boolean {
   return version === EXPECTED_PLAYER_VERSION
@@ -182,6 +182,31 @@ export const streamSchema = z.object({
   format: z.string().min(1),
 })
 
+/**
+ * The two marks a preset can carry, spelled as the player spells them.
+ *
+ * The same word is the wire argument of `ctl/mark`, the key of a `marks` event
+ * and the heading of a set in the player's own file, so there is one spelling
+ * and it is British (ADR-0228). `favorite` is not this vocabulary's word and the
+ * player refuses it rather than mapping it onto a neighbour.
+ */
+export const PRESET_MARKS = ['favourite', 'hidden'] as const
+export type PresetMark = (typeof PRESET_MARKS)[number]
+
+export const marksSchema = z.object({
+  ...base,
+  ev: z.literal('marks'),
+  /**
+   * Both sets **whole** on every line, and both keys even when empty (spec
+   * 0003). There is no delta form to reassemble, so a studio that joined late
+   * or missed a line is correct from the next one; and an absent key would make
+   * "no marks" indistinguishable from a player that does not carry them, which
+   * is the distinction ADR-0229 rests the whole view on.
+   */
+  favourite: z.array(z.string()),
+  hidden: z.array(z.string()),
+})
+
 export const pongSchema = z.object({
   ...base,
   ev: z.literal('pong'),
@@ -201,6 +226,7 @@ export const PLAYER_EVENT_SCHEMAS = {
   preset_warning: presetWarningSchema,
   health: healthSchema,
   stream: streamSchema,
+  marks: marksSchema,
   pong: pongSchema,
 } as const
 
@@ -212,6 +238,7 @@ export const playerEventSchema = z.discriminatedUnion('ev', [
   presetWarningSchema,
   healthSchema,
   streamSchema,
+  marksSchema,
   pongSchema,
 ])
 
@@ -222,6 +249,7 @@ export type HealthEvent = z.infer<typeof healthSchema>
 export type PresetErrorEvent = z.infer<typeof presetErrorSchema>
 export type PresetEvent = z.infer<typeof presetSchema>
 export type RosterEvent = z.infer<typeof rosterSchema>
+export type MarksEvent = z.infer<typeof marksSchema>
 
 /** Every `ev` name, read off the one list rather than typed a second time. */
 export const PLAYER_EVENT_NAMES = Object.keys(PLAYER_EVENT_SCHEMAS) as PlayerEvent['ev'][]
@@ -263,6 +291,18 @@ export const ctlActionSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('params_clear') }),
   z.object({ kind: z.literal('preset'), name: z.string().min(1) }),
   z.object({ kind: z.literal('transport'), verb: z.enum(TRANSPORT_VERBS) }),
+  /**
+   * `on` is a **state**, not a press (spec 0003): the sender says what the mark
+   * should be, so a surface restating a mark the player already holds writes
+   * nothing and reports nothing. A toggle here would make two surfaces disagree
+   * the moment either one missed a `marks` line.
+   */
+  z.object({
+    kind: z.literal('mark'),
+    name: z.string().min(1),
+    mark: z.enum(PRESET_MARKS),
+    on: z.boolean(),
+  }),
   z.object({ kind: z.literal('ping'), nonce: z.number().int() }),
 ])
 
@@ -281,6 +321,7 @@ export const CTL_ADDRESSES = {
   params_clear: `${ADDRESS_PREFIX}/ctl/params/clear`,
   preset: `${ADDRESS_PREFIX}/ctl/preset`,
   transport: `${ADDRESS_PREFIX}/ctl/transport`,
+  mark: `${ADDRESS_PREFIX}/ctl/mark`,
   ping: `${ADDRESS_PREFIX}/ctl/ping`,
 } as const satisfies Record<CtlAction['kind'], string>
 

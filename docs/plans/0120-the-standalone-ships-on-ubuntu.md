@@ -376,6 +376,61 @@ Phase 4 (from a `workflow_dispatch` run, or from a local `stage.sh`) on the Ubun
 Anything that fails here becomes a **backlog entry**, not a silent fix — the plan's `dev` phases are
 finished by this point and a repair belongs in its own scope.
 
+## Implementation log
+
+| phase | owner | state | commit |
+|---|---|---|---|
+| 1 — Probe the Ubuntu box before any code is written | human | done | — |
+| 2 — The tree compiles, lints and tests on Ubuntu | dev | not started | |
+| 3 — The PulseAudio capture backend | dev | not started | |
+| 4 — The release tarball | dev | not started | |
+| 5 — The docs say Linux | dev | not started | |
+| 6 — Run it on the Ubuntu box | human | not started | |
+
+### Notes
+
+- **Phase 1 — the premise holds, and the probe was run on a box the plan did not describe.** Taken
+  2026-09-20 by the owner on the target machine, music playing, from the graphical session. Both
+  captures are 5 s of `s16le` stereo at 48 kHz — 589,824 bytes each, so neither timed out early:
+
+  | step | device | bytes | non-zero | reading |
+  |---|---|---|---|---|
+  | 3 | `@DEFAULT_MONITOR@` | 589,824 | 570,244 (96.7 %) | audio |
+  | 4 | `bluez_output.41_42_63_52_62_40.1.monitor` | 589,824 | 573,834 (97.3 %) | audio |
+
+  That is the probe table's **first row**: the special name resolves and carries audio, so ADR-0131
+  stands as written, nothing is amended, and `dev` starts at Phase 2.
+- **The box is Ubuntu 26.04 LTS, kernel 7.0.0-31-generic — not the 24.04 this plan names.** Phase 4
+  builds the tarball in CI, and a binary linked against the older glibc runs on the newer system and
+  not the reverse, so the direction is the safe one; but Phase 6's verdict will be a reading about
+  26.04, and the TL;DR's *Ubuntu 24.04 x86_64* is now the build target rather than the test machine.
+- **The PulseAudio server is PipeWire.** `Server Name: PulseAudio (on PipeWire 1.6.2)`, protocol
+  version 15.0.0 — the risk this plan's first open question names, answered in the affirmative
+  against the emulation rather than against PulseAudio proper, which is the harder case and the one
+  a current Ubuntu actually ships.
+- **The default sink was Bluetooth**, `bluez_output.41_42_63_52_62_40.1`, its monitor `s16le 2ch
+  48000Hz` and RUNNING, while `alsa_output.pci-0000_05_00.1.hdmi-stereo.monitor` sat SUSPENDED. So
+  the special name resolved across a sink that is neither the first source nor a hardware one, and
+  the monitor's own format already matches the capture format the backend asks for.
+- **`libpulse-dev` is installable and not installed.** `apt-cache policy` reads
+  `Installed: (none)`, `Candidate: 1:17.0+dfsg1-2ubuntu4` from `resolute/main`; the runtime
+  `libpulse0` is present at the same version. Phase 2 installs the headers before its first build.
+- **The session is Wayland.** Phase 6 reads that against `D` (move to next monitor).
+- **The GPU is a discrete NVIDIA card on the proprietary driver, with llvmpipe beside it.** Vulkan
+  instance 1.4.341, and two physical devices:
+
+  | device | type | driver | api |
+  |---|---|---|---|
+  | NVIDIA GeForce RTX 3060 (`0x10de`/`0x2504`) | `DISCRETE_GPU` | `NVIDIA_PROPRIETARY` 595.84 | 1.4.329 |
+  | llvmpipe (LLVM 21.1.8) | `CPU` | `MESA_LLVMPIPE`, Mesa 26.0.3 | 1.4.335 |
+
+  So Phase 2's question is answered in both directions at once: this box gives wgpu a **hardware**
+  adapter, and it also carries the software one CI resolves under ADR-0016 — the two paths can be
+  compared on one machine rather than across two. The loader's two warnings
+  (`vkGetPhysicalDeviceDisplayP*PropertiesKHR` not exported) are about the direct-display
+  extensions, which a Wayland surface does not use; `vulkaninfo` prints them on this driver
+  whatever the session.
+
 ## Risks & open questions
 
 - **`@DEFAULT_MONITOR@` may not resolve under `pipewire-pulse`.** The whole backend rests on it.

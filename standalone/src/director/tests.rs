@@ -26,6 +26,7 @@ fn make(auto: bool, min: u32, max: u32, track_change: bool) -> Director {
         min_dwell_secs: min,
         max_dwell_secs: max,
         track_change,
+        ..config::Rotate::default()
     })
 }
 
@@ -254,6 +255,277 @@ fn inverted_dwell_config_is_clamped() {
         assert_eq!(d.advance(1.0, &steady), None, "rotated early at {step}s");
     }
     assert_eq!(d.advance(1.0, &steady), Some(Rotation::AutoTimer));
+}
+
+// ---------------------------------------------------------------------------
+// The eligible set, and the traversal over it
+// ---------------------------------------------------------------------------
+
+/// A library of five, so a cycle is short enough to walk exhaustively.
+const LIBRARY: [&str; 5] = ["alpha", "bravo", "charlie", "delta", "echo"];
+
+fn library() -> Vec<&'static str> {
+    LIBRARY.to_vec()
+}
+
+fn marked(favourite: &[&str], hidden: &[&str]) -> Marks {
+    let mut marks = Marks::default();
+    for name in favourite {
+        marks.apply(Mark::Favourite, name, true);
+    }
+    for name in hidden {
+        marks.apply(Mark::Hidden, name, true);
+    }
+    marks
+}
+
+/// **Hidden presets never appear in auto-rotate, in either source.** The whole
+/// point of the mark, and the one property that must hold whatever else is set.
+#[test]
+fn a_hidden_preset_is_eligible_under_neither_source() {
+    let marks = marked(&["bravo", "delta"], &["bravo", "charlie"]);
+
+    for source in [RotateSource::All, RotateSource::Favourites] {
+        let eligible = eligible_names(library().into_iter(), &marks, source);
+        assert!(
+            !eligible.contains(&"charlie"),
+            "a hidden preset reached the {source:?} source"
+        );
+        assert!(
+            !eligible.contains(&"bravo"),
+            "a preset that is both favourite and hidden must stay hidden under \
+             {source:?}: hiding is 'stop showing me this', and a promotion \
+             cannot outrank it"
+        );
+    }
+
+    // And a draw over many rotations never lands on one either — the property
+    // stated over the traversal rather than over the filter it reads.
+    let mut traversal = Traversal::new(7);
+    let eligible = eligible_names(library().into_iter(), &marks, RotateSource::All);
+    for _ in 0..50 {
+        let pick = traversal.draw(&eligible).expect("a non-empty eligible set");
+        assert!(
+            pick != "charlie" && pick != "bravo",
+            "rotation drew a hidden preset: {pick}"
+        );
+    }
+}
+
+/// **Favourites-only is a hard filter with a fallback.** With favourites marked
+/// it draws from them and nothing else; with none marked it draws from the whole
+/// eligible set rather than holding one preset forever — a mode that looks
+/// exactly like a hang is a mode nobody can debug from the window.
+#[test]
+fn favourites_only_narrows_and_falls_back_when_nothing_is_marked() {
+    let marks = marked(&["alpha", "echo"], &[]);
+    let eligible = eligible_names(library().into_iter(), &marks, RotateSource::Favourites);
+    assert_eq!(eligible, ["alpha", "echo"], "the filter is not hard");
+
+    let mut traversal = Traversal::new(3);
+    for _ in 0..20 {
+        let pick = traversal.draw(&eligible).expect("two favourites");
+        assert!(
+            pick == "alpha" || pick == "echo",
+            "favourites-only drew {pick}"
+        );
+    }
+
+    // Nothing marked: the fallback is the whole eligible set, hidden excluded.
+    let none = marked(&[], &["delta"]);
+    let eligible = eligible_names(library().into_iter(), &none, RotateSource::Favourites);
+    assert_eq!(
+        eligible,
+        ["alpha", "bravo", "charlie", "echo"],
+        "an empty favourite set must fall back to the whole eligible set"
+    );
+
+    // And a library hidden in its entirety falls back the same way, for the
+    // same reason: no combination of marks may leave the show with nothing.
+    let all_hidden = marked(&[], &LIBRARY);
+    assert_eq!(
+        eligible_names(library().into_iter(), &all_hidden, RotateSource::All).len(),
+        LIBRARY.len(),
+        "hiding everything left rotation with nothing to draw"
+    );
+}
+
+/// **Auto-rotate does not repeat while unseen presets remain**, and a preset
+/// never ends one cycle and begins the next.
+///
+/// Stated as a property over many cycles rather than as a fixed sequence: the
+/// order is seeded and a different seed is a different order, but neither claim
+/// above may depend on which.
+#[test]
+fn a_cycle_shows_every_eligible_preset_once_before_any_of_them_twice() {
+    for seed in [0u32, 1, 7, 12345, u32::MAX] {
+        let mut traversal = Traversal::new(seed);
+        let eligible = library();
+        let mut previous_cycle_last: Option<String> = None;
+
+        for cycle in 0..4 {
+            let mut drawn = Vec::new();
+            for _ in 0..eligible.len() {
+                drawn.push(traversal.draw(&eligible).expect("a non-empty set"));
+            }
+            if let Some(last) = &previous_cycle_last {
+                assert_ne!(
+                    drawn.first(),
+                    Some(last),
+                    "seed {seed}, cycle {cycle}: a preset ended one cycle and \
+                     began the next, which reads as a repeat however shuffled \
+                     the rest is"
+                );
+            }
+            let mut sorted = drawn.clone();
+            sorted.sort();
+            sorted.dedup();
+            assert_eq!(
+                sorted.len(),
+                eligible.len(),
+                "seed {seed}, cycle {cycle}: {drawn:?} repeated before the \
+                 cycle was exhausted"
+            );
+            previous_cycle_last = drawn.last().cloned();
+        }
+    }
+}
+
+/// **The traversal tolerates its set changing between draws** — the case the
+/// plan calls most likely to be got subtly wrong: a mark toggled mid-show grows
+/// or shrinks the universe under a cycle that is already running.
+#[test]
+fn the_traversal_survives_its_set_growing_and_shrinking_between_draws() {
+    let mut traversal = Traversal::new(11);
+
+    // Two eligible presets, one cycle's worth drawn.
+    let small = vec!["alpha", "bravo"];
+    let first = traversal.draw(&small).expect("two eligible");
+    assert!(small.contains(&first.as_str()));
+
+    // The set grows mid-cycle: the new names are unseen, so they are drawable
+    // immediately rather than waiting for the cycle to end.
+    let grown = library();
+    let mut seen_new = false;
+    for _ in 0..4 {
+        let pick = traversal.draw(&grown).expect("a grown set");
+        assert!(grown.contains(&pick.as_str()));
+        seen_new |= !small.contains(&pick.as_str());
+    }
+    assert!(
+        seen_new,
+        "a preset that became eligible mid-cycle was never drawn, so the cycle \
+         is walking a snapshot rather than the live set"
+    );
+
+    // And the set shrinking to one leaves that one, rather than an empty draw
+    // or a name the set does not hold.
+    let single = vec!["delta"];
+    for _ in 0..3 {
+        assert_eq!(traversal.draw(&single).as_deref(), Some("delta"));
+    }
+
+    // An empty roster is the only `None`: no combination of marks reaches it,
+    // but an empty library does.
+    assert_eq!(traversal.draw(&[]), None);
+}
+
+/// **What the console announces is what the rotation then takes.**
+///
+/// The traversal is shuffled, so a roster successor is not the answer and the
+/// peek is. The announcement must also survive being asked twice,
+/// or the line would name a different preset on every frame it is drawn.
+#[test]
+fn the_announced_preset_is_the_one_the_next_draw_takes() {
+    let mut traversal = Traversal::new(99);
+    let eligible = library();
+
+    for _ in 0..10 {
+        let announced = traversal
+            .peek(&eligible)
+            .expect("a non-empty set has a next")
+            .to_owned();
+        assert_eq!(
+            traversal.peek(&eligible),
+            Some(announced.as_str()),
+            "peeking twice named two different presets, so the console line \
+             would change under the operator between frames"
+        );
+        assert_eq!(
+            traversal.draw(&eligible),
+            Some(announced.clone()),
+            "the rotation took a preset other than the one announced"
+        );
+    }
+}
+
+/// An announcement whose preset stops being eligible is **replaced**, not drawn
+/// anyway — hiding the preset that is next up is the one way to reach this.
+#[test]
+fn hiding_the_announced_preset_replaces_it() {
+    let mut traversal = Traversal::new(5);
+    let eligible = library();
+    let announced = traversal.peek(&eligible).expect("a next").to_owned();
+
+    let remaining: Vec<&str> = eligible
+        .iter()
+        .copied()
+        .filter(|name| *name != announced)
+        .collect();
+    let replacement = traversal.draw(&remaining).expect("four left");
+    assert_ne!(
+        replacement, announced,
+        "a preset hidden after it was announced was drawn anyway"
+    );
+}
+
+/// **"Previous" is the preset actually shown before this one**, and repeated
+/// steps walk genuinely backwards rather than flipping between the last two.
+#[test]
+fn stepping_back_walks_what_was_shown_rather_than_an_index() {
+    let mut traversal = Traversal::new(1);
+    assert_eq!(
+        traversal.step_back(),
+        None,
+        "a run that has shown nothing has nowhere to step back to"
+    );
+
+    // Four switches: each records the preset it left.
+    for name in ["alpha", "bravo", "charlie", "delta"] {
+        traversal.note_shown(name);
+    }
+    assert_eq!(traversal.trail_len(), 4);
+
+    assert_eq!(traversal.step_back().as_deref(), Some("delta"));
+    assert_eq!(
+        traversal.step_back().as_deref(),
+        Some("charlie"),
+        "the second step returned to where the first came from, so the two \
+         keys flip rather than walk"
+    );
+    assert_eq!(traversal.step_back().as_deref(), Some("bravo"));
+    assert_eq!(traversal.step_back().as_deref(), Some("alpha"));
+    assert_eq!(traversal.step_back(), None, "the trail is spent");
+    assert_eq!(traversal.trail_len(), 0);
+}
+
+/// The same seed walks the same order, and a different one does not: the
+/// traversal reads no clock, so a run is reproducible from its seed alone.
+#[test]
+fn the_order_is_a_pure_function_of_the_seed() {
+    let walk = |seed| {
+        let mut traversal = Traversal::new(seed);
+        let eligible = library();
+        (0..12)
+            .map(|_| traversal.draw(&eligible).expect("a non-empty set"))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(walk(42), walk(42), "the same seed produced two orders");
+    assert_ne!(
+        walk(42),
+        walk(43),
+        "two seeds produced one order, so the seed is not reaching the mixer"
+    );
 }
 
 /// A rotation the director asks for must reach the renderer and change the

@@ -1,8 +1,8 @@
 # ADR-0228 — A preset mark is user state, keyed by name, in its own file
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-20 ([Plan 0205](../plans/done/0205-the-library-becomes-navigable.md))
 > **Date:** 2026-09-19
-> **Related plan(s):** [0205](../plans/0205-the-library-becomes-navigable.md)
+> **Related plan(s):** [0205](../plans/done/0205-the-library-becomes-navigable.md)
 > **Relates to:** [ADR-0022](0022-build-time-preset-embedding.md) (the set is embedded and
 > read-only), [ADR-0014](0014-preset-dir-override-for-dev-iteration.md) (the directory override),
 > [spec 0001](../specs/0001-c-abi.md) (which already settled preset identity),

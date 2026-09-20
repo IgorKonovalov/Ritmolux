@@ -138,6 +138,7 @@ export function App(): JSX.Element {
             roster={player.roster}
             active={player.preset?.name}
             dir={player.dir}
+            marks={player.marks}
             onProblem={setSaveProblem}
           />
         </div>

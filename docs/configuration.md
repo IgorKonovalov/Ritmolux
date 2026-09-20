@@ -261,6 +261,23 @@ choice, so a stage setup survives a restart.
 to the built-in default rather than failing, so the file below is a complete listing rather than
 something you have to write.
 
+### The other file: `marks.toml`
+
+Beside `config.toml`, in the same directory, sits a second and much smaller file the app writes:
+`marks.toml`, holding the presets you have marked (see [Running the app](running.md)). It is
+**user state rather than settings** — it grows, it is edited from a hotkey rather than from the
+settings menu, and its two keys are lists rather than scalars — which is why it is not a section of
+the file below.
+
+```toml
+favourite = ["Echo Plate", "Gyre"]
+hidden = ["Multibrot"]
+```
+
+Both keys are optional and both are lists of preset **names**. A missing, empty or malformed file
+means "no marks" and never stops the app starting; a malformed one says so on the console. Delete
+the file to forget every mark.
+
 ### `[output]`
 
 Which display the show opens on, and whether it opens fullscreen.
@@ -294,6 +311,15 @@ The scene director's auto-rotate policy.
 | `min_dwell_secs` | `20` | Never rotate sooner than this many seconds after the last change |
 | `max_dwell_secs` | `90` | Always rotate by this many seconds, even through a steady passage |
 | `track_change` | `true` | Let the track-change novelty signal nudge rotation in on the same dwell |
+| `source` | `"all"` | Which part of the library rotation draws from: `"all"`, or `"favourites"` for the presets you have marked |
+
+**What rotation draws from, and in what order.** Hidden presets are excluded from both sources —
+that is what hiding one means. `"favourites"` is a hard filter with a fallback: it narrows to the
+marked presets, and while none are marked it draws from the whole eligible set rather than holding
+one scene forever. Within whichever set that leaves, rotation walks a **shuffled traversal**: it
+shows every eligible preset once before showing any of them twice, reshuffles when the cycle is
+exhausted, and never ends one cycle and begins the next on the same preset. `Backspace` steps back
+through what was actually shown.
 
 **Hold one scene by default.** Out of the box the app stays on a single scene until you opt in — the
 `A` hotkey, or `auto = true` here. Manual `Space` works either way. When auto is on the defaults
@@ -320,6 +346,7 @@ The furniture the shell paints over the show. Separate from `[output]` because i
 |---|---|---|
 | `preset_name` | `true` | Draw the active preset's name in the top-left corner. Even when on, the name yields to a menu and to the `F3` panel — this is "never show it", not "show it always" |
 | `now_playing` | `true` | Announce the current track in the lower-left corner when it changes. Off means no track ever reaches the visualizer, not a banner drawn transparent |
+| `next_rotation` | `true` | Count down to the next auto-rotate, under the preset name. Nothing is drawn while auto-rotate is off, so this key only decides whether the line appears when there *is* a countdown |
 
 ### `[osc]`
 
@@ -403,6 +430,7 @@ auto = false
 min_dwell_secs = 20
 max_dwell_secs = 90
 track_change = true
+source = "all"
 
 [quality]
 tier = "auto"
@@ -410,6 +438,7 @@ tier = "auto"
 [hud]
 preset_name = true
 now_playing = true
+next_rotation = true
 
 [osc]
 enabled = false

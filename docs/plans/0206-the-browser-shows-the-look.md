@@ -20,7 +20,7 @@ behaviour is a preview pane that fills in as you walk the roster.
 
 ## Context & problem
 
-**[Plan 0205](0205-the-library-becomes-navigable.md) narrows the list; it does not make the list
+**[Plan 0205](done/0205-the-library-becomes-navigable.md) narrows the list; it does not make the list
 legible.** Family filters, favourites and marks all reduce 114 names to fewer names. Choosing still
 means recognising `analytic_echoplate` or opening it to find out, and that is the actual friction
 this plan exists to remove. 0205 recorded it as a followup for exactly this reason.

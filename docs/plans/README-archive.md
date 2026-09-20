@@ -19,6 +19,7 @@ hand-edited.
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
   - [0201 - The warp surface stops lying](#0201---the-warp-surface-stops-lying)
+  - [0205 - The library becomes navigable](#0205---the-library-becomes-navigable)
   - [0198 - The control path stops failing quietly](#0198---the-control-path-stops-failing-quietly)
   - [0197 - The conductor becomes operable](#0197---the-conductor-becomes-operable)
   - [0196 - The gate roster stops drifting](#0196---the-gate-roster-stops-drifting)
@@ -296,6 +297,55 @@ question, not a third copy of this parameter. The three square `warp_mesh` golde
 re-blessed — Phase 4 adds, it does not replace. And no `presets/*.toml` was edited: Phase 1's sweep
 for a header reasoning from the inverted direction convicted nothing, because Plan 0184's close had
 already repaired the one shipped paragraph the lie produced.
+
+### [0205 - The library becomes navigable](done/0205-the-library-becomes-navigable.md)
+
+- closed 2026-09-20, conductor-run lane `plan-0205-the-library-becomes-navigable` in
+`WORK/rlx-plan-0205`. Six phases, `c3ed56cb`, `eaeca3bc`, `74b1e5c5`, `fe2b682f`, `5220ce99` and
+`e5f95955` — five `dev` and one `studio-builder` over the same lane — then the repair commit
+`68aa54b8` and the close. One review round: **no blockers, no majors, six minors; four repaired at
+the close, two left open.** Version **0.139.0** (minor). ADR-0228 and ADR-0229 accepted. No backlog
+entry discharged: the plan builds backlog 0256's step-2 evidence rather than closing it.
+- **What landed.** Two name-keyed marks — favourite and hidden — in a `marks.toml` of the
+standalone's own, and everything that spends them. Rotation draws from an eligible set rather than
+the roster and walks a shuffled traversal of it, so it shows every eligible preset once before any
+of them twice and never ends one cycle and begins the next on the same preset; `[rotate] source`
+narrows that set to favourites, with a fallback to the whole eligible set while nothing is marked,
+because a mode that holds one preset forever looks exactly like a hang. `Backspace` steps back
+through what was actually shown. The browser gained a family column, three narrowings that combine
+(`F4` favourites, `F5` family, `F6` show hidden) and a header that names every one of them. The HUD
+says whether the preset on screen is marked and counts down to the next rotation. `/ctl/mark` and a
+`marks` event carry the same state to the studio, which marks from its library list and narrows to
+favourites without ever opening the file.
+- **The three decisions worth keeping.** *Identity is the name, everywhere.* Rotation now selects by
+name rather than by index, which is what ADR-0228's key requires of anything the marks filter — and
+the cost is stated: two presets sharing a display name are one entry to the traversal. *The property
+beat the constant.* "No repeat while an unseen preset remains" is a shuffled traversal with no
+remembered-history window, so there is no length anybody has to defend, and the test states it over
+five seeds rather than over one sequence. *One writer.* The hotkey, the browser and the wire all
+reach `Show::set_mark`, so "a `ctl/mark` applies exactly as the hotkey does" is structural rather
+than a thing to keep true.
+- **The binding constraint was the real design question, and it held.** Letters and digits are
+filter input while the browser is open and this app binds no modifier combination anywhere, so the
+plan's `F1`/`F2` proposal — one key, both contexts, no new input plumbing — is what the phase
+delivered, and the three browser-only narrowings were chosen under the same rule. `B` and `1`-`9`
+are outside-the-browser bindings like `S`, `C`, `F` and `D`, for the same reason.
+- **Two findings outlive the plan, both open.** `Show::set_mark` does not refresh the traversal's
+cached next-up or re-clamp the browser's highlight, so a mark arriving over the wire can leave the
+operator console naming a preset the rotation will not take and an open browser highlighting no row
+— display-only, and self-correcting at the next draw or keypress, because `Traversal::draw`
+re-peeks against the live set. And the mark applier itself has no test: the decoder, the bounded
+queue, the event line and the studio's sender are each covered, but the loop that checks the name
+against the roster, calls `set_mark` and emits the refusal is covered by nothing, while `show.rs`
+already carries a test module with a fixture that would host one.
+- **What outlived the plan.** The browser's name column narrowed from 24 characters to 18 to make
+room for the family, and one shipped preset — `Star Mandala Bordered` at 21 — now draws truncated,
+against three comments that asserted no shipped name ever would; the comments were repaired and the
+column is the owner's call. The traversal's seed is the *embedded* preset count read before the
+reload installs the real library, so it is one number per build and every launch replays one order
+— defensible as determinism, but not the per-machine variation the comment claimed. And
+`docs/running.ru.md` is now stale against a source this plan moved: the Russian lacks the six new
+keys, the marking section and the countdown.
 
 ### [0198 - The control path stops failing quietly](done/0198-the-control-path-stops-failing-quietly.md)
 

@@ -81,6 +81,14 @@ export function ctlArgs(action: CtlAction): Arg[] {
       return [{ tag: 's', value: action.name }]
     case 'transport':
       return [{ tag: 's', value: action.verb }]
+    case 'mark':
+      // The state is an `i` because the row declares one: OSC 1.0's required
+      // types carry no boolean, so the player reads any non-zero as on.
+      return [
+        { tag: 's', value: action.name },
+        { tag: 's', value: action.mark },
+        { tag: 'i', value: action.on ? 1 : 0 },
+      ]
     case 'ping':
       return [{ tag: 'i', value: action.nonce }]
   }

@@ -16,6 +16,7 @@ use std::time::{Duration, Instant};
 use rlx_core::audio::{AudioFormat, SampleConsumer};
 use rlx_core::dsp::Analyzer;
 use rlx_core::render::{AdapterChoice, CapOverflow, Renderer, RendererOptions, Tier};
+use standalone::marks::Mark;
 use standalone::osc::{OscSink, Telemetry, rms_of};
 use standalone::rss;
 use winit::event_loop::ActiveEventLoop;
@@ -37,7 +38,7 @@ use crate::diaglog::DiagLog;
 use crate::downbeatlog::DownbeatLog;
 #[cfg(windows)]
 use crate::nowplaying_win;
-use crate::overlay::{OverlayKey, OverlayState};
+use crate::overlay::{OverlayKey, OverlayState, Row};
 use crate::run::{App, resolve_display};
 use crate::settings::{SettingsAction, SettingsState, SettingsView, TierState};
 use crate::show::Show;
@@ -228,6 +229,15 @@ pub(crate) struct Hud {
     /// (ADR-0142).
     pub(crate) console_request: Option<bool>,
 
+    /// The preset stashed as the **B** side of an A/B comparison, `None` until
+    /// the key is first pressed.
+    ///
+    /// **Session state, deliberately not persisted**: it is a comparison an
+    /// operator is making now, not an opinion about the library — which is what
+    /// the marks are for. Holds the *name*, so a hot-reload that rewrites the
+    /// roster under it either still resolves or says so.
+    pub(crate) ab_side: Option<String>,
+
     /// State for the console's `random` control.
     ///
     /// A counter mixed on each press rather than a dependency or a clock read:
@@ -390,6 +400,19 @@ pub(crate) struct AppState {
 /// steady state never does.
 const TRANSPORT_SCRATCH: usize = 8;
 
+/// Whether a switch records the preset it is leaving on the back trail.
+///
+/// An enum rather than a `bool` at five call sites: the one that must **not**
+/// record is the step backwards itself, and a `false` there reads as nothing at
+/// all.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Trail {
+    /// An ordinary switch: the preset being left joins the trail.
+    Record,
+    /// A step backwards: the trail is being walked, not extended.
+    Rewind,
+}
+
 /// Whether the display loop spends a console present on frame `frame`, at
 /// cadence `every_n`.
 ///
@@ -477,6 +500,7 @@ impl AppState {
             &rotate_for(&config.rotate, held_preset.as_deref()),
             app.events.take(),
             app.control.take(),
+            standalone::marks::resolve_marks_path(),
         );
 
         // `--preset` holds one scene for the run. The name was checked against
@@ -556,6 +580,7 @@ impl AppState {
                 console_census_secs: 0.0,
                 console_cursor: (-1.0, -1.0),
                 console_request: None,
+                ab_side: None,
                 random_state: 0x9E37_79B9,
                 frame_text: console::FrameText::default(),
                 modal_scratch: Vec::new(),
@@ -936,8 +961,8 @@ impl AppState {
         // Keep the browse overlay's highlight valid if the roster just changed
         // shape under it (re-clamp; the open state and filter are preserved).
         let names = self.roster_names();
-        let refs: Vec<&str> = names.iter().map(String::as_str).collect();
-        self.hud.browse.on_roster_changed(&refs);
+        let rows = self.browse_rows(&names);
+        self.hud.browse.on_roster_changed(&rows);
     }
 
     /// Open the windowed preview pipe, if `--preview stdout` asked for one.
@@ -1208,7 +1233,15 @@ impl AppState {
     /// frame has rendered. Reading the title or the cap overflow here would describe
     /// the preset being left, so both wait one frame — see
     /// [`pending_switch_settle`](AppState::pending_switch_settle).
-    pub(crate) fn on_preset_switched(&mut self) {
+    pub(crate) fn on_preset_switched(&mut self, trail: Trail) {
+        // The preset being **left**, read here rather than passed in: a switch
+        // dissolves, so the roster still names the outgoing preset until the
+        // dissolve's capture frame runs, and this is the one moment every switch
+        // passes through with that name in hand.
+        if trail == Trail::Record {
+            let outgoing = self.renderer.preset_name().to_owned();
+            self.show.note_shown(&outgoing);
+        }
         self.pending_switch_settle = true;
         self.note_soak_switch();
         self.window.request_redraw();
@@ -1223,8 +1256,32 @@ impl AppState {
     /// and the scene never changed. Pairing the two here is what makes that
     /// unrepresentable.
     pub(crate) fn rotate_to_next(&mut self) {
-        self.renderer.cycle_preset();
-        self.on_preset_switched();
+        if self.show.rotate(&mut self.renderer).is_some() {
+            self.on_preset_switched(Trail::Record);
+        }
+    }
+
+    /// Step back to the preset shown before this one (`Backspace`, and the
+    /// console's `< prev`).
+    ///
+    /// Falls back to the roster's predecessor whenever the trail is empty — a
+    /// run that has not switched yet, and equally a run whose trail has been
+    /// walked all the way back. There is nothing to return to either way, and an
+    /// inert key would read as an unbound one.
+    pub(crate) fn step_previous(&mut self) {
+        if self.show.has_trail() {
+            if self.show.step_back(&mut self.renderer).is_some() {
+                // `Rewind`, so walking back three presets visits three rather
+                // than flipping between the last two.
+                self.on_preset_switched(Trail::Rewind);
+            }
+            return;
+        }
+        let count = self.renderer.preset_names().count();
+        if let Some(index) = console::previous_index(count, self.renderer.active_index()) {
+            self.renderer.select_preset(index);
+            self.on_preset_switched(Trail::Record);
+        }
     }
 
     /// Mark a GPU-resource rebuild in the soak log, if one is running
@@ -1538,6 +1595,147 @@ impl AppState {
         self.window.request_redraw();
     }
 
+    /// Hold the preset on screen as the **B** side, or swap the two when one is
+    /// already held (the `B` key).
+    ///
+    /// The flip **dissolves like any other change** — it goes through the same
+    /// by-name selection the browser and the wire use — so a fast flip is the
+    /// mid-dissolve rule `docs/running.md` already fixes rather than a second
+    /// transition path.
+    ///
+    /// The side being left becomes the new B, so the key alternates: press it on
+    /// A to hold A, walk to B, then press it to go A-B-A-B without hunting for
+    /// either.
+    pub(crate) fn flip_ab(&mut self) {
+        let current = self.renderer.preset_name().to_owned();
+        if current.is_empty() {
+            return;
+        }
+        let Some(held) = self.hud.ab_side.take() else {
+            eprintln!("A/B: holding '{current}' - press B again to come back to it");
+            self.hud.ab_side = Some(current);
+            return;
+        };
+        if held == current {
+            // Pressing it twice without moving: nothing to compare yet, so keep
+            // the hold rather than dropping it on a no-op.
+            self.hud.ab_side = Some(held);
+            return;
+        }
+        if self.renderer.select_preset_by_name(&held) {
+            self.hud.ab_side = Some(current);
+            self.on_preset_switched(Trail::Record);
+        } else {
+            // The roster does not hold it — a hot-reload retired it while it
+            // was stashed. Say so and re-hold what is on screen, rather than
+            // leaving a key that silently does nothing.
+            eprintln!("A/B: '{held}' is not in the library; holding '{current}' instead");
+            self.hud.ab_side = Some(current);
+        }
+    }
+
+    /// Select the `nth` favourite (zero-based) in the browser's own order, if
+    /// there is one.
+    ///
+    /// **The browser's order, not a second hidden one**: the same roster order
+    /// the favourites filter shows, hidden presets left out — so the mapping
+    /// from key to preset is the one the eye already learned. A key past the end
+    /// does nothing rather than wrapping, because a key that means a different
+    /// preset depending on how many are marked is worse than a key that means
+    /// nothing.
+    pub(crate) fn select_favourite(&mut self, nth: usize) {
+        let names = self.roster_names();
+        let Some(name) = names
+            .iter()
+            .filter(|name| {
+                self.show.marks().is(Mark::Favourite, name)
+                    && !self.show.marks().is(Mark::Hidden, name)
+            })
+            .nth(nth)
+            .cloned()
+        else {
+            return;
+        };
+        if self.renderer.select_preset_by_name(&name) {
+            self.on_preset_switched(Trail::Record);
+        }
+    }
+
+    /// The roster as the browser sees it: name, family and marks per entry.
+    ///
+    /// `names` is the caller's own owned roster, so the returned rows borrow it
+    /// and **not** `self` — a family is `&'static str` and the marks are read
+    /// out as `bool`. That is what lets a caller build the rows and then take
+    /// `&mut self.hud.browse` to feed them to the overlay.
+    pub(crate) fn browse_rows<'a>(&self, names: &'a [String]) -> Vec<Row<'a>> {
+        let families = self.show.families();
+        let marks = self.show.marks();
+        names
+            .iter()
+            .enumerate()
+            .map(|(index, name)| Row {
+                name,
+                // Empty rather than a guess when the two have somehow drifted:
+                // a wrong family would put a preset under a filter it does not
+                // belong to, which is worse than an unlabelled row.
+                family: families.get(index).copied().unwrap_or(""),
+                favourite: marks.is(Mark::Favourite, name),
+                hidden: marks.is(Mark::Hidden, name),
+            })
+            .collect()
+    }
+
+    /// The preset a mark key acts on: the **highlighted row** while the browser
+    /// is open, the preset on screen otherwise.
+    ///
+    /// One key, two contexts, and the target is whichever of them the operator
+    /// is looking at — marking the preset being rendered while the eye is on a
+    /// list would be the same key meaning two things.
+    ///
+    /// Owned rather than borrowed, because every caller goes on to take `&mut
+    /// self` to record the mark.
+    pub(crate) fn mark_target(&self) -> Option<String> {
+        if self.hud.browse.is_open() {
+            let names = self.roster_names();
+            let rows = self.browse_rows(&names);
+            return self
+                .hud
+                .browse
+                .visible(&rows)
+                .get(self.hud.browse.highlight())
+                .map(|(_, row)| row.name.to_owned());
+        }
+        let name = self.renderer.preset_name();
+        (!name.is_empty()).then(|| name.to_owned())
+    }
+
+    /// Flip `mark` on whatever [`mark_target`](AppState::mark_target) names, and
+    /// say what happened.
+    ///
+    /// The line is the whole of the confirmation while the corner name is off,
+    /// so it names the preset as well as the mark: a keypress that reported
+    /// nothing is one an operator cannot tell from a key that is not bound.
+    pub(crate) fn toggle_mark(&mut self, mark: Mark) {
+        let Some(name) = self.mark_target() else {
+            return;
+        };
+        let on = self.show.toggle_mark(mark, &name);
+        eprintln!(
+            "{} {}: '{name}'",
+            if on { "marked" } else { "unmarked" },
+            mark.as_str()
+        );
+        // The mark moves both of the things that read it: what rotation is
+        // about to take, and which rows the browser is showing. Hiding the
+        // highlighted row is the case that needs the re-clamp — the row under
+        // the cursor leaves the list in the same keystroke that marked it.
+        self.show.refresh_upcoming(&self.renderer);
+        let names = self.roster_names();
+        let rows = self.browse_rows(&names);
+        self.hud.browse.on_roster_changed(&rows);
+        self.window.request_redraw();
+    }
+
     /// Toggle the diagnostics overlay (`F3` and the settings row).
     ///
     /// **Deliberately not persisted.** It is a debugging state, and a live show
@@ -1595,6 +1793,7 @@ impl AppState {
             input_editable: cfg!(windows),
             preset_name: self.config.hud.preset_name,
             now_playing: self.config.hud.now_playing,
+            next_rotation: self.config.hud.next_rotation,
             preset_dir: self.show.preset_dir().display().to_string(),
         }
     }
@@ -1654,6 +1853,12 @@ impl AppState {
                 }
                 self.save_config();
             }
+            // Persisted like its two `[hud]` siblings: a clean canvas is a
+            // staging choice that should outlive the restart.
+            SettingsAction::ToggleNextRotation => {
+                self.config.hud.next_rotation = !self.config.hud.next_rotation;
+                self.save_config();
+            }
         }
         self.window.request_redraw();
     }
@@ -1661,12 +1866,12 @@ impl AppState {
     /// Open the browse overlay on the active preset, as `Tab` does.
     pub(crate) fn open_browse(&mut self) {
         let names = self.roster_names();
-        let refs: Vec<&str> = names.iter().map(String::as_str).collect();
+        let rows = self.browse_rows(&names);
         let active = self.renderer.active_index();
-        let layout = self.list_layout(refs.len());
+        let layout = self.list_layout(rows.len());
         self.hud
             .browse
-            .handle_key(OverlayKey::Toggle, &refs, active, &layout);
+            .handle_key(OverlayKey::Toggle, &rows, active, &layout);
     }
 
     /// Push any track change the metadata source picked up into the core's

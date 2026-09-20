@@ -48,6 +48,7 @@ use std::time::Duration;
 
 use rlx_core::render::Renderer;
 
+use crate::marks::Mark;
 use crate::osc::decode::{self, Action, Name, Transport};
 
 /// Distinct parameter names one frame may carry values for.
@@ -66,6 +67,14 @@ const TRANSPORT_SLOTS: usize = 8;
 
 /// Pings one frame may answer.
 const PING_SLOTS: usize = 8;
+
+/// Distinct `(preset, mark)` pairs one frame may carry marks for.
+///
+/// A mark is a deliberate click, so one frame carrying more than a handful is
+/// already a sender doing something odd. Deduplicated per pair like a parameter
+/// value, because a mark is a **state**: the last one sent for a pair is what it
+/// should be.
+const MARK_SLOTS: usize = 16;
 
 /// Receive buffer. One Ethernet MTU, which is far more than any message in the
 /// vocabulary needs and enough that a legitimate datagram is never truncated
@@ -97,6 +106,7 @@ pub struct Pending {
     clear_all: bool,
     preset: Option<Name>,
     transport: Vec<Transport>,
+    marks: Vec<(Name, Mark, bool)>,
     pings: Vec<i32>,
 }
 
@@ -108,6 +118,7 @@ impl Default for Pending {
             clear_all: false,
             preset: None,
             transport: Vec::with_capacity(TRANSPORT_SLOTS),
+            marks: Vec::with_capacity(MARK_SLOTS),
             pings: Vec::with_capacity(PING_SLOTS),
         }
     }
@@ -150,6 +161,26 @@ impl Pending {
                 }
                 self.transport.push(verb);
             }
+            // A state per `(preset, mark)` pair, like a parameter value: the
+            // last one sent is what the mark should be.
+            Action::Mark {
+                name,
+                mark,
+                on: state,
+            } => {
+                if let Some(slot) = self
+                    .marks
+                    .iter_mut()
+                    .find(|(held, kind, _)| *held == name && *kind == mark)
+                {
+                    slot.2 = state;
+                    return true;
+                }
+                if self.marks.len() == self.marks.capacity() {
+                    return false;
+                }
+                self.marks.push((name, mark, state));
+            }
             Action::Ping(nonce) => {
                 if self.pings.len() == self.pings.capacity() {
                     return false;
@@ -171,6 +202,7 @@ impl Pending {
         self.clear_all = false;
         self.preset = None;
         self.transport.clear();
+        self.marks.clear();
         self.pings.clear();
     }
 
@@ -181,6 +213,7 @@ impl Pending {
             && !self.clear_all
             && self.preset.is_none()
             && self.transport.is_empty()
+            && self.marks.is_empty()
             && self.pings.is_empty()
     }
 
@@ -207,6 +240,11 @@ impl Pending {
     /// The held values, one per name.
     pub fn params(&self) -> &[(Name, f32)] {
         &self.params
+    }
+
+    /// The marks to set, one per `(preset, mark)` pair.
+    pub fn marks(&self) -> &[(Name, Mark, bool)] {
+        &self.marks
     }
 
     /// The ping nonces to answer.
@@ -993,6 +1031,71 @@ mod tests {
             Some("b"),
             "the last preset asked for is the one to land on"
         );
+    }
+
+    /// **A mark is a state, so the last one per `(preset, mark)` pair wins** and
+    /// a surface restating what it already set fills nothing. The two marks on
+    /// one preset are separate pairs, because they are separate questions.
+    #[test]
+    fn a_mark_keeps_the_last_state_per_preset_and_kind() {
+        let mut pending = Pending::default();
+        let capacity = pending.marks.capacity();
+
+        for on in [true, false, true] {
+            assert!(pending.record(Action::Mark {
+                name: name("Gyre"),
+                mark: Mark::Favourite,
+                on,
+            }));
+        }
+        assert_eq!(
+            pending.marks().len(),
+            1,
+            "three states for one pair occupy one slot"
+        );
+        assert!(pending.marks()[0].2, "the frame sees the last state sent");
+
+        pending.record(Action::Mark {
+            name: name("Gyre"),
+            mark: Mark::Hidden,
+            on: true,
+        });
+        assert_eq!(
+            pending.marks().len(),
+            2,
+            "the two marks on one preset are separate questions"
+        );
+
+        // Distinct pairs past the cap are dropped, not grown into.
+        for i in 0..capacity {
+            pending.record(Action::Mark {
+                name: name(&format!("p{i}")),
+                mark: Mark::Favourite,
+                on: true,
+            });
+        }
+        assert_eq!(
+            pending.marks.capacity(),
+            capacity,
+            "the buffer grew, so the listener reached the allocator"
+        );
+        assert!(
+            pending.marks.len() <= capacity,
+            "the cap did not hold: {} entries",
+            pending.marks.len()
+        );
+
+        // And a frame carrying only marks is not empty, or the drain would
+        // never take it.
+        let mut only = Pending::default();
+        only.record(Action::Mark {
+            name: name("Gyre"),
+            mark: Mark::Favourite,
+            on: true,
+        });
+        assert!(!only.is_empty());
+        only.clear();
+        assert!(only.is_empty(), "clear left a mark behind");
     }
 
     /// A drain hands the caller what arrived and leaves the listener an empty
