@@ -235,7 +235,8 @@ pub(crate) const MIN_INTERIOR_TEXELS: f32 = 16.0;
 
 const SHADER: &str = r#"
 struct Params {
-    // x: aspect (from the RENDER TARGET), y: shape index (quantized CPU-side),
+    // x: aspect (from the RENDER TARGET), y: shape position (clamped CPU-side
+    // and NOT rounded, so a fractional value blends two arms - ADR-0226),
     // z: points (quantized CPU-side), w: scale
     a: vec4<f32>,
     // xy: pan (the shared ViewTransform, ADR-0018), z: color_span,
@@ -756,9 +757,11 @@ pub struct ShapeFieldScene {
     /// group this scene binds.
     gpu: gpu::FullscreenScene,
     /// The silhouette and its point count, raw as the preset bound them —
-    /// `marks::mark_shape` / `mark_points` quantize on the way to the uniform,
-    /// which is where a selector's precondition belongs (the `kaleido_edge`
-    /// precedent).
+    /// `marks::mark_shape` / `mark_points` condition them on the way to the
+    /// uniform, which is where a selector's precondition belongs (the
+    /// `kaleido_edge` precedent). Only `mark_points` quantizes; `mark_shape`
+    /// clamps and leaves the fraction, which is what lets a bound `shape`
+    /// travel between two arms (ADR-0226).
     shape: f32,
     points: f32,
     /// The `star` arm's shape params and its hand-drawn controls, raw as the
@@ -986,13 +989,15 @@ fn applied_rotation(rotation: f32) -> f32 {
 /// default — and **forced back to the distance on a figure the scaled copy has
 /// no single value on**.
 ///
-/// The quantizing half is `marks::mark_shape`'s treatment for
-/// `marks::mark_shape`'s reason, and the `kaleido_edge` precedent behind both. A
-/// mode's values are **identities** rather than a quantity: `[smoothing]` and
-/// preset dissolves interpolate a binding continuously from one setting to
-/// another, so easing the distance to the radius passes through 0.4 and 0.6, and
-/// there is nothing halfway between an offset curve and a scaled copy for the
-/// shader to draw there.
+/// The quantizing half is the `kaleido_edge` precedent, and `marks::mark_points`
+/// beside it. A mode's values are **identities** rather than a quantity:
+/// `[smoothing]` and preset dissolves interpolate a binding continuously from
+/// one setting to another, so easing the distance to the radius passes through
+/// 0.4 and 0.6, and there is nothing halfway between an offset curve and a
+/// scaled copy for the shader to draw there. `marks::mark_shape` is the
+/// contrasting case rather than the parallel one: a position between two
+/// silhouettes is a figure (ADR-0226), and a position between two coordinate
+/// modes is not.
 ///
 /// # The fallback, and why it is not silent
 ///

@@ -377,9 +377,11 @@ pub struct SwarmScene {
     hue_spread: f32,
     hue_center: f32,
     /// The mark silhouette and its point count, **as bound** (ADR-0084). Both
-    /// are quantized on the way to the uniform rather than here, so a
-    /// `[smoothing]`-eased binding still eases — it just steps at the midpoints
-    /// (see [`marks::mark_points`]).
+    /// are conditioned on the way to the uniform rather than here, and the two
+    /// conditionings differ: `points` is quantized, so a `[smoothing]`-eased
+    /// binding steps at the midpoints (see [`marks::mark_points`]), while
+    /// `shape` is only clamped, so an eased binding travels between two arms
+    /// (ADR-0226, [`marks::mark_shape`]).
     shape: f32,
     points: f32,
     /// The `star` arm's three shape params, raw as the preset bound them

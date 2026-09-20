@@ -1558,7 +1558,7 @@ between them.** `shape = "2.5"` is half a polygon and half a star — the two ar
 distance fields blended, so an eased or bound `shape` carries the figure from a
 heart to a star across a phrase instead of cutting on a beat
 ([ADR-0226](../docs/adrs/0226-the-mark-roster-travels-by-blending-its-fields-and-an-integer-index-is-an-identity.md)).
-Three things come with that:
+Four things come with that:
 
 - **Only adjacent pairs travel.** The table's order is the travel order, so a
   `polygon` can reach a `star` and cannot reach a `heart` without passing through
