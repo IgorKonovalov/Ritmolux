@@ -1,13 +1,21 @@
 #!/usr/bin/env node
 // Render every committed documentation image, from the manifest below.
 //
-// Usage:  node scripts/docs-shots.mjs
+// Usage:  node scripts/docs-shots.mjs [name ...]
 // Writes: docs/images/**.png  — and nothing anywhere else.
 //
-// No arguments, no environment, no options. That is the point: an image set
-// nobody can re-shoot without remembering a command line is an image set that
-// goes stale. `git status` is clean after a re-run on the same machine and
-// binary, so "are these current" is answerable by running this and looking.
+// With no name it renders the whole manifest. A name selects the entries it
+// matches and leaves every other committed image untouched, which is what makes
+// re-shooting one picture possible at all: renders are not byte-reproducible
+// across machines (see below), so a whole-manifest run to refresh one card
+// produces a diff over a hundred unrelated images recording driver drift.
+//
+// A NAME IS THE ONLY THING THE COMMAND LINE TAKES — no settings, no options, no
+// environment. Every capture setting stays in the manifest entry, so a re-render
+// cannot land at a size or tier nobody wrote down, and an image set nobody can
+// re-shoot without remembering a command line is an image set that goes stale.
+// `git status` is clean after a re-run on the same machine and binary, so "are
+// these current" is answerable by running this and looking.
 //
 // THE MANIFEST IS THE PROVENANCE RECORD. Every committed PNG under docs/images/
 // has exactly one entry here, and the entry carries the whole command: preset
@@ -71,7 +79,7 @@
 
 import { execFileSync } from "node:child_process";
 import { existsSync, rmSync } from "node:fs";
-import { relative, resolve, sep } from "node:path";
+import { basename, relative, resolve, sep } from "node:path";
 
 // ---------------------------------------------------------------------------
 // The manifest
@@ -595,6 +603,50 @@ function check(entry, index) {
 IMAGES.forEach(check);
 
 // ---------------------------------------------------------------------------
+// Selection
+// ---------------------------------------------------------------------------
+
+/// The last path segment without its extension: `warp_tracery` for both
+/// `presets/warp_tracery.toml` and `docs/images/gallery/presets/warp_tracery.png`.
+const stem = (path) => basename(path).replace(/\.[^.]*$/, "");
+
+/// The four spellings a command-line name may use for one entry. Backslashes
+/// fold to forward slashes, so a path completed by a Windows shell matches the
+/// forward-slash paths the manifest is written in.
+const aliases = (entry) =>
+  [entry.out, entry.presetFile, stem(entry.out), stem(entry.presetFile)].map((a) =>
+    a.replaceAll("\\", "/"),
+  );
+
+/// Matching is EXACT against those spellings rather than a substring test.
+/// `attractor_clifford` and `attractor_cliffordgallery` are both shipped presets,
+/// so a substring match would re-render a card nobody asked for and put its
+/// driver drift in the same commit as the intended one.
+const requested = process.argv.slice(2).map((name) => name.replaceAll("\\", "/"));
+const unmatched = requested.filter(
+  (name) => !IMAGES.some((entry) => aliases(entry).includes(name)),
+);
+
+// A name that matches nothing stops the run before the first render, rather
+// than rendering the names that did match: a typo'd name would otherwise be
+// indistinguishable from a picture that is simply already current.
+if (unmatched.length > 0) {
+  console.error(`no manifest entry is named: ${unmatched.join(", ")}`);
+  console.error("\nthe names this manifest knows:");
+  const known = [...new Set(IMAGES.flatMap((e) => [stem(e.out), stem(e.presetFile)]))].sort();
+  for (const name of known) {
+    console.error(`  ${name}`);
+  }
+  process.exit(1);
+}
+
+/// No name is every entry — the whole-manifest run the operator docs name.
+const selected =
+  requested.length === 0
+    ? IMAGES
+    : IMAGES.filter((entry) => aliases(entry).some((a) => requested.includes(a)));
+
+// ---------------------------------------------------------------------------
 // THE GALLERY-vs-`SystemKind` CROSS-CHECK IS NOT HERE. It lives in
 // core/tests/suite/hygiene.rs, `every_system_has_a_gallery_image`.
 //
@@ -620,8 +672,10 @@ IMAGES.forEach(check);
 // Checked up front, all of them, before the first render: a manifest typo in the
 // last entry should not cost the eight renders before it.
 let failures = 0;
-for (const [index, entry] of IMAGES.entries()) {
-  const where = `manifest entry ${index} (${entry.out})`;
+for (const entry of selected) {
+  // The manifest index rather than the position in this run, so the name a
+  // failure reports is the one to go and look at in the list above.
+  const where = `manifest entry ${IMAGES.indexOf(entry)} (${entry.out})`;
   console.log(
     `\n${entry.out}\n  ${entry.presetFile} @ hop ${entry.hop}, ` +
       `${entry.signal}, ${entry.size}, tier ${entry.tier}`,
@@ -653,7 +707,9 @@ for (const [index, entry] of IMAGES.entries()) {
 }
 
 if (failures > 0) {
-  console.error(`\n${failures} of ${IMAGES.length} images failed to render`);
+  console.error(`\n${failures} of ${selected.length} images failed to render`);
   process.exit(1);
 }
-console.log(`\n${IMAGES.length} images written under docs/images/`);
+console.log(
+  `\n${selected.length} of ${IMAGES.length} images written under docs/images/`,
+);

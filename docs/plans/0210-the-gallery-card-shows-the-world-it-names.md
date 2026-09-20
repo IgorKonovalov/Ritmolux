@@ -1,6 +1,6 @@
 # 0210 — The gallery card shows the world it names
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user) — approved and deliberately NOT in `tools/conductor/queue.json`
 > **Owner skill(s):** dev, human
@@ -169,11 +169,12 @@ flowchart TB
 > Written by `dev` — one row per phase as that phase's commit lands, and the close block after the
 > last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `plan-0210-the-gallery-card-shows-the-world-it-names`, worktree
+`C:\Users\Igor Konovalov\WORK\rlx-plan-0210`.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the renderer takes a name | dev | not started | |
+| 1 — the renderer takes a name | dev | done | committed with this row |
 | 2 — the accumulating set is named, and the hop follows the family | dev | not started | |
 | 3 — the affected cards are re-rendered as sets | dev | not started | |
 | 4 — a person says whether the cards are now the look | human | not started | |
