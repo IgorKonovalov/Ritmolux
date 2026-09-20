@@ -6,7 +6,7 @@
 > **Related ADRs:** [0131](../adrs/0131-the-linux-standalone-captures-through-pulseaudios-simple-api.md),
 > [0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md),
 > [0038](../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md),
-> [0203](../adrs/0203-a-release-exists-only-if-its-tag-reaches-origin.md)
+> [0203](../adrs/0203-a-release-tag-is-annotated-and-origin-is-what-is-checked.md)
 > **Depends on:** [0120](0120-the-standalone-ships-on-ubuntu.md) — every phase landed and on `main`
 
 ## TL;DR
