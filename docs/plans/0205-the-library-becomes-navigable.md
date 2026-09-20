@@ -309,8 +309,8 @@ pub enum RotateSource {
 |---|---|---|---|
 | 1 — The marks store, and one key that proves it | dev | done | c3ed56cb |
 | 2 — Rotation spends the marks | dev | done | eaeca3bc |
-| 3 — The browser narrows | dev | done | committed with this row |
-| 4 — The keys and the HUD carry it | dev | not started | |
+| 3 — The browser narrows | dev | done | 74b1e5c5 |
+| 4 — The keys and the HUD carry it | dev | done | committed with this row |
 | 5 — The protocol carries a mark | dev | not started | |
 | 6 — The studio marks and filters | studio-builder | not started | |
 
@@ -374,6 +374,18 @@ pub enum RotateSource {
   `show.rs` keeps them beside the roster, falling back to the embedded set's when a load installed
   nothing. `app_state.rs` builds the rows, `input.rs` decodes the three keys, `hud.rs` draws the row
   and the header. No core change: `SystemKind::family()` was already public.
+
+- **The countdown reports the hard cap, not the nudged one.** `Director::remaining_secs` answers
+  `max_dwell - dwell`, so a drop or a track boundary can land the change sooner than the line says.
+  The alternative — counting down to this frame's nudged cap — is a function of the audio arriving
+  now, so it would jump under the operator's eye and still be wrong on the next frame.
+- The `[hud]` row and key are `Next in` / `next_rotation`, following the phase's stated precedent;
+  that put a fourteenth row in the settings menu (`settings.rs`, `settings/tests.rs`, and the two
+  other `SettingsView` literals in `console/tests.rs` and `stream.rs`), which is beyond the phase's
+  file list but is what "a settings row and a `config.toml` key" means here.
+- **A/B is `B`, and the number keys are the top row and the numpad both.** `B` is an
+  outside-the-browser binding like `S`, `C`, `F` and `D` — the phase's own rule for the digits
+  ("the binding applies outside it") is the same one. `0` is deliberately not a tenth slot.
 
 ### Close triggers
 

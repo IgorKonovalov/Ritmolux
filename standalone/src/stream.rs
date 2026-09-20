@@ -1053,6 +1053,7 @@ fn headless_view(
         input_editable: false,
         preset_name: config.hud.preset_name,
         now_playing: config.hud.now_playing,
+        next_rotation: config.hud.next_rotation,
         console: false,
         preset_dir: preset_dir.to_owned(),
     }

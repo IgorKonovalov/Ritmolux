@@ -107,6 +107,18 @@ impl Director {
         self.max_dwell = (max_secs as f32).max(self.min_dwell);
     }
 
+    /// Seconds left before the steady-passage cap rotates, for the HUD.
+    ///
+    /// **The hard cap, not this frame's nudged one.** The nudge is a function of
+    /// the audio arriving now, so a countdown taken from it would jump around
+    /// under the operator's eye and still be wrong on the next frame; a drop or
+    /// a track boundary can land the change sooner than this says, which is the
+    /// honest reading of "by then at the latest". `None` while auto-rotate is
+    /// off, because there is then no rotation to count down to.
+    pub fn remaining_secs(&self) -> Option<f32> {
+        self.auto.then(|| (self.max_dwell - self.dwell).max(0.0))
+    }
+
     /// Advance the timer by `dt` seconds against this frame's analysis and
     /// decide whether to rotate. Returns `Some(reason)` exactly on the frames a
     /// rotation should happen (the caller then calls `Renderer::cycle_preset`);

@@ -10,6 +10,8 @@
 //! beside the pure layout function that reasons about them, so the pixels drawn
 //! here and the arithmetic tested there cannot drift.
 
+use standalone::marks::Mark;
+
 use crate::app_state::AppState;
 use crate::console;
 use crate::overlay::{
@@ -21,6 +23,41 @@ use crate::overlay::{
 pub(crate) const NAME_INSET: f32 = 16.0;
 pub(crate) const NAME_SIZE: f32 = 28.0;
 pub(crate) const NAME_COLOR: [f32; 4] = [0.9, 0.95, 1.0, 1.0];
+
+/// The rotation countdown sits directly under the preset name, smaller and
+/// dimmer: it is a status line about the show's cadence, not part of the show.
+pub(crate) const NEXT_TOP: f32 = NAME_INSET + NAME_SIZE + 6.0;
+pub(crate) const NEXT_SIZE: f32 = 18.0;
+pub(crate) const NEXT_COLOR: [f32; 4] = [0.72, 0.80, 0.90, 0.8];
+
+/// How the corner name reports the marks the preset on screen carries.
+///
+/// Suffixed rather than prefixed so the name still starts at the same x on
+/// every preset, and spelled out rather than glyphed: the browser's single
+/// character has a column of them to be read against, and one floating in a
+/// corner does not.
+pub(crate) fn mark_suffix(favourite: bool, hidden: bool) -> &'static str {
+    match (favourite, hidden) {
+        (true, true) => "  (favourite, hidden)",
+        (true, false) => "  (favourite)",
+        (false, true) => "  (hidden)",
+        (false, false) => "",
+    }
+}
+
+/// The countdown line, or `None` when there is nothing to count down to.
+///
+/// `remaining` is the director's own answer and is already `None` while
+/// auto-rotate is off, so "says nothing when it is off" is that `None` rather
+/// than a second rule here. `enabled` is the operator's switch.
+///
+/// Whole seconds, rounded up, so the line reaches `1 s` and then the rotation
+/// happens — a line that showed `0 s` for most of a second would read as a
+/// stalled timer.
+pub(crate) fn next_rotation_line(remaining: Option<f32>, enabled: bool) -> Option<String> {
+    let secs = remaining.filter(|_| enabled)?;
+    Some(format!("next in {} s", secs.ceil().max(0.0) as u32))
+}
 
 /// Which modal, if any, currently owns the keyboard and the canvas.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -144,13 +181,34 @@ impl AppState {
             self.diagnostics.overlay_on,
             self.config.hud.preset_name,
         ) {
+            // The marks ride on the name rather than on a line of their own:
+            // marking is worthless if you cannot see what is marked without
+            // opening the browser, and a second line for two words is furniture
+            // the show does not need.
+            let name = self.renderer.preset_name();
+            let marks = self.show.marks();
+            let suffix = mark_suffix(
+                marks.is(Mark::Favourite, name),
+                marks.is(Mark::Hidden, name),
+            );
             chrome.push(console::Line::new(
-                self.renderer.preset_name().to_owned(),
+                format!("{name}{suffix}"),
                 NAME_INSET,
                 NAME_INSET,
                 NAME_SIZE,
                 NAME_COLOR,
             ));
+
+            // The countdown under it, on the same visibility rule: it belongs
+            // to the same corner and yields to the same things.
+            if let Some(text) = next_rotation_line(
+                self.show.director.remaining_secs(),
+                self.config.hud.next_rotation,
+            ) {
+                chrome.push(console::Line::new(
+                    text, NAME_INSET, NEXT_TOP, NEXT_SIZE, NEXT_COLOR,
+                ));
+            }
         }
 
         // The capture verdict, under the core's diagnostics panel and only while
@@ -177,10 +235,11 @@ impl AppState {
                 HEADER_COLOR,
             ));
 
-            // One column, always: ten rows fit any window this app opens in —
-            // they start at `ROWS_TOP` (94 px) with a 30 px pitch, so the last
-            // ends at 394 px — and a settings menu that reflowed would move a row
-            // out from under the operator's hand mid-edit.
+            // One column, always: the roster fits any window this app opens in —
+            // the rows start at `ROWS_TOP` (94 px) with a 30 px pitch, so a
+            // fourteen-row menu ends at 484 px — and a settings menu that
+            // reflowed would move a row out from under the operator's hand
+            // mid-edit.
             for (row, (label, value)) in self.hud.settings.lines(&view).into_iter().enumerate() {
                 let y = overlay::ROWS_TOP + row as f32 * ROW_H;
                 let (marker, color) = if row == self.hud.settings.row() {
@@ -323,8 +382,53 @@ impl AppState {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::{Modal, output_modal, preset_name_visible};
+    use super::{Modal, mark_suffix, next_rotation_line, output_modal, preset_name_visible};
     use crate::console;
+
+    /// **The HUD says when the next rotation lands, and says nothing when
+    /// auto-rotate is off.** The console already names *what* comes next and the
+    /// show window named neither, which is the asymmetry this closes.
+    #[test]
+    fn the_countdown_appears_only_while_something_is_counting_down() {
+        assert_eq!(
+            next_rotation_line(Some(42.0), true).as_deref(),
+            Some("next in 42 s")
+        );
+        assert_eq!(
+            next_rotation_line(None, true),
+            None,
+            "auto-rotate is off, so there is no rotation to count down to"
+        );
+        assert_eq!(
+            next_rotation_line(Some(42.0), false),
+            None,
+            "the operator's switch must win over a running timer"
+        );
+
+        // Rounded **up**, so the line reaches `1 s` and the rotation happens —
+        // a `0 s` held for most of a second reads as a stalled timer.
+        assert_eq!(
+            next_rotation_line(Some(0.2), true).as_deref(),
+            Some("next in 1 s")
+        );
+        assert_eq!(
+            next_rotation_line(Some(0.0), true).as_deref(),
+            Some("next in 0 s"),
+            "a cap already reached is the one moment zero is the honest answer"
+        );
+    }
+
+    /// **The corner says whether the preset on screen is marked**, in all four
+    /// combinations — marking is worthless if you cannot see what is marked
+    /// without opening the browser.
+    #[test]
+    fn the_corner_name_reports_both_marks_and_neither() {
+        assert_eq!(mark_suffix(false, false), "", "an unmarked preset is bare");
+        assert!(mark_suffix(true, false).contains("favourite"));
+        assert!(mark_suffix(false, true).contains("hidden"));
+        let both = mark_suffix(true, true);
+        assert!(both.contains("favourite") && both.contains("hidden"));
+    }
 
     #[test]
     fn name_shows_when_nothing_covers_it() {

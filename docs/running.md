@@ -48,7 +48,7 @@ one, so you always land where you asked.
 | `Backspace` | Back to the preset you were on before — walks the presets actually shown, one step per press |
 | `A`       | Toggle auto-rotate on/off (off by default)                  |
 | `Tab`     | Open/close the preset browser — opens on the preset you're watching. Arrow keys walk the list and wrap at both ends, left/right step a column, holding an arrow scrolls, type to filter, `Enter` selects (also dissolves), `Esc` closes |
-| `S`       | Open/close the settings menu — quality, auto-rotate, dwell bounds, fullscreen, display, diagnostics, input mode, input device, preset name, now playing, console. Up/down pick a row, left/right change it, `Esc` closes. Every change applies immediately and (except diagnostics) is written to `config.toml` |
+| `S`       | Open/close the settings menu — quality, auto-rotate, dwell bounds, fullscreen, display, diagnostics, input mode, input device, preset name, now playing, next-in countdown, console. Up/down pick a row, left/right change it, `Esc` closes. Every change applies immediately and (except diagnostics) is written to `config.toml` |
 | `C`       | Open/close the **operator console** — a second window on another display carrying the browser, the settings menu, a transport strip and a live preview of the output |
 | `[` / `]` | Drop / raise the quality tier live — pins it for the session and persists the choice |
 | `F`       | Toggle fullscreen                                           |
@@ -60,6 +60,8 @@ one, so you always land where you asked.
 | `F4`      | In the browser: show **favourites only**                    |
 | `F5`      | In the browser: narrow to **one family**, then the next, then all of them again |
 | `F6`      | In the browser: bring **hidden** presets back into the list |
+| `1`–`9`   | Jump to the first nine favourites, in the order the browser lists them |
+| `B`       | **A/B compare** — hold the preset on screen, then press again to flip between the two |
 
 ### Marking a preset
 
@@ -70,6 +72,15 @@ Function keys, because letters and digits are filter input while the browser is 
 The marks are keyed by the preset's *name*, kept in a `marks.toml` file of its own beside
 `config.toml`, and they survive a restart: the app names the counts it loaded on the way up
 (`preset marks: 3 favourite, 1 hidden`) and each press reports what it did.
+
+Once presets are marked, `1`–`9` go straight to the first nine favourites, in the order the browser
+lists them. Fewer than nine marked means the unfilled keys do nothing — they never wrap, so a key
+means the same preset however many you have marked. Like the letters, the digits are filter input
+while the browser is open, so this works outside it.
+
+**Comparing two looks.** `B` holds the preset on screen as the B side; press it again from anywhere
+else and the two swap, so you can flip between them without hunting either down. It dissolves like
+any other change, and the hold lasts for the session only — it is a comparison, not a mark.
 
 **Hiding is not retiring.** A hidden preset never appears in auto-rotate and is not in the browser's
 default list, but it still ships, still loads and is still there behind `F6`. Nothing about the
@@ -97,9 +108,13 @@ settings hands over to the browser.
 
 The active preset's **name** sits in the top-left corner, and it gets out of the
 way on its own: either menu or the `F3` overlay hides it, and it comes straight
-back when they close. For a permanently clean canvas, turn the settings menu's
-**Preset name** row off — that is `[hud] preset_name` in `config.toml`, and it
-survives a restart.
+back when they close. It says whether the preset is marked — `Gyre  (favourite)` —
+and, while auto-rotate is on, a line under it counts down to the next change
+(`next in 42 s`); with auto-rotate off there is no countdown and the line is not
+drawn. For a permanently clean canvas, turn the settings menu's **Preset name**
+row off — that is `[hud] preset_name` in `config.toml`, and it survives a
+restart; the **Next in** row (`[hud] next_rotation`) turns off just the
+countdown.
 
 ## The operator console
 

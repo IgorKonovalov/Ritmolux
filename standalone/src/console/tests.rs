@@ -329,6 +329,7 @@ fn view() -> crate::settings::SettingsView {
         input_editable: true,
         preset_name: true,
         now_playing: true,
+        next_rotation: true,
         console: false,
         preset_dir: String::new(),
     }

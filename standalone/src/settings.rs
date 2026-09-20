@@ -96,6 +96,9 @@ pub struct SettingsView {
     pub preset_name: bool,
     /// Whether a track change announces itself (`[hud] now_playing`).
     pub now_playing: bool,
+    /// Whether the countdown to the next auto-rotate is drawn
+    /// (`[hud] next_rotation`).
+    pub next_rotation: bool,
     /// Whether the operator console is open right now (ADR-0143). The live
     /// window state, not the config key: the row reports what is on screen, so
     /// a console opened by `--console` or the `C` hotkey reads correctly here.
@@ -175,6 +178,8 @@ pub enum SettingsAction {
     TogglePresetName,
     /// Announce track changes or not, persisted (Plan 0097 Phase 3).
     ToggleNowPlaying,
+    /// Draw the countdown to the next auto-rotate or not, persisted.
+    ToggleNextRotation,
     /// Open or close the operator console (ADR-0143). The state machine says
     /// only that it changed; the shell owns the window.
     ToggleConsole,
@@ -195,13 +200,14 @@ pub enum SettingsRow {
     InputDevice,
     PresetName,
     NowPlaying,
+    NextRotation,
     Console,
     Presets,
 }
 
 impl SettingsRow {
     /// Every row, in display order. The one read-only row stays last.
-    pub const ALL: [SettingsRow; 13] = [
+    pub const ALL: [SettingsRow; 14] = [
         SettingsRow::Quality,
         SettingsRow::AutoRotate,
         SettingsRow::MinDwell,
@@ -219,7 +225,9 @@ impl SettingsRow {
         // in one place.
         SettingsRow::PresetName,
         SettingsRow::NowPlaying,
-        // After the two paint switches and before the read-only row: the
+        // The third `[hud]` key, beside its two siblings for their reason.
+        SettingsRow::NextRotation,
+        // After the three paint switches and before the read-only row: the
         // console is also about what the operator sees rather than about the
         // show, but it opens a window rather than changing the canvas.
         SettingsRow::Console,
@@ -239,6 +247,7 @@ impl SettingsRow {
             SettingsRow::InputDevice => "Input device",
             SettingsRow::PresetName => "Preset name",
             SettingsRow::NowPlaying => "Now playing",
+            SettingsRow::NextRotation => "Next in",
             SettingsRow::Console => "Console",
             SettingsRow::Presets => "Presets",
         }
@@ -291,6 +300,7 @@ impl SettingsRow {
             }
             SettingsRow::PresetName => on_off(view.preset_name).to_owned(),
             SettingsRow::NowPlaying => on_off(view.now_playing).to_owned(),
+            SettingsRow::NextRotation => on_off(view.next_rotation).to_owned(),
             SettingsRow::Console => on_off(view.console).to_owned(),
             SettingsRow::Presets => view.preset_dir.clone(),
         }
@@ -344,6 +354,7 @@ impl SettingsRow {
             SettingsRow::InputMode | SettingsRow::InputDevice => SettingsAction::None,
             SettingsRow::PresetName => SettingsAction::TogglePresetName,
             SettingsRow::NowPlaying => SettingsAction::ToggleNowPlaying,
+            SettingsRow::NextRotation => SettingsAction::ToggleNextRotation,
             SettingsRow::Console => SettingsAction::ToggleConsole,
             // Read-only: it tells you where presets are loaded from, which is a
             // launch-time resolution (`RLX_PRESET_DIR`, then the per-user dir),

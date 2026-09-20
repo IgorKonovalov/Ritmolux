@@ -182,6 +182,11 @@ pub struct Hud {
     /// the way a persistent line would. Off means no track ever reaches the
     /// core, not a banner drawn transparent.
     pub now_playing: bool,
+    /// Say when the next auto-rotate lands, in the corner under the preset name
+    /// — and say nothing while auto-rotate is off, because there is then no
+    /// countdown to report. `true` for the reason the banner is: the line only
+    /// exists while rotation is running, so it cannot clutter a held show.
+    pub next_rotation: bool,
 }
 
 impl Default for Hud {
@@ -189,6 +194,7 @@ impl Default for Hud {
         Self {
             preset_name: true,
             now_playing: true,
+            next_rotation: true,
         }
     }
 }
@@ -452,6 +458,24 @@ mod tests {
         assert!(
             config.hud.now_playing,
             "the key that was not must default on"
+        );
+        assert!(
+            config.hud.next_rotation,
+            "the countdown key a later build added must default on too"
+        );
+    }
+
+    /// The countdown row is only "survives a restart" if its write/read
+    /// round-trips, the same guarantee the other two `[hud]` keys carry.
+    #[test]
+    fn the_next_rotation_choice_round_trips() {
+        let mut config = Config::default();
+        config.hud.next_rotation = false;
+        let text = toml::to_string_pretty(&config).expect("config serializes");
+        let back: Config = toml::from_str(&text).expect("its own output parses");
+        assert!(
+            !back.hud.next_rotation,
+            "the off choice did not survive a save"
         );
     }
 

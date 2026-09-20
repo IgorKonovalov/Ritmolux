@@ -229,6 +229,15 @@ pub(crate) struct Hud {
     /// (ADR-0142).
     pub(crate) console_request: Option<bool>,
 
+    /// The preset stashed as the **B** side of an A/B comparison, `None` until
+    /// the key is first pressed.
+    ///
+    /// **Session state, deliberately not persisted**: it is a comparison an
+    /// operator is making now, not an opinion about the library — which is what
+    /// the marks are for. Holds the *name*, so a hot-reload that rewrites the
+    /// roster under it either still resolves or reports that it no longer does.
+    pub(crate) ab_side: Option<String>,
+
     /// State for the console's `random` control.
     ///
     /// A counter mixed on each press rather than a dependency or a clock read:
@@ -571,6 +580,7 @@ impl AppState {
                 console_census_secs: 0.0,
                 console_cursor: (-1.0, -1.0),
                 console_request: None,
+                ab_side: None,
                 random_state: 0x9E37_79B9,
                 frame_text: console::FrameText::default(),
                 modal_scratch: Vec::new(),
@@ -1584,6 +1594,72 @@ impl AppState {
         self.window.request_redraw();
     }
 
+    /// Hold the preset on screen as the **B** side, or swap the two when one is
+    /// already held (the `B` key).
+    ///
+    /// The flip **dissolves like any other change** — it goes through the same
+    /// by-name selection the browser and the wire use — so a fast flip is the
+    /// mid-dissolve rule `docs/running.md` already fixes rather than a second
+    /// transition path.
+    ///
+    /// The side being left becomes the new B, so the key alternates: press it on
+    /// A to hold A, walk to B, then press it to go A-B-A-B without hunting for
+    /// either.
+    pub(crate) fn flip_ab(&mut self) {
+        let current = self.renderer.preset_name().to_owned();
+        if current.is_empty() {
+            return;
+        }
+        let Some(held) = self.hud.ab_side.take() else {
+            eprintln!("A/B: holding '{current}' - press B again to come back to it");
+            self.hud.ab_side = Some(current);
+            return;
+        };
+        if held == current {
+            // Pressing it twice without moving: nothing to compare yet, so keep
+            // the hold rather than dropping it on a no-op.
+            self.hud.ab_side = Some(held);
+            return;
+        }
+        if self.renderer.select_preset_by_name(&held) {
+            self.hud.ab_side = Some(current);
+            self.on_preset_switched(Trail::Record);
+        } else {
+            // The roster no longer holds it — a hot-reload retired it while it
+            // was stashed. Say so and re-hold what is on screen, rather than
+            // leaving a key that silently does nothing.
+            eprintln!("A/B: '{held}' is no longer in the library; holding '{current}' instead");
+            self.hud.ab_side = Some(current);
+        }
+    }
+
+    /// Select the `nth` favourite (zero-based) in the browser's own order, if
+    /// there is one.
+    ///
+    /// **The browser's order, not a second hidden one**: the same roster order
+    /// the favourites filter shows, hidden presets left out — so the mapping
+    /// from key to preset is the one the eye already learned. A key past the end
+    /// does nothing rather than wrapping, because a key that means a different
+    /// preset depending on how many are marked is worse than a key that means
+    /// nothing.
+    pub(crate) fn select_favourite(&mut self, nth: usize) {
+        let names = self.roster_names();
+        let Some(name) = names
+            .iter()
+            .filter(|name| {
+                self.show.marks().is(Mark::Favourite, name)
+                    && !self.show.marks().is(Mark::Hidden, name)
+            })
+            .nth(nth)
+            .cloned()
+        else {
+            return;
+        };
+        if self.renderer.select_preset_by_name(&name) {
+            self.on_preset_switched(Trail::Record);
+        }
+    }
+
     /// The roster as the browser sees it: name, family and marks per entry.
     ///
     /// `names` is the caller's own owned roster, so the returned rows borrow it
@@ -1716,6 +1792,7 @@ impl AppState {
             input_editable: cfg!(windows),
             preset_name: self.config.hud.preset_name,
             now_playing: self.config.hud.now_playing,
+            next_rotation: self.config.hud.next_rotation,
             preset_dir: self.show.preset_dir().display().to_string(),
         }
     }
@@ -1773,6 +1850,12 @@ impl AppState {
                 if !self.config.hud.now_playing {
                     self.renderer.set_now_playing("");
                 }
+                self.save_config();
+            }
+            // Persisted like its two `[hud]` siblings: a clean canvas is a
+            // staging choice that should outlive the restart.
+            SettingsAction::ToggleNextRotation => {
+                self.config.hud.next_rotation = !self.config.hud.next_rotation;
                 self.save_config();
             }
         }
