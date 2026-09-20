@@ -150,16 +150,62 @@ single shipped picture.
 
 ## Implementation log
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `plan-0203-the-figure-gains-the-levers-it-was-measured-to-lack`, worktree
+`C:\Users\Igor Konovalov\WORK\rlx-plan-0203`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The roster travels | dev | not started | |
+| 1 — The roster travels | dev | done | 56915750 + committed with this row |
 | 2 — The star wobbles, and its scatter can be chosen | dev | not started | |
 | 3 — Judge the floor by rendering | dev | not started | |
 | 4 — The backdrop ramp converges | dev | not started | |
 
+### Phase 1 — what the done-when measured
+
+**The identity, at every integer index, byte for byte.** `shot` rendered ten frames at
+128x128 over 60 frames — a `shape_field` preset and a `swarm` preset at each of the five whole
+indices — first against this lane's sources and then against the same three files restored to
+their pre-phase state (`git restore --source=56915750^`) and rebuilt. All ten PNG pairs compare
+**byte-identical**, so the claim is measured on the rendered frame rather than inferred from the
+CPU mirror.
+
+**The fractional index draws a third figure.** The unit test prints coverage
+(`max(0, 1 - d)^2`, what the shader emits) at each pair's midpoint against both endpoints, as a
+fraction of the disc's mean coverage:
+
+| travelling pair | from lower | from upper |
+|---|---|---|
+| disc -> ring | 1.110 | 0.936 |
+| ring -> polygon | 1.006 | 1.067 |
+| polygon -> star | 0.291 | 0.145 |
+| star -> heart | 0.168 | 0.333 |
+
+The smallest separation is `polygon -> star` at 0.145 from the star side, against the test's 0.02
+floor.
+
+**The shared chunk.** `marks::sdf_wgsl` is prepended by three scenes — `swarm`, `emitter` and
+`shape_field` — and twenty shipped presets sit on those systems: `emitter_driftfield`,
+`emitter_emberjet`, `emitter_heartfall`, `emitter_perseids`, `emitter_petalfall`,
+`fragment_interferencemono` (whose second layer is a `shape_field`), `shape_aperture`,
+`shape_contourmono`, `shape_facet`, `shape_heartmono`, `shape_lion`, `shape_maple`, `shape_pulse`,
+`shape_ringmono`, `shape_strataheart`, `swarm_braid`, `swarm_drift`, `swarm_murmuration`,
+`swarm_shatter` and `swarm_stipple`. Seventeen bind `shape` to a quoted whole constant; the other
+three (`shape_lion`, `shape_maple`, `swarm_drift`) leave it at the default `0`. **None binds it to
+an expression**, so every one of the twenty reaches the identity branch, and the ten renders above
+cover the five values they use between them.
+
+**One behaviour that does change where no preset is involved.** A `[smoothing]` ease or a preset
+dissolve carrying `shape` from one whole setting to another now travels through the blend where it
+used to step at the rounding boundary. No shipped preset can reach that path, and no baseline
+renders one.
+
 ### Notes
+
+- **Phase 1's code did not land in this session's commit.** A prior session was cut off by the
+  usage window mid-phase and its edits were committed unfinished as `56915750`
+  (`wip(marks): phase 1 as the usage limit left it, checks re-run`); this session verified that
+  tree, took the two measurements the phase owed, and committed the log row. The phase's row names
+  both commits.
 
 ### Close triggers
 
