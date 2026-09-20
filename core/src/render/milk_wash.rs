@@ -415,10 +415,17 @@ struct Settled {
 
 impl Settled {
     fn of(at: &[f32]) -> Self {
-        let band: Vec<f32> = at.iter().rev().take(BAND).copied().collect();
-        let level = band.iter().sum::<f32>() / band.len().max(1) as f32;
-        let lo = band.iter().copied().fold(f32::INFINITY, f32::min);
-        let hi = band.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        Self::over(&at.iter().rev().take(BAND).copied().collect::<Vec<f32>>())
+    }
+
+    /// Mean and half-spread over **every** sample handed in, where
+    /// [`Settled::of`] first narrows a checkpoint column to its last [`BAND`].
+    /// Same statistic, different window: the rate probe's tail is already the
+    /// window it wants averaged.
+    fn over(at: &[f32]) -> Self {
+        let level = at.iter().sum::<f32>() / at.len().max(1) as f32;
+        let lo = at.iter().copied().fold(f32::INFINITY, f32::min);
+        let hi = at.iter().copied().fold(f32::NEG_INFINITY, f32::max);
         Self {
             level,
             spread: if level > 0.0 {
@@ -436,3 +443,208 @@ impl Settled {
 /// at all — not where the equilibrium is, which is what the phase measures
 /// (ADR-0071).
 const SETTLED_SPREAD: f32 = 0.20;
+
+// ---------------------------------------------------------------------------
+// The rate probe
+// ---------------------------------------------------------------------------
+
+/// **The rate probe** — Plan 0202 Phase 1.
+///
+/// The same subject as the bisect above, driven at three frame rates over the
+/// **same wall clock**, so the only thing that differs between the runs is how
+/// many frames the engine cut that second into. If a deposit on this path were
+/// per frame and unconverted, the field's equilibrium would rise with the rate
+/// as `1/(1 - d)` does — the shape both remaining washed pairs have.
+///
+/// # Why this is the probe and not a `shot --render` pipeline
+///
+/// `shot --render <clip> --fps N` drives exactly
+/// [`Renderer::capture_stream`](super::Renderer::capture_stream) at `1/N`, and
+/// nothing between that call and the Y4M writer touches the picture — the
+/// encoder path is a colour-space conversion of frames already rendered. So
+/// calling `capture_stream` directly at each rate is the same measurement
+/// without a WAV, an encoder or a video file, and it is deterministic where a
+/// clip is not: the [`AnalysisFrame`] is held constant for the whole run, so the
+/// *only* difference between the three columns is `dt`.
+///
+/// Holding the analysis frame also removes the one confound a clip would add.
+/// The audio hop clock and the frame clock are different clocks, so at 30 fps a
+/// frame spans several hops and at 165 several frames share one — the light the
+/// draw layer lays down would then differ between the runs for a reason that has
+/// nothing to do with the rate conversion under test.
+///
+/// # A ladder, not the two endpoints
+///
+/// The candidate predicts a level **proportional to the rate**, so the two rates
+/// it is stated at would settle it — but they would settle it only as a pair of
+/// numbers, and a pair cannot tell a rate law from a wobble that happens to
+/// straddle them. The ladder spans 11x and brackets both endpoints, which is what
+/// makes "not monotone in the rate" a statement the reading can support.
+const RATES: [f32; 7] = [15.0, 30.0, 45.0, 60.0, 90.0, 120.0, 165.0];
+
+/// The rate every other row is reported against: MilkDrop's own nominal cadence
+/// ([`NOMINAL_FPS`](crate::milk::NOMINAL_FPS)), which is the cadence a `.milk`
+/// author tuned by eye against and the lower of the two rates Plan 0142's log
+/// names.
+const BASE_RATE: f32 = crate::milk::NOMINAL_FPS;
+
+/// Wall-clock seconds each rate is run for. *Fog Tunnel*'s field settles within
+/// about a second and a half at any of [`RATES`] (the bisect's transient is done
+/// by its `f100` checkpoint), so eight seconds is several time constants and the
+/// tail below is well past the climb.
+const RUN_SECONDS: f32 = 8.0;
+
+/// How much of the tail the reported level averages over. A band rather than a
+/// frame, for the reason the bisect's [`BAND`] is one — and **seconds** rather
+/// than frames, because the three runs must average the same stretch of the
+/// preset's own per-frame program or they are not comparable.
+const TAIL_SECONDS: f32 = 2.0;
+
+/// What one rate's run read: the display ground over the tail, and the field's
+/// own level at the last frame.
+struct RateReading {
+    fps: f32,
+    frames: u32,
+    /// Display-referred `edge`, meaned over the last [`TAIL_SECONDS`].
+    display: Settled,
+    /// Linear `edge` at seam A after the run's last frame — the field itself,
+    /// which is where an unconverted deposit would show.
+    field: f32,
+}
+
+/// Drive `source` for [`RUN_SECONDS`] at `fps` and read the ground level.
+fn ground_at_rate(renderer: &mut Renderer, name: &str, fps: f32) -> Option<RateReading> {
+    let dt = 1.0 / fps;
+    let frames = (RUN_SECONDS * fps).round().max(1.0) as u32;
+    let tail_from = frames.saturating_sub((TAIL_SECONDS * fps).round().max(1.0) as u32);
+
+    let mut tail: Vec<f32> = Vec::new();
+    renderer
+        .capture_stream(
+            name,
+            frames,
+            dt,
+            &mut |_| AnalysisFrame::default(),
+            &mut |index, img| {
+                if index >= tail_from {
+                    let linear: Vec<f32> = img.rgba.iter().map(|b| f32::from(*b) / 255.0).collect();
+                    tail.push(edge(&linear, img.width, img.height));
+                }
+                Ok(())
+            },
+        )
+        .expect("the stream capture succeeds");
+
+    Some(RateReading {
+        fps,
+        frames,
+        display: Settled::over(&tail),
+        field: read_linear(renderer, Seam::Field)?,
+    })
+}
+
+/// **Does the converted field's ground level depend on the frame rate?**
+///
+/// Plan 0142's log names a rate mismatch as the candidate behind the two pairs
+/// that are still washed at the ground, and names this probe as the way to
+/// settle it. It **asserts no threshold on the levels** (ADR-0071) — what the
+/// levels are is the measurement, and the comparison between them is recorded in
+/// Plan 0202's implementation log. What it does assert is that the instrument
+/// works: every rate renders, every reading is finite, and each run's tail is a
+/// settled band rather than a point on a climb.
+///
+/// # What it measured
+///
+/// The reading is **printed by the test rather than frozen here**: the question
+/// is a ratio between the rows, and a frozen level would be a golden nobody
+/// could move. What the run prints is the linear `edge` at seam A after the last
+/// frame, the display-referred `edge` meaned over the last [`TAIL_SECONDS`] with
+/// its half-spread, and each row against [`BASE_RATE`] beside the rate ratio
+/// itself — so a level that tracked the rate would read as two matching columns.
+#[test]
+fn the_converted_ground_level_is_read_across_a_frame_rate_ladder() {
+    let preset = Preset::from_toml_str(FOG_TUNNEL).expect("the fixture parses");
+    let name = preset.name.clone();
+
+    let mut renderer = match Renderer::new_headless(HeadlessOptions {
+        width: SIZE,
+        height: SIZE,
+        prefer_software: false,
+    }) {
+        Ok(r) => r,
+        Err(RenderError::RequestAdapter(_)) => {
+            eprintln!("skipped: no GPU adapter on this runner (ADR-0016)");
+            return;
+        }
+        Err(e) => panic!("headless renderer build failed: {e}"),
+    };
+    renderer.set_presets(vec![preset]);
+
+    let mut readings = Vec::with_capacity(RATES.len());
+    for fps in RATES {
+        let Some(reading) = ground_at_rate(&mut renderer, &name, fps) else {
+            panic!("the field seam must read back at {fps} fps");
+        };
+        readings.push(reading);
+    }
+
+    println!(
+        "[rate] fog tunnel, {RUN_SECONDS}s of wall clock, {SIZE}x{SIZE}, tail {TAIL_SECONDS}s"
+    );
+    println!("[rate]    fps  frames       A field     E display  spread");
+    for r in &readings {
+        println!(
+            "[rate] {:>6.0}  {:>6}  {:>12.8}  {:>12.8}  {:>5.2}%",
+            r.fps,
+            r.frames,
+            r.field,
+            r.display.level,
+            r.display.spread * 100.0
+        );
+    }
+    // The comparison the phase is about, printed as the dimensionless quantity
+    // it is: every rate against [`BASE_RATE`], beside the rate ratio itself,
+    // which is what the candidate predicts the level ratio would track.
+    if let Some(base) = readings.iter().find(|r| r.fps == BASE_RATE) {
+        println!("[rate]    fps   rate x    field x  display x");
+        for r in &readings {
+            println!(
+                "[rate] {:>6.0}  {:>7.4}  {:>9.4}  {:>9.4}",
+                r.fps,
+                r.fps / base.fps,
+                ratio(r.field, base.field),
+                ratio(r.display.level, base.display.level),
+            );
+        }
+    }
+
+    for r in &readings {
+        assert!(
+            r.field.is_finite() && r.display.level.is_finite(),
+            "every seam must read a number at {} fps: field {}, display {}",
+            r.fps,
+            r.field,
+            r.display.level
+        );
+        assert!(
+            r.display.level > 0.0,
+            "the washed subject must reach a ground level at {} fps, got {}",
+            r.fps,
+            r.display.level
+        );
+        assert!(
+            r.display.spread < SETTLED_SPREAD,
+            "the tail at {} fps must be a settled band, not a climb: it spread {:.4} \
+             about {:.8}",
+            r.fps,
+            r.display.spread,
+            r.display.level
+        );
+    }
+}
+
+/// `a / b`, or `NaN` when there is no ratio to take — the same guard the bisect's
+/// present-pass gain uses.
+fn ratio(a: f32, b: f32) -> f32 {
+    if b > 0.0 { a / b } else { f32::NAN }
+}

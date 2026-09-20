@@ -1,6 +1,6 @@
 # 0202 — The three mechanisms get their gate
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user)
 > **Owner skill(s):** dev, human
@@ -164,11 +164,12 @@ backlog 0109 asks for an ADR and an interview, and its trigger is this gate's ve
 
 ## Implementation log
 
-**Lane:** _(to be filled by `dev`)_
+**Lane:** `plan-0202-the-three-mechanisms-get-their-gate` in
+`C:\Users\Igor Konovalov\WORK\rlx-plan-0202`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Settle the rate candidate | dev | not started | |
+| 1 — Settle the rate candidate | dev | done | committed with this row |
 | 2 — Repair what Phase 1 convicted | dev | not started | |
 | 3 — The echo nests | dev | not started | |
 | 4 — The waveform scale is measured per mode | dev | not started | |
@@ -176,6 +177,70 @@ backlog 0109 asks for an ADR and an interview, and its trigger is this gate's ve
 | 6 — The corpus census is present-day | human | not started | |
 
 ### Notes
+
+**One red was inherited from the branch point and is not this plan's.**
+`suite hygiene::every_shipped_preset_has_a_gallery_card` fails at `a92857eb`, the commit this lane
+branched from: *"ships with no card: `["cellular_labyrinth", "cellular_wavefront"]`"*. Both presets
+landed in that commit without being added to `CARDS` in `scripts/docs-shots.mjs`, and repairing it
+means editing that script and re-rendering committed stills under `docs/images/` — neither file is in
+any of this plan's phases, and the render is a content-lane act. Recorded here so the state is not
+mistaken for something a phase below did. The baseline it establishes, measured before Phase 1's
+commit: `cargo nextest run --workspace -P fast --no-fail-fast` → **1731 run, 1730 passed, 1 failed,
+317 skipped**, the one failure being that test. Every phase below is checked against that baseline
+rather than against green.
+
+**Phase 1 — the rate probe did not run through `shot --render`, and why.** The conductor session's
+allowlist denies `cargo run` and denies running a built binary out of `target/`, so the command the
+phase names could not be issued. The probe is the same measurement taken one call earlier in the
+same path: `shot --render <clip> --fps N` does nothing but drive
+`Renderer::capture_stream(name, frames, 1/N, ...)` and convert the frames it hands back into Y4M, so
+the probe calls `capture_stream` at each rate directly. It lives in `core/src/render/milk_wash.rs`
+beside the wash bisect, which already owns both washed fixtures and the `edge` statistic. Two
+differences from a clip-driven render, both of which make the reading *cleaner* rather than weaker:
+the `AnalysisFrame` is held constant for the whole run, so the only thing differing between rates is
+`dt` and not also the hop-to-frame mapping; and the run is deterministic, so it is a gated instrument
+rather than a one-off.
+
+**Phase 1 — the reading.** *Geiss - Fog Tunnel*
+(`core/tests/fixtures/milk_wash_fog_tunnel.toml`), 128x128, `AnalysisFrame::default()` held for the
+whole run, 8 s of wall clock at each rate, level meaned over the last 2 s. Machine: dev box, Windows
+10 Home x86_64. Tree: this lane at `a92857eb` plus the probe this row commits. Command:
+
+```
+node tools/conductor/with-lock.mjs suite -- cargo nextest run -p rlx-core --lib \
+  -E 'test(the_converted_ground_level_is_read_across_a_frame_rate_ladder)' --no-capture
+```
+
+`A field` is the linear `edge` at the feedback field after the last frame; `E display` is the
+display-referred `edge` meaned over the tail, with the tail's half-spread beside it.
+
+```text
+   fps  frames       A field     E display  spread     rate x    field x  display x
+    15     120    0.04549802    0.23894683   1.70%     0.5000     0.6698     0.8106
+    30     240    0.06792919    0.29478151   0.87%     1.0000     1.0000     1.0000
+    45     360    0.07412413    0.31072101   1.56%     1.5000     1.0912     1.0541
+    60     480    0.07673959    0.31705654   1.72%     2.0000     1.1297     1.0756
+    90     720    0.07632069    0.31714568   1.90%     3.0000     1.1235     1.0759
+   120     960    0.07156828    0.30849582   2.20%     4.0000     1.0536     1.0465
+   165    1320    0.06162050    0.28800330   1.67%     5.5000     0.9071     0.9770
+```
+
+**Phase 1 — the finding: the rate candidate is falsified, so Phase 2 does not run.** The two rates
+the phase names read `0.29478` and `0.28800` at the display and `0.06793` and `0.06162` at the
+field — differences of `0.0068` and `0.0063`, both inside the `0.02` mean channel difference this
+repository treats as ordinary drift (`docs/testing.md`, the golden compare's tolerance). The
+candidate's own prediction is the `rate x` column: an unconverted per-frame deposit into a field
+whose equilibrium gain is `1/(1 - d)` would read `5.5x` higher at 165 fps than at 30. It reads
+`0.977x`. Across the ladder's 11x span the level is not monotone in the rate at all — it rises to a
+peak somewhere between 60 and 90 fps and falls away on both sides, ending below where it started.
+That is a bounded hump, not a rate law.
+
+**Phase 1 — what the phase did not settle.** A residual remains: `+13 %` at the field between 30 and
+60 fps, and `-19 %` between 60 and 15. It is real (each row's tail spread is under `2.2 %`) and it is
+unattributed. Two per-frame mechanisms in this path cannot be `dt`-converted even in principle and
+are where to look first — each frame is one bilinear resample of the whole field through the warp
+mesh, and each frame applies the 8-bit quantize floor (ADR-0118) once — but neither was tested here
+and neither has the candidate's shape.
 
 ### Close triggers
 
