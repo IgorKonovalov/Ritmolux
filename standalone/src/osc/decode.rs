@@ -27,6 +27,8 @@
 //! in aggregate through the `health` event; `ctl/ping` exists so a studio can
 //! tell a dead player from a quiet one.
 
+use crate::marks::Mark;
+
 /// The control vocabulary's address prefix — the telemetry root plus `ctl`.
 ///
 /// Versioned in the address exactly as telemetry is: a later action is additive
@@ -142,6 +144,13 @@ pub enum Action {
     Preset { name: Name },
     /// The console's transport, by name.
     Transport(Transport),
+    /// Set or clear a mark on a preset, by name (ADR-0229).
+    ///
+    /// A **state**, not a press: the sender says what the mark should be, so a
+    /// surface that restates what it already set changes nothing. The player
+    /// is the only writer of the marks file, which is what this message exists
+    /// to make possible.
+    Mark { name: Name, mark: Mark, on: bool },
     /// Answered by a `pong` event carrying the same nonce.
     Ping(i32),
 }
@@ -155,6 +164,7 @@ impl Action {
             Action::ClearParams => "/rlx/v1/ctl/params/clear",
             Action::Preset { .. } => "/rlx/v1/ctl/preset",
             Action::Transport(_) => "/rlx/v1/ctl/transport",
+            Action::Mark { .. } => "/rlx/v1/ctl/mark",
             Action::Ping(_) => "/rlx/v1/ctl/ping",
         }
     }
@@ -177,6 +187,15 @@ impl Action {
             }
             Action::ClearParams => super::encode(buf, address, &[]),
             Action::Transport(verb) => super::encode(buf, address, &[Arg::S(verb.as_str())]),
+            Action::Mark { name, mark, on } => super::encode(
+                buf,
+                address,
+                &[
+                    Arg::S(name.as_str()),
+                    Arg::S(mark.as_str()),
+                    Arg::I(i32::from(*on)),
+                ],
+            ),
             Action::Ping(nonce) => super::encode(buf, address, &[Arg::I(*nonce)]),
         }
     }
@@ -287,6 +306,21 @@ pub fn decode(datagram: &[u8]) -> Result<Action, Reject> {
             }
             let raw = read_string(datagram, &mut pos).ok_or(Reject::Malformed)?;
             Action::Transport(Transport::parse(raw).ok_or(Reject::Unusable)?)
+        }
+        "/rlx/v1/ctl/mark" => {
+            if tags != "ssi" {
+                return Err(Reject::WrongArguments);
+            }
+            let raw = read_string(datagram, &mut pos).ok_or(Reject::Malformed)?;
+            let name = Name::new(raw).ok_or(Reject::Unusable)?;
+            let mark = read_string(datagram, &mut pos).ok_or(Reject::Malformed)?;
+            let mark = Mark::from_name(mark).ok_or(Reject::Unusable)?;
+            // Any non-zero integer is "on". A `1`/`0` sender and a `-1`/`0` one
+            // both mean the same thing, and refusing the second would be this
+            // decoder inventing a rule the type does not carry.
+            let on =
+                i32::from_be_bytes(read_word(datagram, &mut pos).ok_or(Reject::Malformed)?) != 0;
+            Action::Mark { name, mark, on }
         }
         "/rlx/v1/ctl/ping" => {
             if tags != "i" {

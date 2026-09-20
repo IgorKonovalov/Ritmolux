@@ -177,6 +177,18 @@ pub enum Event<'a> {
         /// The pixel format, as bytes on the wire.
         format: &'a str,
     },
+    /// The user's marks on the library — on start, and whenever they change
+    /// (ADR-0229).
+    ///
+    /// **Unsolicited, and that is the point.** The player is the only writer of
+    /// the marks file, so a mark made from its own hotkey has to reach a studio
+    /// that did not ask; a request/reply shape would miss exactly that.
+    Marks {
+        /// Names marked favourite, sorted.
+        favourite: &'a [&'a str],
+        /// Names marked hidden, sorted.
+        hidden: &'a [&'a str],
+    },
     /// The answer to a `ctl/ping`, carrying its nonce.
     Pong {
         /// The nonce the ping carried.
@@ -195,6 +207,7 @@ impl Event<'_> {
             Event::PresetWarning { .. } => "preset_warning",
             Event::Health { .. } => "health",
             Event::Stream { .. } => "stream",
+            Event::Marks { .. } => "marks",
             Event::Pong { .. } => "pong",
         }
     }
@@ -316,6 +329,10 @@ impl Event<'_> {
                 out.push_str(",\"format\":");
                 out.push_str(&json_string(format));
             }
+            Event::Marks { favourite, hidden } => {
+                push_names(&mut out, "favourite", favourite);
+                push_names(&mut out, "hidden", hidden);
+            }
             Event::Pong { nonce } => out.push_str(&format!(",\"nonce\":{nonce}")),
         }
         out.push_str("}\n");
@@ -349,6 +366,22 @@ fn push_optional_u64(out: &mut String, key: &str, value: Option<u64>) {
         Some(value) => out.push_str(&value.to_string()),
         None => out.push_str("null"),
     }
+}
+
+/// A field that is an array of escaped strings. Always present, empty when
+/// there are none — a consumer reads a fixed shape, and an absent key would make
+/// "no marks" indistinguishable from a build that does not carry them.
+fn push_names(out: &mut String, key: &str, names: &[&str]) {
+    out.push_str(",\"");
+    out.push_str(key);
+    out.push_str("\":[");
+    for (i, name) in names.iter().enumerate() {
+        if i > 0 {
+            out.push(',');
+        }
+        out.push_str(&json_string(name));
+    }
+    out.push(']');
 }
 
 fn push_optional_str(out: &mut String, key: &str, value: Option<&str>) {
@@ -538,6 +571,17 @@ mod tests {
                 fps: 30,
                 format: "rgba8",
             },
+            Event::Marks {
+                favourite: &["Gyre", "quoted \"name\""],
+                hidden: &["Multibrot"],
+            },
+            // Both sets empty, which is every fresh install: the keys stay,
+            // because an absent one would make "no marks" indistinguishable
+            // from a build that does not carry them.
+            Event::Marks {
+                favourite: &[],
+                hidden: &[],
+            },
             Event::Pong { nonce: -7 },
         ]
     }
@@ -636,6 +680,7 @@ mod tests {
             [
                 "health",
                 "hello",
+                "marks",
                 "pong",
                 "preset",
                 "preset_error",
@@ -645,6 +690,44 @@ mod tests {
             "the rendered roster moved; `roster` here covers every event but \
              `roster` itself, which needs an owned slice"
         );
+    }
+
+    /// **The `marks` line carries both sets whole**, and both keys even when
+    /// there is nothing in them.
+    ///
+    /// Whole sets rather than a delta, because a parent that missed a line
+    /// cannot reconstruct the state from the next one — and both keys always,
+    /// because "no marks" and "a build that does not carry them" are different
+    /// facts a parent branches on.
+    #[test]
+    fn the_marks_line_carries_both_sets_and_keeps_both_keys_when_empty() {
+        let line = Event::Marks {
+            favourite: &["Gyre", "Seahorse"],
+            hidden: &["Multibrot"],
+        }
+        .line();
+        assert!(
+            line.contains("\"favourite\":[\"Gyre\",\"Seahorse\"]"),
+            "{line}"
+        );
+        assert!(line.contains("\"hidden\":[\"Multibrot\"]"), "{line}");
+
+        let empty = Event::Marks {
+            favourite: &[],
+            hidden: &[],
+        }
+        .line();
+        assert!(empty.contains("\"favourite\":[]"), "{empty}");
+        assert!(empty.contains("\"hidden\":[]"), "{empty}");
+
+        // A preset name comes off a user's disk, so a quote in one must not be
+        // able to produce a line the parent cannot parse.
+        let quoted = Event::Marks {
+            favourite: &["a \"quoted\" name"],
+            hidden: &[],
+        }
+        .line();
+        assert!(is_one_object(quoted.trim_end()), "{quoted}");
     }
 
     /// **The `health` line carries the listener's three readings**, and carries

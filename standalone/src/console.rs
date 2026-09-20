@@ -402,26 +402,6 @@ pub fn action_for_transport(
 // Staging — what the rotation will take
 // ---------------------------------------------------------------------------
 
-/// The preset a rotation would land on next, given the roster and the active
-/// position.
-///
-/// **The rotation's *which* is the roster's successor, not a director
-/// decision.** [`crate::director::Director`] decides *when* to rotate and
-/// nothing else — it returns a reason and the shell calls `cycle_preset`, which
-/// steps the roster forward and wraps. So the honest source for a "next up" line
-/// is the roster, and the test that keeps it honest compares this against the
-/// name `cycle_preset` then returns rather than against anything the director
-/// holds.
-///
-/// `None` on a roster with fewer than two entries: there is no next, and saying
-/// so is better than naming the preset already on screen.
-pub fn next_up<'a>(names: &[&'a str], active: usize) -> Option<&'a str> {
-    if names.len() < 2 {
-        return None;
-    }
-    names.get((active + 1) % names.len()).copied()
-}
-
 /// A roster position picked from `seed`, never the one already showing.
 ///
 /// Drawn out of the caller's own state rather than from a clock or an added
@@ -460,9 +440,12 @@ pub fn previous_index(count: usize, active: usize) -> Option<usize> {
 /// The standing line naming what a rotation takes next, and whether hands-off
 /// rotation is even running.
 ///
-/// Says *why* there is nothing to name rather than naming a guess: a roster of
-/// one has no successor, and an operator reading "next: —" needs to know which
-/// of the two states they are in.
+/// `next` is the traversal's own upcoming draw rather than the roster's
+/// successor: rotation walks a shuffled traversal of the presets the user's
+/// marks leave eligible, so an index one higher is not what it takes.
+///
+/// Says *why* there is nothing to name rather than naming a guess: an operator
+/// reading "next: —" needs to know which of the two states they are in.
 pub fn staging_line(next: Option<&str>, auto: bool, dwell: (u32, u32)) -> Line {
     // The dwell bounds ride here because the two nudge controls change a number
     // with no other reading on the surface: a `dwell -` that reports nothing
@@ -475,7 +458,7 @@ pub fn staging_line(next: Option<&str>, auto: bool, dwell: (u32, u32)) -> Line {
             format!("next up  -  {name}  (auto off)      dwell {min}-{max} s")
         }
         (None, _) => format!(
-            "next up  -  nothing to rotate to; the roster holds one preset      dwell {min}-{max} s"
+            "next up  -  nothing to rotate to; no presets are loaded      dwell {min}-{max} s"
         ),
     };
     Line::new(

@@ -10,7 +10,7 @@
 > [0202](../adrs/0202-a-written-count-of-the-systems-is-refused-by-a-gate.md)
 > **Closes:** design-backlog 0258
 > **Takes:** design-backlog 0256 — the **instrument half** only. That entry stays live for the curation
-> question behind it, whose evidence is what [Plan 0205](0205-the-library-becomes-navigable.md) builds.
+> question behind it, whose evidence is what [Plan 0205](done/0205-the-library-becomes-navigable.md) builds.
 
 ## TL;DR
 
@@ -168,7 +168,7 @@ flowchart LR
 
 - **It does not answer whether the library should ship less and better.** That is backlog 0256's live
   half, it needs a person and the app, and its evidence is the favourite/hidden marks
-  [Plan 0205](0205-the-library-becomes-navigable.md) builds. This plan gives the question an instrument
+  [Plan 0205](done/0205-the-library-becomes-navigable.md) builds. This plan gives the question an instrument
   that covers the whole library and stops there.
 - **It does not retire or replace any preset**, and it does not move a threshold to make a flag go away
   (Phase 2).

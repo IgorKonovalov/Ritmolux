@@ -4,7 +4,8 @@ The behavioral contract for the two channels a parent process drives and reads t
 through: the OSC control-in vocabulary under `/rlx/v1/ctl/`, and the structured event stream on
 standard error. It states what must be true of the running system, not how it is implemented.
 
-> **Where it lives:** `standalone/src/osc/decode.rs` (the vocabulary and the wire decoder),
+> **Where it lives:** `standalone/src/marks.rs` (the mark store the `ctl/mark` row writes),
+> `standalone/src/osc/decode.rs` (the vocabulary and the wire decoder),
 > `standalone/src/osc/encode.rs` (the wire encoder both directions share),
 > `standalone/src/control.rs` (the listener, the bounded queue and the renderer-side applier),
 > `standalone/src/events.rs` (the event roster and its writer),
@@ -36,6 +37,7 @@ changing or removing one moves the version segment.
 | `/rlx/v1/ctl/params/clear` | none | Drop every override |
 | `/rlx/v1/ctl/preset` | `s name` | Dissolve to the named preset |
 | `/rlx/v1/ctl/transport` | `s next\|prev\|auto\|hold` | The console's transport, by name |
+| `/rlx/v1/ctl/mark` | `s name`, `s favourite\|hidden`, `i state` | Set (non-zero) or clear (`0`) that mark on the named preset |
 | `/rlx/v1/ctl/ping` | `i nonce` | Answered by a `pong` event carrying the nonce |
 
 ## The event roster
@@ -52,6 +54,7 @@ Adding an event or a field is additive under the same `v`; changing or removing 
 | `preset_warning` | `file`, `message`, `param` | A preset loaded with a non-fatal problem; `param` labels the binding it is about as `preset_error`'s does, or is `null` ([ADR-0192](../adrs/0192-a-preset-warning-names-its-parameter.md)) |
 | `health` | `fps`, `frame_ms_p50`, `frame_ms_p99`, `ctl_rejected`, `ctl_dropped`, `ctl_refused`, `ctl_received`, `ctl_recv_errors`, `ctl_listening`, `preview_sent`, `preview_dropped` | Once a second while frames are drawn |
 | `stream` | `width`, `height`, `fps`, `format` (`rgba8` \| `bgra8`) | Once, before the first frame on a frame pipe |
+| `marks` | `favourite`, `hidden` | On start, after the first `roster`, and whenever either set changes — **including a change the player made itself** ([ADR-0229](../adrs/0229-the-studio-marks-a-preset-over-the-control-protocol.md)) |
 | `pong` | `nonce` | Answering a `ctl/ping` |
 
 ## Invariants
@@ -93,6 +96,28 @@ Adding an event or a field is additive under the same `v`; changing or removing 
   would drift. (ADR-0143)
 - `auto` and `hold` are **positions, not presses**. Each is inert when rotation is already where
   it asks for. A control surface that repeats its state MUST NOT thereby toggle rotation off.
+- `prev` MUST step back through the presets the player **actually showed**, not to the roster
+  position one lower. Rotation walks a shuffled traversal of the presets the user's marks leave
+  eligible ([ADR-0228](../adrs/0228-a-preset-mark-is-user-state-keyed-by-name-in-its-own-file.md)),
+  so the two stopped being the same thing; a run that has shown nothing yet has no trail to walk and
+  falls back to the roster's predecessor. This is the same step the player's own key and the
+  console's strip take, through the one applier the invariant above requires.
+- A `ctl/mark` MUST apply **exactly as the player's own hotkey does** and persist identically: the
+  player is the only writer of the marks file, and the studio never opens it (ADR-0229). A mark is a
+  **state**, so a surface restating a mark it already set changes nothing, writes nothing and
+  reports nothing.
+- A `ctl/mark` naming a preset the roster does not hold MUST be **refused and reported**, never
+  silently stored — as a `preset_error` naming what was asked for, the shape ADR-0221 already uses
+  for a refused `ctl/preset`. A mark kept for a name nothing holds would grow a file nothing prunes,
+  off a channel the user never sees.
+- `marks` MUST carry **both sets whole**, and both keys even when empty. A parent that missed a
+  line cannot reconstruct the state from a delta, and an absent key would make "no marks"
+  indistinguishable from a player that does not carry them. Marks change at human rate, so the
+  whole-state cost is paid per keypress rather than per frame.
+- `marks` MUST be emitted for a change the **player itself** made, not only for one a studio asked
+  for. That is ADR-0229's stated cost and the thing a request/reply shape would miss: the studio has
+  to learn about a mark it did not set. It is emitted after the first `roster`, because a parent
+  joins the two by name.
 - An override MUST survive until it is cleared, and MUST be dropped by a preset change and by any
   preset reload — the file is the durable channel and the socket the live one, so a save wins.
   (ADR-0176)
@@ -201,6 +226,11 @@ Adding an event or a field is additive under the same `v`; changing or removing 
 - WHEN a truncated, over-long or mistyped datagram arrives THEN it is refused and counted, the
   queue is untouched, and the process continues.
 - WHEN `ctl/transport auto` arrives while rotation is already on THEN nothing happens.
+- WHEN a `ctl/mark` names a loaded preset THEN the mark is applied and persisted exactly as the
+  player's own key applies it, and a `marks` event carrying both sets goes out. WHEN it names a
+  preset the roster does not hold THEN nothing is stored and a `preset_error` naming it goes out.
+- WHEN a mark is made from the player's **own** keyboard THEN a `marks` event goes out just the
+  same, so a studio that did not ask still learns about it.
 - WHEN a `ctl/ping` arrives THEN a `pong` carrying the same nonce goes out on the event stream —
   the one message answered individually, because it exists to tell a dead player from a quiet one.
 - WHEN the player starts without `--events` THEN standard error carries no line beginning with `{`.
@@ -244,6 +274,17 @@ and it is here so a reader who wants the history has it in one place rather than
   needs to be able to state a position; and `hello` is the first *event* rather than the first
   *line*, because the port it reports cannot be known until the per-user directory has been
   migrated and the config read, and those steps have their own things to say.
+
+**Added 2026-09-20**, from one plan:
+
+- **[Plan 0205](../plans/done/0205-the-library-becomes-navigable.md) Phase 5** added the `ctl/mark`
+  message and the `marks` event, on ADR-0229's decision that the player stays the only writer of
+  the marks file. This is the first row on either table that is about **library state** rather than
+  about the frame being rendered, which ADR-0229 names as a genuine widening of what the protocol
+  is for; the open question it leaves is whether a second such message would be a pattern or a
+  smell. The same phase corrected the `prev` invariant, which had said "the roster's predecessor":
+  Phase 2 of that plan made rotation a shuffled traversal, and a step back is now through what was
+  actually shown.
 
 **Added 2026-09-10**, from one plan:
 

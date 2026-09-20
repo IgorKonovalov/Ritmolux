@@ -82,7 +82,7 @@ match.
 ### Neutral
 - The curation question behind backlog 0256 — whether the library should ship less and better — is
   untouched. This decision is about the instrument, and the evidence for that question is what
-  [Plan 0205](../plans/0205-the-library-becomes-navigable.md) builds.
+  [Plan 0205](../plans/done/0205-the-library-becomes-navigable.md) builds.
 
 ## Alternatives considered
 

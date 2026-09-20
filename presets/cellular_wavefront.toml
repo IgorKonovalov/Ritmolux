@@ -1,0 +1,73 @@
+# Wavefront - the cyclic automaton run long and shallow: twelve colours round the cycle and a
+# threshold of one, so a cell advances the moment a single neighbour is ahead of it. Noise collapses
+# into expanding wavefronts that annihilate where they meet, and what survives is a standing
+# marbled damask - broad interlocking terraces that keep turning over without ever coarsening into
+# spirals. Against a duotone loop - black up through magenta to cream and back - the twelve states
+# read as ripples of light on dark metal rather than as a colour wheel.
+#
+# On the rule: cellular_spiral_bloom's header records a sweep finding that a shallow threshold at
+# these state counts "folds into blocky terraces rather than spirals". That is the same finding,
+# and this preset is the terraces taken as the subject instead of as the failure - which is why it
+# runs twelve states against that preset's three, and a duotone loop against its colour wheel.
+#
+# What drives what:
+#   bass      -> step_rate: the wavefronts travel on the low end (5..14 generations/s).
+#   mid       -> saturation: a busy midrange pushes the ripples to full magenta; a thin passage
+#                leaves them nearly ashen.
+#   onset     -> reseed: a hard hit drops a disc of noise, which boils and throws a new pair of
+#                cores; time -> a floor every 15 s.
+#   time      -> hue: a slow walk round the loop, so the whole plate turns through the cycle.
+#   treb      -> palette_mix: a genuinely bright top end throws the whole plate over to the cold
+#                loop and back. It SNAPS rather than rests: the two loops are complementary, so a
+#                mix parked half way averages them to grey - measured, the loud frame read ashen
+#                while the quiet one read magenta. The smoothstep sits between treb's typical
+#                level and its peak, so the plate rests on one loop or the other and crosses
+#                quickly, the way a partial ink_amount is a transition and not a resting value.
+system = "cellular"
+name = "Wavefront"
+
+[generator]
+seed = 3
+
+[cellular]
+family = "cyclic"
+grid = 200
+wrap = true
+
+[params]
+# Twelve states at threshold 1. The shallow threshold is what makes this a wavefront rule rather
+# than a spiral one: a front advances on a single neighbour, so it travels a cell a generation.
+states = "12"
+threshold = "1"
+step_rate = "5 + clamp(bass * 10.6, 0, 9)"
+reseed = "max(onset > 0.75, mod(time, 15) < 0.2)"
+hue = "mod(time * 0.008, 1)"
+saturation = "0.55 + clamp(mid * 0.53, 0, 0.45)"
+brightness = "0.85"
+palette_mix = "smoothstep(0.45, 0.8, treb)"
+
+[smoothing]
+step_rate = 0.35
+saturation = 0.3
+palette_mix = 0.5
+
+# Both loops close - the last stop returns to the first colour - so the cycle's wrap has no seam.
+# Each runs dark at both ends and bright in the middle, which is what turns twelve flat states
+# into a ripple rather than a wheel.
+[palette]
+stops = [
+  { at = 0.000, color = "#0a0414" },   # black
+  { at = 0.280, color = "#a81f7a" },   # magenta
+  { at = 0.500, color = "#ffe6c2" },   # cream crest
+  { at = 0.720, color = "#a81f7a" },   # magenta
+  { at = 1.000, color = "#0a0414" },   # black again
+]
+
+[palette_b]
+stops = [
+  { at = 0.000, color = "#04101a" },   # black
+  { at = 0.280, color = "#1f7aa8" },   # steel cyan
+  { at = 0.500, color = "#ddfbff" },   # ice crest
+  { at = 0.720, color = "#1f7aa8" },   # steel cyan
+  { at = 1.000, color = "#04101a" },   # black again
+]

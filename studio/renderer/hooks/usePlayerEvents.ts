@@ -10,6 +10,18 @@ import { useEffect, useState } from 'react'
 import type { HealthEvent, HelloEvent, PlayerEvent, StreamEvent } from '@shared/protocol'
 
 /**
+ * The user's opinion of the library, as the player last reported it.
+ *
+ * Two sets rather than a per-name flag: the event carries them whole, and
+ * rebuilding a map per line would be a second shape to keep in step with a
+ * first that is already correct.
+ */
+export interface Marks {
+  favourite: string[]
+  hidden: string[]
+}
+
+/**
  * A preset that failed or complained, as the banner shows it and as the editor
  * places it.
  *
@@ -47,6 +59,16 @@ export interface PlayerState {
     family: string | null
   }
   roster: string[]
+  /**
+   * The marks the player holds, or `undefined` until it has reported any.
+   *
+   * **`undefined` and two empty sets are different states** (ADR-0229): the
+   * first is a studio with no player attached, which does not know which
+   * library is loaded and therefore knows nothing about its marks; the second
+   * is a player that says nothing is marked. A view that folded the two would
+   * tell the user the library has no favourites when it has not been asked.
+   */
+  marks?: Marks
   /** Where the watcher is looking, or `null` when nothing resolved. */
   dir: string | null
   /**
@@ -85,6 +107,10 @@ function reduce(state: PlayerState, event: PlayerEvent): PlayerState {
       }
     case 'roster':
       return { ...state, roster: event.names, dir: event.dir, reloads: state.reloads + 1 }
+    case 'marks':
+      // Replaced whole, never merged: the line is the state, and a merge would
+      // keep a name the player has just unmarked.
+      return { ...state, marks: { favourite: event.favourite, hidden: event.hidden } }
     case 'preset_error':
       return {
         ...state,

@@ -1,8 +1,8 @@
 # ADR-0229 — The studio marks a preset over the control protocol, never by opening the file
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-20 ([Plan 0205](../plans/done/0205-the-library-becomes-navigable.md))
 > **Date:** 2026-09-19
-> **Related plan(s):** [0205](../plans/0205-the-library-becomes-navigable.md)
+> **Related plan(s):** [0205](../plans/done/0205-the-library-becomes-navigable.md)
 > **Relates to:** [ADR-0176](0176-the-player-is-driven-over-osc-control-in-and-reports-on-its-standard-streams.md)
 > (the protocol), [ADR-0177](0177-a-fourth-skill-lane-builds-the-studio.md) (the lane boundary),
 > [ADR-0228](0228-a-preset-mark-is-user-state-keyed-by-name-in-its-own-file.md) (what a mark is),

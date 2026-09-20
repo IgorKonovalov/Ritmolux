@@ -1692,7 +1692,7 @@ the interesting half of the question has no statistic.
   a list ([ADR-0234](adrs/0234-an-instruments-system-roster-is-derived-from-the-enum-the-engine-reads.md)).
   **This entry stays live for the half that matters more** — whether the library should ship less and
   better — which needs a person, an evening and the app, and whose evidence is the favourite/hidden
-  marks [Plan 0205](plans/0205-the-library-becomes-navigable.md) builds. Plan 0209 Phase 2 reads the
+  marks [Plan 0205](plans/done/0205-the-library-becomes-navigable.md) builds. Plan 0209 Phase 2 reads the
   widened report and is forbidden from tuning a threshold to quiet it, so its output is input here.
 
 ### Priority

@@ -1,0 +1,66 @@
+# Labyrinth - the mazectric rule (B3/S1234) drawn in white chalk on black. Dense soup knots itself
+# into corridors within a few generations and then holds, so the look is not the growth but the
+# erosion: a disc of fresh soup lands on the beat, eats a bite out of the maze, and the bite glows
+# amber while it re-knits into new corridors over the following second.
+#
+# The grid is the stroke width. At 40 cells a side a one-cell wall is a wide strip and the figure
+# reads as a labyrinth you could trace; at the 130 this started on it reads as texture instead.
+# That is the one knob to turn if the corridors ever want to be finer - nothing else here sets it.
+#
+# What drives what:
+#   mid       -> step_rate: corridors re-knit faster on a busy passage (6..14 generations/s).
+#   beat      -> reseed: on a little over half the hits (hash of the beat count) a disc lands and
+#                eats a bite; time -> a floor every 5 s so a quiet track still erodes.
+#   bass      -> trail: a heavy passage holds a bitten region's amber longer before it sinks.
+#   treb      -> palette_contour: bright top end sharpens the engraved edge.
+#   noise     -> hue: a slow wander of a few percent, so the chalk warms rather than shifts.
+#
+# On the palette, honestly: a settled maze is two-tone, because every wall is live and sits at the
+# palette ORIGIN - which is why that stop is white and why the rest of the ramp is not what you
+# usually see. The four bands and their contour lines are what a BITTEN region blooms into while it
+# re-knits, a transient after each reseed rather than a resting state. Swept against a neutral grey
+# ramp, a bone one and a cool blue one at this grid: all four read as the same white maze at rest,
+# and they differ only in that bloom, which is the argument for the warm one - it is the only
+# colour event the look has.
+system = "cellular"
+name = "Labyrinth"
+
+[generator]
+seed = 17
+
+[cellular]
+family = "life_like"
+grid = 40
+wrap = true
+
+[params]
+# B3/S1234 - mazectric. Bit k set means k neighbours: birth 8 is bit 3; survive 30 is bits 1-4
+# (2 + 4 + 8 + 16). Swept against the plain maze rule S12345 (62): 62 knots into short stubs,
+# 30 runs the long straight corridors that make the figure read as a labyrinth.
+birth = "8"
+survive = "30"
+step_rate = "6 + clamp(mid * 9.4, 0, 8)"
+reseed = "max(beat * (hash(beat_index * 2.9) > 0.4), mod(time, 5) < 0.2)"
+trail = "22 + clamp(bass * 14.1, 0, 12)"
+age_tint = "0.9"
+palette_steps = "4"
+palette_contour = "0.5 + clamp(treb * 0.5, 0, 0.3)"
+palette_contour_style = "3"
+palette_contour_ink = "0.04"
+hue = "noise(time * 0.025) * 0.05"
+brightness = "0.9"
+saturation = "0.9"
+
+[smoothing]
+trail = 0.45
+step_rate = 0.3
+palette_contour = 0.25
+
+[palette]
+stops = [
+  { at = 0.00, color = "#ffffff" },   # chalk - the standing walls
+  { at = 0.18, color = "#ffe6b0" },   # warm edge, just bitten
+  { at = 0.44, color = "#e0942c" },   # amber
+  { at = 0.72, color = "#6b3410" },   # burnt
+  { at = 1.00, color = "#0a0503" },   # black
+]

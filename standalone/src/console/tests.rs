@@ -329,6 +329,7 @@ fn view() -> crate::settings::SettingsView {
         input_editable: true,
         preset_name: true,
         now_playing: true,
+        next_rotation: true,
         console: false,
         preset_dir: String::new(),
     }
@@ -397,13 +398,11 @@ fn the_predecessor_wraps_and_an_empty_roster_has_none() {
 }
 
 #[test]
-fn a_roster_of_one_stages_nothing_and_says_so() {
-    assert_eq!(next_up(&["only"], 0), None);
-    assert_eq!(next_up(&[], 0), None);
+fn an_empty_roster_stages_nothing_and_says_so() {
     let line = staging_line(None, true, DWELL);
     assert!(
         line.text.contains("nothing to rotate to"),
-        "a roster with no successor must say why rather than name a guess: {}",
+        "a run with nothing to rotate to must say why rather than name a guess: {}",
         line.text
     );
 }
@@ -412,9 +411,7 @@ fn a_roster_of_one_stages_nothing_and_says_so() {
 /// operator reading a name knows whether anything will act on it.
 #[test]
 fn the_staging_line_names_the_successor_and_the_rotation_state() {
-    let names = ["a", "b", "c"];
-    let next = next_up(&names, 1).expect("a three-preset roster has a successor");
-    assert_eq!(next, "c");
+    let next = "c";
 
     let on = staging_line(Some(next), true, DWELL);
     assert!(on.text.contains('c'), "{}", on.text);
@@ -424,27 +421,25 @@ fn the_staging_line_names_the_successor_and_the_rotation_state() {
     assert!(off.text.contains("auto off"), "{}", off.text);
 }
 
-/// **The announced name is the one the rotation then takes.**
+/// **The announced name is the one the rotation then takes**, against the
+/// shipped roster rather than a hand-written one.
 ///
-/// The one assertion here that cannot be made against `next_up` alone: a pure
-/// test of the successor rule would only restate the rule. So this drives a real
+/// The staging line is fed by the traversal's own peek, so this drives a real
 /// [`Director`](crate::director::Director) to a real rotation and compares what
-/// the console announced *beforehand* with the name `cycle_preset` returns
-/// *afterwards*, against the shipped roster.
+/// the console would have announced *beforehand* with the name the draw returns
+/// *afterwards*. The rule itself is asserted next door in `director/tests.rs`;
+/// what this adds is the shipped library and the director firing.
 ///
 /// Needs a GPU device for the roster, so it takes ADR-0016's skip shape.
-///
-/// **There is no shuffled or random rotation policy to cover.** The director
-/// decides only *when*; `cycle_preset` steps the roster forward and wraps, so a
-/// single next preset always exists. The phase's "says so rather than naming a
-/// guess" branch is reachable only through a roster too short to have a
-/// successor, which `a_roster_of_one_stages_nothing_and_says_so` covers.
 #[test]
 fn the_staged_name_is_the_one_the_rotation_then_takes() {
+    use crate::director::{Traversal, eligible_names};
     use rlx_core::dsp::AnalysisFrame;
     use rlx_core::render::{HeadlessOptions, RenderError, Renderer};
+    use standalone::config::RotateSource;
+    use standalone::marks::Marks;
 
-    let mut renderer = match Renderer::new_headless(HeadlessOptions {
+    let renderer = match Renderer::new_headless(HeadlessOptions {
         width: 64,
         height: 64,
         prefer_software: true,
@@ -465,17 +460,27 @@ fn the_staged_name_is_the_one_the_rotation_then_takes() {
         min_dwell_secs: 0,
         max_dwell_secs: 0,
         track_change: false,
+        ..standalone::config::Rotate::default()
     });
 
-    let names: Vec<&str> = renderer.preset_names().collect();
+    let marks = Marks::default();
+    let eligible = eligible_names(renderer.preset_names(), &marks, RotateSource::All);
     assert!(
-        names.len() > 1,
-        "the embedded roster needs a successor for this to say anything"
+        eligible.len() > 1,
+        "the embedded roster needs more than one eligible preset for this to \
+         say anything"
     );
-    let announced = next_up(&names, renderer.active_index()).map(str::to_owned);
+
+    let mut traversal = Traversal::new(renderer.preset_names().count() as u32);
+    let announced = traversal
+        .peek(&eligible)
+        .map(str::to_owned)
+        .expect("a multi-preset roster stages a next");
+    let staged = staging_line(Some(&announced), true, DWELL);
     assert!(
-        announced.is_some(),
-        "a multi-preset roster stages a successor"
+        staged.text.contains(&announced),
+        "the staging line did not carry the announced name: {}",
+        staged.text
     );
 
     let fired = director.advance(1.0 / 60.0, &AnalysisFrame::default());
@@ -485,13 +490,12 @@ fn the_staged_name_is_the_one_the_rotation_then_takes() {
          test is comparing against a rotation that never happened"
     );
 
-    let taken = renderer.cycle_preset().to_owned();
+    let taken = traversal.draw(&eligible).expect("a non-empty eligible set");
     assert_eq!(
-        announced.as_deref(),
-        Some(taken.as_str()),
+        taken, announced,
         "the console announced a different preset than the rotation took — the \
-         staging line is computed from something other than what cycle_preset \
-         steps through"
+         staging line is computed from something other than the traversal the \
+         rotation draws from"
     );
 }
 

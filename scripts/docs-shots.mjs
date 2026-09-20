@@ -167,10 +167,12 @@ const CARDS = [
   "attractor_walkknot",
   "attractor_walkrho",
   "attractor_walkthomas",
-  // cellular (3)
+  // cellular (5)
   "cellular_ember_life",
+  "cellular_labyrinth",
   "cellular_spiral_bloom",
   "cellular_tide_bugs",
+  "cellular_wavefront",
   // emitter (5)
   "emitter_driftfield",
   "emitter_emberjet",
