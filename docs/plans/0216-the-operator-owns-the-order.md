@@ -1,6 +1,6 @@
 # 0216 — The operator owns the order
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-09-20
 > **Owner skill(s):** dev
 > **Related ADRs:** [0239](../adrs/0239-rotation-carries-two-orders-and-the-shuffles-seed-varies-per-launch.md) (proposed), [0228](../adrs/0228-a-preset-mark-is-user-state-keyed-by-name-in-its-own-file.md), [0027](../adrs/0027-scene-rotation-constant-default-calmer-cadence.md)
