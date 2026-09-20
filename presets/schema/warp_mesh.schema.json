@@ -57,6 +57,7 @@
         "color_span": { "$ref": "#/definitions/param.color_span.warp_mesh" },
         "color_center": { "$ref": "#/definitions/param.color_center.shape_field" },
         "color_source": { "$ref": "#/definitions/param.color_source" },
+        "coverage_threshold": { "$ref": "#/definitions/param.coverage_threshold" },
         "saturation": { "$ref": "#/definitions/param.saturation" },
         "palette_mix": { "$ref": "#/definitions/param.palette_mix" },
         "palette_steps": { "$ref": "#/definitions/param.palette_steps" },
@@ -770,8 +771,8 @@
     },
     "param.zoom.warp_mesh": {
       "type": "string",
-      "description": "Scale the previous frame is resampled at, per vertex; above 1 the image tunnels inward.",
-      "markdownDescription": "Scale the previous frame is resampled at, per vertex; above 1 the image tunnels inward.\n\n- default `1.0`\n- typical range `0.5` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
+      "description": "Scale the previous frame is resampled at, per vertex; above 1 the past is magnified and the image travels outward.",
+      "markdownDescription": "Scale the previous frame is resampled at, per vertex; above 1 the past is magnified and the image travels outward.\n\n- default `1.0`\n- typical range `0.5` to `2.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.rot": {
       "type": "string",
@@ -927,6 +928,11 @@
       "type": "string",
       "description": "Where the field takes its colour: 0 the deposit's own angle, 1 the light it has built up.",
       "markdownDescription": "Where the field takes its colour: 0 the deposit's own angle, 1 the light it has built up.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
+    },
+    "param.coverage_threshold": {
+      "type": "string",
+      "description": "In level mode, the coverage a pixel needs to hold the ink: at or above it the palette's colour, below it the backdrop. 0 is off.",
+      "markdownDescription": "In level mode, the coverage a pixel needs to hold the ink: at or above it the palette's colour, below it the backdrop. 0 is off.\n\n- default `0.0`\n- typical range `0.0` to `1.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.bg_hue": {
       "type": "string",

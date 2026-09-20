@@ -829,7 +829,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
-| `zoom` | `1` | `0.5` – `2` | Scale the previous frame is resampled at, per vertex; above 1 the image tunnels inward. |
+| `zoom` | `1` | `0.5` – `2` | Scale the previous frame is resampled at, per vertex; above 1 the past is magnified and the image travels outward. |
 | `rot` | `0` | `-1` – `1` | Turns per second the resample is rotated by, per vertex. |
 | `cx` | `0.5` | `0` – `1` | Horizontal point the per-vertex zoom and rotation pivot about, in uv. |
 | `cy` | `0.5` | `0` – `1` | Vertical point the per-vertex zoom and rotation pivot about, in uv. |
@@ -860,6 +860,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | `hue` | `0` | `0` – `1` | Where this scene reads from the palette, as a coordinate along it rather than a colour. |
 | `color_span` | `1` | `0` – `1` | How much of the palette the field's range covers. |
 | `color_center` | `0` | `-1` – `1` | Shifts which part of that range lands in the middle of the palette. |
+| `coverage_threshold` | `0` | `0` – `1` | In level mode, the coverage a pixel needs to hold the ink: at or above it the palette's colour, below it the backdrop. 0 is off. |
 | `saturation` | `1` | `0` – `1` | Pulls the scene's colour toward grey; 0 is fully desaturated, 1 is the palette's own. |
 | `palette_mix` | `0` | `0` – `1` | Crossfades from the preset's palette to its second one; 0 is the first, 1 the second. |
 | `palette_contour` | `0` | `0` – `1` | Draws a line at each band edge when the palette is stepped; 0 draws none. |

@@ -574,7 +574,7 @@ struct Present {
     // x: palette_mix, y: palette_steps, z: palette_contour,
     // w: palette_contour_style
     e: vec4<f32>,
-    // x: palette_contour_ink, yzw: unused
+    // x: palette_contour_ink, y: coverage_threshold (0 off), zw: unused
     f: vec4<f32>,
 }
 @group(0) @binding(0) var<uniform> pp: Present;
@@ -710,10 +710,17 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     // repeats outward instead of clipping.
     //
     // `ink * coverage` and today's coverage alpha, because everything downstream
-    // reads this as premultiplied. The fringe is not two-ink: coverage decays with
-    // the level, so the outermost rungs fade toward the backdrop through
-    // intermediate values — ADR-0138's guarantee is at the draw seam, not over the
-    // whole frame.
+    // reads this as premultiplied.
+    //
+    // **Coverage is a continuum, so `ink * coverage` is not**: every pixel short
+    // of full coverage is a value the palette never named, which is why the
+    // outermost rungs fade toward the backdrop through colours that are not inks.
+    // `coverage_threshold` (ADR-0224) resolves coverage to 0 or 1 instead, so the
+    // frame holds the palette's own values and the paper and nothing between.
+    // The edge is **hard on purpose** — antialiasing it with a derivative puts
+    // back exactly the intermediate values the threshold removes — and it is off
+    // at `0`, where this reduces to the line it replaced. ADR-0138's draw-seam
+    // guarantee is a different claim and does not move.
     if (pp.d.x > 0.5) {
         let level = max(c.r, max(c.g, c.b));
         let coord = pp.d.y + pp.d.z * level;
@@ -725,7 +732,11 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
             ink, coord, pp.e.y, pp.e.z, pp.e.w, pp.f.x, lut_a, lut_b, lut_samp, pp.e.x
         );
         ink = apply_saturation(ink, pp.d.w);
-        c = vec4<f32>(ink * clamp(c.a, 0.0, 1.0), c.a);
+        var cover = clamp(c.a, 0.0, 1.0);
+        if (pp.f.y > 0.0) {
+            cover = select(0.0, 1.0, cover >= pp.f.y);
+        }
+        c = vec4<f32>(ink * cover, cover);
     }
 
     // The field already holds premultiplied colour and coverage (the deposit

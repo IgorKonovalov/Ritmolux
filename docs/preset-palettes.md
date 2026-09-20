@@ -803,11 +803,43 @@ Three things to know before you author on it:
   the ladder: the palette repeats outward rather than clipping. Lower `color_span`
   for fewer, wider rungs; raise `deposit` or `decay` to push the level, and the
   rung count with it.
-- **The fringe is not two-ink.** The present writes `ink * coverage`, and coverage
-  decays with the level, so the outermost rungs fade toward the backdrop through
-  intermediate values. A limited-ink guarantee holds where the field is opaque
+- **The fringe is not two-ink, until you threshold it.** The present writes
+  `ink * coverage`, and coverage decays with the level, so the outermost rungs
+  fade toward the backdrop through intermediate values. A limited-ink guarantee
+  holds where the field is opaque
   ([ADR-0138](adrs/0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md)
   is a claim about the draw seam, not about the whole frame).
+  **`coverage_threshold` removes that fade**
+  ([ADR-0224](adrs/0224-level-mode-gets-a-coverage-threshold-and-the-ink-class-stays-this-scenes.md)):
+  at or above it a pixel holds the palette's colour at full strength, below it the
+  backdrop, so nothing between an ink and the paper survives. It is off at `"0"`,
+  which is what every look written before it renders.
+
+  **What it gives you and what it does not.** It gives a frame whose colours come
+  from the palette and the paper — the property a print needs. It does **not**
+  move the
+  [draw-seam guarantee](adrs/0138-limited-ink-is-a-supported-palette-class-defined-at-the-draw-seam.md)
+  below, and it is not a promise of an exact colour count: two other continua sit downstream of the ink and are not coverage. The
+  palette *coordinate* is one — at `palette_steps = "0"` it sweeps the LUT
+  continuously and every transition between two runs is one texel wide, so pixels
+  landing inside one sample a blend of the two inks. The display write's dither is
+  the other
+  ([ADR-0096](adrs/0096-the-display-write-dithers.md)), which spreads each ink over
+  its own neighbouring encoded levels. The two readings below were taken on one
+  machine on 2026-09-19; both of those stages feed the exact count, so another
+  rasterizer counts differently and what to carry away is the order of magnitude
+  rather than the number. On the shipped `warp_ladder` at 640x360,
+  full stimulus: `palette_steps = "12"` measures 145 exact frame colours with the
+  threshold off and **11** with it on — two inks and the paper, each dithered.
+  With `palette_steps = "0"` the same switch moves 886 to 802, because there the
+  coordinate, not the coverage, is what the colours are coming from. **Band the
+  coordinate and threshold the coverage**; either alone leaves a continuum.
+
+  **The edge aliases, by design.** The cutoff is hard — no smoothing, no
+  derivative — because an antialiased boundary writes back exactly the
+  intermediate values the threshold removes. On a silhouette that moves, the edge
+  will crawl. That is the trade; an author who does not want it leaves the
+  threshold off and keeps the fade.
 - **Anything the draw layer puts in the field counts toward the level**, because
   the level is `max(r, g, b)` of whatever is there. No native `warp_mesh` preset
   draws a layer, and a converted `[milk]` preset never sets `color_source` — but a
@@ -873,7 +905,12 @@ know exactly what you traded.
    These are **outside** it. `swarm`, `attractor` and `emitter` are a different
    renderer with nothing equivalent sitting in it. `warp_mesh` colours its light
    at deposit time, so the palette never bands the accumulated field at all
-   ([backlog 0146](design-backlog-archive.md)).
+   ([backlog 0146](design-backlog-archive.md)) — and its level mode is a
+   *different* claim rather than a way in: `color_source = "1"` with
+   `coverage_threshold` on gives a frame whose colours are the palette's, which is
+   what a print needs, but the guarantee in this section is at the draw seam and
+   does not reach it
+   ([ADR-0224](adrs/0224-level-mode-gets-a-coverage-threshold-and-the-ink-class-stays-this-scenes.md)).
 3. **A coordinate that lands inside a plateau, not on its edge** — see the LUT
    entry in the table below, which is the one leak that is about *your* numbers
    rather than about a stage you can switch off.

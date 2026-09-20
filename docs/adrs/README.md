@@ -7,7 +7,7 @@ ADR that supersedes the old one and update the status here.
 Rule of thumb: if you can't name an option you're *not* taking, you don't need an ADR —
 you need a code comment.
 
-**Next free number: 0238.** *(0120 was reserved for
+**Next free number: 0239.** *(0120 was reserved for
 [Plan 0111](../plans/done/0111-the-milkdrop-import-stops-washing-out.md) Phase 3 and returned to the
 pool when that phase did not run, on Phase 2's stop condition. It was then claimed **twice** on
 2026-08-25 by two parallel plan lanes; 0120 stayed with Plan 0112's close brief, and Plan 0106's
@@ -178,7 +178,7 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0154](0154-the-reader-facing-docs-publish-as-a-site.md) | The reader-facing docs publish as a site, and `docs/` stays the single source | accepted 2026-09-05 (Plan 0143), Outcome; extended by 0166, 0169, 0171, narrowed by 0167 |
 | [0155](0155-the-window-takes-the-adapter-and-the-preset-the-operator-names.md) | The window takes the adapter and the preset the operator names | accepted 2026-08-31 (Plan 0144), refines 0146 + 0148 |
 | [0156](0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md) | The per-phase gate is scoped, and the whole suite is owed once per plan | accepted 2026-08-31 (Plan 0145), extends 0033, Outcome; extended by 0204, 0205; amended by 0207 |
-| [0157](0157-the-preset-sweeps-split-per-preset-and-the-phase-tier-samples-a-declared-representative.md) | The preset sweeps split per preset, and the per-phase tier samples a declared representative | accepted 2026-08-31 (Plan 0146), extends 0156, Outcome |
+| [0157](0157-the-preset-sweeps-split-per-preset-and-the-phase-tier-samples-a-declared-representative.md) | The preset sweeps split per preset, and the per-phase tier samples a declared representative | accepted 2026-08-31 (Plan 0146), extends 0156, Outcome; amended by 0222 |
 | [0158](0158-a-joined-end-carries-its-own-miter-length.md) | A joined end carries its own miter length, not a flag the shader expands by a half-width | accepted 2026-09-02 (Plan 0149), supersedes the geometry half of 0041, unblocked by 0160, Decision corrected before acceptance |
 | [0159](0159-the-component-gets-its-own-size-cap-and-the-recipe-carries-it.md) | The component gets its own size cap, and the recipe that builds it is what carries it | accepted 2026-09-02 (Plan 0148), Outcome, amends nfr.md 4 |
 | [0160](0160-the-stroke-is-measured-where-the-screen-is-isotropic.md) | The stroke is measured where the screen is isotropic, not in NDC | accepted 2026-09-02 (Plan 0149), supersedes the metric half of 0041, unblocks 0158 |
@@ -218,9 +218,9 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0194](0194-a-family-dependent-range-travels-in-the-schema-and-the-player-reports-the-family.md) | A family-dependent range travels in the schema, and the player reports the family | accepted 2026-09-16 (Plan 0179) |
 | [0195](0195-a-low-density-is-a-trace-count-and-the-law-scales-only-a-cloud.md) | A low `density` is a trace count, and the density law scales only a cloud | accepted 2026-09-17 (Plan 0183), amends 0140 |
 | [0196](0196-the-report-hears-the-musical-clock-in-a-column-of-its-own.md) | The report hears the musical clock in a column of its own, and every existing column keeps its stimulus | accepted 2026-09-15 (Plan 0182; Outcome), supplements 0134 |
-| [0197](0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md) | The band contour can be a hard ink, and the warp field can be coloured by its own level | accepted 2026-09-17 (Plan 0184), Outcome; supplements 0133 |
+| [0197](0197-the-contour-can-be-an-ink-and-the-warp-field-can-be-coloured-by-its-level.md) | The band contour can be a hard ink, and the warp field can be coloured by its own level | accepted 2026-09-17 (Plan 0184), Outcome; supplements 0133; extended by 0224 |
 | [0198](0198-a-scene-advances-after-its-frames-bindings.md) | A scene advances after its frame's bindings, and a shared scene is never evaluated twice in a frame | accepted 2026-09-15 (Plan 0181), Outcome; extends 0135 |
-| [0199](0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md) | A converted waveform draws the released source's figure at the scale its host renders, from a stereo pair the analyzer already receives | accepted 2026-09-16 (Plan 0180), extends 0139, Outcome |
+| [0199](0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md) | A converted waveform draws the released source's figure at the scale its host renders, from a stereo pair the analyzer already receives | accepted 2026-09-16 (Plan 0180), extends 0139, Outcome; extended by 0223 |
 | [0200](0200-the-flatness-conjunctions-second-term-reads-the-reference-a-role-classifier-assigns.md) | The flatness conjunction's second term reads the reference a role classifier assigns | accepted 2026-09-17 (Plan 0186), supersedes 0161 in part; extends 0128, 0129, 0130 |
 | [0201](0201-a-fullscreen-scene-presents-premultiplied-over-the-backdrop.md) | A fullscreen scene presents premultiplied over the backdrop, and the chain's occlude value is the only switch | accepted 2026-09-15 (Plan 0185), extends 0026, 0085 |
 | [0202](0202-a-written-count-of-the-systems-is-refused-by-a-gate.md) | A written-out count of the systems is refused by a gate, and the threshold is five | accepted 2026-09-18 (Plan 0178), Outcome; extends 0168 |
@@ -243,9 +243,9 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0219](0219-the-conductor-can-be-asked-to-finish-and-stop-and-the-ask-does-not-outlive-the-run.md) | The conductor can be asked to finish and stop, and the ask does not outlive the run | accepted 2026-09-19 (Plan 0197), amends 0205 |
 | [0220](0220-the-committed-queue-stands-alone-and-a-merged-plan-is-skipped-with-a-notice.md) | The committed queue stands alone, and a merged plan is skipped with a notice | accepted 2026-09-19 (Plan 0197), amends 0205 |
 | [0221](0221-the-control-path-reports-what-it-did-not-do.md) | The control path reports what it did not do | accepted 2026-09-19 (Plan 0198; Outcome), extends 0176 |
-| [0222](0222-a-preset-sweeps-fixed-cost-is-paid-per-process-so-the-lever-is-the-batch.md) | A preset sweep's fixed cost is paid per process, so the lever is the batch | proposed, amends 0157 |
-| [0223](0223-the-figure-contract-reaches-a-custom-wave-because-the-source-applies-it-there.md) | The figure contract reaches a custom wave, because the source applies it there | proposed, extends 0199 |
-| [0224](0224-level-mode-gets-a-coverage-threshold-and-the-ink-class-stays-this-scenes.md) | Level mode gets a coverage threshold, and the ink class stays this scene's | proposed, extends 0197 |
+| [0222](0222-a-preset-sweeps-fixed-cost-is-paid-per-process-so-the-lever-is-the-batch.md) | A preset sweep's fixed cost is paid per process, so the lever is the batch | accepted 2026-09-19 (Plan 0199), amends 0157, Outcome |
+| [0223](0223-the-figure-contract-reaches-a-custom-wave-because-the-source-applies-it-there.md) | The figure contract reaches a custom wave, because the source applies it there | accepted 2026-09-20 (Plan 0201), extends 0199 |
+| [0224](0224-level-mode-gets-a-coverage-threshold-and-the-ink-class-stays-this-scenes.md) | Level mode gets a coverage threshold, and the ink class stays this scene's | accepted 2026-09-20 (Plan 0201), extends 0197 |
 | [0225](0225-the-backdrop-ramp-gets-an-angular-coordinate-and-the-floor-stays-out-of-the-chain.md) | The backdrop ramp gets an angular coordinate, and the floor stays out of the chain | proposed |
 | [0226](0226-the-mark-roster-travels-by-blending-its-fields-and-an-integer-index-is-an-identity.md) | The mark roster travels by blending its fields, and an integer index is an identity | proposed |
 | [0227](0227-a-borrowed-look-is-authored-natively-and-the-reference-never-enters-the-repository.md) | A borrowed look is authored natively, and the reference never enters the repository | proposed |
@@ -259,4 +259,5 @@ and the status. `scripts/check-index-rows.mjs` holds every row below to 320 byte
 | [0235](0235-a-gallery-cards-hop-is-chosen-per-family-and-the-signal-outlasts-it.md) | A gallery card's hop is chosen per family, and the signal outlasts it | proposed |
 | [0236](0236-a-diffused-render-varies-by-prompt-on-bar-boundaries-and-the-seed-stays-fixed.md) | A diffused render varies by prompt on bar boundaries, and the seed stays fixed | proposed |
 | [0237](0237-the-hook-runs-cargo-only-when-the-push-moved-rust-and-serves-the-rest-from-the-ledger.md) | The hook runs cargo only when the push moved Rust, and serves the rest from the ledger | proposed, supersedes 0033 in part |
+| [0238](0238-a-scene-declares-a-capability-and-the-engine-stops-enumerating-kinds.md) | A scene declares a capability, and the engine stops enumerating kinds | proposed |
 <!-- roster:end -->

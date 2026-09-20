@@ -8,11 +8,17 @@
 //! a hand-written array would. Zero dependency: a `read_dir` + extension filter
 //! is all it takes.
 //!
-//! The same glob also emits **one `#[test]` per preset** for the roster sweeps
-//! (ADR-0157). nextest parallelizes across tests and never inside one, so a
-//! sweep written as a loop over the whole library is a single serial process
-//! however many cores are idle. The generated tests make the loop's assertions
-//! one process at a time instead.
+//! The same glob also emits the roster sweeps' `#[test]`s (ADR-0157). nextest
+//! parallelizes across tests and never inside one, so a sweep written as a loop
+//! over the whole library is a single serial process however many cores are
+//! idle. The generated tests make the loop's assertions parallel instead.
+//!
+//! **A per-preset sweep fans out in batches of [`BATCH`], not one test per
+//! preset** (ADR-0222). nextest runs every testcase in its own process, so a
+//! testcase pays for the process and for the adapter, device and pipeline set it
+//! builds inside it; a batch pays that once for the presets it holds. The
+//! per-family sweep stays one test per family — its claim is about a family's
+//! distribution and does not decompose.
 
 use std::path::{Path, PathBuf};
 
@@ -78,44 +84,33 @@ fn main() {
 
     let roster = roster(&presets_dir, &files);
 
-    // Per preset: the sweeps whose claim is about one preset on its own.
-    //
-    // A representative's test carries a `rep_` marker in its NAME, which is what
-    // lets a static `.config/nextest.toml` filter select the sample: nextest
-    // predicates match binaries and test names and cannot read a `.toml`. The
-    // cost is that flipping `representative` renames a test.
-    let per_preset: Vec<(String, String)> = roster
-        .iter()
-        .map(|(stem, name, _, representative)| {
-            let id = if *representative {
-                format!("rep_{stem}")
-            } else {
-                stem.clone()
-            };
-            (id, name.clone())
-        })
-        .collect();
-    emit_sweep(
-        &out_dir,
-        "animation_tests.rs",
-        "animation",
-        "animates_over_time",
-        &per_preset,
-    );
-    emit_sweep(
-        &out_dir,
-        "reactivity_tests.rs",
-        "reactivity",
-        "reacts_to_at_least_one_band",
-        &per_preset,
-    );
-    emit_sweep(
-        &out_dir,
-        "sanity_loudness_tests.rs",
-        "sanity_loudness",
-        "louder_frame_is_reported_against_a_quieter_one",
-        &per_preset,
-    );
+    // Per preset: the sweeps whose claim is about one preset on its own. The
+    // representatives are batched apart from the rest, so a `rep_` marker in a
+    // batch's NAME still selects exactly the declared sample — nextest
+    // predicates match binaries and test names and cannot read a `.toml`.
+    let subjects = |representative: bool| -> Vec<String> {
+        roster
+            .iter()
+            .filter(|(_, _, _, rep)| *rep == representative)
+            .map(|(_, name, _, _)| name.clone())
+            .collect()
+    };
+    let (reps, rest) = (subjects(true), subjects(false));
+    for (file, prefix, helper) in [
+        ("animation_tests.rs", "animation", "animates_over_time"),
+        (
+            "reactivity_tests.rs",
+            "reactivity",
+            "reacts_to_at_least_one_band",
+        ),
+        (
+            "sanity_loudness_tests.rs",
+            "sanity_loudness",
+            "louder_frame_is_reported_against_a_quieter_one",
+        ),
+    ] {
+        emit_batched_sweep(&out_dir, file, prefix, helper, &reps, &rest);
+    }
 
     // Per family: the sweeps whose claim is about a family's distribution and so
     // has no per-preset form. `sanity`'s shape gate fails a family whose coverage
@@ -267,13 +262,63 @@ fn ident(stem: &str) -> String {
         .collect()
 }
 
+/// Presets per generated testcase in a per-preset sweep (ADR-0222).
+///
+/// A batch costs `fixed + B * variable`, where `fixed` is the process plus the
+/// adapter, device and pipeline set the testcase builds inside it. Measured on
+/// the reference machine through WARP, `fixed` is 1.9-2.2 s and `variable` is
+/// 1.5-3.6 s per preset, which puts this batch at 93 % of its time in the render
+/// — 87 % at four, 96 % at sixteen, so the knee is here. What caps it is not the
+/// arithmetic but **granularity**: the shipped library in batches of eight is
+/// fifteen scheduling units per sweep against sixteen test threads, and sixteen
+/// per batch would halve that and leave slots idle on the tail.
+const BATCH: usize = 8;
+
+/// Write one batched `#[test]` per [`BATCH`] presets into `OUT_DIR/<file>`, each
+/// handing `helper` the display names it holds (ADR-0222).
+///
+/// `reps` and `rest` are emitted as **separate runs of batches** so no batch
+/// mixes the two: a representative's batch is named `<prefix>_rep_batch_<nn>`
+/// and every other `<prefix>_batch_<nn>`. A batch's name carries no preset
+/// filename, so that split is the whole of what keeps the `-P fast` predicate
+/// selecting exactly the declared sample (ADR-0157).
+fn emit_batched_sweep(
+    out_dir: &Path,
+    file: &str,
+    prefix: &str,
+    helper: &str,
+    reps: &[String],
+    rest: &[String],
+) {
+    let mut out = format!(
+        "// @generated by core/build.rs from presets/*.toml (ADR-0157, ADR-0222). Do not edit.\n\
+         // `{helper}_batch` lives in the sweep that includes this.\n"
+    );
+    for (infix, subjects) in [("rep_batch", reps), ("batch", rest)] {
+        for (n, chunk) in subjects.chunks(BATCH).enumerate() {
+            let names = chunk
+                .iter()
+                .map(|name| format!("{name:?}"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            out.push_str(&format!(
+                "#[test]\nfn {prefix}_{infix}_{:02}() {{\n    {helper}_batch(&[{names}]);\n}}\n",
+                n + 1
+            ));
+        }
+    }
+    std::fs::write(out_dir.join(file), out)
+        .unwrap_or_else(|e| panic!("write generated {file}: {e}"));
+}
+
 /// Write one `#[test]` per item into `OUT_DIR/<file>`, each calling `helper`
 /// with that item's argument (ADR-0157).
 ///
-/// `items` is `(ident, argument)`: for a per-preset sweep that is the filename
-/// stem and the preset's display name; for a per-family one it is the family
-/// label twice over. One emitter serves both because the difference between
-/// them is what the sweep's claim is about, not how the fan-out is written.
+/// `items` is `(ident, argument)` — for the per-family sweeps this serves, the
+/// family label twice over. A per-preset sweep goes through
+/// [`emit_batched_sweep`] instead: its subjects are interchangeable inside one
+/// renderer and a family's are not, since a family's claim is about the
+/// distribution over its own members.
 ///
 /// The sweep's own test file `include!`s the result and supplies `helper`, so
 /// the assertions stay in the sweep next to the constants they gate on and only

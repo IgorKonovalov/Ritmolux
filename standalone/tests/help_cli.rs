@@ -14,6 +14,15 @@
 //!
 //! GPU-free by construction: every case here exits before a renderer exists, so
 //! they run on any machine including an adapterless CI runner.
+//!
+//! **Each `#[test]` here spawns several command lines rather than one.** This
+//! binary is in the run-alone class (ADR-0193), where nextest drains every slot
+//! before a testcase starts and admits nothing beside it, so the unit that costs
+//! is the *testcase*, not the spawn: a case that checks six command lines pays
+//! one testcase's share of that serialization and six cheap process launches.
+//! A case groups the command lines that hold one property, and the property is
+//! named in the case's own doc comment. Do not split one back out to make a
+//! failure easier to read — the assertion messages name the command line.
 
 // The bound below is on a *subprocess*, and nothing under test reads a clock:
 // the path being timed formats a string and returns before an event loop,
@@ -56,11 +65,19 @@ fn run_both(args: &[&str]) -> (Option<i32>, String, String, Duration) {
     )
 }
 
-/// **The failure this exists for.** `--help` must terminate on its own. A
-/// process still alive when this returns is one that opened a window, and the
-/// `output()` call would not have returned at all.
+/// **The failure this file exists for: a query answers, within the bound, and
+/// the process is gone.** Every command line here is one a program shells out to
+/// before it drives the player — `--help` to discover the flag surface, a studio
+/// running `--schema` once at startup — so one that opened a window or waited for
+/// a GPU would hang its parent. A process still alive when [`run_both`] returns
+/// is one that opened a window, and `output()` would not have returned at all;
+/// the elapsed bound catches the weaker version, where something was built and
+/// then torn down.
 #[test]
-fn help_prints_the_roster_and_exits_zero() {
+fn every_query_answers_within_the_bound_and_exits_zero() {
+    // `--help` and its short form. The banner, the usage line, and one flag from
+    // each of the two scanner families the roster spans, so a roster that
+    // printed only what `main.rs` parses fails here.
     for flag in ["--help", "-h"] {
         let (code, stdout, elapsed) = run(&[flag]);
         assert_eq!(code, Some(0), "`ritmolux {flag}` did not exit 0");
@@ -78,142 +95,23 @@ fn help_prints_the_roster_and_exits_zero() {
             stdout.starts_with("Ritmolux — "),
             "the banner does not open with the product's name: {stdout:?}"
         );
-        // One flag from each of the two scanner families the roster spans, so a
-        // roster that printed only what `main.rs` parses fails here.
         assert!(stdout.contains("--osc"), "the roster omitted --osc");
         assert!(stdout.contains("--sender"), "the roster omitted --sender");
     }
-}
 
-/// **Help wins over a typo sharing the command line with it.** Someone asking
-/// what the flags are is the one caller to answer rather than refuse.
-#[test]
-fn help_is_answered_even_beside_an_unrecognized_argument() {
+    // **Help wins over a typo sharing the command line with it.** Someone asking
+    // what the flags are is the one caller to answer rather than refuse.
     let (code, stdout, _) = run(&["--ocs", "127.0.0.1:9000", "--help"]);
-    assert_eq!(code, Some(0));
-    assert!(stdout.contains("usage: ritmolux"));
-}
-
-/// **The roster gate, asserted on the process rather than on the function.**
-/// Both commands are design-backlog 0159's own reduction, which measured them
-/// starting the app and drawing.
-#[test]
-fn an_unrecognized_argument_exits_non_zero_and_names_it() {
-    let output = common::player()
-        .arg("--ocs")
-        .arg("127.0.0.1:9000")
-        .output()
-        .expect("failed to spawn the ritmolux binary");
-    assert_eq!(output.status.code(), Some(2));
-    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert_eq!(code, Some(0), "`--help` beside a typo did not exit 0");
     assert!(
-        stderr.contains("--ocs"),
-        "the refusal did not name it: {stderr}"
-    );
-    assert!(
-        stderr.contains("--osc"),
-        "the refusal did not name the nearest flag: {stderr}"
+        stdout.contains("usage: ritmolux"),
+        "`--help` beside a typo printed no usage: {stdout:?}"
     );
 
-    let output = common::player()
-        .arg("--definitely-not-a-flag")
-        .output()
-        .expect("failed to spawn the ritmolux binary");
-    assert_eq!(output.status.code(), Some(2));
-    assert!(
-        String::from_utf8_lossy(&output.stderr).contains("--definitely-not-a-flag"),
-        "the refusal did not name the argument"
-    );
-}
-
-/// **A flag whose companion is absent is refused before anything is built.**
-/// The silence this replaces was a running visualizer doing less than it was
-/// asked; the refusal has to arrive the way `--help` does, from a process that
-/// never opened a window (ADR-0155).
-///
-/// **No elapsed-time bound here, unlike the `--help` cases above**, and the
-/// difference is the number of spawns. `RESPONDS_WITHIN` is sized against one
-/// cold process; this case spawns four in a loop, and on a saturated runner —
-/// this suite puts 1223 tests through one machine — the first can exceed a
-/// second while behaving perfectly. That would be a reading about the load on
-/// the box rather than about the code (ADR-0071). The property is carried
-/// without it: `output()` waits for exit, so a process that opened a window
-/// never returns here at all, and the exit code and named companion are what is
-/// actually under test.
-#[test]
-fn a_stream_only_flag_without_stream_exits_without_starting() {
-    for args in [
-        ["--fps", "30"].as_slice(),
-        ["--size", "1280x720"].as_slice(),
-        ["--sender=rig"].as_slice(),
-        ["--frames", "100"].as_slice(),
-    ] {
-        let (code, _, stderr, _) = run_both(args);
-        assert_eq!(
-            code,
-            Some(2),
-            "`ritmolux {args:?}` did not exit 2: {stderr:?}"
-        );
-        assert!(
-            stderr.contains("--stream"),
-            "`ritmolux {args:?}` did not name the missing companion: {stderr:?}"
-        );
-    }
-}
-
-/// **`--preset` is NOT refused for a missing `--stream`**, because it reaches
-/// the window. This covers `--preset` alone: `--gpu` gets past its own scanner
-/// only by opening a wgpu device, so its freedom from `--stream` is pinned
-/// against the roster by `the_two_windowed_flags_carry_no_dependency` in
-/// `main.rs` rather than by a process here.
-#[test]
-fn the_windowed_preset_flag_is_not_refused_for_a_missing_stream() {
-    let (code, _, stderr, _) = run_both(&["--preset", "a-name-no-preset-has"]);
-    assert_eq!(
-        code,
-        Some(2),
-        "an unknown preset name is still a usage error: {stderr:?}"
-    );
-    assert!(
-        !stderr.contains("--stream"),
-        "`--preset` was refused for a missing `--stream`: {stderr:?}"
-    );
-    assert!(
-        stderr.contains("a-name-no-preset-has"),
-        "the refusal did not name what was typed: {stderr:?}"
-    );
-}
-
-/// **An unknown `--preset` costs no window.** The name is judged against the
-/// roster this launch would load, before the event loop exists, so the failure
-/// is a message rather than a window that opens on an arbitrary scene.
-///
-/// Bound-free for the reason given above, and with one of its own: this path
-/// reads and parses the whole preset directory to build the roster it refuses
-/// against, which is real work whose duration is a property of that directory's
-/// size rather than of whether a window opened.
-#[test]
-fn an_unknown_preset_exits_without_opening_a_window() {
-    let (code, _, stderr, _) = run_both(&["--preset", "definitely-not-a-preset"]);
-    assert_eq!(code, Some(2), "expected a usage error: {stderr:?}");
-    // The roster is listed so the operator can see what they could have meant.
-    assert!(
-        stderr.contains("this launch holds"),
-        "the refusal did not list the roster: {stderr:?}"
-    );
-}
-
-/// `--schema` answers and exits, on stdout, with nothing else on it.
-///
-/// The same property `--help` is spawned for, on the other query a program asks
-/// before it drives the player: a studio runs this once at startup, so a
-/// `--schema` that opened a window or waited for a GPU would hang the thing that
-/// spawned it. The content is asserted in `core` (against the published
-/// reference and against its own hash); what only a subprocess can show is that
-/// the document is **alone** on standard output, which is what lets a parent
-/// pipe it straight into a parser.
-#[test]
-fn schema_answers_on_stdout_and_exits_without_starting_the_app() {
+    // `--schema` answers on stdout with nothing else on it. The content is
+    // asserted in `core` (against the published reference and against its own
+    // hash); what only a subprocess can show is that the document is **alone**
+    // on standard output, which is what lets a parent pipe it into a parser.
     let (code, stdout, stderr, elapsed) = run_both(&["--schema"]);
     assert_eq!(code, Some(0), "--schema exits cleanly");
     assert!(
@@ -226,7 +124,6 @@ fn schema_answers_on_stdout_and_exits_without_starting_the_app() {
         "--schema wrote to stderr, so a parent reading both streams sees noise \
          beside the document: {stderr}"
     );
-
     let trimmed = stdout.trim_end_matches(['\r', '\n']);
     assert!(
         trimmed.starts_with('{') && trimmed.ends_with('}'),
@@ -245,12 +142,130 @@ fn schema_answers_on_stdout_and_exits_without_starting_the_app() {
     );
 }
 
+/// **A command line this launch cannot honour is refused before anything is
+/// built, and the refusal names what was wrong.** The silence each of these
+/// replaces was a running visualizer doing less than it was asked; the refusal
+/// has to arrive the way `--help` does, from a process that never opened a
+/// window (ADR-0155).
+///
+/// **Only the last case carries an elapsed bound**, and the difference is the
+/// number of spawns. `RESPONDS_WITHIN` is sized against one cold process; the
+/// loops here spawn several, and on a saturated runner the first can exceed a
+/// second while behaving perfectly. That would be a reading about the load on
+/// the box rather than about the code (ADR-0071). The property is carried
+/// without it: `output()` waits for exit, so a process that opened a window
+/// never returns here at all, and the exit code and the named cause are what is
+/// actually under test. The unknown-preset paths have a second reason — they
+/// read and parse the whole preset directory to build the roster they refuse
+/// against, which is real work whose duration is a property of that directory's
+/// size.
+#[test]
+fn an_unhonourable_command_line_is_refused_before_anything_is_built() {
+    // **The roster gate, asserted on the process rather than on the function.**
+    // Both command lines are design-backlog 0159's own reduction, which measured
+    // them starting the app and drawing.
+    let (code, _, stderr, _) = run_both(&["--ocs", "127.0.0.1:9000"]);
+    assert_eq!(
+        code,
+        Some(2),
+        "a misspelt flag is a usage error: {stderr:?}"
+    );
+    assert!(
+        stderr.contains("--ocs"),
+        "the refusal did not name it: {stderr}"
+    );
+    assert!(
+        stderr.contains("--osc"),
+        "the refusal did not name the nearest flag: {stderr}"
+    );
+
+    let (code, _, stderr, _) = run_both(&["--definitely-not-a-flag"]);
+    assert_eq!(
+        code,
+        Some(2),
+        "an unknown flag is a usage error: {stderr:?}"
+    );
+    assert!(
+        stderr.contains("--definitely-not-a-flag"),
+        "the refusal did not name the argument: {stderr}"
+    );
+
+    // A flag whose companion is absent is refused rather than ignored.
+    for args in [
+        ["--fps", "30"].as_slice(),
+        ["--size", "1280x720"].as_slice(),
+        ["--sender=rig"].as_slice(),
+        ["--frames", "100"].as_slice(),
+    ] {
+        let (code, _, stderr, _) = run_both(args);
+        assert_eq!(
+            code,
+            Some(2),
+            "`ritmolux {args:?}` did not exit 2: {stderr:?}"
+        );
+        assert!(
+            stderr.contains("--stream"),
+            "`ritmolux {args:?}` did not name the missing companion: {stderr:?}"
+        );
+    }
+
+    // **`--preset` is NOT refused for a missing `--stream`**, because it reaches
+    // the window. This covers `--preset` alone: `--gpu` gets past its own scanner
+    // only by opening a wgpu device, so its freedom from `--stream` is pinned
+    // against the roster by `the_two_windowed_flags_carry_no_dependency` in
+    // `main.rs` rather than by a process here.
+    let (code, _, stderr, _) = run_both(&["--preset", "a-name-no-preset-has"]);
+    assert_eq!(
+        code,
+        Some(2),
+        "an unknown preset name is still a usage error: {stderr:?}"
+    );
+    assert!(
+        !stderr.contains("--stream"),
+        "`--preset` was refused for a missing `--stream`: {stderr:?}"
+    );
+    assert!(
+        stderr.contains("a-name-no-preset-has"),
+        "the refusal did not name what was typed: {stderr:?}"
+    );
+
+    // **An unknown `--preset` costs no window.** The name is judged against the
+    // roster this launch would load, before the event loop exists, so the
+    // failure is a message rather than a window that opens on an arbitrary
+    // scene, and the roster is listed so the operator can see what they could
+    // have meant.
+    let (code, _, stderr, _) = run_both(&["--preset", "definitely-not-a-preset"]);
+    assert_eq!(code, Some(2), "expected a usage error: {stderr:?}");
+    assert!(
+        stderr.contains("this launch holds"),
+        "the refusal did not list the roster: {stderr:?}"
+    );
+
+    // `--preview` with a sink this build does not have exits without a window,
+    // naming the one it does. The same rule every windowed flag follows: a value
+    // typed for this run that cannot be honoured is a usage error, not a window
+    // that opens and then reports one. The default — the flag absent — is
+    // covered by every other case in this file, none of which mirrors anything.
+    let (code, _, stderr, elapsed) = run_both(&["--preview", "syphon"]);
+    assert_eq!(code, Some(2), "a bad flag value is a usage error");
+    assert!(
+        elapsed < RESPONDS_WITHIN,
+        "--preview syphon took {elapsed:?}, which is long enough that it may \
+         have opened a window before refusing"
+    );
+    assert!(
+        stderr.contains("syphon") && stderr.contains("stdout"),
+        "the refusal does not name the value and the sink that exists: {stderr}"
+    );
+}
+
 /// **`--list-presets` answers from the directory this launch would read, and
 /// exits.** The property is the same one `--help` and `--schema` are spawned
 /// for, plus the one only a subprocess can show here: the statuses are computed
 /// against a directory handed in from outside, so the row for a file nobody
 /// shipped and the marker on a name two files claim are visible rather than
-/// inferred.
+/// inferred. It stands alone because it is the only case here that has to build
+/// a directory first.
 ///
 /// The preset directory is scratch **and so is the data root**: left inherited,
 /// the run would resolve the developer's own `%APPDATA%` for `config.toml` and
@@ -338,27 +353,5 @@ fn list_presets_names_each_files_status_and_exits_zero() {
     assert!(
         stderr.contains(&dir.display().to_string()),
         "the listing does not name the directory it read: {stderr}"
-    );
-}
-
-/// `--preview` with a sink this build does not have exits without a window,
-/// naming the one it does.
-///
-/// The same rule every windowed flag follows: a value typed for this run that
-/// cannot be honoured is a usage error, not a window that opens and then reports
-/// one. The default — the flag absent — is covered by every other case in this
-/// file, all of which pass no `--preview` and none of which mirrors anything.
-#[test]
-fn an_unknown_preview_sink_exits_without_starting() {
-    let (code, _, stderr, elapsed) = run_both(&["--preview", "syphon"]);
-    assert_eq!(code, Some(2), "a bad flag value is a usage error");
-    assert!(
-        elapsed < RESPONDS_WITHIN,
-        "--preview syphon took {elapsed:?}, which is long enough that it may \
-         have opened a window before refusing"
-    );
-    assert!(
-        stderr.contains("syphon") && stderr.contains("stdout"),
-        "the refusal does not name the value and the sink that exists: {stderr}"
     );
 }

@@ -87,7 +87,7 @@ retrying into the ground.
   records that the driver stack has a memory floor this project already accepted once; during the
   pass it is paid twice. On a low-memory machine this is the thing most likely to bite.
 - **Process spawn is paid 114 times.** That fixed per-process cost is precisely what
-  [Plan 0199](../plans/0199-the-gates-cost-is-measured-before-it-is-cut.md) is measuring for the
+  [Plan 0199](../plans/done/0199-the-gates-cost-is-measured-before-it-is-cut.md) is measuring for the
   preset sweeps, and this decision commits to paying it before that measurement is in.
 - **About 10.7 minutes to cover the shipped set on the measured machine**, and unknown on a slower
   GPU. A user who opens the browser in the first minutes sees a mostly empty pane, which is the

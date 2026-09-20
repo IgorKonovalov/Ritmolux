@@ -1,8 +1,8 @@
 # ADR-0223 — The figure contract reaches a custom wave, because the source applies it there
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-20 (Plan 0201 Phase 2)
 > **Date:** 2026-09-19
-> **Related plan(s):** [0201](../plans/0201-the-warp-surface-stops-lying.md)
+> **Related plan(s):** [0201](../plans/done/0201-the-warp-surface-stops-lying.md)
 > **Extends:** [0199](0199-a-converted-waveform-draws-the-sources-figure-at-the-hosts-scale.md)
 > (whose clause 2 this widens past the eight built-in modes)
 

@@ -1,8 +1,8 @@
 # ADR-0222 — A preset sweep's fixed cost is paid per process, so the lever is the batch
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-19 (Plan 0199) — carries an Outcome
 > **Date:** 2026-09-19
-> **Related plan(s):** [0199](../plans/0199-the-gates-cost-is-measured-before-it-is-cut.md)
+> **Related plan(s):** [0199](../plans/done/0199-the-gates-cost-is-measured-before-it-is-cut.md)
 > **Amends:** [0157](0157-the-preset-sweeps-split-per-preset-and-the-phase-tier-samples-a-declared-representative.md)
 > (what a sweep's unit is), and rests on
 > [0156](0156-the-per-phase-gate-is-scoped-and-the-suite-is-owed-once-per-plan.md)
@@ -106,3 +106,27 @@ outcome is written into the plan as a stop condition.
 **The interaction with [ADR-0211](0211-a-green-suite-record-serves-a-later-tree-when-no-deferred-suite-can-read-the-diff.md)
 is not additive.** ADR-0211's saving is the difference between `-P fast` and the full suite; the
 cheaper the full suite gets, the less it buys. Whichever lands second is re-measured, not assumed.
+
+## Outcome (2026-09-19, Plan 0199)
+
+The measurement this decision was sized from now exists, and it landed. Three corrections to what is
+written above, recorded here rather than by editing it.
+
+**The stop condition did not fire, and the premise held with room.** The fixed part — the process
+plus the adapter, device and pipeline set — is 38-55 % of a per-preset testcase's wall on the
+reference machine through WARP, 683 s of a 1522 s serial cost over the 114 shipped presets. `BATCH`
+is 8, chosen at the knee of `B x variable / (fixed + process + B x variable)` and capped by
+granularity rather than by the arithmetic: 15 scheduling units per sweep against 16 test threads.
+
+**The first Negative overstated the loss, and the second is wrong as written.** A batch does *not*
+fail whole: each sweep's per-preset helper returns `Option<String>` and the batch `filter_map`s the
+convictions before asserting, so every preset is measured and every conviction is reported in one
+message. What is genuinely lost is resolution in the *test name*, which the first Negative states
+correctly and which stands.
+
+**The saving is serial and has not yet been seen in the parallel suite.** `reactivity` re-timed
+serially is 295.2 s against a library-corrected 514.7 s, a 43 % cut. The full workspace suite on the
+closing tree is 769 s, inside the 725-841 s band of the five comparable runs before it — so the
+positive Consequence above is confirmed as a *serial* reduction and is not yet demonstrated as a
+wall-clock one under 16-way scheduling. Plan 0199's `## Followups` carries the re-measurement, and
+it is the same re-measurement the ADR-0211 note above already asks for.

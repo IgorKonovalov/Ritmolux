@@ -59,28 +59,29 @@ success-output = "immediate"
 #
 # The nine binaries stay excluded, and then the **representatives** are unioned
 # back in: `presets/*.toml` may declare `representative = true`, and `build.rs`
-# names that preset's generated tests `<sweep>_rep_<stem>` (ADR-0157). A nextest
-# predicate matches binaries and test names and cannot read a `.toml`, so the
-# marker in the name is the only thing a static profile can select on — and the
-# per-preset split is what makes any filter possible here at all. ADR-0073
-# Alternative C rejected sampling partly on the ground that "the expensive suites
-# are single tests ... so sampling cannot be a nextest filter"; that was true of
-# roster loops and is what splitting them retires. ADR-0073 carries the Outcome.
+# batches those presets apart from the rest and names their batches
+# `<sweep>_rep_batch_<nn>` (ADR-0157, ADR-0222). A nextest predicate matches
+# binaries and test names and cannot read a `.toml`, so the marker in the name is
+# the only thing a static profile can select on — and the per-preset fan-out is
+# what makes any filter possible here at all. ADR-0073 Alternative C rejected
+# sampling partly on the ground that "the expensive suites are single tests ...
+# so sampling cannot be a nextest filter"; that was true of roster loops and is
+# what splitting them retires. ADR-0073 carries the Outcome.
 #
-# So a phase renders two presets per family and the close renders all 81. This
-# ADDS coverage to the per-phase tier rather than saving time there: ADR-0156
-# had excluded these binaries outright, so the tier rendered none of the library.
+# So a phase renders the declared sample and the close renders the whole library.
+# This ADDS coverage to the per-phase tier rather than saving time there:
+# ADR-0156 had excluded these binaries outright, so the tier rendered none of the
+# library.
 #
-# **Three of the nine now run a subset rather than nothing** — 72 tests, 24
-# presets across `animation`, `reactivity` and `sanity`'s loudness gate. So
-# `-P fast` no longer skips nine whole binaries, and nextest's own skip line
-# reports it that way; the hook and CI both inherit the change.
+# **Three of the nine now run a subset rather than nothing.** So `-P fast` no
+# longer skips nine whole binaries, and nextest's own skip line reports it that
+# way; the hook and CI both inherit the change.
 #
 # Anchored to the three sweep prefixes rather than a bare `_rep_`, so an
 # unrelated test whose name happens to contain the marker cannot join the tier.
-# The marker is NOT collision-proof in the other direction: a preset filed as
-# `rep_*.toml` generates `animation_rep_...` and joins the sample without
-# declaring the flag. Harmless (it only adds coverage) and worth knowing.
+# A batch name carries no preset filename, so the marker cannot be reached by
+# filing a preset as `rep_*.toml` either — the flag in the `.toml` is now the
+# only way into the sample.
 # `sanity_shape_*` and `distinctness_*` are per FAMILY, carry no marker, and stay
 # excluded: `distinctness` must never be sampled (two presets leave one pair,
 # which retires the check), and the shape sweep's floor-slack gate is a claim

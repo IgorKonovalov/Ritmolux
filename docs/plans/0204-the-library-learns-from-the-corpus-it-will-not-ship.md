@@ -69,7 +69,7 @@ system rather than a blanket assignment. And
 [ADR-0089](../adrs/0089-the-library-renews-by-replacement-cohorts.md) says the library renews by
 cohorts, so twenty-one presets is not a thing to author before anyone has seen whether one works.
 
-**It sits behind [Plan 0201](0201-the-warp-surface-stops-lying.md), and that ordering is
+**It sits behind [Plan 0201](done/0201-the-warp-surface-stops-lying.md), and that ordering is
 load-bearing.** That plan's own TL;DR says `warp_mesh`'s `zoom` doc *"says the opposite of what its
 shader does and four generated surfaces carry the lie"* — and that the lie has **already produced a
 false paragraph in shipped content**. Any pick that routes to `warp_mesh` would be authored against
@@ -229,7 +229,7 @@ that needs one, that is a feedback note to `architect`, not a phase of this plan
   backlog entry — that is the [ADR-0017](../adrs/0017-preset-author-skill-lane.md) boundary and
   this plan does not bend it.
 - **It does not author picks 7–21.** Only the Phase 2 cohort. The rest wait on Phase 4's verdict.
-- **It does not fix the warp surface.** [Plan 0201](0201-the-warp-surface-stops-lying.md) owns
+- **It does not fix the warp surface.** [Plan 0201](done/0201-the-warp-surface-stops-lying.md) owns
   that; this plan consumes it.
 - **It does not add a copy key to the app.** Collecting preset names by watching the window title
   from outside was sufficient; a clipboard binding would be a `dev` plan and a new dependency
