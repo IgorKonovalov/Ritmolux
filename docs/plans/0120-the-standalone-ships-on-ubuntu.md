@@ -380,7 +380,7 @@ finished by this point and a repair belongs in its own scope.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — Probe the Ubuntu box before any code is written | human | run 2026-09-20 | — |
+| 1 — Probe the Ubuntu box before any code is written | human | done | — |
 | 2 — The tree compiles, lints and tests on Ubuntu | dev | not started | |
 | 3 — The PulseAudio capture backend | dev | not started | |
 | 4 — The release tarball | dev | not started | |
@@ -416,11 +416,20 @@ finished by this point and a repair belongs in its own scope.
   `Installed: (none)`, `Candidate: 1:17.0+dfsg1-2ubuntu4` from `resolute/main`; the runtime
   `libpulse0` is present at the same version. Phase 2 installs the headers before its first build.
 - **The session is Wayland.** Phase 6 reads that against `D` (move to next monitor).
-- **Still owed from Phase 1: the GPU.** `vulkaninfo --summary` was truncated at its instance
-  extensions, so the box's Vulkan device and driver are unrecorded. The instance is 1.4.341 and
-  `vulkan-tools` is installed, so the reading is one command away —
-  `vulkaninfo --summary | sed -n '/Devices/,$p'` — and Phase 6 wants it next to whatever CI
-  resolves. It gates nothing in Phase 2.
+- **The GPU is a discrete NVIDIA card on the proprietary driver, with llvmpipe beside it.** Vulkan
+  instance 1.4.341, and two physical devices:
+
+  | device | type | driver | api |
+  |---|---|---|---|
+  | NVIDIA GeForce RTX 3060 (`0x10de`/`0x2504`) | `DISCRETE_GPU` | `NVIDIA_PROPRIETARY` 595.84 | 1.4.329 |
+  | llvmpipe (LLVM 21.1.8) | `CPU` | `MESA_LLVMPIPE`, Mesa 26.0.3 | 1.4.335 |
+
+  So Phase 2's question is answered in both directions at once: this box gives wgpu a **hardware**
+  adapter, and it also carries the software one CI resolves under ADR-0016 — the two paths can be
+  compared on one machine rather than across two. The loader's two warnings
+  (`vkGetPhysicalDeviceDisplayP*PropertiesKHR` not exported) are about the direct-display
+  extensions, which a Wayland surface does not use; `vulkaninfo` prints them on this driver
+  whatever the session.
 
 ## Risks & open questions
 
