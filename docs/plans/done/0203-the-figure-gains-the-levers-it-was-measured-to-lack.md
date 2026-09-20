@@ -1,15 +1,20 @@
 # 0203 — The figure gains the levers it was measured to lack
 
-> **Status:** in-progress
+> **Status:** done — closed 2026-09-20. Phases 1-4 landed as `56915750` + `7f8ca5dc`, `b8f00cd8`,
+> `0dd39295` and `869fbbde`; round 1's major was repaired in `5174d516` and round 2's two minors in
+> `6e6dbc08`. Close review round 2: **no blockers, no majors**, three minors and one nit, two of
+> them repaired here. Verified: the full suite green on the tagged tree through the conductor's
+> suite ledger, rustdoc clean under `-D warnings`, the roster travel reachable from a preset
+> binding, every whole index an exact identity, and the backdrop's default byte-identical.
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user)
 > **Owner skill(s):** dev
-> **Related ADRs:** [0226](../adrs/0226-the-mark-roster-travels-by-blending-its-fields-and-an-integer-index-is-an-identity.md)
-> (proposed), [0225](../adrs/0225-the-backdrop-ramp-gets-an-angular-coordinate-and-the-floor-stays-out-of-the-chain.md)
-> (proposed), [0084](../adrs/0084-a-particle-marks-silhouette-is-a-signed-distance-function.md),
-> [0105](../adrs/0105-the-mark-roster-becomes-a-fullscreen-distance-field.md),
-> [0111](../adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md),
-> [0090](../adrs/0090-a-preset-composes-two-scene-layers.md)
+> **Related ADRs:** [0226](../../adrs/0226-the-mark-roster-travels-by-blending-its-fields-and-an-integer-index-is-an-identity.md)
+> (proposed), [0225](../../adrs/0225-the-backdrop-ramp-gets-an-angular-coordinate-and-the-floor-stays-out-of-the-chain.md)
+> (proposed), [0084](../../adrs/0084-a-particle-marks-silhouette-is-a-signed-distance-function.md),
+> [0105](../../adrs/0105-the-mark-roster-becomes-a-fullscreen-distance-field.md),
+> [0111](../../adrs/0111-the-shape-field-gains-a-scaled-copy-coordinate.md),
+> [0090](../../adrs/0090-a-preset-composes-two-scene-layers.md)
 > **Closes:** design-backlog 0095, 0100, 0101
 
 ## TL;DR
@@ -45,10 +50,10 @@ reuse (backlog 0095).
 
 ## Decision
 
-Per [ADR-0226](../adrs/0226-the-mark-roster-travels-by-blending-its-fields-and-an-integer-index-is-an-identity.md)
+Per [ADR-0226](../../adrs/0226-the-mark-roster-travels-by-blending-its-fields-and-an-integer-index-is-an-identity.md)
 the roster travels by blending the neighbouring arms' distance fields and their boundary radii, with
 an integer index an exact identity. Per
-[ADR-0225](../adrs/0225-the-backdrop-ramp-gets-an-angular-coordinate-and-the-floor-stays-out-of-the-chain.md)
+[ADR-0225](../../adrs/0225-the-backdrop-ramp-gets-an-angular-coordinate-and-the-floor-stays-out-of-the-chain.md)
 the backdrop gets an angular coordinate and the floor stays outside the chain — and because backlog
 0095 instructs that the two routes be judged **by rendering rather than by argument**, Phase 3
 renders both before Phase 4 builds either. The star gets a seed and an edge-displacement term, sized
@@ -128,7 +133,7 @@ single shipped picture.
 - **Phase 2's wobble may cost field accuracy**, and the done-when requires the number rather than an
   impression. A materially worse exterior is a stop, not a tuning problem.
 - **Every phase here regenerates a parameter surface**, which a conductor session cannot do until
-  [Plan 0197](done/0197-the-conductor-becomes-operable.md) Phase 4 lands (backlog 0250). Run this plan
+  [Plan 0197](0197-the-conductor-becomes-operable.md) Phase 4 lands (backlog 0250). Run this plan
   after 0197.
 - **This is the weakest-justified of this round's plans, and deliberately so.** Each entry says in
   its own words to take it *when someone wants the thing* — a rough figure, a vanishing point — and
@@ -276,7 +281,7 @@ luma points — while the floor runs 209.1–245.0. **The figure's brightest par
 (210.1) is brighter than the floor's darker stripes (209.1)**, so figure and
 floor are no longer separable by tone at all. This is Plan 0091 Phase 1's
 measurement taken from the other side, and it is exactly the limit
-[ADR-0225](../adrs/0225-the-backdrop-ramp-gets-an-angular-coordinate-and-the-floor-stays-out-of-the-chain.md)
+[ADR-0225](../../adrs/0225-the-backdrop-ramp-gets-an-angular-coordinate-and-the-floor-stays-out-of-the-chain.md)
 states in its own first Negative.
 
 **Route B's other half — the fan in the layer slot instead of the figure.** A
@@ -428,7 +433,262 @@ chain-drawn ground — which then spends the slot. Phase 3's two luma measuremen
   clean.
 - **Outstanding `human` phases:** none. The plan declares no `human` phase.
 
+## Close review
+
+A conductor-run close has no reader in the room (ADR-0205), so this section is the evidence of what
+was checked. Round 2's review follows in full; the round-1 findings a fix round resolved are listed
+under it.
+
+### Round 2 — architect Mode 4, conductor mode, fresh session
+
+> **Lane:** `C:\Users\Igor Konovalov\WORK\rlx-plan-0203`, branch
+> `plan-0203-the-figure-gains-the-levers-it-was-measured-to-lack`
+> **Range reviewed:** `main...HEAD` — `56915750`, `7f8ca5dc`, `b8f00cd8`, `0dd39295`, `869fbbde`,
+> `5174d516` (round 1's fix), `27fdb785`, and the merge `f2bf1ddc`
+> **Date:** 2026-09-20
+
+#### Verdict
+
+**No blockers, no majors. Three minors and one nit. The close proceeds.**
+
+Round 1's major is genuinely discharged rather than papered over: `SHAPE` is `ParamKind::Modal`, the
+three `("*", "shape")` rows left `STRUCTURAL`, all four generated surfaces were regenerated, and the
+new assertion drives the *whole* route a binding takes — `SHAPE.kind.quantize` **and** `mark_shape`
+— with `POINTS` on the same route as a control, which is precisely the test whose absence let the
+defect through. The plan's headline capability now works from a preset.
+
+What this round adds is one class round 1 did not reach: the change that makes the travel work left
+**five comments across the three mark scenes still describing the rounded selector**, two of them
+asserting the exact behaviour ADR-0226 removed. Repaired here. The emitter's glint branch and the
+`background.rs` clamp constant are round 1's findings re-verified and still open, and the
+implementation log is still larger than the contract it reports against.
+
+#### Evidence run
+
+- **Full suite.** `node tools\conductor\with-lock.mjs suite -- cargo nextest run --workspace`
+  printed the ledger record rather than re-running (ADR-0207):
+  `with-lock: skipped cargo nextest run --workspace: tree f708024 is green in the suite ledger, run
+  by gate 0203-pre-review at 2026-09-20T15:05:44.564Z: 1774 tests run: 1774 passed (33 slow), 7
+  skipped`. That record is this lens's full-suite evidence, written by the process that saw the exit
+  code. The count is 304 below round 1's 2078 because the merge `f2bf1ddc` brought in Plan 0199,
+  whose whole subject is cutting the gate's cost; nothing in this lane removed a test.
+- **Rustdoc.** `RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps` — clean.
+- `cargo fmt --all --check` clean, `node scripts/check-comment-hygiene.mjs` clean.
+- The log's `### Close triggers` block is complete and its `Full suite:` bullet correctly cites the
+  conductor's `pre-review` gate, which is the right answer in conductor mode.
+
+**Two commits on the branch were written by an earlier round-2 attempt that did not finish**:
+`27fdb785` (a prose repair, its message already marked `Close review round 2, minor`) and the merge
+`f2bf1ddc`. Neither is an implementer's work, so this review takes the tip as it stands and grades
+it whole; `27fdb785`'s content was checked against the code and is correct, and its own slip is
+finding 2 below.
+
+#### Lens 1 — alignment with the plan and the ADRs
+
+All four phases landed, each with a single in-vocabulary `**Owner skill:** dev` tag. The
+phase-to-commit table is honest, including Phase 1's unusual two-commit row.
+
+I opened the fix's test rather than grading its commit message.
+`an_eased_shape_sweep_lands_between_the_arms` (`core/src/render/scenes/marks/tests.rs:758`) is the
+right test and not a restatement of the one that passed:
+
+- it builds a genuinely continuous one-pole sweep and **asserts the sweep is continuous first**
+  (`distinct_raw.len() > 100`), so the test cannot pass vacuously on a degenerate input;
+- it maps each sample through `mark_shape(SHAPE.kind.quantize(v))` — both stages, in the order the
+  binding pipeline applies them — and asserts over a hundred samples land strictly between the two
+  arms, with a failure message that names `Structural` as the thing that would produce the
+  counterfactual;
+- it asserts **nothing on the route collapses two positions into one** (`distinct_seen.len() ==
+  distinct_raw.len()`), which is stronger than "some fractions survive";
+- it re-checks the identity at all five whole indices *through the same two stages*, so the round-1
+  fix cannot have bought the travel at the cost of the identity;
+- and `POINTS` on the same route still yields exactly `[7, 8, 9]`, which is what proves the
+  quantizer stage is live rather than inert.
+
+The four generated surfaces followed: `presets/README.md` now prints `shape` under **Modal**, and
+`presets/preset.schema.json`, `presets/schema/{swarm,emitter,shape_field}.schema.json` and
+`docs/specs/player-schema.json` all moved with it. `core/tests/suite/preset.rs` carries a comment
+naming ADR-0226 as why `shape` is the one name that ever left the `STRUCTURAL` roster — which is the
+right record, because the roster's own stated rule is what convicted the old declaration.
+
+Phase 3 remains a genuine rendering judgement rather than an argument, and Phase 4's
+`the_angular_ramp_converges_on_its_centre_and_the_straight_one_does_not` asserts both halves the
+done-when demands — a mean gap falling by at least 10 % per step **and** a strictly rising boundary
+count — with a negative control at the same `bg_angle` that puts zero boundaries on the same rows.
+Reading it again this round, the control is doing real work: it is what convicts a measurement
+reading the palette or the frame instead of the coordinate.
+
+#### Lens 2 — layering, coupling, real-time safety
+
+Clean, and unchanged by the fix. No platform or audio-source type entered `core/`; nothing escaped
+the wgpu layer; the C ABI and the control protocol are untouched; nothing was added to an audio
+callback. The six new parameters travel the existing `ParamSpec` / `set_param` / uniform route, and
+all three hand-drawn controls went into padding `QuadUniform` already carried, so no bind-group
+layout moved (ADR-0058, stated at the code).
+
+The fix widened nothing: `ParamKind::Modal` is an existing declaration value, and declaring a
+parameter with it is the ordinary use of that seam rather than a widening of it.
+
+#### Lens 3 — docs and release bookkeeping
+
+Generated surfaces were regenerated, not hand-edited, both in the original phases and in the fix.
+The hand-written sweeps landed where they were owed. `docs/presets.md` now states the travel with
+the ADR citation inside a markdown link, which is what `check-reader-prose.mjs` wants.
+
+**What this lens found is the other direction**: three source files still *document* the rounding
+the plan removed, and one of them says in so many words that an eased `shape` "steps at the
+midpoints" — the sentence ADR-0226 exists to falsify. See finding 1. Doc comments are the surface a
+future reader of `swarm.rs` reaches for before `marks.rs`, so a stale one here is not cosmetic; it
+is the instruction that would send the next change back to rounding.
+
+`presets/README.md` counts three bullets above a list of four. See finding 2.
+
+One thing checked and **not** raised as a finding because it predates this plan and this plan did
+not touch it: `POINTS` declares `range: Some([3.0, 16.0])` while `mark_points` clamps to
+`MIN_POINTS..=MAX_POINTS` = `3..=12`, and both `presets/README.md`'s generated row (`3` – `16`) and
+its hand-written prose (`3` to `12`) are printed from the two different numbers on the same page.
+That is a declared-range-versus-applied-clamp drift of the kind the plan's own Notes routed rather
+than took for `bg_hue_span`; it wants a backlog entry, not a close-time edit.
+
+**Version bump owed: `minor`** — a feature plan, six new parameters and a changed meaning for a
+seventh.
+
+#### Lens 4 — correctness, determinism, geometry
+
+- **The blend's identity is exact at the integers, by arithmetic rather than by tolerance.**
+  `mark_distance` and `mark_boundary_radius` both take `lo = floor(shape)`, `t = shape - lo`, and
+  branch on `t == 0.0`. `shape` reaches the shader clamped and unrounded, so a preset's `"3"` is
+  `3.0` exactly, `floor` is exact on it, and the subtraction is exactly zero. At the roster's top
+  (`shape == MAX_SHAPE == 4.0`) `t` is 0 and no arm 5 is ever addressed — the clamp is what
+  guarantees that, and it stays CPU-side where a NaN cannot reach WGSL's implementation-defined
+  `clamp`.
+- **`shape_touches_ring` is the right widening of the `== RING_SHAPE` test**, and the arithmetic
+  checks out: it is true across the whole open span `(0, 2)` and false at `0`, `2`, `3`, `4`, so the
+  acceptance and the refusal at every whole index are exactly where they were. The blend of two
+  positive single-valued boundary radii is single-valued, so the `polygon`-through-`heart` travel is
+  genuinely safe under `coord_mode = 1` — the fallback is not over-broad.
+- **Determinism.** The seed strides through the hash's **input** with Knuth's 32-bit golden-ratio
+  constant and integer arithmetic only; WGSL's `u32` wraps by specification and the Rust mirror uses
+  `wrapping_mul`/`wrapping_add`, so the two agree. `star_seed` is rounded CPU-side inside `0..=255`,
+  so `u32(seed)` in WGSL is exact rather than a truncation. Seed 0 multiplies to 0 and leaves the
+  pre-existing arrangement bit-identical.
+- **Numeric assertions.** The diff was re-grepped for literals inside `assert*`. The convergence
+  test asserts a *direction* with a margin argued from the geometry plus a monotone count; the
+  exterior-accuracy figures are `println!`ed and compared in prose against Plan 0091 Phase 5's own
+  0.540 rather than pinned; the adapter probe asserts an *ordering* and reports `frame_diff` as a
+  number rather than asserting one. No frozen measurement is asserted universally.
+- **Aspect (ADR-0037).** `angle_pos` takes `aspect` from the uniform the backdrop is rendered with,
+  and the centre is multiplied by the same aspect on both sides, so a wedge subtends an equal angle
+  on screen. This is the one place the plan could have got it wrong and did not.
+- **Panics.** No `unwrap`/`expect`/`panic!` entered a hot-path module, and no new module was added,
+  so Plan 0002's guard set needs no extension.
+
+#### Lens 5 — design integrity
+
+Dependency direction, the three seams and SRP/OCP are intact. The `marks::PARAMS`-declares /
+each-scene-carries split that forced Phase 2 to touch `swarm.rs`, `emitter.rs` and `shape_field.rs`
+is a pre-existing shape of the code, correctly named in the log; it is a legitimate eventual backlog
+entry and not a finding against this plan.
+
+One seam question worth stating explicitly, because it is what finding 3 is about: ADR-0226's third
+Positive says the particle path gets the travel "for free". That is true of `swarm`, whose fragment
+shader calls `mark_distance` unconditionally, and **only partly true of `emitter`**, which keeps its
+own anisotropic glint behind `if (in.shape < 0.5)`. That is a scene declining to participate in a
+roster behaviour, which is a legitimate thing for a scene to do — what is missing is that it says so
+nowhere.
+
+#### Findings
+
+**minor — five comments still describe a `shape` the engine no longer rounds.**
+`core/src/render/scenes/swarm.rs:380`. The plan's central change is that `mark_shape` clamps and
+does **not** quantize, so that a bound `shape` reaches the scene fractional. Five comments across
+the three mark scenes were left describing the rounded selector, and two of them state the removed
+behaviour outright: `swarm.rs:379-382` and `emitter.rs:1011-1014` both say *"Both are quantized on
+the way to the uniform ... it just steps at the midpoints"*, which is what ADR-0226 falsified;
+`shape_field.rs:238` maps the uniform slot as *"shape index (quantized CPU-side)"*;
+`shape_field.rs:758-761` says *"`marks::mark_shape` / `mark_points` quantize on the way to the
+uniform"*; and `shape_field.rs:989-990` justifies `applied_coord_mode`'s own rounding as
+*"`marks::mark_shape`'s treatment for `marks::mark_shape`'s reason"*, citing as precedent a function
+that now does the opposite. A doc comment on the struct field is what the next change to `swarm.rs`
+reads, and this one instructs that reader that the value steps. **Repaired in `6e6dbc08`** — comment
+text only, so it is on ADR-0209's closed list.
+
+**minor — the travel essay counts three bullets and lists four.** `presets/README.md:1561`.
+*"Three things come with that:"* stands above a list of four; the fourth (`coord_mode` falling back
+across the whole `disc`-to-`polygon` span) was added by `27fdb785` without the count following it.
+The bullet itself is correct, verified against `applied_coord_mode` and `marks::shape_touches_ring`;
+only the count was wrong. **Repaired in `6e6dbc08`.**
+
+**minor — the `emitter`'s `disc` freezes and then cuts, and now a preset can reach it.**
+`core/src/render/scenes/emitter.rs:302`. This scene's `disc` is the anisotropic glint rather than
+`mark_distance`'s circle, so `fs_main` early-outs on `if (in.shape < 0.5)`. While `mark_shape`
+rounded, that test meant exactly *"the shape is index 0"*. It is now a half-open interval, and the
+consequence on the `disc -> ring` pair of this one scene is worse than a cut: across `[0, 0.5)` the
+figure does not move at all, and at `0.5` it jumps to a 50/50 blend of the *isotropic* disc and the
+ring — two quantities discontinuous at once, the branch and the disc's own aspect. Round 1 raised
+this and rated it minor partly because the travel was unreachable from a preset at all; that premise
+is gone, since `shape` is `Modal` now. It stays a minor rather than rising, because every whole
+index is still an exact identity, no shipped preset binds `shape` to an expression, no baseline
+moves, and the emitter's `disc` is already documented on the same page as a different figure from
+the roster's. **Left open**: the repair is a decision with two defensible answers — blend the glint
+against the ring across the interval, or declare that this arm does not participate and say so at
+the branch and in the essay — and picking one is a behaviour choice, not a text edit. The second is
+the recommendation, because a glint that morphs into a ring was never a coherent figure.
+
+**nit — `applied_coord_mode` clamps to the default rather than to a named floor.**
+`core/src/render/background.rs:906`. `mode.clamp(DEFAULT_COORD_MODE, MAX_COORD_MODE)` uses the
+parameter's *default* as the roster's lower bound, beside a `MAX_COORD_MODE` that is a named
+constant for the other end. If a later plan moved the default off 0 the clamp would silently start
+refusing arm 0, and neither of `the_coordinate_mode_clamps_rounds_and_falls_back`'s assertions would
+catch it, since both are written against the default's picture. **Left open** — carried from round 1
+and re-verified unchanged; a constant is code, which is not on ADR-0209's closed list.
+
+**minor — the implementation log outweighs the contract it reports against.** `## Implementation
+log` runs about 4.6x the length of `## Implementation phases`, and Mode 4 holds the report to no
+more than the contract. Several sections restate measurement tables that the test doc comments
+already carry verbatim, and could cite the test instead of copying it. **Left open** — trimming an
+implementer's report of its own work is not on ADR-0209's closed list.
+
+#### Close-ceremony record
+
+- **Backlog probes:** exit 0 — *43 stated reductions still hold across all 20 live entries (4
+  unprobeable)*, with 30 probed paths reported as moved (advisory). The three entries this plan
+  closes are not among the live ones: ADR-0206 moved them to the archive at approval, so their
+  evidence is the plan's done-whens and the archived bodies' own probe lines, read against the
+  finished tree. All three are discharged — 0101 by Phase 1's blend (reachable from a preset as of
+  round 1's fix), 0100 by Phase 2's `star_wobble` / `star_seed`, 0095 by Phases 3 and 4, with Phase
+  3 answering by rendering exactly as that entry instructed.
+- **Translation advisory:** two rows — `docs/running.ru.md` (source at `fe2b682f25`) and
+  `packaging/foobar/READ-ME-FIRST.ru.md` (source at `d6e275e6db`). Neither English source was
+  touched by this plan; the rows are routed, not repaired.
+- **Preset curation (step 3b):** `presets/` was touched but **no `.toml` moved**, so the shipped set
+  is unchanged and there is nothing that landed to judge and nothing that converged. The
+  workaround grep was read whole rather than piped, and **no shipped preset is authored around any
+  of the three gaps this plan closes** — `shape_facet.toml`, the one preset on the `star` arm, cites
+  backlog 0097 and 0099 and Plan 0098, none of which this plan touches.
+- **Version bump:** `minor`, plus the studio's two copies, with the annotated tag on the sync commit.
+
+### Round 1 findings a fix round resolved
+
+- **major — the roster travel was unreachable from a preset; `shape` still rounded in the binding
+  pipeline** (`core/src/render/scenes/marks.rs:573`). Resolved in **`5174d516`**: `SHAPE` declared
+  `ParamKind::Modal`, the three `("*", "shape")` rows dropped from `STRUCTURAL` with a comment
+  naming ADR-0226, the four generated surfaces regenerated, and
+  `an_eased_shape_sweep_lands_between_the_arms` added, driving the ease through
+  `SHAPE.kind.quantize` **and** `mark_shape` with `POINTS` as the control. Verified against the tree
+  this round.
+- **minor — on `emitter`, the disc-to-ring travel is a cut at the midpoint** — not resolved; re-raised
+  above as round 2's third minor, with the premise that made it unreachable now gone.
+- **minor — the implementation log outweighs the contract it reports against** — not resolved;
+  re-raised above.
+- **nit — `applied_coord_mode` clamps to the default rather than to a named floor** — not resolved;
+  re-raised above.
+
 ## Followups (after this lands)
 
 - A `preset-author` look for each lever, which is the only thing that can say whether it earned its
   place.
+- **The `emitter`'s glint does not travel** (round 2's third minor): decide between blending it
+  against the ring across `[0, 0.5)` and declaring the arm out of the roster's travel in words.
+- **`points` declares `3..16` and applies `3..12`**, and `presets/README.md` prints both numbers on
+  one page. Predates this plan; wants a backlog entry.

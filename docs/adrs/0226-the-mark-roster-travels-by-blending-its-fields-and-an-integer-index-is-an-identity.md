@@ -1,8 +1,8 @@
 # ADR-0226 — The mark roster travels by blending its fields, and an integer index is an identity
 
-> **Status:** proposed
+> **Status:** accepted 2026-09-20, Plan 0203. **Outcome** below.
 > **Date:** 2026-09-19
-> **Related plan(s):** [0203](../plans/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md)
+> **Related plan(s):** [0203](../plans/done/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md)
 > **Rests on:** [0084](0084-a-particle-marks-silhouette-is-a-signed-distance-function.md) (the roster),
 > [0105](0105-the-mark-roster-becomes-a-fullscreen-distance-field.md) (the shared chunk),
 > [0111](0111-the-shape-field-gains-a-scaled-copy-coordinate.md) (the second per-arm scalar);
@@ -102,3 +102,31 @@ That entry says whoever takes this should read
 [ADR-0111](0111-the-shape-field-gains-a-scaled-copy-coordinate.md) first and that, if both are
 wanted, they are probably one plan — which is why the boundary radius is in this decision rather
 than deferred.
+
+## Outcome — 2026-09-20, Plan 0203 Phase 1
+
+**Three consequences the Decision above did not name, all found in the building.**
+
+**A roster position that carries a meaning between its arms cannot stay `ParamKind::Structural`.**
+The scene-side conditioner is not the only rounding a bound value meets: the binding pipeline
+quantizes every value by its declared kind, after the hold and after the smoother. Removing the
+round from `mark_shape` alone left that second one standing, so the blend was reachable only from an
+unquantized live override and an eased binding still stepped — this decision's own Context defect,
+intact, with three generated documentation surfaces already promising the travel. `shape` is
+`Modal`, and it is the one name that has ever left `core/tests/suite/preset.rs`'s `STRUCTURAL`
+roster. The general form is that this ADR's *"an integer index is an identity"* is a claim about a
+declaration as much as about a shader.
+
+**The `ring`'s disqualification widens from an index to a span.** ADR-0111's scaled-copy coordinate
+needs a figure every ray from the centre leaves once, and a blend with the `ring` on either side
+inherits the hole — so the test is *"does this position touch that arm"* across the whole open span
+between `disc` and `polygon`, not *"is this that arm"*. At every whole index the two tests are the
+same test, so nothing that shipped moved; what it costs is that easing `shape` from `0` to `2` under
+`coord_mode = 1` draws scaled copies at the ends and offset curves through the middle, and the
+load-time notice cannot see it because it reads the resting value.
+
+**The travel is not free on every scene that reads the chunk.** `emitter` keeps its own anisotropic
+glint for `shape < 0.5` rather than calling `mark_distance`, so on that one scene the `disc`-to-
+`ring` pair freezes for the first half of its interval and then jumps. Every whole index is still an
+exact identity there. Left open at Plan 0203's close as a behaviour question: blend the glint across
+the interval, or declare the arm out of the roster's travel in words.

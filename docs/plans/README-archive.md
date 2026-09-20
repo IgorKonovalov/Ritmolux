@@ -18,6 +18,7 @@ hand-edited.
 
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
+  - [0203 - The figure gains the levers it was measured to lack](#0203---the-figure-gains-the-levers-it-was-measured-to-lack)
   - [0199 - The gate's cost is measured before it is cut](#0199---the-gates-cost-is-measured-before-it-is-cut)
   - [0201 - The warp surface stops lying](#0201---the-warp-surface-stops-lying)
   - [0205 - The library becomes navigable](#0205---the-library-becomes-navigable)
@@ -241,6 +242,58 @@ hand-edited.
 <!-- toc:end -->
 
 ## Recently closed (full entries)
+
+### [0203 - The figure gains the levers it was measured to lack](done/0203-the-figure-gains-the-levers-it-was-measured-to-lack.md)
+
+- closed 2026-09-20, conductor-run lane
+`plan-0203-the-figure-gains-the-levers-it-was-measured-to-lack` in `WORK/rlx-plan-0203`. Four
+phases, `56915750` + `7f8ca5dc`, `b8f00cd8`, `0dd39295` and `869fbbde`; round 1's fix `5174d516`; a
+prose repair `27fdb785`; round 2's repairs `6e6dbc08`; the close block after them. Two review
+rounds: round 1 **one major, two minors, one nit**; round 2 **no blockers, no majors, three minors,
+one nit**, three repaired across the two. Version **0.140.0** (minor — six new parameters and a
+seventh with a changed meaning). ADR-0225 and ADR-0226 accepted, both with an `Outcome`. Closed
+backlog 0095, 0100 and 0101.
+- **What landed.** Three levers whose three backlog entries had each measured their own constraint
+before anyone built anything. `mark_shape` became a *position* on the silhouette roster rather than
+an index into it: a fractional value blends the two neighbouring arms' distance fields **and** their
+boundary radii, and a whole value is an exact identity — proved on the rendered frame, ten
+byte-identical PNG pairs against the same three files restored to their pre-phase state and rebuilt.
+The `star` arm gained `star_seed`, `star_wobble` and `star_wobble_freq`, the second of which is the
+quantity "hand-drawn" actually names: the edge between a tip and the notch wanders radially along its
+length while both ends stay pinned, and at amplitude 1 it costs at most 0.12 of exterior field
+accuracy against the `star_jitter` cost of 0.54 it was told to measure itself against. The backdrop
+ramp gained `bg_coord_mode`, `bg_center_x` and `bg_center_y`, so its swept stripes become a fan
+converging on a vanishing point at no cost to the preset's one layer slot. All six default to an
+arithmetic identity, so not one shipped picture moved.
+- **What the rendering decided, rather than the argument.** Phase 3 existed only to answer backlog
+0095 the way that entry demanded — by rendering both routes and looking. It did, from one
+construction, and measured the figure's own luma: over a chain-drawn ground the figure is a flat
+97.3-99.0 against 230.0-232.0, and over the lit backdrop it runs 109.7-210.1 against a floor whose
+darker bands read 209.1, so figure and floor stop being separable by tone at all. ADR-0225 survived,
+and **for a stronger reason than it gave itself**: a preset has one layer slot and dark-on-light
+needs a multiply layer, so the fan and the figure cannot both be the thing that is darkened — the
+expensive route does not buy the collage either, which means the slot is not a price that purchases
+it. Three throwaway presets were rendered and none kept; `docs/examples/` is the guide's, not a
+scrapbook.
+- **What the building found that the ADR had not.** Round 1's major: removing the rounding from
+`mark_shape` left a *second*, independent one standing — the binding pipeline quantizes every bound
+value by its declared `ParamKind`, after the hold and after the smoother — so the travel was
+reachable only from an unquantized live override while three generated documentation surfaces
+already promised it. `shape` is `Modal` now, and it is the one name that has ever left
+`core/tests/suite/preset.rs`'s `STRUCTURAL` roster. The general lesson is in ADR-0226's `Outcome`:
+*"an integer index is an identity"* is a claim about a declaration as much as about a shader, and a
+test that measures the scene's own conditioner cannot see the difference. Two smaller ones followed
+it — the `ring`'s disqualification from the scaled-copy coordinate widened from an index to the whole
+open span that touches it, and `emitter`'s anisotropic glint declines to participate in the travel
+at all below `shape = 0.5`.
+- **What outlived the plan.** The edge wobble is spelled **inline at both of its call sites** rather
+than called as a function, which is the opposite of `marks.rs`'s habit and is a measured constraint:
+as the first user function called inside the sub-segment loop it stopped the DX12 backend producing
+a working `shape_field` pipeline at all — 26 GPU tests and the golden roster on a lost device,
+including presets that never reach the star arm. The constraint is recorded at the code. Left open
+for the owner: whether `emitter`'s glint should blend or be declared out of the travel in words, one
+named constant in `background.rs`, and a pre-existing `points` range that declares `3..16` while the
+code applies `3..12`.
 
 ### [0199 - The gate's cost is measured before it is cut](done/0199-the-gates-cost-is-measured-before-it-is-cut.md)
 
