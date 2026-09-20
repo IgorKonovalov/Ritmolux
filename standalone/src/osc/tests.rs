@@ -9,6 +9,7 @@
 
 use super::decode::{Action, Name, Reject, Transport, decode};
 use super::{ADDRESS_COUNT, ADDRESS_PREFIX, Arg, Telemetry, encode, rms_of};
+use crate::marks::Mark;
 
 /// A telemetry snapshot with distinguishable values, so a transposed field in
 /// [`Telemetry::messages`] shows up as a wrong number rather than as another 0.
@@ -263,6 +264,29 @@ fn vocabulary() -> Vec<Action> {
         Action::Transport(Transport::Prev),
         Action::Transport(Transport::Auto),
         Action::Transport(Transport::Hold),
+        // Every mark, in both states: the pair is what the message carries, and
+        // a row that only ever round-tripped `on` would not exercise the second
+        // argument at all.
+        Action::Mark {
+            name: name("Echo Plate"),
+            mark: Mark::Favourite,
+            on: true,
+        },
+        Action::Mark {
+            name: name("Echo Plate"),
+            mark: Mark::Favourite,
+            on: false,
+        },
+        Action::Mark {
+            name: name("Multibrot"),
+            mark: Mark::Hidden,
+            on: true,
+        },
+        Action::Mark {
+            name: name("Multibrot"),
+            mark: Mark::Hidden,
+            on: false,
+        },
         Action::Ping(0x0BAD_F00D),
     ]
 }
@@ -323,9 +347,76 @@ fn the_control_addresses_are_versioned_and_free_of_collisions() {
             seen.push(address);
         }
     }
-    // Two transport verbs share `ctl/transport` by design; the collision that
-    // would matter is two *actions of different kinds* on one address.
-    assert_eq!(seen.len(), 6, "the vocabulary has six addresses");
+    // Two transport verbs share `ctl/transport` by design, as four mark rows
+    // share `ctl/mark`; the collision that would matter is two *actions of
+    // different kinds* on one address.
+    assert_eq!(seen.len(), 7, "the vocabulary has seven addresses");
+}
+
+/// **A mark the vocabulary does not name is refused rather than mapped onto a
+/// neighbour**, and so is an argument list of the wrong shape. The sender is a
+/// program, and a coerced mark would move the wrong set.
+#[test]
+fn a_mark_message_accepts_only_what_it_understands() {
+    let mut buf = Vec::new();
+
+    encode(
+        &mut buf,
+        "/rlx/v1/ctl/mark",
+        &[Arg::S("Gyre"), Arg::S("favorite"), Arg::I(1)],
+    );
+    assert_eq!(
+        decode(&buf),
+        Err(Reject::Unusable),
+        "an American spelling is not this vocabulary's word"
+    );
+
+    for args in [
+        vec![Arg::S("Gyre"), Arg::S("favourite")],
+        vec![Arg::S("Gyre"), Arg::I(1), Arg::S("favourite")],
+        vec![Arg::S("Gyre"), Arg::S("favourite"), Arg::F(1.0)],
+    ] {
+        encode(&mut buf, "/rlx/v1/ctl/mark", &args);
+        assert_eq!(
+            decode(&buf),
+            Err(Reject::WrongArguments),
+            "a mark with {} arguments of the wrong shape was accepted",
+            args.len()
+        );
+    }
+
+    // Any non-zero integer is "on": a `1`/`0` sender and a `-1`/`0` one mean
+    // the same thing, and refusing the second would invent a rule the type
+    // does not carry.
+    for state in [1, -1, 42] {
+        encode(
+            &mut buf,
+            "/rlx/v1/ctl/mark",
+            &[Arg::S("Gyre"), Arg::S("hidden"), Arg::I(state)],
+        );
+        assert_eq!(
+            decode(&buf),
+            Ok(Action::Mark {
+                name: name("Gyre"),
+                mark: Mark::Hidden,
+                on: true,
+            }),
+            "{state} did not read as on"
+        );
+    }
+    encode(
+        &mut buf,
+        "/rlx/v1/ctl/mark",
+        &[Arg::S("Gyre"), Arg::S("hidden"), Arg::I(0)],
+    );
+    assert_eq!(
+        decode(&buf),
+        Ok(Action::Mark {
+            name: name("Gyre"),
+            mark: Mark::Hidden,
+            on: false,
+        })
+    );
 }
 
 /// A well-formed message to an address this player does not know is refused as

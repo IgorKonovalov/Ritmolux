@@ -11,7 +11,7 @@
 //! one roster (spec 0001), and the shipped set is embedded read-only (ADR-0022),
 //! so there is no file to write a mark into and no stable id to write it under.
 //! The direct costs are that renaming a preset loses its marks, that a mark on a
-//! name no longer in any library is retained and inert, and that two libraries
+//! name absent from every library is retained and inert, and that two libraries
 //! sharing a preset name share its mark.
 //!
 //! **Nothing here can stop the app starting.** A file that is absent, empty or

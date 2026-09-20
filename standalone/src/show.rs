@@ -49,6 +49,14 @@ const PING_SCRATCH: usize = 8;
 const UNRESOLVED_PRESET: &str =
     "ctl/preset: the selection did not take, so this preset is not on screen";
 
+/// What a `preset_error` raised by a refused `ctl/mark` says.
+///
+/// Phrased as the request's outcome, like its sibling above: the mark was not
+/// stored, so nothing about the library moved — and a mark kept for a name the
+/// roster does not hold would grow the file forever off a channel nobody sees.
+const UNMARKABLE_PRESET: &str =
+    "ctl/mark: no preset of this name is loaded, so the mark was not stored";
+
 /// Everything a run manages around the renderer, in one owner.
 pub(crate) struct Show {
     /// Preset directory watched for hot-reload, with its last-seen signature and
@@ -175,6 +183,9 @@ impl Show {
             next_health: now + HEALTH_INTERVAL,
         };
         show.reload(renderer);
+        // The mark sets on connect, after the roster the reload above emitted:
+        // a parent joins the two by name, so the names have to exist first.
+        show.report_marks();
         // What the user state carried across the restart. Silent when there is
         // none, so a fresh install says nothing; a count otherwise, because a
         // marks file that failed to load reports its own reason and one that
@@ -221,9 +232,9 @@ impl Show {
     /// returning its name.
     ///
     /// **The one place a rotation picks a preset**, whether the director's timer
-    /// asked or the operator did. The roster's successor is no longer the
-    /// answer — the traversal is — so a caller that stepped the roster itself
-    /// would show hidden presets and repeat while unseen ones remained.
+    /// asked or the operator did. The traversal decides which, not the roster's
+    /// successor, so a caller that stepped the roster itself would show hidden
+    /// presets and repeat while unseen ones remained.
     pub(crate) fn rotate(&mut self, renderer: &mut Renderer) -> Option<String> {
         let pick = {
             let Self {
@@ -242,9 +253,9 @@ impl Show {
 
     /// Step back to the preset shown before the current one, returning its name.
     ///
-    /// Walks past any name the roster no longer holds — a hot-reload can retire
-    /// a preset while it is still on the trail — and answers `None` once the
-    /// trail is spent.
+    /// Walks past any name the roster does not hold — a hot-reload can retire a
+    /// preset while it is still on the trail — and answers `None` once the trail
+    /// is spent.
     pub(crate) fn step_back(&mut self, renderer: &mut Renderer) -> Option<String> {
         while let Some(name) = self.traversal.step_back() {
             if renderer.select_preset_by_name(&name) {
@@ -279,7 +290,27 @@ impl Show {
         if let Some(path) = &self.marks_path {
             self.marks.save(path);
         }
+        self.report_marks();
         true
+    }
+
+    /// Put the whole of both mark sets on the event stream.
+    ///
+    /// **Whole sets rather than a delta**, and on every change whoever made it:
+    /// a parent that missed a line cannot reconstruct the state from the next
+    /// one, and a mark made from the player's own hotkey has to reach a studio
+    /// that did not ask (ADR-0229). Marks are changed by a keypress, so the cost
+    /// of re-sending both sets is paid at human rate.
+    pub(crate) fn report_marks(&mut self) {
+        let Some(events) = self.events.as_mut() else {
+            return;
+        };
+        let favourite: Vec<&str> = self.marks.favourite.iter().map(String::as_str).collect();
+        let hidden: Vec<&str> = self.marks.hidden.iter().map(String::as_str).collect();
+        events.emit(&Event::Marks {
+            favourite: &favourite,
+            hidden: &hidden,
+        });
     }
 
     /// Flip `name`'s membership of `mark`'s set, returning the new state.
@@ -527,6 +558,14 @@ impl Show {
         let mut scratch = [0_i32; PING_SCRATCH];
         let count = nonces.len().min(PING_SCRATCH);
         scratch[..count].copy_from_slice(&nonces[..count]);
+        // The marks, copied out before the listener goes back: they are applied
+        // below through `set_mark`, which needs `self`. Bounded by
+        // `MARK_SLOTS`, so this copy is bounded by construction.
+        let asked: Vec<(String, Mark, bool)> = drained
+            .marks()
+            .iter()
+            .map(|(name, mark, on)| (name.as_str().to_owned(), *mark, *on))
+            .collect();
         control.note_refused(applied.refused);
         self.control = Some(control);
         // The one message answered individually (ADR-0176): OSC carries no
@@ -544,6 +583,30 @@ impl Show {
                     // discover it.
                     file: Path::new(name.as_str()),
                     message: UNRESOLVED_PRESET,
+                    line: None,
+                    col: None,
+                    param: None,
+                });
+            }
+        }
+        // The marks last, after everything about the frame being rendered: a
+        // mark changes what rotation will draw from, never what this frame
+        // shows, so it cannot be ordered against the values above.
+        //
+        // **A mark naming a preset the roster does not hold is refused and
+        // reported**, not stored. The opposite population from a mistyped
+        // parameter scrubbed at slider rate: a mark comes from a click on a
+        // roster the player itself published, so one refusal is one deliberate
+        // request that did not land — the direction ADR-0221 takes for the rest
+        // of this path. Storing it would also grow the file with names nothing
+        // prunes, off a channel the user never sees.
+        for (name, mark, on) in &asked {
+            if renderer.preset_names().any(|held| held == name) {
+                self.set_mark(*mark, name, *on);
+            } else if let Some(events) = self.events.as_mut() {
+                events.emit(&Event::PresetError {
+                    file: Path::new(name.as_str()),
+                    message: UNMARKABLE_PRESET,
                     line: None,
                     col: None,
                     param: None,

@@ -310,8 +310,8 @@ pub enum RotateSource {
 | 1 — The marks store, and one key that proves it | dev | done | c3ed56cb |
 | 2 — Rotation spends the marks | dev | done | eaeca3bc |
 | 3 — The browser narrows | dev | done | 74b1e5c5 |
-| 4 — The keys and the HUD carry it | dev | done | committed with this row |
-| 5 — The protocol carries a mark | dev | not started | |
+| 4 — The keys and the HUD carry it | dev | done | fe2b682f |
+| 5 — The protocol carries a mark | dev | done | committed with this row |
 | 6 — The studio marks and filters | studio-builder | not started | |
 
 ### Notes
@@ -386,6 +386,20 @@ pub enum RotateSource {
 - **A/B is `B`, and the number keys are the top row and the numpad both.** `B` is an
   outside-the-browser binding like `S`, `C`, `F` and `D` — the phase's own rule for the digits
   ("the binding applies outside it") is the same one. `0` is deliberately not a tenth slot.
+
+- **`/ctl/mark` carries `s name`, `s mark`, `i state`** — a state rather than a press, deduplicated
+  per `(preset, mark)` pair in the listener's queue like a parameter value. Any non-zero integer
+  reads as "on"; refusing `-1` would be the decoder inventing a rule the type does not carry.
+- **A refused mark reuses `preset_error`**, which is the shape ADR-0221 already fixed for a refused
+  `ctl/preset`: `file` holds the asked-for name and is not a path, and `line`/`col`/`param` are
+  `null`. A second event for one more refusal arm would have widened the roster for no fact a
+  parent reads differently.
+- **Phase 5 also corrected spec 0003's `prev` row**, which still said "cut to the roster's
+  predecessor". Phase 2 made that inaccurate and does not own the spec; this phase does. The
+  invariant now states the trail and its roster-predecessor fallback.
+- The `marks` event is emitted **after** the startup `roster`, since a parent joins the two by name,
+  and on every change whoever made it — the hotkey path and the wire path both run through
+  `Show::set_mark`, which is the one writer.
 
 ### Close triggers
 

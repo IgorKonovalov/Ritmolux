@@ -329,7 +329,7 @@ pub struct OverlayState {
     ///
     /// Owned rather than a roster position, because a hot-reload can replace the
     /// roster underneath: a stored index would silently become a different
-    /// family, and a name that is no longer there simply reads as no match.
+    /// family, and a name the new roster lacks simply reads as no match.
     family: Option<String>,
     /// Show only presets marked favourite.
     favourites_only: bool,

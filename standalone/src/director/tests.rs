@@ -419,7 +419,7 @@ fn the_traversal_survives_its_set_growing_and_shrinking_between_draws() {
     );
 
     // And the set shrinking to one leaves that one, rather than an empty draw
-    // or a name that is no longer there.
+    // or a name the set does not hold.
     let single = vec!["delta"];
     for _ in 0..3 {
         assert_eq!(traversal.draw(&single).as_deref(), Some("delta"));
@@ -432,8 +432,8 @@ fn the_traversal_survives_its_set_growing_and_shrinking_between_draws() {
 
 /// **What the console announces is what the rotation then takes.**
 ///
-/// The traversal is shuffled, so the successor rule no longer answers this and
-/// the peek is what does. The announcement must also survive being asked twice,
+/// The traversal is shuffled, so a roster successor is not the answer and the
+/// peek is. The announcement must also survive being asked twice,
 /// or the line would name a different preset on every frame it is drawn.
 #[test]
 fn the_announced_preset_is_the_one_the_next_draw_takes() {

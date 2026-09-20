@@ -235,7 +235,7 @@ pub(crate) struct Hud {
     /// **Session state, deliberately not persisted**: it is a comparison an
     /// operator is making now, not an opinion about the library — which is what
     /// the marks are for. Holds the *name*, so a hot-reload that rewrites the
-    /// roster under it either still resolves or reports that it no longer does.
+    /// roster under it either still resolves or says so.
     pub(crate) ab_side: Option<String>,
 
     /// State for the console's `random` control.
@@ -1625,10 +1625,10 @@ impl AppState {
             self.hud.ab_side = Some(current);
             self.on_preset_switched(Trail::Record);
         } else {
-            // The roster no longer holds it — a hot-reload retired it while it
+            // The roster does not hold it — a hot-reload retired it while it
             // was stashed. Say so and re-hold what is on screen, rather than
             // leaving a key that silently does nothing.
-            eprintln!("A/B: '{held}' is no longer in the library; holding '{current}' instead");
+            eprintln!("A/B: '{held}' is not in the library; holding '{current}' instead");
             self.hud.ab_side = Some(current);
         }
     }
