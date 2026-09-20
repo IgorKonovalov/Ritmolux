@@ -19,6 +19,7 @@ use rlx_core::render::{PixelOrder, Renderer};
 use standalone::config;
 use standalone::control::Control;
 use standalone::events::{Event, Events};
+use standalone::marks::{Mark, Marks};
 use standalone::osc::decode::Transport;
 
 use crate::director::Director;
@@ -85,6 +86,18 @@ pub(crate) struct Show {
     /// last told about.
     reported_preset: Option<(String, &'static str, Option<&'static str>)>,
 
+    /// The user's marks on the library, and the file they live in (ADR-0228).
+    ///
+    /// Held here rather than on the window's state because every path that runs
+    /// a show holds one of these: the marks decide what rotation draws from, and
+    /// a path that held them and rotated without them would be silently
+    /// different rather than broken (ADR-0181). `path` is `None` when no
+    /// per-user directory resolved, and then a mark applies live and is not
+    /// persisted — the rule `config.toml` already follows.
+    marks: Marks,
+
+    marks_path: Option<PathBuf>,
+
     /// When the next `health` event is due. The stream's own cadence, not the
     /// diagnostics log's: that one writes a file an operator reads afterwards
     /// and this one feeds a parent watching now, so neither may silence the
@@ -111,6 +124,7 @@ impl Show {
         rotate: &config::Rotate,
         events: Option<Events>,
         control: Option<Control>,
+        marks_path: Option<PathBuf>,
     ) -> Self {
         let now = Instant::now();
         let mut show = Self {
@@ -121,6 +135,8 @@ impl Show {
             events,
             control,
             reported_preset: None,
+            marks: marks_path.as_deref().map(Marks::load).unwrap_or_default(),
+            marks_path,
             // Due one interval from now, not immediately: the diagnostics window
             // is empty before the first frame, so a reading taken at startup is
             // a row of zeros — which a parent cannot tell from a player that has
@@ -128,12 +144,44 @@ impl Show {
             next_health: now + HEALTH_INTERVAL,
         };
         show.reload(renderer);
+        // What the user state carried across the restart. Silent when there is
+        // none, so a fresh install says nothing; a count otherwise, because a
+        // marks file that failed to load reports its own reason and one that
+        // loaded empty would otherwise be indistinguishable from one that
+        // loaded at all.
+        let (favourite, hidden) = (show.marks.favourite.len(), show.marks.hidden.len());
+        if favourite + hidden > 0 {
+            eprintln!("preset marks: {favourite} favourite, {hidden} hidden");
+        }
         show
     }
 
     /// The resolved preset directory, or an empty path when none did.
     pub(crate) fn preset_dir(&self) -> &Path {
         &self.dir
+    }
+
+    /// Put `name` in or out of `mark`'s set, persisting the change.
+    ///
+    /// **The one writer**, whatever asked — a hotkey, the browser, or a control
+    /// message (ADR-0229). Returns whether anything moved, so a surface
+    /// restating a mark it already set neither rewrites the file nor announces a
+    /// change that did not happen.
+    pub(crate) fn set_mark(&mut self, mark: Mark, name: &str, on: bool) -> bool {
+        if !self.marks.apply(mark, name, on) {
+            return false;
+        }
+        if let Some(path) = &self.marks_path {
+            self.marks.save(path);
+        }
+        true
+    }
+
+    /// Flip `name`'s membership of `mark`'s set, returning the new state.
+    pub(crate) fn toggle_mark(&mut self, mark: Mark, name: &str) -> bool {
+        let on = !self.marks.is(mark, name);
+        self.set_mark(mark, name, on);
+        on
     }
 
     /// **The single caller of [`reload_presets`]**, which is what holds the
@@ -417,6 +465,8 @@ mod tests {
             events: None,
             control: None,
             reported_preset: None,
+            marks: Marks::default(),
+            marks_path: None,
             next_health: now + HEALTH_INTERVAL,
         }
     }

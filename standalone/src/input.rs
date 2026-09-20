@@ -18,6 +18,7 @@ use crate::hud::Modal;
 use crate::overlay::{OverlayAction, OverlayKey};
 use crate::settings::{SettingsAction, SettingsKey};
 use rlx_core::render::Tier;
+use standalone::marks::Mark;
 
 /// How close two left-button presses have to be to read as a double-click
 /// (fullscreen toggle) rather than two separate clicks.
@@ -117,6 +118,15 @@ impl AppState {
             if self.window.fullscreen().is_some() {
                 self.toggle_fullscreen();
             }
+            return;
+        }
+
+        // Marking, before the overlay dispatch so the **same key** works with
+        // the browser open and closed (ADR-0228). A function key is never a
+        // filter character, which is what lets one binding serve both contexts
+        // without introducing modifier handling this app has nowhere else.
+        if code == KeyCode::F1 {
+            self.toggle_mark(Mark::Favourite);
             return;
         }
 

@@ -775,6 +775,7 @@ pub fn run(
         },
         events,
         control,
+        standalone::marks::resolve_marks_path(),
     );
     // Judged against the set the show just installed, which is the per-user
     // directory when one resolved and the embedded set otherwise.

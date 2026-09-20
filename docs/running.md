@@ -46,7 +46,20 @@ one, so you always land where you asked.
 | `F`       | Toggle fullscreen                                           |
 | `Esc`     | Leave fullscreen (with no menu open). Does nothing in a window, and never quits |
 | `D`       | Cycle to the next display/monitor                           |
+| `F1`      | Mark the preset you are watching as a **favourite** (press again to unmark) — remembered across restarts |
 | `F3`      | Toggle the diagnostics overlay                              |
+
+### Marking a preset
+
+`F1` records an opinion about the preset on screen: a **favourite**. The mark is keyed by the
+preset's *name*, kept in a `marks.toml` file of its own beside `config.toml`, and it survives a
+restart — the app names the counts it loaded on the way up (`preset marks: 3 favourite, 0 hidden`)
+and each press reports what it did.
+
+Marking is personal, not editorial. Nothing about the shipped library changes, the preset files are
+untouched, and a mark never reaches the visualizer's own gates. Renaming a preset loses its marks,
+because the name *is* the identity; a mark on a preset that is no longer in your library is kept
+and does nothing.
 
 ## The browser and the settings menu
 

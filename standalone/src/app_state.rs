@@ -16,6 +16,7 @@ use std::time::{Duration, Instant};
 use rlx_core::audio::{AudioFormat, SampleConsumer};
 use rlx_core::dsp::Analyzer;
 use rlx_core::render::{AdapterChoice, CapOverflow, Renderer, RendererOptions, Tier};
+use standalone::marks::Mark;
 use standalone::osc::{OscSink, Telemetry, rms_of};
 use standalone::rss;
 use winit::event_loop::ActiveEventLoop;
@@ -477,6 +478,7 @@ impl AppState {
             &rotate_for(&config.rotate, held_preset.as_deref()),
             app.events.take(),
             app.control.take(),
+            standalone::marks::resolve_marks_path(),
         );
 
         // `--preset` holds one scene for the run. The name was checked against
@@ -1535,6 +1537,34 @@ impl AppState {
         self.save_config();
         eprintln!("auto-rotate {}", if on { "on" } else { "off" });
         self.update_title();
+        self.window.request_redraw();
+    }
+
+    /// The preset a mark key acts on: the one on screen.
+    ///
+    /// Owned rather than borrowed, because every caller goes on to take `&mut
+    /// self` to record the mark.
+    pub(crate) fn mark_target(&self) -> Option<String> {
+        let name = self.renderer.preset_name();
+        (!name.is_empty()).then(|| name.to_owned())
+    }
+
+    /// Flip `mark` on whatever [`mark_target`](AppState::mark_target) names, and
+    /// say what happened.
+    ///
+    /// The line is the whole of the confirmation while the corner name is off,
+    /// so it names the preset as well as the mark: a keypress that reported
+    /// nothing is one an operator cannot tell from a key that is not bound.
+    pub(crate) fn toggle_mark(&mut self, mark: Mark) {
+        let Some(name) = self.mark_target() else {
+            return;
+        };
+        let on = self.show.toggle_mark(mark, &name);
+        eprintln!(
+            "{} {}: '{name}'",
+            if on { "marked" } else { "unmarked" },
+            mark.as_str()
+        );
         self.window.request_redraw();
     }
 

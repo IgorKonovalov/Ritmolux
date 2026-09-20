@@ -261,6 +261,23 @@ choice, so a stage setup survives a restart.
 to the built-in default rather than failing, so the file below is a complete listing rather than
 something you have to write.
 
+### The other file: `marks.toml`
+
+Beside `config.toml`, in the same directory, sits a second and much smaller file the app writes:
+`marks.toml`, holding the presets you have marked (see [Running the app](running.md)). It is
+**user state rather than settings** — it grows, it is edited from a hotkey rather than from the
+settings menu, and its two keys are lists rather than scalars — which is why it is not a section of
+the file below.
+
+```toml
+favourite = ["Echo Plate", "Gyre"]
+hidden = ["Multibrot"]
+```
+
+Both keys are optional and both are lists of preset **names**. A missing, empty or malformed file
+means "no marks" and never stops the app starting; a malformed one says so on the console. Delete
+the file to forget every mark.
+
 ### `[output]`
 
 Which display the show opens on, and whether it opens fullscreen.

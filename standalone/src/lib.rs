@@ -39,6 +39,10 @@ pub mod config;
 pub mod control;
 pub mod events;
 pub mod gpu;
+// The per-user preset marks (ADR-0228). A library module for the reason
+// `config` is: it is the binary's alone, but it round-trips through a file, and
+// a library module is where that test runs.
+pub mod marks;
 pub mod osc;
 // The `--check` preset checker (ADR-0190). A library module rather than a binary
 // one for the reason `config` is: `standalone/tests/` runs it over the whole

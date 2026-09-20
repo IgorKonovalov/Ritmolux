@@ -1,6 +1,6 @@
 # 0205 — The library becomes navigable
 
-> **Status:** approved
+> **Status:** in-progress
 > **Created:** 2026-09-19
 > **Approved:** 2026-09-19 (user)
 > **Amended:** 2026-09-19 — four navigation affordances added after a second UX pass, all in the
@@ -303,11 +303,11 @@ pub enum RotateSource {
 > Written by the lane — one row per phase as that phase's commit lands, and the close block after
 > the last one. **The phases above are the contract; everything here is what happened.**
 
-**Lane:** _(to be filled)_
+**Lane:** `plan-0205-the-library-becomes-navigable` in `C:\Users\Igor Konovalov\WORK\rlx-plan-0205`
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The marks store, and one key that proves it | dev | not started | |
+| 1 — The marks store, and one key that proves it | dev | done | committed with this row |
 | 2 — Rotation spends the marks | dev | not started | |
 | 3 — The browser narrows | dev | not started | |
 | 4 — The keys and the HUD carry it | dev | not started | |
@@ -315,6 +315,23 @@ pub enum RotateSource {
 | 6 — The studio marks and filters | studio-builder | not started | |
 
 ### Notes
+
+- **Phase 1 touched files outside its list.** The store is `standalone/src/marks.rs` as stated,
+  but it is a **library** module (`standalone/src/lib.rs`) rather than a binary one, for the reason
+  `config` is: its round trip through a file is what the done-when asks for, and a library module is
+  where that test runs. Path resolution landed in `marks.rs` beside the store (`resolve_marks_path`)
+  rather than in `config.rs`, next to the `APP_DIR_NAME` join it mirrors. The marks are owned by
+  `standalone/src/show.rs` rather than by the window's state, because Phase 2 spends them in the
+  director and Phase 5 reports them on the event stream, both of which live there; `app_state.rs`
+  and `stream.rs` moved only to pass the resolved path into `Show::start`.
+- **A file that is absent or empty is silent**; only one that exists and cannot be parsed prints a
+  line. The phase's done-when lists all three as yielding "empty mark sets and a diagnostic line" —
+  an empty file parses to empty sets with nothing to report, and an absent file is the ordinary
+  first run, so a line there would be permanent noise for anyone who never marks anything. The
+  no-failure-to-start half is asserted for all three
+  (`an_unusable_file_yields_empty_sets_rather_than_a_failure`).
+- Phase 1 binds `F1` (favourite) only. `F2` (hidden) waits for Phase 3, which is where the browser
+  learns to show hidden presets again — a mark that cannot be found is a mark that cannot be undone.
 
 ### Close triggers
 
