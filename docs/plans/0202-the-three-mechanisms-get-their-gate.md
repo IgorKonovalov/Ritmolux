@@ -171,7 +171,7 @@ backlog 0109 asks for an ADR and an interview, and its trigger is this gate's ve
 |---|---|---|---|
 | 1 — Settle the rate candidate | dev | done | `7568e511` |
 | 2 — Repair what Phase 1 convicted | dev | not run — Phase 1 falsified the candidate | committed with this row |
-| 3 — The echo nests | dev | not started | |
+| 3 — The echo nests | dev | parked — see the note | committed with this row |
 | 4 — The waveform scale is measured per mode | dev | not started | |
 | 5 — The fourth look gate | human | not started | |
 | 6 — The corpus census is present-day | human | not started | |
@@ -247,6 +247,54 @@ candidate"* — is met: there is no deposit path to convert, because no deposit 
 code changed and no baseline moved for it. The two washed pairs therefore leave Phase 1 with **no
 named mechanism**, which is the outcome the plan's own risk section anticipated, and Phase 5's
 verdict has to say so.
+
+**Phase 3 is parked: the nesting it asks for cannot be built without reopening
+[ADR-0119](../adrs/0119-the-video-echo-blends-toward-its-copy-rather-than-adding-it.md), which is
+`architect`'s.** Nothing was changed for it; what follows is what the session established first, so
+whoever settles it starts from here rather than from the top.
+
+*Where the echo is today.* `PRESENT_SHADER` in `core/src/render/scenes/warp_mesh/shaders.rs`:
+`euv = (uv - 0.5) / echo_zoom + 0.5`, flipped in x and/or y per the orientation, then
+`c = mix(c, sample(field, euv), echo_alpha)`. The uniform is filled in `encode.rs::upload_uniforms`,
+which also quantizes the orientation to one of four states on the CPU. So **all three parameters do
+reach the composite and each is read** — the phase's *"if the binding does not reach the composite"*
+branch is not the case, and `core/src/milk/outputs.rs` needs nothing.
+
+*Why sourcing the copy from the previous frame does not on its own produce a nesting.* Under
+ADR-0119's `mix(base, echo, alpha)`, `alpha = 1` is `echo` exactly — the ADR says so in as many
+words, and calls it the property that makes the stage pinnable. *Songflower* authors
+`fVideoEchoAlpha = 1.000`. At that value the composite is **the transformed copy alone**, with the
+un-echoed frame discarded; the copy is magnified by the preset's own `echo_zoom` of roughly 1.75-2.0,
+so what reaches the screen is a doubled crop of the frame — coarse bars where the frame had a fine
+lattice. That is the shape of Plan 0142's reading, *"ours draws the bare grid"*, and it is an
+identity rather than a measurement. Now re-source the copy from the previous frame as this phase
+asks: at `alpha = 1` the composite becomes `T(previous composite)`, a pure recursion with no field
+term in it at all, which runs to a fixed point rather than to a weave. A nested series needs **both**
+a recursive source and a blend that keeps the base at `alpha = 1` — and the second of those is
+ADR-0119's accepted decision, reached at a look gate against the additive alternative. `dev` does not
+change an accepted ADR, and this phase's `Files touched` does not list one.
+
+*What it would cost even if the blend were settled.* `encode_present` composites with
+`LoadOp::Load` into a view the scene does not own — the post chain's target or the tonemap's source —
+so retaining "the previous frame's composite" means a new full-size target, a per-frame copy, and a
+decision about where the loop closes: before or after `gamma`, the four composite remaps, the level
+palette (ADR-0197) and the backdrop. The plan's own risk line asks this phase to stop rather than
+grow at exactly that point.
+
+*One fact to settle before the built-in shader is touched at all.* A converted preset that carries a
+`comp` HLSL shader does not use `PRESENT_SHADER`: `encode_present` selects
+`milk_shaders.comp_pipeline` when the bundle has one, and that shader *is* MilkDrop's composite,
+gamma and echo and all, in the preset's own arithmetic. For such a preset the built-in echo is dead
+code. Whether *Songflower* carries one is not readable from this checkout.
+
+*Two inputs this phase needs are outside the checkout.* The done-when names the reference
+(`xeiraex/milkdrop2` at `d4c843a`, the tree Plan 0142 read at `WORK/milkdrop2-src`) as the contract
+for how the copy is composited, and names a converted *Songflower* — whose `.milk` lives in
+`WORK/milkdrop-corpus` — as the subject. A lane session reaches neither, and *"draws a nested weave
+rather than the bare grid"* is a look in any case. The two questions to put to the reference are
+narrow: what `ShowToUser` blends at `fVideoEchoAlpha = 1`, and which texture its echo pass samples.
+
+**Phase 4 was not reached**, since Phase 3 parked ahead of it. Nothing in it depends on Phase 3.
 
 ### Close triggers
 
