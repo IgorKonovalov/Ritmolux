@@ -122,7 +122,10 @@ flowchart TB
   hop did not move is rewritten, which Phase 1 is what makes possible.
 
 ### Phase 4 — a person says whether the cards are now the look
-- **Owner skill:** human (a `preset-author` session — judging a picture is that lane's work)
+- **Owner skill:** human
+- Taken as a `preset-author` session: judging a picture is that lane's work. The tag stays the bare
+  `human` the conductor's parser accepts — it reads the owner line to the end of the line, so a
+  parenthetical after the word makes the phase ownerless and refuses the whole queue.
 - **What:** Compare each re-rendered card against a late render of the same preset and say whether the
   card is now the world the preset is named for.
 - **Files touched:** none, or `scripts/docs-shots.mjs`'s family hops if the verdict moves one.

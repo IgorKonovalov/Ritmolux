@@ -4,7 +4,7 @@ The one-minute "what's in flight" view. Read this first each session instead of
 re-deriving state from `git log`. Completed plans move to `done/`; their full
 close write-ups move to [README-archive.md](README-archive.md).
 
-**Next free number: 0215** (ADRs are a separate sequence — next free there is **0238**; 0200 is reserved for Plan 0186 Phase 2.)
+**Next free number: 0216** (ADRs are a separate sequence — next free there is **0239**; 0200 is reserved for Plan 0186 Phase 2.)
 
 <!-- toc:begin depth=3 -->
 - [Active roster](#active-roster)
@@ -55,6 +55,7 @@ place. The plan file carries the real link.
 | [0211](0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md) | The diffused frame's resolution is measured before it is designed | approved | dev, human | No ADR yet: the quality profile has never run on a track, so Phase 1 renders the pair and Phase 2 may close the plan. Takes backlog 0125. |
 | [0212](0212-the-diffused-render-gains-a-timeline.md) | The diffused render gains a timeline | approved | dev, human | ADR-0236 (proposed): a prompt timeline in bars, the seed still fixed. Declines the onset-denoise lever. Not folded with 0211 - 0126 forbids it. Closes backlog 0126. |
 | [0213](0213-the-hook-costs-what-the-push-is-worth.md) | The hook costs what the push is worth | approved | dev | ADR-0237 (proposed): the Node roster always runs; cargo runs only when the push moved Rust, and the suite is served by a ledger record for that tree. 0199 measured the cost untrimmable. |
+| [0215](0215-the-wide-seams-narrow-and-a-guard-holds-them.md) | The wide seams narrow, and a guard holds them | approved | dev | ADR-0238 (proposed): a scene declares a capability, not the engine enumerating kinds. Sweep 2026-09-20: capture pragma, Scene seam, preview owner - each gated. Lists are dated evidence. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
@@ -277,6 +278,19 @@ sized in samples, so 21 of 64 bands are bin-starved at 96 kHz — pinned by a te
 waiting on someone reporting a mushy low end on a 96 kHz interface).
 
 ## Recommended execution sequence
+
+**Added 2026-09-20 - [0215] is approved and runs last, behind everything in the roster above.**
+It carries the three structural findings of that day's architecture sweep, and its position is
+deliberate rather than incidental: [0206](0206-the-browser-shows-the-look.md) adds a consumer to the
+preview surface its Phase 5 extracts, [0209](0209-a-system-joins-the-instruments-by-existing.md)
+derives a roster from the `SystemKind` its Phase 4 gates, and [0203] touches scene params. Run
+earlier it would refactor code three approved plans are about to rewrite. Every count and file list
+inside it is stamped with the date it was read, and `dev` re-derives each at the phase it needs it
+rather than restoring a shape this plan recorded - which is what lets it sit at the back of a
+sixteen-plan queue without going stale.
+
+[0215]: 0215-the-wide-seams-narrow-and-a-guard-holds-them.md
+
 
 **Added 2026-09-19 - [0204] is approved, it sits behind [0201], and it is not a conductor plan.**
 Every one of its phases is `human` - content-lane sittings the owner starts - so a conductor run

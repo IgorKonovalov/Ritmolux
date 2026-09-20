@@ -396,11 +396,17 @@ And: `node scripts/check-doc-links.mjs`, `node scripts/check-index-rows.mjs`,
 `node scripts/check-backlog-claims.mjs`, `node scripts/check-reader-prose.mjs` and
 `node scripts/toc.mjs --check` all exit 0.
 
-### Phase 6 — moved to Plan 0214 on 2026-09-20
+### Where the sixth phase went
 
-The on-box run is [0214](0214-the-linux-arm-reports-back.md) Phase 4, carried across with its
-done-when list intact. It is named here rather than deleted because three earlier sections still
-say "which Phase 6 then executes", and a phase that vanishes leaves those pointing at nothing.
+The on-box run moved to [0214](0214-the-linux-arm-reports-back.md) Phase 4 on 2026-09-20, carried
+across with its done-when list intact. It is named here rather than deleted because three earlier
+sections still say "which Phase 6 then executes", and a phase that vanishes leaves those pointing at
+nothing.
+
+**This heading deliberately does not read `### Phase 6 — …`.** The conductor parses a plan's phases
+out of exactly that shape and then demands an owner tag under each one, so a stub in that form is an
+ownerless phase and refuses the entire queue — which is what it did on 2026-09-20 before this
+wording.
 
 ## Implementation log
 
