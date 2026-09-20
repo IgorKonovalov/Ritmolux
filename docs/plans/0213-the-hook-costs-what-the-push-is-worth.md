@@ -1,7 +1,8 @@
 # 0213 — The hook costs what the push is worth
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-09-19
+> **Approved:** 2026-09-20 (user)
 > **Owner skill(s):** dev
 > **Related ADRs:** [0237](../adrs/0237-the-hook-runs-cargo-only-when-the-push-moved-rust-and-serves-the-rest-from-the-ledger.md)
 > (proposed), [0033](../adrs/0033-testing-strategy-coverage-ratchet-and-pre-push-gate.md),
