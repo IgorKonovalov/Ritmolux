@@ -8,9 +8,12 @@
 //! both of its halves: `mesh::vertex_position` multiplies the x axis by the
 //! target aspect (ADR-0037), which is `1.0` there, and the `(aspectx, aspecty,
 //! 1/aspectx, 1/aspecty)` lanes a translated shader reads as `U.aspect` are all
-//! `1.0` for the same reason. So the three `warp_mesh` fixtures in that binary
-//! run the whole chain against operands that cannot express an error in it —
-//! drop either term and every one of those baselines renders byte-identically.
+//! `1.0` for the same reason. So the three converted `warp_mesh` fixtures in
+//! that binary — `warp_mesh_milk`, `warp_mesh_shader` and `warp_mesh_stroke`,
+//! the three carrying a `[milk]` table; the rostered `warp_mesh.toml` carries
+//! none — run the whole chain against operands that cannot express an error in
+//! it: drop either term and every one of those baselines renders
+//! byte-identically.
 //!
 //! `warp_mesh.rs`'s per-stage tests assert what the chain *computes*; what no
 //! capture in the crate held is the **picture** it produces at a shape where the
@@ -55,10 +58,10 @@
 //! All four declare `zoom`, `rot` or `warp`; only one of them renders a picture
 //! the corrected space reaches far enough to exceed a tolerance, and it does so
 //! on the **outlier** term rather than the mean — a warp redistributes edges
-//! rather than shifting the frame's average. `warp_mesh_shader.toml`, the
-//! subject this fixture first carried, reads 0.0000 and 0 under the same probe:
-//! it declares no mesh motion at all, so the corrected coordinates reach nothing
-//! it draws. A fixture that cannot fail is not a guard (Plan 0201 Phase 4a).
+//! rather than shifting the frame's average. `warp_mesh_shader.toml` reads
+//! 0.0000 and 0 under the same probe: it declares no mesh motion at all, so the
+//! corrected coordinates reach nothing it draws. A fixture that cannot fail is
+//! not a guard (Plan 0201 Phase 4a).
 
 use rlx_core::preset::Preset;
 use rlx_core::render::{CaptureImage, metrics::frame_diff};

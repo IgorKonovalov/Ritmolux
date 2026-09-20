@@ -790,7 +790,10 @@ Three things to know before you author on it:
   landing inside one sample a blend of the two inks. The display write's dither is
   the other
   ([ADR-0096](adrs/0096-the-display-write-dithers.md)), which spreads each ink over
-  its own neighbouring encoded levels. On the shipped `warp_ladder` at 640x360,
+  its own neighbouring encoded levels. The two readings below were taken on one
+  machine on 2026-09-19; both of those stages feed the exact count, so another
+  rasterizer counts differently and what to carry away is the order of magnitude
+  rather than the number. On the shipped `warp_ladder` at 640x360,
   full stimulus: `palette_steps = "12"` measures 145 exact frame colours with the
   threshold off and **11** with it on — two inks and the paper, each dithered.
   With `palette_steps = "0"` the same switch moves 886 to 802, because there the
