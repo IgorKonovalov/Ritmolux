@@ -1569,6 +1569,16 @@ Three things come with that:
   it drifts: on `shape_field`, `stroke`'s width and the spacing between contour
   bands are the figure's at a whole index and approximate in between. The
   interior, the outline and the particle falloff are unaffected.
+- **On `shape_field`, travelling anywhere between `disc` and `polygon` turns
+  `coord_mode = "1"` off.** That whole open span touches the `ring`, and a blend
+  with the ring on either side inherits its hole, so the scaled-copy coordinate
+  has no single value there and the scene falls back to the distance — see
+  [Two coordinates](#two-coordinates--offsets-and-scaled-copies). A binding
+  easing `shape` from `0` to `2` therefore draws scaled copies at each end and
+  offset curves through the middle, which is a change of contour *kind* rather
+  than a drift. **Nothing warns**: the load-time notice reads the resting value,
+  and a preset resting on a whole, off-ring `shape` rests off the combination.
+  Travel from `polygon` through `star` to `heart` is unaffected.
 
 #### The `star` arm's shape params
 
@@ -1867,7 +1877,10 @@ those two differently would be broken.
 >   ray gap of **0.40** against a tolerance of 0.02. It ships under `"0"`, so
 >   nothing about it moves — but write `"1"` on it and you get the warning.
 >
-> On both the scene draws the distance instead and warns at load:
+> On both the scene draws the distance instead, and it warns at load **when the
+> preset rests on the combination** — a `shape` that only *travels* through the
+> ring's neighbourhood gets the fallback in silence, because a resting value is
+> all the loader can see:
 >
 > ```text
 > parameter 'coord_mode' is ignored on a `ring`: an annulus's centre lies in its
