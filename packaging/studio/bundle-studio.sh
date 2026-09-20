@@ -222,15 +222,23 @@ entries="$(unzip -Z1 "$zip_path")"
 for required in "${stage_name}/${BUNDLE_DIR}/" \
                 "${stage_name}/${BUNDLE_DIR}/Contents/Resources/player/${BIN_NAME}" \
                 "${stage_name}/READ-ME-FIRST.txt"; do
-    echo "$entries" | grep -qF "$required" \
+    # A here-string, not a pipe: `grep -q` exits at the first match, and under
+    # `set -o pipefail` the upstream `echo` then dies with EPIPE and the whole
+    # pipeline reports 141 - so a present entry reads as missing. It only arms
+    # once the listing outgrows the pipe buffer, which is how it passed every
+    # release until the studio zip crossed 64 KiB.
+    grep -qF -- "$required" <<<"$entries" \
         || die "zip is missing entry: $required"
 done
 check "zip holds ${BUNDLE_DIR}, its bundled player and READ-ME-FIRST.txt"
 
 # No .md anywhere: the tester's instructions ship as .txt so a double-click
 # opens them.
-if echo "$entries" | grep -q '\.md$'; then
-    die "zip contains a .md file: $(echo "$entries" | grep '\.md$' | tr '\n' ' ')"
+# Same here-string rule as above, and here the pipe failed the other way: an
+# EPIPE makes the `if` false, so a `.md` in the zip would go unreported. This
+# guard has to fail closed.
+if grep -q '\.md$' <<<"$entries"; then
+    die "zip contains a .md file: $(grep '\.md$' <<<"$entries" | tr '\n' ' ')"
 fi
 check "no .md in the zip"
 

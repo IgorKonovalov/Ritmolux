@@ -357,9 +357,10 @@ fn resizing_the_grid_keeps_every_array_in_step() {
 ///
 /// Enough for every producer the [`FrameOutputs`](crate::milk::outputs::FrameOutputs)
 /// roster alone drives — the waveform, the two borders, the motion grid — which
-/// is what the three tests below need. The custom elements need EEL2 to be
-/// compiled and so are tested from `milkconv/tests/draw_layer.rs`, on the far
-/// side of the seam that owns the compiler.
+/// is what the three tests below need. A custom element written in **EEL2** is
+/// tested from `milkconv/tests/draw_layer.rs`, on the far side of the seam that
+/// owns the compiler; one written in the bundle's own assembly needs no
+/// compiler and is built here by [`wave_runtime`].
 fn bare_runtime() -> crate::milk::MilkRuntime {
     let bundle =
         crate::milk::MilkBundle::from_assembly(None, None, None).expect("the empty bundle decodes");
@@ -900,6 +901,144 @@ fn the_over_blend_alpha_is_frame_rate_independent() {
         (at_half_rate - two_frames).abs() < 1e-5,
         "one double-length frame ({at_half_rate}) must travel as far as two \
          nominal ones ({two_frames})"
+    );
+}
+
+/// A custom wave's per-point program, in the bundle's own assembly:
+/// `x = sample` spreads the points along the frame and `y = 0.5 + value1 * 0.25`
+/// puts the audio on the other axis, where the host factor is readable off one
+/// drawn coordinate.
+///
+/// Assembly rather than EEL2 so the wave is buildable inside `core` — the
+/// compiler lives on the far side of the `milkconv` seam. `store` leaves its
+/// value on the stack, hence each `pop`.
+const WAVE_POINT_PROGRAM: &str = ".regs x y sample value1\n.code\n\
+     load 2\nstore 0\npop\n\
+     const 0.5\nload 3\nconst 0.25\nmul\nadd\nstore 1\npop\n";
+
+/// How many points the custom wave below draws. Small, because the property is a
+/// count and a ratio rather than a figure.
+const CUSTOM_WAVE_POINTS: u32 = 8;
+
+/// A runtime carrying one custom wave of [`CUSTOM_WAVE_POINTS`] points running
+/// [`WAVE_POINT_PROGRAM`], additive, thin, drawing dots or a line as asked.
+fn wave_runtime(use_dots: bool) -> crate::milk::MilkRuntime {
+    let mut bundle =
+        crate::milk::MilkBundle::from_assembly(None, None, None).expect("the empty bundle decodes");
+    bundle
+        .push_element(
+            crate::milk::ElementKind::Wave,
+            None,
+            None,
+            Some(WAVE_POINT_PROGRAM),
+            CUSTOM_WAVE_POINTS,
+            1,
+            use_dots,
+            false,
+            true,
+        )
+        .expect("the custom wave decodes");
+    crate::milk::MilkRuntime::new(bundle, 0)
+}
+
+/// The outputs a preset that draws **only** a custom wave leaves: the built-in
+/// waveform dark, the trace unsmoothed and unscaled so what reaches `value1` is
+/// the sample itself, and every other producer off.
+fn custom_wave_only() -> crate::milk::outputs::FrameOutputs {
+    crate::milk::outputs::FrameOutputs {
+        // Dark, so `waveform_figure` returns before drawing and every segment
+        // below belongs to the custom wave.
+        wave_a: 0.0,
+        // The per-point program reads the same smoothed, scaled pair the
+        // built-in figures do, so both are neutralized here — otherwise the
+        // running average would decide what `value1` is.
+        wave_smoothing: 0.0,
+        wave_scale: 1.0,
+        ob_a: 0.0,
+        ib_a: 0.0,
+        mv_a: 0.0,
+        ..Default::default()
+    }
+}
+
+/// The geometry one frame of `custom_wave_only` draws for a wave over a constant
+/// trace of `level` in both channels.
+fn custom_wave_geometry(use_dots: bool, level: f32) -> draw::DrawGeometry {
+    let flat = [[level; crate::dsp::WAVE_SAMPLES]; 2];
+    let mut runtime = wave_runtime(use_dots);
+    let mut geometry = draw::DrawGeometry::default();
+    draw::build(
+        &mut geometry,
+        Some(&mut runtime),
+        &custom_wave_only(),
+        &flat,
+        0.0,
+        1.0 / 60.0,
+        // A square target, so `uv_to_world`'s aspect term is 1 and the drawn y
+        // below is the uv the program wrote, converted and nothing else.
+        1.0,
+        DRAW_WIDTH,
+    );
+    geometry
+}
+
+/// **A custom wave passes through the source's smoothing, unless it draws
+/// dots** (ADR-0223).
+///
+/// `SmoothWave` turns `n` points into `2n - 1`, so an open polyline of them is
+/// `2n - 2` segments where the unsmoothed figure would be `n - 1`. The dots case
+/// is the source's own exception and stays one mark per point.
+///
+/// Asserted as the count rather than as the inserted positions: the kernel's
+/// positions are pinned on the built-in figures, and what this arm holds is
+/// *which figures reach the kernel at all*.
+#[test]
+fn a_custom_wave_is_smoothed_unless_it_draws_dots() {
+    let n = CUSTOM_WAVE_POINTS as usize;
+    let line = custom_wave_geometry(false, 0.5);
+    assert_eq!(
+        line.segments.len(),
+        2 * n - 2,
+        "a {n}-point custom wave must draw the {} segments the source's \
+         smoothing produces, not the {} its own points would",
+        2 * n - 2,
+        n - 1
+    );
+    let dotted = custom_wave_geometry(true, 0.5);
+    assert_eq!(
+        dotted.segments.len(),
+        n,
+        "a dots wave is the source's own exception to the smoothing and must \
+         stay one mark per point"
+    );
+}
+
+/// **A custom wave's sample term carries the host factor**, the same one every
+/// built-in figure carries (ADR-0223 widening ADR-0199 clause 2).
+///
+/// Read as a ratio rather than as a pixel figure: the program writes
+/// `y = 0.5 + value1 * 0.25` in uv, so on a square target the drawn world y is
+/// `-2 * 0.25 * value1` — and `value1` is the trace times the factor. Dividing
+/// the drawn coordinate by what an unfactored trace would have drawn leaves the
+/// factor itself, whatever its value is.
+#[test]
+fn a_custom_waves_sample_term_carries_the_host_factor() {
+    const LEVEL: f32 = 0.5;
+    let geometry = custom_wave_geometry(false, LEVEL);
+    let drawn = geometry
+        .segments
+        .first()
+        .map(|s| s.a[1])
+        .expect("the custom wave drew something");
+    // What the same program would have drawn from the raw trace: `y = 0.5 +
+    // level * 0.25` in uv through `uv_to_world`'s `1 - 2y`.
+    let unfactored = 1.0 - 2.0 * (0.5 + LEVEL * 0.25);
+    let ratio = drawn / unfactored;
+    assert!(
+        (ratio - draw::HOST_SAMPLE_FACTOR).abs() < 1e-4,
+        "the custom wave's sample term is scaled by {ratio}, where the figure \
+         contract puts it at {}",
+        draw::HOST_SAMPLE_FACTOR
     );
 }
 

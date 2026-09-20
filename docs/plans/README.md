@@ -40,11 +40,10 @@ place. The plan file carries the real link.
 <!-- roster:begin cap=320 -->
 | Plan | Title | Status | Owner | Live constraint |
 |------|-------|--------|-------|-----------------|
-| [0192](0192-the-component-reaches-its-audience.md) | The component reaches its audience | draft | human | 0103's Phases 5-6 plus the release they stand on. Push ONE tag: the pipeline has published nothing since v0.126.0, two runs red on the foobar job and three tags with no run. |
+| [0192](0192-the-component-reaches-its-audience.md) | The component reaches its audience | approved | human | 0103's Phases 5-6 plus the release they stand on. Push ONE tag: the pipeline has published nothing since v0.126.0, two runs red on the foobar job and three tags with no run. |
 | [0120](0120-the-standalone-ships-on-ubuntu.md) | The standalone ships on Ubuntu | approved | dev, human | ADR-0131 (proposed): PulseAudio capture + an `ubuntu-latest` CI arm. **Phase 1's probe ran 2026-09-20; the premise holds.** Implementation only - witnessing is 0214. Folds backlog 0181 + 0208. |
-| [0214](0214-the-linux-arm-reports-back.md) | The Linux arm reports back | draft | human, dev | The readings 0120 cannot take: the `ubuntu-latest` arm's six steps and the adapter it resolves, a dispatch dry run's six artifacts, the tarball on the box. Three of four phases are `human`. Runs after 0120. |
+| [0214](0214-the-linux-arm-reports-back.md) | The Linux arm reports back | approved | human, dev | The readings 0120 cannot take: the `ubuntu-latest` arm's six steps and the adapter it resolves, a dispatch dry run's six artifacts, the tarball on the box. Three of four phases are `human`. Runs after 0120. |
 | [0133](0133-the-engine-drives-the-lights.md) | The engine drives the lights | approved | dev, human | ADR-0145 + 0174 (proposed): Art-Net. Phases 1-3 landed on its branch. **Postponed 2026-09-18, off the queue: Phase 9 is the rig and its date is unknown.** Phases 4-8 need no rig. |
-| [0201](0201-the-warp-surface-stops-lying.md) | The warp surface stops lying | approved | dev | ADR-0223 + 0224 (proposed): the figure contract reaches a custom wave, level mode gets a coverage threshold, `zoom`'s doc stops inverting the shader. Regenerates surfaces, so after 0197. |
 | [0202](0202-the-three-mechanisms-get-their-gate.md) | The three mechanisms get their gate | approved | dev, human | ADR-0113's third Outcome is the brief: the rate candidate, the echo, the per-mode wave scale, then a fourth look gate. Phases 5-6 need the rig and the corpus, so the conductor parks. |
 | [0203](0203-the-figure-gains-the-levers-it-was-measured-to-lack.md) | The figure gains the levers it was measured to lack | approved | dev | ADR-0225 + 0226 (proposed): the roster travels, the star wobbles, the backdrop converges. Every default an identity; Phase 3 can supersede ADR-0225. Weakest want - last. |
 | [0207](0207-the-commitments-get-their-instruments.md) | The commitments get their instruments | approved | dev, human | ADR-0231 + 0232 (proposed): the exe cap re-derived and a build that prints it; an ADVISORY frame-cost column; the Floor read on a named machine. Phase 1 sets the constant. Closes backlog 0257. |
@@ -55,7 +54,7 @@ place. The plan file carries the real link.
 | [0210](0210-the-gallery-card-shows-the-world-it-names.md) | The gallery card shows the world it names | approved | dev, human | ADR-0235 (proposed): the hop follows the family and the signal outlasts it. Phase 1 (a name filter) is what makes the rest affordable. Closes backlog 0254, 0255. |
 | [0211](0211-the-diffused-frames-resolution-is-measured-before-it-is-designed.md) | The diffused frame's resolution is measured before it is designed | approved | dev, human | No ADR yet: the quality profile has never run on a track, so Phase 1 renders the pair and Phase 2 may close the plan. Takes backlog 0125. |
 | [0212](0212-the-diffused-render-gains-a-timeline.md) | The diffused render gains a timeline | approved | dev, human | ADR-0236 (proposed): a prompt timeline in bars, the seed still fixed. Declines the onset-denoise lever. Not folded with 0211 - 0126 forbids it. Closes backlog 0126. |
-| [0213](0213-the-hook-costs-what-the-push-is-worth.md) | The hook costs what the push is worth | draft | dev | ADR-0237 (proposed): the Node roster always runs; cargo runs only when the push moved Rust, and the suite is served by a ledger record for that tree. 0199 measured the cost untrimmable. |
+| [0213](0213-the-hook-costs-what-the-push-is-worth.md) | The hook costs what the push is worth | approved | dev | ADR-0237 (proposed): the Node roster always runs; cargo runs only when the push moved Rust, and the suite is served by a ledger record for that tree. 0199 measured the cost untrimmable. |
 <!-- roster:end -->
 
 ~~**Added 2026-09-14 - [0170], [0171], [0172] and [0173] are approved, and they run as two
@@ -286,6 +285,10 @@ waits on [0201]: the reference sheet and the routing table need nothing, and `wa
 system whose parameter reference is false today. It also jumps no queue - the six standing sittings
 in [`content-brief.md`](../content-brief.md) are unaffected, and whether the remaining picks join
 them is [0204]'s own Phase 4 verdict.
+**The [0201] half is spent 2026-09-20**, when that plan closed: the `zoom` direction is corrected in
+both declarations and the parameter reference is regenerated from them, so [0204] Phase 3 no longer
+waits on anything and `warp_mesh`'s reference is no longer the false one. The rest of this note
+stands - every phase is still `human` and it is still deliberately out of `queue.json`.
 
 [0204]: 0204-the-library-learns-from-the-corpus-it-will-not-ship.md
 
@@ -327,7 +330,7 @@ round's shape, since most of what it decided was sequencing:
 [0199]: done/0199-the-gates-cost-is-measured-before-it-is-cut.md
 [0198]: done/0198-the-control-path-stops-failing-quietly.md
 [0199]: 0199-the-gates-cost-is-measured-before-it-is-cut.md
-[0201]: 0201-the-warp-surface-stops-lying.md
+[0201]: done/0201-the-warp-surface-stops-lying.md
 [0202]: 0202-the-three-mechanisms-get-their-gate.md
 [0203]: 0203-the-figure-gains-the-levers-it-was-measured-to-lack.md
 
@@ -939,6 +942,7 @@ A bullet is a link, a close date, and a review verdict; the write-up goes to the
 archive first.
 
 <!-- roster:begin cap=320 -->
+- [0201 - The warp surface stops lying](done/0201-the-warp-surface-stops-lying.md) - closed 2026-09-20. Review: **no blockers, no majors, two minors, four nits (four fixed).** Version: **0.138.0**. ADR-0223 + 0224 accepted. Closed backlog 0244, 0245, 0249, 0251. [Write-up](README-archive.md).
 - [0205 - The library becomes navigable](done/0205-the-library-becomes-navigable.md) - closed 2026-09-20. Review: **no blockers, no majors, six minors (four fixed).** Version: **0.139.0**. ADR-0228 + 0229 accepted. Builds backlog 0256's evidence; closes nothing. [Write-up](README-archive.md).
 - [0199 - The gate's cost is measured before it is cut](done/0199-the-gates-cost-is-measured-before-it-is-cut.md) - closed 2026-09-19. Review: **no blockers, no majors, five minors (three fixed).** Version: **0.137.1**. ADR-0222 accepted with an Outcome. Closed backlog 0221, 0239. [Write-up](README-archive.md).
 - [0198 - The control path stops failing quietly](done/0198-the-control-path-stops-failing-quietly.md) - closed 2026-09-19. Review: **no blockers, no majors, three minors, two nits (one fixed).** Version: **0.137.0**. ADR-0221 accepted with an Outcome. Backlog 0219 + 0220 stay live. [Write-up](README-archive.md).

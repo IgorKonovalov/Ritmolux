@@ -477,10 +477,11 @@ pub const WAVE_MODES: u32 = 8;
 ///
 /// **It multiplies the sample term and nothing else** — never a base radius, a
 /// separation or an extent (ADR-0199). It is measured on one mode and inferred
-/// for the other seven, on the argument that the host's gap is in the sample path
-/// every mode shares; the confirmation is a unit-scale mode-0 capture that
+/// for the other seven **and for a custom wave's `value1`/`value2`**
+/// (ADR-0223), on the argument that the host's gap is in the sample path every
+/// figure shares; the confirmation is a unit-scale mode-0 capture that
 /// Plan 0142's rig session owes.
-const HOST_SAMPLE_FACTOR: f32 = 1.256;
+pub(crate) const HOST_SAMPLE_FACTOR: f32 = 1.256;
 
 /// A whole turn, **as the source writes it** (`milkdropfs.cpp` l.2886-2948):
 /// `6.28`, not `TAU`.
@@ -541,14 +542,64 @@ fn smooth_wave(src: &[[f32; 2]], dst: &mut [[f32; 2]; MAX_SMOOTHED_POINTS]) -> u
             at(i as isize + 2),
         );
         if let Some(slot) = dst.get_mut(used) {
-            *slot = [
-                (-0.15 * a[0] + 1.15 * b[0] + 1.15 * c[0] - 0.15 * d[0]) * 0.5,
-                (-0.15 * a[1] + 1.15 * b[1] + 1.15 * c[1] - 0.15 * d[1]) * 0.5,
-            ];
+            *slot = inserted_point(a, b, c, d);
         }
         used += 1;
     }
     used.min(MAX_SMOOTHED_POINTS)
+}
+
+/// The one point `SmoothWave` inserts between `b` and `c`, given the points
+/// either side of that pair — `a` before `b`, `d` after `c`, each clamped to the
+/// figure's ends by the caller.
+///
+/// **The kernel, in one place**, because two callers run it: the built-in
+/// figures through [`smooth_wave`] and a custom wave through [`smooth_points`].
+/// The four coefficients sum to `2`, so the `* 0.5` is the kernel's own
+/// normalization rather than an average of the middle pair.
+fn inserted_point(a: [f32; 2], b: [f32; 2], c: [f32; 2], d: [f32; 2]) -> [f32; 2] {
+    [
+        (-0.15 * a[0] + 1.15 * b[0] + 1.15 * c[0] - 0.15 * d[0]) * 0.5,
+        (-0.15 * a[1] + 1.15 * b[1] + 1.15 * c[1] - 0.15 * d[1]) * 0.5,
+    ]
+}
+
+/// [`smooth_wave`] over points that carry a light, which is the form a custom
+/// wave's per-point program produces (ADR-0223 — the source smooths a custom
+/// wave too, unless it draws dots).
+///
+/// The positions are the same insertion, so `n` points become `2n - 1` and every
+/// original keeps its place at an even index. **The inserted point takes the
+/// light of the point before it** rather than a blend of the pair: a custom
+/// wave's colour is its own program's output at a point the program ran at, and
+/// there is no run between two points to take a colour from.
+///
+/// Writes into `dst` rather than returning, so one buffer serves every wave of a
+/// frame.
+fn smooth_points(src: &[Point], dst: &mut Vec<Point>) {
+    dst.clear();
+    if src.len() < 2 {
+        dst.extend_from_slice(src);
+        return;
+    }
+    let at = |i: isize| -> Option<Point> {
+        let clamped = i.clamp(0, src.len() as isize - 1) as usize;
+        src.get(clamped).copied()
+    };
+    for i in 0..src.len() {
+        let i = i as isize;
+        let Some(b) = at(i) else {
+            continue;
+        };
+        dst.push(b);
+        if i + 1 == src.len() as isize {
+            break;
+        }
+        let (Some(a), Some(c), Some(d)) = (at(i - 1), at(i + 1), at(i + 2)) else {
+            continue;
+        };
+        dst.push((inserted_point(a.0, b.0, c.0, d.0), b.1));
+    }
 }
 
 /// The source's `wave_mystery` fold, `milkdropfs.cpp` l.2869-2877 — **modes 0, 1
@@ -838,6 +889,12 @@ fn emit_uv(
 
 /// The preset's custom waves, each a polyline or a scatter from its own
 /// per-point program.
+///
+/// **A custom wave draws through the same figure contract as the eight built-in
+/// modes** (ADR-0223): its sample term carries [`HOST_SAMPLE_FACTOR`], and the
+/// figure its program placed passes through [`smooth_points`] unless the wave
+/// draws dots — which is the source's own exception (`milkdropfs.cpp` l.2722)
+/// rather than one taken here.
 fn custom_waves(
     geometry: &mut DrawGeometry,
     runtime: &mut MilkRuntime,
@@ -846,6 +903,9 @@ fn custom_waves(
     exposure: Exposure,
     aspect: f32,
 ) {
+    // Reused by every wave of this frame, in the shape the built-in figure's own
+    // smoothing buffer takes.
+    let mut smoothed: Vec<Point> = Vec::new();
     for index in 0..runtime.wave_count() {
         let Some(spec) = runtime.wave_spec(index) else {
             continue;
@@ -862,9 +922,11 @@ fn custom_waves(
             // different numbers on a stereo stream (ADR-0199). A per-point
             // program that plots one against the other draws the figure its
             // author saw rather than a diagonal line.
+            // The sample term, with the host factor on it and nothing else —
+            // the same term the built-in figures read (ADR-0223).
             let at = ((t * (WAVE_SAMPLES - 1) as f32) as usize).min(WAVE_SAMPLES - 1);
-            let value1 = left.get(at).copied().unwrap_or(0.0);
-            let value2 = right.get(at).copied().unwrap_or(0.0);
+            let value1 = left.get(at).copied().unwrap_or(0.0) * HOST_SAMPLE_FACTOR;
+            let value2 = right.get(at).copied().unwrap_or(0.0) * HOST_SAMPLE_FACTOR;
             let Some(point) = runtime.run_wave_point(index, t, value1, value2) else {
                 break;
             };
@@ -885,7 +947,8 @@ fn custom_waves(
         if spec.use_dots {
             dots(geometry, &points, width, spec.additive);
         } else {
-            polyline(geometry, &points, width, false, spec.additive);
+            smooth_points(&points, &mut smoothed);
+            polyline(geometry, &smoothed, width, false, spec.additive);
         }
     }
 }

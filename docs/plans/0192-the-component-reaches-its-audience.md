@@ -1,7 +1,8 @@
 # 0192 — The component reaches its audience
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-09-18
+> **Approved:** 2026-09-20 (user)
 > **Owner skill(s):** human
 > **Related ADRs:** [0115](../adrs/0115-the-foobar-component-is-a-released-artifact-with-a-parameterized-sdk.md),
 > [0038](../adrs/0038-tag-driven-release-unsigned-universal-mac-app.md),

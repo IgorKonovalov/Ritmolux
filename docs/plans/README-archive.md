@@ -19,6 +19,7 @@ hand-edited.
 <!-- toc:begin depth=3 -->
 - [Recently closed (full entries)](#recently-closed-full-entries)
   - [0199 - The gate's cost is measured before it is cut](#0199---the-gates-cost-is-measured-before-it-is-cut)
+  - [0201 - The warp surface stops lying](#0201---the-warp-surface-stops-lying)
   - [0205 - The library becomes navigable](#0205---the-library-becomes-navigable)
   - [0198 - The control path stops failing quietly](#0198---the-control-path-stops-failing-quietly)
   - [0197 - The conductor becomes operable](#0197---the-conductor-becomes-operable)
@@ -276,6 +277,63 @@ comment names the machine, the adapter and the thread count it was derived on an
 will be wrong elsewhere; nothing asserts it. And the fan-out closes a hazard by construction: a batch
 name carries no preset filename, so a preset filed as `rep_*.toml` can no longer join the phase
 tier's sample without declaring the flag.
+
+### [0201 - The warp surface stops lying](done/0201-the-warp-surface-stops-lying.md)
+
+- closed 2026-09-20, conductor-run lane `plan-0201-the-warp-surface-stops-lying` in
+`WORK/rlx-plan-0201`. Six phases, `f14bcd47`, `48120eee`, `c832e76c`, `4c7f739b`, `79fa6b09` and
+`7681ccf7`, then the close repairs in `261aaafb`. One review round: **no blockers, no majors, two
+minors and four nits; four repaired at the close, two left open.** Version **0.138.0** (minor).
+ADR-0223 and ADR-0224 accepted. Backlog 0244, 0245, 0249 and 0251 closed.
+- **What landed.** Four repairs to a surface that told an author four different untrue things.
+`zoom`'s `ParamSpec` doc now says what the shader does — above 1 the past is magnified and the image
+travels outward — in both declarations and in every generated artifact that renders them
+(`presets/README.md`, both editor schemas, the player schema). A converted custom wave passes through
+the source's `SmoothWave` unless it draws dots, and its `value1`/`value2` carry `HOST_SAMPLE_FACTOR`,
+so ADR-0199 clause 2 now covers every waveform the scene draws rather than the eight built-in modes.
+Level mode gained `coverage_threshold`, default off, which resolves the coverage continuum to ink or
+paper so the frame holds the palette's values and the backdrop and nothing between. And the converted
+chain gained a golden fixture at 160x120 — the first capture in the repository at a shape where the
+aspect correction is not the identity.
+- **Phase 4a is the part worth remembering, and the plan did not start with it.** Phase 4 landed a
+non-square fixture on `warp_mesh_shader.toml` and the fixture could not fail: forcing
+`self.aspect = 1.0` at the converted chain's own entry left the capture **byte-identical**, because
+the blessed picture was a smooth gradient and a smooth gradient has no geometry for a geometric
+correction to move. A size that is not 1:1 is necessary and not sufficient. The subject was re-chosen
+by the probe rather than by what the `[milk]` table declares: of four candidates all declaring `zoom`,
+`rot` or `warp`, only `milk_wash_fog_tunnel` moved past a tolerance (outlier 75 against 48), and two
+of the other three read 0.0000 / 0. **Declaring motion is not the same as rendering a picture the
+corrected space reaches**, and that is the sentence the fixture's module docs now carry instead of its
+size.
+- **The mean would have said nothing.** Under the convicting probe the fixture's mean channel
+difference is 0.0139 against a 0.02 tolerance — inside it. Only the outlier fails, because a warp
+redistributes edges rather than shifting the frame's average. A drift guard on a geometric correction
+that watched only the mean would be a guard on paper.
+- **Phase 3's own measurement convicted Phase 3's done-when**, which is the honest failure this plan
+records. The original asked for *two exact ink values plus the background at `palette_steps = "0"`*,
+which no coverage threshold can reach: two continua sit downstream of the ink and the threshold
+removes one. The 256-texel LUT is sampled linearly, so a run boundary is one texel wide whatever the
+stops say; and the display write dithers by one encoded level (ADR-0096), so even a perfect two-ink
+frame counts more than two exact values. The restated done-when asks for the **class** — paper, two
+clusters each within one encoded level of the ink its stop renders as, nothing between — and the
+measurement meets it: 145 exact frame colours to 11 at the shipped banding, on one machine. ADR-0224's
+first Positive carried the same overreach and was corrected in the same commit. A second finding came
+out of it: **the ink an author reads in the frame is not the hex the stop declares** (`#111010` lands
+at `#0d0d0d`), because the light path between them is a one-to-one remap.
+- **Two findings outlive the plan.** `coverage_threshold` ships with **no automated guard at any
+non-zero value** — the parameter is in `encode.rs`, `mod.rs` and `shaders.rs` and in no test, the
+default path is covered only because the existing goldens prove byte-identity, and the evidence that
+the ON path produces the ink class is a hand measurement whose fixtures live in the lane's
+gitignored `target/plan0201/`. That is not a deviation — the amended done-when asked for a
+measurement rather than a test — but a refactor that dropped the `pp.f.y` branch would move no test
+in this repository. Second, `HOST_SAMPLE_FACTOR` was widened to `pub(crate)` for the new test where
+`pub(super)` reaches it.
+- **What did not move, deliberately.** ADR-0138's draw-seam definition of limited ink stays where it
+is; ADR-0224 says the trigger for moving it is a second premultiplied-light scene asking the same
+question, not a third copy of this parameter. The three square `warp_mesh` golden fixtures were not
+re-blessed — Phase 4 adds, it does not replace. And no `presets/*.toml` was edited: Phase 1's sweep
+for a header reasoning from the inverted direction convicted nothing, because Plan 0184's close had
+already repaired the one shipped paragraph the lie produced.
 
 ### [0205 - The library becomes navigable](done/0205-the-library-becomes-navigable.md)
 

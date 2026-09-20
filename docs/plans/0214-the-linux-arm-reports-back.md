@@ -1,7 +1,8 @@
 # 0214 — The Linux arm reports back
 
-> **Status:** draft
+> **Status:** approved
 > **Created:** 2026-09-20
+> **Approved:** 2026-09-20 (user)
 > **Owner skill(s):** human, dev
 > **Related ADRs:** [0131](../adrs/0131-the-linux-standalone-captures-through-pulseaudios-simple-api.md),
 > [0016](../adrs/0016-gpu-tests-opt-in-ci-scope.md),
