@@ -2226,6 +2226,11 @@ fn declared_params_match_set_param() {
                 // two ends of a ramp on that same axis.
                 "bg_angle",
                 "bg_hue_span",
+                // The coordinate that ramp is measured in (ADR-0225), which is
+                // what turns its bands into a fan about a vanishing point.
+                "bg_coord_mode",
+                "bg_center_x",
+                "bg_center_y",
                 "bg_shade",
                 "bg_shade_end",
                 "bg_ramp_gamma",
@@ -2422,8 +2427,14 @@ const STRUCTURAL: &[(&str, &str)] = &[
     ("swarm", "star_seed"),
     ("emitter", "star_seed"),
     ("shape_field", "star_seed"),
-    // `applied_coord_mode`: a two-entry roster, clamped and rounded.
+    // `applied_coord_mode`: a two-entry roster, clamped and rounded. Twice over
+    // and in two files — the shape field's chooses how a figure's distance is
+    // measured, the backdrop ramp's chooses whether its bands run straight
+    // across the frame or around a point (ADR-0225). The backdrop's two centre
+    // params are deliberately absent from this roster: a vanishing point is a
+    // position and the shader reads its fraction, so they are `Modal`.
     ("shape_field", "coord_mode"),
+    ("background", "bg_coord_mode"),
     // `family::roster_index`: rounds into the tuple roster.
     ("attractor", "tuple"),
     // `Grammar::from_param` / `Roster::from_param`: round into a closed set.

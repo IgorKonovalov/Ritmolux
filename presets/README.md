@@ -976,6 +976,12 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 
 ### Engine stage: `background`
 
+**Structural**
+
+| Parameter | Default | Range | What it does |
+|---|---|---|---|
+| `bg_coord_mode` | `0` | `0` – `1` | Which way the backdrop ramp is measured: 0 straight across the frame, 1 around a point, which turns its bands into a fan converging on that point. |
+
 **Modal**
 
 | Parameter | Default | Range | What it does |
@@ -985,6 +991,8 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | `bg_vignette` | `0` | `0` – `1` | Darkens the backdrop toward the corners, pulling the eye to the middle. |
 | `bg_angle` | `0` | `0` – `6.2831855` | Direction the backdrop ramp runs in, in radians; 0 runs bottom to top. |
 | `bg_hue_span` | `0` | `-0.5` – `0.5` | How far along the palette the ramp travels from `bg_hue`; 0 is a flat colour. |
+| `bg_center_x` | `0` | `-2` – `2` | Horizontal point the angular ramp's bands converge on; 0 is the frame's middle and 1 its right edge. Does nothing while bg_coord_mode is 0. |
+| `bg_center_y` | `0` | `-2` – `2` | Vertical point the angular ramp's bands converge on; 0 is the frame's middle and -1 its bottom edge. Does nothing while bg_coord_mode is 0. |
 | `bg_shade` | `0.72` | `0` – `1` | Brightness multiplier at the ramp's start, so a sky can be dark at one edge. |
 | `bg_shade_end` | `1` | `0` – `1` | Brightness multiplier at the ramp's far end. |
 | `bg_ramp_gamma` | `1` | `0.25` – `4` | Bends the ramp's progress: below 1 the far colour arrives early, above 1 it holds off. |
@@ -3004,6 +3012,64 @@ around the other side. `bg_hue = 0.8` with `bg_hue_span = 0.5` sweeps `0.8 -> 1.
 a hard seam where it wraps. That is occasionally what you want and usually a surprise; if the ramp
 has a bright band you did not author, check whether the span left the range. It is not clamped, and
 deliberately: two shipped presets already drive `bg_hue` outside `[0, 1]` and depend on the wrap.
+
+#### The ramp can be measured around a point — `bg_coord_mode`, `bg_center_x`, `bg_center_y`
+
+The same swept, repeat-addressed ramp measured **angularly about a movable point** turns its bands
+into a **fan converging on a vanishing point**
+([ADR-0225](../docs/adrs/0225-the-backdrop-ramp-gets-an-angular-coordinate-and-the-floor-stays-out-of-the-chain.md)).
+It is the floor of a perspective picture, and unlike a ground drawn as a scene it costs nothing —
+no `[layer]` slot, no second scene evaluation, just a different coordinate into the pass that was
+already running.
+
+| Param | Default | What it does |
+|-------|---------|--------------|
+| `bg_coord_mode` | `0` | `0` measures the ramp straight across the frame — everything above. `1` measures it around `bg_center_*`. Rounded: there is nothing between the two. |
+| `bg_center_x` | `0.0` | The point the bands converge on, horizontally. `0` is the frame's middle, `1` its right edge whatever the window's shape, and values past `±1` sit off-frame. Clamped to `±2`. |
+| `bg_center_y` | `0.0` | The same vertically. `-1` is the bottom edge; a floor's vanishing point usually sits a little below it. |
+
+Both defaults are identities: the centre params are inert at `bg_coord_mode = 0`, and mode `0`'s
+arm is the straight ramp's own expression, so every backdrop already authored renders byte-for-byte
+unchanged.
+
+```toml
+[palette]
+# Repeat the two tones many times - see the stripe-count note below.
+stops = [ { at = 0.00, color = "#101010" }, { at = 0.041, color = "#101010" },
+          { at = 0.042, color = "#f0f0f0" }, { at = 0.083, color = "#f0f0f0" },
+          # ...twelve more pairs...
+          { at = 1.00,  color = "#101010" } ]
+
+[params]
+bg_bright     = "0.9"
+bg_hue_span   = "0.5"
+bg_shade      = "1.0"    # equal, because an angular ramp WRAPS - see below
+bg_shade_end  = "1.0"
+bg_angle      = "3.1416" # aim the wrap seam down, away from the frame
+bg_coord_mode = "1"
+bg_center_x   = "0"
+bg_center_y   = "-1.2"   # the vanishing point, just below the frame
+```
+
+**Three things to know, and the first is the reason this is a floor rather than a picture.**
+
+- **It buys the floor, not the collage.** The backdrop is painted *outside* the post chain and added
+  after it, so a figure drawn over a lit fan can only ever be **brighter** than the fan, never
+  darker. A dark figure on a light ground needs a multiply `[layer]`
+  ([ADR-0106](../docs/adrs/0106-two-tone-graphics-come-from-a-multiply-layer.md)) over a ground drawn
+  *inside* the chain — and that ground then spends the one `[layer]` slot
+  ([ADR-0090](../docs/adrs/0090-a-preset-composes-two-scene-layers.md)) the figure would have used.
+  The two routes buy different halves of a perspective collage and neither buys both; choose by which
+  half your world actually needs.
+- **The angular coordinate wraps where the straight one clamps.** A turn comes back to where it
+  started, so both the palette segment *and* the `bg_shade -> bg_shade_end` brightness jump across
+  one seam ray. Keep the two shades equal for a fan, and point the seam out of frame: it runs from
+  the centre along the direction `bg_angle` names, so a centre below the frame wants `bg_angle` near
+  `3.1416`.
+- **The stripe count comes from your stops, not from the span.** `bg_hue_span` covers at most half
+  the gradient, an angular sweep spends that half on a **whole turn**, and the frame sees perhaps a
+  fifth of one. So a fan with a handful of visible bands needs a palette that repeats its two tones
+  a dozen times or more — the hard-edged poster palette, not the dusk ramp.
 
 **The old fixed brightness tilt is gone.** The pass used to multiply its tint by a hardcoded
 `0.72 -> 1.0` gradient welded to the vertical, always brighter at the top and unexplained by any

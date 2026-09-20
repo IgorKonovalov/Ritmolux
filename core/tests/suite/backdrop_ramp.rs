@@ -1149,3 +1149,261 @@ fn the_bands_geometry_is_inert_until_its_amount_is_bound() {
          not a term multiplied by zero."
     );
 }
+
+// --- The angular coordinate (ADR-0225) ----------------------------------------
+
+/// A palette of `pairs` hard dark/light plateaus across its own range, so a
+/// swept coordinate reads as **stripes** rather than as a gradient — which is
+/// what the convergence below is measured on.
+///
+/// **The repetition lives in the palette, not in the span**, and that is how an
+/// author gets a striped floor too: `bg_hue_span` covers at most half the
+/// gradient, and an angular sweep spends that half on a whole turn while a frame
+/// sees only a slice of one. So the stripe count a fan shows is set by how many
+/// times the *palette* repeats, and eight pairs is what makes a third of a turn
+/// carry several of them.
+fn striped(pairs: usize) -> String {
+    let mut stops = String::from("[palette]\nstops = [");
+    for i in 0..pairs {
+        let lo = i as f32 / pairs as f32;
+        let mid = lo + 0.5 / pairs as f32;
+        let hi = (i + 1) as f32 / pairs as f32;
+        stops.push_str(&format!(
+            "{{ at = {lo:.4}, color = \"#101010\" }}, \
+             {{ at = {:.4}, color = \"#101010\" }}, \
+             {{ at = {mid:.4}, color = \"#f0f0f0\" }}, \
+             {{ at = {:.4}, color = \"#f0f0f0\" }}, ",
+            mid - 0.001,
+            hi - 0.001,
+        ));
+    }
+    stops.push_str("{ at = 1.0, color = \"#101010\" }]");
+    stops
+}
+
+/// Where a row's stripe boundaries sit, as columns: every place the row's luma
+/// crosses the midpoint between the **frame's own** darkest and brightest.
+///
+/// The threshold comes from the capture rather than from the palette's two
+/// hexes, because `bg_bright`, `bg_shade` and the tonemap all sit between the
+/// gradient and the pixel — a threshold taken from the source colours can land
+/// outside the range the frame actually occupies, and then no row has an edge
+/// at all.
+///
+/// A crossing count rather than a threshold count, so a row that happens to
+/// start dark and one that starts light are measured the same way.
+fn stripe_edges(image: &CaptureImage, row: u32) -> Vec<u32> {
+    let (mut lo, mut hi) = (f32::INFINITY, f32::NEG_INFINITY);
+    for y in 0..image.height {
+        for x in 0..image.width {
+            let l = luma(pixel(image, x, y));
+            lo = lo.min(l);
+            hi = hi.max(l);
+        }
+    }
+    let mid = 0.5 * (lo + hi);
+    let mut edges = Vec::new();
+    let mut prev = luma(pixel(image, 0, row)) > mid;
+    for col in 1..image.width {
+        let now = luma(pixel(image, col, row)) > mid;
+        if now != prev {
+            edges.push(col);
+        }
+        prev = now;
+    }
+    edges
+}
+
+/// **The angular mode's bands converge on the centre it is given** (ADR-0225),
+/// and the straight mode's do not — measured as **spacing that shrinks along a
+/// radius**, which is the done-when's own phrasing and not an impression.
+///
+/// The centre is put below the frame's bottom edge, which is where a floor's
+/// vanishing point sits. Every band boundary is then a ray through it, so a
+/// fixed angular period subtends a shorter arc the nearer the row sits: the
+/// boundaries crowd together, more of them cross the row, and the mean gap
+/// between consecutive ones falls. Both halves of that are asserted, because a
+/// mean gap alone could shrink by the frame simply running out of room.
+///
+/// **Mode 0 is the control on the same rows.** Its bands run horizontally at
+/// `bg_angle = 0`... and this probe turns the fan's seam away with
+/// `bg_angle = pi`, so the control is captured at the same angle and its bands
+/// run horizontally *there* too — a horizontal row crosses none of them at any
+/// height, which is what convicts a measurement reading the palette or the
+/// frame rather than the coordinate.
+#[test]
+fn the_angular_ramp_converges_on_its_centre_and_the_straight_one_does_not() {
+    let Some(mut renderer) = renderer() else {
+        return;
+    };
+    const CENTER_Y: f32 = -1.2;
+    // Rows, top first, so `radius` below falls down the list.
+    let rows = [SIZE / 4, SIZE / 2, SIZE - 3];
+    // `bg_angle = pi` turns the coordinate's own wrap seam onto the ray running
+    // DOWN from the centre, which is away from the frame. That matters: the
+    // seam is a ray through the vanishing point like every band boundary, but
+    // it sits at zero offset from it, so leaving it in the frame would give
+    // every row the same first edge and measure nothing.
+    let params = |mode: &str| {
+        format!(
+            "bg_hue = \"0.0\"\nbg_hue_span = \"0.5\"\nbg_shade = \"1.0\"\n\
+             bg_shade_end = \"1.0\"\nbg_vignette = \"0.0\"\nbg_angle = \"3.14159265\"\n\
+             bg_coord_mode = \"{mode}\"\nbg_center_x = \"0.0\"\n\
+             bg_center_y = \"{CENTER_Y}\"\n"
+        )
+    };
+
+    // Twenty-four pairs, because an angular sweep spends `bg_hue_span` on a
+    // whole turn while the frame sees a fifth of one — see `striped`.
+    let palette = striped(24);
+    let fan = capture(&mut renderer, &palette, &params("1"));
+    let flat = capture(&mut renderer, &palette, &params("0"));
+
+    println!(
+        "{:<6} {:>9} {:>8} {:>12} {:>12}",
+        "row", "radius", "edges", "mean gap", "flat edges"
+    );
+    let mut gaps = Vec::new();
+    let mut counts = Vec::new();
+    for row in rows {
+        // The row's distance from the centre, in the shader's own square units:
+        // `ndc.y` at this row against the centre below the frame.
+        let radius = ramp_at_row(row, SIZE) * 2.0 - 1.0 - CENTER_Y;
+        let edges = stripe_edges(&fan, row);
+        assert!(
+            edges.len() >= 2,
+            "row {row} of the angular ramp carries {} band boundaries — the \
+             probe needs two to have a spacing at all",
+            edges.len()
+        );
+        let span = (edges[edges.len() - 1] - edges[0]) as f32;
+        let gap = span / (edges.len() - 1) as f32;
+        let flat_edges = stripe_edges(&flat, row).len();
+        println!(
+            "{row:<6} {radius:>9.3} {:>8} {gap:>12.2} {flat_edges:>12}",
+            edges.len()
+        );
+        gaps.push(gap);
+        counts.push(edges.len());
+        assert!(
+            flat_edges == 0,
+            "the straight ramp put {flat_edges} band boundaries along row {row} \
+             — its bands run across the frame at this angle, so a horizontal \
+             row crosses none of them, and this measurement is reading \
+             something other than the ramp's coordinate"
+        );
+    }
+
+    for w in gaps.windows(2) {
+        assert!(
+            w[1] < w[0] * 0.9,
+            "the spacing between band boundaries went {:.2} -> {:.2} px as the \
+             row approached the vanishing point — a fan's spacing has to SHRINK \
+             along a radius, and 10 % per step is well inside what the geometry \
+             gives",
+            w[0],
+            w[1]
+        );
+    }
+    for w in counts.windows(2) {
+        assert!(
+            w[1] > w[0],
+            "the nearer row crossed {} boundaries against the farther row's {} \
+             — the gap can shrink because the frame ran out of room, and a \
+             rising count is what says the bands genuinely crowded toward the \
+             centre",
+            w[1],
+            w[0]
+        );
+    }
+}
+
+/// **Every default is an arithmetic identity** (ADR-0225): binding the two
+/// centre params while `bg_coord_mode` rests at 0 moves not one level, and the
+/// mode's own default leaves the straight ramp's expression untouched.
+///
+/// The bytes half of the same claim — that the whole golden roster re-blesses
+/// unchanged — is the golden suite's, as this file's header says.
+#[test]
+fn the_angular_ramps_centre_is_inert_until_its_mode_is_bound() {
+    let Some(mut renderer) = renderer() else {
+        return;
+    };
+    let plain = capture(
+        &mut renderer,
+        DUSK,
+        "bg_hue = \"0.2\"\nbg_hue_span = \"0.4\"\nbg_angle = \"0.9\"\n",
+    );
+    let bound = capture(
+        &mut renderer,
+        DUSK,
+        "bg_hue = \"0.2\"\nbg_hue_span = \"0.4\"\nbg_angle = \"0.9\"\n\
+         bg_coord_mode = \"0\"\nbg_center_x = \"-0.8\"\nbg_center_y = \"1.4\"\n",
+    );
+    let worst = (0..SIZE)
+        .map(|row| {
+            (0..SIZE)
+                .map(|col| worst_channel(pixel(&plain, col, row), pixel(&bound, col, row)))
+                .max()
+                .unwrap_or(0)
+        })
+        .max()
+        .unwrap_or(0);
+    assert!(
+        worst == 0,
+        "naming a vanishing point at `bg_coord_mode = 0` moved {worst} levels. \
+         The straight arm is supposed to be the expression that shipped, taken \
+         by an untaken branch's sibling — not that expression with a centre \
+         subtracted out of it."
+    );
+}
+
+/// An out-of-range or broken `bg_coord_mode` lands on an arm the shader
+/// defines, and a fractional one rounds rather than blending two coordinates.
+#[test]
+fn the_coordinate_mode_clamps_rounds_and_falls_back() {
+    let Some(mut renderer) = renderer() else {
+        return;
+    };
+    fn shot(renderer: &mut Renderer, mode: &str) -> CaptureImage {
+        capture(
+            renderer,
+            &striped(8),
+            &format!(
+                "bg_hue = \"0.0\"\nbg_hue_span = \"0.5\"\nbg_shade = \"1.0\"\n\
+                 bg_shade_end = \"1.0\"\nbg_coord_mode = \"{mode}\"\n\
+                 bg_center_y = \"-1.6\"\n"
+            ),
+        )
+    }
+    let straight = shot(&mut renderer, "0");
+    let fan = shot(&mut renderer, "1");
+    let same = |a: &CaptureImage, b: &CaptureImage| {
+        (0..SIZE).all(|row| (0..SIZE).all(|col| pixel(a, col, row) == pixel(b, col, row)))
+    };
+
+    // Below the midpoint rounds to the straight arm, above it to the fan, and
+    // past either end it lands on that end rather than on nothing. The last
+    // case is the fallback: a selector has no "as far as you can go" reading,
+    // so a broken binding takes the default rather than a rail.
+    for (mode, want, why) in [
+        ("0.4", &straight, "0.4 must round to the straight arm"),
+        ("0.6", &fan, "0.6 must round to the fan"),
+        ("-5", &straight, "a value below the roster clamps to 0"),
+        ("9", &fan, "a value above the roster clamps to the last arm"),
+        (
+            "0/0",
+            &straight,
+            "a non-finite binding falls back to the default",
+        ),
+    ] {
+        assert!(same(&shot(&mut renderer, mode), want), "{why}");
+    }
+
+    // ...and the two arms are not the same picture, or nothing above means
+    // anything.
+    assert!(
+        !same(&straight, &fan),
+        "the two coordinate modes drew the same frame"
+    );
+}

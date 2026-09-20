@@ -155,10 +155,10 @@ single shipped picture.
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — The roster travels | dev | done | 56915750 + committed with this row |
-| 2 — The star wobbles, and its scatter can be chosen | dev | done | committed with this row |
-| 3 — Judge the floor by rendering | dev | done | committed with this row |
-| 4 — The backdrop ramp converges | dev | not started | |
+| 1 — The roster travels | dev | done | 56915750 + 7f8ca5dc |
+| 2 — The star wobbles, and its scatter can be chosen | dev | done | b8f00cd8 |
+| 3 — Judge the floor by rendering | dev | done | 0dd39295 |
+| 4 — The backdrop ramp converges | dev | done | committed with this row |
 
 ### Phase 1 — what the done-when measured
 
@@ -309,7 +309,60 @@ figure, the second colour, or anything else — and it must still pay for the gr
 as a full scene evaluation per frame rather than as the backdrop pass that already
 runs.
 
+### Phase 4 — what the done-when measured
+
+Three parameters on the backdrop ramp: `bg_coord_mode` (0 straight, 1 angular, rounded),
+`bg_center_x` and `bg_center_y` (the vanishing point in NDC, clamped to ±2). They went into a sixth
+`vec4` row on the backdrop's uniform, whose `min_binding_size` is computed from the struct, so the
+layout stays the one shape ADR-0058 requires it to keep.
+
+**The default renders byte-identically.** Two backdrop presets — one exercising the ramp
+(`bg_hue_span`, `bg_angle`, `bg_shade`/`bg_shade_end`, `bg_ramp_gamma`, `bg_vignette`) and one the
+curved band as well — rendered at 128x128 over 60 frames against this tree and against
+`background.rs` restored to its pre-phase state and rebuilt: **byte-identical**, as were the ten
+Phase 1 probes re-run alongside them. The golden roster passes unmoved, and
+`the_angular_ramps_centre_is_inert_until_its_mode_is_bound` holds the stronger claim that naming a
+vanishing point while the mode rests at 0 moves **zero** levels.
+
+**The angular mode converges on its centre, measured.** Centre at `(0, -1.2)`, just below the
+frame; three rows read far-to-near:
+
+| row | radius | boundaries crossed | mean gap | straight mode's boundaries |
+|---|---|---|---|---|
+| 16 | 1.684 | 4 | 14.67 px | 0 |
+| 32 | 1.184 | 5 | 11.25 px | 0 |
+| 61 | 0.278 | 10 | 5.00 px | 0 |
+
+The spacing falls with the radius and the count rises, which is the pair: a gap can shrink because
+the frame ran out of room, and a rising count is what says the bands genuinely crowded toward the
+point. The straight mode at the same angle puts no boundary on a horizontal row at any height,
+which is the control.
+
+**The documentation states ADR-0225's limit.** Both `presets/README.md`'s new ramp section and
+`docs/preset-palettes.md` open on it: the backdrop is added after the chain, so a figure over a lit
+fan can only be brighter than it, and a dark-on-light collage needs a multiply layer over a
+chain-drawn ground — which then spends the slot. Phase 3's two luma measurements are quoted in
+`preset-palettes.md` so a reader gets the number rather than the assertion.
+
 ### Notes
+
+- **Phase 4 touched two files its `Files touched` list does not name**, both for the same reason
+  Phase 2 did: `core/tests/suite/backdrop_ramp.rs` carries the measurements, and
+  `core/tests/suite/preset.rs` holds two deliberate rosters a new parameter must join — the
+  per-file `set_param` list and `STRUCTURAL`, the latter because `bg_coord_mode` rounds.
+- **A vanishing point is not enough on its own to draw the reference's floor, and the reason is
+  `bg_hue_span`.** An angular sweep spends the span on a whole turn while the frame sees perhaps a
+  fifth of one, and the span is documented at `±0.5` — so the stripe count has to come from the
+  palette repeating its tones a dozen or more times. That works, and the probe's palette does it,
+  but it is a real authoring cost and it is stated in both documents rather than left to be
+  discovered. **Widening `bg_hue_span`'s range would remove it** — nothing clamps the value today,
+  so the change would be to a declared range and a schema bound and would move no pixel. It was not
+  taken: the range is an existing parameter's, ADR-0225 names only a mode and a centre, and a lane
+  widening a published range on its own judgement is the kind of drift the plan/ADR split exists to
+  prevent. Routed here as the one thing an author will hit first.
+- **`bg_shade` and `bg_shade_end` should be equal under the angular mode.** The coordinate wraps
+  where the straight one clamps, so the brightness ramp jumps across the seam ray. Documented at
+  both surfaces; not enforced, because a deliberate hard edge along one ray is a legitimate look.
 
 - **Phase 2 touched three files its `Files touched` list does not name**, and could not avoid it:
   `core/src/render/scenes/swarm.rs`, `emitter.rs` and `shape_field.rs`. A shared mark parameter is
@@ -344,13 +397,29 @@ runs.
 
 ### Close triggers
 
-- **`presets/` touched:**
+- **`presets/` touched:** yes, but **no `.toml` preset**. `presets/README.md` (its generated
+  parameter block, plus three hand-written sections), `presets/preset.schema.json` and all fourteen
+  `presets/schema/*.schema.json` — every one of them a generated file or a documentation edit. The
+  shipped preset set is unchanged, and nothing here is a content tune.
 - **Plan header `Closes:`** design-backlog 0095, 0100, 0101
-- **What shipped:**
-- **Operator docs touched:**
-- **Backlog probes (`node scripts/check-backlog-claims.mjs`):**
-- **Full suite:**
-- **Outstanding `human` phases:**
+- **What shipped:** a **feature**, in three parts. `mark_shape` became a position on the roster that
+  blends the two arms it lies between; the `star` arm gained `star_seed`, `star_wobble` and
+  `star_wobble_freq`; the backdrop ramp gained `bg_coord_mode`, `bg_center_x` and `bg_center_y`.
+  Every one of the six new parameters defaults to an arithmetic identity, and `mark_shape`'s change
+  is an identity at every whole index.
+- **Operator docs touched:** `docs/preset-palettes.md` (a new backdrop section),
+  `presets/README.md` (the star arm's table and essay, and a new ramp section) and `docs/presets.md`
+  was touched in Phase 1 only. No file under `docs/` that an operator reads for running the app
+  moved — no flags, no keys, no config keys.
+- **Backlog probes (`node scripts/check-backlog-claims.mjs`):** exit 0 — *"backlog claims: OK — 43
+  stated reductions still hold across all 20 live entries (4 unprobeable)"*, with 29 probed paths
+  reported as moved since their entries were last read (an advisory, not a failure).
+- **Full suite:** owed to the conductor's pre-review gate (ADR-0207). What this session ran instead,
+  all green on the same tree: `cargo nextest run --workspace -P fast` — **1768 passed, 317 skipped**
+  — plus the deferred `golden` suite (3 passed), run per phase because every phase here changes what
+  it measures, and `cargo fmt --all --check` and `cargo clippy --workspace --all-targets -D warnings`
+  clean.
+- **Outstanding `human` phases:** none. The plan declares no `human` phase.
 
 ## Followups (after this lands)
 

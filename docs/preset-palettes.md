@@ -451,6 +451,41 @@ and with the `[layer]`, so re-spacing stops to bend the backdrop's falloff re-co
 too. When it is only the sky's *response* you want to shape, `bg_ramp_gamma` is the lever that
 touches nothing else.
 
+**`bg_coord_mode` measures that same ramp around a point instead of across the frame**
+([ADR-0225](adrs/0225-the-backdrop-ramp-gets-an-angular-coordinate-and-the-floor-stays-out-of-the-chain.md)),
+which turns the bands into a **fan converging on a vanishing point** — the floor of a perspective
+picture, at no cost to the preset's one `[layer]` slot.
+
+| Param | Default | What it does |
+|-------|---------|--------------|
+| `bg_coord_mode` | `0` | `0` measures the ramp straight across the frame; `1` measures it around a point. |
+| `bg_center_x` | `0.0` | The point the bands converge on, horizontally. `0` is the frame's middle and `1` its right edge, whatever the window's shape. |
+| `bg_center_y` | `0.0` | The same vertically. `-1` is the bottom edge, and a floor's vanishing point usually sits a little below it. |
+
+Both centre params are inert while the mode is `0`, and the mode's own default leaves the straight
+ramp's arithmetic untouched — so nothing you have already authored moves.
+
+Three things to know before reaching for it:
+
+- **It buys the floor, not the collage.** The backdrop is painted *outside* the post chain and added
+  after it, so a figure drawn over a lit fan can only ever be **brighter** than it, never darker.
+  The dark-figure-on-light-ground treatment needs a multiply `[layer]`
+  ([ADR-0106](adrs/0106-two-tone-graphics-come-from-a-multiply-layer.md)) over a ground drawn *in*
+  the chain — and that ground costs the one layer slot
+  ([ADR-0090](adrs/0090-a-preset-composes-two-scene-layers.md)), which is then not available for the
+  figure. Measured both ways: a figure over a striped backdrop reads 109.7–210.1 luma against a
+  floor whose darker bands read 209.1, and the same figure over a chain-drawn ground reads a flat
+  97.3–99.0 against 230.0. Pick the route by which half of the picture you actually need.
+- **The angular coordinate wraps where the straight one clamps.** A turn returns to where it
+  started, so the ramp's palette segment *and* its `bg_shade`..`bg_shade_end` brightness both jump
+  across one seam ray. Keep `bg_shade` and `bg_shade_end` equal for a fan, and aim the seam out of
+  frame with `bg_angle` — the seam runs from the centre along the direction `bg_angle` names, so a
+  centre below the frame wants `bg_angle` near `pi`.
+- **The stripe count comes from your stops, not from the span.** `bg_hue_span` covers at most half
+  the gradient and an angular sweep spends that half on a *whole turn*, while the frame sees perhaps
+  a fifth of one. So a fan with a handful of visible bands wants a palette that repeats its two
+  tones many times over — the same way a hard-edged poster palette is authored.
+
 **The band takes a *second* coordinate in the same gradient**
 ([ADR-0095](adrs/0095-the-backdrop-paints-a-curved-band.md)). The backdrop also paints one soft
 curved band of light over that ground, and it colours through the same `[palette]`, the same
