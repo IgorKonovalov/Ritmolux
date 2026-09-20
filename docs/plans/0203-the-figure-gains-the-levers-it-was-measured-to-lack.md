@@ -395,6 +395,13 @@ chain-drawn ground — which then spends the slot. Phase 3's two luma measuremen
   tree, took the two measurements the phase owed, and committed the log row. The phase's row names
   both commits.
 
+- **Round 1, finding 0 (major) — `shape` reached the scene rounded, so the travel was unreachable
+  from a preset.** `SHAPE` is now declared `ParamKind::Modal`, the three `("*", "shape")` rows left
+  `STRUCTURAL` in `core/tests/suite/preset.rs`, the four generated surfaces were regenerated, and
+  `an_eased_shape_sweep_lands_between_the_arms` drives a one-pole ease through `SHAPE.kind.quantize`
+  as well as `mark_shape` — the route a binding actually takes — with `POINTS` on the same route as
+  the control. Fixed in the commit carrying this line.
+
 ### Close triggers
 
 - **`presets/` touched:** yes, but **no `.toml` preset**. `presets/README.md` (its generated

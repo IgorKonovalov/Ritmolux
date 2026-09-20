@@ -764,7 +764,7 @@
     "param.shape": {
       "type": "string",
       "description": "Where on the silhouette roster each mark sits - a disc, a square, a star, and so on; a whole number is that figure exactly and a value between two travels from one to the other.",
-      "markdownDescription": "Where on the silhouette roster each mark sits - a disc, a square, a star, and so on; a whole number is that figure exactly and a value between two travels from one to the other.\n\n- default `0.0`\n- typical range `0.0` to `4.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- structural parameter\n\nThe value is an expression, always quoted."
+      "markdownDescription": "Where on the silhouette roster each mark sits - a disc, a square, a star, and so on; a whole number is that figure exactly and a value between two travels from one to the other.\n\n- default `0.0`\n- typical range `0.0` to `4.0` — a guide, not a bound: the engine neither clamps to it nor rejects a value outside it\n- modal parameter\n\nThe value is an expression, always quoted."
     },
     "param.points": {
       "type": "string",

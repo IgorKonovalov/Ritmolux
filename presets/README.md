@@ -473,7 +473,6 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
-| `shape` | `0` | `0` – `4` | Where on the silhouette roster each mark sits - a disc, a square, a star, and so on; a whole number is that figure exactly and a value between two travels from one to the other. |
 | `points` | `5` | `3` – `16` | How many points or sides the silhouette has, where the shape has a count at all. |
 | `star_seed` | `0` | `0` – `255` | Picks a different arrangement of the same amount of jitter and wobble - a whole number, and every value is as rough as every other. |
 
@@ -499,6 +498,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | `twinkle` | `0` | `0` – `1` | Per-particle brightness flicker, seeded so it is reproducible. |
 | `size_spread` | `0` | `0` – `1` | How much particle sizes vary about `size`; 0 makes them uniform. |
 | `reseed` | `0` | `0` – `1` | Crossing zero throws every particle back to a fresh start position. |
+| `shape` | `0` | `0` – `4` | Where on the silhouette roster each mark sits - a disc, a square, a star, and so on; a whole number is that figure exactly and a value between two travels from one to the other. |
 | `star_valley` | `0.45` | `0` – `1` | How deep the notches between a star's points cut; near 1 the star becomes a disc. |
 | `star_curve` | `0` | `-1` – `1` | Bows a star's edges inward or outward instead of leaving them straight. |
 | `star_jitter` | `0` | `0` – `1` | Randomises each point's length by a seeded amount, so the star reads as hand-drawn. |
@@ -738,7 +738,6 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
-| `shape` | `0` | `0` – `4` | Where on the silhouette roster each mark sits - a disc, a square, a star, and so on; a whole number is that figure exactly and a value between two travels from one to the other. |
 | `points` | `5` | `3` – `16` | How many points or sides the silhouette has, where the shape has a count at all. |
 | `star_seed` | `0` | `0` – `255` | Picks a different arrangement of the same amount of jitter and wobble - a whole number, and every value is as rough as every other. |
 
@@ -771,6 +770,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 | `zoom` | `1` | `0.25` – `4` | Scales the whole scene about its centre; above 1 fills more of the frame. |
 | `pan_x` | `0` |  | Slides the whole scene sideways, in the scene's own units rather than pixels. |
 | `pan_y` | `0` |  | Slides the whole scene vertically, in the scene's own units rather than pixels. |
+| `shape` | `0` | `0` – `4` | Where on the silhouette roster each mark sits - a disc, a square, a star, and so on; a whole number is that figure exactly and a value between two travels from one to the other. |
 | `star_valley` | `0.45` | `0` – `1` | How deep the notches between a star's points cut; near 1 the star becomes a disc. |
 | `star_curve` | `0` | `-1` – `1` | Bows a star's edges inward or outward instead of leaving them straight. |
 | `star_jitter` | `0` | `0` – `1` | Randomises each point's length by a seeded amount, so the star reads as hand-drawn. |
@@ -783,7 +783,6 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
-| `shape` | `0` | `0` – `4` | Where on the silhouette roster each mark sits - a disc, a square, a star, and so on; a whole number is that figure exactly and a value between two travels from one to the other. |
 | `points` | `5` | `3` – `16` | How many points or sides the silhouette has, where the shape has a count at all. |
 | `star_seed` | `0` | `0` – `255` | Picks a different arrangement of the same amount of jitter and wobble - a whole number, and every value is as rough as every other. |
 | `palette_steps` | `0` | `0` – `16` | Quantizes the palette into this many flat bands; 0 leaves it continuous. |
@@ -794,6 +793,7 @@ A **Range** cell that names families belongs to a parameter whose meaning depend
 
 | Parameter | Default | Range | What it does |
 |---|---|---|---|
+| `shape` | `0` | `0` – `4` | Where on the silhouette roster each mark sits - a disc, a square, a star, and so on; a whole number is that figure exactly and a value between two travels from one to the other. |
 | `star_valley` | `0.45` | `0` – `1` | How deep the notches between a star's points cut; near 1 the star becomes a disc. |
 | `star_curve` | `0` | `-1` – `1` | Bows a star's edges inward or outward instead of leaving them straight. |
 | `star_jitter` | `0` | `0` – `1` | Randomises each point's length by a seeded amount, so the star reads as hand-drawn. |

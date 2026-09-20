@@ -5,10 +5,10 @@ use crate::render::scenes::spec_names;
 use super::{
     DEFAULT_POINTS, DEFAULT_SHAPE, DEFAULT_STAR_CURVE, DEFAULT_STAR_JITTER, DEFAULT_STAR_SEED,
     DEFAULT_STAR_VALLEY, DEFAULT_STAR_WOBBLE, DEFAULT_STAR_WOBBLE_FREQ, HEART_CY, HEART_INRADIUS,
-    HEART_LOBE_R, HEART_SCALE, MAX_POINTS, MAX_SHAPE, MIN_POINTS, PARAMS, PHASE_SALT, RING_HALF,
-    RING_MID, RING_SHAPE, SHAPES, STAR_SEGMENTS, STAR_WOBBLE_MAX, mark_points, mark_shape,
-    sdf_wgsl, seeded_spike_hash01, shape_touches_ring, spike_hash01, star_curve, star_jitter,
-    star_seed, star_valley, star_wobble, star_wobble_freq,
+    HEART_LOBE_R, HEART_SCALE, MAX_POINTS, MAX_SHAPE, MIN_POINTS, PARAMS, PHASE_SALT, POINTS,
+    RING_HALF, RING_MID, RING_SHAPE, SHAPE, SHAPES, STAR_SEGMENTS, STAR_WOBBLE_MAX, mark_points,
+    mark_shape, sdf_wgsl, seeded_spike_hash01, shape_touches_ring, spike_hash01, star_curve,
+    star_jitter, star_seed, star_valley, star_wobble, star_wobble_freq,
 };
 
 /// The neutral star configuration — `(valley, curve, jitter)` at their defaults.
@@ -753,6 +753,89 @@ fn an_eased_points_sweep_visits_only_whole_counts() {
         );
     }
     assert_eq!(mark_points(f32::NAN), DEFAULT_POINTS);
+}
+
+/// **An eased `shape` travels: the sweep lands between the two arms rather than
+/// stepping onto one of them** (ADR-0226).
+///
+/// The twin of `an_eased_points_sweep_visits_only_whole_counts` above, for the
+/// opposite claim — and it is driven through the **whole route a preset binding
+/// takes**, not through the scene's conditioner alone. A bound value crosses two
+/// stages: `ParamKind::quantize`, which the binding pipeline applies after the
+/// hold and the smoother, and then `mark_shape`. Measuring `mark_shape` by
+/// itself passes while the declaration a layer above still rounds, which is the
+/// exact blind spot that leaves the blend reachable only from an unquantized
+/// live override.
+///
+/// `POINTS` is the control on the same route: a declaration that *does* round
+/// still steps through whole counts, so the fraction `shape` keeps is a property
+/// of its own declaration rather than of the stage being inert.
+#[test]
+fn an_eased_shape_sweep_lands_between_the_arms() {
+    const SAMPLES: usize = 400;
+    // The shape a `[smoothing]` ease produces: a one-pole, per frame.
+    let ease = |i: usize| 1.0 - (1.0 - 1.0 / 40.0f32).powi(i as i32);
+
+    let raw: Vec<f32> = (0..=SAMPLES)
+        .map(|i| POLYGON + (STAR - POLYGON) * ease(i))
+        .collect();
+    let mut distinct_raw: Vec<u32> = raw.iter().map(|v| v.to_bits()).collect();
+    distinct_raw.sort_unstable();
+    distinct_raw.dedup();
+    assert!(
+        distinct_raw.len() > 100,
+        "the raw sweep must genuinely be continuous, or this proves nothing: {} \
+         distinct values",
+        distinct_raw.len()
+    );
+
+    let seen: Vec<f32> = raw
+        .iter()
+        .map(|&v| mark_shape(SHAPE.kind.quantize(v)))
+        .collect();
+    let between = seen.iter().filter(|&&v| v > POLYGON && v < STAR).count();
+    assert!(
+        between > 100,
+        "an eased polygon -> star sweep must reach the scene at positions between \
+         the two arms; only {between} of {} samples did, which is what a \
+         `Structural` declaration produces by rounding every one of them onto an \
+         arm before the scene sees it",
+        seen.len()
+    );
+
+    let mut distinct_seen: Vec<u32> = seen.iter().map(|v| v.to_bits()).collect();
+    distinct_seen.sort_unstable();
+    distinct_seen.dedup();
+    assert_eq!(
+        distinct_seen.len(),
+        distinct_raw.len(),
+        "nothing on the route from a binding to the scene may collapse two \
+         positions on the roster into one"
+    );
+
+    // ...and the identity every shipped preset rests on survives the same route.
+    for (i, name) in SHAPES.iter().enumerate() {
+        assert_eq!(
+            mark_shape(SHAPE.kind.quantize(i as f32)),
+            i as f32,
+            "a preset binding {name} by its whole index must reach the scene as \
+             that index exactly"
+        );
+    }
+
+    // The control: the same ease, the same two stages, a rounding declaration.
+    let mut counts: Vec<f32> = (0..=SAMPLES)
+        .map(|i| mark_points(POINTS.kind.quantize(7.0 + 2.0 * ease(i))))
+        .collect();
+    counts.sort_by(f32::total_cmp);
+    counts.dedup();
+    assert_eq!(
+        counts,
+        vec![7.0, 8.0, 9.0],
+        "the same route on a `Structural` declaration must still step through \
+         whole counts, or the quantizer is inert and `shape`'s fraction says \
+         nothing"
+    );
 }
 
 /// The roster is one list in one place, and these are its values.

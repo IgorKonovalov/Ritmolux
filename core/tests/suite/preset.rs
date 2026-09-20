@@ -2410,13 +2410,14 @@ fn declared_params_match_set_param() {
 /// which is why `n`, `d`, `samples`, `contour`, `count`, `seed` and `variant`
 /// are absent despite integer-sounding names.
 const STRUCTURAL: &[(&str, &str)] = &[
-    // `mark_shape` / `mark_points`: clamp then round, CPU-side, because a
-    // fractional point count tears the angle fold along `atan2`'s branch cut.
-    ("swarm", "shape"),
+    // `mark_points`: clamp then round, CPU-side, because a fractional point
+    // count tears the angle fold along `atan2`'s branch cut. Its neighbour
+    // `shape` is deliberately absent, and it is the one name that ever left this
+    // roster: the roster of silhouettes blends between two arms, so the scene
+    // reads the index's fraction on purpose and rounding it here would leave the
+    // travel reachable only from an unquantized live override (ADR-0226).
     ("swarm", "points"),
-    ("emitter", "shape"),
     ("emitter", "points"),
-    ("shape_field", "shape"),
     ("shape_field", "points"),
     // `star_seed`: clamp then round, on the roster's own rule rather than on
     // `mark_points`' tearing one — a seed names an arrangement of the star's

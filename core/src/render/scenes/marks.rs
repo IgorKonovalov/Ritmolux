@@ -563,6 +563,13 @@ const HEART_CY: f32 = 0.552;
 /// spellings of the same idea. `emitter.rs`'s
 /// `both_particle_scenes_carry_the_same_shape_vocabulary` is what holds the
 /// rosters to it.
+///
+/// **`shape` is `Modal` and its neighbour `points` is not**, which is the one
+/// asymmetry in this block: the blend reads the index's fraction on purpose
+/// (ADR-0226), so quantizing it in the binding pipeline would round every eased
+/// or expression-bound value back to a whole arm and leave the travel reachable
+/// only from an unquantized live override. A fractional `points` still tears the
+/// angle fold, so that one keeps its rounding.
 pub(crate) const SHAPE: ParamSpec = ParamSpec {
     name: "shape",
     default: 0.0,
@@ -570,7 +577,7 @@ pub(crate) const SHAPE: ParamSpec = ParamSpec {
     doc: "Where on the silhouette roster each mark sits - a disc, a square, a star, and so on; \
           a whole number is that figure exactly and a value between two travels from one to \
           the other.",
-    kind: ParamKind::Structural,
+    kind: ParamKind::Modal,
 };
 
 /// `points`, shared by the three shaped-mark scenes: the silhouette's count.
