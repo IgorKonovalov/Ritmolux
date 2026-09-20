@@ -131,6 +131,7 @@ Flags:
 | `--report [family=<sys>]` | per-family metrics table — reactivity, animation, coverage and the [transient probe](#the-transient-columns); `family=` takes any `system` name — every one the scene registry carries: `analytic_field`, `attractor`, `cellular`, `emitter`, `fragment_field`, `lsystem`, `parametric_curve`, `reaction_diffusion`, `shape_collage`, `shape_field`, `spectrum`, `star_pattern`, `swarm`, `warp_mesh` |
 | `--json` | emit the report as JSON instead of a text table |
 | `--signal <kind:param>` | synth-audio filmstrip (see below) |
+| `--signal-secs <s>` | how long to synthesize that signal for (default `4`). The clip's length is what decides **which hops exist**, so a late `--frame-at` needs a longer one — [photographing a world that is still assembling](#a-late-hop-photographs-a-world-that-is-still-assembling). Needs `--signal`: `--audio` and `--render` take their length from the file |
 | `--audio <clip.wav>` | filmstrip from a 16-bit PCM WAV |
 | `--strip <N>` | frames tiled along the audio (default 8) |
 | `--at <hop>,...` | explicit filmstrip hops, beating `--strip`'s even spacing — [how to capture a transient](#aiming-a-capture-at-a-transient) |
@@ -707,14 +708,58 @@ cargo run -p standalone --example shot --release -- \
   --out docs/images/gallery/attractor.png
 ```
 
-**Hop 300 is not arbitrary, and a later hop is worse.** `dynamic:110`'s phrase
-builds for six beats and then rests for two at an amplitude of `0.04`, and at
-110 BPM with a 512-sample hop that rest begins at hop 306 — so anything past that
-photographs a reactive preset at its resting state. 300 is the last hop of the
-loudest beat: maximum energy, and the most scene time an accumulating family can
-have before the rest. The arithmetic is in
+**Hop 300 is not arbitrary, and inside a four-second clip a later hop is worse.**
+`dynamic:110`'s phrase builds for six beats and then rests for two at an
+amplitude of `0.04`, and at 110 BPM with a 512-sample hop that rest begins at hop
+306 — so anything past that photographs a reactive preset at its resting state.
+300 is the last hop of the loudest beat: maximum energy, and the most scene time
+an accumulating family can have before the rest. The arithmetic is in
 [`scripts/docs-shots.mjs`](../scripts/docs-shots.mjs)'s header, which is also
 where a per-image deviation from 300 has to say why.
+
+#### A late hop photographs a world that is still assembling
+
+The paragraph above buys the loudest hop a four-second clip has. What it cannot
+buy is a world that is **not there yet** at 3.2 s: a feedback field, a
+reaction-diffusion or cellular field, a trail-fed attractor and a particle
+population all keep developing for tens of seconds, and a picture taken early is
+a picture of the assembly. `warp_ladder`'s own header records the shape of it —
+coverage `0.408` at its 30 s row against `0.619` at 300 s.
+
+`--signal-secs` is what makes a hop that late exist. The clip's length decides
+how many analysis hops there are — 4 s is **375**, and `--frame-at 375` fails the
+run rather than clamping — so the flag comes first and the hop follows:
+
+```bash
+# The same card, thirty seconds in: the hop-300 phrase position, six phrases on
+cargo run -p standalone --example shot --release -- \
+  --preset-file presets/warp_tracery.toml \
+  --signal dynamic:110 --signal-secs 30 --frame-at 2754 \
+  --size 640x360 --tier rich --out tracery.png
+```
+
+**A late hop still has to be a loud one, and that is arithmetic rather than
+luck.** The phrase repeats for as long as the clip runs, so the same position in
+a later phrase carries the same amplitude: a phrase is 409.09 hops, hop 300 sits
+0.87 of the way into the loudest beat, and six phrases on from it is hop **2754**
+— the same beat of the phrase, the same amplitude, 29.4 s of scene time. Picking
+a round number of seconds instead lands in the two-beat rest as surely as hop 340
+does.
+
+Lengthening the clip **appends phrases rather than re-timing them**, so the hops
+a short clip had are the same samples in a long one: a capture at hop 300 is
+byte-identical whether the clip ran for 4 s or 30 s, and omitting the flag
+entirely synthesizes exactly what it always did. That is what lets one family's
+cards move without touching anyone else's
+([ADR-0235](adrs/0235-a-gallery-cards-hop-is-chosen-per-family-and-the-signal-outlasts-it.md)).
+
+A longer clip costs render time in proportion, because every hop up to the
+captured one is advanced through the scene. Measured on the Windows development
+box (hardware adapter, release build, 640x360, Rich) a hop-2754 card takes
+**5.1 s** for a warp world and **11.8 s** for a reaction-diffusion one, against
+well under a second at hop 300 — a different machine or profile is a different
+measurement
+([ADR-0071](adrs/0071-a-numeric-test-contract-states-a-property-or-names-its-machine.md)).
 
 It shares everything with the strip except the write: the same hop numbering, the
 same `capture_audio` call, and the same level table on stdout. A hop past the end

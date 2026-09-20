@@ -225,44 +225,48 @@ flowchart TB
 
 | phase | owner | state | commit |
 |---|---|---|---|
-| 1 — the renderer takes a name | dev | done | committed with this row |
-| 2 — the accumulating set is named, and the hop follows the family | dev | parked — see Notes | |
+| 1 — the renderer takes a name | dev | done | `655fa6a3` |
+| 2 — the accumulating set is named, and the hop follows the family | dev | done | committed with this row |
 | 3 — the affected cards are re-rendered as sets | dev | not started | |
 | 4 — a person says whether the cards are now the look | human | not started | |
 
 ### Notes
 
-**Phase 2 is parked `plan_wrong`: the signal cannot be extended from
-`scripts/docs-shots.mjs`, and the plan forbids the file where it can be.** The synthesized clip is
-`SIGNAL_SECS: f32 = 4.0` in `standalone/src/shot/args.rs`, a constant every `--signal` kind is built
-at; at 48 kHz and a 512-sample hop that is **375 analysis hops**, so hop 374 — the existing swarm
-override — is already the last hop the clip has. `shot` has no flag for the length: the roster is
-`--preset/--presets/--preset-file/--set/--frames/--size/--out/--all/--report/--json/--tier/--signal/--audio/--strip/--horizon/--interval/--render/--fps/--ffmpeg/--crf/--at/--frame-at`,
-and `--frame-at 375` does not clamp — `check_hops` in `standalone/src/shot/film.rs` fails the run
-with *"the clip is only 375 analysis hops long"*, which is pinned by
-`check_hops_rejects_past_the_end_and_agrees_with_the_strip_numbering`. So Phase 2's second half
-needs a Rust edit outside its `Files touched:` list, and **"What this plan does NOT do" rules that
-edit out in as many words** (*"It does not change `shot`"*). The two cannot both hold.
+**Phase 2 touched a file its `Files touched:` does not name, and did not touch one it does.**
 
-The first half — a per-family hop default beside `CARD_HOP_OVERRIDES` — is script-only and was not
-written, because the hop it would resolve to is the half that is blocked: the accumulating families'
-development horizons are measured in tens of seconds (backlog 0254 records `warp_ladder` still
-filling at the 30 s row, which is hop ~2812) and every hop this clip can offer is inside its first
-four seconds.
+- **`standalone/examples/shot.rs`** carries the `--signal-secs` parse arm, its `Args` field, its
+  "needs `--signal`" rejection and its usage line. The amendment's flag cannot exist without it —
+  `standalone/src/shot/args.rs` holds the parser and the synthesis (`parse_signal_secs`,
+  `synth_signal_secs`) but nothing in that crate reads a command line.
+- **`docs/configuration.md`** was left alone. It documents *the app's* flags — "every command-line
+  flag ... the standalone application reads" — and `standalone/tests/suite/configuration_doc.rs`
+  holds it in step with `ritmolux --help`, which `--signal-secs` is not in. The flag is documented
+  in `docs/capturing.md`, which is `shot`'s reader document and where `shot_cli.rs`'s own drift
+  gate points.
 
-**An observation for whoever re-plans Phase 3**, from the bounded bare run used to check Phase 1:
+**The swarm family now renders at two hops, and nothing in this phase resolves that.** The
+per-preset roster wins over the family default, as the done-when requires, so `swarm_braid`,
+`swarm_drift`, `swarm_shatter` and `swarm_stipple` stay at hop 374 while `swarm_murmuration` — the
+one swarm world the roster never named — resolves to the family's 2828. Both hops sit at the same
+position in the phrase's quiet bar, six phrases apart, so the difference is development time and
+not lighting. Retiring the four entries into the family row would have emptied
+`CARD_HOP_OVERRIDES`, which the same done-when asks to stay demonstrable.
+
+**The stop condition was measured and not reached.** A hop-2754 card at 640x360 Rich takes **5.1 s**
+for `warp_tracery` and **11.8 s** for `reaction_verdigris` — the 13-passes-a-frame worst case — on
+the Windows development box, hardware adapter, release build (ADR-0071).
+
+**The byte-identity done-when was shown by rendering, not asserted.**
+`node scripts/docs-shots.mjs analytic_echoplate` re-rendered a non-accumulating card with no
+`--signal-secs` on the command line and left `git status` carrying no image change.
+
+**An observation for Phase 3**, from the bounded bare run used to check Phase 1:
 of the first 33 manifest entries re-rendered on this machine, **12 came back with bytes different
 from the committed PNG** (`hero`, `walkthrough/step-5`, and ten of the one-per-system gallery
 images) while the other 21, `warp_tracery`'s card among them, were byte-identical. All were restored
 with `git restore -- docs/images`; the lane carries no image change. Whether that is driver drift,
 a different binary, or preset content that moved since those files were written is not something
 this session established.
-
-**Scope reading recorded rather than acted on:** Phase 3's `Files touched:` says
-`docs/images/gallery/*.png`, which is the one-per-system set, while every other sentence in the plan
-says *card*, and the cards are `docs/images/gallery/presets/*.png`. The per-system entries also
-carry hand-written per-entry hops with their own judgement comments, so a family default reaching
-them would overwrite those.
 
 ### Close triggers
 

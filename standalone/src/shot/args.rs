@@ -11,8 +11,31 @@ use rlx_core::signal::{
 
 use super::film::FILMSTRIP_WARMUP;
 
-/// Duration synthesized for a `--signal` (enough for several 120 BPM beats).
+/// Duration synthesized for a `--signal` when `--signal-secs` does not name one
+/// (enough for several 120 BPM beats).
+///
+/// At 48 kHz on a [`HOP_SIZE`] hop this is **375 analysis hops**, which is the
+/// number every `--at` / `--frame-at` index is checked against for a clip of
+/// this length — so it is also the ceiling a capture aimed past hits.
 pub const SIGNAL_SECS: f32 = 4.0;
+
+/// Parse `--signal-secs <seconds>` into a clip length.
+///
+/// Zero, negative and non-finite are rejected here rather than downstream: a
+/// zero-length clip synthesizes no samples at all, and the failure it produces
+/// is "audio too short to measure band levels" several steps later, naming
+/// neither the flag nor the value.
+pub fn parse_signal_secs(value: &str) -> Result<f32, String> {
+    let secs: f32 = value
+        .parse()
+        .map_err(|_| format!("--signal-secs expects seconds, got `{value}`"))?;
+    if !secs.is_finite() || secs <= 0.0 {
+        return Err(format!(
+            "--signal-secs expects a positive number of seconds, got `{value}`"
+        ));
+    }
+    Ok(secs)
+}
 
 /// Parse `--size WxH` (either separator case) into non-zero dimensions.
 pub fn parse_size(spec: &str) -> Result<(u32, u32), String> {
@@ -121,35 +144,50 @@ pub fn parse_param(param: &str, what: &str) -> Result<f32, String> {
         .map_err(|_| format!("--signal: expected a {what} value, got `{param}`"))
 }
 
-/// Parse `<kind:param>` into synthesized PCM. Zero committed asset — this is the
-/// self-contained validation of the whole audio path.
+/// Parse `<kind:param>` into synthesized PCM at the default [`SIGNAL_SECS`]
+/// length. Zero committed asset — this is the self-contained validation of the
+/// whole audio path.
 pub fn synth_signal(spec: &str) -> Result<(Vec<f32>, AudioFormat), String> {
+    synth_signal_secs(spec, SIGNAL_SECS)
+}
+
+/// [`synth_signal`] at an explicit clip length — what `--signal-secs` sets.
+///
+/// **The length bounds which hops exist.** A clip yields `secs * 48000 /
+/// HOP_SIZE` analysis hops and a `--frame-at` past the last of them is a failed
+/// run rather than a clamp, so a capture aimed at a world that develops over
+/// tens of seconds needs a clip that long to aim into. Every generator takes its
+/// duration as an argument and repeats its own structure — `dynamic_groove`'s
+/// 8-beat phrase recurs — so a longer clip appends phrases and does not re-time
+/// the ones already there: the hops a shorter clip had are the same samples in a
+/// longer one. ADR-0235.
+pub fn synth_signal_secs(spec: &str, secs: f32) -> Result<(Vec<f32>, AudioFormat), String> {
     let format = AudioFormat {
         sample_rate: 48_000,
         channels: 2,
     };
     let (kind, param) = spec.split_once(':').unwrap_or((spec, ""));
     let pcm = match kind {
-        "click" => click_track(parse_param(param, "click BPM")?, SIGNAL_SECS, format),
-        "bass" => bass_sine(parse_param(param, "bass Hz")?, SIGNAL_SECS, format),
-        "treble" | "treb" => treble_tone(parse_param(param, "treble Hz")?, SIGNAL_SECS, format),
+        "click" => click_track(parse_param(param, "click BPM")?, secs, format),
+        "bass" => bass_sine(parse_param(param, "bass Hz")?, secs, format),
+        "treble" | "treb" => treble_tone(parse_param(param, "treble Hz")?, secs, format),
         "noise" => {
             let seed = param.parse::<u64>().unwrap_or(1);
-            noise(seed, SIGNAL_SECS, 0.8, format)
+            noise(seed, secs, 0.8, format)
         }
-        "chord" => chord(&[220.0, 277.0, 330.0], SIGNAL_SECS, format),
+        "chord" => chord(&[220.0, 277.0, 330.0], secs, format),
         // The one kind with dynamics — everything above is a steady tone or
         // steady noise (Plan 0037 Phase 3).
-        "dynamic" => dynamic_groove(parse_param(param, "dynamic BPM")?, SIGNAL_SECS, format),
+        "dynamic" => dynamic_groove(parse_param(param, "dynamic BPM")?, secs, format),
         // The stereo kinds (ADR-0215). Every kind above builds a mono buffer and
         // duplicates it into both channels, so under them a working stereo
         // implementation and a broken one produce the same output.
-        "pan" => pan(parse_param(param, "pan position")?, SIGNAL_SECS, format),
+        "pan" => pan(parse_param(param, "pan position")?, secs, format),
         "wide" => {
             let seed = param.parse::<u64>().unwrap_or(1);
-            wide(seed, SIGNAL_SECS, format)
+            wide(seed, secs, format)
         }
-        "split" => split(parse_param(param, "pan position")?, SIGNAL_SECS, format),
+        "split" => split(parse_param(param, "pan position")?, secs, format),
         other => {
             return Err(format!(
                 "--signal: unknown kind `{other}` \
@@ -432,6 +470,66 @@ mod tests {
         assert!(synth_signal("click").is_err(), "click needs a BPM");
         assert!(synth_signal("dynamic").is_err(), "dynamic needs a BPM");
         assert!(synth_signal("dynamic:fast").is_err());
+    }
+
+    /// **Omitting `--signal-secs` synthesizes exactly what it always did.** The
+    /// flag's default is [`SIGNAL_SECS`] itself, so the property is byte
+    /// equality of the samples rather than an approximate length — every
+    /// existing caller, every committed capture and every golden included.
+    #[test]
+    fn the_flagless_length_is_the_default_length_sample_for_sample() {
+        for spec in ["click:120", "dynamic:110", "noise:7", "chord", "wide:1"] {
+            let (bare, _) = synth_signal(spec).unwrap_or_else(|e| panic!("{spec}: {e}"));
+            let (explicit, _) =
+                synth_signal_secs(spec, SIGNAL_SECS).unwrap_or_else(|e| panic!("{spec}: {e}"));
+            assert_eq!(bare, explicit, "{spec} moved when the default was spelled");
+        }
+    }
+
+    #[test]
+    fn signal_secs_scales_the_clip_and_rejects_a_length_no_clip_can_have() {
+        let (pcm, format) = synth_signal_secs("dynamic:110", 30.0).expect("a 30 s groove");
+        assert_eq!(pcm.len(), 30 * 48_000 * 2, "30 s of 48 kHz stereo");
+        assert_eq!(format.sample_rate, 48_000);
+
+        assert_eq!(parse_signal_secs("30"), Ok(30.0));
+        assert_eq!(parse_signal_secs("0.5"), Ok(0.5));
+        // A zero-length clip synthesizes nothing and fails several steps later
+        // with a message that names neither the flag nor the value.
+        assert!(parse_signal_secs("0").is_err(), "zero is not a clip");
+        assert!(parse_signal_secs("-4").is_err(), "negative is not a clip");
+        assert!(parse_signal_secs("inf").is_err(), "not finite");
+        assert!(parse_signal_secs("NaN").is_err(), "not finite");
+        assert!(parse_signal_secs("four").is_err(), "not a number");
+    }
+
+    /// The clip length is what bounds which hops exist, so it is what makes a
+    /// late `--frame-at` reachable — and what the refusal has to be measured
+    /// against when it is not.
+    #[test]
+    fn a_longer_clip_moves_the_hop_ceiling_and_the_message_with_it() {
+        use crate::shot::film::{check_hops, total_hops};
+
+        let (pcm, format) = synth_signal("dynamic:110").expect("the default clip");
+        assert_eq!(total_hops(pcm.len(), format), 375, "4 s at 48 kHz / 512");
+        let err = check_hops(&[375], pcm.len(), format, "--frame-at").expect_err("past the end");
+        assert!(err.contains("only 375 analysis hops"), "got {err}");
+
+        // 30 s reaches hop 2754 — the same position inside the phrase's loudest
+        // beat as hop 300, six phrases later. `scripts/docs-shots.mjs`'s header
+        // carries that arithmetic; what matters here is that the hop exists.
+        let (long, format) = synth_signal_secs("dynamic:110", 30.0).expect("a 30 s groove");
+        assert_eq!(total_hops(long.len(), format), 2812);
+        assert_eq!(
+            check_hops(&[2754], long.len(), format, "--frame-at"),
+            Ok(())
+        );
+        let err =
+            check_hops(&[2812], long.len(), format, "--frame-at").expect_err("past the new end");
+        assert!(
+            err.contains("only 2812 analysis hops"),
+            "the refusal must name the clip's own length, got {err}"
+        );
     }
 
     /// The measurement has to put energy where the signal put it, or the numbers

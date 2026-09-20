@@ -28,6 +28,8 @@
 //!   --report [family=<sys>]  per-family reactivity / animation / distinctness
 //!            [--json]        emit JSON instead of a text table
 //!   --signal <kind:param>    synth audio filmstrip (click:120, dynamic:110, ...)
+//!   --signal-secs <s>        how long to synthesize it for (default 4). The
+//!                            clip's length is what bounds which hops exist
 //!   --audio <clip.wav>       filmstrip from a 16-bit PCM WAV
 //!   --strip <N>              frames tiled along the audio (default 8)
 //!   --at <hop>,...           explicit filmstrip hops, beating --strip's even
@@ -69,7 +71,8 @@ use rlx_core::dsp::AnalysisFrame;
 use rlx_core::preset::{Preset, SystemKind, default_presets, load_dir};
 use rlx_core::render::{CaptureImage, Tier};
 use standalone::shot::args::{
-    BandLevels, apply_set, band_levels, parse_hops, parse_size, synth_signal,
+    BandLevels, SIGNAL_SECS, apply_set, band_levels, parse_hops, parse_signal_secs, parse_size,
+    synth_signal_secs,
 };
 use standalone::shot::film::{StripLayout, check_hops, filmstrip_indices, filmstrip_layout};
 use standalone::shot::glyph::{GLYPH_ADVANCE, GLYPH_COLS, glyph_for};
@@ -119,6 +122,16 @@ struct Args {
     family: Option<SystemKind>,
     json: bool,
     signal: Option<String>,
+    /// `--signal-secs <s>`: how long a clip `--signal` synthesizes, `None` for
+    /// [`SIGNAL_SECS`].
+    ///
+    /// An `Option` rather than an eager default so "passed without a `--signal`
+    /// to lengthen" is an exact question, and so the flagless call keeps
+    /// synthesizing the same samples it always did. The length is what decides
+    /// which hops exist at all: a `--frame-at` past the clip's last hop is a
+    /// failed run, and a world that develops over tens of seconds has no hop to
+    /// aim at inside four (ADR-0235).
+    signal_secs: Option<f32>,
     audio: Option<PathBuf>,
     strip: u32,
     /// `--at <hop>,...`: explicit filmstrip hop indices, overriding `--strip`'s
@@ -183,6 +196,7 @@ impl Default for Args {
             family: None,
             json: false,
             signal: None,
+            signal_secs: None,
             audio: None,
             strip: 8,
             at: None,
@@ -232,6 +246,9 @@ fn parse_args() -> Result<Args, String> {
                     .ok_or_else(|| format!("--tier `{value}`: expected `floor` or `rich`"))?;
             }
             "--signal" => args.signal = Some(next_value(&mut it, "--signal")?),
+            "--signal-secs" => {
+                args.signal_secs = Some(parse_signal_secs(&next_value(&mut it, "--signal-secs")?)?);
+            }
             "--audio" => args.audio = Some(PathBuf::from(next_value(&mut it, "--audio")?)),
             "--strip" => {
                 args.strip = next_value(&mut it, "--strip")?
@@ -297,6 +314,17 @@ fn parse_args() -> Result<Args, String> {
                     .to_string(),
             );
         }
+    }
+    // `--signal-secs` lengthens the clip `--signal` synthesizes and has nothing
+    // else to act on: `--audio` and `--render` name a file whose length is the
+    // file's, and a horizon holds one stimulus rather than walking a clip. So
+    // without `--signal` it would be accepted and silently ignored.
+    if args.signal_secs.is_some() && args.signal.is_none() {
+        return Err(
+            "--signal-secs sets how long --signal synthesizes for and cannot lengthen \
+             anything else: add --signal <kind:param>"
+                .to_string(),
+        );
     }
     // A horizon holds one stimulus for its whole run, which is what makes it
     // deterministic and what makes a row at minute nine comparable with a row at
@@ -409,6 +437,10 @@ fn print_usage() {
          --signal <kind:param>      synth audio filmstrip: click:120 bass:60\n\
                                     treble:10000 noise:7 chord dynamic:110\n\
                                     (needs --out)\n\
+         --signal-secs <s>          how long to synthesize it for (default 4).\n\
+                                    The clip's length bounds which hops exist,\n\
+                                    so a late --frame-at needs a longer one.\n\
+                                    Needs --signal\n\
          --audio <clip.wav>         filmstrip from a 16-bit PCM WAV (needs --out)\n\
          --strip <N>                frames tiled along the audio (default 8)\n\
          --at <hop>,...             explicit filmstrip hops (beats --strip) -\n\
@@ -720,7 +752,12 @@ fn filmstrip(args: Args, presets: Vec<Preset>, source: &str) -> Result<(), Strin
 
     let (pcm, format, label) = match (&args.signal, &args.audio) {
         (Some(spec), _) => {
-            let (pcm, fmt) = synth_signal(spec)?;
+            // The default IS `SIGNAL_SECS`, so a call that passes no
+            // `--signal-secs` synthesizes the same samples it did before the
+            // flag existed — which is what keeps every committed capture and
+            // every golden where it is. The label stays the spec alone: the
+            // level table below already prints how many hops the clip yielded.
+            let (pcm, fmt) = synth_signal_secs(spec, args.signal_secs.unwrap_or(SIGNAL_SECS))?;
             (pcm, fmt, format!("signal {spec}"))
         }
         (None, Some(path)) => {

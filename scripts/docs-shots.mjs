@@ -19,9 +19,9 @@
 //
 // THE MANIFEST IS THE PROVENANCE RECORD. Every committed PNG under docs/images/
 // has exactly one entry here, and the entry carries the whole command: preset
-// file, stimulus, hop, size and tier. There is no way to ask "how was this made"
-// and not get an answer, and swapping which preset represents a family is one
-// line plus a re-run (ADR-0100).
+// file, stimulus, clip length, hop, size and tier. There is no way to ask "how
+// was this made" and not get an answer, and swapping which preset represents a
+// family is one line plus a re-run (ADR-0100).
 //
 // ---------------------------------------------------------------------------
 // THIS IS NOT A CI GATE, AND MUST NOT BECOME ONE.
@@ -76,6 +76,42 @@
 // accumulating family can have before the rest. attractor_leviathan — the
 // preset the plan measured — is a fuller rosette at 300 than at 340, so the
 // accumulation argument does not cost anything by moving.
+//
+// WHY AN ACCUMULATING FAMILY'S CARD IS HOP 2754 AND THE CLIP IS 30 s. The
+// paragraph above buys the loudest hop the clip has; what it cannot buy is a
+// world that is not there yet at 3.2 s. A feedback field, a reaction-diffusion
+// field, a cellular field, a trail-fed attractor and a particle population all
+// keep developing for tens of seconds — warp_ladder's own header records
+// coverage 0.408 at its 30 s row against 0.619 at 300 s — so their cards
+// photograph a world mid-assembly (ADR-0235).
+//
+// The phrase is what makes a late hop a loud one. `dynamic_groove` repeats its
+// 8-beat phrase for as long as the clip runs, so the same position in a later
+// phrase carries the same amplitude:
+//
+//   a beat    0.545 s   26,182 samples   51.14 hops
+//   a phrase  4.36 s   209,456 samples  409.09 hops
+//
+// Hop 300 sits 0.87 of the way into beat 5 of phrase 0 — the loudest beat, amp
+// 0.968. Six phrases later that same point is sample 153,600 + 6x209,456 =
+// 1,410,336, which is hop 2754: beat 53, and 53 = 8x6 + 5, so it is beat 5 of
+// its phrase at the same amplitude and the same position inside it. That is
+// 29.4 s of scene time, the neighbourhood of the 30 s render backlog 0254 read
+// warp_tracery's card against.
+//
+// The swarm family's hop is 2828 rather than 2754, and for the reason its own
+// per-preset entries already record: a swarm is a MOTION and photographs as
+// uniform noise at full energy, so it wants the phrase's quiet bar. Hop 374 is
+// 0.31 into beat 7, the second resting beat; six phrases later that is hop 2828,
+// beat 55 = 8x6 + 7.
+//
+// Neither hop exists in the clip `shot` synthesizes by default: 4 s is 375
+// analysis hops, and a `--frame-at` past the last one fails the run rather than
+// clamping. So an entry whose hop needs a longer clip carries `signalSecs`, and
+// that is the whole of what `--signal-secs` is for (Plan 0210). Lengthening
+// appends phrases rather than re-timing the ones already there, so the hops a
+// 4 s clip had are the same samples in a 30 s one — which is why a card whose
+// hop did not move does not move either.
 
 import { execFileSync } from "node:child_process";
 import { existsSync, rmSync } from "node:fs";
@@ -124,18 +160,69 @@ import { basename, relative, resolve, sep } from "node:path";
 // contents of presets/ and fails when they disagree in either direction --
 // the same shape as `every_system_has_a_gallery_image` above it.
 //
-// The capture settings are deliberately uniform. These cards are read as a
-// grid, against each other, so a per-preset hop would be tuning one thumbnail
-// at the cost of the comparison. The one exception is the swarm family, for the
-// reason the swarm entry above already records: a swarm is a MOTION and
-// photographs as uniform noise at full energy, so all four sit at 374, inside
-// the phrase's quiet bar where the flock settles onto its flow field.
+// The capture settings are uniform WITHIN A FAMILY and the hop is not uniform
+// across them. These cards are read as a grid, against each other, so a
+// PER-PRESET hop would be tuning one thumbnail at the cost of the comparison —
+// but a family that is still assembling its world at 3.2 s photographs as a
+// picture of the assembly, which costs the comparison far more (ADR-0235). So
+// the hop resolves per family, and `CARD_HOP_OVERRIDES` above stays for the
+// per-preset exception and still beats the family's own number.
 //
 // 640x360 rather than the 1280x720 above. A card is displayed at roughly a
 // third of a page column, and over a hundred of them at full size would put tens of
 // megabytes of derived PNG into the repository for detail no reader can see.
 const CARD_SIZE = "640x360";
 const CARD_HOP_OVERRIDES = { swarm_braid: 374, swarm_drift: 374, swarm_shatter: 374, swarm_stipple: 374 };
+
+/// The clip `shot` synthesizes when `--signal-secs` is absent — `SIGNAL_SECS` in
+/// standalone/src/shot/args.rs — and the analysis-hop arithmetic every `hop`
+/// here is an index into. `HOP` is `rlx_core::dsp::HOP_SIZE`; `RATE` is what
+/// `synth_signal_secs` builds every kind at.
+const DEFAULT_SIGNAL_SECS = 4;
+const SIGNAL_RATE = 48_000;
+const SIGNAL_HOP = 512;
+
+/// Analysis hops a clip of `secs` yields — the same floor division `total_hops`
+/// does in standalone/src/shot/film.rs, so an entry this file accepts is an
+/// entry `check_hops` accepts.
+const totalHops = (secs) => Math.floor(Math.round(secs * SIGNAL_RATE) / SIGNAL_HOP);
+
+/// Seconds of signal `hop` needs to exist at all, or `undefined` when the CLI's
+/// own default clip already reaches it.
+///
+/// `undefined` is not a missing setting. It is what keeps `--signal-secs` OFF
+/// the command line, so an entry that does not carry one is rendered by exactly
+/// the command that produced its committed PNG, down to the flag roster.
+const signalSecsFor = (hop) => {
+  const needed = Math.ceil(((hop + 1) * SIGNAL_HOP) / SIGNAL_RATE);
+  return needed > DEFAULT_SIGNAL_SECS ? needed : undefined;
+};
+
+/// A card's hop when the roster above does not name its preset, keyed by the
+/// name prefix a family's worlds share (`reaction_*` is `reaction_diffusion`,
+/// `warp_*` is `warp_mesh`, and so on). A prefix with no row here falls to
+/// [`CARD_HOP`] — the family redraws its picture from the frame it is given and
+/// has nothing to develop.
+///
+/// **The family is the grain, not the preset** (ADR-0235): accumulation is a
+/// property of the system and its feedback configuration, which is how a
+/// per-preset roster grew to four entries covering one family and stopped. The
+/// header above derives both numbers from the phrase.
+const CARD_HOP = 300;
+const CARD_HOP_DEVELOPED = 2754;
+const CARD_HOP_DEVELOPED_IN_THE_LULL = 2828;
+const CARD_FAMILY_HOPS = {
+  attractor: CARD_HOP_DEVELOPED,
+  cellular: CARD_HOP_DEVELOPED,
+  emitter: CARD_HOP_DEVELOPED,
+  reaction: CARD_HOP_DEVELOPED,
+  swarm: CARD_HOP_DEVELOPED_IN_THE_LULL,
+  warp: CARD_HOP_DEVELOPED,
+};
+
+/// Highest precedence first: the per-preset roster, the preset's family, 300.
+const cardHop = (preset) =>
+  CARD_HOP_OVERRIDES[preset] ?? CARD_FAMILY_HOPS[preset.split("_")[0]] ?? CARD_HOP;
 
 /// Every shipped preset, grouped by the system it draws with. The comment on
 /// each group is a count, so a family that gains a preset and not a card is
@@ -554,14 +641,23 @@ const IMAGES = [
   },
 
   // --- the gallery: one card per shipped preset ---------------------------
-  ...CARDS.map((preset) => ({
-    out: `docs/images/gallery/presets/${preset}.png`,
-    presetFile: `presets/${preset}.toml`,
-    signal: "dynamic:110",
-    hop: CARD_HOP_OVERRIDES[preset] ?? 300,
-    size: CARD_SIZE,
-    tier: "rich",
-  })),
+  //
+  // The only entries whose settings are computed rather than written out, and
+  // the two computations are the ones a hand-written number would get wrong:
+  // the hop follows the family, and the clip is whatever that hop needs to
+  // exist in.
+  ...CARDS.map((preset) => {
+    const hop = cardHop(preset);
+    return {
+      out: `docs/images/gallery/presets/${preset}.png`,
+      presetFile: `presets/${preset}.toml`,
+      signal: "dynamic:110",
+      signalSecs: signalSecsFor(hop),
+      hop,
+      size: CARD_SIZE,
+      tier: "rich",
+    };
+  }),
 ];
 
 // ---------------------------------------------------------------------------
@@ -597,6 +693,23 @@ function check(entry, index) {
   }
   if (!Number.isInteger(entry.hop) || entry.hop < 0) {
     throw new Error(`${where}: \`hop\` must be a whole analysis-hop index`);
+  }
+  // `signalSecs` is the one optional field, and absent means "no --signal-secs
+  // on the command line" rather than "not written down" — see `signalSecsFor`.
+  if (entry.signalSecs !== undefined) {
+    if (typeof entry.signalSecs !== "number" || !(entry.signalSecs > 0)) {
+      throw new Error(`${where}: \`signalSecs\` must be a positive number of seconds`);
+    }
+  }
+  // The hop has to exist in the clip this entry asks for. `shot` checks the same
+  // thing and fails the run, but it does so after a renderer is up and a
+  // thousand hops have been advanced; here it costs nothing and names the entry.
+  const secs = entry.signalSecs ?? DEFAULT_SIGNAL_SECS;
+  const hops = totalHops(secs);
+  if (entry.hop >= hops) {
+    throw new Error(
+      `${where}: hop ${entry.hop} is past the end of a ${secs}s clip (${hops} analysis hops)`,
+    );
   }
 }
 
@@ -678,7 +791,8 @@ for (const entry of selected) {
   const where = `manifest entry ${IMAGES.indexOf(entry)} (${entry.out})`;
   console.log(
     `\n${entry.out}\n  ${entry.presetFile} @ hop ${entry.hop}, ` +
-      `${entry.signal}, ${entry.size}, tier ${entry.tier}`,
+      `${entry.signal}${entry.signalSecs ? ` for ${entry.signalSecs}s` : ""}, ` +
+      `${entry.size}, tier ${entry.tier}`,
   );
   try {
     execFileSync(
@@ -687,6 +801,10 @@ for (const entry of selected) {
         "run", "--release", "-p", "standalone", "--example", "shot", "--",
         "--preset-file", entry.presetFile,
         "--signal", entry.signal,
+        // Absent unless the entry's hop needs a longer clip than `shot`'s own
+        // default, so an entry whose hop did not move is rendered by the
+        // command that produced its committed PNG.
+        ...(entry.signalSecs ? ["--signal-secs", String(entry.signalSecs)] : []),
         "--frame-at", String(entry.hop),
         "--size", entry.size,
         "--tier", entry.tier,
